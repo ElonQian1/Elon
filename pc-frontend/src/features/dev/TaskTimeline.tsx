@@ -13,7 +13,7 @@ import {
 import { DevTaskMessage } from './DevTaskCard'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
 import { coverageLabels } from './taskTimelineModel'
-import type { TaskTimelineDiagnostic, TaskTimelineModel, TimelineItem, TimelineItemKind } from './taskTimelineModel'
+import type { TaskTimelineDiagnostic, TaskTimelineModel, TaskTimelineStage, TimelineItem, TimelineItemKind } from './taskTimelineModel'
 import styles from './TaskTimeline.module.css'
 
 interface TaskTimelineProps {
@@ -29,6 +29,7 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
   return (
     <div className={styles.timeline}>
       <CoverageStrip model={model} />
+      <StageCard stage={model.stage} />
       {model.diagnostics.map((diagnostic, index) => (
         <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
       ))}
@@ -57,6 +58,18 @@ function CoverageStrip({ model }: { model: TaskTimelineModel }) {
           {item.label}
         </span>
       ))}
+    </div>
+  )
+}
+
+function StageCard({ stage }: { stage: TaskTimelineStage }) {
+  return (
+    <div className={[styles.stageCard, styles[`tone_${stage.tone}`]].join(' ')} data-stuck={stage.stuck ? 'true' : undefined}>
+      <div>
+        <strong>{stage.label}</strong>
+        {stage.meta && <em>{stage.meta}</em>}
+      </div>
+      <span>{stage.detail}</span>
     </div>
   )
 }

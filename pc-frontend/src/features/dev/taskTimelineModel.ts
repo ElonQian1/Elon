@@ -36,6 +36,7 @@ export interface TaskTimelineModel {
   visibleStepCount: number
   heartbeatCount: number
   lastHeartbeat?: TimelineItem
+  stage: TaskTimelineStage
   coverage: TaskTimelineCoverage
   diagnostics: TaskTimelineDiagnostic[]
 }
@@ -57,6 +58,28 @@ export interface TaskTimelineDiagnostic {
   tone: TaskTone
   title: string
   detail: string
+}
+
+export type TaskTimelineStageKey =
+  | 'empty'
+  | 'dispatch'
+  | 'heartbeat'
+  | 'timeout'
+  | 'command'
+  | 'approval'
+  | 'assistant'
+  | 'artifact'
+  | 'finished'
+  | 'latest'
+
+export interface TaskTimelineStage {
+  key: TaskTimelineStageKey
+  tone: TaskTone
+  label: string
+  detail: string
+  meta?: string
+  summary: string
+  stuck: boolean
 }
 
 export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMessage): TaskTimelineModel {
@@ -129,8 +152,10 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
     lastHeartbeat: latestHeartbeat,
     coverage,
   }
+  const stage = buildCurrentStage(model)
   return {
     ...model,
+    stage,
     diagnostics: buildDiagnostics(model),
   }
 }
@@ -145,6 +170,7 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
   if (model.coverage.heartbeat && !model.coverage.command && !model.coverage.toolResult && !model.coverage.assistantEvent) {
     parts.push('未收到 CLI 输出')
   }
+  if (!model.coverage.finalReply && model.stage.summary) parts.push(model.stage.summary)
   if (shortTaskId || taskId) parts.push(shortTaskId || taskId)
   return parts.join(' · ')
 }
@@ -285,7 +311,7 @@ function isAssistantOutputEvent(event: ToolEvent | null): boolean {
   return event?.type === 'assistant_message' || event?.type === 'assistant_chunk'
 }
 
-function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics'>): TaskTimelineDiagnostic[] {
+function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineDiagnostic[] {
   const diagnostics: TaskTimelineDiagnostic[] = []
   const { coverage } = model
   if (coverage.heartbeat && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
@@ -317,6 +343,146 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics'>): TaskTi
     })
   }
   return diagnostics
+}
+
+function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineStage {
+  const latest = model.items[model.items.length - 1]
+  const timeout = latestRuntimePhase(model.items, 'pc_cli_no_output_timeout')
+  if (timeout) {
+    return {
+      key: 'timeout',
+      tone: 'failed',
+      label: 'CLI 无输出超时',
+      detail: 'PC 节点已停止本轮等待，因为没有收到公开的命令、工具结果、回复片段或完成事件。',
+      meta: timeout.meta,
+      summary: '卡点：CLI 无输出超时',
+      stuck: true,
+    }
+  }
+
+  if (model.coverage.finalReply) {
+    return {
+      key: 'finished',
+      tone: 'done',
+      label: '最终回复已生成',
+      detail: model.coverage.command || model.coverage.toolResult
+        ? '公开过程已经结束，最终回复在下方突出展示。'
+        : '本轮已产生最终回复；如果这是普通问答，没有命令或文件修改是正常的。',
+      summary: '已出最终回复',
+      stuck: false,
+    }
+  }
+
+  if (latest?.kind === 'approval' && latest.tone === 'approval') {
+    return {
+      key: 'approval',
+      tone: 'approval',
+      label: '等待工具审批',
+      detail: 'Codex 已请求执行工具；批准或拒绝前不会继续运行对应工具。',
+      meta: latest.meta,
+      summary: '当前：等待审批',
+      stuck: false,
+    }
+  }
+
+  if (model.coverage.command && !model.coverage.toolResult) {
+    return {
+      key: 'command',
+      tone: 'running',
+      label: '等待命令结果',
+      detail: '前端已看到命令调用，但还没有收到对应结果；通常是命令仍在执行，或 CLI 还没有 flush 工具结果。',
+      meta: latest?.meta,
+      summary: '当前：等待命令结果',
+      stuck: false,
+    }
+  }
+
+  if (model.coverage.heartbeat && !model.coverage.command && !model.coverage.toolResult && !model.coverage.assistantEvent) {
+    const waited = heartbeatWaitSeconds(model.lastHeartbeat)
+    const longWait = waited !== null && waited >= 60
+    return {
+      key: 'heartbeat',
+      tone: longWait ? 'failed' : 'running',
+      label: longWait ? '疑似卡在 CLI 输出前' : '等待 CLI 首次输出',
+      detail: '后端已经派发并持续收到等待心跳，但还没看到命令、文件修改、工具结果或回复片段。',
+      meta: model.lastHeartbeat?.meta,
+      summary: '卡点：CLI 无公开输出',
+      stuck: longWait,
+    }
+  }
+
+  if (model.coverage.dispatch && !model.coverage.heartbeat && !model.coverage.command && !model.coverage.assistantEvent) {
+    return {
+      key: 'dispatch',
+      tone: 'running',
+      label: '等待 PC 节点确认',
+      detail: '任务已经进入本机节点链路；如果长时间只停在这里，优先检查节点连接和 Codex CLI 启动状态。',
+      meta: latest?.meta,
+      summary: '当前：等待节点确认',
+      stuck: false,
+    }
+  }
+
+  if (model.coverage.assistantEvent && !model.coverage.finalReply) {
+    return {
+      key: 'assistant',
+      tone: 'running',
+      label: 'Codex 已有回复片段',
+      detail: '前端已经捕获到 Codex 的公开回复片段，正在等待最终回复或后续工具事件。',
+      summary: '当前：已有回复片段',
+      stuck: false,
+    }
+  }
+
+  if (latest?.kind === 'artifact') {
+    return {
+      key: 'artifact',
+      tone: latest.tone,
+      label: latest.title,
+      detail: latest.detail || '正在处理构建产物和安装入口。',
+      meta: latest.meta,
+      summary: `当前：${latest.title}`,
+      stuck: false,
+    }
+  }
+
+  if (latest) {
+    return {
+      key: 'latest',
+      tone: latest.tone,
+      label: `最后公开步骤：${latest.title}`,
+      detail: latest.detail || '前端已收到这一步公开过程，正在等待后续事件。',
+      meta: latest.meta,
+      summary: `当前：${latest.title}`,
+      stuck: false,
+    }
+  }
+
+  return {
+    key: 'empty',
+    tone: 'queued',
+    label: '等待公开过程',
+    detail: '还没有收到可展示的公开过程事件。',
+    summary: '当前：等待过程',
+    stuck: false,
+  }
+}
+
+function latestRuntimePhase(items: TimelineItem[], phase: string): TimelineItem | undefined {
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index]
+    if (item.event?.type === 'runtime_status' && clean(item.event.phase ?? '').toLowerCase() === phase) {
+      return item
+    }
+  }
+  return undefined
+}
+
+function heartbeatWaitSeconds(item: TimelineItem | undefined): number | null {
+  const value = clean(item?.meta ?? '').match(/([0-9]+)\s*s/i)?.[1]
+  if (!value) return null
+  const seconds = Number(value)
+  return Number.isFinite(seconds) ? seconds : null
 }
 
 export function coverageLabels(coverage: TaskTimelineCoverage): Array<{ key: keyof TaskTimelineCoverage; label: string; active: boolean }> {

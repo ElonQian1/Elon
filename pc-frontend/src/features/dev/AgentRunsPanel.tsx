@@ -107,6 +107,7 @@ export default function AgentRunsPanel({ workspacePath, onDraftContinue }: Omit<
     activeControls: data.activeControls,
     recentTasks: data.recentTasks,
     sidecarSessions: data.sidecarSessions,
+    nowMs: data.loadedAt,
   })
   const hasContent = activeSidecar || overview.views.length || data.runs.length
   if (!hasContent) return (
@@ -204,6 +205,11 @@ function RecoveryItem({
         </div>
         <small>{view.summary}</small>
         {!compact && <p className={styles.recoveryDetail}>{view.detail}</p>}
+        <div className={styles.recoveryStage} data-tone={view.stageTone} data-stale={view.stale ? 'true' : undefined}>
+          <strong>{view.stageTitle}</strong>
+          {view.stageMeta && <span>{view.stageMeta}</span>}
+        </div>
+        {!compact && <p className={styles.recoveryStageDetail}>{view.stageDetail}</p>}
         <div className={styles.recoveryFacts}>
           {view.facts.slice(0, compact ? 4 : 8).map((fact) => (
             <span key={`${fact.label}:${fact.value}`} data-tone={fact.tone || undefined}>

@@ -203,9 +203,13 @@ try {
   );
   assert.strictEqual(
     timelineSummary(timeline, 'tsk-heartbeat', 'tsk_hear...'),
-    '5 步过程 · 合并 2 条等待状态 · 未收到 CLI 输出 · tsk_hear...',
-    'timeline summary should expose compacted wait states and missing CLI output',
+    '5 步过程 · 合并 2 条等待状态 · 未收到 CLI 输出 · 卡点：CLI 无公开输出 · tsk_hear...',
+    'timeline summary should expose compacted wait states, missing CLI output, and the current stall point',
   );
+  assert.strictEqual(timeline.stage.key, 'heartbeat', 'heartbeat-only timeline should identify the CLI-output stall stage');
+  assert.strictEqual(timeline.stage.label, '疑似卡在 CLI 输出前', 'long heartbeat waits should be called out as a likely stall');
+  assert.strictEqual(timeline.stage.meta, '已等待 90s', 'stage should carry the latest wait duration');
+  assert.strictEqual(timeline.stage.stuck, true, 'long heartbeat-only waits should be marked as stuck');
   assert.strictEqual(timeline.coverage.heartbeat, true, 'waiting should be visible in coverage');
   assert.strictEqual(timeline.coverage.command, false, 'pure waiting should not pretend command output exists');
   assert.ok(
@@ -236,9 +240,10 @@ try {
   );
   assert.strictEqual(
     timelineSummary(validationTimeline, 'tsk-validation', 'tsk_val...'),
-    '2 步过程 · 有命令 · 有测试/构建 · tsk_val...',
+    '2 步过程 · 有命令 · 有测试/构建 · 当前：验证完成 · tsk_val...',
     'summary should mention command and validation coverage',
   );
+  assert.strictEqual(validationTimeline.stage.label, '最后公开步骤：验证完成', 'completed validation output should become the current public stage');
 
   const liveRecovery = recoveryViewFromEntry({
     task_id: 'tsk_live_1234567890',
@@ -256,7 +261,23 @@ try {
   });
   assert.strictEqual(liveRecovery.canCancel, true, 'live control recovery should expose stop action');
   assert.strictEqual(liveRecovery.canContinue, false, 'live control should wait/cancel instead of snapshot continue');
+  assert.strictEqual(liveRecovery.stageTitle, '本机正在执行', 'live control should explain the current execution stage');
   assert.ok(liveRecovery.facts.some((fact) => fact.value === '可停止'), 'live recovery facts should say the task can be stopped');
+
+  const staleLiveRecovery = recoveryViewFromEntry({
+    task_id: 'tsk_stale_live_1234567890',
+    cli_name: 'Codex',
+    route: 'route_a',
+    status: 'running',
+    recommended_action: 'wait_or_cancel',
+    can_cancel: true,
+    last_heartbeat_ms: 1_000,
+    now_ms: 75_000,
+  });
+  assert.strictEqual(staleLiveRecovery.stageTitle, '疑似卡在本机节点', 'stale live control should identify the likely stuck point');
+  assert.strictEqual(staleLiveRecovery.stageTone, 'failed', 'stale live control should use a warning tone');
+  assert.strictEqual(staleLiveRecovery.stageMeta, '1分钟前', 'stale live control should show how old the heartbeat is');
+  assert.ok(staleLiveRecovery.facts.some((fact) => fact.label === '心跳' && fact.tone === 'failed'), 'stale heartbeat should be visible as a failed fact');
 
   const detachedRecovery = recoveryViewFromTask({
     task_id: 'tsk_detached_1234567890',

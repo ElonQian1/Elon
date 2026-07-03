@@ -17,6 +17,11 @@ export interface RecoveryView {
   tone: RecoveryTone
   summary: string
   detail: string
+  stageTitle: string
+  stageDetail: string
+  stageTone: RecoveryTone
+  stageMeta: string
+  stale: boolean
   actionLabel: string
   canCancel: boolean
   canContinue: boolean
@@ -43,14 +48,17 @@ export interface AgentRunParallelInput {
   activeControls?: Record<string, unknown>[]
   recentTasks?: Record<string, unknown>[]
   sidecarSessions?: unknown[]
+  nowMs?: number
 }
 
 export function buildAgentRunParallelOverview(input: AgentRunParallelInput): AgentRunParallelOverview {
   const candidates: RecoveryView[] = []
-  if (input.recoveryEntry) candidates.push(recoveryViewFromEntry(input.recoveryEntry))
+  const nowMs = finiteNumber(input.nowMs)
+  if (input.recoveryEntry) candidates.push(recoveryViewFromEntry(withNow(input.recoveryEntry, nowMs)))
   for (const control of input.activeControls ?? []) {
     candidates.push(recoveryViewFromEntry({
       ...control,
+      ...(nowMs !== null ? { now_ms: nowMs } : {}),
       status: 'running',
       recommended_action: 'wait_or_cancel',
       reason: '当前本机节点仍持有运行控制句柄，PC 端可以继续观察或停止任务。',
@@ -64,6 +72,9 @@ export function buildAgentRunParallelOverview(input: AgentRunParallelInput): Age
       task_id: session.task_id ?? session.taskId ?? session.session_id ?? session.sessionId,
       cli_name: session.cli_name ?? session.cliName ?? 'agent',
       route: session.route,
+      started_at_ms: session.started_at_ms ?? session.startedAtMs,
+      updated_at_ms: session.last_seen_at_ms ?? session.lastSeenAtMs,
+      ...(nowMs !== null ? { now_ms: nowMs } : {}),
       status: 'sidecar_recoverable',
       recommended_action: 'attach_sidecar',
       reason: '该任务仍有一龙 sidecar 会话记录，可以优先重接 sidecar 或回放输出。',
@@ -78,7 +89,7 @@ export function buildAgentRunParallelOverview(input: AgentRunParallelInput): Age
       },
     }))
   }
-  for (const task of input.recentTasks ?? []) candidates.push(recoveryViewFromTask(task))
+  for (const task of input.recentTasks ?? []) candidates.push(recoveryViewFromTask(withNow(task, nowMs)))
 
   const byTask = new Map<string, RecoveryView>()
   for (const view of candidates) {
@@ -137,15 +148,23 @@ export function recoveryViewFromEntry(entry: Record<string, unknown>): RecoveryV
   const canContinue = Boolean(entry.can_continue ?? entry.canContinue) || action === 'continue_from_snapshot'
   const actionLabel = recoveryActionLabel(action)
   const tone = recoveryTone(status, canCancel, canContinue)
-  const facts = recoveryFacts({ status, action, route, cwd, tty, resume, attach, approval, canCancel, canContinue })
+  const category = recoveryCategory(status, action, canCancel, canContinue)
+  const temporal = recoveryTemporal(entry)
+  const stage = recoveryStage({ status, action, category, canCancel, canContinue, temporal })
+  const facts = recoveryFacts({ status, action, route, cwd, tty, resume, attach, approval, canCancel, canContinue, temporal, stale: stage.stale })
   return {
     taskId,
     title: shortRunId(taskId || cliName),
     badge: recoveryBadge(status, action, canCancel, canContinue),
-    category: recoveryCategory(status, action, canCancel, canContinue),
+    category,
     tone,
     summary: [cliName, route, actionLabel].filter(Boolean).join(' · '),
     detail: reason || recoveryDefaultReason(status, action),
+    stageTitle: stage.title,
+    stageDetail: stage.detail,
+    stageTone: stage.tone,
+    stageMeta: stage.meta,
+    stale: stage.stale,
     actionLabel,
     canCancel,
     canContinue,
@@ -210,12 +229,19 @@ function recoveryFacts(input: {
   approval: Record<string, unknown>
   canCancel: boolean
   canContinue: boolean
+  temporal: RecoveryTemporal
+  stale: boolean
 }): RecoveryFact[] {
   const facts: RecoveryFact[] = []
   const attachStatus = clean(input.attach.status ?? input.status)
   if (attachStatus) facts.push({ label: '现场', value: attachStatusLabel(attachStatus), tone: attachTone(attachStatus) })
   facts.push({ label: '下一步', value: recoveryActionLabel(input.action), tone: input.canContinue ? 'running' : 'muted' })
   facts.push({ label: '停止', value: input.canCancel ? '可停止' : '不可停止', tone: input.canCancel ? 'running' : 'muted' })
+  if (input.temporal.heartbeatLabel) {
+    facts.push({ label: '心跳', value: input.temporal.heartbeatLabel, tone: input.stale ? 'failed' : 'running' })
+  } else if (input.temporal.updatedLabel) {
+    facts.push({ label: '更新', value: input.temporal.updatedLabel, tone: input.stale ? 'failed' : 'muted' })
+  }
   if (clean(input.resume.can_replay_journal_events ?? input.resume.canReplayJournalEvents)) {
     facts.push({ label: 'journal', value: '可回放', tone: 'done' })
   }
@@ -301,6 +327,110 @@ function recoveryCategory(status: string, action: string, canCancel: boolean, ca
   return 'other'
 }
 
+interface RecoveryTemporal {
+  nowMs: number | null
+  updatedAtMs: number | null
+  heartbeatAtMs: number | null
+  ageMs: number | null
+  heartbeatAgeMs: number | null
+  updatedLabel: string
+  heartbeatLabel: string
+}
+
+interface RecoveryStageView {
+  title: string
+  detail: string
+  tone: RecoveryTone
+  meta: string
+  stale: boolean
+}
+
+function recoveryTemporal(entry: Record<string, unknown>): RecoveryTemporal {
+  const nowMs = firstNumberField(entry, ['now_ms', 'nowMs'])
+  const updatedAtMs = firstNumberField(entry, ['updated_at_ms', 'updatedAtMs', 'last_seen_at_ms', 'lastSeenAtMs'])
+  const heartbeatAtMs = firstNumberField(entry, ['last_heartbeat_ms', 'lastHeartbeatMs'])
+  const ageMs = nowMs !== null && updatedAtMs !== null ? Math.max(0, nowMs - updatedAtMs) : null
+  const heartbeatAgeMs = nowMs !== null && heartbeatAtMs !== null ? Math.max(0, nowMs - heartbeatAtMs) : null
+  return {
+    nowMs,
+    updatedAtMs,
+    heartbeatAtMs,
+    ageMs,
+    heartbeatAgeMs,
+    updatedLabel: ageMs !== null ? formatAge(ageMs) : '',
+    heartbeatLabel: heartbeatAgeMs !== null ? formatAge(heartbeatAgeMs) : '',
+  }
+}
+
+function recoveryStage(input: {
+  status: string
+  action: string
+  category: RecoveryCategory
+  canCancel: boolean
+  canContinue: boolean
+  temporal: RecoveryTemporal
+}): RecoveryStageView {
+  const status = clean(input.status).toLowerCase()
+  const ageMs = input.temporal.heartbeatAgeMs ?? input.temporal.ageMs
+  const ageLabel = input.temporal.heartbeatLabel || input.temporal.updatedLabel
+  const stale = input.category === 'active' && ageMs !== null && ageMs >= 60_000
+
+  if (input.category === 'sidecar') {
+    return {
+      title: 'sidecar 可重接',
+      detail: '这个任务仍有 sidecar 会话记录，优先查看终端回放或重接控制面。',
+      tone: 'running',
+      meta: ageLabel,
+      stale: false,
+    }
+  }
+  if (stale) {
+    return {
+      title: '疑似卡在本机节点',
+      detail: '本机仍有运行控制句柄，但最近心跳已经超过 60 秒没有更新；优先检查节点连接、CLI 输出或直接停止任务。',
+      tone: 'failed',
+      meta: ageLabel,
+      stale: true,
+    }
+  }
+  if (input.category === 'active') {
+    return {
+      title: '本机正在执行',
+      detail: input.canCancel
+        ? 'PC 节点仍持有控制句柄，可以继续观察；如果长时间没有公开输出，可以停止。'
+        : 'PC 节点仍显示任务在运行，但当前没有可用停止句柄。',
+      tone: 'running',
+      meta: ageLabel,
+      stale: false,
+    }
+  }
+  if (input.category === 'continue') {
+    return {
+      title: '需要新任务继续',
+      detail: '原任务已经不能原地接管，需要基于 journal、快照和工作区状态开启新一轮。',
+      tone: 'running',
+      meta: ageLabel,
+      stale: false,
+    }
+  }
+  if (input.category === 'terminal') {
+    return {
+      title: ['failed', 'error'].includes(status) ? '最近任务失败' : '最近任务已结束',
+      detail: '这是最近的终态任务记录，可用于判断上一轮是否已经结束。',
+      tone: ['failed', 'error'].includes(status) ? 'failed' : 'done',
+      meta: ageLabel,
+      stale: false,
+    }
+  }
+  return {
+    title: recoveryActionLabel(input.action),
+    detail: '当前只有基础恢复信息，先刷新任务现场或查看 journal。',
+    tone: input.canContinue ? 'running' : 'muted',
+    meta: ageLabel,
+    stale: false,
+  }
+}
+
 function viewKey(view: RecoveryView): string {
   return clean(view.taskId || view.title).toLowerCase()
 }
@@ -341,4 +471,29 @@ function attachTone(status: string): RecoveryTone {
 
 function objectOf(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function withNow(entry: Record<string, unknown>, nowMs: number | null): Record<string, unknown> {
+  return nowMs === null ? entry : { ...entry, now_ms: nowMs }
+}
+
+function firstNumberField(entry: Record<string, unknown>, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = finiteNumber(entry[key])
+    if (value !== null) return value
+  }
+  return null
+}
+
+function finiteNumber(value: unknown): number | null {
+  const num = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(num) && num > 0 ? num : null
+}
+
+function formatAge(ageMs: number): string {
+  if (ageMs < 5_000) return '刚刚'
+  if (ageMs < 60_000) return `${Math.floor(ageMs / 1_000)}秒前`
+  if (ageMs < 3_600_000) return `${Math.floor(ageMs / 60_000)}分钟前`
+  if (ageMs < 86_400_000) return `${Math.floor(ageMs / 3_600_000)}小时前`
+  return `${Math.floor(ageMs / 86_400_000)}天前`
 }

@@ -162,6 +162,62 @@
   line-height: 1.45;
 }
 
+.recoveryStage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: 100%;
+  min-height: 22px;
+  border: 1px solid rgba(78,205,196,.22);
+  border-radius: 5px;
+  padding: 0 7px;
+  background: rgba(78,205,196,.07);
+}
+
+.recoveryStage strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.recoveryStage span {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.recoveryStage[data-tone="failed"] {
+  border-color: rgba(220, 80, 80, .28);
+  background: rgba(220, 80, 80, .08);
+}
+
+.recoveryStage[data-tone="failed"] strong {
+  color: #ff9999;
+}
+
+.recoveryStage[data-tone="done"] {
+  border-color: rgba(113, 214, 155, .22);
+  background: rgba(113, 214, 155, .06);
+}
+
+.recoveryStage[data-tone="done"] strong {
+  color: #71d69b;
+}
+
+.recoveryStageDetail {
+  margin: -1px 0 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .recoveryFacts {
   display: flex;
   flex-wrap: wrap;

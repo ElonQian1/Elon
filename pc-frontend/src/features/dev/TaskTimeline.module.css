@@ -30,6 +30,58 @@
   background: rgba(88, 101, 242, .12);
 }
 
+.stageCard {
+  display: grid;
+  gap: 5px;
+  margin: 0 0 8px 28px;
+  border: 1px solid rgba(88, 101, 242, .22);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: rgba(88, 101, 242, .075);
+}
+
+.stageCard > div {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.stageCard strong {
+  color: #d8e3f7;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.stageCard em {
+  color: var(--text-muted);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.stageCard span {
+  color: #a9b8d1;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.stageCard.tone_failed {
+  border-color: rgba(218, 55, 60, .25);
+  background: rgba(218, 55, 60, .075);
+}
+
+.stageCard.tone_done {
+  border-color: rgba(43, 213, 118, .22);
+  background: rgba(35, 165, 90, .065);
+}
+
+.stageCard.tone_approval {
+  border-color: rgba(255, 209, 102, .26);
+  background: rgba(255, 209, 102, .075);
+}
+
 .diagnostic {
   display: grid;
   gap: 4px;

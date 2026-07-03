@@ -95,6 +95,9 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
             >
               <span className={styles.processDot} />
               <span className={styles.processLabel}>{status.label}</span>
+              <span className={styles.processStage} data-tone={timeline.stage.tone}>
+                {timeline.stage.label}{timeline.stage.meta ? ` · ${timeline.stage.meta}` : ''}
+              </span>
               <span className={styles.processMeta}>
                 {collapsed ? `查看 ${processSummary || `${progressCount} 步过程`}` : `收起过程${processSummary ? ` · ${processSummary}` : ''}`}
               </span>
