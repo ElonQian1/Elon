@@ -66,7 +66,6 @@ internal class MyNodesCard(
         statusPill.setTextColor(Color.parseColor("#8DDC9B"))
         (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#16251A"))
         statusPill.visibility = View.VISIBLE
-        nodeListContainer.removeAllViews()
 
         val ctx = activity.applicationContext
         thread(name = "my-nodes-card") {
@@ -76,6 +75,7 @@ internal class MyNodesCard(
                 result
                     .onSuccess { nodes ->
                         setRefreshLoading(false)
+                        nodeListContainer.removeAllViews()
                         if (nodes.isEmpty()) {
                             statusPill.text = "无节点"
                             statusPill.setTextColor(Color.parseColor("#777777"))
@@ -242,10 +242,6 @@ internal class MyNodesCard(
                         text = "刷新"
                         textSize = 11f
                         setTextColor(Color.parseColor("#8DDC9B"))
-                        background = GradientDrawable().apply {
-                            setColor(Color.parseColor("#16251A"))
-                            cornerRadius = dp(8).toFloat()
-                        }
                         isClickable = true
                         isFocusable = true
                         contentDescription = "刷新我的节点状态"

@@ -1906,13 +1906,52 @@
     .profile-node-resource-panel {
       background: var(--panel);
       border-radius: 8px;
-      padding: 18px 22px;
+      padding: 8px 22px;
       margin-top: 10px;
+    }
+    .profile-node-resource-header {
+      width: 100%;
+      min-height: 56px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0;
+      text-align: left;
+      cursor: pointer;
+    }
+    .profile-node-resource-title-block {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
     .profile-node-resource-title {
       font-size: 16px;
       font-weight: 700;
       color: var(--ink);
+    }
+    .profile-node-resource-hint {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      color: var(--ink-dim);
+    }
+    .profile-node-resource-toggle {
+      min-width: 48px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 13px;
+      flex-shrink: 0;
     }
     .profile-node-resource-panel .node-balance-card {
       background: transparent;
@@ -2109,16 +2148,17 @@
     .my-nodes-status.online { color: var(--accent); background: var(--badge-info-bg); }
     .my-nodes-status.offline { color: var(--ink-faint); background: var(--panel); }
     .my-nodes-refresh {
-      min-width: 56px;
+      min-width: 48px;
       min-height: 40px;
       border: 0;
-      border-radius: 8px;
-      background: var(--badge-info-bg);
+      border-radius: 6px;
+      background: transparent;
       color: var(--badge-info-ink);
       font-size: 11px;
       cursor: pointer;
-      padding: 0 12px;
+      padding: 0 8px;
     }
+    .my-nodes-refresh:hover { background: rgba(88, 190, 106, 0.08); }
     .my-nodes-refresh:disabled {
       cursor: default;
       opacity: 0.55;
@@ -3239,74 +3279,82 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       </div>
 
       <div class="profile-node-resource-panel" id="profileNodeResourcePanel">
-        <div class="profile-node-resource-title">PC 节点资源</div>
+        <button class="profile-node-resource-header" id="profileNodeResourceToggle" type="button" aria-expanded="false">
+          <span class="profile-node-resource-title-block">
+            <span class="profile-node-resource-title">PC 节点资源</span>
+            <span class="profile-node-resource-hint" id="profileNodeResourceHint">积分、全站节点、我的节点</span>
+          </span>
+          <span class="profile-node-resource-toggle" id="profileNodeResourceArrow" aria-hidden="true">展开</span>
+        </button>
 
-        <!-- 节点积分内联卡片 -->
-        <div class="node-balance-card" id="nodeBalanceCard">
-          <div class="node-balance-header">
-            <span class="node-balance-title">节点积分</span>
-            <span class="node-balance-status" id="nodeBalanceStatus">加载中…</span>
-          </div>
-          <div class="node-balance-metrics">
-            <div class="node-balance-metric">
-              <label>可用余额</label>
-              <span class="val" id="nodeBalanceVal">—</span>
+        <div class="profile-node-resource-body hidden" id="profileNodeResourceBody">
+          <!-- 节点积分内联卡片 -->
+          <div class="node-balance-card" id="nodeBalanceCard">
+            <div class="node-balance-header">
+              <span class="node-balance-title">节点积分</span>
+              <span class="node-balance-status" id="nodeBalanceStatus">加载中…</span>
             </div>
-            <div class="node-balance-metric">
-              <label>累计收益</label>
-              <span class="val" id="nodeLifetimeVal">—</span>
+            <div class="node-balance-metrics">
+              <div class="node-balance-metric">
+                <label>可用余额</label>
+                <span class="val" id="nodeBalanceVal">—</span>
+              </div>
+              <div class="node-balance-metric">
+                <label>累计收益</label>
+                <span class="val" id="nodeLifetimeVal">—</span>
+              </div>
+              <div class="node-balance-metric">
+                <label>提现处理中</label>
+                <span class="val" id="nodePendingPayoutVal">—</span>
+              </div>
             </div>
-            <div class="node-balance-metric">
-              <label>提现处理中</label>
-              <span class="val" id="nodePendingPayoutVal">—</span>
+            <div class="node-balance-cta-row">
+              <span class="node-balance-cta" onclick="openNodeMarketDialog()">查看在线 PC 节点  →</span>
+              <span class="node-payout-actions">
+                <span class="node-balance-payout-btn" onclick="openNodePayoutDialog()">申请提现</span>
+                <span class="node-balance-tx-btn" onclick="openNodePayoutsDialog()">提现记录</span>
+                <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
+              </span>
             </div>
           </div>
-          <div class="node-balance-cta-row">
-            <span class="node-balance-cta" onclick="openNodeMarketDialog()">查看在线 PC 节点  →</span>
-            <span class="node-payout-actions">
-              <span class="node-balance-payout-btn" onclick="openNodePayoutDialog()">申请提现</span>
-              <span class="node-balance-tx-btn" onclick="openNodePayoutsDialog()">提现记录</span>
-              <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
-            </span>
-          </div>
-        </div>
 
-        <!-- 全站 PC 节点概览卡片 -->
-        <div class="node-directory-card" id="nodeDirectoryCard" onclick="openNodeMarketDialog()">
-          <div class="node-directory-header">
-            <span class="node-directory-title">全站 PC 节点</span>
-            <span class="node-directory-status" id="nodeDirectoryStatus">加载中…</span>
-          </div>
-          <div class="node-directory-metrics">
-            <div class="node-directory-metric">
-              <label>在线节点</label>
-              <span class="val" id="nodeDirectoryOnlineVal">—</span>
+          <!-- 全站 PC 节点概览卡片 -->
+          <div class="node-directory-card" id="nodeDirectoryCard" onclick="openNodeMarketDialog()">
+            <div class="node-directory-header">
+              <span class="node-directory-title">全站 PC 节点</span>
+              <span class="node-directory-status" id="nodeDirectoryStatus">加载中…</span>
             </div>
-            <div class="node-directory-metric">
-              <label>可接项目</label>
-              <span class="val" id="nodeDirectoryReadyVal">—</span>
+            <div class="node-directory-metrics">
+              <div class="node-directory-metric">
+                <label>在线节点</label>
+                <span class="val" id="nodeDirectoryOnlineVal">—</span>
+              </div>
+              <div class="node-directory-metric">
+                <label>可接项目</label>
+                <span class="val" id="nodeDirectoryReadyVal">—</span>
+              </div>
+              <div class="node-directory-metric">
+                <label>可用模型</label>
+                <span class="val" id="nodeDirectoryModelsVal">—</span>
+              </div>
             </div>
-            <div class="node-directory-metric">
-              <label>可用模型</label>
-              <span class="val" id="nodeDirectoryModelsVal">—</span>
+            <div class="node-directory-preview" id="nodeDirectoryPreview">
+              <div class="node-directory-empty">加载中…</div>
             </div>
+            <span class="node-directory-cta">进入 PC 节点大厅  →</span>
           </div>
-          <div class="node-directory-preview" id="nodeDirectoryPreview">
-            <div class="node-directory-empty">加载中…</div>
-          </div>
-          <span class="node-directory-cta">进入 PC 节点大厅  →</span>
-        </div>
 
-        <!-- 我的节点状态卡片 -->
-        <div class="my-nodes-card" id="myNodesCard">
-          <div class="my-nodes-header">
-            <span class="my-nodes-title">我的节点</span>
-            <span class="my-nodes-actions">
-              <span class="my-nodes-status" id="myNodesStatus">加载中…</span>
-              <button class="my-nodes-refresh" id="myNodesRefreshBtn" type="button">刷新</button>
-            </span>
+          <!-- 我的节点状态卡片 -->
+          <div class="my-nodes-card" id="myNodesCard">
+            <div class="my-nodes-header">
+              <span class="my-nodes-title">我的节点</span>
+              <span class="my-nodes-actions">
+                <span class="my-nodes-status" id="myNodesStatus">加载中…</span>
+                <button class="my-nodes-refresh" id="myNodesRefreshBtn" type="button">刷新</button>
+              </span>
+            </div>
+            <div id="myNodesList"></div>
           </div>
-          <div id="myNodesList"></div>
         </div>
       </div>
 
@@ -3991,6 +4039,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let groupSummaryPosts = [];
   let groupSummaryRefreshTimer = null;
   let currentTab = 'chatPage';
+  let nodeResourceExpanded = false;
   let socket = null;
   let appSocket = null;
   let busy = false;
@@ -4745,9 +4794,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (tabId === 'profilePage') {
       refreshDownloadPage();
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
-      loadNodeBalance().catch((e) => console.warn('loadNodeBalance failed:', e));
-      loadNodeDirectory().catch((e) => console.warn('loadNodeDirectory failed:', e));
-      loadMyNodes().catch((e) => console.warn('loadMyNodes failed:', e));
+      renderNodeResourcePanel();
+      if (nodeResourceExpanded) {
+        loadNodeResourcePanel().catch((e) => console.warn('loadNodeResourcePanel failed:', e));
+      }
       loadMemories().catch((e) => console.warn('loadMemories failed:', e));
     }
   }
@@ -8162,6 +8212,39 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   // ====== 节点积分内联卡片 ======
+  function renderNodeResourcePanel() {
+    const body = document.getElementById('profileNodeResourceBody');
+    const toggle = document.getElementById('profileNodeResourceToggle');
+    const hint = document.getElementById('profileNodeResourceHint');
+    const arrow = document.getElementById('profileNodeResourceArrow');
+    if (body) body.classList.toggle('hidden', !nodeResourceExpanded);
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', nodeResourceExpanded ? 'true' : 'false');
+      toggle.setAttribute('aria-label', nodeResourceExpanded ? '收起 PC 节点资源' : '展开 PC 节点资源');
+    }
+    if (hint) hint.textContent = nodeResourceExpanded ? '节点积分、全站节点、我的节点' : '积分、全站节点、我的节点';
+    if (arrow) arrow.textContent = nodeResourceExpanded ? '收起' : '展开';
+  }
+
+  async function loadNodeResourcePanel() {
+    const results = await Promise.allSettled([
+      loadNodeBalance(),
+      loadNodeDirectory(),
+      loadMyNodes()
+    ]);
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) throw failed.reason || new Error('node resource refresh failed');
+  }
+
+  function setNodeResourceExpanded(expanded, refresh = false) {
+    const shouldRefresh = !!expanded && (!nodeResourceExpanded || refresh);
+    nodeResourceExpanded = !!expanded;
+    renderNodeResourcePanel();
+    if (shouldRefresh) {
+      loadNodeResourcePanel().catch((e) => console.warn('loadNodeResourcePanel failed:', e));
+    }
+  }
+
   async function loadNodeBalance() {
     const statusEl = document.getElementById('nodeBalanceStatus');
     const balEl    = document.getElementById('nodeBalanceVal');
@@ -8358,6 +8441,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   aiSettingsRow.addEventListener('click', openAgentDialog);
   modelBtn.addEventListener('click', openAgentDialog);
   if (nodeMarketRow) nodeMarketRow.addEventListener('click', openNodeMarketDialog);
+  const profileNodeResourceToggle = $('profileNodeResourceToggle');
+  if (profileNodeResourceToggle) {
+    profileNodeResourceToggle.addEventListener('click', () => {
+      setNodeResourceExpanded(!nodeResourceExpanded);
+    });
+  }
   const myNodesRefreshBtn = $('myNodesRefreshBtn');
   if (myNodesRefreshBtn) {
     myNodesRefreshBtn.addEventListener('click', (event) => {

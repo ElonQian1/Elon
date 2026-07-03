@@ -671,36 +671,84 @@
                     android:background="@drawable/bg_profile_node_resource_panel"
                     android:orientation="vertical"
                     android:paddingStart="22dp"
-                    android:paddingTop="18dp"
+                    android:paddingTop="8dp"
                     android:paddingEnd="22dp"
-                    android:paddingBottom="18dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:includeFontPadding="false"
-                        android:text="PC 节点资源"
-                        android:textColor="@color/elon_text_primary"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
+                    android:paddingBottom="8dp">
 
                     <LinearLayout
-                        android:id="@+id/profileNodeBalanceContainer"
+                        android:id="@+id/profileNodeResourceHeader"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:layout_height="56dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:includeFontPadding="false"
+                                android:text="PC 节点资源"
+                                android:textColor="@color/elon_text_primary"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/profileNodeResourceHint"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:ellipsize="end"
+                                android:includeFontPadding="false"
+                                android:maxLines="1"
+                                android:text="积分、全站节点、我的节点"
+                                android:textColor="@color/elon_text_tertiary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <TextView
+                            android:id="@+id/profileNodeResourceArrow"
+                            android:layout_width="wrap_content"
+                            android:layout_height="48dp"
+                            android:gravity="center"
+                            android:includeFontPadding="false"
+                            android:minWidth="48dp"
+                            android:text="展开"
+                            android:textColor="@color/elon_accent_primary"
+                            android:textSize="13sp" />
+                    </LinearLayout>
 
                     <LinearLayout
-                        android:id="@+id/profileNodeDirectoryContainer"
+                        android:id="@+id/profileNodeResourceContent"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        android:orientation="vertical"
+                        android:visibility="gone">
 
-                    <LinearLayout
-                        android:id="@+id/profileMyNodesContainer"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
+                        <LinearLayout
+                            android:id="@+id/profileNodeBalanceContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+
+                        <LinearLayout
+                            android:id="@+id/profileNodeDirectoryContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+
+                        <LinearLayout
+                            android:id="@+id/profileMyNodesContainer"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout

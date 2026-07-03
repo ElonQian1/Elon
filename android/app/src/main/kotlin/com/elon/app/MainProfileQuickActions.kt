@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
@@ -41,6 +42,7 @@ internal class MainProfileQuickActions(
     }
     private val myNodesCard by lazy { MyNodesCard(activity, binding, http, serverUrl) }
     private val userMemoriesCard by lazy { UserMemoriesCard(activity, binding, http, serverUrl) }
+    private var nodeResourceExpanded = false
 
     fun setupQuickActions() {
         MainQuickActionBindings(
@@ -57,6 +59,7 @@ internal class MainProfileQuickActions(
             confirmLogout = confirmLogout,
             openNodeMarket = { nodeMarketSheet.show() }
         ).setupQuickActions()
+        setupNodeResourcePanel()
         refreshAccountUi()
         refreshProfileSummary()
         binding.profileVersionText.text =
@@ -68,9 +71,10 @@ internal class MainProfileQuickActions(
         if (isBindingInitialized()) {
             UserProfileViews.renderSummary(activity, binding, openProfileDetails)
             tokenUsageCard.attachAndRefresh()
-            nodeBalanceCard.attachAndRefresh()
-            nodeDirectoryCard.attachAndRefresh()
-            myNodesCard.attachAndRefresh()
+            renderNodeResourcePanel()
+            if (nodeResourceExpanded) {
+                refreshNodeResourceCards()
+            }
             userMemoriesCard.attachAndRefresh()
         }
     }
@@ -85,5 +89,34 @@ internal class MainProfileQuickActions(
                 }
             }
         }.start()
+    }
+
+    private fun setupNodeResourcePanel() {
+        binding.profileNodeResourceHeader.setOnClickListener {
+            nodeResourceExpanded = !nodeResourceExpanded
+            renderNodeResourcePanel()
+            if (nodeResourceExpanded) {
+                refreshNodeResourceCards()
+            }
+        }
+        renderNodeResourcePanel()
+    }
+
+    private fun renderNodeResourcePanel() {
+        binding.profileNodeResourceContent.visibility =
+            if (nodeResourceExpanded) View.VISIBLE else View.GONE
+        binding.profileNodeResourceHint.text =
+            if (nodeResourceExpanded) "节点积分、全站节点、我的节点"
+            else "积分、全站节点、我的节点"
+        binding.profileNodeResourceArrow.text =
+            if (nodeResourceExpanded) "收起" else "展开"
+        binding.profileNodeResourceHeader.contentDescription =
+            if (nodeResourceExpanded) "收起 PC 节点资源" else "展开 PC 节点资源"
+    }
+
+    private fun refreshNodeResourceCards() {
+        nodeBalanceCard.attachAndRefresh()
+        nodeDirectoryCard.attachAndRefresh()
+        myNodesCard.attachAndRefresh()
     }
 }
