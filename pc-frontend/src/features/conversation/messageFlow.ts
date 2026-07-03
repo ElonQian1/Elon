@@ -95,31 +95,19 @@ export function buildDisplayMessages(input: {
 }
 
 export function hasRunningTask(messages: Message[]): boolean {
-  const taskIds = new Set<string>()
-  const doneIds = new Set<string>()
-  let latestOpenTaskId = ''
-
-  for (const message of messages) {
-    const kind = messageKind(message)
-    const taskId = messageTaskId(message)
-    if (taskId && (kind === 'ai_task' || isConversationUserTaskMessage(message))) {
-      taskIds.add(taskId)
-      latestOpenTaskId = taskId
-    }
-    if (taskId && isTaskTerminalMessage(message)) {
-      taskIds.add(taskId)
-      doneIds.add(taskId)
-      if (latestOpenTaskId === taskId) latestOpenTaskId = ''
-      continue
-    }
-    if (!taskId && latestOpenTaskId && isConversationAssistantTaskMessage(message) && !isAssistantProgressDisplay(message)) {
-      doneIds.add(latestOpenTaskId)
-      latestOpenTaskId = ''
-    }
-  }
+  const { taskIds, doneIds } = collectTaskReplyState(messages)
 
   for (const taskId of taskIds) {
     if (!doneIds.has(taskId)) return true
+  }
+  return false
+}
+
+export function hasRunningTaskAwaitingVisibleReply(messages: Message[]): boolean {
+  const { taskIds, doneIds, repliedIds } = collectTaskReplyState(messages)
+
+  for (const taskId of taskIds) {
+    if (!doneIds.has(taskId) && !repliedIds.has(taskId)) return true
   }
   return false
 }
@@ -156,6 +144,43 @@ export function buildMessageGroups(messages: Message[], taskFlowEnabled: boolean
   })
 
   return groups
+}
+
+function collectTaskReplyState(messages: Message[]) {
+  const taskIds = new Set<string>()
+  const doneIds = new Set<string>()
+  const repliedIds = new Set<string>()
+  let latestOpenTaskId = ''
+
+  for (const message of messages) {
+    const kind = messageKind(message)
+    const taskId = messageTaskId(message)
+    const assistantProgressTaskId = assistantProgressSourceTaskId(message)
+    if (assistantProgressTaskId) {
+      taskIds.add(assistantProgressTaskId)
+      repliedIds.add(assistantProgressTaskId)
+      continue
+    }
+
+    if (taskId && (kind === 'ai_task' || isConversationUserTaskMessage(message))) {
+      taskIds.add(taskId)
+      latestOpenTaskId = taskId
+    }
+    if (taskId && isTaskTerminalMessage(message)) {
+      taskIds.add(taskId)
+      doneIds.add(taskId)
+      repliedIds.add(taskId)
+      if (latestOpenTaskId === taskId) latestOpenTaskId = ''
+      continue
+    }
+    if (!taskId && latestOpenTaskId && isConversationAssistantTaskMessage(message) && !isAssistantProgressDisplay(message)) {
+      doneIds.add(latestOpenTaskId)
+      repliedIds.add(latestOpenTaskId)
+      latestOpenTaskId = ''
+    }
+  }
+
+  return { taskIds, doneIds, repliedIds }
 }
 
 export function containsTaskProcess(messages: Message[]): boolean {
@@ -232,13 +257,18 @@ function isAssistantProgressDisplay(message: Message): boolean {
   return (message as Record<string, unknown>)[ASSISTANT_PROGRESS_FLAG] === true
 }
 
+function assistantProgressSourceTaskId(message: Message): string {
+  if (!isAssistantProgressDisplay(message)) return ''
+  return clean((message as Record<string, unknown>).source_task_id ?? (message as Record<string, unknown>).sourceTaskId ?? '')
+}
+
 function taskThreadId(message: Message): string {
   const taskId = messageTaskId(message)
   if (taskId && (isTaskBackfillMessage(message) || isConversationUserTaskMessage(message) || isConversationAssistantTaskMessage(message))) {
     return taskId
   }
   if (isAssistantProgressDisplay(message)) {
-    return clean((message as Record<string, unknown>).source_task_id ?? (message as Record<string, unknown>).sourceTaskId ?? '')
+    return assistantProgressSourceTaskId(message)
   }
   return ''
 }

@@ -63,6 +63,10 @@ export interface TaskTimelineDiagnostic {
   detail: string
 }
 
+export interface TaskTimelineOptions {
+  assistantNoteCount?: number
+}
+
 export type TaskTimelineStageKey =
   | 'empty'
   | 'dispatch'
@@ -85,10 +89,15 @@ export interface TaskTimelineStage {
   stuck: boolean
 }
 
-export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMessage): TaskTimelineModel {
+export function buildTaskTimeline(
+  messages: ChatMessage[],
+  finalMessage?: ChatMessage,
+  options: TaskTimelineOptions = {},
+): TaskTimelineModel {
   const items: TimelineItem[] = []
   const seenText = new Set<string>()
   const finalText = finalMessage ? normalizedProgressText(messageText(finalMessage)) : ''
+  const assistantNoteCount = Math.max(0, Number(options.assistantNoteCount ?? 0) || 0)
   let lastHeartbeat: TimelineItem | undefined
   let latestHeartbeat: TimelineItem | undefined
   let heartbeatCount = 0
@@ -101,7 +110,7 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
     fileChange: false,
     toolResult: false,
     usage: false,
-    assistantEvent: false,
+    assistantEvent: assistantNoteCount > 0,
     finalReply: !!finalText,
   }
 
@@ -340,6 +349,13 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'
       detail: '前端已捕获命令调用，但还没有对应工具结果。长时间停在这里时，通常是命令仍在执行或 CLI 没有 flush 完成事件。'
     })
   }
+  if (coverage.assistantEvent && !coverage.finalReply) {
+    diagnostics.push({
+      tone: 'muted',
+      title: '已有公开回复',
+      detail: 'AI CLI 的回复片段已经作为气泡显示；如果后面还有等待状态，通常是在同步用量、终态或后续工具事件。'
+    })
+  }
   if (coverage.finalReply && !coverage.command && !coverage.fileChange && !coverage.testRun) {
     diagnostics.push({
       tone: 'muted',
@@ -432,9 +448,9 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
     return {
       key: 'assistant',
       tone: 'running',
-      label: 'AI CLI 已有回复片段',
-      detail: '前端已经捕获到 AI CLI 的公开回复片段，正在等待最终回复或后续工具事件。',
-      summary: '当前：已有回复片段',
+      label: '回复已显示，等待收尾',
+      detail: 'AI CLI 的公开回复已经在气泡里展示；后续等待状态通常是在同步用量、终态或继续处理工具事件。',
+      summary: '当前：回复已显示，等待收尾',
       stuck: false,
     }
   }

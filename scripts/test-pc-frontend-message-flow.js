@@ -35,6 +35,7 @@ try {
     buildMessageGroups,
     buildTaskProcessMessageMap,
     hasRunningTask,
+    hasRunningTaskAwaitingVisibleReply,
   } = require(path.join(pcRoot, 'src', 'features', 'conversation', 'messageFlow.ts'));
   const {
     statusForTask,
@@ -224,6 +225,20 @@ try {
 
   const runningMessages = taskMessages.slice(0, 2);
   assert.strictEqual(hasRunningTask(runningMessages), true, 'task without result should remain running');
+  assert.strictEqual(hasRunningTaskAwaitingVisibleReply(runningMessages), true, 'raw process rows without a display bubble should still show typing');
+  const publicReplyRunningMessages = buildDisplayMessages({
+    sessionView: 'conv-1',
+    channelMessages: [],
+    conversationMessages: [conversationMessages[0]],
+    conversationLoading: false,
+    taskMessagesById: buildTaskProcessMessageMap([runningMessages]),
+  });
+  assert.strictEqual(hasRunningTask(publicReplyRunningMessages), true, 'task can remain running after a public reply fragment');
+  assert.strictEqual(
+    hasRunningTaskAwaitingVisibleReply(publicReplyRunningMessages),
+    false,
+    'visible AI CLI reply fragments should hide the global typing placeholder while the task is only settling',
+  );
   assert.deepStrictEqual(
     statusForTask({ status: 'running', progressCount: 0, result: null }),
     { tone: 'running', label: '等待AI响应' },
@@ -522,6 +537,37 @@ try {
     assistantOutputTimeline.coverage.assistantEvent,
     true,
     'timeline coverage should still record that the AI CLI produced assistant output',
+  );
+  const settlingTimeline = buildTaskTimeline(
+    [
+      {
+        id: 'settle-1',
+        kind: 'ai_progress',
+        task_id: 'tsk-settling',
+        content: '{"type":"tool_call","tool":"shell","args":{"command":"Get-Date"}}',
+      },
+      {
+        id: 'settle-2',
+        kind: 'ai_progress',
+        task_id: 'tsk-settling',
+        content: '{"type":"tool_result","tool":"shell","result":"exit=0 2026-07-04 00:50:29"}',
+      },
+      {
+        id: 'settle-3',
+        kind: 'ai_progress',
+        task_id: 'tsk-settling',
+        content: 'Codex\\nCodex (GPT-5.5 · 推理 xhigh) 正在处理中…（已等待 25s）',
+      },
+    ],
+    undefined,
+    { assistantNoteCount: 1 },
+  );
+  assert.strictEqual(settlingTimeline.stage.key, 'assistant', 'public reply bubbles should keep later waiting heartbeats from becoming the main stage');
+  assert.strictEqual(settlingTimeline.stage.label, '回复已显示，等待收尾', 'settling state should explain that the answer is already visible');
+  assert.strictEqual(
+    timelineSummary(settlingTimeline, 'tsk-settling', 'tsk_set...'),
+    '3 步过程 · 有命令 · 当前：回复已显示，等待收尾 · tsk_set...',
+    'summary should describe visible reply settling instead of saying the task is still only processing',
   );
   const finalEchoTimeline = buildTaskTimeline(
     [

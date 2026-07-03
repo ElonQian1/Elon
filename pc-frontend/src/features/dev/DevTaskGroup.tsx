@@ -49,7 +49,9 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
   const assistantNotes = messages.filter(isAssistantProgressNote)
-  const timeline = buildTaskTimeline(progressMsgs, resultMsg)
+  const timeline = buildTaskTimeline(progressMsgs, resultMsg, {
+    assistantNoteCount: assistantNotes.length,
+  })
   const progressCount = timeline.visibleStepCount + assistantNotes.length
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
