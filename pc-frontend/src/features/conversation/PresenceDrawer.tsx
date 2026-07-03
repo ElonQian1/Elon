@@ -59,6 +59,7 @@ export function PresenceDrawer({
       setCustomStatus(data.custom_status ?? '')
       setActivity(data.activity ?? '')
       setMessage('已保存')
+      publishPresenceUpdate(data)
       await onSaved(data)
     } catch (err) {
       setMessage((err as { message?: string }).message ?? '保存失败')
@@ -129,4 +130,20 @@ export function PresenceDrawer({
       </section>
     </div>
   )
+}
+
+function publishPresenceUpdate(presence: UserPresenceSettings) {
+  const status = presence.status || 'online'
+  window.dispatchEvent(new CustomEvent('elon:presence', {
+    detail: {
+      userId: presence.user_id,
+      isOnline: status !== 'offline' && status !== 'invisible',
+      status,
+      customStatus: presence.custom_status ?? null,
+      custom_status: presence.custom_status ?? null,
+      activity: presence.activity ?? null,
+      updatedAt: presence.updated_at,
+      updated_at: presence.updated_at,
+    },
+  }))
 }
