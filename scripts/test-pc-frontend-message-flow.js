@@ -42,6 +42,10 @@ try {
     buildTaskTimeline,
     timelineSummary,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskTimelineModel.ts'));
+  const {
+    recoveryViewFromEntry,
+    recoveryViewFromTask,
+  } = require(path.join(pcRoot, 'src', 'features', 'dev', 'agentRunRecoveryModel.ts'));
 
   const taskMessages = [
     { id: 'pcm-task', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },
@@ -234,6 +238,58 @@ try {
     '2 步过程 · 有命令 · 有测试/构建 · tsk_val...',
     'summary should mention command and validation coverage',
   );
+
+  const liveRecovery = recoveryViewFromEntry({
+    task_id: 'tsk_live_1234567890',
+    cli_name: 'Codex',
+    route: 'route_a',
+    status: 'running',
+    recommended_action: 'wait_or_cancel',
+    reason: '当前本机节点仍持有运行控制句柄。',
+    can_cancel: true,
+    tty_reconnect: {
+      supported: false,
+      user_label: '原 CLI 终端不可重接',
+      reason: '浏览器不能重新接管原始 CLI TTY。',
+    },
+  });
+  assert.strictEqual(liveRecovery.canCancel, true, 'live control recovery should expose stop action');
+  assert.strictEqual(liveRecovery.canContinue, false, 'live control should wait/cancel instead of snapshot continue');
+  assert.ok(liveRecovery.facts.some((fact) => fact.value === '可停止'), 'live recovery facts should say the task can be stopped');
+
+  const detachedRecovery = recoveryViewFromTask({
+    task_id: 'tsk_detached_1234567890',
+    cli_name: 'Codex',
+    route: 'route_a',
+    status: 'running',
+    cwd: 'D:/demo/project',
+    attach: {
+      status: 'detached',
+      reason: '本机 journal 显示任务未终态，但当前节点已没有运行句柄，只能基于快照继续。',
+    },
+    resume: {
+      status: 'detached',
+      next_action: 'continue_from_snapshot',
+      can_cancel: false,
+      can_replay_journal_events: true,
+      reason: '原进程控制句柄已经丢失，需要新开一轮任务并先检查工作区状态。',
+      tty_reattach: {
+        supported: false,
+        user_label: '原 CLI 终端不可重接',
+        reason: '原始 CLI TTY 已经脱离当前页面。',
+      },
+      tool_approval_recovery: {
+        status: 'lost_after_restart',
+        journal_pending_count: 1,
+        reason: '历史审批卡必须失效。',
+      },
+    },
+  });
+  assert.strictEqual(detachedRecovery.canCancel, false, 'detached task should not expose cancel');
+  assert.strictEqual(detachedRecovery.canContinue, true, 'detached task should expose snapshot continue');
+  assert.ok(detachedRecovery.continuePrompt.includes('不要批准已经失效的旧审批'), 'continue draft should guard stale approvals');
+  assert.ok(detachedRecovery.facts.some((fact) => fact.value.includes('审批已失效')), 'detached recovery should explain lost approval waiter');
+
   const assistantOutputTimeline = buildTaskTimeline([
     {
       id: 'assistant-progress',

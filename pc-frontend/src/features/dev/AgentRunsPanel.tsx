@@ -3,6 +3,12 @@ import { nodeApi } from '../node/localNodeApi'
 import { safeNodeAdminUrl, clean } from '../../lib/utils'
 import SidecarTerminalPanel from './SidecarTerminalPanel'
 import type { AgentRunsData, AgentRunEntry, SidecarSession } from './types'
+import {
+  recoveryViewFromEntry,
+  recoveryViewFromTask,
+  shortRunId,
+  type RecoveryView,
+} from './agentRunRecoveryModel'
 import styles from './AgentRunsPanel.module.css'
 
 const POLL_INTERVAL = 4500
@@ -10,12 +16,14 @@ const POLL_INTERVAL = 4500
 interface Props {
   projectId: string
   workspacePath: string
+  onDraftContinue?: (text: string) => void
 }
 
-export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId'>) {
+export default function AgentRunsPanel({ workspacePath, onDraftContinue }: Omit<Props, 'projectId'>) {
   const adminUrl = safeNodeAdminUrl()
   const [data, setData] = useState<AgentRunsData | null>(null)
   const [loading, setLoading] = useState(false)
+  const [actionState, setActionState] = useState<Record<string, string>>({})
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async (force = false) => {
@@ -57,6 +65,34 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspacePath])
 
+  const cancelTask = useCallback(async (taskId: string) => {
+    const id = clean(taskId)
+    if (!id) return
+    setActionState((prev) => ({ ...prev, [id]: '正在停止…' }))
+    try {
+      await nodeApi(adminUrl, `/api/task-journal/${encodeURIComponent(id)}`, { method: 'POST' })
+      setActionState((prev) => ({ ...prev, [id]: '已请求停止' }))
+      await load(true)
+    } catch (err) {
+      setActionState((prev) => ({ ...prev, [id]: (err as Error).message || '停止失败' }))
+    }
+  }, [adminUrl, load])
+
+  const draftContinue = useCallback(async (view: RecoveryView) => {
+    const id = view.taskId || view.title
+    try {
+      if (onDraftContinue) {
+        onDraftContinue(view.continuePrompt)
+        setActionState((prev) => ({ ...prev, [id]: '已写入输入框' }))
+        return
+      }
+      await navigator.clipboard.writeText(view.continuePrompt)
+      setActionState((prev) => ({ ...prev, [id]: '继续草稿已复制' }))
+    } catch (err) {
+      setActionState((prev) => ({ ...prev, [id]: (err as Error).message || '复制失败' }))
+    }
+  }, [onDraftContinue])
+
   if (!data) return <div className={styles.panel}><p className={styles.status}>读取中…</p></div>
   if (data.error) return (
     <div className={styles.panel}>
@@ -82,9 +118,40 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
       </div>
       <div className={styles.list}>
         {activeSidecar && <SidecarTerminalPanel adminUrl={adminUrl} session={activeSidecar} />}
-        {data.recoveryEntry && <RecoveryItem entry={data.recoveryEntry} />}
-        {data.activeControls.map((ctrl, i) => <ControlItem key={i} control={ctrl} />)}
-        {data.recentTasks.slice(0, 3).map((task, i) => <RecentTaskItem key={i} task={task} />)}
+        {data.recoveryEntry && (
+          <RecoveryItem
+            view={recoveryViewFromEntry(data.recoveryEntry)}
+            actionState={actionState}
+            onCancel={cancelTask}
+            onDraftContinue={draftContinue}
+          />
+        )}
+        {data.activeControls.map((ctrl, i) => (
+          <RecoveryItem
+            key={i}
+            view={recoveryViewFromEntry({
+              ...ctrl,
+              status: 'running',
+              recommended_action: 'wait_or_cancel',
+              reason: '当前本机节点仍持有运行控制句柄，PC 端可以继续观察或停止任务。',
+              can_cancel: ctrl.can_cancel ?? ctrl.canCancel,
+            })}
+            compact
+            actionState={actionState}
+            onCancel={cancelTask}
+            onDraftContinue={draftContinue}
+          />
+        ))}
+        {data.recentTasks.slice(0, 3).map((task, i) => (
+          <RecoveryItem
+            key={i}
+            view={recoveryViewFromTask(task)}
+            compact
+            actionState={actionState}
+            onCancel={cancelTask}
+            onDraftContinue={draftContinue}
+          />
+        ))}
         {data.runs.slice(0, 3).map((run, i) => <RunItem key={i} run={run} />)}
       </div>
     </div>
@@ -114,52 +181,51 @@ function statusLabel(status: string): string {
   return v || '未知'
 }
 
-function shortRunId(value: string): string {
-  const text = clean(value) || 'agent run'
-  if (text.length <= 24) return text
-  return `${text.slice(0, 12)}…${text.slice(-8)}`
-}
-
-function RecoveryItem({ entry }: { entry: Record<string, unknown> }) {
-  const taskId = clean(entry.task_id ?? entry.taskId ?? '')
-  const cliName = clean(entry.cli_name ?? entry.cliName ?? 'agent')
-  const action = clean(entry.recommended_action ?? entry.recommendedAction ?? '').toLowerCase()
+function RecoveryItem({
+  view,
+  actionState,
+  compact,
+  onCancel,
+  onDraftContinue,
+}: {
+  view: RecoveryView
+  actionState: Record<string, string>
+  compact?: boolean
+  onCancel: (taskId: string) => void
+  onDraftContinue: (view: RecoveryView) => void
+}) {
+  const stateText = clean(actionState[view.taskId] ?? actionState[view.title])
   return (
-    <article className={[styles.item, styles.running].join(' ')}>
+    <article className={[styles.item, styles[`tone_${view.tone}`], compact ? styles.compact : ''].join(' ')}>
       <div className={styles.itemMain}>
-        <span className={styles.badge}>推荐恢复</span>
-        <strong>{shortRunId(taskId || cliName)}</strong>
-        <small>{cliName} · {action === 'continue_from_snapshot' ? '基于快照继续' : '等待或停止'}</small>
-      </div>
-    </article>
-  )
-}
-
-function ControlItem({ control }: { control: Record<string, unknown> }) {
-  const taskId = clean(control.task_id ?? control.taskId ?? control.run_handle_id ?? control.runHandleId ?? '')
-  const cliName = clean(control.cli_name ?? control.cliName ?? 'agent')
-  const route = clean(control.route ?? 'local-runtime')
-  return (
-    <article className={[styles.item, styles.running].join(' ')}>
-      <div className={styles.itemMain}>
-        <span className={styles.badge}>运行中</span>
-        <strong>{shortRunId(taskId || route)}</strong>
-        <small>{cliName} · {route}</small>
-      </div>
-    </article>
-  )
-}
-
-function RecentTaskItem({ task }: { task: Record<string, unknown> }) {
-  const taskId = clean(task.task_id ?? task.taskId ?? task.req_id ?? task.reqId ?? '')
-  const status = clean(task.status ?? '')
-  const cliName = clean(task.cli_name ?? task.cliName ?? 'agent')
-  return (
-    <article className={[styles.item, statusTone(status)].join(' ')}>
-      <div className={styles.itemMain}>
-        <span className={styles.badge}>{statusLabel(status)}</span>
-        <strong>{shortRunId(taskId || cliName)}</strong>
-        <small>{cliName}</small>
+        <div className={styles.recoveryHead}>
+          <span className={styles.badge}>{view.badge}</span>
+          <strong>{view.title}</strong>
+        </div>
+        <small>{view.summary}</small>
+        {!compact && <p className={styles.recoveryDetail}>{view.detail}</p>}
+        <div className={styles.recoveryFacts}>
+          {view.facts.slice(0, compact ? 4 : 8).map((fact) => (
+            <span key={`${fact.label}:${fact.value}`} data-tone={fact.tone || undefined}>
+              {fact.label}：{fact.value}
+            </span>
+          ))}
+        </div>
+        {(stateText || view.canCancel || view.canContinue) && (
+          <div className={styles.recoveryActions}>
+            {view.canCancel && (
+              <button type="button" className={styles.stopBtn} onClick={() => onCancel(view.taskId)}>
+                停止
+              </button>
+            )}
+            {view.canContinue && (
+              <button type="button" className={styles.continueBtn} onClick={() => onDraftContinue(view)}>
+                继续草稿
+              </button>
+            )}
+            {stateText && <span>{stateText}</span>}
+          </div>
+        )}
       </div>
     </article>
   )
