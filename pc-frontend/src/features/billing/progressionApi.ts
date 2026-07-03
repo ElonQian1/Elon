@@ -26,6 +26,12 @@ export interface UserProgressionSummary {
   platform_call_count?: number
   provided_run_count: number
   provider_earned_fen: number
+  provider_week_start_at?: string
+  provider_week_end_at?: string
+  provider_week_tokens?: number
+  provider_week_run_count?: number
+  provider_week_billed_fen?: number
+  provider_week_earned_fen?: number
 }
 
 export function fetchMyProgression() {

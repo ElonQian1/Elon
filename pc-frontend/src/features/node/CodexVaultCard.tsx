@@ -61,10 +61,13 @@ export default function CodexVaultCard({
       <div className={styles.vaultHead}>
         <div>
           <span className={styles.codexLabel}>Codex Pro 保险箱</span>
-          <h4>临时登录到陌生电脑</h4>
+          <h4>云端保存自己的 auth.json</h4>
         </div>
         <span className={[styles.vaultState, stateTone].join(' ')}>{state}</span>
       </div>
+      <p className={styles.vaultNote}>
+        保险箱只给账号所有者自己的节点备份和恢复；共享算力时，别人只能派发任务到你的节点，不会拿到凭证明文。
+      </p>
       <div className={styles.vaultGrid}>
         <div>
           <span>默认 auth.json</span>
@@ -79,7 +82,7 @@ export default function CodexVaultCard({
           <strong>{formatVaultTime(vault?.last_backup_at)}</strong>
         </div>
         <div>
-          <span>最近租用</span>
+          <span>最近恢复</span>
           <strong>{formatVaultTime(vault?.last_lease_at)}</strong>
         </div>
       </div>

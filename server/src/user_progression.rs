@@ -46,6 +46,12 @@ pub struct UserProgressionSummary {
     pub platform_call_count: i64,
     pub provided_run_count: i64,
     pub provider_earned_fen: i64,
+    pub provider_week_start_at: String,
+    pub provider_week_end_at: String,
+    pub provider_week_tokens: i64,
+    pub provider_week_run_count: i64,
+    pub provider_week_billed_fen: i64,
+    pub provider_week_earned_fen: i64,
 }
 
 pub async fn get_my_progression(
@@ -135,6 +141,12 @@ pub(crate) fn build_progression_summary(
         platform_call_count: ledger.platform_call_count.max(0),
         provided_run_count: ledger.provided_run_count.max(0),
         provider_earned_fen: ledger.provider_earned_fen.max(0),
+        provider_week_start_at: ledger.provider_week_start_at,
+        provider_week_end_at: ledger.provider_week_end_at,
+        provider_week_tokens: ledger.provider_week_tokens.max(0),
+        provider_week_run_count: ledger.provider_week_run_count.max(0),
+        provider_week_billed_fen: ledger.provider_week_billed_fen.max(0),
+        provider_week_earned_fen: ledger.provider_week_earned_fen.max(0),
     }
 }
 
@@ -246,6 +258,12 @@ mod tests {
                 consumed_call_count: 3,
                 provided_run_count: 2,
                 provider_earned_fen: 42,
+                provider_week_start_at: "2026-07-06T00:00:00+00:00".to_string(),
+                provider_week_end_at: "2026-07-13T00:00:00+00:00".to_string(),
+                provider_week_tokens: 30_000,
+                provider_week_run_count: 2,
+                provider_week_billed_fen: 100,
+                provider_week_earned_fen: 42,
             },
         );
         assert_eq!(summary.level, 3);
@@ -267,6 +285,12 @@ mod tests {
                 consumed_call_count: 3,
                 provided_run_count: 2,
                 provider_earned_fen: 42,
+                provider_week_start_at: "2026-07-06T00:00:00+00:00".to_string(),
+                provider_week_end_at: "2026-07-13T00:00:00+00:00".to_string(),
+                provider_week_tokens: 40_000,
+                provider_week_run_count: 2,
+                provider_week_billed_fen: 100,
+                provider_week_earned_fen: 42,
             },
         );
         assert_eq!(next.level, 3);

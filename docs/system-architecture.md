@@ -114,6 +114,8 @@ PC 项目会话的 AI 运行路线分为五类：
 
 项目会话默认优先 `route_a`，让本机 Codex CLI 自己读取项目规则、判断是否需要读文件、修改代码、运行命令或构建。PC 前端的“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入当前本机节点和项目工作区路径。
 
+Codex Pro `auth.json` 云端保险箱只属于账号所有者自己的备份/恢复能力：本机节点上传密文，云端只存 AES-GCM 密文，本人节点用用户 token + 节点 secret 恢复到托管临时 `CODEX_HOME`。它不改变 Route C3 的安全边界：远程用户只能把任务派发到 provider 的 PC 节点，不能下载、恢复或复制 provider 的 `auth.json` 明文。共享算力的收益通过 `shared_codex` token 账本和 `node_transactions` provider 结算流水记录。
+
 Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是新的运行路线。Route A / Route C3 都可以在对应节点里选择下面的传输模式：
 
 | 模式 | 当前是否具备 | 定位 |
