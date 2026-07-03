@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
@@ -8,6 +8,43 @@ use crate::types::AppState;
 
 const PC_AGENT_CLI_ACCEPT_TIMEOUT_ENV: &str = "ELON_PC_AGENT_CLI_ACCEPT_TIMEOUT_SECS";
 const PC_AGENT_CLI_ACCEPT_TIMEOUT_DEFAULT_SECS: u64 = 15;
+
+#[derive(Debug)]
+pub(crate) struct PcCliPromptAcceptTimeout {
+    agent_id: String,
+    cli_name: String,
+    timeout_secs: u64,
+}
+
+impl PcCliPromptAcceptTimeout {
+    fn new(agent_id: &str, cli_name: &str, timeout_secs: u64) -> Self {
+        Self {
+            agent_id: agent_id.to_string(),
+            cli_name: cli_name.to_string(),
+            timeout_secs,
+        }
+    }
+
+    pub(crate) fn timeout_secs(&self) -> u64 {
+        self.timeout_secs
+    }
+}
+
+impl fmt::Display for PcCliPromptAcceptTimeout {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "PC 节点 {} 在 {} 秒内没有确认接收 {} 请求；本轮已停止。通常是节点连接假在线、旧节点进程未更新、节点正在重连，或 WebSocket 写通道没有真正送达本机。请重启一龙 PC 节点客户端后重发。",
+            self.agent_id, self.timeout_secs, self.cli_name
+        )
+    }
+}
+
+impl std::error::Error for PcCliPromptAcceptTimeout {}
+
+pub(crate) fn pc_cli_accept_timeout(error: &anyhow::Error) -> Option<&PcCliPromptAcceptTimeout> {
+    error.downcast_ref::<PcCliPromptAcceptTimeout>()
+}
 
 pub(crate) async fn wait_for_pc_cli_prompt_acceptance(
     state: &Arc<AppState>,
@@ -33,9 +70,7 @@ pub(crate) async fn wait_for_pc_cli_prompt_acceptance(
                 .agent_manager
                 .close_agent_session(agent_id, "CLI prompt accept timeout")
                 .await;
-            Err(anyhow!(
-                "PC 节点 {agent_id} 在 {timeout_secs} 秒内没有确认接收 {cli_name} 请求；本轮已停止。通常是节点连接假在线、旧节点进程未更新、节点正在重连，或 WebSocket 写通道没有真正送达本机。请重启一龙 PC 节点客户端后重发。"
-            ))
+            Err(PcCliPromptAcceptTimeout::new(agent_id, cli_name, timeout_secs).into())
         }
     }
 }
@@ -70,5 +105,22 @@ fn pc_cli_progress_label(cli_name: &str) -> &'static str {
         "api-runtime" => "Route B",
         "server-runtime" => "Route C",
         _ => "PC AI",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pc_cli_accept_timeout, PcCliPromptAcceptTimeout};
+
+    #[test]
+    fn accept_timeout_error_can_be_downcast_for_retry() {
+        let error: anyhow::Error = PcCliPromptAcceptTimeout::new("node-a", "codex", 15).into();
+
+        let timeout = pc_cli_accept_timeout(&error).expect("typed timeout");
+
+        assert_eq!(timeout.timeout_secs(), 15);
+        assert!(error
+            .to_string()
+            .contains("PC 节点 node-a 在 15 秒内没有确认接收 codex 请求"));
     }
 }

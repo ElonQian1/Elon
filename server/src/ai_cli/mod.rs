@@ -17,6 +17,7 @@ mod ai_cli_streaming;
 mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
+mod pc_agent_dispatch;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
 mod pc_prompt_acceptance;
@@ -24,7 +25,7 @@ mod pc_prompt_acceptance;
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
-use homecli_proto::{AgentToServer, CliProjectContext, CliWorkspaceStatus};
+use homecli_proto::{AgentToServer, CliWorkspaceStatus};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
@@ -49,9 +50,7 @@ pub(crate) use self::pc_dispatch_capture::{
 pub(crate) use self::pc_passthrough_events::{
     pc_cli_passthrough_event, pc_cli_passthrough_events_flush, pc_cli_passthrough_events_from_chunk,
 };
-use self::pc_prompt_acceptance::{
-    pc_lightweight_no_node_event_diagnostic, wait_for_pc_cli_prompt_acceptance,
-};
+use self::pc_prompt_acceptance::pc_lightweight_no_node_event_diagnostic;
 
 use self::{
     ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},
@@ -68,6 +67,7 @@ use self::{
     },
     ai_cli_prompts::build_cli_prompt,
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
+    pc_agent_dispatch::{dispatch_pc_cli_prompt_until_accepted, PcCliPromptDispatchRequest},
 };
 use crate::{
     agent_routing::quick_casual_reply,
@@ -1257,65 +1257,25 @@ async fn run_via_pc_agent(
         effective_codex_reasoning_effort.as_deref(),
     );
 
-    // dispatch 时节点可能刚好掉线重连
-    let (pc_req_id, mut rx, cancel_handle) = {
-        let mut last_err = anyhow::anyhow!("dispatch failed");
-        let mut result = Err(last_err);
-        let max_attempts = if lightweight_pc_chat { 3 } else { 25 };
-        for attempt in 0..max_attempts {
-            let project_context = native_session_scope
-                .as_ref()
-                .map(|scope| CliProjectContext {
-                    project_id: scope.project_id.clone(),
-                    conversation_id: scope.conversation_id.clone(),
-                    runtime_permission: Some(if request_mode.is_plan() {
-                        "read_only".to_string()
-                    } else {
-                        scope.runtime_permission.clone()
-                    }),
-                });
-            match state
-                .agent_manager
-                .dispatch_cli_prompt_with_context_control(
-                    agent_id,
-                    cli_name.to_string(),
-                    extra_args.clone(),
-                    cwd.map(ToOwned::to_owned),
-                    project_context,
-                    prompt.clone(),
-                )
-                .await
-            {
-                Ok(dispatch) => {
-                    result = Ok(dispatch.into_parts());
-                    break;
-                }
-                Err(e) => {
-                    last_err = e;
-                    let msg = last_err.to_string();
-                    let is_offline = msg.contains("agent not connected");
-                    if is_offline && attempt + 1 < max_attempts {
-                        let wait = format!(
-                            "PC 节点短暂离线，等待重连（{}/{}）…",
-                            attempt + 1,
-                            max_attempts
-                        );
-                        if !lightweight_pc_chat {
-                            let _ = tx.send(WsMessage::progress(wait).to_json());
-                        }
-                        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    } else {
-                        result = Err(last_err);
-                        break;
-                    }
-                }
-            }
-        }
-        result?
-    };
+    // dispatch 时节点可能刚好掉线重连；dispatch 成功后仍要等本机 ACK，避免假在线连接吞请求。
+    let accepted_dispatch = dispatch_pc_cli_prompt_until_accepted(PcCliPromptDispatchRequest {
+        state,
+        tx,
+        agent_id,
+        cli_name,
+        extra_args: &extra_args,
+        cwd,
+        prompt: &prompt,
+        request_mode,
+        native_session_scope: native_session_scope.as_ref(),
+        lightweight_pc_chat,
+    })
+    .await?;
+    let pc_req_id = accepted_dispatch.pc_req_id;
+    let mut rx = accepted_dispatch.rx;
+    let cancel_handle = accepted_dispatch.cancel_handle;
+    let mut first_cli_event = accepted_dispatch.first_cli_event;
     let mut pc_cancel_guard = PcCliCancelOnDrop::armed(cancel_handle);
-    let mut first_cli_event =
-        wait_for_pc_cli_prompt_acceptance(state, agent_id, &pc_req_id, cli_name, &mut rx).await?;
     let pc_cli_feature = if request_mode.is_plan() {
         "pc_agent_cli_plan"
     } else if raw_pc_passthrough {
