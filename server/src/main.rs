@@ -32,6 +32,7 @@ mod billing_events;
 mod billing_lifecycle;
 mod billing_monitor;
 mod billing_pay;
+mod billing_trial_credit_migration;
 mod chat_attachments;
 mod cli_config;
 mod cli_usage;

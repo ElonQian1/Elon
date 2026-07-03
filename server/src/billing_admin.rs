@@ -286,7 +286,7 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
         "billing_node_llm_min_reservation_fen": config_int("billing_node_llm_min_reservation_fen", 1),
         "billing_image_min_reservation_fen": config_int("billing_image_min_reservation_fen", 1),
         "billing_realtime_voice_min_reservation_fen": config_int("billing_realtime_voice_min_reservation_fen", 1),
-        "new_user_trial_credit_fen": config_int("new_user_trial_credit_fen", 100),
+        "new_user_trial_credit_fen": config_int("new_user_trial_credit_fen", 30000),
         "external_app_fb2_trial_credit_fen": config_int("external_app_fb2_trial_credit_fen", 100),
         "external_app_bb64a_trial_credit_fen": config_int("external_app_bb64a_trial_credit_fen", 100),
         "billing_open_reservation_alert_threshold": config_int("billing_open_reservation_alert_threshold", 100),

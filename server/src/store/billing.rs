@@ -276,7 +276,7 @@ impl Store {
         Ok(Some(new_balance))
     }
 
-    /// 查询用户是否已经获得过指定方式的赠送/充值记录。
+    /// 查询用户是否已经获得过指定方式的赠送/充值记录，amount_fen 返回该方式累计金额。
     pub fn billing_find_recharge_by_method(
         &self,
         user_id: &str,
@@ -284,11 +284,23 @@ impl Store {
     ) -> Result<Option<RechargeRecord>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            r#"SELECT id, user_id, amount_fen, method, operator_id, note, created_at
+            r#"SELECT
+                    (SELECT rr.id FROM recharge_records rr
+                      WHERE rr.user_id = recharge_records.user_id AND rr.method = recharge_records.method
+                      ORDER BY rr.created_at ASC LIMIT 1) AS id,
+                    user_id,
+                    COALESCE(SUM(amount_fen), 0) AS amount_fen,
+                    method,
+                    (SELECT rr.operator_id FROM recharge_records rr
+                      WHERE rr.user_id = recharge_records.user_id AND rr.method = recharge_records.method
+                      ORDER BY rr.created_at ASC LIMIT 1) AS operator_id,
+                    (SELECT rr.note FROM recharge_records rr
+                      WHERE rr.user_id = recharge_records.user_id AND rr.method = recharge_records.method
+                      ORDER BY rr.created_at ASC LIMIT 1) AS note,
+                    MIN(created_at) AS created_at
                FROM recharge_records
                WHERE user_id = ?1 AND method = ?2
-               ORDER BY created_at ASC
-               LIMIT 1"#,
+               GROUP BY user_id, method"#,
             params![user_id, method],
             |r| {
                 Ok(RechargeRecord {

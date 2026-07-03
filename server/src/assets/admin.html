@@ -1177,7 +1177,7 @@ function closeConvModal() {
     </div>
     <div class="form-group">
       <label>新用户试用额度（元，0 表示关闭）</label>
-      <input type="number" id="cfgNewUserTrial" placeholder="1.00" min="0" step="0.01" />
+      <input type="number" id="cfgNewUserTrial" placeholder="300.00" min="0" step="0.01" />
     </div>
     <div class="form-group">
       <label>冻结预授权告警阈值（条）</label>
@@ -2073,7 +2073,7 @@ function renderBillingConfig(cfg) {
   const rate = (rateRaw / 10000).toFixed(4);
   const markup = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
   const threshold = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
-  const newUserTrial = ((cfg.new_user_trial_credit_fen ?? 100) / 100).toFixed(2);
+  const newUserTrial = ((cfg.new_user_trial_credit_fen ?? 30000) / 100).toFixed(2);
   const reservationAlert = cfg.billing_open_reservation_alert_threshold || 100;
   const nodeShare = ((cfg.node_provider_revenue_share_x1000 || 800) / 10).toFixed(0);
   const nodePayoutMin = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
@@ -2241,7 +2241,7 @@ function openConfigModal() {
     document.getElementById('cfgRate').value = ((cfg.usd_to_rmb_rate_x10000 || 73000) / 10000).toFixed(4);
     document.getElementById('cfgMarkup').value = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
     document.getElementById('cfgThreshold').value = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
-    document.getElementById('cfgNewUserTrial').value = ((cfg.new_user_trial_credit_fen ?? 100) / 100).toFixed(2);
+    document.getElementById('cfgNewUserTrial').value = ((cfg.new_user_trial_credit_fen ?? 30000) / 100).toFixed(2);
     document.getElementById('cfgReservationAlert').value = String(cfg.billing_open_reservation_alert_threshold || 100);
     document.getElementById('cfgNodeProviderShare').value = String(Math.round((cfg.node_provider_revenue_share_x1000 || 800) / 10));
     document.getElementById('cfgNodePayoutMin').value = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
@@ -2271,7 +2271,7 @@ async function saveConfig() {
   const rate_x10000 = String(Math.round(parseFloat(rateStr) * 10000));
   const markup_x1000 = String(Math.round(parseFloat(markupStr) * 1000));
   const threshold_fen = String(Math.round(parseFloat(threshStr || '1') * 100));
-  const new_user_trial_fen = String(Math.max(0, Math.round(parseFloat(newUserTrialStr || '1') * 100)));
+  const new_user_trial_fen = String(Math.max(0, Math.round(parseFloat(newUserTrialStr || '300') * 100)));
   const reservation_alert = String(Math.max(1, Math.round(parseFloat(reservationAlertStr || '100'))));
   const node_provider_share = String(Math.round(parseFloat(nodeShareStr || '80') * 10));
   const node_payout_min = String(Math.max(1, Math.round(parseFloat(nodePayoutMinStr || '1') * 100)));

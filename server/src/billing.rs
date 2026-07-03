@@ -19,7 +19,7 @@ use crate::store::{
 
 const NEW_USER_TRIAL_CREDIT_CONFIG_KEY: &str = "new_user_trial_credit_fen";
 const NEW_USER_TRIAL_CREDIT_ENV: &str = "NEW_USER_TRIAL_CREDIT_FEN";
-const DEFAULT_NEW_USER_TRIAL_CREDIT_FEN: i64 = 100;
+const DEFAULT_NEW_USER_TRIAL_CREDIT_FEN: i64 = 30_000;
 pub(crate) const NEW_USER_TRIAL_METHOD: &str = "new_user_trial";
 const NEW_USER_TRIAL_OPERATOR: &str = "system";
 
@@ -560,9 +560,6 @@ mod tests {
     #[test]
     fn strict_billing_grants_new_user_trial_credit_before_first_call() {
         let (store, path) = temp_store();
-        store
-            .billing_set_config("new_user_trial_credit_fen", "100")
-            .unwrap();
         let expected = new_user_trial_credit_fen(&store);
         if expected <= 0 {
             let _ = std::fs::remove_file(path);
@@ -629,11 +626,47 @@ mod tests {
     }
 
     #[test]
+    fn trial_credit_lookup_sums_topup_records() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!("trial-topup-{}@example.com", Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        store
+            .billing_recharge(
+                &user.id,
+                100,
+                NEW_USER_TRIAL_METHOD,
+                "system",
+                Some("old trial"),
+            )
+            .unwrap();
+        store
+            .billing_recharge(
+                &user.id,
+                29_900,
+                NEW_USER_TRIAL_METHOD,
+                "system",
+                Some("trial top-up"),
+            )
+            .unwrap();
+
+        let grant = store
+            .billing_find_recharge_by_method(&user.id, NEW_USER_TRIAL_METHOD)
+            .unwrap()
+            .expect("trial grant should be summarized");
+        assert_eq!(grant.amount_fen, 30_000);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn reservation_grants_trial_credit_before_holding_balance() {
         let (store, path) = temp_store();
-        store
-            .billing_set_config("new_user_trial_credit_fen", "100")
-            .unwrap();
         let expected = new_user_trial_credit_fen(&store);
         if expected <= 0 {
             let _ = std::fs::remove_file(path);
