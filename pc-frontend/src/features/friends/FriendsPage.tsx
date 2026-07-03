@@ -161,7 +161,7 @@ export default function FriendsPage() {
         kind: 'friend',
         id: friend.id,
         title: friend.nickname ?? friend.account,
-        subtitle: friend.last_message || friend.account || '暂无消息',
+        subtitle: friendPreviewText(friend),
         lastMessage: friend.last_message,
         lastMessageAt: friend.last_message_at,
         unreadCount: friend.unread_count ?? 0,
@@ -625,6 +625,10 @@ function sortConversationItems(items: ConversationItem[]) {
     if (byTime !== 0) return byTime
     return a.title.localeCompare(b.title, 'zh-Hans-CN')
   })
+}
+
+function friendPreviewText(friend: Friend) {
+  return clean(friend.last_message) || '暂无消息'
 }
 
 function truncateText(value: string, length: number) {

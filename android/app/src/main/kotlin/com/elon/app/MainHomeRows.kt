@@ -115,7 +115,7 @@ internal class MainHomeRows(
             ellipsize = TextUtils.TruncateAt.END
             includeFontPadding = false
             maxLines = 1
-            text = friend.lastMessage ?: friend.phone ?: friend.account
+            text = friend.lastMessage ?: "\u6682\u65e0\u6d88\u606f"
             setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
             textSize = 13f
         })

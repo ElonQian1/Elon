@@ -4377,7 +4377,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return (friend && (friend.nickname || friend.name || friend.account || friend.phone || friend.id)) || '好友';
   }
   function friendSubtitle(friend) {
-    return (friend && (friend.last_message || friend.lastMessage || friend.phone || friend.account)) || '暂无消息';
+    return (friend && (friend.last_message || friend.lastMessage)) || '暂无消息';
   }
   function groupDisplayName(group) {
     return (group && (group.name || group.id)) || '群聊';
