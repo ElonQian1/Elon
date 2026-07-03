@@ -1,7 +1,15 @@
 .wrap {
+  position: relative;
   min-width: 0;
   display: grid;
   gap: 3px;
+  outline: none;
+}
+
+.wrap:focus-visible .track {
+  box-shadow:
+    0 0 0 2px rgba(93, 166, 255, .72),
+    inset 0 0 0 1px rgba(0, 0, 0, .18);
 }
 
 .meta {
@@ -47,5 +55,140 @@
 }
 
 .provided {
+  background: var(--yellow, #d8a535);
+}
+
+.panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 10px);
+  z-index: 60;
+  width: min(260px, calc(100vw - 28px));
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 8px;
+  background: #1f2228;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, .38);
+  color: #d9dde5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: opacity .14s ease, transform .14s ease;
+}
+
+.wrap:hover .panel,
+.wrap:focus-visible .panel,
+.wrap:focus-within .panel {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.panel::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  bottom: -6px;
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid rgba(255, 255, 255, .12);
+  border-bottom: 1px solid rgba(255, 255, 255, .12);
+  background: #1f2228;
+  transform: rotate(45deg);
+}
+
+.panelHead,
+.nextLine,
+.detailRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelHead {
+  margin-bottom: 9px;
+}
+
+.panelHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.panelHead span {
+  flex-shrink: 0;
+  color: #79e1a1;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.nextLine {
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: rgba(46, 168, 97, .13);
+}
+
+.nextLine span,
+.detailRow span,
+.split span {
+  color: #aeb5c2;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.nextLine strong,
+.detailRow strong,
+.split strong {
+  color: #f2f4f8;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.detailRow {
+  margin-top: 8px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.split div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 6px;
+  align-items: center;
+  padding: 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .05);
+}
+
+.split strong {
+  grid-column: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dotConsumed,
+.dotProvided {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dotConsumed {
+  background: var(--green, #2ea861);
+}
+
+.dotProvided {
   background: var(--yellow, #d8a535);
 }
