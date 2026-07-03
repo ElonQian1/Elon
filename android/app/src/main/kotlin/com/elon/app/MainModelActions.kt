@@ -52,7 +52,7 @@ internal class MainModelActions(
         private set
     var selectedAgentName: String? = null
         private set
-    var selectedRuntimeRoute: AiRuntimeRoute = AiRuntimeRoute.default
+    var selectedRuntimeRoute: AiRuntimeRoute = AiRuntimeRoute.projectDefault
         private set
     var currentModelLabel = "默认"
         private set
@@ -274,6 +274,7 @@ internal class MainModelActions(
             putString(PREF_SELECTED_MODEL_LABEL, label)
             putString(PREF_SELECTED_RUNTIME_ROUTE, runtimeRoute.wireValue ?: "auto")
             putBoolean(PREF_SELECTED_RUNTIME_ROUTE_DEFAULT_VERSION, true)
+            putString(PREF_SELECTED_PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION)
         }.apply()
     }
 
@@ -292,10 +293,16 @@ internal class MainModelActions(
     private fun cachedRuntimeRoute(): AiRuntimeRoute {
         val stored = prefs.getString(PREF_SELECTED_RUNTIME_ROUTE, null)
         val defaultVersionSeen = prefs.getBoolean(PREF_SELECTED_RUNTIME_ROUTE_DEFAULT_VERSION, false)
+        val projectDefaultVersion = prefs.getString(PREF_SELECTED_PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION, null)
         if (stored.isNullOrBlank() || (!defaultVersionSeen && stored.equals("auto", ignoreCase = true))) {
-            return AiRuntimeRoute.default
+            return AiRuntimeRoute.projectDefault
         }
-        return AiRuntimeRoute.fromStored(stored)
+        if (stored.equals(AiRuntimeRoute.default.wireValue, ignoreCase = true) &&
+            projectDefaultVersion != PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION
+        ) {
+            return AiRuntimeRoute.projectDefault
+        }
+        return AiRuntimeRoute.fromStored(stored, AiRuntimeRoute.projectDefault)
     }
 
     private fun saveRuntimeRouteSelection(route: AiRuntimeRoute) {
@@ -735,6 +742,8 @@ internal class MainModelActions(
         const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
         const val PREF_SELECTED_RUNTIME_ROUTE = "selected_runtime_route"
         const val PREF_SELECTED_RUNTIME_ROUTE_DEFAULT_VERSION = "selected_runtime_route_default_v2"
+        const val PREF_SELECTED_PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = "selected_project_runtime_route_default_version"
+        const val PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = "project-local-codex-default-20260702"
         const val MODEL_POPUP_REOPEN_SUPPRESS_MS = 260L
     }
 }

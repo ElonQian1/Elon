@@ -50,6 +50,7 @@ internal enum class AiRuntimeRoute(
 
     companion object {
         val default: AiRuntimeRoute = PlatformAi
+        val projectDefault: AiRuntimeRoute = MyPcAi
 
         val quickOptions: List<AiRuntimeRoute> = listOf(
             Auto,
@@ -60,11 +61,11 @@ internal enum class AiRuntimeRoute(
             RemoteCodex
         )
 
-        fun fromStored(value: String?): AiRuntimeRoute {
+        fun fromStored(value: String?, fallback: AiRuntimeRoute = default): AiRuntimeRoute {
             val clean = value?.trim().orEmpty()
-            if (clean.isBlank()) return default
+            if (clean.isBlank()) return fallback
             if (clean.equals("auto", ignoreCase = true)) return Auto
-            return quickOptions.firstOrNull { it.wireValue.equals(clean, ignoreCase = true) } ?: default
+            return quickOptions.firstOrNull { it.wireValue.equals(clean, ignoreCase = true) } ?: fallback
         }
     }
 }
