@@ -14,6 +14,16 @@ pub fn chat_reply_after_intent_gate(user_message: &str, codex_reply: Option<Stri
     "我先按普通聊天处理，不进入改代码、编译或发布流程。你可以继续问；如果要我实际检查项目或动代码，再直接说明。".into()
 }
 
+pub(crate) fn append_nonempty_ws_text(buffer: &mut String, text: Option<&str>) {
+    let Some(text) = text.map(str::trim).filter(|value| !value.is_empty()) else {
+        return;
+    };
+    if !buffer.is_empty() && !buffer.ends_with('\n') {
+        buffer.push('\n');
+    }
+    buffer.push_str(text);
+}
+
 fn looks_like_clarification_only(reply: &str) -> bool {
     [
         "没看懂",

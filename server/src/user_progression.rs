@@ -26,6 +26,9 @@ pub struct UserProgressionSummary {
     pub tier_name: String,
     pub total_xp_tokens: i64,
     pub consumed_tokens: i64,
+    pub own_codex_tokens: i64,
+    pub shared_codex_tokens: i64,
+    pub platform_tokens: i64,
     pub provided_tokens: i64,
     pub level_floor_tokens: i64,
     pub next_level_tokens: i64,
@@ -33,8 +36,14 @@ pub struct UserProgressionSummary {
     pub tokens_to_next_level: i64,
     pub level_progress_ratio: f64,
     pub consumed_progress_ratio: f64,
+    pub own_codex_progress_ratio: f64,
+    pub shared_codex_progress_ratio: f64,
+    pub platform_progress_ratio: f64,
     pub provided_progress_ratio: f64,
     pub consumed_call_count: i64,
+    pub own_codex_call_count: i64,
+    pub shared_codex_call_count: i64,
+    pub platform_call_count: i64,
     pub provided_run_count: i64,
     pub provider_earned_fen: i64,
 }
@@ -65,6 +74,13 @@ pub(crate) fn build_progression_summary(
     ledger: UserProgressionLedger,
 ) -> UserProgressionSummary {
     let consumed_tokens = ledger.consumed_tokens.max(0);
+    let own_codex_tokens = ledger.own_codex_tokens.max(0);
+    let shared_codex_tokens = ledger.shared_codex_tokens.max(0);
+    let mut platform_tokens = ledger.platform_tokens.max(0);
+    let classified_consumed = own_codex_tokens.saturating_add(shared_codex_tokens);
+    if consumed_tokens > classified_consumed.saturating_add(platform_tokens) {
+        platform_tokens = consumed_tokens.saturating_sub(classified_consumed);
+    }
     let provided_tokens = ledger.provided_tokens.max(0);
     let total_xp_tokens = consumed_tokens.saturating_add(provided_tokens);
     let level = level_for_tokens(total_xp_tokens);
@@ -75,12 +91,23 @@ pub(crate) fn build_progression_summary(
     let tokens_into_level = (total_xp_tokens - level_floor_tokens).clamp(0, level_span);
     let tokens_to_next_level = (next_level_tokens - total_xp_tokens).max(0);
     let level_progress_ratio = ratio(tokens_into_level, level_span);
-    let (consumed_progress_ratio, provided_progress_ratio) = progress_segments(
-        consumed_tokens,
-        provided_tokens,
+    let segments = progress_segments(
+        &[
+            own_codex_tokens,
+            shared_codex_tokens,
+            platform_tokens,
+            provided_tokens,
+        ],
         tokens_into_level,
         level_span,
     );
+    let own_codex_progress_ratio = segments[0];
+    let shared_codex_progress_ratio = segments[1];
+    let platform_progress_ratio = segments[2];
+    let provided_progress_ratio = segments[3];
+    let consumed_progress_ratio =
+        (own_codex_progress_ratio + shared_codex_progress_ratio + platform_progress_ratio)
+            .clamp(0.0, 1.0);
 
     UserProgressionSummary {
         user_id: user_id.to_string(),
@@ -88,6 +115,9 @@ pub(crate) fn build_progression_summary(
         tier_name: tier_name(level).to_string(),
         total_xp_tokens,
         consumed_tokens,
+        own_codex_tokens,
+        shared_codex_tokens,
+        platform_tokens,
         provided_tokens,
         level_floor_tokens,
         next_level_tokens,
@@ -95,8 +125,14 @@ pub(crate) fn build_progression_summary(
         tokens_to_next_level,
         level_progress_ratio,
         consumed_progress_ratio,
+        own_codex_progress_ratio,
+        shared_codex_progress_ratio,
+        platform_progress_ratio,
         provided_progress_ratio,
         consumed_call_count: ledger.consumed_call_count.max(0),
+        own_codex_call_count: ledger.own_codex_call_count.max(0),
+        shared_codex_call_count: ledger.shared_codex_call_count.max(0),
+        platform_call_count: ledger.platform_call_count.max(0),
         provided_run_count: ledger.provided_run_count.max(0),
         provider_earned_fen: ledger.provider_earned_fen.max(0),
     }
@@ -130,24 +166,30 @@ fn tokens_required_for_level(level: i64) -> i64 {
         .max(0.0) as i64
 }
 
-fn progress_segments(
-    consumed_tokens: i64,
-    provided_tokens: i64,
-    tokens_into_level: i64,
-    level_span: i64,
-) -> (f64, f64) {
-    let total = consumed_tokens.saturating_add(provided_tokens);
+fn progress_segments(values: &[i64], tokens_into_level: i64, level_span: i64) -> Vec<f64> {
+    let total = values
+        .iter()
+        .fold(0i64, |sum, value| sum.saturating_add((*value).max(0)));
     if total <= 0 || tokens_into_level <= 0 {
-        return (0.0, 0.0);
+        return vec![0.0; values.len()];
     }
-    let consumed_segment = ((tokens_into_level as f64) * (consumed_tokens as f64) / (total as f64))
-        .round()
-        .clamp(0.0, tokens_into_level as f64) as i64;
-    let provided_segment = (tokens_into_level - consumed_segment).max(0);
-    (
-        ratio(consumed_segment, level_span),
-        ratio(provided_segment, level_span),
-    )
+    let mut remaining = tokens_into_level;
+    values
+        .iter()
+        .enumerate()
+        .map(|(index, value)| {
+            let segment = if index + 1 == values.len() {
+                remaining.max(0)
+            } else {
+                let raw = ((tokens_into_level as f64) * ((*value).max(0) as f64) / (total as f64))
+                    .round() as i64;
+                let segment = raw.clamp(0, remaining.max(0));
+                remaining -= segment;
+                segment
+            };
+            ratio(segment, level_span)
+        })
+        .collect()
 }
 
 fn ratio(value: i64, total: i64) -> f64 {
@@ -194,6 +236,12 @@ mod tests {
             "u1",
             UserProgressionLedger {
                 consumed_tokens: 100_000,
+                own_codex_tokens: 0,
+                own_codex_call_count: 0,
+                shared_codex_tokens: 0,
+                shared_codex_call_count: 0,
+                platform_tokens: 100_000,
+                platform_call_count: 3,
                 provided_tokens: 30_000,
                 consumed_call_count: 3,
                 provided_run_count: 2,
@@ -209,6 +257,12 @@ mod tests {
             "u1",
             UserProgressionLedger {
                 consumed_tokens: 120_000,
+                own_codex_tokens: 60_000,
+                own_codex_call_count: 1,
+                shared_codex_tokens: 20_000,
+                shared_codex_call_count: 1,
+                platform_tokens: 40_000,
+                platform_call_count: 1,
                 provided_tokens: 40_000,
                 consumed_call_count: 3,
                 provided_run_count: 2,
@@ -217,6 +271,8 @@ mod tests {
         );
         assert_eq!(next.level, 3);
         assert!(next.consumed_progress_ratio > next.provided_progress_ratio);
+        assert!(next.own_codex_progress_ratio > next.shared_codex_progress_ratio);
+        assert!(next.platform_progress_ratio > 0.0);
         assert!((next.consumed_progress_ratio + next.provided_progress_ratio) <= 1.0);
     }
 }

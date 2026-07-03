@@ -357,6 +357,14 @@ pub fn account_trusted_usage(
     store: &Store,
     record: &TokenUsageRecord<'_>,
 ) -> anyhow::Result<TokenUsageAccountingResult> {
+    account_trusted_usage_with_charge_policy(store, record, true)
+}
+
+pub fn account_trusted_usage_with_charge_policy(
+    store: &Store,
+    record: &TokenUsageRecord<'_>,
+    charge_platform_balance: bool,
+) -> anyhow::Result<TokenUsageAccountingResult> {
     let (rate, markup) = store.billing_get_rate_and_markup();
     let model = record.model.unwrap_or("unknown");
     let price = price_snapshot_for_store(store, model);
@@ -378,6 +386,7 @@ pub fn account_trusted_usage(
         markup_x1000: markup,
         price_snapshot: price,
         bill_missing_balance: billing_required_for_all_users(store),
+        charge_platform_balance,
     };
     let result = store.record_token_usage_with_billing(record, &charge)?;
     if let Some(balance) = result.balance_after_fen {
@@ -744,6 +753,8 @@ mod tests {
             output_tokens: 1_000_000,
             reasoning_tokens: 0,
             total_tokens: 1_000_000,
+            billing_source: None,
+            resource_owner_user_id: None,
             idempotency_key: Some("price-snapshot-key-1"),
         };
         let result = account_trusted_usage(&store, &record).unwrap();

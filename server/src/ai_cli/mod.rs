@@ -19,6 +19,7 @@ mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
 mod pc_agent_dispatch;
+mod pc_billing;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
 mod pc_prompt_acceptance;
@@ -45,6 +46,10 @@ pub(crate) use self::ai_cli_process::{
 pub(crate) use self::ai_cli_runner::codex_thread_uri;
 #[cfg(test)]
 pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
+pub(crate) use self::pc_billing::{pc_cli_request_is_own_codex, requested_pc_cli_looks_like_codex};
+use self::pc_billing::{
+    record_pc_cli_trusted_usage, reserve_pc_cli_billing_call, settle_pc_cli_node_usage,
+};
 pub(crate) use self::pc_dispatch_capture::{
     run_pc_agent_workspace_capture, PcAgentWorkspaceCaptureRequest, PcAgentWorkspaceCaptureResult,
 };
@@ -812,8 +817,11 @@ pub async fn run_with_pc_agent_workspace(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
-    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow!(msg));
+    let cli_name = cli_name.unwrap_or("copilot");
+    if !pc_cli_request_is_own_codex(state.as_ref(), user_id, agent_id, Some(cli_name)) {
+        if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+            return Err(anyhow!(msg));
+        }
     }
 
     let outcome = run_via_pc_agent(
@@ -827,7 +835,7 @@ pub async fn run_with_pc_agent_workspace(
         download_base,
         artifact_workspace,
         attempt_apk_sync,
-        cli_name.unwrap_or("copilot"),
+        cli_name,
         copilot_model,
         codex_reasoning_effort,
         model_label,
@@ -859,8 +867,11 @@ pub async fn run_with_pc_agent_passthrough_workspace(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<PcAgentChatOutcome> {
-    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow!(msg));
+    let cli_name = cli_name.unwrap_or("codex");
+    if !pc_cli_request_is_own_codex(state.as_ref(), user_id, agent_id, Some(cli_name)) {
+        if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+            return Err(anyhow!(msg));
+        }
     }
     let outcome = run_via_pc_agent(
         agent_id,
@@ -873,7 +884,7 @@ pub async fn run_with_pc_agent_passthrough_workspace(
         download_base,
         artifact_workspace,
         attempt_apk_sync,
-        cli_name.unwrap_or("codex"),
+        cli_name,
         copilot_model,
         codex_reasoning_effort,
         model_label,
@@ -908,11 +919,13 @@ pub async fn run_with_pc_agent_chat(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<PcAgentChatOutcome> {
-    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
-        return Err(anyhow!(msg));
+    let cli_name = cli_name.unwrap_or("codex");
+    if !pc_cli_request_is_own_codex(state.as_ref(), user_id, agent_id, Some(cli_name)) {
+        if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+            return Err(anyhow!(msg));
+        }
     }
 
-    let cli_name = cli_name.unwrap_or("codex");
     let chat_codex_reasoning_effort =
         pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort);
     let read_only_scope = if should_skip_pc_chat_native_session(user_message) {
@@ -1299,14 +1312,15 @@ async fn run_via_pc_agent(
             10
         },
     );
-    let mut pc_billing_call = crate::billing_lifecycle::TrustedBillingCall::reserve(
-        &state.store,
+    let (mut pc_billing_call, pc_billing_context) = reserve_pc_cli_billing_call(
+        state.as_ref(),
         user_id,
+        agent_id,
         &pc_accounting_key,
         pc_cli_feature,
-        "pc_agent_cli",
         model_label.or(copilot_model).or(Some(cli_name)),
         pc_reserve_fen,
+        cli_name,
     )
     .map_err(|msg| anyhow!(msg))?;
     let display_model = pc_display_model_label(
@@ -1727,14 +1741,14 @@ async fn run_via_pc_agent(
                     total_tokens,
                     model.clone().or_else(|| Some(display_model.clone())),
                 ) {
-                    accounting_result = crate::token_usage_api::record_trusted_usage_with_key(
+                    accounting_result = record_pc_cli_trusted_usage(
                         &state.store,
                         user_id,
                         pc_cli_feature,
-                        "pc_agent_cli",
                         model.as_deref().or(Some(display_model.as_str())),
                         &usage,
-                        Some(&pc_accounting_key),
+                        &pc_accounting_key,
+                        &pc_billing_context,
                     );
                     node_transaction = settle_pc_cli_node_usage(
                         state,
@@ -2640,90 +2654,6 @@ fn pc_cli_progress_label(cli_name: &str) -> &'static str {
     }
 }
 
-fn settle_pc_cli_node_usage(
-    state: &AppState,
-    consumer_user_id: &str,
-    node_id: &str,
-    feature: &str,
-    model: Option<&str>,
-    usage: &crate::cli_usage::CliTokenUsage,
-    accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
-) -> Option<crate::store::NodeTransaction> {
-    if accounting_result
-        .map(|result| result.deduplicated)
-        .unwrap_or(true)
-    {
-        return None;
-    }
-    let provider_user_id = match state.store.get_node_credential_owner(node_id) {
-        Ok(Some(owner)) if !owner.trim().is_empty() => owner,
-        Ok(_) => {
-            tracing::warn!(
-                node_id,
-                "PC CLI 用量已记录，但节点缺少 owner，跳过节点收益流水"
-            );
-            return None;
-        }
-        Err(e) => {
-            tracing::warn!(node_id, error = %e, "查询 PC 节点 owner 失败，跳过节点收益流水");
-            return None;
-        }
-    };
-    let (prompt_tokens_i64, completion_tokens_i64) = pc_cli_usage_tokens(usage);
-    let prompt_tokens = clamp_i64_to_u32(prompt_tokens_i64);
-    let completion_tokens = clamp_i64_to_u32(completion_tokens_i64);
-    if prompt_tokens == 0 && completion_tokens == 0 {
-        return None;
-    }
-    let model_id = pc_cli_model_id(model);
-    let params = crate::store::SettleParams {
-        consumer_user_id,
-        provider_user_id: &provider_user_id,
-        node_id,
-        model_id: &model_id,
-        feature,
-        usage_mode: "pc_agent_cli",
-        compute_call_id: accounting_result.and_then(|result| result.idempotency_key.as_deref()),
-        token_usage_event_id: accounting_result.map(|result| result.token_usage_event_id.as_str()),
-        billing_event_id: accounting_result.and_then(|result| result.billing_event_id.as_deref()),
-        prompt_tokens,
-        completion_tokens,
-        price_per_1k_credits: pc_cli_price_per_1k_credits(),
-        billed_cost_rmb_fen: accounting_result
-            .map(|result| result.cost_rmb_fen)
-            .unwrap_or(0),
-        accounting_status: accounting_result.map(|result| result.accounting_status.as_str()),
-        provider_revenue_share_x1000: crate::node_router::provider_revenue_share_x1000(
-            &state.store,
-        ),
-        platform_fee_rate: 0.2,
-    };
-    match state.store.settle_node_inference(params) {
-        Ok(tx) => {
-            tracing::debug!(
-                consumer_user_id,
-                provider_user_id,
-                node_id,
-                tokens = prompt_tokens + completion_tokens,
-                billed_cost_rmb_fen = tx.billed_cost_rmb_fen,
-                provider_earned_fen = tx.provider_earned_fen,
-                settlement_status = tx.settlement_status,
-                "PC CLI 节点收益流水已记录"
-            );
-            Some(tx)
-        }
-        Err(e) => {
-            tracing::error!(
-                consumer_user_id,
-                provider_user_id,
-                node_id,
-                "PC CLI 节点收益流水记录失败: {e}"
-            );
-            None
-        }
-    }
-}
-
 fn pc_cli_model_id(model: Option<&str>) -> String {
     model
         .map(str::trim)
@@ -2747,10 +2677,6 @@ fn pc_cli_price_per_1k_credits() -> f64 {
         .and_then(|value| value.trim().parse::<f64>().ok())
         .filter(|value| *value >= 0.0)
         .unwrap_or(0.1)
-}
-
-fn clamp_i64_to_u32(value: i64) -> u32 {
-    value.clamp(0, u32::MAX as i64) as u32
 }
 
 /// 从 Codex exec 的完整输出中提取最后一段 AI 回复文本。

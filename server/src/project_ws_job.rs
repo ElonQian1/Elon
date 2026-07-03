@@ -17,9 +17,9 @@ use std::{
 use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::{
-    billing,
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_chat::run_project_agent_with_scheduler,
+    project_chat_pc_node::run_bill,
     project_execution_mode::ProjectExecutionMode,
     project_keys::project_ws_job_key,
     project_trace_events::record_server_message,
@@ -144,7 +144,15 @@ pub(crate) async fn get_or_start_project_ws_job(
         return job;
     }
 
-    if let Err(msg) = billing::check_can_call(&state.store, &user_id) {
+    let agent = agent_name.as_deref();
+    if let Some(msg) = run_bill(
+        &state,
+        &user_id,
+        &project,
+        agent,
+        pc_runtime_route,
+        direct_pc_cli,
+    ) {
         let raw = WsMessage::error(msg).to_json();
         let (broadcast_tx, _) = broadcast::channel::<String>(256);
         let (cancel_tx, _cancel_rx) = watch::channel(false);

@@ -13,6 +13,12 @@ use super::Store;
 pub struct UserProgressionLedger {
     pub consumed_tokens: i64,
     pub consumed_call_count: i64,
+    pub own_codex_tokens: i64,
+    pub own_codex_call_count: i64,
+    pub shared_codex_tokens: i64,
+    pub shared_codex_call_count: i64,
+    pub platform_tokens: i64,
+    pub platform_call_count: i64,
     pub provided_tokens: i64,
     pub provided_run_count: i64,
     pub provider_earned_fen: i64,
@@ -21,14 +27,41 @@ pub struct UserProgressionLedger {
 impl Store {
     pub fn user_progression_ledger(&self, user_id: &str) -> Result<UserProgressionLedger> {
         let conn = self.conn.lock().unwrap();
-        let (consumed_tokens, consumed_call_count): (i64, i64) = conn.query_row(
-            "SELECT COALESCE(SUM(total_tokens), 0), COUNT(*)
+        let (
+            consumed_tokens,
+            consumed_call_count,
+            own_codex_tokens,
+            own_codex_call_count,
+            shared_codex_tokens,
+            shared_codex_call_count,
+            platform_tokens,
+            platform_call_count,
+        ): (i64, i64, i64, i64, i64, i64, i64, i64) = conn.query_row(
+            "SELECT COALESCE(SUM(total_tokens), 0),
+                    COUNT(*),
+                    COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') = 'own_codex' THEN total_tokens ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') = 'own_codex' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') = 'shared_codex' THEN total_tokens ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') = 'shared_codex' THEN 1 ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') NOT IN ('own_codex', 'shared_codex') THEN total_tokens ELSE 0 END), 0),
+                    COALESCE(SUM(CASE WHEN COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') NOT IN ('own_codex', 'shared_codex') THEN 1 ELSE 0 END), 0)
                FROM token_usage_events
               WHERE user_id = ?1
                 AND usage_mode NOT IN ('client_reported', 'user_api_key_proxy')
                 AND total_tokens > 0",
             params![user_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                    row.get(5)?,
+                    row.get(6)?,
+                    row.get(7)?,
+                ))
+            },
         )?;
 
         let (provided_tokens, provided_run_count, provider_earned_fen): (i64, i64, i64) = conn
@@ -47,6 +80,12 @@ impl Store {
         Ok(UserProgressionLedger {
             consumed_tokens: consumed_tokens.max(0),
             consumed_call_count: consumed_call_count.max(0),
+            own_codex_tokens: own_codex_tokens.max(0),
+            own_codex_call_count: own_codex_call_count.max(0),
+            shared_codex_tokens: shared_codex_tokens.max(0),
+            shared_codex_call_count: shared_codex_call_count.max(0),
+            platform_tokens: platform_tokens.max(0),
+            platform_call_count: platform_call_count.max(0),
             provided_tokens: provided_tokens.max(0),
             provided_run_count: provided_run_count.max(0),
             provider_earned_fen: provider_earned_fen.max(0),
@@ -89,6 +128,8 @@ mod tests {
                 output_tokens: 40_000,
                 reasoning_tokens: 0,
                 total_tokens: 120_000,
+                billing_source: None,
+                resource_owner_user_id: None,
                 idempotency_key: None,
             })
             .expect("trusted usage should record");
@@ -103,6 +144,8 @@ mod tests {
                 output_tokens: 0,
                 reasoning_tokens: 0,
                 total_tokens: 1_000_000,
+                billing_source: None,
+                resource_owner_user_id: None,
                 idempotency_key: None,
             })
             .expect("client report should record");
@@ -153,6 +196,9 @@ mod tests {
             .expect("ledger should load");
         assert_eq!(ledger.consumed_tokens, 120_000);
         assert_eq!(ledger.consumed_call_count, 1);
+        assert_eq!(ledger.platform_tokens, 120_000);
+        assert_eq!(ledger.own_codex_tokens, 0);
+        assert_eq!(ledger.shared_codex_tokens, 0);
         assert_eq!(ledger.provided_tokens, 12_500);
         assert_eq!(ledger.provided_run_count, 1);
         assert_eq!(ledger.provider_earned_fen, 80);

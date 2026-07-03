@@ -44,6 +44,19 @@ impl<'a> TrustedBillingCall<'a> {
         })
     }
 
+    pub(crate) fn no_platform_charge(
+        store: &'a Store,
+        user_id: &str,
+        compute_call_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            store,
+            user_id: user_id.to_string(),
+            compute_call_id: compute_call_id.into(),
+            active: false,
+        }
+    }
+
     pub(crate) fn key(&self) -> &str {
         &self.compute_call_id
     }

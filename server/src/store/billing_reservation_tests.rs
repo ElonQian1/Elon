@@ -59,6 +59,8 @@ fn reservation_settles_with_refund_and_idempotency() {
         output_tokens: 100,
         reasoning_tokens: 0,
         total_tokens: 200,
+        billing_source: None,
+        resource_owner_user_id: None,
         idempotency_key: Some(key),
     };
     let charge = TokenUsageBillingCharge {
@@ -71,6 +73,7 @@ fn reservation_settles_with_refund_and_idempotency() {
         markup_x1000: 1_200,
         price_snapshot: BillingPriceSnapshot::legacy(),
         bill_missing_balance: true,
+        charge_platform_balance: true,
     };
     let first = store
         .record_token_usage_with_billing(&record, &charge)

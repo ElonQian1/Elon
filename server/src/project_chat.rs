@@ -15,7 +15,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     agent, agent_intent,
     agent_routing::is_local_cli_option,
-    ai_cli, billing, intent_router,
+    ai_cli, intent_router,
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_attachment_notes::{
         append_project_attachment_notes, append_project_cli_attachment_artifacts,
@@ -23,10 +23,11 @@ use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_executor::run_project_agent_in_execution_workspace,
     project_chat_pc_node::{
-        acquire_pc_node_cli_permit, pc_node_cli_execution_progress_message,
-        pc_node_fast_path_route, record_pc_node_cli_execution_granted,
+        acquire_pc_node_cli_permit, chat_billing_block, pc_node_cli_execution_progress_message,
+        pc_node_fast_path_route, record_pc_node_cli_execution_granted, run_bill,
+        should_auto_bind_local_node,
     },
-    project_chat_reply::chat_reply_after_intent_gate,
+    project_chat_reply::{append_nonempty_ws_text, chat_reply_after_intent_gate},
     project_conversation_workspace::{
         prepare_project_conversation_workspace, project_conversation_execution_key,
         project_shared_execution_key, ProjectConversationWorkspace,
@@ -69,9 +70,6 @@ pub async fn chat_project(
             "请求正文疑似发生字符编码损坏，中文已变成大量问号。请使用 UTF-8 发送 JSON；Windows 脚本建议使用 PowerShell 7，或先把 JSON 写成 UTF-8 文件后再用 curl.exe --data-binary @file 发送。",
         );
     }
-    if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
-        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
-    }
     let pc_runtime_route = match req.pc_runtime_route() {
         Ok(route) => route,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
@@ -109,6 +107,9 @@ pub async fn chat_project(
                 }
             }
         }
+    }
+    if let Some(msg) = chat_billing_block(&state, &user.id, &project, &req, pc_runtime_route) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
 
     let conversation_id = match state.store.ensure_conversation(
@@ -303,13 +304,6 @@ pub async fn chat_project(
     .into_response()
 }
 
-fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
-    !matches!(
-        route,
-        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
-    )
-}
-
 pub use crate::project_prewarm::{prewarm_project, prewarm_user_project};
 
 /// POST /api/projects/:project_id/chat/stream
@@ -344,13 +338,13 @@ pub async fn chat_project_stream(
             "请求正文疑似发生字符编码损坏，中文已变成大量问号。请使用 UTF-8 发送 JSON；Windows 脚本建议使用 PowerShell 7，或先把 JSON 写成 UTF-8 文件后再用 curl.exe --data-binary @file 发送。",
         );
     }
-    if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
-        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
-    }
     let pc_runtime_route = match req.pc_runtime_route() {
         Ok(route) => route,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };
+    if let Some(msg) = chat_billing_block(&state, &user.id, &project, &req, pc_runtime_route) {
+        return json_error(StatusCode::PAYMENT_REQUIRED, msg);
+    }
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
         &user.id,
@@ -550,16 +544,6 @@ fn clean_project_icon_context_data_url(project_icon_data_url: Option<&str>) -> O
     Some(value.to_string())
 }
 
-fn append_nonempty_ws_text(buffer: &mut String, text: Option<&str>) {
-    let Some(text) = text.map(str::trim).filter(|value| !value.is_empty()) else {
-        return;
-    };
-    if !buffer.is_empty() && !buffer.ends_with('\n') {
-        buffer.push('\n');
-    }
-    buffer.push_str(text);
-}
-
 fn write_project_icon_metadata(
     workspace: &Path,
     project: &ProjectAccess,
@@ -597,7 +581,15 @@ pub(crate) async fn run_project_agent_with_scheduler(
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
-    if let Err(msg) = billing::check_can_call(&state.store, &user_id) {
+    let agent = agent_name.as_deref();
+    if let Some(msg) = run_bill(
+        &state,
+        &user_id,
+        &project,
+        agent,
+        pc_runtime_route,
+        direct_pc_cli,
+    ) {
         let _ = tx.send(WsMessage::error(msg).to_json());
         return;
     }

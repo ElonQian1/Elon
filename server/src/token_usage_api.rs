@@ -20,7 +20,12 @@ use std::sync::Arc;
 use crate::{
     cli_usage::{parse_cli_usage, usage_from_value, CliTokenUsage},
     project_auth::{auth_from_headers, json_error},
-    store::{ComputeMeterEvent, Store, TokenUsageAccountingResult, TokenUsageRecord},
+    store::{
+        token_usage::{
+            BILLING_SOURCE_CLIENT_REPORTED, BILLING_SOURCE_PLATFORM, BILLING_SOURCE_USER_API_KEY,
+        },
+        ComputeMeterEvent, Store, TokenUsageAccountingResult, TokenUsageRecord,
+    },
     types::AppState,
 };
 
@@ -106,6 +111,8 @@ pub async fn report_client_usage(
         output_tokens: output,
         reasoning_tokens: reasoning,
         total_tokens: total,
+        billing_source: Some(BILLING_SOURCE_CLIENT_REPORTED),
+        resource_owner_user_id: None,
         idempotency_key: None,
     };
 
@@ -146,6 +153,8 @@ pub(crate) fn record_api_usage(
             output_tokens: usage.output_tokens,
             reasoning_tokens: usage.reasoning_tokens,
             total_tokens: usage.total_tokens,
+            billing_source: Some(BILLING_SOURCE_USER_API_KEY),
+            resource_owner_user_id: Some(user_id),
             idempotency_key: None,
         };
         if let Err(e) = store.record_token_usage(&record) {
@@ -186,6 +195,32 @@ pub(crate) fn record_trusted_usage_with_key(
     usage: &CliTokenUsage,
     idempotency_key: Option<&str>,
 ) -> Option<crate::store::TokenUsageAccountingResult> {
+    record_trusted_usage_with_key_and_resource(
+        store,
+        user_id,
+        feature,
+        usage_mode,
+        model,
+        usage,
+        idempotency_key,
+        Some(BILLING_SOURCE_PLATFORM),
+        None,
+        true,
+    )
+}
+
+pub(crate) fn record_trusted_usage_with_key_and_resource(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: Option<&str>,
+    usage: &CliTokenUsage,
+    idempotency_key: Option<&str>,
+    billing_source: Option<&str>,
+    resource_owner_user_id: Option<&str>,
+    charge_platform_balance: bool,
+) -> Option<crate::store::TokenUsageAccountingResult> {
     let Some(usage) = usage.clone().normalized() else {
         if let Some(key) = idempotency_key {
             crate::billing::release_trusted_call(store, user_id, key, "released_no_usage");
@@ -203,9 +238,15 @@ pub(crate) fn record_trusted_usage_with_key(
         output_tokens: usage.output_tokens,
         reasoning_tokens: usage.reasoning_tokens,
         total_tokens: usage.total_tokens,
+        billing_source,
+        resource_owner_user_id,
         idempotency_key,
     };
-    match crate::billing::account_trusted_usage(store, &record) {
+    match crate::billing::account_trusted_usage_with_charge_policy(
+        store,
+        &record,
+        charge_platform_balance,
+    ) {
         Ok(result) => {
             tracing::debug!(
                 user_id,

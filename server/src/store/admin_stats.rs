@@ -682,6 +682,7 @@ impl Store {
                     "SELECT COALESCE(SUM(total_tokens),0) FROM token_usage_events
                      WHERE user_id=?1
                        AND usage_mode NOT IN ('client_reported','user_api_key_proxy')
+                       AND COALESCE(NULLIF(TRIM(billing_source), ''), 'platform') != 'own_codex'
                        AND created_at >= ?2",
                     params![user_id, month_start],
                     |r| r.get(0),

@@ -8,9 +8,17 @@ interface LevelExperienceBarProps {
 export default function LevelExperienceBar({ progression }: LevelExperienceBarProps) {
   if (!progression) return null
 
-  const consumed = clampPercent(progression.consumed_progress_ratio)
-  const provided = clampPercent(progression.provided_progress_ratio)
-  const providedLeft = Math.min(consumed, 100)
+  const ownCodexTokens = progression.own_codex_tokens ?? 0
+  const sharedCodexTokens = progression.shared_codex_tokens ?? 0
+  const platformTokens = progression.platform_tokens ?? Math.max(0, progression.consumed_tokens - ownCodexTokens - sharedCodexTokens)
+  const segments = progression.own_codex_progress_ratio == null
+    ? legacySegments(progression)
+    : [
+        { key: 'own', className: styles.ownCodex, label: '自用 Codex', value: ownCodexTokens, ratio: progression.own_codex_progress_ratio ?? 0 },
+        { key: 'shared', className: styles.sharedCodex, label: '用别人 Codex', value: sharedCodexTokens, ratio: progression.shared_codex_progress_ratio ?? 0 },
+        { key: 'platform', className: styles.platform, label: '平台/其他', value: platformTokens, ratio: progression.platform_progress_ratio ?? 0 },
+        { key: 'provided', className: styles.provided, label: '分享给别人', value: progression.provided_tokens, ratio: progression.provided_progress_ratio },
+      ]
   const progressPercent = Math.round(progression.level_progress_ratio * 100)
   const levelSpan = progression.next_level_tokens - progression.level_floor_tokens
   const nextLevel = progression.level + 1
@@ -18,9 +26,11 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
     `Lv.${progression.level} ${progression.tier_name}`,
     `本级 ${formatTokens(progression.tokens_into_level)} / ${formatTokens(levelSpan)}`,
     `距 Lv.${nextLevel} ${formatTokens(progression.tokens_to_next_level)}`,
-    `消耗 ${formatTokens(progression.consumed_tokens)}`,
-    `贡献 ${formatTokens(progression.provided_tokens)}`,
+    `自用 Codex ${formatTokens(ownCodexTokens)}`,
+    `用别人 Codex ${formatTokens(sharedCodexTokens)}`,
+    `分享给别人 ${formatTokens(progression.provided_tokens)}`,
   ].join(' · ')
+  let left = 0
 
   return (
     <div
@@ -38,14 +48,12 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
         <span>{progressPercent}%</span>
       </div>
       <div className={styles.track}>
-        <span
-          className={styles.consumed}
-          style={{ width: `${consumed}%` }}
-        />
-        <span
-          className={styles.provided}
-          style={{ left: `${providedLeft}%`, width: `${Math.max(0, Math.min(provided, 100 - providedLeft))}%` }}
-        />
+        {segments.map((segment) => {
+          const width = Math.max(0, Math.min(clampPercent(segment.ratio), 100 - left))
+          const style = { left: `${left}%`, width: `${width}%` }
+          left += width
+          return <span key={segment.key} className={`${styles.segment} ${segment.className}`} style={style} />
+        })}
       </div>
       <div className={styles.panel} aria-hidden="true">
         <div className={styles.panelHead}>
@@ -65,19 +73,16 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
           <strong>{formatTokens(progression.total_xp_tokens)}</strong>
         </div>
         <div className={styles.split}>
-          <div>
-            <span className={styles.dotConsumed} />
-            <span>消耗</span>
-            <strong>{formatTokens(progression.consumed_tokens)}</strong>
-          </div>
-          <div>
-            <span className={styles.dotProvided} />
-            <span>贡献</span>
-            <strong>{formatTokens(progression.provided_tokens)}</strong>
-          </div>
+          {segments.map((segment) => (
+            <div key={segment.key}>
+              <span className={`${styles.dot} ${segment.className}`} />
+              <span>{segment.label}</span>
+              <strong>{formatTokens(segment.value)}</strong>
+            </div>
+          ))}
         </div>
         <div className={styles.detailRow}>
-          <span>调用 / 贡献</span>
+          <span>调用 / 分享</span>
           <strong>{progression.consumed_call_count} / {progression.provided_run_count}</strong>
         </div>
         {progression.provider_earned_fen > 0 && (
@@ -89,6 +94,13 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
       </div>
     </div>
   )
+}
+
+function legacySegments(progression: UserProgressionSummary) {
+  return [
+    { key: 'platform', className: styles.platform, label: '消耗', value: progression.consumed_tokens, ratio: progression.consumed_progress_ratio },
+    { key: 'provided', className: styles.provided, label: '分享给别人', value: progression.provided_tokens, ratio: progression.provided_progress_ratio },
+  ]
 }
 
 function clampPercent(value: number) {

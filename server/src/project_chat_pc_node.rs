@@ -4,9 +4,12 @@ use homecli_proto::NodeHardwareProfile;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
+    ai_cli, billing,
     node_runtime::node_runtime_by_id,
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_task_scheduler::ProjectTaskPermit,
+    project_ws_protocol::ProjectChatRequest,
+    store::ProjectAccess,
     types::{AppState, WsMessage},
 };
 
@@ -27,6 +30,112 @@ pub(crate) fn pc_node_fast_path_route(
         return Some(PcRuntimeRoutePreference::RouteA);
     }
     pc_runtime_route
+}
+
+pub(crate) fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
+    !matches!(
+        route,
+        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+    )
+}
+
+pub(crate) fn project_request_uses_own_pc_codex_account(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project_node_id: Option<&str>,
+    local_node_id: Option<&str>,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
+) -> bool {
+    if matches!(
+        pc_runtime_route,
+        Some(
+            PcRuntimeRoutePreference::RouteB
+                | PcRuntimeRoutePreference::RouteC
+                | PcRuntimeRoutePreference::RouteC2
+                | PcRuntimeRoutePreference::RouteC3
+        )
+    ) {
+        return false;
+    }
+    if !direct_pc_cli
+        && !matches!(
+            pc_runtime_route,
+            None | Some(PcRuntimeRoutePreference::RouteA)
+        )
+    {
+        return false;
+    }
+    if !ai_cli::requested_pc_cli_looks_like_codex(state.as_ref(), agent_name) {
+        return false;
+    }
+    let node_id = local_node_id
+        .and_then(clean_node_id)
+        .or_else(|| project_node_id.and_then(clean_node_id));
+    node_id
+        .map(|node_id| ai_cli::pc_cli_request_is_own_codex(state.as_ref(), user_id, node_id, None))
+        .unwrap_or(false)
+}
+
+pub(crate) fn chat_billing_block(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    req: &ProjectChatRequest,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+) -> Option<String> {
+    billing_block(
+        state,
+        user_id,
+        project,
+        req.local_node_id.as_deref(),
+        req.agent.as_deref(),
+        pc_runtime_route,
+        req.direct_pc_cli.unwrap_or(false),
+    )
+}
+
+pub(crate) fn run_bill(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
+) -> Option<String> {
+    billing_block(
+        state,
+        user_id,
+        project,
+        None,
+        agent_name,
+        pc_runtime_route,
+        direct_pc_cli,
+    )
+}
+
+fn billing_block(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    local_node_id: Option<&str>,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
+) -> Option<String> {
+    if project_request_uses_own_pc_codex_account(
+        state,
+        user_id,
+        project.node_id.as_deref(),
+        local_node_id,
+        agent_name,
+        pc_runtime_route,
+        direct_pc_cli,
+    ) {
+        return None;
+    }
+    billing::check_can_call(&state.store, user_id).err()
 }
 
 pub(crate) async fn acquire_pc_node_cli_permit(
@@ -165,6 +274,15 @@ async fn try_acquire_pc_node_cli_slot(
 
 fn pc_node_cli_execution_key(agent_id: &str) -> String {
     format!("pc-node-cli:{}", agent_id.trim())
+}
+
+fn clean_node_id(value: &str) -> Option<&str> {
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 fn pc_node_cli_slot_key(base_key: &str, slot: usize) -> String {

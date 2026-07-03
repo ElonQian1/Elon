@@ -1,10 +1,8 @@
 use crate::store_schema::apply_migrations;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
-use std::{
-    path::Path,
-    sync::{Mutex, MutexGuard},
-};
+use std::path::Path;
+use std::sync::{Mutex, MutexGuard};
 
 mod admin_stats;
 mod billing;
@@ -65,7 +63,9 @@ mod social_ai_selected;
 mod store_types;
 mod system_projects;
 mod tasks;
-mod token_usage;
+pub(crate) mod token_usage;
+#[cfg(test)]
+mod token_usage_tests;
 mod user_archive;
 mod user_memories;
 mod user_presence;

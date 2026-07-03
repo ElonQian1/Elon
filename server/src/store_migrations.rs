@@ -88,11 +88,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (64, "Route C 服务器模型每日预算调用审计", migration_v64),
     (65, "Route C 服务器模型用户日预算索引", migration_v65),
     (66, "Route C 服务器模型调用完成态审计", migration_v66),
-    (
-        67,
-        "BB64A external app AI reply trial credit config",
-        migration_v67,
-    ),
+    (67, "BB64A external app AI reply trial credit config", migration_v67),
     (68, "项目级 AI danger_full_access 权限", migration_v68),
     (69, "项目成员管理审计日志", migration_v69),
     (70, "项目成员禁言与封禁状态", migration_v70),
@@ -110,6 +106,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (82, "项目成员昵称与管理员备注", migration_v82),
     (83, "releases", crate::project_release_migration::migration_v83),
     (84, "新用户默认免费额度提升到 30000 分", crate::billing_trial_credit_migration::migration_v84),
+    (85, "token 用量资源来源与自有 Codex 免扣费标记", crate::billing_usage_source_migration::migration_v85),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
