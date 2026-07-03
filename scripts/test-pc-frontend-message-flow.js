@@ -238,12 +238,59 @@ try {
     [['test', '运行测试/构建'], ['test', '验证完成']],
     'validation commands should render as test/build process rows',
   );
+  assert.strictEqual(validationTimeline.items[0].process.kind, 'test', 'validation command should expose a structured test process card');
+  assert.strictEqual(validationTimeline.items[0].process.bodyLabel, '命令', 'test command card should label the command body');
+  assert.ok(validationTimeline.items[0].process.body.includes('cargo-dev.ps1 check'), 'test command card should show the actual command');
+  assert.strictEqual(validationTimeline.items[1].process.bodyLabel, '输出', 'test result card should label command output');
+  assert.ok(validationTimeline.items[1].process.body.includes('Finished `dev`'), 'test result card should show the command output');
   assert.strictEqual(
     timelineSummary(validationTimeline, 'tsk-validation', 'tsk_val...'),
     '2 步过程 · 有命令 · 有测试/构建 · 当前：验证完成 · tsk_val...',
     'summary should mention command and validation coverage',
   );
   assert.strictEqual(validationTimeline.stage.label, '最后公开步骤：验证完成', 'completed validation output should become the current public stage');
+
+  const fileTimeline = buildTaskTimeline([
+    {
+      id: 'f1',
+      kind: 'ai_progress',
+      task_id: 'tsk-file',
+      content: JSON.stringify({
+        type: 'tool_call',
+        tool: 'file_change',
+        args: {
+          changes: [
+            { path: 'pc-frontend/src/features/dev/TaskTimeline.tsx' },
+            { path: 'pc-frontend/src/features/dev/TaskTimeline.module.css' },
+          ],
+        },
+      }),
+    },
+    {
+      id: 'f2',
+      kind: 'ai_progress',
+      task_id: 'tsk-file',
+      content: JSON.stringify({
+        type: 'tool_result',
+        tool: 'file_change',
+        status: 'ok',
+        result: 'applied',
+        diff: {
+          files: ['pc-frontend/src/features/dev/TaskTimeline.tsx'],
+          preview: 'diff --git a/TaskTimeline.tsx b/TaskTimeline.tsx\n+<ProcessCardView />',
+        },
+      }),
+    },
+  ]);
+  assert.strictEqual(fileTimeline.coverage.fileChange, true, 'file_change events should be visible in coverage');
+  assert.deepStrictEqual(
+    fileTimeline.items.map((item) => [item.kind, item.process && item.process.kind]),
+    [['file', 'file'], ['file', 'file']],
+    'file changes should render as structured file process rows',
+  );
+  assert.ok(fileTimeline.items[0].process.subtitle.includes('TaskTimeline.tsx'), 'file call card should list target files');
+  assert.strictEqual(fileTimeline.items[1].process.bodyLabel, 'Diff 预览', 'file result card should prefer diff previews');
+  assert.ok(fileTimeline.items[1].process.body.includes('ProcessCardView'), 'file result card should show diff preview content');
 
   const liveRecovery = recoveryViewFromEntry({
     task_id: 'tsk_live_1234567890',

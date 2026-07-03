@@ -11,6 +11,7 @@ import {
   Terminal,
 } from 'lucide-react'
 import { DevTaskMessage } from './DevTaskCard'
+import type { ProcessCard } from './taskProcessCardModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
 import { coverageLabels } from './taskTimelineModel'
 import type { TaskTimelineDiagnostic, TaskTimelineModel, TaskTimelineStage, TimelineItem, TimelineItemKind } from './taskTimelineModel'
@@ -101,7 +102,8 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
           <span className={styles.title}>{item.title}</span>
           {item.meta && <span className={styles.meta}>{item.meta}</span>}
         </div>
-        {item.detail && !embedded && <div className={styles.detail}>{item.detail}</div>}
+        {item.process && <ProcessCardView process={item.process} />}
+        {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}
         {embedded && item.message && (
           <div className={styles.embedded}>
             <DevTaskMessage
@@ -119,10 +121,31 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
 
 function shouldRenderEmbeddedMessage(item: TimelineItem): boolean {
   const type = item.event?.type
-  return type === 'tool_call'
-    || type === 'tool_result'
-    || type === 'tool_approval_required'
+  if (item.process) return false
+  return type === 'tool_approval_required'
     || type === 'tool_approval_decision'
+}
+
+function ProcessCardView({ process }: { process: ProcessCard }) {
+  return (
+    <div className={[styles.processCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
+      <div className={styles.processCardHead}>
+        <span>{process.subtitle}</span>
+        <div className={styles.processChips}>
+          {process.chips.map((chip, index) => (
+            <em key={`${chip.label}-${index}`} data-tone={chip.tone || undefined}>{chip.label}</em>
+          ))}
+          {process.truncated && <em data-tone="muted">已截断</em>}
+        </div>
+      </div>
+      {process.body && (
+        <div className={styles.processBody}>
+          <strong>{process.bodyLabel}</strong>
+          <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function iconFor(kind: TimelineItemKind, tone: TaskTone) {
@@ -132,6 +155,7 @@ function iconFor(kind: TimelineItemKind, tone: TaskTone) {
   if (tone === 'canceled') return <Ban {...props} />
   if (kind === 'node') return <HardDrive {...props} />
   if (kind === 'test') return <ListChecks {...props} />
+  if (kind === 'file') return <FileCode2 {...props} />
   if (kind === 'tool') return <Terminal {...props} />
   if (kind === 'approval') return <KeyRound {...props} />
   if (kind === 'artifact') return <FileCode2 {...props} />

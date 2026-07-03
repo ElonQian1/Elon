@@ -7,12 +7,14 @@ import {
   toolEventTitle,
   usageEventSummary,
 } from './devTaskUtils'
+import { processCardFromToolEvent, type ProcessCard } from './taskProcessCardModel'
 import type { ChatMessage, TaskTone, ToolEvent } from './types'
 
 export type TimelineItemKind =
   | 'node'
   | 'codex'
   | 'tool'
+  | 'file'
   | 'test'
   | 'approval'
   | 'artifact'
@@ -28,6 +30,7 @@ export interface TimelineItem {
   meta?: string
   message?: ChatMessage
   event?: ToolEvent
+  process?: ProcessCard
   compact?: boolean
 }
 
@@ -275,14 +278,16 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
   const failed = isResult && clean(event.status ?? '').toLowerCase() === 'error'
   const isShell = clean(event.tool ?? '') === 'shell'
   const validation = isShell && eventLooksLikeValidation(event)
+  const process = processCardFromToolEvent(event)
   return {
     id: itemId(message, index),
-    kind: validation ? 'test' : 'tool',
+    kind: process?.kind === 'file' ? 'file' : validation ? 'test' : 'tool',
     tone: failed ? 'failed' : isResult ? 'done' : 'running',
     title: toolEventTitle(event),
     detail: toolEventSummary(event, 140),
     message,
     event,
+    process: process ?? undefined,
   }
 }
 

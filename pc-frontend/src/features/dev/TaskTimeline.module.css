@@ -193,6 +193,119 @@
   padding-right: 8px;
 }
 
+.processCard {
+  display: grid;
+  gap: 7px;
+  margin: 3px 8px 0 0;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .026);
+  padding: 8px;
+  min-width: 0;
+}
+
+.processCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.processCardHead > span {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c7d4eb;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.processChips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.processChips em {
+  height: 19px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 4px;
+  padding: 0 6px;
+  color: #92a2bb;
+  background: rgba(255, 255, 255, .025);
+  font-size: 10px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.processChips em[data-tone="running"] {
+  color: #9fb2ff;
+  border-color: rgba(88, 101, 242, .25);
+  background: rgba(88, 101, 242, .08);
+}
+
+.processChips em[data-tone="failed"] {
+  color: #ff9da1;
+  border-color: rgba(218, 55, 60, .26);
+  background: rgba(218, 55, 60, .08);
+}
+
+.processBody {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.processBody strong {
+  color: #8492aa;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.processBody pre {
+  max-height: 260px;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, .24);
+  color: #cfd8e8;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.processBody pre[data-monospace="true"] {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
+.process_test {
+  border-color: rgba(143, 211, 255, .18);
+  background: rgba(37, 99, 235, .055);
+}
+
+.process_file {
+  border-color: rgba(43, 213, 118, .18);
+  background: rgba(35, 165, 90, .045);
+}
+
+.processCard.tone_failed {
+  border-color: rgba(218, 55, 60, .26);
+  background: rgba(218, 55, 60, .07);
+}
+
 .embedded {
   margin-top: 4px;
   min-width: 0;
@@ -221,6 +334,12 @@
   color: #8fd3ff;
   border-color: rgba(143, 211, 255, .28);
   background: rgba(37, 99, 235, .10);
+}
+
+.kind_file .icon {
+  color: #8ee8af;
+  border-color: rgba(43, 213, 118, .28);
+  background: rgba(35, 165, 90, .10);
 }
 
 .tone_canceled .icon,
