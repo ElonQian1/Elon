@@ -1873,6 +1873,37 @@
       line-height: 1.65;
       white-space: pre-wrap;
     }
+    .profile-node-resource-panel {
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 18px 22px;
+      margin-top: 10px;
+    }
+    .profile-node-resource-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .profile-node-resource-panel .node-balance-card {
+      background: transparent;
+      border-radius: 0;
+      padding: 0;
+      margin-top: 16px;
+      cursor: default;
+    }
+    .profile-node-resource-panel .node-balance-card:hover { background: transparent; }
+    .profile-node-resource-panel .node-directory-card,
+    .profile-node-resource-panel .my-nodes-card {
+      background: transparent;
+      border-top: 1px solid rgba(77, 77, 77, 0.45);
+      border-radius: 0;
+      padding: 16px 0 0;
+      margin-top: 16px;
+    }
+    .profile-node-resource-panel .node-directory-node,
+    .profile-node-resource-panel .my-node-row {
+      background: var(--panel-header);
+    }
     .node-balance-card {
       background: #222222;
       border-radius: 8px;
@@ -2035,6 +2066,11 @@
       margin-bottom: 10px;
     }
     .my-nodes-title { font-size: 15px; font-weight: 700; color: #D6D6D6; }
+    .my-nodes-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .my-nodes-status {
       font-size: 11px; color: #8DDC9B;
       background: #16251A; border-radius: 8px;
@@ -2042,6 +2078,21 @@
     }
     .my-nodes-status.online { color: var(--accent); background: var(--badge-info-bg); }
     .my-nodes-status.offline { color: var(--ink-faint); background: var(--panel); }
+    .my-nodes-refresh {
+      min-width: 56px;
+      min-height: 40px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--badge-info-bg);
+      color: var(--badge-info-ink);
+      font-size: 11px;
+      cursor: pointer;
+      padding: 0 12px;
+    }
+    .my-nodes-refresh:disabled {
+      cursor: default;
+      opacity: 0.55;
+    }
     .my-node-row {
       display: flex; align-items: center;
       background: #222222; border-radius: 6px;
@@ -3157,60 +3208,76 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <div class="download-link-box" id="downloadLinkBox">生成中…</div>
       </div>
 
-      <!-- 节点积分内联卡片 -->
-      <div class="node-balance-card" id="nodeBalanceCard">
-        <div class="node-balance-header">
-          <span class="node-balance-title">节点积分</span>
-          <span class="node-balance-status" id="nodeBalanceStatus">加载中…</span>
-        </div>
-        <div class="node-balance-metrics">
-          <div class="node-balance-metric">
-            <label>可用余额</label>
-            <span class="val" id="nodeBalanceVal">—</span>
-          </div>
-          <div class="node-balance-metric">
-            <label>累计收益</label>
-            <span class="val" id="nodeLifetimeVal">—</span>
-          </div>
-          <div class="node-balance-metric">
-            <label>提现处理中</label>
-            <span class="val" id="nodePendingPayoutVal">—</span>
-          </div>
-        </div>
-        <div class="node-balance-cta-row">
-          <span class="node-balance-cta" onclick="openNodeMarketDialog()">查看在线 PC 节点  →</span>
-          <span class="node-payout-actions">
-            <span class="node-balance-payout-btn" onclick="openNodePayoutDialog()">申请提现</span>
-            <span class="node-balance-tx-btn" onclick="openNodePayoutsDialog()">提现记录</span>
-            <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
-          </span>
-        </div>
-      </div>
+      <div class="profile-node-resource-panel" id="profileNodeResourcePanel">
+        <div class="profile-node-resource-title">PC 节点资源</div>
 
-      <!-- 全站 PC 节点概览卡片 -->
-      <div class="node-directory-card" id="nodeDirectoryCard" onclick="openNodeMarketDialog()">
-        <div class="node-directory-header">
-          <span class="node-directory-title">全站 PC 节点</span>
-          <span class="node-directory-status" id="nodeDirectoryStatus">加载中…</span>
-        </div>
-        <div class="node-directory-metrics">
-          <div class="node-directory-metric">
-            <label>在线节点</label>
-            <span class="val" id="nodeDirectoryOnlineVal">—</span>
+        <!-- 节点积分内联卡片 -->
+        <div class="node-balance-card" id="nodeBalanceCard">
+          <div class="node-balance-header">
+            <span class="node-balance-title">节点积分</span>
+            <span class="node-balance-status" id="nodeBalanceStatus">加载中…</span>
           </div>
-          <div class="node-directory-metric">
-            <label>可接项目</label>
-            <span class="val" id="nodeDirectoryReadyVal">—</span>
+          <div class="node-balance-metrics">
+            <div class="node-balance-metric">
+              <label>可用余额</label>
+              <span class="val" id="nodeBalanceVal">—</span>
+            </div>
+            <div class="node-balance-metric">
+              <label>累计收益</label>
+              <span class="val" id="nodeLifetimeVal">—</span>
+            </div>
+            <div class="node-balance-metric">
+              <label>提现处理中</label>
+              <span class="val" id="nodePendingPayoutVal">—</span>
+            </div>
           </div>
-          <div class="node-directory-metric">
-            <label>可用模型</label>
-            <span class="val" id="nodeDirectoryModelsVal">—</span>
+          <div class="node-balance-cta-row">
+            <span class="node-balance-cta" onclick="openNodeMarketDialog()">查看在线 PC 节点  →</span>
+            <span class="node-payout-actions">
+              <span class="node-balance-payout-btn" onclick="openNodePayoutDialog()">申请提现</span>
+              <span class="node-balance-tx-btn" onclick="openNodePayoutsDialog()">提现记录</span>
+              <span class="node-balance-tx-btn" onclick="openNodeTxDialog()">积分明细</span>
+            </span>
           </div>
         </div>
-        <div class="node-directory-preview" id="nodeDirectoryPreview">
-          <div class="node-directory-empty">加载中…</div>
+
+        <!-- 全站 PC 节点概览卡片 -->
+        <div class="node-directory-card" id="nodeDirectoryCard" onclick="openNodeMarketDialog()">
+          <div class="node-directory-header">
+            <span class="node-directory-title">全站 PC 节点</span>
+            <span class="node-directory-status" id="nodeDirectoryStatus">加载中…</span>
+          </div>
+          <div class="node-directory-metrics">
+            <div class="node-directory-metric">
+              <label>在线节点</label>
+              <span class="val" id="nodeDirectoryOnlineVal">—</span>
+            </div>
+            <div class="node-directory-metric">
+              <label>可接项目</label>
+              <span class="val" id="nodeDirectoryReadyVal">—</span>
+            </div>
+            <div class="node-directory-metric">
+              <label>可用模型</label>
+              <span class="val" id="nodeDirectoryModelsVal">—</span>
+            </div>
+          </div>
+          <div class="node-directory-preview" id="nodeDirectoryPreview">
+            <div class="node-directory-empty">加载中…</div>
+          </div>
+          <span class="node-directory-cta">进入 PC 节点大厅  →</span>
         </div>
-        <span class="node-directory-cta">进入 PC 节点大厅  →</span>
+
+        <!-- 我的节点状态卡片 -->
+        <div class="my-nodes-card" id="myNodesCard">
+          <div class="my-nodes-header">
+            <span class="my-nodes-title">我的节点</span>
+            <span class="my-nodes-actions">
+              <span class="my-nodes-status" id="myNodesStatus">加载中…</span>
+              <button class="my-nodes-refresh" id="myNodesRefreshBtn" type="button">刷新</button>
+            </span>
+          </div>
+          <div id="myNodesList"></div>
+        </div>
       </div>
 
       <!-- 积分流水明细弹窗 -->
@@ -3222,15 +3289,6 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           </div>
           <div class="node-tx-list" id="nodeTxList"><div style="text-align:center;padding:32px 0;color:#777777">加载中…</div></div>
         </div>
-      </div>
-
-      <!-- 我的节点状态卡片 -->
-      <div class="my-nodes-card" id="myNodesCard">
-        <div class="my-nodes-header">
-          <span class="my-nodes-title">我的节点</span>
-          <span class="my-nodes-status" id="myNodesStatus">加载中…</span>
-        </div>
-        <div id="myNodesList"></div>
       </div>
 
       <div class="my-nodes-card" id="memoriesCard">
@@ -8161,21 +8219,22 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const listEl = document.getElementById('myNodesList');
     if (!card || !listEl) return;
     card.style.display = '';
-    if (!isLoggedIn()) {
-      if (statusEl) { statusEl.textContent = '未登录'; statusEl.className = 'my-nodes-status'; }
-      listEl.innerHTML = '';
-      return;
-    }
-    if (statusEl) { statusEl.textContent = '加载中…'; statusEl.className = 'my-nodes-status'; }
+    setMyNodesRefreshLoading(true);
     try {
-      const res = await fetch('/api/me/nodes', { headers: authHeaders() });
+      if (!isLoggedIn()) {
+        if (statusEl) { statusEl.textContent = '未登录'; statusEl.className = 'my-nodes-status offline'; }
+        listEl.innerHTML = '';
+        return;
+      }
+      if (statusEl) { statusEl.textContent = '加载中…'; statusEl.className = 'my-nodes-status'; }
+      const res = await fetch('/api/me/nodes', { headers: authHeaders(), cache: 'no-store' });
       if (!res.ok) throw new Error('http ' + res.status);
       const data = await res.json();
       const nodes = data.nodes || [];
       listEl.innerHTML = '';
       if (nodes.length === 0) {
         listEl.innerHTML = '<div class="my-nodes-empty">暂无你提供的节点<br>所有在线节点请看 PC 节点大厅</div>';
-        if (statusEl) { statusEl.textContent = '无节点'; statusEl.className = 'my-nodes-status'; }
+        if (statusEl) { statusEl.textContent = '无节点'; statusEl.className = 'my-nodes-status offline'; }
         return;
       }
       const onlineCnt = nodes.filter((n) => n.online).length;
@@ -8230,14 +8289,29 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         listEl.appendChild(row);
       });
     } catch {
-      if (statusEl) { statusEl.textContent = '暂不可用'; statusEl.className = 'my-nodes-status'; }
+      if (statusEl) { statusEl.textContent = '暂不可用'; statusEl.className = 'my-nodes-status offline'; }
+    } finally {
+      setMyNodesRefreshLoading(false);
     }
   }
 
+  function setMyNodesRefreshLoading(loading) {
+    const btn = document.getElementById('myNodesRefreshBtn');
+    if (!btn) return;
+    btn.disabled = !!loading;
+    btn.textContent = loading ? '刷新中' : '刷新';
+  }
 
   aiSettingsRow.addEventListener('click', openAgentDialog);
   modelBtn.addEventListener('click', openAgentDialog);
   if (nodeMarketRow) nodeMarketRow.addEventListener('click', openNodeMarketDialog);
+  const myNodesRefreshBtn = $('myNodesRefreshBtn');
+  if (myNodesRefreshBtn) {
+    myNodesRefreshBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      loadMyNodes().catch((e) => console.warn('loadMyNodes failed:', e));
+    });
+  }
   window.ElonWebApp = {
     api,
     escapeHtml,

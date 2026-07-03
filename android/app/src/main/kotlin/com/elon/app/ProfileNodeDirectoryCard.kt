@@ -134,16 +134,14 @@ internal class ProfileNodeDirectoryCard(
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.setMargins(0, dp(10), 0, 0) }
+            ).also { it.setMargins(0, dp(18), 0, 0) }
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(18), dp(22), dp(16))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#222222"))
-                cornerRadius = dp(8).toFloat()
-            }
+            setPadding(0, 0, 0, 0)
             isClickable = true
             isFocusable = true
             setOnClickListener { openMarket() }
+
+            addView(buildSectionDivider())
 
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -233,7 +231,7 @@ internal class ProfileNodeDirectoryCard(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#151515"))
+                setColor(Color.parseColor("#1F2023"))
                 cornerRadius = dp(6).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(
@@ -272,6 +270,17 @@ internal class ProfileNodeDirectoryCard(
             setTextColor(Color.parseColor("#777777"))
             gravity = Gravity.CENTER
             setPadding(0, dp(8), 0, dp(6))
+        }
+    }
+
+    private fun buildSectionDivider(): View {
+        return View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)
+            ).also { it.bottomMargin = dp(16) }
+            setBackgroundColor(Color.parseColor("#4D4D4D"))
+            alpha = 0.45f
         }
     }
 

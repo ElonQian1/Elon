@@ -116,13 +116,9 @@ internal class ProfileNodeBalanceCard(
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.setMargins(0, dp(10), 0, 0) }
+            ).also { it.setMargins(0, dp(16), 0, 0) }
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(18), dp(22), dp(18))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#222222"))
-                cornerRadius = dp(8).toFloat()
-            }
+            setPadding(0, 0, 0, 0)
             isClickable = false
 
             // 标题行

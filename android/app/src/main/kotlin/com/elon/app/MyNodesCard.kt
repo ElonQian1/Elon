@@ -32,6 +32,7 @@ internal class MyNodesCard(
     private var loadSerial = 0
 
     private lateinit var statusPill: TextView
+    private lateinit var refreshButton: TextView
     private lateinit var nodeListContainer: LinearLayout
 
     // ─── 公开 API ────────────────────────────────────────────────────────────
@@ -49,15 +50,21 @@ internal class MyNodesCard(
 
     // ─── 刷新逻辑 ────────────────────────────────────────────────────────────
 
-    private fun refresh() {
+    fun refresh() {
+        val serial = ++loadSerial
+        setRefreshLoading(true)
         if (!AuthManager.isLoggedIn(activity)) {
             statusPill.text = "未登录"
+            statusPill.setTextColor(Color.parseColor("#777777"))
+            (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#1A1A1A"))
             statusPill.visibility = View.VISIBLE
             nodeListContainer.removeAllViews()
+            setRefreshLoading(false)
             return
         }
-        val serial = ++loadSerial
         statusPill.text = "加载中…"
+        statusPill.setTextColor(Color.parseColor("#8DDC9B"))
+        (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#16251A"))
         statusPill.visibility = View.VISIBLE
         nodeListContainer.removeAllViews()
 
@@ -68,8 +75,12 @@ internal class MyNodesCard(
                 if (serial != loadSerial || activity.isFinishing || activity.isDestroyed) return@runOnUiThread
                 result
                     .onSuccess { nodes ->
-                        statusPill.visibility = View.GONE
+                        setRefreshLoading(false)
                         if (nodes.isEmpty()) {
+                            statusPill.text = "无节点"
+                            statusPill.setTextColor(Color.parseColor("#777777"))
+                            (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#1A1A1A"))
+                            statusPill.visibility = View.VISIBLE
                             nodeListContainer.addView(buildEmptyHint())
                         } else {
                             val online = nodes.count { it.online }
@@ -84,7 +95,10 @@ internal class MyNodesCard(
                         }
                     }
                     .onFailure {
+                        setRefreshLoading(false)
                         statusPill.text = "暂不可用"
+                        statusPill.setTextColor(Color.parseColor("#777777"))
+                        (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#1A1A1A"))
                         statusPill.visibility = View.VISIBLE
                     }
             }
@@ -113,7 +127,10 @@ internal class MyNodesCard(
     private fun fetchMyNodes(ctx: Context): List<NodeItem> {
         val req = AuthManager.applyAuth(
             ctx,
-            Request.Builder().url("$serverUrl/api/me/nodes").get()
+            Request.Builder()
+                .url("$serverUrl/api/me/nodes")
+                .header("Cache-Control", "no-cache")
+                .get()
         ).build()
         val body = http.newCall(req).execute().use { it.body?.string() ?: "{}" }
         val arr: JSONArray = JSONObject(body).optJSONArray("nodes") ?: return emptyList()
@@ -169,13 +186,11 @@ internal class MyNodesCard(
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.setMargins(0, dp(10), 0, 0) }
+            ).also { it.setMargins(0, dp(18), 0, 0) }
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(16), dp(22), dp(16))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#151515"))
-                cornerRadius = dp(8).toFloat()
-            }
+            setPadding(0, 0, 0, 0)
+
+            addView(buildSectionDivider())
 
             // 标题行
             addView(LinearLayout(activity).apply {
@@ -185,6 +200,7 @@ internal class MyNodesCard(
                 )
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
+                minimumHeight = dp(48)
 
                 addView(TextView(activity).apply {
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
@@ -195,19 +211,48 @@ internal class MyNodesCard(
                     setTypeface(typeface, Typeface.BOLD)
                 })
 
-                statusPill = TextView(activity).apply {
-                    includeFontPadding = false
-                    gravity = Gravity.CENTER
-                    setPadding(dp(10), dp(4), dp(10), dp(4))
-                    text = "加载中…"
-                    textSize = 11f
-                    setTextColor(Color.parseColor("#8DDC9B"))
-                    background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#16251A"))
-                        cornerRadius = dp(8).toFloat()
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+
+                    statusPill = TextView(this@MyNodesCard.activity).apply {
+                        includeFontPadding = false
+                        gravity = Gravity.CENTER
+                        setPadding(dp(10), dp(4), dp(10), dp(4))
+                        text = "加载中…"
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#8DDC9B"))
+                        background = GradientDrawable().apply {
+                            setColor(Color.parseColor("#16251A"))
+                            cornerRadius = dp(8).toFloat()
+                        }
                     }
-                }
-                addView(statusPill)
+                    addView(statusPill)
+
+                    refreshButton = TextView(this@MyNodesCard.activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.WRAP_CONTENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).also { it.marginStart = dp(8) }
+                        includeFontPadding = false
+                        gravity = Gravity.CENTER
+                        minWidth = dp(56)
+                        minHeight = dp(48)
+                        setPadding(dp(12), 0, dp(12), 0)
+                        text = "刷新"
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#8DDC9B"))
+                        background = GradientDrawable().apply {
+                            setColor(Color.parseColor("#16251A"))
+                            cornerRadius = dp(8).toFloat()
+                        }
+                        isClickable = true
+                        isFocusable = true
+                        contentDescription = "刷新我的节点状态"
+                        setOnClickListener { refresh() }
+                    }
+                    addView(refreshButton)
+                })
             })
 
             // 节点列表
@@ -231,7 +276,7 @@ internal class MyNodesCard(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#222222"))
+            setColor(Color.parseColor("#1F2023"))
             cornerRadius = dp(6).toFloat()
             when (node.capacityTone.lowercase(Locale.US)) {
                 "bad" -> setStroke(dp(1), Color.parseColor("#784242"))
@@ -401,6 +446,24 @@ internal class MyNodesCard(
         } else {
             "${amount.toInt()} ${units[index]}"
         }
+    }
+
+    private fun buildSectionDivider(): View {
+        return View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)
+            ).also { it.bottomMargin = dp(16) }
+            setBackgroundColor(Color.parseColor("#4D4D4D"))
+            alpha = 0.45f
+        }
+    }
+
+    private fun setRefreshLoading(loading: Boolean) {
+        if (!::refreshButton.isInitialized) return
+        refreshButton.isEnabled = !loading
+        refreshButton.alpha = if (loading) 0.55f else 1f
+        refreshButton.text = if (loading) "刷新中" else "刷新"
     }
 
     private fun dp(n: Int): Int =
