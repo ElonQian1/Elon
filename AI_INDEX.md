@@ -9,7 +9,7 @@
 | Rust 服务启动和路由 | `server/src/main.rs` |
 | 项目 API / 项目空间 | `server/src/project_api.rs` 及同领域拆分模块 |
 | AI CLI 调度 | `server/src/ai_cli/`、`server/src/agent.rs` |
-| PC 节点 AI 运行路线 / Codex JSON 与 PTY 分工 | `AI_ARCHITECTURE.md` 的“PC 节点 AI 运行路线”、`docs/符号索引讨论/我们项目的cli能力.md` |
+| PC 节点 AI 三层架构 / Codex JSON、pipe sidecar 与 PTY 分工 | `AI_ARCHITECTURE.md` 的“PC 节点 AI 运行路线”、`docs/符号索引讨论/我们项目的cli能力.md` |
 | 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
 | 用户等级、经验条、token 消耗/分享算力经验 | `server/src/user_progression.rs`、`server/src/store/user_progression.rs`、`server/src/token_usage_api.rs`、`server/src/store/node_ledger.rs` |
 | context compiler / repo map | `server/src/context_compiler/` |

@@ -33,7 +33,17 @@ Android APK / Web UI
 
 ## PC 节点 AI 运行路线
 
-项目会话里的 AI 执行路线和“是否需要终端接管”是两件事：
+项目会话里的 AI 能力按三层理解，避免把“路由选择”“CLI 传输方式”和“前端展示”混成一个开关：
+
+| 层级 | 决定什么 | 当前状态 |
+|---|---|---|
+| 1. 运行路线 | AI / 模型从哪里来，项目在哪台 PC 执行 | 已有 `route_a` / `route_b` / `route_c` / `route_c2` / `route_c3` |
+| 2. CLI 会话 / 传输模式 | node-agent 如何启动、连接和恢复 CLI | Codex 默认 `direct_json_pipe`；`pipe_sidecar` 是建议目标形态，当前未独立实现；`pty_sidecar` 保留给终端接管和 TUI |
+| 3. 前端展示 / 恢复模式 | PC UI 如何展示过程、折叠最终回复、恢复或接管任务 | 结构化过程卡片读取 JSON 事件和 task journal；终端 attach 读取 PTY sidecar |
+
+因此，Route A 本机 CLI 是否使用 PTY 是第二层传输模式选择，不是新的运行路线。Route A / Route C3 都可以在自己的节点内选择 `direct_json_pipe`、未来 `pipe_sidecar` 或 `pty_sidecar`。
+
+第一层：运行路线：
 
 | 路线 | 模型/AI 来源 | 项目文件与命令在哪里执行 | 适用场景 |
 |---|---|---|---|
@@ -45,7 +55,17 @@ Android APK / Web UI
 
 当前 PC 项目会话默认值是 `route_a`。前端“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入本机 `localNodeId` 与项目 `workspacePath`。
 
-Codex CLI 的主路不是 PTY，而是：
+第二层：CLI 会话 / 传输模式：
+
+| 模式 | 当前是否具备 | 定位 |
+|---|---|---|
+| `direct_json_pipe` | 已具备，Codex 默认 | node-agent 直接启动 `codex exec --json`，读取干净 stdout JSONL / stderr，并把事件写入任务过程 |
+| `pipe_sidecar` | 当前未独立实现，建议作为下一阶段目标 | sidecar 负责进程生命周期、取消、journal、session id 和恢复入口；CLI stdout/stderr 仍保持程序 pipe，不进入 PTY |
+| `pty_sidecar` | 已具备，辅助路 | 用 portable_pty / ConPTY 管真实终端，适合 TUI、人工接管、resize、交互输入和终端型 CLI |
+
+长期看，`pipe_sidecar` 比把 Codex JSON 放进 PTY 更适合后台结构化过程展示：它保留 sidecar 的生命周期管理和恢复能力，同时避免 PTY 污染 JSONL。但这不是当前已经完成的独立实现，当前 Codex 主路仍是 `direct_json_pipe`。
+
+当前 Codex CLI 的主路不是 PTY，而是：
 
 ```text
 PC 网页端 -> Rust server -> node-agent -> codex exec --json

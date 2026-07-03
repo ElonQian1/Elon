@@ -100,7 +100,9 @@ Step 7: 通过 WebSocket 推送给用户
 
 ### 2.4 PC 节点 AI 运行路线
 
-PC 项目会话的 AI 执行路线分为五类：
+PC 项目会话按三层拆分：运行路线决定 AI / 模型来源和项目执行位置；CLI 会话 / 传输模式决定 node-agent 如何连接 CLI；前端展示 / 恢复模式决定网页端如何展示公开过程、折叠最终回复、恢复或接管任务。
+
+PC 项目会话的 AI 运行路线分为五类：
 
 | 路线 | 请求值 | AI / 模型来源 | 项目文件与命令执行位置 |
 |---|---|---|---|
@@ -112,7 +114,15 @@ PC 项目会话的 AI 执行路线分为五类：
 
 项目会话默认优先 `route_a`，让本机 Codex CLI 自己读取项目规则、判断是否需要读文件、修改代码、运行命令或构建。PC 前端的“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入当前本机节点和项目工作区路径。
 
-Codex CLI 的后台开发主链路使用 `codex exec --json`：
+Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是新的运行路线。Route A / Route C3 都可以在对应节点里选择下面的传输模式：
+
+| 模式 | 当前是否具备 | 定位 |
+|---|---|---|
+| `direct_json_pipe` | 已具备，Codex 默认 | 直接启动 `codex exec --json`，读取 stdout JSONL / stderr，并生成结构化过程事件 |
+| `pipe_sidecar` | 当前未独立实现，建议作为下一阶段目标 | sidecar 管进程生命周期、取消、journal、session id 和恢复入口；stdout/stderr 仍保持干净 pipe |
+| `pty_sidecar` | 已具备，辅助路 | 用 portable_pty / ConPTY 管真实终端，适合 TUI、人工接管、resize、交互输入和终端型 CLI |
+
+长期看，`pipe_sidecar` 比把 Codex JSON 放进 PTY 更适合后台结构化过程展示；它保留 sidecar 管理能力，同时避免终端画面污染机器事件流。当前 Codex CLI 的后台开发主链路仍使用 `direct_json_pipe`：
 
 ```
 PC 网页端 → Rust server → node-agent → codex exec --json

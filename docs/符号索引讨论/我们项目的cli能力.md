@@ -1,6 +1,14 @@
 ## 当前项目实现状态（2026-07-03）
 
-项目已经支持五条 PC 节点 AI 运行路线。运行路线只决定“模型/AI 从哪里来、项目在哪台电脑执行”，不要和“是否打开 PTY 终端接管”混在一起：
+项目已经支持五条 PC 节点 AI 运行路线。更准确的架构应分成三层，避免把“模型从哪里来”“CLI 怎么接入”“前端怎么展示过程”混在一起：
+
+| 层级 | 决定什么 | 当前状态 |
+|---|---|---|
+| 1. 运行路线 | 模型 / AI 从哪里来、项目在哪台电脑执行 | 已有 Route A/B/C1/C2/C3 |
+| 2. CLI 会话 / 传输模式 | node-agent 如何启动、连接、取消和恢复 CLI | Codex 默认 `direct_json_pipe`；`pipe_sidecar` 是目标形态，当前未独立实现；`pty_sidecar` 保留给终端接管 |
+| 3. 前端展示 / 恢复模式 | 网页端如何展示公开过程、折叠最终回复、恢复或接管任务 | 结构化过程卡片读 JSON 事件和 journal；终端 attach 读 PTY sidecar |
+
+运行路线只决定“模型 / AI 从哪里来、项目在哪台电脑执行”，不要和“是否打开 PTY 终端接管”混在一起：
 
 | 路线 | 前端值 | AI / 模型来源 | 项目文件和命令执行位置 | 当前定位 |
 |---|---|---|---|---|
@@ -12,7 +20,17 @@
 
 PC 项目会话默认值是 `route_a`。PC 前端“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入 `localNodeId` 与项目 `workspacePath`；关闭该开关时，按当前运行路线选择器走 `route_a` / `route_b` / `route_c` / `route_c2` / `route_c3`。
 
-Codex CLI 的默认后台开发主路是 `codex exec --json` + 直接 stdout JSONL 解析：
+Route A 本机 CLI 是否使用 PTY 是第二层传输模式选择，不是新的路线。Route A / Route C3 都可以在各自节点内选择 `direct_json_pipe`、未来 `pipe_sidecar` 或 `pty_sidecar`。
+
+CLI 会话 / 传输模式当前这样定位：
+
+| 模式 | 当前是否具备 | 定位 |
+|---|---|---|
+| `direct_json_pipe` | 已具备，Codex 默认 | node-agent 直接启动 `codex exec --json`，读取干净 stdout JSONL / stderr，并把事件写入任务过程 |
+| `pipe_sidecar` | 当前未独立实现，建议作为下一阶段目标 | sidecar 管进程生命周期、取消、journal、session id、恢复入口；stdout/stderr 仍走程序 pipe，不进入 PTY |
+| `pty_sidecar` | 已具备，辅助路 | 用 portable_pty / ConPTY 管真实终端，适合 TUI、人工接管、resize、交互输入和终端型 CLI |
+
+长期看，`pipe_sidecar` 比“把 Codex JSON 放进 PTY”更好：它能保留 sidecar 的生命周期管理、日志和恢复能力，同时不污染 JSONL。当前不要把它描述成已实现能力；现在 Codex 的默认后台开发主路仍是 `direct_json_pipe`，也就是 `codex exec --json` + 直接 stdout JSONL 解析：
 
 ```text
 PC 网页端
