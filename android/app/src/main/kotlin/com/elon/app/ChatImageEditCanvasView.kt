@@ -34,6 +34,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
     private val completedAnnotationIconBitmap: Bitmap? by lazy {
         BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation_filled)
     }
+    private val annotationBubbleRenderer = ChatImageAnnotationBubbleRenderer(context)
 
     private var baseBitmap: Bitmap? = null
     private var mosaicBitmap: Bitmap? = null
@@ -46,6 +47,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
     private var activeLineEnd: PointF? = null
     private var lastBitmapPoint: PointF? = null
     private var pressedAnnotationIndex: Int? = null
+    private var expandedAnnotationIndex: Int? = null
     private var currentTool = ChatImageEditTool.ANNOTATION
     private var currentColor = Color.WHITE
     var onHistoryChanged: (() -> Unit)? = null
@@ -64,6 +66,8 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         activeShapeRect = null
         activeLineStart = null
         activeLineEnd = null
+        pressedAnnotationIndex = null
+        expandedAnnotationIndex = null
         updateImageMatrix()
         invalidate()
     }
@@ -84,6 +88,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
     fun undo(): Boolean {
         if (operations.isEmpty()) return false
         redoOperations.add(operations.removeAt(operations.lastIndex))
+        normalizeExpandedAnnotationIndex()
         invalidate()
         onHistoryChanged?.invoke()
         return true
@@ -92,6 +97,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
     fun redo(): Boolean {
         if (redoOperations.isEmpty()) return false
         operations.add(redoOperations.removeAt(redoOperations.lastIndex))
+        normalizeExpandedAnnotationIndex()
         invalidate()
         onHistoryChanged?.invoke()
         return true
@@ -105,7 +111,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         val output = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         canvas.drawBitmap(source, 0f, 0f, basePaint)
-        drawOperations(canvas, includeAnnotationIcons = true)
+        drawOperations(canvas, includeAnnotationIcons = true, respectExpandedAnnotations = false)
         return output
     }
 
@@ -120,8 +126,15 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
 
     fun updateAnnotationNote(index: Int, note: String) {
         val annotation = annotationAt(index) ?: return
-        if (annotation.note == note) return
+        if (annotation.note == note) {
+            if (note.trim().isNotEmpty() && expandedAnnotationIndex == index) {
+                expandedAnnotationIndex = null
+                invalidate()
+            }
+            return
+        }
         annotation.note = note
+        expandedAnnotationIndex = if (note.trim().isEmpty()) index else null
         redoOperations.clear()
         invalidate()
         onHistoryChanged?.invoke()
@@ -168,8 +181,9 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         canvas.save()
         canvas.concat(imageMatrix)
         canvas.clipRect(0f, 0f, bitmap.width.toFloat(), bitmap.height.toFloat())
-        drawOperations(canvas, includeAnnotationIcons = false)
+        drawOperations(canvas, includeAnnotationIcons = false, respectExpandedAnnotations = true)
         canvas.restore()
+        drawExpandedAnnotationBubble(canvas)
         drawAnnotationIcons(canvas)
     }
 
@@ -201,7 +215,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
                 val hitIndex = pressedAnnotationIndex ?: return false
                 pressedAnnotationIndex = null
                 if (findAnnotationIconAt(event.x, event.y) == hitIndex) {
-                    onAnnotationRequested?.invoke(hitIndex)
+                    handleAnnotationIconClick(hitIndex)
                 }
                 return true
             }
@@ -369,10 +383,19 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         }
     }
 
-    private fun drawOperations(canvas: Canvas, includeAnnotationIcons: Boolean) {
+    private fun drawOperations(
+        canvas: Canvas,
+        includeAnnotationIcons: Boolean,
+        respectExpandedAnnotations: Boolean
+    ) {
         val mosaic = ensureMosaicBitmap()
-        operations.forEach { op ->
-            drawOperation(canvas, op, mosaic)
+        operations.forEachIndexed { index, op ->
+            drawOperation(
+                canvas,
+                op,
+                mosaic,
+                annotationBoundsExpanded = respectExpandedAnnotations && expandedAnnotationIndex == index
+            )
         }
         if (includeAnnotationIcons) {
             operations.forEach { op ->
@@ -389,7 +412,8 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
                         matrixScale().coerceAtLeast(0.01f),
                     mosaic = currentTool == ChatImageEditTool.MOSAIC
                 ),
-                mosaic
+                mosaic,
+                annotationBoundsExpanded = true
             )
         }
         val lineStart = activeLineStart
@@ -422,12 +446,17 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
                         shape = activeShapeForTool()
                     )
                 }
-                drawOperation(canvas, op, mosaic)
+                drawOperation(canvas, op, mosaic, annotationBoundsExpanded = true)
             }
         }
     }
 
-    private fun drawOperation(canvas: Canvas, op: ChatImageEditOp, mosaic: Bitmap?) {
+    private fun drawOperation(
+        canvas: Canvas,
+        op: ChatImageEditOp,
+        mosaic: Bitmap?,
+        annotationBoundsExpanded: Boolean = false
+    ) {
         when (op) {
             is ChatImageEditOp.Stroke -> {
                 if (op.mosaic && mosaic != null) {
@@ -455,11 +484,21 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
                 canvas.drawLine(op.start.x, op.start.y, op.end.x, op.end.y, strokePaint)
             }
             is ChatImageEditOp.Annotation -> {
-                strokePaint.color = op.color
-                strokePaint.strokeWidth = op.width
-                canvas.drawRect(op.bounds, strokePaint)
+                if (op.note.trim().isEmpty() || annotationBoundsExpanded) {
+                    strokePaint.color = op.color
+                    strokePaint.strokeWidth = op.width
+                    canvas.drawRect(op.bounds, strokePaint)
+                }
             }
         }
+    }
+
+    private fun drawExpandedAnnotationBubble(canvas: Canvas) {
+        val index = expandedAnnotationIndex ?: return
+        val annotation = annotationAt(index) ?: return
+        if (annotation.note.trim().isEmpty()) return
+        val anchor = RectF(annotation.bounds).also { imageMatrix.mapRect(it) }
+        annotationBubbleRenderer.draw(canvas, annotation.note, anchor, width, height)
     }
 
     private fun drawAnnotationIcons(canvas: Canvas) {
@@ -482,6 +521,22 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
             completedAnnotationIconBitmap ?: annotationIconBitmap
         } else {
             annotationIconBitmap
+        }
+    }
+
+    private fun handleAnnotationIconClick(index: Int) {
+        val annotation = annotationAt(index) ?: return
+        if (annotation.note.trim().isEmpty()) {
+            expandedAnnotationIndex = index
+            invalidate()
+            onAnnotationRequested?.invoke(index)
+            return
+        }
+        if (expandedAnnotationIndex == index) {
+            onAnnotationRequested?.invoke(index)
+        } else {
+            expandedAnnotationIndex = index
+            invalidate()
         }
     }
 
@@ -563,7 +618,12 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         for (index in operations.lastIndex downTo 0) {
             val annotation = operations[index] as? ChatImageEditOp.Annotation ?: continue
             val rect = annotationIconRectOnView(annotation) ?: continue
-            if (rect.contains(x, y)) return index
+            val hitRect = RectF(rect).apply {
+                val extraX = max(0f, (dp(48).toFloat() - width()) / 2f)
+                val extraY = max(0f, (dp(48).toFloat() - height()) / 2f)
+                inset(-extraX, -extraY)
+            }
+            if (hitRect.contains(x, y)) return index
         }
         return null
     }
@@ -608,6 +668,13 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
 
     private fun annotationAt(index: Int): ChatImageEditOp.Annotation? {
         return operations.getOrNull(index) as? ChatImageEditOp.Annotation
+    }
+
+    private fun normalizeExpandedAnnotationIndex() {
+        val index = expandedAnnotationIndex ?: return
+        if (annotationAt(index) == null) {
+            expandedAnnotationIndex = null
+        }
     }
 
     private fun annotationIconSize(): Float {
