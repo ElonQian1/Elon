@@ -85,6 +85,7 @@ export default function AiChatPage() {
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
+  const [nodeStatusChecked, setNodeStatusChecked] = useState(false)
 
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -121,6 +122,7 @@ export default function AiChatPage() {
 
   // ── 节点状态轮询（每 6s）──────────────────────────────────────────────
   useEffect(() => {
+    setNodeStatusChecked(false)
     function checkNode() {
       api.get<{ nodes?: Array<{ node_id: string; online: boolean; ai_cli_ready: boolean; display_name: string; device_name?: string }> }>('/api/me/nodes')
         .then(d => {
@@ -132,13 +134,24 @@ export default function AiChatPage() {
             setOnlineNodeId(null)
             setOnlineNodeName('')
           }
+          setNodeStatusChecked(true)
         })
-        .catch(() => {})
+        .catch(() => {
+          setOnlineNodeId(null)
+          setOnlineNodeName('')
+          setNodeStatusChecked(true)
+        })
     }
     checkNode()
     const t = setInterval(checkNode, 6000)
     return () => clearInterval(t)
   }, [user?.id]) // eslint-disable-line
+
+  useEffect(() => {
+    if (nodeStatusChecked && runtimeRoute === 'route_a' && !onlineNodeId) {
+      setRuntimeRoute('auto')
+    }
+  }, [nodeStatusChecked, onlineNodeId, runtimeRoute])
 
   // 客户端搜索过滤
   const filteredFriends = useMemo(() => {
@@ -202,9 +215,12 @@ export default function AiChatPage() {
       setError('普通聊天暂未绑定远程 PC 节点。请先在节点页选择远程节点，或切回自动/平台AI。')
       return
     }
+    let requestRuntimeRoute: RuntimeRoute = runtimeRoute
+    let forcePlatformFallback = false
     if (runtimeRoute === 'route_a' && !onlineNodeId) {
-      setError('已选择本机AI，但当前账号没有在线的本机节点。请启动一龙开发平台，或切回自动/平台AI。')
-      return
+      requestRuntimeRoute = 'route_c'
+      forcePlatformFallback = true
+      setRuntimeRoute('auto')
     }
     setInput('')
     setError('')
@@ -219,8 +235,10 @@ export default function AiChatPage() {
 
     setSending(true)
     try {
-      const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, runtimeRoute)
-      const useLocalNode = !!onlineNodeId && (runtimeRoute === 'auto' || runtimeRoute === 'route_a')
+      const requestAgent = forcePlatformFallback
+        ? ''
+        : selectedAgentForRuntimeRoute(selectedAgent, modelOptions, requestRuntimeRoute)
+      const useLocalNode = !!onlineNodeId && (requestRuntimeRoute === 'auto' || requestRuntimeRoute === 'route_a')
       if (useLocalNode) {
         // ── 节点在线：直接在用户电脑上执行 ────────────────────────────────
         const res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
@@ -241,7 +259,7 @@ export default function AiChatPage() {
         const res = await api.post<LmChatResponse>('/api/llm/chat', {
           messages: [{ role: 'user', content: text }],
           agent: requestAgent || null,
-          runtimeRoute,
+          runtimeRoute: requestRuntimeRoute,
           conversation_id: convId,
           scope: 'chat_memory',
         })
@@ -667,4 +685,3 @@ function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anch
     </div>
   )
 }
-
