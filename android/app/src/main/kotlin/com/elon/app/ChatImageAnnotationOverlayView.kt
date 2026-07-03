@@ -124,16 +124,15 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
 
         val bounds = annotationBoundsOnView(annotation, imageRect) ?: return null
         val size = dp(36).toFloat()
-        val pad = dp(5).toFloat()
+        val inset = dp(5).toFloat()
         val edgePad = dp(8).toFloat()
-        val rightLeft = bounds.right + pad
-        val leftLeft = bounds.left - pad - size
-        val rawLeft = if (rightLeft + size <= imageRect.right - edgePad) rightLeft else leftLeft
+        val rawLeft = bounds.right - size - inset
+        val rawTop = bounds.bottom - size - inset
         val left = rawLeft.coerceIn(
             imageRect.left + edgePad,
             max(imageRect.left + edgePad, imageRect.right - size - edgePad)
         )
-        val top = (bounds.bottom - size * 0.9f).coerceIn(
+        val top = rawTop.coerceIn(
             imageRect.top + edgePad,
             max(imageRect.top + edgePad, imageRect.bottom - size - edgePad)
         )

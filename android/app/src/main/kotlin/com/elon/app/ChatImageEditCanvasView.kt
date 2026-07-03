@@ -630,40 +630,33 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
 
     private fun annotationIconRectOnView(annotation: ChatImageEditOp.Annotation): RectF? {
         if (baseBitmap == null) return null
-        val points = floatArrayOf(
-            annotation.bounds.left,
-            annotation.bounds.bottom,
-            annotation.bounds.right,
-            annotation.bounds.bottom
-        )
-        imageMatrix.mapPoints(points)
+        val bounds = RectF(annotation.bounds).also { imageMatrix.mapRect(it) }
         val size = annotationIconSize()
-        val pad = dp(5).toFloat()
+        val inset = dp(5).toFloat()
         val edgePad = dp(8).toFloat()
-        val rightLeft = points[2] + pad
-        val leftLeft = points[0] - pad - size
-        val rawLeft = if (rightLeft + size <= width - edgePad) rightLeft else leftLeft
+        val rawLeft = bounds.right - size - inset
+        val rawTop = bounds.bottom - size - inset
         val left = rawLeft.coerceIn(edgePad, max(edgePad, width - size - edgePad))
-        val top = points[1] - size * 0.9f
+        val top = rawTop.coerceIn(edgePad, max(edgePad, height - size - edgePad))
         return RectF(left, top, left + size, top + size)
     }
 
-    private fun annotationIconRectOnBitmap(annotation: ChatImageEditOp.Annotation, iconSize: Float, pad: Float): RectF {
+    private fun annotationIconRectOnBitmap(annotation: ChatImageEditOp.Annotation, iconSize: Float, inset: Float): RectF {
         val bitmapWidth = baseBitmap?.width?.toFloat() ?: 0f
+        val bitmapHeight = baseBitmap?.height?.toFloat() ?: 0f
         val edgePad = dp(8) / matrixScale().coerceAtLeast(0.01f)
-        val rightLeft = annotation.bounds.right + pad
-        val leftLeft = annotation.bounds.left - pad - iconSize
-        val rawLeft = if (rightLeft + iconSize <= bitmapWidth - edgePad) rightLeft else leftLeft
+        val rawLeft = annotation.bounds.right - iconSize - inset
+        val rawTop = annotation.bounds.bottom - iconSize - inset
         val left = rawLeft.coerceIn(edgePad, max(edgePad, bitmapWidth - iconSize - edgePad))
-        val top = annotation.bounds.bottom - iconSize * 0.9f
+        val top = rawTop.coerceIn(edgePad, max(edgePad, bitmapHeight - iconSize - edgePad))
         return RectF(left, top, left + iconSize, top + iconSize)
     }
 
     private fun annotationIconRectOnBitmap(annotation: ChatImageEditOp.Annotation): RectF {
         val scale = matrixScale().coerceAtLeast(0.01f)
         val iconSize = annotationIconSize() / scale
-        val pad = dp(5) / scale
-        return annotationIconRectOnBitmap(annotation, iconSize, pad)
+        val inset = dp(5) / scale
+        return annotationIconRectOnBitmap(annotation, iconSize, inset)
     }
 
     private fun annotationAt(index: Int): ChatImageEditOp.Annotation? {
