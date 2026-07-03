@@ -1,5 +1,8 @@
 // server/src/node_agent_task_resume.rs
 
+#[path = "node_agent_task_resume_tty.rs"]
+mod tty;
+
 use serde::Serialize;
 
 use crate::{
@@ -11,6 +14,7 @@ use crate::{
         sidecar_limitations, sidecar_session_from_record, TaskResumeSidecarSession,
     },
 };
+use tty::{pipe_sidecar_tty_reattach_status, sidecar_tty_reattach_status, tty_reattach_status};
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TaskAttachState {
@@ -200,6 +204,29 @@ fn task_resume_contract_with_journal_pending(
     let codex_session = attach.codex_session.clone();
     let sidecar_session = attach.sidecar_session.clone();
     let can_resume_codex_session = codex_session.is_some();
+    let sidecar_can_attach_terminal = attach
+        .sidecar_session
+        .as_ref()
+        .is_some_and(|session| session.can_attach_terminal);
+    let sidecar_can_cancel = attach
+        .sidecar_session
+        .as_ref()
+        .is_some_and(|session| session.can_cancel);
+    let sidecar_strategy_kind = if sidecar_can_attach_terminal {
+        "managed_pty_conpty_sidecar_attach"
+    } else {
+        "managed_pipe_json_sidecar_follow"
+    };
+    let sidecar_strategy_label = if sidecar_can_attach_terminal {
+        "重接 PTY/ConPTY sidecar 会话"
+    } else {
+        "跟随 pipe JSON sidecar 会话"
+    };
+    let sidecar_strategy_reason = if sidecar_can_attach_terminal {
+        "任务由一龙 sidecar 持有 PTY/ConPTY，node-agent 重启后可重新连接 sidecar 控制面；终端输入、resize 和审批决定写入 sidecar mailbox，由 sidecar 复核后执行。"
+    } else {
+        "任务由一龙 pipe sidecar 持有，node-agent 重启后可重新读取结构化输出、发送取消命令，并继续依赖 Codex JSON 事件展示公开过程；该模式没有终端输入或 resize。"
+    };
     match attach.status {
         "live" => TaskResumeContract {
             status: attach.status,
@@ -231,10 +258,7 @@ fn task_resume_contract_with_journal_pending(
         "sidecar_recoverable" => TaskResumeContract {
             status: attach.status,
             can_reconnect: true,
-            can_cancel: attach
-                .sidecar_session
-                .as_ref()
-                .is_some_and(|session| session.can_attach_terminal),
+            can_cancel: sidecar_can_cancel,
             can_stream_live_output: attach
                 .sidecar_session
                 .as_ref()
@@ -252,13 +276,17 @@ fn task_resume_contract_with_journal_pending(
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
-            tty_reattach: sidecar_tty_reattach_status(),
+            tty_reattach: if sidecar_can_attach_terminal {
+                sidecar_tty_reattach_status()
+            } else {
+                pipe_sidecar_tty_reattach_status()
+            },
             sidecar_session,
             run_handle: None,
             strategy: TaskResumeStrategy {
-                kind: "managed_pty_conpty_sidecar_attach",
-                label: "重接 PTY/ConPTY sidecar 会话",
-                reason: "任务由一龙 sidecar 持有 PTY/ConPTY，node-agent 重启后可重新连接 sidecar 控制面；终端输入、resize 和审批决定写入 sidecar mailbox，由 sidecar 复核后执行。",
+                kind: sidecar_strategy_kind,
+                label: sidecar_strategy_label,
+                reason: sidecar_strategy_reason,
                 requires_new_task: false,
                 uses_cloud_snapshot: false,
                 uses_local_journal: true,
@@ -370,34 +398,6 @@ impl TaskResumeContract {
 
     pub(crate) fn reason(&self) -> &'static str {
         self.reason
-    }
-}
-
-fn tty_reattach_status() -> TaskResumeTtyReattach {
-    TaskResumeTtyReattach {
-        status: "not_supported",
-        supported: false,
-        mode: "no_original_cli_tty_reattach",
-        fallback: "journal_replay_snapshot_continue_and_codex_session_resume",
-        reason: "当前节点只能重连本机控制句柄、回放 journal、处理仍在内存中的审批 waiter，不能重新接管已经打开的原 CLI 终端 TTY。",
-        required_future_work: vec![
-            "外部 CLI 终端仍不能被接管；需要从一龙 sidecar 启动的任务才有 PTY/ConPTY attach。",
-            "非 sidecar 任务继续使用 journal 回放、Codex session resume 和云端快照续跑。",
-        ],
-    }
-}
-
-fn sidecar_tty_reattach_status() -> TaskResumeTtyReattach {
-    TaskResumeTtyReattach {
-        status: "supported",
-        supported: true,
-        mode: "managed_pty_conpty_sidecar_reattach",
-        fallback: "journal_replay_snapshot_continue_and_codex_session_resume",
-        reason: "该任务由一龙 sidecar 启动并持有 PTY/ConPTY 与控制 mailbox，node-agent 重启后可以重接 sidecar、读写终端和 resize，而不是接管任意外部终端。",
-        required_future_work: vec![
-            "在 PC 前端接入真实终端 attach 面板。",
-            "为 sidecar 输出补充屏幕级 buffer/ANSI 视图；当前恢复协议回放 PTY 字节流。",
-        ],
     }
 }
 

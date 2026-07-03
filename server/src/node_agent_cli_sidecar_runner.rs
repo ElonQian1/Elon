@@ -1,5 +1,8 @@
 // server/src/node_agent_cli_sidecar_runner.rs
 
+#[path = "node_agent_cli_pipe_sidecar_runner.rs"]
+mod pipe_sidecar_runner;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -23,9 +26,10 @@ use crate::{
     node_agent_codex_session::{self, CodexSessionCapture},
     node_agent_task_journal::TaskJournal,
 };
+use pipe_sidecar_runner::run_pipe_json_sidecar;
 
-const SIDECAR_HEARTBEAT_SECS: u64 = 5;
-const SIDECAR_POLL_MS: u64 = 250;
+pub(crate) const SIDECAR_HEARTBEAT_SECS: u64 = 5;
+pub(crate) const SIDECAR_POLL_MS: u64 = 250;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct CliSidecarLaunchConfig {
@@ -89,11 +93,23 @@ pub(crate) fn sidecar_enabled() -> bool {
 }
 
 pub(crate) fn sidecar_enabled_for_cli(cli_name: &str) -> bool {
-    sidecar_enabled() && sidecar_enabled_for_cli_name(cli_name, codex_json_direct_stdout_enabled())
+    sidecar_enabled()
+        && sidecar_enabled_for_cli_name(
+            cli_name,
+            codex_json_direct_stdout_enabled(),
+            codex_pipe_sidecar_enabled(),
+        )
 }
 
-fn sidecar_enabled_for_cli_name(cli_name: &str, codex_json_direct_stdout: bool) -> bool {
-    !cli_name.trim().eq_ignore_ascii_case("codex") || !codex_json_direct_stdout
+fn sidecar_enabled_for_cli_name(
+    cli_name: &str,
+    codex_json_direct_stdout: bool,
+    codex_pipe_sidecar: bool,
+) -> bool {
+    if !cli_name.trim().eq_ignore_ascii_case("codex") {
+        return true;
+    }
+    !codex_json_direct_stdout || codex_pipe_sidecar
 }
 
 fn codex_json_direct_stdout_enabled() -> bool {
@@ -108,6 +124,43 @@ fn codex_json_direct_stdout_enabled_from(value: Option<String>) -> bool {
         value.trim().to_ascii_lowercase().as_str(),
         "0" | "false" | "no" | "off" | "disabled"
     )
+}
+
+fn codex_pipe_sidecar_enabled() -> bool {
+    codex_pipe_sidecar_enabled_from(std::env::var("ELON_CODEX_PIPE_SIDECAR").ok())
+}
+
+fn codex_pipe_sidecar_enabled_from(value: Option<String>) -> bool {
+    let Some(value) = value else {
+        return true;
+    };
+    !matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "0" | "false" | "no" | "off" | "disabled"
+    )
+}
+
+fn should_use_pipe_json_sidecar(config: &CliSidecarLaunchConfig) -> bool {
+    should_use_pipe_json_sidecar_from(
+        config,
+        codex_json_direct_stdout_enabled(),
+        codex_pipe_sidecar_enabled(),
+    )
+}
+
+fn should_use_pipe_json_sidecar_from(
+    config: &CliSidecarLaunchConfig,
+    codex_json_direct_stdout: bool,
+    codex_pipe_sidecar: bool,
+) -> bool {
+    config.cli_name.trim().eq_ignore_ascii_case("codex")
+        && codex_json_direct_stdout
+        && codex_pipe_sidecar
+        && args_request_json_stream(&config.args)
+}
+
+fn args_request_json_stream(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == "--json")
 }
 
 pub(crate) fn session_id_for_task(task_id: &str) -> String {
@@ -215,6 +268,13 @@ pub(crate) async fn follow_sidecar_output(
 }
 
 pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
+    if should_use_pipe_json_sidecar(&config) {
+        return run_pipe_json_sidecar(config).await;
+    }
+    run_pty_sidecar(config).await
+}
+
+async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     let registry = CliSidecarRegistry::new(config.registry_dir.clone());
     let task_journal = config
         .task_journal_dir
@@ -581,7 +641,7 @@ fn safe_id_fragment(value: &str) -> String {
 }
 
 #[cfg(windows)]
-fn hide_tokio_command_window(command: &mut tokio::process::Command) {
+pub(crate) fn hide_tokio_command_window(command: &mut tokio::process::Command) {
     #[allow(unused_imports)]
     use std::os::windows::process::CommandExt as _;
     const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -589,20 +649,21 @@ fn hide_tokio_command_window(command: &mut tokio::process::Command) {
 }
 
 #[cfg(not(windows))]
-fn hide_tokio_command_window(_command: &mut tokio::process::Command) {}
+pub(crate) fn hide_tokio_command_window(_command: &mut tokio::process::Command) {}
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn sidecar_skips_codex_when_json_direct_stdout_is_enabled() {
-        assert!(!super::sidecar_enabled_for_cli_name("codex", true));
-        assert!(!super::sidecar_enabled_for_cli_name(" CODEX ", true));
-        assert!(super::sidecar_enabled_for_cli_name("copilot", true));
+    fn sidecar_uses_pipe_sidecar_for_codex_when_json_direct_stdout_is_enabled() {
+        assert!(super::sidecar_enabled_for_cli_name("codex", true, true));
+        assert!(super::sidecar_enabled_for_cli_name(" CODEX ", true, true));
+        assert!(super::sidecar_enabled_for_cli_name("copilot", true, true));
+        assert!(!super::sidecar_enabled_for_cli_name("codex", true, false));
     }
 
     #[test]
     fn sidecar_can_be_reenabled_for_codex_fallback() {
-        assert!(super::sidecar_enabled_for_cli_name("codex", false));
+        assert!(super::sidecar_enabled_for_cli_name("codex", false, false));
         assert!(super::codex_json_direct_stdout_enabled_from(None));
         assert!(super::codex_json_direct_stdout_enabled_from(Some(
             "true".to_string()
@@ -613,5 +674,52 @@ mod tests {
         assert!(!super::codex_json_direct_stdout_enabled_from(Some(
             "OFF".to_string()
         )));
+        assert!(super::codex_pipe_sidecar_enabled_from(None));
+        assert!(super::codex_pipe_sidecar_enabled_from(Some(
+            "true".to_string()
+        )));
+        assert!(!super::codex_pipe_sidecar_enabled_from(Some(
+            "0".to_string()
+        )));
+    }
+
+    #[test]
+    fn pipe_json_sidecar_requires_codex_json_args() {
+        let mut config = super::CliSidecarLaunchConfig {
+            session_id: "sidecar-test".to_string(),
+            task_id: "task-test".to_string(),
+            cli_name: "codex".to_string(),
+            route: "route_a_external_cli".to_string(),
+            program: "codex".to_string(),
+            args: vec!["exec".to_string(), "--json".to_string()],
+            cwd: None,
+            runtime_permission: None,
+            env: Vec::new(),
+            output_path: std::path::PathBuf::from("output.jsonl"),
+            registry_dir: std::path::PathBuf::from("registry"),
+            task_journal_dir: None,
+            codex_session_scope_key: None,
+            legacy_codex_sessions_file: None,
+            timeout_secs: 10,
+            stdin_piped_empty: false,
+            initial_cols: crate::node_agent_cli_pty::default_cols(),
+            initial_rows: crate::node_agent_cli_pty::default_rows(),
+        };
+        assert!(super::should_use_pipe_json_sidecar_from(
+            &config, true, true
+        ));
+        config.args = vec!["exec".to_string()];
+        assert!(!super::should_use_pipe_json_sidecar_from(
+            &config, true, true
+        ));
+        config.cli_name = "copilot".to_string();
+        config.args = vec!["--json".to_string()];
+        assert!(!super::should_use_pipe_json_sidecar_from(
+            &config, true, true
+        ));
+        config.cli_name = "codex".to_string();
+        assert!(!super::should_use_pipe_json_sidecar_from(
+            &config, true, false
+        ));
     }
 }

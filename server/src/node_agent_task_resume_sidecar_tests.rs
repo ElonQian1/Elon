@@ -3,7 +3,8 @@ use crate::{
     node_agent_task_approval_snapshot::TaskApprovalJournalTracker,
     node_agent_task_journal::TaskJournalRecord,
     node_agent_task_resume::{
-        task_attach_state_with_sidecar, task_resume_contract_with_journal_approvals,
+        task_attach_state_with_sidecar, task_resume_contract,
+        task_resume_contract_with_journal_approvals,
     },
 };
 use serde_json::json;
@@ -55,6 +56,36 @@ fn sidecar_contract_can_reattach_and_recover_pending_approval() {
     assert_eq!(resume_json["sidecar_session"]["session_id"], "sidecar-1");
 }
 
+#[test]
+fn pipe_sidecar_contract_can_follow_output_but_not_tty() {
+    let running = record("running");
+    let attach =
+        task_attach_state_with_sidecar(Some(&running), None, Some(pipe_sidecar("sidecar-pipe-1")));
+    let resume = task_resume_contract(&attach);
+    let resume_json = serde_json::to_value(resume).expect("resume should serialize");
+
+    assert_eq!(resume_json["status"], "sidecar_recoverable");
+    assert_eq!(resume_json["can_reconnect"], true);
+    assert_eq!(resume_json["can_cancel"], true);
+    assert_eq!(resume_json["can_stream_live_output"], true);
+    assert_eq!(resume_json["can_approve_tools"], false);
+    assert_eq!(
+        resume_json["strategy"]["kind"],
+        "managed_pipe_json_sidecar_follow"
+    );
+    assert_eq!(resume_json["tty_reattach"]["supported"], false);
+    assert_eq!(
+        resume_json["tty_reattach"]["mode"],
+        "managed_pipe_json_sidecar_no_tty"
+    );
+    assert_eq!(
+        resume_json["sidecar_session"]["transport"],
+        "managed_pipe_json_sidecar"
+    );
+    assert_eq!(resume_json["sidecar_session"]["can_attach_terminal"], false);
+    assert_eq!(resume_json["sidecar_session"]["can_cancel"], true);
+}
+
 fn record(status: &str) -> TaskJournalRecord {
     TaskJournalRecord {
         req_id: "task-1".to_string(),
@@ -83,6 +114,20 @@ fn sidecar(session_id: &str) -> CliSidecarSessionRecord {
         "route_a_external_cli",
         Some("D:/demo".to_string()),
         Some("npipe://elon/sidecar-1".to_string()),
+        Some(100),
+        Some(200),
+        now_ms(),
+    )
+}
+
+fn pipe_sidecar(session_id: &str) -> CliSidecarSessionRecord {
+    CliSidecarSessionRecord::managed_pipe_json(
+        session_id,
+        "task-1",
+        "codex",
+        "route_a_external_cli",
+        Some("D:/demo".to_string()),
+        Some("D:/state/output.jsonl".to_string()),
         Some(100),
         Some(200),
         now_ms(),

@@ -184,7 +184,7 @@ impl CliSidecarRegistry {
         let Some(session) = self.session_for_task(task_id)? else {
             return Ok(false);
         };
-        if !session.is_attachable_at(now_ms()) || !session.capabilities.cancel {
+        if !session.can_cancel_at(now_ms()) {
             return Ok(false);
         }
         self.append_sidecar_command(task_id, "cancel", None, None, None, None, None)
@@ -379,16 +379,62 @@ impl CliSidecarSessionRecord {
         }
     }
 
+    pub(crate) fn managed_pipe_json(
+        session_id: impl Into<String>,
+        task_id: impl Into<String>,
+        cli_name: impl Into<String>,
+        route: impl Into<String>,
+        cwd: Option<String>,
+        endpoint: Option<String>,
+        sidecar_pid: Option<u32>,
+        child_pid: Option<u32>,
+        now_ms: u128,
+    ) -> Self {
+        Self {
+            session_id: session_id.into(),
+            task_id: task_id.into(),
+            cli_name: cli_name.into(),
+            route: route.into(),
+            cwd,
+            state: "running".to_string(),
+            transport: "managed_pipe_json_sidecar".to_string(),
+            endpoint,
+            sidecar_pid,
+            child_pid,
+            started_at_ms: now_ms,
+            last_seen_at_ms: now_ms,
+            capabilities: CliSidecarCapabilities {
+                terminal_attach: false,
+                output_stream_replay: true,
+                terminal_input: false,
+                terminal_resize: false,
+                tool_approval_recovery: false,
+                cancel: true,
+            },
+        }
+    }
+
     pub(crate) fn is_attachable_at(&self, now_ms: u128) -> bool {
+        self.is_live_at(now_ms) && self.capabilities.terminal_attach
+    }
+
+    pub(crate) fn can_replay_output_at(&self, now_ms: u128) -> bool {
+        self.is_live_at(now_ms) && self.capabilities.output_stream_replay
+    }
+
+    pub(crate) fn can_cancel_at(&self, now_ms: u128) -> bool {
+        self.is_live_at(now_ms) && self.capabilities.cancel
+    }
+
+    pub(crate) fn can_recover_tool_approval_after_restart(&self, now_ms: u128) -> bool {
+        self.is_live_at(now_ms) && self.capabilities.tool_approval_recovery
+    }
+
+    pub(crate) fn is_live_at(&self, now_ms: u128) -> bool {
         matches!(
             self.state.trim().to_ascii_lowercase().as_str(),
             "running" | "waiting_approval" | "cancel_requested"
         ) && now_ms.saturating_sub(self.last_seen_at_ms) <= SIDECAR_STALE_AFTER_MS
-            && self.capabilities.terminal_attach
-    }
-
-    pub(crate) fn can_recover_tool_approval_after_restart(&self, now_ms: u128) -> bool {
-        self.is_attachable_at(now_ms) && self.capabilities.tool_approval_recovery
     }
 }
 
@@ -406,7 +452,10 @@ pub(crate) fn sidecar_status_view(session: &CliSidecarSessionRecord) -> serde_js
         "child_pid": session.child_pid,
         "started_at_ms": session.started_at_ms,
         "last_seen_at_ms": session.last_seen_at_ms,
+        "live_after_restart": session.is_live_at(now),
         "attachable_after_restart": session.is_attachable_at(now),
+        "output_replayable_after_restart": session.can_replay_output_at(now),
+        "cancelable_after_restart": session.can_cancel_at(now),
         "approval_recoverable_after_restart": session.can_recover_tool_approval_after_restart(now),
         "capabilities": session.capabilities,
     })
@@ -532,6 +581,42 @@ mod tests {
         assert!(!registry
             .record_tool_approval_decision("task-1", "tap_1_1", "maybe")
             .expect("invalid decision should be rejected"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn pipe_json_sidecar_can_cancel_without_terminal_attach() {
+        let dir = unique_test_dir("pipe-cancel");
+        let _ = fs::remove_dir_all(&dir);
+        let registry = CliSidecarRegistry::new(&dir);
+        registry
+            .upsert_session(CliSidecarSessionRecord::managed_pipe_json(
+                "sidecar-pipe-1",
+                "task-pipe-1",
+                "codex",
+                "route_a_external_cli",
+                Some("D:/demo".to_string()),
+                Some("D:/state/output.jsonl".to_string()),
+                Some(100),
+                Some(200),
+                now_ms(),
+            ))
+            .expect("pipe sidecar session should persist");
+
+        let session = registry
+            .session_for_task("task-pipe-1")
+            .expect("session lookup should read")
+            .expect("session should exist");
+        assert!(!session.is_attachable_at(now_ms()));
+        assert!(session.can_replay_output_at(now_ms()));
+        assert!(session.can_cancel_at(now_ms()));
+        assert!(!session.can_recover_tool_approval_after_restart(now_ms()));
+        assert!(registry
+            .record_cancel_command("task-pipe-1")
+            .expect("pipe sidecar cancel command should persist"));
+        let commands = fs::read_to_string(dir.join("commands-task-pipe-1.jsonl"))
+            .expect("mailbox should exist");
+        assert!(commands.contains(r#""command":"cancel""#));
         let _ = fs::remove_dir_all(dir);
     }
 

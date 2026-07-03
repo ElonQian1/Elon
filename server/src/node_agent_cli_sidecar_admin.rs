@@ -42,7 +42,7 @@ struct SidecarAttachResponse {
     session: serde_json::Value,
     output_records: Vec<CliSidecarOutputRecord>,
     next_offset: u64,
-    transport: &'static str,
+    transport: String,
     protocol: serde_json::Value,
 }
 
@@ -65,8 +65,8 @@ async fn attach_handler(
     let Some(session) = session_for_task(&runtime, &task_id) else {
         return not_found(&task_id, "没有可重接的 sidecar 会话。");
     };
-    if !session.is_attachable_at(crate::node_agent_cli_sidecar::now_ms()) {
-        return not_found(&task_id, "sidecar 会话已结束或心跳过期。");
+    if !session.can_replay_output_at(crate::node_agent_cli_sidecar::now_ms()) {
+        return not_found(&task_id, "sidecar 会话已结束、心跳过期或不支持输出回放。");
     }
     let Some(output_path) = session.endpoint.as_deref().map(PathBuf::from) else {
         return not_found(&task_id, "sidecar 会话缺少输出流路径。");
@@ -81,13 +81,16 @@ async fn attach_handler(
             session: sidecar_status_view(&session),
             output_records: records,
             next_offset: offset,
-            transport: "pty_conpty",
+            transport: session.transport.clone(),
             protocol: json!({
                 "read": format!("/api/cli-sidecars/{task_id}/attach?since=<offset>"),
-                "write": format!("/api/cli-sidecars/{task_id}/input"),
-                "resize": format!("/api/cli-sidecars/{task_id}/resize"),
-                "input_encoding": "utf8_terminal_bytes",
-                "resize_units": "terminal_cells"
+                "write": session.capabilities.terminal_input.then(|| format!("/api/cli-sidecars/{task_id}/input")),
+                "resize": session.capabilities.terminal_resize.then(|| format!("/api/cli-sidecars/{task_id}/resize")),
+                "cancel": session.capabilities.cancel,
+                "output_stream_replay": session.capabilities.output_stream_replay,
+                "terminal_attach": session.capabilities.terminal_attach,
+                "input_encoding": if session.capabilities.terminal_input { "utf8_terminal_bytes" } else { "not_supported" },
+                "resize_units": if session.capabilities.terminal_resize { "terminal_cells" } else { "not_supported" }
             }),
         })
         .into_response(),

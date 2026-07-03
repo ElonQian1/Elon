@@ -38,10 +38,10 @@ Android APK / Web UI
 | 层级 | 决定什么 | 当前状态 |
 |---|---|---|
 | 1. 运行路线 | AI / 模型从哪里来，项目在哪台 PC 执行 | 已有 `route_a` / `route_b` / `route_c` / `route_c2` / `route_c3` |
-| 2. CLI 会话 / 传输模式 | node-agent 如何启动、连接和恢复 CLI | Codex 默认 `direct_json_pipe`；`pipe_sidecar` 是建议目标形态，当前未独立实现；`pty_sidecar` 保留给终端接管和 TUI |
+| 2. CLI 会话 / 传输模式 | node-agent 如何启动、连接和恢复 CLI | Codex JSON 默认 `pipe_sidecar + pipe + JSON`；`direct_json_pipe` 保留为回退；`pty_sidecar` 保留给终端接管和 TUI |
 | 3. 前端展示 / 恢复模式 | PC UI 如何展示过程、折叠最终回复、恢复或接管任务 | 结构化过程卡片读取 JSON 事件和 task journal；终端 attach 读取 PTY sidecar |
 
-因此，Route A 本机 CLI 是否使用 PTY 是第二层传输模式选择，不是新的运行路线。Route A / Route C3 都可以在自己的节点内选择 `direct_json_pipe`、未来 `pipe_sidecar` 或 `pty_sidecar`。
+因此，Route A 本机 CLI 是否使用 PTY 是第二层传输模式选择，不是新的运行路线。Route A / Route C3 都可以在自己的节点内选择 `pipe_sidecar`、`direct_json_pipe` 或 `pty_sidecar`。
 
 第一层：运行路线：
 
@@ -59,37 +59,37 @@ Android APK / Web UI
 
 | 模式 | 当前是否具备 | 定位 |
 |---|---|---|
-| `direct_json_pipe` | 已具备，Codex 默认 | node-agent 直接启动 `codex exec --json`，读取干净 stdout JSONL / stderr，并把事件写入任务过程 |
-| `pipe_sidecar` | 当前未独立实现，建议作为下一阶段目标 | sidecar 负责进程生命周期、取消、journal、session id 和恢复入口；CLI stdout/stderr 仍保持程序 pipe，不进入 PTY |
+| `pipe_sidecar` | 已具备，Codex JSON 默认 | sidecar 负责进程生命周期、取消、journal、session id 和恢复入口；CLI stdout/stderr 仍保持程序 pipe，不进入 PTY |
+| `direct_json_pipe` | 已具备，回退路径 | node-agent 直接启动 `codex exec --json`，读取干净 stdout JSONL / stderr；设置 `ELON_CODEX_PIPE_SIDECAR=0` 且保持 `ELON_CODEX_JSON_DIRECT_STDOUT=1` 时使用 |
 | `pty_sidecar` | 已具备，辅助路 | 用 portable_pty / ConPTY 管真实终端，适合 TUI、人工接管、resize、交互输入和终端型 CLI |
 
-长期看，`pipe_sidecar` 比把 Codex JSON 放进 PTY 更适合后台结构化过程展示：它保留 sidecar 的生命周期管理和恢复能力，同时避免 PTY 污染 JSONL。但这不是当前已经完成的独立实现，当前 Codex 主路仍是 `direct_json_pipe`。
+当前 `pipe_sidecar` 已用于 Codex JSON 主路：它保留 sidecar 的生命周期管理和恢复能力，同时避免 PTY 污染 JSONL。显式设置 `ELON_CODEX_PIPE_SIDECAR=0` 可回退到旧的直接子进程 pipe；显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 会回到旧 PTY sidecar 路径，只应作为兼容或调试用途。
 
-### 现状、未来蓝图和差距
+### 当前能力和后续增强
 
 `pipe_sidecar` 不是因为 Codex CLI 不够好才需要。Codex CLI 负责“聪明地干活”：读项目、跑命令、改文件、总结结果；一龙平台负责“可靠地管理这次干活”：排队、并行、取消、重连、恢复、journal、前端过程展示和最终回复折叠。
 
-| 维度 | 当前 `direct_json_pipe` | 未来 `pipe_sidecar + pipe + JSON` | 差距 / 判断 |
+| 维度 | 当前默认 `pipe_sidecar + pipe + JSON` | 回退 `direct_json_pipe` | 差距 / 判断 |
 |---|---|---|---|
-| 最小可用 | 已足够让 Codex 直接处理项目会话 | 不是 MVP 必需 | 只要“发一句话等回复”，当前方案不需要 sidecar |
-| JSON 干净度 | 好，直接读 `codex exec --json` stdout | 同样好，仍然走 pipe，不走 PTY | 未来不能退回 `PTY + JSON` |
-| 任务管理 | 主要由 node-agent 当前 runner 和 task journal 管 | sidecar 独立管理进程生命周期、取消、session id、journal 和恢复入口 | 差距在平台级生命周期统一性，不在 Codex 智能能力 |
-| 重连 / 恢复 | 依赖现有 journal、Codex session/thread id 和云端快照组合 | sidecar 提供更稳定的运行句柄和恢复契约 | 多会话并行、节点重启、长任务恢复越多，sidecar 价值越高 |
-| 前端过程感 | 能展示 JSON 事件里已有的公开过程 | 更容易稳定沉淀完整过程、等待状态、取消和恢复状态 | 当前优先把 JSON 事件解析和 UI 展示补完整 |
-| 多 CLI 扩展 | Codex 最顺；其他 CLI 视输出能力而定 | sidecar 可统一管理 Codex / Claude / Copilot / Gemini 等 CLI | 多 CLI 成为核心能力后再实现更划算 |
+| 最小可用 | 已让 Codex 直接处理项目会话 | 仍可工作 | direct 适合排障；默认用 sidecar 管生命周期 |
+| JSON 干净度 | 好，仍然读 `codex exec --json` stdout pipe | 好，直接读 stdout pipe | 两者都不能退回 `PTY + JSON` |
+| 任务管理 | sidecar 独立管理进程生命周期、取消、session id、journal 和恢复入口 | 主要由 node-agent 当前 runner 和 task journal 管 | 默认路径已经补齐平台级生命周期 |
+| 重连 / 恢复 | sidecar registry 暴露 `managed_pipe_json_sidecar`，可回放输出、取消和恢复状态 | 依赖 journal、Codex session/thread id 和云端快照组合 | 后续增强重点是更完整的前端恢复入口 |
+| 前端过程感 | JSON 事件和 sidecar output/journal 一起支撑公开过程卡片 | 只靠直接 stdout 和 journal | 当前还要继续把 UI 过程卡片做细 |
+| 多 CLI 扩展 | Codex 已走 pipe sidecar；PTY sidecar 继续服务终端型 CLI | Codex 专用回退 | 后续可把更多稳定 JSON CLI 接入 pipe sidecar |
 
-因此当前策略是：先把 `direct_json_pipe` 跑稳，把 Codex JSON 公开过程完整展示出来；当取消、重连、恢复、多会话并行和多 CLI 管理成为主要瓶颈时，再升级为 `pipe_sidecar + pipe + JSON`。`pipe_sidecar` 是平台级会话管理蓝图，不是对 Codex CLI 能力的替代。
+因此当前策略是：默认用 `pipe_sidecar + pipe + JSON` 管 Codex；继续完善前端公开过程卡片、任务恢复入口和多 CLI 管理。`pipe_sidecar` 是平台级会话管理层，不是对 Codex CLI 能力的替代。
 
 当前 Codex CLI 的主路不是 PTY，而是：
 
 ```text
-PC 网页端 -> Rust server -> node-agent -> codex exec --json
+PC 网页端 -> Rust server -> node-agent -> pipe sidecar -> codex exec --json
   -> 直接读取 stdout JSONL
   -> 解析 assistant_message / tool_call / tool_result / usage / final_reply
   -> 网页端任务过程卡片
 ```
 
-`codex exec --json` 是给程序消费的结构化事件流，默认不能再放进 PTY/ConPTY 里抠 JSON，否则终端折行、ANSI 控制序列、光标帧和提示文本会污染事件流。当前节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1`，因此 Codex 跳过 PTY sidecar；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 sidecar 路径。
+`codex exec --json` 是给程序消费的结构化事件流，默认不能再放进 PTY/ConPTY 里抠 JSON，否则终端折行、ANSI 控制序列、光标帧和提示文本会污染事件流。当前节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1` 且 `ELON_CODEX_PIPE_SIDECAR` 默认开启，因此 Codex 进入 `managed_pipe_json_sidecar`；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 PTY sidecar 路径。
 
 PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
 

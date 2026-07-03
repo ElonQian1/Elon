@@ -87,6 +87,85 @@ async fn sidecar_runner_registers_real_child_and_replays_output() {
 }
 
 #[tokio::test]
+async fn pipe_json_sidecar_registers_child_and_keeps_streams_clean() {
+    let root = temp_dir("runner-pipe-json");
+    let registry = CliSidecarRegistry::new(root.join("sidecars"));
+    let task_id = "task-sidecar-pipe-json";
+    let session_id = "sidecar-pipe-json";
+    let output_path = registry.output_path(task_id, session_id);
+    let (program, args) = pipe_json_echo_command();
+
+    run_sidecar(CliSidecarLaunchConfig {
+        session_id: session_id.to_string(),
+        task_id: task_id.to_string(),
+        cli_name: "codex".to_string(),
+        route: "route_a_external_cli".to_string(),
+        program,
+        args,
+        cwd: None,
+        runtime_permission: None,
+        env: Vec::new(),
+        output_path: output_path.clone(),
+        registry_dir: registry.dir(),
+        task_journal_dir: Some(root.join("journal")),
+        codex_session_scope_key: None,
+        legacy_codex_sessions_file: None,
+        timeout_secs: 10,
+        stdin_piped_empty: false,
+        initial_cols: default_cols(),
+        initial_rows: default_rows(),
+    })
+    .await
+    .expect("pipe json sidecar should run shell child");
+
+    let sessions = registry
+        .latest_sessions(5)
+        .expect("sidecar sessions should load");
+    assert_eq!(sessions.len(), 1);
+    assert_eq!(sessions[0].session_id, session_id);
+    assert_eq!(sessions[0].state, "finished");
+    assert_eq!(sessions[0].transport, "managed_pipe_json_sidecar");
+    assert!(!sessions[0].capabilities.terminal_attach);
+    assert!(sessions[0].capabilities.output_stream_replay);
+    assert!(sessions[0].capabilities.cancel);
+    assert!(sessions[0].child_pid.is_some());
+
+    let (_cancel_tx, mut cancel_rx) = watch::channel(false);
+    let mut events = Vec::new();
+    let result = follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |event| {
+        events.push(event)
+    })
+    .await
+    .expect("sidecar output should replay");
+
+    assert!(result.exit_ok);
+    assert!(result.stdout_text.contains("pipe-out"));
+    assert!(result.stderr_text.contains("pipe-err"));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CliSidecarOutputEvent::Stdout(text) if text.contains("pipe-out")
+    )));
+    assert!(events.iter().any(|event| matches!(
+        event,
+        CliSidecarOutputEvent::Stderr(text) if text.contains("pipe-err")
+    )));
+    let mut offset = 0;
+    let records = read_new_output_records(&output_path, &mut offset)
+        .expect("sidecar output records should load");
+    assert!(records
+        .iter()
+        .any(|record| record.stream.as_deref() == Some("stdout")));
+    assert!(records
+        .iter()
+        .any(|record| record.stream.as_deref() == Some("stderr")));
+    assert!(!records
+        .iter()
+        .any(|record| record.stream.as_deref() == Some("pty")));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[tokio::test]
 async fn sidecar_runner_accepts_terminal_input_and_resize_after_attach() {
     let root = temp_dir("runner-terminal-input");
     let registry = CliSidecarRegistry::new(root.join("sidecars"));
@@ -445,6 +524,28 @@ fn shell_echo_command() -> (String, Vec<String>) {
             vec![
                 "-c".to_string(),
                 "echo sidecar-out; echo sidecar-err >&2".to_string(),
+            ],
+        )
+    }
+}
+
+fn pipe_json_echo_command() -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "cmd".to_string(),
+            vec![
+                "/C".to_string(),
+                "echo pipe-out && echo pipe-err 1>&2".to_string(),
+                "--json".to_string(),
+            ],
+        )
+    } else {
+        (
+            "sh".to_string(),
+            vec![
+                "-c".to_string(),
+                "echo pipe-out; echo pipe-err >&2".to_string(),
+                "--json".to_string(),
             ],
         )
     }

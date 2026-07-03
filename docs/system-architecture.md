@@ -118,22 +118,22 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 | 模式 | 当前是否具备 | 定位 |
 |---|---|---|
-| `direct_json_pipe` | 已具备，Codex 默认 | 直接启动 `codex exec --json`，读取 stdout JSONL / stderr，并生成结构化过程事件 |
-| `pipe_sidecar` | 当前未独立实现，建议作为下一阶段目标 | sidecar 管进程生命周期、取消、journal、session id 和恢复入口；stdout/stderr 仍保持干净 pipe |
+| `pipe_sidecar` | 已具备，Codex JSON 默认 | sidecar 管进程生命周期、取消、journal、session id 和恢复入口；stdout/stderr 仍保持干净 pipe |
+| `direct_json_pipe` | 已具备，回退路径 | 直接启动 `codex exec --json`，读取 stdout JSONL / stderr，并生成结构化过程事件 |
 | `pty_sidecar` | 已具备，辅助路 | 用 portable_pty / ConPTY 管真实终端，适合 TUI、人工接管、resize、交互输入和终端型 CLI |
 
-长期看，`pipe_sidecar` 比把 Codex JSON 放进 PTY 更适合后台结构化过程展示；它保留 sidecar 管理能力，同时避免终端画面污染机器事件流。当前 Codex CLI 的后台开发主链路仍使用 `direct_json_pipe`：
+当前 Codex CLI 的后台开发主链路使用 `pipe_sidecar + pipe + JSON`。它比把 Codex JSON 放进 PTY 更适合后台结构化过程展示：sidecar 管生命周期和恢复，stdout/stderr 仍保持干净 pipe，避免终端画面污染机器事件流。
 
-当前和未来的边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`direct_json_pipe` 已能满足最小可用和干净 JSON 解析；`pipe_sidecar + pipe + JSON` 是后续平台级会话管理蓝图，主要补齐独立生命周期管理、稳定运行句柄、恢复契约和多 CLI 统一管理，不替代 Codex CLI 本身能力。
+当前边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`pipe_sidecar + pipe + JSON` 已补齐基础生命周期管理、稳定运行句柄、恢复契约和 Codex JSON 输出回放；后续继续增强前端恢复入口和多 CLI 统一管理，不替代 Codex CLI 本身能力。
 
 ```
-PC 网页端 → Rust server → node-agent → codex exec --json
+PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --json
     → stdout JSONL 事件流
     → 服务端解析 tool_call / tool_result / usage / final_reply
     → PC 网页端任务过程卡片
 ```
 
-这条链路默认不走 PTY/ConPTY。PTY 是给人看的终端画面，适合终端接管、TUI、人工输入、resize、取消和调试；`codex exec --json` 是给程序读的结构化事件流，进入 PTY 后可能被终端折行、ANSI 控制序列或提示文本污染。节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1`，Codex 跳过 PTY sidecar；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 sidecar 路径。
+这条链路默认不走 PTY/ConPTY。PTY 是给人看的终端画面，适合终端接管、TUI、人工输入、resize、取消和调试；`codex exec --json` 是给程序读的结构化事件流，进入 PTY 后可能被终端折行、ANSI 控制序列或提示文本污染。节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1` 且 `ELON_CODEX_PIPE_SIDECAR` 默认开启，因此 Codex 进入 `managed_pipe_json_sidecar`；设置 `ELON_CODEX_PIPE_SIDECAR=0` 可回退到直接 pipe，设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 PTY sidecar 路径。
 
 ---
 

@@ -7,8 +7,10 @@ pub(crate) const SIDECAR_TOOL_APPROVAL_RECOVERY_SUPPORTED: bool = true;
 
 pub(crate) fn capability_summary(
     managed_sidecar_available: bool,
+    pipe_json_sidecar_available: bool,
     sidecar_approval_available: bool,
     sidecar_attachable_count: usize,
+    sidecar_stream_replay_count: usize,
     sidecar_approval_recoverable_count: usize,
     codex_session_count: usize,
     recent_record_count: usize,
@@ -20,6 +22,13 @@ pub(crate) fn capability_summary(
             "attachable_count": sidecar_attachable_count,
             "mode": "managed_pty_conpty_attach_read_write_resize",
             "requires": "task_started_by_elon_sidecar"
+        },
+        "managed_pipe_json_sidecar": {
+            "supported": true,
+            "currently_available": pipe_json_sidecar_available,
+            "stream_replay_count": sidecar_stream_replay_count,
+            "mode": "managed_pipe_json_output_replay_cancel",
+            "requires": "codex_exec_json_started_by_elon_sidecar"
         },
         "post_restart_tool_approval": {
             "supported": SIDECAR_TOOL_APPROVAL_RECOVERY_SUPPORTED,

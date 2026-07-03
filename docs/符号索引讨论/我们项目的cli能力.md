@@ -5,7 +5,7 @@
 | 层级 | 决定什么 | 当前状态 |
 |---|---|---|
 | 1. 运行路线 | 模型 / AI 从哪里来、项目在哪台电脑执行 | 已有 Route A/B/C1/C2/C3 |
-| 2. CLI 会话 / 传输模式 | node-agent 如何启动、连接、取消和恢复 CLI | Codex 默认 `direct_json_pipe`；`pipe_sidecar` 是目标形态，当前未独立实现；`pty_sidecar` 保留给终端接管 |
+| 2. CLI 会话 / 传输模式 | node-agent 如何启动、连接、取消和恢复 CLI | Codex JSON 默认 `pipe_sidecar + pipe + JSON`；`direct_json_pipe` 保留为回退；`pty_sidecar` 保留给终端接管 |
 | 3. 前端展示 / 恢复模式 | 网页端如何展示公开过程、折叠最终回复、恢复或接管任务 | 结构化过程卡片读 JSON 事件和 journal；终端 attach 读 PTY sidecar |
 
 运行路线只决定“模型 / AI 从哪里来、项目在哪台电脑执行”，不要和“是否打开 PTY 终端接管”混在一起：
@@ -20,49 +20,50 @@
 
 PC 项目会话默认值是 `route_a`。PC 前端“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入 `localNodeId` 与项目 `workspacePath`；关闭该开关时，按当前运行路线选择器走 `route_a` / `route_b` / `route_c` / `route_c2` / `route_c3`。
 
-Route A 本机 CLI 是否使用 PTY 是第二层传输模式选择，不是新的路线。Route A / Route C3 都可以在各自节点内选择 `direct_json_pipe`、未来 `pipe_sidecar` 或 `pty_sidecar`。
+Route A 本机 CLI 是否使用 PTY 是第二层传输模式选择，不是新的路线。Route A / Route C3 都可以在各自节点内选择 `pipe_sidecar`、`direct_json_pipe` 或 `pty_sidecar`。
 
 CLI 会话 / 传输模式当前这样定位：
 
 | 模式 | 当前是否具备 | 定位 |
 |---|---|---|
-| `direct_json_pipe` | 已具备，Codex 默认 | node-agent 直接启动 `codex exec --json`，读取干净 stdout JSONL / stderr，并把事件写入任务过程 |
-| `pipe_sidecar` | 当前未独立实现，建议作为下一阶段目标 | sidecar 管进程生命周期、取消、journal、session id、恢复入口；stdout/stderr 仍走程序 pipe，不进入 PTY |
+| `pipe_sidecar` | 已具备，Codex JSON 默认 | sidecar 管进程生命周期、取消、journal、session id、恢复入口；stdout/stderr 仍走程序 pipe，不进入 PTY |
+| `direct_json_pipe` | 已具备，回退路径 | node-agent 直接启动 `codex exec --json`，读取干净 stdout JSONL / stderr，并把事件写入任务过程 |
 | `pty_sidecar` | 已具备，辅助路 | 用 portable_pty / ConPTY 管真实终端，适合 TUI、人工接管、resize、交互输入和终端型 CLI |
 
-长期看，`pipe_sidecar` 比“把 Codex JSON 放进 PTY”更好：它能保留 sidecar 的生命周期管理、日志和恢复能力，同时不污染 JSONL。当前不要把它描述成已实现能力；现在 Codex 的默认后台开发主路仍是 `direct_json_pipe`，也就是 `codex exec --json` + 直接 stdout JSONL 解析：
+当前 Codex 的默认后台开发主路已经是 `pipe_sidecar + pipe + JSON`：它能保留 sidecar 的生命周期管理、日志和恢复能力，同时不污染 JSONL。`direct_json_pipe` 仍保留为回退；`PTY + JSON` 只作为旧兼容路径，不应作为结构化过程展示主路。
 
 小白版判断：
 
 - Codex CLI 本身负责“干活”：理解项目、读文件、跑命令、改代码、回答用户。
 - 一龙平台负责“管这次干活”：排队、并行、取消、重连、恢复、记录过程、让网页端折叠过程并突出最终回复。
-- 如果只是单次问答，当前 `direct_json_pipe` 不需要 sidecar 也能跑。
-- 如果要接近 Codex 桌面版的会话体验，尤其是多会话并行、长任务恢复、节点重启后续跑、统一取消和多 CLI 管理，未来 `pipe_sidecar + pipe + JSON` 更合适。
+- 如果只是单次问答，`direct_json_pipe` 不需要 sidecar 也能跑，所以它保留为回退。
+- 如果要接近 Codex 桌面版的会话体验，尤其是多会话并行、长任务恢复、节点重启后续跑、统一取消和多 CLI 管理，默认使用 `pipe_sidecar + pipe + JSON`。
 - `pipe_sidecar` 不是把 Codex 放进 PTY；它是“任务管家”。Codex 的 JSON 仍然通过干净 pipe 传给平台，不能让终端画面污染 JSON。
 
-现状和未来差距：
+默认路径和回退路径差距：
 
-| 维度 | 当前 `direct_json_pipe` | 未来 `pipe_sidecar + pipe + JSON` |
+| 维度 | 当前默认 `pipe_sidecar + pipe + JSON` | 回退 `direct_json_pipe` |
 |---|---|---|
-| 是否多余 | 当前 MVP 不需要先上 sidecar | 平台级任务管理成熟后不多余 |
-| Codex 智能能力 | 已由 Codex CLI 自己提供 | 不替代 Codex，只管理 Codex 进程 |
-| 过程展示 | 取决于 JSON 事件解析和前端卡片是否完整 | 更容易把过程、等待、取消、恢复状态统一落 journal |
-| 断线 / 重启 | 依赖现有 task journal、session/thread id、云端快照组合 | sidecar 提供更稳定的运行句柄、生命周期和恢复契约 |
-| 多 CLI | Codex 走 JSON 最清晰，其他 CLI 分散处理 | sidecar 可以统一管理不同 CLI 的启动、取消、日志和接管 |
+| 是否多余 | 默认启用，用于平台级任务管理 | 可排障、可简化链路 |
+| Codex 智能能力 | 不替代 Codex，只管理 Codex 进程 | 也不替代 Codex |
+| 过程展示 | 更容易把过程、等待、取消、恢复状态统一落 journal | 取决于直接 stdout 和 journal |
+| 断线 / 重启 | sidecar 提供运行句柄、生命周期、输出回放和恢复契约 | 依赖 task journal、session/thread id、云端快照组合 |
+| 多 CLI | Codex JSON 已接入；终端型 CLI 继续走 PTY sidecar | Codex 专用回退 |
 
-当前实现结论：先把 `direct_json_pipe` 下 Codex 的公开过程链路做完整；不要为了架构好看提前上 sidecar。未来蓝图结论：当“平台怎么可靠管理这次任务”成为主要问题时，再实现 `pipe_sidecar + pipe + JSON`。
+当前实现结论：Codex JSON 默认走 `pipe_sidecar + pipe + JSON`；继续完善前端公开过程链路，不要把 pipe sidecar 画成终端。`ELON_CODEX_PIPE_SIDECAR=0` 可回退到 `direct_json_pipe`；`ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 PTY sidecar。
 
 ```text
 PC 网页端
   -> Rust server
   -> node-agent
+  -> pipe sidecar
   -> codex exec --json
   -> 直接读取 stdout JSONL
   -> 解析 assistant_message / tool_call / tool_result / usage / final_reply
   -> 网页端结构化过程卡片
 ```
 
-这条主路不默认进入 PTY/ConPTY。原因是 `codex exec --json` 输出的是给程序消费的机器事件流，PTY 是给人看的终端画面；一旦进入 PTY，终端折行、ANSI 控制序列、光标帧、提示文本或启动警告可能污染 JSONL，导致前端只剩“Codex 正在处理中”而看不到命令、工具结果和最终回复。当前节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1`，因此 Codex 跳过 PTY sidecar；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才让 Codex 回到旧 sidecar 路径。
+这条主路不默认进入 PTY/ConPTY。原因是 `codex exec --json` 输出的是给程序消费的机器事件流，PTY 是给人看的终端画面；一旦进入 PTY，终端折行、ANSI 控制序列、光标帧、提示文本或启动警告可能污染 JSONL，导致前端只剩“Codex 正在处理中”而看不到命令、工具结果和最终回复。当前节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1` 且 `ELON_CODEX_PIPE_SIDECAR` 默认开启，因此 Codex 进入 `managed_pipe_json_sidecar`；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才让 Codex 回到旧 PTY sidecar 路径。
 
 PTY/ConPTY sidecar 仍然保留，但它是辅助路，不是 Codex 结构化过程展示主路：
 
