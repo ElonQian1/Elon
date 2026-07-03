@@ -72,7 +72,7 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 好友列表 + 在线状态 | 🟡 中 | `src/features/friends/FriendList.tsx` | ⬜ 未开始 |
+| 好友列表 + 在线状态 | 🟡 中 | `src/features/friends/FriendsPage.tsx` | ✅ P4.1 完整 presence 实时同步 |
 | 好友私聊消息 | 🟡 中 | `src/features/friends/FriendChat.tsx` | ⬜ 未开始 |
 | 添加好友 / 扫码 | 🟢 低 | `src/features/friends/AddFriend.tsx` | ⬜ 未开始 |
 

@@ -19,9 +19,10 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
+    presence_events,
     project_auth::{auth_from_headers, json_error},
     project_ws_protocol::ProjectAttachmentRef,
-    store::SOCIAL_AI_USER_ID,
+    store::{FriendProfile, SOCIAL_AI_USER_ID},
     types::AppState,
 };
 
@@ -83,12 +84,26 @@ pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap
         Ok(mut friends) => {
             let online = state.online_users.read().await;
             for f in &mut friends {
-                f.is_online = f.id == SOCIAL_AI_USER_ID || online.contains_key(&f.id);
+                apply_friend_presence(f, f.id == SOCIAL_AI_USER_ID || online.contains_key(&f.id));
             }
             Json(serde_json::json!({ "friends": friends })).into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
+}
+
+fn apply_friend_presence(friend: &mut FriendProfile, connected: bool) {
+    let configured = friend.presence_status.as_deref().unwrap_or("online");
+    let (is_online, status, custom_status, activity) = presence_events::effective_presence(
+        connected,
+        configured,
+        friend.custom_status.take(),
+        friend.activity.take(),
+    );
+    friend.is_online = is_online;
+    friend.presence_status = Some(status);
+    friend.custom_status = custom_status;
+    friend.activity = activity;
 }
 
 pub async fn list_friend_groups(
@@ -125,7 +140,8 @@ pub async fn list_friend_recommendations(
             let total_count = recommendations.len();
             let online = state.online_users.read().await;
             for r in &mut recommendations {
-                r.is_online = r.id == SOCIAL_AI_USER_ID || online.contains_key(&r.id);
+                r.is_online =
+                    r.already_friend && (r.id == SOCIAL_AI_USER_ID || online.contains_key(&r.id));
             }
             // 在线用户排在前面，离线用户在后面
             recommendations.sort_by(|a, b| b.is_online.cmp(&a.is_online));

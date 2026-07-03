@@ -106,6 +106,12 @@ pub struct FriendProfile {
     pub unread_count: i64,
     /// 当前是否在线（由 API 层在返回前注入，store 层默认 false）
     pub is_online: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub presence_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub activity: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

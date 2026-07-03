@@ -55,6 +55,35 @@ impl Store {
         drop(conn);
         self.user_presence_settings(user_id)
     }
+
+    pub fn can_receive_presence(
+        &self,
+        viewer_user_id: &str,
+        subject_user_id: &str,
+    ) -> Result<bool> {
+        if viewer_user_id == subject_user_id {
+            return Ok(true);
+        }
+        let conn = self.conn()?;
+        let allowed: i64 = conn.query_row(
+            "SELECT
+               EXISTS(
+                 SELECT 1
+                   FROM user_friends
+                  WHERE user_id = ?1 AND friend_user_id = ?2
+               )
+               OR EXISTS(
+                 SELECT 1
+                   FROM project_members viewer
+                   JOIN project_members subject
+                     ON subject.project_id = viewer.project_id
+                  WHERE viewer.user_id = ?1 AND subject.user_id = ?2
+               )",
+            params![viewer_user_id, subject_user_id],
+            |row| row.get(0),
+        )?;
+        Ok(allowed != 0)
+    }
 }
 
 fn clean_presence_text(value: Option<&str>, max_chars: usize) -> Option<String> {
@@ -111,5 +140,50 @@ mod tests {
             .set_user_presence_settings(&user.id, "busy", None, None)
             .expect_err("invalid status should fail");
         assert!(error.to_string().contains("状态必须"));
+    }
+
+    #[test]
+    fn presence_visibility_is_limited_to_friends_and_project_members() {
+        let store = temp_store();
+        let alice = store
+            .create_user("presence-alice@example.com", "secret1", None, None)
+            .expect("alice should be created");
+        let bob = store
+            .create_user("presence-bob@example.com", "secret1", None, None)
+            .expect("bob should be created");
+        let carol = store
+            .create_user("presence-carol@example.com", "secret1", None, None)
+            .expect("carol should be created");
+        let dave = store
+            .create_user("presence-dave@example.com", "secret1", None, None)
+            .expect("dave should be created");
+
+        assert!(!store
+            .can_receive_presence(&alice.id, &bob.id)
+            .expect("visibility should query"));
+
+        store
+            .add_friend(&alice.id, Some("email"), "presence-bob@example.com")
+            .expect("friendship should be created");
+        assert!(store
+            .can_receive_presence(&alice.id, &bob.id)
+            .expect("friends can see presence"));
+        assert!(store
+            .can_receive_presence(&bob.id, &alice.id)
+            .expect("friendship is reciprocal"));
+
+        let project = store
+            .create_project(&alice.id, "Presence Visibility", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .add_project_member_by_account(&project.id, "presence-carol@example.com", "member")
+            .expect("project member should be added");
+        assert!(store
+            .can_receive_presence(&carol.id, &alice.id)
+            .expect("project members can see presence"));
+        assert!(!store
+            .can_receive_presence(&dave.id, &alice.id)
+            .expect("unrelated users cannot see presence"));
     }
 }

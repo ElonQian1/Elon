@@ -163,14 +163,21 @@ async fn handle(
                     _ => {}
                 }
             }
-            // 在线状态变更——推给所有已认证连接（客户端按好友关系过滤）
+            // 在线状态变更——只推给好友或同项目成员，避免向陌生登录用户暴露在线状态。
             msg = presence_rx.recv(), if authenticated_user_id.is_some() => {
                 match msg {
                     Ok(event) => {
                         // 不把自己的上线事件推回给自己
-                        if authenticated_user_id.as_deref() != Some(event.user_id.as_str()) {
-                            let Some(payload) = event.to_json() else { continue; };
-                            if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if let Some(viewer_user_id) = authenticated_user_id.as_deref() {
+                            if viewer_user_id != event.user_id.as_str()
+                                && state
+                                    .store
+                                    .can_receive_presence(viewer_user_id, &event.user_id)
+                                    .unwrap_or(false)
+                            {
+                                let Some(payload) = event.to_json() else { continue; };
+                                if tx.send(Message::Text(payload)).await.is_err() { break; }
+                            }
                         }
                     }
                     Err(RecvError::Lagged(_)) => { /* 下次列表刷新可以重新获取在线状态 */ }

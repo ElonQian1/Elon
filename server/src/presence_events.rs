@@ -85,7 +85,7 @@ pub fn publish_settings(
     });
 }
 
-fn effective_presence(
+pub(crate) fn effective_presence(
     connected: bool,
     status: &str,
     custom_status: Option<String>,

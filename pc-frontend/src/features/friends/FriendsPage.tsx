@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { ChevronDown, ChevronRight, Layers, List } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
-import { formatTime } from '../../lib/utils'
+import { clean, formatTime } from '../../lib/utils'
 import MarkdownContent from '../markdown/MarkdownContent'
 import styles from './FriendsPage.module.css'
 
@@ -15,6 +15,9 @@ interface Friend {
   last_message_at?: string
   unread_count?: number
   is_online?: boolean
+  presence_status?: string | null
+  custom_status?: string | null
+  activity?: string | null
 }
 
 interface FriendGroupMemberPreview {
@@ -60,6 +63,7 @@ interface FriendSearchResponse {
 type ConversationKind = 'friend' | 'group'
 type ConversationDisplayMode = 'grouped' | 'active'
 type CollapsibleSection = 'friends' | 'groups'
+type PresenceStatus = 'online' | 'idle' | 'dnd' | 'offline'
 
 interface ActiveConversation {
   kind: ConversationKind
@@ -75,8 +79,21 @@ interface ConversationItem {
   lastMessageAt?: string
   unreadCount: number
   isOnline?: boolean
+  presenceStatus?: PresenceStatus
+  presenceSummary?: string
   friend?: Friend
   group?: FriendGroup
+}
+
+interface PresenceEvent extends CustomEvent {
+  detail: {
+    userId?: string
+    isOnline?: boolean
+    status?: string
+    customStatus?: string | null
+    custom_status?: string | null
+    activity?: string | null
+  }
 }
 
 export default function FriendsPage() {
@@ -106,6 +123,26 @@ export default function FriendsPage() {
   useEffect(() => { loadSocialConversations() }, [me?.id]) // eslint-disable-line
 
   useEffect(() => {
+    function onPresence(event: PresenceEvent) {
+      const detail = event.detail ?? {}
+      const userId = clean(detail.userId)
+      if (!userId) return
+      setFriends((prev) => {
+        let changed = false
+        const next = prev.map((friend) => {
+          if (friend.id !== userId) return friend
+          changed = true
+          return applyFriendPresencePatch(friend, detail)
+        })
+        return changed ? next : prev
+      })
+    }
+
+    window.addEventListener('elon:presence', onPresence as EventListener)
+    return () => window.removeEventListener('elon:presence', onPresence as EventListener)
+  }, [])
+
+  useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages])
 
@@ -118,17 +155,22 @@ export default function FriendsPage() {
   }, [collapsedSections])
 
   const friendConversationItems = useMemo(() => {
-    return sortConversationItems(friends.map((friend) => ({
-      kind: 'friend',
-      id: friend.id,
-      title: friend.nickname ?? friend.account,
-      subtitle: friend.last_message || friend.account || '暂无消息',
-      lastMessage: friend.last_message,
-      lastMessageAt: friend.last_message_at,
-      unreadCount: friend.unread_count ?? 0,
-      isOnline: friend.is_online,
-      friend,
-    })))
+    return sortConversationItems(friends.map((friend) => {
+      const presence = friendPresence(friend)
+      return {
+        kind: 'friend',
+        id: friend.id,
+        title: friend.nickname ?? friend.account,
+        subtitle: friend.last_message || friend.account || '暂无消息',
+        lastMessage: friend.last_message,
+        lastMessageAt: friend.last_message_at,
+        unreadCount: friend.unread_count ?? 0,
+        isOnline: presence.status !== 'offline',
+        presenceStatus: presence.status,
+        presenceSummary: presence.summary,
+        friend,
+      }
+    }))
   }, [friends])
 
   const groupConversationItems = useMemo(() => {
@@ -297,13 +339,20 @@ export default function FriendsPage() {
           <div className={[styles.friendAvatar, item.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
             {avatarInitial(item.title, item.kind === 'group' ? '群' : '友')}
           </div>
-          {item.isOnline && <div className={styles.onlineDot} />}
+          {item.kind === 'friend' && (
+            <div className={styles.onlineDot} data-status={item.presenceStatus ?? 'offline'} />
+          )}
         </div>
         <div className={styles.friendMeta}>
           <div className={styles.friendNameRow}>
             <strong>{item.title}</strong>
             {showTypeBadge && (
               <span className={styles.conversationType}>{item.kind === 'group' ? '群' : '友'}</span>
+            )}
+            {item.kind === 'friend' && item.presenceStatus && (
+              <span className={styles.presencePill} data-status={item.presenceStatus}>
+                {presenceLabel(item.presenceStatus)}
+              </span>
             )}
             {item.unreadCount > 0 && (
               <span className={styles.unreadBadge}>{item.unreadCount}</span>
@@ -452,10 +501,13 @@ export default function FriendsPage() {
               </div>
               <div>
                 <strong>{activeItem.title}</strong>
-                <span className={[styles.onlineStatus, activeItem.isOnline ? styles.onlineTrue : ''].join(' ')}>
+                <span
+                  className={styles.onlineStatus}
+                  data-status={activeItem.kind === 'friend' ? activeItem.presenceStatus ?? 'offline' : undefined}
+                >
                   {activeItem.kind === 'group'
                     ? `${activeItem.group?.member_count ?? 0} 位成员`
-                    : activeItem.isOnline ? '在线' : '离线'}
+                    : activeItem.presenceSummary ?? '离线'}
                 </span>
               </div>
             </div>
@@ -577,4 +629,56 @@ function sortConversationItems(items: ConversationItem[]) {
 
 function truncateText(value: string, length: number) {
   return value.length > length ? `${value.slice(0, length)}…` : value
+}
+
+function applyFriendPresencePatch(friend: Friend, detail: PresenceEvent['detail']): Friend {
+  const status = normalizePresenceStatus(
+    typeof detail.status === 'string' ? detail.status : friend.presence_status,
+    typeof detail.isOnline === 'boolean' ? detail.isOnline : friend.is_online,
+  )
+  const isVisible = status !== 'offline'
+  const hasCustomStatus = Object.prototype.hasOwnProperty.call(detail, 'customStatus')
+    || Object.prototype.hasOwnProperty.call(detail, 'custom_status')
+  const hasActivity = Object.prototype.hasOwnProperty.call(detail, 'activity')
+  return {
+    ...friend,
+    is_online: isVisible,
+    presence_status: status,
+    custom_status: isVisible
+      ? (hasCustomStatus ? detail.customStatus ?? detail.custom_status ?? null : friend.custom_status ?? null)
+      : null,
+    activity: isVisible
+      ? (hasActivity ? detail.activity ?? null : friend.activity ?? null)
+      : null,
+  }
+}
+
+function friendPresence(friend: Friend) {
+  const status = normalizePresenceStatus(friend.presence_status, friend.is_online)
+  const details = status === 'offline'
+    ? []
+    : [clean(friend.activity), clean(friend.custom_status)].filter(Boolean)
+  const label = presenceLabel(status)
+  return {
+    status,
+    label,
+    summary: [label, ...details].join(' · '),
+  }
+}
+
+function normalizePresenceStatus(status: unknown, isOnline: unknown): PresenceStatus {
+  const value = clean(status).toLowerCase()
+  if (isOnline === false || value === 'offline' || value === 'invisible') return 'offline'
+  if (value === 'idle' || value === 'dnd') return value
+  return 'online'
+}
+
+function presenceLabel(status: PresenceStatus) {
+  const labels: Record<PresenceStatus, string> = {
+    online: '在线',
+    idle: '离开',
+    dnd: '勿扰',
+    offline: '离线',
+  }
+  return labels[status]
 }

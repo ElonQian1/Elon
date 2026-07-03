@@ -166,9 +166,13 @@ impl Store {
                               read_state.last_read_at IS NULL
                               OR unread.created_at > read_state.last_read_at
                           )
-                    ) AS unread_count
+                    ) AS unread_count,
+                    COALESCE(ps.status, 'online') AS presence_status,
+                    ps.custom_status,
+                    ps.activity
              FROM user_friends f
              JOIN users u ON u.id = f.friend_user_id
+             LEFT JOIN user_presence_settings ps ON ps.user_id = u.id
              LEFT JOIN friend_messages lm
                ON lm.id = (
                    SELECT latest.id
@@ -205,6 +209,9 @@ impl Store {
                     last_message_at: row.get(7)?,
                     unread_count: row.get(8)?,
                     is_online: false,
+                    presence_status: row.get(9)?,
+                    custom_status: row.get(10)?,
+                    activity: row.get(11)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -231,6 +238,9 @@ fn social_ai_friend_profile(conn: &Connection, user_id: &str) -> Result<FriendPr
         last_message_at: latest.map(|(_, created_at)| created_at),
         unread_count,
         is_online: true,
+        presence_status: Some("online".to_string()),
+        custom_status: None,
+        activity: None,
     })
 }
 
@@ -423,6 +433,9 @@ fn friend_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FriendPr
         last_message_at: None,
         unread_count: 0,
         is_online: false,
+        presence_status: None,
+        custom_status: None,
+        activity: None,
     })
 }
 
