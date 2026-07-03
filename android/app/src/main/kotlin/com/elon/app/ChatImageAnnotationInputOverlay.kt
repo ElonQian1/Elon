@@ -69,7 +69,7 @@ internal class ChatImageAnnotationInputOverlay(
             background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.TOP or Gravity.START
             hint = "请输入标注内容"
-            includeFontPadding = false
+            includeFontPadding = true
             minLines = 1
             maxLines = Int.MAX_VALUE
             isVerticalScrollBarEnabled = false
@@ -89,7 +89,7 @@ internal class ChatImageAnnotationInputOverlay(
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 leftMargin = dp(16)
-                topMargin = dp(16)
+                topMargin = dp(14)
                 rightMargin = dp(16)
                 bottomMargin = dp(52)
             }
@@ -141,7 +141,7 @@ internal class ChatImageAnnotationInputOverlay(
         val lineCount = max(1, textView?.lineCount ?: 1)
         val lineHeight = textView?.lineHeight ?: dp(22)
         val textHeight = lineCount * lineHeight
-        val chromeHeight = dp(16) + dp(52)
+        val chromeHeight = dp(14) + dp(56)
         val minHeight = max(dp(124), (currentBounds?.height()?.times(0.72f) ?: 0f).roundToInt())
         val desiredHeight = max(minHeight, textHeight + chromeHeight)
         val availableHeight = max(dp(124), root.height - dp(96) - dp(180))
