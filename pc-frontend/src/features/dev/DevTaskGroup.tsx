@@ -61,6 +61,7 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const codexThreadUri = codexThreadUriFor(messages)
   const canCancel = !!taskId && !isDone && !!onCancel
+  const requestAuthor = userDisplayName(userMsg)
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -85,7 +86,13 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
     <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
       {request && (
         <div className={styles.userTurn}>
-          <div className={styles.userBubble}>{request}</div>
+          <div className={styles.userBody}>
+            <div className={styles.userMeta}>
+              <strong>{requestAuthor.name}</strong>
+            </div>
+            <div className={styles.userBubble}>{request}</div>
+          </div>
+          <div className={styles.userAvatar}>{requestAuthor.initial}</div>
         </div>
       )}
 
@@ -256,6 +263,20 @@ function taskRequestText(message: ChatMessage | undefined): string {
   return messageText(message)
     .replace(/^发起\s*AI\s*开发任务[：:]\s*/i, '')
     .trim()
+}
+
+function userDisplayName(message: ChatMessage | undefined): { name: string; initial: string } {
+  const name = clean(
+    message?.sender_name
+    ?? message?.senderName
+    ?? message?.sender_account
+    ?? message?.senderAccount
+    ?? '',
+  ) || '我'
+  return {
+    name,
+    initial: (name[0] ?? '我').toUpperCase(),
+  }
 }
 
 function latestMessageOfKind(messages: ChatMessage[], kind: string): ChatMessage | undefined {
