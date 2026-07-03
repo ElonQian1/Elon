@@ -1,15 +1,15 @@
 .strip {
   position: relative;
   min-width: 0;
-  min-height: 78px;
+  min-height: 66px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
     "progress progress"
     "profile actions";
   align-items: end;
-  gap: 7px 9px;
-  padding: 10px;
+  gap: 6px 8px;
+  padding: 8px;
   background: #151619;
   transition: background var(--transition);
 }
@@ -22,9 +22,9 @@
 .profileBtn {
   grid-area: profile;
   min-width: 0;
-  height: 44px;
+  height: 38px;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
   padding: 3px 4px;
@@ -39,7 +39,7 @@
 .progressSlot {
   grid-area: progress;
   min-width: 0;
-  min-height: 17px;
+  min-height: 15px;
 }
 
 .profileBtn:hover,
@@ -86,8 +86,8 @@
 }
 
 .actionBtn {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border: 0;

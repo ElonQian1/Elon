@@ -47,8 +47,8 @@
 }
 
 .nodeBannerConnecting {
-  background: rgba(60, 111, 162, .18);
-  color: #9fc7ff;
+  background: rgba(255, 255, 255, .055);
+  color: var(--text);
 }
 
 .nodeBannerSuccess {

@@ -431,7 +431,7 @@ export default function ConversationPage() {
   const autoResize = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
-    el.style.height = '42px'
+    el.style.height = '40px'
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
     el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
   }, [])
@@ -575,7 +575,7 @@ export default function ConversationPage() {
   function clearComposerDraft() {
     setInput('')
     setAttachments([])
-    if (textareaRef.current) { textareaRef.current.style.height = '42px' }
+    if (textareaRef.current) { textareaRef.current.style.height = '40px' }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

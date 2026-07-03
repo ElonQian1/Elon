@@ -17,11 +17,11 @@ interface RailItem {
 }
 
 const RAIL_ITEMS: RailItem[] = [
-  { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#243246', hoverColor: '#3c6fa2' },
-  { path: '/',        Icon: Boxes,        label: '项目中心',  color: '#2c2e35', hoverColor: '#4f5d71' },
-  { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2c2e35', hoverColor: '#4f5d71' },
-  { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2c2e35', hoverColor: '#365b44' },
-  { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2f2a3a', hoverColor: '#7a4f9a' },
+  { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/',        Icon: Boxes,        label: '项目中心',  color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
 ]
 
 export default function ServerRail() {
