@@ -126,6 +126,10 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 当前边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`pipe_sidecar + pipe + JSON` 已补齐基础生命周期管理、稳定运行句柄、恢复契约和 Codex JSON 输出回放；后续继续增强前端恢复入口和多 CLI 统一管理，不替代 Codex CLI 本身能力。
 
+服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器更新中，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
+
+节点客户端自更新属于一龙控制面链路，默认必须直连一龙服务器，不能继承开发机或子项目设置的系统代理；确需代理的环境用 `NODE_AGENT_UPDATE_USE_SYSTEM_PROXY=1` 或 `NODE_AGENT_UPDATE_PROXY_MODE=system` 显式开启。
+
 ```
 PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --json
     → stdout JSONL 事件流

@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::{path::Path, time::Duration};
+use std::{collections::HashMap, path::Path, time::Duration};
 
 use super::{command as launcher_command, env_file, paths, process, DEFAULT_BASE_URL};
 
@@ -44,7 +44,7 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
 
     let base_url = update_base_url(&env_values);
     let version_url = format!("{}/api/node-agent/version", base_url.trim_end_matches('/'));
-    let client = update_http_client()?;
+    let client = update_http_client(&env_values)?;
     let remote_text = client
         .get(&version_url)
         .send()
@@ -74,7 +74,7 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     } else {
         remote.windows_client_download_url.clone()
     };
-    match try_update_from_client_package(install_dir, &package_url, &remote_text) {
+    match try_update_from_client_package(install_dir, &package_url, &remote_text, &env_values) {
         Ok(updated) => return Ok(updated),
         Err(error) => {
             super::log_file::record_event(
@@ -137,6 +137,7 @@ fn try_update_from_client_package(
     install_dir: &Path,
     package_url: &str,
     remote_text: &str,
+    env_values: &HashMap<String, String>,
 ) -> Result<bool> {
     let internal_dir = paths::internal_dir(install_dir);
     std::fs::create_dir_all(&internal_dir)
@@ -144,7 +145,7 @@ fn try_update_from_client_package(
     let tmp_zip = internal_dir.join("elon-node-agent-windows.zip.new");
     let tmp_version = internal_dir.join("node-agent-version.json.new");
     let version_file = paths::version_file(install_dir);
-    let client = update_http_client()?;
+    let client = update_http_client(env_values)?;
     let bytes = download_bytes_with_retries(&client, package_url, "无法读取完整客户端包内容")?;
     if bytes.len() < 1024 * 1024 {
         anyhow::bail!("下载的完整客户端包过小，疑似异常响应");
@@ -164,8 +165,8 @@ fn try_update_from_client_package(
     }
 }
 
-fn update_http_client() -> Result<reqwest::blocking::Client> {
-    reqwest::blocking::Client::builder()
+fn update_http_client(env_values: &HashMap<String, String>) -> Result<reqwest::blocking::Client> {
+    let mut builder = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(env_u64(
             "NODE_AGENT_UPDATE_CONNECT_TIMEOUT_SECS",
             DEFAULT_UPDATE_CONNECT_TIMEOUT_SECS,
@@ -177,9 +178,30 @@ fn update_http_client() -> Result<reqwest::blocking::Client> {
             DEFAULT_UPDATE_DOWNLOAD_TIMEOUT_SECS,
             60,
             60 * 60,
-        )))
-        .build()
-        .context("无法创建更新下载客户端")
+        )));
+    if !update_uses_system_proxy(env_values) {
+        builder = builder.no_proxy();
+    }
+    builder.build().context("无法创建更新下载客户端")
+}
+
+fn update_uses_system_proxy(env_values: &HashMap<String, String>) -> bool {
+    env_values
+        .get("NODE_AGENT_UPDATE_USE_SYSTEM_PROXY")
+        .map(|value| matches_truthy(value))
+        .or_else(|| {
+            env_values
+                .get("NODE_AGENT_UPDATE_PROXY_MODE")
+                .map(|value| value.trim().eq_ignore_ascii_case("system"))
+        })
+        .unwrap_or(false)
+}
+
+fn matches_truthy(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on"
+    )
 }
 
 fn download_bytes_with_retries(
@@ -741,5 +763,34 @@ mod tests {
         assert!(script.contains("Remove-Item -LiteralPath $tmpVersion"));
         assert!(!script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
         assert!(!script.contains("Start-ElonNodeRuntimeAndWait"));
+    }
+
+    #[test]
+    fn update_download_bypasses_system_proxy_by_default() {
+        let env_values = std::collections::HashMap::new();
+
+        assert!(!super::update_uses_system_proxy(&env_values));
+    }
+
+    #[test]
+    fn update_download_can_opt_into_system_proxy() {
+        let mut env_values = std::collections::HashMap::new();
+        env_values.insert(
+            "NODE_AGENT_UPDATE_USE_SYSTEM_PROXY".to_string(),
+            "1".to_string(),
+        );
+
+        assert!(super::update_uses_system_proxy(&env_values));
+    }
+
+    #[test]
+    fn update_download_proxy_mode_system_uses_system_proxy() {
+        let mut env_values = std::collections::HashMap::new();
+        env_values.insert(
+            "NODE_AGENT_UPDATE_PROXY_MODE".to_string(),
+            "system".to_string(),
+        );
+
+        assert!(super::update_uses_system_proxy(&env_values));
     }
 }
