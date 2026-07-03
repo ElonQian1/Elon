@@ -2,14 +2,14 @@
 
 .rail {
   grid-column: 1;
-  width: 72px;
+  width: var(--rail-width);
   height: 100vh;
   background: var(--rail);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px 8px;
+  padding: 8px 6px;
   overflow: hidden;
   border-right: 1px solid rgba(255, 255, 255, .06);
   scrollbar-width: none;
@@ -19,8 +19,8 @@
 .rail::-webkit-scrollbar { width: 0; }
 
 .avatar {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -37,7 +37,7 @@
 .avatar::before {
   content: "";
   position: absolute;
-  left: -8px;
+  left: -6px;
   top: 50%;
   width: 3px;
   height: 0;
@@ -47,8 +47,8 @@
   transition: height .14s ease;
 }
 
-.avatar:hover::before { height: 18px; }
-.active::before       { height: 28px; }
+.avatar:hover::before { height: 16px; }
+.active::before       { height: 26px; }
 
 .avatar:hover,
 .active {
@@ -66,10 +66,10 @@
 }
 
 .icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: block;
-  line-height: 22px;
+  line-height: 20px;
   text-align: center;
   user-select: none;
   pointer-events: none;
@@ -77,7 +77,7 @@
 }
 
 .divider {
-  width: 36px;
+  width: 32px;
   height: 1px;
   background: rgba(255, 255, 255, .08);
   flex-shrink: 0;
@@ -118,7 +118,7 @@
 /* ── Tooltip（hover 时显示在 rail 右侧）── */
 .tooltip {
   position: fixed;
-  left: 80px;
+  left: calc(var(--rail-width) + 8px);
   z-index: 200;
   max-width: min(260px, calc(100vw - 96px));
   overflow: hidden;
@@ -155,16 +155,16 @@
   background: rgba(108, 168, 255, .16);
 }
 .projectIcon {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   object-fit: cover;
   object-position: center;
   border-radius: 8px;
   display: block;
 }
 .projectFallback {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: grid;
   place-items: center;
   border-radius: 8px;

@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { Cpu, History, RefreshCw, Smartphone } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
@@ -430,7 +431,7 @@ export default function ConversationPage() {
   const autoResize = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
-    el.style.height = '46px'
+    el.style.height = '42px'
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
     el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
   }, [])
@@ -574,7 +575,7 @@ export default function ConversationPage() {
   function clearComposerDraft() {
     setInput('')
     setAttachments([])
-    if (textareaRef.current) { textareaRef.current.style.height = '46px' }
+    if (textareaRef.current) { textareaRef.current.style.height = '42px' }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -1098,9 +1099,9 @@ export default function ConversationPage() {
   return (
     <div className={styles.layout}>
 
-      {/* ══ 频道面板（左 304px）══ */}
+      {/* ══ 频道面板 ══ */}
       <aside className={styles.channelPanel}>
-        {/* 工作区标题（58px）*/}
+        {/* 工作区标题 */}
         <div className={styles.workspaceTitle}>
           {activeProjectId ? (
             /* 项目视图：显项目名，点击返回项目列表 */
@@ -1236,7 +1237,7 @@ export default function ConversationPage() {
 
       {/* ══ 聊天区（中 1fr）══ */}
       <div className={styles.chatColumn}>
-        {/* 顶栏（58px）*/}
+        {/* 顶栏 */}
         <header className={styles.chatTopbar}>
           <div className={styles.chatTitle}>
             <span className={styles.chatTitleGlyph}>
@@ -1253,31 +1254,25 @@ export default function ConversationPage() {
           </div>
           <div className={styles.topbarActions}>
             {activeChannelId && (
-              <button className={styles.textBtn} type="button" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
-                刷新
+              <button className={styles.textBtn} type="button" title="刷新消息" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
+                <RefreshCw size={15} aria-hidden="true" /><span>刷新</span>
               </button>
             )}
-            <button className={styles.textBtn} type="button"
-              title="分享这台电脑的算力并查看连接状态"
-              onClick={() => navigate('/node')}>
-              分享算力
+            <button className={styles.textBtn} type="button" title="分享这台电脑的算力并查看连接状态" onClick={() => navigate('/node')}>
+              <Cpu size={15} aria-hidden="true" /><span>分享算力</span>
             </button>
-            <button className={styles.textBtn} type="button"
-              title="打开移动端入口"
-              onClick={() => window.open('/app/download', '_blank', 'noopener')}>
-              打开移动端
+            <button className={styles.textBtn} type="button" title="打开移动端入口" onClick={() => window.open('/app/download', '_blank', 'noopener')}>
+              <Smartphone size={15} aria-hidden="true" /><span>移动端</span>
             </button>
-            <button className={styles.textBtn} type="button"
-              title="切换到旧版 PC 工作台"
-              onClick={() => {
-                const tok = useAuthStore.getState().token
-                if (tok) {
-                  localStorage.setItem('lodex_token', tok)
-                  localStorage.setItem('elon_token', tok)
-                }
-                window.open('/pc-legacy', '_blank', 'noopener')
-              }}>
-              旧版
+            <button className={styles.textBtn} type="button" title="切换到旧版 PC 工作台" onClick={() => {
+              const tok = useAuthStore.getState().token
+              if (tok) {
+                localStorage.setItem('lodex_token', tok)
+                localStorage.setItem('elon_token', tok)
+              }
+              window.open('/pc-legacy', '_blank', 'noopener')
+            }}>
+              <History size={15} aria-hidden="true" /><span>旧版</span>
             </button>
           </div>
         </header>
@@ -1474,7 +1469,7 @@ export default function ConversationPage() {
         )}
       </div>
 
-      {/* ══ 成员面板（右 272px）══ */}
+      {/* ══ 成员面板 ══ */}
       <aside className={styles.memberPanel}>
         <div className={styles.memberTitle}>
           <div className={styles.memberTitleCopy}>
