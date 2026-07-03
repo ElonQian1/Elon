@@ -2610,47 +2610,8 @@ async fn run_session(
     creds: &Credentials,
     runtime: &Arc<NodeRuntime>,
 ) -> Result<()> {
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-    let mut request = cfg.cloud_url.as_str().into_client_request()?;
-    request.headers_mut().insert(
-        "Authorization",
-        format!("Bearer {}", creds.agent_secret).parse()?,
-    );
-
-    let (ws_stream, _) = connect_async(request).await?;
-    info!("✅ 已连接到云端: {}", cfg.cloud_url);
-
-    let (ws_write, mut ws_read) = ws_stream.split();
-    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
-
-    // 写任务
-    let writer = tokio::spawn(async move {
-        let mut sink = ws_write;
-        while let Some(msg) = out_rx.recv().await {
-            if sink.send(msg).await.is_err() {
-                break;
-            }
-        }
-        let _ = sink.close().await;
-    });
-
-    // The cloud requires the first WebSocket frame to be Register within 10s.
-    // Send a lightweight registration immediately, then refresh full capabilities
-    // after local model/CLI/toolchain discovery completes.
-    out_tx.send(ws_text(&AgentToServer::Register {
-        agent_id: creds.agent_id.clone(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        proto_version: PROTO_VERSION,
-        allowed_clis: vec![],
-        allowed_cwds: vec![],
-        owner_user_id: Some(creds.owner_user_id.clone()),
-        device_name: Some(machine_label()),
-        hardware: None,
-        storage: None,
-        dev_runtime: None,
-    }))?;
     runtime
-        .set_connected(true, "已连接，正在扫描本机能力")
+        .set_connected(false, "正在扫描本机能力，完成后连接云端")
         .await;
 
     // 扫描本地模型
@@ -2711,6 +2672,45 @@ async fn run_session(
     let storage_settings = runtime.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
 
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+    let mut request = cfg.cloud_url.as_str().into_client_request()?;
+    request.headers_mut().insert(
+        "Authorization",
+        format!("Bearer {}", creds.agent_secret).parse()?,
+    );
+
+    let (ws_stream, _) = connect_async(request).await?;
+    info!("✅ 已连接到云端: {}", cfg.cloud_url);
+
+    let (ws_write, mut ws_read) = ws_stream.split();
+    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
+
+    // 写任务
+    let writer = tokio::spawn(async move {
+        let mut sink = ws_write;
+        while let Some(msg) = out_rx.recv().await {
+            if sink.send(msg).await.is_err() {
+                break;
+            }
+        }
+        let _ = sink.close().await;
+    });
+
+    // The cloud requires the first WebSocket frame to be Register within 10s.
+    // Discover capabilities first so the registered session can immediately
+    // answer protocol pings and accept dispatched work.
+    out_tx.send(ws_text(&AgentToServer::Register {
+        agent_id: creds.agent_id.clone(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        proto_version: PROTO_VERSION,
+        allowed_clis: available_clis.clone(),
+        allowed_cwds: vec![],
+        owner_user_id: Some(creds.owner_user_id.clone()),
+        device_name: Some(machine_label()),
+        hardware: Some(hardware.clone()),
+        storage: Some(storage.clone()),
+        dev_runtime: Some(dev_runtime.clone()),
+    }))?;
     // 发送 RegisterCapabilities（含 TTS Worker URL）
     let tts_url = runtime.tts_worker_url.read().await.clone();
     out_tx.send(ws_text(&AgentToServer::RegisterCapabilities {
