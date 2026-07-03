@@ -40,9 +40,9 @@
 
 1. 服务器以 `project_id + conversation_id` 为单位分配会话执行权：同一会话内串行，避免一个会话的连续上下文和分支被两个任务同时修改。
 2. 普通服务器 worktree 路线允许同一项目的不同会话并行编码；进入开发流程后，后端为每个 APK 会话创建或复用独立 Git worktree 和 `ai/session/...` 分支。主工作区的 `main` 只负责跟随最新 `origin/main`，不得被业务会话长期占用。
-3. PC 节点外部 CLI 路线还要按“PC 节点 + CLI”分配容量槽位：不同 PC 节点可以并行，同一 PC 节点上的 Codex / Claude / Copilot 等外部 CLI 也可以并行，但不能无上限并发。默认根据硬件保守估算槽位，未知硬件从 1 个槽开始，强工作站可提升到 2-4 个槽；服务端仍可用 `ELON_PC_NODE_CLI_MAX_PARALLEL` / `ELON_PC_NODE_CLI_HARD_MAX_PARALLEL` 兜底控制。
+3. PC 节点外部 CLI 路线还要按“PC 节点 + CLI”分配容量槽位：不同 PC 节点可以并行，同一 PC 节点上的 Codex / Claude / Copilot 等外部 CLI 也可以并行，但不能无上限并发。当前试运行默认每个 PC 节点 6 个 CLI 槽位；硬件估算只作为容量参考，不再把默认值压低到 1-4。服务端仍可用 `ELON_PC_NODE_CLI_MAX_PARALLEL` / `ELON_PC_NODE_CLI_HARD_MAX_PARALLEL` 兜底控制。
 4. 同一 PC 节点所有 CLI 槽位都被占用时，新任务进入节点队列，而不是继续启动更多 CLI 进程。这样能避免多个会话同时争用同一个本机登录态、sidecar、缓存和项目路径，导致只剩等待状态、没有 CLI 输出、最终超时失败。
-5. PC 前端必须明确展示节点容量状态：节点槽位已满、并发槽位数、排队等待时长、已获得节点 CLI 执行权、已派发到 CLI、CLI 公开输出、命令/文件/测试/最终回复。
+5. PC 前端必须明确展示节点容量状态：节点槽位已满、并发槽位数、排队等待时长、已获得节点 CLI 执行权、PC 节点已确认接收、CLI 公开输出、命令/文件/测试/最终回复。云端只写出派发消息不等于本机节点已收到；Route A 必须用节点 ACK 区分“已送达本机”和“等待 CLI 输出”。
 6. 推送到远端主线、Android 版本 claim、APK 发布、服务器部署、数据库任务状态落库必须串行；如果项目不能创建 worktree，退回项目级共享工作区串行执行。
 7. 一龙自项目与普通 GitHub / `local_path` 项目遵守同一套规则，不允许隐藏特殊流程。
 

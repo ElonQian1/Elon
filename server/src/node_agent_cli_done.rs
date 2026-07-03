@@ -18,6 +18,20 @@ pub(crate) fn duplicate_cli_prompt_done(req_id: String) -> AgentToServer {
     }
 }
 
+pub(crate) fn cli_prompt_accepted(
+    req_id: String,
+    cli: Option<String>,
+    cwd: Option<String>,
+    runtime_permission: Option<String>,
+) -> AgentToServer {
+    AgentToServer::CliPromptAccepted {
+        req_id,
+        cli,
+        cwd,
+        runtime_permission,
+    }
+}
+
 pub(crate) fn cli_done_message(
     req_id: String,
     exit_ok: bool,

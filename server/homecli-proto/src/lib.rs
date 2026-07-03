@@ -397,6 +397,19 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC 节点已收到 CLI 请求；后续仍会继续返回 CliChunk/CliDone。
+    CliPromptAccepted {
+        req_id: String,
+        /// 本机节点实际解析到的 CLI 名称，例如 codex / copilot。
+        #[serde(default)]
+        cli: Option<String>,
+        /// 本机节点最终使用的工作目录；为空表示使用节点默认目录。
+        #[serde(default)]
+        cwd: Option<String>,
+        /// 本轮 Route A 权限，仅用于云端诊断和前端过程展示。
+        #[serde(default)]
+        runtime_permission: Option<String>,
+    },
     /// PC CLI 执行的流式输出片段
     CliChunk {
         req_id: String,
@@ -570,6 +583,7 @@ impl AgentToServer {
             | Self::Pong { .. }
             | Self::HttpResponse { .. }
             | Self::HttpError { .. }
+            | Self::CliPromptAccepted { .. }
             | Self::CliChunk { .. }
             | Self::CliDone { .. }
             | Self::ToolApprovalDecisionAck { .. }
@@ -596,6 +610,7 @@ impl AgentToServer {
         match self {
             Self::HttpResponse { req_id, .. }
             | Self::HttpError { req_id, .. }
+            | Self::CliPromptAccepted { req_id, .. }
             | Self::CliChunk { req_id, .. }
             | Self::CliDone { req_id, .. }
             | Self::LlmStreamChunk { req_id, .. }
@@ -619,7 +634,10 @@ impl AgentToServer {
 
     /// 流式消息需要保留在 pending map 中（还有后续），其余 req_id 消息在发送后删除。
     pub fn is_final_req_msg(&self) -> bool {
-        !matches!(self, Self::CliChunk { .. } | Self::LlmStreamChunk { .. })
+        !matches!(
+            self,
+            Self::CliPromptAccepted { .. } | Self::CliChunk { .. } | Self::LlmStreamChunk { .. }
+        )
     }
 }
 
@@ -664,6 +682,20 @@ mod tests {
 
         assert_eq!(msg.req_id(), None);
         assert_eq!(msg.task_id(), None);
+    }
+
+    #[test]
+    fn cli_prompt_accepted_keeps_req_stream_open() {
+        let msg = AgentToServer::CliPromptAccepted {
+            req_id: "req".to_string(),
+            cli: Some("codex".to_string()),
+            cwd: Some("D:\\work".to_string()),
+            runtime_permission: Some("danger_full_access".to_string()),
+        };
+
+        assert_eq!(msg.req_id(), Some("req"));
+        assert_eq!(msg.task_id(), None);
+        assert!(!msg.is_final_req_msg());
     }
 
     #[test]

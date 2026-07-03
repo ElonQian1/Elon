@@ -19,6 +19,7 @@ mod ai_cli_trace;
 mod ai_cli_types;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
+mod pc_prompt_acceptance;
 
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
@@ -47,6 +48,9 @@ pub(crate) use self::pc_dispatch_capture::{
 };
 pub(crate) use self::pc_passthrough_events::{
     pc_cli_passthrough_event, pc_cli_passthrough_events_flush, pc_cli_passthrough_events_from_chunk,
+};
+use self::pc_prompt_acceptance::{
+    pc_lightweight_no_node_event_diagnostic, wait_for_pc_cli_prompt_acceptance,
 };
 
 use self::{
@@ -1310,6 +1314,8 @@ async fn run_via_pc_agent(
         result?
     };
     let mut pc_cancel_guard = PcCliCancelOnDrop::armed(cancel_handle);
+    let mut first_cli_event =
+        wait_for_pc_cli_prompt_acceptance(state, agent_id, &pc_req_id, cli_name, &mut rx).await?;
     let pc_cli_feature = if request_mode.is_plan() {
         "pc_agent_cli_plan"
     } else if raw_pc_passthrough {
@@ -1389,6 +1395,7 @@ async fn run_via_pc_agent(
     let mut lightweight_streamed_reply = String::new();
     let mut lightweight_received_event = false;
     let mut last_codex_progress_hint: Option<(&'static str, std::time::Instant)> = None;
+    let mut pending_first_cli_event = first_cli_event.take();
     let project_recv_timeout_secs =
         pc_agent_cli_recv_timeout_secs(cli_name, request_mode, native_session_scope.as_ref());
 
@@ -1417,7 +1424,9 @@ async fn run_via_pc_agent(
     };
 
     loop {
-        let event = if lightweight_pc_chat {
+        let event = if let Some(event) = pending_first_cli_event.take() {
+            event
+        } else if lightweight_pc_chat {
             let recv_timeout_secs = if lightweight_received_event {
                 PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS
             } else {
@@ -1623,6 +1632,9 @@ async fn run_via_pc_agent(
         }
 
         match event {
+            AgentToServer::CliPromptAccepted { .. } => {
+                continue;
+            }
             AgentToServer::CliChunk { text, .. } => {
                 if lightweight_pc_chat {
                     full_text.push_str(&text);
@@ -2163,19 +2175,6 @@ fn no_readable_lightweight_reply(output: &str, cli_name: &str) -> PcAgentRunOutc
     PcAgentRunOutcome::NoReadableLightweightReply {
         diagnostic: pc_lightweight_no_readable_diagnostic(output, cli_name),
     }
-}
-
-fn pc_lightweight_no_node_event_diagnostic(
-    cli_name: &str,
-    agent_id: &str,
-    timeout_secs: u64,
-) -> String {
-    format!(
-        "{}已派发到 PC 节点 {}，但 {} 秒内没有收到节点确认或任何 CLI 输出；本轮已停止。请检查本机节点是否正在重连、是否有重复/旧连接，或稍后重发。",
-        pc_cli_progress_label(cli_name),
-        agent_id,
-        timeout_secs
-    )
 }
 
 fn pc_lightweight_no_readable_diagnostic(output: &str, cli_name: &str) -> Option<String> {

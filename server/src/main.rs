@@ -110,6 +110,7 @@ mod pc_agent_runtime_choice;
 mod pc_node_capacity;
 mod pc_node_display;
 mod pc_relay;
+mod pc_relay_cli_prompt;
 mod pc_relay_client;
 mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;

@@ -2137,7 +2137,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             insert_channel_ai_progress(&task, &raw_status);
                         }
                         let msg = format!(
-                            "本机 AI 已派发到 PC 节点，但在 {} 秒内没有收到 Codex CLI 输出、命令、工具结果或最终完成事件；已停止本轮任务。请更新/重启一龙 PC 节点客户端，并检查 Codex 网络/代理状态。",
+                            "本机 AI 已被 PC 节点确认接收，但在 {} 秒内没有收到 Codex CLI 输出、命令、工具结果或最终完成事件；已停止本轮任务。请更新/重启一龙 PC 节点客户端，并检查 Codex 网络/代理状态。",
                             timeout_secs
                         );
                         final_reply = msg.clone();

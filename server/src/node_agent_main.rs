@@ -48,7 +48,10 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
-use node_agent_cli_done::{cli_done_message, duplicate_cli_prompt_done, latest_codex_session_id};
+use node_agent_cli_done::{
+    cli_done_message, cli_prompt_accepted, duplicate_cli_prompt_done, latest_codex_session_id,
+};
+use node_agent_env::{env_flag, node_agent_env_file_path};
 
 const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -81,6 +84,7 @@ mod node_agent_codex_approval;
 mod node_agent_codex_session;
 mod node_agent_codex_vault;
 mod node_agent_download_router;
+mod node_agent_env;
 mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
@@ -283,11 +287,6 @@ fn initial_storage_settings(persisted: &PersistedState) -> pc_storage_repo::Stor
         }),
         git_base_url,
     }
-}
-
-fn env_flag(name: &str) -> Option<bool> {
-    let value = std::env::var(name).ok()?.trim().to_ascii_lowercase();
-    Some(matches!(value.as_str(), "1" | "true" | "yes" | "on"))
 }
 
 /// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
@@ -2983,6 +2982,15 @@ async fn run_session(
                                     let _ = tx_c.send(ws_text(&duplicate_cli_prompt_done(req_id)));
                                     return;
                                 }
+                                let requested_runtime_permission = project_context
+                                    .as_ref()
+                                    .and_then(|ctx| ctx.runtime_permission.clone());
+                                let _ = tx_c.send(ws_text(&cli_prompt_accepted(
+                                    req_id_for_cleanup.clone(),
+                                    Some(cli.clone()),
+                                    cwd.clone(),
+                                    requested_runtime_permission.clone(),
+                                )));
                                 let resolved_cli = match rt_c.resolve_cli(&cli).await {
                                     Ok(resolved) => resolved,
                                     Err(e) => {
@@ -3016,9 +3024,7 @@ async fn run_session(
                                         .as_deref(),
                                 )
                                 .await;
-                                let runtime_permission = project_context
-                                    .as_ref()
-                                    .and_then(|ctx| ctx.runtime_permission.clone());
+                                let runtime_permission = requested_runtime_permission;
                                 if let Err(e) =
                                     node_agent_full_access::require_route_a_full_access_grant(
                                         &rt_c.full_access_grants,
@@ -4705,11 +4711,4 @@ async fn admin_save_openai_key(
             "api_runtime_contract": contract,
         })),
     )
-}
-
-fn node_agent_env_file_path() -> Option<std::path::PathBuf> {
-    std::env::current_exe().ok().and_then(|path| {
-        path.parent()
-            .map(|dir| dir.join("_internal").join("node-agent.env"))
-    })
 }

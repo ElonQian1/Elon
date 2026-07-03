@@ -10,8 +10,8 @@ use crate::{
     types::{AppState, WsMessage},
 };
 
-const DEFAULT_PC_NODE_CLI_PARALLEL_LIMIT: usize = 1;
-const DEFAULT_PC_NODE_CLI_HARD_LIMIT: usize = 4;
+const DEFAULT_PC_NODE_CLI_PARALLEL_LIMIT: usize = 6;
+const DEFAULT_PC_NODE_CLI_HARD_LIMIT: usize = 6;
 const GIB: u64 = 1024 * 1024 * 1024;
 
 pub(crate) struct PcNodeCliPermit {
@@ -194,6 +194,7 @@ async fn pc_node_cli_parallel_limit(state: &Arc<AppState>, node_id: &str) -> usi
         .as_ref()
         .map(pc_node_cli_parallel_limit_from_hardware)
         .unwrap_or(DEFAULT_PC_NODE_CLI_PARALLEL_LIMIT)
+        .max(DEFAULT_PC_NODE_CLI_PARALLEL_LIMIT)
         .clamp(1, hard_limit)
 }
 
@@ -210,9 +211,9 @@ fn pc_node_cli_parallel_limit_from_hardware(hardware: &NodeHardwareProfile) -> u
     let has_gpu = gpu_memory >= 8 * GIB || !hardware.gpu_names.is_empty();
 
     if cores >= 16 && memory >= 96 * GIB && gpu_memory >= 12 * GIB {
-        4
+        6
     } else if cores >= 12 && memory >= 48 * GIB && has_gpu {
-        3
+        4
     } else if cores >= 8 && memory >= 24 * GIB {
         2
     } else {
@@ -275,7 +276,7 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(pc_node_cli_parallel_limit_from_hardware(&hardware), 4);
+        assert_eq!(pc_node_cli_parallel_limit_from_hardware(&hardware), 6);
     }
 
     #[test]

@@ -23,13 +23,13 @@ pub(crate) fn pc_dispatch_started_progress(value: &serde_json::Value) -> Option<
         .unwrap_or(false);
     let message = if cwd_configured {
         format!(
-            "已派发到 PC 节点 {}，等待 {} CLI 输出。",
+            "PC 节点 {} 已确认接收，等待 {} CLI 输出。",
             short_pc_node_id(agent_id),
             pc_cli_label(cli)
         )
     } else {
         format!(
-            "已派发到 PC 节点 {}，等待 {} CLI 确认。",
+            "PC 节点 {} 已确认接收，等待 {} CLI 输出。",
             short_pc_node_id(agent_id),
             pc_cli_label(cli)
         )
@@ -111,10 +111,7 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("node-usr_5c...33ed36"));
-        assert!(value["message"]
-            .as_str()
-            .unwrap()
-            .contains("等待 Codex CLI 确认"));
+        assert!(value["message"].as_str().unwrap().contains("已确认接收"));
     }
 
     #[test]
