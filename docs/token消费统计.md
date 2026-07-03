@@ -63,6 +63,28 @@ Token Usage Meter
 
 ---
 
+## 3.1 Codex CLI 的资源来源与扣费口径
+
+PC 项目会话里的 Codex CLI 需要同时记录 token 和资源来源，不能只看 `usage_mode=pc_agent_cli`。当前统一字段是：
+
+| `billing_source` | 含义 | 是否扣平台额度 | 经验条展示 |
+|---|---|---:|---|
+| `own_codex` | 用户使用自己 PC 节点上登录的 Codex 账号 | 否 | 自用 Codex |
+| `shared_codex` | 用户借用其他用户 PC 节点上登录的 Codex 账号 | 是，按平台策略结算 | 借用 Codex；节点 owner 侧显示分享给别人 |
+| `platform` | 平台 API / 平台模型 / 未能归类的可信服务端调用 | 是 | 平台/其他 |
+| `user_api_key` | 用户自己的 API key 经服务端代理 | 否 | 不计平台额度，仍记录 token |
+| `client_reported` | 客户端参考上报 | 否 | 仅参考统计 |
+
+硬规则：
+
+1. 用户自己的 Codex 账号不消耗一龙平台余额；即使用户平台额度为 0，也允许继续使用自己的 Codex。
+2. 自有 Codex 仍必须写入 token 用量，便于用户看到自己实际用了多少上下文和输出。
+3. 借用别人 Codex / 远程节点时，consumer 侧记录 `shared_codex`，provider 侧通过节点结算流水累计“分享给别人”的 token 和收益。
+4. 自用自己的节点不能生成 provider 分享流水，避免经验条把“自己用自己”误算成贡献。
+5. 月度额度、余额预检和可用性判断必须排除 `own_codex`；共享或平台来源仍按平台策略检查额度。
+
+---
+
 ## 4. 三种模式分别怎么接入
 
 ### 模式 1：用户使用你们服务器 API Key

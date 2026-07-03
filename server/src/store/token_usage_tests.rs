@@ -1,4 +1,7 @@
-use super::{token_usage::BILLING_SOURCE_OWN_CODEX, Store, TokenUsageRecord};
+use super::{
+    token_usage::{BILLING_SOURCE_OWN_CODEX, BILLING_SOURCE_SHARED_CODEX},
+    SettleParams, Store, TokenUsageRecord,
+};
 
 fn temp_store() -> (Store, std::path::PathBuf) {
     let path = std::env::temp_dir().join(format!(
@@ -263,6 +266,101 @@ fn own_codex_usage_records_tokens_without_billing_or_quota_cost() {
     assert!(stats.by_billing_source.iter().any(|row| {
         row.billing_source == BILLING_SOURCE_OWN_CODEX && row.total_tokens == 5_000
     }));
+    let ledger = store.user_progression_ledger(&user.id).unwrap();
+    assert_eq!(ledger.consumed_tokens, 5_000);
+    assert_eq!(ledger.own_codex_tokens, 5_000);
+    assert_eq!(ledger.shared_codex_tokens, 0);
+    assert_eq!(ledger.provided_tokens, 0);
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn shared_codex_usage_bills_consumer_and_counts_provider_share() {
+    let (store, path) = temp_store();
+    let consumer = store
+        .create_user(
+            &format!("shared-consumer-{}@example.com", uuid::Uuid::new_v4().simple()),
+            "secret1",
+            None,
+            None,
+        )
+        .unwrap();
+    let provider = store
+        .create_user(
+            &format!("shared-provider-{}@example.com", uuid::Uuid::new_v4().simple()),
+            "secret1",
+            None,
+            None,
+        )
+        .unwrap();
+    store
+        .billing_recharge(&consumer.id, 2_000, "test", "test", None)
+        .unwrap();
+
+    let record = TokenUsageRecord {
+        user_id: &consumer.id,
+        feature: "pc_agent_cli_chat",
+        usage_mode: "pc_agent_cli",
+        model: Some("gpt-5-codex"),
+        input_tokens: 3_000,
+        cached_input_tokens: 0,
+        output_tokens: 2_000,
+        reasoning_tokens: 0,
+        total_tokens: 5_000,
+        billing_source: Some(BILLING_SOURCE_SHARED_CODEX),
+        resource_owner_user_id: Some(&provider.id),
+        idempotency_key: Some("pc_agent_cli:shared-codex-1"),
+    };
+    let result =
+        crate::billing::account_trusted_usage_with_charge_policy(&store, &record, true).unwrap();
+
+    assert_eq!(result.accounting_status, "billed");
+    assert!(result.cost_rmb_fen > 0);
+    assert!(result.billing_event_id.is_some());
+    assert_eq!(
+        store.billing_get_balance(&consumer.id).unwrap(),
+        Some(2_000 - result.cost_rmb_fen)
+    );
+    let stats = store.get_usage_stats(&consumer.id, 30).unwrap();
+    assert_eq!(stats.total.billable_tokens, 5_000);
+    assert!(stats.by_billing_source.iter().any(|row| {
+        row.billing_source == BILLING_SOURCE_SHARED_CODEX && row.total_tokens == 5_000
+    }));
+
+    store
+        .settle_node_inference(SettleParams {
+            consumer_user_id: &consumer.id,
+            provider_user_id: &provider.id,
+            node_id: "node-shared-codex",
+            model_id: "pc-cli/gpt-5-codex",
+            feature: "pc_agent_cli_chat",
+            usage_mode: "pc_agent_cli",
+            compute_call_id: result.idempotency_key.as_deref(),
+            token_usage_event_id: Some(&result.token_usage_event_id),
+            billing_event_id: result.billing_event_id.as_deref(),
+            prompt_tokens: 3_000,
+            completion_tokens: 2_000,
+            price_per_1k_credits: 0.1,
+            billed_cost_rmb_fen: result.cost_rmb_fen,
+            accounting_status: Some(&result.accounting_status),
+            provider_revenue_share_x1000: 800,
+            platform_fee_rate: 0.2,
+        })
+        .unwrap();
+
+    let consumer_ledger = store.user_progression_ledger(&consumer.id).unwrap();
+    assert_eq!(consumer_ledger.consumed_tokens, 5_000);
+    assert_eq!(consumer_ledger.shared_codex_tokens, 5_000);
+    assert_eq!(consumer_ledger.own_codex_tokens, 0);
+    assert_eq!(consumer_ledger.platform_tokens, 0);
+
+    let provider_ledger = store.user_progression_ledger(&provider.id).unwrap();
+    assert_eq!(provider_ledger.consumed_tokens, 0);
+    assert_eq!(provider_ledger.provided_tokens, 5_000);
+    assert_eq!(provider_ledger.provided_run_count, 1);
+    assert!(provider_ledger.provider_earned_fen > 0);
 
     drop(store);
     let _ = std::fs::remove_file(path);

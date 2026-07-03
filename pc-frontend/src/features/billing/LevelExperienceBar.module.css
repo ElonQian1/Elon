@@ -170,7 +170,7 @@
 .split div {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 3px 6px;
   align-items: center;
   padding: 7px;
@@ -179,9 +179,37 @@
 }
 
 .split strong {
-  grid-column: 2;
+  grid-column: 3;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.split em {
+  grid-column: 2 / 4;
+  color: #8f98a7;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.segmentInfo {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.segmentInfo span,
+.segmentInfo small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmentInfo small {
+  color: #8f98a7;
+  font-size: 10px;
+  font-weight: 650;
 }
 
 .dot {
