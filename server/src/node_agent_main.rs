@@ -53,7 +53,7 @@ use node_agent_cli_done::{
 };
 use node_agent_env::{env_flag, node_agent_env_file_path};
 
-const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
+const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(35);
 
 mod agent_runtime_error_summary;
 mod cli_usage;
@@ -2731,7 +2731,7 @@ async fn run_session(
     // WS ping 定时器
     let ping_tx = out_tx.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(30));
+        let mut interval = tokio::time::interval(Duration::from_secs(10));
         loop {
             interval.tick().await;
             if ping_tx.send(Message::Ping(vec![])).is_err() {

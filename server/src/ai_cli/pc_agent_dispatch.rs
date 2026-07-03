@@ -14,7 +14,7 @@ use crate::{
 };
 
 const PC_AGENT_CLI_ACCEPT_RETRY_LIMIT: usize = 1;
-const PC_AGENT_CLI_ACCEPT_RETRY_DELAY_SECS: u64 = 3;
+const PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS: u64 = 45;
 
 pub(crate) struct PcCliPromptDispatchRequest<'a> {
     pub(crate) state: &'a Arc<AppState>,
@@ -41,6 +41,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
 ) -> Result<PcAcceptedCliPrompt> {
     let mut accept_retry_count = 0usize;
     loop {
+        let previous_connected_at = agent_connected_at(request.state, request.agent_id).await;
         let dispatch = dispatch_pc_cli_prompt_once(&request).await?;
         let (pc_req_id, mut rx, cancel_handle) = dispatch.into_parts();
         match wait_for_pc_cli_prompt_acceptance(
@@ -71,7 +72,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
                 if !request.lightweight_pc_chat {
                     let _ = request.tx.send(
                         WsMessage::progress(format!(
-                            "PC 节点连接疑似假在线：{} 秒内未确认接收请求，已关闭旧连接，正在自动重派（{}/{}）。",
+                            "PC 节点连接疑似假在线：{} 秒内未确认接收请求，已关闭旧连接，等待节点重新注册后自动重派（{}/{}）。",
                             timeout_secs,
                             accept_retry_count,
                             PC_AGENT_CLI_ACCEPT_RETRY_LIMIT
@@ -79,10 +80,18 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
                         .to_json(),
                     );
                 }
-                tokio::time::sleep(std::time::Duration::from_secs(
-                    PC_AGENT_CLI_ACCEPT_RETRY_DELAY_SECS,
-                ))
-                .await;
+                if !wait_for_agent_reconnect(&request, previous_connected_at).await {
+                    return Err(anyhow!(
+                        "PC 节点 {} 在 {} 秒内没有重新连接；本轮已停止。请重启一龙 PC 节点客户端后重发。",
+                        request.agent_id,
+                        PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS
+                    ));
+                }
+                if !request.lightweight_pc_chat {
+                    let _ = request.tx.send(
+                        WsMessage::progress("PC 节点已重新连接，正在重派本轮请求。").to_json(),
+                    );
+                }
             }
             Err(error) => return Err(error),
         }
@@ -144,4 +153,40 @@ async fn dispatch_pc_cli_prompt_once(
         }
     }
     result
+}
+
+async fn agent_connected_at(state: &Arc<AppState>, agent_id: &str) -> Option<u64> {
+    state
+        .agent_manager
+        .list()
+        .await
+        .into_iter()
+        .find(|agent| agent.agent_id == agent_id)
+        .map(|agent| agent.connected_at)
+}
+
+async fn wait_for_agent_reconnect(
+    request: &PcCliPromptDispatchRequest<'_>,
+    previous_connected_at: Option<u64>,
+) -> bool {
+    let mut waited_secs = 0u64;
+    while waited_secs < PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        waited_secs += 2;
+        if let Some(connected_at) = agent_connected_at(request.state, request.agent_id).await {
+            if previous_connected_at.is_none_or(|previous| connected_at > previous) {
+                return true;
+            }
+        }
+        if !request.lightweight_pc_chat && waited_secs % 10 == 0 {
+            let _ = request.tx.send(
+                WsMessage::progress(format!(
+                    "仍在等待 PC 节点重新连接（已等待 {}s / {}s）。",
+                    waited_secs, PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS
+                ))
+                .to_json(),
+            );
+        }
+    }
+    false
 }
