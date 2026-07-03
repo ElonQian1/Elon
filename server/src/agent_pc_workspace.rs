@@ -53,6 +53,7 @@ pub(crate) fn project_chat_should_use_pc_cli(
     false
 }
 
+#[cfg(test)]
 pub(crate) fn pc_cli_chat_route_label(
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> &'static str {
