@@ -37,6 +37,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
   const [collapsed, setCollapsed] = useState(isDone)
   const prevDone = useRef(isDone)
+  const userCollapseOverride = useRef(false)
 
   // 任务从"运行中"变为"完成"时自动折叠（延迟一下让用户看到结果）
   useEffect(() => {
@@ -64,6 +65,11 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const codexThreadUri = codexThreadUriFor(messages)
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
+
+  useEffect(() => {
+    if (userCollapseOverride.current || isDone || progressCount <= 3) return
+    setCollapsed(true)
+  }, [isDone, progressCount])
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -124,7 +130,10 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
             <button
               type="button"
               className={styles.processToggle}
-              onClick={() => setCollapsed((c) => !c)}
+              onClick={() => {
+                userCollapseOverride.current = true
+                setCollapsed((c) => !c)
+              }}
               aria-expanded={!collapsed}
             >
               <span className={styles.processDot} />

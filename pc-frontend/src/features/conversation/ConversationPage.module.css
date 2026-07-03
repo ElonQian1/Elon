@@ -6,7 +6,10 @@
 /* 三栏 grid：通用桌面密度，保留中间会话区为主视觉 */
 .layout {
   display: grid;
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) minmax(280px, var(--member-width));
+  grid-template-columns:
+    var(--conversation-channel-column, var(--sidebar-width))
+    minmax(520px, 1fr)
+    var(--conversation-member-column, minmax(280px, var(--member-width)));
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -23,6 +26,21 @@
   grid-template-rows: 48px 40px minmax(0, 1fr) 66px;
   min-height: 0;
   position: relative;
+}
+.channelPanel[data-collapsed="true"] {
+  grid-template-rows: 48px minmax(0, 1fr);
+  overflow: hidden;
+}
+.channelPanel[data-collapsed="true"] .workspaceTitle {
+  justify-content: center;
+  padding: 0 6px;
+}
+.channelPanel[data-collapsed="true"] .workspaceBackBtn,
+.channelPanel[data-collapsed="true"] .workspaceHomeBtn,
+.channelPanel[data-collapsed="true"] .iconBtn:not(.panelToggleBtn),
+.channelPanel[data-collapsed="true"] .channelSearch,
+.channelPanel[data-collapsed="true"] .channelList {
+  display: none;
 }
 
 /* 工作区标题行 */
@@ -81,6 +99,44 @@
   flex-shrink: 0;
 }
 .iconBtn:hover { background: #2a2c32; color: var(--text); }
+.panelToggleBtn {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.resizeHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 8;
+  width: 10px;
+  cursor: col-resize;
+  outline: none;
+  touch-action: none;
+}
+.resizeHandle::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 4px;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background var(--transition), box-shadow var(--transition);
+}
+.resizeHandle:hover::after,
+.resizeHandle:focus-visible::after,
+.resizeHandle[data-dragging="true"]::after {
+  background: rgba(217, 217, 217, .42);
+  box-shadow: 0 0 0 3px rgba(217, 217, 217, .08);
+}
+.channelResizeHandle {
+  right: -5px;
+}
+.memberResizeHandle {
+  left: -5px;
+}
 
 /* 搜索栏 */
 .channelSearch { padding: 7px 10px; }
@@ -238,6 +294,9 @@
   gap: 7px;
   flex-shrink: 0;
   min-width: 0;
+}
+.panelControlBtn {
+  min-width: 36px;
 }
 
 /* Text button（顶栏、面板等复用）*/
@@ -701,6 +760,10 @@
   display: grid;
   grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   min-height: 0;
+  position: relative;
+}
+.memberPanel[data-collapsed="true"] {
+  display: none;
 }
 .memberTitle {
   display: flex;
@@ -821,12 +884,17 @@
    响应式
    ══════════════════════════════════════ */
 @media (max-width: 1180px) {
-  .layout { grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
+  .layout {
+    grid-template-columns: var(--conversation-channel-column, var(--sidebar-width)) minmax(0, 1fr);
+  }
   .memberPanel { display: none; }
 }
 @media (max-width: 1360px) {
   .topbarActions .textBtn span {
     display: none;
+  }
+  .topbarActions .panelControlBtn span:first-child {
+    display: inline;
   }
   .topbarActions .textBtn {
     width: var(--control-height);

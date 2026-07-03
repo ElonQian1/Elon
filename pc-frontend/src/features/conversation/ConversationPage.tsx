@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Cpu, History, RefreshCw, Smartphone } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
@@ -11,13 +10,15 @@ import type { UploadedAttachment } from './AttachmentButton'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
-import AgentRunsPanel from '../dev/AgentRunsPanel'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
 import ComposerRuntimeToggles from './ComposerRuntimeToggles'
+import ConversationMemberSidebar from './ConversationMemberSidebar'
+import type { MemberPanelScope } from './ConversationMemberSidebar'
+import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
 import { api } from '../../api/client'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
 import { localJson } from '../doctor/localApi'
@@ -32,6 +33,7 @@ import {
   initialDirectPcCliFromStorage,
   persistDirectPcCliSelection,
 } from './localPcRuntime'
+import { useWorkspacePanels } from './useWorkspacePanels'
 import type { LocalNodeStatus } from './localPcRuntime'
 import type {
   Channel,
@@ -88,19 +90,9 @@ import { RoleManagementDrawer } from './RoleManagementDrawer'
 import { PermissionDrawer } from './PermissionDrawer'
 import { MemberDetailDrawer } from './MemberDetailDrawer'
 import { MemberDirectoryDrawer } from './MemberDirectoryDrawer'
-import {
-  MemberSearch,
-  MemberContextMenu,
-  MemberProfilePopover,
-  MemberContextSummary,
-  MemberLoadingRows,
-  memberPresenceAvatarClass,
-} from './MemberPanel'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
-
-type MemberPanelScope = 'channel' | 'project'
 
 interface ProjectRealtimeDetail {
   projectId?: string
@@ -169,6 +161,7 @@ export default function ConversationPage() {
   const [localNodeError, setLocalNodeError] = useState('')
   const [localBindStatus, setLocalBindStatus] = useState('')
   const autoBindRef = useRef('')
+  const workspacePanels = useWorkspacePanels()
 
   // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
   const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
@@ -1098,10 +1091,19 @@ export default function ConversationPage() {
   }
 
   return (
-    <div className={styles.layout}>
+    <div
+      className={styles.layout}
+      style={workspacePanels.layoutStyle}
+      data-channel-collapsed={workspacePanels.channelCollapsed ? 'true' : undefined}
+      data-member-collapsed={workspacePanels.memberCollapsed ? 'true' : undefined}
+    >
 
       {/* ══ 频道面板 ══ */}
-      <aside className={styles.channelPanel}>
+      <aside
+        className={styles.channelPanel}
+        data-collapsed={workspacePanels.channelCollapsed ? 'true' : undefined}
+        aria-label="项目和频道"
+      >
         {/* 工作区标题 */}
         <div className={styles.workspaceTitle}>
           {activeProjectId ? (
@@ -1131,6 +1133,13 @@ export default function ConversationPage() {
                 type="button"
                 style={{ fontSize: 14 }}
               >⚙</button>
+              <button
+                className={[styles.iconBtn, styles.panelToggleBtn].join(' ')}
+                onClick={workspacePanels.toggleChannelPanel}
+                title={workspacePanels.channelCollapsed ? '展开左侧栏' : '收起左侧栏'}
+                aria-label={workspacePanels.channelCollapsed ? '展开左侧栏' : '收起左侧栏'}
+                type="button"
+              >{workspacePanels.channelCollapsed ? '›' : '‹'}</button>
             </>
           ) : (
             /* 项目列表视图：显我的项目标题 */
@@ -1139,6 +1148,13 @@ export default function ConversationPage() {
                 <strong className={styles.workspaceTitleText}>我的项目</strong>
               </div>
               <button className={styles.iconBtn} onClick={() => setShowCreate(true)} title="新建项目" type="button">+</button>
+              <button
+                className={[styles.iconBtn, styles.panelToggleBtn].join(' ')}
+                onClick={workspacePanels.toggleChannelPanel}
+                title={workspacePanels.channelCollapsed ? '展开左侧栏' : '收起左侧栏'}
+                aria-label={workspacePanels.channelCollapsed ? '展开左侧栏' : '收起左侧栏'}
+                type="button"
+              >{workspacePanels.channelCollapsed ? '›' : '‹'}</button>
             </>
           )}
         </div>
@@ -1233,7 +1249,8 @@ export default function ConversationPage() {
           )}
         </div>
 
-        <SidebarUserStrip />
+        {!workspacePanels.channelCollapsed && <SidebarUserStrip />}
+        {!workspacePanels.channelCollapsed && <WorkspacePanelResizeHandle side="channel" panels={workspacePanels} />}
       </aside>
 
       {/* ══ 聊天区（中 1fr）══ */}
@@ -1254,6 +1271,17 @@ export default function ConversationPage() {
             </div>
           </div>
           <div className={styles.topbarActions}>
+            <button
+              className={[styles.textBtn, styles.panelControlBtn].join(' ')}
+              type="button"
+              title={workspacePanels.memberCollapsed ? '展开右侧项目大厅' : '收起右侧项目大厅'}
+              aria-label={workspacePanels.memberCollapsed ? '展开右侧项目大厅' : '收起右侧项目大厅'}
+              aria-pressed={!workspacePanels.memberCollapsed}
+              onClick={workspacePanels.toggleMemberPanel}
+            >
+              <span aria-hidden="true">{workspacePanels.memberCollapsed ? '◂' : '▸'}</span>
+              <span>{workspacePanels.memberCollapsed ? '项目栏' : '收起右栏'}</span>
+            </button>
             {activeChannelId && (
               <button className={styles.textBtn} type="button" title="刷新消息" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
                 <RefreshCw size={15} aria-hidden="true" /><span>刷新</span>
@@ -1467,140 +1495,62 @@ export default function ConversationPage() {
       </div>
 
       {/* ══ 成员面板 ══ */}
-      <aside className={styles.memberPanel}>
-        <div className={styles.memberTitle}>
-          <div className={styles.memberTitleCopy}>
-            <strong>{memberPanelTitle}{memberPanelCount > 0 ? ` — ${memberPanelCount}` : ''}</strong>
-            <span>{memberPanelContext}</span>
-          </div>
-          <div className={styles.memberActions}>
-            <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
-            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowDirectory(true)}>目录</button>}
-            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => navigate(`/projects/${activeProjectId}/members`)}>成员页</button>}
-            {activeProjectId && canInviteMembers && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
-            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => { setModerationFocusMemberId(''); setShowModeration(true) }}>管理</button>}
-            {activeProjectId && canUseRoleManager && <button className={styles.memberInviteBtn} type="button" onClick={() => { setRoleFocusMemberId(''); setShowRoles(true) }}>角色</button>}
-            {activeProjectId && canViewMemberAudit && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowAudit(true)}>日志</button>}
-            {activeProjectId && activeChannelId && canManagePermissions && (
-              <button className={styles.memberInviteBtn} type="button" onClick={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}>权限</button>
-            )}
-          </div>
-        </div>
-        <div className={styles.memberList}>
-          {memberMenu && createPortal(
-            <MemberContextMenu
-              member={memberMenu.member}
-              x={memberMenu.x}
-              y={memberMenu.y}
-              canModerate={canModerateMembers && memberMenu.member.user_id !== user?.id}
-              canRemove={canManageMembers && memberMenu.member.user_id !== user?.id}
-              onClose={() => setMemberMenu(null)}
-              onOpenProfile={openMemberProfile}
-              onOpenDetails={openMemberDetails}
-              onOpenConversations={openMemberConversations}
-              onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
-              onOpenRoles={activeProjectId && canUseRoleManager ? openMemberRoles : undefined}
-              onModerate={moderateMemberFromPopover}
-              onRemove={removeMemberFromProject}
-            />,
-            document.body
-          )}
-          {selectedMember && createPortal(
-            <MemberProfilePopover
-              member={selectedMember}
-              anchorY={memberPopoverY}
-              projectId={activeProjectId}
-              channels={channels}
-              channel={activeChannel}
-              canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
-              canRemove={canManageMembers && selectedMember.user_id !== user?.id}
-              onClose={() => setSelectedMember(null)}
-              onOpenDetails={openMemberDetails}
-              onOpenConversations={openMemberConversations}
-              onOpenRoles={canUseRoleManager ? openMemberRoles : undefined}
-              onModerate={moderateMemberFromPopover}
-              onRemove={removeMemberFromProject}
-            />,
-            document.body
-          )}
-          {activeProjectId && (
-            isDevChannel && activeWorkspacePath ? (
-              <div className={styles.agentRunsSlot}>
-                <AgentRunsPanel workspacePath={activeWorkspacePath} />
-              </div>
-            ) : null
-          )}
-          {activeProjectId && (
-            <div className={styles.memberScopeSwitch} role="group" aria-label="成员列表范围">
-              {activeChannelId && (
-                <button
-                  type="button"
-                  data-active={panelUsesChannelScope ? 'true' : undefined}
-                  onClick={() => setMemberPanelScope('channel')}
-                >
-                  当前频道
-                </button>
-              )}
-              <button
-                type="button"
-                data-active={!panelUsesChannelScope ? 'true' : undefined}
-                onClick={() => setMemberPanelScope('project')}
-              >
-                项目大厅
-              </button>
-            </div>
-          )}
-          {activeProjectId && (
-            <MemberContextSummary
-              title={panelUsesChannelScope ? '当前频道' : '项目大厅'}
-              label={memberPanelSummary}
-              members={panelMembers}
-              channel={panelUsesChannelScope ? activeChannel : undefined}
-              projectTotal={spaceMembers.length}
-              usingChannelPermissions={panelUsesChannelPermissions}
-            />
-          )}
-          {activeProjectId && spaceLoading && panelMembers.length === 0 && (
-            <MemberLoadingRows />
-          )}
-          {activeProjectId && !spaceLoading && spaceError && (
-            <p className={styles.sideHint}>{spaceError}</p>
-          )}
-          {activeProjectId && panelMembers.length > 0 && (
-              <MemberSearch
-                members={panelMembers}
-                onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
-                onOpenConversations={openMemberConversations}
-                onOpenMenu={setMemberMenu}
-                activeConversationMemberId={isAssistingMember ? activeConversationTargetId : null}
-                placeholder={panelUsesChannelScope ? '搜索频道成员' : '搜索项目成员'}
-              channelId={panelUsesChannelScope ? activeChannelId ?? undefined : undefined}
-            />
-          )}
-          {activeProjectId && !spaceLoading && !spaceError && panelMembers.length === 0 && (
-            <p className={styles.sideHint}>{panelUsesChannelScope ? '暂无可见频道成员' : '暂无项目成员'}</p>
-          )}
-          {!activeProjectId && user && (
-            <>
-              <div className={styles.memberSection}>当前账号</div>
-              <div className={styles.memberItem}>
-                <div className={[styles.memberAvatar, memberPresenceAvatarClass(ownPresenceAvatarStatus)].join(' ')}>
-                  {ownAvatarUrl
-                    ? <img src={ownAvatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-                    : ownInitial
-                  }
-                </div>
-                <div className={styles.memberCopy}>
-                  <div className={styles.memberLine}>
-                    <strong className={styles.memberItemName}>{ownDisplayName}</strong>
-                  </div>
-                  <span className={styles.memberSub}>{ownPresenceSubtitle}</span>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </aside>
+      <ConversationMemberSidebar
+        workspacePanels={workspacePanels}
+        title={memberPanelTitle}
+        count={memberPanelCount}
+        context={memberPanelContext}
+        activeProjectId={activeProjectId}
+        activeChannelId={activeChannelId}
+        activeChannel={activeChannel}
+        channels={channels}
+        canInviteMembers={canInviteMembers}
+        canUseRoleManager={canUseRoleManager}
+        canViewMemberAudit={canViewMemberAudit}
+        canManagePermissions={canManagePermissions}
+        canModerateMembers={canModerateMembers}
+        canManageMembers={canManageMembers}
+        panelUsesChannelScope={panelUsesChannelScope}
+        panelUsesChannelPermissions={panelUsesChannelPermissions}
+        memberPanelSummary={memberPanelSummary}
+        panelMembers={panelMembers}
+        spaceMembers={spaceMembers}
+        spaceLoading={spaceLoading}
+        spaceError={spaceError}
+        memberMenu={memberMenu}
+        selectedMember={selectedMember}
+        memberPopoverY={memberPopoverY}
+        isDevChannel={isDevChannel}
+        activeWorkspacePath={activeWorkspacePath}
+        isAssistingMember={isAssistingMember}
+        activeConversationTargetId={activeConversationTargetId}
+        user={user}
+        ownPresenceAvatarStatus={ownPresenceAvatarStatus}
+        ownAvatarUrl={ownAvatarUrl}
+        ownInitial={ownInitial}
+        ownDisplayName={ownDisplayName}
+        ownPresenceSubtitle={ownPresenceSubtitle}
+        onShowPresence={() => setShowPresence(true)}
+        onShowDirectory={() => setShowDirectory(true)}
+        onOpenMembersPage={() => navigate(`/projects/${activeProjectId}/members`)}
+        onShowInvites={() => setShowInvites(true)}
+        onOpenModeration={() => { setModerationFocusMemberId(''); setShowModeration(true) }}
+        onOpenRoleManager={() => { setRoleFocusMemberId(''); setShowRoles(true) }}
+        onShowAudit={() => setShowAudit(true)}
+        onOpenPermissionManager={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}
+        onCloseMemberMenu={() => setMemberMenu(null)}
+        onOpenMemberProfile={openMemberProfile}
+        onOpenMemberDetails={openMemberDetails}
+        onOpenMemberConversations={openMemberConversations}
+        onOpenMemberPermissions={openMemberPermissions}
+        onOpenMemberRoles={openMemberRoles}
+        onModerateMember={moderateMemberFromPopover}
+        onRemoveMember={removeMemberFromProject}
+        onCloseSelectedMember={() => setSelectedMember(null)}
+        onSetMemberPanelScope={setMemberPanelScope}
+        onSelectMember={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
+        onOpenMemberMenu={setMemberMenu}
+      />
 
       {(invitePreview || inviteStatus) && inviteCode && (
         <div className={styles.inviteBanner}>
