@@ -13,7 +13,7 @@ import MarkdownContent from '../markdown/MarkdownContent'
 import { clean } from '../../lib/utils'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
-import type { ChatMessage, TaskContext, TaskTone } from './types'
+import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
 
 interface Props {
@@ -24,11 +24,12 @@ interface Props {
 }
 
 function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
-  const taskId  = taskIdOf(messages[0]) || ''
+  const taskId  = taskIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
   const terminalAssistantMsg = latestMessageMatching(messages, isTerminalAssistantTaskMessage)
-  const explicitResultMsg = latestMessageOfKind(messages, 'ai_result') ?? terminalAssistantMsg
+  const fallbackAssistantMsg = latestMessageMatching(messages, (message) => isFallbackAssistantTaskReply(message, taskId))
+  const explicitResultMsg = latestMessageOfKind(messages, 'ai_result') ?? terminalAssistantMsg ?? fallbackAssistantMsg
   const isDone  = taskIsTerminal(task) || !!explicitResultMsg || messages.some(isTerminalTaskMessage)
 
   // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
@@ -47,13 +48,14 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
+  const assistantNotes = messages.filter(isAssistantProgressNote)
   const timeline = buildTaskTimeline(progressMsgs, resultMsg)
-  const progressCount = timeline.visibleStepCount
-  const status = statusForTask(task)
+  const progressCount = timeline.visibleStepCount + assistantNotes.length
+  const status = statusForTaskGroup(task, isDone, resultMsg)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const hasProgressDetails = progressCount > 0
   const tone = status.tone
-  const processSummary = timelineSummary(timeline, taskId, taskId ? shortId(taskId) : '')
+  const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const codexThreadUri = codexThreadUriFor(messages)
   const canCancel = !!taskId && !isDone && !!onCancel
 
@@ -136,6 +138,13 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
 
           {!collapsed && (
             <div className={styles.processBody}>
+              {assistantNotes.length > 0 && (
+                <div className={styles.publicNotes}>
+                  {assistantNotes.map((message, index) => (
+                    <PublicAssistantNote key={clean(message.id ?? '') || index} message={message} />
+                  ))}
+                </div>
+              )}
               <TaskTimeline
                 model={timeline}
                 taskContext={taskContext}
@@ -159,6 +168,18 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.onApprove === next.onApprove
 )
 
+function PublicAssistantNote({ message }: { message: ChatMessage }) {
+  const content = messageText(message)
+  if (!content) return null
+  const hasMarkdown = /[#*`\[\]>|]/.test(content)
+  return (
+    <div className={styles.publicNote}>
+      <strong>Codex</strong>
+      {hasMarkdown ? <MarkdownContent content={content} copy /> : <span>{content}</span>}
+    </div>
+  )
+}
+
 function TaskFinalReply({ message, tone }: { message: ChatMessage; tone: TaskTone }) {
   const content = messageText(message)
   if (!content) return null
@@ -181,6 +202,44 @@ function TaskFinalReply({ message, tone }: { message: ChatMessage; tone: TaskTon
       </div>
     </div>
   )
+}
+
+function taskIdForGroup(messages: ChatMessage[]): string {
+  for (const message of messages) {
+    const taskId = taskIdOf(message) || clean(message.source_task_id ?? message.sourceTaskId ?? '')
+    if (taskId) return taskId
+  }
+  return ''
+}
+
+function statusForTaskGroup(
+  task: TaskState | null,
+  isDone: boolean,
+  resultMsg: ChatMessage | undefined,
+): { tone: TaskTone; label: string } {
+  if (!isDone) return statusForTask(task)
+  const content = resultMsg ? messageText(resultMsg) : ''
+  const status = clean(resultMsg?.task_status ?? resultMsg?.taskStatus ?? task?.status ?? '').toLowerCase()
+  if (['canceled', 'cancelled', 'interrupted'].includes(status) || /停止|取消|canceled|cancelled/i.test(content)) {
+    return { tone: 'canceled', label: status === 'interrupted' ? '已中断' : '任务已停止' }
+  }
+  if (['failed', 'error'].includes(status) || /失败|错误|error|failed/i.test(content)) {
+    return { tone: 'failed', label: '任务失败' }
+  }
+  return { tone: 'done', label: '任务完成' }
+}
+
+function taskThreadSummary(
+  timeline: ReturnType<typeof buildTaskTimeline>,
+  assistantNoteCount: number,
+  taskId: string,
+  shortTaskId: string,
+): string {
+  const base = timelineSummary(timeline, taskId, shortTaskId)
+  if (!assistantNoteCount) return base
+  const noteSummary = `${assistantNoteCount} 条公开回复`
+  if (!base) return [noteSummary, shortTaskId || taskId].filter(Boolean).join(' · ')
+  return `${base} · ${noteSummary}`
 }
 
 function taskRequestText(message: ChatMessage | undefined): string {
@@ -232,6 +291,16 @@ function isTerminalAssistantTaskMessage(message: ChatMessage): boolean {
   if (!taskIdOf(message)) return false
   const status = String(message.task_status ?? message.taskStatus ?? '').toLowerCase()
   return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
+}
+
+function isFallbackAssistantTaskReply(message: ChatMessage, taskId: string): boolean {
+  if (!taskId || !isAssistantTaskMessage(message)) return false
+  if (isAssistantProgressNote(message)) return false
+  return taskIdOf(message) === taskId
+}
+
+function isAssistantProgressNote(message: ChatMessage): boolean {
+  return (message as Record<string, unknown>).assistant_progress_event === true
 }
 
 function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined {

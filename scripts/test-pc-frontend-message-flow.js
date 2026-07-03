@@ -59,6 +59,10 @@ try {
     { id: 'msg-user', role: 'user', conversation_id: 'conv-1', task_id: 'tsk-1', content: '修复会话 UI' },
     { id: 'msg-assistant', role: 'assistant', conversation_id: 'conv-1', task_id: 'tsk-1', content: '已完成。' },
   ];
+  const conversationMessagesWithoutAssistantTaskId = [
+    conversationMessages[0],
+    { id: 'msg-assistant-no-task', role: 'assistant', conversation_id: 'conv-1', content: '已完成。' },
+  ];
   const taskMessagesById = buildTaskProcessMessageMap([taskMessages]);
 
   const merged = buildDisplayMessages({
@@ -85,23 +89,18 @@ try {
   assert.strictEqual(merged[2].task_id, undefined, 'reply fragments should not be swallowed by task grouping');
 
   const groups = buildMessageGroups(merged, true);
-  assert.strictEqual(groups.length, 6, 'assistant bubbles should split process groups into visible conversation turns');
+  assert.strictEqual(groups.length, 1, 'task-linked user, process, public replies, and final answer should render as one task thread');
   assert.deepStrictEqual(
     groups.map((group) => group.type),
-    ['single', 'task', 'single', 'task', 'single', 'task'],
-    'process groups should be consecutive segments, not a global task_id bucket',
+    ['task'],
+    'task flow should not split one task into scattered process groups',
   );
   assert.deepStrictEqual(
     groups.map((group) => group.type === 'task' ? group.messages.map((message) => message.id) : [group.message.id]),
     [
-      ['msg-user'],
-      ['pcm-task'],
-      ['assistant-progress-pcm-assistant-1'],
-      ['pcm-progress'],
-      ['assistant-progress-pcm-assistant-2'],
-      ['pcm-result'],
+      ['msg-user', 'pcm-task', 'assistant-progress-pcm-assistant-1', 'pcm-progress', 'assistant-progress-pcm-assistant-2', 'pcm-result'],
     ],
-    'task process, Codex reply fragments, and final result should stay in chronological order',
+    'task process, Codex reply fragments, and final result should stay in one chronological thread',
   );
 
   const inFlightTaskMessages = taskMessages.slice(0, 3);
@@ -115,23 +114,37 @@ try {
   assert.deepStrictEqual(
     mergedWithAssistantFallback.map((message) => message.id),
     ['msg-user', 'pcm-task', 'assistant-progress-pcm-assistant-1', 'pcm-progress', 'msg-assistant'],
-    'assistant conversation reply should remain a normal bubble when channel ai_result is not available yet',
+    'assistant conversation reply should remain in chronological order when channel ai_result is not available yet',
   );
+  assert.strictEqual(mergedWithAssistantFallback[4].kind, 'ai_result', 'assistant fallback should be promoted to a task result');
   assert.strictEqual(hasRunningTask(mergedWithAssistantFallback), false, 'assistant fallback should close the task');
   const fallbackGroups = buildMessageGroups(mergedWithAssistantFallback, true);
-  assert.strictEqual(fallbackGroups.length, 5, 'assistant fallback should not be folded into the process panel');
+  assert.strictEqual(fallbackGroups.length, 1, 'assistant fallback should stay attached to the task thread');
   assert.deepStrictEqual(
     fallbackGroups.map((group) => group.type === 'task' ? group.messages.map((message) => message.id) : [group.message.id]),
-    [['msg-user'], ['pcm-task'], ['assistant-progress-pcm-assistant-1'], ['pcm-progress'], ['msg-assistant']],
-    'fallback final answer should stay in the chat stream after the process rows',
+    [['msg-user', 'pcm-task', 'assistant-progress-pcm-assistant-1', 'pcm-progress', 'msg-assistant']],
+    'fallback final answer should close the same task thread after process rows',
   );
 
+  const mergedNoTaskAssistantFallback = buildDisplayMessages({
+    sessionView: 'conv-1',
+    channelMessages: [],
+    conversationMessages: conversationMessagesWithoutAssistantTaskId,
+    conversationLoading: false,
+    taskMessagesById: buildTaskProcessMessageMap([inFlightTaskMessages]),
+  });
+  assert.strictEqual(mergedNoTaskAssistantFallback.at(-1).kind, 'ai_result', 'assistant reply without task_id should be promoted to task result');
+  assert.strictEqual(mergedNoTaskAssistantFallback.at(-1).task_id, 'tsk-1', 'promoted assistant reply should inherit latest visible task_id');
+  assert.strictEqual(hasRunningTask(mergedNoTaskAssistantFallback), false, 'promoted assistant reply should close typing state');
+  const noTaskFallbackGroups = buildMessageGroups(mergedNoTaskAssistantFallback, true);
+  assert.strictEqual(noTaskFallbackGroups.length, 1, 'promoted assistant reply should stay in the same task thread');
+
   const conversationOnlyGroups = buildMessageGroups(conversationMessages, true);
-  assert.strictEqual(conversationOnlyGroups.length, 2, 'task-linked conversation rows should remain normal chat bubbles');
+  assert.strictEqual(conversationOnlyGroups.length, 1, 'task-linked conversation rows should become one task conversation thread');
   assert.deepStrictEqual(
     conversationOnlyGroups.map((group) => group.type === 'task' ? group.messages.map((message) => message.id) : [group.message.id]).flat(),
     ['msg-user', 'msg-assistant'],
-    'conversation-only task messages should preserve user and assistant turns without a process group',
+    'conversation-only task messages should preserve user and assistant turns in one group',
   );
   assert.strictEqual(
     hasRunningTask([
@@ -142,6 +155,16 @@ try {
     ]),
     false,
     'assistant task reply should stop the typing indicator even before channel ai_result refreshes',
+  );
+  assert.strictEqual(
+    hasRunningTask([
+      conversationMessages[0],
+      { id: 'pcm-task-3', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },
+      { id: 'pcm-progress-3', kind: 'ai_progress', task_id: 'tsk-1', content: '处理中' },
+      { id: 'msg-assistant-no-task', role: 'assistant', conversation_id: 'conv-1', content: '已完成。' },
+    ]),
+    false,
+    'assistant reply without task_id should still stop typing for the latest visible task',
   );
 
   const runningMessages = taskMessages.slice(0, 2);

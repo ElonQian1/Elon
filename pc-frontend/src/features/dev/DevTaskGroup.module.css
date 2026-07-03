@@ -156,6 +156,33 @@
   padding: 6px 0 2px;
 }
 
+.publicNotes {
+  display: grid;
+  gap: 5px;
+}
+
+.publicNote {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(96, 139, 214, .16);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: rgba(55, 69, 102, .18);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.publicNote strong {
+  color: #c9d8ff;
+  font-size: 11px;
+}
+
+.publicNote span {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .processCancel {
   display: inline-flex;
   align-items: center;
