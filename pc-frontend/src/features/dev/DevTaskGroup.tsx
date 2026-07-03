@@ -3,8 +3,8 @@
  *
  * 将同一 task_id 的用户请求、过程消息和最终回复连成一个对话段：
  *  - 用户请求显示为右侧气泡
- *  - 工具调用 / 命令 / 过程默认可折叠
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
+ *  - 工具调用 / 命令 / 过程默认可折叠，并放在回复气泡下方
  */
 import { memo, useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, StopCircle } from 'lucide-react'
@@ -56,6 +56,7 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const hasProgressDetails = progressCount > 0
+  const visibleAssistantNotes = resultMsg ? [] : assistantNotes
   const tone = status.tone
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const codexThreadUri = codexThreadUriFor(messages)
@@ -87,6 +88,17 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
           <div className={styles.userBubble}>{request}</div>
         </div>
       )}
+
+      {visibleAssistantNotes.map((message, index) => (
+        <TaskAssistantBubble
+          key={clean(message.id ?? '') || `assistant-note-${index}`}
+          message={message}
+          tone={tone}
+          label={assistantNoteLabel(message)}
+        />
+      ))}
+
+      {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
       {(hasProgressDetails || !isDone) && (
         <div className={styles.processPanel}>
@@ -140,13 +152,6 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
 
           {!collapsed && (
             <div className={styles.processBody}>
-              {assistantNotes.length > 0 && (
-                <div className={styles.publicNotes}>
-                  {assistantNotes.map((message, index) => (
-                    <PublicAssistantNote key={clean(message.id ?? '') || index} message={message} />
-                  ))}
-                </div>
-              )}
               <TaskTimeline
                 model={timeline}
                 taskContext={taskContext}
@@ -157,8 +162,6 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
           )}
         </div>
       )}
-
-      {resultMsg && <TaskFinalReply message={resultMsg} tone={tone} />}
     </div>
   )
 }
@@ -170,24 +173,11 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.onApprove === next.onApprove
 )
 
-function PublicAssistantNote({ message }: { message: ChatMessage }) {
-  const content = messageText(message)
-  if (!content) return null
-  const hasMarkdown = /[#*`\[\]>|]/.test(content)
-  return (
-    <div className={styles.publicNote}>
-      <strong>{assistantNoteLabel(message)}</strong>
-      {hasMarkdown ? <MarkdownContent content={content} copy /> : <span>{content}</span>}
-    </div>
-  )
-}
-
-function TaskFinalReply({ message, tone }: { message: ChatMessage; tone: TaskTone }) {
+function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; tone: TaskTone; label: string }) {
   const content = messageText(message)
   if (!content) return null
   const failed = tone === 'failed'
   const canceled = tone === 'canceled'
-  const label = failed ? '任务失败' : canceled ? '任务已停止' : '最终回复'
   const hasMarkdown = /[#*`\[\]>|]/.test(content)
 
   return (
@@ -204,6 +194,12 @@ function TaskFinalReply({ message, tone }: { message: ChatMessage; tone: TaskTon
       </div>
     </div>
   )
+}
+
+function replyLabelForTone(tone: TaskTone): string {
+  if (tone === 'failed') return '任务失败'
+  if (tone === 'canceled') return '任务已停止'
+  return '最终回复'
 }
 
 function taskIdForGroup(messages: ChatMessage[]): string {
