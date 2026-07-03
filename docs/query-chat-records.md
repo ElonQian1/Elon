@@ -4,8 +4,8 @@
 > **用途**：诊断用户投诉"为什么这么慢"、"中间说了什么"、"APK地址在哪"等问题时，快速定位数据库和日志中的真实聊天记录。  
 > **加载时机**：用户要求"查看聊天记录"、"分析对话时间线"、"找到某个会话的历史"时按需加载本文档。
 
-**完整对话内容 = SQLite messages + task_events + `/root/.codex/sessions/**/*.jsonl`（Codex 内部 LLM 记录）**  
-**最快路径**：用 `conversation_timeline` VIEW 一条 SQL 得到合并时间线，再通过 `codex_thread_id` 找 Codex JSONL 文件读取 AI 内部思考过程。
+**完整对话内容 = SQLite messages + task_events + `/root/.codex/sessions/**/*.jsonl`（Codex 会话事件记录）**
+**最快路径**：用 `conversation_timeline` VIEW 一条 SQL 得到合并时间线，再通过 `codex_thread_id` 找 Codex JSONL 文件核对公开执行过程、工具调用、工具结果和最终回复；不要把它描述成可展示的“内心推理”。
 
 ---
 

@@ -199,7 +199,40 @@ try {
   assert.strictEqual(
     timelineSummary(timeline, 'tsk-heartbeat', 'tsk_hear...'),
     '5 步过程 · 合并 2 条等待状态 · 未收到 CLI 输出 · tsk_hear...',
-    'timeline summary should expose compacted step count and heartbeat compaction',
+    'timeline summary should expose compacted wait states and missing CLI output',
+  );
+  assert.strictEqual(timeline.coverage.heartbeat, true, 'waiting should be visible in coverage');
+  assert.strictEqual(timeline.coverage.command, false, 'pure waiting should not pretend command output exists');
+  assert.ok(
+    timeline.diagnostics.some((item) => item.title === '只收到等待状态'),
+    'pure waiting timeline should explain that no public CLI output arrived',
+  );
+
+  const validationTimeline = buildTaskTimeline([
+    {
+      id: 'v1',
+      kind: 'ai_progress',
+      task_id: 'tsk-validation',
+      content: '{"type":"tool_call","tool":"shell","args":{"command":"powershell -ExecutionPolicy Bypass -File scripts\\\\cargo-dev.ps1 check --manifest-path server\\\\Cargo.toml"}}',
+    },
+    {
+      id: 'v2',
+      kind: 'ai_progress',
+      task_id: 'tsk-validation',
+      content: '{"type":"tool_result","tool":"shell","result":"Finished `dev` profile target(s) in 2.33s"}',
+    },
+  ]);
+  assert.strictEqual(validationTimeline.coverage.command, true, 'shell command should be covered');
+  assert.strictEqual(validationTimeline.coverage.testRun, true, 'check/build/test command should be marked as validation');
+  assert.deepStrictEqual(
+    validationTimeline.items.map((item) => [item.kind, item.title]),
+    [['test', '运行测试/构建'], ['test', '验证完成']],
+    'validation commands should render as test/build process rows',
+  );
+  assert.strictEqual(
+    timelineSummary(validationTimeline, 'tsk-validation', 'tsk_val...'),
+    '2 步过程 · 有命令 · 有测试/构建 · tsk_val...',
+    'summary should mention command and validation coverage',
   );
   const assistantOutputTimeline = buildTaskTimeline([
     {

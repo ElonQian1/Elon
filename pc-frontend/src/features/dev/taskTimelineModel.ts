@@ -13,6 +13,7 @@ export type TimelineItemKind =
   | 'node'
   | 'codex'
   | 'tool'
+  | 'test'
   | 'approval'
   | 'artifact'
   | 'status'
@@ -36,6 +37,7 @@ export interface TaskTimelineModel {
   heartbeatCount: number
   lastHeartbeat?: TimelineItem
   coverage: TaskTimelineCoverage
+  diagnostics: TaskTimelineDiagnostic[]
 }
 
 export interface TaskTimelineCoverage {
@@ -43,11 +45,18 @@ export interface TaskTimelineCoverage {
   heartbeat: boolean
   toolCall: boolean
   command: boolean
+  testRun: boolean
   fileChange: boolean
   toolResult: boolean
   usage: boolean
   assistantEvent: boolean
   finalReply: boolean
+}
+
+export interface TaskTimelineDiagnostic {
+  tone: TaskTone
+  title: string
+  detail: string
 }
 
 export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMessage): TaskTimelineModel {
@@ -62,6 +71,7 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
     heartbeat: false,
     toolCall: false,
     command: false,
+    testRun: false,
     fileChange: false,
     toolResult: false,
     usage: false,
@@ -112,12 +122,16 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
 
   flushHeartbeat()
 
-  return {
+  const model = {
     items,
     visibleStepCount: items.length,
     heartbeatCount,
     lastHeartbeat: latestHeartbeat,
     coverage,
+  }
+  return {
+    ...model,
+    diagnostics: buildDiagnostics(model),
   }
 }
 
@@ -125,6 +139,9 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
   const parts: string[] = []
   if (model.visibleStepCount > 0) parts.push(`${model.visibleStepCount} 步过程`)
   if (model.heartbeatCount > 1) parts.push(`合并 ${model.heartbeatCount} 条等待状态`)
+  if (model.coverage.command) parts.push('有命令')
+  if (model.coverage.fileChange) parts.push('有文件修改')
+  if (model.coverage.testRun) parts.push('有测试/构建')
   if (model.coverage.heartbeat && !model.coverage.command && !model.coverage.toolResult && !model.coverage.assistantEvent) {
     parts.push('未收到 CLI 输出')
   }
@@ -230,9 +247,11 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
 
   const isResult = type === 'tool_result'
   const failed = isResult && clean(event.status ?? '').toLowerCase() === 'error'
+  const isShell = clean(event.tool ?? '') === 'shell'
+  const validation = isShell && eventLooksLikeValidation(event)
   return {
     id: itemId(message, index),
-    kind: 'tool',
+    kind: validation ? 'test' : 'tool',
     tone: failed ? 'failed' : isResult ? 'done' : 'running',
     title: toolEventTitle(event),
     detail: toolEventSummary(event, 140),
@@ -249,11 +268,13 @@ function markCoverage(coverage: TaskTimelineCoverage, event: ToolEvent) {
   if (type === 'tool_call') {
     coverage.toolCall = true
     if (tool === 'shell') coverage.command = true
+    if (tool === 'shell' && eventLooksLikeValidation(event)) coverage.testRun = true
     if (tool === 'file_change') coverage.fileChange = true
   }
   if (type === 'tool_result') {
     coverage.toolResult = true
     if (tool === 'shell') coverage.command = true
+    if (tool === 'shell' && eventLooksLikeValidation(event)) coverage.testRun = true
     if (tool === 'file_change') coverage.fileChange = true
   }
   if (type === 'usage') coverage.usage = true
@@ -262,6 +283,77 @@ function markCoverage(coverage: TaskTimelineCoverage, event: ToolEvent) {
 
 function isAssistantOutputEvent(event: ToolEvent | null): boolean {
   return event?.type === 'assistant_message' || event?.type === 'assistant_chunk'
+}
+
+function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics'>): TaskTimelineDiagnostic[] {
+  const diagnostics: TaskTimelineDiagnostic[] = []
+  const { coverage } = model
+  if (coverage.heartbeat && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
+    diagnostics.push({
+      tone: 'failed',
+      title: '只收到等待状态',
+      detail: '后端已经派发任务或正在等待 Codex，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
+    })
+  }
+  if (coverage.dispatch && !coverage.command && !coverage.assistantEvent && !coverage.finalReply) {
+    diagnostics.push({
+      tone: 'running',
+      title: '已到 PC 节点',
+      detail: '任务已进入本机节点链路；如果持续只有这一项，优先检查节点是否重连、Codex CLI 是否启动、sidecar 是否仍存活。'
+    })
+  }
+  if (coverage.command && !coverage.toolResult) {
+    diagnostics.push({
+      tone: 'running',
+      title: '命令已开始，等待结果',
+      detail: '前端已捕获命令调用，但还没有对应工具结果。长时间停在这里时，通常是命令仍在执行或 CLI 没有 flush 完成事件。'
+    })
+  }
+  if (coverage.finalReply && !coverage.command && !coverage.fileChange && !coverage.testRun) {
+    diagnostics.push({
+      tone: 'muted',
+      title: '本轮像普通问答',
+      detail: '最终回复已出现，但没有命令、文件修改或测试事件。普通问答这是正常的；涉及项目修改时应继续检查 Codex 是否真的执行了公开过程。'
+    })
+  }
+  return diagnostics
+}
+
+export function coverageLabels(coverage: TaskTimelineCoverage): Array<{ key: keyof TaskTimelineCoverage; label: string; active: boolean }> {
+  return [
+    { key: 'dispatch', label: '派发', active: coverage.dispatch },
+    { key: 'heartbeat', label: '等待', active: coverage.heartbeat },
+    { key: 'command', label: '命令', active: coverage.command },
+    { key: 'fileChange', label: '文件', active: coverage.fileChange },
+    { key: 'testRun', label: '测试/构建', active: coverage.testRun },
+    { key: 'assistantEvent', label: '回复片段', active: coverage.assistantEvent },
+    { key: 'usage', label: '用量', active: coverage.usage },
+    { key: 'finalReply', label: '最终回复', active: coverage.finalReply },
+  ]
+}
+
+function eventLooksLikeValidation(event: ToolEvent): boolean {
+  const command = clean(event.args?.command ?? '')
+  const result = clean(event.result ?? '')
+  return commandLooksLikeValidation(command) || resultLooksLikeValidation(result)
+}
+
+function commandLooksLikeValidation(command: string): boolean {
+  const value = command.toLowerCase()
+  return /\b(cargo|npm|pnpm|yarn|bun|pytest|gradle|go|mvn|ruff|eslint|tsc)\b/.test(value)
+    && /\b(test|check|build|clippy|lint|typecheck|assemble|verify)\b/.test(value)
+}
+
+function resultLooksLikeValidation(result: string): boolean {
+  const value = result.toLowerCase()
+  return value.includes('test result:')
+    || value.includes('finished `test`')
+    || value.includes('finished `dev`')
+    || value.includes('npm run build')
+    || value.includes('vite')
+    || value.includes('cargo check')
+    || value.includes('cargo test')
+    || value.includes('build successful')
 }
 
 function itemFromText(text: string, message: ChatMessage, index: number): TimelineItem {

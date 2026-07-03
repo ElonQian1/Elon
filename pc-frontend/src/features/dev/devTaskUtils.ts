@@ -165,10 +165,25 @@ export function toolEventTitle(event: ToolEvent): string {
   const type = clean(event.type)
   const tool = clean(event.tool ?? 'tool')
   const isResult = type === 'tool_result'
+  if (tool === 'shell' && shellEventLooksLikeValidation(event)) return isResult ? '验证完成' : '运行测试/构建'
   if (tool === 'shell') return isResult ? '命令完成' : '执行命令'
   if (tool === 'file_change') return isResult ? '文件修改完成' : '修改文件'
   if (tool === 'web_search') return isResult ? '搜索完成' : '搜索网络'
   return `${isResult ? '完成' : '调用'} ${tool}`
+}
+
+function shellEventLooksLikeValidation(event: ToolEvent): boolean {
+  const command = clean(event.args?.command ?? '').toLowerCase()
+  const result = clean(event.result ?? '').toLowerCase()
+  return (
+    /\b(cargo|npm|pnpm|yarn|bun|pytest|gradle|go|mvn|ruff|eslint|tsc)\b/.test(command)
+    && /\b(test|check|build|clippy|lint|typecheck|assemble|verify)\b/.test(command)
+  ) || result.includes('test result:')
+    || result.includes('finished `test`')
+    || result.includes('finished `dev`')
+    || result.includes('cargo check')
+    || result.includes('cargo test')
+    || result.includes('build successful')
 }
 
 export function toolEventSummary(event: ToolEvent, maxLen = 120): string {

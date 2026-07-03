@@ -7,11 +7,13 @@ import {
   FileCode2,
   HardDrive,
   KeyRound,
+  ListChecks,
   Terminal,
 } from 'lucide-react'
 import { DevTaskMessage } from './DevTaskCard'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
-import type { TaskTimelineModel, TimelineItem, TimelineItemKind } from './taskTimelineModel'
+import { coverageLabels } from './taskTimelineModel'
+import type { TaskTimelineDiagnostic, TaskTimelineModel, TimelineItem, TimelineItemKind } from './taskTimelineModel'
 import styles from './TaskTimeline.module.css'
 
 interface TaskTimelineProps {
@@ -26,6 +28,10 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
 
   return (
     <div className={styles.timeline}>
+      <CoverageStrip model={model} />
+      {model.diagnostics.map((diagnostic, index) => (
+        <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
+      ))}
       {model.items.map((item) => (
         <TimelineRow
           key={item.id}
@@ -39,6 +45,31 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
   )
 }
 
+function CoverageStrip({ model }: { model: TaskTimelineModel }) {
+  const labels = coverageLabels(model.coverage)
+  return (
+    <div className={styles.coverage} aria-label="过程覆盖情况">
+      {labels.map((item) => (
+        <span
+          key={item.key}
+          className={[styles.coveragePill, item.active ? styles.coverageActive : ''].join(' ')}
+        >
+          {item.label}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function DiagnosticCard({ diagnostic }: { diagnostic: TaskTimelineDiagnostic }) {
+  return (
+    <div className={[styles.diagnostic, styles[`tone_${diagnostic.tone}`]].join(' ')}>
+      <strong>{diagnostic.title}</strong>
+      <span>{diagnostic.detail}</span>
+    </div>
+  )
+}
+
 function TimelineRow({ item, taskContext, onCancel, onApprove }: {
   item: TimelineItem
   taskContext: TaskContext
@@ -48,7 +79,7 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
   const embedded = shouldRenderEmbeddedMessage(item)
 
   return (
-    <div className={[styles.item, styles[`tone_${item.tone}`], item.compact ? styles.compact : ''].filter(Boolean).join(' ')}>
+    <div className={[styles.item, styles[`tone_${item.tone}`], styles[`kind_${item.kind}`], item.compact ? styles.compact : ''].filter(Boolean).join(' ')}>
       <div className={styles.rail}>
         <span className={styles.icon}>{iconFor(item.kind, item.tone)}</span>
       </div>
@@ -87,6 +118,7 @@ function iconFor(kind: TimelineItemKind, tone: TaskTone) {
   if (tone === 'failed') return <AlertTriangle {...props} />
   if (tone === 'canceled') return <Ban {...props} />
   if (kind === 'node') return <HardDrive {...props} />
+  if (kind === 'test') return <ListChecks {...props} />
   if (kind === 'tool') return <Terminal {...props} />
   if (kind === 'approval') return <KeyRound {...props} />
   if (kind === 'artifact') return <FileCode2 {...props} />

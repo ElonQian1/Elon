@@ -44,7 +44,7 @@ server/src/
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 消息附件上传（图片/文件） | 🟡 中 | `src/features/conversation/AttachmentUpload.tsx` | ⬜ 未开始 |
-| 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | ⬜ 未开始 |
+| 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | 🟡 P1.5 已补过程覆盖诊断、等待卡点提示、运行中停止入口；task_done 细化仍继续 |
 
 ### 阶段 P2 — 项目管理
 

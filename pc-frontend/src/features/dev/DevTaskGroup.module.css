@@ -121,6 +121,26 @@
   padding: 6px 0 2px;
 }
 
+.processCancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  margin-top: 6px;
+  border: 1px solid rgba(218, 55, 60, .28);
+  border-radius: 6px;
+  background: rgba(218, 55, 60, .08);
+  color: #ffb1b4;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.processCancel:hover {
+  background: rgba(218, 55, 60, .14);
+  border-color: rgba(218, 55, 60, .40);
+}
+
 .codexThreadLink {
   width: max-content;
   max-width: 100%;

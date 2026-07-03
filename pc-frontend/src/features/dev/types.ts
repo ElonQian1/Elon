@@ -40,6 +40,7 @@ export interface ChatMessage {
 
 export interface ToolEvent {
   type: string
+  id?: string
   tool?: string
   args?: Record<string, unknown>
   result?: string

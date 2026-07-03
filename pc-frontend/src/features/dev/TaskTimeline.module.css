@@ -4,6 +4,64 @@
   padding: 7px 0 2px;
 }
 
+.coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 0 8px 28px;
+}
+
+.coveragePill {
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, .12);
+  border-radius: 5px;
+  padding: 0 7px;
+  color: #7f8ca3;
+  background: rgba(255, 255, 255, .025);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.coverageActive {
+  color: #d8e3f7;
+  border-color: rgba(88, 101, 242, .28);
+  background: rgba(88, 101, 242, .12);
+}
+
+.diagnostic {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px 28px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, .028);
+}
+
+.diagnostic strong {
+  color: #d8e3f7;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.diagnostic span {
+  color: #98a6bc;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.diagnostic.tone_failed {
+  border-color: rgba(218, 55, 60, .25);
+  background: rgba(218, 55, 60, .07);
+}
+
+.diagnostic.tone_running {
+  border-color: rgba(88, 101, 242, .22);
+  background: rgba(88, 101, 242, .07);
+}
+
 .item {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
@@ -105,6 +163,12 @@
   color: #ff7b7f;
   border-color: rgba(218, 55, 60, .30);
   background: rgba(218, 55, 60, .10);
+}
+
+.kind_test .icon {
+  color: #8fd3ff;
+  border-color: rgba(143, 211, 255, .28);
+  background: rgba(37, 99, 235, .10);
 }
 
 .tone_canceled .icon,

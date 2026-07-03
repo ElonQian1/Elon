@@ -7,7 +7,7 @@
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
  */
 import { memo, useState, useEffect, useRef } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink, StopCircle } from 'lucide-react'
 import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { clean } from '../../lib/utils'
@@ -55,6 +55,7 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const tone = status.tone
   const processSummary = timelineSummary(timeline, taskId, taskId ? shortId(taskId) : '')
   const codexThreadUri = codexThreadUriFor(messages)
+  const canCancel = !!taskId && !isDone && !!onCancel
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -107,6 +108,19 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
               <span>{status.label}</span>
               {taskId && <em>{shortId(taskId)}</em>}
             </div>
+          )}
+
+          {canCancel && (
+            <button
+              type="button"
+              className={styles.processCancel}
+              onClick={() => {
+                if (window.confirm('停止这个任务？')) onCancel?.(taskId)
+              }}
+            >
+              <StopCircle size={13} />
+              <span>停止</span>
+            </button>
           )}
 
           {codexThreadUri && (
