@@ -16,12 +16,12 @@ mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
 mod pc_dispatch_capture;
+mod pc_passthrough_events;
 
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
 use homecli_proto::{AgentToServer, CliProjectContext, CliWorkspaceStatus};
-use serde_json::Value;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
@@ -39,6 +39,9 @@ pub(crate) use self::ai_cli_runner::codex_thread_uri;
 pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
 pub(crate) use self::pc_dispatch_capture::{
     run_pc_agent_workspace_capture, PcAgentWorkspaceCaptureRequest, PcAgentWorkspaceCaptureResult,
+};
+pub(crate) use self::pc_passthrough_events::{
+    pc_cli_passthrough_event, pc_cli_passthrough_events_flush, pc_cli_passthrough_events_from_chunk,
 };
 
 use self::{
@@ -1371,6 +1374,7 @@ async fn run_via_pc_agent(
     let stream_id = Uuid::new_v4().to_string();
     let mut stream_started = false;
     let is_codex = cli_name == "codex";
+    let mut codex_passthrough_line_buffer = String::new();
     let mut lightweight_streamed_reply = String::new();
     let mut lightweight_received_event = false;
     let mut last_codex_progress_hint: Option<(&'static str, std::time::Instant)> = None;
@@ -1641,7 +1645,11 @@ async fn run_via_pc_agent(
                 }
                 if is_codex {
                     full_text.push_str(&text);
-                    let events = pc_cli_passthrough_events(&text, Some(display_model.as_str()));
+                    let events = pc_cli_passthrough_events_from_chunk(
+                        &mut codex_passthrough_line_buffer,
+                        &text,
+                        Some(display_model.as_str()),
+                    );
                     for event in events {
                         let _ = tx.send(event);
                     }
@@ -1715,6 +1723,15 @@ async fn run_via_pc_agent(
                 workspace_status,
                 ..
             } => {
+                if is_codex {
+                    let events = pc_cli_passthrough_events_flush(
+                        &mut codex_passthrough_line_buffer,
+                        Some(display_model.as_str()),
+                    );
+                    for event in events {
+                        let _ = tx.send(event);
+                    }
+                }
                 abort_pc_progress(&mut progress_handle); // 停止心跳
                 pc_cancel_guard.disarm();
                 let mut cli_usage = None;
@@ -2783,35 +2800,6 @@ fn extract_retry_fraction(text: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn pc_cli_passthrough_event(text: &str) -> Option<String> {
-    let trimmed = text.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let value = serde_json::from_str::<Value>(trimmed).ok()?;
-    match value.get("type").and_then(Value::as_str)? {
-        "tool_approval_required"
-        | "tool_approval_decision"
-        | "tool_call"
-        | "tool_result"
-        | "usage"
-        | "progress" => serde_json::to_string(&value).ok(),
-        _ => None,
-    }
-}
-
-fn pc_cli_passthrough_events(text: &str, model_used: Option<&str>) -> Vec<String> {
-    text.lines()
-        .flat_map(|line| {
-            let mut events = crate::codex_stream::stream_event_to_ws_messages(line, model_used);
-            if let Some(event) = pc_cli_passthrough_event(line) {
-                events.push(event);
-            }
-            events
-        })
-        .collect()
-}
-
 fn pc_dispatch_started_event(
     pc_req_id: &str,
     agent_id: &str,
@@ -3234,12 +3222,12 @@ mod pc_cli_passthrough_tests {
     use super::{
         clean_codex_stream_chunk, extract_codex_reply, extract_lightweight_pc_chat_reply,
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
-        pc_cli_passthrough_event, pc_cli_passthrough_events, pc_codex_progress_hint,
-        pc_dispatch_started_event, pc_display_model_label, pc_lightweight_chat_prompt,
-        pc_lightweight_chat_reasoning_effort, pc_lightweight_no_node_event_diagnostic,
-        pc_lightweight_no_readable_diagnostic, pc_project_execution_had_no_changes,
-        pc_project_execution_prompt, pc_project_passthrough_prompt, pc_project_reasoning_effort,
-        pc_route_a_extra_args, sanitize_pc_development_reply, should_skip_pc_chat_native_session,
+        pc_codex_progress_hint, pc_dispatch_started_event, pc_display_model_label,
+        pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
+        pc_lightweight_no_node_event_diagnostic, pc_lightweight_no_readable_diagnostic,
+        pc_project_execution_had_no_changes, pc_project_execution_prompt,
+        pc_project_passthrough_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
+        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
         strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use homecli_proto::CliWorkspaceStatus;
@@ -3252,50 +3240,6 @@ mod pc_cli_passthrough_tests {
             conversation_id: conversation_id.to_string(),
             runtime_permission: "project_write".to_string(),
         }
-    }
-
-    #[test]
-    fn pc_cli_passthrough_keeps_tool_approval_events() {
-        let line =
-            r#"{"type":"tool_approval_required","tool":"write_file","approval_id":"tap_1_1"}"#;
-        let out = pc_cli_passthrough_event(line).expect("approval event should pass through");
-        let value: Value = serde_json::from_str(&out).unwrap();
-
-        assert_eq!(value["type"], "tool_approval_required");
-        assert_eq!(value["approval_id"], "tap_1_1");
-    }
-
-    #[test]
-    fn pc_cli_passthrough_rejects_unknown_json_events() {
-        assert!(pc_cli_passthrough_event(r#"{"type":"unknown","message":"x"}"#).is_none());
-        assert!(pc_cli_passthrough_event("not json").is_none());
-    }
-
-    #[test]
-    fn pc_cli_passthrough_events_translate_codex_json_stream() {
-        let raw = r#"{"type":"item.started","item":{"id":"call_1","type":"command_execution","command":"rg -n \"TODO\" server/src"}}"#;
-        let events = pc_cli_passthrough_events(raw, Some("Codex"));
-
-        assert_eq!(events.len(), 2);
-        let tool: Value = serde_json::from_str(&events[0]).unwrap();
-        assert_eq!(tool["type"], "tool_call");
-        assert_eq!(tool["tool"], "shell");
-        assert_eq!(tool["args"]["command"], "rg -n \"TODO\" server/src");
-        let progress: Value = serde_json::from_str(&events[1]).unwrap();
-        assert_eq!(progress["type"], "progress");
-        assert!(progress["message"].as_str().unwrap().contains("rg -n"));
-    }
-
-    #[test]
-    fn pc_cli_passthrough_events_keep_legacy_tool_event_lines() {
-        let raw = r#"{"type":"tool_result","tool":"shell","result":"ok"}"#;
-        let events = pc_cli_passthrough_events(raw, None);
-
-        assert_eq!(events.len(), 1);
-        let value: Value = serde_json::from_str(&events[0]).unwrap();
-        assert_eq!(value["type"], "tool_result");
-        assert_eq!(value["tool"], "shell");
-        assert_eq!(value["result"], "ok");
     }
 
     #[test]
