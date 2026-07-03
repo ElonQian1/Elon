@@ -1427,7 +1427,7 @@ export default function ConversationPage() {
                 data-active={directPcCliActive ? 'true' : 'false'}
                 data-default-local={shouldPreferLocalNode && localNodeReady ? 'true' : 'false'}
                 data-disabled={!directPcCliAvailable || composerDisabled ? 'true' : 'false'}
-                title="项目会话默认优先走本机节点；打开后强制交给本机 Codex CLI"
+                title="项目会话默认优先走本机节点；打开后强制交给本机 AI CLI"
               >
                 <input
                   type="checkbox"
@@ -1437,7 +1437,7 @@ export default function ConversationPage() {
                 />
                 <span className={styles.directCliSwitch} aria-hidden="true" />
                 <span className={styles.directCliCopy}>
-                  <strong>{directPcCliActive ? '强制Codex' : '默认本机'}</strong>
+                  <strong>{directPcCliActive ? '直连CLI' : '默认本机'}</strong>
                   <em>{!directPcCliAvailable ? '未就绪' : directPcCliActive ? '直连' : '自动'}</em>
                 </span>
               </label>

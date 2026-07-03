@@ -50,7 +50,7 @@ try {
 
   const taskMessages = [
     { id: 'pcm-task', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },
-    { id: 'pcm-assistant-1', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"assistant_message","text":"我先读取规则入口。","model_used":"codex"}' },
+    { id: 'pcm-assistant-1', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"assistant_message","text":"我先读取规则入口。","model_used":"Claude"}' },
     { id: 'pcm-progress', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"tool_call","tool":"rg"}' },
     { id: 'pcm-assistant-2', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"assistant_message","text":"规则已读完，接着运行只读命令。","model_used":"codex"}' },
     { id: 'pcm-result', kind: 'ai_result', task_id: 'tsk-1', content: '最终答案：已修复。' },
@@ -85,8 +85,9 @@ try {
     'assistant_message progress rows should become normal assistant bubbles between structured process rows',
   );
   assert.strictEqual(hasRunningTask(merged), false, 'terminal ai_result should close the task');
-  assert.strictEqual(merged[2].kind, 'assistant', 'Codex reply fragments should render as assistant messages');
+  assert.strictEqual(merged[2].kind, 'assistant', 'AI CLI reply fragments should render as assistant messages');
   assert.strictEqual(merged[2].task_id, undefined, 'reply fragments should not be swallowed by task grouping');
+  assert.strictEqual(merged[2].model_used, 'Claude', 'reply fragments should preserve the source CLI label');
 
   const groups = buildMessageGroups(merged, true);
   assert.strictEqual(groups.length, 1, 'task-linked user, process, public replies, and final answer should render as one task thread');
@@ -100,7 +101,7 @@ try {
     [
       ['msg-user', 'pcm-task', 'assistant-progress-pcm-assistant-1', 'pcm-progress', 'assistant-progress-pcm-assistant-2', 'pcm-result'],
     ],
-    'task process, Codex reply fragments, and final result should stay in one chronological thread',
+    'task process, AI CLI reply fragments, and final result should stay in one chronological thread',
   );
 
   const inFlightTaskMessages = taskMessages.slice(0, 3);
@@ -466,7 +467,7 @@ try {
   assert.strictEqual(
     assistantOutputTimeline.coverage.assistantEvent,
     true,
-    'timeline coverage should still record that Codex produced assistant output',
+    'timeline coverage should still record that the AI CLI produced assistant output',
   );
   const finalEchoTimeline = buildTaskTimeline(
     [

@@ -174,7 +174,7 @@ function PublicAssistantNote({ message }: { message: ChatMessage }) {
   const hasMarkdown = /[#*`\[\]>|]/.test(content)
   return (
     <div className={styles.publicNote}>
-      <strong>Codex</strong>
+      <strong>{assistantNoteLabel(message)}</strong>
       {hasMarkdown ? <MarkdownContent content={content} copy /> : <span>{content}</span>}
     </div>
   )
@@ -210,6 +210,17 @@ function taskIdForGroup(messages: ChatMessage[]): string {
     if (taskId) return taskId
   }
   return ''
+}
+
+function assistantNoteLabel(message: ChatMessage): string {
+  const label = clean(
+    message.model_used
+    ?? message.modelUsed
+    ?? message.cli_name
+    ?? message.cliName
+    ?? '',
+  )
+  return label || 'AI CLI'
 }
 
 function statusForTaskGroup(

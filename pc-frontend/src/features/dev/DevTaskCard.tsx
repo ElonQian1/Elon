@@ -80,7 +80,7 @@ function ProgressLine({ message, context, onCancel, onApprove }: DevTaskMessageP
     return <StatusLine text={clean(event.message ?? '') || `${total} 步完成，${failed} 步失败`} tone={tone} runtime={clean(event.runtime ?? '')} turn={Number(event.turn)} />
   }
   if (event.type === 'pc_dispatch_started') {
-    const cli = clean(event.cli ?? 'Codex')
+    const cli = clean(event.cli ?? 'AI')
     const agent = shortNode(clean(event.agent_id ?? ''))
     return <StatusLine text={`已派发到 PC 节点，等待 ${cli} CLI 输出`} tone="running" runtime={agent} />
   }

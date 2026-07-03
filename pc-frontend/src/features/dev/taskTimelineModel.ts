@@ -12,7 +12,7 @@ import type { ChatMessage, TaskTone, ToolEvent } from './types'
 
 export type TimelineItemKind =
   | 'node'
-  | 'codex'
+  | 'agent'
   | 'tool'
   | 'file'
   | 'test'
@@ -181,7 +181,7 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
 function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): TimelineItem {
   const type = clean(event.type)
   if (type === 'pc_dispatch_started') {
-    const cli = clean(event.cli ?? 'Codex')
+    const cli = clean(event.cli ?? 'AI')
     const agentId = clean(event.agent_id ?? '')
     const cwdConfigured = Boolean(event.cwd_configured)
     return {
@@ -217,7 +217,7 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     }
     return {
       id: itemId(message, index),
-      kind: 'codex',
+      kind: 'agent',
       tone: label.tone,
       title: eventMessage || label.title,
       detail: eventMessage ? undefined : label.body,
@@ -236,7 +236,7 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     const failedRun = failed > 0 || ['error', 'failed'].includes(status)
     return {
       id: itemId(message, index),
-      kind: 'codex',
+      kind: 'agent',
       tone: canceled ? 'canceled' : failedRun ? 'failed' : 'done',
       title: clean(event.message ?? '') || `运行完成，${total} 个工具事件`,
       meta: failed > 0 ? `${failed} 个失败` : '',
@@ -323,14 +323,14 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'
     diagnostics.push({
       tone: 'failed',
       title: '只收到等待状态',
-      detail: '后端已经派发任务或正在等待 Codex，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
+      detail: '后端已经派发任务或正在等待 AI CLI，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
     })
   }
   if (coverage.dispatch && !coverage.command && !coverage.assistantEvent && !coverage.finalReply) {
     diagnostics.push({
       tone: 'running',
       title: '已到 PC 节点',
-      detail: '任务已进入本机节点链路；如果持续只有这一项，优先检查节点是否重连、Codex CLI 是否启动、sidecar 是否仍存活。'
+      detail: '任务已进入本机节点链路；如果持续只有这一项，优先检查节点是否重连、AI CLI 是否启动、sidecar 是否仍存活。'
     })
   }
   if (coverage.command && !coverage.toolResult) {
@@ -344,7 +344,7 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'
     diagnostics.push({
       tone: 'muted',
       title: '本轮像普通问答',
-      detail: '最终回复已出现，但没有命令、文件修改或测试事件。普通问答这是正常的；涉及项目修改时应继续检查 Codex 是否真的执行了公开过程。'
+      detail: '最终回复已出现，但没有命令、文件修改或测试事件。普通问答这是正常的；涉及项目修改时应继续检查本机 CLI 是否真的执行了公开过程。'
     })
   }
   return diagnostics
@@ -383,7 +383,7 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
       key: 'approval',
       tone: 'approval',
       label: '等待工具审批',
-      detail: 'Codex 已请求执行工具；批准或拒绝前不会继续运行对应工具。',
+      detail: 'AI CLI 已请求执行工具；批准或拒绝前不会继续运行对应工具。',
       meta: latest.meta,
       summary: '当前：等待审批',
       stuck: false,
@@ -421,7 +421,7 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
       key: 'dispatch',
       tone: 'running',
       label: '等待 PC 节点确认',
-      detail: '任务已经进入本机节点链路；如果长时间只停在这里，优先检查节点连接和 Codex CLI 启动状态。',
+      detail: '任务已经进入本机节点链路；如果长时间只停在这里，优先检查节点连接和 AI CLI 启动状态。',
       meta: latest?.meta,
       summary: '当前：等待节点确认',
       stuck: false,
@@ -432,8 +432,8 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
     return {
       key: 'assistant',
       tone: 'running',
-      label: 'Codex 已有回复片段',
-      detail: '前端已经捕获到 Codex 的公开回复片段，正在等待最终回复或后续工具事件。',
+      label: 'AI CLI 已有回复片段',
+      detail: '前端已经捕获到 AI CLI 的公开回复片段，正在等待最终回复或后续工具事件。',
       summary: '当前：已有回复片段',
       stuck: false,
     }
@@ -549,7 +549,7 @@ function itemFromText(text: string, message: ChatMessage, index: number): Timeli
     return textItem(message, index, 'artifact', 'muted', '本轮没有 APK 产物', text)
   }
   if (text.includes('读取') || text.includes('看完项目规则') || text.includes('分析')) {
-    return textItem(message, index, 'codex', 'running', shortText(text), text)
+    return textItem(message, index, 'agent', 'running', shortText(text), text)
   }
   if (text.includes('任务完成')) {
     return textItem(message, index, 'status', 'done', '任务完成', text)
@@ -569,7 +569,7 @@ function parseHeartbeat(text: string, message: ChatMessage, index: number): Time
     id: itemId(message, index),
     kind: 'heartbeat',
     tone: 'running',
-    title: 'Codex 正在处理中',
+    title: 'AI CLI 正在处理中',
     detail: nodeId ? `PC 节点 ${nodeId}` : undefined,
     meta: wait ? `已等待 ${wait}s` : undefined,
     message,
@@ -600,7 +600,7 @@ function textItem(
 
 function normalizedProgressText(text: string): string {
   return clean(text)
-    .replace(/^Codex\s*\n\s*/i, '')
+    .replace(/^(Codex|Claude|Copilot|Gemini|AI CLI)\s*\n\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
