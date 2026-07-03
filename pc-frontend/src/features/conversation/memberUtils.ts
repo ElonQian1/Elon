@@ -120,6 +120,10 @@ export function memberPrimaryRoleKey(member: ProjectMember) {
   return clean(member.roles?.[0]?.id ?? member.role ?? 'member').toLowerCase()
 }
 
+export function memberPrimaryRoleColor(member: ProjectMember) {
+  return clean(member.roles?.[0]?.color ?? '') || undefined
+}
+
 export function projectMemberHasRolePermission(member: ProjectMember, roles: ProjectRole[], permission: string) {
   return memberRoleIds(member).some((roleId) => {
     if (roleId === 'owner') return true

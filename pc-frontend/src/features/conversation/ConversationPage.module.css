@@ -2613,10 +2613,23 @@
   font-size: 12px;
 }
 
-.roleListItem em {
+.roleListMeta {
+  min-width: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.roleListItem em,
+.roleListItem small {
   color: var(--text-muted);
   font-size: 11px;
   font-style: normal;
+}
+
+.roleListItem small {
+  font-size: 10px;
 }
 
 .roleEditor,
@@ -2649,6 +2662,40 @@
   color: var(--text-muted);
   font-size: 11px;
   line-height: 1.4;
+}
+
+.rolePreviewStrip {
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 4px;
+  background: rgba(255,255,255,.035);
+}
+
+.rolePreviewStrip strong,
+.rolePreviewStrip em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rolePreviewStrip strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.rolePreviewStrip em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .rolePermissionGrid,
@@ -3712,6 +3759,13 @@
   color: var(--text-muted);
   font-size: 11px;
   font-style: normal;
+}
+
+.memberDirectoryBadges .memberDirectoryRolePill {
+  border-color: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.055);
+  color: var(--text-soft);
+  font-weight: 900;
 }
 
 .memberDirectoryActions {

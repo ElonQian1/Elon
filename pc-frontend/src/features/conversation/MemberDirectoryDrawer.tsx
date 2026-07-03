@@ -8,6 +8,7 @@ import {
   memberChannelPermissions,
   memberInitial,
   memberModerationSummary,
+  memberPrimaryRoleColor,
   memberPresenceStatus,
   memberRoleSummary,
   presenceLabel,
@@ -393,6 +394,9 @@ function MemberDirectoryRow({
   const visibleChannels = visibleChannelCount(member, channels)
   const joined = member.joined_at ? formatTime(member.joined_at) : '未知'
   const state = member.is_banned ? 'banned' : member.is_muted ? 'muted' : status
+  const roleColor = memberPrimaryRoleColor(member)
+  const roleAccentStyle = roleColor ? { color: roleColor, borderColor: roleColor } : undefined
+  const roleAvatarStyle = roleColor ? { boxShadow: `inset 0 0 0 2px ${roleColor}` } : undefined
   return (
     <article className={styles.memberDirectoryRow} data-state={state} data-selectable={canSelect ? 'true' : undefined} data-selected={selected ? 'true' : undefined}>
       {canSelect && (
@@ -406,16 +410,17 @@ function MemberDirectoryRow({
           />
         </label>
       )}
-      <span className={[styles.memberAvatar, directoryAvatarClass(status)].join(' ')}>
+      <span className={[styles.memberAvatar, directoryAvatarClass(status)].join(' ')} style={roleAvatarStyle}>
         {member.avatar_data_url
           ? <img src={member.avatar_data_url} alt="" />
           : memberInitial(member)
         }
       </span>
       <div className={styles.memberDirectoryMain}>
-        <strong title={member.account || member.user_id}>{member.account || member.user_id}</strong>
+        <strong title={member.account || member.user_id} style={roleColor ? { color: roleColor } : undefined}>{member.account || member.user_id}</strong>
         <span>{presenceLabel(status)} · {memberRoleSummary(member)}</span>
         <div className={styles.memberDirectoryBadges}>
+          <em className={styles.memberDirectoryRolePill} style={roleAccentStyle}>{memberDirectoryPrimaryRoleLabel(member)}</em>
           <em>{memberModerationSummary(member)}</em>
           <em>可见频道 {visibleChannels}/{channels.length}</em>
           <em>加入 {joined}</em>
@@ -521,6 +526,13 @@ function visibleChannelCount(member: ProjectMember, channels: Channel[]) {
 
 function memberName(member: ProjectMember) {
   return member.account || member.user_id
+}
+
+function memberDirectoryPrimaryRoleLabel(member: ProjectMember) {
+  const role = member.roles?.[0]
+  if (role?.name) return role.name
+  if (role?.id) return roleLabel(role.id)
+  return roleLabel(member.role ?? 'member')
 }
 
 function batchActionNote(action: DirectoryBatchAction) {

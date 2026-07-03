@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
 import { clean } from '../../lib/utils'
 import type { PermissionOption, ProjectMember, ProjectRole, ProjectRolesResponse } from './types'
-import { filterMembers, memberInitial, memberRoleSummary, roleLabel } from './memberUtils'
+import { filterMembers, memberInitial, memberPrimaryRoleColor, memberRoleSummary, roleLabel } from './memberUtils'
 import styles from './ConversationPage.module.css'
 
 type RoleResponse = {
@@ -236,8 +236,11 @@ export function RoleManagementDrawer({
                   onClick={() => setSelectedRoleId(role.id)}
                 >
                   <span className={styles.roleSwatch} style={{ background: role.color || '#747f8d' }} />
-                  <strong>{role.name || roleLabel(role.id)}</strong>
-                  <em>{role.member_count ?? 0}</em>
+                  <strong style={role.color ? { color: role.color } : undefined}>{role.name || roleLabel(role.id)}</strong>
+                  <span className={styles.roleListMeta}>
+                    <em>{role.member_count ?? 0} 人</em>
+                    <small>层级 {role.position ?? 0}</small>
+                  </span>
                 </button>
               ))}
             </div>
@@ -266,20 +269,23 @@ export function RoleManagementDrawer({
               placeholder="搜索成员"
             />
             <div className={styles.roleMemberList}>
-              {visibleMembers.map((member) => (
-                <button
-                  key={member.user_id}
-                  className={[styles.roleMemberItem, member.user_id === selectedMemberId ? styles.roleMemberItemActive : ''].join(' ')}
-                  type="button"
-                  onClick={() => setSelectedMemberId(member.user_id)}
-                >
-                  <span className={styles.memberAvatar}>{memberInitial(member)}</span>
-                  <span>
-                    <strong>{member.account || member.user_id}</strong>
-                    <em>{memberRoleSummary(member)}</em>
-                  </span>
-                </button>
-              ))}
+              {visibleMembers.map((member) => {
+                const roleColor = memberPrimaryRoleColor(member)
+                return (
+                  <button
+                    key={member.user_id}
+                    className={[styles.roleMemberItem, member.user_id === selectedMemberId ? styles.roleMemberItemActive : ''].join(' ')}
+                    type="button"
+                    onClick={() => setSelectedMemberId(member.user_id)}
+                  >
+                    <span className={styles.memberAvatar} style={roleColor ? { boxShadow: `inset 0 0 0 2px ${roleColor}` } : undefined}>{memberInitial(member)}</span>
+                    <span>
+                      <strong style={roleColor ? { color: roleColor } : undefined}>{member.account || member.user_id}</strong>
+                      <em>{memberRoleSummary(member)}</em>
+                    </span>
+                  </button>
+                )
+              })}
               {visibleMembers.length === 0 && <p className={styles.sideHint}>没有匹配成员</p>}
             </div>
             <div className={styles.roleAssignmentPanel}>
@@ -356,6 +362,11 @@ function RoleEditor({
       <div className={styles.roleEditorHead}>
         <strong>{readOnly ? '内置角色' : '编辑角色'}</strong>
         <span>{role.builtin ? '内置角色不能直接编辑，可用频道权限覆盖。' : !canManageRoles ? '当前角色只能查看角色定义，不能编辑。' : '调整名称、颜色、排序和项目权限。'}</span>
+      </div>
+      <div className={styles.rolePreviewStrip}>
+        <span className={styles.roleSwatch} style={{ background: roleColor || '#747f8d' }} />
+        <strong style={roleColor ? { color: roleColor } : undefined}>{roleName || role.name || roleLabel(role.id)}</strong>
+        <em>层级 {rolePosition || (role.position ?? 0)}</em>
       </div>
       <div className={styles.formGrid}>
         <label className={styles.field}>

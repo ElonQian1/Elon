@@ -12,6 +12,7 @@ import {
   memberRoleSummary,
   presenceLabel,
   memberPrimaryRoleKey,
+  memberPrimaryRoleColor,
   roleLabel,
 } from './memberUtils'
 import styles from './ConversationPage.module.css'
@@ -552,6 +553,7 @@ function MemberListItem({
 }) {
   const roleKey = memberPrimaryRoleKey(member)
   const roleBadge = memberPrimaryRoleLabel(member)
+  const roleColor = memberPrimaryRoleColor(member)
   const status = memberPresenceStatus(member)
   const name = member.account ?? member.user_id
   const avatarCls = [
@@ -560,6 +562,8 @@ function MemberListItem({
     memberPresenceAvatarClass(status),
   ].filter(Boolean).join(' ')
   const active = activeConversationMemberId === member.user_id
+  const roleAccentStyle = roleColor ? { color: roleColor, borderColor: roleColor } : undefined
+  const roleAvatarStyle = roleColor ? { boxShadow: `inset 0 0 0 2px ${roleColor}` } : undefined
   function openProfile(e: React.MouseEvent<HTMLElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     onSelect(member, rect.top + rect.height / 2)
@@ -581,7 +585,7 @@ function MemberListItem({
         title={`查看 ${name} 的项目会话`}
         aria-label={`查看 ${name} 的项目会话`}
       >
-        <span className={avatarCls}>
+        <span className={avatarCls} style={roleAvatarStyle}>
           {member.avatar_data_url
             ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
             : name[0].toUpperCase()
@@ -591,8 +595,8 @@ function MemberListItem({
       <button className={styles.memberInfoButton} type="button" onClick={openProfile}>
         <span className={styles.memberCopy}>
           <span className={styles.memberLine}>
-            <strong className={styles.memberItemName}>{name}</strong>
-            {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')}>{roleBadge}</em>}
+            <strong className={styles.memberItemName} style={roleColor ? { color: roleColor } : undefined}>{name}</strong>
+            {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')} style={roleAccentStyle}>{roleBadge}</em>}
             <em className={[styles.memberPresencePill, memberPresencePillClass(status)].join(' ')}>{presenceLabel(status)}</em>
           </span>
           <span className={styles.memberSub}>{memberChannelSubtitle(member, channelId)}</span>
