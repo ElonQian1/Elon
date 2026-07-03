@@ -50,6 +50,12 @@ internal class ChatImageAnnotationInputOverlay(
         input?.post { showKeyboard(input) }
     }
 
+    fun commitActive() {
+        currentIndex?.let { index ->
+            canvasView.updateAnnotationNote(index, input?.text?.toString().orEmpty())
+        }
+    }
+
     private fun ensurePanel(): FrameLayout {
         panel?.let { return it }
         return FrameLayout(activity).apply {
@@ -149,9 +155,7 @@ internal class ChatImageAnnotationInputOverlay(
     }
 
     private fun collapse() {
-        currentIndex?.let { index ->
-            canvasView.updateAnnotationNote(index, input?.text?.toString().orEmpty())
-        }
+        commitActive()
         currentIndex = null
         currentBounds = null
         hideKeyboard(input)

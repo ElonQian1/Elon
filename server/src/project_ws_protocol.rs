@@ -76,6 +76,28 @@ pub struct ProjectPrewarmRequest {
 }
 
 #[derive(Debug, Clone, Deserialize, serde::Serialize)]
+pub struct ProjectAttachmentAnnotation {
+    #[serde(default)]
+    pub x: f32,
+    #[serde(default)]
+    pub y: f32,
+    #[serde(default)]
+    pub width: f32,
+    #[serde(default)]
+    pub height: f32,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_x: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_y: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_width: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_height: Option<f32>,
+}
+
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub struct ProjectAttachmentRef {
     pub attachment_id: Option<String>,
     pub kind: Option<String>,
@@ -90,6 +112,8 @@ pub struct ProjectAttachmentRef {
     pub image_height: Option<u32>,
     pub duration_seconds: Option<u32>,
     pub transcription: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub annotations: Vec<ProjectAttachmentAnnotation>,
 }
 
 pub fn enrich_project_ws_event(raw: String, task_id: &str) -> String {
@@ -331,7 +355,20 @@ mod tests {
                         "sha256":"abc123",
                         "size_bytes":128,
                         "image_width":640,
-                        "image_height":480
+                        "image_height":480,
+                        "annotations":[
+                            {
+                                "x":0.1,
+                                "y":0.2,
+                                "width":0.3,
+                                "height":0.4,
+                                "note":"看这里",
+                                "icon_x":0.42,
+                                "icon_y":0.58,
+                                "icon_width":0.06,
+                                "icon_height":0.06
+                            }
+                        ]
                     }
                 ]
             }"#,
@@ -358,6 +395,9 @@ mod tests {
         assert_eq!(attachment.size_bytes, Some(128));
         assert_eq!(attachment.image_width, Some(640));
         assert_eq!(attachment.image_height, Some(480));
+        let annotation = attachment.annotations.first().expect("annotation should parse");
+        assert_eq!(annotation.note, "看这里");
+        assert_eq!(annotation.icon_x, Some(0.42));
     }
 
     #[test]

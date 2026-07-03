@@ -430,7 +430,20 @@ private fun List<ChatAttachment>.attachmentRenderSignature(): String {
             attachment.sizeBytes?.toString().orEmpty(),
             attachment.imageWidth?.toString().orEmpty(),
             attachment.imageHeight?.toString().orEmpty(),
-            attachment.durationSeconds?.toString().orEmpty()
+            attachment.durationSeconds?.toString().orEmpty(),
+            attachment.annotations.joinToString(separator = "|") { annotation ->
+                listOf(
+                    annotation.x,
+                    annotation.y,
+                    annotation.width,
+                    annotation.height,
+                    annotation.iconX,
+                    annotation.iconY,
+                    annotation.iconWidth,
+                    annotation.iconHeight,
+                    annotation.note
+                ).joinToString(separator = ",")
+            }
         ).joinToString(separator = "\u001E")
     }
 }

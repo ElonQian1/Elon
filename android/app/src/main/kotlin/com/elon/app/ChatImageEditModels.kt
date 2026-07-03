@@ -17,6 +17,20 @@ internal enum class ChatImageEditShape {
     SQUARE
 }
 
+data class ChatImageAnnotation(
+    val x: Float,
+    val y: Float,
+    val width: Float,
+    val height: Float,
+    val note: String,
+    val iconX: Float? = null,
+    val iconY: Float? = null,
+    val iconWidth: Float? = null,
+    val iconHeight: Float? = null
+) {
+    fun hasNote(): Boolean = note.trim().isNotEmpty()
+}
+
 internal sealed class ChatImageEditOp {
     data class Stroke(
         val path: Path,

@@ -94,6 +94,10 @@ internal fun uploadAttachmentRefsOrNull(
                 uploaded.optIntOrNull("image_height", attachment.imageHeight)?.let {
                     addProperty("image_height", it)
                 }
+                val annotations = chatImageAnnotationsToGsonArray(attachment.annotations)
+                if (annotations.size() > 0) {
+                    add("annotations", annotations)
+                }
                 attachment.durationSeconds?.let {
                     addProperty("duration_seconds", it)
                 }

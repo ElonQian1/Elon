@@ -329,6 +329,8 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     }
 
     private fun finishWithEditedImage() {
+        annotationInputOverlay.commitActive()
+        val annotations = canvasView.exportAnnotations()
         val bitmap = runCatching { canvasView.renderEditedBitmap() }.getOrNull()
         if (bitmap == null) {
             Toast.makeText(this, "图片生成失败", Toast.LENGTH_SHORT).show()
@@ -346,6 +348,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                             putExtra(EXTRA_OUTPUT_NAME, saved.file.name)
                             putExtra(EXTRA_OUTPUT_WIDTH, saved.width)
                             putExtra(EXTRA_OUTPUT_HEIGHT, saved.height)
+                            putExtra(EXTRA_OUTPUT_ANNOTATIONS, chatImageAnnotationsToJsonString(annotations))
                         }
                     )
                     finish()
@@ -459,6 +462,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         const val EXTRA_OUTPUT_NAME = "chat_image_edit_output_name"
         const val EXTRA_OUTPUT_WIDTH = "chat_image_edit_output_width"
         const val EXTRA_OUTPUT_HEIGHT = "chat_image_edit_output_height"
+        const val EXTRA_OUTPUT_ANNOTATIONS = "chat_image_edit_output_annotations"
         private const val MAX_EDITOR_PIXELS = 4_000_000
         private const val BOTTOM_TOOL_PANEL_HEIGHT_DP = 156
 

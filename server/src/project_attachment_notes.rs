@@ -79,6 +79,9 @@ pub(crate) fn append_project_attachment_notes(
             if let Some(dimensions) = attachment_image_dimensions(attachment) {
                 note.push_str(&format!("\n  image_dimensions: {}", dimensions));
             }
+            if let Some(annotation_notes) = attachment_annotations_summary(attachment) {
+                note.push_str(&format!("\n  image_annotations:\n{}", annotation_notes));
+            }
             note.push_str(
                 "\n  Image context: this image has been passed via --attachment; Copilot can view it directly. Do NOT try to open the local path above (it may not exist); use the image content that was already loaded.",
             );
@@ -111,6 +114,33 @@ fn attachment_image_dimensions(attachment: &ProjectAttachmentRef) -> Option<Stri
         "{}x{}",
         attachment.image_width?, attachment.image_height?
     ))
+}
+
+fn attachment_annotations_summary(attachment: &ProjectAttachmentRef) -> Option<String> {
+    if attachment.annotations.is_empty() {
+        return None;
+    }
+    let lines = attachment
+        .annotations
+        .iter()
+        .enumerate()
+        .filter_map(|(index, annotation)| {
+            let note = annotation.note.trim();
+            if note.is_empty() {
+                return None;
+            }
+            Some(format!(
+                "  - #{} at x={:.3}, y={:.3}, width={:.3}, height={:.3}: {}",
+                index + 1,
+                annotation.x,
+                annotation.y,
+                annotation.width,
+                annotation.height,
+                note.chars().take(500).collect::<String>()
+            ))
+        })
+        .collect::<Vec<_>>();
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 /// CLI 任务执行时把附件文件复制到工作区，并生成 manifest 和提示注释。
@@ -257,6 +287,9 @@ pub async fn append_project_cli_attachment_artifacts(
             if let Some(dimensions) = dimensions.as_deref() {
                 note.push_str(&format!("\n  image_dimensions: {}", dimensions));
             }
+            if let Some(annotation_notes) = attachment_annotations_summary(attachment) {
+                note.push_str(&format!("\n  image_annotations:\n{}", annotation_notes));
+            }
             note.push_str("\n  Image context: inspect cli_workspace_path directly when this message asks about the image.");
         } else if mime_type.starts_with("audio/") || kind == "audio" {
             note.push_str(
@@ -274,6 +307,7 @@ pub async fn append_project_cli_attachment_artifacts(
             "size_bytes": size_bytes,
             "image_width": attachment.image_width,
             "image_height": attachment.image_height,
+            "annotations": &attachment.annotations,
             "sha256": sha256,
             "cli_workspace_path": artifact_path.to_string_lossy(),
             "source_server_path": canonical_source.to_string_lossy(),

@@ -3,6 +3,7 @@ package com.elon.app
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 data class ChatAttachment(
@@ -16,7 +17,8 @@ data class ChatAttachment(
     val imageWidth: Int? = null,
     val imageHeight: Int? = null,
     val durationSeconds: Int? = null,
-    val transcription: String? = null
+    val transcription: String? = null,
+    val annotations: List<ChatImageAnnotation> = emptyList()
 ) {
     fun isImage(): Boolean {
         return kind == "image" || mimeType.orEmpty().startsWith("image/")
@@ -49,7 +51,8 @@ internal fun chatAttachmentsFromRefs(refs: JsonArray): List<ChatAttachment> {
             imageWidth = item.positiveIntOrNull("image_width"),
             imageHeight = item.positiveIntOrNull("image_height"),
             durationSeconds = item.positiveIntOrNull("duration_seconds"),
-            transcription = item.stringOrNull("transcription")
+            transcription = item.stringOrNull("transcription"),
+            annotations = chatImageAnnotationsFromGsonArray(item.arrayOrNull("annotations"))
         )
     }
 }
@@ -69,7 +72,8 @@ internal fun chatAttachmentsFromJsonArray(array: JSONArray?): List<ChatAttachmen
                 imageWidth = item.optInt("image_width", 0).takeIf { it > 0 },
                 imageHeight = item.optInt("image_height", 0).takeIf { it > 0 },
                 durationSeconds = item.optInt("duration_seconds", 0).takeIf { it > 0 },
-                transcription = item.optString("transcription").takeIf { it.isNotBlank() }
+                transcription = item.optString("transcription").takeIf { it.isNotBlank() },
+                annotations = chatImageAnnotationsFromJsonArray(item.optJSONArray("annotations"))
             )
         }
 }
@@ -86,7 +90,8 @@ internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): L
             imageWidth = attachment.imageWidth,
             imageHeight = attachment.imageHeight,
             durationSeconds = attachment.durationSeconds,
-            transcription = attachment.transcription
+            transcription = attachment.transcription,
+            annotations = attachment.annotations
         )
     }
 }
@@ -108,7 +113,8 @@ internal fun pendingAttachmentsFromChatAttachments(attachments: List<ChatAttachm
             mimeType = mimeType,
             file = file,
             imageWidth = attachment.imageWidth,
-            imageHeight = attachment.imageHeight
+            imageHeight = attachment.imageHeight,
+            annotations = attachment.annotations
         )
     }
 }
@@ -121,6 +127,16 @@ private fun JsonObject.stringOrNull(name: String): String? {
         ?.takeIf { it.isNotEmpty() }
 }
 
+private fun JsonObject.arrayOrNull(name: String): JsonArray? {
+    return get(name)?.takeIf { it.isJsonArray }?.asJsonArray
+}
+
+private fun JsonObject.floatOrNull(name: String): Float? {
+    return runCatching {
+        get(name)?.takeIf { it.isJsonPrimitive }?.asFloat
+    }.getOrNull()
+}
+
 internal fun chatAttachmentFromImageUrl(url: String?): List<ChatAttachment> {
     val imageUrl = url?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
     return listOf(
@@ -131,6 +147,117 @@ internal fun chatAttachmentFromImageUrl(url: String?): List<ChatAttachment> {
             url = imageUrl
         )
     )
+}
+
+internal fun chatImageAnnotationsToJsonString(annotations: List<ChatImageAnnotation>): String {
+    return chatImageAnnotationsToJsonArray(annotations).toString()
+}
+
+internal fun chatImageAnnotationsFromJsonString(raw: String?): List<ChatImageAnnotation> {
+    val text = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return emptyList()
+    return runCatching { chatImageAnnotationsFromJsonArray(JSONArray(text)) }.getOrDefault(emptyList())
+}
+
+internal fun chatImageAnnotationsToGsonArray(annotations: List<ChatImageAnnotation>): JsonArray {
+    return JsonArray().apply {
+        annotations.mapNotNull { it.normalizedForTransport() }.forEach { annotation ->
+            add(JsonObject().apply {
+                addProperty("x", annotation.x)
+                addProperty("y", annotation.y)
+                addProperty("width", annotation.width)
+                addProperty("height", annotation.height)
+                addProperty("note", annotation.note)
+                annotation.iconX?.let { addProperty("icon_x", it) }
+                annotation.iconY?.let { addProperty("icon_y", it) }
+                annotation.iconWidth?.let { addProperty("icon_width", it) }
+                annotation.iconHeight?.let { addProperty("icon_height", it) }
+            })
+        }
+    }
+}
+
+private fun chatImageAnnotationsToJsonArray(annotations: List<ChatImageAnnotation>): JSONArray {
+    return JSONArray().apply {
+        annotations.mapNotNull { it.normalizedForTransport() }.forEach { annotation ->
+            put(JSONObject().apply {
+                put("x", annotation.x)
+                put("y", annotation.y)
+                put("width", annotation.width)
+                put("height", annotation.height)
+                put("note", annotation.note)
+                annotation.iconX?.let { put("icon_x", it) }
+                annotation.iconY?.let { put("icon_y", it) }
+                annotation.iconWidth?.let { put("icon_width", it) }
+                annotation.iconHeight?.let { put("icon_height", it) }
+            })
+        }
+    }
+}
+
+private fun chatImageAnnotationsFromGsonArray(array: JsonArray?): List<ChatImageAnnotation> {
+    array ?: return emptyList()
+    return array.mapNotNull { element ->
+        val item = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@mapNotNull null
+        ChatImageAnnotation(
+            x = item.floatOrNull("x") ?: return@mapNotNull null,
+            y = item.floatOrNull("y") ?: return@mapNotNull null,
+            width = item.floatOrNull("width") ?: return@mapNotNull null,
+            height = item.floatOrNull("height") ?: return@mapNotNull null,
+            note = item.stringOrNull("note").orEmpty(),
+            iconX = item.floatOrNull("icon_x"),
+            iconY = item.floatOrNull("icon_y"),
+            iconWidth = item.floatOrNull("icon_width"),
+            iconHeight = item.floatOrNull("icon_height")
+        ).normalizedForTransport()
+    }
+}
+
+private fun chatImageAnnotationsFromJsonArray(array: JSONArray?): List<ChatImageAnnotation> {
+    array ?: return emptyList()
+    return List(array.length()) { index -> array.optJSONObject(index) }
+        .mapNotNull { item ->
+            item ?: return@mapNotNull null
+            ChatImageAnnotation(
+                x = item.optDoubleOrNull("x")?.toFloat() ?: return@mapNotNull null,
+                y = item.optDoubleOrNull("y")?.toFloat() ?: return@mapNotNull null,
+                width = item.optDoubleOrNull("width")?.toFloat() ?: return@mapNotNull null,
+                height = item.optDoubleOrNull("height")?.toFloat() ?: return@mapNotNull null,
+                note = item.optString("note").orEmpty(),
+                iconX = item.optDoubleOrNull("icon_x")?.toFloat(),
+                iconY = item.optDoubleOrNull("icon_y")?.toFloat(),
+                iconWidth = item.optDoubleOrNull("icon_width")?.toFloat(),
+                iconHeight = item.optDoubleOrNull("icon_height")?.toFloat()
+            ).normalizedForTransport()
+        }
+}
+
+private fun ChatImageAnnotation.normalizedForTransport(): ChatImageAnnotation? {
+    val cleanNote = note.trim()
+    if (cleanNote.isEmpty()) return null
+    val cleanWidth = width.coerceIn(0f, 1f)
+    val cleanHeight = height.coerceIn(0f, 1f)
+    if (cleanWidth <= 0f || cleanHeight <= 0f) return null
+    val cleanX = x.coerceIn(0f, 1f)
+    val cleanY = y.coerceIn(0f, 1f)
+    val boundedWidth = minOf(cleanWidth, 1f - cleanX)
+    val boundedHeight = minOf(cleanHeight, 1f - cleanY)
+    if (boundedWidth <= 0f || boundedHeight <= 0f) return null
+    return copy(
+        x = cleanX,
+        y = cleanY,
+        width = boundedWidth,
+        height = boundedHeight,
+        note = cleanNote,
+        iconX = iconX?.coerceIn(-0.25f, 1.25f),
+        iconY = iconY?.coerceIn(-0.25f, 1.25f),
+        iconWidth = iconWidth?.coerceIn(0f, 1f),
+        iconHeight = iconHeight?.coerceIn(0f, 1f)
+    )
+}
+
+private fun JSONObject.optDoubleOrNull(name: String): Double? {
+    if (!has(name) || isNull(name)) return null
+    return optDouble(name).takeIf { !it.isNaN() && !it.isInfinite() }
 }
 
 private fun JsonObject.positiveIntOrNull(name: String): Int? {

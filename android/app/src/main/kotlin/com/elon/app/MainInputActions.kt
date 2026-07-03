@@ -223,6 +223,9 @@ internal class MainInputActions(
             ?: outputFile.name
         val width = data.getIntExtra(ChatImageEditActivity.EXTRA_OUTPUT_WIDTH, 0).takeIf { it > 0 }
         val height = data.getIntExtra(ChatImageEditActivity.EXTRA_OUTPUT_HEIGHT, 0).takeIf { it > 0 }
+        val annotations = chatImageAnnotationsFromJsonString(
+            data.getStringExtra(ChatImageEditActivity.EXTRA_OUTPUT_ANNOTATIONS)
+        )
         pendingAttachments[index] = old.copy(
             displayLabel = "编辑图片",
             displayName = editedDisplayName(old.displayName),
@@ -230,7 +233,8 @@ internal class MainInputActions(
             mimeType = "image/jpeg",
             file = outputFile,
             imageWidth = width,
-            imageHeight = height
+            imageHeight = height,
+            annotations = annotations
         )
         runCatching { old.file.delete() }
         refreshPendingAttachmentPreview()

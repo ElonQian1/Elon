@@ -127,6 +127,36 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         onHistoryChanged?.invoke()
     }
 
+    fun exportAnnotations(): List<ChatImageAnnotation> {
+        val bitmap = baseBitmap ?: return emptyList()
+        val bitmapWidth = bitmap.width.toFloat().coerceAtLeast(1f)
+        val bitmapHeight = bitmap.height.toFloat().coerceAtLeast(1f)
+        return operations.mapNotNull { op ->
+            val annotation = op as? ChatImageEditOp.Annotation ?: return@mapNotNull null
+            val note = annotation.note.trim()
+            if (note.isEmpty()) return@mapNotNull null
+            val bounds = RectF(annotation.bounds).apply {
+                left = left.coerceIn(0f, bitmapWidth)
+                top = top.coerceIn(0f, bitmapHeight)
+                right = right.coerceIn(0f, bitmapWidth)
+                bottom = bottom.coerceIn(0f, bitmapHeight)
+            }
+            if (bounds.width() <= 0f || bounds.height() <= 0f) return@mapNotNull null
+            val iconRect = annotationIconRectOnBitmap(annotation)
+            ChatImageAnnotation(
+                x = bounds.left / bitmapWidth,
+                y = bounds.top / bitmapHeight,
+                width = bounds.width() / bitmapWidth,
+                height = bounds.height() / bitmapHeight,
+                note = note,
+                iconX = iconRect.left / bitmapWidth,
+                iconY = iconRect.top / bitmapHeight,
+                iconWidth = iconRect.width() / bitmapWidth,
+                iconHeight = iconRect.height() / bitmapHeight
+            )
+        }
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         updateImageMatrix()
     }
@@ -443,10 +473,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
 
     private fun drawAnnotationIconOnBitmap(canvas: Canvas, annotation: ChatImageEditOp.Annotation) {
         val icon = annotationIconFor(annotation) ?: return
-        val scale = matrixScale().coerceAtLeast(0.01f)
-        val iconSize = annotationIconSize() / scale
-        val pad = dp(5) / scale
-        val rect = annotationIconRectOnBitmap(annotation, iconSize, pad)
+        val rect = annotationIconRectOnBitmap(annotation)
         canvas.drawBitmap(icon, null, rect, basePaint)
     }
 
@@ -570,6 +597,13 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         val left = rawLeft.coerceIn(edgePad, max(edgePad, bitmapWidth - iconSize - edgePad))
         val top = annotation.bounds.bottom - iconSize * 0.9f
         return RectF(left, top, left + iconSize, top + iconSize)
+    }
+
+    private fun annotationIconRectOnBitmap(annotation: ChatImageEditOp.Annotation): RectF {
+        val scale = matrixScale().coerceAtLeast(0.01f)
+        val iconSize = annotationIconSize() / scale
+        val pad = dp(5) / scale
+        return annotationIconRectOnBitmap(annotation, iconSize, pad)
     }
 
     private fun annotationAt(index: Int): ChatImageEditOp.Annotation? {

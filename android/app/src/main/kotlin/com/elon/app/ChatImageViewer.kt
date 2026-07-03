@@ -4,6 +4,7 @@ import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.Window
@@ -30,6 +31,18 @@ internal object ChatImageViewer {
             setImageResource(android.R.drawable.ic_menu_gallery)
         }
 
+        val notePanel = createAnnotationNotePanel(context)
+        val annotationOverlay = ChatImageAnnotationOverlayView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            setImageInfo(attachment.imageWidth, attachment.imageHeight, attachment.annotations)
+            onAnnotationClick = { annotation ->
+                showAnnotationNote(notePanel, annotation.note)
+            }
+        }
+
         val root = FrameLayout(context).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -37,12 +50,20 @@ internal object ChatImageViewer {
             )
             setBackgroundColor(Color.BLACK)
             isClickable = true
-            setOnClickListener { dialog.dismiss() }
+            setOnClickListener {
+                if (notePanel.visibility == android.view.View.VISIBLE) {
+                    hideAnnotationNote(notePanel)
+                } else {
+                    dialog.dismiss()
+                }
+            }
             addView(image)
+            addView(annotationOverlay)
             addView(createCloseButton(context, dialog))
             attachment.displayName?.takeIf { it.isNotBlank() }?.let { name ->
                 addView(createTitle(context, name))
             }
+            addView(notePanel)
         }
 
         dialog.setContentView(root)
@@ -61,6 +82,9 @@ internal object ChatImageViewer {
             image.post {
                 if (image.tag == source) {
                     image.setImageBitmap(bitmap)
+                    val width = attachment.imageWidth ?: bitmap.width
+                    val height = attachment.imageHeight ?: bitmap.height
+                    annotationOverlay.setImageInfo(width, height, attachment.annotations)
                 }
             }
         }
@@ -100,6 +124,60 @@ internal object ChatImageViewer {
             setTextColor(Color.parseColor("#DDEEEEEE"))
             textSize = 13f
         }
+    }
+
+    private fun createAnnotationNotePanel(context: Context): TextView {
+        return TextView(context).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM
+            ).apply {
+                leftMargin = context.dp(20)
+                rightMargin = context.dp(20)
+                bottomMargin = context.dp(72)
+            }
+            background = GradientDrawable().apply {
+                cornerRadius = context.dp(10).toFloat()
+                setColor(Color.parseColor("#EE171717"))
+                setStroke(context.dp(1), Color.parseColor("#333333"))
+            }
+            gravity = Gravity.START
+            includeFontPadding = true
+            isClickable = true
+            maxLines = 10
+            setPadding(context.dp(16), context.dp(14), context.dp(16), context.dp(14))
+            setTextColor(Color.parseColor("#D9D9D9"))
+            textSize = 15f
+            visibility = android.view.View.GONE
+            alpha = 0f
+        }
+    }
+
+    private fun showAnnotationNote(panel: TextView, note: String) {
+        panel.animate().cancel()
+        panel.text = note.trim()
+        panel.visibility = android.view.View.VISIBLE
+        panel.alpha = 0f
+        panel.translationY = panel.context.dp(8).toFloat()
+        panel.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(140L)
+            .start()
+    }
+
+    private fun hideAnnotationNote(panel: TextView) {
+        panel.animate().cancel()
+        panel.animate()
+            .alpha(0f)
+            .translationY(panel.context.dp(8).toFloat())
+            .setDuration(120L)
+            .withEndAction {
+                panel.visibility = android.view.View.GONE
+                panel.translationY = 0f
+            }
+            .start()
     }
 
     private fun Context.dp(value: Int): Int {
