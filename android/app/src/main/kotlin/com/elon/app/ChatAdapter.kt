@@ -611,13 +611,7 @@ class ChatAdapter(
         }
 
         val marker = if (message.evidenceExpanded) "⌄" else "›"
-        val prefix = when {
-            message.evidenceWorking -> "过程记录"
-            message.processLayer -> "过程已收起"
-            message.role == "ai" -> if (message.evidenceExpanded) "收起过程" else "查看过程"
-            else -> "过程"
-        }
-        summary.text = "$marker $prefix · ${message.evidenceTitle}"
+        summary.text = "$marker ${message.evidenceTitle}"
         summary.visibility = View.VISIBLE
 
         if (message.evidenceExpanded) {

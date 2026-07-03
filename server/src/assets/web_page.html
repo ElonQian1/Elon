@@ -772,13 +772,9 @@
       white-space: pre-wrap;
     }
     .bubble details.process-layer summary {
-      display: inline-flex;
-      align-items: center;
-      min-height: 34px;
-      padding: 6px 10px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel);
+      display: inline-block;
+      padding: 0 2px;
+      color: var(--ink-faint);
       cursor: pointer;
       list-style: none;
     }
@@ -6684,7 +6680,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const details = document.createElement('details');
       details.className = 'process-layer';
       const summary = document.createElement('summary');
-      summary.textContent = '查看过程 · ' + processLog.length + ' 条记录';
+      summary.textContent = '› 过程记录 ' + processLog.length + ' 条';
       const processBody = document.createElement('div');
       processBody.className = 'process-layer-body';
       processBody.textContent = processLog.map((item, index) => '· ' + (index + 1) + '. ' + item).join('\n');
