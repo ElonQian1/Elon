@@ -26,8 +26,10 @@ internal class MainTaskMessageRouterActions(
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
         val key = taskKey(traceId, projectId, conversationId)
-        val hasExplicitTarget = !projectId.isNullOrBlank() && !conversationId.isNullOrBlank()
-        val activeVisible = !hasExplicitTarget && key == activeConversationTaskKey() && isProjectConversationVisible()
+        val activeVisible = key == activeConversationTaskKey() && isProjectConversationVisible()
+        if (activeVisible && isDevelopment != null) {
+            updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, false)
+        }
         if (activeVisible) {
             appendActiveMessage(raw)
         } else {
@@ -43,7 +45,7 @@ internal class MainTaskMessageRouterActions(
             removeConversationTask(traceId, projectId, conversationId)
             persistActiveWork()
             drainNextQueuedMessage(projectId, conversationId)
-        } else {
+        } else if (!activeVisible) {
             updateConversationTaskFromService(traceId, projectId, conversationId, isDevelopment, false)
         }
     }
