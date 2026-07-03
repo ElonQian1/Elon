@@ -33,6 +33,7 @@ import type {
   ProjectInvitePreview,
   ProjectInvitePreviewResponse,
   ProjectMember,
+  UserPresenceSettings,
 } from './types'
 import MemberConversationList from './MemberConversationList'
 import {
@@ -59,6 +60,7 @@ import type {
 import {
   channelCanManage,
   channelPermissionSummary,
+  presenceLabel,
   membersHaveChannelPermissionMap,
   membersForChannel,
   projectMemberHasRolePermission,
@@ -84,6 +86,7 @@ import {
   MemberProfilePopover,
   MemberContextSummary,
   MemberLoadingRows,
+  memberPresenceAvatarClass,
 } from './MemberPanel'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
@@ -169,6 +172,7 @@ export default function ConversationPage() {
   ))
   const [showPermissions, setShowPermissions] = useState(false)
   const [showPresence, setShowPresence] = useState(false)
+  const [myPresence, setMyPresence] = useState<UserPresenceSettings | null>(null)
   const [showInvites, setShowInvites] = useState(false)
   const [showModeration, setShowModeration] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
@@ -231,8 +235,59 @@ export default function ConversationPage() {
     setRuntimeRoute(route)
     setDirectPcCli(false)
   }, [])
+  const handlePresenceSaved = useCallback(async (presence: UserPresenceSettings) => {
+    setMyPresence(presence)
+    await reloadProjectSpace()
+  }, [reloadProjectSpace])
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+
+  useEffect(() => {
+    let canceled = false
+    if (!user?.id) {
+      setMyPresence(null)
+      return () => { canceled = true }
+    }
+    api.get<UserPresenceSettings>('/api/me/presence')
+      .then((presence) => {
+        if (!canceled) setMyPresence(presence)
+      })
+      .catch(() => {
+        if (!canceled) setMyPresence(null)
+      })
+    return () => { canceled = true }
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user?.id) return
+    const userId = user.id
+    function onPresence(event: Event) {
+      const detail = (event as CustomEvent<{
+        userId?: string
+        status?: string
+        customStatus?: string | null
+        custom_status?: string | null
+        activity?: string | null
+        updatedAt?: string
+        updated_at?: string
+      }>).detail
+      if (!detail || detail.userId !== userId) return
+      setMyPresence((prev) => ({
+        user_id: userId,
+        status: detail.status ?? prev?.status ?? 'online',
+        custom_status: Object.prototype.hasOwnProperty.call(detail, 'customStatus')
+          || Object.prototype.hasOwnProperty.call(detail, 'custom_status')
+          ? detail.customStatus ?? detail.custom_status ?? null
+          : prev?.custom_status ?? null,
+        activity: Object.prototype.hasOwnProperty.call(detail, 'activity')
+          ? detail.activity ?? null
+          : prev?.activity ?? null,
+        updated_at: detail.updatedAt ?? detail.updated_at ?? prev?.updated_at,
+      }))
+    }
+    window.addEventListener('elon:presence', onPresence)
+    return () => window.removeEventListener('elon:presence', onPresence)
+  }, [user?.id])
 
   useEffect(() => {
     persistProjectRuntimeRouteSelection(window.localStorage, runtimeRoute)
@@ -695,6 +750,12 @@ export default function ConversationPage() {
     ? activeChannel?.name ?? '当前频道'
     : activeProject?.name ?? '我的项目'
   const memberPanelCount = activeProjectId ? panelMembers.length : (user ? 1 : 0)
+  const ownPresenceStatus = normalizeOwnPresenceStatus(myPresence?.status ?? user?.status ?? 'online')
+  const ownPresenceAvatarStatus = ownPresenceStatus === 'invisible' ? 'offline' : ownPresenceStatus
+  const ownPresenceSubtitle = ownPresenceSummary(myPresence, ownPresenceStatus)
+  const ownAvatarUrl = clean(user?.avatar_data_url ?? '')
+  const ownDisplayName = user ? (user.nickname ?? user.account) : ''
+  const ownInitial = ownDisplayName ? ownDisplayName[0].toUpperCase() : '?'
   const memberPanelSummary = panelUsesChannelScope && activeChannel
     ? panelUsesChannelPermissions
       ? channelPermissionSummary(activeChannel, panelMembers.length, spaceMembers.length, true)
@@ -1546,14 +1607,17 @@ export default function ConversationPage() {
             <>
               <div className={styles.memberSection}>当前账号</div>
               <div className={styles.memberItem}>
-                <div className={[styles.memberAvatar, styles.memberAvatarOnline].join(' ')}>
-                  {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}
+                <div className={[styles.memberAvatar, memberPresenceAvatarClass(ownPresenceAvatarStatus)].join(' ')}>
+                  {ownAvatarUrl
+                    ? <img src={ownAvatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+                    : ownInitial
+                  }
                 </div>
                 <div className={styles.memberCopy}>
                   <div className={styles.memberLine}>
-                    <strong className={styles.memberItemName}>{user.nickname ?? user.account}</strong>
+                    <strong className={styles.memberItemName}>{ownDisplayName}</strong>
                   </div>
-                  <span className={styles.memberSub}>在线</span>
+                  <span className={styles.memberSub}>{ownPresenceSubtitle}</span>
                 </div>
               </div>
             </>
@@ -1600,7 +1664,7 @@ export default function ConversationPage() {
       )}
 
       {showPresence && (
-        <PresenceDrawer onClose={() => setShowPresence(false)} onSaved={reloadProjectSpace} />
+        <PresenceDrawer onClose={() => setShowPresence(false)} onSaved={handlePresenceSaved} />
       )}
       {showInvites && activeProjectId && (
         <InviteDrawer projectId={activeProjectId} onClose={() => setShowInvites(false)} />
@@ -1736,6 +1800,20 @@ function projectRoleLabel(role: string): string {
   if (role === 'member') return '成员'
   if (role === 'observer') return '只读'
   return role || '未知角色'
+}
+
+function normalizeOwnPresenceStatus(status: string): string {
+  const value = clean(status).toLowerCase()
+  if (value === 'idle' || value === 'dnd' || value === 'invisible' || value === 'offline') return value
+  return 'online'
+}
+
+function ownPresenceSummary(presence: UserPresenceSettings | null, status: string): string {
+  const extras = [
+    clean(presence?.activity ?? ''),
+    clean(presence?.custom_status ?? ''),
+  ].filter(Boolean)
+  return [presenceLabel(status), ...extras].join(' · ')
 }
 
 function shortNodeId(nodeId: string): string {

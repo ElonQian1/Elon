@@ -16,7 +16,7 @@ export function PresenceDrawer({
   onSaved,
 }: {
   onClose: () => void
-  onSaved: () => Promise<void>
+  onSaved: (presence: UserPresenceSettings) => Promise<void> | void
 }) {
   const [status, setStatus] = useState('online')
   const [customStatus, setCustomStatus] = useState('')
@@ -59,7 +59,7 @@ export function PresenceDrawer({
       setCustomStatus(data.custom_status ?? '')
       setActivity(data.activity ?? '')
       setMessage('已保存')
-      await onSaved()
+      await onSaved(data)
     } catch (err) {
       setMessage((err as { message?: string }).message ?? '保存失败')
     } finally {
