@@ -40,6 +40,7 @@ export default function App() {
         <Route path="account" element={<AccountPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
+        <Route path="projects/:id/members" element={<ProjectDetailPage />} />
         <Route path="dev-tasks" element={<DevTasksPage />} />
         <Route path="voice" element={<VoicePage />} />
         <Route path="doctor" element={<DoctorPage />} />

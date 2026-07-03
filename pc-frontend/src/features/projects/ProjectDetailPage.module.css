@@ -118,6 +118,20 @@
 }
 .tabCount { font-size: 12px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; }
 
+.primaryBtn {
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--green);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.primaryBtn:hover:not(:disabled) { filter: brightness(1.06); }
+.primaryBtn:disabled { opacity: .45; cursor: not-allowed; }
+
 .textBtn {
   height: 28px;
   padding: 0 10px;
@@ -129,6 +143,292 @@
   transition: background .1s;
 }
 .textBtn:hover { background: #343741; color: var(--text); }
+.textBtn:disabled { opacity: .45; cursor: not-allowed; }
+.textBtn[data-danger="true"] {
+  border-color: rgba(223, 92, 92, .3);
+  color: #ffb4b4;
+}
+
+.memberWorkbench {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.memberWorkbenchStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.memberWorkbenchStats button {
+  min-width: 0;
+  min-height: 62px;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #202126;
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.memberWorkbenchStats button:hover,
+.memberWorkbenchStats button[data-active="true"] {
+  border-color: rgba(88,101,242,.38);
+  background: rgba(88,101,242,.1);
+}
+
+.memberWorkbenchStats strong,
+.memberWorkbenchStats span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberWorkbenchStats strong {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.memberWorkbenchStats span {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.memberInviteForm,
+.memberWorkbenchToolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(140px, 180px) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.memberWorkbenchToolbar {
+  grid-template-columns: minmax(260px, 1fr) minmax(150px, 190px) minmax(130px, 170px) auto;
+  align-items: center;
+}
+
+.memberInviteForm label {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.memberInviteForm span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.memberInviteForm input,
+.memberInviteForm select,
+.memberWorkbenchToolbar input,
+.memberWorkbenchToolbar select {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #1a1c21;
+  color: var(--text);
+  padding: 0 10px;
+  outline: none;
+  font-size: 13px;
+}
+
+.memberInviteForm input:focus,
+.memberInviteForm select:focus,
+.memberWorkbenchToolbar input:focus,
+.memberWorkbenchToolbar select:focus {
+  border-color: var(--green);
+}
+
+.memberFormError,
+.memberFormSuccess,
+.memberFormHint {
+  margin: -4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.memberFormError { color: var(--red); }
+.memberFormSuccess { color: #4caf78; }
+
+.memberBatchBar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(88,101,242,.18);
+  border-radius: 8px;
+  background: rgba(88,101,242,.07);
+}
+
+.memberBatchBar > div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memberBatchBar strong,
+.memberBatchBar span,
+.memberBatchBar p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberBatchBar strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.memberBatchBar span,
+.memberBatchBar p {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.memberBatchBar > div:last-of-type {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.memberBatchBar p {
+  grid-column: 1 / -1;
+}
+
+.memberTable {
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #202126;
+}
+
+.memberTableHead,
+.memberTableRow {
+  display: grid;
+  grid-template-columns: 34px minmax(220px, 1.2fr) minmax(180px, 1fr) minmax(150px, 210px) minmax(88px, auto);
+  gap: 10px;
+  align-items: center;
+}
+
+.memberTableHead {
+  min-height: 34px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line-soft);
+  background: #27292f;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.memberTableRow {
+  min-height: 70px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+}
+
+.memberTableRow:last-child { border-bottom: 0; }
+.memberTableRow[data-selected="true"] { background: rgba(88,101,242,.09); }
+
+.memberTableCheck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.memberTableCheck input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--green);
+}
+
+.memberTableIdentity {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.memberTableIdentity > span:last-child,
+.memberStatusCell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memberTableIdentity strong,
+.memberTableIdentity em,
+.memberStatusCell strong,
+.memberStatusCell span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberTableIdentity strong,
+.memberStatusCell strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.memberTableIdentity em,
+.memberStatusCell span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.memberRoleStack {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.memberRoleStack em {
+  min-height: 20px;
+  max-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 4px;
+  background: rgba(255,255,255,.035);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberRowActions {
+  display: flex;
+  justify-content: flex-end;
+}
 
 .memberGrid {
   display: grid;
@@ -151,6 +451,13 @@
   display: grid; place-items: center;
   font-size: 14px; font-weight: 800; color: white;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.memberAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 .memberInfo { min-width: 0; }
 .memberInfo strong {
@@ -190,3 +497,24 @@
 
 .empty { padding: 20px; color: var(--text-muted); font-size: 13px; }
 .loading { padding: 20px; color: var(--text-muted); font-size: 13px; }
+
+@media (max-width: 980px) {
+  .memberWorkbenchStats,
+  .memberInviteForm,
+  .memberWorkbenchToolbar,
+  .memberBatchBar,
+  .memberTableHead,
+  .memberTableRow {
+    grid-template-columns: 1fr;
+  }
+  .memberTableHead {
+    display: none;
+  }
+  .memberTableRow {
+    align-items: stretch;
+  }
+  .memberBatchBar > div:last-of-type,
+  .memberRowActions {
+    justify-content: flex-start;
+  }
+}

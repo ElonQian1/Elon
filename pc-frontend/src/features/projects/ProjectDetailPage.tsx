@@ -1,10 +1,21 @@
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../../api/client'
 import GroupAiPanel from '../group-ai/GroupAiPanel'
 import { useProjectStore } from '../conversation/useProjectStore'
 import ProjectReadinessCard from './ProjectReadinessCard'
 import type { ProjectMember } from '../conversation/types'
+import {
+  filterMembers,
+  memberInitial,
+  memberModerationSummary,
+  memberPresenceStatus,
+  memberPrimaryRoleColor,
+  memberRoleSummary,
+  presenceLabel,
+  roleLabel,
+} from '../conversation/memberUtils'
+import { useAuthStore } from '../../store/auth'
 import styles from './ProjectDetailPage.module.css'
 
 type Tab = 'overview' | 'members' | 'workspace' | 'groupAi'
@@ -41,21 +52,29 @@ interface WorkspaceHealth {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const currentUserId = useAuthStore((s) => s.user?.id)
   const projects = useProjectStore((s) => s.projects)
   const space = useProjectStore((s) => s.space)
   const selectProject = useProjectStore((s) => s.selectProject)
   const reloadProjectSpace = useProjectStore((s) => s.reloadProjectSpace)
 
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(() => location.pathname.endsWith('/members') ? 'members' : 'overview')
   const [health, setHealth] = useState<WorkspaceHealth | null>(null)
   const [healthLoading, setHealthLoading] = useState(false)
   const [memberList, setMemberList] = useState<ProjectMember[]>([])
 
   const project = id ? projects.find((p) => p.id === id) : null
+  const activeRole = String(space?.my_role ?? project?.my_role ?? project?.role ?? '').toLowerCase()
+  const canManageMembers = activeRole === 'owner' || activeRole === 'admin'
 
   useEffect(() => {
     if (id) selectProject(id).catch(() => {})
   }, [id]) // eslint-disable-line
+
+  useEffect(() => {
+    if (location.pathname.endsWith('/members')) setTab('members')
+  }, [location.pathname])
 
   useEffect(() => {
     if (space?.members) setMemberList(space.members)
@@ -95,6 +114,16 @@ export default function ProjectDetailPage() {
 
   if (!project && !id) return <div className={styles.empty}>未选择项目</div>
 
+  function switchTab(nextTab: Tab) {
+    setTab(nextTab)
+    if (!id) return
+    if (nextTab === 'members') {
+      if (!location.pathname.endsWith('/members')) navigate(`/projects/${id}/members`)
+      return
+    }
+    if (location.pathname.endsWith('/members')) navigate(`/projects/${id}`)
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -111,7 +140,7 @@ export default function ProjectDetailPage() {
           <button
             key={key}
             className={[styles.tab, tab === key ? styles.tabActive : ''].join(' ')}
-            onClick={() => setTab(key)}
+            onClick={() => switchTab(key)}
             type="button"
           >
             {{ overview: '概览', members: '成员', workspace: '工作区', groupAi: '群体 AI' }[key]}
@@ -121,7 +150,15 @@ export default function ProjectDetailPage() {
 
       <div className={styles.content}>
         {tab === 'overview' && <OverviewTab project={project} space={space} />}
-        {tab === 'members' && <MembersTab members={memberList} onRefresh={loadMembers} projectId={id ?? ''} />}
+        {tab === 'members' && (
+          <MembersTab
+            members={memberList}
+            onRefresh={loadMembers}
+            projectId={id ?? ''}
+            currentUserId={currentUserId}
+            canManageMembers={canManageMembers}
+          />
+        )}
         {tab === 'groupAi' && <GroupAiPanel projectId={id ?? ''} channels={space?.channels ?? []} />}
         {tab === 'workspace' && (
           <WorkspaceTab
@@ -169,13 +206,69 @@ function OverviewTab({ project, space }: { project: StoreProject; space: StoreSp
   )
 }
 
-function MembersTab({ members, onRefresh, projectId }: { members: ProjectMember[]; onRefresh: () => void; projectId: string }) {
+type ProjectMemberStatusFilter = 'all' | 'online' | 'offline' | 'restricted'
+type ProjectMemberSortMode = 'role' | 'name' | 'joined'
+type ProjectMemberBatchAction = 'mute1h' | 'mute1d' | 'unmute' | 'remove'
+
+const PROJECT_MEMBER_STATUS_FILTERS: Array<{ id: ProjectMemberStatusFilter; label: string }> = [
+  { id: 'all', label: '全部' },
+  { id: 'online', label: '在线' },
+  { id: 'offline', label: '离线' },
+  { id: 'restricted', label: '受限' },
+]
+
+function MembersTab({
+  members,
+  onRefresh,
+  projectId,
+  currentUserId,
+  canManageMembers,
+}: {
+  members: ProjectMember[]
+  onRefresh: () => Promise<void> | void
+  projectId: string
+  currentUserId?: string
+  canManageMembers: boolean
+}) {
   const [inviteAccount, setInviteAccount] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [inviteSuccess, setInviteSuccess] = useState('')
   const [removing, setRemoving] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<ProjectMemberStatusFilter>('all')
+  const [roleFilter, setRoleFilter] = useState('')
+  const [sortMode, setSortMode] = useState<ProjectMemberSortMode>('role')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [batchBusy, setBatchBusy] = useState<ProjectMemberBatchAction | ''>('')
+  const [batchMessage, setBatchMessage] = useState('')
+  const stats = useMemo(() => projectMemberStats(members), [members])
+  const roleOptions = useMemo(() => projectMemberRoleOptions(members), [members])
+  const visibleMembers = useMemo(() => {
+    const searched = filterMembers(members, query)
+    return sortProjectMembers(
+      searched
+        .filter((member) => matchesProjectMemberStatus(member, statusFilter))
+        .filter((member) => !roleFilter || projectMemberHasRole(member, roleFilter)),
+      sortMode,
+    )
+  }, [members, query, roleFilter, sortMode, statusFilter])
+  const selectedMembers = useMemo(
+    () => members.filter((member) => selectedIds.has(member.user_id) && member.user_id !== currentUserId),
+    [members, selectedIds, currentUserId],
+  )
+  const selectableVisibleMembers = visibleMembers.filter((member) => member.user_id !== currentUserId)
+  const selectedVisibleCount = selectableVisibleMembers.filter((member) => selectedIds.has(member.user_id)).length
+  const allVisibleSelected = selectableVisibleMembers.length > 0 && selectedVisibleCount === selectableVisibleMembers.length
+
+  useEffect(() => {
+    const validIds = new Set(members.map((member) => member.user_id))
+    setSelectedIds((current) => {
+      const next = new Set(Array.from(current).filter((id) => validIds.has(id) && id !== currentUserId))
+      return next.size === current.size ? current : next
+    })
+  }, [members, currentUserId])
 
   async function handleInvite(e: React.FormEvent) {
     e.preventDefault()
@@ -199,7 +292,32 @@ function MembersTab({ members, onRefresh, projectId }: { members: ProjectMember[
     }
   }
 
+  function toggleMember(member: ProjectMember) {
+    if (!canManageMembers || member.user_id === currentUserId) return
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(member.user_id)) next.delete(member.user_id)
+      else next.add(member.user_id)
+      return next
+    })
+    setBatchMessage('')
+  }
+
+  function toggleVisibleMembers() {
+    if (!canManageMembers || selectableVisibleMembers.length === 0) return
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      selectableVisibleMembers.forEach((member) => {
+        if (allVisibleSelected) next.delete(member.user_id)
+        else next.add(member.user_id)
+      })
+      return next
+    })
+    setBatchMessage('')
+  }
+
   async function handleRemove(userId: string, account: string) {
+    if (userId === currentUserId) return
     if (!window.confirm(`确认移除成员 ${account}？`)) return
     setRemoving(userId)
     try {
@@ -212,74 +330,308 @@ function MembersTab({ members, onRefresh, projectId }: { members: ProjectMember[
     }
   }
 
+  async function runBatchAction(action: ProjectMemberBatchAction) {
+    const targets = selectedMembers.filter((member) => member.user_id !== currentUserId)
+    if (!projectId || !canManageMembers || batchBusy) return
+    if (targets.length === 0) {
+      setBatchMessage('请先选择要处理的成员')
+      return
+    }
+    if (action === 'remove' && !window.confirm(`确定要将 ${targets.length} 位成员移出项目吗？`)) return
+    setBatchBusy(action)
+    setBatchMessage(`正在处理 ${targets.length} 位成员...`)
+    try {
+      for (const member of targets) {
+        if (action === 'remove') {
+          await api.delete(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(member.user_id)}`)
+        } else {
+          await api.patch(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(member.user_id)}/moderation`, {
+            action: action === 'unmute' ? 'unmute' : 'mute',
+            duration_minutes: action === 'mute1d' ? 1440 : action === 'mute1h' ? 60 : undefined,
+            note: projectMemberBatchNote(action),
+          })
+        }
+      }
+      setSelectedIds(new Set())
+      setBatchMessage(`已批量更新 ${targets.length} 位成员`)
+      await onRefresh()
+    } catch (err) {
+      setBatchMessage((err as { message?: string }).message ?? '批量操作失败')
+    } finally {
+      setBatchBusy('')
+    }
+  }
+
   return (
-    <div>
-      {/* 邀请表单 */}
-      <form onSubmit={handleInvite} style={{ marginBottom: 18, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>账号（手机号/邮箱）</span>
+    <div className={styles.memberWorkbench}>
+      <div className={styles.memberWorkbenchStats}>
+        {PROJECT_MEMBER_STATUS_FILTERS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            data-active={statusFilter === item.id ? 'true' : undefined}
+            onClick={() => setStatusFilter(item.id)}
+          >
+            <strong>{projectMemberStatCount(stats, item.id)}</strong>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <form className={styles.memberInviteForm} onSubmit={handleInvite}>
+        <label>
+          <span>账号（手机号/邮箱）</span>
           <input
             value={inviteAccount}
             onChange={(e) => setInviteAccount(e.target.value)}
             placeholder="15612345678"
-            style={{ height: 34, border: '1px solid var(--line)', borderRadius: 6, background: '#1a1c21', color: 'var(--text)', padding: '0 10px', outline: 'none', fontSize: 13 }}
             disabled={inviting}
           />
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 110 }}>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>角色</span>
-          <select
-            value={inviteRole}
-            onChange={(e) => setInviteRole(e.target.value)}
-            style={{ height: 34, border: '1px solid var(--line)', borderRadius: 6, background: '#1a1c21', color: 'var(--text)', padding: '0 8px', fontSize: 13 }}
-          >
-            <option value="member">成员</option>
-            <option value="editor">协作者</option>
-            <option value="admin">管理员</option>
-            <option value="observer">只读</option>
+        <label>
+          <span>角色</span>
+          <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}>
+            {inviteRoleOptions(roleOptions).map((role) => (
+              <option key={role.id} value={role.id}>{role.label}</option>
+            ))}
           </select>
         </label>
-        <button
-          type="submit"
-          disabled={inviting || !inviteAccount.trim()}
-          style={{ height: 34, padding: '0 16px', background: 'var(--green)', border: 'none', borderRadius: 6, color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' }}
-        >
+        <button className={styles.primaryBtn} type="submit" disabled={!canManageMembers || inviting || !inviteAccount.trim()}>
           {inviting ? '邀请中…' : '邀请'}
         </button>
       </form>
-      {inviteError && <p style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{inviteError}</p>}
-      {inviteSuccess && <p style={{ fontSize: 12, color: '#4caf78', marginBottom: 10 }}>{inviteSuccess}</p>}
+      {inviteError && <p className={styles.memberFormError}>{inviteError}</p>}
+      {inviteSuccess && <p className={styles.memberFormSuccess}>{inviteSuccess}</p>}
+      {!canManageMembers && <p className={styles.memberFormHint}>当前角色可查看成员数据；邀请、批量限制和移除需要拥有者或管理员权限。</p>}
 
-      <div className={styles.tabToolbar}>
-        <span className={styles.tabCount}>{members.length} 位成员</span>
+      <div className={styles.memberWorkbenchToolbar}>
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="搜索账号、ID、角色、状态、备注"
+        />
+        <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} aria-label="按角色筛选">
+          <option value="">全部角色</option>
+          {roleOptions.map((role) => (
+            <option key={role.id} value={role.id}>{role.label} ({role.count})</option>
+          ))}
+        </select>
+        <select value={sortMode} onChange={(event) => setSortMode(event.target.value as ProjectMemberSortMode)} aria-label="排序">
+          <option value="role">按角色层级</option>
+          <option value="name">按名称</option>
+          <option value="joined">按加入时间</option>
+        </select>
         <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
       </div>
-      <div className={styles.memberGrid}>
-        {members.map((m) => (
-          <div key={m.user_id} className={styles.memberCard}>
-            <div className={styles.memberAvatar}>
-              {(m.account ?? m.user_id ?? '?')[0]?.toUpperCase()}
-            </div>
-            <div className={styles.memberInfo} style={{ flex: 1 }}>
-              <strong>{m.account ?? m.user_id ?? '-'}</strong>
-              <span>{m.user_id}</span>
-              <span className={styles.roleBadge}>{m.role ?? 'member'}</span>
-            </div>
-            <button
-              style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 16, cursor: 'pointer' }}
-              title="移除成员"
-              disabled={removing === m.user_id}
-              onClick={() => handleRemove(m.user_id, m.account ?? m.user_id)}
-              type="button"
-            >
-              {removing === m.user_id ? '…' : '×'}
-            </button>
+
+      {canManageMembers && (
+        <section className={styles.memberBatchBar}>
+          <div>
+            <strong>批量成员管理</strong>
+            <span>{selectedMembers.length > 0 ? `已选择 ${selectedMembers.length} 位成员` : '选择成员后可批量禁言、解禁言或移出项目'}</span>
           </div>
-        ))}
-        {members.length === 0 && <p className={styles.empty}>暂无成员数据</p>}
+          <div>
+            <button className={styles.textBtn} type="button" disabled={selectableVisibleMembers.length === 0 || !!batchBusy} onClick={toggleVisibleMembers}>
+              {allVisibleSelected ? '取消当前' : '选择当前'}
+            </button>
+            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => setSelectedIds(new Set())}>清空</button>
+            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('mute1h')}>禁言 1 小时</button>
+            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('mute1d')}>禁言 1 天</button>
+            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('unmute')}>解禁言</button>
+            <button className={styles.textBtn} type="button" data-danger="true" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('remove')}>批量移除</button>
+          </div>
+          {batchMessage && <p>{batchMessage}</p>}
+        </section>
+      )}
+
+      <div className={styles.tabToolbar}>
+        <span className={styles.tabCount}>显示 {visibleMembers.length}/{members.length} 位成员</span>
+      </div>
+
+      <div className={styles.memberTable}>
+        <div className={styles.memberTableHead}>
+          <span />
+          <span>成员</span>
+          <span>角色</span>
+          <span>状态</span>
+          <span>操作</span>
+        </div>
+        {visibleMembers.map((member) => {
+          const roleColor = memberPrimaryRoleColor(member)
+          const roles = projectMemberRoleRefs(member)
+          const name = member.account ?? member.user_id ?? '-'
+          const status = memberPresenceStatus(member)
+          const canSelect = canManageMembers && member.user_id !== currentUserId
+          return (
+            <div key={member.user_id} className={styles.memberTableRow} data-selected={selectedIds.has(member.user_id) ? 'true' : undefined}>
+              <label className={styles.memberTableCheck}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(member.user_id)}
+                  disabled={!canSelect}
+                  onChange={() => toggleMember(member)}
+                  aria-label={`选择 ${name}`}
+                />
+              </label>
+              <div className={styles.memberTableIdentity}>
+                <span className={styles.memberAvatar} style={roleColor ? { boxShadow: `inset 0 0 0 2px ${roleColor}` } : undefined}>
+                  {member.avatar_data_url ? <img src={member.avatar_data_url} alt="" /> : memberInitial(member)}
+                </span>
+                <span>
+                  <strong style={roleColor ? { color: roleColor } : undefined}>{name}</strong>
+                  <em>{member.user_id}</em>
+                </span>
+              </div>
+              <div className={styles.memberRoleStack}>
+                {roles.slice(0, 3).map((role) => (
+                  <em key={role.id} style={role.color ? { color: role.color, borderColor: role.color } : undefined}>
+                    {role.name || roleLabel(role.id)}
+                  </em>
+                ))}
+                {roles.length > 3 && <em>+{roles.length - 3}</em>}
+              </div>
+              <div className={styles.memberStatusCell}>
+                <strong>{presenceLabel(status)}</strong>
+                <span>{memberStatusDetail(member)}</span>
+              </div>
+              <div className={styles.memberRowActions}>
+                <button
+                  className={styles.textBtn}
+                  title="移除成员"
+                  disabled={!canManageMembers || member.user_id === currentUserId || removing === member.user_id}
+                  onClick={() => handleRemove(member.user_id, name)}
+                  type="button"
+                >
+                  {removing === member.user_id ? '移除中' : '移除'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+        {visibleMembers.length === 0 && <p className={styles.empty}>暂无匹配成员</p>}
       </div>
     </div>
   )
+}
+
+function projectMemberStats(members: ProjectMember[]) {
+  return members.reduce((stats, member) => {
+    const status = memberPresenceStatus(member)
+    stats.total += 1
+    if (status === 'offline') stats.offline += 1
+    else stats.online += 1
+    if (member.is_banned || member.is_muted) stats.restricted += 1
+    return stats
+  }, { total: 0, online: 0, offline: 0, restricted: 0 })
+}
+
+function projectMemberStatCount(stats: ReturnType<typeof projectMemberStats>, filter: ProjectMemberStatusFilter) {
+  if (filter === 'online') return stats.online
+  if (filter === 'offline') return stats.offline
+  if (filter === 'restricted') return stats.restricted
+  return stats.total
+}
+
+function matchesProjectMemberStatus(member: ProjectMember, filter: ProjectMemberStatusFilter) {
+  if (filter === 'all') return true
+  if (filter === 'restricted') return !!(member.is_banned || member.is_muted)
+  const status = memberPresenceStatus(member)
+  if (filter === 'online') return status !== 'offline'
+  return status === 'offline'
+}
+
+function projectMemberRoleRefs(member: ProjectMember) {
+  if (member.roles?.length) return member.roles
+  const roleId = member.role ?? 'member'
+  return [{ id: roleId, name: roleLabel(roleId), position: 0 }]
+}
+
+function projectMemberRoleOptions(members: ProjectMember[]) {
+  const options = new Map<string, { id: string; label: string; color?: string | null; position: number; count: number }>()
+  members.forEach((member) => {
+    projectMemberRoleRefs(member).forEach((role) => {
+      const id = String(role.id || role.name || '').trim().toLowerCase()
+      if (!id) return
+      const current = options.get(id)
+      if (current) {
+        current.count += 1
+        current.position = Math.max(current.position, role.position ?? 0)
+        if (!current.color && role.color) current.color = role.color
+        return
+      }
+      options.set(id, {
+        id,
+        label: role.name || roleLabel(id),
+        color: role.color,
+        position: role.position ?? 0,
+        count: 1,
+      })
+    })
+  })
+  return Array.from(options.values())
+    .sort((left, right) => right.position - left.position || right.count - left.count || left.label.localeCompare(right.label))
+}
+
+function inviteRoleOptions(roleOptions: ReturnType<typeof projectMemberRoleOptions>) {
+  if (roleOptions.length) return roleOptions
+  return [
+    { id: 'member', label: '成员' },
+    { id: 'editor', label: '协作者' },
+    { id: 'admin', label: '管理员' },
+    { id: 'observer', label: '只读成员' },
+  ]
+}
+
+function projectMemberHasRole(member: ProjectMember, roleId: string) {
+  const target = roleId.trim().toLowerCase()
+  return projectMemberRoleRefs(member).some((role) =>
+    String(role.id || role.name || '').trim().toLowerCase() === target
+  )
+}
+
+function sortProjectMembers(members: ProjectMember[], sortMode: ProjectMemberSortMode) {
+  return [...members].sort((left, right) => {
+    if (sortMode === 'name') return projectMemberName(left).localeCompare(projectMemberName(right))
+    if (sortMode === 'joined') return joinedTime(right) - joinedTime(left) || projectMemberName(left).localeCompare(projectMemberName(right))
+    return memberPresenceRank(left) - memberPresenceRank(right)
+      || projectMemberTopRolePosition(right) - projectMemberTopRolePosition(left)
+      || projectMemberName(left).localeCompare(projectMemberName(right))
+  })
+}
+
+function projectMemberTopRolePosition(member: ProjectMember) {
+  return projectMemberRoleRefs(member)[0]?.position ?? 0
+}
+
+function projectMemberName(member: ProjectMember) {
+  return member.account || member.user_id
+}
+
+function joinedTime(member: ProjectMember) {
+  const timestamp = Date.parse(member.joined_at ?? '')
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function memberPresenceRank(member: ProjectMember) {
+  if (member.is_banned) return 5
+  if (member.is_muted) return 4
+  const status = memberPresenceStatus(member)
+  if (status === 'online') return 1
+  if (status === 'idle') return 2
+  if (status === 'dnd') return 3
+  return 6
+}
+
+function memberStatusDetail(member: ProjectMember) {
+  if (member.is_banned || member.is_muted) return memberModerationSummary(member)
+  return member.activity || member.custom_status || memberRoleSummary(member)
+}
+
+function projectMemberBatchNote(action: ProjectMemberBatchAction) {
+  if (action === 'mute1h') return 'PC 成员管理页批量禁言 1 小时'
+  if (action === 'mute1d') return 'PC 成员管理页批量禁言 1 天'
+  if (action === 'unmute') return 'PC 成员管理页批量解禁言'
+  return 'PC 成员管理页批量移除'
 }
 
 function WorkspaceTab({ health, loading, channels, onRefresh, onOpenChannel }: {

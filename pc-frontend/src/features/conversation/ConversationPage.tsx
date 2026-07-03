@@ -1438,6 +1438,7 @@ export default function ConversationPage() {
           <div className={styles.memberActions}>
             <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowDirectory(true)}>目录</button>}
+            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => navigate(`/projects/${activeProjectId}/members`)}>成员页</button>}
             {activeProjectId && canInviteMembers && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => { setModerationFocusMemberId(''); setShowModeration(true) }}>管理</button>}
             {activeProjectId && canUseRoleManager && <button className={styles.memberInviteBtn} type="button" onClick={() => { setRoleFocusMemberId(''); setShowRoles(true) }}>角色</button>}
