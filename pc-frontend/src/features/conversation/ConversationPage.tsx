@@ -1615,10 +1615,14 @@ export default function ConversationPage() {
       )}
       {showDirectory && activeProjectId && (
         <MemberDirectoryDrawer
+          projectId={activeProjectId}
           members={members}
           channels={channels}
+          currentUserId={user?.id}
+          canManageMembers={canManageMembers}
           canManageRoles={canUseRoleManager}
           canModerate={canModerateMembers}
+          onSaved={reloadProjectSpace}
           onClose={() => setShowDirectory(false)}
           onOpenDetails={(member) => {
             setShowDirectory(false)

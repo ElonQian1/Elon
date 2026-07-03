@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { api } from '../../api/client'
 import { clean, formatTime } from '../../lib/utils'
 import type { Channel, ProjectMember } from './types'
 import {
@@ -16,6 +17,7 @@ import styles from './ConversationPage.module.css'
 
 type DirectoryFilter = 'all' | 'online' | 'offline' | 'restricted' | 'recent'
 type DirectorySort = 'status' | 'name' | 'joined'
+type DirectoryBatchAction = 'mute1h' | 'mute1d' | 'unmute' | 'remove'
 
 const DIRECTORY_FILTERS: Array<{ id: DirectoryFilter; label: string }> = [
   { id: 'all', label: '全部' },
@@ -31,20 +33,28 @@ const DIRECTORY_LIST_OVERSCAN = 6
 const DIRECTORY_LIST_MIN_WINDOW = 10
 
 export function MemberDirectoryDrawer({
+  projectId,
   members,
   channels,
+  currentUserId,
+  canManageMembers,
   canManageRoles,
   canModerate,
+  onSaved,
   onClose,
   onOpenDetails,
   onOpenConversations,
   onOpenRoles,
   onOpenModerationCenter,
 }: {
+  projectId: string
   members: ProjectMember[]
   channels: Channel[]
+  currentUserId?: string
+  canManageMembers?: boolean
   canManageRoles?: boolean
   canModerate?: boolean
+  onSaved?: () => Promise<void>
   onClose: () => void
   onOpenDetails?: (member: ProjectMember) => void
   onOpenConversations?: (member: ProjectMember) => void
@@ -57,6 +67,9 @@ export function MemberDirectoryDrawer({
   const [roleFilter, setRoleFilter] = useState('')
   const [listScrollTop, setListScrollTop] = useState(0)
   const [listHeight, setListHeight] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  const [batchBusy, setBatchBusy] = useState<DirectoryBatchAction | ''>('')
+  const [batchMessage, setBatchMessage] = useState('')
   const listRef = useRef<HTMLDivElement | null>(null)
   const stats = useMemo(() => memberDirectoryStats(members), [members])
   const roleOptions = useMemo(() => memberDirectoryRoles(members), [members])
@@ -75,6 +88,17 @@ export function MemberDirectoryDrawer({
   const listStart = Math.max(0, Math.floor(listScrollTop / DIRECTORY_ROW_HEIGHT) - DIRECTORY_LIST_OVERSCAN)
   const listEnd = Math.min(visibleMembers.length, listStart + listWindowSize)
   const virtualMembers = visibleMembers.slice(listStart, listEnd)
+  const canBatchManage = !!(projectId && (canModerate || canManageMembers))
+  const selectedMembers = useMemo(
+    () => members.filter((member) => selectedIds.has(member.user_id) && member.user_id !== currentUserId),
+    [members, selectedIds, currentUserId],
+  )
+  const selectableVisibleMembers = useMemo(
+    () => visibleMembers.filter((member) => member.user_id !== currentUserId),
+    [visibleMembers, currentUserId],
+  )
+  const selectedVisibleCount = selectableVisibleMembers.filter((member) => selectedIds.has(member.user_id)).length
+  const allVisibleSelected = selectableVisibleMembers.length > 0 && selectedVisibleCount === selectableVisibleMembers.length
 
   useEffect(() => {
     setListScrollTop(0)
@@ -95,6 +119,14 @@ export function MemberDirectoryDrawer({
     return () => observer.disconnect()
   }, [])
 
+  useEffect(() => {
+    const validIds = new Set(members.map((member) => member.user_id))
+    setSelectedIds((current) => {
+      const next = new Set(Array.from(current).filter((id) => validIds.has(id) && id !== currentUserId))
+      return next.size === current.size ? current : next
+    })
+  }, [members, currentUserId])
+
   function openDetails(member: ProjectMember) {
     onOpenDetails?.(member)
     onClose()
@@ -113,6 +145,65 @@ export function MemberDirectoryDrawer({
   function openModeration(member?: ProjectMember) {
     onOpenModerationCenter?.(member)
     onClose()
+  }
+
+  function toggleMemberSelection(member: ProjectMember) {
+    if (!canBatchManage || member.user_id === currentUserId) return
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(member.user_id)) next.delete(member.user_id)
+      else next.add(member.user_id)
+      return next
+    })
+    setBatchMessage('')
+  }
+
+  function toggleVisibleSelection() {
+    if (!canBatchManage || selectableVisibleMembers.length === 0) return
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      selectableVisibleMembers.forEach((member) => {
+        if (allVisibleSelected) next.delete(member.user_id)
+        else next.add(member.user_id)
+      })
+      return next
+    })
+    setBatchMessage('')
+  }
+
+  async function runBatchAction(action: DirectoryBatchAction) {
+    if (!projectId || batchBusy) return
+    const targets = selectedMembers.filter((member) => member.user_id !== currentUserId)
+    if (targets.length === 0) {
+      setBatchMessage('请先选择要处理的成员')
+      return
+    }
+    if (action === 'remove' && !canManageMembers) return
+    if (action !== 'remove' && !canModerate) return
+    if (action === 'remove' && !window.confirm(`确定要将 ${targets.length} 位成员移出项目吗？`)) return
+
+    setBatchBusy(action)
+    setBatchMessage(`正在处理 ${targets.length} 位成员...`)
+    try {
+      for (const member of targets) {
+        if (action === 'remove') {
+          await api.delete(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(member.user_id)}`)
+        } else {
+          await api.patch(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(member.user_id)}/moderation`, {
+            action: action === 'unmute' ? 'unmute' : 'mute',
+            duration_minutes: action === 'mute1d' ? 1440 : action === 'mute1h' ? 60 : undefined,
+            note: batchActionNote(action),
+          })
+        }
+      }
+      setSelectedIds(new Set())
+      setBatchMessage(`已批量更新 ${targets.length} 位成员`)
+      await onSaved?.()
+    } catch (err) {
+      setBatchMessage((err as { message?: string }).message ?? '批量操作失败')
+    } finally {
+      setBatchBusy('')
+    }
   }
 
   return (
@@ -170,6 +261,73 @@ export function MemberDirectoryDrawer({
             {filter !== 'all' ? ` · ${DIRECTORY_FILTERS.find((item) => item.id === filter)?.label ?? filter}` : ''}
           </div>
 
+          {canBatchManage && (
+            <section className={styles.memberDirectoryBatchBar}>
+              <div className={styles.memberDirectoryBatchCopy}>
+                <strong>批量管理</strong>
+                <span>{selectedMembers.length > 0 ? `已选择 ${selectedMembers.length} 位成员` : '勾选成员后批量禁言、解禁言或移出项目'}</span>
+              </div>
+              <div className={styles.memberDirectoryBatchActions}>
+                <button
+                  className={styles.drawerCloseBtn}
+                  type="button"
+                  disabled={selectableVisibleMembers.length === 0 || !!batchBusy}
+                  onClick={toggleVisibleSelection}
+                >
+                  {allVisibleSelected ? '取消当前' : '选择当前'}
+                </button>
+                <button
+                  className={styles.drawerCloseBtn}
+                  type="button"
+                  disabled={selectedMembers.length === 0 || !!batchBusy}
+                  onClick={() => setSelectedIds(new Set())}
+                >
+                  清空
+                </button>
+                {canModerate && (
+                  <>
+                    <button
+                      className={styles.drawerCloseBtn}
+                      type="button"
+                      disabled={selectedMembers.length === 0 || !!batchBusy}
+                      onClick={() => runBatchAction('mute1h')}
+                    >
+                      禁言 1 小时
+                    </button>
+                    <button
+                      className={styles.drawerCloseBtn}
+                      type="button"
+                      disabled={selectedMembers.length === 0 || !!batchBusy}
+                      onClick={() => runBatchAction('mute1d')}
+                    >
+                      禁言 1 天
+                    </button>
+                    <button
+                      className={styles.drawerCloseBtn}
+                      type="button"
+                      disabled={selectedMembers.length === 0 || !!batchBusy}
+                      onClick={() => runBatchAction('unmute')}
+                    >
+                      解禁言
+                    </button>
+                  </>
+                )}
+                {canManageMembers && (
+                  <button
+                    className={styles.drawerCloseBtn}
+                    type="button"
+                    data-danger="true"
+                    disabled={selectedMembers.length === 0 || !!batchBusy}
+                    onClick={() => runBatchAction('remove')}
+                  >
+                    批量移除
+                  </button>
+                )}
+              </div>
+              {batchMessage && <p>{batchMessage}</p>}
+            </section>
+          )}
+
           <div
             ref={listRef}
             className={styles.memberDirectoryList}
@@ -184,8 +342,11 @@ export function MemberDirectoryDrawer({
                       <MemberDirectoryRow
                         member={member}
                         channels={channels}
+                        canSelect={canBatchManage && member.user_id !== currentUserId}
+                        selected={selectedIds.has(member.user_id)}
                         canManageRoles={canManageRoles}
                         canModerate={canModerate}
+                        onToggleSelected={toggleMemberSelection}
                         onOpenDetails={openDetails}
                         onOpenConversations={onOpenConversations ? openConversations : undefined}
                         onOpenRoles={canManageRoles && onOpenRoles ? openRoles : undefined}
@@ -206,8 +367,11 @@ export function MemberDirectoryDrawer({
 function MemberDirectoryRow({
   member,
   channels,
+  canSelect,
+  selected,
   canManageRoles,
   canModerate,
+  onToggleSelected,
   onOpenDetails,
   onOpenConversations,
   onOpenRoles,
@@ -215,8 +379,11 @@ function MemberDirectoryRow({
 }: {
   member: ProjectMember
   channels: Channel[]
+  canSelect?: boolean
+  selected?: boolean
   canManageRoles?: boolean
   canModerate?: boolean
+  onToggleSelected?: (member: ProjectMember) => void
   onOpenDetails: (member: ProjectMember) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenRoles?: (member: ProjectMember) => void
@@ -227,7 +394,18 @@ function MemberDirectoryRow({
   const joined = member.joined_at ? formatTime(member.joined_at) : '未知'
   const state = member.is_banned ? 'banned' : member.is_muted ? 'muted' : status
   return (
-    <article className={styles.memberDirectoryRow} data-state={state}>
+    <article className={styles.memberDirectoryRow} data-state={state} data-selectable={canSelect ? 'true' : undefined} data-selected={selected ? 'true' : undefined}>
+      {canSelect && (
+        <label className={styles.memberDirectorySelect} title={`选择 ${memberName(member)}`}>
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelected?.(member)}
+            onClick={(event) => event.stopPropagation()}
+            aria-label={`选择 ${memberName(member)}`}
+          />
+        </label>
+      )}
       <span className={[styles.memberAvatar, directoryAvatarClass(status)].join(' ')}>
         {member.avatar_data_url
           ? <img src={member.avatar_data_url} alt="" />
@@ -343,6 +521,13 @@ function visibleChannelCount(member: ProjectMember, channels: Channel[]) {
 
 function memberName(member: ProjectMember) {
   return member.account || member.user_id
+}
+
+function batchActionNote(action: DirectoryBatchAction) {
+  if (action === 'mute1h') return 'PC 成员目录批量禁言 1 小时'
+  if (action === 'mute1d') return 'PC 成员目录批量禁言 1 天'
+  if (action === 'unmute') return 'PC 成员目录批量解禁言'
+  return 'PC 成员目录批量移除'
 }
 
 function joinedTime(member: ProjectMember) {
