@@ -346,7 +346,7 @@ PC 工作区的本地路径只代表“当前执行位置”，不能作为长�
 
 2. `聊天记忆`
    - `projects.source_type = 'chat_memory'`
-   - PC/Web/APK 的普通聊天归档到这个项目。
+   - PC/Web/APK 的非项目执行类问答、偏好和长期聊天记忆归档到这个项目。
    - `/api/llm/chat` 传 `scope = "chat_memory"` 时，服务端自动确保该项目存在，并把会话写入该项目。
 
 3. 用户新建或打开的真实项目
@@ -370,7 +370,7 @@ users.id
     node_id + workspace_path -> PC 节点真实目录
 ```
 
-`user_memories` 必须支持 `scope_type + scope_id`。读取上下文时合并全局记忆和当前作用域记忆；写入时只写当前作用域，避免悬浮球、普通聊天和项目开发互相污染。
+`user_memories` 必须支持 `scope_type + scope_id`。读取上下文时合并全局记忆和当前作用域记忆；写入时只写当前作用域，避免悬浮球、聊天记忆和项目执行互相污染。
 
 ## 6. PC 节点如何建立 Git
 

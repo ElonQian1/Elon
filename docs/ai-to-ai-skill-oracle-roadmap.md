@@ -39,8 +39,8 @@
 当前已经具备：
 
 - 一龙 AI 多轮会话和项目上下文。
-- `intent_router` 的聊天/开发安全分流。
-- Codex 轻量意图确认，避免普通聊天误触发重型开发。
+- `intent_router` 的多路线辅助分流。
+- Codex 轻量意图确认作为可选保护层，用于未显式选定路线时避免非执行类项目问答误进入构建、发布或代码修改。
 - Group AI Coordinator、Matter 计划、Bot 选择、节点授权和执行记录。
 - Context compiler、repo map、符号索引、task pack、验证和修复线索。
 - 项目频道、任务、artifact、审批、计费和发布链路。

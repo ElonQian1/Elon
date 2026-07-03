@@ -2,19 +2,23 @@
 
 ## 目标
 
-用户入口会同时来自 Web、APK，未来还可能来自 Windows 客户端。入口可以不同，但服务端需要先判断“这句话要用哪种能力”，再选择具体模型或执行管线。
+用户入口会同时来自 Web、APK，未来还可能来自 Windows 客户端。入口可以不同，但服务端需要先判断“本轮选择哪条能力路线”，再选择具体模型或执行管线。
 
 本模块把分流规则集中在 `server/src/intent_router.rs`，避免在 Web、APK、项目会话、CLI fallback 等不同路径里重复写关键词判断。
 
-长期上，能力路由不只区分聊天和代码开发，还要识别用户当前处于“产品讨论、demo 预演、Skill 规划、正式开发、验收发布”中的哪个阶段。现有 `intent_router` 继续承担安全分流；总调度 AI 在其后负责需求成熟度判断和 Skill 选择，不能让低成本分类模型直接获得写代码或发布权限。
+长期上，能力路由不是“普通聊天优先 vs 开发任务”的二分，而是多条并行路线的选择：项目 CLI 透传、项目执行、产品讨论、demo 预演、Skill 规划、验收发布、图片/资产旁路、非执行类项目问答等都可以是合法路线。`intent_router` 只是在未显式指定路线时提供确定性辅助；总调度 AI 在其后负责需求成熟度判断和 Skill 选择，不能让低成本分类模型直接获得写代码或发布权限。
+
+当用户或产品功能已经显式选择 Route A / passthrough / plan / Route B/C 等路线时，显式路线优先。不能因为用户消息很短、像问候、像解释性问题，就自动把本轮改判为“普通聊天/轻量聊天”。“轻量问答”只是并行能力之一，不是项目会话的默认产品重心。
 
 ## 当前能力矩阵
 
-| 能力路线 | 代码枚举 | 主要执行者 | 适合请求 |
-| --- | --- | --- | --- |
-| 普通聊天 | `CapabilityRoute::ChatAgent` | Codex CLI only（当前测试期强制） | 闲聊、解释、配置问题、模型选择说明 |
-| 代码/项目开发 | `CapabilityRoute::CodeAgent` | Codex CLI only（当前测试期强制） | App、Web、服务端、APK、部署、修复、重构 |
-| 图片处理（测试期） | `CapabilityRoute::CodeAgent` | Codex CLI only | “画一张图”“生成头像/海报/壁纸”“生成 App 图标并替换” |
+| 能力路线 | 代码枚举/模式 | 主要执行者 | 适合请求 | 权重说明 |
+| --- | --- | --- | --- | --- |
+| 项目 CLI 透传 / Route A 直连 | `AiCliRequestMode::Passthrough` + Route A | 用户 PC 上已登录的 Codex / Copilot / Claude CLI | 用户明确选择“直连本机 CLI”“强制 Codex”“按项目上下文完整交给 CLI” | 一等路线；即使输入很短也不降级为轻量问答 |
+| 项目执行 / 开发 | `CapabilityRoute::CodeAgent` | Codex CLI only（当前测试期强制） | App、Web、服务端、APK、部署、修复、重构 | 一等路线；需要项目队列、worktree、命令、文件和验证过程 |
+| 规划 / 预演 / Skill 路线 | 目标阶段枚举 | 一龙会话主 AI、预言家 AI、Skill Router | 产品讨论、demo、Matter、预算、风险、验收标准 | 一等路线；用于正式开发前的决策和确认 |
+| 非执行类项目问答（可选） | `CapabilityRoute::ChatAgent` | Codex CLI only（当前测试期强制） | 不需要项目执行的说明、配置、能力讨论、模型选择说明 | 并行路线之一；不能作为项目会话的默认重心 |
+| 图片处理（测试期） | `CapabilityRoute::CodeAgent` | Codex CLI only | “画一张图”“生成头像/海报/壁纸”“生成 App 图标并替换” | 当前测试期仍交给 Codex CLI；后续可恢复图片旁路 |
 
 ## 目标能力阶段
 
@@ -30,7 +34,7 @@
 
 ## 意图类型
 
-`UserIntent` 是用户语义，`CapabilityRoute` 是执行路线。
+`UserIntent` 是用户语义，`CapabilityRoute` / Route A/B/C / passthrough / plan 等是执行路线。语义分类不能覆盖用户或产品功能已经显式选择的路线。
 
 | 意图 | 执行路线 | 是否需要图片 | 是否需要改代码 |
 | --- | --- | --- | --- |
@@ -43,16 +47,19 @@
 
 ## 运行顺序
 
-1. `agent::run_dispatch_with_workspace` 先调用 `intent_router::classify(user_message)`。
-2. 当前默认启用 `AI_CODEX_CLI_ONLY=true`，不论路由结果是普通聊天、模型配置、图片处理还是项目开发，默认执行后端都会被锁定为 Codex CLI；用户显式保存自带 API Key 的 BYOK 配置时，可作为例外走 API Agent。
-3. Codex CLI only 只表示“主执行者是 Codex CLI”，不表示每句话都走重型开发流程。`ChatAgent` 普通聊天继续绑定同一个 Codex CLI 原生 session，但使用轻量聊天 prompt，不做 Git 检查、不读项目文档、不修改文件、不注入发布规则。
-4. 只有 `CodeAgent`、图片转项目资产、编译、部署、发布、代码修改等开发路线，才进入项目队列并注入通用项目工作流和强制 Git/文档/验证规则。普通聊天不能抢项目锁，也不能在进入 agent 前触发 `git pull`。
-5. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex 预设 `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型；唯一例外是 `AI_USER_BYOK_API_ENABLED=true` 时用户自己保存的自定义 API base/key/model。
-6. 需要恢复多模型路由时，必须显式设置 `AI_CODEX_CLI_ONLY=false`，并同步检查 APK 模型选择 UI、服务端 fallback 和本文档。
+1. 先读取产品功能、用户设置和 API 参数里是否已经显式指定 Route A/B/C、passthrough、plan、图片、项目执行等路线。
+2. 如果路线已经显式指定，按该路线执行；`intent_router` 只能做补充解释和安全校验，不能把本轮改判到另一条路线。
+3. 未显式指定路线时，`agent::run_dispatch_with_workspace` 再调用 `intent_router::classify(user_message)` 选择默认路线。
+4. 当前默认启用 `AI_CODEX_CLI_ONLY=true`，不论路线结果是非执行类项目问答、模型配置、图片处理还是项目开发，默认执行后端都会被锁定为 Codex CLI；用户显式保存自带 API Key 的 BYOK 配置时，可作为例外走 API Agent。
+5. Codex CLI only 只表示“主执行者是 Codex CLI”，不表示只有“轻量问答”和“重型开发”两种选择。Route A 直连、passthrough、plan、CodeAgent、ChatAgent 都是不同执行路线。
+6. `ChatAgent` / 轻量问答路线只服务于“明确不需要项目执行”的项目问答；它可以不做 Git 检查、不读项目文档、不修改文件、不注入发布规则。用户选择项目 CLI 透传时，不因为消息短就改走这条路线。
+7. 只有 `CodeAgent`、图片转项目资产、编译、部署、发布、代码修改等执行路线，才进入项目队列并注入通用项目工作流和强制 Git/文档/验证规则。非执行类项目问答不能抢项目锁，也不能在进入 agent 前触发 `git pull`。
+8. Codex CLI only 模式会忽略 APK/Web 传来的非 Codex 预设 `agent` 选择，并关闭 API fallback，避免 CLI 失败后切回 Hunyuan、TokenHub 或其他 API 模型；唯一例外是 `AI_USER_BYOK_API_ENABLED=true` 时用户自己保存的自定义 API base/key/model。
+9. 需要恢复多模型路由时，必须显式设置 `AI_CODEX_CLI_ONLY=false`，并同步检查 APK 模型选择 UI、服务端 fallback 和本文档。
 
-注意：当前的 `intent_router` 是服务端本地确定性规则，不是另一个 AI 模型。它只做安全分流，防止一句普通聊天误触发 `git pull`、构建或发布。默认情况下真正需要模型理解、回复、澄清和代码协作的环节都走 Codex CLI。用户 BYOK API Agent 是显式选择的例外；API fallback 默认关闭，未来恢复通用 API 旁路必须显式设置 `AI_ALLOW_API_FALLBACK=true`。
+注意：当前的 `intent_router` 是服务端本地确定性规则，不是另一个 AI 模型。它是路线辅助层，不是产品主线，也不是“普通聊天优先”的判断器。默认情况下真正需要模型理解、回复、澄清和代码协作的环节都走 Codex CLI。用户 BYOK API Agent 是显式选择的例外；API fallback 默认关闭，未来恢复通用 API 旁路必须显式设置 `AI_ALLOW_API_FALLBACK=true`。
 
-当本地规则怀疑消息需要进入开发流程时，不能立刻抢项目锁或执行 Git 操作。服务端必须先调用同一个 Codex CLI 原生 session 做一次轻量意图确认：Codex 高置信返回 `development` 才进入强流程；返回 `chat` 或置信度不足时，直接使用本次 Codex 轻量确认给出的 `chat_reply` 回复，避免普通聊天被误判后等待很久。这个轻量确认器在返回 `chat` 时也要尽量正常回答用户的问题，只有确实看不懂时才追问，不应因为消息里出现 APK、项目、服务器或 Git 就要求用户重说。若 Codex 已判定为 `chat`，但 `chat_reply` 仍是低价值澄清句，服务端可以用固定护栏回复兜底，确保用户得到“这不会进入开发流程”的及时反馈。例如“APK 是否支持多个手机登录/并行修改/会不会冲突”属于能力和流程讨论，应该按 chat 回答；只有“现在帮我改代码、打包、发布、提交、推送”才进入 development。
+只有在未显式指定执行路线，且本地规则怀疑消息可能需要进入开发流程时，才需要先做轻量意图确认，避免非执行类项目问答误进入 `git pull`、构建或发布。服务端可以调用同一个 Codex CLI 原生 session 做一次确认：Codex 高置信返回 `development` 才进入强流程；返回 `chat` 或置信度不足时，直接使用本次确认给出的 `chat_reply` 回复。这个确认器在返回 `chat` 时也要尽量正常回答用户的问题，只有确实看不懂时才追问，不应因为消息里出现 APK、项目、服务器或 Git 就要求用户重说。例如“APK 是否支持多个手机登录/并行修改/会不会冲突”属于能力和流程讨论，可以按非执行类项目问答回答；只有“现在帮我改代码、打包、发布、提交、推送”才进入 development。
 
 ## 多模型旁路原则
 
@@ -69,10 +76,11 @@
 
 可以引入低价 token 的分类模型，但它应该是“补充层”，不是唯一判断来源。建议顺序：
 
-1. 先跑 `intent_router` 的确定性规则。
-2. 当置信度低于阈值，例如 `< 70`，再调用低价分类模型。
-3. 分类模型只输出结构化 JSON，不直接决定执行。
-4. 服务端再用能力矩阵做最终校验，防止模型把不能执行的能力误分出去。
+1. 先读取用户或产品功能是否显式指定路线。
+2. 未显式指定时，再跑 `intent_router` 的确定性规则。
+3. 当置信度低于阈值，例如 `< 70`，再调用低价分类模型。
+4. 分类模型只输出结构化 JSON，不直接决定执行。
+5. 服务端再用能力矩阵做最终校验，防止模型把不能执行的能力误分出去。
 
 预言家 AI 可以复用低价模型，但它不是纯分类器。分类器只回答“当前属于什么阶段”；预言家 AI 要基于总调度 AI 的需求摘要生成可讨论 demo。两者都不能绕过确定性安全规则、项目权限和 Matter 审批。
 
@@ -93,7 +101,10 @@
 - 新增能力时，优先扩展 `server/src/intent_router.rs`，不要在 `agent.rs`、Web handler 或 APK handler 里复制分流逻辑。
 - 新增意图必须添加单元测试，至少覆盖正例、近似反例、和混合意图。
 - Web、APK、未来 Win 端都只负责采集用户输入和展示结果，不承担核心能力分流。
-- 当前 Codex CLI only 模式下，用户历史保存的聊天模型配置不能覆盖任何能力路线；普通聊天、意图后的执行和开发协作都只走 Codex CLI，但普通聊天必须使用轻量 prompt，不能触发 Git/构建/发布强流程。
+- 讨论问题时先确认当前功能选择的路线。不要把“普通聊天 / 轻量聊天 / 避免误触发重型开发流程”当成默认主线或优先建议；它只是非执行类项目问答路线的安全约束。
+- 文档、UI、诊断文案优先使用具体路线名：项目 CLI 透传、Route A 直连、项目执行、规划/预演、非执行类项目问答。少用“普通聊天/闲聊”作为项目会话的总称。
+- 当前 Codex CLI only 模式下，用户历史保存的聊天模型配置不能覆盖任何能力路线；项目 CLI 透传、意图后的执行、非执行类项目问答和开发协作都只走 Codex CLI。
+- 如果用户或功能显式选择 Route A / passthrough / plan / Route B/C，就尊重该路线，不因为消息短、像问候或像解释性问题而改走轻量问答。
 - 多模型恢复后，任何非 Codex 模型都只能作为旁路证据源；它的结论必须写回统一会话记录，并作为后续提示输入到对应 Codex CLI session。
 - 测试期图片请求必须继续走 Codex CLI；恢复独立图片模型前，需要同步更新路由、测试和本文档。
 - 如果新增低价分类模型，请把它放在 `intent_router` 的低置信度补充层，并保留确定性规则作为第一道门。
