@@ -80,6 +80,7 @@ mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
+mod node_agent_cloud_net;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
 mod node_agent_codex_vault;
@@ -300,10 +301,7 @@ async fn provision_node(
         "{}/api/me/nodes/register",
         cfg.cloud_http_url.trim_end_matches('/')
     );
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .unwrap_or_default();
+    let client = node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15));
     let mut body = serde_json::json!({ "label": machine_label() });
     if let Some(creds) = existing {
         body["existing_agent_id"] = serde_json::Value::String(creds.agent_id.clone());
@@ -350,10 +348,7 @@ async fn cloud_login(cfg: &NodeConfig, account: &str, password: &str) -> Result<
         "{}/api/auth/login",
         cfg.cloud_http_url.trim_end_matches('/')
     );
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .unwrap_or_default();
+    let client = node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15));
     let resp = client
         .post(&url)
         .json(&serde_json::json!({
@@ -3337,12 +3332,13 @@ async fn run_agent_runtime() -> Result<()> {
             }
         }
     }
-    node_agent_proxy::ensure_localhost_no_proxy();
     tracing_subscriber::fmt()
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
         .init();
 
     let cfg = NodeConfig::from_env()?;
+    node_agent_proxy::ensure_localhost_no_proxy();
+    node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
     let persisted = load_persisted();
     let storage_settings = initial_storage_settings(&persisted);
     let mut creds = initial_credentials(&persisted);
@@ -4178,6 +4174,7 @@ async fn admin_status(
             "stale": cli_probe.is_stale(),
         },
         "download_router": node_agent_download_router::status_payload(),
+        "cloud_network": node_agent_cloud_net::status_payload(&rt.cfg.cloud_url, &rt.cfg.cloud_http_url),
         "codex_vault": node_agent_codex_vault::local_status_payload(),
         "codex_cli": codex_cli,
         "allowed_clis": available_clis,
@@ -4404,10 +4401,7 @@ async fn admin_register_project(
         "landing": project_landing::load_workspace_landing(pb),
         "dev_profile": req.dev_profile,
     });
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .unwrap_or_default();
+    let client = node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15));
     match client
         .post(&url)
         .bearer_auth(&token)

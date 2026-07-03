@@ -38,11 +38,18 @@ use crate::types::AppState;
 // ── manager state ────────────────────────────────────────────────────────────
 
 const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
-const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
+const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(40);
+const AGENT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
+const AGENT_HEARTBEAT_ACK_TIMEOUT: Duration = Duration::from_secs(8);
+const AGENT_DISPATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSPECT_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
+
+#[cfg(test)]
+#[path = "homecli_agent_tests.rs"]
+mod homecli_agent_tests;
 
 /// Snapshot of one connected PC agent.
 #[derive(Clone)]
@@ -63,6 +70,8 @@ pub struct AgentEntry {
     pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
     /// One-shot ACK waiters keyed by req_id + approval_id + dispatch_id.
     approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+    /// One-shot protocol ping waiters keyed by nonce.
+    ping_acks: Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>,
     /// Signals the session reader/writer to close when a newer connection replaces it.
     session_shutdown: watch::Sender<bool>,
 }
@@ -178,19 +187,32 @@ impl AgentManager {
         prompt: String,
     ) -> Result<CliPromptDispatch> {
         let req_id = Uuid::new_v4().to_string();
-        let agents = self.agents.read().await;
-        let agent = agents
-            .get(agent_id)
-            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (cmd_tx, pending, ping_acks) = {
+            let agents = self.agents.read().await;
+            let agent = agents
+                .get(agent_id)
+                .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+            (
+                agent.cmd_tx.clone(),
+                agent.pending.clone(),
+                agent.ping_acks.clone(),
+            )
+        };
+        if let Err(error) =
+            send_protocol_ping(agent_id, &cmd_tx, &ping_acks, AGENT_DISPATCH_PROBE_TIMEOUT).await
+        {
+            let _ = self
+                .close_agent_session(agent_id, "dispatch probe failed")
+                .await;
+            return Err(anyhow!("agent not connected: {agent_id} ({error})"));
+        }
         let (tx, rx) = mpsc::unbounded_channel();
-        let pending = agent.pending.clone();
         pending.lock().await.insert(req_id.clone(), tx);
         let cancel_handle = CliPromptCancelHandle {
             req_id: req_id.clone(),
-            cmd_tx: agent.cmd_tx.clone(),
+            cmd_tx: cmd_tx.clone(),
         };
-        if let Err(error) = agent
-            .cmd_tx
+        if let Err(error) = cmd_tx
             .send(ServerToAgent::CliPrompt {
                 req_id: req_id.clone(),
                 cli,
@@ -296,15 +318,17 @@ impl AgentManager {
                     entry.session_shutdown.clone(),
                     entry.pending.clone(),
                     entry.approval_acks.clone(),
+                    entry.ping_acks.clone(),
                 )
             })
         };
-        let Some((session_id, shutdown, pending, approval_acks)) = shutdown else {
+        let Some((session_id, shutdown, pending, approval_acks, ping_acks)) = shutdown else {
             return false;
         };
         tracing::warn!(%agent_id, %session_id, %reason, "closing PC agent session");
         fail_pending_requests(&pending, reason).await;
         fail_pending_approvals(&approval_acks).await;
+        fail_pending_pings(&ping_acks).await;
         let _ = shutdown.send(true);
         true
     }
@@ -880,6 +904,8 @@ async fn run_agent_session(
         Arc::new(Mutex::new(HashMap::new()));
     let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let ping_acks: Arc<Mutex<HashMap<String, oneshot::Sender<()>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
     let (session_shutdown, session_shutdown_rx) = watch::channel(false);
     let entry = AgentEntry {
         session_id: session_id.clone(),
@@ -898,6 +924,7 @@ async fn run_agent_session(
         cmd_tx: cmd_tx.clone(),
         pending: pending.clone(),
         approval_acks: approval_acks.clone(),
+        ping_acks: ping_acks.clone(),
         session_shutdown: session_shutdown.clone(),
     };
 
@@ -915,6 +942,7 @@ async fn run_agent_session(
             // 通知旧连接的所有挂起请求立即失败
             fail_pending_requests(&old_entry.pending, "节点重新注册，旧连接已关闭").await;
             fail_pending_approvals(&old_entry.approval_acks).await;
+            fail_pending_pings(&old_entry.ping_acks).await;
             let _ = old_entry.session_shutdown.send(true);
         }
         agents.insert(agent_id.clone(), entry);
@@ -941,28 +969,29 @@ async fn run_agent_session(
         )
         .await;
 
-    // 服务端 → 节点 ping 定时器：每 30s 发一次 ServerToAgent::Ping。
-    // 只有节点回 Pong 或发送其他消息时才刷新 TTL，避免僵尸连接被误判在线。
+    // 服务端 → 节点 ping 定时器：短间隔 Ping，并要求 Pong ACK。
+    // 普通家庭/办公网络会静默丢弃空闲 TCP；没有 ACK 就主动摘掉会话，
+    // 避免下一次用户请求先撞上“假在线”旧连接。
     {
         let ping_tx = cmd_tx.clone();
+        let ping_acks = ping_acks.clone();
+        let shutdown = session_shutdown.clone();
         let aid = agent_id.clone();
         let mut shutdown_rx = session_shutdown_rx.clone();
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(30));
-            let mut nonce: u64 = 0;
+            let mut interval = tokio::time::interval(AGENT_HEARTBEAT_INTERVAL);
             loop {
                 tokio::select! {
                     _ = shutdown_rx.changed() => break,
                     _ = interval.tick() => {}
                 }
-                nonce += 1;
-                if ping_tx
-                    .send(ServerToAgent::Ping {
-                        nonce: Some(nonce.to_string()),
-                    })
-                    .is_err()
+                if let Err(error) =
+                    send_protocol_ping(&aid, &ping_tx, &ping_acks, AGENT_HEARTBEAT_ACK_TIMEOUT)
+                        .await
                 {
-                    break; // 连接已断开
+                    tracing::warn!(agent_id = %aid, error = %error, "agent heartbeat failed");
+                    let _ = shutdown.send(true);
+                    break;
                 }
                 tracing::trace!(agent_id = %aid, "agent ping sent");
             }
@@ -1000,6 +1029,7 @@ async fn run_agent_session(
     // Reader: route AgentToServer events to the right pending task.
     let pending_r = pending.clone();
     let approval_acks_r = approval_acks.clone();
+    let ping_acks_r = ping_acks.clone();
     let mut reader_shutdown_rx = session_shutdown_rx.clone();
     let read_result: Result<()> = async {
         loop {
@@ -1123,7 +1153,12 @@ async fn run_agent_session(
                                         )
                                         .await;
                                 }
-                                AgentToServer::Pong { .. } => {
+                                AgentToServer::Pong { nonce } => {
+                                    if let Some(nonce) = nonce.as_deref() {
+                                        if let Some(tx) = ping_acks_r.lock().await.remove(nonce) {
+                                            let _ = tx.send(());
+                                        }
+                                    }
                                     state.node_registry.touch(&agent_id).await;
                                 }
                                 _ => {}
@@ -1182,6 +1217,9 @@ async fn run_agent_session(
     {
         fail_pending_approvals(&approval_acks).await;
     }
+    {
+        fail_pending_pings(&ping_acks).await;
+    }
 
     drop(cmd_tx);
     let _ = writer.await;
@@ -1192,6 +1230,38 @@ async fn run_agent_session(
 fn tool_approval_ack_key(req_id: &str, approval_id: &str, dispatch_id: &str) -> String {
     format!("{req_id}:{approval_id}:{dispatch_id}")
 }
+
+async fn send_protocol_ping(
+    agent_id: &str,
+    cmd_tx: &mpsc::UnboundedSender<ServerToAgent>,
+    ping_acks: &Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>,
+    timeout: Duration,
+) -> Result<()> {
+    let nonce = Uuid::new_v4().to_string();
+    let (ack_tx, ack_rx) = oneshot::channel();
+    ping_acks.lock().await.insert(nonce.clone(), ack_tx);
+    if cmd_tx
+        .send(ServerToAgent::Ping {
+            nonce: Some(nonce.clone()),
+        })
+        .is_err()
+    {
+        ping_acks.lock().await.remove(&nonce);
+        return Err(anyhow!("agent writer closed before ping: {agent_id}"));
+    }
+    match tokio::time::timeout(timeout, ack_rx).await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(_)) => Err(anyhow!("agent ping waiter closed: {agent_id}")),
+        Err(_) => {
+            ping_acks.lock().await.remove(&nonce);
+            Err(anyhow!(
+                "agent ping ack timeout after {}s: {agent_id}",
+                timeout.as_secs()
+            ))
+        }
+    }
+}
+
 async fn fail_pending_requests(
     pending: &Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
     message: &str,
@@ -1225,6 +1295,11 @@ async fn fail_pending_approvals(
     for (_, sender) in stale {
         let _ = sender.send(false);
     }
+}
+
+async fn fail_pending_pings(ping_acks: &Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>) {
+    let mut ping_acks = ping_acks.lock().await;
+    ping_acks.clear();
 }
 
 fn project_workspace_provision_timeout() -> Duration {
@@ -1421,200 +1496,4 @@ pub async fn test_cli_prompt(
         error,
     })
     .into_response()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    struct TestApprovalAgent {
-        manager: Arc<AgentManager>,
-        cmd_rx: mpsc::UnboundedReceiver<ServerToAgent>,
-        pending_rx: mpsc::UnboundedReceiver<AgentToServer>,
-        approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
-        session_shutdown_rx: watch::Receiver<bool>,
-    }
-
-    async fn registered_approval_agent() -> TestApprovalAgent {
-        let manager = Arc::new(AgentManager::new());
-        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
-        let (session_shutdown, session_shutdown_rx) = watch::channel(false);
-        let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
-            Arc::new(Mutex::new(HashMap::new()));
-        let (pending_tx, pending_rx) = mpsc::unbounded_channel();
-        pending.lock().await.insert("req".to_string(), pending_tx);
-        manager.agents.write().await.insert(
-            "agent".to_string(),
-            AgentEntry {
-                session_id: "session".to_string(),
-                agent_id: "agent".to_string(),
-                version: "test".to_string(),
-                device_name: None,
-                hardware: None,
-                storage: None,
-                dev_runtime: None,
-                allowed_clis: Vec::new(),
-                allowed_cwds: Vec::new(),
-                connected_at: 0,
-                cmd_tx,
-                pending,
-                approval_acks: approval_acks.clone(),
-                session_shutdown,
-            },
-        );
-        TestApprovalAgent {
-            manager,
-            cmd_rx,
-            pending_rx,
-            approval_acks,
-            session_shutdown_rx,
-        }
-    }
-
-    #[test]
-    fn cli_prompt_cancel_handle_sends_cancel_for_req_id() {
-        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();
-        let handle = CliPromptCancelHandle {
-            req_id: "req-123".to_string(),
-            cmd_tx,
-        };
-
-        assert!(handle.cancel());
-        match cmd_rx.try_recv() {
-            Ok(ServerToAgent::Cancel { task_id }) => assert_eq!(task_id, "req-123"),
-            other => panic!("expected cancel message, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn tool_approval_decision_waits_for_matching_ack() {
-        let TestApprovalAgent {
-            manager,
-            mut cmd_rx,
-            approval_acks,
-            ..
-        } = registered_approval_agent().await;
-
-        let manager_for_send = manager.clone();
-        let send_task = tokio::spawn(async move {
-            manager_for_send
-                .send_tool_approval_decision("req", "tap_1_1", "approve")
-                .await
-        });
-        let dispatch_id = match cmd_rx.recv().await {
-            Some(ServerToAgent::ToolApprovalDecision {
-                req_id,
-                approval_id,
-                dispatch_id,
-                decision,
-            }) => {
-                assert_eq!(req_id, "req");
-                assert_eq!(approval_id, "tap_1_1");
-                assert_eq!(decision, "approve");
-                dispatch_id
-            }
-            other => panic!("expected tool approval decision, got {other:?}"),
-        };
-        let ack_key = tool_approval_ack_key("req", "tap_1_1", &dispatch_id);
-        let ack_tx = approval_acks
-            .lock()
-            .await
-            .remove(&ack_key)
-            .expect("ack waiter should be registered");
-        ack_tx.send(true).expect("ack receiver should be live");
-
-        assert!(send_task.await.unwrap().unwrap());
-    }
-
-    #[tokio::test]
-    async fn stale_tool_approval_ack_does_not_complete_new_dispatch() {
-        let TestApprovalAgent {
-            manager,
-            mut cmd_rx,
-            approval_acks,
-            ..
-        } = registered_approval_agent().await;
-
-        let manager_for_first = manager.clone();
-        let first_send = tokio::spawn(async move {
-            manager_for_first
-                .send_tool_approval_decision("req", "tap_1_1", "approve")
-                .await
-        });
-        let stale_dispatch_id = match cmd_rx.recv().await {
-            Some(ServerToAgent::ToolApprovalDecision { dispatch_id, .. }) => dispatch_id,
-            other => panic!("expected first tool approval decision, got {other:?}"),
-        };
-        let stale_key = tool_approval_ack_key("req", "tap_1_1", &stale_dispatch_id);
-        approval_acks
-            .lock()
-            .await
-            .remove(&stale_key)
-            .expect("first ack waiter should be registered");
-
-        let manager_for_retry = manager.clone();
-        let retry_send = tokio::spawn(async move {
-            manager_for_retry
-                .send_tool_approval_decision("req", "tap_1_1", "approve")
-                .await
-        });
-        let retry_dispatch_id = match cmd_rx.recv().await {
-            Some(ServerToAgent::ToolApprovalDecision { dispatch_id, .. }) => dispatch_id,
-            other => panic!("expected retry tool approval decision, got {other:?}"),
-        };
-        assert_ne!(stale_dispatch_id, retry_dispatch_id);
-
-        let stale_key = tool_approval_ack_key("req", "tap_1_1", &stale_dispatch_id);
-        assert!(
-            approval_acks.lock().await.remove(&stale_key).is_none(),
-            "stale ACK key must not match retry waiter"
-        );
-        let retry_key = tool_approval_ack_key("req", "tap_1_1", &retry_dispatch_id);
-        let retry_ack = approval_acks
-            .lock()
-            .await
-            .remove(&retry_key)
-            .expect("retry ack waiter should be registered");
-        retry_ack
-            .send(true)
-            .expect("retry ack receiver should be live");
-
-        assert!(retry_send.await.unwrap().unwrap());
-        assert!(first_send.await.unwrap().is_err());
-    }
-
-    #[tokio::test]
-    async fn close_agent_session_fails_pending_work_and_signals_shutdown() {
-        let TestApprovalAgent {
-            manager,
-            mut pending_rx,
-            approval_acks,
-            mut session_shutdown_rx,
-            ..
-        } = registered_approval_agent().await;
-        let (ack_tx, ack_rx) = oneshot::channel();
-        approval_acks.lock().await.insert("ack".to_string(), ack_tx);
-
-        assert!(
-            manager
-                .close_agent_session("agent", "test forced close")
-                .await
-        );
-        tokio::time::timeout(Duration::from_secs(1), session_shutdown_rx.changed())
-            .await
-            .expect("session shutdown signal should arrive")
-            .expect("shutdown sender should still be alive");
-        assert!(*session_shutdown_rx.borrow());
-
-        match pending_rx.recv().await {
-            Some(AgentToServer::CliDone { exit_ok, error, .. }) => {
-                assert!(!exit_ok);
-                assert_eq!(error.as_deref(), Some("test forced close"));
-            }
-            other => panic!("expected failed CliDone, got {other:?}"),
-        }
-        assert!(!ack_rx.await.expect("approval ack should be rejected"));
-    }
 }

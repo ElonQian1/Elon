@@ -25,10 +25,7 @@ pub(crate) async fn server_runtime_status_from_cloud(
             }),
         };
     };
-    let client = match reqwest::Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-    {
+    let client = match crate::node_agent_cloud_net::direct_cloud_client(Duration::from_secs(5)) {
         Ok(client) => client,
         Err(e) => {
             warn!("Route C 服务器模型预检无法创建 HTTP client: {e}");
