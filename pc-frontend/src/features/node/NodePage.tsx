@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { DownloadCloud, Settings, ShieldCheck, Trash2, UploadCloud } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
+import CodexVaultCard from './CodexVaultCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { safeNodeAdminUrl } from '../../lib/utils'
+import { useAuthStore } from '../../store/auth'
 import type {
   AutostartStatus,
-  CodexVaultLocalStatus,
   CodexVaultStatusResponse,
   LocalCliToolStatus,
   LocalNodeStatus,
@@ -173,6 +174,7 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
 
 /* ── 本机已连接时的管理面板（精简版） ── */
 function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initialStatus: LocalNodeStatus }) {
+  const token = useAuthStore((s) => s.token)
   const [status, setStatus] = useState(initialStatus)
   const [autostart, setAutostart] = useState<AutostartStatus | null>(null)
   const [autostartBusy, setAutostartBusy] = useState(false)
@@ -248,9 +250,16 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
 
   async function login() {
     setResult('绑定中…'); setError('')
+    const userToken = String(token ?? '').trim()
+    if (!userToken) {
+      setResult('')
+      setError('请先在 PC 工作台登录一龙账号，再绑定本机节点。')
+      return
+    }
     try {
-      await nodeApi(adminUrl, '/api/login', { method: 'POST', body: JSON.stringify({ token: '' }) })
+      await nodeApi(adminUrl, '/api/login', { method: 'POST', body: JSON.stringify({ token: userToken }) })
       setResult('本机节点已绑定当前账号。')
+      await refreshStatus(true)
       await loadCodexVaultStatus()
     } catch (err) { setError((err as Error).message) }
   }
@@ -612,141 +621,6 @@ function CodexStatusCard({
         )}
         <button className={styles.btn} onClick={onRefresh} disabled={busy}>
           重新检测
-        </button>
-      </div>
-    </section>
-  )
-}
-
-function formatVaultTime(value?: string | null): string {
-  if (!value) return '无'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleString()
-}
-
-function authStateText(auth?: CodexVaultLocalStatus['default_auth']): string {
-  if (!auth?.present) return '未找到'
-  if (auth.problem) return '读取异常'
-  if (auth.auth_mode && auth.auth_mode !== 'chatgpt') return auth.auth_mode
-  return auth.has_refresh_token ? 'ChatGPT / Pro' : '缺少 refresh_token'
-}
-
-function CodexVaultCard({
-  status,
-  cloud,
-  busy,
-  onBackup,
-  onRestore,
-  onClear,
-  onDeleteCloud,
-  onRefresh,
-}: {
-  status: CodexVaultLocalStatus | null
-  cloud?: CodexVaultStatusResponse['cloud']
-  busy: boolean
-  onBackup: () => void
-  onRestore: () => void
-  onClear: () => void
-  onDeleteCloud: () => void
-  onRefresh: () => void
-}) {
-  const vault = cloud?.vault
-  const cloudReady = !!vault?.configured
-  const bound = !!vault?.bound
-  const defaultAuth = status?.default_auth
-  const managedAuth = status?.managed_auth
-  const activeManaged = !!status?.active_home_managed
-  const canBackup = !!defaultAuth?.present
-    && defaultAuth.auth_mode !== 'api_key'
-    && !!defaultAuth.has_refresh_token
-  const canRestore = cloudReady && bound
-  const canClear = activeManaged || !!managedAuth?.present
-  const state = cloud?.error
-    ? '云端不可用'
-    : !cloud
-      ? '读取中'
-      : !cloudReady
-        ? '服务器未配置'
-        : bound
-          ? `已备份 v${vault?.credential_version ?? 1}`
-          : '未备份'
-  const stateTone = cloudReady && bound ? styles.vaultOnline : cloud?.error ? styles.vaultOffline : styles.vaultChecking
-  return (
-    <section className={styles.vaultCard}>
-      <div className={styles.vaultHead}>
-        <div>
-          <span className={styles.codexLabel}>Codex Pro 保险箱</span>
-          <h4>临时登录到陌生电脑</h4>
-        </div>
-        <span className={[styles.vaultState, stateTone].join(' ')}>{state}</span>
-      </div>
-      <div className={styles.vaultGrid}>
-        <div>
-          <span>默认 auth.json</span>
-          <strong>{authStateText(defaultAuth)}</strong>
-        </div>
-        <div>
-          <span>托管 CODEX_HOME</span>
-          <strong>{activeManaged ? '当前生效' : managedAuth?.present ? '已写入' : '未写入'}</strong>
-        </div>
-        <div>
-          <span>最近备份</span>
-          <strong>{formatVaultTime(vault?.last_backup_at)}</strong>
-        </div>
-        <div>
-          <span>最近租用</span>
-          <strong>{formatVaultTime(vault?.last_lease_at)}</strong>
-        </div>
-      </div>
-      {cloud?.error && <p className={styles.codexFixHint}>{cloud.error}</p>}
-      {defaultAuth?.problem && <p className={styles.codexFixHint}>{defaultAuth.problem}</p>}
-      {status?.managed_home && <code className={styles.codexPath}>{status.managed_home}</code>}
-      <div className={styles.vaultActions}>
-        <button
-          className={[styles.btn, styles.primary, styles.iconBtn].join(' ')}
-          onClick={onBackup}
-          disabled={busy || !canBackup}
-          title="把本机默认 Codex Pro 登录态加密备份到云端保险箱"
-        >
-          <UploadCloud size={15} strokeWidth={2.2} aria-hidden="true" />
-          备份本机登录
-        </button>
-        <button
-          className={[styles.btn, styles.iconBtn].join(' ')}
-          onClick={onRestore}
-          disabled={busy || !canRestore}
-          title="把云端保险箱凭据写入本机节点托管的临时 CODEX_HOME"
-        >
-          <DownloadCloud size={15} strokeWidth={2.2} aria-hidden="true" />
-          临时恢复
-        </button>
-        <button
-          className={[styles.btn, styles.iconBtn].join(' ')}
-          onClick={onClear}
-          disabled={busy || !canClear}
-          title="删除本机节点托管的临时 CODEX_HOME，不影响默认 auth.json"
-        >
-          <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
-          清理本机
-        </button>
-        <button
-          className={[styles.btn, styles.iconBtn].join(' ')}
-          onClick={onDeleteCloud}
-          disabled={busy || !bound}
-          title="删除云端保险箱中的 Codex Pro 备份，不影响本机文件"
-        >
-          <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
-          删除云端
-        </button>
-        <button
-          className={[styles.btn, styles.iconBtn].join(' ')}
-          onClick={onRefresh}
-          disabled={busy}
-          title="刷新 Codex Pro 保险箱状态"
-        >
-          <ShieldCheck size={15} strokeWidth={2.2} aria-hidden="true" />
-          刷新
         </button>
       </div>
     </section>

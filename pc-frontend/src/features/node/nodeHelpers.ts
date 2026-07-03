@@ -38,7 +38,7 @@ export function formatUnixTime(value: unknown): string {
 }
 
 export async function fetchMyNodes(): Promise<NodeSummary[]> {
-  const data = await api.get<{ nodes?: NodeSummary[] }>('/api/nodes')
+  const data = await api.get<{ nodes?: NodeSummary[] }>('/api/me/nodes')
   return data.nodes ?? []
 }
 

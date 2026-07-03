@@ -303,6 +303,7 @@ $zip = '{tmp_zip}'
 $installDir = '{install_dir}'
 $tmpVersion = '{tmp_version}'
 $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N'))
+$archivePath = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N') + '.zip')
 $logDir = Join-Path $installDir '_internal\logs'
 $logFile = Join-Path $logDir 'client-update.log'
 function Write-ElonNodeUpdateLog {{
@@ -316,7 +317,8 @@ try {{
   Write-ElonNodeUpdateLog "scheduled package repair update from $zip"
   Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
   New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-  Expand-Archive -LiteralPath $zip -DestinationPath $extractDir -Force
+  Copy-Item -LiteralPath $zip -Destination $archivePath -Force
+  Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
   $packageClient = Join-Path $extractDir '一龙开发平台.exe'
   if (-not (Test-Path -LiteralPath $packageClient)) {{ $packageClient = Join-Path $extractDir '一龙PC节点.exe' }}
   if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
@@ -331,6 +333,7 @@ try {{
   throw
 }} finally {{
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $tmpVersion -Force -ErrorAction SilentlyContinue
 }}
@@ -366,10 +369,12 @@ $versionFile = '{version_file}'
 $client = Join-Path $installDir '一龙开发平台.exe'
 $uninstall = Join-Path $installDir '卸载一龙开发平台.exe'
 $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N'))
+$archivePath = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N') + '.zip')
 {replace_helpers}
 New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 try {{
-  Expand-Archive -LiteralPath $zip -DestinationPath $extractDir -Force
+  Copy-Item -LiteralPath $zip -Destination $archivePath -Force
+  Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
   # 支持新旧包名称（新：一龙开发平台，旧：一龙PC节点）
   $packageClient = Join-Path $extractDir '一龙开发平台.exe'
   if (-not (Test-Path -LiteralPath $packageClient)) {{ $packageClient = Join-Path $extractDir '一龙PC节点.exe' }}
@@ -390,6 +395,7 @@ try {{
   Move-ElonNodeFileWithRetry -Source $tmpVersion -Destination $versionFile
 }} finally {{
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
 }}
 {restart}"#,
@@ -697,7 +703,9 @@ mod tests {
         );
 
         assert!(script.contains("Wait-Process -Id 1234"));
-        assert!(script.contains("Expand-Archive -LiteralPath $zip"));
+        assert!(script.contains("+ '.zip'"));
+        assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
+        assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
         assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
         assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
         assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageUninstall"));
@@ -723,10 +731,13 @@ mod tests {
         );
 
         assert!(script.contains("Wait-Process -Id $pidToWait"));
-        assert!(script.contains("Expand-Archive -LiteralPath $zip"));
+        assert!(script.contains("+ '.zip'"));
+        assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
+        assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
         assert!(script.contains("Start-Process -FilePath $packageClient -ArgumentList '--repair'"));
         assert!(script.contains("Wait-Process -Id $repair.Id -Timeout 120"));
         assert!(script.contains("client-update.log"));
+        assert!(script.contains("Remove-Item -LiteralPath $archivePath"));
         assert!(script.contains("Remove-Item -LiteralPath $tmpVersion"));
         assert!(!script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
         assert!(!script.contains("Start-ElonNodeRuntimeAndWait"));

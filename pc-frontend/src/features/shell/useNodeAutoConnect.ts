@@ -21,14 +21,24 @@ interface NodeConnectState {
 }
 
 const LOCAL_NODE_PORT = 7799
+const LOCAL_NODE_BASES = [
+  `http://127.0.0.1:${LOCAL_NODE_PORT}`,
+  `http://localhost:${LOCAL_NODE_PORT}`,
+]
 const PROBE_INTERVAL_MS = 30_000
 
 export function useNodeAutoConnect(): NodeConnectState {
   const token = useAuthStore((s: { token: string | null }) => s.token)
   const [state, setState] = useState<NodeConnectState>({ status: 'idle', errorMessage: '' })
   const successRef = useRef(false)
+  const tokenRef = useRef<string | null>(null)
 
   useEffect(() => {
+    if (tokenRef.current !== token) {
+      tokenRef.current = token
+      successRef.current = false
+      setState({ status: 'idle', errorMessage: '' })
+    }
     if (!token || successRef.current) return
 
     // 立即探测一次
@@ -45,18 +55,13 @@ export function useNodeAutoConnect(): NodeConnectState {
 
   async function probe(userToken: string) {
     try {
-      const res = await fetch(`http://localhost:${LOCAL_NODE_PORT}/api/status`, {
-        credentials: 'omit',
-        signal: AbortSignal.timeout(2000),
-      })
-      if (!res.ok) return // 节点没在跑，静默跳过
-      const data = await res.json()
-      const localAdminToken: string = data.local_admin_token ?? ''
-      if (!localAdminToken) return // 节点在跑但不暴露 token，跳过
+      const found = await probeLocalNode()
+      if (!found) return // 节点没在跑，静默跳过
+      const { baseUrl, localAdminToken } = found
 
       setState({ status: 'connecting', errorMessage: '' })
 
-      const loginRes = await fetch(`http://localhost:${LOCAL_NODE_PORT}/api/login`, {
+      const loginRes = await fetch(`${baseUrl}/api/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,5 +84,23 @@ export function useNodeAutoConnect(): NodeConnectState {
   }
 
   return state
+}
+
+async function probeLocalNode(): Promise<{ baseUrl: string; localAdminToken: string } | null> {
+  for (const baseUrl of LOCAL_NODE_BASES) {
+    try {
+      const res = await fetch(`${baseUrl}/api/status`, {
+        credentials: 'omit',
+        signal: AbortSignal.timeout(2000),
+      })
+      if (!res.ok) continue
+      const data = await res.json()
+      const localAdminToken: string = data.local_admin_token ?? ''
+      if (localAdminToken) return { baseUrl, localAdminToken }
+    } catch {
+      // Try the next loopback hostname.
+    }
+  }
+  return null
 }
 
