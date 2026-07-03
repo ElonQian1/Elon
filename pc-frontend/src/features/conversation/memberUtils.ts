@@ -232,6 +232,9 @@ export function filterMembers(members: ProjectMember[], query: string) {
   return members.filter((member) => {
     const haystack = [
       member.account,
+      member.global_account,
+      member.member_display_name,
+      member.admin_note,
       member.user_id,
       member.role,
       member.custom_status,

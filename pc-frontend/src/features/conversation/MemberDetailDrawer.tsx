@@ -24,11 +24,17 @@ type MemberDetailChannelRow = {
   inherited: boolean
 }
 
+type MemberProfilePatch = {
+  display_name?: string | null
+  admin_note?: string | null
+}
+
 const DETAIL_AUDIT_LABELS: Record<string, string> = {
   add_member: '添加成员',
   invite_member: '邀请成员',
   join_by_invite_link: '通过邀请加入',
   update_member_role: '调整角色',
+  update_member_profile: '更新成员资料',
   remove_member: '移除成员',
   mute_member: '禁言成员',
   unmute_member: '解除禁言',
@@ -45,6 +51,7 @@ export function MemberDetailDrawer({
   currentChannel,
   canModerate,
   canRemove,
+  canEditProfile,
   canManageRoles,
   canManagePermissions,
   onClose,
@@ -53,6 +60,7 @@ export function MemberDetailDrawer({
   onOpenPermissions,
   onModerate,
   onRemove,
+  onUpdateProfile,
 }: {
   projectId: string
   member: ProjectMember
@@ -60,6 +68,7 @@ export function MemberDetailDrawer({
   currentChannel?: Channel
   canModerate?: boolean
   canRemove?: boolean
+  canEditProfile?: boolean
   canManageRoles?: boolean
   canManagePermissions?: boolean
   onClose: () => void
@@ -68,13 +77,18 @@ export function MemberDetailDrawer({
   onOpenPermissions?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
   onRemove?: (member: ProjectMember) => Promise<boolean | void>
+  onUpdateProfile?: (member: ProjectMember, payload: MemberProfilePatch) => Promise<ProjectMember | undefined>
 }) {
   const [auditEntries, setAuditEntries] = useState<ProjectMemberAuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [busyAction, setBusyAction] = useState<MemberModerationAction | ''>('')
   const [removing, setRemoving] = useState(false)
+  const [profileName, setProfileName] = useState(member.member_display_name ?? '')
+  const [adminNote, setAdminNote] = useState(member.admin_note ?? '')
+  const [savingProfile, setSavingProfile] = useState(false)
   const name = member.account || member.user_id
+  const globalAccount = member.global_account || member.account || member.user_id
   const presence = memberPresenceStatus(member)
   const roleChips = memberDetailRoles(member)
   const channelRows = useMemo(
@@ -115,6 +129,12 @@ export function MemberDetailDrawer({
     refreshAudit()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, member.user_id])
+
+  useEffect(() => {
+    setProfileName(member.member_display_name ?? '')
+    setAdminNote(member.admin_note ?? '')
+    setSavingProfile(false)
+  }, [member.user_id, member.member_display_name, member.admin_note])
 
   function copyId() {
     navigator.clipboard.writeText(member.user_id).catch(() => {})
@@ -166,6 +186,36 @@ export function MemberDetailDrawer({
     }
   }
 
+  async function saveMemberProfile() {
+    if (!onUpdateProfile || savingProfile) return
+    const nextName = profileName.trim()
+    const nextNote = adminNote.trim()
+    const currentName = (member.member_display_name ?? '').trim()
+    const currentNote = (member.admin_note ?? '').trim()
+    const payload: MemberProfilePatch = {}
+    if (nextName !== currentName) payload.display_name = nextName || null
+    if (nextNote !== currentNote) payload.admin_note = nextNote || null
+    if (!Object.keys(payload).length) {
+      setStatusMsg('成员资料没有变化')
+      return
+    }
+    setSavingProfile(true)
+    setStatusMsg('保存中...')
+    try {
+      const updated = await onUpdateProfile(member, payload)
+      if (updated) {
+        setProfileName(updated.member_display_name ?? '')
+        setAdminNote(updated.admin_note ?? '')
+      }
+      setStatusMsg('成员资料已保存')
+      await refreshAudit()
+    } catch (err) {
+      setStatusMsg((err as { message?: string }).message ?? '保存失败')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
   return (
     <div className={styles.drawerBackdrop}>
       <section className={[styles.permissionDrawer, styles.memberDetailDrawer].join(' ')} role="dialog" aria-modal="true">
@@ -196,6 +246,7 @@ export function MemberDetailDrawer({
               <div className={styles.memberDetailBadges}>
                 <em>{roleChips.length} 个角色</em>
                 <em>{visibleCount}/{channels.length} 个可见频道</em>
+                {member.member_display_name && <em>项目昵称</em>}
                 {hiddenCount > 0 && <em data-tone="danger">隐藏 {hiddenCount}</em>}
                 {member.custom_status && <em>{member.custom_status}</em>}
                 {member.activity && <em>{member.activity}</em>}
@@ -229,12 +280,57 @@ export function MemberDetailDrawer({
               </div>
               <div className={styles.memberDetailKv}>
                 <span>账号</span>
-                <strong title={member.account || '-'}>{member.account || '-'}</strong>
+                <strong title={globalAccount}>{globalAccount}</strong>
+                <span>项目昵称</span>
+                <strong title={member.member_display_name || '-'}>{member.member_display_name || '-'}</strong>
                 <span>用户 ID</span>
                 <strong title={member.user_id}>{member.user_id}</strong>
                 <span>加入时间</span>
                 <strong>{member.joined_at ? formatTime(member.joined_at) : '-'}</strong>
               </div>
+            </section>
+
+            <section className={styles.memberDetailCard}>
+              <div className={styles.memberDetailCardHead}>
+                <strong>项目资料</strong>
+                <span>{canEditProfile ? '项目内显示名与管理员备注' : '项目内资料'}</span>
+              </div>
+              {canEditProfile && onUpdateProfile ? (
+                <div className={styles.memberDetailEditGrid}>
+                  <label className={styles.field}>
+                    <span>项目昵称</span>
+                    <input
+                      value={profileName}
+                      onChange={(event) => setProfileName(event.target.value)}
+                      maxLength={40}
+                      placeholder={globalAccount}
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>管理员备注</span>
+                    <input
+                      value={adminNote}
+                      onChange={(event) => setAdminNote(event.target.value)}
+                      maxLength={160}
+                      placeholder="仅成员管理员可见"
+                    />
+                  </label>
+                  <button className={styles.primaryBtn} onClick={saveMemberProfile} disabled={savingProfile}>
+                    {savingProfile ? '保存中...' : '保存项目资料'}
+                  </button>
+                </div>
+              ) : (
+                <div className={styles.memberDetailKv}>
+                  <span>项目昵称</span>
+                  <strong>{member.member_display_name || '-'}</strong>
+                  {member.admin_note && (
+                    <>
+                      <span>管理员备注</span>
+                      <strong title={member.admin_note}>{member.admin_note}</strong>
+                    </>
+                  )}
+                </div>
+              )}
             </section>
 
             <section className={styles.memberDetailCard}>

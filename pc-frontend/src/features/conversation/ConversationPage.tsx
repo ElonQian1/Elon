@@ -1016,6 +1016,23 @@ export default function ConversationPage() {
     return true
   }
 
+  async function updateMemberProfile(
+    member: ProjectMember,
+    payload: { display_name?: string | null; admin_note?: string | null },
+  ) {
+    if (!activeProjectId) return undefined
+    const data = await api.patch<{ member?: ProjectMember }>(
+      `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(member.user_id)}/profile`,
+      payload,
+    )
+    if (data.member) {
+      setDetailMember((current) => current?.user_id === member.user_id ? data.member as ProjectMember : current)
+      setSelectedMember((current) => current?.user_id === member.user_id ? data.member as ProjectMember : current)
+    }
+    await reloadProjectSpace()
+    return data.member
+  }
+
   function resetMemberConversationTarget() {
     setMemberConversationTarget(null)
     setSendError('')
@@ -1645,6 +1662,7 @@ export default function ConversationPage() {
           currentChannel={activeChannel}
           canModerate={canModerateMembers && detailMember.user_id !== user?.id}
           canRemove={canManageMembers && detailMember.user_id !== user?.id}
+          canEditProfile={canManageMembers && detailMember.user_id !== user?.id}
           canManageRoles={canUseRoleManager}
           canManagePermissions={!!(activeProjectId && activeChannelId && canManagePermissions)}
           onClose={() => setDetailMember(null)}
@@ -1653,6 +1671,7 @@ export default function ConversationPage() {
           onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
           onModerate={moderateMemberFromPopover}
           onRemove={removeMemberFromProject}
+          onUpdateProfile={updateMemberProfile}
         />
       )}
       {showPermissions && activeProjectId && activeChannelId && (

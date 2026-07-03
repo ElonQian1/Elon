@@ -486,6 +486,11 @@ pub struct PublicProjectItem {
 pub struct ProjectMemberEntry {
     pub user_id: String,
     pub account: String,
+    pub global_account: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub member_display_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub admin_note: Option<String>,
     pub avatar_data_url: Option<String>,
     pub role: String, // "owner" | "admin" | "editor" | "member" | "observer"
     pub roles: Vec<ProjectMemberRoleRef>,

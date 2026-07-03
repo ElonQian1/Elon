@@ -253,6 +253,9 @@ function filterVisibleMembers(members: ProjectMember[], query: string) {
   return members.filter(member => {
     const haystack = [
       member.account,
+      member.global_account,
+      member.member_display_name,
+      member.admin_note,
       member.user_id,
       member.role,
       member.custom_status,
@@ -1194,6 +1197,7 @@ const PROFILE_AUDIT_ACTION_LABELS: Record<string, string> = {
   invite_member: '邀请成员',
   join_by_invite_link: '通过邀请加入',
   update_member_role: '调整角色',
+  update_member_profile: '更新成员资料',
   remove_member: '移除成员',
   mute_member: '禁言成员',
   unmute_member: '解除禁言',

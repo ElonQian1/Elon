@@ -12,6 +12,7 @@ const ACTION_LABELS: Record<string, string> = {
   add_member: '添加成员',
   invite_member: '邀请成员',
   update_member_role: '调整角色',
+  update_member_profile: '更新成员资料',
   remove_member: '移除成员',
   create_role: '创建角色',
   update_role: '更新角色',

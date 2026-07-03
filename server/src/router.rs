@@ -449,6 +449,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
                 .delete(project_membership::remove_member),
         )
         .route(
+            "/api/projects/:id/members/:user_id/profile",
+            axum::routing::patch(project_membership::update_member_profile),
+        )
+        .route(
             "/api/projects/:id/members/:user_id/moderation",
             axum::routing::patch(project_membership::update_member_moderation),
         )

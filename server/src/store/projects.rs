@@ -16,8 +16,8 @@ use super::project_roles::{
     sync_project_member_roles_locked,
 };
 use super::{
-    is_system_project_source_type, normalize_account, now, project_branding, ProjectDeletionTarget,
-    ProjectMemberEntry, PublicProjectItem, Store,
+    clean_optional, is_system_project_source_type, normalize_account, now, project_branding,
+    ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store,
 };
 
 impl Store {
@@ -635,7 +635,10 @@ impl Store {
         let now = now();
         let mut stmt = conn.prepare(
             "SELECT pm.user_id,
-                    COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
+                    COALESCE(NULLIF(trim(pm.display_name), ''), u.nickname, u.phone, u.email, pm.user_id) AS account,
+                    COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS global_account,
+                    pm.display_name,
+                    pm.admin_note,
                     u.avatar_data_url,
                     pm.role,
                     pm.created_at,
@@ -665,19 +668,22 @@ impl Store {
                 Ok(ProjectMemberEntry {
                     user_id: row.get(0)?,
                     account: row.get(1)?,
-                    avatar_data_url: row.get(2)?,
-                    role: row.get(3)?,
+                    global_account: row.get(2)?,
+                    member_display_name: row.get(3)?,
+                    admin_note: row.get(4)?,
+                    avatar_data_url: row.get(5)?,
+                    role: row.get(6)?,
                     roles: Vec::new(),
-                    joined_at: row.get(4)?,
+                    joined_at: row.get(7)?,
                     is_online: false,
-                    presence_status: row.get(10)?,
-                    custom_status: row.get(11)?,
-                    activity: row.get(12)?,
-                    muted_until: row.get(5)?,
-                    banned_at: row.get(6)?,
-                    banned_until: row.get(7)?,
-                    is_muted: row.get::<_, i64>(8)? != 0,
-                    is_banned: row.get::<_, i64>(9)? != 0,
+                    presence_status: row.get(13)?,
+                    custom_status: row.get(14)?,
+                    activity: row.get(15)?,
+                    muted_until: row.get(8)?,
+                    banned_at: row.get(9)?,
+                    banned_until: row.get(10)?,
+                    is_muted: row.get::<_, i64>(11)? != 0,
+                    is_banned: row.get::<_, i64>(12)? != 0,
                     channel_permissions: None,
                 })
             })?
@@ -698,6 +704,53 @@ impl Store {
                 .then_with(|| left.account.cmp(&right.account))
         });
         Ok(rows)
+    }
+
+    pub fn update_project_member_profile(
+        &self,
+        project_id: &str,
+        target_user_id: &str,
+        display_name: Option<Option<&str>>,
+        admin_note: Option<Option<&str>>,
+    ) -> Result<ProjectMemberEntry> {
+        let conn = self.conn()?;
+        let (current_display_name, current_admin_note): (Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT display_name, admin_note
+                   FROM project_members
+                  WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, target_user_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("不是该项目成员"))?;
+        let next_display_name = display_name
+            .map(|value| {
+                value
+                    .and_then(|value| clean_optional(Some(value)))
+                    .map(ToOwned::to_owned)
+            })
+            .unwrap_or(current_display_name);
+        let next_admin_note = admin_note
+            .map(|value| {
+                value
+                    .and_then(|value| clean_optional(Some(value)))
+                    .map(ToOwned::to_owned)
+            })
+            .unwrap_or(current_admin_note);
+        conn.execute(
+            "UPDATE project_members
+                SET display_name = ?3,
+                    admin_note = ?4
+              WHERE project_id = ?1 AND user_id = ?2",
+            params![
+                project_id,
+                target_user_id,
+                next_display_name,
+                next_admin_note
+            ],
+        )?;
+        project_member_entry(&conn, project_id, target_user_id)
     }
 
     /// 列出用户已加入或拥有的公开项目；项目广场用它判断“加入”还是“进入空间”。
@@ -1030,7 +1083,10 @@ fn project_member_entry(
     let now = now();
     let mut entry = conn.query_row(
         "SELECT pm.user_id,
-                COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
+                COALESCE(NULLIF(trim(pm.display_name), ''), u.nickname, u.phone, u.email, pm.user_id) AS account,
+                COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS global_account,
+                pm.display_name,
+                pm.admin_note,
                 u.avatar_data_url,
                 pm.role,
                 pm.created_at,
@@ -1053,19 +1109,22 @@ fn project_member_entry(
             Ok(ProjectMemberEntry {
                 user_id: row.get(0)?,
                 account: row.get(1)?,
-                avatar_data_url: row.get(2)?,
-                role: row.get(3)?,
+                global_account: row.get(2)?,
+                member_display_name: row.get(3)?,
+                admin_note: row.get(4)?,
+                avatar_data_url: row.get(5)?,
+                role: row.get(6)?,
                 roles: Vec::new(),
-                joined_at: row.get(4)?,
+                joined_at: row.get(7)?,
                 is_online: false,
-                presence_status: row.get(10)?,
-                custom_status: row.get(11)?,
-                activity: row.get(12)?,
-                muted_until: row.get(5)?,
-                banned_at: row.get(6)?,
-                banned_until: row.get(7)?,
-                is_muted: row.get::<_, i64>(8)? != 0,
-                is_banned: row.get::<_, i64>(9)? != 0,
+                presence_status: row.get(13)?,
+                custom_status: row.get(14)?,
+                activity: row.get(15)?,
+                muted_until: row.get(8)?,
+                banned_at: row.get(9)?,
+                banned_until: row.get(10)?,
+                is_muted: row.get::<_, i64>(11)? != 0,
+                is_banned: row.get::<_, i64>(12)? != 0,
                 channel_permissions: None,
             })
         },

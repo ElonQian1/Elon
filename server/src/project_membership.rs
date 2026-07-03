@@ -10,6 +10,7 @@
 ///   PATCH  /api/projects/:id/icon                          修改项目 APK 图标（仅 owner）
 ///   PATCH  /api/projects/:id/brand                         修改项目展示别名与 logo（仅 owner）
 ///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner/admin，不可改 owner/自己）
+///   PATCH  /api/projects/:id/members/:user_id/profile      改项目内昵称/管理员备注
 ///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner/admin，不可踢 owner/自己）
 ///   PATCH  /api/projects/:id/members/:user_id/moderation   禁言/封禁/解除限制（仅 owner/admin）
 use axum::{
@@ -111,6 +112,8 @@ pub struct UpdateProjectRoleRequest {
 /// POST /api/projects/:id/join — 加入公开项目
 const MAX_PROJECT_ICON_DATA_URL_BYTES: usize = 512 * 1024;
 const MAX_PROJECT_DISPLAY_NAME_CHARS: usize = 80;
+const MAX_MEMBER_DISPLAY_NAME_CHARS: usize = 40;
+const MAX_MEMBER_ADMIN_NOTE_CHARS: usize = 160;
 
 pub async fn join_project(
     State(state): State<Arc<AppState>>,
@@ -235,9 +238,23 @@ pub async fn list_members(
 
     match state.store.list_project_members(&project_id) {
         Ok(mut members) => {
+            let can_view_admin_notes = auth_from_headers(&state, &headers)
+                .ok()
+                .map(|user| {
+                    member_has_project_permission(
+                        &state,
+                        &project_id,
+                        &user.id,
+                        PERMISSION_MANAGE_MEMBERS,
+                    )
+                })
+                .unwrap_or(false);
             let online = state.online_users.read().await;
             for member in &mut members {
                 apply_member_presence(member, online.contains_key(&member.user_id));
+                if !can_view_admin_notes {
+                    member.admin_note = None;
+                }
             }
             let total = members.len();
             Json(serde_json::json!({
@@ -248,6 +265,130 @@ pub async fn list_members(
             .into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+/// PATCH /api/projects/:id/members/:user_id/profile — 修改项目内昵称与管理员备注
+pub async fn update_member_profile(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, target_user_id)): Path<(String, String)>,
+    Json(req): Json<Value>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let access = match state.store.get_project_access(&user.id, &project_id) {
+        Ok(a) => a,
+        Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
+    };
+    if !member_has_project_permission(&state, &project_id, &user.id, PERMISSION_MANAGE_MEMBERS) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权修改成员资料");
+    }
+
+    let Some(obj) = req.as_object() else {
+        return json_error(StatusCode::BAD_REQUEST, "请求体必须是 JSON 对象");
+    };
+    let display_name_update = match clean_member_text_update(
+        project_brand_field(obj, "display_name", "displayName"),
+        MAX_MEMBER_DISPLAY_NAME_CHARS,
+        "成员昵称",
+    ) {
+        Ok(value) => value,
+        Err((status, message)) => return json_error(status, message),
+    };
+    let admin_note_update = match clean_member_text_update(
+        project_brand_field(obj, "admin_note", "adminNote"),
+        MAX_MEMBER_ADMIN_NOTE_CHARS,
+        "管理员备注",
+    ) {
+        Ok(value) => value,
+        Err((status, message)) => return json_error(status, message),
+    };
+    if display_name_update.is_none() && admin_note_update.is_none() {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "至少需要提供 display_name/displayName 或 admin_note/adminNote",
+        );
+    }
+
+    let old_role = state
+        .store
+        .project_member_role(&project_id, &target_user_id)
+        .ok()
+        .flatten();
+    if let Err(message) = ensure_role_management_allowed(
+        &state,
+        &project_id,
+        &access.role,
+        old_role.as_deref(),
+        None,
+        "修改成员资料",
+    ) {
+        return json_error(StatusCode::FORBIDDEN, message);
+    }
+
+    let display_name_arg = display_name_update.as_ref().map(|value| value.as_deref());
+    let admin_note_arg = admin_note_update.as_ref().map(|value| value.as_deref());
+    match state.store.update_project_member_profile(
+        &project_id,
+        &target_user_id,
+        display_name_arg,
+        admin_note_arg,
+    ) {
+        Ok(member) => {
+            let mut note_parts = Vec::new();
+            if let Some(value) = display_name_update {
+                note_parts.push(format!(
+                    "display_name={}",
+                    value.unwrap_or_else(|| "cleared".to_string())
+                ));
+            }
+            if let Some(value) = admin_note_update {
+                note_parts.push(format!(
+                    "admin_note={}",
+                    value
+                        .as_deref()
+                        .map(|note| format!("{} chars", note.chars().count()))
+                        .unwrap_or_else(|| "cleared".to_string())
+                ));
+            }
+            if let Err(err) = state.store.record_project_member_audit(
+                &project_id,
+                Some(&user.id),
+                Some(&target_user_id),
+                "update_member_profile",
+                old_role.as_deref(),
+                old_role.as_deref(),
+                Some(&note_parts.join(";")),
+            ) {
+                tracing::warn!(?err, project_id = %project_id, "记录成员资料更新审计日志失败");
+            }
+            publish_members_updated(
+                &state,
+                &project_id,
+                "update_member_profile",
+                Some(&target_user_id),
+                Some(&user.id),
+            );
+            Json(serde_json::json!({
+                "ok": true,
+                "project_id": project_id,
+                "user_id": target_user_id,
+                "member": member,
+            }))
+            .into_response()
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("不是该项目成员") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            json_error(status, msg)
+        }
     }
 }
 
@@ -1318,6 +1459,33 @@ fn clean_project_display_name_update(
     }
     if value.chars().count() > MAX_PROJECT_DISPLAY_NAME_CHARS {
         return Err((StatusCode::BAD_REQUEST, "项目别名不能超过 80 个字".into()));
+    }
+    Ok(Some(Some(value.to_string())))
+}
+
+fn clean_member_text_update(
+    value: Option<&Value>,
+    max_chars: usize,
+    label: &str,
+) -> Result<Option<Option<String>>, (StatusCode, String)> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(Some(None));
+    }
+    let Some(value) = value.as_str() else {
+        return Err((StatusCode::BAD_REQUEST, format!("{}必须是字符串", label)));
+    };
+    let value = value.trim();
+    if value.is_empty() || value.eq_ignore_ascii_case("null") {
+        return Ok(Some(None));
+    }
+    if value.chars().count() > max_chars {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("{}不能超过 {} 个字", label, max_chars),
+        ));
     }
     Ok(Some(Some(value.to_string())))
 }

@@ -3290,6 +3290,16 @@
   white-space: nowrap;
 }
 
+.memberDetailEditGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.memberDetailEditGrid .primaryBtn {
+  justify-self: flex-end;
+}
+
 .memberDetailModerationGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

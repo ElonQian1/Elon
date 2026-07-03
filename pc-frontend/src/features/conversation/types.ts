@@ -65,6 +65,9 @@ export interface ProjectRoleRef {
 export interface ProjectMember {
   user_id: string
   account?: string
+  global_account?: string
+  member_display_name?: string | null
+  admin_note?: string | null
   avatar_data_url?: string | null
   role?: string
   roles?: ProjectRoleRef[]

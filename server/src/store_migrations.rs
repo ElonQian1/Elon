@@ -113,6 +113,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (79, "群体 AI 产物上传与人工合并队列", migration_v79),
     (80, "项目 PC 节点级工作区绑定", migration_v80),
     (81, "用户 Codex Pro 凭据保险箱", migration_v81),
+    (82, "项目成员昵称与管理员备注", migration_v82),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2890,6 +2891,12 @@ fn migration_v81(conn: &Connection) -> Result<()> {
           ON user_codex_credential_events(user_id, created_at DESC);
         "#,
     )?;
+    Ok(())
+}
+
+fn migration_v82(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "project_members", "display_name", "display_name TEXT")?;
+    add_column_if_missing(conn, "project_members", "admin_note", "admin_note TEXT")?;
     Ok(())
 }
 
