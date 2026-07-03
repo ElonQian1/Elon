@@ -37,8 +37,8 @@ internal class ProjectSpaceController(
     private val showMessageActions: (View, ChatMessage) -> Unit,
     private val onProjectShareAction: (ChatProjectShare) -> Unit,
     private val collapseInputComposer: () -> Unit,
-    private val personalConversations: () -> List<AppConversation>,
     private val openPersonalAiChat: (Int) -> Unit,
+    private val personalConversationSync: ProjectConversationSyncBridge,
     private val showCreateAndOpenPersonalConversation: (suggestedTitle: String?, onCreated: (Int) -> Unit) -> Unit,
     private val selectedAgentForRequest: () -> String?,
     private val selectedRuntimeRouteForRequest: () -> String?,
@@ -183,11 +183,12 @@ internal class ProjectSpaceController(
         renderMessages = { conversation, member, space ->
             renderMemberConversationMessages(conversation, member, space)
         },
-        openPersonalConversationById = { conversationId ->
-            openPersonalConversationById(conversationId)
+        openRemotePersonalConversation = { conversation, member, space ->
+            openRemotePersonalConversation(conversation, member, space)
         },
         showCreateAndOpenPersonalConversation = showCreateAndOpenPersonalConversation,
-        openPersonalAiChat = openPersonalAiChat
+        openPersonalAiChat = openPersonalAiChat,
+        onSelfConversationsLoaded = personalConversationSync::syncSummaries
     )
     init {
         setupProjectSpaceAiMenuMotion()
@@ -1182,15 +1183,8 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun openPersonalConversationById(conversationId: String, fromMember: ProjectMember? = null) {
-        val index = personalConversations().indexOfFirst { it.id == conversationId }
-        if (index >= 0) {
-            if (fromMember != null) pendingMemberBack = fromMember
-            openPersonalAiChat(index)
-        } else {
-            Toast.makeText(activity, "找不到该会话，可能已删除", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private fun openRemotePersonalConversation(conversation: ProjectMemberConversation, member: ProjectMember, space: ProjectSpace) =
+        openRemotePersonalProjectConversation(activity, http, serverUrl, conversation, member, space, personalConversationSync::syncMessages, { pendingMemberBack = it }, openPersonalAiChat)
 
     // ── 成员会话列表（内联页面）───────────────────────────────────────
 

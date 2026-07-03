@@ -20,9 +20,10 @@ internal class ProjectSpaceMemberConversationViews(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val renderActiveSpace: () -> Unit,
     private val renderMessages: (ProjectMemberConversation, ProjectMember, ProjectSpace) -> Unit,
-    private val openPersonalConversationById: (String) -> Unit,
+    private val openRemotePersonalConversation: (ProjectMemberConversation, ProjectMember, ProjectSpace) -> Unit,
     private val showCreateAndOpenPersonalConversation: (String?, (Int) -> Unit) -> Unit,
-    private val openPersonalAiChat: (Int) -> Unit
+    private val openPersonalAiChat: (Int) -> Unit,
+    private val onSelfConversationsLoaded: (List<ProjectMemberConversation>) -> Unit = {}
 ) {
     private var latestContainer: LinearLayout? = null
 
@@ -49,6 +50,7 @@ internal class ProjectSpaceMemberConversationViews(
                 if (container.indexOfChild(loadingView) < 0) return@runOnUiThread
                 container.removeView(loadingView)
                 result.onSuccess { conversations ->
+                    if (isSelf) onSelfConversationsLoaded(conversations)
                     if (conversations.isEmpty()) {
                         container.addView(inlineStatusRow("还没有项目 AI 会话", "#777777"))
                     } else {
@@ -121,7 +123,7 @@ internal class ProjectSpaceMemberConversationViews(
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener {
-                if (isSelf) openPersonalConversationById(conversation.id) else renderMessages(conversation, member, space)
+                if (isSelf) openRemotePersonalConversation(conversation, member, space) else renderMessages(conversation, member, space)
             }
             if (isSelf) {
                 setOnLongClickListener {

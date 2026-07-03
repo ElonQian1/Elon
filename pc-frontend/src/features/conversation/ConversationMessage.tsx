@@ -5,13 +5,14 @@ import MarkdownContent from '../markdown/MarkdownContent'
 import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext } from '../dev/devTaskUtils'
 import { formatTime } from '../../lib/utils'
+import UserAvatar from '../shell/UserAvatar'
 import styles from './ConversationPage.module.css'
 
 interface MessageItemProps {
   message: Message
   isDevChannel: boolean
   taskContext: ReturnType<typeof buildContext>
-  user: { nickname?: string; account?: string } | null
+  user: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   onCancel: (id: string) => Promise<void>
   onApprove: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
   grouped?: boolean
@@ -49,11 +50,7 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
 
   return (
     <div className={[styles.messageRow, isOwn ? styles.ownRow : '', isAi ? styles.aiRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
-      <div className={styles.messageAvatar}>
-        {isUserRole
-          ? (displayName[0]?.toUpperCase() ?? '我')
-          : 'AI'}
-      </div>
+      <MessageAvatar message={message} isAi={isAi} isOwn={isOwn} displayName={displayName} user={user} />
       <div className={styles.messageBody}>
         <div className={styles.messageMeta}>
           <strong>{displayName}</strong>
@@ -73,6 +70,38 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
   )
 }, areMessageItemPropsEqual)
 
+function MessageAvatar({
+  message,
+  isAi,
+  isOwn,
+  displayName,
+  user,
+}: {
+  message: Message
+  isAi: boolean
+  isOwn: boolean
+  displayName: string
+  user: MessageItemProps['user']
+}) {
+  if (isAi) {
+    return <div className={styles.messageAvatar}>AI</div>
+  }
+  const avatarUser = {
+    id: clean(message.user_id ?? '') || user?.account || displayName,
+    account: displayName,
+    nickname: displayName,
+    avatar_data_url: clean(
+      message.sender_avatar_data_url
+      ?? message.senderAvatarDataUrl
+      ?? message.avatar_data_url
+      ?? message.avatarDataUrl
+      ?? (isOwn ? user?.avatar_data_url : '')
+      ?? '',
+    ) || null,
+  }
+  return <UserAvatar user={avatarUser} size="compact" className={styles.messageAvatar} />
+}
+
 function areMessageItemPropsEqual(
   prev: MessageItemProps,
   next: MessageItemProps,
@@ -83,4 +112,5 @@ function areMessageItemPropsEqual(
     && prev.grouped === next.grouped
     && prev.user?.nickname === next.user?.nickname
     && prev.user?.account === next.user?.account
+    && prev.user?.avatar_data_url === next.user?.avatar_data_url
 }

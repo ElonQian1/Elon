@@ -148,10 +148,11 @@ impl Store {
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, conversation_id, task_id, user_id, sender_name,
-                    role, content, created_at, outgoing
+                    sender_avatar_data_url, role, content, created_at, outgoing
              FROM (
                 SELECT m.id, m.project_id, m.conversation_id, m.task_id, m.user_id,
                        COALESCE(u.nickname, u.phone, u.email, m.user_id) AS sender_name,
+                       u.avatar_data_url AS sender_avatar_data_url,
                        m.role, m.content, m.created_at,
                        CASE WHEN LOWER(m.role) IN ('user', 'human') AND m.user_id = ?4 THEN 1 ELSE 0 END AS outgoing
                 FROM messages m
@@ -162,6 +163,7 @@ impl Store {
                 UNION ALL
                 SELECT d.id, d.project_id, d.conversation_id, NULL AS task_id, d.sender_user_id AS user_id,
                        COALESCE(u.nickname, u.phone, u.email, d.sender_user_id) AS sender_name,
+                       u.avatar_data_url AS sender_avatar_data_url,
                        'discussion' AS role, d.content, d.created_at,
                        CASE WHEN d.sender_user_id = ?4 THEN 1 ELSE 0 END AS outgoing
                 FROM project_member_conversation_discussion_messages d
@@ -169,7 +171,7 @@ impl Store {
                 WHERE d.project_id = ?1
                   AND d.member_user_id = ?3
                   AND d.conversation_id = ?2
-                ORDER BY 9 DESC, 1 DESC
+                ORDER BY 10 DESC, 1 DESC
                 LIMIT ?5
              )
              ORDER BY created_at ASC, id ASC",
@@ -191,10 +193,11 @@ impl Store {
                         task_id: row.get(3)?,
                         user_id: row.get(4)?,
                         sender_name: row.get(5)?,
-                        role: row.get(6)?,
-                        content: row.get(7)?,
-                        created_at: row.get(8)?,
-                        outgoing: row.get::<_, i64>(9)? != 0,
+                        sender_avatar_data_url: row.get(6)?,
+                        role: row.get(7)?,
+                        content: row.get(8)?,
+                        created_at: row.get(9)?,
+                        outgoing: row.get::<_, i64>(10)? != 0,
                     })
                 },
             )?
@@ -248,11 +251,11 @@ impl Store {
                 AND id = ?4",
             params![created_at, project_id, member_user_id, conversation_id],
         )?;
-        let sender_name: Option<String> = conn
+        let sender: Option<(Option<String>, Option<String>)> = conn
             .query_row(
-                "SELECT COALESCE(nickname, phone, email, id) FROM users WHERE id = ?1",
+                "SELECT COALESCE(nickname, phone, email, id), avatar_data_url FROM users WHERE id = ?1",
                 params![requester_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .optional()?;
 
@@ -262,7 +265,8 @@ impl Store {
             conversation_id: Some(conversation_id.to_string()),
             task_id: None,
             user_id: Some(requester_id.to_string()),
-            sender_name,
+            sender_name: sender.as_ref().and_then(|(name, _)| name.clone()),
+            sender_avatar_data_url: sender.and_then(|(_, avatar)| avatar),
             role: "discussion".to_string(),
             content: content.to_string(),
             created_at,

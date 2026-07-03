@@ -771,12 +771,12 @@ class MainActivity : AppCompatActivity() {
             showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
             onProjectShareAction = chatProjectShareActions::handleCardAction,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
-            personalConversations = { projectStateActions.conversations },
             openPersonalAiChat = { conversationIndex ->
                 val idx = s.projects.indexOfFirst { it.id == projectStateActions.activeProject().id }
                     .takeIf { it >= 0 } ?: s.activeProjectIndex
                 conversationOpenActions.openProjectSpaceConversation(idx, conversationIndex)
             },
+            personalConversationSync = projectConversationSyncBridge(s, projectStateActions, homeListActions),
             showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.createConversationAndOpen(title, onCreated) },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             selectedRuntimeRouteForRequest = { modelActions.selectedRuntimeRouteForRequest() },

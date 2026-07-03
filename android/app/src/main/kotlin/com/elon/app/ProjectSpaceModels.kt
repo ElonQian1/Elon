@@ -66,6 +66,7 @@ internal data class ProjectMemberConversationMessage(
     val taskId: String?,
     val userId: String?,
     val senderName: String?,
+    val senderAvatarDataUrl: String?,
     val role: String,
     val content: String,
     val createdAt: String,

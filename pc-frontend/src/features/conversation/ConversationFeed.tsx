@@ -14,7 +14,7 @@ interface ConversationFeedProps {
   messageGroups: MessageGroup[]
   taskContext: TaskContext
   isDevChannel: boolean
-  user: { nickname?: string; account?: string } | null
+  user: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   showTaskTyping: boolean
   sendingMessage: boolean
   onScroll: () => void
@@ -58,6 +58,7 @@ export default function ConversationFeed({
             <DevTaskGroup
               messages={group.messages as Parameters<typeof DevTaskGroup>[0]['messages']}
               taskContext={taskContext}
+              user={user}
               onCancel={onCancelTask}
               onApprove={onApproveTool}
             />

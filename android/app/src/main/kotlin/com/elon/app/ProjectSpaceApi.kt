@@ -558,6 +558,7 @@ private fun parseProjectMemberConversationMessage(json: JSONObject) = ProjectMem
     taskId = json.cleanProjectSpaceString("task_id"),
     userId = json.cleanProjectSpaceString("user_id"),
     senderName = json.cleanProjectSpaceString("sender_name"),
+    senderAvatarDataUrl = json.cleanProjectSpaceString("sender_avatar_data_url"),
     role = json.optString("role", "user"),
     content = json.optString("content", ""),
     createdAt = json.optString("created_at", ""),

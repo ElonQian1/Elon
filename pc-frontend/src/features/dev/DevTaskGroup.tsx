@@ -10,6 +10,7 @@ import { memo, useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, StopCircle } from 'lucide-react'
 import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
+import UserAvatar from '../shell/UserAvatar'
 import { clean } from '../../lib/utils'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
@@ -19,11 +20,12 @@ import styles from './DevTaskGroup.module.css'
 interface Props {
   messages: ChatMessage[]
   taskContext: TaskContext
+  user?: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   onCancel?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
-function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
+function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Props) {
   const taskId  = taskIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
@@ -61,7 +63,7 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const codexThreadUri = codexThreadUriFor(messages)
   const canCancel = !!taskId && !isDone && !!onCancel
-  const requestAuthor = userDisplayName(userMsg)
+  const requestAuthor = userDisplayName(userMsg, user)
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -92,7 +94,16 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
             </div>
             <div className={styles.userBubble}>{request}</div>
           </div>
-          <div className={styles.userAvatar}>{requestAuthor.initial}</div>
+          <UserAvatar
+            user={{
+              id: requestAuthor.name,
+              account: requestAuthor.name,
+              nickname: requestAuthor.name,
+              avatar_data_url: requestAuthor.avatarDataUrl || null,
+            }}
+            size="compact"
+            className={styles.userAvatar}
+          />
         </div>
       )}
 
@@ -176,6 +187,9 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
 export default memo(DevTaskGroup, (prev, next) =>
   prev.messages === next.messages
   && prev.taskContext === next.taskContext
+  && prev.user?.nickname === next.user?.nickname
+  && prev.user?.account === next.user?.account
+  && prev.user?.avatar_data_url === next.user?.avatar_data_url
   && prev.onCancel === next.onCancel
   && prev.onApprove === next.onApprove
 )
@@ -265,17 +279,29 @@ function taskRequestText(message: ChatMessage | undefined): string {
     .trim()
 }
 
-function userDisplayName(message: ChatMessage | undefined): { name: string; initial: string } {
+function userDisplayName(
+  message: ChatMessage | undefined,
+  user: Props['user'],
+): { name: string; avatarDataUrl: string } {
   const name = clean(
     message?.sender_name
     ?? message?.senderName
     ?? message?.sender_account
     ?? message?.senderAccount
+    ?? user?.nickname
+    ?? user?.account
     ?? '',
   ) || '我'
   return {
     name,
-    initial: (name[0] ?? '我').toUpperCase(),
+    avatarDataUrl: clean(
+      message?.sender_avatar_data_url
+      ?? message?.senderAvatarDataUrl
+      ?? message?.avatar_data_url
+      ?? message?.avatarDataUrl
+      ?? user?.avatar_data_url
+      ?? '',
+    ),
   }
 }
 

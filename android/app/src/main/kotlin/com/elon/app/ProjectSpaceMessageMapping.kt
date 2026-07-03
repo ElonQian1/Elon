@@ -137,6 +137,7 @@ internal fun ProjectMemberConversationMessage.toChatMessage(): ChatMessage {
         role = chatRole,
         content = content,
         senderLabel = if (chatRole == "friend") senderName ?: userId ?: "成员" else null,
+        senderAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
         id = id,
         createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
     )

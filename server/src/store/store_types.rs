@@ -731,6 +731,7 @@ pub struct ProjectMemberConversationMessage {
     pub task_id: Option<String>,
     pub user_id: Option<String>,
     pub sender_name: Option<String>,
+    pub sender_avatar_data_url: Option<String>,
     pub role: String,
     pub content: String,
     pub created_at: String,

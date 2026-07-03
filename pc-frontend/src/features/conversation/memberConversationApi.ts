@@ -31,6 +31,8 @@ export type MemberConversationMessage = Message & {
   conversationId?: string | null
   sender_name?: string | null
   senderName?: string | null
+  sender_avatar_data_url?: string | null
+  senderAvatarDataUrl?: string | null
   outgoing?: boolean
 }
 
