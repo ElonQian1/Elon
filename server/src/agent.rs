@@ -14,7 +14,8 @@ use crate::{
     },
     agent_pc_workspace::{
         project_chat_should_use_pc_cli, project_cli_runtime_permission,
-        project_requires_pc_workspace, should_attempt_pc_apk_sync,
+        project_cli_runtime_permission_fallback, project_requires_pc_workspace,
+        should_attempt_pc_apk_sync,
     },
     agent_routing::{
         api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
@@ -146,21 +147,22 @@ pub async fn run_pc_cli_passthrough_for_project(
         ))
         .to_json(),
     );
+    let preferred_runtime_permission = project_cli_runtime_permission(project);
     let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
         project_id: project.id.clone(),
         user_id: user_id.to_string(),
         conversation_id: cid.to_string(),
-        runtime_permission: project_cli_runtime_permission(project),
+        runtime_permission: preferred_runtime_permission.clone(),
     });
     let server_artifact_workspace = state.get_project_workspace(&project.workspace_key);
     let attempt_apk_sync = should_attempt_pc_apk_sync(project, user_message);
 
-    match ai_cli::run_with_pc_agent_passthrough_workspace(
+    let run_result = ai_cli::run_with_pc_agent_passthrough_workspace(
         agent_id,
         user_id,
         pc_workspace,
         user_message,
-        session_scope,
+        session_scope.clone(),
         Some(download_base),
         Some(server_artifact_workspace.as_path()),
         attempt_apk_sync,
@@ -171,8 +173,50 @@ pub async fn run_pc_cli_passthrough_for_project(
         state,
         &tx,
     )
-    .await
-    {
+    .await;
+    let run_result = match run_result {
+        Err(error) => {
+            let error_str = error.to_string();
+            if let Some(fallback_permission) =
+                project_cli_runtime_permission_fallback(&preferred_runtime_permission, &error_str)
+            {
+                let _ = tx.send(
+                    WsMessage::progress(
+                        "本机节点尚未确认完全访问，已自动切换为项目目录写入模式重试。",
+                    )
+                    .to_json(),
+                );
+                let fallback_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+                    project_id: project.id.clone(),
+                    user_id: user_id.to_string(),
+                    conversation_id: cid.to_string(),
+                    runtime_permission: fallback_permission.to_string(),
+                });
+                ai_cli::run_with_pc_agent_passthrough_workspace(
+                    agent_id,
+                    user_id,
+                    pc_workspace,
+                    user_message,
+                    fallback_scope,
+                    Some(download_base),
+                    Some(server_artifact_workspace.as_path()),
+                    attempt_apk_sync,
+                    Some(runtime_choice.cli_name.as_str()),
+                    runtime_choice.copilot_model.as_deref(),
+                    runtime_choice.codex_reasoning_effort.as_deref(),
+                    runtime_choice.model_label.as_deref(),
+                    state,
+                    &tx,
+                )
+                .await
+            } else {
+                Err(error)
+            }
+        }
+        other => other,
+    };
+
+    match run_result {
         Ok(ai_cli::PcAgentChatOutcome::Answered) => {}
         Ok(ai_cli::PcAgentChatOutcome::NoReadableReply { diagnostic }) => {
             let detail = diagnostic
@@ -1934,16 +1978,10 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_chat_route_label, pc_workspace_inspect_error_allows_bound_dispatch,
-        pc_workspace_inspect_problem, pc_workspace_inspect_usable,
-        requires_project_workflow_for_message, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
+        pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
+        pc_workspace_inspect_usable, requires_project_workflow_for_message,
+        BOUND_PC_NODE_RECONNECT_WAIT_SECS,
     };
-    use crate::agent_pc_workspace::{
-        project_cli_runtime_permission, project_fields_require_pc_workspace,
-        should_attempt_pc_apk_sync,
-    };
-    use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
-    use crate::store::ProjectAccess;
     use homecli_proto::ProjectWorkspaceInspectStatus;
     use std::path::Path;
 
@@ -1980,124 +2018,6 @@ mod tests {
         assert!(!requires_project_workflow_for_message(
             "完成的项目我在哪里下载安装呢",
             Path::new("C:/tmp/project__demo")
-        ));
-    }
-
-    #[test]
-    fn pc_cli_chat_labels_match_user_selected_route() {
-        assert_eq!(
-            pc_cli_chat_route_label(Some(PcRuntimeRoutePreference::RouteA)),
-            "本机 AI"
-        );
-        assert_eq!(
-            pc_cli_chat_route_label(Some(PcRuntimeRoutePreference::RouteC3)),
-            "远程 Codex"
-        );
-        assert_eq!(pc_cli_chat_route_label(None), "本机 AI");
-    }
-
-    #[test]
-    fn android_template_pc_project_attempts_apk_sync_for_ui_changes() {
-        let project = ProjectAccess {
-            id: "prj_android".into(),
-            name: "大大泡泡".into(),
-            workspace_key: "prj_android".into(),
-            template: "android_kotlin".into(),
-            source_type: "pc_managed".into(),
-            repo_url: None,
-            branch: None,
-            workspace_path: Some(r"C:\Users\Administrator\Elon\workspaces\prj\repo".into()),
-            node_id: Some("node-local".into()),
-            storage_node_id: None,
-            storage_repo_path: None,
-            storage_repo_url: None,
-            storage_worktree_path: None,
-            storage_status: "none".into(),
-            role: "owner".into(),
-            status: "active".into(),
-            runtime_permission: "workspace_write".into(),
-        };
-
-        assert!(should_attempt_pc_apk_sync(&project, "把按钮改成绿色"));
-    }
-
-    #[test]
-    fn pc_managed_projects_use_full_access_for_cli() {
-        let project = ProjectAccess {
-            id: "prj_pc".into(),
-            name: "PC App".into(),
-            workspace_key: "prj_pc".into(),
-            template: "android_kotlin".into(),
-            source_type: "pc_managed".into(),
-            repo_url: None,
-            branch: None,
-            workspace_path: Some(r"C:\Users\Administrator\Elon\workspaces\usr\prj_pc\repo".into()),
-            node_id: Some("node-local".into()),
-            storage_node_id: None,
-            storage_repo_path: None,
-            storage_repo_url: None,
-            storage_worktree_path: None,
-            storage_status: "none".into(),
-            role: "owner".into(),
-            status: "active".into(),
-            runtime_permission: "project_write".into(),
-        };
-
-        assert_eq!(project_cli_runtime_permission(&project), "full_access");
-    }
-
-    #[test]
-    fn pc_managed_projects_require_pc_workspace_route() {
-        assert!(project_fields_require_pc_workspace(
-            "pc_managed",
-            None,
-            Some("/srv/elon/project")
-        ));
-    }
-
-    #[test]
-    fn bound_node_projects_require_pc_workspace_route() {
-        assert!(project_fields_require_pc_workspace(
-            "local_path",
-            Some("node-local"),
-            Some("/srv/elon/project")
-        ));
-    }
-
-    #[test]
-    fn windows_local_paths_require_pc_workspace_route() {
-        assert!(project_fields_require_pc_workspace(
-            "local_path",
-            None,
-            Some(r"D:\rust\active-projects\elon cli")
-        ));
-        assert!(project_fields_require_pc_workspace(
-            "local_path",
-            None,
-            Some("D:/rust/active-projects/elon cli")
-        ));
-    }
-
-    #[test]
-    fn unc_paths_require_pc_workspace_route() {
-        assert!(project_fields_require_pc_workspace(
-            "local_path",
-            None,
-            Some(r"\\workstation\repos\elon")
-        ));
-        assert!(project_fields_require_pc_workspace(
-            "local_path",
-            None,
-            Some("//workstation/repos/elon")
-        ));
-    }
-
-    #[test]
-    fn server_local_paths_can_still_use_server_git_route() {
-        assert!(!project_fields_require_pc_workspace(
-            "local_path",
-            None,
-            Some("/srv/elon/project")
         ));
     }
 

@@ -19,6 +19,28 @@ pub(crate) fn project_cli_runtime_permission(project: &ProjectAccess) -> String 
     }
 }
 
+pub(crate) fn project_cli_runtime_permission_fallback(
+    runtime_permission: &str,
+    error_message: &str,
+) -> Option<&'static str> {
+    if runtime_permission == "full_access" && route_a_full_access_grant_error(error_message) {
+        Some("project_write")
+    } else {
+        None
+    }
+}
+
+pub(crate) fn route_a_full_access_grant_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    (message.contains("Route A") || lower.contains("route a"))
+        && (message.contains("完全访问尚未在本机授权")
+            || message.contains("完全访问尚未")
+            || (lower.contains("full access")
+                && (lower.contains("grant")
+                    || lower.contains("authoriz")
+                    || lower.contains("permission"))))
+}
+
 pub(crate) fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> bool {
     matches!(
         pc_runtime_route,
@@ -106,7 +128,8 @@ fn path_looks_windows_workspace(path: &str) -> bool {
 mod tests {
     use super::{
         pc_cli_chat_requested, pc_cli_chat_route_label, project_chat_should_use_pc_cli,
-        project_cli_runtime_permission, project_fields_require_pc_workspace,
+        project_cli_runtime_permission, project_cli_runtime_permission_fallback,
+        project_fields_require_pc_workspace, route_a_full_access_grant_error,
         should_attempt_pc_apk_sync,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
@@ -158,6 +181,21 @@ mod tests {
         let project = pc_project("prj_pc", "android_kotlin", Some("node-local"));
 
         assert_eq!(project_cli_runtime_permission(&project), "full_access");
+    }
+
+    #[test]
+    fn route_a_full_access_grant_errors_can_fallback_to_project_write() {
+        let message = "PC CLI 执行失败: Route A 完全访问尚未在本机授权：请在 PC 工作台设置中重新选择该项目目录并确认完全访问。";
+
+        assert!(route_a_full_access_grant_error(message));
+        assert_eq!(
+            project_cli_runtime_permission_fallback("full_access", message),
+            Some("project_write")
+        );
+        assert_eq!(
+            project_cli_runtime_permission_fallback("project_write", message),
+            None
+        );
     }
 
     #[test]
