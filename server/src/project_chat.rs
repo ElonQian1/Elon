@@ -22,6 +22,10 @@ use crate::{
     },
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_chat_executor::run_project_agent_in_execution_workspace,
+    project_chat_pc_node::{
+        acquire_pc_node_cli_permit, pc_node_cli_execution_progress_message,
+        pc_node_fast_path_route, record_pc_node_cli_execution_granted,
+    },
     project_chat_reply::chat_reply_after_intent_gate,
     project_conversation_workspace::{
         prepare_project_conversation_workspace, project_conversation_execution_key,
@@ -471,16 +475,6 @@ fn should_append_project_icon_context_for_pc_fast_path(needs_project_workflow: b
     needs_project_workflow
 }
 
-fn pc_node_fast_path_route(
-    pc_runtime_route: Option<PcRuntimeRoutePreference>,
-    direct_pc_cli: bool,
-) -> Option<PcRuntimeRoutePreference> {
-    if direct_pc_cli {
-        return Some(PcRuntimeRoutePreference::RouteA);
-    }
-    pc_runtime_route
-}
-
 fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
     let mut total = 0usize;
     let mut question_marks = 0usize;
@@ -516,10 +510,8 @@ fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        looks_like_replaced_unicode_mojibake, pc_node_fast_path_route,
-        should_append_project_icon_context_for_pc_fast_path,
+        looks_like_replaced_unicode_mojibake, should_append_project_icon_context_for_pc_fast_path,
     };
-    use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
 
     #[test]
     fn detects_windows_question_mark_mojibake() {
@@ -544,27 +536,6 @@ mod tests {
     fn pc_node_fast_path_keeps_lightweight_chat_message_plain() {
         assert!(!should_append_project_icon_context_for_pc_fast_path(false));
         assert!(should_append_project_icon_context_for_pc_fast_path(true));
-    }
-
-    #[test]
-    fn pc_node_fast_path_does_not_default_lightweight_chat_to_route_a() {
-        assert_eq!(pc_node_fast_path_route(None, false), None);
-        assert_eq!(
-            pc_node_fast_path_route(Some(PcRuntimeRoutePreference::RouteC3), false),
-            Some(PcRuntimeRoutePreference::RouteC3)
-        );
-    }
-
-    #[test]
-    fn pc_node_direct_cli_switch_selects_route_a() {
-        assert_eq!(
-            pc_node_fast_path_route(None, true),
-            Some(PcRuntimeRoutePreference::RouteA)
-        );
-        assert_eq!(
-            pc_node_fast_path_route(Some(PcRuntimeRoutePreference::RouteC), true),
-            Some(PcRuntimeRoutePreference::RouteA)
-        );
     }
 }
 
@@ -782,7 +753,32 @@ pub(crate) async fn run_project_agent_with_scheduler(
         } else {
             message
         };
+        let pc_node_id = project.node_id.clone().unwrap_or_default();
+        let node_cli_permit = acquire_pc_node_cli_permit(
+            &state,
+            &tx,
+            trace_id.as_deref(),
+            &project.id,
+            &conversation_id,
+            &pc_node_id,
+        )
+        .await;
+        let node_was_queued = node_cli_permit.permit.was_queued();
+        let node_parallel_limit = node_cli_permit.parallel_limit;
+        let node_message =
+            pc_node_cli_execution_progress_message(node_was_queued, node_parallel_limit);
+        record_pc_node_cli_execution_granted(
+            &state,
+            trace_id.as_deref(),
+            &project.id,
+            &conversation_id,
+            &pc_node_id,
+            node_was_queued,
+            node_parallel_limit,
+        );
+        let _ = tx.send(WsMessage::progress(node_message).to_json());
         let _keep_conversation_permit = conversation_permit;
+        let _keep_node_cli_permit = node_cli_permit.permit;
         if execution_mode.is_plan() {
             agent::plan_for_project_in_workspace(
                 &user_id,

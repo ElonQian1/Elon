@@ -117,10 +117,30 @@ impl ProjectTaskScheduler {
             }
         }
     }
+
+    pub async fn try_acquire(&self, project_id: &str) -> Option<ProjectTaskPermit> {
+        let lock = {
+            let mut locks = self.locks.lock().await;
+            locks
+                .entry(project_id.to_string())
+                .or_insert_with(|| Arc::new(AsyncMutex::new(())))
+                .clone()
+        };
+
+        lock.try_lock_owned().ok().map(|guard| ProjectTaskPermit {
+            was_queued: false,
+            _guard: guard,
+        })
+    }
 }
 
 impl ProjectTaskPermit {
     pub fn was_queued(&self) -> bool {
         self.was_queued
+    }
+
+    pub fn mark_queued(mut self) -> Self {
+        self.was_queued = true;
+        self
     }
 }

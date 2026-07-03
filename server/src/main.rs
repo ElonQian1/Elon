@@ -123,6 +123,7 @@ mod project_auth;
 mod project_channel_summary;
 mod project_chat;
 mod project_chat_executor;
+mod project_chat_pc_node;
 mod project_chat_reply;
 mod project_completion;
 mod project_conversation_identity;
