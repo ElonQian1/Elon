@@ -18,14 +18,13 @@ import kotlin.concurrent.thread
 
 /**
  * 我的页内联积分余额卡片。
- * 无需打开 PC 节点大厅即可一眼看到余额和累计收益，点击后直接查看在线节点。
+ * 无需打开 PC 节点大厅即可一眼看到余额和累计收益。
  */
 internal class ProfileNodeBalanceCard(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val http: OkHttpClient,
     private val serverUrl: String,
-    private val openMarket: () -> Unit,
     private val openTransactions: () -> Unit = {}
 ) {
     private var root: LinearLayout? = null
@@ -169,25 +168,14 @@ internal class ProfileNodeBalanceCard(
                 addView(buildMetricBlock("累计收益", "…") { lifetimeValue = it })
             })
 
-            // 底部 CTA 行：算力市场 | 积分明细
+            // 底部 CTA 行：积分明细
             addView(LinearLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).also { it.topMargin = dp(12) }
                 orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-
-                addView(TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    includeFontPadding = false
-                    text = "查看在线 PC 节点  →"
-                    setTextColor(Color.parseColor("#58BE6A"))
-                    textSize = 13f
-                    isClickable = true
-                    isFocusable = true
-                    setOnClickListener { openMarket() }
-                })
+                gravity = Gravity.CENTER_VERTICAL or Gravity.END
 
                 addView(TextView(activity).apply {
                     includeFontPadding = false

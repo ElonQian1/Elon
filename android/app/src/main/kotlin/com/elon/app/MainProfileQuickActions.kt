@@ -30,7 +30,6 @@ internal class MainProfileQuickActions(
     private val nodeBalanceCard by lazy {
         ProfileNodeBalanceCard(
             activity, binding, http, serverUrl,
-            openMarket = { nodeMarketSheet.show() },
             openTransactions = { nodeTransactionSheet.show() }
         )
     }
