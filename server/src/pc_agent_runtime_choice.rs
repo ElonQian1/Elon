@@ -1,5 +1,8 @@
 // server/src/pc_agent_runtime_choice.rs
 
+mod capability_wait;
+
+use capability_wait::agent_summary_after_capability_scan;
 use homecli_proto::NodeDevRuntimeProfile;
 use serde_json::Value;
 use std::sync::Arc;
@@ -78,12 +81,7 @@ pub(crate) async fn choose_pc_agent_runtime(
         .filter(|name| state.ai_cli.has_option(name))
         .and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
     let requested_cli = requested_cli_name(option.as_ref(), agent_name);
-    let summary = state
-        .agent_manager
-        .list()
-        .await
-        .into_iter()
-        .find(|agent| agent.agent_id == agent_id);
+    let summary = agent_summary_after_capability_scan(state, agent_id, route_preference).await;
     let allowed_clis = summary
         .as_ref()
         .map(|agent| agent.allowed_clis.as_slice())
