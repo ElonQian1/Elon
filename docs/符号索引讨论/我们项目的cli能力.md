@@ -1,24 +1,50 @@
-## 当前项目实现状态（2026-06-24）
+## 当前项目实现状态（2026-07-03）
 
-项目已经支持三条运行路线：
+项目已经支持五条 PC 节点 AI 运行路线。运行路线只决定“模型/AI 从哪里来、项目在哪台电脑执行”，不要和“是否打开 PTY 终端接管”混在一起：
 
-- 路线 A：Win 节点套壳本机已有 Codex / Claude / Gemini / Copilot 等 CLI。
-- 路线 B：Win 节点使用用户本机配置的 OpenAI-compatible API key，模型调用走本机，文件读写和命令执行也在本机受控执行。
-- 路线 C：用户没有本机 CLI、也没有自己的 API key 时，Win 节点请求我们服务器提供模型能力，但文件读写和命令执行仍留在用户本机节点。
+| 路线 | 前端值 | AI / 模型来源 | 项目文件和命令执行位置 | 当前定位 |
+|---|---|---|---|---|
+| 路线 A：本机AI | `route_a` | 项目绑定 PC 上已登录的 Codex / Claude / Gemini / Copilot CLI | 项目绑定 PC 节点 | 项目会话默认优先；适合 owner 自己电脑已准备好 CLI |
+| 路线 B：我的Key | `route_b` | 项目绑定 PC 上配置的 OpenAI-compatible API key | 项目绑定 PC 节点的一龙工具 runtime | 用户自带模型 key，仍在本机安全执行文件/命令 |
+| 路线 C1：平台AI | `route_c` / `route_c1` | 一龙平台提供模型能力 | 项目绑定 PC 节点的一龙工具 runtime | 用户没有 CLI/key 时兜底；文件读写和命令不搬到服务器 |
+| 路线 C2：远程AI | `route_c2` | 其他用户 PC 节点的 API runtime | 被授权的远程 PC 节点 | 借用远程电脑和它的 API key |
+| 路线 C3：远程Codex | `route_c3` | 其他用户 PC 节点已登录的 Codex / Claude / Copilot 等 CLI | 被授权的远程 PC 节点 | 借用远程电脑上的专业 CLI |
 
-Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_info`、`read_file`、`read_file_range`、只读 `git_status` / `git_diff` / `git_log` / `git_show`、`write_file`、`apply_patch`、`run_command`。其中 `git_status`、`git_diff`、`git_log`、`git_show` 是项目内只读 Git 检查工具，不消耗命令审批；`write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
+PC 项目会话默认值是 `route_a`。PC 前端“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入 `localNodeId` 与项目 `workspacePath`；关闭该开关时，按当前运行路线选择器走 `route_a` / `route_b` / `route_c` / `route_c2` / `route_c3`。
 
-PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要、尾部事件、活跃控制句柄、最近可续任务和顶层 `recovery_entry`，方便 PC UI 直接展示“推荐恢复”入口、做任务恢复和压力测试。
+Codex CLI 的默认后台开发主路是 `codex exec --json` + 直接 stdout JSONL 解析：
 
-任务生命周期压力测试已经覆盖 Route A/B/C 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。恢复契约会结构化暴露 `tool_approval_recovery`，状态包含 `active_waiter`、`no_active_waiter`、`lost_after_restart`、`closed_by_terminal_task`、`unavailable`，PC UI 会优先使用该字段解释历史审批为什么可点、失效或只能基于快照继续；本机 `approval_state.approvals[]` 也会给每个审批项返回 `next_action`、`requires_new_task` 和可选 `checkpoint`。Route B/C 发起 `write_file`、`apply_patch`、`run_command` 审批时，会把不含 prompt/API key/写入正文的 `approval_checkpoint` 写进本机 journal：包含注册时间、过期时间、action/diff 指纹、重启后当前仍需 `continue_from_snapshot` 的原因和后续必须重新校验的字段。这样已经完成“审批恢复所需证据先落库”的第一步，但为了安全，节点重启后直接续批仍未开放；旧 waiter 丢失时仍必须基于快照新开任务。项目频道里的“本机 Agent 运行”面板也会在推荐恢复卡、最近任务卡和继续草稿里显示这条审批恢复状态，避免接手任务的 AI 或用户误解旧审批能力。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批；本机 task journal API 在刷新终态任务时也会把历史 pending 审批标成“已关闭/任务已结束”，避免 PC UI 继续显示可误解的失效审批按钮。
+```text
+PC 网页端
+  -> Rust server
+  -> node-agent
+  -> codex exec --json
+  -> 直接读取 stdout JSONL
+  -> 解析 assistant_message / tool_call / tool_result / usage / final_reply
+  -> 网页端结构化过程卡片
+```
+
+这条主路不默认进入 PTY/ConPTY。原因是 `codex exec --json` 输出的是给程序消费的机器事件流，PTY 是给人看的终端画面；一旦进入 PTY，终端折行、ANSI 控制序列、光标帧、提示文本或启动警告可能污染 JSONL，导致前端只剩“Codex 正在处理中”而看不到命令、工具结果和最终回复。当前节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1`，因此 Codex 跳过 PTY sidecar；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才让 Codex 回到旧 sidecar 路径。
+
+PTY/ConPTY sidecar 仍然保留，但它是辅助路，不是 Codex 结构化过程展示主路：
+
+- 用户点击“打开终端接管”、需要真实终端输入、resize、取消或调试时走 sidecar/PTY。
+- 交互式 `codex` TUI、Copilot / Claude / Gemini 这类终端型 CLI 可以继续使用 sidecar/PTY。
+- 任务恢复以 task journal、Codex session/thread id、云端快照和 sidecar registry 组合实现；不重新接管任意外部终端 TTY。
+
+Route B/C1/C2 的一龙工具 runtime 已经包含 `list_dir`、`search_files`、`file_info`、`read_file`、`read_file_range`、只读 `git_status` / `git_diff` / `git_log` / `git_show`、`write_file`、`apply_patch`、`run_command`。其中 `git_status`、`git_diff`、`git_log`、`git_show` 是项目内只读 Git 检查工具，不消耗命令审批；`write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
+
+PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C1/C2 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要、尾部事件、活跃控制句柄、最近可续任务和顶层 `recovery_entry`，方便 PC UI 直接展示“推荐恢复”入口、做任务恢复和压力测试。
+
+任务生命周期压力测试已经覆盖 Route A/B/C1/C2/C3 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。恢复契约会结构化暴露 `tool_approval_recovery`，状态包含 `active_waiter`、`no_active_waiter`、`lost_after_restart`、`closed_by_terminal_task`、`unavailable`，PC UI 会优先使用该字段解释历史审批为什么可点、失效或只能基于快照继续；本机 `approval_state.approvals[]` 也会给每个审批项返回 `next_action`、`requires_new_task` 和可选 `checkpoint`。Route B/C1/C2 发起 `write_file`、`apply_patch`、`run_command` 审批时，会把不含 prompt/API key/写入正文的 `approval_checkpoint` 写进本机 journal：包含注册时间、过期时间、action/diff 指纹、重启后当前仍需 `continue_from_snapshot` 的原因和后续必须重新校验的字段。这样已经完成“审批恢复所需证据先落库”的第一步，但为了安全，节点重启后直接续批仍未开放；旧 waiter 丢失时仍必须基于快照新开任务。项目频道里的“本机 Agent 运行”面板也会在推荐恢复卡、最近任务卡和继续草稿里显示这条审批恢复状态，避免接手任务的 AI 或用户误解旧审批能力。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批；本机 task journal API 在刷新终态任务时也会把历史 pending 审批标成“已关闭/任务已结束”，避免 PC UI 继续显示可误解的失效审批按钮。
 
 CLI TTY 接管方案当前明确走“有限连续性”契约：不重新接管已经打开的原 CLI 终端 TTY；本机状态接口会结构化暴露 `not_supported`、`resume_order`、`recommended_next_actions` 和 `future_work`，前端优先提示运行句柄、journal 回放、Codex session 自动续接或云端快照新任务四种继续路径。真正接管原 TTY 仍需要后续 PTY/ConPTY 会话层、会话 id 持久化和前端 attach 授权协议。
 
 Win 客户端“注册本地项目”流程会自动读取常见项目清单来填项目名、描述、Git 远端、分支和运行/测试/构建命令；其中 Node.js 项目会识别 npm/pnpm/yarn/bun 锁文件、`dev/start/serve/watch`、`test/check/test:unit/typecheck`、`build/compile/dist` 等常见脚本，并在缺少 scripts 但检测到 Vite / Next / Astro / Tauri 依赖时自动给出开发和构建命令；Wails 桌面项目会识别 `wails.json` + `go.mod` 并在用户直接选择 Wails 项目目录时自动给出 `wails dev`、`go test ./...`、`wails build`；Android/Gradle 项目会从 `settings.gradle` 或 `settings.gradle.kts` 的 `rootProject.name` 自动识别项目名，.NET 项目会从 `.sln` 或 `.csproj` 自动识别名称和描述，Python 项目会识别 `pyproject.toml`、`requirements.txt`、`uv.lock`、`poetry.lock`、`Pipfile`、`manage.py`。选择 monorepo 根目录时，也会浅层识别 `server/`、`backend/`、`api/`、`app/`、`cmd/`、`web/`、`frontend/`、`client/`、`android/` 里的 `package.json`、`Cargo.toml`、`pyproject.toml`、`go.mod`、Gradle/Tauri/Wails/.NET 清单和 Python 子模块，减少用户手填字段。
 
-Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。`/api/agent/runtime/status` 会返回结构化 `blockingReasons`，把运维开关、agent 策略、server_api_key-only、平台预算、个人额度、限流等不可用原因统一给 Win 节点和 PC UI。Win 节点读取服务器 Route C 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制、`agentPolicy` 明确不可用，或 `blockingReasons` 非空，即使顶层 `ready=true` 也不会把 Route C 显示成可用。
+Route C1 平台AI能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。`/api/agent/runtime/status` 会返回结构化 `blockingReasons`，把运维开关、agent 策略、server_api_key-only、平台预算、个人额度、限流等不可用原因统一给 Win 节点和 PC UI。Win 节点读取服务器 Route C1 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制、`agentPolicy` 明确不可用，或 `blockingReasons` 非空，即使顶层 `ready=true` 也不会把 Route C1 显示成可用。
 
-Win 节点 `/api/status` 会返回 `runtime_policy`，结构化暴露 full_access 的真实边界：Route A full_access 只适用于本机已安装 CLI 且需要本机项目授权；Route B/C 即使 full_access，也不会绕过工作区路径检查、命令白名单、工具审批或高危 `git push` 拦截。PC 页面和后续运营面板可以直接读取 `runtime_policy.fullAccess`、`runtime_policy.routeBC.highRiskGitPushDenied` 和 `full_access_grant_count` 做可视化，不再只靠文档记忆。
+Win 节点 `/api/status` 会返回 `runtime_policy`，结构化暴露 full_access 的真实边界：Route A/C3 full_access 只适用于已安装 CLI 且需要本机项目授权；Route B/C1/C2 即使 full_access，也不会绕过工作区路径检查、命令白名单、工具审批或高危 `git push` 拦截。PC 页面和后续运营面板可以直接读取 `runtime_policy.fullAccess`、`runtime_policy.routeBC.highRiskGitPushDenied` 和 `full_access_grant_count` 做可视化，不再只靠文档记忆。
 
 Win 客户端维护入口已经集中到 PC 设置页和本机 `/api/client-maintenance`：状态接口会返回安装目录、运行日志、启动器日志、任务 journal、诊断目录、完整维护动作列表和唯一 `primary_maintenance_action`。PC 设置页会把首要建议动作排在维护按钮第一位，例如安装布局异常时优先“修复客户端入口”，布局正常时优先“检查更新”；卸载仍保留确认文案，诊断导出继续输出脱敏 JSON。
 
@@ -1051,30 +1077,30 @@ ELON_SERVER_AGENT_RUNTIME_DUPLICATE_WINDOW_SECS
 ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS
   默认只允许服务器默认 agent；需要显式 allowlist 才能选其他 agent
 
-Route C agent usage_mode
-  只允许 server_api_key；user_api_key_proxy / CLI 类 / Copilot 类 agent 即使被误配为默认或 allowlist，也不会被 Route C 调用
+Route C1 agent usage_mode
+  只允许 server_api_key；user_api_key_proxy / CLI 类 / Copilot 类 agent 即使被误配为默认或 allowlist，也不会被 Route C1 调用
 
-Route C agentPolicy 状态
-  /api/agent/runtime/status 结构化暴露 default_agent_only / allowlist / any，Win 客户端 Route C 保护状态会展示 agent 策略
+Route C1 agentPolicy 状态
+  /api/agent/runtime/status 结构化暴露 default_agent_only / allowlist / any，Win 客户端 Route C1 保护状态会展示 agent 策略
 ```
 
-Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽、agent 模式不允许，并显示重试时间、平台剩余额度、个人剩余额度、并发、分钟级请求限制、重复请求防抖窗口和 agent 策略。
+Win 客户端的 Route C1 状态会区分平台预算耗尽、个人额度耗尽、agent 模式不允许，并显示重试时间、平台剩余额度、个人剩余额度、并发、分钟级请求限制、重复请求防抖窗口和 agent 策略。
 
 已完成的边界：
 
 ```text
-项目绑定、开发频道、Route A/B/C 选择
+项目绑定、开发频道、Route A/B/C1/C2/C3 选择
 read_only / project_write / full_access 权限字段
-Route B/C 本机工具白名单
-Route B/C 工具调用时间线
-Route B/C 任务恢复契约会暴露 tool_approval_recovery，用 active_waiter / no_active_waiter / lost_after_restart / closed_by_terminal_task / unavailable 区分当前可审批、历史回放和重启后失效审批；PC 项目运行面板会把这条状态显示到推荐恢复卡和继续草稿
-Route C 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛 + 结构化 blockingReasons
+Route B/C1/C2 本机工具白名单
+Route B/C1/C2 工具调用时间线
+Route B/C1/C2 任务恢复契约会暴露 tool_approval_recovery，用 active_waiter / no_active_waiter / lost_after_restart / closed_by_terminal_task / unavailable 区分当前可审批、历史回放和重启后失效审批；PC 项目运行面板会把这条状态显示到推荐恢复卡和继续草稿
+Route C1 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛 + 结构化 blockingReasons
 Win 客户端维护面板展示安装状态、开始菜单健康、日志入口、修复客户端入口、更新/卸载动作和下一步建议
 客户端维护按钮已经改成后端 `maintenance_actions` 契约驱动；PC 设置页和节点注册页都会按 `kind/target/enabled/tone/confirmation` 生成可点击的日志、诊断、配置、修复、更新和卸载动作，避免前端硬编码按钮和后端能力漂移
 本机 7799 管理 API token 保护
 Route A CLI 名称、路径、参数、cwd fail-closed 校验
 legacy relay 同步拒绝任意 CLI 和内置 runtime
-Route B/C 即使开启 full_access，也不会放宽本机 run_command 命令白名单；Git 推送会继续拒绝 --force / --delete / --mirror / --all / --tags / +refspec / :branch 等高危参数，正常 HEAD:main 推送仍可审批执行
+Route B/C1/C2 即使开启 full_access，也不会放宽本机 run_command 命令白名单；Git 推送会继续拒绝 --force / --delete / --mirror / --all / --tags / +refspec / :branch 等高危参数，正常 HEAD:main 推送仍可审批执行
 ```
 
 还不能说完全等同 Codex Desktop。按 2026-06-24 当前主线，下一步主要补：

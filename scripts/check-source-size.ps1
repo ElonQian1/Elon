@@ -98,7 +98,7 @@ function Get-RedLimit {
 function Get-ChangedSourcePaths {
     param([string]$MergeBase)
     $paths = New-Object System.Collections.Generic.HashSet[string]
-    $diff = & git diff --name-status --diff-filter=ACMR $MergeBase --
+    $diff = & git -c core.quotepath=false diff --name-status --diff-filter=ACMR $MergeBase --
     if ($LASTEXITCODE -ne 0) {
         Stop-Guard "git diff failed while collecting changed source files."
     }
@@ -206,6 +206,15 @@ function Invoke-SelfTest {
         git commit -m "baseline legacy red file" *> $null
         $base = (git rev-parse HEAD).Trim()
 
+        New-Item -ItemType Directory -Path "docs" | Out-Null
+        $unicodeName = ([string][char]0x4E2D) + ([string][char]0x6587) + ([string][char]0x8BF4) + ([string][char]0x660E) + ".md"
+        $unicodePath = Join-Path "docs" $unicodeName
+        Set-Content -LiteralPath $unicodePath -Value "unicode docs path should be ignored cleanly"
+        git add -- $unicodePath
+        git commit -m "change unicode docs path" *> $null
+        if ((Invoke-SelfTestCase $root $base) -ne 0) { Stop-Guard "SelfTest failed: unicode docs path was not ignored cleanly." }
+
+        git reset --hard $base *> $null
         Set-Content -Path "src/legacy.rs" -Value (("fn old() {}" + [Environment]::NewLine) * 901) -NoNewline
         git add src/legacy.rs
         git commit -m "grow red file" *> $null

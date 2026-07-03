@@ -31,6 +31,37 @@ Android APK / Web UI
 
 预言家 AI 不是正式开发者，也不拥有发布权限。它默认使用低成本模型和受限工具，只允许生成临时 demo 产物；不得直接修改正式项目主线、接入真实支付、执行生产部署或把假数据包装成已完成能力。
 
+## PC 节点 AI 运行路线
+
+项目会话里的 AI 执行路线和“是否需要终端接管”是两件事：
+
+| 路线 | 模型/AI 来源 | 项目文件与命令在哪里执行 | 适用场景 |
+|---|---|---|---|
+| `route_a` 本机AI | 项目绑定 PC 上已登录的 Codex / Copilot / Claude / Gemini CLI | 项目绑定 PC 节点 | 项目 owner 自己电脑已准备好 CLI；项目会话默认优先走这条 |
+| `route_b` 我的Key | 项目绑定 PC 上配置的 OpenAI-compatible API key | 项目绑定 PC 节点的一龙工具 runtime | 用户想用自己的模型 key，仍让本机执行文件/命令 |
+| `route_c` 平台AI | 一龙平台提供模型 | 项目绑定 PC 节点的一龙工具 runtime | 用户没有 CLI 或自己的 key；项目操作仍不搬到服务器 |
+| `route_c2` 远程AI | 其他用户 PC 节点的 API runtime | 被授权的远程 PC 节点 | 自己电脑不方便运行，借用远程节点和它的 key |
+| `route_c3` 远程Codex | 其他用户 PC 节点已登录的 Codex / Claude / Copilot 等 CLI | 被授权的远程 PC 节点 | 借用远程节点上的专业 CLI |
+
+当前 PC 项目会话默认值是 `route_a`。前端“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入本机 `localNodeId` 与项目 `workspacePath`。
+
+Codex CLI 的主路不是 PTY，而是：
+
+```text
+PC 网页端 -> Rust server -> node-agent -> codex exec --json
+  -> 直接读取 stdout JSONL
+  -> 解析 assistant_message / tool_call / tool_result / usage / final_reply
+  -> 网页端任务过程卡片
+```
+
+`codex exec --json` 是给程序消费的结构化事件流，默认不能再放进 PTY/ConPTY 里抠 JSON，否则终端折行、ANSI 控制序列、光标帧和提示文本会污染事件流。当前节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1`，因此 Codex 跳过 PTY sidecar；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 sidecar 路径。
+
+PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
+
+- 交互式 `codex` TUI 或其他终端型 CLI 需要用户接管时使用。
+- 需要真实终端输入、resize、取消、调试、审批恢复时使用。
+- Copilot / Claude / Gemini 等没有稳定 JSONL 事件流的 CLI 可以继续走 sidecar/PTY。
+
 ## 项目理解 / RAG 架构
 
 当前项目理解系统不是纯向量库，而是混合检索：

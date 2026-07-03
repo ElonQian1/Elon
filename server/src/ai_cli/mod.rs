@@ -1678,11 +1678,9 @@ async fn run_via_pc_agent(
                             let _ = tx.send(WsMessage::progress(message).to_json());
                         }
                     }
-                    // Codex Route A runs in a PTY. Its raw stream includes model labels, prompt
-                    // echoes, cursor frames, and startup warnings split across chunks; filtering
-                    // each chunk independently still leaks noise into APK chat bubbles. Keep the
-                    // raw buffer for final reply extraction, but only forward structured passthrough
-                    // events above while the task is running.
+                    // Codex Route A normally streams codex exec --json over stdout. Only forward
+                    // structured events while running; keep raw text for final reply extraction
+                    // and for legacy/fallback noisy streams.
                     continue;
                 }
                 if let Some(event) = pc_cli_passthrough_event(&text) {
@@ -1822,8 +1820,8 @@ async fn run_via_pc_agent(
                         })
                         .unwrap_or(true);
                 if effective_exit_ok || allow_codex_output_despite_error {
-                    // Codex 的 PTY 输出会先流式给前端；HTTP/历史记录仍依赖 done.message，
-                    // 因此需要从完整输出中提取最终可读总结，避免任务完成但聊天记录为空。
+                    // Codex 过程事件会先流式给前端；HTTP/历史记录仍依赖 done.message，
+                    // 因此从完整输出中提取最终可读总结，避免聊天记录为空。
                     let codex_final_reply = if is_codex {
                         extract_codex_reply(&full_text)
                     } else {

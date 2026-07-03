@@ -98,6 +98,31 @@ Step 6: 生成唯一下载链接
 Step 7: 通过 WebSocket 推送给用户
 ```
 
+### 2.4 PC 节点 AI 运行路线
+
+PC 项目会话的 AI 执行路线分为五类：
+
+| 路线 | 请求值 | AI / 模型来源 | 项目文件与命令执行位置 |
+|---|---|---|---|
+| 本机AI | `route_a` | 项目绑定 PC 上已登录的 Codex / Copilot / Claude / Gemini CLI | 项目绑定 PC 节点 |
+| 我的Key | `route_b` | 项目绑定 PC 上配置的 OpenAI-compatible API key | 项目绑定 PC 节点的一龙工具 runtime |
+| 平台AI | `route_c` / `route_c1` | 一龙平台提供模型能力 | 项目绑定 PC 节点的一龙工具 runtime |
+| 远程AI | `route_c2` | 其他用户 PC 节点的 API runtime | 被授权的远程 PC 节点 |
+| 远程Codex | `route_c3` | 其他用户 PC 节点已登录的 Codex / Claude / Copilot 等 CLI | 被授权的远程 PC 节点 |
+
+项目会话默认优先 `route_a`，让本机 Codex CLI 自己读取项目规则、判断是否需要读文件、修改代码、运行命令或构建。PC 前端的“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入当前本机节点和项目工作区路径。
+
+Codex CLI 的后台开发主链路使用 `codex exec --json`：
+
+```
+PC 网页端 → Rust server → node-agent → codex exec --json
+    → stdout JSONL 事件流
+    → 服务端解析 tool_call / tool_result / usage / final_reply
+    → PC 网页端任务过程卡片
+```
+
+这条链路默认不走 PTY/ConPTY。PTY 是给人看的终端画面，适合终端接管、TUI、人工输入、resize、取消和调试；`codex exec --json` 是给程序读的结构化事件流，进入 PTY 后可能被终端折行、ANSI 控制序列或提示文本污染。节点默认 `ELON_CODEX_JSON_DIRECT_STDOUT=1`，Codex 跳过 PTY sidecar；只有显式设置 `ELON_CODEX_JSON_DIRECT_STDOUT=0` 才回到旧 sidecar 路径。
+
 ---
 
 ## 3. 代码仓库结构（目标结构）
