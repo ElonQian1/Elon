@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -14,7 +13,6 @@ import android.view.Gravity
 import android.view.View
 import android.view.Window
 import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -33,6 +31,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     private lateinit var redoButton: ImageButton
     private lateinit var bottomToolPanel: FrameLayout
     private lateinit var collapsedToolButton: ImageButton
+    private lateinit var annotationInputOverlay: ChatImageAnnotationInputOverlay
     private val toolButtons = mutableMapOf<ChatImageEditTool, ImageButton>()
     private var bottomToolsCollapsed = false
     private var bottomToolsAnimating = false
@@ -63,13 +62,18 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             onHistoryChanged = { refreshUndoRedo() }
         }
 
-        setContentView(FrameLayout(this).apply {
+        val root = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(canvasView)
             addView(createBottomToolPanel())
             addView(createCollapsedToolButton())
-        })
-        selectTool(ChatImageEditTool.BRUSH)
+        }
+        setContentView(root)
+        annotationInputOverlay = ChatImageAnnotationInputOverlay(this, root, canvasView)
+        canvasView.onAnnotationRequested = { index ->
+            annotationInputOverlay.show(index)
+        }
+        selectTool(ChatImageEditTool.ANNOTATION)
         refreshUndoRedo()
     }
 
@@ -135,17 +139,17 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             gravity = Gravity.CENTER
             orientation = LinearLayout.HORIZONTAL
 
-            addToolButton(this, ChatImageEditTool.BRUSH, R.drawable.ic_chat_image_tool_brush, "画笔") {
-                selectTool(ChatImageEditTool.BRUSH)
+            addToolButton(this, ChatImageEditTool.ANNOTATION, R.drawable.ic_chat_image_tool_annotation, "标注") {
+                selectTool(ChatImageEditTool.ANNOTATION)
+            }
+            addToolButton(this, ChatImageEditTool.HORIZONTAL_LINE, R.drawable.ic_chat_image_tool_horizontal_line, "横线") {
+                selectTool(ChatImageEditTool.HORIZONTAL_LINE)
             }
             addToolButton(this, ChatImageEditTool.CIRCLE, R.drawable.ic_chat_image_tool_circle, "圆形圈选") {
                 selectTool(ChatImageEditTool.CIRCLE)
             }
             addToolButton(this, ChatImageEditTool.SQUARE, R.drawable.ic_chat_image_tool_square, "方形圈选") {
                 selectTool(ChatImageEditTool.SQUARE)
-            }
-            addToolButton(this, ChatImageEditTool.TEXT, R.drawable.ic_chat_image_tool_text, "文字") {
-                showTextDialog()
             }
             addToolButton(this, ChatImageEditTool.MOSAIC, R.drawable.ic_chat_image_tool_mosaic, "马赛克") {
                 selectTool(ChatImageEditTool.MOSAIC)
@@ -223,7 +227,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         description: String,
         onClick: () -> Unit
     ) {
-        val button = iconButton(iconRes, description, tintWhite = tool != ChatImageEditTool.BRUSH).apply {
+        val button = iconButton(iconRes, description, tintWhite = tool != ChatImageEditTool.ANNOTATION).apply {
             layoutParams = LinearLayout.LayoutParams(dp(48), dp(58))
             setOnClickListener { onClick() }
         }
@@ -322,30 +326,6 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 bottomToolsAnimating = false
             }
             .start()
-    }
-
-    private fun showTextDialog() {
-        selectTool(ChatImageEditTool.TEXT)
-        val input = EditText(this).apply {
-            setSingleLine(false)
-            minLines = 1
-            maxLines = 3
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.parseColor("#AFAFAF"))
-            hint = "输入文字"
-        }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle("添加文字")
-            .setView(input)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("添加") { _, _ ->
-                canvasView.addText(input.text.toString())
-                refreshUndoRedo()
-            }
-            .show()
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.parseColor("#1A1A1A")))
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.WHITE)
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#B8B8B8"))
     }
 
     private fun finishWithEditedImage() {

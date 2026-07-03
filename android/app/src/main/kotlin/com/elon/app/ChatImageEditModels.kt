@@ -1,13 +1,14 @@
 package com.elon.app
 
 import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.RectF
 
 internal enum class ChatImageEditTool {
-    BRUSH,
+    ANNOTATION,
+    HORIZONTAL_LINE,
     CIRCLE,
     SQUARE,
-    TEXT,
     MOSAIC
 }
 
@@ -24,18 +25,24 @@ internal sealed class ChatImageEditOp {
         val mosaic: Boolean
     ) : ChatImageEditOp()
 
-    data class Label(
-        val value: String,
-        var x: Float,
-        var y: Float,
-        val color: Int,
-        val textSize: Float
-    ) : ChatImageEditOp()
-
     data class Shape(
         val bounds: RectF,
         val color: Int,
         val width: Float,
         val shape: ChatImageEditShape
+    ) : ChatImageEditOp()
+
+    data class HorizontalLine(
+        val start: PointF,
+        val end: PointF,
+        val color: Int,
+        val width: Float
+    ) : ChatImageEditOp()
+
+    data class Annotation(
+        val bounds: RectF,
+        val color: Int,
+        val width: Float,
+        var note: String = ""
     ) : ChatImageEditOp()
 }
