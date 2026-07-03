@@ -64,6 +64,17 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
     {
         Ok(Some(_path)) => Some(tools::stable_apk_url(download_base)),
         Ok(None) => {
+            if let Some(apk_url) = latest_project_release_apk_url(state, download_base) {
+                if explicit_apk_sync {
+                    let _ = tx.send(
+                        WsMessage::progress(
+                            "本轮 PC 工作区没有发现新的 APK，已复用项目空间最新安装包入口。",
+                        )
+                        .to_json(),
+                    );
+                }
+                return Some(apk_url);
+            }
             if explicit_apk_sync {
                 let _ = tx.send(
                     WsMessage::progress("本轮 PC 工作区没有发现 APK；不会生成安装按钮链接。")
@@ -83,6 +94,36 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
             None
         }
     }
+}
+
+fn latest_project_release_apk_url(state: &AppState, download_base: &str) -> Option<String> {
+    let project_id = project_id_from_download_base(download_base)?;
+    if project_id.is_empty() {
+        return None;
+    }
+    match state.store.latest_project_apk_url(project_id) {
+        Ok(Some(apk_url)) => Some(apk_url),
+        Ok(None) => None,
+        Err(error) => {
+            tracing::warn!(
+                project_id = %project_id,
+                error = %error,
+                "failed to read latest project APK URL after PC sync miss"
+            );
+            None
+        }
+    }
+}
+
+fn project_id_from_download_base(download_base: &str) -> Option<&str> {
+    let without_query = download_base.split('?').next().unwrap_or(download_base);
+    let parts = without_query.split('/').collect::<Vec<_>>();
+    for window in parts.windows(3) {
+        if window[0] == "projects" && window[2] == "download" {
+            return Some(window[1]);
+        }
+    }
+    None
 }
 
 async fn sync_pc_agent_apk_artifact(
@@ -232,5 +273,28 @@ pub(crate) fn safe_pc_apk_filename(raw: &str) -> String {
         safe
     } else {
         "ElonSpeed-latest.apk".to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::project_id_from_download_base;
+
+    #[test]
+    fn parses_project_download_base() {
+        assert_eq!(
+            project_id_from_download_base("https://example.test/api/projects/prj_123/download"),
+            Some("prj_123")
+        );
+    }
+
+    #[test]
+    fn parses_user_project_download_base() {
+        assert_eq!(
+            project_id_from_download_base(
+                "https://example.test/api/user/usr_1/projects/prj_abc/download?token=t"
+            ),
+            Some("prj_abc")
+        );
     }
 }
