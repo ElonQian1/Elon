@@ -628,7 +628,7 @@ fn project_chat_should_use_pc_cli(
     {
         return agent_is_local_cli;
     }
-    true
+    false
 }
 
 fn pc_cli_chat_route_label(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> &'static str {
@@ -2062,7 +2062,7 @@ mod tests {
         )));
         assert!(!pc_cli_chat_requested(None));
 
-        assert!(project_chat_should_use_pc_cli(None, None, false));
+        assert!(!project_chat_should_use_pc_cli(None, None, false));
         assert!(project_chat_should_use_pc_cli(
             Some(PcRuntimeRoutePreference::RouteA),
             None,

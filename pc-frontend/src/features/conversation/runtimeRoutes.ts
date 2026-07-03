@@ -19,10 +19,12 @@ export interface RuntimeRouteGroup {
 
 export const RUNTIME_ROUTE_STORAGE_KEY = 'elon_pc_project_runtime_route'
 export const RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_pc_project_runtime_route_default_v2'
-export const RUNTIME_ROUTE_DEFAULT_VERSION = 'platform-ai-default-20260630'
-export const DEFAULT_RUNTIME_ROUTE: RuntimeRoute = 'route_c'
-export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = 'project-local-codex-default-20260702'
-export const DEFAULT_PROJECT_RUNTIME_ROUTE: RuntimeRoute = 'route_a'
+const LEGACY_PLATFORM_DEFAULT_VERSION = 'platform-ai-default-20260630'
+const LEGACY_PROJECT_LOCAL_DEFAULT_VERSION = 'project-local-codex-default-20260702'
+export const RUNTIME_ROUTE_DEFAULT_VERSION = 'auto-default-20260703'
+export const DEFAULT_RUNTIME_ROUTE: RuntimeRoute = 'auto'
+export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = 'project-auto-default-20260703'
+export const DEFAULT_PROJECT_RUNTIME_ROUTE: RuntimeRoute = 'auto'
 
 export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
@@ -121,11 +123,16 @@ function getStorageValue(storage: Storage, key: string): string | null {
   }
 }
 
+function isLegacyImplicitDefault(stored: string | null, defaultVersion: string | null): boolean {
+  return (stored === 'route_c' && defaultVersion === LEGACY_PLATFORM_DEFAULT_VERSION)
+    || (stored === 'route_a' && defaultVersion === LEGACY_PROJECT_LOCAL_DEFAULT_VERSION)
+}
+
 export function initialRuntimeRouteFromStorage(storage?: Storage | null): RuntimeRoute {
   if (!storage) return DEFAULT_RUNTIME_ROUTE
   const stored = getStorageValue(storage, RUNTIME_ROUTE_STORAGE_KEY)
   const defaultVersion = getStorageValue(storage, RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
-  if (!stored || (!defaultVersion && stored === 'auto')) return DEFAULT_RUNTIME_ROUTE
+  if (!stored || isLegacyImplicitDefault(stored, defaultVersion)) return DEFAULT_RUNTIME_ROUTE
   return normalizeRuntimeRoute(stored)
 }
 
@@ -133,10 +140,7 @@ export function initialProjectRuntimeRouteFromStorage(storage?: Storage | null):
   if (!storage) return DEFAULT_PROJECT_RUNTIME_ROUTE
   const stored = getStorageValue(storage, RUNTIME_ROUTE_STORAGE_KEY)
   const defaultVersion = getStorageValue(storage, RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
-  if (!stored || (!defaultVersion && stored === 'auto')) return DEFAULT_PROJECT_RUNTIME_ROUTE
-  if (stored === DEFAULT_RUNTIME_ROUTE && defaultVersion !== PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION) {
-    return DEFAULT_PROJECT_RUNTIME_ROUTE
-  }
+  if (!stored || isLegacyImplicitDefault(stored, defaultVersion)) return DEFAULT_PROJECT_RUNTIME_ROUTE
   return normalizeRuntimeRoute(stored, DEFAULT_PROJECT_RUNTIME_ROUTE)
 }
 
