@@ -350,38 +350,38 @@ function Assert-RemoteApkManifestVersion {
     }
 }
 
-function Get-UserGradleProperty {
+function Get-LocalSigningProperty {
     param([string]$Name)
 
-    if (-not (Test-Path $UserGradleProps)) { return $null }
-    foreach ($line in Get-Content $UserGradleProps -Encoding UTF8) {
-        $trimmed = $line.Trim()
-        if ($trimmed.StartsWith("#") -or -not $trimmed.Contains("=")) { continue }
-        $parts = $trimmed.Split("=", 2)
-        if ($parts[0].Trim() -eq $Name) {
-            return $parts[1].Trim().Trim('"')
+    foreach ($path in @($UserGradleProps, (Join-Path $AndroidDir "local.properties"))) {
+        if (-not (Test-Path $path)) { continue }
+        foreach ($line in Get-Content $path -Encoding UTF8) {
+            $trimmed = $line.Trim()
+            if ($trimmed.StartsWith("#") -or -not $trimmed.Contains("=")) { continue }
+            $parts = $trimmed.Split("=", 2)
+            if ($parts[0].Trim() -eq $Name) { return $parts[1].Trim().Trim('"') }
         }
     }
     return $null
 }
 
-function Set-EnvFromUserGradleProperty {
+function Set-EnvFromLocalSigningProperty {
     param([string]$Name)
 
     if (-not [string]::IsNullOrWhiteSpace((Get-Item "Env:$Name" -ErrorAction SilentlyContinue).Value)) {
         return
     }
-    $value = Get-UserGradleProperty $Name
+    $value = Get-LocalSigningProperty $Name
     if (-not [string]::IsNullOrWhiteSpace($value)) {
         Set-Item "Env:$Name" $value
     }
 }
 
 function Use-ReleaseSigningConfig {
-    Set-EnvFromUserGradleProperty "ELON_RELEASE_KEYSTORE"
-    Set-EnvFromUserGradleProperty "ELON_RELEASE_STORE_PASSWORD"
-    Set-EnvFromUserGradleProperty "ELON_RELEASE_KEY_ALIAS"
-    Set-EnvFromUserGradleProperty "ELON_RELEASE_KEY_PASSWORD"
+    Set-EnvFromLocalSigningProperty "ELON_RELEASE_KEYSTORE"
+    Set-EnvFromLocalSigningProperty "ELON_RELEASE_STORE_PASSWORD"
+    Set-EnvFromLocalSigningProperty "ELON_RELEASE_KEY_ALIAS"
+    Set-EnvFromLocalSigningProperty "ELON_RELEASE_KEY_PASSWORD"
 
     if ([string]::IsNullOrWhiteSpace($env:ELON_RELEASE_KEYSTORE)) {
         if (Test-Path $DefaultKeystore) {
@@ -421,7 +421,7 @@ function Assert-ReleaseSigningConfig {
         Write-Host ""
         Write-Host "一次性推荐设置：" -ForegroundColor Cyan
         Write-Host "  1. 将 elon-release.jks 放到 $DefaultKeystore" -ForegroundColor Cyan
-        Write-Host "  2. 在用户环境变量或 ~/.gradle/gradle.properties 中配置：" -ForegroundColor Cyan
+        Write-Host "  2. 在用户环境变量、~/.gradle/gradle.properties 或 android/local.properties 中配置：" -ForegroundColor Cyan
         Write-Host "     ELON_RELEASE_KEYSTORE=$DefaultKeystore" -ForegroundColor Cyan
         Write-Host "     ELON_RELEASE_STORE_PASSWORD=<不要提交到 git>" -ForegroundColor Cyan
         Write-Host "     ELON_RELEASE_KEY_ALIAS=elon" -ForegroundColor Cyan
