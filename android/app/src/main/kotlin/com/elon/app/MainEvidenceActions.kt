@@ -58,7 +58,8 @@ internal class MainEvidenceActions(
         val index = messages.indices.lastOrNull {
             it > latestUserIndex &&
                 messages[it].role in assistantEvidenceRoles &&
-                messages[it].content.isNotBlank()
+                messages[it].content.isNotBlank() &&
+                !messages[it].processLayer
         } ?: return false
 
         val source = messages[index]
@@ -134,7 +135,8 @@ internal class MainEvidenceActions(
         val placeholder = ChatMessage(
             role = "ai-intent",
             content = "我正在处理这次请求，过程会折叠在这里。",
-            evidenceWorking = working
+            evidenceWorking = working,
+            processLayer = true
         )
         val adapter = chatAdapter()
         if (adapter.ownsMessages(messages)) {

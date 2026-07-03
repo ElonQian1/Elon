@@ -223,6 +223,46 @@ internal fun evidenceDetails(entries: List<EvidenceEntry>): String {
     }
 }
 
+internal fun evidenceEntriesFromDetails(details: String?): List<EvidenceEntry> {
+    return details
+        ?.lineSequence()
+        ?.mapNotNull(::evidenceEntryFromLine)
+        ?.toList()
+        .orEmpty()
+}
+
+internal fun evidenceEntryFromLine(line: String): EvidenceEntry? {
+    val cleaned = line.trim().removePrefix("·").trim()
+    if (cleaned.isBlank()) return null
+    val label = cleaned.substringBefore("：", "").trim()
+    val text = cleaned.substringAfter("：", cleaned).trim()
+    if (text.isBlank()) return null
+    val kind = when (label) {
+        "命令" -> "command"
+        "文件" -> "file"
+        "编辑" -> "edit"
+        "构建" -> "build"
+        "CLI" -> "cli"
+        "环境" -> "env"
+        "连接" -> "connection"
+        "结果" -> "result"
+        else -> "progress"
+    }
+    return EvidenceEntry(kind, text)
+}
+
+internal fun applyEvidenceEntriesToMessage(
+    message: ChatMessage,
+    entries: List<EvidenceEntry>,
+    working: Boolean
+) {
+    if (entries.isEmpty()) return
+    message.evidenceTitle = evidenceTitle(entries)
+    message.evidenceDetails = evidenceDetails(entries)
+    message.evidenceWorking = working
+    if (!working) message.evidenceExpanded = false
+}
+
 internal fun evidenceKindLabel(kind: String): String {
     return when (kind) {
         "command" -> "命令"

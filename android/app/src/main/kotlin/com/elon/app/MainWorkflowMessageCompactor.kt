@@ -56,7 +56,7 @@ internal class MainWorkflowMessageCompactor(
         if (latestUserIndex < 0) return false
         var removed = false
         for (index in messages.lastIndex downTo latestUserIndex + 1) {
-            if (messages[index].role in staleWorkflowRoles) {
+            if (messages[index].role in staleWorkflowRoles || messages[index].processLayer) {
                 messages.removeAt(index)
                 removed = true
             }

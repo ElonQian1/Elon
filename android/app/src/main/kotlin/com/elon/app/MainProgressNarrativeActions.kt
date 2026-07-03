@@ -2,8 +2,7 @@ package com.elon.app
 
 internal class MainProgressNarrativeActions(
     private val isDevelopmentRequest: () -> Boolean,
-    private val finalizeEvidenceForLatestAssistant: () -> Unit,
-    private val appendMessage: (ChatMessage) -> Unit,
+    private val recordEvidence: (String, String) -> Unit,
     private val attachEvidenceToLatestAi: () -> Unit
 ) {
     private val emittedProgressSignals = linkedSetOf<String>()
@@ -38,8 +37,7 @@ internal class MainProgressNarrativeActions(
 
     private fun appendProgressNarrative(narrative: CodexProgressNarrative.Narrative): Boolean {
         if (!emittedProgressSignals.add(narrative.key)) return false
-        finalizeEvidenceForLatestAssistant()
-        appendMessage(narrative.message)
+        recordEvidence("progress", narrative.message.content)
         attachEvidenceToLatestAi()
         return true
     }

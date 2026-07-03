@@ -54,8 +54,9 @@ internal class MainWorkflowActions(
     val progressNarrativeActions: MainProgressNarrativeActions by lazy {
         MainProgressNarrativeActions(
             isDevelopmentRequest = activeRequestIsDevelopment,
-            finalizeEvidenceForLatestAssistant = { evidenceActions.finalizeEvidenceForLatestAssistant() },
-            appendMessage = messageAppendActions::appendMessage,
+            recordEvidence = { kind, detail ->
+                if (activeRequestIsDevelopment()) evidenceActions.recordEvidence(kind, detail)
+            },
             attachEvidenceToLatestAi = { evidenceActions.attachEvidenceToLatestAi() }
         )
     }

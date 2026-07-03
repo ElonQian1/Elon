@@ -115,7 +115,8 @@ object CodexProgressNarrative {
             key = key,
             message = ChatMessage(
                 role = "ai-intent",
-                content = content
+                content = content,
+                processLayer = true
             )
         )
     }

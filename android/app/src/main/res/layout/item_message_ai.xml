@@ -73,6 +73,18 @@
                 android:visibility="gone" />
 
             <TextView
+                android:id="@+id/finalReplyLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="6dp"
+                android:includeFontPadding="false"
+                android:text="最终回复"
+                android:textColor="@color/elon_accent_primary"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/messageText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -87,8 +99,13 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:paddingStart="2dp"
-            android:paddingEnd="2dp"
+            android:background="@drawable/bg_process_summary"
+            android:minHeight="36dp"
+            android:gravity="center_vertical"
+            android:paddingStart="10dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="6dp"
             android:textColor="@color/elon_text_tertiary"
             android:textSize="12sp"
             android:visibility="gone" />

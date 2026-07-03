@@ -12,10 +12,16 @@ internal class MainMessageAppendActions(
     private val workflowTerminalRoles: Set<String>
 ) {
     fun appendMessage(message: ChatMessage) {
+        var changedBeforeAppend = false
         if (message.role in workflowTerminalRoles) {
+            changedBeforeAppend = mergeProcessLayerIntoTerminal(activeConversation().messages, message)
             removeTransientWorkflowMessagesAfterLatestUser()
         }
         val adapter = chatAdapter()
+        if (changedBeforeAppend) {
+            adapter.notifyDataSetChanged()
+            saveConversations()
+        }
         adapter.addMessage(message)
         updateActiveConversationPreview(message)
         binding.chatList.scrollToPosition(adapter.itemCount - 1)

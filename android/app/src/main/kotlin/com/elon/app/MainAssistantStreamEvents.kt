@@ -67,6 +67,20 @@ internal class MainAssistantStreamEvents(
         markToolResult(tool)
     }
 
+    fun handleStructuredProcessEvent(json: JsonObject) {
+        if (!isDevelopmentRequest()) return
+        structuredProcessEvidence(jsonStringOrNull(json, "type"), json)?.let { entry ->
+            recordEvidence(entry.kind, entry.text)
+        }
+    }
+
+    fun handleUsage(json: JsonObject) {
+        if (!isDevelopmentRequest()) return
+        usageEvidence(json)?.let { entry ->
+            recordEvidence(entry.kind, entry.text)
+        }
+    }
+
     fun assistantMessage(json: JsonObject): ChatMessage? {
         val text = jsonStringOrNull(json, "text").orEmpty().trim()
         if (text.isBlank()) return null

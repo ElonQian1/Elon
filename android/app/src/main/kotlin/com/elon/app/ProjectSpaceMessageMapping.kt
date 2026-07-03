@@ -7,12 +7,16 @@ internal fun ProjectChannelMessage.toChatMessage(
 ): ChatMessage {
     val role = when (kind) {
         "ai_progress" -> "ai-progress"
-        "ai_result" -> "ai-complete"
+        "ai_result" -> "ai"
         "system" -> "ai"
         else -> if (outgoing) "user" else "friend"
     }
     val postText = parseProjectSpacePostText(content)
-    val displayContent = postText.detailText
+    val displayContent = if (kind == "ai_progress") {
+        projectSpaceAiProgressText(content)
+    } else {
+        postText.detailText
+    }
     val cleanSenderName = senderName.cleanProjectSpaceDisplayName()
     val postCard = if (postText.structured && channel?.isProjectSpaceFeedChannel() == true) {
         ChatProjectPostCard(
@@ -32,6 +36,7 @@ internal fun ProjectChannelMessage.toChatMessage(
     } else {
         null
     }
+    val evidence = taskEvidenceEntries() + projectSpaceAiProgressEvidence(content)
     return ChatMessage(
         role = role,
         content = displayContent,
@@ -39,12 +44,66 @@ internal fun ProjectChannelMessage.toChatMessage(
         senderLabel = if (role == "friend") cleanSenderName else null,
         senderAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
         id = id,
+        apkUrl = taskApkUrl.takeIf { role == "ai" },
+        codexThreadUri = taskCodexThreadId?.let { "codex://threads/$it" },
+        evidenceTitle = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceTitle),
+        evidenceDetails = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceDetails),
         suggestionStatus = suggestionStatus,
         suggestionResolvedByName = suggestionResolvedByName,
         suggestionResolvedAt = suggestionResolvedAt,
         canResolveSuggestion = canResolveSuggestion(projectRole),
         createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
     )
+}
+
+private fun ProjectChannelMessage.taskEvidenceEntries(): List<EvidenceEntry> {
+    val entries = mutableListOf<EvidenceEntry>()
+    taskStatus?.let { entries.add(EvidenceEntry("result", "任务状态：$it")) }
+    taskError?.let { entries.add(EvidenceEntry("result", "任务错误：${summarize(it, 96)}")) }
+    taskApkUrl?.let { entries.add(EvidenceEntry("result", "APK：$it")) }
+    taskCodexThreadId?.let { entries.add(EvidenceEntry("connection", "Codex 会话：codex://threads/$it")) }
+    taskId?.let { entries.add(EvidenceEntry("connection", "任务 ID：$it")) }
+    return entries
+}
+
+private fun projectSpaceAiProgressText(content: String): String {
+    val parsed = runCatching { org.json.JSONObject(content) }.getOrNull()
+    if (parsed != null) {
+        val type = parsed.optString("type")
+        return when (type) {
+            "tool_call" -> "过程：开始${toolLabel(parsed.optString("tool").ifBlank { "工具" })}"
+            "tool_result" -> "过程：${toolLabel(parsed.optString("tool").ifBlank { "工具" })}已完成"
+            "usage" -> usageEvidence(parsed)?.text ?: "过程：模型用量已记录"
+            "runtime_status", "runtime_summary", "pc_dispatch_started" ->
+                structuredProcessEvidence(parsed)?.text ?: "过程：运行状态已记录"
+            else -> parsed.optString("message").takeIf { it.isNotBlank() } ?: "过程已记录"
+        }
+    }
+    return workflowProgressMessage(content)
+}
+
+private fun projectSpaceAiProgressEvidence(content: String): List<EvidenceEntry> {
+    val parsed = runCatching { org.json.JSONObject(content) }.getOrNull() ?: return emptyList()
+    return when (parsed.optString("type")) {
+        "tool_call" -> listOf(
+            EvidenceEntry(
+                toolEvidenceKind(parsed.optString("tool").ifBlank { "工具" }),
+                "开始：${toolLabel(parsed.optString("tool").ifBlank { "工具" })}"
+            )
+        )
+        "tool_result" -> listOf(
+            EvidenceEntry(
+                toolEvidenceKind(parsed.optString("tool").ifBlank { "工具" }),
+                parsed.optString("result").takeIf { it.isNotBlank() }
+                    ?.let { "完成：${toolLabel(parsed.optString("tool").ifBlank { "工具" })}，${summarize(it, 96)}" }
+                    ?: "完成：${toolLabel(parsed.optString("tool").ifBlank { "工具" })}"
+            )
+        )
+        "usage" -> usageEvidence(parsed)?.let(::listOf).orEmpty()
+        "runtime_status", "runtime_summary", "pc_dispatch_started" ->
+            structuredProcessEvidence(parsed)?.let(::listOf).orEmpty()
+        else -> emptyList()
+    }
 }
 
 internal fun ProjectMemberConversationMessage.toChatMessage(): ChatMessage {

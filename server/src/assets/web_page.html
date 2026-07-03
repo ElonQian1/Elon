@@ -756,6 +756,36 @@
     .bubble .meta { display: block; font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
     .bubble .status { display: block; font-size: 12px; color: rgba(7,18,10,0.54); margin-top: 5px; }
     .bubble .status.read { color: var(--accent); }
+    .bubble .final-reply-label {
+      display: inline-block;
+      margin-bottom: 6px;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .bubble details.process-layer {
+      margin-top: 8px;
+      color: var(--ink-faint);
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .bubble details.process-layer summary {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      cursor: pointer;
+      list-style: none;
+    }
+    .bubble details.process-layer summary::-webkit-details-marker { display: none; }
+    .bubble .process-layer-body {
+      padding: 6px 2px 0;
+    }
     .bubble a { color: inherit; text-decoration: underline; }
 
     @media (min-width: 720px) {
@@ -6592,7 +6622,28 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       kind === 'progress' ? 'progress' :
       kind === 'error' ? 'error' :
       kind === 'friend' ? 'friend' : 'ai');
-    bubble.textContent = text || '';
+    const processLog = Array.isArray(options.processLog) ? options.processLog.filter(Boolean) : [];
+    if (kind === 'ai' && processLog.length) {
+      const finalLabel = document.createElement('div');
+      finalLabel.className = 'final-reply-label';
+      finalLabel.textContent = '最终回复';
+      bubble.appendChild(finalLabel);
+      const body = document.createElement('div');
+      body.textContent = text || '';
+      bubble.appendChild(body);
+      const details = document.createElement('details');
+      details.className = 'process-layer';
+      const summary = document.createElement('summary');
+      summary.textContent = '查看过程 · ' + processLog.length + ' 条记录';
+      const processBody = document.createElement('div');
+      processBody.className = 'process-layer-body';
+      processBody.textContent = processLog.map((item, index) => '· ' + (index + 1) + '. ' + item).join('\n');
+      details.appendChild(summary);
+      details.appendChild(processBody);
+      bubble.appendChild(details);
+    } else {
+      bubble.textContent = text || '';
+    }
     bubble.title = formatChatExactTime(nowMs);
     if (links && links.length) {
       links.forEach((lk) => {
@@ -6695,7 +6746,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           const links = [];
           if (data.apk_url) links.push({ href: data.apk_url, label: '下载 APK' });
           if (data.image_url) links.push({ href: data.image_url, label: '查看图片' });
-          appendBubble('ai', data.message || '已完成。', links, data.model_used, data.node_id);
+          appendBubble('ai', data.message || '已完成。', links, data.model_used, data.node_id, {
+            processLog: progressLog.slice()
+          });
           loadProjects();
           if (data.apk_url) refreshDownloadPage().catch(() => {});
         } else if (data.type === 'error') {

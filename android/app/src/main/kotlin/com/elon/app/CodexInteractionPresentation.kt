@@ -65,7 +65,8 @@ object CodexInteractionPresentation {
             } else {
                 "理解意图 · 直接回复"
             },
-            evidenceDetails = evidence
+            evidenceDetails = evidence,
+            processLayer = true
         )
     }
 

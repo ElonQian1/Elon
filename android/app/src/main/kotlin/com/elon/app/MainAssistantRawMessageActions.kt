@@ -43,6 +43,14 @@ internal class MainAssistantRawMessageActions(
                     assistantStreamEvents().handleToolResult(json)
                     return
                 }
+                "pc_dispatch_started", "runtime_status", "runtime_summary" -> {
+                    assistantStreamEvents().handleStructuredProcessEvent(json)
+                    return
+                }
+                "usage" -> {
+                    assistantStreamEvents().handleUsage(json)
+                    return
+                }
                 "assistant_message" -> {
                     receivedStreamingReplyThisTurn = true
                     assistantStreamEvents().assistantMessage(json) ?: return

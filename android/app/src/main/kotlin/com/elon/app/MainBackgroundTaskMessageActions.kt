@@ -53,6 +53,10 @@ internal class MainBackgroundTaskMessageActions(
                 recordEvidence(location, toolResultEvidence(parsed), working = true, enabled = isDevelopment)
                 toolResultMessage(parsed) ?: return
             }
+            "pc_dispatch_started", "runtime_status", "runtime_summary" -> {
+                recordEvidence(location, structuredProcessEvidence(parsed), working = true, enabled = isDevelopment)
+                return
+            }
             "assistant_message" -> assistantMessage(parsed, isDevelopment) ?: return
             "assistant_chunk" -> {
                 val streamId = jsonStringOrNull(parsed, "stream_id") ?: return
@@ -61,7 +65,7 @@ internal class MainBackgroundTaskMessageActions(
                 return
             }
             "usage" -> {
-                recordEvidence(location, usageEvidence(parsed), working = true, enabled = isDevelopment)
+                recordEvidence(location, usageEvidenceEntry(parsed), working = true, enabled = isDevelopment)
                 return
             }
             else -> return
@@ -188,10 +192,7 @@ internal class MainBackgroundTaskMessageActions(
         return EvidenceEntry("result", summarize(content, 96))
     }
 
-    private fun usageEvidence(parsed: JSONObject): EvidenceEntry? {
-        val total = parsed.optInt("total_tokens", 0).takeIf { it > 0 } ?: return null
-        val model = parsed.optString("model").takeIf { it.isNotBlank() }
-        val detail = if (model == null) "模型用量：$total tokens" else "模型用量：$model · $total tokens"
-        return EvidenceEntry("result", detail)
+    private fun usageEvidenceEntry(parsed: JSONObject): EvidenceEntry? {
+        return usageEvidence(parsed)
     }
 }

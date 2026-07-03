@@ -44,6 +44,10 @@ data class ChatMessage(
     var modelUsed: String? = null,
     /** 若回答来自用户贡献的 PC 节点，填写节点 ID */
     var nodeId: String? = null,
+    /** Codex 桌面会话深链，用于把公开过程跳转到原生 Codex 线程。 */
+    var codexThreadUri: String? = null,
+    /** 本条消息只是过程承载层，终态回复出现后会把 evidence 合并到最终回复。 */
+    var processLayer: Boolean = false,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
     var streamId: String? = null,
     var projectPostCard: ChatProjectPostCard? = null
@@ -80,6 +84,7 @@ class ChatAdapter(
         val evidenceSummary: TextView? = view.findViewById(R.id.evidenceSummary)
         val evidenceDetails: TextView? = view.findViewById(R.id.evidenceDetails)
         val evidenceLastEntry: TextView? = view.findViewById(R.id.evidenceLastEntry)
+        val finalReplyLabel: TextView? = view.findViewById(R.id.finalReplyLabel)
         val pauseButton: ImageButton? = view.findViewById(R.id.pauseWorkButton)
         val userAvatar: TextView? = view.findViewById(R.id.userAvatar)
         val friendAvatar: TextView? = view.findViewById(R.id.friendAvatar)
@@ -187,6 +192,7 @@ class ChatAdapter(
         bindFriendAvatar(holder.friendAvatar, message)
         bindSelectionVisual(holder, message, projectCardBound, position)
         bindMessageActions(holder, message, projectCardBound)
+        bindFinalReplyLabel(holder, message)
         bindEvidence(holder, message, position)
         bindModelAttribution(holder, message)
         if (message.role in shimmerWorkflowRoles) startShimmer(holder, message.role)
@@ -580,6 +586,15 @@ class ChatAdapter(
         tv.visibility = View.VISIBLE
     }
 
+    private fun bindFinalReplyLabel(holder: VH, message: ChatMessage) {
+        val label = holder.finalReplyLabel ?: return
+        val show = message.role == "ai" &&
+            !message.processLayer &&
+            !message.evidenceTitle.isNullOrBlank()
+        label.visibility = if (show) View.VISIBLE else View.GONE
+        label.text = "最终回复"
+    }
+
     private fun bindEvidence(holder: VH, message: ChatMessage, position: Int) {
         val summary = holder.evidenceSummary ?: return
         val details = holder.evidenceDetails ?: return
@@ -596,7 +611,13 @@ class ChatAdapter(
         }
 
         val marker = if (message.evidenceExpanded) "⌄" else "›"
-        summary.text = "$marker ${message.evidenceTitle}"
+        val prefix = when {
+            message.evidenceWorking -> "过程记录"
+            message.processLayer -> "过程已收起"
+            message.role == "ai" -> if (message.evidenceExpanded) "收起过程" else "查看过程"
+            else -> "过程"
+        }
+        summary.text = "$marker $prefix · ${message.evidenceTitle}"
         summary.visibility = View.VISIBLE
 
         if (message.evidenceExpanded) {

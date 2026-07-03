@@ -45,6 +45,7 @@ internal class MainConversationPreviewActions(
         val project = projects().getOrNull(projectIndex) ?: return
         val conversation = project.conversations.getOrNull(conversationIndex) ?: return
         if (message.role in workflowTerminalRoles) {
+            mergeProcessLayerIntoTerminal(conversation.messages, message)
             closeStaleWorkflowMessages(conversation.messages)
         }
         conversation.messages.add(message)
@@ -86,12 +87,10 @@ internal class MainConversationPreviewActions(
             conversation.messages.lastIndex
         }
         val target = conversation.messages[evidenceIndex]
-        val entries = evidenceEntriesFrom(target).toMutableList()
+        val entries = evidenceEntriesFromDetails(target.evidenceDetails).toMutableList()
         entries.add(EvidenceEntry(entry.kind, summarize(clean, 96)))
         while (entries.size > 40) entries.removeAt(0)
-        target.evidenceTitle = evidenceTitle(entries)
-        target.evidenceDetails = evidenceDetails(entries)
-        target.evidenceWorking = working
+        applyEvidenceEntriesToMessage(target, entries, working)
         markConversationUpdated(project, conversation, target.content)
         saveProjects()
         notifyConversationChanged(projectIndex, conversationIndex, evidenceIndex)
@@ -226,30 +225,4 @@ internal class MainConversationPreviewActions(
             chatAdapter().ownsMessages(conversation.messages)
     }
 
-    private fun evidenceEntriesFrom(message: ChatMessage): List<EvidenceEntry> {
-        return message.evidenceDetails
-            ?.lineSequence()
-            ?.mapNotNull(::evidenceEntryFromLine)
-            ?.toList()
-            .orEmpty()
-    }
-
-    private fun evidenceEntryFromLine(line: String): EvidenceEntry? {
-        val cleaned = line.trim().removePrefix("·").trim()
-        if (cleaned.isBlank()) return null
-        val label = cleaned.substringBefore("：", "").trim()
-        val text = cleaned.substringAfter("：", cleaned).trim()
-        val kind = when (label) {
-            "命令" -> "command"
-            "文件" -> "file"
-            "编辑" -> "edit"
-            "构建" -> "build"
-            "CLI" -> "cli"
-            "环境" -> "env"
-            "连接" -> "connection"
-            "结果" -> "result"
-            else -> "progress"
-        }
-        return EvidenceEntry(kind, text)
-    }
 }
