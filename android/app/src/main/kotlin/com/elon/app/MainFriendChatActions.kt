@@ -167,6 +167,7 @@ internal class MainFriendChatActions(
     fun trySendMessage(rawText: String, pendingAttachments: List<PendingAttachment>): Boolean {
         val friend = activeFriend ?: return false
         val attachmentsToSend = pendingAttachments.toList()
+        val localAttachments = chatAttachmentsFromPending(attachmentsToSend)
         val text = visibleTextForPendingAttachments(rawText, attachmentsToSend)
         if (text.isBlank() && attachmentsToSend.isEmpty()) return true
 
@@ -174,7 +175,7 @@ internal class MainFriendChatActions(
         val pending = ChatMessage(
             role = "user",
             content = text,
-            attachments = chatAttachmentsFromPending(attachmentsToSend).takeIf { it.isNotEmpty() },
+            attachments = localAttachments.takeIf { it.isNotEmpty() },
             sendStatus = SENDING_STATUS
         )
         messages.add(pending)
@@ -192,6 +193,7 @@ internal class MainFriendChatActions(
             activity.runOnUiThread {
                 if (activeFriend?.id != friend.id) return@runOnUiThread
                 result.onSuccess { sentMessage ->
+                    sentMessage.withMissingImageAnnotationsFrom(localAttachments)
                     val index = messages.indexOf(pending)
                     if (index >= 0) {
                         messages[index] = sentMessage
@@ -316,15 +318,16 @@ internal class MainFriendChatActions(
             activity.runOnUiThread {
                 if (activeFriend?.id != friend.id) return@runOnUiThread
                 result.onSuccess { remoteMessages ->
-                    val changed = currentMessages.size != remoteMessages.size ||
-                        currentMessages.zip(remoteMessages).any { (current, incoming) ->
+                    val mergedMessages = remoteMessages.withMissingImageAnnotationsFromCurrent(currentMessages)
+                    val changed = currentMessages.size != mergedMessages.size ||
+                        currentMessages.zip(mergedMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
                                 current.content != incoming.content ||
                                 current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
                                 current.attachments != incoming.attachments
                     }
                     currentMessages.clear()
-                    currentMessages.addAll(remoteMessages)
+                    currentMessages.addAll(mergedMessages)
                     if (scrollToBottom && currentMessages.isNotEmpty()) {
                         binding.chatList.jumpToLatestMessageBeforeNextDraw()
                     }

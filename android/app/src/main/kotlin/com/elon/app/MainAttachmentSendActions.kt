@@ -110,7 +110,9 @@ internal class MainAttachmentSendActions(
                     setSendEnabled(true)
                     return@runOnUiThread
                 }
+                val localAttachments = chatAttachmentsFromPending(attachments)
                 val uploadedAttachments = chatAttachmentsFromRefs(refs)
+                    .withMissingImageAnnotationsFrom(localAttachments)
                 optimisticMessage.content = visibleText
                 optimisticMessage.attachments = uploadedAttachments.takeIf { it.isNotEmpty() }
                 optimisticMessage.sendStatus = null

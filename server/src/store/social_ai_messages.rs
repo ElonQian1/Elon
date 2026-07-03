@@ -412,6 +412,7 @@ fn normalize_reply_content(content: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project_ws_protocol::{ProjectAttachmentAnnotation, ProjectAttachmentRef};
     use crate::store::Store;
     use uuid::Uuid;
 
@@ -421,6 +422,71 @@ mod tests {
             Uuid::new_v4().simple()
         ));
         Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn friend_image_annotations_are_visible_to_recipient() {
+        let store = temp_store();
+        let alice = store
+            .create_user(
+                "alice-annotation@example.com",
+                "secret1",
+                Some("Alice"),
+                None,
+            )
+            .expect("alice should be created");
+        let bob = store
+            .create_user("bob-annotation@example.com", "secret1", Some("Bob"), None)
+            .expect("bob should be created");
+        store
+            .add_friend(&alice.id, Some("email"), "bob-annotation@example.com")
+            .expect("alice can add bob");
+
+        let attachments = vec![ProjectAttachmentRef {
+            attachment_id: Some("att_annotated".to_string()),
+            kind: Some("image".to_string()),
+            display_name: Some("marked.jpg".to_string()),
+            file_name: Some("marked.jpg".to_string()),
+            mime_type: Some("image/jpeg".to_string()),
+            path: Some("/tmp/marked.jpg".to_string()),
+            url: Some("http://example.test/marked.jpg".to_string()),
+            sha256: None,
+            size_bytes: Some(2048),
+            image_width: Some(1080),
+            image_height: Some(720),
+            duration_seconds: None,
+            transcription: None,
+            annotations: vec![ProjectAttachmentAnnotation {
+                x: 0.1,
+                y: 0.2,
+                width: 0.3,
+                height: 0.4,
+                note: "tap this note".to_string(),
+                icon_x: Some(0.41),
+                icon_y: Some(0.58),
+                icon_width: Some(0.06),
+                icon_height: Some(0.08),
+            }],
+        }];
+
+        let sent = store
+            .send_friend_message(&alice.id, &bob.id, "", Some(&attachments))
+            .expect("message with annotated image should be stored");
+        assert_eq!(sent.attachments[0].annotations[0].note, "tap this note");
+
+        let bob_messages = store
+            .list_friend_messages(&bob.id, &alice.id, None, 20)
+            .expect("recipient can list messages");
+        let received = bob_messages
+            .last()
+            .expect("recipient should see annotated image message");
+        let annotation = received.attachments[0]
+            .annotations
+            .first()
+            .expect("annotation should be preserved for recipient");
+        assert_eq!(annotation.note, "tap this note");
+        assert_eq!(annotation.icon_x, Some(0.41));
+        assert!(!received.outgoing);
     }
 
     #[test]
