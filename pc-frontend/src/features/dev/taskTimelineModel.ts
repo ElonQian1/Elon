@@ -81,6 +81,10 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
     const parsedEvent = parseToolEvent(text)
     const echoText = eventTextForEcho(parsedEvent) || text
     if (isFinalAnswerEcho(echoText, finalText)) return
+    if (isAssistantOutputEvent(parsedEvent)) {
+      coverage.assistantEvent = true
+      return
+    }
 
     const heartbeat = parseHeartbeat(text, message, index)
     if (heartbeat) {
@@ -196,20 +200,6 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     }
   }
 
-  if (type === 'assistant_message' || type === 'assistant_chunk') {
-    const text = clean(event.text ?? '')
-    return {
-      id: itemId(message, index),
-      kind: 'codex',
-      tone: type === 'assistant_message' ? 'done' : 'running',
-      title: type === 'assistant_message' ? 'Codex 回复片段' : 'Codex 正在输出',
-      detail: text.slice(0, 180),
-      meta: [clean(event.model_used ?? ''), shortNode(clean(event.node_id ?? ''))].filter(Boolean).join(' · '),
-      message,
-      event,
-    }
-  }
-
   if (type === 'usage') {
     return {
       id: itemId(message, index),
@@ -268,6 +258,10 @@ function markCoverage(coverage: TaskTimelineCoverage, event: ToolEvent) {
   }
   if (type === 'usage') coverage.usage = true
   if (type === 'assistant_message' || type === 'assistant_chunk') coverage.assistantEvent = true
+}
+
+function isAssistantOutputEvent(event: ToolEvent | null): boolean {
+  return event?.type === 'assistant_message' || event?.type === 'assistant_chunk'
 }
 
 function itemFromText(text: string, message: ChatMessage, index: number): TimelineItem {

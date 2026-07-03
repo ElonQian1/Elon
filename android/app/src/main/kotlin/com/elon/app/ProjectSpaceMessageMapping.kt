@@ -5,15 +5,20 @@ internal fun ProjectChannelMessage.toChatMessage(
     channel: ProjectChannel? = null,
     replyCount: Int? = null
 ): ChatMessage {
+    val assistantProgressText = if (kind == "ai_progress") {
+        projectSpaceAssistantProgressText(content)
+    } else {
+        null
+    }
     val role = when (kind) {
-        "ai_progress" -> "ai-progress"
+        "ai_progress" -> if (assistantProgressText != null) "ai" else "ai-progress"
         "ai_result" -> "ai"
         "system" -> "ai"
         else -> if (outgoing) "user" else "friend"
     }
     val postText = parseProjectSpacePostText(content)
     val displayContent = if (kind == "ai_progress") {
-        projectSpaceAiProgressText(content)
+        assistantProgressText ?: projectSpaceAiProgressText(content)
     } else {
         postText.detailText
     }
@@ -36,7 +41,11 @@ internal fun ProjectChannelMessage.toChatMessage(
     } else {
         null
     }
-    val evidence = taskEvidenceEntries() + projectSpaceAiProgressEvidence(content)
+    val evidence = if (assistantProgressText != null) {
+        emptyList()
+    } else {
+        taskEvidenceEntries() + projectSpaceAiProgressEvidence(content)
+    }
     return ChatMessage(
         role = role,
         content = displayContent,
@@ -44,8 +53,12 @@ internal fun ProjectChannelMessage.toChatMessage(
         senderLabel = if (role == "friend") cleanSenderName else null,
         senderAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
         id = id,
-        apkUrl = taskApkUrl.takeIf { role == "ai" },
-        codexThreadUri = taskCodexThreadId?.let { "codex://threads/$it" },
+        apkUrl = taskApkUrl.takeIf { kind == "ai_result" },
+        codexThreadUri = if (assistantProgressText == null) {
+            taskCodexThreadId?.let { "codex://threads/$it" }
+        } else {
+            null
+        },
         evidenceTitle = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceTitle),
         evidenceDetails = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceDetails),
         suggestionStatus = suggestionStatus,
@@ -54,6 +67,15 @@ internal fun ProjectChannelMessage.toChatMessage(
         canResolveSuggestion = canResolveSuggestion(projectRole),
         createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
     )
+}
+
+private fun projectSpaceAssistantProgressText(content: String): String? {
+    val parsed = runCatching { org.json.JSONObject(content) }.getOrNull() ?: return null
+    return when (parsed.optString("type")) {
+        "assistant_message", "assistant_chunk" ->
+            parsed.optString("text").takeIf { it.isNotBlank() }?.trim()
+        else -> null
+    }
 }
 
 private fun ProjectChannelMessage.taskEvidenceEntries(): List<EvidenceEntry> {

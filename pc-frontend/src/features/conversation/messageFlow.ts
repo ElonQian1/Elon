@@ -5,6 +5,7 @@ const TASK_PROCESS_KINDS = new Set(['ai_task', 'ai_progress', 'ai_result'])
 const CONVERSATION_USER_TASK_ROLES = new Set(['user', 'human'])
 const CONVERSATION_ASSISTANT_TASK_ROLES = new Set(['assistant', 'ai', 'bot'])
 const TERMINAL_TASK_STATUSES = new Set(['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'])
+const ASSISTANT_PROGRESS_EVENT_TYPES = new Set(['assistant_message', 'assistant_chunk'])
 
 export type SingleMessageGroup = {
   type: 'single'
@@ -35,17 +36,11 @@ export function messageConversationId(message: Message): string {
 }
 
 export function isTaskProcessMessage(message: Message): boolean {
-  return TASK_PROCESS_KINDS.has(messageKind(message)) && !!messageTaskId(message)
-}
-
-function isTaskLinkedConversationMessage(message: Message): boolean {
-  const kind = messageKind(message)
-  if (!messageTaskId(message)) return false
-  return CONVERSATION_USER_TASK_ROLES.has(kind) || CONVERSATION_ASSISTANT_TASK_ROLES.has(kind)
+  return isTaskBackfillMessage(message) && !parseAssistantProgressEvent(message)
 }
 
 function isTaskThreadMessage(message: Message): boolean {
-  return isTaskProcessMessage(message) || isTaskLinkedConversationMessage(message)
+  return isTaskProcessMessage(message)
 }
 
 export function isTerminalTaskStatus(status: unknown): boolean {
@@ -58,7 +53,7 @@ export function buildTaskProcessMessageMap(messageSources: Message[][]): Map<str
 
   for (const messages of messageSources) {
     for (const message of messages) {
-      if (!isTaskProcessMessage(message)) continue
+      if (!isTaskBackfillMessage(message)) continue
       const taskId = messageTaskId(message)
       const key = messageIdentity(message)
       if (seen.has(key)) continue
@@ -87,19 +82,19 @@ export function buildDisplayMessages(input: {
     taskMessagesById,
   } = input
 
-  if (!sessionView) return channelMessages
+  if (!sessionView) return materializeDisplayMessages(channelMessages)
   if (sessionView === 'new') return []
 
   if (conversationMessages.length > 0 || conversationLoading) {
-    return mergeConversationMessagesWithTaskProcess(conversationMessages, taskMessagesById)
+    return materializeDisplayMessages(mergeConversationMessagesWithTaskProcess(conversationMessages, taskMessagesById))
   }
 
   const byConversation = channelMessages.filter((message) => messageConversationId(message) === sessionView)
   if (byConversation.length > 0) {
-    return mergeConversationMessagesWithTaskProcess(byConversation, taskMessagesById)
+    return materializeDisplayMessages(mergeConversationMessagesWithTaskProcess(byConversation, taskMessagesById))
   }
 
-  return channelMessages.filter((message) => messageTaskId(message) === sessionView)
+  return materializeDisplayMessages(channelMessages.filter((message) => messageTaskId(message) === sessionView))
 }
 
 export function hasRunningTask(messages: Message[]): boolean {
@@ -122,14 +117,13 @@ export function hasRunningTask(messages: Message[]): boolean {
 
 export function buildMessageGroups(messages: Message[], taskFlowEnabled: boolean): MessageGroup[] {
   const groups: MessageGroup[] = []
-  const taskGroupById = new Map<string, TaskMessageGroup>()
+  let activeTaskGroup: TaskMessageGroup | null = null
 
   messages.forEach((message, index) => {
     const taskId = messageTaskId(message)
     if (taskFlowEnabled && isTaskThreadMessage(message)) {
-      const existing = taskGroupById.get(taskId)
-      if (existing) {
-        existing.messages.push(message)
+      if (activeTaskGroup && activeTaskGroup.taskId === taskId) {
+        activeTaskGroup.messages.push(message)
       } else {
         const group: TaskMessageGroup = {
           type: 'task',
@@ -137,12 +131,13 @@ export function buildMessageGroups(messages: Message[], taskFlowEnabled: boolean
           messages: [message],
           key: `task-${taskId}-${index}`,
         }
-        taskGroupById.set(taskId, group)
+        activeTaskGroup = group
         groups.push(group)
       }
       return
     }
 
+    activeTaskGroup = null
     groups.push({
       type: 'single',
       message,
@@ -171,7 +166,6 @@ function mergeConversationMessagesWithTaskProcess(
   const merged: Message[] = []
   const seen = new Set<string>()
   const insertedTaskIds = new Set<string>()
-  const insertedAssistantFallbackTaskIds = new Set<string>()
 
   for (const message of conversationMessages) {
     const taskId = messageTaskId(message)
@@ -191,12 +185,8 @@ function mergeConversationMessagesWithTaskProcess(
         for (const taskMessage of taskMessages) pushUniqueMessage(merged, seen, taskMessage)
         insertedTaskIds.add(taskId)
       }
-      if (
-        !taskMessages.some((taskMessage) => messageKind(taskMessage) === 'ai_result')
-        && !insertedAssistantFallbackTaskIds.has(taskId)
-      ) {
-        pushUniqueMessage(merged, seen, assistantMessageAsTaskResult(message))
-        insertedAssistantFallbackTaskIds.add(taskId)
+      if (!taskMessages.some((taskMessage) => messageKind(taskMessage) === 'ai_result')) {
+        pushUniqueMessage(merged, seen, message)
       }
       continue
     }
@@ -213,16 +203,6 @@ function isConversationUserTaskMessage(message: Message): boolean {
 
 function isConversationAssistantTaskMessage(message: Message): boolean {
   return CONVERSATION_ASSISTANT_TASK_ROLES.has(messageKind(message))
-}
-
-function assistantMessageAsTaskResult(message: Message): Message {
-  return {
-    ...message,
-    id: `task-result-${clean(message.id) || messageIdentity(message)}`,
-    kind: 'ai_result',
-    role: undefined,
-    task_status: clean(message.task_status ?? message.taskStatus) || 'done',
-  }
 }
 
 function pushUniqueMessage(target: Message[], seen: Set<string>, message: Message) {
@@ -258,4 +238,60 @@ function messageIdentity(message: Message): string {
     clean(message.created_at),
     clean(message.content ?? message.text ?? ''),
   ].join('|')
+}
+
+function isTaskBackfillMessage(message: Message): boolean {
+  return TASK_PROCESS_KINDS.has(messageKind(message)) && !!messageTaskId(message)
+}
+
+function materializeDisplayMessages(messages: Message[]): Message[] {
+  const out: Message[] = []
+  for (const message of messages) {
+    const assistantMessage = assistantProgressAsConversationMessage(message)
+    if (assistantMessage) {
+      out.push(assistantMessage)
+      continue
+    }
+    if (parseAssistantProgressEvent(message)) continue
+    out.push(message)
+  }
+  return out
+}
+
+function assistantProgressAsConversationMessage(message: Message): Message | null {
+  const event = parseAssistantProgressEvent(message)
+  if (!event) return null
+  const text = clean(event.text)
+  if (!text) return null
+  return {
+    ...message,
+    id: `assistant-progress-${clean(message.id) || messageIdentity(message)}`,
+    kind: 'assistant',
+    role: 'assistant',
+    content: text,
+    text,
+    task_id: undefined,
+    taskId: undefined,
+    task_status: undefined,
+    taskStatus: undefined,
+    task_error: undefined,
+    taskError: undefined,
+    model_used: clean(event.model_used) || message.model_used,
+    node_id: clean(event.node_id) || message.node_id,
+    stream_id: clean(event.stream_id) || message.stream_id,
+    assistant_progress_event: true,
+    source_task_id: messageTaskId(message),
+  }
+}
+
+function parseAssistantProgressEvent(message: Message): Record<string, unknown> | null {
+  if (messageKind(message) !== 'ai_progress') return null
+  const content = clean(message.content ?? message.text ?? '')
+  if (!content.startsWith('{')) return null
+  try {
+    const event = JSON.parse(content) as Record<string, unknown>
+    return ASSISTANT_PROGRESS_EVENT_TYPES.has(clean(event.type)) ? event : null
+  } catch {
+    return null
+  }
 }

@@ -67,11 +67,15 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
     if (apkUrl) task.apkUrl = apkUrl
     if (kind === 'ai_task') task.request = clean(messageText(msg)).replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '') || task.request
     if (kind === 'ai_progress') {
-      task.progressCount += 1
       const event = parseToolEvent(messageText(msg))
+      if (event?.type === 'assistant_message' || event?.type === 'assistant_chunk') continue
+      task.progressCount += 1
       if (event) rememberApprovalState(approvals, taskId, event)
     }
-    if (kind === 'ai_result' || isAssistantReplyKind(kind)) {
+    if (
+      kind === 'ai_result'
+      || (isAssistantReplyKind(kind) && !isAssistantProgressDisplay(msg) && isTerminalStatus(status))
+    ) {
       const content = messageText(msg)
       task.result = msg
       task.resultText = content
@@ -80,6 +84,14 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
     }
   }
   return { tasks, approvals }
+}
+
+function isAssistantProgressDisplay(msg: ChatMessage): boolean {
+  return (msg as Record<string, unknown>).assistant_progress_event === true
+}
+
+function isTerminalStatus(status: string): boolean {
+  return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
 }
 
 function rememberApprovalState(approvals: Map<string, ApprovalState>, taskId: string, event: ToolEvent) {

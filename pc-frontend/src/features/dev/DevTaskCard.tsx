@@ -85,8 +85,7 @@ function ProgressLine({ message, context, onCancel, onApprove }: DevTaskMessageP
     return <StatusLine text={`已派发到 PC 节点，等待 ${cli} CLI 输出`} tone="running" runtime={agent} />
   }
   if (event.type === 'assistant_message' || event.type === 'assistant_chunk') {
-    const text = clean(event.text ?? '')
-    return <StatusLine text={text || 'Codex 正在输出'} tone={event.type === 'assistant_message' ? 'done' : 'running'} runtime={clean(event.model_used ?? '')} />
+    return null
   }
   if (event.type === 'usage') {
     return <StatusLine text={usageEventSummary(event)} tone="done" runtime={clean(event.model ?? '')} />

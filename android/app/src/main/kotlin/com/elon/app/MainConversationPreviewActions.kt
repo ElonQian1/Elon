@@ -74,14 +74,23 @@ internal class MainConversationPreviewActions(
         val clean = sanitizeEvidenceDetail(entry.text)
         if (clean.isBlank()) return
         val latestUserIndex = conversation.messages.indexOfLast { it.role == "user" }
+        val latestAssistantIndex = conversation.messages.indices.lastOrNull { index ->
+            index > latestUserIndex &&
+                conversation.messages[index].role == "ai" &&
+                !conversation.messages[index].processLayer
+        } ?: -1
+        val evidenceFloor = maxOf(latestUserIndex, latestAssistantIndex)
         val evidenceIndex = conversation.messages.indices.lastOrNull { index ->
-            index > latestUserIndex && conversation.messages[index].role in MainWorkflowRoles.assistantEvidence
+            index > evidenceFloor &&
+                conversation.messages[index].role in MainWorkflowRoles.assistantEvidence &&
+                conversation.messages[index].processLayer
         } ?: run {
             conversation.messages.add(
                 ChatMessage(
                     role = "ai-intent",
                     content = "我正在处理这次请求，过程会折叠在这里。",
-                    evidenceWorking = working
+                    evidenceWorking = working,
+                    processLayer = true
                 )
             )
             conversation.messages.lastIndex

@@ -76,14 +76,28 @@ internal class MainEvidenceActions(
             promoted.evidenceWorking = false
         }
 
+        var targetIndex = index
+        var removedProcessLayer = false
+        for (i in messages.lastIndex downTo latestUserIndex + 1) {
+            if (i != targetIndex && isTransientCodexProcessMessage(messages[i])) {
+                messages.removeAt(i)
+                if (i < targetIndex) targetIndex -= 1
+                removedProcessLayer = true
+            }
+        }
+
         messages.forEachIndexed { i, msg ->
-            if (i != index && msg.evidenceWorking) {
+            if (i != targetIndex && msg.evidenceWorking) {
                 msg.evidenceWorking = false
                 chatAdapter().notifyMessageUpdated(i)
             }
         }
-        messages[index] = promoted
-        chatAdapter().notifyMessageUpdated(index)
+        messages[targetIndex] = promoted
+        if (removedProcessLayer) {
+            chatAdapter().notifyDataSetChanged()
+        } else {
+            chatAdapter().notifyMessageUpdated(targetIndex)
+        }
         saveConversations()
         return true
     }
@@ -129,7 +143,17 @@ internal class MainEvidenceActions(
         latestUserIndex: Int,
         working: Boolean
     ): Int? {
-        messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
+        val latestAssistantIndex = messages.indices.lastOrNull {
+            it > latestUserIndex &&
+                messages[it].role == "ai" &&
+                !messages[it].processLayer
+        } ?: -1
+        val evidenceFloor = maxOf(latestUserIndex, latestAssistantIndex)
+        messages.indices.lastOrNull {
+            it > evidenceFloor &&
+                messages[it].role in assistantEvidenceRoles &&
+                messages[it].processLayer
+        }
             ?.let { return it }
 
         val placeholder = ChatMessage(

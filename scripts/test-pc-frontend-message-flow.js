@@ -45,7 +45,9 @@ try {
 
   const taskMessages = [
     { id: 'pcm-task', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },
+    { id: 'pcm-assistant-1', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"assistant_message","text":"我先读取规则入口。","model_used":"codex"}' },
     { id: 'pcm-progress', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"tool_call","tool":"rg"}' },
+    { id: 'pcm-assistant-2', kind: 'ai_progress', task_id: 'tsk-1', content: '{"type":"assistant_message","text":"规则已读完，接着运行只读命令。","model_used":"codex"}' },
     { id: 'pcm-result', kind: 'ai_result', task_id: 'tsk-1', content: '最终答案：已修复。' },
   ];
   const conversationMessages = [
@@ -63,22 +65,41 @@ try {
   });
   assert.deepStrictEqual(
     merged.map((message) => message.id),
-    ['msg-user', 'pcm-task', 'pcm-progress', 'pcm-result'],
-    'member conversation task rows should keep the real user turn and attach structured task process rows',
+    [
+      'msg-user',
+      'pcm-task',
+      'assistant-progress-pcm-assistant-1',
+      'pcm-progress',
+      'assistant-progress-pcm-assistant-2',
+      'pcm-result',
+    ],
+    'assistant_message progress rows should become normal assistant bubbles between structured process rows',
   );
   assert.strictEqual(hasRunningTask(merged), false, 'terminal ai_result should close the task');
+  assert.strictEqual(merged[2].kind, 'assistant', 'Codex reply fragments should render as assistant messages');
+  assert.strictEqual(merged[2].task_id, undefined, 'reply fragments should not be swallowed by task grouping');
 
   const groups = buildMessageGroups(merged, true);
-  assert.strictEqual(groups.length, 1, 'structured task process should render as one task group');
-  assert.strictEqual(groups[0].type, 'task');
-  assert.strictEqual(groups[0].taskId, 'tsk-1');
+  assert.strictEqual(groups.length, 6, 'assistant bubbles should split process groups into visible conversation turns');
   assert.deepStrictEqual(
-    groups[0].messages.map((message) => message.id),
-    ['msg-user', 'pcm-task', 'pcm-progress', 'pcm-result'],
-    'task group should preserve the real user request, progress, and final result together',
+    groups.map((group) => group.type),
+    ['single', 'task', 'single', 'task', 'single', 'task'],
+    'process groups should be consecutive segments, not a global task_id bucket',
+  );
+  assert.deepStrictEqual(
+    groups.map((group) => group.type === 'task' ? group.messages.map((message) => message.id) : [group.message.id]),
+    [
+      ['msg-user'],
+      ['pcm-task'],
+      ['assistant-progress-pcm-assistant-1'],
+      ['pcm-progress'],
+      ['assistant-progress-pcm-assistant-2'],
+      ['pcm-result'],
+    ],
+    'task process, Codex reply fragments, and final result should stay in chronological order',
   );
 
-  const inFlightTaskMessages = taskMessages.slice(0, 2);
+  const inFlightTaskMessages = taskMessages.slice(0, 3);
   const mergedWithAssistantFallback = buildDisplayMessages({
     sessionView: 'conv-1',
     channelMessages: [],
@@ -88,30 +109,24 @@ try {
   });
   assert.deepStrictEqual(
     mergedWithAssistantFallback.map((message) => message.id),
-    ['msg-user', 'pcm-task', 'pcm-progress', 'task-result-msg-assistant'],
-    'assistant conversation reply should remain visible when channel ai_result is not available yet',
-  );
-  assert.strictEqual(
-    mergedWithAssistantFallback[3].kind,
-    'ai_result',
-    'assistant fallback should render inside the structured task group as the final result',
+    ['msg-user', 'pcm-task', 'assistant-progress-pcm-assistant-1', 'pcm-progress', 'msg-assistant'],
+    'assistant conversation reply should remain a normal bubble when channel ai_result is not available yet',
   );
   assert.strictEqual(hasRunningTask(mergedWithAssistantFallback), false, 'assistant fallback should close the task');
   const fallbackGroups = buildMessageGroups(mergedWithAssistantFallback, true);
-  assert.strictEqual(fallbackGroups.length, 1, 'assistant fallback should stay connected to the task group');
+  assert.strictEqual(fallbackGroups.length, 5, 'assistant fallback should not be folded into the process panel');
   assert.deepStrictEqual(
-    fallbackGroups[0].messages.map((message) => message.id),
-    ['msg-user', 'pcm-task', 'pcm-progress', 'task-result-msg-assistant'],
-    'task group should include the fallback final answer',
+    fallbackGroups.map((group) => group.type === 'task' ? group.messages.map((message) => message.id) : [group.message.id]),
+    [['msg-user'], ['pcm-task'], ['assistant-progress-pcm-assistant-1'], ['pcm-progress'], ['msg-assistant']],
+    'fallback final answer should stay in the chat stream after the process rows',
   );
 
   const conversationOnlyGroups = buildMessageGroups(conversationMessages, true);
-  assert.strictEqual(conversationOnlyGroups.length, 1, 'task-linked conversation rows should form one task thread');
-  assert.strictEqual(conversationOnlyGroups[0].type, 'task');
+  assert.strictEqual(conversationOnlyGroups.length, 2, 'task-linked conversation rows should remain normal chat bubbles');
   assert.deepStrictEqual(
-    conversationOnlyGroups[0].messages.map((message) => message.id),
+    conversationOnlyGroups.map((group) => group.type === 'task' ? group.messages.map((message) => message.id) : [group.message.id]).flat(),
     ['msg-user', 'msg-assistant'],
-    'conversation-only task thread should keep user and assistant turns connected',
+    'conversation-only task messages should preserve user and assistant turns without a process group',
   );
   assert.strictEqual(
     hasRunningTask([
@@ -183,8 +198,26 @@ try {
   );
   assert.strictEqual(
     timelineSummary(timeline, 'tsk-heartbeat', 'tsk_hear...'),
-    '5 步过程 · 合并 2 条等待状态 · tsk_hear...',
+    '5 步过程 · 合并 2 条等待状态 · 未收到 CLI 输出 · tsk_hear...',
     'timeline summary should expose compacted step count and heartbeat compaction',
+  );
+  const assistantOutputTimeline = buildTaskTimeline([
+    {
+      id: 'assistant-progress',
+      kind: 'ai_progress',
+      task_id: 'tsk-assistant-progress',
+      content: '{"type":"assistant_message","text":"我会先读取规则入口。","model_used":"codex"}',
+    },
+  ]);
+  assert.strictEqual(
+    assistantOutputTimeline.items.length,
+    0,
+    'assistant_message events should not appear inside the folded process timeline',
+  );
+  assert.strictEqual(
+    assistantOutputTimeline.coverage.assistantEvent,
+    true,
+    'timeline coverage should still record that Codex produced assistant output',
   );
   const finalEchoTimeline = buildTaskTimeline(
     [

@@ -57,7 +57,7 @@ internal class MainBackgroundTaskMessageActions(
                 recordEvidence(location, structuredProcessEvidence(parsed), working = true, enabled = isDevelopment)
                 return
             }
-            "assistant_message" -> assistantMessage(parsed, isDevelopment) ?: return
+            "assistant_message" -> assistantMessage(parsed) ?: return
             "assistant_chunk" -> {
                 val streamId = jsonStringOrNull(parsed, "stream_id") ?: return
                 val chunk = jsonStringOrNull(parsed, "text") ?: return
@@ -116,11 +116,10 @@ internal class MainBackgroundTaskMessageActions(
         return ChatMessage("ai-progress", workflowProgressMessage("工具执行遇到问题：${summarize(result, 80)}"))
     }
 
-    private fun assistantMessage(parsed: JSONObject, isDevelopment: Boolean): ChatMessage? {
+    private fun assistantMessage(parsed: JSONObject): ChatMessage? {
         val text = jsonStringOrNull(parsed, "text") ?: return null
-        val role = if (isDevelopment) "ai-intent" else "ai"
         return ChatMessage(
-            role = role,
+            role = "ai",
             content = text,
             modelUsed = jsonStringOrNull(parsed, "model_used"),
             nodeId = jsonStringOrNull(parsed, "node_id"),
