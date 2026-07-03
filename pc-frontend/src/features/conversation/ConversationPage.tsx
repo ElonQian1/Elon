@@ -25,6 +25,12 @@ import {
 } from '../models/routeModelPolicy'
 import { initialProjectRuntimeRouteFromStorage, persistProjectRuntimeRouteSelection } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
+import {
+  ensureLocalFullAccessGrant,
+  initialDirectPcCliFromStorage,
+  persistDirectPcCliSelection,
+} from './localPcRuntime'
+import type { LocalNodeStatus } from './localPcRuntime'
 import type {
   Channel,
   ChannelMessagesResponse,
@@ -92,16 +98,7 @@ import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
-const DIRECT_PC_CLI_STORAGE_KEY = 'elon_pc_project_direct_pc_cli'
 type MemberPanelScope = 'channel' | 'project'
-
-interface LocalNodeStatus {
-  agent_id?: string
-  owner_user_id?: string
-  device_name?: string
-  connected?: boolean
-  codex_cli?: { available?: boolean; logged_in?: boolean; status?: string }
-}
 
 interface ProjectRealtimeDetail {
   projectId?: string
@@ -125,26 +122,6 @@ interface TaskMessageCacheEntry {
 const TASK_MESSAGE_CACHE_FRESH_MS = 4000
 const CONVERSATION_CACHE_FRESH_MS = 12000
 const CACHED_CONVERSATION_REFRESH_DELAY_MS = 450
-
-function initialDirectPcCliFromStorage(storage?: Storage | null): boolean {
-  try {
-    return storage?.getItem(DIRECT_PC_CLI_STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function persistDirectPcCliSelection(storage: Storage | null | undefined, enabled: boolean): void {
-  try {
-    if (enabled) {
-      storage?.setItem(DIRECT_PC_CLI_STORAGE_KEY, '1')
-    } else {
-      storage?.removeItem(DIRECT_PC_CLI_STORAGE_KEY)
-    }
-  } catch {
-    // Ignore blocked storage; the selected value still works for the current session.
-  }
-}
 
 export default function ConversationPage() {
   useChannelAutoRefresh()
@@ -528,14 +505,22 @@ export default function ConversationPage() {
         return
       }
 
-      clearComposerDraft()
-      const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
-      const conversationId = isExistingConversation ? sessionView : uuidv4()
-      const conversationTitle = isExistingConversation ? null : titleFromMessage(text)
       const directPcCliForRequest = directPcCliActive
       const requestRuntimeRoute: RuntimeRoute = directPcCliForRequest ? 'route_a' : runtimeRoute
       const useLocalNodeForRequest = (directPcCliForRequest || shouldPreferLocalNode) && localNodeReady
       const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, requestRuntimeRoute)
+      await ensureLocalFullAccessGrant({
+        adminUrl: safeNodeAdminUrl(),
+        projectId: activeProjectId,
+        projectName: activeProject?.name,
+        workspacePath: activeWorkspacePath,
+        runtimePermission: activeProject?.runtime_permission,
+        useLocalRouteA: useLocalNodeForRequest && requestRuntimeRoute === 'route_a',
+      })
+      clearComposerDraft()
+      const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
+      const conversationId = isExistingConversation ? sessionView : uuidv4()
+      const conversationTitle = isExistingConversation ? null : titleFromMessage(text)
       const response = await sendMessage(
         fullContent,
         requestAgent || null,

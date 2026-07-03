@@ -28,6 +28,7 @@ require.extensions['.ts'] = function loadTsModule(module, filename) {
   module._compile(output.outputText, filename);
 };
 
+async function main() {
 try {
   const {
     buildDisplayMessages,
@@ -47,6 +48,59 @@ try {
     recoveryViewFromEntry,
     recoveryViewFromTask,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'agentRunRecoveryModel.ts'));
+  const {
+    ensureLocalFullAccessGrant,
+    normalizeLocalWorkspacePath,
+    requiresLocalFullAccessGrant,
+  } = require(path.join(pcRoot, 'src', 'features', 'conversation', 'localPcRuntime.ts'));
+
+  assert.strictEqual(normalizeLocalWorkspacePath('E:/一龙项目/'), 'e:\\一龙项目', 'workspace path comparison should ignore slash style and case');
+  assert.strictEqual(requiresLocalFullAccessGrant('project_write', true), false, 'project-write mode should not request a local full-access grant');
+  assert.strictEqual(requiresLocalFullAccessGrant('full_access', true), true, 'Route A full-access mode should require a local grant');
+  assert.strictEqual(requiresLocalFullAccessGrant('danger_full_access', false), false, 'non-Route-A execution should keep its own permission policy');
+
+  const existingGrantRequests = [];
+  const existingGrantResult = await ensureLocalFullAccessGrant({
+    adminUrl: 'http://127.0.0.1:7799/',
+    projectId: 'elon-self',
+    projectName: '一龙项目',
+    workspacePath: 'E:\\一龙项目',
+    runtimePermission: 'danger_full_access',
+    useLocalRouteA: true,
+  }, {
+    request: async (requestPath, options) => {
+      existingGrantRequests.push({ requestPath, options });
+      return { grants: [{ project_id: 'elon-self', workspace_path: 'e:/一龙项目/' }] };
+    },
+    confirm: () => { throw new Error('existing grants must not prompt again'); },
+  });
+  assert.strictEqual(existingGrantResult, 'already_granted', 'matching project and canonical workspace should reuse the existing grant');
+  assert.strictEqual(existingGrantRequests.length, 1, 'existing grant should only read the local grant list');
+
+  const missingGrantRequests = [];
+  let confirmationText = '';
+  const missingGrantResult = await ensureLocalFullAccessGrant({
+    adminUrl: 'http://127.0.0.1:7799/',
+    projectId: 'elon-self',
+    projectName: '一龙项目',
+    workspacePath: 'E:\\一龙项目',
+    runtimePermission: 'danger_full_access',
+    useLocalRouteA: true,
+  }, {
+    request: async (requestPath, options) => {
+      missingGrantRequests.push({ requestPath, options });
+      return requestPath === '/api/full-access/grants' && !options ? { grants: [] } : { ok: true };
+    },
+    confirm: (message) => { confirmationText = message; return true; },
+  });
+  assert.strictEqual(missingGrantResult, 'granted', 'confirmed missing grant should be persisted before dispatch');
+  assert.ok(confirmationText.includes('E:\\一龙项目') && confirmationText.includes('任意命令'), 'danger mode should confirm the exact path and risk locally');
+  assert.strictEqual(missingGrantRequests.length, 2, 'missing grant should read then write the local grant');
+  assert.deepStrictEqual(JSON.parse(missingGrantRequests[1].options.body), {
+    project_id: 'elon-self',
+    workspace_path: 'E:\\一龙项目',
+    confirm_full_access: true,
+  }, 'grant request should carry the exact project, path, and explicit confirmation');
 
   const taskMessages = [
     { id: 'pcm-task', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },
@@ -508,3 +562,9 @@ try {
 } finally {
   require.extensions['.ts'] = originalTsLoader;
 }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
