@@ -6,6 +6,7 @@ import LevelExperienceBar from '../billing/LevelExperienceBar'
 import { useUserProgression } from '../billing/useUserProgression'
 import UserAvatar, { userDisplayName } from './UserAvatar'
 import UserAccountMenu from './UserAccountMenu'
+import { presenceSummary, useMyPresence } from './useMyPresence'
 import styles from './SidebarUserStrip.module.css'
 
 export default function SidebarUserStrip() {
@@ -17,7 +18,9 @@ export default function SidebarUserStrip() {
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
   const progression = useUserProgression(user?.id, token)
+  const presence = useMyPresence()
   const displayName = user ? userDisplayName(user) : token ? '加载中…' : '未登录'
+  const statusText = user ? presenceSummary(presence) : '需要登录'
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
 
@@ -50,10 +53,10 @@ export default function SidebarUserStrip() {
         aria-expanded={user ? menuOpen : undefined}
         aria-controls={user ? accountMenuId : undefined}
       >
-        <UserAvatar user={user} size="compact" showStatus={!!user} />
+        <UserAvatar user={user} size="compact" showStatus={!!user} presenceStatus={presence?.status} />
         <span className={styles.userCopy}>
           <strong>{displayName}</strong>
-          <small>{user ? '在线' : '需要登录'}</small>
+          <small>{statusText}</small>
         </span>
       </button>
 
@@ -75,6 +78,7 @@ export default function SidebarUserStrip() {
           id={accountMenuId}
           user={user}
           token={token}
+          presence={presence}
           open={menuOpen}
           anchorRef={stripRef}
           onClose={closeMenu}

@@ -5,6 +5,7 @@ import { Bot, Boxes, MonitorCog, UsersRound, Mic2 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { useProjectStore } from '../conversation/useProjectStore'
 import UserAvatar, { userDisplayName } from './UserAvatar'
+import { presenceLabel, useMyPresence } from './useMyPresence'
 import styles from './ServerRail.module.css'
 
 interface RailItem {
@@ -27,6 +28,7 @@ export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const user = useAuthStore((s) => s.user)
+  const presence = useMyPresence()
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
 
   // 项目列表（从 store 读取，实时响应）
@@ -112,14 +114,14 @@ export default function ServerRail() {
       {user && (
         <button
           className={[styles.avatar, styles.userAvatar].join(' ')}
-          title={`${userDisplayName(user)} — 账号设置`}
-          aria-label={`${userDisplayName(user)} — 账号设置`}
-          onMouseEnter={(e) => showTip(e, userDisplayName(user))}
+          title={`${userDisplayName(user)} — ${presenceLabel(presence?.status)}`}
+          aria-label={`${userDisplayName(user)} — ${presenceLabel(presence?.status)}`}
+          onMouseEnter={(e) => showTip(e, `${userDisplayName(user)} · ${presenceLabel(presence?.status)}`)}
           onMouseLeave={() => setTooltip(null)}
           onClick={() => navigate('/account')}
           type="button"
         >
-          <UserAvatar user={user} size="rail" showStatus className={styles.railUserAvatar} />
+          <UserAvatar user={user} size="rail" showStatus presenceStatus={presence?.status} className={styles.railUserAvatar} />
         </button>
       )}
 

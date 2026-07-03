@@ -5,12 +5,15 @@ import { ExternalLink, FolderPlus, LogOut, Settings } from 'lucide-react'
 import type { User } from '../../store/auth'
 import { getPcLegacyUrl, rememberPcLegacyToken } from './pcLegacyUrl'
 import UserAvatar, { userAccountMeta, userDisplayName } from './UserAvatar'
+import type { UserPresenceSettings } from './useMyPresence'
+import { presenceSummary } from './useMyPresence'
 import styles from './UserAccountMenu.module.css'
 
 interface Props {
   id: string
   user: User
   token: string | null
+  presence: UserPresenceSettings | null
   open: boolean
   anchorRef: RefObject<HTMLElement>
   onClose: () => void
@@ -21,6 +24,7 @@ export default function UserAccountMenu({
   id,
   user,
   token,
+  presence,
   open,
   anchorRef,
   onClose,
@@ -79,10 +83,16 @@ export default function UserAccountMenu({
       hidden={!open}
     >
       <div className={styles.header}>
-        <UserAvatar user={user} size="panel" showStatus className={styles.headerAvatar} />
+        <UserAvatar
+          user={user}
+          size="panel"
+          showStatus
+          presenceStatus={presence?.status}
+          className={styles.headerAvatar}
+        />
         <div className={styles.headerCopy}>
           <strong>{displayName}</strong>
-          <span>{userAccountMeta(user)}</span>
+          <span>{presence ? presenceSummary(presence) : userAccountMeta(user)}</span>
         </div>
       </div>
 

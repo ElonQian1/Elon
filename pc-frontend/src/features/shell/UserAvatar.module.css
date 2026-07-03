@@ -63,6 +63,18 @@
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .16);
 }
 
+.statusDot[data-status="idle"] {
+  background: #f0b232;
+}
+
+.statusDot[data-status="dnd"] {
+  background: #df5c5c;
+}
+
+.statusDot[data-status="offline"] {
+  background: #545862;
+}
+
 .rail .statusDot {
   right: 1px;
   bottom: 1px;

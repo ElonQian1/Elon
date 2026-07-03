@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { User } from '../../store/auth'
+import { visiblePresenceStatus } from './useMyPresence'
 import styles from './UserAvatar.module.css'
 
 type AvatarSize = 'rail' | 'compact' | 'panel'
@@ -8,6 +9,7 @@ interface Props {
   user: User | null
   size?: AvatarSize
   showStatus?: boolean
+  presenceStatus?: string | null
   className?: string
 }
 
@@ -78,9 +80,10 @@ function shortUserId(id: string): string {
   return `${value.slice(0, 8)}…${value.slice(-4)}`
 }
 
-export default function UserAvatar({ user, size = 'compact', showStatus = false, className = '' }: Props) {
+export default function UserAvatar({ user, size = 'compact', showStatus = false, presenceStatus, className = '' }: Props) {
   const avatarSrc = userAvatarUrl(user)
   const [imageFailed, setImageFailed] = useState(false)
+  const status = visiblePresenceStatus(presenceStatus ?? user?.status ?? 'online')
 
   useEffect(() => {
     setImageFailed(false)
@@ -105,7 +108,7 @@ export default function UserAvatar({ user, size = 'compact', showStatus = false,
         />
       )}
       <span className={styles.initial}>{userInitial(user)}</span>
-      {showStatus && <span className={styles.statusDot} />}
+      {showStatus && <span className={styles.statusDot} data-status={status} />}
     </span>
   )
 }
