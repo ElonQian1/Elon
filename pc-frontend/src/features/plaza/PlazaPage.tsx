@@ -57,7 +57,7 @@ export default function PlazaPage() {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { load(searchQ, activeFilter) }, [searchQ, activeFilter]) // eslint-disable-line
+  useEffect(() => { load(searchQ, activeFilter) }, [searchQ, activeFilter])
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault()

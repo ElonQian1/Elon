@@ -63,7 +63,7 @@ export function RoleManagementDrawer({
 
   useEffect(() => {
     refreshRoles()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [projectId])
 
   const selectedRole = roles.find((role) => role.id === selectedRoleId)

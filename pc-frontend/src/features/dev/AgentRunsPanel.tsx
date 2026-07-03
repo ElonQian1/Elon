@@ -62,7 +62,7 @@ export default function AgentRunsPanel({ workspacePath, onDraftContinue }: Omit<
     load(true)
     pollRef.current = setInterval(() => load(), POLL_INTERVAL)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [workspacePath])
 
   const cancelTask = useCallback(async (taskId: string) => {

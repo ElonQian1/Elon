@@ -118,7 +118,7 @@ export default function AiChatPage() {
         setUsersLoading(false)
       })
     return () => { cancelled = true }
-  }, [user?.id]) // eslint-disable-line
+  }, [user?.id])
 
   // ── 节点状态轮询（每 6s）──────────────────────────────────────────────
   useEffect(() => {
@@ -145,7 +145,7 @@ export default function AiChatPage() {
     checkNode()
     const t = setInterval(checkNode, 6000)
     return () => clearInterval(t)
-  }, [user?.id]) // eslint-disable-line
+  }, [user?.id])
 
   useEffect(() => {
     if (nodeStatusChecked && runtimeRoute === 'route_a' && !onlineNodeId) {

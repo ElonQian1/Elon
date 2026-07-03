@@ -36,7 +36,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
 
   useEffect(() => {
     loadNodes()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [])
 
   async function loadNodes() {

@@ -25,9 +25,9 @@ export default function DoctorPage() {
   const [adapterName, setAdapterName] = useState('')
   const feedRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => { loadSessions() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (section === 'memory' && memories === null) loadMemory() }, [section]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (section === 'router' && routerStatus === null) loadRouterStatus() }, [section]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSessions() }, [])
+  useEffect(() => { if (section === 'memory' && memories === null) loadMemory() }, [section])
+  useEffect(() => { if (section === 'router' && routerStatus === null) loadRouterStatus() }, [section])
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages, result])

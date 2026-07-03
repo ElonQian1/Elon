@@ -64,7 +64,7 @@ function StudioPanel() {
         setRelayUrl(relayRes.value.ttsWorkerUrl ?? '')
       }
     }).finally(() => setLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [])
 
   async function saveRelay() {

@@ -51,7 +51,7 @@ export default function Shell() {
         useAuthStore.getState().logout()
       }
     })
-  }, [token]) // eslint-disable-line
+  }, [token])
 
   return (
     <div className={styles.shell}>

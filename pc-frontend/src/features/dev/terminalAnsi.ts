@@ -69,7 +69,7 @@ export function normalizeTerminalChunk(value: string): string {
 
 export function parseTerminalSegments(value: string): TerminalSegment[] {
   const segments: TerminalSegment[] = []
-  let style = defaultStyle()
+  const style = defaultStyle()
   let cursor = 0
   ANSI_SEQUENCE.lastIndex = 0
 

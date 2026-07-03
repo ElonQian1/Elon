@@ -84,7 +84,7 @@ export function ModelPickerPopover({
   // 初次打开时加载
   useEffect(() => {
     if (user?.id && !loading) load(user.id)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user?.id])
 
   // Escape 关闭

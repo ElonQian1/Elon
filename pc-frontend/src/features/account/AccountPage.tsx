@@ -55,7 +55,7 @@ export default function AccountPage() {
   useEffect(() => {
     loadBalance()
     loadBilling()
-  }, []) // eslint-disable-line
+  }, [])
 
   async function loadBalance() {
     try {

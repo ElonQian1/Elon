@@ -87,7 +87,7 @@ export function InviteDrawer({
   useEffect(() => {
     refreshInvites()
     refreshRoles()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [projectId])
 
   async function createInvite() {

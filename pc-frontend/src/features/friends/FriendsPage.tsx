@@ -120,7 +120,7 @@ export default function FriendsPage() {
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => { loadSocialConversations() }, [me?.id]) // eslint-disable-line
+  useEffect(() => { loadSocialConversations() }, [me?.id])
 
   useEffect(() => {
     function onPresence(event: PresenceEvent) {

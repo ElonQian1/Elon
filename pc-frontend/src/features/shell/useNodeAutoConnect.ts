@@ -51,7 +51,7 @@ export function useNodeAutoConnect(): NodeConnectState {
     }, PROBE_INTERVAL_MS)
 
     return () => clearInterval(timer)
-  }, [token]) // eslint-disable-line
+  }, [token])
 
   async function probe(userToken: string) {
     try {

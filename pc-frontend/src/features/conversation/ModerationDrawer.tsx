@@ -144,7 +144,7 @@ export function ModerationDrawer({
 
   useEffect(() => {
     refreshAudit()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [projectId])
   useEffect(() => {
     if (!initialMemberId) return

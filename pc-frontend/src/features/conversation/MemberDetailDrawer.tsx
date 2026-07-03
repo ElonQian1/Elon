@@ -127,7 +127,7 @@ export function MemberDetailDrawer({
 
   useEffect(() => {
     refreshAudit()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [projectId, member.user_id])
 
   useEffect(() => {

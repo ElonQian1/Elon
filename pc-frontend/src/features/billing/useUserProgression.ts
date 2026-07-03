@@ -11,7 +11,6 @@ export function useUserProgression(userId?: string, token?: string | null) {
     }
 
     let cancelled = false
-    let timer: number | undefined
 
     async function refresh() {
       try {
@@ -23,11 +22,11 @@ export function useUserProgression(userId?: string, token?: string | null) {
     }
 
     void refresh()
-    timer = window.setInterval(refresh, 60_000)
+    const timer = window.setInterval(refresh, 60_000)
 
     return () => {
       cancelled = true
-      if (timer) window.clearInterval(timer)
+      window.clearInterval(timer)
     }
   }, [userId, token])
 

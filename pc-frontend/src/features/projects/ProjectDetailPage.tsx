@@ -80,7 +80,7 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     if (id) selectProject(id).catch(() => {})
-  }, [id]) // eslint-disable-line
+  }, [id])
 
   useEffect(() => {
     if (location.pathname.endsWith('/members')) setTab('members')
@@ -127,7 +127,7 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (tab === 'workspace') loadHealth()
     if (tab === 'members') loadMembers()
-  }, [tab, id]) // eslint-disable-line
+  }, [tab, id])
 
   if (!project && !id) return <div className={styles.empty}>未选择项目</div>
 

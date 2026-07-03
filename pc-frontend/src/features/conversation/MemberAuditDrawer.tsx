@@ -56,7 +56,7 @@ export function MemberAuditDrawer({
 
   useEffect(() => {
     refreshAudit()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [projectId])
 
   const visibleEntries = useMemo(() => {

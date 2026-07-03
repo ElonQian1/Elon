@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Cpu, History, RefreshCw, Smartphone } from 'lucide-react'
@@ -218,7 +218,7 @@ export default function ConversationPage() {
     await reloadProjectSpace()
   }, [reloadProjectSpace])
 
-  useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+  useEffect(() => { loadProjects() }, [user?.id])
 
   useEffect(() => {
     let canceled = false
@@ -314,7 +314,7 @@ export default function ConversationPage() {
     listMemberConversations(activeProjectId, activeConversationTargetId).then(setMemberConversations).catch((err: { message?: string; status?: number }) => {
       console.warn('[MemberConversations] failed:', err?.status, err?.message)
     })
-  }, [activeProjectId, activeConversationTargetId]) // eslint-disable-line
+  }, [activeProjectId, activeConversationTargetId])
 
   // 项目切换时清空会话消息
   useEffect(() => {
@@ -326,7 +326,7 @@ export default function ConversationPage() {
     setSessionView(null)
     setMemberConversationTarget(null)
     waitingForNewSession.current = false
-  }, [activeProjectId, projectHomeVersion]) // eslint-disable-line
+  }, [activeProjectId, projectHomeVersion])
 
   useEffect(() => {
     setSelectedMember(null)
@@ -804,7 +804,7 @@ export default function ConversationPage() {
       waitingForNewSession.current = false
       openConversation(newConv.id)
     }
-  }, [memberConversations]) // eslint-disable-line
+  }, [memberConversations])
 
   // 切换频道时重置会话视图
   useEffect(() => {
@@ -813,7 +813,7 @@ export default function ConversationPage() {
     setConvMessages([])
     setSessionTaskMessages([])
     waitingForNewSession.current = false
-  }, [activeChannelId]) // eslint-disable-line
+  }, [activeChannelId])
 
   // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
   async function openConversation(convId: string, options: { force?: boolean } = {}) {

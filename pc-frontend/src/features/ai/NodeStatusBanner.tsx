@@ -45,7 +45,7 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
     checkNodes()
     pollRef.current = setInterval(checkNodes, POLL_INTERVAL_MS)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, [isControlled]) // eslint-disable-line
+  }, [isControlled])
 
   async function checkNodes() {
     try {
