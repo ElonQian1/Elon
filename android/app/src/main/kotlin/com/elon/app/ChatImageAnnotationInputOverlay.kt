@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.graphics.RectF
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.InputMethodManager
@@ -23,6 +25,8 @@ internal class ChatImageAnnotationInputOverlay(
     private var panel: FrameLayout? = null
     private var input: EditText? = null
     private var currentIndex: Int? = null
+    private var currentBounds: RectF? = null
+    private var currentPanelWidth = 0
 
     fun show(index: Int) {
         val bounds = canvasView.annotationPanelBounds(index) ?: return
@@ -31,10 +35,12 @@ internal class ChatImageAnnotationInputOverlay(
             return
         }
         currentIndex = index
+        currentBounds = bounds
         val view = ensurePanel()
         input?.setText(canvasView.annotationNote(index))
         input?.setSelection(input?.text?.length ?: 0)
         positionPanel(view, bounds)
+        input?.post { refreshPanelHeight() }
         view.visibility = View.VISIBLE
         view.alpha = 0f
         view.scaleX = 0.96f
@@ -64,20 +70,28 @@ internal class ChatImageAnnotationInputOverlay(
             gravity = Gravity.TOP or Gravity.START
             hint = "请输入标注内容"
             includeFontPadding = false
-            minLines = 3
-            maxLines = 5
+            minLines = 1
+            maxLines = Int.MAX_VALUE
+            isVerticalScrollBarEnabled = false
             setHintTextColor(Color.parseColor("#777777"))
             setTextColor(Color.parseColor("#D9D9D9"))
             textSize = 15f
             setPadding(0, 0, 0, 0)
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                override fun afterTextChanged(s: Editable?) {
+                    post { refreshPanelHeight() }
+                }
+            })
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 leftMargin = dp(16)
                 topMargin = dp(16)
-                rightMargin = dp(76)
-                bottomMargin = dp(48)
+                rightMargin = dp(16)
+                bottomMargin = dp(52)
             }
         }
     }
@@ -90,7 +104,7 @@ internal class ChatImageAnnotationInputOverlay(
             setTextColor(Color.parseColor("#D9D9D9"))
             textSize = 15f
             layoutParams = FrameLayout.LayoutParams(dp(64), dp(40), Gravity.END or Gravity.BOTTOM).apply {
-                rightMargin = dp(10)
+                rightMargin = dp(16)
                 bottomMargin = dp(8)
             }
             setOnClickListener { collapse() }
@@ -99,7 +113,8 @@ internal class ChatImageAnnotationInputOverlay(
 
     private fun positionPanel(view: FrameLayout, bounds: RectF) {
         val width = min(root.width - dp(48), max(dp(260), (bounds.width() * 0.74f).roundToInt()))
-        val height = min(dp(156), max(dp(124), (bounds.height() * 0.72f).roundToInt()))
+        currentPanelWidth = width
+        val height = measuredPanelHeight()
         val left = (bounds.left + (bounds.width() - width) / 2f)
             .roundToInt()
             .coerceIn(dp(16), max(dp(16), root.width - width - dp(16)))
@@ -113,11 +128,32 @@ internal class ChatImageAnnotationInputOverlay(
         }
     }
 
+    private fun refreshPanelHeight() {
+        val view = panel ?: return
+        val bounds = currentBounds ?: return
+        if (currentPanelWidth <= 0) return
+        positionPanel(view, bounds)
+        view.requestLayout()
+    }
+
+    private fun measuredPanelHeight(): Int {
+        val textView = input
+        val lineCount = max(1, textView?.lineCount ?: 1)
+        val lineHeight = textView?.lineHeight ?: dp(22)
+        val textHeight = lineCount * lineHeight
+        val chromeHeight = dp(16) + dp(52)
+        val minHeight = max(dp(124), (currentBounds?.height()?.times(0.72f) ?: 0f).roundToInt())
+        val desiredHeight = max(minHeight, textHeight + chromeHeight)
+        val availableHeight = max(dp(124), root.height - dp(96) - dp(180))
+        return min(desiredHeight, availableHeight)
+    }
+
     private fun collapse() {
         currentIndex?.let { index ->
             canvasView.updateAnnotationNote(index, input?.text?.toString().orEmpty())
         }
         currentIndex = null
+        currentBounds = null
         hideKeyboard(input)
         panel?.animate()
             ?.alpha(0f)

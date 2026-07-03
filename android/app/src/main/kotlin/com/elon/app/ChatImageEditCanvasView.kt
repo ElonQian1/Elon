@@ -28,6 +28,10 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         strokeJoin = Paint.Join.ROUND
     }
     private val basePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val annotationDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.parseColor("#F2C94C")
+    }
     private val annotationIconBitmap: Bitmap? by lazy {
         BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation)
     }
@@ -435,6 +439,9 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
             val annotation = op as? ChatImageEditOp.Annotation ?: return@forEach
             val rect = annotationIconRectOnView(annotation) ?: return@forEach
             canvas.drawBitmap(icon, null, rect, basePaint)
+            if (annotation.note.trim().isNotEmpty()) {
+                drawCompletedAnnotationDots(canvas, rect)
+            }
         }
     }
 
@@ -443,14 +450,20 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         val scale = matrixScale().coerceAtLeast(0.01f)
         val iconSize = annotationIconSize() / scale
         val pad = dp(5) / scale
-        val top = annotation.bounds.bottom - iconSize * 0.9f
-        val rect = RectF(
-            annotation.bounds.right + pad,
-            top,
-            annotation.bounds.right + pad + iconSize,
-            top + iconSize
-        )
+        val rect = annotationIconRectOnBitmap(annotation, iconSize, pad)
         canvas.drawBitmap(icon, null, rect, basePaint)
+        if (annotation.note.trim().isNotEmpty()) {
+            drawCompletedAnnotationDots(canvas, rect)
+        }
+    }
+
+    private fun drawCompletedAnnotationDots(canvas: Canvas, iconRect: RectF) {
+        val radius = iconRect.width() * 0.052f
+        val cy = iconRect.top + iconRect.height() * 0.735f
+        val centers = floatArrayOf(0.55f, 0.70f, 0.85f)
+        centers.forEach { ratio ->
+            canvas.drawCircle(iconRect.left + iconRect.width() * ratio, cy, radius, annotationDotPaint)
+        }
     }
 
     private fun ensureMosaicBitmap(): Bitmap? {
@@ -538,12 +551,33 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
 
     private fun annotationIconRectOnView(annotation: ChatImageEditOp.Annotation): RectF? {
         if (baseBitmap == null) return null
-        val point = floatArrayOf(annotation.bounds.right, annotation.bounds.bottom)
-        imageMatrix.mapPoints(point)
+        val points = floatArrayOf(
+            annotation.bounds.left,
+            annotation.bounds.bottom,
+            annotation.bounds.right,
+            annotation.bounds.bottom
+        )
+        imageMatrix.mapPoints(points)
         val size = annotationIconSize()
-        val left = point[0] + dp(5)
-        val top = point[1] - size * 0.9f
+        val pad = dp(5).toFloat()
+        val edgePad = dp(8).toFloat()
+        val rightLeft = points[2] + pad
+        val leftLeft = points[0] - pad - size
+        val rawLeft = if (rightLeft + size <= width - edgePad) rightLeft else leftLeft
+        val left = rawLeft.coerceIn(edgePad, max(edgePad, width - size - edgePad))
+        val top = points[1] - size * 0.9f
         return RectF(left, top, left + size, top + size)
+    }
+
+    private fun annotationIconRectOnBitmap(annotation: ChatImageEditOp.Annotation, iconSize: Float, pad: Float): RectF {
+        val bitmapWidth = baseBitmap?.width?.toFloat() ?: 0f
+        val edgePad = dp(8) / matrixScale().coerceAtLeast(0.01f)
+        val rightLeft = annotation.bounds.right + pad
+        val leftLeft = annotation.bounds.left - pad - iconSize
+        val rawLeft = if (rightLeft + iconSize <= bitmapWidth - edgePad) rightLeft else leftLeft
+        val left = rawLeft.coerceIn(edgePad, max(edgePad, bitmapWidth - iconSize - edgePad))
+        val top = annotation.bounds.bottom - iconSize * 0.9f
+        return RectF(left, top, left + iconSize, top + iconSize)
     }
 
     private fun annotationAt(index: Int): ChatImageEditOp.Annotation? {
