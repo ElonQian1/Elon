@@ -234,6 +234,7 @@ impl Store {
              WHERE id = (SELECT project_id FROM tasks WHERE id = ?2)",
             params![now, task_id],
         )?;
+        super::project_releases::insert_task_apk_release_locked(&conn, task_id, status, apk_url)?;
 
         if let Some(reply) = clean_optional(reply) {
             let task_context: Option<(String, String, Option<String>)> = conn
@@ -427,8 +428,6 @@ impl Store {
         Ok(())
     }
 
-    /// 检查该项目是否有过成功构建并产出 APK 的历史记录。
-    /// 用于跨会话 worktree 判断——不依赖当前 worktree 的文件系统。
     pub fn project_has_built_apk(&self, project_id: &str) -> Result<bool> {
         let count: i64 = self.conn()?.query_row(
             "SELECT COUNT(*) FROM tasks WHERE project_id = ?1 AND apk_url IS NOT NULL AND apk_url != ''",
@@ -438,8 +437,6 @@ impl Store {
         Ok(count > 0)
     }
 
-    /// 获取项目最近一次任务产出的 APK 下载地址。
-    /// 这是项目空间"安装"按钮和交付问答的权威来源，避免依赖当前 worktree 是否可用。
     pub fn latest_project_apk_url(&self, project_id: &str) -> Result<Option<String>> {
         Ok(self
             .latest_project_apk_delivery(project_id)?
@@ -453,6 +450,9 @@ impl Store {
         &self,
         project_id: &str,
     ) -> Result<Option<(String, String, String)>> {
+        if let Some(release) = self.latest_project_release(project_id)? {
+            return Ok(Some((release.id, release.apk_url, release.updated_at)));
+        }
         self.conn()?
             .query_row(
                 "SELECT id, TRIM(apk_url), updated_at

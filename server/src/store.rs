@@ -1,11 +1,10 @@
+use crate::store_schema::apply_migrations;
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{
     path::Path,
     sync::{Mutex, MutexGuard},
 };
-
-use crate::store_schema::apply_migrations;
 
 mod admin_stats;
 mod billing;
@@ -52,6 +51,7 @@ mod project_landing_upload_tokens;
 mod project_member_audit;
 mod project_member_conversations;
 mod project_member_moderation;
+pub(crate) mod project_releases;
 mod project_roles;
 mod project_runtime_permissions;
 mod project_space;

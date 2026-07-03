@@ -1,12 +1,5 @@
-//! SQLite 迁移注册表与所有迁移函数。
-//!
-//! **追加规则**：只能在 `MIGRATIONS` 末尾追加新条目；禁止修改已发布版本的内容。
-//! 每次新增表结构变更时添加新版本，服务器下次启动时自动检测并应用。
-
 use anyhow::Result;
 use rusqlite::Connection;
-
-/// 迁移注册表：(版本号, 描述, 迁移函数)
 pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (1, "初始全量表结构（幂等）", migration_v1),
     (2, "补充缺失列与辅助索引（幂等）", migration_v2),
@@ -114,10 +107,14 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (80, "项目 PC 节点级工作区绑定", migration_v80),
     (81, "用户 Codex Pro 凭据保险箱", migration_v81),
     (82, "项目成员昵称与管理员备注", migration_v82),
+    (
+        83,
+        "releases",
+        crate::project_release_migration::migration_v83,
+    ),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
-
 fn migration_v1(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"

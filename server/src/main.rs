@@ -145,6 +145,8 @@ mod project_landing_api;
 mod project_membership;
 mod project_mobile;
 mod project_prewarm;
+mod project_release_migration;
+mod project_releases;
 mod project_runtime_permission_api;
 mod project_space;
 mod project_space_ai_progress;
