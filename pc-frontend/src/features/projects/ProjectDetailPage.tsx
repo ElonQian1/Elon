@@ -4,6 +4,7 @@ import { api } from '../../api/client'
 import GroupAiPanel from '../group-ai/GroupAiPanel'
 import { useProjectStore } from '../conversation/useProjectStore'
 import ProjectReadinessCard from './ProjectReadinessCard'
+import WorkspaceAccessPanel from './WorkspaceAccessPanel'
 import type { ProjectMember, ProjectRole, ProjectRolesResponse } from '../conversation/types'
 import {
   filterMembers,
@@ -179,21 +180,34 @@ export default function ProjectDetailPage() {
         )}
         {tab === 'groupAi' && <GroupAiPanel projectId={id ?? ''} channels={space?.channels ?? []} />}
         {tab === 'workspace' && (
-          <WorkspaceTab
-            health={health}
-            loading={healthLoading}
-            onRefresh={loadHealth}
-            channels={space?.channels ?? []}
-            onOpenChannel={(channelId) => {
-              // 跳回主页并激活该频道
-              navigate('/')
-              setTimeout(() => {
-                if (id) useProjectStore.getState().selectProject(id).then(() => {
-                  useProjectStore.getState().selectChannel(channelId)
-                })
-              }, 100)
-            }}
-          />
+          <>
+            <WorkspaceAccessPanel
+              projectId={id ?? ''}
+              projectName={space?.project?.name ?? project?.name ?? id ?? '当前项目'}
+              workspacePath={space?.project?.workspace_path ?? project?.workspace_path}
+              runtimePermission={space?.project?.runtime_permission ?? project?.runtime_permission}
+              boundNodeId={space?.project?.node_id ?? project?.node_id}
+              onChanged={async () => {
+                await reloadProjectSpace()
+                await loadHealth()
+              }}
+            />
+            <WorkspaceTab
+              health={health}
+              loading={healthLoading}
+              onRefresh={loadHealth}
+              channels={space?.channels ?? []}
+              onOpenChannel={(channelId) => {
+                // 跳回主页并激活该频道
+                navigate('/')
+                setTimeout(() => {
+                  if (id) useProjectStore.getState().selectProject(id).then(() => {
+                    useProjectStore.getState().selectChannel(channelId)
+                  })
+                }, 100)
+              }}
+            />
+          </>
         )}
       </div>
     </div>

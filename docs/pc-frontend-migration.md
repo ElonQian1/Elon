@@ -55,7 +55,7 @@ server/src/
 | 项目详情页（概览/设置/成员 Tab）| 🔴 高 | `src/features/projects/ProjectDetailPage.tsx` | ⬜ 未开始 |
 | 成员列表 + 邀请 + 移除 | 🟡 中 | `src/features/projects/MemberPanel.tsx` | ⬜ 未开始 |
 | 项目任务进度面板 | 🟡 中 | `src/features/projects/ProjectReadiness.tsx` | ⬜ 未开始 |
-| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceSettings.tsx` | ⬜ 未开始 |
+| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceAccessPanel.tsx` | 🟡 已补本机目录选择、节点重绑与 Route A 完全访问确认；Git 设置继续迁移 |
 | 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ChannelSettings.tsx` | ⬜ 未开始 |
 
 ### 阶段 P3 — 个人 AI 对话
