@@ -398,14 +398,34 @@ try {
   });
   assert.strictEqual(parallelOverview.counts.total, 4, 'parallel overview should dedupe the recommended live task');
   assert.strictEqual(parallelOverview.counts.active, 2, 'parallel overview should count active live controls');
+  assert.strictEqual(parallelOverview.counts.staleActive, 0, 'parallel overview should not mark fresh controls as stale');
   assert.strictEqual(parallelOverview.counts.sidecar, 1, 'parallel overview should count sidecar-reconnectable tasks');
   assert.strictEqual(parallelOverview.counts.recoverable, 1, 'parallel overview should count snapshot-continuable tasks');
   assert.strictEqual(parallelOverview.counts.staleApproval, 1, 'parallel overview should surface stale approval waiters');
+  assert.strictEqual(parallelOverview.continuity.mode, 'sidecar_reconnect', 'parallel overview should explain restart sidecar continuity');
+  assert.ok(parallelOverview.continuity.facts.some((fact) => fact.label === '可重接'), 'parallel overview continuity should expose sidecar reconnect count');
   assert.deepStrictEqual(
     parallelOverview.views.map((view) => view.taskId),
     ['tsk-live-a', 'tsk-live-b', 'tsk-sidecar-d', 'tsk-detached-c'],
     'parallel overview should keep running tasks ahead of sidecar and recoverable detached tasks',
   );
+
+  const staleNodeOverview = buildAgentRunParallelOverview({
+    activeControls: [
+      {
+        task_id: 'tsk-stale-node',
+        cli_name: 'Codex',
+        route: 'route_a',
+        can_cancel: true,
+        last_heartbeat_ms: 1_000,
+      },
+    ],
+    nowMs: 75_000,
+  });
+  assert.strictEqual(staleNodeOverview.counts.staleActive, 1, 'parallel overview should count stale active controls');
+  assert.strictEqual(staleNodeOverview.continuity.title, '节点心跳疑似断开', 'stale node overview should lead with reconnect diagnosis');
+  assert.strictEqual(staleNodeOverview.continuity.tone, 'failed', 'stale node overview should use failed tone');
+  assert.ok(staleNodeOverview.continuity.facts.some((fact) => fact.label === '陈旧心跳' && fact.tone === 'failed'), 'stale node overview should show stale heartbeat facts');
 
   const assistantOutputTimeline = buildTaskTimeline([
     {

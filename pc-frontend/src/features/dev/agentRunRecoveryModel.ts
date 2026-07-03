@@ -2,6 +2,13 @@ import { clean } from '../../lib/utils'
 
 export type RecoveryTone = 'running' | 'done' | 'failed' | 'muted'
 export type RecoveryCategory = 'active' | 'sidecar' | 'continue' | 'terminal' | 'other'
+export type AgentRunContinuityMode =
+  | 'empty'
+  | 'healthy'
+  | 'stale_active'
+  | 'sidecar_reconnect'
+  | 'snapshot_continue'
+  | 'terminal'
 
 export interface RecoveryFact {
   label: string
@@ -29,13 +36,23 @@ export interface RecoveryView {
   facts: RecoveryFact[]
 }
 
+export interface AgentRunContinuityStatus {
+  title: string
+  detail: string
+  tone: RecoveryTone
+  mode: AgentRunContinuityMode
+  facts: RecoveryFact[]
+}
+
 export interface AgentRunParallelOverview {
   views: RecoveryView[]
   headline: string
   summary: string
+  continuity: AgentRunContinuityStatus
   counts: {
     total: number
     active: number
+    staleActive: number
     sidecar: number
     recoverable: number
     terminal: number
@@ -108,6 +125,7 @@ export function buildAgentRunParallelOverview(input: AgentRunParallelInput): Age
   const counts = {
     total: views.length,
     active: views.filter((view) => view.category === 'active').length,
+    staleActive: views.filter((view) => view.category === 'active' && view.stale).length,
     sidecar: views.filter((view) => view.category === 'sidecar').length,
     recoverable: views.filter((view) => view.category === 'continue').length,
     terminal: views.filter((view) => view.category === 'terminal').length,
@@ -123,8 +141,83 @@ export function buildAgentRunParallelOverview(input: AgentRunParallelInput): Age
     views,
     headline: counts.total > 1 ? `${counts.total} 个任务现场` : counts.total === 1 ? '1 个任务现场' : '暂无任务现场',
     summary: summaryParts.join(' · ') || (counts.terminal ? `${counts.terminal} 个最近终态` : '没有运行中或可恢复任务'),
+    continuity: buildContinuityStatus(counts),
     counts,
   }
+}
+
+function buildContinuityStatus(counts: AgentRunParallelOverview['counts']): AgentRunContinuityStatus {
+  const facts = continuityFacts(counts)
+  if (counts.staleActive > 0) {
+    return {
+      title: '节点心跳疑似断开',
+      detail: `仍有 ${counts.active} 个运行控制句柄，其中 ${counts.staleActive} 个超过 60 秒没有心跳；先看节点是否重连，必要时停止或开新任务继续。`,
+      tone: 'failed',
+      mode: 'stale_active',
+      facts,
+    }
+  }
+  if (counts.sidecar > 0) {
+    return {
+      title: '重启后可重接 sidecar',
+      detail: `检测到 ${counts.sidecar} 个 sidecar 会话仍可重接，优先回放输出或打开终端控制面。`,
+      tone: 'running',
+      mode: 'sidecar_reconnect',
+      facts,
+    }
+  }
+  if (counts.recoverable > 0) {
+    return {
+      title: '重启后可基于快照继续',
+      detail: `检测到 ${counts.recoverable} 个任务不能原地接管，但 journal 和快照可用于新开一轮继续处理。`,
+      tone: 'running',
+      mode: 'snapshot_continue',
+      facts,
+    }
+  }
+  if (counts.active > 0) {
+    return {
+      title: '节点执行现场正常',
+      detail: `当前有 ${counts.active} 个本机控制句柄仍在心跳中，可以继续观察公开输出或停止任务。`,
+      tone: 'running',
+      mode: 'healthy',
+      facts,
+    }
+  }
+  if (counts.terminal > 0) {
+    return {
+      title: '没有活动恢复现场',
+      detail: `只找到 ${counts.terminal} 个最近终态任务；新消息会作为新的项目会话继续。`,
+      tone: 'done',
+      mode: 'terminal',
+      facts,
+    }
+  }
+  return {
+    title: '暂无恢复现场',
+    detail: '没有运行中、可重接或可继续的本机任务。',
+    tone: 'muted',
+    mode: 'empty',
+    facts,
+  }
+}
+
+function continuityFacts(counts: AgentRunParallelOverview['counts']): RecoveryFact[] {
+  const facts: RecoveryFact[] = []
+  if (counts.active) {
+    facts.push({
+      label: '运行句柄',
+      value: `${counts.active} 个`,
+      tone: counts.staleActive ? 'failed' : 'running',
+    })
+  }
+  if (counts.staleActive) facts.push({ label: '陈旧心跳', value: `${counts.staleActive} 个`, tone: 'failed' })
+  if (counts.sidecar) facts.push({ label: '可重接', value: `${counts.sidecar} 个`, tone: 'running' })
+  if (counts.recoverable) facts.push({ label: '快照继续', value: `${counts.recoverable} 个`, tone: 'running' })
+  if (counts.staleApproval) facts.push({ label: '失效审批', value: `${counts.staleApproval} 个`, tone: 'failed' })
+  if (!facts.length && counts.terminal) facts.push({ label: '最近终态', value: `${counts.terminal} 个`, tone: 'done' })
+  if (!facts.length) facts.push({ label: '状态', value: '无活动现场', tone: 'muted' })
+  return facts
 }
 
 export function recoveryViewFromEntry(entry: Record<string, unknown>): RecoveryView {

@@ -149,8 +149,20 @@ function ParallelOverview({ overview }: { overview: AgentRunParallelOverview }) 
         <strong>{overview.headline}</strong>
         <span>{overview.summary}</span>
       </div>
+      <div className={styles.continuityStatus} data-tone={overview.continuity.tone} data-mode={overview.continuity.mode}>
+        <strong>{overview.continuity.title}</strong>
+        <span>{overview.continuity.detail}</span>
+        <div className={styles.continuityFacts}>
+          {overview.continuity.facts.map((fact) => (
+            <span key={`${fact.label}:${fact.value}`} data-tone={fact.tone || undefined}>
+              {fact.label}：{fact.value}
+            </span>
+          ))}
+        </div>
+      </div>
       <div className={styles.parallelCounts}>
         <span data-tone={overview.counts.active ? 'running' : undefined}>运行 {overview.counts.active}</span>
+        <span data-tone={overview.counts.staleActive ? 'failed' : undefined}>陈旧 {overview.counts.staleActive}</span>
         <span data-tone={overview.counts.sidecar ? 'running' : undefined}>重接 {overview.counts.sidecar}</span>
         <span data-tone={overview.counts.recoverable ? 'running' : undefined}>继续 {overview.counts.recoverable}</span>
         <span data-tone={overview.counts.staleApproval ? 'failed' : undefined}>审批 {overview.counts.staleApproval}</span>
