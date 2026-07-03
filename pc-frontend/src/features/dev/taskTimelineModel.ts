@@ -1,5 +1,12 @@
 import { clean } from '../../lib/utils'
-import { messageText, parseToolEvent, runtimeStatusLabel } from './devTaskUtils'
+import {
+  messageText,
+  parseToolEvent,
+  runtimeStatusLabel,
+  toolEventSummary,
+  toolEventTitle,
+  usageEventSummary,
+} from './devTaskUtils'
 import type { ChatMessage, TaskTone, ToolEvent } from './types'
 
 export type TimelineItemKind =
@@ -28,6 +35,19 @@ export interface TaskTimelineModel {
   visibleStepCount: number
   heartbeatCount: number
   lastHeartbeat?: TimelineItem
+  coverage: TaskTimelineCoverage
+}
+
+export interface TaskTimelineCoverage {
+  dispatch: boolean
+  heartbeat: boolean
+  toolCall: boolean
+  command: boolean
+  fileChange: boolean
+  toolResult: boolean
+  usage: boolean
+  assistantEvent: boolean
+  finalReply: boolean
 }
 
 export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMessage): TaskTimelineModel {
@@ -37,6 +57,17 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
   let lastHeartbeat: TimelineItem | undefined
   let latestHeartbeat: TimelineItem | undefined
   let heartbeatCount = 0
+  const coverage: TaskTimelineCoverage = {
+    dispatch: false,
+    heartbeat: false,
+    toolCall: false,
+    command: false,
+    fileChange: false,
+    toolResult: false,
+    usage: false,
+    assistantEvent: false,
+    finalReply: !!finalText,
+  }
 
   const flushHeartbeat = () => {
     if (!lastHeartbeat) return
@@ -47,21 +78,25 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
   messages.forEach((message, index) => {
     const text = normalizedProgressText(messageText(message))
     if (!text) return
-    if (!text.startsWith('{') && isFinalAnswerEcho(text, finalText)) return
+    const parsedEvent = parseToolEvent(text)
+    const echoText = eventTextForEcho(parsedEvent) || text
+    if (isFinalAnswerEcho(echoText, finalText)) return
 
     const heartbeat = parseHeartbeat(text, message, index)
     if (heartbeat) {
       heartbeatCount += 1
+      coverage.heartbeat = true
       lastHeartbeat = heartbeat
       latestHeartbeat = heartbeat
       return
     }
 
     flushHeartbeat()
-    const event = parseToolEvent(text)
+    const event = parsedEvent
     const item = event
       ? itemFromEvent(event, message, index)
       : itemFromText(text, message, index)
+    if (event) markCoverage(coverage, event)
 
     const uniqueKey = event
       ? `${event.type}:${clean(event.tool ?? '')}:${clean(event.status ?? '')}:${clean(event.approval_id ?? '')}:${clean(event.message ?? '')}`
@@ -78,6 +113,7 @@ export function buildTaskTimeline(messages: ChatMessage[], finalMessage?: ChatMe
     visibleStepCount: items.length,
     heartbeatCount,
     lastHeartbeat: latestHeartbeat,
+    coverage,
   }
 }
 
@@ -91,6 +127,23 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
 
 function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): TimelineItem {
   const type = clean(event.type)
+  if (type === 'pc_dispatch_started') {
+    const cli = clean(event.cli ?? 'Codex')
+    const agentId = clean(event.agent_id ?? '')
+    const cwdConfigured = Boolean(event.cwd_configured)
+    return {
+      id: itemId(message, index),
+      kind: 'node',
+      tone: 'running',
+      title: '已派发到 PC 节点',
+      detail: cwdConfigured ? `等待 ${cli} CLI 输出` : `等待 ${cli} CLI 确认`,
+      meta: agentId ? shortNode(agentId) : '',
+      message,
+      event,
+      compact: true,
+    }
+  }
+
   if (type === 'runtime_status') {
     const phase = clean(event.phase ?? '').toLowerCase()
     const label = runtimeStatusLabel(phase)
@@ -127,6 +180,34 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     }
   }
 
+  if (type === 'assistant_message' || type === 'assistant_chunk') {
+    const text = clean(event.text ?? '')
+    return {
+      id: itemId(message, index),
+      kind: 'codex',
+      tone: type === 'assistant_message' ? 'done' : 'running',
+      title: type === 'assistant_message' ? 'Codex 回复片段' : 'Codex 正在输出',
+      detail: text.slice(0, 180),
+      meta: [clean(event.model_used ?? ''), shortNode(clean(event.node_id ?? ''))].filter(Boolean).join(' · '),
+      message,
+      event,
+    }
+  }
+
+  if (type === 'usage') {
+    return {
+      id: itemId(message, index),
+      kind: 'status',
+      tone: 'done',
+      title: '用量统计',
+      detail: usageEventSummary(event),
+      meta: clean(event.model ?? ''),
+      message,
+      event,
+      compact: true,
+    }
+  }
+
   if (type === 'tool_approval_required' || type === 'tool_approval_decision') {
     return {
       id: itemId(message, index),
@@ -147,11 +228,30 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     id: itemId(message, index),
     kind: 'tool',
     tone: failed ? 'failed' : isResult ? 'done' : 'running',
-    title: `${isResult ? '完成' : '调用'} ${clean(event.tool ?? 'tool')}`,
-    detail: isResult ? clean(event.result ?? '').slice(0, 120) : briefArgs(event.args),
+    title: toolEventTitle(event),
+    detail: toolEventSummary(event, 140),
     message,
     event,
   }
+}
+
+function markCoverage(coverage: TaskTimelineCoverage, event: ToolEvent) {
+  const type = clean(event.type)
+  const tool = clean(event.tool ?? '')
+  if (type === 'pc_dispatch_started') coverage.dispatch = true
+  if (type === 'runtime_status' && clean(event.phase ?? '') === 'pc_dispatched') coverage.dispatch = true
+  if (type === 'tool_call') {
+    coverage.toolCall = true
+    if (tool === 'shell') coverage.command = true
+    if (tool === 'file_change') coverage.fileChange = true
+  }
+  if (type === 'tool_result') {
+    coverage.toolResult = true
+    if (tool === 'shell') coverage.command = true
+    if (tool === 'file_change') coverage.fileChange = true
+  }
+  if (type === 'usage') coverage.usage = true
+  if (type === 'assistant_message' || type === 'assistant_chunk') coverage.assistantEvent = true
 }
 
 function itemFromText(text: string, message: ChatMessage, index: number): TimelineItem {
@@ -233,10 +333,18 @@ function normalizedProgressText(text: string): string {
 }
 
 function isFinalAnswerEcho(text: string, finalText: string): boolean {
-  if (finalText.length < 40) return false
+  if (!text || !finalText) return false
   if (text === finalText) return true
+  if (finalText.length < 40) return false
   const sample = finalText.slice(0, Math.min(60, finalText.length))
   return sample.length >= 40 && text.includes(sample)
+}
+
+function eventTextForEcho(event: ToolEvent | null): string {
+  if (!event) return ''
+  const type = clean(event.type)
+  if (type === 'assistant_message' || type === 'assistant_chunk') return clean(event.text ?? '')
+  return ''
 }
 
 function itemId(message: ChatMessage, index: number): string {
@@ -247,15 +355,13 @@ function extractNodeId(text: string): string {
   return clean(text.match(/node-[A-Za-z0-9_-]+(?:\.\.\.[A-Za-z0-9_-]+)?/)?.[0] ?? '')
 }
 
+function shortNode(value: string): string {
+  const cleanValue = clean(value)
+  if (cleanValue.length <= 18) return cleanValue
+  return `${cleanValue.slice(0, 11)}...${cleanValue.slice(-6)}`
+}
+
 function shortText(text: string): string {
   if (text.length <= 34) return text
   return `${text.slice(0, 34)}...`
-}
-
-function briefArgs(args: unknown): string {
-  if (!args) return ''
-  if (typeof args === 'string') return args.slice(0, 80)
-  const obj = args as Record<string, unknown>
-  const value = obj.command ?? obj.path ?? obj.file ?? obj.query ?? obj.input ?? obj.content ?? ''
-  return clean(value).slice(0, 80)
 }

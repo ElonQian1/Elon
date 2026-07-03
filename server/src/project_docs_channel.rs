@@ -67,6 +67,7 @@ fn synthetic_message(
         task_status: None,
         task_error: None,
         task_apk_url: None,
+        task_codex_thread_id: None,
         suggestion_status: None,
         suggestion_resolved_by: None,
         suggestion_resolved_by_name: None,

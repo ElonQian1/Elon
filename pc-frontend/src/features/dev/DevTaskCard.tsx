@@ -12,7 +12,8 @@ import styles from './DevTaskCard.module.css'
 import { clean } from '../../lib/utils'
 import {
   taskIsTerminal, statusForTask, parseToolEvent, approvalFinalState,
-  approvalStateFor, runtimeStatusLabel, shortId,
+  approvalStateFor, runtimeStatusLabel, shortId, toolEventSummary, toolEventTitle,
+  usageEventSummary,
 } from './devTaskUtils'
 import type { ChatMessage, TaskContext, ToolEvent, TaskTone } from './types'
 
@@ -78,6 +79,18 @@ function ProgressLine({ message, context, onCancel, onApprove }: DevTaskMessageP
     const tone: TaskTone = canceled ? 'canceled' : (ok ? 'done' : 'failed')
     return <StatusLine text={clean(event.message ?? '') || `${total} 步完成，${failed} 步失败`} tone={tone} runtime={clean(event.runtime ?? '')} turn={Number(event.turn)} />
   }
+  if (event.type === 'pc_dispatch_started') {
+    const cli = clean(event.cli ?? 'Codex')
+    const agent = shortNode(clean(event.agent_id ?? ''))
+    return <StatusLine text={`已派发到 PC 节点，等待 ${cli} CLI 输出`} tone="running" runtime={agent} />
+  }
+  if (event.type === 'assistant_message' || event.type === 'assistant_chunk') {
+    const text = clean(event.text ?? '')
+    return <StatusLine text={text || 'Codex 正在输出'} tone={event.type === 'assistant_message' ? 'done' : 'running'} runtime={clean(event.model_used ?? '')} />
+  }
+  if (event.type === 'usage') {
+    return <StatusLine text={usageEventSummary(event)} tone="done" runtime={clean(event.model ?? '')} />
+  }
   if (event.type === 'tool_approval_required') {
     const approvalId = clean(event.approval_id ?? '')
     const savedState = approvalId ? approvalStateFor(context, taskId, approvalId) : null
@@ -98,21 +111,21 @@ function ToolChip({ event }: { event: ToolEvent }) {
   const isResult = event.type === 'tool_result'
   const failed = isResult && clean(event.status ?? '').toLowerCase() === 'error'
   const tool = clean(event.tool ?? 'tool')
-  const summary = isResult
-    ? (clean(event.result ?? '').slice(0, 80) || '完成')
-    : briefArgs(event.args)
+  const title = toolEventTitle(event)
+  const summary = toolEventSummary(event, 96)
   return (
     <div className={[styles.toolChip, failed ? styles.toolFailed : isResult ? styles.toolDone : styles.toolRunning].join(' ')}>
       <button className={styles.toolChipBtn} onClick={() => setOpen(!open)} type="button">
         <span className={styles.toolChipArrow}>{open ? '▾' : '▸'}</span>
         <span className={styles.toolChipIcon}>{isResult ? (failed ? '✗' : '✓') : '⟳'}</span>
-        <span className={styles.toolChipName}>{tool}</span>
+        <span className={styles.toolChipName}>{title}</span>
         {!open && summary && <span className={styles.toolChipSummary}>{summary}</span>}
       </button>
       {open && (
         <div className={styles.toolChipBody}>
+          <div className={styles.toolChipMeta}>{tool}</div>
           {!isResult && event.args && (
-            <pre className={styles.toolChipPre}>{JSON.stringify(event.args, null, 2)}</pre>
+            <pre className={styles.toolChipPre}>{formatToolArgs(event.args)}</pre>
           )}
           {isResult && (
             <pre className={[styles.toolChipPre, failed ? styles.toolChipPreErr : ''].join(' ')}>
@@ -198,12 +211,15 @@ function statusIcon(tone: TaskTone): string {
   return '⟳'
 }
 
-function briefArgs(args: unknown): string {
-  if (!args) return ''
-  if (typeof args === 'string') return args.slice(0, 60)
-  const obj = args as Record<string, unknown>
-  const val = obj.command ?? obj.path ?? obj.content ?? obj.query ?? obj.input ?? ''
-  return String(val ?? '').slice(0, 60)
+function formatToolArgs(args: Record<string, unknown>): string {
+  const command = clean(args.command)
+  if (command) return command
+  return JSON.stringify(args, null, 2)
+}
+
+function shortNode(value: string): string {
+  const v = clean(value)
+  return v.length > 18 ? `${v.slice(0, 11)}...${v.slice(-6)}` : v
 }
 
 function formatApprovalBody(event: ToolEvent): string {

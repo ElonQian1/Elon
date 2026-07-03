@@ -682,6 +682,7 @@ pub struct ProjectChannelMessage {
     pub task_status: Option<String>,
     pub task_error: Option<String>,
     pub task_apk_url: Option<String>,
+    pub task_codex_thread_id: Option<String>,
     pub suggestion_status: Option<String>,
     pub suggestion_resolved_by: Option<String>,
     pub suggestion_resolved_by_name: Option<String>,

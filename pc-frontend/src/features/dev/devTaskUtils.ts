@@ -32,9 +32,20 @@ export function parseToolEvent(content: string): ToolEvent | null {
   try {
     const e = JSON.parse(text) as ToolEvent
     const type = clean(e.type)
-    const validTypes = ['runtime_status', 'runtime_summary', 'tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision']
+    const validTypes = [
+      'pc_dispatch_started',
+      'runtime_status',
+      'runtime_summary',
+      'tool_call',
+      'tool_result',
+      'tool_approval_required',
+      'tool_approval_decision',
+      'assistant_message',
+      'assistant_chunk',
+      'usage',
+    ]
     if (!validTypes.includes(type)) return null
-    if (!['runtime_status', 'runtime_summary'].includes(type) && !clean(e.tool)) return null
+    if (['tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision'].includes(type) && !clean(e.tool)) return null
     return e
   } catch { return null }
 }
@@ -129,11 +140,68 @@ export function statusForTask(task: TaskState | null): { tone: TaskTone; label: 
 }
 
 export function runtimeStatusLabel(phase: string): { tone: TaskTone; title: string; body: string } {
+  if (phase === 'pc_dispatched') return { tone: 'running', title: '已派发到 PC 节点', body: '正在等待本机 Codex 输出。' }
   if (phase === 'waiting_approval') return { tone: 'approval', title: '等待工具审批', body: '批准前不会执行工具。' }
   if (phase === 'completed') return { tone: 'done', title: '运行时完成', body: '没有更多运行时动作。' }
   if (phase === 'failed') return { tone: 'failed', title: '运行时受阻', body: '需要继续处理。' }
   if (phase === 'canceled') return { tone: 'canceled', title: '运行时已停止', body: '任务已停止。' }
   return { tone: 'running', title: '运行时正在思考', body: '正在生成下一步计划。' }
+}
+
+export function toolEventTitle(event: ToolEvent): string {
+  const type = clean(event.type)
+  const tool = clean(event.tool ?? 'tool')
+  const isResult = type === 'tool_result'
+  if (tool === 'shell') return isResult ? '命令完成' : '执行命令'
+  if (tool === 'file_change') return isResult ? '文件修改完成' : '修改文件'
+  if (tool === 'web_search') return isResult ? '搜索完成' : '搜索网络'
+  return `${isResult ? '完成' : '调用'} ${tool}`
+}
+
+export function toolEventSummary(event: ToolEvent, maxLen = 120): string {
+  const type = clean(event.type)
+  if (type === 'tool_result') {
+    return clean(event.result ?? '').slice(0, maxLen) || '完成'
+  }
+  const args = event.args
+  if (!args) return ''
+  const command = clean(args.command)
+  if (command) return command.slice(0, maxLen)
+  const path = clean(args.path ?? args.file)
+  if (path) return path.slice(0, maxLen)
+  const changes = Array.isArray(args.changes) ? args.changes : null
+  if (changes?.length) {
+    const files = changes
+      .map((change) => clean((change as Record<string, unknown>).path ?? (change as Record<string, unknown>).file))
+      .filter(Boolean)
+    if (files.length) return files.slice(0, 3).join(', ').slice(0, maxLen)
+  }
+  return clean(args.query ?? args.input ?? args.content).slice(0, maxLen)
+}
+
+export function usageEventSummary(event: ToolEvent): string {
+  const input = numberField(event, 'input_tokens')
+  const output = numberField(event, 'output_tokens')
+  const total = numberField(event, 'total_tokens')
+  const cached = numberField(event, 'cached_input_tokens')
+  const reasoning = numberField(event, 'reasoning_output_tokens')
+  const parts = [
+    input !== null ? `输入 ${formatNumber(input)}` : '',
+    cached !== null ? `缓存 ${formatNumber(cached)}` : '',
+    output !== null ? `输出 ${formatNumber(output)}` : '',
+    reasoning !== null ? `推理 ${formatNumber(reasoning)}` : '',
+    total !== null ? `总计 ${formatNumber(total)}` : '',
+  ].filter(Boolean)
+  return parts.join(' · ') || '已记录本轮用量'
+}
+
+function numberField(event: ToolEvent, key: string): number | null {
+  const value = event[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('zh-CN').format(value)
 }
 
 export function approvalStateFor(context: TaskContext, taskId: string, approvalId: string): ApprovalState | null {

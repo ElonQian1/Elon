@@ -48,6 +48,8 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
+use node_agent_cli_done::{cli_done_message, duplicate_cli_prompt_done, latest_codex_session_id};
+
 const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
 
 mod agent_runtime_error_summary;
@@ -58,6 +60,7 @@ mod node_agent_active_task_registry;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
+mod node_agent_cli_done;
 #[cfg(test)]
 mod node_agent_cli_prompt_timeout_tests;
 mod node_agent_cli_pty;
@@ -1363,6 +1366,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             req_id,
             exit_ok: false,
             error: Some(message),
+            session_id: None,
             prompt_tokens: None,
             cached_input_tokens: None,
             completion_tokens: None,
@@ -1395,6 +1399,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             req_id,
             exit_ok,
             error,
+            session_id: None,
             prompt_tokens: result.prompt_tokens,
             cached_input_tokens: None,
             completion_tokens: result.completion_tokens,
@@ -1440,6 +1445,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             req_id,
             exit_ok,
             error,
+            session_id: None,
             prompt_tokens: result.prompt_tokens,
             cached_input_tokens: None,
             completion_tokens: result.completion_tokens,
@@ -1733,6 +1739,11 @@ async fn run_cli_prompt(run: CliPromptRun) {
                             req_id,
                             exit_ok: false,
                             error: Some(message),
+                            session_id: latest_codex_session_id(
+                                cli_name,
+                                &codex_plan,
+                                &task_journal,
+                            ),
                             prompt_tokens: None,
                             cached_input_tokens: None,
                             completion_tokens: None,
@@ -1757,6 +1768,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                         None,
                         model,
                         workspace_status,
+                        latest_codex_session_id(cli_name, &codex_plan, &task_journal),
                     )));
                     return;
                 }
@@ -1850,6 +1862,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     usage,
                     model,
                     workspace_status,
+                    latest_codex_session_id(cli_name, &codex_plan, &task_journal),
                 )));
                 return;
             }
@@ -1868,6 +1881,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 req_id,
                 exit_ok: false,
                 error: Some(message),
+                session_id: latest_codex_session_id(cli_name, &codex_plan, &task_journal),
                 prompt_tokens: None,
                 cached_input_tokens: None,
                 completion_tokens: None,
@@ -2003,6 +2017,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                         None,
                         model,
                         workspace_status,
+                        latest_codex_session_id(cli_name, &codex_plan, &task_journal),
                     )));
                     return;
                 }
@@ -2021,6 +2036,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     req_id,
                     exit_ok: false,
                     error: Some(message),
+                    session_id: latest_codex_session_id(cli_name, &codex_plan, &task_journal),
                     prompt_tokens: None,
                     cached_input_tokens: None,
                     completion_tokens: None,
@@ -2114,22 +2130,8 @@ async fn run_cli_prompt(run: CliPromptRun) {
         usage,
         model,
         workspace_status,
+        latest_codex_session_id(cli_name, &codex_plan, &task_journal),
     )));
-}
-
-fn duplicate_cli_prompt_done(req_id: String) -> AgentToServer {
-    AgentToServer::CliDone {
-        req_id,
-        exit_ok: false,
-        error: Some("该任务已在本机节点运行，已拒绝重复启动，避免重复 CLI 进程堆积。".to_string()),
-        prompt_tokens: None,
-        cached_input_tokens: None,
-        completion_tokens: None,
-        reasoning_tokens: None,
-        total_tokens: None,
-        model: None,
-        workspace_status: None,
-    }
 }
 
 fn send_cli_chunk(
@@ -2370,29 +2372,6 @@ fn cli_workspace_status(
         prepare_status: "prepared".into(),
         merge_status: Some(merge_status.into()),
         merge_message: merge_message.map(ToOwned::to_owned),
-    }
-}
-
-fn cli_done_message(
-    req_id: String,
-    exit_ok: bool,
-    error: Option<String>,
-    usage: Option<cli_usage::CliTokenUsage>,
-    model: Option<String>,
-    workspace_status: Option<CliWorkspaceStatus>,
-) -> AgentToServer {
-    let usage = usage.and_then(cli_usage::CliTokenUsage::normalized);
-    AgentToServer::CliDone {
-        req_id,
-        exit_ok,
-        error,
-        prompt_tokens: usage.as_ref().map(|u| u.input_tokens.max(0) as u64),
-        cached_input_tokens: usage.as_ref().map(|u| u.cached_input_tokens.max(0) as u64),
-        completion_tokens: usage.as_ref().map(|u| u.output_tokens.max(0) as u64),
-        reasoning_tokens: usage.as_ref().map(|u| u.reasoning_tokens.max(0) as u64),
-        total_tokens: usage.as_ref().map(|u| u.total_tokens.max(0) as u64),
-        model,
-        workspace_status,
     }
 }
 
@@ -3011,6 +2990,7 @@ async fn run_session(
                                             req_id,
                                             exit_ok: false,
                                             error: Some(e.to_string()),
+                                            session_id: None,
                                             prompt_tokens: None,
                                             cached_input_tokens: None,
                                             completion_tokens: None,
@@ -3053,6 +3033,7 @@ async fn run_session(
                                         req_id,
                                         exit_ok: false,
                                         error: Some(e.to_string()),
+                                        session_id: None,
                                         prompt_tokens: None,
                                         cached_input_tokens: None,
                                         completion_tokens: None,
@@ -3071,6 +3052,7 @@ async fn run_session(
                                                 req_id,
                                                 exit_ok: false,
                                                 error: Some(e.to_string()),
+                                                session_id: None,
                                                 prompt_tokens: None,
                                                 cached_input_tokens: None,
                                                 completion_tokens: None,

@@ -408,6 +408,10 @@ pub enum AgentToServer {
         exit_ok: bool,
         #[serde(default)]
         error: Option<String>,
+        /// Native CLI thread/session id. For Codex this can be opened by the
+        /// desktop app as `codex://threads/<id>`. Old nodes omit this field.
+        #[serde(default)]
+        session_id: Option<String>,
         #[serde(default)]
         prompt_tokens: Option<u64>,
         #[serde(default)]
@@ -660,5 +664,43 @@ mod tests {
 
         assert_eq!(msg.req_id(), None);
         assert_eq!(msg.task_id(), None);
+    }
+
+    #[test]
+    fn old_cli_done_without_session_id_still_decodes() {
+        let json = r#"{
+            "type": "cli_done",
+            "req_id": "req",
+            "exit_ok": true
+        }"#;
+
+        let msg: AgentToServer = serde_json::from_str(json).expect("decode old cli_done");
+        match msg {
+            AgentToServer::CliDone { session_id, .. } => {
+                assert_eq!(session_id, None);
+            }
+            other => panic!("expected cli_done, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cli_done_decodes_session_id() {
+        let json = r#"{
+            "type": "cli_done",
+            "req_id": "req",
+            "exit_ok": true,
+            "session_id": "019f2125-41f3-7e01-b676-ef7a0e5ee392"
+        }"#;
+
+        let msg: AgentToServer = serde_json::from_str(json).expect("decode cli_done");
+        match msg {
+            AgentToServer::CliDone { session_id, .. } => {
+                assert_eq!(
+                    session_id.as_deref(),
+                    Some("019f2125-41f3-7e01-b676-ef7a0e5ee392")
+                );
+            }
+            other => panic!("expected cli_done, got {other:?}"),
+        }
     }
 }

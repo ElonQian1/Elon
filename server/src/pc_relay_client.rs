@@ -372,7 +372,6 @@ async fn run_relay_session(
                     let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
                 });
             }
-
             // Exec 在本地 relay 模式下不支持（使用 CliPrompt 替代）
             ServerToAgent::Exec { task_id, .. } => {
                 let err = AgentToServer::TaskError {
@@ -381,7 +380,6 @@ async fn run_relay_session(
                 };
                 let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
-
             ServerToAgent::Cancel { task_id } => {
                 let abort = running_cli_tasks.lock().await.remove(&task_id);
                 if let Some(abort) = abort {
@@ -391,6 +389,7 @@ async fn run_relay_session(
                         req_id: task_id,
                         exit_ok: false,
                         error: Some("任务已取消".into()),
+                        session_id: None,
                         prompt_tokens: None,
                         cached_input_tokens: None,
                         completion_tokens: None,
@@ -515,6 +514,7 @@ async fn handle_cli_prompt(
         req_id,
         exit_ok,
         error,
+        session_id: None,
         prompt_tokens: None,
         cached_input_tokens: None,
         completion_tokens: None,
@@ -525,12 +525,12 @@ async fn handle_cli_prompt(
     };
     let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
 }
-
 fn send_cli_done_error(out: mpsc::UnboundedSender<Message>, req_id: String, error: String) {
     let done = AgentToServer::CliDone {
         req_id,
         exit_ok: false,
         error: Some(error),
+        session_id: None,
         prompt_tokens: None,
         cached_input_tokens: None,
         completion_tokens: None,

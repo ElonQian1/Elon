@@ -1192,7 +1192,6 @@ async fn run_agent_session(
 fn tool_approval_ack_key(req_id: &str, approval_id: &str, dispatch_id: &str) -> String {
     format!("{req_id}:{approval_id}:{dispatch_id}")
 }
-
 async fn fail_pending_requests(
     pending: &Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
     message: &str,
@@ -1205,6 +1204,7 @@ async fn fail_pending_requests(
             req_id,
             exit_ok: false,
             error: Some(message.to_string()),
+            session_id: None,
             prompt_tokens: None,
             cached_input_tokens: None,
             completion_tokens: None,

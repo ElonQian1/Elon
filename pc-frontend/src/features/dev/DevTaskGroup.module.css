@@ -121,6 +121,29 @@
   padding: 6px 0 2px;
 }
 
+.codexThreadLink {
+  width: max-content;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  color: #9fb2d8;
+  font-size: 11px;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.codexThreadLink:hover {
+  color: #d7e2f7;
+}
+
+.codexThreadLink em {
+  color: var(--text-muted);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-style: normal;
+}
+
 .assistantTurn {
   display: flex;
   align-items: flex-start;

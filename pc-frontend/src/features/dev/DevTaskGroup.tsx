@@ -7,9 +7,10 @@
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
  */
 import { memo, useState, useEffect, useRef } from 'react'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
+import { clean } from '../../lib/utils'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
@@ -53,6 +54,26 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const hasProgressDetails = progressCount > 0
   const tone = status.tone
   const processSummary = timelineSummary(timeline, taskId, taskId ? shortId(taskId) : '')
+  const codexThreadUri = codexThreadUriFor(messages)
+
+  useEffect(() => {
+    if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
+    console.info('[elon-task-timeline]', {
+      taskId,
+      status: status.label,
+      done: isDone,
+      coverage: timeline.coverage,
+      codexThreadUri,
+      steps: timeline.items.map((item) => ({
+        kind: item.kind,
+        tone: item.tone,
+        title: item.title,
+        type: item.event?.type,
+        tool: item.event?.tool,
+        meta: item.meta,
+      })),
+    })
+  }, [taskId, status.label, isDone, processSummary, codexThreadUri])
 
   return (
     <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
@@ -86,6 +107,14 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
               <span>{status.label}</span>
               {taskId && <em>{shortId(taskId)}</em>}
             </div>
+          )}
+
+          {codexThreadUri && (
+            <a className={styles.codexThreadLink} href={codexThreadUri} title={codexThreadUri}>
+              <ExternalLink size={12} />
+              <span>Codex 会话</span>
+              <em>{shortThreadUri(codexThreadUri)}</em>
+            </a>
           )}
 
           {!collapsed && (
@@ -197,4 +226,32 @@ function isTerminalTaskMessage(message: ChatMessage): boolean {
   if (isAssistantTaskMessage(message) && taskIdOf(message)) return true
   const status = String(message.task_status ?? message.taskStatus ?? '').toLowerCase()
   return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
+}
+
+function codexThreadUriFor(messages: ChatMessage[]): string {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const value = clean(
+      messages[index].codex_thread_uri
+      ?? messages[index].codexThreadUri
+      ?? messages[index].task_codex_thread_uri
+      ?? messages[index].taskCodexThreadUri
+      ?? '',
+    )
+    if (value) return value.startsWith('codex://threads/') ? value : `codex://threads/${value}`
+    const threadId = clean(
+      messages[index].task_codex_thread_id
+      ?? messages[index].taskCodexThreadId
+      ?? messages[index].codex_thread_id
+      ?? messages[index].codexThreadId
+      ?? '',
+    )
+    if (threadId) return threadId.startsWith('codex://threads/') ? threadId : `codex://threads/${threadId}`
+  }
+  return ''
+}
+
+function shortThreadUri(uri: string): string {
+  const id = clean(uri).replace(/^codex:\/\/threads\//, '')
+  if (!id) return ''
+  return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id
 }

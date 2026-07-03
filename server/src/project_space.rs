@@ -26,6 +26,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_landing,
     project_mobile::ensure_mobile_project,
+    project_space_ai_progress::{is_pc_cli_heartbeat_progress, pc_dispatch_started_progress},
     project_tool_approval_recovery, project_tool_approvals, project_workspace_recovery,
     project_ws_protocol::enrich_project_ws_event,
     store::{
@@ -1973,82 +1974,6 @@ fn channel_ai_heartbeat_only_timeout() -> Duration {
     Duration::from_secs(secs)
 }
 
-fn is_pc_cli_heartbeat_progress(event_type: &str, message: &str) -> bool {
-    event_type == "progress"
-        && message.contains("正在处理中")
-        && message.contains("已等待")
-        && message.contains("Codex")
-}
-
-fn pc_dispatch_started_progress(value: &serde_json::Value) -> Option<String> {
-    let agent_id = value
-        .get("agent_id")
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .filter(|v| !v.is_empty())?;
-    let cli = value
-        .get("cli")
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .filter(|v| !v.is_empty())
-        .unwrap_or("pc-ai");
-    let cwd_configured = value
-        .get("cwd_configured")
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let message = if cwd_configured {
-        format!(
-            "已派发到 PC 节点 {}，等待 {} CLI 输出。",
-            short_pc_node_id(agent_id),
-            pc_cli_label(cli)
-        )
-    } else {
-        format!(
-            "已派发到 PC 节点 {}，等待 {} CLI 确认。",
-            short_pc_node_id(agent_id),
-            pc_cli_label(cli)
-        )
-    };
-    serde_json::to_string(&serde_json::json!({
-        "type": "runtime_status",
-        "phase": "pc_dispatched",
-        "runtime": pc_cli_label(cli),
-        "message": message,
-        "agent_id": agent_id,
-        "cwd_configured": cwd_configured,
-    }))
-    .ok()
-}
-
-fn pc_cli_label(cli: &str) -> &'static str {
-    match cli {
-        "codex" => "Codex",
-        "copilot" => "Copilot",
-        "claude" => "Claude",
-        "gemini" => "Gemini",
-        "api-runtime" => "Route B",
-        "server-runtime" => "Route C",
-        _ => "PC AI",
-    }
-}
-
-fn short_pc_node_id(agent_id: &str) -> String {
-    let clean = agent_id.trim();
-    if clean.chars().count() <= 18 {
-        return clean.to_string();
-    }
-    let head = clean.chars().take(11).collect::<String>();
-    let tail = clean
-        .chars()
-        .rev()
-        .take(6)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<String>();
-    format!("{head}...{tail}")
-}
-
 fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -2134,7 +2059,12 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     insert_channel_ai_progress(&task, &content);
                                 }
                             }
-                            "tool_approval_decision" | "tool_call" | "tool_result" => {
+                            "tool_approval_decision"
+                            | "tool_call"
+                            | "tool_result"
+                            | "runtime_status"
+                            | "runtime_summary"
+                            | "usage" => {
                                 if let Ok(content) = serde_json::to_string(&value) {
                                     insert_channel_ai_progress(&task, &content);
                                 }
@@ -2146,7 +2076,9 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     .unwrap_or("")
                                     .trim();
                                 if !text.is_empty() {
-                                    insert_channel_ai_progress(&task, text);
+                                    if let Ok(content) = serde_json::to_string(&value) {
+                                        insert_channel_ai_progress(&task, &content);
+                                    }
                                 }
                             }
                             "done" => {
@@ -2494,7 +2426,8 @@ impl BlankFallback for str {
 
 #[cfg(test)]
 mod tests {
-    use super::{can_start_channel_ai, pc_dispatch_started_progress};
+    use super::can_start_channel_ai;
+    use crate::project_space_ai_progress::pc_dispatch_started_progress;
 
     #[test]
     fn channel_ai_requires_edit_role() {

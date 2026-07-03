@@ -119,14 +119,14 @@ fn project_channel_message_from_row(
         task_status: row.get(10)?,
         task_error: row.get(11)?,
         task_apk_url: row.get(12)?,
-        suggestion_status: row.get(13)?,
-        suggestion_resolved_by: row.get(14)?,
-        suggestion_resolved_by_name: row.get(15)?,
-        suggestion_resolved_at: row.get(16)?,
-        created_at: row.get(17)?,
+        task_codex_thread_id: row.get(13)?,
+        suggestion_status: row.get(14)?,
+        suggestion_resolved_by: row.get(15)?,
+        suggestion_resolved_by_name: row.get(16)?,
+        suggestion_resolved_at: row.get(17)?,
+        created_at: row.get(18)?,
     })
 }
-
 impl Store {
     pub fn project_space_summary(
         &self,
@@ -691,7 +691,7 @@ impl Store {
                     m.kind, m.content, m.task_id,
                     t.status AS task_status,
                     t.error AS task_error,
-                    t.apk_url AS task_apk_url,
+                    t.apk_url AS task_apk_url, t.codex_thread_id AS task_codex_thread_id,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
@@ -785,7 +785,7 @@ impl Store {
                     m.kind, m.content, m.task_id,
                     t.status AS task_status,
                     t.error AS task_error,
-                    t.apk_url AS task_apk_url,
+                    t.apk_url AS task_apk_url, t.codex_thread_id AS task_codex_thread_id,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
@@ -912,7 +912,7 @@ impl Store {
                     m.kind, m.content, m.task_id,
                     t.status AS task_status,
                     t.error AS task_error,
-                    t.apk_url AS task_apk_url,
+                    t.apk_url AS task_apk_url, t.codex_thread_id AS task_codex_thread_id,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
