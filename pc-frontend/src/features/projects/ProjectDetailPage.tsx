@@ -4,7 +4,7 @@ import { api } from '../../api/client'
 import GroupAiPanel from '../group-ai/GroupAiPanel'
 import { useProjectStore } from '../conversation/useProjectStore'
 import ProjectReadinessCard from './ProjectReadinessCard'
-import type { ProjectMember } from '../conversation/types'
+import type { ProjectMember, ProjectRole, ProjectRolesResponse } from '../conversation/types'
 import {
   filterMembers,
   memberInitial,
@@ -13,6 +13,10 @@ import {
   memberPrimaryRoleColor,
   memberRoleSummary,
   presenceLabel,
+  projectMemberHasRolePermission,
+  ROLE_PERMISSION_INVITE_MEMBERS,
+  ROLE_PERMISSION_MANAGE_MEMBERS,
+  ROLE_PERMISSION_MODERATE_MEMBERS,
   roleLabel,
 } from '../conversation/memberUtils'
 import { useAuthStore } from '../../store/auth'
@@ -63,10 +67,15 @@ export default function ProjectDetailPage() {
   const [health, setHealth] = useState<WorkspaceHealth | null>(null)
   const [healthLoading, setHealthLoading] = useState(false)
   const [memberList, setMemberList] = useState<ProjectMember[]>([])
+  const [roles, setRoles] = useState<ProjectRole[]>([])
 
   const project = id ? projects.find((p) => p.id === id) : null
   const activeRole = String(space?.my_role ?? project?.my_role ?? project?.role ?? '').toLowerCase()
-  const canManageMembers = activeRole === 'owner' || activeRole === 'admin'
+  const currentMember = currentUserId ? (space?.members ?? memberList).find((member) => member.user_id === currentUserId) : undefined
+  const fallbackAdmin = activeRole === 'owner' || activeRole === 'admin'
+  const canInviteMembers = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_INVITE_MEMBERS, fallbackAdmin)
+  const canManageMembers = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_MANAGE_MEMBERS, fallbackAdmin)
+  const canModerateMembers = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_MODERATE_MEMBERS, fallbackAdmin)
 
   useEffect(() => {
     if (id) selectProject(id).catch(() => {})
@@ -79,6 +88,13 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (space?.members) setMemberList(space.members)
   }, [space])
+
+  useEffect(() => {
+    if (!id) return
+    api.get<ProjectRolesResponse>(`/api/projects/${encodeURIComponent(id)}/roles`)
+      .then((data) => setRoles(data.roles ?? []))
+      .catch(() => setRoles([]))
+  }, [id])
 
   async function loadHealth() {
     if (!id) return
@@ -156,7 +172,9 @@ export default function ProjectDetailPage() {
             onRefresh={loadMembers}
             projectId={id ?? ''}
             currentUserId={currentUserId}
+            canInviteMembers={canInviteMembers}
             canManageMembers={canManageMembers}
+            canModerateMembers={canModerateMembers}
           />
         )}
         {tab === 'groupAi' && <GroupAiPanel projectId={id ?? ''} channels={space?.channels ?? []} />}
@@ -206,6 +224,11 @@ function OverviewTab({ project, space }: { project: StoreProject; space: StoreSp
   )
 }
 
+function canUseProjectPermission(member: ProjectMember | undefined, roles: ProjectRole[], permission: string, fallback: boolean) {
+  if (member && roles.length > 0) return projectMemberHasRolePermission(member, roles, permission)
+  return fallback
+}
+
 type ProjectMemberStatusFilter = 'all' | 'online' | 'offline' | 'restricted'
 type ProjectMemberSortMode = 'role' | 'name' | 'joined'
 type ProjectMemberBatchAction = 'mute1h' | 'mute1d' | 'unmute' | 'remove'
@@ -222,13 +245,17 @@ function MembersTab({
   onRefresh,
   projectId,
   currentUserId,
+  canInviteMembers,
   canManageMembers,
+  canModerateMembers,
 }: {
   members: ProjectMember[]
   onRefresh: () => Promise<void> | void
   projectId: string
   currentUserId?: string
+  canInviteMembers: boolean
   canManageMembers: boolean
+  canModerateMembers: boolean
 }) {
   const [inviteAccount, setInviteAccount] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -258,6 +285,7 @@ function MembersTab({
     () => members.filter((member) => selectedIds.has(member.user_id) && member.user_id !== currentUserId),
     [members, selectedIds, currentUserId],
   )
+  const canBatchMembers = canManageMembers || canModerateMembers
   const selectableVisibleMembers = visibleMembers.filter((member) => member.user_id !== currentUserId)
   const selectedVisibleCount = selectableVisibleMembers.filter((member) => selectedIds.has(member.user_id)).length
   const allVisibleSelected = selectableVisibleMembers.length > 0 && selectedVisibleCount === selectableVisibleMembers.length
@@ -293,7 +321,7 @@ function MembersTab({
   }
 
   function toggleMember(member: ProjectMember) {
-    if (!canManageMembers || member.user_id === currentUserId) return
+    if (!canBatchMembers || member.user_id === currentUserId) return
     setSelectedIds((current) => {
       const next = new Set(current)
       if (next.has(member.user_id)) next.delete(member.user_id)
@@ -304,7 +332,7 @@ function MembersTab({
   }
 
   function toggleVisibleMembers() {
-    if (!canManageMembers || selectableVisibleMembers.length === 0) return
+    if (!canBatchMembers || selectableVisibleMembers.length === 0) return
     setSelectedIds((current) => {
       const next = new Set(current)
       selectableVisibleMembers.forEach((member) => {
@@ -317,6 +345,7 @@ function MembersTab({
   }
 
   async function handleRemove(userId: string, account: string) {
+    if (!canManageMembers) return
     if (userId === currentUserId) return
     if (!window.confirm(`确认移除成员 ${account}？`)) return
     setRemoving(userId)
@@ -332,11 +361,13 @@ function MembersTab({
 
   async function runBatchAction(action: ProjectMemberBatchAction) {
     const targets = selectedMembers.filter((member) => member.user_id !== currentUserId)
-    if (!projectId || !canManageMembers || batchBusy) return
+    if (!projectId || !canBatchMembers || batchBusy) return
     if (targets.length === 0) {
       setBatchMessage('请先选择要处理的成员')
       return
     }
+    if (action === 'remove' && !canManageMembers) return
+    if (action !== 'remove' && !canModerateMembers) return
     if (action === 'remove' && !window.confirm(`确定要将 ${targets.length} 位成员移出项目吗？`)) return
     setBatchBusy(action)
     setBatchMessage(`正在处理 ${targets.length} 位成员...`)
@@ -396,13 +427,13 @@ function MembersTab({
             ))}
           </select>
         </label>
-        <button className={styles.primaryBtn} type="submit" disabled={!canManageMembers || inviting || !inviteAccount.trim()}>
+        <button className={styles.primaryBtn} type="submit" disabled={!canInviteMembers || inviting || !inviteAccount.trim()}>
           {inviting ? '邀请中…' : '邀请'}
         </button>
       </form>
       {inviteError && <p className={styles.memberFormError}>{inviteError}</p>}
       {inviteSuccess && <p className={styles.memberFormSuccess}>{inviteSuccess}</p>}
-      {!canManageMembers && <p className={styles.memberFormHint}>当前角色可查看成员数据；邀请、批量限制和移除需要拥有者或管理员权限。</p>}
+      {!canBatchMembers && !canInviteMembers && <p className={styles.memberFormHint}>当前角色可查看成员数据；邀请、批量限制和移除需要成员管理权限。</p>}
 
       <div className={styles.memberWorkbenchToolbar}>
         <input
@@ -424,7 +455,7 @@ function MembersTab({
         <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
       </div>
 
-      {canManageMembers && (
+      {canBatchMembers && (
         <section className={styles.memberBatchBar}>
           <div>
             <strong>批量成员管理</strong>
@@ -435,10 +466,10 @@ function MembersTab({
               {allVisibleSelected ? '取消当前' : '选择当前'}
             </button>
             <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => setSelectedIds(new Set())}>清空</button>
-            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('mute1h')}>禁言 1 小时</button>
-            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('mute1d')}>禁言 1 天</button>
-            <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('unmute')}>解禁言</button>
-            <button className={styles.textBtn} type="button" data-danger="true" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('remove')}>批量移除</button>
+            {canModerateMembers && <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('mute1h')}>禁言 1 小时</button>}
+            {canModerateMembers && <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('mute1d')}>禁言 1 天</button>}
+            {canModerateMembers && <button className={styles.textBtn} type="button" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('unmute')}>解禁言</button>}
+            {canManageMembers && <button className={styles.textBtn} type="button" data-danger="true" disabled={selectedMembers.length === 0 || !!batchBusy} onClick={() => runBatchAction('remove')}>批量移除</button>}
           </div>
           {batchMessage && <p>{batchMessage}</p>}
         </section>
@@ -461,7 +492,7 @@ function MembersTab({
           const roles = projectMemberRoleRefs(member)
           const name = member.account ?? member.user_id ?? '-'
           const status = memberPresenceStatus(member)
-          const canSelect = canManageMembers && member.user_id !== currentUserId
+          const canSelect = canBatchMembers && member.user_id !== currentUserId
           return (
             <div key={member.user_id} className={styles.memberTableRow} data-selected={selectedIds.has(member.user_id) ? 'true' : undefined}>
               <label className={styles.memberTableCheck}>
