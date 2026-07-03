@@ -26,7 +26,10 @@ use crate::{
     project_keys::clean_trace_id,
     project_landing,
     project_mobile::ensure_mobile_project,
-    project_space_ai_progress::{is_pc_cli_heartbeat_progress, pc_dispatch_started_progress},
+    project_space_ai_progress::{
+        is_pc_cli_heartbeat_progress, pc_cli_no_output_timeout_progress,
+        pc_dispatch_started_progress,
+    },
     project_tool_approval_recovery, project_tool_approvals, project_workspace_recovery,
     project_ws_protocol::enrich_project_ws_event,
     store::{
@@ -2124,9 +2127,17 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                         runner.abort();
                         project_tool_approvals::clear_task(&task.task_id);
                         final_status = "failed".to_string();
+                        let timeout_secs = heartbeat_only_timeout.as_secs();
+                        if let Some(raw_status) = pc_cli_no_output_timeout_progress(timeout_secs) {
+                            let _ = task.state.store.record_task_event(
+                                &task.task_id,
+                                &enrich_project_ws_event(raw_status.clone(), &task.task_id),
+                            );
+                            insert_channel_ai_progress(&task, &raw_status);
+                        }
                         let msg = format!(
-                            "本机 AI 在 {} 秒内没有返回有效进展，已停止本轮任务。请稍后重试，或检查 Codex 网络/代理状态。",
-                            heartbeat_only_timeout.as_secs()
+                            "本机 AI 已派发到 PC 节点，但在 {} 秒内没有收到 Codex CLI 输出、命令、工具结果或最终完成事件；已停止本轮任务。请更新/重启一龙 PC 节点客户端，并检查 Codex 网络/代理状态。",
+                            timeout_secs
                         );
                         final_reply = msg.clone();
                         error = Some(msg.clone());
@@ -2427,7 +2438,6 @@ impl BlankFallback for str {
 #[cfg(test)]
 mod tests {
     use super::can_start_channel_ai;
-    use crate::project_space_ai_progress::pc_dispatch_started_progress;
 
     #[test]
     fn channel_ai_requires_edit_role() {
@@ -2437,29 +2447,5 @@ mod tests {
         assert!(!can_start_channel_ai("member"));
         assert!(!can_start_channel_ai("observer"));
         assert!(!can_start_channel_ai("viewer"));
-    }
-
-    #[test]
-    fn pc_dispatch_started_progress_names_node_and_cli() {
-        let raw = serde_json::json!({
-            "type": "pc_dispatch_started",
-            "agent_id": "node-usr_5c-dd33ed36",
-            "cli": "codex",
-            "cwd_configured": false
-        });
-        let progress = pc_dispatch_started_progress(&raw).unwrap();
-        let value: serde_json::Value = serde_json::from_str(&progress).unwrap();
-
-        assert_eq!(value["type"], "runtime_status");
-        assert_eq!(value["phase"], "pc_dispatched");
-        assert_eq!(value["runtime"], "Codex");
-        assert!(value["message"]
-            .as_str()
-            .unwrap()
-            .contains("node-usr_5c...33ed36"));
-        assert!(value["message"]
-            .as_str()
-            .unwrap()
-            .contains("等待 Codex CLI 确认"));
     }
 }

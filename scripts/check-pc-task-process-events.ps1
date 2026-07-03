@@ -34,6 +34,7 @@ $validExpect = @(
     "tool_result",
     "usage",
     "assistant_event",
+    "no_cli_output",
     "final_reply",
     "error"
 )
@@ -76,6 +77,7 @@ coverage_keys = [
     "tool_result",
     "usage",
     "assistant_event",
+    "no_cli_output",
     "final_reply",
     "error",
 ]
@@ -151,6 +153,8 @@ for row in events:
         coverage["dispatch"] = True
     if event_type == "runtime_status" and str(value.get("phase") or "") == "pc_dispatched":
         coverage["dispatch"] = True
+    if event_type == "runtime_status" and str(value.get("phase") or "") == "pc_cli_no_output_timeout":
+        coverage["no_cli_output"] = True
     if event_type == "progress":
         message = event_message(value)
         if any(marker in message for marker in heartbeat_markers):
@@ -241,7 +245,7 @@ Write-Host ("EVENT_COUNT={0}" -f $report.event_count)
 Write-Host ("MESSAGE_COUNT={0}" -f $report.message_count)
 Write-Host ""
 Write-Host "Coverage:"
-foreach ($name in @("dispatch", "heartbeat", "tool_call", "command", "file_change", "tool_result", "usage", "assistant_event", "final_reply", "error")) {
+foreach ($name in @("dispatch", "heartbeat", "tool_call", "command", "file_change", "tool_result", "usage", "assistant_event", "no_cli_output", "final_reply", "error")) {
     $mark = if ([bool]$report.coverage.$name) { "[x]" } else { "[ ]" }
     Write-Host ("  {0} {1}" -f $mark, $name)
 }

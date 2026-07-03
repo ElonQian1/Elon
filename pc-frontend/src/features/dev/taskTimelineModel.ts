@@ -121,6 +121,9 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
   const parts: string[] = []
   if (model.visibleStepCount > 0) parts.push(`${model.visibleStepCount} 步过程`)
   if (model.heartbeatCount > 1) parts.push(`合并 ${model.heartbeatCount} 条等待状态`)
+  if (model.coverage.heartbeat && !model.coverage.command && !model.coverage.toolResult && !model.coverage.assistantEvent) {
+    parts.push('未收到 CLI 输出')
+  }
   if (shortTaskId || taskId) parts.push(shortTaskId || taskId)
   return parts.join(' · ')
 }
@@ -149,12 +152,25 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     const label = runtimeStatusLabel(phase)
     const runtime = clean(event.runtime ?? '')
     const turn = Number(event.turn ?? 0)
+    const eventMessage = clean(event.message ?? '')
+    if (phase === 'pc_cli_no_output_timeout') {
+      return {
+        id: itemId(message, index),
+        kind: 'status',
+        tone: 'failed',
+        title: label.title,
+        detail: eventMessage || label.body,
+        meta: runtime,
+        message,
+        event,
+      }
+    }
     return {
       id: itemId(message, index),
       kind: 'codex',
       tone: label.tone,
-      title: clean(event.message ?? '') || label.title,
-      detail: clean(event.message ?? '') ? undefined : label.body,
+      title: eventMessage || label.title,
+      detail: eventMessage ? undefined : label.body,
       meta: [runtime, turn > 0 ? `第 ${turn} 轮` : ''].filter(Boolean).join(' · '),
       message,
       event,

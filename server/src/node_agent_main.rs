@@ -1652,7 +1652,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
 
     let codex_key = codex_plan.scope_key.clone();
 
-    if node_agent_cli_sidecar_runner::sidecar_enabled() {
+    if node_agent_cli_sidecar_runner::sidecar_enabled_for_cli(cli_name) {
         let sidecar_registry = runtime.cli_sidecars.clone();
         let session_id = node_agent_cli_sidecar_runner::session_id_for_task(&req_id);
         let output_path = sidecar_registry.output_path(&req_id, &session_id);

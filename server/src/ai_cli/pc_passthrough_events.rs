@@ -39,28 +39,30 @@ pub(crate) fn pc_cli_passthrough_events_from_chunk(
     let clean = strip_terminal_control_sequences(text);
     let mut out = Vec::new();
 
-    for segment in clean.split_inclusive('\n') {
-        if segment.is_empty() {
+    for ch in clean.chars() {
+        if buffer.is_empty() {
+            if ch == '{' {
+                buffer.push(ch);
+            }
             continue;
         }
-        let line_complete = segment.ends_with('\n');
-        if buffer.is_empty() && !line_complete && !looks_like_json_event_fragment(segment) {
-            continue;
-        }
-        buffer.push_str(segment);
-        if line_complete {
-            out.extend(pc_cli_passthrough_events(buffer, model_used));
-            buffer.clear();
-        } else if !looks_like_json_event_fragment(buffer) {
-            buffer.clear();
-        } else {
-            let events = pc_cli_passthrough_events(buffer, model_used);
-            if !events.is_empty() {
+
+        if matches!(ch, '\r' | '\n') {
+            if let Some(events) = buffered_json_event(buffer, model_used) {
                 out.extend(events);
                 buffer.clear();
-            } else if serde_json::from_str::<Value>(buffer.trim()).is_ok() {
+            } else if !looks_like_json_event_fragment(buffer) {
                 buffer.clear();
             }
+            continue;
+        }
+
+        buffer.push(ch);
+        if let Some(events) = buffered_json_event(buffer, model_used) {
+            out.extend(events);
+            buffer.clear();
+        } else if buffer.len() > MAX_BUFFERED_JSON_EVENT_CHARS {
+            buffer.clear();
         }
     }
 
@@ -82,6 +84,16 @@ pub(crate) fn pc_cli_passthrough_events_flush(
 fn looks_like_json_event_fragment(text: &str) -> bool {
     text.trim_start_matches(|ch: char| ch.is_whitespace() || ch == '\r')
         .starts_with('{')
+}
+
+const MAX_BUFFERED_JSON_EVENT_CHARS: usize = 1024 * 1024;
+
+fn buffered_json_event(buffer: &str, model_used: Option<&str>) -> Option<Vec<String>> {
+    let trimmed = buffer.trim();
+    if trimmed.is_empty() || serde_json::from_str::<Value>(trimmed).is_err() {
+        return None;
+    }
+    Some(pc_cli_passthrough_events(trimmed, model_used))
 }
 
 #[cfg(test)]
@@ -140,6 +152,43 @@ mod tests {
         assert_eq!(tool["type"], "tool_call");
         assert_eq!(tool["tool"], "shell");
         assert_eq!(tool["args"]["command"], "cargo test");
+    }
+
+    #[test]
+    fn repairs_terminal_wrapped_codex_json_stream() {
+        let mut buffer = String::new();
+        let raw = concat!(
+            "{\"type\":\"item.started\",\"item\":{\"id\":\"call_1\",\"type\":\"command",
+            "\r\n\u{1b}[29;120H",
+            "_execution\",\"command\":\"git status --short\"}}\r\n"
+        );
+
+        let events = pc_cli_passthrough_events_from_chunk(&mut buffer, raw, Some("Codex"));
+
+        assert!(buffer.is_empty());
+        assert_eq!(events.len(), 2);
+        let tool: Value = serde_json::from_str(&events[0]).unwrap();
+        assert_eq!(tool["type"], "tool_call");
+        assert_eq!(tool["tool"], "shell");
+        assert_eq!(tool["args"]["command"], "git status --short");
+    }
+
+    #[test]
+    fn parses_multiple_codex_events_in_one_chunk() {
+        let mut buffer = String::new();
+        let raw = concat!(
+            "{\"type\":\"item.started\",\"item\":{\"id\":\"call_1\",\"type\":\"command_execution\",\"command\":\"pwd\"}}\n",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"call_1\",\"type\":\"command_execution\",\"exit_code\":0,\"aggregated_output\":\"ok\"}}\n"
+        );
+
+        let events = pc_cli_passthrough_events_from_chunk(&mut buffer, raw, Some("Codex"));
+
+        assert!(buffer.is_empty());
+        assert_eq!(events.len(), 4);
+        let started: Value = serde_json::from_str(&events[0]).unwrap();
+        let completed: Value = serde_json::from_str(&events[2]).unwrap();
+        assert_eq!(started["type"], "tool_call");
+        assert_eq!(completed["type"], "tool_result");
     }
 
     #[test]

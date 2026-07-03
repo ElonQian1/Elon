@@ -88,6 +88,28 @@ pub(crate) fn sidecar_enabled() -> bool {
     )
 }
 
+pub(crate) fn sidecar_enabled_for_cli(cli_name: &str) -> bool {
+    sidecar_enabled() && sidecar_enabled_for_cli_name(cli_name, codex_json_direct_stdout_enabled())
+}
+
+fn sidecar_enabled_for_cli_name(cli_name: &str, codex_json_direct_stdout: bool) -> bool {
+    !cli_name.trim().eq_ignore_ascii_case("codex") || !codex_json_direct_stdout
+}
+
+fn codex_json_direct_stdout_enabled() -> bool {
+    codex_json_direct_stdout_enabled_from(std::env::var("ELON_CODEX_JSON_DIRECT_STDOUT").ok())
+}
+
+fn codex_json_direct_stdout_enabled_from(value: Option<String>) -> bool {
+    let Some(value) = value else {
+        return true;
+    };
+    !matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "0" | "false" | "no" | "off" | "disabled"
+    )
+}
+
 pub(crate) fn session_id_for_task(task_id: &str) -> String {
     format!("sidecar-{}-{}", safe_id_fragment(task_id), now_ms())
 }
@@ -568,3 +590,28 @@ fn hide_tokio_command_window(command: &mut tokio::process::Command) {
 
 #[cfg(not(windows))]
 fn hide_tokio_command_window(_command: &mut tokio::process::Command) {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn sidecar_skips_codex_when_json_direct_stdout_is_enabled() {
+        assert!(!super::sidecar_enabled_for_cli_name("codex", true));
+        assert!(!super::sidecar_enabled_for_cli_name(" CODEX ", true));
+        assert!(super::sidecar_enabled_for_cli_name("copilot", true));
+    }
+
+    #[test]
+    fn sidecar_can_be_reenabled_for_codex_fallback() {
+        assert!(super::sidecar_enabled_for_cli_name("codex", false));
+        assert!(super::codex_json_direct_stdout_enabled_from(None));
+        assert!(super::codex_json_direct_stdout_enabled_from(Some(
+            "true".to_string()
+        )));
+        assert!(!super::codex_json_direct_stdout_enabled_from(Some(
+            "0".to_string()
+        )));
+        assert!(!super::codex_json_direct_stdout_enabled_from(Some(
+            "OFF".to_string()
+        )));
+    }
+}
