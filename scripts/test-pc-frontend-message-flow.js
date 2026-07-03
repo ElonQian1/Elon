@@ -43,6 +43,7 @@ try {
     timelineSummary,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskTimelineModel.ts'));
   const {
+    buildAgentRunParallelOverview,
     recoveryViewFromEntry,
     recoveryViewFromTask,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'agentRunRecoveryModel.ts'));
@@ -289,6 +290,54 @@ try {
   assert.strictEqual(detachedRecovery.canContinue, true, 'detached task should expose snapshot continue');
   assert.ok(detachedRecovery.continuePrompt.includes('不要批准已经失效的旧审批'), 'continue draft should guard stale approvals');
   assert.ok(detachedRecovery.facts.some((fact) => fact.value.includes('审批已失效')), 'detached recovery should explain lost approval waiter');
+
+  const parallelOverview = buildAgentRunParallelOverview({
+    recoveryEntry: {
+      task_id: 'tsk-live-a',
+      cli_name: 'Codex',
+      route: 'route_a',
+      status: 'running',
+      recommended_action: 'wait_or_cancel',
+      can_cancel: true,
+    },
+    activeControls: [
+      { task_id: 'tsk-live-a', cli_name: 'Codex', route: 'route_a', can_cancel: true },
+      { task_id: 'tsk-live-b', cli_name: 'Codex', route: 'route_a', can_cancel: true },
+    ],
+    sidecarSessions: [
+      {
+        task_id: 'tsk-sidecar-d',
+        cli_name: 'Codex',
+        route: 'route_a',
+        capabilities: { terminal_attach: true, cancel: true },
+      },
+    ],
+    recentTasks: [
+      {
+        task_id: 'tsk-detached-c',
+        cli_name: 'Codex',
+        route: 'route_a',
+        attach: { status: 'detached' },
+        resume: {
+          status: 'detached',
+          next_action: 'continue_from_snapshot',
+          can_cancel: false,
+          can_replay_journal_events: true,
+          tool_approval_recovery: { status: 'lost_after_restart', journal_pending_count: 1 },
+        },
+      },
+    ],
+  });
+  assert.strictEqual(parallelOverview.counts.total, 4, 'parallel overview should dedupe the recommended live task');
+  assert.strictEqual(parallelOverview.counts.active, 2, 'parallel overview should count active live controls');
+  assert.strictEqual(parallelOverview.counts.sidecar, 1, 'parallel overview should count sidecar-reconnectable tasks');
+  assert.strictEqual(parallelOverview.counts.recoverable, 1, 'parallel overview should count snapshot-continuable tasks');
+  assert.strictEqual(parallelOverview.counts.staleApproval, 1, 'parallel overview should surface stale approval waiters');
+  assert.deepStrictEqual(
+    parallelOverview.views.map((view) => view.taskId),
+    ['tsk-live-a', 'tsk-live-b', 'tsk-sidecar-d', 'tsk-detached-c'],
+    'parallel overview should keep running tasks ahead of sidecar and recoverable detached tasks',
+  );
 
   const assistantOutputTimeline = buildTaskTimeline([
     {

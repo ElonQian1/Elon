@@ -31,6 +31,61 @@
   color: var(--text-muted);
 }
 
+.parallelOverview {
+  display: grid;
+  gap: 7px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.022);
+}
+
+.parallelOverview > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.parallelOverview strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.parallelOverview span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.parallelCounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.parallelCounts span {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, .13);
+  border-radius: 4px;
+  padding: 0 6px;
+  background: rgba(255,255,255,.025);
+  line-height: 1;
+}
+
+.parallelCounts span[data-tone="running"] {
+  color: var(--accent);
+  border-color: rgba(78, 205, 196, .22);
+  background: rgba(78, 205, 196, .07);
+}
+
+.parallelCounts span[data-tone="failed"] {
+  color: #ff9999;
+  border-color: rgba(220, 80, 80, .25);
+  background: rgba(220, 80, 80, .07);
+}
+
 .item {
   display: flex;
   align-items: center;

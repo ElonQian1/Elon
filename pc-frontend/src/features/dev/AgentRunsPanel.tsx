@@ -4,9 +4,9 @@ import { safeNodeAdminUrl, clean } from '../../lib/utils'
 import SidecarTerminalPanel from './SidecarTerminalPanel'
 import type { AgentRunsData, AgentRunEntry, SidecarSession } from './types'
 import {
-  recoveryViewFromEntry,
-  recoveryViewFromTask,
+  buildAgentRunParallelOverview,
   shortRunId,
+  type AgentRunParallelOverview,
   type RecoveryView,
 } from './agentRunRecoveryModel'
 import styles from './AgentRunsPanel.module.css'
@@ -102,7 +102,13 @@ export default function AgentRunsPanel({ workspacePath, onDraftContinue }: Omit<
   )
 
   const activeSidecar = data.sidecarSessions.find(sidecarAttachable) ?? data.sidecarSessions[0]
-  const hasContent = activeSidecar || data.recoveryEntry || data.activeControls.length || data.recentTasks.length || data.runs.length
+  const overview = buildAgentRunParallelOverview({
+    recoveryEntry: data.recoveryEntry,
+    activeControls: data.activeControls,
+    recentTasks: data.recentTasks,
+    sidecarSessions: data.sidecarSessions,
+  })
+  const hasContent = activeSidecar || overview.views.length || data.runs.length
   if (!hasContent) return (
     <div className={styles.panel}>
       <div className={styles.panelHead}><strong>本机 Agent 运行</strong><button onClick={() => load(true)}>刷新</button></div>
@@ -118,41 +124,35 @@ export default function AgentRunsPanel({ workspacePath, onDraftContinue }: Omit<
       </div>
       <div className={styles.list}>
         {activeSidecar && <SidecarTerminalPanel adminUrl={adminUrl} session={activeSidecar} />}
-        {data.recoveryEntry && (
+        {overview.views.length > 0 && <ParallelOverview overview={overview} />}
+        {overview.views.slice(0, 6).map((view, i) => (
           <RecoveryItem
-            view={recoveryViewFromEntry(data.recoveryEntry)}
-            actionState={actionState}
-            onCancel={cancelTask}
-            onDraftContinue={draftContinue}
-          />
-        )}
-        {data.activeControls.map((ctrl, i) => (
-          <RecoveryItem
-            key={i}
-            view={recoveryViewFromEntry({
-              ...ctrl,
-              status: 'running',
-              recommended_action: 'wait_or_cancel',
-              reason: '当前本机节点仍持有运行控制句柄，PC 端可以继续观察或停止任务。',
-              can_cancel: ctrl.can_cancel ?? ctrl.canCancel,
-            })}
-            compact
-            actionState={actionState}
-            onCancel={cancelTask}
-            onDraftContinue={draftContinue}
-          />
-        ))}
-        {data.recentTasks.slice(0, 3).map((task, i) => (
-          <RecoveryItem
-            key={i}
-            view={recoveryViewFromTask(task)}
-            compact
+            key={`${view.taskId || view.title}-${i}`}
+            view={view}
+            compact={i > 0 || overview.views.length > 1}
             actionState={actionState}
             onCancel={cancelTask}
             onDraftContinue={draftContinue}
           />
         ))}
         {data.runs.slice(0, 3).map((run, i) => <RunItem key={i} run={run} />)}
+      </div>
+    </div>
+  )
+}
+
+function ParallelOverview({ overview }: { overview: AgentRunParallelOverview }) {
+  return (
+    <div className={styles.parallelOverview} aria-label="项目任务现场总览">
+      <div>
+        <strong>{overview.headline}</strong>
+        <span>{overview.summary}</span>
+      </div>
+      <div className={styles.parallelCounts}>
+        <span data-tone={overview.counts.active ? 'running' : undefined}>运行 {overview.counts.active}</span>
+        <span data-tone={overview.counts.sidecar ? 'running' : undefined}>重接 {overview.counts.sidecar}</span>
+        <span data-tone={overview.counts.recoverable ? 'running' : undefined}>继续 {overview.counts.recoverable}</span>
+        <span data-tone={overview.counts.staleApproval ? 'failed' : undefined}>审批 {overview.counts.staleApproval}</span>
       </div>
     </div>
   )
