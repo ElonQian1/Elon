@@ -28,18 +28,11 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         strokeJoin = Paint.Join.ROUND
     }
     private val basePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val annotationDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = Color.parseColor("#F2C94C")
-    }
-    private val annotationIconStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-        color = Color.parseColor("#D9D9D9")
-    }
     private val annotationIconBitmap: Bitmap? by lazy {
         BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation)
+    }
+    private val completedAnnotationIconBitmap: Bitmap? by lazy {
+        BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation_filled)
     }
 
     private var baseBitmap: Bitmap? = null
@@ -440,52 +433,28 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
     }
 
     private fun drawAnnotationIcons(canvas: Canvas) {
-        val icon = annotationIconBitmap ?: return
         operations.forEach { op ->
             val annotation = op as? ChatImageEditOp.Annotation ?: return@forEach
             val rect = annotationIconRectOnView(annotation) ?: return@forEach
-            if (annotation.note.trim().isNotEmpty()) {
-                drawCompletedAnnotationIcon(canvas, rect)
-                drawCompletedAnnotationDots(canvas, rect)
-            } else {
-                canvas.drawBitmap(icon, null, rect, basePaint)
-            }
-        }
-    }
-
-    private fun drawAnnotationIconOnBitmap(canvas: Canvas, annotation: ChatImageEditOp.Annotation) {
-        val icon = annotationIconBitmap ?: return
-        val scale = matrixScale().coerceAtLeast(0.01f)
-        val iconSize = annotationIconSize() / scale
-        val pad = dp(5) / scale
-        val rect = annotationIconRectOnBitmap(annotation, iconSize, pad)
-        if (annotation.note.trim().isNotEmpty()) {
-            drawCompletedAnnotationIcon(canvas, rect)
-            drawCompletedAnnotationDots(canvas, rect)
-        } else {
+            val icon = annotationIconFor(annotation) ?: return@forEach
             canvas.drawBitmap(icon, null, rect, basePaint)
         }
     }
 
-    private fun drawCompletedAnnotationIcon(canvas: Canvas, iconRect: RectF) {
-        annotationIconStrokePaint.strokeWidth = iconRect.width() * 0.075f
-        val l = iconRect.left
-        val t = iconRect.top
-        val w = iconRect.width()
-        val h = iconRect.height()
-        canvas.drawLine(l + w * 0.17f, t + h * 0.72f, l + w * 0.47f, t + h * 0.42f, annotationIconStrokePaint)
-        canvas.drawLine(l + w * 0.27f, t + h * 0.82f, l + w * 0.57f, t + h * 0.52f, annotationIconStrokePaint)
-        canvas.drawLine(l + w * 0.47f, t + h * 0.42f, l + w * 0.57f, t + h * 0.52f, annotationIconStrokePaint)
-        canvas.drawLine(l + w * 0.17f, t + h * 0.72f, l + w * 0.27f, t + h * 0.82f, annotationIconStrokePaint)
-        canvas.drawLine(l + w * 0.14f, t + h * 0.84f, l + w * 0.27f, t + h * 0.82f, annotationIconStrokePaint)
+    private fun drawAnnotationIconOnBitmap(canvas: Canvas, annotation: ChatImageEditOp.Annotation) {
+        val icon = annotationIconFor(annotation) ?: return
+        val scale = matrixScale().coerceAtLeast(0.01f)
+        val iconSize = annotationIconSize() / scale
+        val pad = dp(5) / scale
+        val rect = annotationIconRectOnBitmap(annotation, iconSize, pad)
+        canvas.drawBitmap(icon, null, rect, basePaint)
     }
 
-    private fun drawCompletedAnnotationDots(canvas: Canvas, iconRect: RectF) {
-        val radius = iconRect.width() * 0.052f
-        val cy = iconRect.top + iconRect.height() * 0.735f
-        val centers = floatArrayOf(0.55f, 0.70f, 0.85f)
-        centers.forEach { ratio ->
-            canvas.drawCircle(iconRect.left + iconRect.width() * ratio, cy, radius, annotationDotPaint)
+    private fun annotationIconFor(annotation: ChatImageEditOp.Annotation): Bitmap? {
+        return if (annotation.note.trim().isNotEmpty()) {
+            completedAnnotationIconBitmap ?: annotationIconBitmap
+        } else {
+            annotationIconBitmap
         }
     }
 
