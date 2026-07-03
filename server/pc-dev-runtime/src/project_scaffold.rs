@@ -1,3 +1,4 @@
+use crate::android_project::{ensure_android_project_files, template_is_android};
 use crate::download_router::ensure_project_download_router_files;
 use crate::project_agent_runtime::ensure_project_agent_runtime_files;
 use crate::project_commands::ensure_project_command_files;
@@ -34,7 +35,8 @@ pub fn ensure_project_scaffold(repo: &Path, req: &ProjectScaffoldRequest<'_>) ->
     ensure_project_download_router_files(repo, req)?;
     ensure_project_agent_runtime_files(repo, req)?;
     ensure_project_workflow_files(repo, req)?;
-    if req.template.eq_ignore_ascii_case("android") {
+    if template_is_android(req.template) {
+        ensure_android_project_files(repo, req)?;
         ensure_file(
             repo.join("local.properties.example"),
             android_local_properties,
@@ -171,6 +173,14 @@ mod tests {
         assert!(root.join("scripts").join("elon-new-task.ps1").exists());
         assert!(root.join(".elon").join("project.json").exists());
         assert!(root.join("local.properties.example").exists());
+        assert!(root.join("gradlew.bat").exists());
+        assert!(root.join("settings.gradle").exists());
+        assert!(root.join("app").join("build.gradle").exists());
+        assert!(root
+            .join("gradle")
+            .join("wrapper")
+            .join("gradle-wrapper.jar")
+            .exists());
         assert!(fs::read_to_string(root.join(".elon").join("project.json"))
             .unwrap()
             .contains("\"managed_by\": \"elon_pc_dev_runtime\""));
@@ -197,7 +207,7 @@ mod tests {
             project_id: "project-1",
             user_id: "user-1",
             name: "Demo App",
-            template: "android",
+            template: "android_kotlin",
             repo_url: Some("https://example.com/repo.git"),
             branch: Some("main"),
         }

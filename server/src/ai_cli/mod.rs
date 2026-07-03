@@ -1,5 +1,6 @@
 // server/src/ai_cli/mod.rs
 
+mod ai_cli_apk_build_script;
 mod ai_cli_apk_sync;
 mod ai_cli_chat;
 mod ai_cli_chat_policy;
@@ -834,7 +835,6 @@ pub async fn run_with_pc_agent_workspace(
         tx,
     )
     .await?;
-
     match outcome {
         PcAgentRunOutcome::Completed => Ok(()),
         PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => Err(anyhow!(
@@ -843,13 +843,15 @@ pub async fn run_with_pc_agent_workspace(
         )),
     }
 }
-
 pub async fn run_with_pc_agent_passthrough_workspace(
     agent_id: &str,
     user_id: &str,
     workspace_path: &str,
     user_message: &str,
     native_session_scope: Option<NativeSessionScope>,
+    download_base: Option<&str>,
+    artifact_workspace: Option<&Path>,
+    attempt_apk_sync: bool,
     cli_name: Option<&str>,
     copilot_model: Option<&str>,
     codex_reasoning_effort: Option<&str>,
@@ -860,7 +862,6 @@ pub async fn run_with_pc_agent_passthrough_workspace(
     if let Err(msg) = billing::check_can_call(&state.store, user_id) {
         return Err(anyhow!(msg));
     }
-
     let outcome = run_via_pc_agent(
         agent_id,
         user_id,
@@ -869,9 +870,9 @@ pub async fn run_with_pc_agent_passthrough_workspace(
         None,
         AiCliRequestMode::Passthrough,
         native_session_scope,
-        None,
-        None,
-        false,
+        download_base,
+        artifact_workspace,
+        attempt_apk_sync,
         cli_name.unwrap_or("codex"),
         copilot_model,
         codex_reasoning_effort,
@@ -1189,7 +1190,6 @@ enum PcAgentRunOutcome {
     Completed,
     NoReadableLightweightReply { diagnostic: Option<String> },
 }
-
 const PC_PROJECT_NO_CHANGES_ERROR: &str =
     "开发助手已经结束，但项目工作区没有产生新提交；本轮需求没有实际修改项目。请重新发送需求，或切换可用 PC 节点后再试。";
 

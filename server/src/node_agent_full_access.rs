@@ -2,6 +2,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use axum::{extract::State, http::StatusCode, Json};
+use elon_pc_dev_runtime::{safe_path_part, workspace_root};
 use homecli_proto::CliProjectContext;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -137,6 +138,9 @@ pub(crate) async fn require_route_a_full_access_grant(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| anyhow!("Route A 完全访问必须携带项目目录，已拒绝执行。"))?;
+    if platform_managed_workspace_matches(&context.project_id, cwd) {
+        return Ok(());
+    }
     grants.require_project(&context.project_id, cwd).await
 }
 
@@ -223,6 +227,58 @@ fn canonical_workspace_path(workspace_path: &str) -> Result<String> {
     Ok(full.to_string_lossy().to_string())
 }
 
+fn platform_managed_workspace_matches(project_id: &str, cwd: &str) -> bool {
+    platform_managed_workspace_matches_under(project_id, cwd, &workspace_root())
+}
+
+fn platform_managed_workspace_matches_under(project_id: &str, cwd: &str, root: &Path) -> bool {
+    let project_part = normalize_workspace_component(safe_path_part(project_id, "project", 80));
+    let root = match std::fs::canonicalize(root) {
+        Ok(path) => path,
+        Err(_) => return false,
+    };
+    let cwd = match std::fs::canonicalize(Path::new(cwd)) {
+        Ok(path) => path,
+        Err(_) => return false,
+    };
+    let root = normalize_workspace_path(&root);
+    let cwd = normalize_workspace_path(&cwd);
+    if cwd != root && !cwd.starts_with(&format!("{root}/")) {
+        return false;
+    }
+    let rel = cwd
+        .strip_prefix(&root)
+        .unwrap_or(cwd.as_str())
+        .trim_start_matches('/');
+    let parts = rel
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .map(|part| normalize_workspace_component(part.to_string()))
+        .collect::<Vec<_>>();
+
+    let is_project_repo = (parts.len() >= 3 && parts[1] == project_part && parts[2] == "repo")
+        || (parts.len() >= 2 && parts[0] == project_part && parts[1] == "repo");
+    let is_conversation_worktree =
+        parts.len() >= 3 && parts[0] == "conversation-worktrees" && parts[1] == project_part;
+    is_project_repo || is_conversation_worktree
+}
+
+fn normalize_workspace_path(path: &Path) -> String {
+    let mut value = path.to_string_lossy().replace('\\', "/");
+    while value.ends_with('/') {
+        value.pop();
+    }
+    normalize_workspace_component(value)
+}
+
+fn normalize_workspace_component(value: String) -> String {
+    if cfg!(windows) {
+        value.to_ascii_lowercase()
+    } else {
+        value
+    }
+}
+
 fn is_route_a_cli(cli_name: &str) -> bool {
     ROUTE_A_CLIS
         .iter()
@@ -283,6 +339,48 @@ mod tests {
             "elon_full_access_grants_{label}_{}.json",
             Uuid::new_v4().simple()
         ))
+    }
+
+    #[test]
+    fn platform_managed_workspace_allows_project_repo_and_conversation_worktree() {
+        let root = temp_workspace("managed_root");
+        let project_id = "prj_abc123";
+        let project_part = safe_path_part(project_id, "project", 80);
+        let repo = root.join("usr_1").join(&project_part).join("repo");
+        let worktree = root
+            .join("conversation-worktrees")
+            .join(&project_part)
+            .join("conv_1");
+        std::fs::create_dir_all(&repo).expect("create managed repo");
+        std::fs::create_dir_all(&worktree).expect("create managed worktree");
+
+        assert!(platform_managed_workspace_matches_under(
+            project_id,
+            repo.to_string_lossy().as_ref(),
+            &root
+        ));
+        assert!(platform_managed_workspace_matches_under(
+            project_id,
+            worktree.to_string_lossy().as_ref(),
+            &root
+        ));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn platform_managed_workspace_rejects_other_project_paths() {
+        let root = temp_workspace("managed_mismatch");
+        let repo = root.join("usr_1").join("prj_other").join("repo");
+        std::fs::create_dir_all(&repo).expect("create other repo");
+
+        assert!(!platform_managed_workspace_matches_under(
+            "prj_expected",
+            repo.to_string_lossy().as_ref(),
+            &root
+        ));
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     fn context(project_id: &str) -> CliProjectContext {

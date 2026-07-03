@@ -3,14 +3,16 @@ use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 
-use super::{looks_like_android_task, AiCliRequestMode};
+use super::{
+    ai_cli_apk_build_script::pc_apk_sync_script, looks_like_android_task, AiCliRequestMode,
+};
 use crate::{
     tools,
     types::{AppState, WsMessage},
 };
 
 pub(crate) fn pc_apk_probe_since(request_mode: AiCliRequestMode, cwd: Option<&str>) -> Option<u64> {
-    if request_mode != AiCliRequestMode::Execute || cwd.is_none() {
+    if request_mode.is_plan() || cwd.is_none() {
         return None;
     }
     std::time::SystemTime::now()
@@ -31,7 +33,7 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
     artifact_workspace: Option<&Path>,
     tx: &UnboundedSender<String>,
 ) -> Option<String> {
-    if request_mode != AiCliRequestMode::Execute {
+    if request_mode.is_plan() {
         return None;
     }
     let (Some(pc_workspace), Some(download_base), Some(artifact_workspace)) =
@@ -59,6 +61,7 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
         pc_workspace,
         artifact_workspace,
         fresh_after_unix_secs,
+        explicit_apk_sync,
     )
     .await
     {
@@ -132,41 +135,11 @@ async fn sync_pc_agent_apk_artifact(
     pc_workspace: &str,
     artifact_workspace: &Path,
     fresh_after_unix_secs: Option<u64>,
+    build_if_missing: bool,
 ) -> Result<Option<std::path::PathBuf>> {
     use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
-    let freshness_filter = fresh_after_unix_secs
-        .map(|secs| {
-            format!(
-                "$minModifiedUtc = [DateTimeOffset]::FromUnixTimeSeconds({secs}).UtcDateTime\n$files = @($files | Where-Object {{ $_.LastWriteTimeUtc -ge $minModifiedUtc }})"
-            )
-        })
-        .unwrap_or_default();
-    let script = r#"
-$ErrorActionPreference = 'Stop'
-$roots = @(
-  (Join-Path (Get-Location) 'app\build\outputs\apk'),
-  (Join-Path (Get-Location) 'android\app\build\outputs\apk'),
-  (Join-Path (Get-Location) 'build'),
-  (Join-Path (Get-Location) 'artifacts')
-)
-$files = @()
-foreach ($root in $roots) {
-  if (Test-Path -LiteralPath $root) {
-    $files += Get-ChildItem -LiteralPath $root -Recurse -Filter *.apk -File -ErrorAction SilentlyContinue
-  }
-}
-__ELON_FRESHNESS_FILTER__
-$apk = $files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-if (-not $apk) { exit 2 }
-if ($apk.Length -gt 104857600) { Write-Error 'APK too large to relay'; exit 3 }
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-Write-Output ('ELON_APK_NAME:' + $apk.Name)
-Write-Output 'ELON_APK_BASE64_BEGIN'
-Write-Output ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($apk.FullName)))
-Write-Output 'ELON_APK_BASE64_END'
-"#
-    .replace("__ELON_FRESHNESS_FILTER__", &freshness_filter);
+    let script = pc_apk_sync_script(fresh_after_unix_secs, build_if_missing);
     let (_task_id, mut rx) = state
         .agent_manager
         .dispatch(

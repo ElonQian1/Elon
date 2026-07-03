@@ -16,6 +16,7 @@ mod agent_config;
 mod agent_fallback;
 mod agent_intent;
 mod agent_llm_call;
+mod agent_pc_workspace;
 mod agent_prompts;
 mod agent_routing;
 mod agent_runtime_error_summary;

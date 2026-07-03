@@ -1,3 +1,4 @@
+mod android_project;
 mod command_probe;
 mod download_router;
 mod paths;

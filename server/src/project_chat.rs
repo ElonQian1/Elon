@@ -803,13 +803,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
             &message,
             agent_name.as_deref(),
             pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
+            &download_base,
             &state,
             tx,
         )
         .await;
         return;
     }
-
     let prepared_execution_workspace =
         if needs_project_workflow && !execution_mode.is_plan() && !is_pc_node_project {
             match prepare_project_conversation_workspace(&state, &project, &conversation_id) {

@@ -12,6 +12,10 @@ use crate::{
         has_origin_remote, is_project_delivery_request, is_pure_project_delivery_message,
         is_short_build_command, is_short_resume_command,
     },
+    agent_pc_workspace::{
+        project_chat_should_use_pc_cli, project_cli_runtime_permission,
+        project_requires_pc_workspace, should_attempt_pc_apk_sync,
+    },
     agent_routing::{
         api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
     },
@@ -111,6 +115,7 @@ pub async fn run_pc_cli_passthrough_for_project(
     user_message: &str,
     agent_name: Option<&str>,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    download_base: &str,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
@@ -145,8 +150,10 @@ pub async fn run_pc_cli_passthrough_for_project(
         project_id: project.id.clone(),
         user_id: user_id.to_string(),
         conversation_id: cid.to_string(),
-        runtime_permission: project.runtime_permission.clone(),
+        runtime_permission: project_cli_runtime_permission(project),
     });
+    let server_artifact_workspace = state.get_project_workspace(&project.workspace_key);
+    let attempt_apk_sync = should_attempt_pc_apk_sync(project, user_message);
 
     match ai_cli::run_with_pc_agent_passthrough_workspace(
         agent_id,
@@ -154,6 +161,9 @@ pub async fn run_pc_cli_passthrough_for_project(
         pc_workspace,
         user_message,
         session_scope,
+        Some(download_base),
+        Some(server_artifact_workspace.as_path()),
+        attempt_apk_sync,
         Some(runtime_choice.cli_name.as_str()),
         runtime_choice.copilot_model.as_deref(),
         runtime_choice.codex_reasoning_effort.as_deref(),
@@ -403,7 +413,7 @@ async fn run_for_project_in_workspace_with_routing(
                 project_id: project.id.clone(),
                 user_id: user_id.to_string(),
                 conversation_id: cid.to_string(),
-                runtime_permission: project.runtime_permission.clone(),
+                runtime_permission: project_cli_runtime_permission(project),
             });
             let pc_user_message =
                 append_project_dev_profile_context(state, user_id, project, user_message);
@@ -538,7 +548,7 @@ async fn run_for_project_in_workspace_with_routing(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: conversation_id.unwrap_or("default").to_string(),
-            runtime_permission: project.runtime_permission.clone(),
+            runtime_permission: project_cli_runtime_permission(project),
         }),
         user_message,
         preflight_note.as_deref(),
@@ -592,45 +602,6 @@ fn latest_project_delivery_apk_url(
     has_apk.then(|| tools::stable_apk_url(download_base))
 }
 
-fn should_attempt_pc_apk_sync(project: &ProjectAccess, user_message: &str) -> bool {
-    project.template.eq_ignore_ascii_case("android")
-        || ai_cli::looks_like_android_task(user_message)
-}
-
-fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> bool {
-    matches!(
-        pc_runtime_route,
-        Some(PcRuntimeRoutePreference::RouteA | PcRuntimeRoutePreference::RouteC3)
-    )
-}
-
-fn project_chat_should_use_pc_cli(
-    pc_runtime_route: Option<PcRuntimeRoutePreference>,
-    agent_name: Option<&str>,
-    agent_is_local_cli: bool,
-) -> bool {
-    if pc_cli_chat_requested(pc_runtime_route) {
-        return true;
-    }
-    if matches!(
-        pc_runtime_route,
-        Some(
-            PcRuntimeRoutePreference::RouteB
-                | PcRuntimeRoutePreference::RouteC
-                | PcRuntimeRoutePreference::RouteC2
-        )
-    ) {
-        return false;
-    }
-    if agent_name
-        .map(str::trim)
-        .is_some_and(|name| !name.is_empty())
-    {
-        return agent_is_local_cli;
-    }
-    false
-}
-
 fn pc_cli_chat_route_label(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> &'static str {
     match pc_runtime_route {
         Some(PcRuntimeRoutePreference::RouteC3) => "远程 Codex",
@@ -674,7 +645,7 @@ pub async fn plan_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: cid.to_string(),
-            runtime_permission: project.runtime_permission.clone(),
+            runtime_permission: project_cli_runtime_permission(project),
         });
         let plan_result = ai_cli::run_with_pc_agent_workspace(
             agent_id,
@@ -752,7 +723,7 @@ pub async fn plan_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: conversation_id.unwrap_or("default").to_string(),
-            runtime_permission: project.runtime_permission.clone(),
+            runtime_permission: project_cli_runtime_permission(project),
         }),
         user_message,
         None,
@@ -796,45 +767,6 @@ fn requested_agent_for_runtime_route<'a>(
 struct PcProjectBinding {
     agent_id: String,
     workspace: String,
-}
-
-fn project_requires_pc_workspace(project: &ProjectAccess) -> bool {
-    project_fields_require_pc_workspace(
-        &project.source_type,
-        project.node_id.as_deref(),
-        project.workspace_path.as_deref(),
-    )
-}
-
-fn project_fields_require_pc_workspace(
-    source_type: &str,
-    node_id: Option<&str>,
-    workspace_path: Option<&str>,
-) -> bool {
-    if source_type == "pc_managed" {
-        return true;
-    }
-    if node_id
-        .map(str::trim)
-        .is_some_and(|value| !value.is_empty())
-    {
-        return true;
-    }
-    workspace_path
-        .map(str::trim)
-        .is_some_and(path_looks_windows_workspace)
-}
-
-fn path_looks_windows_workspace(path: &str) -> bool {
-    let value = path.trim();
-    if value.starts_with("\\\\") || value.starts_with("//") {
-        return true;
-    }
-    let bytes = value.as_bytes();
-    bytes.len() >= 3
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && (bytes[2] == b'\\' || bytes[2] == b'/')
 }
 
 async fn resolve_pc_chat_agent(
@@ -2002,11 +1934,13 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_chat_requested, pc_cli_chat_route_label,
-        pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
-        pc_workspace_inspect_usable, project_chat_should_use_pc_cli,
-        project_fields_require_pc_workspace, requires_project_workflow_for_message,
-        should_attempt_pc_apk_sync, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
+        pc_cli_chat_route_label, pc_workspace_inspect_error_allows_bound_dispatch,
+        pc_workspace_inspect_problem, pc_workspace_inspect_usable,
+        requires_project_workflow_for_message, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
+    };
+    use crate::agent_pc_workspace::{
+        project_cli_runtime_permission, project_fields_require_pc_workspace,
+        should_attempt_pc_apk_sync,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use crate::store::ProjectAccess;
@@ -2050,34 +1984,6 @@ mod tests {
     }
 
     #[test]
-    fn explicit_pc_cli_routes_are_cli_first_for_chat() {
-        assert!(pc_cli_chat_requested(Some(
-            PcRuntimeRoutePreference::RouteA
-        )));
-        assert!(pc_cli_chat_requested(Some(
-            PcRuntimeRoutePreference::RouteC3
-        )));
-        assert!(!pc_cli_chat_requested(Some(
-            PcRuntimeRoutePreference::RouteC
-        )));
-        assert!(!pc_cli_chat_requested(None));
-
-        assert!(!project_chat_should_use_pc_cli(None, None, false));
-        assert!(project_chat_should_use_pc_cli(
-            Some(PcRuntimeRoutePreference::RouteA),
-            None,
-            false
-        ));
-        assert!(project_chat_should_use_pc_cli(None, Some("codex"), true));
-        assert!(!project_chat_should_use_pc_cli(
-            Some(PcRuntimeRoutePreference::RouteC),
-            None,
-            false
-        ));
-        assert!(!project_chat_should_use_pc_cli(None, Some("api"), false));
-    }
-
-    #[test]
     fn pc_cli_chat_labels_match_user_selected_route() {
         assert_eq!(
             pc_cli_chat_route_label(Some(PcRuntimeRoutePreference::RouteA)),
@@ -2096,7 +2002,7 @@ mod tests {
             id: "prj_android".into(),
             name: "大大泡泡".into(),
             workspace_key: "prj_android".into(),
-            template: "android".into(),
+            template: "android_kotlin".into(),
             source_type: "pc_managed".into(),
             repo_url: None,
             branch: None,
@@ -2113,6 +2019,31 @@ mod tests {
         };
 
         assert!(should_attempt_pc_apk_sync(&project, "把按钮改成绿色"));
+    }
+
+    #[test]
+    fn pc_managed_projects_use_full_access_for_cli() {
+        let project = ProjectAccess {
+            id: "prj_pc".into(),
+            name: "PC App".into(),
+            workspace_key: "prj_pc".into(),
+            template: "android_kotlin".into(),
+            source_type: "pc_managed".into(),
+            repo_url: None,
+            branch: None,
+            workspace_path: Some(r"C:\Users\Administrator\Elon\workspaces\usr\prj_pc\repo".into()),
+            node_id: Some("node-local".into()),
+            storage_node_id: None,
+            storage_repo_path: None,
+            storage_repo_url: None,
+            storage_worktree_path: None,
+            storage_status: "none".into(),
+            role: "owner".into(),
+            status: "active".into(),
+            runtime_permission: "project_write".into(),
+        };
+
+        assert_eq!(project_cli_runtime_permission(&project), "full_access");
     }
 
     #[test]
