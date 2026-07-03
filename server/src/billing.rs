@@ -20,7 +20,7 @@ use crate::store::{
 const NEW_USER_TRIAL_CREDIT_CONFIG_KEY: &str = "new_user_trial_credit_fen";
 const NEW_USER_TRIAL_CREDIT_ENV: &str = "NEW_USER_TRIAL_CREDIT_FEN";
 const DEFAULT_NEW_USER_TRIAL_CREDIT_FEN: i64 = 100;
-const NEW_USER_TRIAL_METHOD: &str = "new_user_trial";
+pub(crate) const NEW_USER_TRIAL_METHOD: &str = "new_user_trial";
 const NEW_USER_TRIAL_OPERATOR: &str = "system";
 
 // ── 模型定价表（USD / 1M tokens）─────────────────────────────────────────────
@@ -213,7 +213,7 @@ fn try_grant_new_user_trial_credit(store: &Store, user_id: &str) -> Result<Optio
     }
 }
 
-fn new_user_trial_credit_fen(store: &Store) -> i64 {
+pub(crate) fn new_user_trial_credit_fen(store: &Store) -> i64 {
     std::env::var(NEW_USER_TRIAL_CREDIT_ENV)
         .ok()
         .and_then(|value| value.trim().parse::<i64>().ok())

@@ -5,10 +5,21 @@ import UserAvatar from '../shell/UserAvatar'
 import styles from './AccountPage.module.css'
 
 interface Balance {
-  balance_fen?: number
-  balance_yuan?: number
-  month_consumption_fen?: number
-  month_consumption_yuan?: number
+  billing_enabled?: boolean
+  balance_fen?: number | null
+  balance_yuan?: number | null
+  this_month_cost_fen?: number | null
+  this_month_cost_yuan?: number | null
+  month_consumption_fen?: number | null
+  month_consumption_yuan?: number | null
+  trial_credit?: {
+    amount_fen?: number | null
+    amount_yuan?: number | null
+    granted?: boolean
+    granted_fen?: number | null
+    granted_yuan?: number | null
+    granted_at?: string | null
+  } | null
 }
 
 interface BillingRecord {
@@ -18,6 +29,11 @@ interface BillingRecord {
   description?: string
   created_at?: string
   type?: string
+  model?: string | null
+  input_tokens?: number
+  cached_input_tokens?: number
+  output_tokens?: number
+  cost_rmb_fen?: number
 }
 
 export default function AccountPage() {
@@ -51,8 +67,8 @@ export default function AccountPage() {
   async function loadBilling() {
     setBillingLoading(true)
     try {
-      const data = await api.get<{ records?: BillingRecord[] }>('/api/me/billing?limit=20')
-      setBilling(data.records ?? [])
+      const data = await api.get<{ events?: BillingRecord[], records?: BillingRecord[] }>('/api/me/billing?page=1&size=20')
+      setBilling(data.events ?? data.records ?? [])
     } catch { /* ignore */ }
     finally { setBillingLoading(false) }
   }
@@ -128,15 +144,30 @@ export default function AccountPage() {
               <div className={styles.balanceCard}>
                 <span>当前余额</span>
                 <strong>
-                  {balance.balance_yuan != null
-                    ? `¥ ${balance.balance_yuan.toFixed(2)}`
+                  {balanceYuan(balance) != null
+                    ? formatYuan(balanceYuan(balance))
                     : '—'}
                 </strong>
               </div>
-              {balance.month_consumption_yuan != null && (
+              {monthCostYuan(balance) != null && (
                 <div className={styles.balanceCard}>
                   <span>本月消费</span>
-                  <strong>¥ {balance.month_consumption_yuan.toFixed(2)}</strong>
+                  <strong>{formatYuan(monthCostYuan(balance))}</strong>
+                </div>
+              )}
+              {balance.trial_credit && (
+                <div className={styles.balanceCard}>
+                  <span>试用额度</span>
+                  <strong>
+                    {balance.trial_credit.granted
+                      ? `已领 ${formatYuan(trialGrantedYuan(balance))}`
+                      : `可领 ${formatYuan(trialAmountYuan(balance))}`}
+                  </strong>
+                  <small className={styles.balanceHint}>
+                    {balance.trial_credit.granted
+                      ? `自动领取于 ${formatDateTime(balance.trial_credit.granted_at)}`
+                      : '首次 AI 调用会自动发放'}
+                  </small>
                 </div>
               )}
             </div>
@@ -155,14 +186,13 @@ export default function AccountPage() {
               {billing.map((r, i) => (
                 <div key={r.id ?? i} className={styles.billingRow}>
                   <div className={styles.billingDesc}>
-                    <strong>{r.description ?? r.type ?? '消费记录'}</strong>
+                    <strong>{billingDescription(r)}</strong>
                     {r.created_at && (
-                      <span>{new Date(r.created_at).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                      <span>{formatDateTime(r.created_at)}</span>
                     )}
                   </div>
-                  <span className={[styles.billingAmount, (r.amount_fen ?? 0) >= 0 ? styles.positive : styles.negative].join(' ')}>
-                    {(r.amount_fen ?? 0) >= 0 ? '+' : ''}
-                    {r.amount_yuan != null ? `¥ ${r.amount_yuan.toFixed(2)}` : `${r.amount_fen ?? 0} fen`}
+                  <span className={[styles.billingAmount, billingAmountFen(r) >= 0 ? styles.positive : styles.negative].join(' ')}>
+                    {formatSignedFen(billingAmountFen(r))}
                   </span>
                 </div>
               ))}
@@ -172,4 +202,65 @@ export default function AccountPage() {
       </div>
     </div>
   )
+}
+
+function balanceYuan(balance: Balance): number | null {
+  if (balance.balance_yuan != null) return balance.balance_yuan
+  if (balance.balance_fen != null) return balance.balance_fen / 100
+  return null
+}
+
+function monthCostYuan(balance: Balance): number | null {
+  if (balance.this_month_cost_yuan != null) return balance.this_month_cost_yuan
+  if (balance.this_month_cost_fen != null) return balance.this_month_cost_fen / 100
+  if (balance.month_consumption_yuan != null) return balance.month_consumption_yuan
+  if (balance.month_consumption_fen != null) return balance.month_consumption_fen / 100
+  return null
+}
+
+function trialAmountYuan(balance: Balance): number | null {
+  const trial = balance.trial_credit
+  if (!trial) return null
+  if (trial.amount_yuan != null) return trial.amount_yuan
+  if (trial.amount_fen != null) return trial.amount_fen / 100
+  return null
+}
+
+function trialGrantedYuan(balance: Balance): number | null {
+  const trial = balance.trial_credit
+  if (!trial) return null
+  if (trial.granted_yuan != null) return trial.granted_yuan
+  if (trial.granted_fen != null) return trial.granted_fen / 100
+  return trialAmountYuan(balance)
+}
+
+function formatYuan(value: number | null | undefined) {
+  return value == null ? '¥ 0.00' : `¥ ${value.toFixed(2)}`
+}
+
+function billingAmountFen(record: BillingRecord) {
+  if (record.cost_rmb_fen != null) return -Math.abs(record.cost_rmb_fen)
+  if (record.amount_fen != null) return record.amount_fen
+  if (record.amount_yuan != null) return Math.round(record.amount_yuan * 100)
+  return 0
+}
+
+function formatSignedFen(fen: number) {
+  const sign = fen >= 0 ? '+' : '-'
+  return `${sign}¥ ${Math.abs(fen / 100).toFixed(2)}`
+}
+
+function billingDescription(record: BillingRecord) {
+  if (record.description) return record.description
+  if (record.type) return record.type
+  const totalTokens = (record.input_tokens ?? 0) + (record.cached_input_tokens ?? 0) + (record.output_tokens ?? 0)
+  const model = record.model || 'AI 调用'
+  return totalTokens > 0 ? `${model} · ${totalTokens} tokens` : model
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '未知时间'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })
 }

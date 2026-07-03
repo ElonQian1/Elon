@@ -10,10 +10,11 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
+    billing,
     project_auth::{auth_from_headers, json_error},
     types::AppState,
 };
@@ -25,6 +26,7 @@ pub async fn get_my_balance(State(state): State<Arc<AppState>>, headers: HeaderM
         Ok(u) => u,
         Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
     };
+    let trial_credit = trial_credit_overview(&state, &user.id);
 
     let balance_fen = match state.store.billing_get_balance(&user.id) {
         Ok(Some(b)) => b,
@@ -36,6 +38,7 @@ pub async fn get_my_balance(State(state): State<Arc<AppState>>, headers: HeaderM
                 "balance_yuan": null,
                 "this_month_cost_fen": null,
                 "this_month_cost_yuan": null,
+                "trial_credit": trial_credit,
                 "currency": "CNY",
             }))
             .into_response();
@@ -54,9 +57,33 @@ pub async fn get_my_balance(State(state): State<Arc<AppState>>, headers: HeaderM
         "balance_yuan": balance_fen as f64 / 100.0,
         "this_month_cost_fen": month_cost,
         "this_month_cost_yuan": month_cost as f64 / 100.0,
+        "trial_credit": trial_credit,
         "currency": "CNY",
     }))
     .into_response()
+}
+
+fn trial_credit_overview(state: &AppState, user_id: &str) -> Value {
+    let amount_fen = billing::new_user_trial_credit_fen(&state.store);
+    let grant = match state
+        .store
+        .billing_find_recharge_by_method(user_id, billing::NEW_USER_TRIAL_METHOD)
+    {
+        Ok(grant) => grant,
+        Err(e) => {
+            tracing::warn!("trial credit lookup failed for {}: {}", user_id, e);
+            None
+        }
+    };
+    let granted_fen = grant.as_ref().map(|record| record.amount_fen);
+    json!({
+        "amount_fen": amount_fen,
+        "amount_yuan": amount_fen as f64 / 100.0,
+        "granted": grant.is_some(),
+        "granted_fen": granted_fen,
+        "granted_yuan": granted_fen.map(|fen| fen as f64 / 100.0),
+        "granted_at": grant.as_ref().map(|record| record.created_at.as_str()),
+    })
 }
 
 // ── GET /api/me/billing ───────────────────────────────────────────────────────

@@ -276,6 +276,36 @@ impl Store {
         Ok(Some(new_balance))
     }
 
+    /// 查询用户是否已经获得过指定方式的赠送/充值记录。
+    pub fn billing_find_recharge_by_method(
+        &self,
+        user_id: &str,
+        method: &str,
+    ) -> Result<Option<RechargeRecord>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            r#"SELECT id, user_id, amount_fen, method, operator_id, note, created_at
+               FROM recharge_records
+               WHERE user_id = ?1 AND method = ?2
+               ORDER BY created_at ASC
+               LIMIT 1"#,
+            params![user_id, method],
+            |r| {
+                Ok(RechargeRecord {
+                    id: r.get(0)?,
+                    user_id: r.get(1)?,
+                    amount_fen: r.get(2)?,
+                    method: r.get(3)?,
+                    operator_id: r.get(4)?,
+                    note: r.get(5)?,
+                    created_at: r.get(6)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
     /// 分页查询用户自己的扣费明细。返回 (事件列表, 总条数)。
     pub fn billing_list_events(
         &self,
