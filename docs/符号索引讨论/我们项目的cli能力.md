@@ -32,6 +32,26 @@ CLI 会话 / 传输模式当前这样定位：
 
 长期看，`pipe_sidecar` 比“把 Codex JSON 放进 PTY”更好：它能保留 sidecar 的生命周期管理、日志和恢复能力，同时不污染 JSONL。当前不要把它描述成已实现能力；现在 Codex 的默认后台开发主路仍是 `direct_json_pipe`，也就是 `codex exec --json` + 直接 stdout JSONL 解析：
 
+小白版判断：
+
+- Codex CLI 本身负责“干活”：理解项目、读文件、跑命令、改代码、回答用户。
+- 一龙平台负责“管这次干活”：排队、并行、取消、重连、恢复、记录过程、让网页端折叠过程并突出最终回复。
+- 如果只是单次问答，当前 `direct_json_pipe` 不需要 sidecar 也能跑。
+- 如果要接近 Codex 桌面版的会话体验，尤其是多会话并行、长任务恢复、节点重启后续跑、统一取消和多 CLI 管理，未来 `pipe_sidecar + pipe + JSON` 更合适。
+- `pipe_sidecar` 不是把 Codex 放进 PTY；它是“任务管家”。Codex 的 JSON 仍然通过干净 pipe 传给平台，不能让终端画面污染 JSON。
+
+现状和未来差距：
+
+| 维度 | 当前 `direct_json_pipe` | 未来 `pipe_sidecar + pipe + JSON` |
+|---|---|---|
+| 是否多余 | 当前 MVP 不需要先上 sidecar | 平台级任务管理成熟后不多余 |
+| Codex 智能能力 | 已由 Codex CLI 自己提供 | 不替代 Codex，只管理 Codex 进程 |
+| 过程展示 | 取决于 JSON 事件解析和前端卡片是否完整 | 更容易把过程、等待、取消、恢复状态统一落 journal |
+| 断线 / 重启 | 依赖现有 task journal、session/thread id、云端快照组合 | sidecar 提供更稳定的运行句柄、生命周期和恢复契约 |
+| 多 CLI | Codex 走 JSON 最清晰，其他 CLI 分散处理 | sidecar 可以统一管理不同 CLI 的启动、取消、日志和接管 |
+
+当前实现结论：先把 `direct_json_pipe` 下 Codex 的公开过程链路做完整；不要为了架构好看提前上 sidecar。未来蓝图结论：当“平台怎么可靠管理这次任务”成为主要问题时，再实现 `pipe_sidecar + pipe + JSON`。
+
 ```text
 PC 网页端
   -> Rust server

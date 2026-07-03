@@ -124,6 +124,8 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 长期看，`pipe_sidecar` 比把 Codex JSON 放进 PTY 更适合后台结构化过程展示；它保留 sidecar 管理能力，同时避免终端画面污染机器事件流。当前 Codex CLI 的后台开发主链路仍使用 `direct_json_pipe`：
 
+当前和未来的边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`direct_json_pipe` 已能满足最小可用和干净 JSON 解析；`pipe_sidecar + pipe + JSON` 是后续平台级会话管理蓝图，主要补齐独立生命周期管理、稳定运行句柄、恢复契约和多 CLI 统一管理，不替代 Codex CLI 本身能力。
+
 ```
 PC 网页端 → Rust server → node-agent → codex exec --json
     → stdout JSONL 事件流

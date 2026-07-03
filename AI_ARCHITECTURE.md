@@ -65,6 +65,21 @@ Android APK / Web UI
 
 长期看，`pipe_sidecar` 比把 Codex JSON 放进 PTY 更适合后台结构化过程展示：它保留 sidecar 的生命周期管理和恢复能力，同时避免 PTY 污染 JSONL。但这不是当前已经完成的独立实现，当前 Codex 主路仍是 `direct_json_pipe`。
 
+### 现状、未来蓝图和差距
+
+`pipe_sidecar` 不是因为 Codex CLI 不够好才需要。Codex CLI 负责“聪明地干活”：读项目、跑命令、改文件、总结结果；一龙平台负责“可靠地管理这次干活”：排队、并行、取消、重连、恢复、journal、前端过程展示和最终回复折叠。
+
+| 维度 | 当前 `direct_json_pipe` | 未来 `pipe_sidecar + pipe + JSON` | 差距 / 判断 |
+|---|---|---|---|
+| 最小可用 | 已足够让 Codex 直接处理项目会话 | 不是 MVP 必需 | 只要“发一句话等回复”，当前方案不需要 sidecar |
+| JSON 干净度 | 好，直接读 `codex exec --json` stdout | 同样好，仍然走 pipe，不走 PTY | 未来不能退回 `PTY + JSON` |
+| 任务管理 | 主要由 node-agent 当前 runner 和 task journal 管 | sidecar 独立管理进程生命周期、取消、session id、journal 和恢复入口 | 差距在平台级生命周期统一性，不在 Codex 智能能力 |
+| 重连 / 恢复 | 依赖现有 journal、Codex session/thread id 和云端快照组合 | sidecar 提供更稳定的运行句柄和恢复契约 | 多会话并行、节点重启、长任务恢复越多，sidecar 价值越高 |
+| 前端过程感 | 能展示 JSON 事件里已有的公开过程 | 更容易稳定沉淀完整过程、等待状态、取消和恢复状态 | 当前优先把 JSON 事件解析和 UI 展示补完整 |
+| 多 CLI 扩展 | Codex 最顺；其他 CLI 视输出能力而定 | sidecar 可统一管理 Codex / Claude / Copilot / Gemini 等 CLI | 多 CLI 成为核心能力后再实现更划算 |
+
+因此当前策略是：先把 `direct_json_pipe` 跑稳，把 Codex JSON 公开过程完整展示出来；当取消、重连、恢复、多会话并行和多 CLI 管理成为主要瓶颈时，再升级为 `pipe_sidecar + pipe + JSON`。`pipe_sidecar` 是平台级会话管理蓝图，不是对 Codex CLI 能力的替代。
+
 当前 Codex CLI 的主路不是 PTY，而是：
 
 ```text
