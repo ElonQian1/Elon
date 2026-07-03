@@ -147,6 +147,7 @@ mod project_prewarm;
 mod project_runtime_permission_api;
 mod project_space;
 mod project_space_ai_progress;
+mod project_space_task_result;
 mod project_space_task_snapshot;
 mod project_storage;
 mod project_storage_git;

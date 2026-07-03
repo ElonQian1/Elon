@@ -1,5 +1,6 @@
 // server/src/ai_cli/mod.rs
 
+mod ai_cli_apk_sync;
 mod ai_cli_chat;
 mod ai_cli_chat_policy;
 mod ai_cli_environment;
@@ -27,6 +28,9 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
+#[cfg(test)]
+pub(crate) use self::ai_cli_apk_sync::safe_pc_apk_filename;
+pub(crate) use self::ai_cli_apk_sync::{pc_apk_probe_since, sync_pc_agent_apk_after_success};
 pub(crate) use self::ai_cli_chat_policy::project_lightweight_chat_split_enabled;
 pub(crate) use self::ai_cli_environment::looks_like_android_task;
 pub(crate) use self::ai_cli_output::truncate_chars;
@@ -1205,6 +1209,7 @@ async fn run_via_pc_agent(
 ) -> Result<PcAgentRunOutcome> {
     let raw_pc_passthrough = request_mode.is_passthrough();
     let lightweight_pc_chat = !request_mode.is_plan() && cwd.is_none();
+    let apk_sync_probe_since = pc_apk_probe_since(request_mode, cwd);
     let effective_codex_reasoning_effort = if lightweight_pc_chat {
         pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort)
     } else {
@@ -1885,6 +1890,7 @@ async fn run_via_pc_agent(
                         user_message,
                         request_mode,
                         attempt_apk_sync,
+                        apk_sync_probe_since,
                         download_base,
                         artifact_workspace,
                         tx,
@@ -2072,187 +2078,6 @@ fn pc_project_execution_had_no_changes(
         .and_then(|status| status.merge_message.as_deref())
         .map(|message| message.contains("conversation branch had no new commits"))
         .unwrap_or(false)
-}
-
-async fn sync_pc_agent_apk_after_success(
-    state: &Arc<AppState>,
-    agent_id: &str,
-    pc_workspace: Option<&str>,
-    user_message: &str,
-    request_mode: AiCliRequestMode,
-    attempt_apk_sync: bool,
-    download_base: Option<&str>,
-    artifact_workspace: Option<&Path>,
-    tx: &UnboundedSender<String>,
-) -> Option<String> {
-    if request_mode != AiCliRequestMode::Execute
-        || !(attempt_apk_sync || looks_like_android_task(user_message))
-    {
-        return None;
-    }
-    let (Some(pc_workspace), Some(download_base), Some(artifact_workspace)) =
-        (pc_workspace, download_base, artifact_workspace)
-    else {
-        return None;
-    };
-
-    let _ = tx.send(WsMessage::progress("正在同步 PC 构建产物，准备安装入口。").to_json());
-    match sync_pc_agent_apk_artifact(state, agent_id, pc_workspace, artifact_workspace).await {
-        Ok(Some(_path)) => Some(tools::stable_apk_url(download_base)),
-        Ok(None) => {
-            let _ = tx.send(
-                WsMessage::progress("本轮 PC 工作区没有发现 APK；不会生成安装按钮链接。").to_json(),
-            );
-            None
-        }
-        Err(error) => {
-            tracing::warn!(%agent_id, %error, "同步 PC APK 产物失败");
-            let _ = tx.send(
-                WsMessage::progress("同步 PC 构建产物失败；本轮不会生成安装按钮链接。").to_json(),
-            );
-            None
-        }
-    }
-}
-
-async fn sync_pc_agent_apk_artifact(
-    state: &Arc<AppState>,
-    agent_id: &str,
-    pc_workspace: &str,
-    artifact_workspace: &Path,
-) -> Result<Option<std::path::PathBuf>> {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-
-    let script = r#"
-$ErrorActionPreference = 'Stop'
-$roots = @(
-  (Join-Path (Get-Location) 'app\build\outputs\apk'),
-  (Join-Path (Get-Location) 'android\app\build\outputs\apk'),
-  (Join-Path (Get-Location) 'build'),
-  (Join-Path (Get-Location) 'artifacts')
-)
-$files = @()
-foreach ($root in $roots) {
-  if (Test-Path -LiteralPath $root) {
-    $files += Get-ChildItem -LiteralPath $root -Recurse -Filter *.apk -File -ErrorAction SilentlyContinue
-  }
-}
-$apk = $files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1
-if (-not $apk) { exit 2 }
-if ($apk.Length -gt 104857600) { Write-Error 'APK too large to relay'; exit 3 }
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-Write-Output ('ELON_APK_NAME:' + $apk.Name)
-Write-Output 'ELON_APK_BASE64_BEGIN'
-Write-Output ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($apk.FullName)))
-Write-Output 'ELON_APK_BASE64_END'
-"#;
-    let (_task_id, mut rx) = state
-        .agent_manager
-        .dispatch(
-            agent_id,
-            "powershell".to_string(),
-            vec![
-                "-NoProfile".to_string(),
-                "-ExecutionPolicy".to_string(),
-                "Bypass".to_string(),
-                "-Command".to_string(),
-                script.to_string(),
-            ],
-            pc_workspace.to_string(),
-            vec![],
-        )
-        .await?;
-
-    let mut output = String::new();
-    let mut stderr = String::new();
-    let mut exit_code = None;
-    while let Some(msg) = rx.recv().await {
-        match msg {
-            AgentToServer::TaskStdout { data, .. } => {
-                if let Ok(bytes) = B64.decode(&data) {
-                    output.push_str(&String::from_utf8_lossy(&bytes));
-                }
-            }
-            AgentToServer::TaskStderr { data, .. } => {
-                if let Ok(bytes) = B64.decode(&data) {
-                    stderr.push_str(&String::from_utf8_lossy(&bytes));
-                }
-            }
-            AgentToServer::TaskExit { code, .. } => {
-                exit_code = code;
-                break;
-            }
-            AgentToServer::TaskError { message, .. } => return Err(anyhow!(message)),
-            _ => {}
-        }
-    }
-
-    if exit_code != Some(0) {
-        if exit_code == Some(2) {
-            return Ok(None);
-        }
-        return Err(anyhow!(
-            "PC APK 查找命令退出 {:?}: {}",
-            exit_code,
-            stderr.trim()
-        ));
-    }
-
-    let Some((filename, apk_bytes)) = parse_pc_apk_relay_output(&output)? else {
-        return Ok(None);
-    };
-    let artifact_dir = artifact_workspace.join("artifacts");
-    tokio::fs::create_dir_all(&artifact_dir).await?;
-    let artifact_path = artifact_dir.join(filename);
-    tokio::fs::write(&artifact_path, apk_bytes).await?;
-    Ok(Some(artifact_path))
-}
-
-fn parse_pc_apk_relay_output(output: &str) -> Result<Option<(String, Vec<u8>)>> {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-
-    let Some(begin_index) = output.find("ELON_APK_BASE64_BEGIN") else {
-        return Ok(None);
-    };
-    let Some(end_index) = output.find("ELON_APK_BASE64_END") else {
-        return Ok(None);
-    };
-    if end_index <= begin_index {
-        return Ok(None);
-    }
-
-    let filename = output
-        .lines()
-        .find_map(|line| line.trim().strip_prefix("ELON_APK_NAME:"))
-        .map(safe_pc_apk_filename)
-        .unwrap_or_else(|| "ElonSpeed-latest.apk".to_string());
-    let payload = output[begin_index + "ELON_APK_BASE64_BEGIN".len()..end_index]
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .collect::<String>();
-    if payload.is_empty() {
-        return Ok(None);
-    }
-    let apk_bytes = B64.decode(payload)?;
-    Ok(Some((filename, apk_bytes)))
-}
-
-fn safe_pc_apk_filename(raw: &str) -> String {
-    let basename = raw
-        .rsplit(|ch| ch == '/' || ch == '\\')
-        .next()
-        .unwrap_or(raw)
-        .trim();
-    let safe = basename
-        .chars()
-        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_'))
-        .collect::<String>();
-    if safe.to_ascii_lowercase().ends_with(".apk") && !safe.is_empty() {
-        safe
-    } else {
-        "ElonSpeed-latest.apk".to_string()
-    }
 }
 
 fn abort_pc_progress(handle: &mut Option<tokio::task::JoinHandle<()>>) {

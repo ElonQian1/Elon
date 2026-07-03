@@ -436,6 +436,14 @@ fn project_dev_profile_counts_as_android_task_for_pc_artifact_sync() {
 }
 
 #[test]
+fn pc_apk_probe_since_only_tracks_execute_workspace_tasks() {
+    assert!(pc_apk_probe_since(AiCliRequestMode::Execute, Some("C:/repo")).is_some());
+    assert!(pc_apk_probe_since(AiCliRequestMode::Execute, None).is_none());
+    assert!(pc_apk_probe_since(AiCliRequestMode::Plan, Some("C:/repo")).is_none());
+    assert!(pc_apk_probe_since(AiCliRequestMode::Passthrough, Some("C:/repo")).is_none());
+}
+
+#[test]
 fn pc_apk_filename_is_sanitized() {
     assert_eq!(
         safe_pc_apk_filename(r"C:\tmp\outputs\app-debug.apk"),

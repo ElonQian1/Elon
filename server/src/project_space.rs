@@ -30,6 +30,7 @@ use crate::{
         is_pc_cli_heartbeat_progress, pc_cli_no_output_timeout_progress,
         pc_dispatch_started_progress,
     },
+    project_space_task_result::result_message,
     project_tool_approval_recovery, project_tool_approvals, project_workspace_recovery,
     project_ws_protocol::enrich_project_ws_event,
     store::{
@@ -2020,6 +2021,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let mut final_reply = String::new();
         let mut final_status = "done".to_string();
         let mut apk_url = None;
+        let mut final_done_result_pending = false;
         let mut error = None;
         let heartbeat_only_timeout = channel_ai_heartbeat_only_timeout();
         let mut last_effective_progress_at = Instant::now();
@@ -2092,8 +2094,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     .get("apk_url")
                                     .and_then(|v| v.as_str())
                                     .map(ToOwned::to_owned);
-                                let result = result_message(message, apk_url.as_deref(), None);
-                                insert_channel_ai_result(&task, &result);
+                                final_done_result_pending = true;
                             }
                             "error" => {
                                 remove_channel_ai_task_control(&task.task_id);
@@ -2158,7 +2159,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         if final_reply.is_empty() {
             final_reply = "AI 开发任务已结束。".to_string();
         }
-        if matches!(
+        let task_finished = matches!(
             task.state.store.finish_running_task(
                 &task.task_id,
                 &final_status,
@@ -2167,7 +2168,12 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 error.as_deref(),
             ),
             Ok(true)
-        ) {
+        );
+        if task_finished {
+            if final_done_result_pending {
+                let result = result_message(&final_reply, apk_url.as_deref(), None);
+                insert_channel_ai_result(&task, &result);
+            }
             publish_channel_task_updated(&task, "conversation_result");
         }
     });
@@ -2405,20 +2411,6 @@ fn project_landing_manifest(
         return snapshot;
     }
     workspace_landing.or(snapshot)
-}
-
-fn result_message(message: &str, apk_url: Option<&str>, status: Option<&str>) -> String {
-    let mut parts = Vec::new();
-    if let Some(status) = status {
-        parts.push(format!("AI 开发任务{}。", status));
-    }
-    if !message.trim().is_empty() {
-        parts.push(message.trim().to_string());
-    }
-    if let Some(apk_url) = apk_url.filter(|value| !value.is_empty()) {
-        parts.push(format!("APK 下载：{}", apk_url));
-    }
-    parts.join("\n")
 }
 
 trait BlankFallback {
