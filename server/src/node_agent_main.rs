@@ -65,6 +65,7 @@ mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
+mod node_agent_cli_env;
 #[cfg(test)]
 mod node_agent_cli_prompt_timeout_tests;
 mod node_agent_cli_pty;
@@ -1429,11 +1430,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         .map(|(program, _)| *program)
         .unwrap_or(bin);
 
-    // 构建命令
-    // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
-    // Claude/Gemini: claude|gemini [extra_args] -p "<prompt>"
-    // Codex 首次: codex exec --json --dangerously-bypass-approvals-and-sandbox "<prompt>"
-    // Codex 续接: codex exec resume --json <session-uuid> "<prompt>"
+    // 构建外部 CLI 命令；Codex 的 prompt 是位置参数，其他 CLI 使用 -p。
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
     let codex_scope_key = if cli_name == "codex" {
@@ -1482,8 +1479,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
     }
     if cli_name == "codex" {
-        // 从 extra_args 提取 --codex-model=xxx 和 --codex-effort=yyy，在 exec 前插入
-        // 例如：codex -m gpt-5.4-mini -c model_reasoning_effort="medium" exec ...
+        // 从 extra_args 提取 Codex 模型/推理强度，在 exec 前插入。
         for a in &extra_args {
             if let Some(model) = a.strip_prefix("--codex-model=") {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "-m");
@@ -1499,7 +1495,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }
         push_tracked_arg(&mut cmd, &mut sidecar_args, "exec");
         if let Some(ref real_sid) = codex_plan.session_id {
-            // 续接已有会话
             push_tracked_arg(&mut cmd, &mut sidecar_args, "resume");
             push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
             if let Some(path) = codex_last_message_path.as_ref() {
@@ -1530,7 +1525,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     path.to_string_lossy().to_string(),
                 );
             }
-            // 首次执行：默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
+            // 首次执行默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
             if full_access {
                 push_tracked_arg(
                     &mut cmd,
@@ -1547,7 +1542,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
             }
         }
-        // 其余 extra_args，跳过已处理的 --session-id / --codex-model / --codex-effort
+        // 跳过已处理的 Codex 专用 extra_args。
         for a in &extra_args {
             if !a.starts_with("--session-id=")
                 && !a.starts_with("--codex-model=")
@@ -1569,9 +1564,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             push_tracked_arg(&mut cmd, &mut sidecar_args, a);
         }
     }
-    // prompt 传递方式
     if cli_name == "codex" {
-        // Codex: prompt 是位置参数（-p 是 --profile，不是 prompt）
         push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
     } else if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
         push_tracked_arg(&mut cmd, &mut sidecar_args, "-p");
@@ -1582,7 +1575,13 @@ async fn run_cli_prompt(run: CliPromptRun) {
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
     }
-    // 显式设置 CODEX_HOME 为本机实际路径，避免继承服务器端 Linux 路径（如 /root/.codex）
+    if cli_name == "codex" {
+        for (key, value) in node_agent_cli_env::codex_child_env_overrides(actual_bin) {
+            cmd.env(&key, &value);
+            sidecar_env.push((key, value));
+        }
+    }
+    // 使用本机实际 CODEX_HOME，避免继承服务器端 Linux 路径。
     if cli_name == "codex" {
         let codex_home = std::env::var("CODEX_HOME")
             .ok()

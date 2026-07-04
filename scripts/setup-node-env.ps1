@@ -6,10 +6,11 @@
 #   2. JDK 17         （Android Gradle 构建必需）
 #   3. Node.js LTS    （前端/项目工具链）
 #   4. Codex CLI      （OpenAI AI 编码代理：官方 Windows 安装器）
-#   5. Android SDK    （编译发布 APK 必需：cmdline-tools + platforms-34 + build-tools-34）
-#   6. Gradle 镜像    （阿里云，国内大幅加速 Android 构建）
-#   7. Ollama         （可选，本地 LLM 推理，贡献算力赚积分）
-#   8. OPENAI_API_KEY （持久化到 node-agent.env + 用户环境变量）
+#   5. ripgrep rg     （AI 代码检索加速，Codex CLI 优先使用）
+#   6. Android SDK    （编译发布 APK 必需：cmdline-tools + platforms-34 + build-tools-34）
+#   7. Gradle 镜像    （阿里云，国内大幅加速 Android 构建）
+#   8. Ollama         （可选，本地 LLM 推理，贡献算力赚积分）
+#   9. OPENAI_API_KEY （持久化到 node-agent.env + 用户环境变量）
 #
 # 用法：
 #   .\scripts\setup-node-env.ps1
@@ -116,6 +117,199 @@ function Add-CodexRuntimeBinsToPath {
     }
 }
 
+function Add-DirToProcessPath {
+    param([string]$Dir)
+
+    if ([string]::IsNullOrWhiteSpace($Dir)) { return $false }
+    if (-not (Test-Path -LiteralPath $Dir -PathType Container)) { return $false }
+    $parts = @($env:PATH -split [System.IO.Path]::PathSeparator | Where-Object { $_ })
+    foreach ($part in $parts) {
+        if ($part.TrimEnd('\') -ieq $Dir.TrimEnd('\')) { return $true }
+    }
+    $env:PATH = $Dir + [System.IO.Path]::PathSeparator + $env:PATH
+    return $true
+}
+
+function Add-DirToUserPathPrefix {
+    param([string]$Dir)
+
+    if ([string]::IsNullOrWhiteSpace($Dir)) { return $false }
+    if (-not (Test-Path -LiteralPath $Dir -PathType Container)) { return $false }
+    $userPath = [System.Environment]::GetEnvironmentVariable('PATH', 'User')
+    if ($null -eq $userPath) { $userPath = '' }
+    $parts = @($userPath -split [System.IO.Path]::PathSeparator | Where-Object { $_ })
+    $nextParts = @($Dir) + @($parts | Where-Object { $_.TrimEnd('\') -ine $Dir.TrimEnd('\') })
+    $nextUserPath = $nextParts -join [System.IO.Path]::PathSeparator
+    if ($nextUserPath -ne $userPath) {
+        [System.Environment]::SetEnvironmentVariable('PATH', $nextUserPath, 'User')
+        return $true
+    }
+    return $false
+}
+
+function Test-CodexDesktopResourceDir {
+    param([string]$Dir)
+
+    if ([string]::IsNullOrWhiteSpace($Dir)) { return $false }
+    $lower = $Dir.ToLowerInvariant()
+    return ($lower.Contains('\windowsapps\') -and
+        $lower.Contains('\openai.codex_') -and
+        $lower.Contains('\app\resources'))
+}
+
+function Find-RipgrepExeCandidates {
+    $candidates = @()
+    $cmd = Get-Command rg -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source -and (Test-Path -LiteralPath $cmd.Source -PathType Leaf)) {
+        $candidates += $cmd.Source
+    }
+
+    $candidateFiles = @()
+    if ($env:LOCALAPPDATA) {
+        $candidateFiles += Join-Path $env:LOCALAPPDATA 'ElonNode\tools\ripgrep\bin\rg.exe'
+    }
+    if ($env:USERPROFILE) {
+        $candidateFiles += Join-Path $env:USERPROFILE '.cargo\bin\rg.exe'
+        $candidateFiles += Join-Path $env:USERPROFILE 'scoop\shims\rg.exe'
+    }
+    if ($env:ProgramFiles) {
+        $candidateFiles += Join-Path $env:ProgramFiles 'ripgrep\rg.exe'
+        $candidateFiles += Join-Path $env:ProgramFiles 'Ripgrep\rg.exe'
+    }
+    if ($env:ProgramData) {
+        $candidateFiles += Join-Path $env:ProgramData 'chocolatey\bin\rg.exe'
+    }
+    foreach ($file in $candidateFiles) {
+        if (Test-Path -LiteralPath $file -PathType Leaf) { $candidates += $file }
+    }
+
+    $roots = @()
+    if ($env:LOCALAPPDATA) {
+        $roots += Join-Path $env:LOCALAPPDATA 'OpenAI\Codex\bin'
+        $roots += Join-Path $env:LOCALAPPDATA 'ElonNode\tools\ripgrep'
+    }
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+        Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+            foreach ($rel in @('rg.exe', 'bin\rg.exe')) {
+                $file = Join-Path $_.FullName $rel
+                if (Test-Path -LiteralPath $file -PathType Leaf) { $candidates += $file }
+            }
+        }
+    }
+
+    if ($env:ProgramFiles) {
+        $windowsApps = Join-Path $env:ProgramFiles 'WindowsApps'
+        if (Test-Path -LiteralPath $windowsApps -PathType Container) {
+            Get-ChildItem -LiteralPath $windowsApps -Directory -Filter 'OpenAI.Codex_*' -ErrorAction SilentlyContinue | ForEach-Object {
+                $file = Join-Path $_.FullName 'app\resources\rg.exe'
+                if (Test-Path -LiteralPath $file -PathType Leaf) { $candidates += $file }
+            }
+        }
+    }
+
+    $seen = @{}
+    $unique = @()
+    foreach ($candidate in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        $key = $candidate.TrimEnd('\').ToLowerInvariant()
+        if ($seen.ContainsKey($key)) { continue }
+        $seen[$key] = $true
+        $unique += $candidate
+    }
+    return $unique
+}
+
+function Add-RipgrepBinsToPath {
+    param([switch]$PersistUser)
+
+    $candidates = @(Find-RipgrepExeCandidates)
+    foreach ($rg in $candidates) {
+        $dir = Split-Path -Parent $rg
+        [void](Add-DirToProcessPath $dir)
+    }
+
+    if ($PersistUser) {
+        $preferred = $candidates |
+            Where-Object { -not (Test-CodexDesktopResourceDir (Split-Path -Parent $_)) } |
+            Select-Object -First 1
+        if ($preferred) {
+            $dir = Split-Path -Parent $preferred
+            if (Add-DirToUserPathPrefix $dir) {
+                Ok "ripgrep 路径已写入用户 PATH：$dir"
+            }
+        }
+    }
+
+    return ($candidates.Count -gt 0)
+}
+
+function Install-RipgrepPortable {
+    $url = $env:ELON_RIPGREP_ZIP_URL
+    if ([string]::IsNullOrWhiteSpace($url)) { return $false }
+    if (-not $env:LOCALAPPDATA) {
+        Warn "LOCALAPPDATA 不可用，无法安装绿色 ripgrep。"
+        return $false
+    }
+
+    Step "安装绿色 ripgrep（ELON_RIPGREP_ZIP_URL）"
+    $stage = Join-Path $env:TEMP ("elon-ripgrep-" + [guid]::NewGuid().ToString("N"))
+    $zip = Join-Path $stage "ripgrep.zip"
+    try {
+        New-Item -ItemType Directory -Path $stage -Force | Out-Null
+        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip
+        if (-not [string]::IsNullOrWhiteSpace($env:ELON_RIPGREP_ZIP_SHA256)) {
+            $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+            $expected = $env:ELON_RIPGREP_ZIP_SHA256.Trim().ToLowerInvariant()
+            if ($actual -ne $expected) {
+                throw "ripgrep zip SHA256 mismatch: expected $expected, got $actual"
+            }
+        }
+        Expand-Archive -LiteralPath $zip -DestinationPath $stage -Force
+        $rg = Get-ChildItem -LiteralPath $stage -Recurse -Filter 'rg.exe' -File -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (-not $rg) { throw "压缩包内未找到 rg.exe" }
+        $bin = Join-Path $env:LOCALAPPDATA 'ElonNode\tools\ripgrep\bin'
+        New-Item -ItemType Directory -Path $bin -Force | Out-Null
+        Copy-Item -LiteralPath $rg.FullName -Destination (Join-Path $bin 'rg.exe') -Force
+        Ok "绿色 ripgrep 已安装：$bin\rg.exe"
+        return $true
+    } catch {
+        Warn "绿色 ripgrep 安装失败：$_"
+        return $false
+    } finally {
+        Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Ensure-Ripgrep {
+    Step "检查 ripgrep (rg)"
+    [void](Add-RipgrepBinsToPath -PersistUser)
+    if (RunsVersion 'rg') {
+        Ok "ripgrep 已就绪：$(rg --version | Select-Object -First 1)"
+        return
+    }
+
+    if (Install-RipgrepPortable) {
+        Refresh-Path
+        [void](Add-RipgrepBinsToPath -PersistUser)
+        if (RunsVersion 'rg') {
+            Ok "ripgrep 已就绪：$(rg --version | Select-Object -First 1)"
+            return
+        }
+    }
+
+    if (WingetInstall 'BurntSushi.ripgrep.MSVC' 'ripgrep (rg)') {
+        Refresh-Path
+        [void](Add-RipgrepBinsToPath -PersistUser)
+        if (RunsVersion 'rg') {
+            Ok "ripgrep 安装成功：$(rg --version | Select-Object -First 1)"
+            return
+        }
+    }
+
+    Warn "ripgrep 暂未就绪；Codex CLI 仍可运行，但大仓库检索会退回较慢的 PowerShell 搜索。"
+}
+
 function Install-CodexCli {
     Step "安装 Codex CLI（OpenAI 官方 Windows 安装器）"
     $shell = if (Has 'powershell') { 'powershell' } elseif (Has 'pwsh') { 'pwsh' } else { '' }
@@ -179,6 +373,7 @@ Write-Host "══════════════════════�
 
 if ($CodexOnly) {
     Ensure-CodexCli
+    Ensure-Ripgrep
     if (RunsVersion 'codex') {
         Write-Host "`nCodex CLI 已就绪。请回到一龙 Win 端点击重新检测。" -ForegroundColor Cyan
         exit 0
@@ -228,6 +423,9 @@ if (Has 'node') {
 
 # ── 4. Codex CLI ──────────────────────────────────────────────────────────────
 Ensure-CodexCli
+
+# ── 4b. ripgrep（AI 代码检索加速）────────────────────────────────────────────
+Ensure-Ripgrep
 
 # ── 5. Android SDK ────────────────────────────────────────────────────────────
 Step "检查 Android SDK（APK 编译必需）"

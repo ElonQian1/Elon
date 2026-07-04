@@ -88,36 +88,48 @@ fn command_search_dirs() -> Vec<PathBuf> {
             std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".to_string());
         let program_files_x86 = std::env::var("ProgramFiles(x86)")
             .unwrap_or_else(|_| "C:\\Program Files (x86)".to_string());
+        let program_data =
+            std::env::var("ProgramData").unwrap_or_else(|_| "C:\\ProgramData".to_string());
 
         for dir in [
             PathBuf::from(&appdata).join("npm"),
             PathBuf::from(&localappdata).join("Yarn").join("bin"),
+            PathBuf::from(&localappdata)
+                .join("ElonNode")
+                .join("tools")
+                .join("ripgrep")
+                .join("bin"),
             PathBuf::from(&appdata).join("pnpm"),
             PathBuf::from(&userprofile).join(".volta").join("bin"),
+            PathBuf::from(&userprofile).join(".cargo").join("bin"),
             PathBuf::from(&appdata).join("nvm"),
             PathBuf::from(&userprofile).join("scoop").join("shims"),
+            PathBuf::from(&program_data).join("chocolatey").join("bin"),
             PathBuf::from(&program_files).join("GitHub CLI"),
             PathBuf::from(&program_files_x86).join("GitHub CLI"),
             PathBuf::from(&program_files).join("Git").join("cmd"),
             PathBuf::from(&program_files).join("Git").join("bin"),
             PathBuf::from(&program_files).join("nodejs"),
             PathBuf::from(&program_files).join("Ollama"),
+            PathBuf::from(&program_files).join("ripgrep"),
+            PathBuf::from(&program_files).join("Ripgrep"),
         ] {
             push_unique_dir(&mut dirs, dir);
         }
+
+        push_child_tool_dirs(
+            &mut dirs,
+            PathBuf::from(&localappdata)
+                .join("ElonNode")
+                .join("tools")
+                .join("ripgrep"),
+        );
 
         let codex_bin_root = PathBuf::from(&localappdata)
             .join("OpenAI")
             .join("Codex")
             .join("bin");
-        if let Ok(entries) = std::fs::read_dir(codex_bin_root) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    push_unique_dir(&mut dirs, path);
-                }
-            }
-        }
+        push_child_tool_dirs(&mut dirs, codex_bin_root);
     }
 
     #[cfg(not(windows))]
@@ -162,6 +174,19 @@ fn push_unique_dir(dirs: &mut Vec<PathBuf>, dir: PathBuf) {
         return;
     }
     dirs.push(dir);
+}
+
+#[cfg(windows)]
+fn push_child_tool_dirs(dirs: &mut Vec<PathBuf>, root: PathBuf) {
+    if let Ok(entries) = std::fs::read_dir(root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                push_unique_dir(dirs, path.clone());
+                push_unique_dir(dirs, path.join("bin"));
+            }
+        }
+    }
 }
 
 fn sort_command_candidates(name: &str, candidates: &mut [PathBuf]) {
