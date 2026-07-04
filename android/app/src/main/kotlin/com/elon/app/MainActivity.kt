@@ -776,7 +776,7 @@ class MainActivity : AppCompatActivity() {
                     .takeIf { it >= 0 } ?: s.activeProjectIndex
                 conversationOpenActions.openProjectSpaceConversation(idx, conversationIndex)
             },
-            personalConversationSync = projectConversationSyncBridge(s, projectStateActions, homeListActions),
+            personalConversationSync = projectConversationSyncBridge(s, projectStateActions, homeListActions) { binding.renderProjectListIfProjectHomeVisible { homeListActions.renderProjectList() } },
             showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.createConversationAndOpen(title, onCreated) },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             selectedRuntimeRouteForRequest = { modelActions.selectedRuntimeRouteForRequest() },
@@ -967,7 +967,7 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             reloadProjects = projectStateActions::loadProjects,
             renderConversationList = homeListActions::renderConversationList,
-            renderProjectList = homeListActions::renderProjectList
+            renderProjectList = { binding.renderProjectListIfProjectHomeVisible { homeListActions.renderProjectList() } }
         )
     }
 
@@ -1172,7 +1172,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (changed) {
             projectStateActions.saveProjects()
-            homeListActions.renderProjectList()
+            binding.renderProjectListIfProjectHomeVisible { homeListActions.renderProjectList() }
         }
     }
 

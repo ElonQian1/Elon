@@ -52,14 +52,15 @@ internal class ProjectConversationSyncBridge(
 internal fun projectConversationSyncBridge(
     state: MainActivityState,
     projectStateActions: MainProjectStateActions,
-    homeListActions: MainHomeListActions
+    homeListActions: MainHomeListActions,
+    renderProjectList: () -> Unit = homeListActions::renderProjectList
 ) = ProjectConversationSyncBridge(
     projects = state.projects,
     activeProject = projectStateActions::activeProject,
     setActiveProjectIndex = { state.activeProjectIndex = it },
     saveProjects = projectStateActions::saveProjects,
     renderConversationList = homeListActions::renderConversationList,
-    renderProjectList = homeListActions::renderProjectList
+    renderProjectList = renderProjectList
 )
 
 internal fun openRemotePersonalProjectConversation(
