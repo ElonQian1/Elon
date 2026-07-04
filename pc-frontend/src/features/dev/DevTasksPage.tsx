@@ -1,4 +1,5 @@
 import styles from './DevTasksPage.module.css'
+import { getPcLegacyUrl } from '../shell/pcLegacyUrl'
 
 export default function DevTasksPage() {
   return (
@@ -10,7 +11,7 @@ export default function DevTasksPage() {
           <br />
           DevTaskCard、AgentRunsPanel 组件已就绪，等待项目频道路由集成。
         </p>
-        <a className={styles.link} href="/pc">前往旧版 PC 查看 AI 开发频道 →</a>
+        <a className={styles.link} href={getPcLegacyUrl()}>前往旧版 PC 查看 AI 开发频道 →</a>
       </div>
     </div>
   )

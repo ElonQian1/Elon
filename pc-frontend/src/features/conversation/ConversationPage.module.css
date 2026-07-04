@@ -25,7 +25,7 @@
     #0f1012;
   border-right: 1px solid rgba(255, 255, 255, .055);
   display: grid;
-  grid-template-rows: 50px 40px minmax(0, 1fr) 62px;
+  grid-template-rows: 50px 40px minmax(0, 1fr) auto;
   min-height: 0;
   position: relative;
 }

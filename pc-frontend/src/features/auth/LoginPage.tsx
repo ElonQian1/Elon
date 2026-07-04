@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
 import type { ApiError } from '../../api/client'
+import { getPcLegacyUrl } from '../shell/pcLegacyUrl'
 import styles from './LoginPage.module.css'
 
 export default function LoginPage() {
@@ -56,7 +57,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className={styles.hint}>
-          如需使用旧版 PC，请访问 <a href="/pc">/pc</a>
+          如需使用旧版 PC，请访问 <a href={getPcLegacyUrl()}>旧版工作台</a>
         </p>
       </div>
     </div>

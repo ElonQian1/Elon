@@ -1,4 +1,5 @@
 import styles from './HomePage.module.css'
+import { getPcLegacyUrl } from '../shell/pcLegacyUrl'
 
 export default function HomePage() {
   return (
@@ -10,7 +11,7 @@ export default function HomePage() {
           <br />
           功能模块将逐步从旧版迁移至此。
         </p>
-        <a className={styles.legacyBtn} href="/pc">
+        <a className={styles.legacyBtn} href={getPcLegacyUrl()}>
           前往旧版 PC 工作台 →
         </a>
       </div>
