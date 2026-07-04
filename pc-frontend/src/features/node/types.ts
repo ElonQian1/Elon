@@ -50,6 +50,18 @@ export interface NodeSummary {
   connected_at?: number
 }
 
+export interface NodeAgentVersion {
+  version?: string
+  gitSha?: string
+  updated_at?: string
+  downloadUrl?: string
+  linuxDownloadUrl?: string
+  windowsClientDownloadUrl?: string
+  fileSize?: number
+  linuxFileSize?: number
+  windowsClientFileSize?: number
+}
+
 export interface LocalNodeStatus {
   logged_in?: boolean
   connected?: boolean
@@ -143,4 +155,45 @@ export interface AutostartStatus {
   install_error?: string | null
   summary?: string
   message?: string
+}
+
+export interface ClientMaintenanceAction {
+  id?: string
+  kind?: 'open_target' | 'export_diagnostics' | 'repair' | 'update' | 'uninstall' | string
+  label?: string
+  description?: string
+  target?: string
+  enabled?: boolean
+  tone?: 'primary' | 'neutral' | 'danger' | string
+  confirmation?: string | null
+  recommended?: boolean
+  recommendation?: string
+}
+
+export interface ClientMaintenanceStatus {
+  ok?: boolean
+  platform?: string
+  supported?: boolean
+  version?: string
+  installed?: boolean
+  running_from_install_dir?: boolean
+  installed_git_sha?: string
+  installed_package_version?: string
+  version_manifest?: NodeAgentVersion
+  layout_status?: string
+  product_status?: { status?: string; summary?: string }
+  maintenance_overview?: {
+    status?: string
+    severity?: string
+    title?: string
+    detail?: string
+    primary_action_id?: string
+    primary_action_label?: string
+    recent_failure_count?: number
+  }
+  primary_maintenance_action?: ClientMaintenanceAction
+  maintenance_actions?: ClientMaintenanceAction[]
+  maintenance_recent_events?: Array<{ action?: string; ok?: boolean; detail?: string; ts?: number }>
+  message?: string
+  error?: string
 }

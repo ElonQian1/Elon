@@ -1577,6 +1577,13 @@
 
 .localNodeNoticeWarn strong { color: var(--yellow); }
 
+.localNodeNoticeUpdate {
+  border-color: rgba(216, 165, 53, .32);
+  background: rgba(216, 165, 53, .12);
+}
+
+.localNodeNoticeUpdate strong { color: #f7d08a; }
+
 .localNodeNotice span {
   flex: 1 1 auto;
   min-width: 0;

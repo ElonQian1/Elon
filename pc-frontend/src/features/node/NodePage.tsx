@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from './launchWinClient'
+import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { useUserProgression } from '../billing/useUserProgression'
@@ -441,6 +442,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           <div key={k}><span>{k}</span><strong>{v}</strong></div>
         ))}
       </div>
+      <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
       <CodexStatusCard
         status={codex}
         refreshing={!!status.cli_probe?.refreshing}

@@ -6,6 +6,7 @@ export interface LocalNodeStatus {
   agent_id?: string
   owner_user_id?: string
   device_name?: string
+  version?: string
   connected?: boolean
   codex_cli?: { available?: boolean; logged_in?: boolean; status?: string }
 }

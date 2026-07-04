@@ -1,6 +1,6 @@
 import { api } from '../../api/client'
 import { formatBytes } from '../projects/nodeHelpers'
-import type { NodeSummary } from './types'
+import type { NodeAgentVersion, NodeSummary } from './types'
 
 export { formatBytes }
 
@@ -42,6 +42,6 @@ export async function fetchMyNodes(): Promise<NodeSummary[]> {
   return data.nodes ?? []
 }
 
-export async function fetchNodeAgentVersion(): Promise<{ version?: string; windowsClientFileSize?: number }> {
+export async function fetchNodeAgentVersion(): Promise<NodeAgentVersion> {
   return api.get('/api/node-agent/version')
 }

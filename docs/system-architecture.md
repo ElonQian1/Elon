@@ -132,6 +132,14 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 节点客户端自更新属于一龙控制面链路，默认必须直连一龙服务器，不能继承开发机或子项目设置的系统代理；确需代理的环境用 `NODE_AGENT_UPDATE_USE_SYSTEM_PROXY=1` 或 `NODE_AGENT_UPDATE_PROXY_MODE=system` 显式开启。
 
+Win 端启动和更新的产品闭环如下：
+
+1. PC 网页端只负责提示和触发：节点未运行时展示“启动 Win 端 / 下载 / 节点设置”；节点已运行但版本落后时展示“Win 端可更新 / 下载新版 / 节点设置”。
+2. 浏览器通过 `elon-node://open` 拉起本机 Win 端；如果协议未注册或本机未安装，用户走标准下载地址 `/api/node-agent/download/windows-client`。
+3. 节点设置页读取 `/api/node-agent/version` 和本机 `/api/client-maintenance`，用服务器版本、包大小、本机安装状态判断“未知 / 最新 / 可更新”。
+4. 用户点击“更新并重启 Win 端”时，网页端只调用本机 `/api/client-maintenance/update`；真正下载、替换、重启由 Win 端维护层执行，网页端轮询 `/api/status` 确认节点重新上线。
+5. 服务器更新频繁时，网页端不能把“服务端有新版本”误报成任务失败；任务页继续展示当前 CLI 公开过程，节点/设置页单独提示客户端版本维护。长期目标是在 Win 端启动时主动比对服务器版本并提示/自动维护，但用户可见入口仍保持在节点设置页。
+
 ```
 PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --json
     → stdout JSONL 事件流
