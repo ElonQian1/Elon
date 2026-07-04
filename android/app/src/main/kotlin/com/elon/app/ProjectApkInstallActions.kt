@@ -290,9 +290,12 @@ private fun promotePendingProjectApkInstall(
         ?: return
     val pendingVersionCode = prefs.getLong(pendingVersionCodeKey(projectId), -1L)
     val recordedVersionCode = prefs.getLong(installedVersionCodeKey(projectId), -1L)
+    val recordedUpdatedAt = prefs.getLong(installedUpdatedAtKey(projectId), -1L)
     val targetReached = pendingVersionCode <= 0L || installed.versionCode >= pendingVersionCode
-    val versionChanged = recordedVersionCode <= 0L || installed.versionCode > recordedVersionCode
-    if (!targetReached || !versionChanged) return
+    val installChanged = recordedVersionCode <= 0L ||
+        installed.versionCode > recordedVersionCode ||
+        (recordedUpdatedAt > 0L && installed.lastUpdateTime > recordedUpdatedAt)
+    if (!targetReached || !installChanged) return
     prefs.edit()
         .putString(installedMarkerKey(projectId), pendingMarker)
         .putLong(installedVersionCodeKey(projectId), installed.versionCode)

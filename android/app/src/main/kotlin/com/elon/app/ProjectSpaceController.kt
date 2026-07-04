@@ -521,7 +521,7 @@ internal class ProjectSpaceController(
 
     fun resumeIfActive() {
         if (activeChannel?.kind == DOCS_CHANNEL_KIND) return
-        if (activeChannel != null || activeMemberConversation != null) startPolling()
+        if (activeChannel != null || activeMemberConversation != null) startPolling() else if (activeSpace != null) renderProjectSpaceLanding()
     }
 
     fun stopPolling() {
