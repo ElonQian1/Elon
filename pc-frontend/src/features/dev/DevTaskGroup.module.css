@@ -219,34 +219,6 @@
   border-color: rgba(218, 55, 60, .40);
 }
 
-.codexThreadLink {
-  flex: 0 1 170px;
-  min-width: 0;
-  max-width: 170px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 0;
-  color: #9fb2d8;
-  font-size: 11px;
-  line-height: 1.4;
-  text-decoration: none;
-}
-
-.codexThreadLink:hover {
-  color: #d7e2f7;
-}
-
-.codexThreadLink em {
-  color: var(--text-muted);
-  font-family: 'Cascadia Code', 'Consolas', monospace;
-  font-style: normal;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .assistantTurn {
   display: flex;
   align-items: flex-start;

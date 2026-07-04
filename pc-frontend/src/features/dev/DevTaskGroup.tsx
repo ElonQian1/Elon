@@ -7,7 +7,7 @@
  *  - 工具调用 / 命令 / 过程默认可折叠，并放在回复气泡下方
  */
 import { memo, useState, useEffect, useRef } from 'react'
-import { ChevronDown, ChevronRight, ExternalLink, StopCircle } from 'lucide-react'
+import { ChevronDown, ChevronRight, StopCircle } from 'lucide-react'
 import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
@@ -63,7 +63,6 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const showProcessingBubble = !isDone && !resultMsg && visibleAssistantNotes.length === 0
   const tone = status.tone
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
-  const codexThreadUri = codexThreadUriFor(messages)
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
 
@@ -79,7 +78,6 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
       status: status.label,
       done: isDone,
       coverage: timeline.coverage,
-      codexThreadUri,
       steps: timeline.items.map((item) => ({
         kind: item.kind,
         tone: item.tone,
@@ -89,7 +87,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
         meta: item.meta,
       })),
     })
-  }, [taskId, status.label, isDone, processSummary, codexThreadUri])
+  }, [taskId, status.label, isDone, processSummary])
 
   return (
     <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
@@ -170,14 +168,6 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
               <StopCircle size={13} />
               <span>停止</span>
             </button>
-          )}
-
-          {codexThreadUri && (
-            <a className={styles.codexThreadLink} href={codexThreadUri} title={codexThreadUri}>
-              <ExternalLink size={12} />
-              <span>Codex 会话</span>
-              <em>{shortThreadUri(codexThreadUri)}</em>
-            </a>
           )}
 
           {!collapsed && (
@@ -405,30 +395,3 @@ function isTerminalTaskMessage(message: ChatMessage): boolean {
   return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
 }
 
-function codexThreadUriFor(messages: ChatMessage[]): string {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    const value = clean(
-      messages[index].codex_thread_uri
-      ?? messages[index].codexThreadUri
-      ?? messages[index].task_codex_thread_uri
-      ?? messages[index].taskCodexThreadUri
-      ?? '',
-    )
-    if (value) return value.startsWith('codex://threads/') ? value : `codex://threads/${value}`
-    const threadId = clean(
-      messages[index].task_codex_thread_id
-      ?? messages[index].taskCodexThreadId
-      ?? messages[index].codex_thread_id
-      ?? messages[index].codexThreadId
-      ?? '',
-    )
-    if (threadId) return threadId.startsWith('codex://threads/') ? threadId : `codex://threads/${threadId}`
-  }
-  return ''
-}
-
-function shortThreadUri(uri: string): string {
-  const id = clean(uri).replace(/^codex:\/\/threads\//, '')
-  if (!id) return ''
-  return id.length > 16 ? `${id.slice(0, 8)}...${id.slice(-4)}` : id
-}
