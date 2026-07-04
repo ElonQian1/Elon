@@ -192,6 +192,7 @@
       color: var(--ink-soft);
       cursor: pointer;
       border-radius: 22px;
+      outline: none;
     }
     .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--ink); }
     .icon-btn svg, .icon-btn img { width: 100%; height: 100%; display: block; }
@@ -206,8 +207,27 @@
     #moreBtn.project-members-mode .more-chat-icon { display: none; }
     #moreBtn.project-members-mode .toolbar-members-icon { display: block; }
     #addBtn .add-btn-project-icon { display: none; }
-    #addBtn.project-create-mode .add-btn-plus { display: none; }
-    #addBtn.project-create-mode .add-btn-project-icon { display: block; }
+    #addBtn .add-btn-icon-stack {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: relative;
+      line-height: 0;
+    }
+    #addBtn .add-btn-ring,
+    #addBtn .add-btn-plus-mark {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    #addBtn .add-btn-plus-mark {
+      transform-origin: center;
+      transition: transform 160ms ease;
+    }
+    #addBtn.add-plus-expanded .add-btn-plus-mark { transform: rotate(45deg); }
     #addBtn {
       width: 44px;
       height: 44px;
@@ -224,10 +244,6 @@
       width: 56px;
       height: 56px;
       padding: 16px;
-    }
-    #addBtn.project-create-mode,
-    .app.project-tabs-visible #addBtn.project-create-mode {
-      padding: 0;
     }
     #searchBtn {
       width: 46px;
@@ -3002,10 +3018,13 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.17a2 2 0 0 1 2.11-.45c.84.29 1.71.5 2.61.62A2 2 0 0 1 22 16.92z"/></svg>
     </button>
     <button class="icon-btn" id="searchBtn" title="搜索">
-      <svg viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12.3 5.9a6.4 6.4 0 1 0 0 12.8a6.4 6.4 0 1 0 0 -12.8"/><path d="M17.2 17.2 L22.6 22.6"/></svg>
+      <img src="data:image/png;base64,__TOP_SEARCH_ICON_PNG_B64__" alt="" aria-hidden="true" />
     </button>
     <button class="icon-btn" id="addBtn" title="新建项目">
-      <svg class="add-btn-plus" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="13" cy="13" r="9.4"/><path d="M13 8.5 L13 17.5 M8.5 13 L17.5 13"/></svg>
+      <span class="add-btn-icon-stack" aria-hidden="true">
+        <img class="add-btn-ring" src="data:image/png;base64,__TOP_ADD_RING_ICON_PNG_B64__" alt="" />
+        <img class="add-btn-plus-mark" src="data:image/png;base64,__TOP_ADD_PLUS_ICON_PNG_B64__" alt="" />
+      </span>
       <img class="add-btn-project-icon" src="data:image/png;base64,__POPUP_NEW_PROJECT_PNG_B64__" alt="" aria-hidden="true" />
     </button>
     <button class="icon-btn" id="moreBtn" title="聊天设置" style="display:none">
@@ -7571,6 +7590,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   // ====== 新建项目 ======
+  function setTopAddButtonExpanded(expanded) {
+    addBtn.classList.toggle('add-plus-expanded', expanded);
+  }
+
   function openNewProject() {
     newProjectError.textContent = '';
     projectNameInput.value = '';
@@ -7587,9 +7610,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       newProjectError.textContent = err.message || '加载开发环境失败';
     });
     newProjectMask.classList.add('active');
+    setTopAddButtonExpanded(true);
     setTimeout(() => projectNameInput.focus(), 50);
   }
-  function closeNewProject() { newProjectMask.classList.remove('active'); }
+  function closeNewProject() {
+    newProjectMask.classList.remove('active');
+    setTopAddButtonExpanded(false);
+  }
   async function loadProjectCreateNodes() {
     projectNodeSelect.disabled = true;
     projectNodeSelect.innerHTML = '<option value="">正在加载可用开发环境...</option>';
@@ -7732,11 +7759,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     friendRecommendations = [];
     friendRecommendationList.innerHTML = '';
     addFriendMask.classList.add('active');
+    setTopAddButtonExpanded(true);
     loadFriendRecommendations();
     setTimeout(() => friendSearchInput.focus(), 50);
   }
   function closeAddFriendDialog() {
     addFriendMask.classList.remove('active');
+    setTopAddButtonExpanded(false);
   }
   addBtn.addEventListener('click', () => {
     if (currentTab === 'chatPage' && !isAnyChatActive()) {

@@ -22,6 +22,9 @@ const HOME_PROJECT_MARKER_PNG_B64: &str = include_str!("assets/ic_home_project_m
 const HOME_PULL_FILTER_PNG_B64: &str = include_str!("assets/ic_home_pull_filter.b64");
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
+const TOP_SEARCH_ICON_PNG_B64: &str = include_str!("assets/ic_top_search_custom.b64");
+const TOP_ADD_RING_ICON_PNG_B64: &str = include_str!("assets/ic_top_add_ring_custom.b64");
+const TOP_ADD_PLUS_ICON_PNG_B64: &str = include_str!("assets/ic_top_add_plus_custom.b64");
 const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] = include_bytes!(
     "../../android/app/src/main/res/drawable-xxxhdpi/ic_side_menu_folder_closed.png"
 );
@@ -113,6 +116,9 @@ fn build_html() -> String {
             "__PROJECT_DOCUMENT_ICON_PNG_B64__",
             PROJECT_DOCUMENT_ICON_PNG_B64.trim(),
         )
+        .replace("__TOP_SEARCH_ICON_PNG_B64__", TOP_SEARCH_ICON_PNG_B64.trim())
+        .replace("__TOP_ADD_RING_ICON_PNG_B64__", TOP_ADD_RING_ICON_PNG_B64.trim())
+        .replace("__TOP_ADD_PLUS_ICON_PNG_B64__", TOP_ADD_PLUS_ICON_PNG_B64.trim())
         .replace(
             "__POPUP_NEW_PROJECT_PNG_B64__",
             POPUP_NEW_PROJECT_PNG_B64.trim(),

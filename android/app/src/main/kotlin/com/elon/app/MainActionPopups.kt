@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.graphics.drawable.Drawable
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
@@ -49,7 +50,14 @@ internal class MainActionPopups(
                 TopAction("新建项目", R.drawable.ic_popup_new_project) { showCreateProjectDialog() }
             )
         }
-        showTopActionPopup(anchor, actions)
+        val popup = showTopActionPopup(anchor, actions)
+        if (anchor === binding.addButton) {
+            setTopAddButtonExpanded(true)
+            popup.setOnDismissListener {
+                setTopAddButtonExpanded(false)
+                if (getActionPopup() === popup) setActionPopup(null)
+            }
+        }
     }
 
     fun showChatActionPopup(anchor: View) {
@@ -105,8 +113,19 @@ internal class MainActionPopups(
         setActionPopup(renderer().showProjectCardActionPopup(anchor, getActionPopup(), actions))
     }
 
-    private fun showTopActionPopup(anchor: View, actions: List<TopAction>) {
-        setActionPopup(renderer().showTopActionPopup(anchor, getActionPopup(), actions))
+    private fun showTopActionPopup(anchor: View, actions: List<TopAction>): PopupWindow {
+        val popup = renderer().showTopActionPopup(anchor, getActionPopup(), actions)
+        setActionPopup(popup)
+        return popup
+    }
+
+    private fun setTopAddButtonExpanded(expanded: Boolean) {
+        binding.addButtonPlus.animate().cancel()
+        binding.addButtonPlus.animate()
+            .rotation(if (expanded) 45f else 0f)
+            .setDuration(160L)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
     }
 
     private fun renderer(): MainActionPopupRenderer {
