@@ -45,27 +45,27 @@ internal class ProjectSpacePlayStoreHeaderView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(36)
             ).apply {
-                topMargin = dp(14)
+                topMargin = dp(16)
             })
             addView(projectMetrics(space, postCount), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(68)
             ).apply {
-                topMargin = dp(20)
+                topMargin = dp(16)
             })
             addView(installButton(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(40)
             ).apply {
                 leftMargin = dp(24)
-                topMargin = dp(28)
+                topMargin = dp(20)
                 rightMargin = dp(24)
             })
             addView(previewStrip(space, previewImages), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(167)
             ).apply {
-                topMargin = dp(16)
+                topMargin = dp(20)
             })
         }
     }
