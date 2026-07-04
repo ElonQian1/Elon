@@ -33,6 +33,13 @@ pub(crate) fn pc_apk_probe_since(request_mode: AiCliRequestMode, cwd: Option<&st
         .map(|duration| duration.as_secs().saturating_sub(600))
 }
 
+pub(crate) fn pc_apk_sync_workspace<'a>(
+    configured_workspace: Option<&'a str>,
+    active_workspace: Option<&'a str>,
+) -> Option<&'a str> {
+    clean_workspace_path(active_workspace).or_else(|| clean_workspace_path(configured_workspace))
+}
+
 pub(crate) async fn sync_pc_agent_apk_after_success(
     state: &Arc<AppState>,
     agent_id: &str,
@@ -98,6 +105,10 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
             None
         }
     }
+}
+
+fn clean_workspace_path(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|path| !path.is_empty())
 }
 
 fn register_synced_pc_release(

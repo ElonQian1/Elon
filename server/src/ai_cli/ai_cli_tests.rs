@@ -436,11 +436,26 @@ fn project_dev_profile_counts_as_android_task_for_pc_artifact_sync() {
 }
 
 #[test]
-fn pc_apk_probe_since_only_tracks_execute_workspace_tasks() {
+fn pc_apk_probe_since_tracks_non_plan_workspace_tasks() {
     assert!(pc_apk_probe_since(AiCliRequestMode::Execute, Some("C:/repo")).is_some());
     assert!(pc_apk_probe_since(AiCliRequestMode::Execute, None).is_none());
     assert!(pc_apk_probe_since(AiCliRequestMode::Plan, Some("C:/repo")).is_none());
-    assert!(pc_apk_probe_since(AiCliRequestMode::Passthrough, Some("C:/repo")).is_none());
+    assert!(pc_apk_probe_since(AiCliRequestMode::Passthrough, Some("C:/repo")).is_some());
+}
+
+#[test]
+fn pc_apk_sync_prefers_active_conversation_workspace() {
+    assert_eq!(
+        super::ai_cli_apk_sync::pc_apk_sync_workspace(
+            Some("C:/project/repo"),
+            Some("C:/project/conversation-worktree")
+        ),
+        Some("C:/project/conversation-worktree")
+    );
+    assert_eq!(
+        super::ai_cli_apk_sync::pc_apk_sync_workspace(Some("C:/project/repo"), Some("  ")),
+        Some("C:/project/repo")
+    );
 }
 
 #[test]

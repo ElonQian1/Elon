@@ -130,7 +130,6 @@ pub async fn run_with_workspace(
     )
     .await
 }
-
 pub async fn run_plan_with_workspace(
     user_id: &str,
     workspace: &Path,
@@ -161,7 +160,6 @@ pub async fn run_plan_with_workspace(
     )
     .await
 }
-
 async fn run_with_workspace_mode(
     user_id: &str,
     workspace: &Path,
@@ -1671,9 +1669,6 @@ async fn run_via_pc_agent(
                             let _ = tx.send(WsMessage::progress(message).to_json());
                         }
                     }
-                    // Codex Route A normally streams codex exec --json over stdout. Only forward
-                    // structured events while running; keep raw text for final reply extraction
-                    // and for legacy/fallback noisy streams.
                     continue;
                 }
                 if let Some(event) = pc_cli_passthrough_event(&text) {
@@ -1875,7 +1870,12 @@ async fn run_via_pc_agent(
                     let apk_url = sync_pc_agent_apk_after_success(
                         state,
                         agent_id,
-                        cwd,
+                        ai_cli_apk_sync::pc_apk_sync_workspace(
+                            cwd,
+                            workspace_status
+                                .as_ref()
+                                .map(|status| status.active_workspace_path.as_str()),
+                        ),
                         user_message,
                         request_mode,
                         attempt_apk_sync,
