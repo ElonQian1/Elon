@@ -1,12 +1,9 @@
 import { useEffect, useRef } from 'react'
+import { dispatchRealtimeEvent } from '../realtime/realtimeBus'
+import { normalizeRealtimeEvent, REALTIME_SERVER_TYPES } from '../realtime/realtimeEvents'
 import { useAuthStore } from '../../store/auth'
 
 const MAX_RECONNECT_MS = 30_000
-const DONE_EVENT_TYPE = 'project_task_done'
-const GROUP_AI_EVENT_TYPE = 'project_ai_matter_event'
-const PROJECT_MESSAGE_EVENT_TYPE = 'project_message_updated'
-const PROJECT_MEMBERS_EVENT_TYPE = 'project_members_updated'
-const PRESENCE_EVENT_TYPE = 'presence'
 
 /** 对应旧 pc_app_notifications.js：WebSocket 任务完成通知 + 声音 + 标题角标 */
 export function useNotifications() {
@@ -78,23 +75,23 @@ export function useNotifications() {
       let data: Record<string, unknown>
       try { data = JSON.parse(raw) } catch { return }
       if (!data) return
-      if (data.type === PROJECT_MESSAGE_EVENT_TYPE) {
-        window.dispatchEvent(new CustomEvent('elon:project-message-updated', { detail: data }))
+      if (data.type === REALTIME_SERVER_TYPES.projectMessageUpdated) {
+        dispatchRealtime(data)
         return
       }
-      if (data.type === PROJECT_MEMBERS_EVENT_TYPE) {
-        window.dispatchEvent(new CustomEvent('elon:project-members-updated', { detail: data }))
+      if (data.type === REALTIME_SERVER_TYPES.projectMembersUpdated) {
+        dispatchRealtime(data)
         return
       }
-      if (data.type === PRESENCE_EVENT_TYPE) {
-        window.dispatchEvent(new CustomEvent('elon:presence', { detail: data }))
+      if (data.type === REALTIME_SERVER_TYPES.presence) {
+        dispatchRealtime(data)
         return
       }
-      if (data.type === GROUP_AI_EVENT_TYPE) {
+      if (data.type === REALTIME_SERVER_TYPES.projectAiMatterEvent) {
         handleGroupAiEvent(data)
         return
       }
-      if (data.type !== DONE_EVENT_TYPE) return
+      if (data.type !== REALTIME_SERVER_TYPES.projectTaskDone) return
 
       const key = [data.projectId ?? '', data.conversationId ?? '', data.message ?? ''].join('|')
       const now = Date.now()
@@ -102,10 +99,15 @@ export function useNotifications() {
       s.lastEventKey = key
       s.lastEventAt = now
 
-      window.dispatchEvent(new CustomEvent('elon:project-task-done', { detail: data }))
+      dispatchRealtime(data)
       showBrowserNotification(data)
       playDoneSound()
       markTitle()
+    }
+
+    function dispatchRealtime(data: Record<string, unknown>) {
+      const event = normalizeRealtimeEvent(data)
+      if (event) dispatchRealtimeEvent(event)
     }
 
     function handleGroupAiEvent(data: Record<string, unknown>) {
@@ -115,7 +117,7 @@ export function useNotifications() {
       s.lastEventKey = key
       s.lastEventAt = now
 
-      window.dispatchEvent(new CustomEvent('elon:project-ai-matter-event', { detail: data }))
+      dispatchRealtime(data)
       showGroupAiNotification(data)
       markTitle()
     }

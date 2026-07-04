@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
+import { realtimeResources } from '../realtime/resourceKeys'
+import { REALTIME_SERVER_TYPES, type RealtimeEvent } from '../realtime/realtimeEvents'
+import { useRealtimeResourceRefresh } from '../realtime/useRealtimeResourceRefresh'
 import { useProjectStore } from './useProjectStore'
 import {
   listMemberConversationMessages,
@@ -9,19 +12,6 @@ import type { MemberConversationEntry } from './memberConversationApi'
 import { hasRunningTask, messageTaskId } from './messageFlow'
 import { sameMessageList } from './messageListCompare'
 import type { Message } from './types'
-
-const EVENT_REFRESH_DEBOUNCE_MS = 120
-const RUNNING_POLL_MS = 1800
-const SETTLE_POLL_MS = 2600
-const SETTLE_REFRESH_WINDOW_MS = 12_000
-
-interface ProjectRealtimeDetail {
-  projectId?: string
-  channelId?: string
-  conversationId?: string
-  taskId?: string
-  kind?: string
-}
 
 interface Options {
   activeProjectId: string
@@ -57,9 +47,7 @@ export function useConversationRealtimeRefresh({
   setMemberConversations,
 }: Options) {
   const activeConversationId = typeof sessionView === 'string' && sessionView !== 'new' ? sessionView : ''
-  const refreshTimerRef = useRef<number | undefined>()
   const refreshSeqRef = useRef(0)
-  const [settleUntil, setSettleUntil] = useState(0)
   const visibleTaskIds = useMemo(() => {
     const ids = new Set<string>()
     for (const message of displayMessages) {
@@ -69,6 +57,16 @@ export function useConversationRealtimeRefresh({
     return ids
   }, [displayMessages])
   const running = useMemo(() => hasRunningTask(displayMessages), [displayMessages])
+  const resourceKeys = useMemo(() => {
+    if (!activeProjectId || !activeConversationTargetId || !activeConversationId) return []
+    return [
+      realtimeResources.projectSpace(activeProjectId),
+      realtimeResources.conversationAny(activeProjectId, activeConversationId),
+      realtimeResources.conversationMessages(activeProjectId, activeConversationTargetId, activeConversationId),
+      realtimeResources.conversationList(activeProjectId, activeConversationTargetId),
+      ...Array.from(visibleTaskIds, (taskId) => realtimeResources.taskTimeline(activeProjectId, taskId)),
+    ]
+  }, [activeProjectId, activeConversationTargetId, activeConversationId, visibleTaskIds])
 
   const refreshConversation = useCallback(async () => {
     if (!activeProjectId || !activeConversationTargetId || !activeConversationId) return
@@ -116,83 +114,27 @@ export function useConversationRealtimeRefresh({
     setMemberConversations,
   ])
 
-  useEffect(() => {
-    function clearRefreshTimer() {
-      if (refreshTimerRef.current) {
-        window.clearTimeout(refreshTimerRef.current)
-        refreshTimerRef.current = undefined
-      }
-    }
-
-    function scheduleRefresh(delay = EVENT_REFRESH_DEBOUNCE_MS) {
-      clearRefreshTimer()
-      setSettleUntil(Date.now() + SETTLE_REFRESH_WINDOW_MS)
-      refreshTimerRef.current = window.setTimeout(() => {
-        refreshTimerRef.current = undefined
-        refreshConversation()
-      }, delay)
-    }
-
-    function matchesCurrentConversation(detail: ProjectRealtimeDetail | undefined) {
-      if (!detail || !activeConversationId) return false
-      if (detail.projectId && detail.projectId !== activeProjectId) return false
-      if (detail.conversationId === activeConversationId) return true
-      if (detail.taskId && visibleTaskIds.has(detail.taskId)) return true
-      return !!detail.channelId && detail.channelId === aiDevelopmentChannelId && running
-    }
-
-    function onProjectMessageUpdated(e: Event) {
-      const detail = (e as CustomEvent<ProjectRealtimeDetail>).detail
-      if (matchesCurrentConversation(detail)) scheduleRefresh()
-    }
-
-    function onProjectTaskDone(e: Event) {
-      const detail = (e as CustomEvent<ProjectRealtimeDetail>).detail
-      if (matchesCurrentConversation(detail)) scheduleRefresh(0)
-    }
-
-    window.addEventListener('elon:project-message-updated', onProjectMessageUpdated)
-    window.addEventListener('elon:project-task-done', onProjectTaskDone)
-    return () => {
-      clearRefreshTimer()
-      window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated)
-      window.removeEventListener('elon:project-task-done', onProjectTaskDone)
-    }
+  const matchesCurrentConversation = useCallback((event: RealtimeEvent) => {
+    if (!activeConversationId) return false
+    if (event.projectId && event.projectId !== activeProjectId) return false
+    if (event.conversationId === activeConversationId) return true
+    if (event.taskId && visibleTaskIds.has(event.taskId)) return true
+    if (event.type === REALTIME_SERVER_TYPES.projectTaskDone) return true
+    return !!event.channelId && event.channelId === aiDevelopmentChannelId && running
   }, [
     activeProjectId,
     activeConversationId,
     aiDevelopmentChannelId,
     visibleTaskIds,
     running,
-    refreshConversation,
   ])
 
-  useEffect(() => {
-    if (!activeConversationId) return
-    if (!running && Date.now() >= settleUntil) return
-    const intervalMs = running ? RUNNING_POLL_MS : SETTLE_POLL_MS
-    const timer = window.setInterval(() => {
-      if (!running && Date.now() >= settleUntil) {
-        setSettleUntil(0)
-        return
-      }
-      refreshConversation()
-    }, intervalMs)
-    return () => window.clearInterval(timer)
-  }, [activeConversationId, running, settleUntil, refreshConversation])
-
-  useEffect(() => {
-    if (!activeConversationId) return
-    function refreshVisiblePage() {
-      if (document.visibilityState === 'hidden') return
-      setSettleUntil(Date.now() + SETTLE_REFRESH_WINDOW_MS)
-      refreshConversation()
-    }
-    window.addEventListener('focus', refreshVisiblePage)
-    document.addEventListener('visibilitychange', refreshVisiblePage)
-    return () => {
-      window.removeEventListener('focus', refreshVisiblePage)
-      document.removeEventListener('visibilitychange', refreshVisiblePage)
-    }
-  }, [activeConversationId, refreshConversation])
+  useRealtimeResourceRefresh({
+    enabled: !!activeConversationId,
+    running,
+    debounceMs: 120,
+    resourceKeys,
+    refresh: refreshConversation,
+    shouldRefreshEvent: matchesCurrentConversation,
+  })
 }

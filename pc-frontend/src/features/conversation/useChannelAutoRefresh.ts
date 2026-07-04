@@ -1,117 +1,49 @@
 /**
  * 频道消息实时刷新。
  *
- * `/ws/app` 收到项目消息更新后派发前端事件，本 hook 只刷新当前可见频道。
+ * `/ws/app` 收到项目消息更新后派发统一 realtime 事件，本 hook 只刷新当前可见频道。
  * 多条连续 AI 事件会被合并成一次短延迟刷新，避免打字流式输出时反复请求。
  */
-import { useEffect } from 'react'
+import { useCallback, useMemo } from 'react'
+import { realtimeResources } from '../realtime/resourceKeys'
+import { REALTIME_SERVER_TYPES, type RealtimeEvent } from '../realtime/realtimeEvents'
+import { useRealtimeResourceRefresh } from '../realtime/useRealtimeResourceRefresh'
 import { useProjectStore } from './useProjectStore'
 import { hasRunningTask } from './messageFlow'
 
-const REFRESH_DEBOUNCE_MS = 160
-const RUNNING_POLL_MS = 1800
-
-interface ProjectMessageUpdatedEvent extends CustomEvent {
-  detail: {
-    projectId?: string
-    channelId?: string
-    conversationId?: string
-    kind?: string
-  }
-}
-
-interface TaskDoneEvent extends CustomEvent {
-  detail: { projectId?: string; conversationId?: string }
-}
-
-interface GroupAiMatterEvent extends CustomEvent {
-  detail: { projectId?: string; matterId?: string; matterEventType?: string }
-}
-
 export function useChannelAutoRefresh() {
   const messages = useProjectStore((state) => state.messages)
+  const activeProjectId = useProjectStore((state) => state.activeProjectId)
+  const activeChannelId = useProjectStore((state) => state.activeChannelId)
   const running = hasRunningTask(messages)
+  const resourceKeys = useMemo(() => {
+    if (!activeProjectId || !activeChannelId) return []
+    return [
+      realtimeResources.projectSpace(activeProjectId),
+      realtimeResources.channelMessages(activeProjectId, activeChannelId),
+    ]
+  }, [activeProjectId, activeChannelId])
 
-  useEffect(() => {
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null
+  const refreshActiveChannel = useCallback(() => {
+    if (!activeProjectId || !activeChannelId) return
+    useProjectStore.getState().loadMessages(activeProjectId, activeChannelId).catch(() => {})
+  }, [activeProjectId, activeChannelId])
 
-    function clearRefreshTimer() {
-      if (refreshTimer) {
-        clearTimeout(refreshTimer)
-        refreshTimer = null
-      }
+  const currentChannelMatches = useCallback((event: RealtimeEvent) => {
+    if (!activeProjectId || !activeChannelId) return false
+    if (event.projectId && event.projectId !== activeProjectId) return false
+    if (event.type === REALTIME_SERVER_TYPES.projectMessageUpdated) {
+      if (!event.channelId && event.conversationId) return false
+      return !event.channelId || event.channelId === activeChannelId
     }
+    return event.type === REALTIME_SERVER_TYPES.projectTaskDone || event.type === REALTIME_SERVER_TYPES.projectAiMatterEvent
+  }, [activeProjectId, activeChannelId])
 
-    function refreshActiveChannel() {
-      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
-      if (!activeProjectId || !activeChannelId) return
-      loadMessages(activeProjectId, activeChannelId).catch(() => {})
-    }
-
-    function scheduleChannelRefresh(delay = REFRESH_DEBOUNCE_MS) {
-      clearRefreshTimer()
-      refreshTimer = setTimeout(() => {
-        refreshActiveChannel()
-      }, delay)
-    }
-
-    function currentChannelMatches(projectId?: string, channelId?: string) {
-      const { activeProjectId, activeChannelId } = useProjectStore.getState()
-      if (!activeProjectId || !activeChannelId) return false
-      if (projectId && projectId !== activeProjectId) return false
-      if (channelId && channelId !== activeChannelId) return false
-      return true
-    }
-
-    function onProjectMessageUpdated(e: ProjectMessageUpdatedEvent) {
-      const { projectId, channelId, conversationId } = e.detail ?? {}
-      if (!channelId && conversationId) return
-      if (currentChannelMatches(projectId, channelId)) scheduleChannelRefresh()
-    }
-
-    function onTaskDone(e: TaskDoneEvent) {
-      const eventProjectId = e.detail?.projectId ?? ''
-      if (currentChannelMatches(eventProjectId, undefined)) scheduleChannelRefresh(0)
-    }
-
-    function onGroupAiMatterEvent(e: GroupAiMatterEvent) {
-      const eventProjectId = e.detail?.projectId ?? ''
-      if (currentChannelMatches(eventProjectId, undefined)) scheduleChannelRefresh()
-    }
-
-    window.addEventListener('elon:project-message-updated', onProjectMessageUpdated as EventListener)
-    window.addEventListener('elon:project-task-done', onTaskDone as EventListener)
-    window.addEventListener('elon:project-ai-matter-event', onGroupAiMatterEvent as EventListener)
-    return () => {
-      clearRefreshTimer()
-      window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated as EventListener)
-      window.removeEventListener('elon:project-task-done', onTaskDone as EventListener)
-      window.removeEventListener('elon:project-ai-matter-event', onGroupAiMatterEvent as EventListener)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!running) return
-    const timer = window.setInterval(() => {
-      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
-      if (!activeProjectId || !activeChannelId) return
-      loadMessages(activeProjectId, activeChannelId).catch(() => {})
-    }, RUNNING_POLL_MS)
-    return () => window.clearInterval(timer)
-  }, [running])
-
-  useEffect(() => {
-    function refreshVisiblePage() {
-      if (document.visibilityState === 'hidden') return
-      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
-      if (!activeProjectId || !activeChannelId) return
-      loadMessages(activeProjectId, activeChannelId).catch(() => {})
-    }
-    window.addEventListener('focus', refreshVisiblePage)
-    document.addEventListener('visibilitychange', refreshVisiblePage)
-    return () => {
-      window.removeEventListener('focus', refreshVisiblePage)
-      document.removeEventListener('visibilitychange', refreshVisiblePage)
-    }
-  }, [])
+  useRealtimeResourceRefresh({
+    enabled: !!activeProjectId && !!activeChannelId,
+    running,
+    resourceKeys,
+    refresh: refreshActiveChannel,
+    shouldRefreshEvent: currentChannelMatches,
+  })
 }

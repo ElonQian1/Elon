@@ -58,6 +58,16 @@ try {
     messageFingerprint,
     sameMessageList,
   } = require(path.join(pcRoot, 'src', 'features', 'conversation', 'messageListCompare.ts'));
+  const {
+    realtimeResources,
+  } = require(path.join(pcRoot, 'src', 'features', 'realtime', 'resourceKeys.ts'));
+  const {
+    REALTIME_DOM_EVENTS,
+    REALTIME_SERVER_TYPES,
+    legacyDomEventNameForType,
+    normalizeRealtimeEvent,
+    resourcesForRealtimeEvent,
+  } = require(path.join(pcRoot, 'src', 'features', 'realtime', 'realtimeEvents.ts'));
 
   assert.strictEqual(normalizeLocalWorkspacePath('E:/一龙项目/'), 'e:\\一龙项目', 'workspace path comparison should ignore slash style and case');
   assert.strictEqual(requiresLocalFullAccessGrant('project_write', true), false, 'project-write mode should not request a local full-access grant');
@@ -128,6 +138,77 @@ try {
     messageFingerprint({ id: 'avatar-msg', role: 'user', content: '你好', sender_avatar_data_url: 'new' }),
     'avatar changes should invalidate memoized message rows',
   );
+  const messageRealtimeEvent = normalizeRealtimeEvent({
+    type: REALTIME_SERVER_TYPES.projectMessageUpdated,
+    projectId: 'project-1',
+    channelId: 'channel-1',
+    conversationId: 'conv-1',
+    taskId: 'tsk-1',
+  });
+  assert.ok(messageRealtimeEvent, 'known websocket events should normalize into realtime events');
+  assert.deepStrictEqual(
+    messageRealtimeEvent.resources,
+    [
+      realtimeResources.projectSpace('project-1'),
+      realtimeResources.channelMessages('project-1', 'channel-1'),
+      realtimeResources.conversationAny('project-1', 'conv-1'),
+      realtimeResources.taskTimeline('project-1', 'tsk-1'),
+      realtimeResources.taskAny('project-1'),
+    ],
+    'project message events should map to every affected visible resource',
+  );
+  assert.deepStrictEqual(
+    resourcesForRealtimeEvent({
+      type: REALTIME_SERVER_TYPES.projectTaskDone,
+      projectId: 'project-1',
+      conversationId: 'conv-1',
+      taskId: 'tsk-1',
+    }),
+    [
+      realtimeResources.projectSpace('project-1'),
+      realtimeResources.taskAny('project-1'),
+      realtimeResources.taskTimeline('project-1', 'tsk-1'),
+      realtimeResources.conversationAny('project-1', 'conv-1'),
+    ],
+    'task_done events should refresh task timelines and the linked conversation',
+  );
+  assert.deepStrictEqual(
+    resourcesForRealtimeEvent({
+      type: REALTIME_SERVER_TYPES.projectAiMatterEvent,
+      projectId: 'project-1',
+      matterId: 'matter-1',
+    }),
+    [
+      realtimeResources.projectSpace('project-1'),
+      realtimeResources.groupAiMatter('project-1', 'matter-1'),
+    ],
+    'group AI matter events should expose project and matter resources',
+  );
+  assert.deepStrictEqual(
+    resourcesForRealtimeEvent({
+      type: REALTIME_SERVER_TYPES.projectMembersUpdated,
+      projectId: 'project-1',
+    }),
+    [
+      realtimeResources.projectSpace('project-1'),
+      realtimeResources.projectMembers('project-1'),
+    ],
+    'project member events should refresh member-scoped resources',
+  );
+  assert.deepStrictEqual(
+    resourcesForRealtimeEvent({
+      type: REALTIME_SERVER_TYPES.presence,
+      userId: 'user-1',
+    }),
+    [realtimeResources.presence('user-1')],
+    'presence events should map to a stable user resource key',
+  );
+  assert.strictEqual(
+    legacyDomEventNameForType(REALTIME_SERVER_TYPES.projectMessageUpdated),
+    REALTIME_DOM_EVENTS.projectMessageUpdated,
+    'normalized realtime events should keep legacy DOM event compatibility',
+  );
+  assert.strictEqual(normalizeRealtimeEvent({ type: 'unknown_event' }), null, 'unknown websocket events should be ignored by the realtime layer');
 
   const taskMessages = [
     { id: 'pcm-task', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },

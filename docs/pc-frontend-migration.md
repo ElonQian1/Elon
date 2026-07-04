@@ -43,6 +43,7 @@ server/src/
 | Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
+| 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |
 | 消息附件上传（图片/文件） | 🟡 中 | `src/features/conversation/AttachmentUpload.tsx` | ⬜ 未开始 |
 | 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | 🟡 P1.7 已补过程覆盖诊断、当前卡点阶段、结构化命令/文件/测试过程卡、侧栏心跳陈旧提示、运行中停止入口、恢复控制面、项目级多任务现场总览；task_done 细化仍继续 |
 
@@ -107,8 +108,23 @@ server/src/
 1. **每次只做一个任务**：单次 AI 对话只迁移上表中一个模块，完成后更新状态为 ✅
 2. **先 P1，再 P2**：对话核心不完整时不开始项目管理
 3. **有 API 先看路由**：开始前先查 `server/src/router.rs` 确认 API 端点
-4. **实时推送复用**：WebSocket 逻辑统一放 `src/features/conversation/useChannelSocket.ts`，各页面引用
+4. **实时刷新复用**：`/ws/app` 消息先进入 `src/features/realtime/`，统一标准化为公开事件和资源 key；页面模块只声明自己关心的资源，并用共享刷新 hook 触发加载
 5. **Markdown 统一**：渲染逻辑放 `src/features/markdown/`，不在各页面各自实现
+
+## PC 实时刷新架构
+
+PC 前端动态刷新分三层，后续新增模块必须接入这条链路，避免每个页面重复写 WebSocket 监听、轮询和焦点刷新：
+
+1. `src/features/notifications/useNotifications.ts` 只负责连接 `/ws/app`，收到后端消息后调用 `normalizeRealtimeEvent`，同时保留旧 DOM 事件名给未迁移模块兼容。
+2. `src/features/realtime/` 负责把后端事件映射为资源 key，例如 `project.space:{projectId}`、`channel.messages:{projectId}:{channelId}`、`conversation.any:{projectId}:{conversationId}`、`task.timeline:{projectId}:{taskId}`。
+3. 页面或业务 hook 使用 `useRealtimeResourceRefresh`，传入 `resourceKeys`、`refresh` 和必要的兼容判断函数。通用 hook 统一处理事件防抖、运行中短轮询、完成后短暂收尾轮询、窗口重新聚焦刷新。
+
+当前已接入模块：
+
+- 当前频道消息刷新：`src/features/conversation/useChannelAutoRefresh.ts`
+- 项目成员会话消息、任务过程和最终回复刷新：`src/features/conversation/useConversationRealtimeRefresh.ts`
+
+新增实时模块时不要直接在页面组件里 `window.addEventListener('elon:...')`；优先新增或复用资源 key，再用共享 hook 连接加载函数。
 
 ---
 
