@@ -111,7 +111,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         val output = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
         canvas.drawBitmap(source, 0f, 0f, basePaint)
-        drawOperations(canvas, includeAnnotationIcons = true, respectExpandedAnnotations = false)
+        drawOperations(canvas, includeAnnotationIcons = false, respectExpandedAnnotations = false)
         return output
     }
 

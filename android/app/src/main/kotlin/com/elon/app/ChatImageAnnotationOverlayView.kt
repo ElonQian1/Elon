@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -38,24 +39,31 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     private var pressedIndex: Int? = null
     private var collapseOnTouchUp = false
     private var expandedIndex: Int? = null
+    private var appearingIndex: Int? = null
+    private var appearingProgress = 1f
+    private var iconAppearAnimator: ValueAnimator? = null
 
     fun setImageInfo(width: Int?, height: Int?, nextAnnotations: List<ChatImageAnnotation>) {
         imageWidth = width?.takeIf { it > 0 } ?: 0
         imageHeight = height?.takeIf { it > 0 } ?: 0
         annotations = nextAnnotations.filter { it.hasNote() }
         expandedIndex = expandedIndex?.takeIf { it in annotations.indices }
+        appearingIndex = appearingIndex?.takeIf { it in annotations.indices }
         visibility = if (imageWidth > 0 && imageHeight > 0 && annotations.isNotEmpty()) {
             VISIBLE
         } else {
             expandedIndex = null
+            appearingIndex = null
+            iconAppearAnimator?.cancel()
             GONE
         }
         invalidate()
     }
 
     fun collapseExpandedAnnotation(): Boolean {
-        if (expandedIndex == null) return false
+        val index = expandedIndex ?: return false
         expandedIndex = null
+        startIconAppearAnimation(index)
         invalidate()
         return true
     }
@@ -68,7 +76,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         annotations.forEachIndexed { index, annotation ->
             if (expandedIndex == index) return@forEachIndexed
             val iconRect = iconRectOnView(annotation, imageRect) ?: return@forEachIndexed
-            canvas.drawBitmap(icon, null, iconRect, iconPaint)
+            drawAnnotationIcon(canvas, icon, iconRect, index)
         }
     }
 
@@ -99,6 +107,8 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
                 val hitIndex = pressedIndex ?: return false
                 pressedIndex = null
                 if (findAnnotationAt(event.x, event.y) == hitIndex) {
+                    iconAppearAnimator?.cancel()
+                    appearingIndex = null
                     expandedIndex = hitIndex
                     invalidate()
                 }
@@ -120,6 +130,36 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         val bounds = annotationBoundsOnView(annotation, imageRect) ?: return
         canvas.drawRect(bounds, boundsPaint)
         annotationBubbleRenderer.draw(canvas, annotation.note, bounds, width, height)
+    }
+
+    private fun drawAnnotationIcon(canvas: Canvas, icon: Bitmap, iconRect: RectF, index: Int) {
+        val progress = if (appearingIndex == index) appearingProgress.coerceIn(0f, 1f) else 1f
+        val scale = 0.72f + 0.28f * progress
+        val drawRect = if (scale >= 0.999f) {
+            iconRect
+        } else {
+            val insetX = iconRect.width() * (1f - scale) / 2f
+            val insetY = iconRect.height() * (1f - scale) / 2f
+            RectF(iconRect).apply { inset(insetX, insetY) }
+        }
+        val oldAlpha = iconPaint.alpha
+        iconPaint.alpha = (235 * progress).toInt().coerceIn(0, 235)
+        canvas.drawBitmap(icon, null, drawRect, iconPaint)
+        iconPaint.alpha = oldAlpha
+    }
+
+    private fun startIconAppearAnimation(index: Int) {
+        iconAppearAnimator?.cancel()
+        appearingIndex = index
+        appearingProgress = 0f
+        iconAppearAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 150L
+            addUpdateListener { animator ->
+                appearingProgress = animator.animatedValue as Float
+                invalidate()
+            }
+            start()
+        }
     }
 
     private fun findAnnotationAt(x: Float, y: Float): Int? {
@@ -191,5 +231,11 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
 
     private fun dp(value: Int): Int {
         return (value * resources.displayMetrics.density).toInt()
+    }
+
+    override fun onDetachedFromWindow() {
+        iconAppearAnimator?.cancel()
+        iconAppearAnimator = null
+        super.onDetachedFromWindow()
     }
 }
