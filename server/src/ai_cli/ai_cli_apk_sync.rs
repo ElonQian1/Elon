@@ -8,7 +8,7 @@ use std::{
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{
-    ai_cli_apk_build_script::pc_apk_sync_script, looks_like_android_task, AiCliRequestMode,
+    ai_cli_apk_build_script::pc_apk_sync_loader_command, looks_like_android_task, AiCliRequestMode,
 };
 use crate::{
     tools,
@@ -193,7 +193,8 @@ async fn sync_pc_agent_apk_artifact(
     fresh_after_unix_secs: Option<u64>,
     build_if_missing: bool,
 ) -> Result<Option<SyncedPcApk>> {
-    let script = pc_apk_sync_script(fresh_after_unix_secs, build_if_missing);
+    let command =
+        pc_apk_sync_loader_command(&state.public_url, fresh_after_unix_secs, build_if_missing);
     let (_task_id, mut rx) = state
         .agent_manager
         .dispatch(
@@ -204,7 +205,7 @@ async fn sync_pc_agent_apk_artifact(
                 "-ExecutionPolicy".to_string(),
                 "Bypass".to_string(),
                 "-Command".to_string(),
-                script.to_string(),
+                command,
             ],
             pc_workspace.to_string(),
             vec![],

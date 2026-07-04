@@ -1,6 +1,6 @@
 // server/src/ai_cli/mod.rs
 
-mod ai_cli_apk_build_script;
+pub(crate) mod ai_cli_apk_build_script;
 mod ai_cli_apk_sync;
 mod ai_cli_chat;
 mod ai_cli_chat_policy;

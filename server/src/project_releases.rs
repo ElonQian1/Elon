@@ -1,7 +1,7 @@
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Path as AxumPath, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{header::CONTENT_TYPE, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -23,6 +23,10 @@ pub const MAX_PROJECT_RELEASE_APK_BYTES: usize = 160 * 1024 * 1024;
 
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
+        .route(
+            "/api/agent/scripts/pc-apk-sync.ps1",
+            get(pc_apk_sync_script),
+        )
         .route(
             "/api/user/:user_id/projects/:project_id/download/:filename",
             get(project_downloads::download_user_project_apk),
@@ -50,6 +54,20 @@ pub struct ReleaseUploadQuery {
     pub changelog: Option<String>,
     pub channel: Option<String>,
     pub task_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct PcApkSyncScriptQuery {
+    pub fresh_after_unix_secs: Option<u64>,
+    pub build_if_missing: Option<bool>,
+}
+
+pub async fn pc_apk_sync_script(Query(query): Query<PcApkSyncScriptQuery>) -> Response {
+    let script = crate::ai_cli::ai_cli_apk_build_script::pc_apk_sync_script(
+        query.fresh_after_unix_secs,
+        query.build_if_missing.unwrap_or(false),
+    );
+    ([(CONTENT_TYPE, "text/plain; charset=utf-8")], script).into_response()
 }
 
 pub async fn list_project_releases(

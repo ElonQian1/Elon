@@ -35,6 +35,30 @@ pub(crate) fn pc_apk_sync_script(
         )
 }
 
+pub(crate) fn pc_apk_sync_loader_command(
+    public_url: &str,
+    fresh_after_unix_secs: Option<u64>,
+    build_if_missing: bool,
+) -> String {
+    let mut url = format!(
+        "{}/api/agent/scripts/pc-apk-sync.ps1?build_if_missing={}",
+        public_url.trim_end_matches('/'),
+        if build_if_missing { "true" } else { "false" }
+    );
+    if let Some(secs) = fresh_after_unix_secs {
+        url.push_str("&fresh_after_unix_secs=");
+        url.push_str(&secs.to_string());
+    }
+    let url = powershell_single_quoted(&url);
+    format!(
+        "$ErrorActionPreference='Stop'; [Console]::OutputEncoding=[System.Text.Encoding]::UTF8; $u='{url}'; $s=(Invoke-WebRequest -UseBasicParsing -Uri $u).Content; Invoke-Expression $s"
+    )
+}
+
+fn powershell_single_quoted(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
 const SCRIPT_TEMPLATE: &str = r#"
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
@@ -329,7 +353,7 @@ Write-Output 'ELON_APK_BASE64_END'
 
 #[cfg(test)]
 mod tests {
-    use super::pc_apk_sync_script;
+    use super::{pc_apk_sync_loader_command, pc_apk_sync_script};
 
     #[test]
     fn apk_sync_script_can_enable_build_fallback() {
@@ -346,5 +370,24 @@ mod tests {
         let script = pc_apk_sync_script(Some(42), false);
         assert!(script.contains("$BuildIfMissing = $false"));
         assert!(script.contains("FromUnixTimeSeconds(42)"));
+    }
+
+    #[test]
+    fn apk_sync_loader_command_stays_short() {
+        let command = pc_apk_sync_loader_command("http://example.test/", Some(42), true);
+
+        assert!(command.len() < 512);
+        assert!(command.contains("/api/agent/scripts/pc-apk-sync.ps1"));
+        assert!(command.contains("build_if_missing=true"));
+        assert!(command.contains("fresh_after_unix_secs=42"));
+        assert!(!command.contains("gradle-wrapper.jar"));
+    }
+
+    #[test]
+    fn apk_sync_loader_command_escapes_single_quote() {
+        let command = pc_apk_sync_loader_command("http://example.test/a'b", None, false);
+
+        assert!(command.contains("a''b"));
+        assert!(command.contains("build_if_missing=false"));
     }
 }
