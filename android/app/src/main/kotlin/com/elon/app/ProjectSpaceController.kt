@@ -1203,7 +1203,7 @@ internal class ProjectSpaceController(
     private fun prepareProjectContent(showAiMenu: Boolean = false): LinearLayout {
         binding.projectScrollView.stopNestedScroll()
         binding.projectScrollView.scrollTo(0, 0)
-        if (showAiMenu) showProjectSpaceAiMenu() else hideProjectSpaceAiMenu()
+        if (showAiMenu && binding.canShowProjectSpaceAiMenu()) showProjectSpaceAiMenu() else hideProjectSpaceAiMenu()
         binding.projectContentLayout.jumpDrawablesToCurrentState()
         return binding.projectContentLayout
     }

@@ -12,3 +12,9 @@ internal fun ActivityMainBinding.renderProjectListIfProjectHomeVisible(renderPro
         renderProjectList()
     }
 }
+
+internal fun ActivityMainBinding.canShowProjectSpaceAiMenu(): Boolean =
+    projectPage.visibility == View.VISIBLE &&
+        chatPage.visibility != View.VISIBLE &&
+        inputLayout.visibility != View.VISIBLE &&
+        pageTabs.visibility != View.VISIBLE
