@@ -1,4 +1,4 @@
-import type { RefObject } from 'react'
+import type { RefObject, UIEventHandler } from 'react'
 import DevTaskGroup from '../dev/DevTaskGroup'
 import type { TaskContext } from '../dev/types'
 import { MessageItem } from './ConversationMessage'
@@ -16,7 +16,7 @@ interface ConversationFeedProps {
   isDevChannel: boolean
   user: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   sendingMessage: boolean
-  onScroll: () => void
+  onScroll: UIEventHandler<HTMLDivElement>
   onCancelTask: (id: string) => Promise<void>
   onApproveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
 }
