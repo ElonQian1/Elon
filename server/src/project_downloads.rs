@@ -53,9 +53,6 @@ async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: 
     if !filename.ends_with(".apk") {
         return json_error(StatusCode::BAD_REQUEST, "only APK downloads are allowed");
     }
-    let workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    let managed_workspace = state.get_project_workspace(&project.workspace_key);
     let release_path = match state
         .store
         .project_release_for_download(&project.id, filename)
@@ -67,10 +64,17 @@ async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: 
             None
         }
     };
-    let apk_path = release_path
-        .filter(|path| path.is_file())
-        .or_else(|| tools::find_download_apk(&managed_workspace, filename))
-        .or_else(|| tools::find_download_apk(&workspace, filename));
+    let release_path = release_path.filter(|path| path.is_file());
+    let apk_path = if filename == tools::STABLE_APK_FILENAME {
+        release_path
+    } else {
+        let workspace = state
+            .resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+        let managed_workspace = state.get_project_workspace(&project.workspace_key);
+        release_path
+            .or_else(|| tools::find_download_apk(&managed_workspace, filename))
+            .or_else(|| tools::find_download_apk(&workspace, filename))
+    };
     let Some(apk_path) = apk_path else {
         return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
     };

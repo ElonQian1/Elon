@@ -450,20 +450,7 @@ impl Store {
         if let Some(release) = self.latest_project_release(project_id)? {
             return Ok(Some((release.id, release.apk_url, release.updated_at)));
         }
-        self.conn()?
-            .query_row(
-                "SELECT id, TRIM(apk_url), updated_at
-                 FROM tasks
-                 WHERE project_id = ?1
-                   AND apk_url IS NOT NULL
-                   AND TRIM(apk_url) != ''
-                 ORDER BY updated_at DESC, created_at DESC
-                 LIMIT 1",
-                params![project_id],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
-            )
-            .optional()
-            .map_err(Into::into)
+        Ok(None)
     }
 
     /// 服务重启恢复：标记运行中任务，并给频道 AI 任务补一条终态消息。

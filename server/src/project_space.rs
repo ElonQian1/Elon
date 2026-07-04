@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock, Mutex},
-    time::{Duration, Instant, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 use tokio::sync::watch;
 
@@ -38,7 +38,6 @@ use crate::{
         ProjectChannelRolePermissionOverride, PublicUser, CHANNEL_PERMISSION_MANAGE,
         CHANNEL_PERMISSION_SEND, CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW,
     },
-    tools,
     types::{AppState, WsMessage},
 };
 
@@ -2353,33 +2352,10 @@ fn latest_project_apk_delivery(
         Err(error) => tracing::warn!(
             project_id = %project.id,
             error = %error,
-            "读取项目历史 APK 交付记录失败，回退到工作区扫描"
+            "读取项目历史 APK 交付记录失败"
         ),
     }
-
-    let workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    let managed_workspace = state.get_project_workspace(&project.workspace_key);
-    let apk_path =
-        tools::find_latest_apk(&managed_workspace).or_else(|| tools::find_latest_apk(&workspace));
-    apk_path.map(|path| {
-        let modified_secs = path
-            .metadata()
-            .and_then(|metadata| metadata.modified())
-            .ok()
-            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
-            .map(|duration| duration.as_secs())
-            .unwrap_or_default();
-        let url = tools::stable_apk_url(&format!(
-            "{}/api/projects/{}/download",
-            state.public_url, project.id
-        ));
-        LatestProjectApkDelivery {
-            url: url.clone(),
-            identity: format!("workspace:{}:{}:{}", project.id, modified_secs, url),
-            updated_at: Some(modified_secs.to_string()),
-        }
-    })
+    None
 }
 
 fn project_landing_manifest(

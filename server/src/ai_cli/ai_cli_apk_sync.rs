@@ -79,20 +79,9 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
             Some(apk_url)
         }
         Ok(None) => {
-            if let Some(apk_url) = latest_project_release_apk_url(state, download_base) {
-                if explicit_apk_sync {
-                    let _ = tx.send(
-                        WsMessage::progress(
-                            "本轮 PC 工作区没有发现新的 APK，已复用项目空间最新安装包入口。",
-                        )
-                        .to_json(),
-                    );
-                }
-                return Some(apk_url);
-            }
             if explicit_apk_sync {
                 let _ = tx.send(
-                    WsMessage::progress("本轮 PC 工作区没有发现 APK；不会生成安装按钮链接。")
+                    WsMessage::progress("本轮 PC 工作区没有同步到新的 APK；不会复用旧安装包入口。")
                         .to_json(),
                 );
             }
@@ -148,25 +137,6 @@ fn register_synced_pc_release(
             error = %error,
             "failed to register synced PC APK release"
         );
-    }
-}
-
-fn latest_project_release_apk_url(state: &AppState, download_base: &str) -> Option<String> {
-    let project_id = project_id_from_download_base(download_base)?;
-    if project_id.is_empty() {
-        return None;
-    }
-    match state.store.latest_project_apk_url(project_id) {
-        Ok(Some(apk_url)) => Some(apk_url),
-        Ok(None) => None,
-        Err(error) => {
-            tracing::warn!(
-                project_id = %project_id,
-                error = %error,
-                "failed to read latest project APK URL after PC sync miss"
-            );
-            None
-        }
     }
 }
 

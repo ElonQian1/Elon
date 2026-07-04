@@ -86,6 +86,7 @@ impl Store {
     pub fn latest_project_release(&self, project_id: &str) -> Result<Option<ProjectRelease>> {
         let sql = format!(
             "{PROJECT_RELEASE_SELECT} WHERE project_id = ?1 AND status = 'published'
+               AND file_path IS NOT NULL AND TRIM(file_path) != ''
              ORDER BY updated_at DESC, created_at DESC LIMIT 1"
         );
         self.conn()?
@@ -122,7 +123,9 @@ impl Store {
         }
         let sql = format!(
             "{PROJECT_RELEASE_SELECT} WHERE project_id = ?1 AND file_name = ?2
-             AND status = 'published' ORDER BY updated_at DESC, created_at DESC LIMIT 1"
+             AND status = 'published'
+             AND file_path IS NOT NULL AND TRIM(file_path) != ''
+             ORDER BY updated_at DESC, created_at DESC LIMIT 1"
         );
         self.conn()?
             .query_row(
@@ -160,13 +163,13 @@ pub(super) fn insert_task_apk_release_locked(
     else {
         return Ok(());
     };
-    let file_name = release_file_name_from_url(apk_url);
     let now = now();
     if let Some(release_id) = conn
         .query_row(
             "SELECT id FROM project_releases
              WHERE project_id = ?1 AND task_id IS NULL AND status = 'published'
                AND TRIM(apk_url) = ?2
+               AND file_path IS NOT NULL AND TRIM(file_path) != ''
              ORDER BY updated_at DESC, created_at DESC LIMIT 1",
             params![project_id, apk_url.trim()],
             |row| row.get::<_, String>(0),
@@ -203,6 +206,7 @@ pub(super) fn insert_task_apk_release_locked(
              FROM project_releases
              WHERE project_id = ?1 AND status = 'published'
                AND TRIM(apk_url) = ?2
+               AND file_path IS NOT NULL AND TRIM(file_path) != ''
              ORDER BY
                CASE WHEN file_path IS NULL OR TRIM(file_path) = '' THEN 1 ELSE 0 END,
                updated_at DESC, created_at DESC
@@ -248,24 +252,8 @@ pub(super) fn insert_task_apk_release_locked(
         )?;
         return Ok(());
     }
-    conn.execute(
-        "INSERT OR IGNORE INTO project_releases (
-           id, project_id, task_id, uploaded_by, version_name, channel, status,
-           apk_url, file_name, created_at, updated_at
-         )
-         VALUES (?1, ?2, ?3, ?4, ?5, 'internal', 'published', ?6, ?7, ?8, ?9)",
-        params![
-            new_id("rel"),
-            project_id,
-            task_id,
-            user_id,
-            format!("AI task {}", created_at),
-            apk_url.trim(),
-            file_name,
-            created_at,
-            now,
-        ],
-    )?;
+    // A stable download URL alone is not a published APK. Only create task release
+    // records after the APK file has been synced into server-managed artifacts.
     Ok(())
 }
 
@@ -291,15 +279,6 @@ fn project_release_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
         created_at: row.get(13)?,
         updated_at: row.get(14)?,
     })
-}
-
-fn release_file_name_from_url(apk_url: &str) -> String {
-    apk_url
-        .split(['?', '#'])
-        .next()
-        .and_then(|path| path.rsplit('/').next())
-        .map(release_file_name)
-        .unwrap_or_else(|| crate::tools::STABLE_APK_FILENAME.to_string())
 }
 
 fn release_file_name(raw: &str) -> String {
