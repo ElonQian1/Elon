@@ -20,12 +20,12 @@ function Invoke-PcFrontendLocalBuild {
     $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"
     $viteCmd = Join-Path $FrontendDir "node_modules\.bin\vite.cmd"
     if (-not (Test-Path $tscCmd) -or -not (Test-Path $viteCmd)) {
-        throw "本地 node_modules 缺少 tsc/vite"
+        throw "local node_modules is missing tsc/vite"
     }
-    Write-Host "   🔁 npm 构建失败，尝试直接使用 node_modules/.bin/tsc + vite ..." -ForegroundColor Gray
+    Write-Host "   npm build failed, trying node_modules/.bin/tsc + vite ..." -ForegroundColor Gray
     $exitCode = Invoke-LoggedCmd -Command "`"$tscCmd`" --noEmit && `"$viteCmd`" build"
     if ($exitCode -ne 0) {
-        throw "node_modules/.bin 构建失败，exit=$exitCode"
+        throw "node_modules/.bin build failed, exit=$exitCode"
     }
 }
 
@@ -68,18 +68,18 @@ function Invoke-PcFrontendPnpmBuild {
 
     $pnpmCmd = Resolve-PnpmCommand
     if (-not $pnpmCmd) {
-        throw "pnpm 不可用"
+        throw "pnpm is unavailable"
     }
 
-    Write-Host "   🔁 npm 不可用，改用 pnpm 构建 PC 前端 ..." -ForegroundColor Gray
+    Write-Host "   npm is unavailable, building PC frontend with pnpm ..." -ForegroundColor Gray
     Push-Location $FrontendDir
     try {
         $installExit = Invoke-LoggedCmd -Command "`"$pnpmCmd`" install --no-frozen-lockfile --config.dangerously-allow-all-builds=true"
-        if ($installExit -ne 0) { throw "pnpm install 失败，exit=$installExit" }
+        if ($installExit -ne 0) { throw "pnpm install failed, exit=$installExit" }
 
         Reset-PcFrontendBuildArtifacts -FrontendDir $FrontendDir
         $buildExit = Invoke-LoggedCmd -Command "`"$pnpmCmd`" run build"
-        if ($buildExit -ne 0) { throw "pnpm run build 失败，exit=$buildExit" }
+        if ($buildExit -ne 0) { throw "pnpm run build failed, exit=$buildExit" }
     } finally {
         Pop-Location
     }
