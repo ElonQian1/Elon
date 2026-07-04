@@ -65,7 +65,9 @@ export default function Shell() {
       <ServerRail />
       <div className={styles.content}>
         <NodeConnectBanner />
-        <Outlet />
+        <main className={styles.routeFrame}>
+          <Outlet />
+        </main>
       </div>
     </div>
   )

@@ -145,6 +145,27 @@
 }
 .link:hover { text-decoration: underline; }
 
+/* ── 图片 ── */
+.imageLink {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.image {
+  display: block;
+  max-width: min(100%, 520px);
+  max-height: 420px;
+  width: auto;
+  height: auto;
+  border: 1px solid rgba(255, 255, 255, .10);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .035);
+  object-fit: contain;
+}
+
 /* ── 表格 ── */
 .tableWrap {
   max-width: min(780px, 100%);

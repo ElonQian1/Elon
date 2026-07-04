@@ -42,10 +42,19 @@ function buildComponents(showCopy: boolean): Components {
     },
     // 链接：强制新标签，防止 javascript: 等危险协议
     a({ href, children }) {
-      const safe = href && /^https?:|^mailto:/.test(href) ? href : undefined
+      const safe = safeMarkdownUrl(href, { image: false })
       return safe
         ? <a href={safe} target="_blank" rel="noopener noreferrer" className={styles.link}>{children}</a>
         : <span className={styles.link}>{children}</span>
+    },
+    img({ src, alt }) {
+      const safe = safeMarkdownUrl(src, { image: true })
+      if (!safe) return null
+      return (
+        <a href={safe} target="_blank" rel="noopener noreferrer" className={styles.imageLink}>
+          <img src={safe} alt={alt ?? ''} className={styles.image} loading="lazy" />
+        </a>
+      )
     },
     // 表格包裹层（水平滚动）
     table({ children }) {
@@ -59,6 +68,16 @@ function buildComponents(showCopy: boolean): Components {
     td({ children }) { return <td className={styles.td}>{children}</td> },
     // 段落、标题等保持原有样式，通过 CSS 控制
   }
+}
+
+function safeMarkdownUrl(value: string | undefined, options: { image: boolean }): string | undefined {
+  if (!value) return undefined
+  const url = value.trim()
+  if (/^https?:\/\//i.test(url)) return url
+  if (!options.image && /^mailto:/i.test(url)) return url
+  if (options.image && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(url)) return url
+  if (url.startsWith('/') && !url.startsWith('//')) return url
+  return undefined
 }
 
 /* 独立代码块组件（含复制按钮）*/

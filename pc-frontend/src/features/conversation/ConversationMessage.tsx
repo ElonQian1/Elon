@@ -45,8 +45,10 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
     ? 'AI'
     : senderName || (isOwn ? (user?.nickname ?? user?.account ?? '我') : '成员')
 
-  // AI 消息：检测是否含 Markdown 特征，有则渲染 Markdown
-  const hasMarkdown = isAi && /[#*`\[\]>|]/.test(content)
+  // AI 回复默认支持 Markdown；用户消息至少支持图片、链接和代码片段。
+  const hasMarkdown = isAi
+    ? /[#*`\[\]>|]/.test(content)
+    : /!\[[^\]]*]\([^)]+\)|\[[^\]]+]\([^)]+\)|`/.test(content)
 
   return (
     <div className={[styles.messageRow, isOwn ? styles.ownRow : '', isAi ? styles.aiRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
@@ -57,8 +59,8 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
           {time && <span>{time}</span>}
         </div>
         {hasMarkdown ? (
-          <div className={[styles.messageContent, styles.aiContent, styles.markdownMsg].join(' ')}>
-            <MarkdownContent content={content} copy />
+          <div className={[styles.messageContent, isAi ? styles.aiContent : '', styles.markdownMsg].filter(Boolean).join(' ')}>
+            <MarkdownContent content={content} copy={isAi} />
           </div>
         ) : (
           <div className={[styles.messageContent, isAi ? styles.aiContent : ''].join(' ')}>
