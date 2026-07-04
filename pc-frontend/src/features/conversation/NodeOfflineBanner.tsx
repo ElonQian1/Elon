@@ -5,6 +5,7 @@
  * 节点在线或未注册时自动隐藏。
  */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 
@@ -17,22 +18,34 @@ interface NodeInfo {
   online: boolean
 }
 
-export default function NodeOfflineBanner() {
+interface Props {
+  localNodeReady?: boolean
+  localNodeId?: string
+}
+
+export default function NodeOfflineBanner({ localNodeReady = false, localNodeId = '' }: Props) {
+  const navigate = useNavigate()
   const [offlineNode, setOfflineNode] = useState<NodeInfo | null>(null)
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
+    if (localNodeReady) {
+      setOfflineNode(null)
+      setDismissed(false)
+      return
+    }
     check()
     const t = setInterval(check, POLL_MS)
     return () => clearInterval(t)
-  }, [])
+  }, [localNodeReady, localNodeId])
 
   async function check() {
     try {
       const data = await api.get<{ nodes?: NodeInfo[] }>('/api/me/nodes')
       const nodes = data.nodes ?? []
       const online  = nodes.find((n) => n.online)
-      const offline = nodes.find((n) => !n.online)
+      const offline = nodes.find((n) => !n.online && n.node_id === localNodeId)
+        ?? nodes.find((n) => !n.online)
       if (!online && offline) {
         setOfflineNode(offline)
       } else {
@@ -58,8 +71,8 @@ export default function NodeOfflineBanner() {
     }}>
       <span style={{ fontSize: 16 }}>⚠️</span>
       <span style={{ flex: 1, lineHeight: 1.5 }}>
-        <strong style={{ color: '#f5c07a' }}>{name}</strong> 未运行——
-        电脑重启后需要重新打开一龙 Win 端，节点才会重新上线。
+        账号下的 <strong style={{ color: '#f5c07a' }}>{name}</strong> 当前未在线。
+        如果这是这台电脑，请启动 Win 端，并在节点设置里确认开机自启动。
       </span>
       <button
         type="button"
@@ -71,6 +84,17 @@ export default function NodeOfflineBanner() {
         }}
       >
         启动 Win 端
+      </button>
+      <button
+        type="button"
+        onClick={() => navigate('/node')}
+        style={{
+          background: 'rgba(245, 192, 122, .12)', border: '1px solid rgba(245, 192, 122, .34)', borderRadius: 5,
+          color: '#ffe1b2', padding: '5px 14px',
+          cursor: 'pointer', fontSize: 12, fontWeight: 800, flexShrink: 0,
+        }}
+      >
+        检查自启动
       </button>
       <a
         href={WIN_CLIENT_DOWNLOAD_URL}

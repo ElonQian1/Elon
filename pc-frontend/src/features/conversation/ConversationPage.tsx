@@ -1247,7 +1247,7 @@ export default function ConversationPage() {
           {activeProjectId && (
             <>
               {/* 节点离线提示：电脑重启后节点未运行时出现 */}
-              <NodeOfflineBanner />
+              <NodeOfflineBanner localNodeReady={localNodeReady} localNodeId={localNodeId} />
               <LocalNodeProjectNotice
                 localNode={localNode}
                 localNodeReady={localNodeReady}

@@ -98,6 +98,23 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn repair_existing_autostart(install_dir: &Path) -> Result<()> {
+    #[cfg(not(windows))]
+    let _ = install_dir;
+    #[cfg(windows)]
+    {
+        let client = paths::client_exe(install_dir);
+        let value = format!("\"{}\"", client.display());
+        let script = repair_existing_autostart_value_script(&value);
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let status = launcher_command::status_hidden(&mut cmd).context("无法修复已有开机自启")?;
+        if !status.success() {
+            anyhow::bail!("修复已有开机自启失败");
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn create_start_menu_shortcuts(install_dir: &Path) -> Result<()> {
     #[cfg(not(windows))]
     let _ = install_dir;
@@ -331,6 +348,30 @@ try {{
 }
 
 #[cfg(windows)]
+fn repair_existing_autostart_value_script(value: &str) -> String {
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+$name = '{}'
+$expected = '{}'
+$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath, $true)
+if ($null -eq $key) {{ return }}
+try {{
+  $actual = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
+  if ($null -ne $actual -and ([string]$actual) -ne $expected) {{
+    $key.SetValue($name, $expected, [Microsoft.Win32.RegistryValueKind]::String)
+  }}
+}} finally {{
+  if ($null -ne $key) {{ $key.Dispose() }}
+}}
+"#,
+        launcher_command::ps_single_quote(RUN_VALUE_NAME),
+        launcher_command::ps_single_quote(value)
+    )
+}
+
+#[cfg(windows)]
 fn remove_legacy_scheduled_task() {
     let mut cmd = launcher_command::silent_command("schtasks");
     cmd.args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"]);
@@ -379,6 +420,18 @@ mod tests {
         assert!(script.contains("SetValue($name, $value"));
         assert!(script.contains("一龙开发平台.exe"));
         assert!(!script.contains("reg add"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn repair_existing_autostart_script_does_not_create_missing_value() {
+        let script = super::repair_existing_autostart_value_script(
+            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe""#,
+        );
+
+        assert!(script.contains("OpenSubKey($keyPath, $true)"));
+        assert!(script.contains("$null -ne $actual"));
+        assert!(!script.contains("CreateSubKey"));
     }
 }
 

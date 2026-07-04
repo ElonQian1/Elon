@@ -177,6 +177,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   const [status, setStatus] = useState(initialStatus)
   const [autostart, setAutostart] = useState<AutostartStatus | null>(null)
   const [autostartBusy, setAutostartBusy] = useState(false)
+  const [repairBusy, setRepairBusy] = useState(false)
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [codexBusy, setCodexBusy] = useState(false)
@@ -426,6 +427,15 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     }
   }
 
+  async function repairClientEntry() {
+    setRepairBusy(true); setResult(''); setError('')
+    try {
+      const data = await nodeApi<{ message?: string }>(adminUrl, '/api/client-maintenance/repair', { method: 'POST' }, 12000)
+      setResult(data.message || '已开始修复客户端入口，会重新创建网页唤起协议和开机自启动。')
+      window.setTimeout(() => { void loadAutostart(); void refreshStatus(true) }, 2500)
+    } catch (err) { setError((err as Error).message) } finally { setRepairBusy(false) }
+  }
+
   return (
     <div className={styles.adminPanel}>
       <div className={styles.adminRow}>
@@ -486,6 +496,9 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         >
           <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
           {autostart?.enabled ? '关闭开机自启动' : '开启开机自启动'}
+        </button>
+        <button className={styles.btn} onClick={repairClientEntry} disabled={repairBusy}>
+          {repairBusy ? '修复中…' : '修复客户端入口'}
         </button>
         <button className={styles.btn} onClick={() => window.open(adminUrl, '_blank', 'noopener')}>
           高级本机页

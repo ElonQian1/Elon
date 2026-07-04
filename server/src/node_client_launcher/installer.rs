@@ -54,6 +54,9 @@ pub(crate) fn ensure_installed() -> Result<PathBuf> {
         if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
             eprintln!("警告：创建开始菜单入口失败：{error:#}");
         }
+        if let Err(error) = windows_integration::repair_existing_autostart(&install_dir) {
+            eprintln!("警告：修复已有开机自启失败：{error:#}");
+        }
         if let Err(error) = windows_integration::register_url_protocol(&install_dir) {
             eprintln!("警告：注册网页一键唤起入口失败：{error:#}");
         }

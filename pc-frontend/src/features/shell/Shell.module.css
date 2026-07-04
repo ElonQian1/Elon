@@ -56,6 +56,11 @@
   color: #dff6e8;
 }
 
+.nodeBannerOffline {
+  background: rgba(245, 176, 76, .14);
+  color: #ffe2ad;
+}
+
 .nodeBannerError {
   background: rgba(223, 92, 92, .14);
   color: #ffdede;

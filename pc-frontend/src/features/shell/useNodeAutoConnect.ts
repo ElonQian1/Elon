@@ -3,7 +3,7 @@
  *
  * 逻辑：只要用户已登录，就尝试探测 localhost:7799，
  * 探测到节点后自动发送 token 完成绑定。
- * 每 30s 重试一次（覆盖"先登录、后启动节点"的场景）。
+ * 每 30s 持续确认一次，避免顶部"已绑定"状态在 Win 端退出后变成过期绿条。
  * 不依赖任何 URL 参数。
  */
 import { useEffect, useRef, useState } from 'react'
@@ -13,11 +13,13 @@ export type NodeConnectStatus =
   | 'idle'        // 未登录或节点探测未开始
   | 'connecting'  // 正在发送 token 给本地节点
   | 'success'     // 绑定成功
+  | 'offline'     // 曾经绑定成功，但当前本机 Win 端不可达
   | 'error'       // 发生错误（会自动重试）
 
 interface NodeConnectState {
   status: NodeConnectStatus
   errorMessage: string
+  detailMessage: string
 }
 
 const LOCAL_NODE_PORT = 7799
@@ -29,37 +31,80 @@ const PROBE_INTERVAL_MS = 30_000
 
 export function useNodeAutoConnect(): NodeConnectState {
   const token = useAuthStore((s: { token: string | null }) => s.token)
-  const [state, setState] = useState<NodeConnectState>({ status: 'idle', errorMessage: '' })
-  const successRef = useRef(false)
+  const userId = useAuthStore((s) => s.user?.id ?? '')
+  const [state, setState] = useState<NodeConnectState>({
+    status: 'idle',
+    errorMessage: '',
+    detailMessage: '',
+  })
+  const seenLocalNodeRef = useRef(false)
   const tokenRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (tokenRef.current !== token) {
       tokenRef.current = token
-      successRef.current = false
-      setState({ status: 'idle', errorMessage: '' })
+      seenLocalNodeRef.current = false
+      setState({ status: 'idle', errorMessage: '', detailMessage: '' })
     }
-    if (!token || successRef.current) return
+    if (!token) return
 
     // 立即探测一次
-    probe(token)
+    probe(token, userId)
 
-    // 每 30s 重试（覆盖"先登录、后启动节点"场景）
+    // 每 30s 持续确认（覆盖"先登录、后启动节点"和"节点后来退出"场景）
     const timer = setInterval(() => {
-      if (successRef.current) { clearInterval(timer); return }
-      probe(token)
+      probe(token, userId)
     }, PROBE_INTERVAL_MS)
 
     return () => clearInterval(timer)
-  }, [token])
+  }, [token, userId])
 
-  async function probe(userToken: string) {
+  async function probe(userToken: string, currentUserId: string) {
     try {
       const found = await probeLocalNode()
-      if (!found) return // 节点没在跑，静默跳过
-      const { baseUrl, localAdminToken } = found
+      if (!found) {
+        setState((current) => {
+          if (!seenLocalNodeRef.current && current.status !== 'success') {
+            return { status: 'idle', errorMessage: '', detailMessage: '' }
+          }
+          return {
+            status: 'offline',
+            errorMessage: '',
+            detailMessage: '本机 Win 端当前不可达；启动后会自动重新绑定。',
+          }
+        })
+        return
+      }
+      seenLocalNodeRef.current = true
+      const { baseUrl, localAdminToken, status } = found
+      const ownerOk = !currentUserId || !status.owner_user_id || status.owner_user_id === currentUserId
+      const alreadyBound = !!status.logged_in && ownerOk
 
-      setState({ status: 'connecting', errorMessage: '' })
+      if (alreadyBound && status.connected !== false) {
+        setState({
+          status: 'success',
+          errorMessage: '',
+          detailMessage: '本机节点已绑定到你的账号，可在 AI 对话页直接操控这台电脑。',
+        })
+        return
+      }
+
+      if (alreadyBound && status.connected === false) {
+        setState({
+          status: 'connecting',
+          errorMessage: '',
+          detailMessage: '本机 Win 端已启动，正在等待云端连接恢复…',
+        })
+        return
+      }
+
+      setState({
+        status: 'connecting',
+        errorMessage: '',
+        detailMessage: status.connected === false
+          ? '本机 Win 端已启动，正在等待云端连接恢复…'
+          : '检测到本机节点，正在自动绑定到你的账号…',
+      })
 
       const loginRes = await fetch(`${baseUrl}/api/login`, {
         method: 'POST',
@@ -72,21 +117,48 @@ export function useNodeAutoConnect(): NodeConnectState {
       })
       const loginData = await loginRes.json()
       if (!loginRes.ok || !loginData.ok) {
-        setState({ status: 'error', errorMessage: loginData.error ?? '绑定失败' })
+        setState({
+          status: 'error',
+          errorMessage: loginData.error ?? '绑定失败',
+          detailMessage: '',
+        })
         return
       }
 
-      successRef.current = true
-      setState({ status: 'success', errorMessage: '' })
+      setState({
+        status: 'success',
+        errorMessage: '',
+        detailMessage: '本机节点已绑定到你的账号，可在 AI 对话页直接操控这台电脑。',
+      })
     } catch {
-      // 节点没在跑，静默跳过（不显示错误）
+      setState((current) => {
+        if (!seenLocalNodeRef.current && current.status !== 'success') {
+          return { status: 'idle', errorMessage: '', detailMessage: '' }
+        }
+        return {
+          status: 'offline',
+          errorMessage: '',
+          detailMessage: '本机 Win 端当前不可达；启动后会自动重新绑定。',
+        }
+      })
     }
   }
 
   return state
 }
 
-async function probeLocalNode(): Promise<{ baseUrl: string; localAdminToken: string } | null> {
+interface LocalNodeProbeStatus {
+  logged_in?: boolean
+  owner_user_id?: string
+  connected?: boolean
+  local_admin_token?: string
+}
+
+async function probeLocalNode(): Promise<{
+  baseUrl: string
+  localAdminToken: string
+  status: LocalNodeProbeStatus
+} | null> {
   for (const baseUrl of LOCAL_NODE_BASES) {
     try {
       const res = await fetch(`${baseUrl}/api/status`, {
@@ -94,9 +166,9 @@ async function probeLocalNode(): Promise<{ baseUrl: string; localAdminToken: str
         signal: AbortSignal.timeout(2000),
       })
       if (!res.ok) continue
-      const data = await res.json()
+      const data = await res.json() as LocalNodeProbeStatus
       const localAdminToken: string = data.local_admin_token ?? ''
-      if (localAdminToken) return { baseUrl, localAdminToken }
+      if (localAdminToken) return { baseUrl, localAdminToken, status: data }
     } catch {
       // Try the next loopback hostname.
     }

@@ -8,6 +8,8 @@ export interface LocalNodeStatus {
   device_name?: string
   version?: string
   connected?: boolean
+  logged_in?: boolean
+  last_event?: string
   codex_cli?: { available?: boolean; logged_in?: boolean; status?: string }
 }
 

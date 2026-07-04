@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
-import { CircleCheck, Link2, TriangleAlert } from 'lucide-react'
+import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
@@ -8,24 +8,31 @@ import { useAuthStore } from '../../store/auth'
 import styles from './Shell.module.css'
 
 function NodeConnectBanner() {
-  const { status, errorMessage } = useNodeAutoConnect()
+  const { status, errorMessage, detailMessage } = useNodeAutoConnect()
   if (status === 'idle') return null
   const bannerClass = [
     styles.nodeBanner,
     status === 'connecting' ? styles.nodeBannerConnecting : '',
     status === 'success' ? styles.nodeBannerSuccess : '',
+    status === 'offline' ? styles.nodeBannerOffline : '',
     status === 'error' ? styles.nodeBannerError : '',
   ].filter(Boolean).join(' ')
   if (status === 'connecting') return (
     <div className={bannerClass}>
       <Link2 className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
-      <span>检测到本机节点，正在自动绑定到你的账号…</span>
+      <span>{detailMessage || '检测到本机节点，正在自动绑定到你的账号…'}</span>
     </div>
   )
   if (status === 'success') return (
     <div className={bannerClass}>
       <CircleCheck className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
-      <span>本机节点已绑定到你的账号，可在 AI 对话页直接操控这台电脑。</span>
+      <span>{detailMessage || '本机节点已绑定到你的账号，可在 AI 对话页直接操控这台电脑。'}</span>
+    </div>
+  )
+  if (status === 'offline') return (
+    <div className={bannerClass}>
+      <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
+      <span>{detailMessage || '本机 Win 端当前不可达；启动后会自动重新绑定。'}</span>
     </div>
   )
   if (status === 'error') return (
