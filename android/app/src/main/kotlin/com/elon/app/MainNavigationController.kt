@@ -177,7 +177,7 @@ internal class MainNavigationController(
     }
 
     private fun showProjectSpaceBottomMenu() {
-        setNavigationBarColor(R.color.elon_bg_app)
+        setNavigationBarColor(R.color.elon_store_detail_bg)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
     }

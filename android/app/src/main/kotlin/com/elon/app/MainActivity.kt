@@ -411,7 +411,7 @@ class MainActivity : AppCompatActivity() {
     private fun applySystemBarColors() {
         window.statusBarColor = ContextCompat.getColor(this, R.color.elon_bg_app)
         val navigationColor = if (::binding.isInitialized && binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
-            R.color.elon_bg_app
+            R.color.elon_store_detail_bg
         } else {
             R.color.elon_nav_bg
         }
