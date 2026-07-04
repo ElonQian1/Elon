@@ -205,10 +205,11 @@
 }
 
 .channelSectionHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  min-height: 22px;
+  gap: 6px;
+  min-height: 26px;
   padding: 0 4px 0 0;
   color: var(--text-muted);
   font-size: 10px;
@@ -217,8 +218,9 @@
   letter-spacing: .06em;
 }
 .channelSectionToggle {
+  width: 100%;
   min-width: 0;
-  min-height: 22px;
+  min-height: 26px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -228,6 +230,7 @@
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
+  text-align: left;
 }
 .channelSectionToggle:hover,
 .channelSectionToggle:focus-visible {
