@@ -318,7 +318,12 @@ if (-not $apk) { exit 2 }
 if ($apk.Length -gt 104857600) { Write-Error 'APK too large to relay'; exit 3 }
 Write-Output ('ELON_APK_NAME:' + $apk.Name)
 Write-Output 'ELON_APK_BASE64_BEGIN'
-Write-Output ([Convert]::ToBase64String([System.IO.File]::ReadAllBytes($apk.FullName)))
+$payload = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($apk.FullName))
+$chunkSize = 65536
+for ($offset = 0; $offset -lt $payload.Length; $offset += $chunkSize) {
+  $length = [Math]::Min($chunkSize, $payload.Length - $offset)
+  Write-Output $payload.Substring($offset, $length)
+}
 Write-Output 'ELON_APK_BASE64_END'
 "#;
 
@@ -331,6 +336,7 @@ mod tests {
         let script = pc_apk_sync_script(None, true);
         assert!(script.contains("$BuildIfMissing = $true"));
         assert!(script.contains("$apk = if ($BuildIfMissing) { $null } else { Find-LatestApk }"));
+        assert!(script.contains("$chunkSize = 65536"));
         assert!(script.contains("Ensure-AndroidBuildBootstrap"));
         assert!(script.contains("gradle-wrapper.jar"));
     }

@@ -193,8 +193,6 @@ async fn sync_pc_agent_apk_artifact(
     fresh_after_unix_secs: Option<u64>,
     build_if_missing: bool,
 ) -> Result<Option<SyncedPcApk>> {
-    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
-
     let script = pc_apk_sync_script(fresh_after_unix_secs, build_if_missing);
     let (_task_id, mut rx) = state
         .agent_manager
@@ -219,14 +217,10 @@ async fn sync_pc_agent_apk_artifact(
     while let Some(msg) = rx.recv().await {
         match msg {
             AgentToServer::TaskStdout { data, .. } => {
-                if let Ok(bytes) = B64.decode(&data) {
-                    output.push_str(&String::from_utf8_lossy(&bytes));
-                }
+                output.push_str(&pc_task_text_chunk(&data));
             }
             AgentToServer::TaskStderr { data, .. } => {
-                if let Ok(bytes) = B64.decode(&data) {
-                    stderr.push_str(&String::from_utf8_lossy(&bytes));
-                }
+                stderr.push_str(&pc_task_text_chunk(&data));
             }
             AgentToServer::TaskExit { code, .. } => {
                 exit_code = code;
@@ -268,6 +262,25 @@ async fn sync_pc_agent_apk_artifact(
         sha256,
         size_bytes,
     }))
+}
+
+fn pc_task_text_chunk(data: &str) -> String {
+    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+
+    let trimmed = data.trim_end_matches(['\r', '\n']);
+    if !trimmed.is_empty() {
+        if let Ok(bytes) = B64.decode(trimmed) {
+            if let Ok(decoded) = String::from_utf8(bytes) {
+                if decoded.contains("ELON_APK_")
+                    || decoded.ends_with('\n')
+                    || decoded.ends_with('\r')
+                {
+                    return decoded;
+                }
+            }
+        }
+    }
+    data.to_string()
 }
 
 fn parse_pc_apk_relay_output(output: &str) -> Result<Option<(String, Vec<u8>)>> {
@@ -319,7 +332,8 @@ pub(crate) fn safe_pc_apk_filename(raw: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::project_id_from_download_base;
+    use super::{parse_pc_apk_relay_output, pc_task_text_chunk, project_id_from_download_base};
+    use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
     #[test]
     fn parses_project_download_base() {
@@ -337,5 +351,40 @@ mod tests {
             ),
             Some("prj_abc")
         );
+    }
+
+    #[test]
+    fn parses_raw_pc_agent_relay_output() {
+        let apk_bytes = b"fake apk bytes";
+        let payload = B64.encode(apk_bytes);
+        let output = format!(
+            "ELON_APK_NAME:app-debug.apk\nELON_APK_BASE64_BEGIN\n{}\n{}\nELON_APK_BASE64_END\n",
+            &payload[..8],
+            &payload[8..]
+        );
+
+        let (filename, parsed) = parse_pc_apk_relay_output(&output)
+            .expect("relay output should parse")
+            .expect("apk should be present");
+
+        assert_eq!(filename, "app-debug.apk");
+        assert_eq!(parsed, apk_bytes);
+    }
+
+    #[test]
+    fn pc_task_text_chunk_keeps_raw_apk_payload_line() {
+        let raw_payload = B64.encode([0, 159, 146, 150, 255, 0, 1, 2]);
+
+        assert_eq!(
+            pc_task_text_chunk(&(raw_payload.clone() + "\n")),
+            raw_payload + "\n"
+        );
+    }
+
+    #[test]
+    fn pc_task_text_chunk_decodes_legacy_base64_text_line() {
+        let legacy = B64.encode("ELON_APK_BASE64_BEGIN\n");
+
+        assert_eq!(pc_task_text_chunk(&legacy), "ELON_APK_BASE64_BEGIN\n");
     }
 }

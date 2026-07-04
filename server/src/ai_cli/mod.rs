@@ -19,6 +19,7 @@ mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
 mod pc_agent_dispatch;
+mod pc_artifact_completion;
 mod pc_billing;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
@@ -27,7 +28,7 @@ mod pc_prompt_acceptance;
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
-use homecli_proto::{AgentToServer, CliWorkspaceStatus};
+use homecli_proto::AgentToServer;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
@@ -46,6 +47,7 @@ pub(crate) use self::ai_cli_process::{
 pub(crate) use self::ai_cli_runner::codex_thread_uri;
 #[cfg(test)]
 pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
+use self::pc_artifact_completion::pc_project_execution_had_no_changes;
 pub(crate) use self::pc_billing::{pc_cli_request_is_own_codex, requested_pc_cli_looks_like_codex};
 use self::pc_billing::{
     record_pc_cli_trusted_usage, reserve_pc_cli_billing_call, settle_pc_cli_node_usage,
@@ -1768,6 +1770,7 @@ async fn run_via_pc_agent(
                     request_mode,
                     lightweight_pc_chat,
                     workspace_status.as_ref(),
+                    attempt_apk_sync || looks_like_android_task(user_message),
                 );
                 let effective_exit_ok = exit_ok && !no_project_changes;
                 let effective_error = if no_project_changes {
@@ -2049,21 +2052,6 @@ async fn run_via_pc_agent(
     pc_execution_guard.disarm();
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
-}
-
-fn pc_project_execution_had_no_changes(
-    request_mode: AiCliRequestMode,
-    lightweight_pc_chat: bool,
-    workspace_status: Option<&CliWorkspaceStatus>,
-) -> bool {
-    if lightweight_pc_chat || request_mode.is_plan() || request_mode.is_passthrough() {
-        return false;
-    }
-
-    workspace_status
-        .and_then(|status| status.merge_message.as_deref())
-        .map(|message| message.contains("conversation branch had no new commits"))
-        .unwrap_or(false)
 }
 
 fn abort_pc_progress(handle: &mut Option<tokio::task::JoinHandle<()>>) {
@@ -2766,12 +2754,10 @@ mod pc_cli_passthrough_tests {
         pc_codex_progress_hint, pc_dispatch_started_event, pc_display_model_label,
         pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
         pc_lightweight_no_node_event_diagnostic, pc_lightweight_no_readable_diagnostic,
-        pc_project_execution_had_no_changes, pc_project_execution_prompt,
-        pc_project_passthrough_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
-        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
+        pc_project_execution_prompt, pc_project_passthrough_prompt, pc_project_reasoning_effort,
+        pc_route_a_extra_args, sanitize_pc_development_reply, should_skip_pc_chat_native_session,
         strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
-    use homecli_proto::CliWorkspaceStatus;
     use serde_json::Value;
 
     fn test_scope(conversation_id: &str) -> NativeSessionScope {
@@ -3094,40 +3080,6 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
         assert!(sanitized.contains("没有返回可展示的总结"));
         assert!(!sanitized.contains("已改好"));
         assert!(!sanitized.contains("本轮开发任务已完成"));
-    }
-
-    #[test]
-    fn pc_project_execution_detects_no_new_commits_as_no_changes() {
-        let status = CliWorkspaceStatus {
-            base_workspace_path: Some("D:/project".into()),
-            active_workspace_path: "D:/project-worktree".into(),
-            isolated: true,
-            branch: Some("ai/session/project/conversation".into()),
-            prepare_status: "prepared".into(),
-            merge_status: Some("merged".into()),
-            merge_message: Some("conversation branch had no new commits".into()),
-        };
-
-        assert!(pc_project_execution_had_no_changes(
-            AiCliRequestMode::Execute,
-            false,
-            Some(&status)
-        ));
-        assert!(!pc_project_execution_had_no_changes(
-            AiCliRequestMode::Plan,
-            false,
-            Some(&status)
-        ));
-        assert!(!pc_project_execution_had_no_changes(
-            AiCliRequestMode::Execute,
-            true,
-            Some(&status)
-        ));
-        assert!(!pc_project_execution_had_no_changes(
-            AiCliRequestMode::Passthrough,
-            false,
-            Some(&status)
-        ));
     }
 
     #[test]
