@@ -21,6 +21,12 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
     private val annotationIconRenderer = ChatImageAnnotationIconRenderer()
+    private val boundsHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.BLACK
+        alpha = 170
+        strokeWidth = dp(5).toFloat()
+    }
     private val boundsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = Color.WHITE
@@ -128,6 +134,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         val index = expandedIndex ?: return
         val annotation = annotations.getOrNull(index) ?: return
         val bounds = annotationBoundsOnView(annotation, imageRect) ?: return
+        canvas.drawRect(bounds, boundsHaloPaint)
         canvas.drawRect(bounds, boundsPaint)
         annotationBubbleRenderer.draw(canvas, annotation.note, bounds, width, height)
     }
