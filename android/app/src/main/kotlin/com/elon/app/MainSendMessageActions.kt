@@ -31,16 +31,26 @@ internal class MainSendMessageActions(
             appendMessage(ChatMessage("error", "这个会话已结束，请新建会话继续。"))
             return
         }
-        val text = if (pendingAttachments.isNotEmpty()) {
+        val visibleText = if (pendingAttachments.isNotEmpty()) {
             visibleTextForPendingAttachments(rawText, pendingAttachments)
         } else {
             rawText
         }
-        val outgoingText = expandShortDevelopmentCommand(text, activeConversation().messages)
+        val baseOutgoingText = if (pendingAttachments.isNotEmpty()) {
+            outgoingTextForPendingAttachments(rawText, pendingAttachments)
+        } else {
+            rawText
+        }
+        val titleSeed = if (pendingAttachments.isNotEmpty()) {
+            titleSeedForPendingAttachments(rawText, pendingAttachments)
+        } else {
+            rawText
+        }
+        val outgoingText = expandShortDevelopmentCommand(baseOutgoingText, activeConversation().messages)
         if (isActiveConversationWorking()) {
             val handled = handleRunningInput(
                 runningInputMode(),
-                text,
+                visibleText,
                 outgoingText,
                 pendingAttachments.isNotEmpty()
             )
@@ -50,15 +60,15 @@ internal class MainSendMessageActions(
             }
             return
         }
-        prepareConversationTitle(text)
+        prepareConversationTitle(titleSeed)
         val target = currentSendTarget()
         val executionMode = consumeExecutionModeForSend()
         collapseInputComposer()
         if (pendingAttachments.isNotEmpty()) {
-            uploadAttachmentsThenSend(text, outgoingText, target, executionMode)
+            uploadAttachmentsThenSend(visibleText, outgoingText, target, executionMode)
             return
         }
-        startPreparedMessage(text, outgoingText, JsonArray(), target, emptyList(), executionMode)
+        startPreparedMessage(visibleText, outgoingText, JsonArray(), target, emptyList(), executionMode)
     }
 
     private fun currentSendTarget(): SendTarget {

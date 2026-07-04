@@ -182,9 +182,10 @@ internal class MainConversationPreviewActions(
         project: AppProject,
         message: ChatMessage
     ) {
-        conversation.subtitle = summarize(message.content, 30)
-        project.subtitle = summarize(message.content, 34)
-        refreshConversationTitleFromUserMessage(conversation, message.content)
+        val previewText = previewTextForChatContent(message.content, message.attachments)
+        conversation.subtitle = summarize(previewText, 30)
+        project.subtitle = summarize(previewText, 34)
+        refreshConversationTitleFromUserMessage(conversation, previewText)
     }
 
     private fun refreshConversationTitleFromUserMessage(

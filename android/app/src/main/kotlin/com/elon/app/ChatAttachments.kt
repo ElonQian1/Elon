@@ -280,6 +280,117 @@ internal fun visibleTextForPendingAttachments(rawText: String, attachments: List
     return cleaned
 }
 
+internal fun outgoingTextForPendingAttachments(
+    rawText: String,
+    attachments: List<PendingAttachment>
+): String {
+    val visibleText = visibleTextForPendingAttachments(rawText, attachments)
+    return visibleText.ifBlank { pendingAttachmentAiPrompt(attachments) }
+}
+
+internal fun titleSeedForPendingAttachments(
+    rawText: String,
+    attachments: List<PendingAttachment>
+): String {
+    val visibleText = visibleTextForPendingAttachments(rawText, attachments)
+    val primaryNote = pendingAttachmentPrimaryNote(attachments)
+    return when {
+        visibleText.isBlank() -> pendingAttachmentTitleSeed(attachments)
+        primaryNote != null && visibleText.length <= 20 -> "$visibleText\n$primaryNote"
+        else -> visibleText
+    }
+}
+
+internal fun previewTextForChatContent(
+    content: String,
+    attachments: List<ChatAttachment>?
+): String {
+    val text = content.trim()
+    if (text.isNotBlank()) return text
+    return chatAttachmentTitleSeed(attachments.orEmpty())
+}
+
+private fun pendingAttachmentAiPrompt(attachments: List<PendingAttachment>): String {
+    val annotationLines = pendingAttachmentAnnotationLines(attachments)
+    if (annotationLines.isNotEmpty()) {
+        return buildString {
+            append("请根据上传图片中的标注内容完成对应需求。")
+            append("\n\n图片标注：")
+            annotationLines.forEach { line ->
+                append("\n- ")
+                append(line)
+            }
+        }
+    }
+    val imageCount = attachments.count { it.kind == "image" || it.mimeType.startsWith("image/") }
+    val voice = attachments.firstOrNull { it.kind == "audio" || it.mimeType.startsWith("audio/") }
+    return when {
+        imageCount > 0 -> "请查看上传的图片，并根据图片内容完成我的需求。"
+        voice != null -> "请根据上传的语音内容完成我的需求。"
+        attachments.isNotEmpty() -> "请根据上传的附件内容完成我的需求。"
+        else -> ""
+    }
+}
+
+private fun pendingAttachmentTitleSeed(attachments: List<PendingAttachment>): String {
+    pendingAttachmentPrimaryNote(attachments)?.let { return it }
+    val imageCount = attachments.count { it.kind == "image" || it.mimeType.startsWith("image/") }
+    return when {
+        imageCount > 0 -> "查看上传图片"
+        attachments.any { it.kind == "audio" || it.mimeType.startsWith("audio/") } -> "处理语音内容"
+        attachments.isNotEmpty() -> "处理上传附件"
+        else -> ""
+    }
+}
+
+private fun chatAttachmentTitleSeed(attachments: List<ChatAttachment>): String {
+    chatAttachmentPrimaryNote(attachments)?.let { return it }
+    val imageCount = attachments.count { it.isImage() }
+    return when {
+        imageCount > 0 -> "查看上传图片"
+        attachments.any { it.isVoice() } -> "处理语音内容"
+        attachments.isNotEmpty() -> "处理上传附件"
+        else -> ""
+    }
+}
+
+private fun pendingAttachmentPrimaryNote(attachments: List<PendingAttachment>): String? {
+    return attachments
+        .asSequence()
+        .flatMap { attachment -> attachment.annotations.asSequence() }
+        .mapNotNull { annotation -> annotation.cleanNoteForTitle() }
+        .firstOrNull()
+}
+
+private fun chatAttachmentPrimaryNote(attachments: List<ChatAttachment>): String? {
+    return attachments
+        .asSequence()
+        .flatMap { attachment -> attachment.annotations.asSequence() }
+        .mapNotNull { annotation -> annotation.cleanNoteForTitle() }
+        .firstOrNull()
+}
+
+private fun pendingAttachmentAnnotationLines(attachments: List<PendingAttachment>): List<String> {
+    return attachments
+        .flatMap { attachment -> attachment.annotations }
+        .mapIndexedNotNull { index, annotation -> annotation.annotationLine(index) }
+}
+
+private fun chatAttachmentAnnotationLines(attachments: List<ChatAttachment>): List<String> {
+    return attachments
+        .flatMap { attachment -> attachment.annotations }
+        .mapIndexedNotNull { index, annotation -> annotation.annotationLine(index) }
+}
+
+private fun ChatImageAnnotation.annotationLine(index: Int): String? {
+    val cleanNote = note.trim().takeIf { it.isNotEmpty() } ?: return null
+    return "标注 ${index + 1}：${summarize(cleanNote, 120)}"
+}
+
+private fun ChatImageAnnotation.cleanNoteForTitle(): String? {
+    return note.trim().takeIf { it.isNotEmpty() }?.let { summarize(it, 120) }
+}
+
 internal fun pendingAttachmentSummary(attachments: List<PendingAttachment>): String {
     if (attachments.isEmpty()) return "文本内容在此输入。"
     val imageCount = attachments.count { it.mimeType.startsWith("image/") || it.kind == "image" }

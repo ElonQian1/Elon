@@ -112,11 +112,93 @@ pub(crate) fn append_project_attachment_notes(
     )
 }
 
+pub(crate) fn project_message_with_attachment_fallback(
+    message: String,
+    attachments: Option<&[ProjectAttachmentRef]>,
+) -> String {
+    let message = message.trim().to_string();
+    if !message.is_empty() {
+        return message;
+    }
+    let Some(attachments) = attachments.filter(|items| !items.is_empty()) else {
+        return String::new();
+    };
+
+    let mut lines = Vec::new();
+    for (attachment_index, attachment) in attachments
+        .iter()
+        .take(MAX_PROJECT_ATTACHMENTS_PER_MESSAGE)
+        .enumerate()
+    {
+        let display_name = attachment_display_name(attachment);
+        if is_image_attachment(attachment) {
+            let annotation_lines = attachment
+                .annotations
+                .iter()
+                .enumerate()
+                .filter_map(|(annotation_index, annotation)| {
+                    let note = annotation.note.trim();
+                    if note.is_empty() {
+                        return None;
+                    }
+                    Some(format!(
+                        "- image {} annotation #{} ({}): {}",
+                        attachment_index + 1,
+                        annotation_index + 1,
+                        display_name,
+                        note.chars().take(500).collect::<String>()
+                    ))
+                })
+                .collect::<Vec<_>>();
+            if annotation_lines.is_empty() {
+                lines.push(format!(
+                    "- image {}: {}",
+                    attachment_index + 1,
+                    display_name
+                ));
+            } else {
+                lines.extend(annotation_lines);
+            }
+        } else if attachment.mime_type.as_deref().is_some_and(|mime| mime.starts_with("audio/"))
+            || attachment.kind.as_deref() == Some("audio")
+        {
+            lines.push(format!(
+                "- voice attachment {}: {}",
+                attachment_index + 1,
+                display_name
+            ));
+        } else {
+            lines.push(format!(
+                "- attachment {}: {}",
+                attachment_index + 1,
+                display_name
+            ));
+        }
+    }
+
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "Please use the uploaded attachments as the user's request context.\n{}",
+            lines.join("\n")
+        )
+    }
+}
+
 fn attachment_image_dimensions(attachment: &ProjectAttachmentRef) -> Option<String> {
     Some(format!(
         "{}x{}",
         attachment.image_width?, attachment.image_height?
     ))
+}
+
+fn is_image_attachment(attachment: &ProjectAttachmentRef) -> bool {
+    attachment
+        .mime_type
+        .as_deref()
+        .is_some_and(|mime| mime.starts_with("image/"))
+        || attachment.kind.as_deref() == Some("image")
 }
 
 fn attachment_annotations_summary(attachment: &ProjectAttachmentRef) -> Option<String> {
@@ -358,7 +440,7 @@ pub async fn append_project_cli_attachment_artifacts(
 
 #[cfg(test)]
 mod tests {
-    use super::attachment_annotations_summary;
+    use super::{attachment_annotations_summary, project_message_with_attachment_fallback};
     use crate::project_ws_protocol::{ProjectAttachmentAnnotation, ProjectAttachmentRef};
 
     #[test]
@@ -411,5 +493,41 @@ mod tests {
         assert!(summary.contains("#2"));
         assert!(summary.contains("second marked requirement"));
         assert!(summary.contains("x=0.100"));
+    }
+
+    #[test]
+    fn empty_project_message_uses_image_annotation_fallback() {
+        let attachment = ProjectAttachmentRef {
+            attachment_id: Some("att_marked".to_string()),
+            kind: Some("image".to_string()),
+            display_name: Some("marked.jpg".to_string()),
+            file_name: Some("marked.jpg".to_string()),
+            mime_type: Some("image/jpeg".to_string()),
+            path: Some("/workspace/attachments/marked.jpg".to_string()),
+            url: None,
+            sha256: None,
+            size_bytes: Some(2048),
+            image_width: Some(1080),
+            image_height: Some(720),
+            duration_seconds: None,
+            transcription: None,
+            annotations: vec![ProjectAttachmentAnnotation {
+                x: 0.1,
+                y: 0.2,
+                width: 0.3,
+                height: 0.4,
+                note: "add a yellow button named 魔王".to_string(),
+                icon_x: None,
+                icon_y: None,
+                icon_width: None,
+                icon_height: None,
+            }],
+        };
+
+        let message = project_message_with_attachment_fallback("   ".to_string(), Some(&[attachment]));
+
+        assert!(message.contains("uploaded attachments"));
+        assert!(message.contains("annotation #1"));
+        assert!(message.contains("add a yellow button named 魔王"));
     }
 }

@@ -60,7 +60,7 @@ pub async fn chat_project(
     if !can_edit(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
-    let message = req.message.trim().to_string();
+    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(req.message.trim().to_string(), req.attachments.as_deref());
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
@@ -328,7 +328,7 @@ pub async fn chat_project_stream(
     if !can_edit(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
-    let message = req.message.trim().to_string();
+    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(req.message.trim().to_string(), req.attachments.as_deref());
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }

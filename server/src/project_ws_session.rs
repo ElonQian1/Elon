@@ -10,7 +10,9 @@ use tokio::sync::broadcast;
 
 use crate::{
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
-    project_attachment_notes::append_project_attachment_notes,
+    project_attachment_notes::{
+        append_project_attachment_notes, project_message_with_attachment_fallback,
+    },
     project_auth::project_access,
     project_execution_mode::ProjectExecutionMode,
     project_keys::{clean_trace_id, project_ws_fingerprint},
@@ -129,7 +131,10 @@ pub(crate) async fn handle_project_ws(
             continue;
         }
 
-        let message = request.message.trim().to_string();
+        let message = project_message_with_attachment_fallback(
+            request.message.trim().to_string(),
+            request.attachments.as_deref(),
+        );
         if message.is_empty() {
             continue;
         }
