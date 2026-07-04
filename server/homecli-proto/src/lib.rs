@@ -350,6 +350,9 @@ pub enum AgentToServer {
         /// PC 设备名，仅用于展示
         #[serde(default)]
         device_name: Option<String>,
+        /// Win 端安装实例 ID，用于同账号下节点凭证幂等续约。
+        #[serde(default)]
+        install_id: Option<String>,
         /// PC 硬件画像，用于市场展示和算力供给筛选。
         #[serde(default)]
         hardware: Option<NodeHardwareProfile>,

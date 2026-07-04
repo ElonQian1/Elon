@@ -18,9 +18,9 @@ use axum::{
 use homecli_proto::{
     ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile,
 };
-use sha2::Digest as _;
 use std::{collections::HashMap, sync::Arc};
 
+pub use crate::node_register_api::register_node;
 use crate::{
     node_runtime::{
         clean_string, display_node_name, short_node_id, supports_project_cli, user_node_runtimes,
@@ -262,142 +262,6 @@ struct AvailableModelsResp {
 pub async fn list_available_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let models = state.node_registry.available_models().await;
     Json(AvailableModelsResp { models }).into_response()
-}
-
-// ── /api/me/nodes/register ────────────────────────────────────────────────────
-
-#[derive(Deserialize)]
-pub struct RegisterNodeRequest {
-    /// 用户给这个节点起的名字，如 "我的游戏 PC"
-    pub label: Option<String>,
-    /// 已有节点 ID（重新登录时带上，服务器验证后复用，避免换 ID）
-    pub existing_agent_id: Option<String>,
-    /// 已有节点 secret（与 existing_agent_id 配套，用于验证所有权）
-    pub existing_secret: Option<String>,
-}
-
-#[derive(Serialize)]
-pub struct RegisterNodeResponse {
-    /// 分配给节点的 agent_id，配置到 NODE_AGENT_ID 环境变量
-    pub agent_id: String,
-    /// 明文 secret（只在注册时返回一次，不存储明文）
-    pub agent_secret: String,
-    /// 节点应连接的服务器 WebSocket 地址
-    pub cloud_ws_url: String,
-    /// 对应的 owner user_id（节点需要配置到 NODE_OWNER_USER_ID）
-    pub owner_user_id: String,
-}
-
-/// POST /api/me/nodes/register — 为当前用户生成一个新的 PC 节点凭证
-///
-/// 若请求中携带了 `existing_agent_id + existing_secret`，且它们属于当前用户，
-/// 则只刷新 secret、保留原 agent_id（续约模式）；
-/// 否则生成全新 agent_id（首次注册模式）。
-pub async fn register_node(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(req): Json<RegisterNodeRequest>,
-) -> impl IntoResponse {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response();
-        }
-    };
-
-    // 新 secret（无论续约还是新建，都刷新 secret）
-    let new_secret = uuid::Uuid::new_v4().to_string().replace('-', "")
-        + &uuid::Uuid::new_v4().to_string().replace('-', "");
-    let new_secret_hash = hex::encode(sha2::Sha256::digest(new_secret.as_bytes()));
-
-    // ── 续约模式：客户端带来旧凭证，验证属主后复用 agent_id ──────────────
-    let existing_id = req
-        .existing_agent_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-    let existing_secret = req
-        .existing_secret
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty());
-
-    if let (Some(eid), Some(esec)) = (existing_id, existing_secret) {
-        let old_hash = hex::encode(sha2::Sha256::digest(esec.as_bytes()));
-        match state
-            .store
-            .renew_node_credential_secret(eid, &old_hash, &new_secret_hash, &user.id)
-        {
-            Ok(true) => {
-                // 续约成功，返回同一个 agent_id + 新 secret
-                let cloud_ws_url = format!(
-                    "ws://{}",
-                    std::env::var("ELON_PUBLIC_HOST")
-                        .unwrap_or_else(|_| "43.139.149.158:8080".to_string())
-                );
-                return Json(RegisterNodeResponse {
-                    agent_id: eid.to_string(),
-                    agent_secret: new_secret,
-                    cloud_ws_url,
-                    owner_user_id: user.id,
-                })
-                .into_response();
-            }
-            Ok(false) => {
-                // 旧凭证不匹配（可能已失效），走下面新建流程
-            }
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": format!("续约失败: {e}")})),
-                )
-                    .into_response();
-            }
-        }
-    }
-
-    // ── 新建模式：生成随机 agent_id ──────────────────────────────────────────
-    let random_suffix = uuid::Uuid::new_v4()
-        .to_string()
-        .replace('-', "")
-        .chars()
-        .take(8)
-        .collect::<String>();
-    let agent_id = format!(
-        "node-{}-{}",
-        &user.id.chars().take(6).collect::<String>(),
-        random_suffix
-    );
-
-    if let Err(e) = state.store.create_node_credential(
-        &agent_id,
-        &new_secret_hash,
-        &user.id,
-        req.label.as_deref(),
-    ) {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": format!("创建凭证失败: {e}")})),
-        )
-            .into_response();
-    }
-
-    let cloud_ws_url = format!(
-        "ws://{}",
-        std::env::var("ELON_PUBLIC_HOST").unwrap_or_else(|_| "43.139.149.158:8080".to_string())
-    );
-
-    Json(RegisterNodeResponse {
-        agent_id,
-        agent_secret: new_secret,
-        cloud_ws_url,
-        owner_user_id: user.id,
-    })
-    .into_response()
 }
 
 // ── /api/me/node-balance ──────────────────────────────────────────────────────
@@ -845,6 +709,7 @@ fn capacity_for_response(
         owner_user_id: owner_user_id.to_string(),
         label: label.to_string(),
         device_name: device_name.map(ToOwned::to_owned),
+        install_id: None,
         hardware: None,
         storage: None,
         dev_runtime,

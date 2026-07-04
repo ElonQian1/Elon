@@ -75,6 +75,7 @@ pub struct NodeCredential {
     pub owner_user_id: String,
     pub label: String,
     pub device_name: Option<String>,
+    pub install_id: Option<String>,
     pub created_at: String,
 }
 
@@ -264,16 +265,23 @@ impl Store {
         secret_hash: &str,
         owner_user_id: &str,
         label: Option<&str>,
+        device_name: Option<&str>,
+        install_id: Option<&str>,
     ) -> Result<()> {
         let conn = self.conn.lock().unwrap();
+        let device_name = normalize_optional(device_name);
+        let install_id = normalize_optional(install_id);
         conn.execute(
-            "INSERT INTO node_credentials (agent_id, secret_hash, owner_user_id, label, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO node_credentials
+               (agent_id, secret_hash, owner_user_id, label, device_name, install_id, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![
                 agent_id,
                 secret_hash,
                 owner_user_id,
                 label.unwrap_or(""),
+                device_name,
+                install_id,
                 now()
             ],
         )?;
@@ -310,7 +318,7 @@ impl Store {
     pub fn get_node_credential(&self, agent_id: &str) -> Result<Option<NodeCredential>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT agent_id, owner_user_id, label, device_name, created_at
+            "SELECT agent_id, owner_user_id, label, device_name, install_id, created_at
              FROM node_credentials WHERE agent_id = ?1",
             params![agent_id],
             |row| {
@@ -319,7 +327,8 @@ impl Store {
                     owner_user_id: row.get(1)?,
                     label: row.get(2)?,
                     device_name: row.get(3)?,
-                    created_at: row.get(4)?,
+                    install_id: row.get(4)?,
+                    created_at: row.get(5)?,
                 })
             },
         )
@@ -346,6 +355,75 @@ impl Store {
             params![agent_id, old_secret_hash, owner_user_id, new_secret_hash],
         )?;
         Ok(updated > 0)
+    }
+
+    /// 按稳定安装实例续约节点凭证。用于 Win 端本地凭证丢失或重新登录后，
+    /// 仍复用同一台设备原来的 agent_id，避免节点列表产生离线重复项。
+    pub fn renew_node_credential_by_install_id(
+        &self,
+        owner_user_id: &str,
+        install_id: &str,
+        new_secret_hash: &str,
+        label: Option<&str>,
+        device_name: Option<&str>,
+    ) -> Result<Option<String>> {
+        let install_id = match normalize_optional(Some(install_id)) {
+            Some(value) => value,
+            None => return Ok(None),
+        };
+        let conn = self.conn.lock().unwrap();
+        let agent_id: Option<String> = conn
+            .query_row(
+                "SELECT agent_id
+                 FROM node_credentials
+                 WHERE owner_user_id = ?1 AND install_id = ?2
+                 ORDER BY created_at DESC
+                 LIMIT 1",
+                params![owner_user_id, install_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(agent_id) = agent_id else {
+            return Ok(None);
+        };
+
+        let label = normalize_optional(label);
+        let device_name = normalize_optional(device_name);
+        conn.execute(
+            "UPDATE node_credentials
+             SET secret_hash = ?3,
+                 label = COALESCE(NULLIF(label, ''), ?4, ''),
+                 device_name = COALESCE(?5, device_name)
+             WHERE agent_id = ?1
+               AND owner_user_id = ?2",
+            params![agent_id, owner_user_id, new_secret_hash, label, device_name],
+        )?;
+        Ok(Some(agent_id))
+    }
+
+    pub fn update_node_credential_registration_info(
+        &self,
+        agent_id: &str,
+        owner_user_id: &str,
+        install_id: Option<&str>,
+        device_name: Option<&str>,
+    ) -> Result<()> {
+        let install_id = normalize_optional(install_id);
+        let device_name = normalize_optional(device_name);
+        if install_id.is_none() && device_name.is_none() {
+            return Ok(());
+        }
+
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE node_credentials
+             SET install_id = COALESCE(NULLIF(install_id, ''), ?3),
+                 device_name = COALESCE(?4, device_name)
+             WHERE agent_id = ?1
+               AND owner_user_id = ?2",
+            params![agent_id, owner_user_id, install_id, device_name],
+        )?;
+        Ok(())
     }
 
     /// 回填节点设备名。设备名来自 PC 系统名，和用户自定义 label 分开保存。
@@ -375,7 +453,7 @@ impl Store {
     pub fn list_node_credentials(&self, owner_user_id: &str) -> Result<Vec<NodeCredential>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT agent_id, owner_user_id, label, device_name, created_at
+            "SELECT agent_id, owner_user_id, label, device_name, install_id, created_at
              FROM node_credentials WHERE owner_user_id = ?1
              ORDER BY created_at DESC",
         )?;
@@ -385,7 +463,8 @@ impl Store {
                 owner_user_id: row.get(1)?,
                 label: row.get(2)?,
                 device_name: row.get(3)?,
-                created_at: row.get(4)?,
+                install_id: row.get(4)?,
+                created_at: row.get(5)?,
             })
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -475,6 +554,53 @@ mod tests {
         ));
         let _ = std::fs::remove_file(&path);
         (Store::open(&path).expect("store should open"), path)
+    }
+
+    #[test]
+    fn install_id_renewal_reuses_existing_node_credential() {
+        let (store, path) = temp_store();
+        let owner = store
+            .create_user("node-install-owner@example.com", "secret1", None, None)
+            .unwrap();
+        store
+            .create_node_credential(
+                "node-old",
+                "old-hash",
+                &owner.id,
+                Some("一龙4060"),
+                Some("ELONQIAN"),
+                Some("ins_same"),
+            )
+            .unwrap();
+
+        let reused = store
+            .renew_node_credential_by_install_id(
+                &owner.id,
+                "ins_same",
+                "new-hash",
+                Some("ELONQIAN"),
+                Some("ELONQIAN"),
+            )
+            .unwrap();
+
+        assert_eq!(reused.as_deref(), Some("node-old"));
+        assert_eq!(
+            store
+                .get_node_credential_hash("node-old")
+                .unwrap()
+                .as_deref(),
+            Some("new-hash")
+        );
+        let credential = store
+            .get_node_credential("node-old")
+            .unwrap()
+            .expect("credential");
+        assert_eq!(credential.label, "一龙4060");
+        assert_eq!(credential.device_name.as_deref(), Some("ELONQIAN"));
+        assert_eq!(credential.install_id.as_deref(), Some("ins_same"));
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

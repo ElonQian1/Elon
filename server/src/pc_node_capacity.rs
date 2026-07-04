@@ -152,6 +152,7 @@ mod tests {
             owner_user_id: "user-a".to_string(),
             label: "PC-A".to_string(),
             device_name: Some("PC-A".to_string()),
+            install_id: None,
             hardware: None,
             storage: None,
             dev_runtime: None,

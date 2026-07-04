@@ -52,6 +52,7 @@ use node_agent_cli_done::{
     cli_done_message, cli_prompt_accepted, duplicate_cli_prompt_done, latest_codex_session_id,
 };
 use node_agent_env::{env_flag, node_agent_env_file_path};
+use node_agent_registration::provision_node;
 
 const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(35);
 
@@ -99,6 +100,7 @@ mod node_agent_project_profile;
 mod node_agent_project_profile_node;
 mod node_agent_project_profile_python;
 mod node_agent_proxy;
+mod node_agent_registration;
 mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
@@ -170,6 +172,7 @@ struct Credentials {
 /// 持久化到磁盘的状态（`%APPDATA%\elon-node-agent\node.json` / `~/.config/elon-node-agent/node.json`）。
 #[derive(Default, Serialize, Deserialize)]
 struct PersistedState {
+    install_id: Option<String>,
     agent_id: Option<String>,
     agent_secret: Option<String>,
     owner_user_id: Option<String>,
@@ -234,9 +237,28 @@ fn save_persisted(s: &PersistedState) {
     }
 }
 
+fn ensure_install_id(persisted: &mut PersistedState) -> String {
+    if let Some(existing) = persisted
+        .install_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return existing.to_string();
+    }
+    let install_id = format!("ins_{}", uuid::Uuid::new_v4().simple());
+    persisted.install_id = Some(install_id.clone());
+    install_id
+}
+
 impl PersistedState {
-    fn from_parts(c: Option<&Credentials>, storage: &pc_storage_repo::StorageSettings) -> Self {
+    fn from_parts(
+        install_id: &str,
+        c: Option<&Credentials>,
+        storage: &pc_storage_repo::StorageSettings,
+    ) -> Self {
         Self {
+            install_id: Some(install_id.to_string()),
             agent_id: c.map(|c| c.agent_id.clone()),
             agent_secret: c.map(|c| c.agent_secret.clone()),
             owner_user_id: c.map(|c| c.owner_user_id.clone()),
@@ -290,58 +312,6 @@ fn initial_storage_settings(persisted: &PersistedState) -> pc_storage_repo::Stor
         }),
         git_base_url,
     }
-}
-
-/// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
-/// 若 `existing` 不为空，则带上旧凭证让服务器续约（保留原 agent_id）。
-async fn provision_node(
-    cfg: &NodeConfig,
-    token: &str,
-    existing: Option<&Credentials>,
-) -> Result<Credentials> {
-    let url = format!(
-        "{}/api/me/nodes/register",
-        cfg.cloud_http_url.trim_end_matches('/')
-    );
-    let client = node_agent_cloud_net::direct_cloud_client_or_default(Duration::from_secs(15));
-    let mut body = serde_json::json!({ "label": machine_label() });
-    if let Some(creds) = existing {
-        body["existing_agent_id"] = serde_json::Value::String(creds.agent_id.clone());
-        body["existing_secret"] = serde_json::Value::String(creds.agent_secret.clone());
-    }
-    let resp = client
-        .post(&url)
-        .bearer_auth(token)
-        .json(&body)
-        .send()
-        .await?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(anyhow!("注册节点失败 {}: {}", status, body));
-    }
-    let j: serde_json::Value = resp.json().await?;
-    let agent_id = j
-        .get("agent_id")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("响应缺少 agent_id"))?
-        .to_string();
-    let agent_secret = j
-        .get("agent_secret")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow!("响应缺少 agent_secret"))?
-        .to_string();
-    let owner_user_id = j
-        .get("owner_user_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string();
-    Ok(Credentials {
-        agent_id,
-        agent_secret,
-        owner_user_id,
-        user_token: Some(token.to_string()),
-    })
 }
 
 /// 账号 + 密码登录云端，换取 token。
@@ -2708,6 +2678,7 @@ async fn run_session(
         allowed_cwds: vec![],
         owner_user_id: Some(creds.owner_user_id.clone()),
         device_name: Some(machine_label()),
+        install_id: Some(runtime.install_id.clone()),
         hardware: Some(hardware.clone()),
         storage: Some(storage.clone()),
         dev_runtime: Some(dev_runtime.clone()),
@@ -3340,9 +3311,15 @@ async fn run_agent_runtime() -> Result<()> {
     let cfg = NodeConfig::from_env()?;
     node_agent_proxy::ensure_localhost_no_proxy();
     node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
-    let persisted = load_persisted();
+    let mut persisted = load_persisted();
+    let install_id = ensure_install_id(&mut persisted);
     let storage_settings = initial_storage_settings(&persisted);
     let mut creds = initial_credentials(&persisted);
+    save_persisted(&PersistedState::from_parts(
+        &install_id,
+        creds.as_ref(),
+        &storage_settings,
+    ));
 
     // 有登录 token 但还没有节点凭证 → 自动注册一次
     if creds.is_none() {
@@ -3352,10 +3329,14 @@ async fn run_agent_runtime() -> Result<()> {
             .or_else(|| persisted.user_token.clone());
         if let Some(tok) = token {
             info!("检测到登录 token，正在自动注册节点…");
-            match provision_node(&cfg, &tok, None).await {
+            match provision_node(&cfg, &tok, None, &install_id).await {
                 Ok(c) => {
                     info!("✅ 节点已自动注册: {}", c.agent_id);
-                    save_persisted(&PersistedState::from_parts(Some(&c), &storage_settings));
+                    save_persisted(&PersistedState::from_parts(
+                        &install_id,
+                        Some(&c),
+                        &storage_settings,
+                    ));
                     creds = Some(c);
                 }
                 Err(e) => warn!("自动注册失败（可在管理页重新登录）: {e:#}"),
@@ -3387,7 +3368,7 @@ async fn run_agent_runtime() -> Result<()> {
         );
     }
 
-    let runtime = Arc::new(NodeRuntime::new(cfg, creds, storage_settings));
+    let runtime = Arc::new(NodeRuntime::new(cfg, creds, storage_settings, install_id));
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
     node_agent_admin_open::maybe_open_admin_page(admin_port);
@@ -3409,6 +3390,7 @@ struct NodeStatus {
 
 pub(crate) struct NodeRuntime {
     cfg: NodeConfig,
+    install_id: String,
     creds: RwLock<Option<Credentials>>,
     status: RwLock<NodeStatus>,
     /// Hardware probing can spawn system commands on Windows; cache it so
@@ -3445,6 +3427,7 @@ impl NodeRuntime {
         cfg: NodeConfig,
         creds: Option<Credentials>,
         storage_settings: pc_storage_repo::StorageSettings,
+        install_id: String,
     ) -> Self {
         // 从环境变量读取 TTS Worker URL 初始值
         let tts_url = std::env::var("NODE_TTS_WORKER_URL")
@@ -3453,6 +3436,7 @@ impl NodeRuntime {
             .filter(|v| !v.is_empty());
         Self {
             cfg,
+            install_id,
             creds: RwLock::new(creds),
             status: RwLock::new(NodeStatus::default()),
             hardware_cached: RwLock::new(crate::node_hardware_probe::collect_hardware_profile()),
@@ -3718,14 +3702,22 @@ impl NodeRuntime {
     /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
     async fn set_creds(&self, c: Option<Credentials>) {
         let storage = self.storage_settings.read().await.clone();
-        save_persisted(&PersistedState::from_parts(c.as_ref(), &storage));
+        save_persisted(&PersistedState::from_parts(
+            &self.install_id,
+            c.as_ref(),
+            &storage,
+        ));
         *self.creds.write().await = c;
         self.wake.notify_waiters();
     }
 
     async fn set_storage_settings(&self, settings: pc_storage_repo::StorageSettings) {
         let creds = self.creds.read().await.clone();
-        save_persisted(&PersistedState::from_parts(creds.as_ref(), &settings));
+        save_persisted(&PersistedState::from_parts(
+            &self.install_id,
+            creds.as_ref(),
+            &settings,
+        ));
         *self.storage_settings.write().await = settings;
         self.wake.notify_waiters();
     }
@@ -4269,7 +4261,7 @@ async fn admin_login(
 
     // 2) 用 token 注册/换取节点凭证；若已有凭证则尝试续约（保留 agent_id）
     let existing = rt.creds.read().await.clone();
-    match provision_node(&rt.cfg, &token, existing.as_ref()).await {
+    match provision_node(&rt.cfg, &token, existing.as_ref(), &rt.install_id).await {
         Ok(c) => {
             let agent_id = c.agent_id.clone();
             rt.set_creds(Some(c)).await;

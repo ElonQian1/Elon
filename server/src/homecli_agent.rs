@@ -816,6 +816,7 @@ async fn run_agent_session(
         _proto_ver,
         owner_user_id,
         device_name,
+        install_id,
         hardware,
         storage,
         dev_runtime,
@@ -828,6 +829,7 @@ async fn run_agent_session(
             allowed_cwds,
             owner_user_id,
             device_name,
+            install_id,
             hardware,
             storage,
             dev_runtime,
@@ -839,13 +841,13 @@ async fn run_agent_session(
             proto_version,
             owner_user_id,
             clean_optional(device_name),
+            clean_optional(install_id),
             hardware,
             storage,
             dev_runtime,
         ),
         _ => return Err(anyhow!("first frame must be register")),
     };
-
     // Auth check: presented token must equal the secret bound to agent_id.
     // Priority: env var secrets (static, for legacy/admin agents) → DB credentials (dynamic, user-registered nodes).
     let auth_ok = if let Some(expected) = secrets.get(&agent_id) {
@@ -861,7 +863,6 @@ async fn run_agent_session(
     if !auth_ok {
         return Err(anyhow!("auth failed for agent_id={agent_id}"));
     }
-
     // If agent registered via DB credentials, resolve owner from DB
     let resolved_owner_user_id = if owner_user_id.is_some() {
         owner_user_id.clone()
@@ -874,13 +875,14 @@ async fn run_agent_session(
     } else {
         None
     };
-
-    if let (Some(owner), Some(device)) = (&resolved_owner_user_id, &device_name) {
-        if let Err(e) = state
-            .store
-            .update_node_credential_device_name(&agent_id, owner, device)
-        {
-            tracing::warn!(%agent_id, error = %e, "failed to update node device name");
+    if let Some(owner) = &resolved_owner_user_id {
+        if let Err(e) = state.store.update_node_credential_registration_info(
+            &agent_id,
+            owner,
+            install_id.as_deref(),
+            device_name.as_deref(),
+        ) {
+            tracing::warn!(%agent_id, error = %e, "failed to update node registration info");
         }
     }
     if let (Some(owner), Some(hardware)) = (&resolved_owner_user_id, hardware.as_ref()) {
@@ -893,9 +895,7 @@ async fn run_agent_session(
             tracing::warn!(%agent_id, error = %e, "failed to update node hardware snapshot");
         }
     }
-
     tracing::info!(%agent_id, %version, device_name = ?device_name, "agent registered");
-
     let session_id = Uuid::new_v4().to_string();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();

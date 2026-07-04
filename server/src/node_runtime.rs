@@ -2,7 +2,7 @@ use anyhow::Result;
 use homecli_proto::{
     ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     homecli_agent::AgentSummary, node_registry::NodeSummary, store::NodeCredential, types::AppState,
@@ -14,6 +14,7 @@ pub struct NodeRuntime {
     pub owner_user_id: String,
     pub label: String,
     pub device_name: Option<String>,
+    pub install_id: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
     pub dev_runtime: Option<NodeDevRuntimeProfile>,
@@ -94,13 +95,8 @@ pub async fn user_node_runtimes(state: &AppState, user_id: &str) -> Result<Vec<N
         ));
     }
 
-    nodes.sort_by(|left, right| {
-        right
-            .online
-            .cmp(&left.online)
-            .then(right.project_count.cmp(&left.project_count))
-            .then_with(|| left.display_name.cmp(&right.display_name))
-    });
+    let mut nodes = dedupe_node_runtimes(nodes);
+    nodes.sort_by(preferred_node_order);
     Ok(nodes)
 }
 
@@ -156,6 +152,9 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
         credential
             .as_ref()
             .and_then(|credential| credential.device_name.as_deref()),
+        credential
+            .as_ref()
+            .and_then(|credential| credential.install_id.as_deref()),
         credential
             .as_ref()
             .map(|credential| credential.created_at.clone())
@@ -217,6 +216,7 @@ fn build_runtime(
         owner_user_id,
         label,
         credential.and_then(|credential| credential.device_name.as_deref()),
+        credential.and_then(|credential| credential.install_id.as_deref()),
         created_at,
         registry,
         cli,
@@ -229,6 +229,7 @@ fn build_runtime_for_parts(
     owner_user_id: String,
     label: String,
     credential_device_name: Option<&str>,
+    credential_install_id: Option<&str>,
     created_at: String,
     registry: Option<&NodeSummary>,
     cli: Option<&AgentSummary>,
@@ -239,6 +240,7 @@ fn build_runtime_for_parts(
         .and_then(|node| clean_string(node.device_name.as_deref()))
         .or_else(|| cli.and_then(|agent| clean_string(agent.device_name.as_deref())))
         .or_else(|| clean_string(credential_device_name));
+    let install_id = clean_string(credential_install_id);
     let display_label = if label == node_id { "" } else { &label };
     let display_name = display_node_name(display_label, device_name.as_deref(), &short_id);
     let models = registry.map(|node| node.models.clone()).unwrap_or_default();
@@ -262,6 +264,7 @@ fn build_runtime_for_parts(
         owner_user_id,
         label,
         device_name,
+        install_id,
         hardware,
         storage,
         dev_runtime,
@@ -281,6 +284,61 @@ fn build_runtime_for_parts(
         cli_connected,
         project_count,
     }
+}
+
+fn preferred_node_order(left: &NodeRuntime, right: &NodeRuntime) -> std::cmp::Ordering {
+    right
+        .online
+        .cmp(&left.online)
+        .then(right.project_count.cmp(&left.project_count))
+        .then(right.connected_at.cmp(&left.connected_at))
+        .then(right.created_at.cmp(&left.created_at))
+        .then_with(|| left.display_name.cmp(&right.display_name))
+}
+
+fn dedupe_node_runtimes(mut nodes: Vec<NodeRuntime>) -> Vec<NodeRuntime> {
+    nodes.sort_by(preferred_node_order);
+    let mut seen = HashSet::new();
+    let mut result = Vec::with_capacity(nodes.len());
+    for node in nodes {
+        if let Some(key) = node_dedupe_key(&node) {
+            let first_for_device = seen.insert(key);
+            if !first_for_device && node.project_count == 0 {
+                continue;
+            }
+        }
+        result.push(node);
+    }
+    result
+}
+
+fn node_dedupe_key(node: &NodeRuntime) -> Option<String> {
+    if let Some(install_id) = clean_string(node.install_id.as_deref()) {
+        return Some(format!("install:{}", normalize_dedupe_key(&install_id)));
+    }
+    if let Some(device_name) = clean_string(node.device_name.as_deref()) {
+        return Some(format!(
+            "legacy-device:{}",
+            normalize_dedupe_key(&device_name)
+        ));
+    }
+    if !node.online {
+        if let Some(display_name) = clean_string(Some(&node.display_name)) {
+            return Some(format!(
+                "legacy-label:{}",
+                normalize_dedupe_key(&display_name)
+            ));
+        }
+    }
+    None
+}
+
+fn normalize_dedupe_key(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 fn user_project_counts_by_node(state: &AppState, user_id: &str) -> HashMap<String, i64> {
@@ -303,6 +361,62 @@ fn user_project_counts_by_node(state: &AppState, user_id: &str) -> HashMap<Strin
 mod tests {
     use super::*;
 
+    fn runtime(
+        node_id: &str,
+        device_name: Option<&str>,
+        install_id: Option<&str>,
+        online: bool,
+        project_count: i64,
+        connected_at: u64,
+    ) -> NodeRuntime {
+        NodeRuntime {
+            node_id: node_id.to_string(),
+            owner_user_id: "usr_test".to_string(),
+            label: String::new(),
+            device_name: device_name.map(ToOwned::to_owned),
+            install_id: install_id.map(ToOwned::to_owned),
+            hardware: None,
+            storage: None,
+            dev_runtime: None,
+            display_name: device_name.unwrap_or(node_id).to_string(),
+            short_id: node_id.to_string(),
+            models: Vec::new(),
+            allowed_clis: Vec::new(),
+            allowed_cwds: Vec::new(),
+            connected_at,
+            created_at: format!("2026-07-05T00:00:{connected_at:02}Z"),
+            online,
+            registry_online: online,
+            cli_connected: false,
+            project_count,
+        }
+    }
+
+    #[test]
+    fn dedupe_prefers_online_node_for_same_install_id() {
+        let nodes = dedupe_node_runtimes(vec![
+            runtime("node-old", Some("ELONQIAN"), Some("ins_same"), false, 0, 1),
+            runtime("node-live", Some("ELONQIAN"), Some("ins_same"), true, 0, 2),
+        ]);
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].node_id, "node-live");
+    }
+
+    #[test]
+    fn dedupe_keeps_project_bound_legacy_node() {
+        let nodes = dedupe_node_runtimes(vec![
+            runtime("node-live", Some("ELONQIAN"), None, true, 0, 2),
+            runtime("node-project", Some("ELONQIAN"), None, false, 1, 1),
+            runtime("node-stale", Some("ELONQIAN"), None, false, 0, 0),
+        ]);
+        let ids = nodes
+            .into_iter()
+            .map(|node| node.node_id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(ids, vec!["node-live", "node-project"]);
+    }
     #[test]
     fn project_cli_support_accepts_codex_or_copilot_case_insensitive() {
         assert!(supports_project_cli(&["Codex".to_string()]));
@@ -343,6 +457,7 @@ mod tests {
             owner_user_id: "user-a".to_string(),
             label: "PC-A".to_string(),
             device_name: Some("PC-A".to_string()),
+            install_id: None,
             hardware: None,
             storage: None,
             dev_runtime: None,

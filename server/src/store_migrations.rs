@@ -107,6 +107,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (83, "releases", crate::project_release_migration::migration_v83),
     (84, "新用户默认免费额度提升到 30000 分", crate::billing_trial_credit_migration::migration_v84),
     (85, "token 用量资源来源与自有 Codex 免扣费标记", crate::billing_usage_source_migration::migration_v85),
+    (86, "PC 节点安装实例幂等注册", crate::node_install_id_migration::migration_v86),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2891,7 +2892,6 @@ fn migration_v82(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "project_members", "admin_note", "admin_note TEXT")?;
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

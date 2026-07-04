@@ -141,6 +141,7 @@ async fn run_relay_session(
         allowed_cwds: vec![],
         owner_user_id: None,
         device_name: local_device_name(),
+        install_id: None,
         hardware: Some(crate::node_hardware_probe::collect_hardware_profile()),
         storage: None,
         dev_runtime: None,
