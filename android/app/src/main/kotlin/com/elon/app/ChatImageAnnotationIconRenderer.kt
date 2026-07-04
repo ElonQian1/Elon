@@ -41,10 +41,14 @@ internal class ChatImageAnnotationIconRenderer {
         val side = minOf(iconRect.width(), iconRect.height())
         if (side <= 0f) return
 
-        val diameter = side * if (label.length >= 3) 0.48f else 0.43f
+        val diameter = side * when (label.length) {
+            1 -> 0.30f
+            2 -> 0.36f
+            else -> 0.38f
+        }
         val radius = diameter / 2f
-        val centerX = iconRect.right - radius
-        val centerY = iconRect.bottom - radius
+        val centerX = iconRect.left + iconRect.width() * 0.72f
+        val centerY = iconRect.top + iconRect.height() * 0.48f
         val badgeAlpha = (255 * alphaScale).toInt().coerceIn(0, 255)
         if (badgeAlpha <= 0) return
 
@@ -54,8 +58,8 @@ internal class ChatImageAnnotationIconRenderer {
         badgePaint.alpha = badgeAlpha
         badgeTextPaint.alpha = badgeAlpha
         badgeTextPaint.textSize = diameter * when (label.length) {
-            1 -> 0.66f
-            2 -> 0.56f
+            1 -> 0.64f
+            2 -> 0.52f
             else -> 0.40f
         }
 
