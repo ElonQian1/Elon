@@ -72,6 +72,13 @@ function Find-LatestApk {
   $roots = @(
     (Join-Path (Get-Location) 'app\build\outputs\apk'),
     (Join-Path (Get-Location) 'android\app\build\outputs\apk'),
+    (Join-Path (Get-Location) 'dist'),
+    (Join-Path (Get-Location) 'release'),
+    (Join-Path (Get-Location) 'releases'),
+    (Join-Path (Get-Location) 'output'),
+    (Join-Path (Get-Location) 'outputs'),
+    (Join-Path (Get-Location) 'apk'),
+    (Join-Path (Get-Location) 'apks'),
     (Join-Path (Get-Location) 'build'),
     (Join-Path (Get-Location) 'artifacts')
   )
@@ -294,6 +301,31 @@ function Invoke-GitQuiet {
   }
 }
 
+function Invoke-NativeToLog {
+  param([string]$ExePath, [string[]]$NativeArgs, [string]$LogPath)
+  $oldPreference = $ErrorActionPreference
+  $hadNativePreference = Test-Path Variable:\PSNativeCommandUseErrorActionPreference
+  if ($hadNativePreference) {
+    $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+  }
+  $ErrorActionPreference = 'Continue'
+  try {
+    & $ExePath @NativeArgs *> $LogPath
+    return $LASTEXITCODE
+  } catch {
+    try {
+      ($_ | Out-String) | Add-Content -LiteralPath $LogPath -Encoding UTF8
+    } catch {}
+    return 1
+  } finally {
+    $ErrorActionPreference = $oldPreference
+    if ($hadNativePreference) {
+      $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+    }
+  }
+}
+
 function Commit-BootstrapIfGit {
   if (-not $script:BootstrapTouched) { return }
   try {
@@ -342,8 +374,7 @@ function Invoke-AndroidDebugBuild {
       return
     }
     $log = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-gradle-build-' + [Guid]::NewGuid().ToString('N') + '.log')
-    & $file @args *> $log
-    $code = $LASTEXITCODE
+    $code = Invoke-NativeToLog -ExePath $file -NativeArgs $args -LogPath $log
     if ($code -ne 0) {
       $tail = if (Test-Path -LiteralPath $log) { (Get-Content -LiteralPath $log -Tail 80 -ErrorAction SilentlyContinue) -join "`n" } else { '' }
       throw "Android debug build failed with exit code $code`n$tail"
@@ -353,8 +384,8 @@ function Invoke-AndroidDebugBuild {
   }
 }
 
-$apk = if ($BuildIfMissing) { $null } else { Find-LatestApk }
-if ($BuildIfMissing) {
+$apk = Find-LatestApk
+if ((-not $apk) -and $BuildIfMissing) {
   Write-Output 'ELON_APK_BUILD_ATTEMPT_BEGIN'
   Invoke-AndroidDebugBuild
   Write-Output 'ELON_APK_BUILD_ATTEMPT_END'
@@ -381,10 +412,13 @@ mod tests {
     fn apk_sync_script_can_enable_build_fallback() {
         let script = pc_apk_sync_script(None, true);
         assert!(script.contains("$BuildIfMissing = $true"));
-        assert!(script.contains("$apk = if ($BuildIfMissing) { $null } else { Find-LatestApk }"));
+        assert!(script.contains("$apk = Find-LatestApk"));
+        assert!(script.contains("(-not $apk) -and $BuildIfMissing"));
         assert!(script.contains("$chunkSize = 65536"));
+        assert!(script.contains("(Join-Path (Get-Location) 'dist')"));
         assert!(script.contains("Ensure-AndroidBuildBootstrap"));
         assert!(script.contains("Invoke-GitQuiet"));
+        assert!(script.contains("Invoke-NativeToLog"));
         assert!(script.contains("ELON_APK_BOOTSTRAP_COMMIT_SKIPPED"));
         assert!(script.contains("gradle-wrapper.jar"));
     }
