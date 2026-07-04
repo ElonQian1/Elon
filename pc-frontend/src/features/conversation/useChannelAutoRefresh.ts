@@ -6,8 +6,10 @@
  */
 import { useEffect } from 'react'
 import { useProjectStore } from './useProjectStore'
+import { hasRunningTask } from './messageFlow'
 
 const REFRESH_DEBOUNCE_MS = 160
+const RUNNING_POLL_MS = 1800
 
 interface ProjectMessageUpdatedEvent extends CustomEvent {
   detail: {
@@ -27,6 +29,9 @@ interface GroupAiMatterEvent extends CustomEvent {
 }
 
 export function useChannelAutoRefresh() {
+  const messages = useProjectStore((state) => state.messages)
+  const running = hasRunningTask(messages)
+
   useEffect(() => {
     let refreshTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -37,12 +42,16 @@ export function useChannelAutoRefresh() {
       }
     }
 
+    function refreshActiveChannel() {
+      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
+      if (!activeProjectId || !activeChannelId) return
+      loadMessages(activeProjectId, activeChannelId).catch(() => {})
+    }
+
     function scheduleChannelRefresh(delay = REFRESH_DEBOUNCE_MS) {
       clearRefreshTimer()
       refreshTimer = setTimeout(() => {
-        const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
-        if (!activeProjectId || !activeChannelId) return
-        loadMessages(activeProjectId, activeChannelId).catch(() => {})
+        refreshActiveChannel()
       }, delay)
     }
 
@@ -78,6 +87,31 @@ export function useChannelAutoRefresh() {
       window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated as EventListener)
       window.removeEventListener('elon:project-task-done', onTaskDone as EventListener)
       window.removeEventListener('elon:project-ai-matter-event', onGroupAiMatterEvent as EventListener)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!running) return
+    const timer = window.setInterval(() => {
+      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
+      if (!activeProjectId || !activeChannelId) return
+      loadMessages(activeProjectId, activeChannelId).catch(() => {})
+    }, RUNNING_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [running])
+
+  useEffect(() => {
+    function refreshVisiblePage() {
+      if (document.visibilityState === 'hidden') return
+      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
+      if (!activeProjectId || !activeChannelId) return
+      loadMessages(activeProjectId, activeChannelId).catch(() => {})
+    }
+    window.addEventListener('focus', refreshVisiblePage)
+    document.addEventListener('visibilitychange', refreshVisiblePage)
+    return () => {
+      window.removeEventListener('focus', refreshVisiblePage)
+      document.removeEventListener('visibilitychange', refreshVisiblePage)
     }
   }, [])
 }

@@ -54,6 +54,10 @@ try {
     normalizeLocalWorkspacePath,
     requiresLocalFullAccessGrant,
   } = require(path.join(pcRoot, 'src', 'features', 'conversation', 'localPcRuntime.ts'));
+  const {
+    messageFingerprint,
+    sameMessageList,
+  } = require(path.join(pcRoot, 'src', 'features', 'conversation', 'messageListCompare.ts'));
 
   assert.strictEqual(normalizeLocalWorkspacePath('E:/一龙项目/'), 'e:\\一龙项目', 'workspace path comparison should ignore slash style and case');
   assert.strictEqual(requiresLocalFullAccessGrant('project_write', true), false, 'project-write mode should not request a local full-access grant');
@@ -102,6 +106,28 @@ try {
     workspace_path: 'E:\\一龙项目',
     confirm_full_access: true,
   }, 'grant request should carry the exact project, path, and explicit confirmation');
+
+  assert.strictEqual(
+    sameMessageList(
+      [{ id: 'same-id', kind: 'ai_progress', task_id: 'tsk-1', task_status: 'running', content: '等待' }],
+      [{ id: 'same-id', kind: 'ai_progress', task_id: 'tsk-1', task_status: 'done', content: '等待' }],
+    ),
+    false,
+    'same id with changed task status must trigger a React state update',
+  );
+  assert.strictEqual(
+    sameMessageList(
+      [{ id: 'same-id', role: 'assistant', content: '旧回复', sender_avatar_data_url: 'old' }],
+      [{ id: 'same-id', role: 'assistant', content: '新回复', sender_avatar_data_url: 'old' }],
+    ),
+    false,
+    'same id with changed assistant content must refresh the visible bubble',
+  );
+  assert.notStrictEqual(
+    messageFingerprint({ id: 'avatar-msg', role: 'user', content: '你好', sender_avatar_data_url: 'old' }),
+    messageFingerprint({ id: 'avatar-msg', role: 'user', content: '你好', sender_avatar_data_url: 'new' }),
+    'avatar changes should invalidate memoized message rows',
+  );
 
   const taskMessages = [
     { id: 'pcm-task', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },

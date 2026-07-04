@@ -17,6 +17,7 @@ import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
 import ComposerRuntimeToggles from './ComposerRuntimeToggles'
 import LocalNodeProjectNotice from './LocalNodeProjectNotice'
+import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import ConversationMemberSidebar from './ConversationMemberSidebar'
 import type { MemberPanelScope } from './ConversationMemberSidebar'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
@@ -54,6 +55,7 @@ import {
   containsTaskProcess,
   hasRunningTaskAwaitingVisibleReply,
 } from './messageFlow'
+import { sameMessageList } from './messageListCompare'
 import {
   listMemberConversationMessages,
   listMemberConversations,
@@ -94,14 +96,6 @@ import { MemberDirectoryDrawer } from './MemberDirectoryDrawer'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
-
-interface ProjectRealtimeDetail {
-  projectId?: string
-  channelId?: string
-  conversationId?: string
-  taskId?: string
-  kind?: string
-}
 
 interface ConversationMessageCacheEntry {
   messages: Message[]
@@ -791,6 +785,20 @@ export default function ConversationPage() {
     && sessionView !== 'new'
     && (convLoading || (messagesLoading && displayMessages.length === 0))
 
+  useConversationRealtimeRefresh({
+    activeProjectId,
+    activeConversationTargetId,
+    sessionView,
+    aiDevelopmentChannelId,
+    activeChannelId,
+    displayMessages,
+    loadTaskMessages: loadCachedTaskMessages,
+    writeConversationCache,
+    setConvMessages,
+    setSessionTaskMessages,
+    setMemberConversations,
+  })
+
   // sessionView='new' 时，一旦会话列表出现新会话，自动切入
   useEffect(() => {
     if (!waitingForNewSession.current) return
@@ -916,72 +924,6 @@ export default function ConversationPage() {
     )
     await refreshTaskSurface()
   }
-
-  useEffect(() => {
-    if (!activeProjectId || !activeConversationTargetId || !sessionView || sessionView === 'new') return
-    let canceled = false
-    let refreshTimer: number | undefined
-
-    function clearRefreshTimer() {
-      if (refreshTimer) {
-        window.clearTimeout(refreshTimer)
-        refreshTimer = undefined
-      }
-    }
-
-    async function refreshConversation() {
-      try {
-        const [nextMessages, taskMessages] = await Promise.all([
-          listMemberConversationMessages(
-            activeProjectId,
-            activeConversationTargetId,
-            String(sessionView),
-          ),
-          loadCachedTaskMessages(activeProjectId, aiDevelopmentChannelId, true),
-        ])
-        if (canceled) return
-        const conversationMessages = nextMessages as Message[]
-        writeConversationCache(activeProjectId, activeConversationTargetId, String(sessionView), conversationMessages, taskMessages)
-        setConvMessages((prev) => sameMessageList(prev, conversationMessages) ? prev : conversationMessages)
-        setSessionTaskMessages((prev) => sameMessageList(prev, taskMessages) ? prev : taskMessages)
-        listMemberConversations(activeProjectId, activeConversationTargetId)
-          .then((items) => { if (!canceled) setMemberConversations(items) })
-          .catch(() => {})
-      } catch (err) {
-        console.warn('[ConvMessages] refresh failed:', err)
-      }
-    }
-
-    function scheduleConversationRefresh(delay = 160) {
-      clearRefreshTimer()
-      refreshTimer = window.setTimeout(refreshConversation, delay)
-    }
-
-    function matchesCurrentConversation(detail: ProjectRealtimeDetail | undefined) {
-      if (!detail) return false
-      if (detail.projectId && detail.projectId !== activeProjectId) return false
-      return detail.conversationId === sessionView
-    }
-
-    function onProjectMessageUpdated(e: Event) {
-      const detail = (e as CustomEvent<ProjectRealtimeDetail>).detail
-      if (matchesCurrentConversation(detail)) scheduleConversationRefresh()
-    }
-
-    function onProjectTaskDone(e: Event) {
-      const detail = (e as CustomEvent<ProjectRealtimeDetail>).detail
-      if (matchesCurrentConversation(detail)) scheduleConversationRefresh(0)
-    }
-
-    window.addEventListener('elon:project-message-updated', onProjectMessageUpdated)
-    window.addEventListener('elon:project-task-done', onProjectTaskDone)
-    return () => {
-      canceled = true
-      clearRefreshTimer()
-      window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated)
-      window.removeEventListener('elon:project-task-done', onProjectTaskDone)
-    }
-  }, [activeProjectId, activeConversationTargetId, sessionView, aiDevelopmentChannelId, loadCachedTaskMessages, writeConversationCache])
 
   function startNewSession() {
     if (!isOwnConversationTarget) {
@@ -1761,25 +1703,4 @@ function taskMessageCacheKey(projectId: string, channelId: string): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
-}
-
-function sameMessageList(left: Message[], right: Message[]): boolean {
-  if (left === right) return true
-  if (left.length !== right.length) return false
-  for (let index = 0; index < left.length; index += 1) {
-    if (messageFingerprint(left[index]) !== messageFingerprint(right[index])) return false
-  }
-  return true
-}
-
-function messageFingerprint(message: Message | undefined): string {
-  if (!message) return ''
-  return [
-    clean(message.id),
-    clean(message.kind ?? message.role ?? (message as Record<string, unknown>).message_kind ?? ''),
-    clean(message.task_id ?? message.taskId ?? ''),
-    clean(message.task_status ?? message.taskStatus ?? ''),
-    clean(message.created_at),
-    clean(message.content ?? message.text ?? ''),
-  ].join('|')
 }
