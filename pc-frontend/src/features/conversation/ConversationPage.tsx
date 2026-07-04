@@ -19,6 +19,7 @@ import ConversationFeed from './ConversationFeed'
 import ComposerRuntimeToggles from './ComposerRuntimeToggles'
 import LocalNodeProjectNotice from './LocalNodeProjectNotice'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
+import { useConversationAutoScroll } from './useConversationAutoScroll'
 import ConversationMemberSidebar from './ConversationMemberSidebar'
 import type { MemberPanelScope } from './ConversationMemberSidebar'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
@@ -169,13 +170,9 @@ export default function ConversationPage() {
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
   const [inviteStatus, setInviteStatus] = useState('')
   const [channelSearch, setChannelSearch] = useState('')
-  const [showNewMsg, setShowNewMsg] = useState(false)
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([])   // P1.4   // P1.3：新消息提示
-  const feedRef = useRef<HTMLDivElement>(null)
-  const scrollFrameRef = useRef<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
-  const atBottomRef = useRef(true)   // P1.3：用户是否在底部
   // 会话视图模式：null=默认(全部) / 'new'=新建空会话 / string=会话 ID
   const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
   const prevSessionIdsRef = useRef<Set<string>>(new Set())
@@ -206,6 +203,21 @@ export default function ConversationPage() {
     setMyPresence(presence)
     await reloadProjectSpace()
   }, [reloadProjectSpace])
+
+  const {
+    feedRef,
+    handleFeedScroll,
+    requestFeedAutoFollow,
+    scrollToBottom,
+    showNewMsg,
+  } = useConversationAutoScroll({
+    messages,
+    convMessages,
+    sessionTaskMessages,
+    sessionView,
+    sendingMessage,
+    sendingMemberDiscussion,
+  })
 
   useEffect(() => { loadProjects() }, [user?.id])
 
@@ -307,6 +319,7 @@ export default function ConversationPage() {
 
   // 项目切换时清空会话消息
   useEffect(() => {
+    requestFeedAutoFollow()
     conversationLoadSeqRef.current += 1
     conversationMessageCacheRef.current.clear()
     taskMessageCacheRef.current.clear()
@@ -315,7 +328,7 @@ export default function ConversationPage() {
     setSessionView(null)
     setMemberConversationTarget(null)
     waitingForNewSession.current = false
-  }, [activeProjectId, projectHomeVersion])
+  }, [activeProjectId, projectHomeVersion, requestFeedAutoFollow])
 
   useEffect(() => {
     setSelectedMember(null)
@@ -352,12 +365,13 @@ export default function ConversationPage() {
   }, [members, memberMenu])
 
   useEffect(() => {
+    requestFeedAutoFollow()
     conversationLoadSeqRef.current += 1
     setSessionView(null)
     setConvMessages([])
     setSessionTaskMessages([])
     waitingForNewSession.current = false
-  }, [activeConversationTargetId])
+  }, [activeConversationTargetId, requestFeedAutoFollow])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -375,47 +389,6 @@ export default function ConversationPage() {
         setInviteStatus(err.message ?? '邀请链接不可用')
       })
   }, [])
-
-  // P1.3：智能滚动——延后一帧读写 scrollHeight，避免切换会话时同步强制布局。
-  useEffect(() => {
-    if (scrollFrameRef.current) {
-      window.cancelAnimationFrame(scrollFrameRef.current)
-      scrollFrameRef.current = null
-    }
-    scrollFrameRef.current = window.requestAnimationFrame(() => {
-      scrollFrameRef.current = null
-      const el = feedRef.current
-      if (!el) return
-      if (atBottomRef.current) {
-        el.scrollTop = el.scrollHeight
-        setShowNewMsg((visible) => visible ? false : visible)
-      } else {
-        setShowNewMsg((visible) => visible || true)
-      }
-    })
-    return () => {
-      if (scrollFrameRef.current) {
-        window.cancelAnimationFrame(scrollFrameRef.current)
-        scrollFrameRef.current = null
-      }
-    }
-  }, [messages, convMessages, sessionTaskMessages, sessionView])
-
-  // P1.3：检测用户是否滚到底部
-  function handleFeedScroll() {
-    const el = feedRef.current
-    if (!el) return
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-    if (atBottomRef.current) setShowNewMsg(false)
-  }
-
-  function scrollToBottom() {
-    const el = feedRef.current
-    if (!el) return
-    el.scrollTop = el.scrollHeight
-    atBottomRef.current = true
-    setShowNewMsg(false)
-  }
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current
@@ -454,6 +427,7 @@ export default function ConversationPage() {
       ? text + attachmentsToMarkdown(attachments)
       : text
     try {
+      requestFeedAutoFollow()
       if (isMemberDiscussion) {
         clearComposerDraft()
         setSendingMemberDiscussion(true)
@@ -808,12 +782,13 @@ export default function ConversationPage() {
 
   // 切换频道时重置会话视图
   useEffect(() => {
+    requestFeedAutoFollow()
     conversationLoadSeqRef.current += 1
     setSessionView(null)
     setConvMessages([])
     setSessionTaskMessages([])
     waitingForNewSession.current = false
-  }, [activeChannelId])
+  }, [activeChannelId, requestFeedAutoFollow])
 
   // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
   async function openConversation(convId: string, options: { force?: boolean } = {}) {
@@ -827,6 +802,7 @@ export default function ConversationPage() {
     const requestSeq = conversationLoadSeqRef.current + 1
     conversationLoadSeqRef.current = requestSeq
 
+    requestFeedAutoFollow()
     setSessionView(convId)
     if (cached) {
       setConvMessages(cached.messages)
