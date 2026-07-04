@@ -13,6 +13,7 @@ import { ModelPickerPopover } from '../models/ModelPicker'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
+import ChannelNavList from './ChannelNavList'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
 import ComposerRuntimeToggles from './ComposerRuntimeToggles'
@@ -1112,33 +1113,11 @@ export default function ConversationPage() {
           {activeProjectId ? (
             /* —— Discord 式：只显当前项目的频道 + 会话列表 —— */
             <>
-              {filteredChannels.length === 0 ? (
-                <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
-                  还没有频道
-                </div>
-              ) : (
-                filteredChannels.map((c) => {
-                  const isDev = c.kind === 'ai_development'
-                  return (
-                    <button
-                      key={c.id}
-                      className={[
-                        styles.channelItem,
-                        isDev ? styles.devChannel : '',
-                        c.id === activeChannelId ? styles.channelActive : '',
-                      ].join(' ')}
-                      onClick={() => selectChannel(c.id)}
-                      type="button"
-                    >
-                      <span className={styles.channelGlyph}>{isDev ? '🛠' : '#'}</span>
-                      <span className={styles.channelMain}>
-                        <strong>{c.name}</strong>
-                        {c.description && <span>{c.description}</span>}
-                      </span>
-                    </button>
-                  )
-                })
-              )}
+              <ChannelNavList
+                channels={filteredChannels}
+                activeChannelId={activeChannelId}
+                onSelectChannel={selectChannel}
+              />
 
               {activeConversationTarget && (
                 <MemberConversationList

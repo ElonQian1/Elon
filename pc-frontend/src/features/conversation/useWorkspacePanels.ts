@@ -14,13 +14,13 @@ interface StoredWorkspacePanelState extends Partial<WorkspacePanelState> {
   version?: number
 }
 
-const STORAGE_KEY = 'elon.pc.workspacePanels.v1'
+const STORAGE_KEY = 'elon.pc.workspacePanels.v2'
 const COMPACT_RIGHT_PANEL_BREAKPOINT = 1440
 const COLLAPSED_CHANNEL_WIDTH = 44
 
-const CHANNEL_MIN = 196
-const CHANNEL_MAX = 340
-const CHANNEL_DEFAULT = 248
+const CHANNEL_MIN = 220
+const CHANNEL_MAX = 360
+const CHANNEL_DEFAULT = 272
 const MEMBER_MIN = 260
 const MEMBER_MAX = 420
 const MEMBER_DEFAULT = 300
