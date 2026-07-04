@@ -30,6 +30,55 @@
   background: rgba(88, 101, 242, .12);
 }
 
+.fold {
+  margin: 0 0 7px 28px;
+  border: 1px solid rgba(148, 163, 184, .10);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .018);
+}
+
+.fold[open] {
+  background: rgba(255, 255, 255, .024);
+}
+
+.fold summary {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 10px;
+  color: #9aa8bd;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  user-select: none;
+}
+
+.fold summary::marker {
+  color: #718096;
+}
+
+.fold summary em {
+  color: #7d899c;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.foldBody {
+  padding: 0 10px 7px;
+}
+
+.foldBody .coverage,
+.foldBody .stageCard,
+.foldBody .diagnostic {
+  margin-left: 0;
+}
+
+.foldBody .coverage {
+  padding: 3px 0 4px;
+}
+
 .stageCard {
   display: grid;
   gap: 5px;

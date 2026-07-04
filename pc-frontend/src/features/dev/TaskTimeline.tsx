@@ -10,6 +10,7 @@ import {
   ListChecks,
   Terminal,
 } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { DevTaskMessage } from './DevTaskCard'
 import type { ProcessCard } from './taskProcessCardModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
@@ -27,15 +28,14 @@ interface TaskTimelineProps {
 
 export default function TaskTimeline({ model, taskContext, onCancel, onApprove }: TaskTimelineProps) {
   if (model.items.length === 0) return null
+  const grouped = groupTimelineItems(model.items)
+  const showStageAtTop = model.stage.key !== 'finished' || model.stage.stuck
+  const statusCount = (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
 
   return (
     <div className={styles.timeline}>
-      <CoverageStrip model={model} />
-      <StageCard stage={model.stage} />
-      {model.diagnostics.map((diagnostic, index) => (
-        <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
-      ))}
-      {model.items.map((item) => (
+      {showStageAtTop && <StageCard stage={model.stage} />}
+      {grouped.primary.map((item) => (
         <TimelineRow
           key={item.id}
           item={item}
@@ -44,8 +44,84 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
           onApprove={onApprove}
         />
       ))}
+      <TimelineFold title="连接与等待" count={grouped.connection.length} defaultOpen={!model.coverage.finalReply && grouped.primary.length === 0}>
+        {grouped.connection.map((item) => (
+          <TimelineRow
+            key={item.id}
+            item={item}
+            taskContext={taskContext}
+            onCancel={onCancel}
+            onApprove={onApprove}
+          />
+        ))}
+      </TimelineFold>
+      <TimelineFold title="状态诊断" count={statusCount} defaultOpen={model.stage.stuck}>
+        {!showStageAtTop && <StageCard stage={model.stage} />}
+        {model.diagnostics.map((diagnostic, index) => (
+          <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
+        ))}
+        <CoverageStrip model={model} />
+      </TimelineFold>
+      <TimelineFold title="用量与摘要" count={grouped.summary.length}>
+        {grouped.summary.map((item) => (
+          <TimelineRow
+            key={item.id}
+            item={item}
+            taskContext={taskContext}
+            onCancel={onCancel}
+            onApprove={onApprove}
+          />
+        ))}
+      </TimelineFold>
     </div>
   )
+}
+
+function TimelineFold({ title, count, defaultOpen = false, children }: {
+  title: string
+  count: number
+  defaultOpen?: boolean
+  children: ReactNode
+}) {
+  if (count <= 0) return null
+  return (
+    <details className={styles.fold} open={defaultOpen}>
+      <summary>
+        <span>{title}</span>
+        <em>{count} 项</em>
+      </summary>
+      <div className={styles.foldBody}>{children}</div>
+    </details>
+  )
+}
+
+function groupTimelineItems(items: TimelineItem[]) {
+  const grouped: { primary: TimelineItem[]; connection: TimelineItem[]; summary: TimelineItem[] } = {
+    primary: [],
+    connection: [],
+    summary: [],
+  }
+  for (const item of items) {
+    if (isConnectionItem(item)) grouped.connection.push(item)
+    else if (isSummaryItem(item)) grouped.summary.push(item)
+    else grouped.primary.push(item)
+  }
+  return grouped
+}
+
+function isConnectionItem(item: TimelineItem) {
+  if (item.kind === 'node' || item.kind === 'heartbeat') return true
+  if (item.event?.type === 'pc_dispatch_started') return true
+  const phase = String(item.event?.phase ?? '')
+  const text = [item.title, item.detail, item.meta, phase].filter(Boolean).join(' ')
+  if (/^(Codex|Claude|Copilot|Gemini|AI CLI)$/i.test(text.trim())) return true
+  return /(执行权|会话隔离|PC 节点|pc 节点|绑定的 PC|正在直连|正在连接|快速检查|巡检|派发|确认接收|等待 .*CLI|正在处理中|重连)/i.test(text)
+}
+
+function isSummaryItem(item: TimelineItem) {
+  if (item.event?.type === 'usage' || item.event?.type === 'runtime_summary') return true
+  const text = [item.title, item.detail].filter(Boolean).join(' ')
+  return item.kind === 'status' && item.tone !== 'failed' && /(用量统计|运行完成|任务完成)/.test(text)
 }
 
 function CoverageStrip({ model }: { model: TaskTimelineModel }) {

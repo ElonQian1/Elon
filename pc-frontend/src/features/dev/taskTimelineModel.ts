@@ -179,7 +179,7 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
   if (model.coverage.command) parts.push('有命令')
   if (model.coverage.fileChange) parts.push('有文件修改')
   if (model.coverage.testRun) parts.push('有测试/构建')
-  if (model.coverage.heartbeat && !model.coverage.command && !model.coverage.toolResult && !model.coverage.assistantEvent) {
+  if (model.coverage.heartbeat && !model.coverage.finalReply && !model.coverage.command && !model.coverage.toolResult && !model.coverage.assistantEvent) {
     parts.push('未收到 CLI 输出')
   }
   if (!model.coverage.finalReply && model.stage.summary) parts.push(model.stage.summary)
@@ -328,7 +328,7 @@ function isAssistantOutputEvent(event: ToolEvent | null): boolean {
 function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineDiagnostic[] {
   const diagnostics: TaskTimelineDiagnostic[] = []
   const { coverage } = model
-  if (coverage.heartbeat && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
+  if (coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
     diagnostics.push({
       tone: 'failed',
       title: '只收到等待状态',
@@ -359,8 +359,8 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'
   if (coverage.finalReply && !coverage.command && !coverage.fileChange && !coverage.testRun) {
     diagnostics.push({
       tone: 'muted',
-      title: '本轮像普通问答',
-      detail: '最终回复已出现，但没有命令、文件修改或测试事件。普通问答这是正常的；涉及项目修改时应继续检查本机 CLI 是否真的执行了公开过程。'
+      title: '本轮无公开工具过程',
+      detail: '最终回复已出现，但没有命令、文件修改或测试事件。需要改项目时，应继续检查是否真的产生了命令、文件或测试过程。'
     })
   }
   return diagnostics
@@ -388,7 +388,7 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
       label: '最终回复已生成',
       detail: model.coverage.command || model.coverage.toolResult
         ? '公开过程已经结束，最终回复在下方突出展示。'
-        : '本轮已产生最终回复；如果这是普通问答，没有命令或文件修改是正常的。',
+        : '本轮已产生最终回复；未收到公开命令、文件修改或测试过程。',
       summary: '已出最终回复',
       stuck: false,
     }
