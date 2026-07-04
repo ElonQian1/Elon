@@ -111,7 +111,6 @@ export function AttachmentButton({ disabled, uploading, onFilesSelected }: Props
         ref={inputRef}
         type="file"
         className={styles.hiddenInput}
-        accept="image/*,.pdf,.txt,.md,.json,.csv,.zip"
         multiple
         onChange={handleFileChange}
         disabled={disabled || uploading}

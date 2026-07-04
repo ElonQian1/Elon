@@ -68,33 +68,34 @@ export function useComposerAttachments({
     }
   }, [activeProjectId, attachmentConversationId, attachmentUploading, attachments.length, composerDisabled])
 
-  function handleComposerPaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+  function handleComposerPaste(e: ClipboardEvent<HTMLElement>) {
+    if (e.defaultPrevented) return
     const files = Array.from(e.clipboardData.files ?? [])
     if (files.length === 0) return
     e.preventDefault()
     uploadComposerFiles(files).catch(() => {})
   }
 
-  function handleComposerDragEnter(e: DragEvent<HTMLFormElement>) {
+  function handleComposerDragEnter(e: DragEvent<HTMLElement>) {
     if (!dataTransferHasFiles(e.dataTransfer) || composerDisabled) return
     e.preventDefault()
     setAttachmentDropActive(true)
   }
 
-  function handleComposerDragOver(e: DragEvent<HTMLFormElement>) {
+  function handleComposerDragOver(e: DragEvent<HTMLElement>) {
     if (!dataTransferHasFiles(e.dataTransfer) || composerDisabled) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
     setAttachmentDropActive(true)
   }
 
-  function handleComposerDragLeave(e: DragEvent<HTMLFormElement>) {
+  function handleComposerDragLeave(e: DragEvent<HTMLElement>) {
     const nextTarget = e.relatedTarget
     if (nextTarget instanceof Node && e.currentTarget.contains(nextTarget)) return
     setAttachmentDropActive(false)
   }
 
-  function handleComposerDrop(e: DragEvent<HTMLFormElement>) {
+  function handleComposerDrop(e: DragEvent<HTMLElement>) {
     if (!dataTransferHasFiles(e.dataTransfer) || composerDisabled) return
     e.preventDefault()
     setAttachmentDropActive(false)
@@ -137,11 +138,11 @@ export function useComposerAttachments({
     clearAttachmentDraft: () => void
     restoreAttachmentDraft: (draft: RestoreAttachmentDraft) => void
     uploadComposerFiles: (files: File[] | FileList) => Promise<void>
-    handleComposerPaste: (e: ClipboardEvent<HTMLTextAreaElement>) => void
-    handleComposerDragEnter: (e: DragEvent<HTMLFormElement>) => void
-    handleComposerDragOver: (e: DragEvent<HTMLFormElement>) => void
-    handleComposerDragLeave: (e: DragEvent<HTMLFormElement>) => void
-    handleComposerDrop: (e: DragEvent<HTMLFormElement>) => void
+    handleComposerPaste: (e: ClipboardEvent<HTMLElement>) => void
+    handleComposerDragEnter: (e: DragEvent<HTMLElement>) => void
+    handleComposerDragOver: (e: DragEvent<HTMLElement>) => void
+    handleComposerDragLeave: (e: DragEvent<HTMLElement>) => void
+    handleComposerDrop: (e: DragEvent<HTMLElement>) => void
   }
 }
 

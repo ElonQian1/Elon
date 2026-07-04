@@ -1191,7 +1191,12 @@ export default function ConversationPage() {
       </aside>
 
       {/* ══ 聊天区（中 1fr）══ */}
-      <div className={styles.chatColumn}>
+      <div
+        className={styles.chatColumn}
+        data-drop-active={attachmentDropActive ? 'true' : 'false'}
+        onPaste={handleComposerPaste} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}
+      >
+        {attachmentDropActive && <div className={styles.attachmentDropOverlay}>松开添加附件</div>}
         {/* 顶栏 */}
         <header className={styles.chatTopbar}>
           <div className={styles.chatTitle}>
@@ -1338,12 +1343,7 @@ export default function ConversationPage() {
             className={styles.composerForm}
             data-drop-active={attachmentDropActive ? 'true' : 'false'}
             onSubmit={handleSend}
-            onDragEnter={handleComposerDragEnter}
-            onDragOver={handleComposerDragOver}
-            onDragLeave={handleComposerDragLeave}
-            onDrop={handleComposerDrop}
           >
-            {attachmentDropActive && <div className={styles.attachmentDropOverlay}>松开添加附件</div>}
             {/* P1.4：附件预览条 */}
             {attachments.length > 0 && (
               <div className={styles.attachmentTray}>
@@ -1392,7 +1392,6 @@ export default function ConversationPage() {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); autoResize() }}
                 onKeyDown={handleKeyDown}
-                onPaste={handleComposerPaste}
                 placeholder={
                   isAssistingMember
                     ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
