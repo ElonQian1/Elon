@@ -1114,7 +1114,7 @@ export default function ConversationPage() {
             /* —— Discord 式：只显当前项目的频道 + 会话列表 —— */
             <>
               <ChannelNavList
-                channels={filteredChannels}
+                projectId={activeProjectId} channels={filteredChannels}
                 activeChannelId={activeChannelId}
                 onSelectChannel={selectChannel}
               />
