@@ -1,5 +1,7 @@
 package com.elon.app
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Bitmap
@@ -37,7 +39,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     private var pressedIndex: Int? = null
     private var collapseOnTouchUp = false
     private var expandedIndex: Int? = null
-    private var appearingIndex: Int? = null
+    private var iconsAppearing = false
     private var appearingProgress = 1f
     private var iconAppearAnimator: ValueAnimator? = null
 
@@ -46,12 +48,11 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         imageHeight = height?.takeIf { it > 0 } ?: 0
         annotations = nextAnnotations.filter { it.hasNote() }
         expandedIndex = expandedIndex?.takeIf { it in annotations.indices }
-        appearingIndex = appearingIndex?.takeIf { it in annotations.indices }
         visibility = if (imageWidth > 0 && imageHeight > 0 && annotations.isNotEmpty()) {
             VISIBLE
         } else {
             expandedIndex = null
-            appearingIndex = null
+            iconsAppearing = false
             iconAppearAnimator?.cancel()
             GONE
         }
@@ -59,9 +60,9 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     }
 
     fun collapseExpandedAnnotation(): Boolean {
-        val index = expandedIndex ?: return false
+        if (expandedIndex == null) return false
         expandedIndex = null
-        startIconAppearAnimation(index)
+        startIconsAppearAnimation()
         invalidate()
         return true
     }
@@ -71,8 +72,8 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         val icon = fallbackIcon ?: return
         val imageRect = displayedImageRect() ?: return
         drawExpandedAnnotation(canvas, imageRect)
+        if (expandedIndex != null) return
         annotations.forEachIndexed { index, annotation ->
-            if (expandedIndex == index) return@forEachIndexed
             val iconRect = iconRectOnView(annotation, imageRect) ?: return@forEachIndexed
             drawAnnotationIcon(canvas, icon, iconRect, index)
         }
@@ -106,7 +107,8 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
                 pressedIndex = null
                 if (findAnnotationAt(event.x, event.y) == hitIndex) {
                     iconAppearAnimator?.cancel()
-                    appearingIndex = null
+                    iconsAppearing = false
+                    appearingProgress = 1f
                     expandedIndex = hitIndex
                     invalidate()
                 }
@@ -131,7 +133,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     }
 
     private fun drawAnnotationIcon(canvas: Canvas, icon: Bitmap, iconRect: RectF, index: Int) {
-        val progress = if (appearingIndex == index) appearingProgress.coerceIn(0f, 1f) else 1f
+        val progress = if (iconsAppearing) appearingProgress.coerceIn(0f, 1f) else 1f
         val scale = 0.72f + 0.28f * progress
         val drawRect = if (scale >= 0.999f) {
             iconRect
@@ -149,9 +151,9 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         )
     }
 
-    private fun startIconAppearAnimation(index: Int) {
+    private fun startIconsAppearAnimation() {
         iconAppearAnimator?.cancel()
-        appearingIndex = index
+        iconsAppearing = true
         appearingProgress = 0f
         iconAppearAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 150L
@@ -159,14 +161,23 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
                 appearingProgress = animator.animatedValue as Float
                 invalidate()
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if (iconAppearAnimator == animation) {
+                        iconsAppearing = false
+                        appearingProgress = 1f
+                        invalidate()
+                    }
+                }
+            })
             start()
         }
     }
 
     private fun findAnnotationAt(x: Float, y: Float): Int? {
         val imageRect = displayedImageRect() ?: return null
+        if (expandedIndex != null) return null
         for (index in annotations.lastIndex downTo 0) {
-            if (index == expandedIndex) continue
             val iconRect = iconRectOnView(annotations[index], imageRect) ?: continue
             val hitRect = RectF(iconRect).apply {
                 val extraX = max(0f, (dp(48).toFloat() - width()) / 2f)

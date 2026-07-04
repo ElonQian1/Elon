@@ -2,13 +2,14 @@ package com.elon.app
 
 import android.app.Activity
 import android.graphics.Color
-import android.graphics.RectF
+import android.graphics.Rect
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -25,21 +26,31 @@ internal class ChatImageAnnotationInputOverlay(
     private var panel: FrameLayout? = null
     private var input: EditText? = null
     private var currentIndex: Int? = null
-    private var currentBounds: RectF? = null
     private var currentPanelWidth = 0
+    private var keyboardTopInRoot = 0
+    private var keyboardVisible = false
+    private var layoutListenerAttached = false
+    private val windowVisibleFrame = Rect()
+    private val rootLocation = IntArray(2)
+    private val globalLayoutListener = ViewTreeObserver.OnGlobalLayoutListener {
+        updateKeyboardState()
+        if (panel?.visibility == View.VISIBLE) {
+            refreshPanelHeight()
+        }
+    }
 
     fun show(index: Int) {
-        val bounds = canvasView.annotationPanelBounds(index) ?: return
+        if (canvasView.annotationPanelBounds(index) == null) return
         if (root.width <= 0 || root.height <= 0) {
             root.post { show(index) }
             return
         }
         currentIndex = index
-        currentBounds = bounds
         val view = ensurePanel()
+        updateKeyboardState()
         input?.setText(canvasView.annotationNote(index))
         input?.setSelection(input?.text?.length ?: 0)
-        positionPanel(view, bounds)
+        positionPanel(view)
         input?.post { refreshPanelHeight() }
         view.visibility = View.VISIBLE
         view.alpha = 0f
@@ -58,6 +69,7 @@ internal class ChatImageAnnotationInputOverlay(
 
     private fun ensurePanel(): FrameLayout {
         panel?.let { return it }
+        attachLayoutListener()
         return FrameLayout(activity).apply {
             visibility = View.INVISIBLE
             background = roundedRect()
@@ -67,6 +79,12 @@ internal class ChatImageAnnotationInputOverlay(
             root.addView(this)
             panel = this
         }
+    }
+
+    private fun attachLayoutListener() {
+        if (layoutListenerAttached) return
+        root.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
+        layoutListenerAttached = true
     }
 
     private fun createInput(): EditText {
@@ -117,17 +135,26 @@ internal class ChatImageAnnotationInputOverlay(
         }
     }
 
-    private fun positionPanel(view: FrameLayout, bounds: RectF) {
-        val width = min(root.width - dp(48), max(dp(260), (bounds.width() * 0.74f).roundToInt()))
+    private fun positionPanel(view: FrameLayout) {
+        val width = min(root.width - dp(48), max(dp(280), (root.width * 0.72f).roundToInt()))
         currentPanelWidth = width
         val height = measuredPanelHeight()
-        val left = (bounds.left + (bounds.width() - width) / 2f)
-            .roundToInt()
+        val left = ((root.width - width) / 2f).roundToInt()
             .coerceIn(dp(16), max(dp(16), root.width - width - dp(16)))
-        val topLimit = max(dp(72), root.height - height - dp(180))
-        val top = (bounds.top + (bounds.height() - height) / 2f)
-            .roundToInt()
-            .coerceIn(dp(72), topLimit)
+        val usableBottom = keyboardTopForPosition()
+        val bottomGap = if (keyboardVisible) dp(52) else dp(188)
+        val minTop = dp(72)
+        val maxTop = max(minTop, usableBottom - height - dp(12))
+        val top = (usableBottom - height - bottomGap).coerceIn(minTop, maxTop)
+        val currentParams = view.layoutParams as? FrameLayout.LayoutParams
+        if (
+            currentParams?.width == width &&
+            currentParams.height == height &&
+            currentParams.leftMargin == left &&
+            currentParams.topMargin == top
+        ) {
+            return
+        }
         view.layoutParams = FrameLayout.LayoutParams(width, height).apply {
             leftMargin = left
             topMargin = top
@@ -136,10 +163,10 @@ internal class ChatImageAnnotationInputOverlay(
 
     private fun refreshPanelHeight() {
         val view = panel ?: return
-        val bounds = currentBounds ?: return
+        currentIndex ?: return
         if (currentPanelWidth <= 0) return
-        positionPanel(view, bounds)
-        view.requestLayout()
+        updateKeyboardState()
+        positionPanel(view)
     }
 
     private fun measuredPanelHeight(): Int {
@@ -148,16 +175,36 @@ internal class ChatImageAnnotationInputOverlay(
         val lineHeight = textView?.lineHeight ?: dp(22)
         val textHeight = lineCount * lineHeight
         val chromeHeight = dp(14) + dp(56)
-        val minHeight = max(dp(124), (currentBounds?.height()?.times(0.72f) ?: 0f).roundToInt())
+        val minHeight = dp(124)
         val desiredHeight = max(minHeight, textHeight + chromeHeight)
-        val availableHeight = max(dp(124), root.height - dp(96) - dp(180))
+        val bottomGap = if (keyboardVisible) dp(52) else dp(188)
+        val availableHeight = max(dp(124), keyboardTopForPosition() - dp(96) - bottomGap)
         return min(desiredHeight, availableHeight)
+    }
+
+    private fun updateKeyboardState() {
+        if (root.height <= 0) {
+            keyboardTopInRoot = 0
+            keyboardVisible = false
+            return
+        }
+        root.getWindowVisibleDisplayFrame(windowVisibleFrame)
+        root.getLocationOnScreen(rootLocation)
+        val visibleBottom = (windowVisibleFrame.bottom - rootLocation[1]).coerceIn(0, root.height)
+        val hiddenHeight = (root.height - visibleBottom).coerceAtLeast(0)
+        keyboardTopInRoot = if (visibleBottom > 0) visibleBottom else root.height
+        keyboardVisible = hiddenHeight > max(dp(120), root.height / 5)
+    }
+
+    private fun keyboardTopForPosition(): Int {
+        val keyboardTop = keyboardTopInRoot.takeIf { it > 0 } ?: root.height
+        return keyboardTop.coerceIn(min(dp(160), root.height), root.height)
     }
 
     private fun collapse() {
         commitActive()
         currentIndex = null
-        currentBounds = null
+        currentPanelWidth = 0
         hideKeyboard(input)
         panel?.animate()
             ?.alpha(0f)
