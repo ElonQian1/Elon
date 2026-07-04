@@ -637,7 +637,7 @@ function parseHeartbeat(text: string, message: ChatMessage, index: number): Time
     tone: 'running',
     title: 'AI CLI 正在处理中',
     detail: nodeId ? `PC 节点 ${nodeId}` : undefined,
-    meta: wait ? `已等待 ${wait}s` : undefined,
+    meta: wait ? `总耗时 ${wait}s` : undefined,
     message,
     compact: true,
   }
