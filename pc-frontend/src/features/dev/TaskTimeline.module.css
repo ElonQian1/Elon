@@ -342,6 +342,27 @@
   gap: 4px;
 }
 
+.processDetails {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.processDetails summary {
+  width: max-content;
+  max-width: 100%;
+  color: #8998b0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+}
+
+.processDetails summary::marker {
+  color: #66748a;
+}
+
 .processBody strong {
   color: #8492aa;
   font-size: 10px;
@@ -350,7 +371,8 @@
   letter-spacing: .03em;
 }
 
-.processBody pre {
+.processBody pre,
+.processDetails pre {
   max-height: 260px;
   min-width: 0;
   overflow: auto;
@@ -367,7 +389,8 @@
   line-height: 1.5;
 }
 
-.processBody pre[data-monospace="true"] {
+.processBody pre[data-monospace="true"],
+.processDetails pre[data-monospace="true"] {
   font-family: 'Cascadia Code', 'Consolas', monospace;
 }
 

@@ -18,6 +18,7 @@ export interface ProcessCard {
   chips: ProcessCardChip[]
   monospace: boolean
   truncated: boolean
+  bodyCollapsed?: boolean
 }
 
 const BODY_LIMIT = 2400
@@ -41,21 +42,36 @@ function shellProcessCard(event: ToolEvent, tone: TaskTone, isResult: boolean): 
   const command = clean(event.args?.command ?? '')
   const result = clean(event.result ?? '')
   const status = clean(event.status ?? '')
-  const body = isResult ? result || '（命令没有输出）' : command || formatJson(event.args)
+  const shellResult = parseShellResult(result, status)
+  const output = shellResult.output || '（命令没有输出）'
+  const body = isResult ? output : command || formatJson(event.args)
+  const commandSummary = firstLine(command)
   return {
     kind: validation ? 'test' : 'command',
     tone,
     title: validation ? (isResult ? '测试/构建完成' : '运行测试/构建') : (isResult ? '命令完成' : '执行命令'),
-    subtitle: isResult ? firstLine(result) || firstLine(command) || 'shell' : firstLine(command) || 'shell',
-    bodyLabel: isResult ? '输出' : '命令',
+    subtitle: isResult ? commandSummary || firstLine(output) || 'shell' : commandSummary || 'shell',
+    bodyLabel: isResult ? '输出' : '完整命令',
     ...limitedBody(body),
     chips: [
       { label: 'shell' },
       validation ? { label: '测试/构建', tone: 'running' } : null,
-      status ? { label: status, tone } : null,
-      isResult ? { label: formatChars(result.length) } : null,
+      shellResult.status ? { label: shellResult.status, tone } : null,
+      isResult ? { label: formatChars(output.length) } : null,
     ].filter(Boolean) as ProcessCardChip[],
     monospace: true,
+    bodyCollapsed: !isResult && Boolean(command),
+  }
+}
+
+function parseShellResult(result: string, status: string): { status: string; output: string } {
+  const explicitStatus = clean(status)
+  const text = clean(result)
+  const exitMatch = text.match(/^exit=(-?\d+)(?:\s+([\s\S]*))?$/i)
+  if (!exitMatch) return { status: explicitStatus, output: text }
+  return {
+    status: explicitStatus || `exit=${exitMatch[1]}`,
+    output: clean(exitMatch[2] ?? ''),
   }
 }
 

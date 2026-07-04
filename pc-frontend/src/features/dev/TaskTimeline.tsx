@@ -224,10 +224,17 @@ function ProcessCardView({ process }: { process: ProcessCard }) {
         </div>
       </div>
       {process.body && (
-        <div className={styles.processBody}>
-          <strong>{process.bodyLabel}</strong>
-          <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
-        </div>
+        process.bodyCollapsed ? (
+          <details className={styles.processDetails}>
+            <summary>{process.bodyLabel}</summary>
+            <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
+          </details>
+        ) : (
+          <div className={styles.processBody}>
+            <strong>{process.bodyLabel}</strong>
+            <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
+          </div>
+        )
       )}
     </div>
   )

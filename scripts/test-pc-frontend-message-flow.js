@@ -344,6 +344,12 @@ try {
       content: '{"type":"tool_call","tool":"shell","args":{"command":"powershell -ExecutionPolicy Bypass -File scripts\\\\cargo-dev.ps1 check --manifest-path server\\\\Cargo.toml"}}',
     },
     {
+      id: 'v1-text',
+      kind: 'ai_progress',
+      task_id: 'tsk-validation',
+      content: 'AI 执行命令： powershell -ExecutionPolicy Bypass -File scripts\\cargo-dev.ps1 check --manifest-path server\\Cargo.toml',
+    },
+    {
       id: 'v2',
       kind: 'ai_progress',
       task_id: 'tsk-validation',
@@ -354,17 +360,16 @@ try {
   assert.strictEqual(validationTimeline.coverage.testRun, true, 'check/build/test command should be marked as validation');
   assert.deepStrictEqual(
     validationTimeline.items.map((item) => [item.kind, item.title]),
-    [['test', '运行测试/构建'], ['test', '验证完成']],
-    'validation commands should render as test/build process rows',
+    [['test', '验证完成']],
+    'validation command lifecycle should render as one test/build process row',
   );
   assert.strictEqual(validationTimeline.items[0].process.kind, 'test', 'validation command should expose a structured test process card');
-  assert.strictEqual(validationTimeline.items[0].process.bodyLabel, '命令', 'test command card should label the command body');
-  assert.ok(validationTimeline.items[0].process.body.includes('cargo-dev.ps1 check'), 'test command card should show the actual command');
-  assert.strictEqual(validationTimeline.items[1].process.bodyLabel, '输出', 'test result card should label command output');
-  assert.ok(validationTimeline.items[1].process.body.includes('Finished `dev`'), 'test result card should show the command output');
+  assert.ok(validationTimeline.items[0].process.subtitle.includes('cargo-dev.ps1 check'), 'merged test card should keep the command summary');
+  assert.strictEqual(validationTimeline.items[0].process.bodyLabel, '输出', 'merged test card should label command output');
+  assert.ok(validationTimeline.items[0].process.body.includes('Finished `dev`'), 'merged test card should show the command output');
   assert.strictEqual(
     timelineSummary(validationTimeline, 'tsk-validation', 'tsk_val...'),
-    '2 步过程 · 有命令 · 有测试/构建 · 当前：验证完成 · tsk_val...',
+    '1 步过程 · 有命令 · 有测试/构建 · 当前：验证完成 · tsk_val...',
     'summary should mention command and validation coverage',
   );
   assert.strictEqual(validationTimeline.stage.label, '最后公开步骤：验证完成', 'completed validation output should become the current public stage');
@@ -592,9 +597,11 @@ try {
   assert.strictEqual(settlingTimeline.stage.label, '回复已显示，等待收尾', 'settling state should explain that the answer is already visible');
   assert.strictEqual(
     timelineSummary(settlingTimeline, 'tsk-settling', 'tsk_set...'),
-    '3 步过程 · 有命令 · 当前：回复已显示，等待收尾 · tsk_set...',
+    '2 步过程 · 有命令 · 当前：回复已显示，等待收尾 · tsk_set...',
     'summary should describe visible reply settling instead of saying the task is still only processing',
   );
+  assert.strictEqual(settlingTimeline.items[0].process.chips.some((chip) => chip.label === 'exit=0'), true, 'merged command result should show exit status as a chip');
+  assert.strictEqual(settlingTimeline.items[0].process.body, '2026-07-04 00:50:29', 'merged command result should not repeat exit status inside the output body');
   const finalEchoTimeline = buildTaskTimeline(
     [
       {

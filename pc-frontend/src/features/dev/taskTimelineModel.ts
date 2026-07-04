@@ -130,6 +130,7 @@ export function buildTaskTimeline(
       coverage.assistantEvent = true
       return
     }
+    if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
 
     const heartbeat = parseHeartbeat(text, message, index)
     if (heartbeat) {
@@ -152,6 +153,7 @@ export function buildTaskTimeline(
       : text
     if (!event && seenText.has(uniqueKey)) return
     seenText.add(uniqueKey)
+    if (mergeShellResult(items, item)) return
     items.push(item)
   })
 
@@ -170,6 +172,34 @@ export function buildTaskTimeline(
     stage,
     diagnostics: buildDiagnostics(model),
   }
+}
+
+function mergeShellResult(items: TimelineItem[], item: TimelineItem): boolean {
+  const event = item.event
+  if (event?.type !== 'tool_result' || clean(event.tool ?? '') !== 'shell') return false
+  const command = clean(event.args?.command ?? '')
+  for (let index = items.length - 1; index >= 0 && index >= items.length - 5; index--) {
+    const previous = items[index]
+    const previousEvent = previous.event
+    if (previousEvent?.type !== 'tool_call' || clean(previousEvent.tool ?? '') !== 'shell') continue
+    const previousCommand = clean(previousEvent.args?.command ?? '')
+    if (command && previousCommand && command !== previousCommand) continue
+    const mergedEvent = command || !previousCommand
+      ? event
+      : { ...event, args: { ...(event.args ?? {}), command: previousCommand } }
+    items[index] = {
+      ...previous,
+      tone: item.tone,
+      title: item.title,
+      detail: item.detail,
+      meta: item.meta,
+      event: mergedEvent,
+      process: mergedEvent === event ? item.process : processCardFromToolEvent(mergedEvent) ?? item.process,
+      compact: item.compact,
+    }
+    return true
+  }
+  return false
 }
 
 export function timelineSummary(model: TaskTimelineModel, taskId: string, shortTaskId: string): string {
@@ -575,6 +605,10 @@ function itemFromText(text: string, message: ChatMessage, index: number): Timeli
   }
 
   return textItem(message, index, 'status', 'running', shortText(text), text, nodeId)
+}
+
+function isShellCommandEcho(text: string): boolean {
+  return /^AI\s*执行命令\s*[：:]/i.test(text)
 }
 
 function parseHeartbeat(text: string, message: ChatMessage, index: number): TimelineItem | null {
