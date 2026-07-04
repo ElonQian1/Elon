@@ -398,7 +398,7 @@ try {
   );
   assert.strictEqual(
     timeline.items[2].meta,
-    '总耗时 90s',
+    '累计前面全部流程总耗时 90s',
     'collapsed heartbeat should keep the latest wait duration',
   );
   assert.strictEqual(
@@ -408,7 +408,7 @@ try {
   );
   assert.strictEqual(timeline.stage.key, 'heartbeat', 'heartbeat-only timeline should identify the CLI-output stall stage');
   assert.strictEqual(timeline.stage.label, '疑似卡在 CLI 输出前', 'long heartbeat waits should be called out as a likely stall');
-  assert.strictEqual(timeline.stage.meta, '总耗时 90s', 'stage should carry the latest wait duration');
+  assert.strictEqual(timeline.stage.meta, '累计前面全部流程总耗时 90s', 'stage should carry the latest wait duration');
   assert.strictEqual(timeline.stage.stuck, true, 'long heartbeat-only waits should be marked as stuck');
   assert.strictEqual(timeline.coverage.heartbeat, true, 'waiting should be visible in coverage');
   assert.strictEqual(timeline.coverage.command, false, 'pure waiting should not pretend command output exists');
@@ -450,7 +450,7 @@ try {
   );
   assert.strictEqual(
     separatedHeartbeatTimeline.items[separatedHeartbeatTimeline.items.length - 1].meta,
-    '总耗时 15s',
+    '累计前面全部流程总耗时 15s',
     'visible waiting row should show the latest wait duration',
   );
 
