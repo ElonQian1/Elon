@@ -55,11 +55,7 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
     };
 
     let explicit_apk_sync = attempt_apk_sync || looks_like_android_task(user_message);
-    let fresh_after_unix_secs = if explicit_apk_sync {
-        None
-    } else {
-        apk_sync_probe_since
-    };
+    let fresh_after_unix_secs = apk_sync_probe_since;
     if !explicit_apk_sync && fresh_after_unix_secs.is_none() {
         return None;
     }

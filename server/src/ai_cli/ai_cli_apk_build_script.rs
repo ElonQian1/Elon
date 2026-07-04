@@ -384,13 +384,12 @@ function Invoke-AndroidDebugBuild {
   }
 }
 
-$apk = Find-LatestApk
-if ((-not $apk) -and $BuildIfMissing) {
+if ($BuildIfMissing) {
   Write-Output 'ELON_APK_BUILD_ATTEMPT_BEGIN'
   Invoke-AndroidDebugBuild
   Write-Output 'ELON_APK_BUILD_ATTEMPT_END'
-  $apk = Find-LatestApk
 }
+$apk = Find-LatestApk
 if (-not $apk) { exit 2 }
 if ($apk.Length -gt 104857600) { Write-Error 'APK too large to relay'; exit 3 }
 Write-Output ('ELON_APK_NAME:' + $apk.Name)
@@ -409,11 +408,21 @@ mod tests {
     use super::{pc_apk_sync_loader_command, pc_apk_sync_script};
 
     #[test]
-    fn apk_sync_script_can_enable_build_fallback() {
+    fn apk_sync_script_builds_before_selecting_existing_apk() {
         let script = pc_apk_sync_script(None, true);
         assert!(script.contains("$BuildIfMissing = $true"));
         assert!(script.contains("$apk = Find-LatestApk"));
-        assert!(script.contains("(-not $apk) -and $BuildIfMissing"));
+        assert!(!script.contains("(-not $apk) -and $BuildIfMissing"));
+        let build_index = script
+            .find("ELON_APK_BUILD_ATTEMPT_BEGIN")
+            .expect("build attempt marker should exist");
+        let find_index = script
+            .find("$apk = Find-LatestApk")
+            .expect("APK selection should exist");
+        assert!(
+            build_index < find_index,
+            "forced PC APK sync must build current sources before choosing an APK"
+        );
         assert!(script.contains("$chunkSize = 65536"));
         assert!(script.contains("(Join-Path (Get-Location) 'dist')"));
         assert!(script.contains("Ensure-AndroidBuildBootstrap"));
