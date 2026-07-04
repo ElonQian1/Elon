@@ -417,6 +417,28 @@ try {
     'pure waiting timeline should explain that no public CLI output arrived',
   );
 
+  const toolTimeoutTimeline = buildTaskTimeline([
+    {
+      id: 'tt1',
+      kind: 'ai_progress',
+      task_id: 'tsk-tool-timeout',
+      content: '{"type":"tool_call","tool":"shell","args":{"command":"powershell -ExecutionPolicy Bypass -File scripts\\\\publish-server.ps1"}}',
+    },
+    {
+      id: 'tt2',
+      kind: 'ai_progress',
+      task_id: 'tsk-tool-timeout',
+      content: '{"type":"runtime_status","phase":"pc_tool_result_timeout","runtime":"Codex","message":"已等待 1800 秒，但 PC 节点没有返回 shell 命令的工具结果；本轮已停止。","tool":"shell","tool_summary":"powershell -ExecutionPolicy Bypass -File scripts\\\\publish-server.ps1"}',
+    },
+  ]);
+  assert.strictEqual(toolTimeoutTimeline.stage.key, 'tool-timeout', 'pending shell tool should use the tool-result timeout stage');
+  assert.strictEqual(toolTimeoutTimeline.stage.label, '工具结果超时', 'tool-result timeout should not be labeled as missing first CLI output');
+  assert.strictEqual(
+    timelineSummary(toolTimeoutTimeline, 'tsk-tool-timeout', 'tsk_tool...'),
+    '2 步过程 · 有命令 · 卡点：工具结果超时 · tsk_tool...',
+    'summary should describe a started command waiting for a missing tool result',
+  );
+
   const separatedHeartbeatTimeline = buildTaskTimeline([
     {
       id: 'sh1',

@@ -72,6 +72,7 @@ export type TaskTimelineStageKey =
   | 'dispatch'
   | 'heartbeat'
   | 'timeout'
+  | 'tool-timeout'
   | 'command'
   | 'approval'
   | 'assistant'
@@ -258,7 +259,7 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     const runtime = clean(event.runtime ?? '')
     const turn = Number(event.turn ?? 0)
     const eventMessage = clean(event.message ?? '')
-    if (phase === 'pc_cli_no_output_timeout') {
+    if (phase === 'pc_cli_no_output_timeout' || phase === 'pc_tool_result_timeout') {
       return {
         id: itemId(message, index),
         kind: 'status',
@@ -414,6 +415,19 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'
 
 function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineStage {
   const latest = model.items[model.items.length - 1]
+  const toolTimeout = latestRuntimePhase(model.items, 'pc_tool_result_timeout')
+  if (toolTimeout) {
+    return {
+      key: 'tool-timeout',
+      tone: 'failed',
+      label: '工具结果超时',
+      detail: 'PC 节点已开始执行工具，但长时间没有返回工具结果或完成事件。通常是命令卡住、构建长时间无输出，或节点输出通道中断。',
+      meta: toolTimeout.meta,
+      summary: '卡点：工具结果超时',
+      stuck: true,
+    }
+  }
+
   const timeout = latestRuntimePhase(model.items, 'pc_cli_no_output_timeout')
   if (timeout) {
     return {

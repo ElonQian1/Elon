@@ -154,6 +154,7 @@ export function statusForTask(task: TaskState | null): { tone: TaskTone; label: 
 export function runtimeStatusLabel(phase: string): { tone: TaskTone; title: string; body: string } {
   if (phase === 'pc_dispatched') return { tone: 'running', title: '已派发到 PC 节点', body: '正在等待本机 AI CLI 输出。' }
   if (phase === 'pc_cli_no_output_timeout') return { tone: 'failed', title: '未收到 AI CLI 输出', body: 'PC 节点没有返回命令、工具结果或最终完成事件。' }
+  if (phase === 'pc_tool_result_timeout') return { tone: 'failed', title: '工具结果超时', body: 'PC 节点已开始执行工具，但没有返回工具结果或最终完成事件。' }
   if (phase === 'waiting_approval') return { tone: 'approval', title: '等待工具审批', body: '批准前不会执行工具。' }
   if (phase === 'completed') return { tone: 'done', title: '运行时完成', body: '没有更多运行时动作。' }
   if (phase === 'failed') return { tone: 'failed', title: '运行时受阻', body: '需要继续处理。' }

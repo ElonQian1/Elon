@@ -60,6 +60,41 @@ pub(crate) fn pc_cli_no_output_timeout_progress(timeout_secs: u64) -> Option<Str
     .ok()
 }
 
+pub(crate) fn pc_tool_result_timeout_progress(
+    timeout_secs: u64,
+    tool: &str,
+    summary: &str,
+) -> Option<String> {
+    let tool = tool.trim();
+    let tool = if tool.is_empty() { "tool" } else { tool };
+    let summary = summary.trim();
+    let message = if summary.is_empty() {
+        format!(
+            "已等待 {} 秒，但 PC 节点没有返回 {} 的工具结果；本轮已停止。",
+            timeout_secs,
+            pc_tool_label(tool)
+        )
+    } else {
+        format!(
+            "已等待 {} 秒，但 PC 节点没有返回 {} 的工具结果；本轮已停止。最后等待：{}",
+            timeout_secs,
+            pc_tool_label(tool),
+            summary
+        )
+    };
+    serde_json::to_string(&serde_json::json!({
+        "type": "runtime_status",
+        "phase": "pc_tool_result_timeout",
+        "runtime": "Codex",
+        "message": message,
+        "timeout_secs": timeout_secs,
+        "tool": tool,
+        "tool_summary": summary,
+        "expected_events": ["tool_result", "assistant_message", "usage", "cli_done"],
+    }))
+    .ok()
+}
+
 fn pc_cli_label(cli: &str) -> &'static str {
     match cli {
         "codex" => "Codex",
@@ -69,6 +104,15 @@ fn pc_cli_label(cli: &str) -> &'static str {
         "api-runtime" => "Route B",
         "server-runtime" => "Route C",
         _ => "PC AI",
+    }
+}
+
+fn pc_tool_label(tool: &str) -> &'static str {
+    match tool {
+        "shell" => "shell 命令",
+        "file_change" => "文件修改",
+        "web_search" => "网络搜索",
+        _ => "工具调用",
     }
 }
 
@@ -91,7 +135,10 @@ fn short_pc_node_id(agent_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{pc_cli_no_output_timeout_progress, pc_dispatch_started_progress};
+    use super::{
+        pc_cli_no_output_timeout_progress, pc_dispatch_started_progress,
+        pc_tool_result_timeout_progress,
+    };
 
     #[test]
     fn pc_dispatch_started_progress_names_node_and_cli() {
@@ -127,5 +174,22 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("没有返回任何 Codex CLI 输出"));
+    }
+
+    #[test]
+    fn pc_tool_result_timeout_progress_is_structured() {
+        let raw = pc_tool_result_timeout_progress(1800, "shell", "npm run build").unwrap();
+        let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        assert_eq!(value["type"], "runtime_status");
+        assert_eq!(value["phase"], "pc_tool_result_timeout");
+        assert_eq!(value["runtime"], "Codex");
+        assert_eq!(value["timeout_secs"], 1800);
+        assert_eq!(value["tool"], "shell");
+        assert_eq!(value["tool_summary"], "npm run build");
+        assert!(value["message"]
+            .as_str()
+            .unwrap()
+            .contains("没有返回 shell 命令的工具结果"));
     }
 }

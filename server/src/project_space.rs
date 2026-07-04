@@ -11,7 +11,7 @@ use axum::{
 use serde::Deserialize;
 use std::{
     collections::HashMap,
-    sync::{Arc, LazyLock, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tokio::sync::watch;
@@ -28,9 +28,14 @@ use crate::{
     project_mobile::ensure_mobile_project,
     project_space_ai_progress::{
         is_pc_cli_heartbeat_progress, pc_cli_no_output_timeout_progress,
-        pc_dispatch_started_progress,
+        pc_dispatch_started_progress, pc_tool_result_timeout_progress,
+    },
+    project_space_task_control::{
+        register_channel_ai_task_control, remove_channel_ai_task_control,
+        take_channel_ai_task_control,
     },
     project_space_task_result::result_message,
+    project_space_task_watchdog::{channel_ai_heartbeat_only_timeout, ChannelAiPendingTools},
     project_tool_approval_recovery, project_tool_approvals, project_workspace_recovery,
     project_ws_protocol::enrich_project_ws_event,
     store::{
@@ -41,20 +46,12 @@ use crate::{
     types::{AppState, WsMessage},
 };
 
+pub(crate) use crate::project_space_task_control::{
+    active_channel_ai_task_ids, is_channel_ai_task_active,
+};
+
 const DOCS_CHANNEL_KIND: &str = "docs";
 const CHANNEL_AI_CANCEL_MESSAGE: &str = "用户已停止 AI 开发任务。";
-const CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_ENV: &str = "ELON_CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_SECS";
-const CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_DEFAULT_SECS: u64 = 180;
-
-static CHANNEL_AI_TASKS: LazyLock<Mutex<HashMap<String, ChannelAiTaskControl>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-#[derive(Clone)]
-struct ChannelAiTaskControl {
-    project_id: String,
-    channel_id: String,
-    cancel_tx: watch::Sender<bool>,
-}
 
 #[derive(Deserialize)]
 pub struct ChannelMessagesQuery {
@@ -1552,7 +1549,7 @@ fn cancel_channel_ai_task_response(
         Some(control) => control,
         None => return json_error(StatusCode::NOT_FOUND, "任务不在运行中或已结束"),
     };
-    let _ = control.cancel_tx.send(true);
+    control.request_cancel();
     Json(serde_json::json!({
         "ok": true,
         "task_id": task_id,
@@ -1968,15 +1965,6 @@ fn insert_channel_ai_result(task: &ChannelAiTask, content: &str) {
     }
 }
 
-fn channel_ai_heartbeat_only_timeout() -> Duration {
-    let secs = std::env::var(CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_ENV)
-        .ok()
-        .and_then(|value| value.trim().parse::<u64>().ok())
-        .unwrap_or(CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_DEFAULT_SECS)
-        .clamp(60, 1800);
-    Duration::from_secs(secs)
-}
-
 fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -2024,6 +2012,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let mut error = None;
         let heartbeat_only_timeout = channel_ai_heartbeat_only_timeout();
         let mut last_effective_progress_at = Instant::now();
+        let mut pending_tools = ChannelAiPendingTools::new();
         let mut watchdog = tokio::time::interval(Duration::from_secs(5));
         loop {
             tokio::select! {
@@ -2043,6 +2032,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                         if !is_pc_cli_heartbeat_progress(event_type, message) {
                             last_effective_progress_at = Instant::now();
                         }
+                        pending_tools.note_event(event_type, &value);
                         match event_type {
                             "pc_dispatch_started" => {
                                 if let Some(content) = pc_dispatch_started_progress(&value) {
@@ -2123,7 +2113,37 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                     }
                 }
                 _ = watchdog.tick() => {
-                    if last_effective_progress_at.elapsed() >= heartbeat_only_timeout {
+                    if let Some((pending_tool, timeout_secs)) = pending_tools.timed_out() {
+                        runner.abort();
+                        project_tool_approvals::clear_task(&task.task_id);
+                        final_status = "failed".to_string();
+                        let pending_label = pending_tool.label();
+                        if let Some(raw_status) = pc_tool_result_timeout_progress(
+                            timeout_secs,
+                            pending_tool.tool(),
+                            pending_tool.summary(),
+                        ) {
+                            let _ = task.state.store.record_task_event(
+                                &task.task_id,
+                                &enrich_project_ws_event(raw_status.clone(), &task.task_id),
+                            );
+                            insert_channel_ai_progress(&task, &raw_status);
+                        }
+                        let msg = format!(
+                            "本机 AI 已开始执行 {}，但在 {} 秒内没有返回工具结果或最终完成事件；已停止本轮任务。请查看任务过程中的最后一条命令，必要时重启一龙 PC 节点客户端并检查 Codex 网络/代理状态后重试。",
+                            pending_label,
+                            timeout_secs
+                        );
+                        final_reply = msg.clone();
+                        error = Some(msg.clone());
+                        let raw_error = WsMessage::error(&msg).to_json();
+                        let _ = task.state.store.record_task_event(
+                            &task.task_id,
+                            &enrich_project_ws_event(raw_error, &task.task_id),
+                        );
+                        insert_channel_ai_result(&task, &result_message(&msg, None, Some("超时")));
+                        break;
+                    } else if last_effective_progress_at.elapsed() >= heartbeat_only_timeout {
                         runner.abort();
                         project_tool_approvals::clear_task(&task.task_id);
                         final_status = "failed".to_string();
@@ -2176,66 +2196,6 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
             publish_channel_task_updated(&task, "conversation_result");
         }
     });
-}
-
-fn register_channel_ai_task_control(
-    task_id: &str,
-    project_id: &str,
-    channel_id: &str,
-    cancel_tx: watch::Sender<bool>,
-) {
-    if let Ok(mut tasks) = CHANNEL_AI_TASKS.lock() {
-        tasks.insert(
-            task_id.to_string(),
-            ChannelAiTaskControl {
-                project_id: project_id.to_string(),
-                channel_id: channel_id.to_string(),
-                cancel_tx,
-            },
-        );
-    }
-}
-
-pub(crate) fn active_channel_ai_task_ids() -> Vec<String> {
-    CHANNEL_AI_TASKS
-        .lock()
-        .map(|tasks| tasks.keys().cloned().collect())
-        .unwrap_or_default()
-}
-
-pub(crate) fn is_channel_ai_task_active(task_id: &str, project_id: &str, channel_id: &str) -> bool {
-    CHANNEL_AI_TASKS
-        .lock()
-        .ok()
-        .and_then(|tasks| {
-            tasks
-                .get(task_id)
-                .map(|task| task.project_id == project_id && task.channel_id == channel_id)
-        })
-        .unwrap_or(false)
-}
-
-fn take_channel_ai_task_control(
-    task_id: &str,
-    project_id: &str,
-    channel_id: &str,
-) -> Option<ChannelAiTaskControl> {
-    let mut tasks = CHANNEL_AI_TASKS.lock().ok()?;
-    let matches = tasks
-        .get(task_id)
-        .map(|task| task.project_id == project_id && task.channel_id == channel_id)
-        .unwrap_or(false);
-    if matches {
-        tasks.remove(task_id)
-    } else {
-        None
-    }
-}
-
-fn remove_channel_ai_task_control(task_id: &str) {
-    if let Ok(mut tasks) = CHANNEL_AI_TASKS.lock() {
-        tasks.remove(task_id);
-    }
 }
 
 #[cfg(test)]
