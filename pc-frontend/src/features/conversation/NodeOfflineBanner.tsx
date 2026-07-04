@@ -10,6 +10,7 @@ import { api } from '../../api/client'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 
 const POLL_MS = 30_000
+const OFFLINE_DEBOUNCE_MS = 60_000
 
 interface NodeInfo {
   node_id: string
@@ -23,14 +24,22 @@ interface Props {
   localNodeId?: string
 }
 
+type BannerMode = 'reconnecting' | 'offline'
+
+interface BannerState {
+  node: NodeInfo
+  firstSeenAt: number
+  mode: BannerMode
+}
+
 export default function NodeOfflineBanner({ localNodeReady = false, localNodeId = '' }: Props) {
   const navigate = useNavigate()
-  const [offlineNode, setOfflineNode] = useState<NodeInfo | null>(null)
+  const [banner, setBanner] = useState<BannerState | null>(null)
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
     if (localNodeReady) {
-      setOfflineNode(null)
+      setBanner(null)
       setDismissed(false)
       return
     }
@@ -47,44 +56,65 @@ export default function NodeOfflineBanner({ localNodeReady = false, localNodeId 
       const offline = nodes.find((n) => !n.online && n.node_id === localNodeId)
         ?? nodes.find((n) => !n.online)
       if (!online && offline) {
-        setOfflineNode(offline)
+        const now = Date.now()
+        setBanner((current) => {
+          const firstSeenAt = current?.node.node_id === offline.node_id ? current.firstSeenAt : now
+          const mode = now - firstSeenAt >= OFFLINE_DEBOUNCE_MS ? 'offline' : 'reconnecting'
+          return { node: offline, firstSeenAt, mode }
+        })
       } else {
-        setOfflineNode(null)
+        setBanner(null)
         setDismissed(false)
       }
     } catch { /* 静默，保持现状 */ }
   }
 
-  if (!offlineNode || dismissed) return null
+  if (!banner || dismissed) return null
 
-  const name = offlineNode.display_name || offlineNode.device_name || '本机节点'
+  const name = banner.node.display_name || banner.node.device_name || '本机节点'
+  const isOffline = banner.mode === 'offline'
+  const background = isOffline ? '#2a1f0f' : '#14251c'
+  const borderColor = isOffline ? '#6b3c10' : '#235a3a'
+  const textColor = isOffline ? '#e8a460' : '#85d5a4'
+  const strongColor = isOffline ? '#f5c07a' : '#b8f5ce'
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
+      display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
       padding: '9px 16px',
-      background: '#2a1f0f',
-      borderBottom: '1px solid #6b3c10',
-      color: '#e8a460',
+      background,
+      borderBottom: `1px solid ${borderColor}`,
+      color: textColor,
       fontSize: 13,
       flexShrink: 0,
     }}>
-      <span style={{ fontSize: 16 }}>⚠️</span>
+      <span style={{ fontWeight: 900, fontSize: 15, lineHeight: 1 }}>!</span>
       <span style={{ flex: 1, lineHeight: 1.5 }}>
-        账号下的 <strong style={{ color: '#f5c07a' }}>{name}</strong> 当前未在线。
-        如果这是这台电脑，请启动 Win 端，并在节点设置里确认开机自启动。
+        {isOffline ? (
+          <>
+            账号下的 <strong style={{ color: strongColor }}>{name}</strong> 持续未在线。
+            如果这是这台电脑，请启动 Win 端，并在节点设置里确认开机自启动。
+          </>
+        ) : (
+          <>
+            <strong style={{ color: strongColor }}>{name}</strong> 正在重连。
+            服务器更新或 Win 端自更新后可能会短暂出现这种状态。
+          </>
+        )}
       </span>
-      <button
-        type="button"
-        onClick={launchWinClientProtocol}
-        style={{
-          background: '#1f6f3d', border: 'none', borderRadius: 5,
-          color: '#d9ffe5', padding: '5px 14px',
-          cursor: 'pointer', fontSize: 12, fontWeight: 800, flexShrink: 0,
-        }}
-      >
-        启动 Win 端
-      </button>
+      {isOffline && (
+        <button
+          type="button"
+          onClick={launchWinClientProtocol}
+          style={{
+            background: '#1f6f3d', border: 'none', borderRadius: 5,
+            color: '#d9ffe5', padding: '5px 14px',
+            cursor: 'pointer', fontSize: 12, fontWeight: 800, flexShrink: 0,
+          }}
+        >
+          启动 Win 端
+        </button>
+      )}
       <button
         type="button"
         onClick={() => navigate('/node')}
@@ -94,23 +124,25 @@ export default function NodeOfflineBanner({ localNodeReady = false, localNodeId 
           cursor: 'pointer', fontSize: 12, fontWeight: 800, flexShrink: 0,
         }}
       >
-        检查自启动
+        节点设置
       </button>
-      <a
-        href={WIN_CLIENT_DOWNLOAD_URL}
-        download
-        style={{
-          background: '#7a4510', border: 'none', borderRadius: 5,
-          color: '#ffd8a8', padding: '5px 14px',
-          cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0,
-          textDecoration: 'none', display: 'inline-block',
-          transition: 'background .1s',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = '#9a5518')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = '#7a4510')}
-      >
-        重新下载
-      </a>
+      {isOffline && (
+        <a
+          href={WIN_CLIENT_DOWNLOAD_URL}
+          download
+          style={{
+            background: '#7a4510', border: 'none', borderRadius: 5,
+            color: '#ffd8a8', padding: '5px 14px',
+            cursor: 'pointer', fontSize: 12, fontWeight: 700, flexShrink: 0,
+            textDecoration: 'none', display: 'inline-block',
+            transition: 'background .1s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = '#9a5518')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = '#7a4510')}
+        >
+          重新下载
+        </a>
+      )}
       <button
         type="button"
         onClick={() => setDismissed(true)}

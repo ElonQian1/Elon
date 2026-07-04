@@ -39,14 +39,13 @@ use crate::types::AppState;
 
 const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(40);
-const AGENT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
-const AGENT_HEARTBEAT_ACK_TIMEOUT: Duration = Duration::from_secs(8);
 const AGENT_DISPATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSPECT_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
 
+mod heartbeat;
 #[cfg(test)]
 #[path = "homecli_agent_tests.rs"]
 mod homecli_agent_tests;
@@ -973,29 +972,13 @@ async fn run_agent_session(
     // 普通家庭/办公网络会静默丢弃空闲 TCP；没有 ACK 就主动摘掉会话，
     // 避免下一次用户请求先撞上“假在线”旧连接。
     {
-        let ping_tx = cmd_tx.clone();
-        let ping_acks = ping_acks.clone();
-        let shutdown = session_shutdown.clone();
-        let aid = agent_id.clone();
-        let mut shutdown_rx = session_shutdown_rx.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(AGENT_HEARTBEAT_INTERVAL);
-            loop {
-                tokio::select! {
-                    _ = shutdown_rx.changed() => break,
-                    _ = interval.tick() => {}
-                }
-                if let Err(error) =
-                    send_protocol_ping(&aid, &ping_tx, &ping_acks, AGENT_HEARTBEAT_ACK_TIMEOUT)
-                        .await
-                {
-                    tracing::warn!(agent_id = %aid, error = %error, "agent heartbeat failed");
-                    let _ = shutdown.send(true);
-                    break;
-                }
-                tracing::trace!(agent_id = %aid, "agent ping sent");
-            }
-        });
+        heartbeat::spawn_agent_heartbeat(
+            agent_id.clone(),
+            control_tx.clone(),
+            ping_acks.clone(),
+            session_shutdown.clone(),
+            session_shutdown_rx.clone(),
+        );
     }
 
     // Writer: drain cmd_rx → ws_tx.
@@ -1003,6 +986,7 @@ async fn run_agent_session(
     let writer = tokio::spawn(async move {
         loop {
             let outbound = tokio::select! {
+                biased;
                 _ = writer_shutdown_rx.changed() => break,
                 control = control_rx.recv() => match control {
                     Some(msg) => msg,

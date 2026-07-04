@@ -107,12 +107,24 @@ async fn run_relay_session(
     // 拆分读写，用 channel 让并发任务向 WS 写消息
     let (ws_write, mut ws_read) = ws_stream.split();
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
+    let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
     let running_cli_tasks: RunningCliTasks = Arc::new(Mutex::new(HashMap::new()));
 
     // 写任务：drain out_rx → ws_write
     let writer = tokio::spawn(async move {
         let mut sink = ws_write;
-        while let Some(msg) = out_rx.recv().await {
+        loop {
+            let msg = tokio::select! {
+                biased;
+                control = control_rx.recv() => match control {
+                    Some(msg) => msg,
+                    None => break,
+                },
+                msg = out_rx.recv() => match msg {
+                    Some(msg) => msg,
+                    None => break,
+                },
+            };
             if sink.send(msg).await.is_err() {
                 break;
             }
@@ -143,7 +155,7 @@ async fn run_relay_session(
     let local_base = format!("http://127.0.0.1:{}", local_port);
 
     // 周期 WS Ping：防止 NAT 保活 / 检测 zombie 连接
-    let ping_tx = out_tx.clone();
+    let ping_tx = control_tx.clone();
     let _ping_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(WS_PING_INTERVAL);
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -172,7 +184,7 @@ async fn run_relay_session(
             Message::Text(t) => t,
             Message::Close(_) => break,
             Message::Ping(d) => {
-                let _ = out_tx.send(Message::Pong(d));
+                let _ = control_tx.send(Message::Pong(d));
                 continue;
             }
             Message::Pong(_) => continue, // 收到 Pong，超时计时器自然重置
@@ -243,7 +255,7 @@ async fn run_relay_session(
 
             ServerToAgent::Ping { nonce } => {
                 let pong = AgentToServer::Pong { nonce };
-                let _ = out_tx.send(Message::Text(serde_json::to_string(&pong)?));
+                let _ = control_tx.send(Message::Text(serde_json::to_string(&pong)?));
             }
 
             ServerToAgent::ProvisionProjectWorkspace {
@@ -439,6 +451,7 @@ async fn run_relay_session(
     }
 
     drop(out_tx);
+    drop(control_tx);
     let _ = writer.await;
     Ok(())
 }

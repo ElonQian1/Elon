@@ -122,6 +122,56 @@ async fn cli_prompt_dispatch_probes_agent_before_sending_prompt() {
     assert!(!dispatch.req_id.is_empty());
 }
 
+#[test]
+fn heartbeat_closes_only_after_consecutive_missed_acks() {
+    assert!(!heartbeat::heartbeat_should_close_session(1));
+    assert!(!heartbeat::heartbeat_should_close_session(
+        heartbeat::AGENT_HEARTBEAT_MAX_MISSED_ACKS - 1
+    ));
+    assert!(heartbeat::heartbeat_should_close_session(
+        heartbeat::AGENT_HEARTBEAT_MAX_MISSED_ACKS
+    ));
+}
+
+#[tokio::test]
+async fn protocol_ping_control_uses_ws_text_and_waits_for_ack() {
+    let (control_tx, mut control_rx) = mpsc::unbounded_channel();
+    let ping_acks: Arc<Mutex<HashMap<String, oneshot::Sender<()>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
+
+    let ping_acks_for_task = ping_acks.clone();
+    let ping_task = tokio::spawn(async move {
+        heartbeat::send_protocol_ping_control(
+            "agent",
+            &control_tx,
+            &ping_acks_for_task,
+            Duration::from_secs(1),
+        )
+        .await
+    });
+
+    let nonce = match control_rx.recv().await {
+        Some(Message::Text(text)) => match serde_json::from_str::<ServerToAgent>(&text)
+            .expect("ping text should deserialize")
+        {
+            ServerToAgent::Ping { nonce } => nonce.expect("control ping should carry nonce"),
+            other => panic!("expected protocol ping, got {other:?}"),
+        },
+        other => panic!("expected control text ping, got {other:?}"),
+    };
+    let ack = ping_acks
+        .lock()
+        .await
+        .remove(&nonce)
+        .expect("ping waiter should be registered");
+    ack.send(()).expect("ping receiver should be live");
+
+    ping_task
+        .await
+        .expect("ping task should join")
+        .expect("ping should complete after ACK");
+}
+
 #[tokio::test]
 async fn tool_approval_decision_waits_for_matching_ack() {
     let TestApprovalAgent {

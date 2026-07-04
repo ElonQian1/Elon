@@ -123,6 +123,7 @@ mod node_agent_tool_guard;
 mod node_agent_workspace_match;
 mod node_agent_workspace_modules;
 mod node_agent_write_preview;
+mod node_agent_ws_control_queue;
 #[cfg(windows)]
 mod node_client_launcher;
 mod node_hardware_probe;
@@ -929,8 +930,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             available: false,
             status: "not_runnable".to_string(),
             detail: Some(run.summary.clone().unwrap_or_else(|| {
-                "检测到 codex 命令，但无法非交互执行；请安装 Codex CLI 或修复 PATH"
-                    .to_string()
+                "检测到 codex 命令，但无法非交互执行；请安装 Codex CLI 或修复 PATH".to_string()
             })),
             reason: run
                 .reason
@@ -2685,11 +2685,11 @@ async fn run_session(
 
     let (ws_write, mut ws_read) = ws_stream.split();
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
-
-    // 写任务
+    let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
     let writer = tokio::spawn(async move {
         let mut sink = ws_write;
-        while let Some(msg) = out_rx.recv().await {
+        while let Some(msg) = node_agent_ws_control_queue::recv(&mut control_rx, &mut out_rx).await
+        {
             if sink.send(msg).await.is_err() {
                 break;
             }
@@ -2724,8 +2724,7 @@ async fn run_session(
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
-    // WS ping 定时器
-    let ping_tx = out_tx.clone();
+    let ping_tx = control_tx.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(10));
         loop {
@@ -2736,9 +2735,7 @@ async fn run_session(
         }
     });
 
-    let cfg_r = cfg.clone();
-    let out_tx_r = out_tx.clone();
-    // 读取服务器消息；同时监听凭证变更（登录/登出）以便重连或断开
+    let (cfg_r, out_tx_r, control_tx_r) = (cfg.clone(), out_tx.clone(), control_tx.clone());
     let read_result: Result<()> = async {
         loop {
             let frame = tokio::select! {
@@ -2784,7 +2781,7 @@ async fn run_session(
                             });
                         }
                         ServerToAgent::Ping { nonce } => {
-                            let _ = out_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));
+                            let _ = control_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));
                         }
                         ServerToAgent::ProvisionProjectWorkspace {
                             req_id,
@@ -3227,6 +3224,9 @@ async fn run_session(
                             // 其他消息类型暂不处理
                         }
                     }
+                }
+                Message::Ping(payload) => {
+                    node_agent_ws_control_queue::send_pong(&control_tx_r, payload)
                 }
                 Message::Pong(_) => {}
                 Message::Close(_) => break,
