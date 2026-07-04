@@ -50,8 +50,25 @@ internal class ChatAiSideMenuView(
             dp(CHAT_SECTION_GAP_COLLAPSED_DP)
         )
     }
-    private val conversationDirectoryGroup = LinearLayout(context).apply {
+    private val conversationHeaderGroup = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
+    }
+    private val conversationRowsGroup = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+    }
+    private val conversationRowsScroll = ScrollView(context).apply {
+        overScrollMode = View.OVER_SCROLL_NEVER
+        isVerticalScrollBarEnabled = false
+        isFillViewport = false
+    }
+    private val conversationListContainer = FrameLayout(context).apply {
+        clipChildren = false
+        clipToPadding = false
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
     }
     private val directoryRowAnimators = mutableMapOf<View, ValueAnimator>()
     private var personalProjectsExpanded = false
@@ -74,20 +91,8 @@ internal class ChatAiSideMenuView(
     }
 
     private fun buildMenuContent() {
-        val menuScroll = ScrollView(context).apply {
-            overScrollMode = View.OVER_SCROLL_NEVER
-            isVerticalScrollBarEnabled = false
-            isFillViewport = false
-        }
-        menuScroll.addView(
-            menuContent,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
         addView(
-            menuScroll,
+            menuContent,
             LayoutParams(
                 LayoutParams.MATCH_PARENT,
                 LayoutParams.MATCH_PARENT
@@ -96,10 +101,25 @@ internal class ChatAiSideMenuView(
                 bottomMargin = dp(bottomReservedHeightDp)
             }
         )
+        conversationRowsScroll.addView(
+            conversationRowsGroup,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
+        conversationListContainer.addView(
+            conversationRowsScroll,
+            LayoutParams(
+                LayoutParams.MATCH_PARENT,
+                LayoutParams.MATCH_PARENT
+            )
+        )
         menuContent.addView(projectDirectoryGroup)
         menuContent.addView(chatSectionGap)
-        menuContent.addView(conversationDirectoryGroup)
-        conversationDirectoryGroup.addView(conversationHeaderRow())
+        menuContent.addView(conversationHeaderGroup)
+        conversationHeaderGroup.addView(conversationHeaderRow())
+        menuContent.addView(conversationListContainer)
     }
 
     private fun updateProjectSections() {
@@ -289,16 +309,14 @@ internal class ChatAiSideMenuView(
 
     private fun updateConversationSummaries() {
         stopAnimations()
-        while (conversationDirectoryGroup.childCount > 1) {
-            conversationDirectoryGroup.removeViewAt(1)
-        }
+        conversationRowsGroup.removeAllViews()
         val items = conversationDirectoryEntries()
         if (items.isEmpty()) {
-            conversationDirectoryGroup.addView(directoryRow("暂无会话", active = false, working = false, onClick = {}))
+            conversationRowsGroup.addView(directoryRow("暂无会话", active = false, working = false, onClick = {}))
             return
         }
         items.forEach { entry ->
-            conversationDirectoryGroup.addView(
+            conversationRowsGroup.addView(
                 directoryRow(
                     title = entry.conversation.title,
                     active = entry.index == activeConversationIndex(),

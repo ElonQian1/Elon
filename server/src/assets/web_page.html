@@ -638,6 +638,7 @@
       display: flex;
       flex-direction: column;
       gap: 12px;
+      overflow: hidden;
     }
     .web-chat-side-menu-mask.active .web-chat-side-menu { transform: translateX(0); }
     .web-chat-side-menu-head {
@@ -672,6 +673,16 @@
       padding: 0 16px;
       text-align: left;
       cursor: pointer;
+    }
+    .web-chat-side-menu-body {
+      min-height: 0;
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding-right: 2px;
     }
     .web-chat-side-menu-action:disabled {
       opacity: 0.42;
@@ -3418,11 +3429,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <h2 id="webChatSideMenuTitle">侧面工具栏</h2>
         <button class="web-chat-side-menu-close" id="webChatSideMenuClose" type="button" aria-label="关闭侧面工具栏">×</button>
       </div>
-      <button class="web-chat-side-menu-action" id="webSideMenuProgressBtn" type="button">进度记录</button>
-      <button class="web-chat-side-menu-action" id="webSideMenuDocsBtn" type="button">项目文档</button>
-      <button class="web-chat-side-menu-action" id="webSideMenuGitBtn" type="button">Git 仓库</button>
-      <button class="web-chat-side-menu-action" id="webSideMenuContinueBtn" type="button">继续输入</button>
-      <p class="web-chat-side-menu-note" id="webChatSideMenuNote">网页版同步显示基础项目入口；完整拖拽和原生侧栏体验请使用 APK。</p>
+      <div class="web-chat-side-menu-body">
+        <button class="web-chat-side-menu-action" id="webSideMenuProgressBtn" type="button">进度记录</button>
+        <button class="web-chat-side-menu-action" id="webSideMenuDocsBtn" type="button">项目文档</button>
+        <button class="web-chat-side-menu-action" id="webSideMenuGitBtn" type="button">Git 仓库</button>
+        <button class="web-chat-side-menu-action" id="webSideMenuContinueBtn" type="button">继续输入</button>
+        <p class="web-chat-side-menu-note" id="webChatSideMenuNote">网页版同步显示基础项目入口；完整拖拽和原生侧栏体验请使用 APK。</p>
+      </div>
     </aside>
   </div>
 
