@@ -5,8 +5,12 @@ import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { useMemberRealtimeRefresh } from './useMemberRealtimeRefresh'
-import { AttachmentButton, AttachmentChip, attachmentsToMarkdown } from './AttachmentButton'
-import type { UploadedAttachment } from './AttachmentButton'
+import { AttachmentButton, AttachmentChip } from './AttachmentButton'
+import {
+  attachmentTitleFromAttachments,
+  buildComposerContent,
+  useComposerAttachments,
+} from './useComposerAttachments'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
@@ -40,10 +44,7 @@ import {
 import { useWorkspacePanels } from './useWorkspacePanels'
 import type { LocalNodeStatus } from './localPcRuntime'
 import type {
-  Channel,
-  ChannelMessagesResponse,
   Message,
-  Project,
   ProjectInvitePreview,
   ProjectInvitePreviewResponse,
   ProjectMember,
@@ -74,7 +75,6 @@ import type {
 import {
   channelCanManage,
   channelPermissionSummary,
-  presenceLabel,
   membersHaveChannelPermissionMap,
   membersForChannel,
   projectMemberHasRolePermission,
@@ -86,6 +86,20 @@ import {
   inviteTitle,
   roleLabel,
 } from './memberUtils'
+import {
+  channelAllowsAiStart,
+  conversationMessageCacheKey,
+  delay,
+  loadAiDevelopmentTaskMessages,
+  mergeProjectRecords,
+  normalizeOwnPresenceStatus,
+  ownPresenceSummary,
+  projectRoleCanAutoBind,
+  projectRoleLabel,
+  shortNodeId,
+  taskMessageCacheKey,
+  titleFromMessage,
+} from './conversationPageHelpers'
 import { PresenceDrawer } from './PresenceDrawer'
 import { InviteDrawer } from './InviteDrawer'
 import { ModerationDrawer } from './ModerationDrawer'
@@ -170,7 +184,6 @@ export default function ConversationPage() {
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
   const [inviteStatus, setInviteStatus] = useState('')
   const [channelSearch, setChannelSearch] = useState('')
-  const [attachments, setAttachments] = useState<UploadedAttachment[]>([])   // P1.4   // P1.3：新消息提示
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   // 会话视图模式：null=默认(全部) / 'new'=新建空会话 / string=会话 ID
@@ -415,7 +428,7 @@ export default function ConversationPage() {
     e.preventDefault()
     const text = input.trim()
     const isMemberDiscussion = isAssistingMember && !!activeProjectId && !!activeConversationTargetId && !!sessionView && sessionView !== 'new'
-    if (!text || sendingMessage || sendingMemberDiscussion) return
+    if ((!text && attachments.length === 0) || sendingMessage || sendingMemberDiscussion || attachmentUploading) return
     if (isAssistingMember && !isMemberDiscussion) {
       setSendError('请先选择这个成员的一个会话')
       return
@@ -423,9 +436,8 @@ export default function ConversationPage() {
     setSendError('')
     const previousInput = input
     const previousAttachments = attachments
-    const fullContent = attachments.length > 0
-      ? text + attachmentsToMarkdown(attachments)
-      : text
+    const previousDraftConversationId = draftConversationId
+    const fullContent = buildComposerContent(text, attachments)
     try {
       requestFeedAutoFollow()
       if (isMemberDiscussion) {
@@ -483,8 +495,8 @@ export default function ConversationPage() {
       })
       clearComposerDraft()
       const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
-      const conversationId = isExistingConversation ? sessionView : uuidv4()
-      const conversationTitle = isExistingConversation ? null : titleFromMessage(text)
+      const conversationId = isExistingConversation ? sessionView : (draftConversationId || uuidv4())
+      const conversationTitle = isExistingConversation ? null : titleFromMessage(text || attachmentTitleFromAttachments(attachments))
       const response = await sendMessage(
         fullContent,
         requestAgent || null,
@@ -495,6 +507,7 @@ export default function ConversationPage() {
         useLocalNodeForRequest ? activeWorkspacePath : null,
         targetChannelId,
         directPcCliForRequest,
+        attachments,
       )
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
@@ -527,7 +540,10 @@ export default function ConversationPage() {
       }
     } catch (err) {
       setInput(previousInput)
-      setAttachments(previousAttachments)
+      restoreAttachmentDraft({
+        attachments: previousAttachments,
+        draftConversationId: previousDraftConversationId,
+      })
       setTimeout(autoResize, 0)
       setSendError((err as { message?: string }).message ?? '发送失败')
     } finally {
@@ -537,7 +553,7 @@ export default function ConversationPage() {
 
   function clearComposerDraft() {
     setInput('')
-    setAttachments([])
+    clearAttachmentDraft()
     if (textareaRef.current) { textareaRef.current.style.height = '40px' }
   }
 
@@ -723,6 +739,33 @@ export default function ConversationPage() {
     || aiDevelopmentChannelBlocksAi
     || (!aiDevelopmentChannelId && !isAssistingMember)
     || (!activeChannelId && channels.length === 0 && !isAssistingMember)
+  const {
+    attachments,
+    setAttachments,
+    attachmentUploading,
+    attachmentDropActive,
+    attachmentError,
+    draftConversationId,
+    clearAttachmentDraft,
+    restoreAttachmentDraft,
+    uploadComposerFiles,
+    handleComposerPaste,
+    handleComposerDragEnter,
+    handleComposerDragOver,
+    handleComposerDragLeave,
+    handleComposerDrop,
+  } = useComposerAttachments({
+    activeProjectId,
+    composerDisabled,
+    sessionView,
+  })
+  const composerSubmitDisabled = (!input.trim() && attachments.length === 0)
+    || composerDisabled
+    || attachmentUploading
+
+  useEffect(() => {
+    clearAttachmentDraft()
+  }, [activeProjectId, projectHomeVersion, activeConversationTargetId, clearAttachmentDraft])
 
   const channelTaskMessagesById = useMemo(
     () => buildTaskProcessMessageMap([messages, sessionTaskMessages]),
@@ -1291,10 +1334,19 @@ export default function ConversationPage() {
 
         {/* 输入框（composer）——项目开启时始终可见 */}
         {activeProjectId && (
-          <form onSubmit={handleSend}>
+          <form
+            className={styles.composerForm}
+            data-drop-active={attachmentDropActive ? 'true' : 'false'}
+            onSubmit={handleSend}
+            onDragEnter={handleComposerDragEnter}
+            onDragOver={handleComposerDragOver}
+            onDragLeave={handleComposerDragLeave}
+            onDrop={handleComposerDrop}
+          >
+            {attachmentDropActive && <div className={styles.attachmentDropOverlay}>松开添加附件</div>}
             {/* P1.4：附件预览条 */}
             {attachments.length > 0 && (
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 16px 0' }}>
+              <div className={styles.attachmentTray}>
                 {attachments.map((att) => (
                   <AttachmentChip
                     key={att.attachment_id}
@@ -1340,6 +1392,7 @@ export default function ConversationPage() {
                 value={input}
                 onChange={(e) => { setInput(e.target.value); autoResize() }}
                 onKeyDown={handleKeyDown}
+                onPaste={handleComposerPaste}
                 placeholder={
                   isAssistingMember
                     ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
@@ -1360,9 +1413,9 @@ export default function ConversationPage() {
               {/* P1.4：附件按钮 */}
               {activeProjectId && (
                 <AttachmentButton
-                  projectId={activeProjectId}
                   disabled={composerDisabled}
-                  onAttached={(att) => setAttachments((prev) => [...prev, att])}
+                  uploading={attachmentUploading}
+                  onFilesSelected={(files) => uploadComposerFiles(files).catch(() => {})}
                 />
               )}
 
@@ -1370,12 +1423,13 @@ export default function ConversationPage() {
               <button
                 className={styles.sendBtn}
                 type="submit"
-                disabled={(!input.trim() && attachments.length === 0) || composerDisabled}
+                disabled={composerSubmitDisabled}
               >
-                {sendingMessage || sendingMemberDiscussion ? '…' : '发送'}
+                {sendingMessage || sendingMemberDiscussion ? '…' : attachmentUploading ? '上传中' : '发送'}
               </button>
             </div>
             {sendError && <p className={styles.sendError}>{sendError}</p>}
+            {attachmentError && <p className={styles.sendError}>{attachmentError}</p>}
           </form>
         )}
       </div>
@@ -1570,87 +1624,4 @@ export default function ConversationPage() {
       )}
     </div>
   )
-}
-
-function titleFromMessage(message: string): string {
-  const title = message.replace(/\s+/g, ' ').trim()
-  if (!title) return '新会话'
-  return title.length > 24 ? `${title.slice(0, 24)}...` : title
-}
-
-function mergeProjectRecords(listedProject?: Project, spaceProject?: Project | null): Project | undefined {
-  if (!listedProject) return spaceProject ?? undefined
-  if (!spaceProject) return listedProject
-  return {
-    ...listedProject,
-    ...spaceProject,
-    source_type: spaceProject.source_type ?? listedProject.source_type,
-    workspace_path: spaceProject.workspace_path ?? listedProject.workspace_path,
-    storage_worktree_path: spaceProject.storage_worktree_path ?? listedProject.storage_worktree_path,
-    node_id: spaceProject.node_id ?? listedProject.node_id,
-    role: spaceProject.role ?? listedProject.role,
-    my_role: spaceProject.my_role ?? listedProject.my_role,
-    runtime_permission: spaceProject.runtime_permission ?? listedProject.runtime_permission,
-  }
-}
-
-function channelAllowsAiStart(channel?: Channel | null): boolean {
-  if (!channel) return false
-  if (channel.kind !== 'ai_development') return false
-  const permissions = channel.permissions
-  if (!permissions) return true
-  return Boolean(permissions.can_start_ai ?? permissions.canStartAi)
-}
-
-function projectRoleCanAutoBind(role: string): boolean {
-  return role === 'owner'
-}
-
-function projectRoleLabel(role: string): string {
-  if (role === 'owner') return 'Owner'
-  if (role === 'admin') return 'Admin'
-  if (role === 'editor') return '协作者'
-  if (role === 'member') return '成员'
-  if (role === 'observer') return '只读'
-  return role || '未知角色'
-}
-
-function normalizeOwnPresenceStatus(status: string): string {
-  const value = clean(status).toLowerCase()
-  if (value === 'idle' || value === 'dnd' || value === 'invisible' || value === 'offline') return value
-  return 'online'
-}
-
-function ownPresenceSummary(presence: UserPresenceSettings | null, status: string): string {
-  const extras = [
-    clean(presence?.activity ?? ''),
-    clean(presence?.custom_status ?? ''),
-  ].filter(Boolean)
-  return [presenceLabel(status), ...extras].join(' · ')
-}
-
-function shortNodeId(nodeId: string): string {
-  const cleanId = clean(nodeId)
-  if (cleanId.length <= 18) return cleanId
-  return `${cleanId.slice(0, 11)}…${cleanId.slice(-6)}`
-}
-
-async function loadAiDevelopmentTaskMessages(projectId: string, channelId: string): Promise<Message[]> {
-  if (!projectId || !channelId) return []
-  const data = await api.get<ChannelMessagesResponse>(
-    `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=200`,
-  )
-  return data.messages ?? []
-}
-
-function conversationMessageCacheKey(projectId: string, targetUserId: string, conversationId: string): string {
-  return `${projectId}::${targetUserId}::${conversationId}`
-}
-
-function taskMessageCacheKey(projectId: string, channelId: string): string {
-  return `${projectId}::${channelId}`
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms))
 }

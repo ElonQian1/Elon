@@ -15,6 +15,11 @@
 }
 .btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn[data-uploading="true"] svg { animation: attachmentSpin 900ms linear infinite; }
+
+@keyframes attachmentSpin {
+  to { transform: rotate(360deg); }
+}
 
 .error {
   position: absolute;
@@ -51,7 +56,7 @@
   object-fit: cover;
   flex-shrink: 0;
 }
-.chipIcon { font-size: 14px; flex-shrink: 0; }
+.chipIcon { flex-shrink: 0; color: var(--text-muted); }
 
 .chipName {
   overflow: hidden;
@@ -69,7 +74,6 @@
   border-radius: 50%;
   background: transparent;
   color: var(--text-muted);
-  font-size: 14px;
   line-height: 1;
   display: grid; place-items: center;
   flex-shrink: 0;

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
-import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse, SendMessageResponse } from './types'
+import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse, SendMessageResponse, ProjectAttachmentRef } from './types'
 import { DEFAULT_RUNTIME_ROUTE } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 
@@ -65,6 +65,7 @@ interface ProjectState {
     localWorkspacePath?: string | null,
     channelIdOverride?: string | null,
     directPcCli?: boolean,
+    attachments?: ProjectAttachmentRef[],
   ) => Promise<SendMessageResponse | null>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
@@ -299,6 +300,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     localWorkspacePath?: string | null,
     channelIdOverride?: string | null,
     directPcCli?: boolean,
+    attachments?: ProjectAttachmentRef[],
   ) => {
     const { activeProjectId, activeChannelId } = get()
     const channelId = channelIdOverride || activeChannelId
@@ -316,6 +318,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           localNodeId: localNodeId || undefined,
           localWorkspacePath: localWorkspacePath || undefined,
           directPcCli: directPcCli || undefined,
+          attachments: attachments?.length ? attachments : undefined,
         },
       )
       // 立即刷新消息

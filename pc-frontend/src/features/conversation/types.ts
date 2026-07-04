@@ -237,6 +237,20 @@ export interface Message {
   [key: string]: unknown
 }
 
+export interface ProjectAttachmentRef {
+  attachment_id?: string
+  kind?: string
+  display_name?: string
+  file_name?: string
+  mime_type?: string
+  path?: string
+  url?: string
+  sha256?: string
+  size_bytes?: number
+  image_width?: number
+  image_height?: number
+}
+
 export interface SendMessagePayload {
   content: string
   agent?: string | null
@@ -246,6 +260,7 @@ export interface SendMessagePayload {
   localNodeId?: string
   localWorkspacePath?: string
   directPcCli?: boolean
+  attachments?: ProjectAttachmentRef[]
 }
 
 export interface SendMessageResponse {
