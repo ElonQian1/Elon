@@ -424,6 +424,44 @@ mod tests {
         Store::open(&path).expect("store should open")
     }
 
+    fn image_attachment(name: &str) -> ProjectAttachmentRef {
+        ProjectAttachmentRef {
+            attachment_id: Some(format!("att_{}", name)),
+            kind: Some("image".to_string()),
+            display_name: Some(name.to_string()),
+            file_name: Some(name.to_string()),
+            mime_type: Some("image/jpeg".to_string()),
+            path: Some(format!("/tmp/{}", name)),
+            url: Some(format!("http://example.test/{}", name)),
+            sha256: None,
+            size_bytes: Some(2048),
+            image_width: Some(1080),
+            image_height: Some(720),
+            duration_seconds: None,
+            transcription: None,
+            annotations: Vec::new(),
+        }
+    }
+
+    fn voice_attachment(seconds: u32) -> ProjectAttachmentRef {
+        ProjectAttachmentRef {
+            attachment_id: Some("att_voice".to_string()),
+            kind: Some("voice".to_string()),
+            display_name: Some("voice.m4a".to_string()),
+            file_name: Some("voice.m4a".to_string()),
+            mime_type: Some("audio/mp4".to_string()),
+            path: Some("/tmp/voice.m4a".to_string()),
+            url: Some("http://example.test/voice.m4a".to_string()),
+            sha256: None,
+            size_bytes: Some(4096),
+            image_width: None,
+            image_height: None,
+            duration_seconds: Some(seconds),
+            transcription: None,
+            annotations: Vec::new(),
+        }
+    }
+
     #[test]
     fn friend_image_annotations_are_visible_to_recipient() {
         let store = temp_store();
@@ -487,6 +525,64 @@ mod tests {
         assert_eq!(annotation.note, "tap this note");
         assert_eq!(annotation.icon_x, Some(0.41));
         assert!(!received.outgoing);
+
+        let bob_friends = store.list_friends(&bob.id).expect("friends should load");
+        let alice_profile = bob_friends
+            .iter()
+            .find(|friend| friend.id == alice.id)
+            .expect("alice should be listed");
+        assert_eq!(alice_profile.last_message.as_deref(), Some("【图片】"));
+    }
+
+    #[test]
+    fn media_messages_have_chat_list_previews() {
+        let store = temp_store();
+        let alice = store
+            .create_user(
+                "alice-media-preview@example.com",
+                "secret1",
+                Some("Alice"),
+                None,
+            )
+            .expect("alice should be created");
+        let bob = store
+            .create_user(
+                "bob-media-preview@example.com",
+                "secret1",
+                Some("Bob"),
+                None,
+            )
+            .expect("bob should be created");
+        store
+            .add_friend(&alice.id, Some("email"), "bob-media-preview@example.com")
+            .expect("alice can add bob");
+
+        let voice = vec![voice_attachment(7)];
+        store
+            .send_friend_message(&alice.id, &bob.id, "", Some(&voice))
+            .expect("voice message should be stored");
+        let bob_friends = store.list_friends(&bob.id).expect("friends should load");
+        let alice_profile = bob_friends
+            .iter()
+            .find(|friend| friend.id == alice.id)
+            .expect("alice should be listed");
+        assert_eq!(alice_profile.last_message.as_deref(), Some("【语音】7秒"));
+
+        let group = store
+            .create_friend_group(&alice.id, Some("Media preview"), &[bob.id.clone()])
+            .expect("group should be created");
+        let group_image = vec![image_attachment("group.jpg")];
+        store
+            .send_friend_group_message(&alice.id, &group.id, "", Some(&group_image))
+            .expect("group image message should be stored");
+        let bob_groups = store
+            .list_friend_groups(&bob.id)
+            .expect("groups should load");
+        let listed_group = bob_groups
+            .iter()
+            .find(|candidate| candidate.id == group.id)
+            .expect("group should be listed");
+        assert_eq!(listed_group.last_message.as_deref(), Some("【图片】"));
     }
 
     #[test]

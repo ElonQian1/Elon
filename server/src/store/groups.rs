@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
 
-use super::friend_messages::{attachments_to_json, parse_attachments};
+use super::friend_messages::{attachments_to_json, message_preview_from_parts, parse_attachments};
 use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
 impl Store {
@@ -18,6 +18,7 @@ impl Store {
                         WHERE count_member.group_id = g.id
                     ) AS member_count,
                     latest.content,
+                    latest.attachments_json,
                     latest.created_at,
                     (
                         SELECT COUNT(*)
@@ -50,9 +51,16 @@ impl Store {
                     created_at: row.get(2)?,
                     member_count: row.get(3)?,
                     members: Vec::new(),
-                    last_message: row.get(4)?,
-                    last_message_at: row.get(5)?,
-                    unread_count: row.get(6)?,
+                    last_message: {
+                        let last_content: Option<String> = row.get(4)?;
+                        let last_attachments_json: Option<String> = row.get(5)?;
+                        message_preview_from_parts(
+                            last_content.as_deref(),
+                            last_attachments_json.as_deref(),
+                        )?
+                    },
+                    last_message_at: row.get(6)?,
+                    unread_count: row.get(7)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

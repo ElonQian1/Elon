@@ -336,3 +336,85 @@ pub(super) fn parse_attachments(
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(error))
     })
 }
+
+pub(super) fn message_preview_from_parts(
+    content: Option<&str>,
+    attachments_json: Option<&str>,
+) -> rusqlite::Result<Option<String>> {
+    if let Some(content) = content.map(str::trim).filter(|value| !value.is_empty()) {
+        return Ok(Some(content.to_string()));
+    }
+
+    let attachments = parse_attachments(attachments_json)?;
+    Ok(message_preview_from_attachments(&attachments))
+}
+
+fn message_preview_from_attachments(attachments: &[ProjectAttachmentRef]) -> Option<String> {
+    for attachment in attachments {
+        if is_voice_attachment(attachment) {
+            return Some(match attachment.duration_seconds {
+                Some(seconds) => format!("【语音】{}秒", seconds),
+                None => "【语音】".to_string(),
+            });
+        }
+        if is_image_attachment(attachment) {
+            return Some("【图片】".to_string());
+        }
+    }
+
+    if attachments.is_empty() {
+        None
+    } else {
+        Some("【附件】".to_string())
+    }
+}
+
+fn is_voice_attachment(attachment: &ProjectAttachmentRef) -> bool {
+    attachment_field_matches(&attachment.kind, &["voice", "audio"])
+        || attachment_mime_starts_with(&attachment.mime_type, "audio/")
+        || attachment_has_extension(
+            attachment,
+            &["m4a", "mp3", "wav", "aac", "ogg", "opus", "amr"],
+        )
+}
+
+fn is_image_attachment(attachment: &ProjectAttachmentRef) -> bool {
+    attachment_field_matches(&attachment.kind, &["image", "photo"])
+        || attachment_mime_starts_with(&attachment.mime_type, "image/")
+        || attachment_has_extension(
+            attachment,
+            &["jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif"],
+        )
+}
+
+fn attachment_field_matches(value: &Option<String>, choices: &[&str]) -> bool {
+    value.as_deref().map(str::trim).is_some_and(|value| {
+        choices
+            .iter()
+            .any(|choice| value.eq_ignore_ascii_case(choice))
+    })
+}
+
+fn attachment_mime_starts_with(value: &Option<String>, prefix: &str) -> bool {
+    value
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|value| value.to_ascii_lowercase().starts_with(prefix))
+}
+
+fn attachment_has_extension(attachment: &ProjectAttachmentRef, extensions: &[&str]) -> bool {
+    [
+        &attachment.file_name,
+        &attachment.display_name,
+        &attachment.path,
+    ]
+    .into_iter()
+    .filter_map(|value| value.as_deref())
+    .filter_map(|value| value.rsplit(['/', '\\']).next())
+    .filter_map(|value| value.rsplit_once('.').map(|(_, extension)| extension))
+    .any(|extension| {
+        extensions
+            .iter()
+            .any(|choice| extension.eq_ignore_ascii_case(choice))
+    })
+}

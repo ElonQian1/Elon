@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+use super::friend_messages::message_preview_from_parts;
 use super::{
     normalize_account, now, AddFriendResult, FriendProfile, FriendRecommendation,
     FriendSearchResult, Store, SOCIAL_AI_FRIEND_ACCOUNT, SOCIAL_AI_FRIEND_NAME,
@@ -147,6 +148,7 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT u.id, u.phone, u.email, u.nickname, u.avatar_data_url, f.created_at,
                     lm.content,
+                    lm.attachments_json,
                     lm.created_at,
                     (
                         SELECT COUNT(*)
@@ -198,6 +200,8 @@ impl Store {
                 let phone: Option<String> = row.get(1)?;
                 let email: Option<String> = row.get(2)?;
                 let account = phone.clone().or(email).unwrap_or_else(|| id.clone());
+                let last_content: Option<String> = row.get(6)?;
+                let last_attachments_json: Option<String> = row.get(7)?;
                 Ok(FriendProfile {
                     id,
                     account,
@@ -205,13 +209,16 @@ impl Store {
                     phone,
                     avatar_data_url: row.get(4)?,
                     friend_since: row.get(5)?,
-                    last_message: row.get(6)?,
-                    last_message_at: row.get(7)?,
-                    unread_count: row.get(8)?,
+                    last_message: message_preview_from_parts(
+                        last_content.as_deref(),
+                        last_attachments_json.as_deref(),
+                    )?,
+                    last_message_at: row.get(8)?,
+                    unread_count: row.get(9)?,
                     is_online: false,
-                    presence_status: row.get(9)?,
-                    custom_status: row.get(10)?,
-                    activity: row.get(11)?,
+                    presence_status: row.get(10)?,
+                    custom_status: row.get(11)?,
+                    activity: row.get(12)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -233,7 +240,7 @@ fn social_ai_friend_profile(conn: &Connection, user_id: &str) -> Result<FriendPr
         friend_since: None,
         last_message: latest
             .as_ref()
-            .map(|(content, _)| content.clone())
+            .and_then(|(preview, _)| preview.clone())
             .or_else(|| Some(SOCIAL_AI_FRIEND_PREVIEW.to_string())),
         last_message_at: latest.map(|(_, created_at)| created_at),
         unread_count,
@@ -247,9 +254,9 @@ fn social_ai_friend_profile(conn: &Connection, user_id: &str) -> Result<FriendPr
 fn latest_direct_social_ai_message(
     conn: &Connection,
     user_id: &str,
-) -> Result<Option<(String, String)>> {
+) -> Result<Option<(Option<String>, String)>> {
     conn.query_row(
-        "SELECT content, created_at
+        "SELECT content, attachments_json, created_at
          FROM friend_messages
          WHERE (
              sender_user_id = ?1
@@ -264,7 +271,14 @@ fn latest_direct_social_ai_message(
          ORDER BY created_at DESC
          LIMIT 1",
         params![user_id, SOCIAL_AI_USER_ID],
-        |row| Ok((row.get(0)?, row.get(1)?)),
+        |row| {
+            let content: String = row.get(0)?;
+            let attachments_json: Option<String> = row.get(1)?;
+            Ok((
+                message_preview_from_parts(Some(content.as_str()), attachments_json.as_deref())?,
+                row.get(2)?,
+            ))
+        },
     )
     .optional()
     .map_err(Into::into)
