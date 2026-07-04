@@ -336,6 +336,43 @@ try {
     'pure waiting timeline should explain that no public CLI output arrived',
   );
 
+  const separatedHeartbeatTimeline = buildTaskTimeline([
+    {
+      id: 'sh1',
+      kind: 'ai_progress',
+      task_id: 'tsk-separated-heartbeat',
+      content: '已派发到 PC 节点 node-usr_5c...33ed36，等待 Codex CLI 输出。',
+    },
+    {
+      id: 'sh2',
+      kind: 'ai_progress',
+      task_id: 'tsk-separated-heartbeat',
+      content: 'Codex\nAI CLI 正在处理中\n已等待 5s',
+    },
+    {
+      id: 'sh3',
+      kind: 'ai_progress',
+      task_id: 'tsk-separated-heartbeat',
+      content: 'PC 节点 node-usr_5c...33ed36 已确认接收，等待 Codex CLI 输出。',
+    },
+    {
+      id: 'sh4',
+      kind: 'ai_progress',
+      task_id: 'tsk-separated-heartbeat',
+      content: 'Codex\nAI CLI 正在处理中\n已等待 15s',
+    },
+  ]);
+  assert.strictEqual(
+    separatedHeartbeatTimeline.items.filter((item) => item.kind === 'heartbeat').length,
+    1,
+    'separated waiting heartbeats should still keep only the latest visible wait row',
+  );
+  assert.strictEqual(
+    separatedHeartbeatTimeline.items[separatedHeartbeatTimeline.items.length - 1].meta,
+    '已等待 15s',
+    'visible waiting row should show the latest wait duration',
+  );
+
   const validationTimeline = buildTaskTimeline([
     {
       id: 'v1',

@@ -29,7 +29,7 @@ interface TaskTimelineProps {
 export default function TaskTimeline({ model, taskContext, onCancel, onApprove }: TaskTimelineProps) {
   if (model.items.length === 0) return null
   const grouped = groupTimelineItems(model.items)
-  const showStageAtTop = model.stage.key !== 'finished' || model.stage.stuck
+  const showStageAtTop = (model.stage.key !== 'finished' && model.stage.key !== 'heartbeat') || model.stage.stuck
   const statusCount = (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
 
   return (
@@ -44,7 +44,7 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
           onApprove={onApprove}
         />
       ))}
-      <TimelineFold title="连接与等待" count={grouped.connection.length} defaultOpen={!model.coverage.finalReply && grouped.primary.length === 0}>
+      <TimelineFold title="连接信息" count={grouped.connection.length} defaultOpen={!model.coverage.finalReply && grouped.primary.length === 0}>
         {grouped.connection.map((item) => (
           <TimelineRow
             key={item.id}
@@ -110,7 +110,8 @@ function groupTimelineItems(items: TimelineItem[]) {
 }
 
 function isConnectionItem(item: TimelineItem) {
-  if (item.kind === 'node' || item.kind === 'heartbeat') return true
+  if (item.kind === 'heartbeat') return false
+  if (item.kind === 'node') return true
   if (item.event?.type === 'pc_dispatch_started') return true
   const phase = String(item.event?.phase ?? '')
   const text = [item.title, item.detail, item.meta, phase].filter(Boolean).join(' ')

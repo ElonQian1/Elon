@@ -158,10 +158,11 @@ export function buildTaskTimeline(
   })
 
   flushHeartbeat()
+  const compactedItems = collapseHeartbeatItems(items)
 
   const model = {
-    items,
-    visibleStepCount: items.length,
+    items: compactedItems,
+    visibleStepCount: compactedItems.length,
     heartbeatCount,
     lastHeartbeat: latestHeartbeat,
     coverage,
@@ -172,6 +173,21 @@ export function buildTaskTimeline(
     stage,
     diagnostics: buildDiagnostics(model),
   }
+}
+
+function collapseHeartbeatItems(items: TimelineItem[]): TimelineItem[] {
+  let heartbeatCount = 0
+  let latestHeartbeatIndex = -1
+  items.forEach((item, index) => {
+    if (item.kind === 'heartbeat') {
+      heartbeatCount += 1
+      latestHeartbeatIndex = index
+    }
+  })
+  if (latestHeartbeatIndex < 0 || heartbeatCount <= 1) {
+    return items
+  }
+  return items.filter((item, index) => item.kind !== 'heartbeat' || index === latestHeartbeatIndex)
 }
 
 function mergeShellResult(items: TimelineItem[], item: TimelineItem): boolean {
