@@ -483,8 +483,10 @@ try {
   );
   assert.strictEqual(validationTimeline.items[0].process.kind, 'test', 'validation command should expose a structured test process card');
   assert.ok(validationTimeline.items[0].process.subtitle.includes('cargo-dev.ps1 check'), 'merged test card should keep the command summary');
+  assert.ok(validationTimeline.items[0].process.commandText.includes('cargo-dev.ps1 check'), 'merged test card should keep the full command separately from output');
   assert.strictEqual(validationTimeline.items[0].process.bodyLabel, '输出', 'merged test card should label command output');
   assert.ok(validationTimeline.items[0].process.body.includes('Finished `dev`'), 'merged test card should show the command output');
+  assert.strictEqual(validationTimeline.items[0].process.bodyCollapsed, true, 'merged shell output should default to collapsed');
   assert.strictEqual(
     timelineSummary(validationTimeline, 'tsk-validation', 'tsk_val...'),
     '1 步过程 · 有命令 · 有测试/构建 · 当前：验证完成 · tsk_val...',
@@ -719,7 +721,9 @@ try {
     'summary should describe visible reply settling instead of saying the task is still only processing',
   );
   assert.strictEqual(settlingTimeline.items[0].process.chips.some((chip) => chip.label === 'exit=0'), true, 'merged command result should show exit status as a chip');
+  assert.strictEqual(settlingTimeline.items[0].process.commandText, 'Get-Date', 'merged command result should preserve the command line separately');
   assert.strictEqual(settlingTimeline.items[0].process.body, '2026-07-04 00:50:29', 'merged command result should not repeat exit status inside the output body');
+  assert.strictEqual(settlingTimeline.items[0].process.bodyCollapsed, true, 'merged command output should default to collapsed');
   const finalEchoTimeline = buildTaskTimeline(
     [
       {

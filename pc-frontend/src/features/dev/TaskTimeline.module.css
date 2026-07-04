@@ -409,6 +409,167 @@
   background: rgba(218, 55, 60, .07);
 }
 
+.shellProcessCard {
+  gap: 6px;
+  padding: 9px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .045);
+}
+
+.shellMetaRow {
+  min-height: 17px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #9aa3b1;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.shellMetaRow span {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  font-style: normal;
+}
+
+.shellMetaRow span[data-tone="done"] {
+  color: #8ee8af;
+}
+
+.shellMetaRow span[data-tone="failed"] {
+  color: #ff9da1;
+}
+
+.shellMetaRow span[data-tone="running"] {
+  color: #9fb2ff;
+}
+
+.shellMetaRow span[data-tone="muted"] {
+  color: #7f8ca3;
+}
+
+.shellCommandDetails,
+.shellOutputDetails {
+  min-width: 0;
+}
+
+.shellCommandDetails summary,
+.shellOutputDetails summary {
+  list-style: none;
+}
+
+.shellCommandDetails summary::-webkit-details-marker,
+.shellOutputDetails summary::-webkit-details-marker {
+  display: none;
+}
+
+.shellCommandDetails summary {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.shellCommandDetails summary code {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e2e8f0;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.shellCommandMore {
+  flex: 0 0 auto;
+  min-width: 24px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, .12);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .035);
+  color: #9aa8bd;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.shellCommandDetails summary:hover .shellCommandMore {
+  border-color: rgba(148, 163, 184, .24);
+  background: rgba(255, 255, 255, .07);
+  color: #d8e3f7;
+}
+
+.shellCommandDetails summary:focus-visible {
+  outline: 1px solid rgba(143, 211, 255, .45);
+  outline-offset: 2px;
+}
+
+.shellCommandDetails:not([open]) > pre,
+.shellOutputDetails:not([open]) > pre {
+  display: none;
+}
+
+.shellOutputDetails {
+  border-top: 1px solid rgba(148, 163, 184, .10);
+  padding-top: 5px;
+}
+
+.shellOutputDetails summary {
+  width: max-content;
+  max-width: 100%;
+  color: #8998b0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+}
+
+.shellOutputDetails summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 5px;
+  color: #66748a;
+}
+
+.shellOutputDetails[open] summary::before {
+  content: "▾";
+}
+
+.shellCommandDetails pre,
+.shellOutputDetails pre {
+  max-height: 260px;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  margin: 6px 0 0;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, .24);
+  color: #cfd8e8;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.shellCommandDetails pre[data-monospace="true"],
+.shellOutputDetails pre[data-monospace="true"] {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
 .embedded {
   margin-top: 4px;
   min-width: 0;

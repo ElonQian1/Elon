@@ -213,6 +213,7 @@ function shouldRenderEmbeddedMessage(item: TimelineItem): boolean {
 }
 
 function ProcessCardView({ process }: { process: ProcessCard }) {
+  if (process.commandText) return <ShellProcessCardView process={process} />
   return (
     <div className={[styles.processCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
       <div className={styles.processCardHead}>
@@ -236,6 +237,35 @@ function ProcessCardView({ process }: { process: ProcessCard }) {
             <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
           </div>
         )
+      )}
+    </div>
+  )
+}
+
+function ShellProcessCardView({ process }: { process: ProcessCard }) {
+  const commandText = process.commandText ?? ''
+  const chips = process.truncated
+    ? [...process.chips, { label: '已截断', tone: 'muted' as TaskTone }]
+    : process.chips
+  return (
+    <div className={[styles.processCard, styles.shellProcessCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
+      <div className={styles.shellMetaRow}>
+        {chips.map((chip, index) => (
+          <span key={`${chip.label}-${index}`} data-tone={chip.tone || undefined}>{chip.label}</span>
+        ))}
+      </div>
+      <details className={styles.shellCommandDetails}>
+        <summary title="点击查看完整命令">
+          <code>{commandText}</code>
+          <span className={styles.shellCommandMore} aria-hidden="true">...</span>
+        </summary>
+        <pre data-monospace="true">{commandText}</pre>
+      </details>
+      {process.body && (
+        <details className={styles.shellOutputDetails}>
+          <summary>{process.bodyLabel || '输出'}</summary>
+          <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
+        </details>
       )}
     </div>
   )

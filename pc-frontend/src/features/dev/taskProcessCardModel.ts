@@ -13,6 +13,7 @@ export interface ProcessCard {
   tone: TaskTone
   title: string
   subtitle: string
+  commandText?: string
   bodyLabel: string
   body: string
   chips: ProcessCardChip[]
@@ -44,13 +45,14 @@ function shellProcessCard(event: ToolEvent, tone: TaskTone, isResult: boolean): 
   const status = clean(event.status ?? '')
   const shellResult = parseShellResult(result, status)
   const output = shellResult.output || '（命令没有输出）'
-  const body = isResult ? output : command || formatJson(event.args)
+  const body = isResult ? output : command ? '' : formatJson(event.args)
   const commandSummary = firstLine(command)
   return {
     kind: validation ? 'test' : 'command',
     tone,
     title: validation ? (isResult ? '测试/构建完成' : '运行测试/构建') : (isResult ? '命令完成' : '执行命令'),
     subtitle: isResult ? commandSummary || firstLine(output) || 'shell' : commandSummary || 'shell',
+    commandText: command,
     bodyLabel: isResult ? '输出' : '完整命令',
     ...limitedBody(body),
     chips: [
@@ -60,7 +62,7 @@ function shellProcessCard(event: ToolEvent, tone: TaskTone, isResult: boolean): 
       isResult ? { label: formatChars(output.length) } : null,
     ].filter(Boolean) as ProcessCardChip[],
     monospace: true,
-    bodyCollapsed: !isResult && Boolean(command),
+    bodyCollapsed: Boolean(command) || isResult,
   }
 }
 
