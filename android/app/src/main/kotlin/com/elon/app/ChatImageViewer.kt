@@ -53,9 +53,6 @@ internal object ChatImageViewer {
             addView(image)
             addView(annotationOverlay)
             addView(createCloseButton(context, dialog))
-            attachment.displayName?.takeIf { it.isNotBlank() }?.let { name ->
-                addView(createTitle(context, name))
-            }
         }
 
         dialog.setContentView(root)
@@ -95,26 +92,6 @@ internal object ChatImageViewer {
             setTextColor(Color.parseColor("#D6D6D6"))
             textSize = 30f
             setOnClickListener { dialog.dismiss() }
-        }
-    }
-
-    private fun createTitle(context: Context, name: String): TextView {
-        return TextView(context).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM
-            ).apply {
-                leftMargin = context.dp(20)
-                rightMargin = context.dp(20)
-                bottomMargin = context.dp(24)
-            }
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            maxLines = 1
-            text = name
-            setTextColor(Color.parseColor("#DDEEEEEE"))
-            textSize = 13f
         }
     }
 
