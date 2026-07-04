@@ -209,12 +209,35 @@
   align-items: center;
   justify-content: space-between;
   min-height: 22px;
-  padding: 0 6px;
+  padding: 0 4px 0 0;
   color: var(--text-muted);
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .06em;
+}
+.channelSectionToggle {
+  min-width: 0;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 2px;
+  border-radius: 5px;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+.channelSectionToggle:hover,
+.channelSectionToggle:focus-visible {
+  background: rgba(255, 255, 255, .045);
+  color: var(--text-soft);
+}
+.channelSectionToggle span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .channelSectionHeader small {
   color: rgba(217, 217, 217, .42);

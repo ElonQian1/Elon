@@ -1,4 +1,5 @@
-import { Plus, User } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, User } from 'lucide-react'
+import { useState } from 'react'
 import { formatTime } from '../../lib/utils'
 import type { MemberConversationEntry } from './memberConversationApi'
 import styles from './MemberConversationList.module.css'
@@ -22,12 +23,28 @@ export default function MemberConversationList({
   onStartNew,
   onResetTarget,
 }: Props) {
+  const [sectionCollapsed, setSectionCollapsed] = useState(false)
+  const sectionTitle = isOwnTarget ? '我的会话' : `${targetName} 的会话`
+
   return (
     <section className={styles.section} aria-label={`${targetName} 的会话`}>
       <div className={styles.header}>
-        <div className={styles.headerCopy}>
-          <span>{isOwnTarget ? '我的会话' : `${targetName} 的会话`}</span>
-          {!isOwnTarget && <em>以你的账号继续协助</em>}
+        <button
+          aria-expanded={!sectionCollapsed}
+          className={styles.headerToggle}
+          onClick={() => setSectionCollapsed((value) => !value)}
+          type="button"
+        >
+          {sectionCollapsed
+            ? <ChevronRight size={13} strokeWidth={2.2} aria-hidden="true" />
+            : <ChevronDown size={13} strokeWidth={2.2} aria-hidden="true" />}
+          <span className={styles.headerCopy}>
+            <span>{sectionTitle}</span>
+            {!isOwnTarget && <em>以你的账号继续协助</em>}
+          </span>
+        </button>
+        <div className={styles.headerMeta}>
+          <small>{conversations.length}</small>
         </div>
         <div className={styles.actions}>
           {!isOwnTarget && (
@@ -55,36 +72,38 @@ export default function MemberConversationList({
         </div>
       </div>
 
-      {conversations.length === 0 && (
+      {!sectionCollapsed && conversations.length === 0 && (
         <div className={styles.empty}>
           {isOwnTarget ? '发送第一条消息自动创建会话' : '该成员暂无可见会话'}
         </div>
       )}
 
-      <div className={styles.list}>
-        {conversations.map((conversation) => {
-          const failed = conversation.last_task_status === 'error' || conversation.last_task_status === 'failed'
-          const title = conversationDisplayTitle(conversation)
-          const active = conversation.id === selectedId
-          return (
-            <button
-              key={conversation.id}
-              type="button"
-              className={[styles.item, active ? styles.itemActive : ''].join(' ')}
-              onClick={() => onOpen(conversation.id)}
-            >
-              <span className={styles.itemTitleRow}>
-                <span className={styles.itemTitle}>{title}</span>
-                {failed && <span className={styles.statusPill}>失败</span>}
-              </span>
-              <span className={styles.itemMeta}>
-                {conversation.updated_at ? formatTime(conversation.updated_at) : '未更新'}
-                {typeof conversation.message_count === 'number' && ` · ${conversation.message_count} 条`}
-              </span>
-            </button>
-          )
-        })}
-      </div>
+      {!sectionCollapsed && (
+        <div className={styles.list}>
+          {conversations.map((conversation) => {
+            const failed = conversation.last_task_status === 'error' || conversation.last_task_status === 'failed'
+            const title = conversationDisplayTitle(conversation)
+            const active = conversation.id === selectedId
+            return (
+              <button
+                key={conversation.id}
+                type="button"
+                className={[styles.item, active ? styles.itemActive : ''].join(' ')}
+                onClick={() => onOpen(conversation.id)}
+              >
+                <span className={styles.itemTitleRow}>
+                  <span className={styles.itemTitle}>{title}</span>
+                  {failed && <span className={styles.statusPill}>失败</span>}
+                </span>
+                <span className={styles.itemMeta}>
+                  {conversation.updated_at ? formatTime(conversation.updated_at) : '未更新'}
+                  {typeof conversation.message_count === 'number' && ` · ${conversation.message_count} 条`}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }
