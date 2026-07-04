@@ -272,23 +272,45 @@ zipStorePath=wrapper/dists
   Write-BytesIfMissing 'gradle\wrapper\gradle-wrapper.jar' $WrapperJarB64
 }
 
+function Invoke-GitQuiet {
+  param([string[]]$GitArgs)
+  $oldPreference = $ErrorActionPreference
+  $hadNativePreference = Test-Path Variable:\PSNativeCommandUseErrorActionPreference
+  if ($hadNativePreference) {
+    $oldNativePreference = $PSNativeCommandUseErrorActionPreference
+    $PSNativeCommandUseErrorActionPreference = $false
+  }
+  $ErrorActionPreference = 'Continue'
+  try {
+    & git @GitArgs *> $null
+    return $LASTEXITCODE
+  } catch {
+    return 1
+  } finally {
+    $ErrorActionPreference = $oldPreference
+    if ($hadNativePreference) {
+      $PSNativeCommandUseErrorActionPreference = $oldNativePreference
+    }
+  }
+}
+
 function Commit-BootstrapIfGit {
   if (-not $script:BootstrapTouched) { return }
-  & git rev-parse --is-inside-work-tree *> $null
-  if ($LASTEXITCODE -ne 0) { return }
-  $paths = @(
-    'settings.gradle', 'build.gradle', 'gradle.properties', 'app\build.gradle',
-    'app\src\main\AndroidManifest.xml', 'app\src\main\java', 'app\src\main\res',
-    'gradlew.bat', 'gradlew', 'gradle\wrapper\gradle-wrapper.properties',
-    'gradle\wrapper\gradle-wrapper.jar'
-  ) | Where-Object { Test-Path -LiteralPath $_ }
-  if (-not $paths.Count) { return }
-  & git config user.name 'Elon PC Node' *> $null
-  & git config user.email 'node@elon.local' *> $null
-  & git add -f -- $paths *> $null
-  $staged = @(& git diff --cached --name-only)
-  if ($staged.Count -gt 0) {
-    & git commit -m 'chore(build): ensure Android debug build pipeline' *> $null
+  try {
+    if ((Invoke-GitQuiet -GitArgs @('rev-parse', '--is-inside-work-tree')) -ne 0) { return }
+    $paths = @(
+      'settings.gradle', 'build.gradle', 'gradle.properties', 'app\build.gradle',
+      'app\src\main\AndroidManifest.xml', 'app\src\main\java', 'app\src\main\res',
+      'gradlew.bat', 'gradlew', 'gradle\wrapper\gradle-wrapper.properties',
+      'gradle\wrapper\gradle-wrapper.jar'
+    ) | Where-Object { Test-Path -LiteralPath $_ }
+    if (-not $paths.Count) { return }
+    [void](Invoke-GitQuiet -GitArgs @('config', 'user.name', 'Elon PC Node'))
+    [void](Invoke-GitQuiet -GitArgs @('config', 'user.email', 'node@elon.local'))
+    [void](Invoke-GitQuiet -GitArgs (@('add', '-f', '--') + $paths))
+    [void](Invoke-GitQuiet -GitArgs @('commit', '-m', 'chore(build): ensure Android debug build pipeline'))
+  } catch {
+    Write-Output ('ELON_APK_BOOTSTRAP_COMMIT_SKIPPED:' + $_.Exception.Message)
   }
 }
 
@@ -362,6 +384,8 @@ mod tests {
         assert!(script.contains("$apk = if ($BuildIfMissing) { $null } else { Find-LatestApk }"));
         assert!(script.contains("$chunkSize = 65536"));
         assert!(script.contains("Ensure-AndroidBuildBootstrap"));
+        assert!(script.contains("Invoke-GitQuiet"));
+        assert!(script.contains("ELON_APK_BOOTSTRAP_COMMIT_SKIPPED"));
         assert!(script.contains("gradle-wrapper.jar"));
     }
 
