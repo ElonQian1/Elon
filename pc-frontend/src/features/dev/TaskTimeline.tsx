@@ -275,7 +275,6 @@ function CommandRunItem({ item }: { item: TimelineItem }) {
   return (
     <details className={styles.commandRunItem}>
       <summary title={commandText}>
-        <span>已运行</span>
         <span className={styles.commandRunOpenLabel}>命令</span>
         <code>{commandSummary(commandText)}</code>
       </summary>
