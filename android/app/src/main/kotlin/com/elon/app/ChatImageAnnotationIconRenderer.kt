@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 
@@ -16,6 +17,7 @@ internal class ChatImageAnnotationIconRenderer {
         textAlign = Paint.Align.CENTER
         typeface = Typeface.DEFAULT_BOLD
     }
+    private val numberTextBounds = Rect()
 
     fun draw(
         canvas: Canvas,
@@ -37,8 +39,8 @@ internal class ChatImageAnnotationIconRenderer {
         val side = minOf(iconRect.width(), iconRect.height())
         if (side <= 0f) return
 
-        val centerX = iconRect.left + iconRect.width() * 0.55f
-        val centerY = iconRect.top + iconRect.height() * 0.39f
+        val centerX = iconRect.left + iconRect.width() * 0.50f
+        val centerY = iconRect.top + iconRect.height() * 0.43f
         val textAlpha = (255 * alphaScale).toInt().coerceIn(0, 255)
         if (textAlpha <= 0) return
 
@@ -46,13 +48,13 @@ internal class ChatImageAnnotationIconRenderer {
         val oldTextSize = numberTextPaint.textSize
         numberTextPaint.alpha = textAlpha
         numberTextPaint.textSize = side * when (label.length) {
-            1 -> 0.42f
-            2 -> 0.34f
-            else -> 0.25f
+            1 -> 0.34f
+            2 -> 0.28f
+            else -> 0.21f
         }
 
-        val fontMetrics = numberTextPaint.fontMetrics
-        val textY = centerY - (fontMetrics.ascent + fontMetrics.descent) / 2f
+        numberTextPaint.getTextBounds(label, 0, label.length, numberTextBounds)
+        val textY = centerY - numberTextBounds.exactCenterY()
         canvas.drawText(label, centerX, textY, numberTextPaint)
 
         numberTextPaint.alpha = oldTextAlpha
