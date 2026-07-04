@@ -19,6 +19,7 @@ import ComposerRuntimeToggles from './ComposerRuntimeToggles'
 import ConversationMemberSidebar from './ConversationMemberSidebar'
 import type { MemberPanelScope } from './ConversationMemberSidebar'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
+import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 import { api } from '../../api/client'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
 import { localJson } from '../doctor/localApi'
@@ -622,6 +623,9 @@ export default function ConversationPage() {
   const localNodeReady = localNodeOwnerOk
     && localNode?.connected !== false
     && localNode?.codex_cli?.available !== false
+  const localNodeStatusText = localNodeReady
+    ? `${clean(localNode?.device_name) || '本机'} · ${localNodeId}${localBindStatus ? ` · ${localBindStatus}` : ''}`
+    : localNodeOfflineText(localNodeError)
   const shouldPreferLocalNode = !['route_c2', 'route_c3'].includes(runtimeRoute)
   const directPcCliAvailable = !!activeProjectId
     && !isAssistingMember
@@ -1321,10 +1325,15 @@ export default function ConversationPage() {
                     : '未锁定当前电脑节点'}
                 </strong>
                 <span>
-                  {localNodeReady
-                    ? `${clean(localNode?.device_name) || '本机'} · ${localNodeId}${localBindStatus ? ` · ${localBindStatus}` : ''}`
-                    : localNodeError || '请确认 Windows 节点助手正在运行并已登录当前账号'}
+                  {localNodeStatusText}
                 </span>
+                {!localNodeReady && (
+                  <div className={styles.localNodeActions}>
+                    <button type="button" onClick={launchWinClientProtocol}>启动 Win 端</button>
+                    <a href={WIN_CLIENT_DOWNLOAD_URL} download>下载</a>
+                    <button type="button" onClick={() => navigate('/node')}>节点设置</button>
+                  </div>
+                )}
               </div>
               <div className={styles.projectRouteNotice}>
                 <span>
@@ -1747,6 +1756,14 @@ function shortNodeId(nodeId: string): string {
   const cleanId = clean(nodeId)
   if (cleanId.length <= 18) return cleanId
   return `${cleanId.slice(0, 11)}…${cleanId.slice(-6)}`
+}
+
+function localNodeOfflineText(error: string): string {
+  const text = clean(error)
+  if (!text || /failed to fetch/i.test(text)) {
+    return '未检测到本机 Win 端；电脑重启后请先启动节点客户端并保持登录。'
+  }
+  return text
 }
 
 async function loadAiDevelopmentTaskMessages(projectId: string, channelId: string): Promise<Message[]> {

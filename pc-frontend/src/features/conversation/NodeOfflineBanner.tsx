@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
+import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 
 const POLL_MS = 30_000
 
@@ -58,11 +59,21 @@ export default function NodeOfflineBanner() {
       <span style={{ fontSize: 16 }}>⚠️</span>
       <span style={{ flex: 1, lineHeight: 1.5 }}>
         <strong style={{ color: '#f5c07a' }}>{name}</strong> 未运行——
-        双击桌面快捷方式「一龙开发平台」重新启动即可。
-        找不到快捷方式？
+        电脑重启后需要重新打开一龙 Win 端，节点才会重新上线。
       </span>
+      <button
+        type="button"
+        onClick={launchWinClientProtocol}
+        style={{
+          background: '#1f6f3d', border: 'none', borderRadius: 5,
+          color: '#d9ffe5', padding: '5px 14px',
+          cursor: 'pointer', fontSize: 12, fontWeight: 800, flexShrink: 0,
+        }}
+      >
+        启动 Win 端
+      </button>
       <a
-        href="/api/node-agent/download/windows"
+        href={WIN_CLIENT_DOWNLOAD_URL}
         download
         style={{
           background: '#7a4510', border: 'none', borderRadius: 5,

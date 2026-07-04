@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { Settings } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
+import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from './launchWinClient'
 import CodexVaultCard from './CodexVaultCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { useUserProgression } from '../billing/useUserProgression'
@@ -17,9 +18,6 @@ import type {
   NodeSummary,
 } from './types'
 import styles from './NodePage.module.css'
-
-const DOWNLOAD_URL = '/api/node-agent/download/windows-client'
-const LAUNCH_URL = 'elon-node://open'
 
 export default function NodePage() {
   const [nodes, setNodes] = useState<NodeSummary[]>([])
@@ -120,11 +118,7 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
   }, [doProbe])
 
   function launchWinClient() {
-    const iframe = document.createElement('iframe')
-    iframe.style.display = 'none'
-    iframe.src = LAUNCH_URL
-    document.body.appendChild(iframe)
-    setTimeout(() => iframe.remove(), 2000)
+    launchWinClientProtocol()
     if (!pollRef.current) {
       let attempts = 0
       pollRef.current = setInterval(() => {
@@ -149,7 +143,7 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
       </div>
 
       <div className={styles.actions}>
-        <a className={[styles.btn, styles.primary].join(' ')} href={DOWNLOAD_URL} download>下载 Win 端</a>
+        <a className={[styles.btn, styles.primary].join(' ')} href={WIN_CLIENT_DOWNLOAD_URL} download>下载 Win 端</a>
         <button className={styles.btn} onClick={launchWinClient}>
           {probeStatus === 'online' ? '打开高级本机页' : '启动 Win 端'}
         </button>

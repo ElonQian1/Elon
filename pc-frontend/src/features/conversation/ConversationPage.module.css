@@ -1550,6 +1550,7 @@
   border-radius: 6px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   color: var(--text-soft);
   font-size: 12px;
@@ -1577,10 +1578,43 @@
 .localNodeNoticeWarn strong { color: var(--yellow); }
 
 .localNodeNotice span {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.localNodeActions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.localNodeActions button,
+.localNodeActions a {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(216, 165, 53, .26);
+  border-radius: 6px;
+  background: rgba(216, 165, 53, .12);
+  color: #f7d08a;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.localNodeActions button:hover,
+.localNodeActions a:hover {
+  background: rgba(216, 165, 53, .18);
+  border-color: rgba(216, 165, 53, .38);
 }
 
 .projectRouteNotice,
