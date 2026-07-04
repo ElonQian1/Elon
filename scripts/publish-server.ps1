@@ -74,6 +74,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
+. (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
 
 Set-ElonProjectDirectNetwork
 
@@ -909,76 +910,6 @@ function Publish-StaticDist {
     }
 }
 
-function Invoke-LoggedCmd {
-    param([string]$Command)
-
-    $previousErrorAction = $ErrorActionPreference
-    try {
-        $ErrorActionPreference = "Continue"
-        $output = & cmd /c $Command 2>&1
-        $exitCode = $LASTEXITCODE
-        foreach ($line in $output) {
-            Write-Host $line
-        }
-        return $exitCode
-    } finally {
-        $ErrorActionPreference = $previousErrorAction
-    }
-}
-
-function Invoke-PcFrontendLocalBuild {
-    param([string]$FrontendDir)
-    $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"
-    $viteCmd = Join-Path $FrontendDir "node_modules\.bin\vite.cmd"
-    if (-not (Test-Path $tscCmd) -or -not (Test-Path $viteCmd)) {
-        throw "本地 node_modules 缺少 tsc/vite"
-    }
-    Write-Host "   🔁 npm 构建失败，尝试直接使用 node_modules/.bin/tsc + vite ..." -ForegroundColor Gray
-    $exitCode = Invoke-LoggedCmd -Command "`"$tscCmd`" --noEmit && `"$viteCmd`" build"
-    if ($exitCode -ne 0) {
-        throw "node_modules/.bin 构建失败，exit=$exitCode"
-    }
-}
-
-function Resolve-PnpmCommand {
-    if (-not [string]::IsNullOrWhiteSpace($env:PNPM_CMD) -and (Test-Path $env:PNPM_CMD)) {
-        return $env:PNPM_CMD
-    }
-
-    $pnpm = Get-Command "pnpm" -ErrorAction SilentlyContinue
-    if ($pnpm) {
-        return $pnpm.Source
-    }
-
-    $codexPnpm = Join-Path $HOME ".cache\codex-runtimes\codex-primary-runtime\dependencies\bin\pnpm.cmd"
-    if (Test-Path $codexPnpm) {
-        return $codexPnpm
-    }
-
-    return $null
-}
-
-function Invoke-PcFrontendPnpmBuild {
-    param([string]$FrontendDir)
-
-    $pnpmCmd = Resolve-PnpmCommand
-    if (-not $pnpmCmd) {
-        throw "pnpm 不可用"
-    }
-
-    Write-Host "   🔁 npm 不可用，改用 pnpm 构建 PC 前端 ..." -ForegroundColor Gray
-    Push-Location $FrontendDir
-    try {
-        $installExit = Invoke-LoggedCmd -Command "`"$pnpmCmd`" install --no-frozen-lockfile --config.dangerously-allow-all-builds=true"
-        if ($installExit -ne 0) { throw "pnpm install 失败，exit=$installExit" }
-
-        $buildExit = Invoke-LoggedCmd -Command "`"$pnpmCmd`" run build"
-        if ($buildExit -ne 0) { throw "pnpm run build 失败，exit=$buildExit" }
-    } finally {
-        Pop-Location
-    }
-}
-
 if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Host "3.5⃣  ⚠️  npm 不在 PATH，跳过前端构建（/pc 将使用现有 dist 或返回 404）" -ForegroundColor Yellow
@@ -1003,12 +934,14 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
                 if ($installExit -ne 0) { throw "npm ci 失败，exit=$installExit" }
                 $lockHash | Set-Content $nmInstalled -NoNewline
             }
+            Reset-PcFrontendBuildArtifacts -FrontendDir $PcFrontendDir
             $buildExit = Invoke-LoggedCmd -Command "npm run build"
             if ($buildExit -ne 0) { throw "npm run build 失败，exit=$buildExit" }
             Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
         } catch {
             $primaryBuildError = $_
             try {
+                Reset-PcFrontendBuildArtifacts -FrontendDir $PcFrontendDir
                 Invoke-PcFrontendLocalBuild -FrontendDir $PcFrontendDir
                 Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
             } catch {
