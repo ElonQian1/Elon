@@ -15,7 +15,6 @@ interface ConversationFeedProps {
   taskContext: TaskContext
   isDevChannel: boolean
   user: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
-  showTaskTyping: boolean
   sendingMessage: boolean
   onScroll: () => void
   onCancelTask: (id: string) => Promise<void>
@@ -31,7 +30,6 @@ export default function ConversationFeed({
   taskContext,
   isDevChannel,
   user,
-  showTaskTyping,
   sendingMessage,
   onScroll,
   onCancelTask,
@@ -76,7 +74,7 @@ export default function ConversationFeed({
           />
         ),
       )}
-      {(showTaskTyping || sendingMessage) && (
+      {sendingMessage && (
         <div className={styles.typingRow}>
           <div className={styles.typingAvatar}>AI</div>
           <div className={styles.typingBubble}>

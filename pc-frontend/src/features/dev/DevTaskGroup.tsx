@@ -60,6 +60,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const hasProgressDetails = progressCount > 0
   const visibleAssistantNotes = resultMsg ? [] : assistantNotes
+  const showProcessingBubble = !isDone && !resultMsg && visibleAssistantNotes.length === 0
   const tone = status.tone
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const codexThreadUri = codexThreadUriFor(messages)
@@ -121,6 +122,8 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
           label={assistantNoteLabel(message)}
         />
       ))}
+
+      {showProcessingBubble && <TaskProcessingBubble />}
 
       {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
@@ -220,6 +223,22 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
         </div>
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TaskProcessingBubble() {
+  return (
+    <div className={styles.assistantTurn}>
+      <div className={styles.assistantAvatar}>AI</div>
+      <div className={styles.assistantBody}>
+        <div className={styles.processingBubble}>
+          <span>AI 正在处理</span>
+          <div className={styles.processingDots} aria-hidden="true">
+            <span /><span /><span />
+          </div>
         </div>
       </div>
     </div>

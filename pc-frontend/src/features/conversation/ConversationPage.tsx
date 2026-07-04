@@ -53,7 +53,6 @@ import {
   buildMessageGroups,
   buildTaskProcessMessageMap,
   containsTaskProcess,
-  hasRunningTaskAwaitingVisibleReply,
 } from './messageFlow'
 import { sameMessageList } from './messageListCompare'
 import {
@@ -772,9 +771,6 @@ export default function ConversationPage() {
     [displayMessages],
   )
 
-  // P1.3：打字指示器只看当前可见会话；公开回复已显示后不再追加“AI 正在处理”占位。
-  const showTaskTyping = useMemo(() => hasRunningTaskAwaitingVisibleReply(displayMessages), [displayMessages])
-
   // 消息分组：dev频道中把同一 task_id 的消息聚合为 DevTaskGroup（任务级折叠层）
   const taskFlowEnabled = isDevChannel || containsTaskProcess(displayMessages)
   const messageGroups = useMemo(
@@ -1325,7 +1321,6 @@ export default function ConversationPage() {
             taskContext={taskContext}
             isDevChannel={isDevChannel}
             user={user}
-            showTaskTyping={showTaskTyping}
             sendingMessage={sendingMessage}
             onScroll={handleFeedScroll}
             onCancelTask={handleCancelTask}
