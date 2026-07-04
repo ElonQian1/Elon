@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+use crate::project_ws_protocol::ProjectAttachmentRef;
+
+use super::friend_messages::parse_attachments;
 use super::{SocialAiHistoryMessage, Store, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID};
 
 impl Store {
@@ -15,7 +18,8 @@ impl Store {
         conn.query_row(
             "SELECT m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content
+                    m.content,
+                    m.attachments_json
              FROM friend_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.id = ?3
@@ -36,6 +40,7 @@ impl Store {
                     &row.get::<_, String>(0)?,
                     &row.get::<_, String>(1)?,
                     row.get(2)?,
+                    parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                 ))
             },
         )
@@ -54,7 +59,8 @@ impl Store {
         conn.query_row(
             "SELECT m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content
+                    m.content,
+                    m.attachments_json
              FROM friend_group_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1 AND m.id = ?2
@@ -66,6 +72,7 @@ impl Store {
                     &row.get::<_, String>(0)?,
                     &row.get::<_, String>(1)?,
                     row.get(2)?,
+                    parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                 ))
             },
         )
@@ -79,6 +86,7 @@ fn selected_history_message(
     sender_user_id: &str,
     sender_name: &str,
     content: String,
+    attachments: Vec<ProjectAttachmentRef>,
 ) -> SocialAiHistoryMessage {
     let from_request_user = sender_user_id == request_user_id;
     let speaker = if sender_user_id == SOCIAL_AI_USER_ID {
@@ -90,7 +98,10 @@ fn selected_history_message(
     };
     SocialAiHistoryMessage {
         speaker,
-        content,
+        content: crate::social_ai_attachment_context::append_to_message_content(
+            &content,
+            &attachments,
+        ),
         from_request_user,
     }
 }
@@ -135,6 +146,7 @@ fn ensure_group_member(conn: &Connection, user_id: &str, group_id: &str) -> Resu
 
 #[cfg(test)]
 mod tests {
+    use crate::project_ws_protocol::{ProjectAttachmentAnnotation, ProjectAttachmentRef};
     use crate::store::Store;
     use uuid::Uuid;
 
@@ -144,6 +156,72 @@ mod tests {
             Uuid::new_v4().simple()
         ));
         Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn selected_image_only_message_uses_annotation_context() {
+        let store = temp_store();
+        let alice = store
+            .create_user(
+                "selected-annotation-alice@example.com",
+                "secret1",
+                Some("Alice"),
+                None,
+            )
+            .expect("alice should be created");
+        let bob = store
+            .create_user(
+                "selected-annotation-bob@example.com",
+                "secret1",
+                Some("Bob"),
+                None,
+            )
+            .expect("bob should be created");
+        store
+            .add_friend(
+                &alice.id,
+                Some("email"),
+                "selected-annotation-bob@example.com",
+            )
+            .expect("alice can add bob");
+
+        let attachment = ProjectAttachmentRef {
+            attachment_id: Some("att_selected".to_string()),
+            kind: Some("image".to_string()),
+            display_name: Some("selected.jpg".to_string()),
+            file_name: Some("selected.jpg".to_string()),
+            mime_type: Some("image/jpeg".to_string()),
+            path: None,
+            url: None,
+            sha256: None,
+            size_bytes: Some(2048),
+            image_width: Some(800),
+            image_height: Some(600),
+            duration_seconds: None,
+            transcription: None,
+            annotations: vec![ProjectAttachmentAnnotation {
+                x: 0.2,
+                y: 0.3,
+                width: 0.4,
+                height: 0.5,
+                note: "selected note content".to_string(),
+                icon_x: None,
+                icon_y: None,
+                icon_width: None,
+                icon_height: None,
+            }],
+        };
+        let message = store
+            .send_friend_message(&bob.id, &alice.id, "", Some(&[attachment]))
+            .expect("image-only message should be stored");
+
+        let selected = store
+            .friend_message_for_social_ai_selection(&alice.id, &bob.id, &message.id)
+            .expect("selection lookup should work")
+            .expect("message is visible");
+
+        assert!(selected.content.contains("Attached media context for AI"));
+        assert!(selected.content.contains("selected note content"));
     }
 
     #[test]

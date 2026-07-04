@@ -188,6 +188,7 @@ mod server_agent_runtime_status;
 mod server_trace;
 mod social_ai;
 mod social_ai_agents;
+mod social_ai_attachment_context;
 mod social_ai_message_reply;
 mod source_hygiene;
 mod speech_translate;

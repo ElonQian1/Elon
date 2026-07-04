@@ -1,6 +1,9 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+use crate::project_ws_protocol::ProjectAttachmentRef;
+
+use super::friend_messages::parse_attachments;
 use super::{new_id, now, FriendChatMessage, FriendGroupMessage, Store};
 
 pub(crate) const SOCIAL_AI_USER_ID: &str = "usr_elon_ai";
@@ -32,7 +35,8 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content
+                    m.content,
+                    m.attachments_json
              FROM friend_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE (
@@ -58,6 +62,7 @@ impl Store {
                         &sender_user_id,
                         &sender_name,
                         row.get::<_, String>(2)?,
+                        parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                     ))
                 },
             )?
@@ -109,7 +114,8 @@ impl Store {
         let mut stmt = conn.prepare(
             "SELECT m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content
+                    m.content,
+                    m.attachments_json
              FROM friend_group_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1
@@ -125,6 +131,7 @@ impl Store {
                     &sender_user_id,
                     &sender_name,
                     row.get::<_, String>(2)?,
+                    parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                 ))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -225,6 +232,7 @@ fn history_message_from_row(
     sender_user_id: &str,
     sender_name: &str,
     content: String,
+    attachments: Vec<ProjectAttachmentRef>,
 ) -> SocialAiHistoryMessage {
     let from_request_user = sender_user_id == request_user_id;
     let speaker = if sender_user_id == SOCIAL_AI_USER_ID {
@@ -236,7 +244,10 @@ fn history_message_from_row(
     };
     SocialAiHistoryMessage {
         speaker,
-        content,
+        content: crate::social_ai_attachment_context::append_to_message_content(
+            &content,
+            &attachments,
+        ),
         from_request_user,
     }
 }
@@ -325,7 +336,8 @@ fn list_recent_direct_social_ai_messages(
     let mut stmt = conn.prepare(
         "SELECT m.sender_user_id,
                 COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                m.content
+                m.content,
+                m.attachments_json
          FROM friend_messages m
          LEFT JOIN users u ON u.id = m.sender_user_id
          WHERE (
@@ -354,6 +366,7 @@ fn list_recent_direct_social_ai_messages(
                     &sender_user_id,
                     &sender_name,
                     row.get::<_, String>(2)?,
+                    parse_attachments(row.get::<_, Option<String>>(3)?.as_deref())?,
                 ))
             },
         )?
@@ -532,6 +545,49 @@ mod tests {
             .find(|friend| friend.id == alice.id)
             .expect("alice should be listed");
         assert_eq!(alice_profile.last_message.as_deref(), Some("【图片】"));
+    }
+
+    #[test]
+    fn annotated_images_are_included_in_social_ai_history() {
+        let store = temp_store();
+        let alice = store
+            .create_user(
+                "social-ai-annotated-alice@example.com",
+                "secret1",
+                Some("Alice"),
+                None,
+            )
+            .expect("alice should be created");
+
+        let mut attachment = image_attachment("marked.jpg");
+        attachment.annotations = vec![ProjectAttachmentAnnotation {
+            x: 0.12,
+            y: 0.24,
+            width: 0.36,
+            height: 0.48,
+            note: "read this marked area".to_string(),
+            icon_x: Some(0.55),
+            icon_y: Some(0.66),
+            icon_width: Some(0.07),
+            icon_height: Some(0.08),
+        }];
+
+        store
+            .send_friend_message(&alice.id, SOCIAL_AI_USER_ID, "", Some(&[attachment]))
+            .expect("direct AI image-only message should be stored");
+
+        let history = store
+            .list_recent_friend_messages_for_social_ai(&alice.id, SOCIAL_AI_USER_ID, 10)
+            .expect("social AI history should load");
+        let content = &history
+            .last()
+            .expect("history should contain the image message")
+            .content;
+
+        assert!(content.contains("Attached media context for AI"));
+        assert!(content.contains("image_annotation #1"));
+        assert!(content.contains("read this marked area"));
+        assert!(content.contains("region x=0.120"));
     }
 
     #[test]

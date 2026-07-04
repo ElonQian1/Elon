@@ -81,6 +81,9 @@ pub(crate) fn append_project_attachment_notes(
             }
             if let Some(annotation_notes) = attachment_annotations_summary(attachment) {
                 note.push_str(&format!("\n  image_annotations:\n{}", annotation_notes));
+                note.push_str(
+                    "\n  Annotation intent: these annotations are user-authored requirements attached to the image. If the message text is empty or vague, treat each annotation note as part of the user's request.",
+                );
             }
             note.push_str(
                 "\n  Image context: this image has been passed via --attachment; Copilot can view it directly. Do NOT try to open the local path above (it may not exist); use the image content that was already loaded.",
@@ -289,6 +292,9 @@ pub async fn append_project_cli_attachment_artifacts(
             }
             if let Some(annotation_notes) = attachment_annotations_summary(attachment) {
                 note.push_str(&format!("\n  image_annotations:\n{}", annotation_notes));
+                note.push_str(
+                    "\n  Annotation intent: these annotations are user-authored requirements attached to the image. If the message text is empty or vague, treat each annotation note as part of the user's request.",
+                );
             }
             note.push_str("\n  Image context: inspect cli_workspace_path directly when this message asks about the image.");
         } else if mime_type.starts_with("audio/") || kind == "audio" {
@@ -348,4 +354,62 @@ pub async fn append_project_cli_attachment_artifacts(
         conversation_id,
         notes.join("\n")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::attachment_annotations_summary;
+    use crate::project_ws_protocol::{ProjectAttachmentAnnotation, ProjectAttachmentRef};
+
+    #[test]
+    fn project_attachment_annotations_are_summarized_for_ai_context() {
+        let attachment = ProjectAttachmentRef {
+            attachment_id: Some("att_marked".to_string()),
+            kind: Some("image".to_string()),
+            display_name: Some("marked.jpg".to_string()),
+            file_name: Some("marked.jpg".to_string()),
+            mime_type: Some("image/jpeg".to_string()),
+            path: Some("/workspace/attachments/marked.jpg".to_string()),
+            url: None,
+            sha256: None,
+            size_bytes: Some(2048),
+            image_width: Some(1080),
+            image_height: Some(720),
+            duration_seconds: None,
+            transcription: None,
+            annotations: vec![
+                ProjectAttachmentAnnotation {
+                    x: 0.1,
+                    y: 0.2,
+                    width: 0.3,
+                    height: 0.4,
+                    note: "first marked requirement".to_string(),
+                    icon_x: Some(0.41),
+                    icon_y: Some(0.58),
+                    icon_width: Some(0.06),
+                    icon_height: Some(0.08),
+                },
+                ProjectAttachmentAnnotation {
+                    x: 0.5,
+                    y: 0.6,
+                    width: 0.2,
+                    height: 0.1,
+                    note: "second marked requirement".to_string(),
+                    icon_x: None,
+                    icon_y: None,
+                    icon_width: None,
+                    icon_height: None,
+                },
+            ],
+        };
+
+        let summary =
+            attachment_annotations_summary(&attachment).expect("summary should be generated");
+
+        assert!(summary.contains("#1"));
+        assert!(summary.contains("first marked requirement"));
+        assert!(summary.contains("#2"));
+        assert!(summary.contains("second marked requirement"));
+        assert!(summary.contains("x=0.100"));
+    }
 }
