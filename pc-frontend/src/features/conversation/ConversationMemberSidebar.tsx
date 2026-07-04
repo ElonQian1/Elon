@@ -132,13 +132,14 @@ export default function ConversationMemberSidebar({
 }: ConversationMemberSidebarProps) {
   const hasProject = !!activeProjectId
 
+  if (workspacePanels.memberCollapsed) return null
+
   return (
     <aside
       className={styles.memberPanel}
-      data-collapsed={workspacePanels.memberCollapsed ? 'true' : undefined}
-      aria-hidden={workspacePanels.memberCollapsed ? 'true' : undefined}
+      aria-label="右侧项目大厅"
     >
-      {!workspacePanels.memberCollapsed && <WorkspacePanelResizeHandle side="member" panels={workspacePanels} />}
+      <WorkspacePanelResizeHandle side="member" panels={workspacePanels} />
       <div className={styles.memberTitle}>
         <div className={styles.memberTitleCopy}>
           <strong>{title}{count > 0 ? ` — ${count}` : ''}</strong>

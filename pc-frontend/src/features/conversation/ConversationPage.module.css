@@ -14,6 +14,7 @@
   min-height: 0;
   overflow: hidden;
   background: var(--bg-base);
+  position: relative;
 }
 
 /* ══════════════════════════════════════
@@ -918,9 +919,6 @@
   grid-template-rows: var(--topbar-height) minmax(0, 1fr);
   min-height: 0;
   position: relative;
-}
-.memberPanel[data-collapsed="true"] {
-  display: none;
 }
 .memberTitle {
   display: flex;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Stethoscope } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -82,6 +82,11 @@ export default function AiChatPage() {
   const [usersError, setUsersError] = useState('')
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
   const [friendPopoverY, setFriendPopoverY] = useState(200)
+  const [userPanelCollapsed, setUserPanelCollapsed] = useState(() => (
+    typeof window !== 'undefined'
+      ? window.localStorage.getItem('elon.pc.aiUserPanelCollapsed') === 'true'
+      : false
+  ))
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
@@ -99,6 +104,14 @@ export default function AiChatPage() {
   useEffect(() => {
     persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('elon.pc.aiUserPanelCollapsed', userPanelCollapsed ? 'true' : 'false')
+    } catch {
+      // Layout preference is best-effort only.
+    }
+  }, [userPanelCollapsed])
 
   useEffect(() => {
     let cancelled = false
@@ -283,7 +296,7 @@ export default function AiChatPage() {
   }
 
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} data-user-panel-collapsed={userPanelCollapsed ? 'true' : undefined}>
       {/* 会话列表（左栏）*/}
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
@@ -330,6 +343,18 @@ export default function AiChatPage() {
             {conversations.find((c) => c.id === activeConvId)?.title ?? '新对话'}
           </span>
           <div className={styles.topbarRight}>
+            <button
+              className={[styles.topbarBtn, styles.panelToggleBtn].join(' ')}
+              type="button"
+              title={userPanelCollapsed ? '展开右侧用户栏' : '收起右侧用户栏'}
+              aria-label={userPanelCollapsed ? '展开右侧用户栏' : '收起右侧用户栏'}
+              aria-pressed={!userPanelCollapsed}
+              onClick={() => setUserPanelCollapsed((collapsed) => !collapsed)}
+            >
+              {userPanelCollapsed
+                ? <ChevronLeft size={14} aria-hidden="true" />
+                : <ChevronRight size={14} aria-hidden="true" />}
+            </button>
             <span className={styles.modelBadge}>{modelButtonCopy.source} · {modelButtonCopy.detail}</span>
             <button className={styles.topbarBtn} type="button"
               title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
@@ -445,7 +470,7 @@ export default function AiChatPage() {
       </div>
 
       {/* ══ 右侧用户栏 ══ */}
-      <aside className={styles.userPanel}>
+      {!userPanelCollapsed && <aside className={styles.userPanel}>
         <div className={styles.userPanelTitle}>
           <div className={styles.userPanelTitleCopy}>
             <strong>全站用户{friends.length > 0 ? ` — ${friends.length}` : ''}</strong>
@@ -550,7 +575,19 @@ export default function AiChatPage() {
             <p className={styles.userPanelHint}>已显示 {friends.length} 位</p>
           )}
         </div>
-      </aside>
+      </aside>}
+
+      {userPanelCollapsed && (
+        <button
+          className={styles.userPanelRestoreBtn}
+          type="button"
+          title="展开右侧用户栏"
+          aria-label="展开右侧用户栏"
+          onClick={() => setUserPanelCollapsed(false)}
+        >
+          <ChevronLeft size={17} aria-hidden="true" />
+        </button>
+      )}
 
       {showModelPicker && (
         <ModelPickerPopover

@@ -6,11 +6,17 @@
   height: 100%;
   overflow: hidden;
   background: var(--bg-base);
+  position: relative;
+}
+
+.layout[data-user-panel-collapsed="true"] {
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 @media (max-width: 960px) {
   .layout { grid-template-columns: 260px minmax(0, 1fr); }
   .userPanel { display: none; }
+  .userPanelRestoreBtn { display: none; }
 }
 
 /* ── 会话列表（左栏）── */
@@ -176,6 +182,13 @@
   white-space: nowrap;
 }
 .topbarBtn:hover { background: rgba(255,255,255,.06); color: #c8ccd4; }
+.panelToggleBtn {
+  width: 28px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
 
 .feed {
   overflow-y: auto;
@@ -411,6 +424,27 @@
   display: grid;
   grid-template-rows: 48px minmax(0, 1fr);
   min-height: 0;
+}
+.userPanelRestoreBtn {
+  position: absolute;
+  top: 58px;
+  right: 10px;
+  z-index: 16;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 7px;
+  background: #202126;
+  color: var(--text-soft);
+  box-shadow: 0 10px 26px rgba(0,0,0,.32);
+}
+.userPanelRestoreBtn:hover,
+.userPanelRestoreBtn:focus-visible {
+  background: #2a2c32;
+  color: var(--text);
+  outline: none;
 }
 .userPanelTitle {
   display: flex;

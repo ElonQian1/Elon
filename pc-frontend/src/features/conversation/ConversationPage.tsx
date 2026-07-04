@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, History, RefreshCw, Smartphone } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Cpu, History, RefreshCw, Smartphone } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
@@ -1197,7 +1197,7 @@ export default function ConversationPage() {
               aria-pressed={!workspacePanels.memberCollapsed}
               onClick={workspacePanels.toggleMemberPanel}
             >
-              <span aria-hidden="true">{workspacePanels.memberCollapsed ? '◂' : '▸'}</span>
+              {workspacePanels.memberCollapsed ? <ChevronLeft size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
               <span>{workspacePanels.memberCollapsed ? '项目栏' : '收起右栏'}</span>
             </button>
             {activeChannelId && (
