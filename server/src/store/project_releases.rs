@@ -162,6 +162,92 @@ pub(super) fn insert_task_apk_release_locked(
     };
     let file_name = release_file_name_from_url(apk_url);
     let now = now();
+    if let Some(release_id) = conn
+        .query_row(
+            "SELECT id FROM project_releases
+             WHERE project_id = ?1 AND task_id IS NULL AND status = 'published'
+               AND TRIM(apk_url) = ?2
+             ORDER BY updated_at DESC, created_at DESC LIMIT 1",
+            params![project_id, apk_url.trim()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+    {
+        conn.execute(
+            "UPDATE project_releases
+                SET task_id = ?1,
+                    uploaded_by = COALESCE(uploaded_by, ?2),
+                    version_name = COALESCE(version_name, ?3),
+                    updated_at = ?4
+              WHERE id = ?5",
+            params![
+                task_id,
+                user_id,
+                format!("AI task {}", created_at),
+                now,
+                release_id,
+            ],
+        )?;
+        return Ok(());
+    }
+    if let Some((
+        existing_file_name,
+        existing_file_path,
+        existing_sha256,
+        existing_size,
+        channel,
+        changelog,
+    )) = conn
+        .query_row(
+            "SELECT file_name, file_path, sha256, size_bytes, channel, changelog
+             FROM project_releases
+             WHERE project_id = ?1 AND status = 'published'
+               AND TRIM(apk_url) = ?2
+             ORDER BY
+               CASE WHEN file_path IS NULL OR TRIM(file_path) = '' THEN 1 ELSE 0 END,
+               updated_at DESC, created_at DESC
+             LIMIT 1",
+            params![project_id, apk_url.trim()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<i64>>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(5)?,
+                ))
+            },
+        )
+        .optional()?
+    {
+        conn.execute(
+            "INSERT OR IGNORE INTO project_releases (
+               id, project_id, task_id, uploaded_by, version_name, channel, status,
+               apk_url, file_name, file_path, sha256, size_bytes, changelog,
+               created_at, updated_at
+             )
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'published',
+                     ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            params![
+                new_id("rel"),
+                project_id,
+                task_id,
+                user_id,
+                format!("AI task {}", created_at),
+                channel,
+                apk_url.trim(),
+                release_file_name(&existing_file_name),
+                existing_file_path,
+                existing_sha256,
+                existing_size,
+                changelog,
+                created_at,
+                now,
+            ],
+        )?;
+        return Ok(());
+    }
     conn.execute(
         "INSERT OR IGNORE INTO project_releases (
            id, project_id, task_id, uploaded_by, version_name, channel, status,

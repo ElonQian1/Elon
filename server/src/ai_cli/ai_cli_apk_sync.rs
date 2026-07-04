@@ -1,6 +1,10 @@
 use anyhow::{anyhow, Result};
 use homecli_proto::AgentToServer;
-use std::{path::Path, sync::Arc};
+use sha2::{Digest, Sha256};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 use super::{
@@ -10,6 +14,14 @@ use crate::{
     tools,
     types::{AppState, WsMessage},
 };
+
+#[derive(Debug)]
+struct SyncedPcApk {
+    path: PathBuf,
+    file_name: String,
+    sha256: String,
+    size_bytes: i64,
+}
 
 pub(crate) fn pc_apk_probe_since(request_mode: AiCliRequestMode, cwd: Option<&str>) -> Option<u64> {
     if request_mode.is_plan() || cwd.is_none() {
@@ -65,7 +77,11 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
     )
     .await
     {
-        Ok(Some(_path)) => Some(tools::stable_apk_url(download_base)),
+        Ok(Some(apk)) => {
+            let apk_url = tools::stable_apk_url(download_base);
+            register_synced_pc_release(state, download_base, &apk_url, &apk);
+            Some(apk_url)
+        }
         Ok(None) => {
             if let Some(apk_url) = latest_project_release_apk_url(state, download_base) {
                 if explicit_apk_sync {
@@ -96,6 +112,46 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
             }
             None
         }
+    }
+}
+
+fn register_synced_pc_release(
+    state: &AppState,
+    download_base: &str,
+    apk_url: &str,
+    apk: &SyncedPcApk,
+) {
+    let Some(project_id) = project_id_from_download_base(download_base) else {
+        return;
+    };
+    if project_id.is_empty() {
+        return;
+    }
+    let file_path = apk.path.to_string_lossy();
+    if let Err(error) =
+        state
+            .store
+            .create_project_release(crate::store::project_releases::ProjectReleaseWrite {
+                id: None,
+                project_id,
+                task_id: None,
+                uploaded_by: None,
+                version_name: Some("PC node debug build"),
+                channel: Some("pc_node"),
+                status: Some("published"),
+                apk_url,
+                file_name: &apk.file_name,
+                file_path: Some(file_path.as_ref()),
+                sha256: Some(&apk.sha256),
+                size_bytes: Some(apk.size_bytes),
+                changelog: Some("Synced from PC node after AI development task"),
+            })
+    {
+        tracing::warn!(
+            project_id = %project_id,
+            error = %error,
+            "failed to register synced PC APK release"
+        );
     }
 }
 
@@ -136,7 +192,7 @@ async fn sync_pc_agent_apk_artifact(
     artifact_workspace: &Path,
     fresh_after_unix_secs: Option<u64>,
     build_if_missing: bool,
-) -> Result<Option<std::path::PathBuf>> {
+) -> Result<Option<SyncedPcApk>> {
     use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
     let script = pc_apk_sync_script(fresh_after_unix_secs, build_if_missing);
@@ -198,8 +254,20 @@ async fn sync_pc_agent_apk_artifact(
     let artifact_dir = artifact_workspace.join("artifacts");
     tokio::fs::create_dir_all(&artifact_dir).await?;
     let artifact_path = artifact_dir.join(filename);
+    let sha256 = format!("{:x}", Sha256::digest(&apk_bytes));
+    let size_bytes = apk_bytes.len() as i64;
     tokio::fs::write(&artifact_path, apk_bytes).await?;
-    Ok(Some(artifact_path))
+    let file_name = artifact_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("ElonSpeed-latest.apk")
+        .to_string();
+    Ok(Some(SyncedPcApk {
+        path: artifact_path,
+        file_name,
+        sha256,
+        size_bytes,
+    }))
 }
 
 fn parse_pc_apk_relay_output(output: &str) -> Result<Option<(String, Vec<u8>)>> {

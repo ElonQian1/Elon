@@ -1,7 +1,12 @@
-use crate::{ai_cli, pc_agent_runtime_choice::PcRuntimeRoutePreference, store::ProjectAccess};
+use crate::{
+    ai_cli, intent_router, pc_agent_runtime_choice::PcRuntimeRoutePreference, store::ProjectAccess,
+};
 
 pub(crate) fn should_attempt_pc_apk_sync(project: &ProjectAccess, user_message: &str) -> bool {
-    project_template_is_android(&project.template) || ai_cli::looks_like_android_task(user_message)
+    let development_request = intent_router::looks_like_development_request(user_message);
+    (project_template_is_android(&project.template) && development_request)
+        || ai_cli::looks_like_android_task(user_message)
+        || (project_requires_pc_workspace(project) && development_request)
 }
 
 fn project_template_is_android(template: &str) -> bool {
@@ -173,7 +178,25 @@ mod tests {
     fn android_template_pc_project_attempts_apk_sync_for_ui_changes() {
         let project = pc_project("prj_android", "android_kotlin", Some("node-local"));
 
-        assert!(should_attempt_pc_apk_sync(&project, "change button color"));
+        assert!(should_attempt_pc_apk_sync(&project, "新增一个绿色按钮"));
+    }
+
+    #[test]
+    fn pc_managed_development_request_attempts_apk_sync_without_apk_keyword() {
+        let mut project = pc_project("prj_pc", "blank", Some("node-local"));
+        project.template = "custom".into();
+
+        assert!(should_attempt_pc_apk_sync(
+            &project,
+            "现在新增一个按钮 金色 叫 角色"
+        ));
+    }
+
+    #[test]
+    fn pc_managed_casual_chat_does_not_force_apk_sync() {
+        let project = pc_project("prj_pc", "blank", Some("node-local"));
+
+        assert!(!should_attempt_pc_apk_sync(&project, "你好，先聊一下想法"));
     }
 
     #[test]

@@ -1,5 +1,3 @@
-// server/src/store/tasks.rs
-
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 
@@ -12,7 +10,6 @@ const CHANNEL_TASK_INTERRUPTED_RESULT: &str =
     "任务已中断：服务器重启前任务未完成。请点击“继续”让 AI 检查当前工作区后接着处理。";
 const CHANNEL_TASK_STALE_RESULT: &str =
     "任务失败：PC 节点断线或任务超时自动终止。请点击“继续”让 AI 检查当前工作区后接着处理。";
-
 #[derive(Debug, Clone)]
 struct ChannelTaskResultTarget {
     task_id: String,
@@ -667,6 +664,9 @@ fn insert_missing_channel_ai_results(
     }
     Ok(inserted)
 }
+
+#[cfg(test)]
+mod task_release_tests;
 
 #[cfg(test)]
 mod tests {

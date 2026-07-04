@@ -307,8 +307,8 @@ function Invoke-AndroidDebugBuild {
   }
 }
 
-$apk = Find-LatestApk
-if (-not $apk -and $BuildIfMissing) {
+$apk = if ($BuildIfMissing) { $null } else { Find-LatestApk }
+if ($BuildIfMissing) {
   Write-Output 'ELON_APK_BUILD_ATTEMPT_BEGIN'
   Invoke-AndroidDebugBuild
   Write-Output 'ELON_APK_BUILD_ATTEMPT_END'
@@ -330,6 +330,7 @@ mod tests {
     fn apk_sync_script_can_enable_build_fallback() {
         let script = pc_apk_sync_script(None, true);
         assert!(script.contains("$BuildIfMissing = $true"));
+        assert!(script.contains("$apk = if ($BuildIfMissing) { $null } else { Find-LatestApk }"));
         assert!(script.contains("Ensure-AndroidBuildBootstrap"));
         assert!(script.contains("gradle-wrapper.jar"));
     }
