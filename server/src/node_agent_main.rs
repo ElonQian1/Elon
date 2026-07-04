@@ -89,6 +89,7 @@ mod node_agent_env;
 mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
+mod node_agent_install_env;
 mod node_agent_local_admin;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
@@ -899,7 +900,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             available: false,
             status: "not_installed".to_string(),
             detail: Some(
-                "未检测到 @openai/codex CLI；只安装 Codex 桌面端不一定会提供可调用的 codex 命令"
+                "未检测到可运行的 Codex CLI；只安装 Codex 桌面端不一定会提供可调用的 codex 命令"
                     .to_string(),
             ),
             reason: Some("not_found".to_string()),
@@ -908,7 +909,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
                     .to_string(),
             ),
             fix_hint: Some(
-                "点击安装/修复，让 Win 端安装 @openai/codex CLI；安装后重新检测。".to_string(),
+                "点击安装/修复，让 Win 端运行 OpenAI 官方 Windows 安装器；安装后重新检测。".to_string(),
             ),
             fix_action: "install".to_string(),
             backend: "cli",
@@ -928,7 +929,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             available: false,
             status: "not_runnable".to_string(),
             detail: Some(run.summary.clone().unwrap_or_else(|| {
-                "检测到 codex 命令，但无法非交互执行；请安装 @openai/codex CLI 或修复 PATH"
+                "检测到 codex 命令，但无法非交互执行；请安装 Codex CLI 或修复 PATH"
                     .to_string()
             })),
             reason: run
@@ -1115,10 +1116,10 @@ fn codex_not_runnable_diagnosis(path: &Path, reason: Option<&str>) -> String {
 
 fn codex_not_runnable_fix_hint(path: &Path) -> String {
     if is_codex_desktop_resource_path(path) {
-        return "请点击安装/修复 Codex，让 Win 端安装真正的 @openai/codex CLI；如果已安装，请确保 npm/本地 Codex CLI 的 bin 目录排在 WindowsApps 桌面资源路径之前。"
+        return "请点击安装/修复 Codex，让 Win 端运行 OpenAI 官方 Windows 安装器；如果已安装，请确保本地 Codex CLI 的 bin 目录排在 WindowsApps 桌面资源路径之前。"
             .to_string();
     }
-    "请点击安装/修复 Codex，或重新安装 @openai/codex CLI 后再检测。".to_string()
+    "请点击安装/修复 Codex，或重新安装 Codex CLI 后再检测。".to_string()
 }
 
 fn is_codex_desktop_resource_path(path: &Path) -> bool {
@@ -3829,7 +3830,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
         );
         let protected_routes = axum::Router::new()
             .route("/api/env-check", axum::routing::get(admin_env_check))
-            .route("/api/install-env", axum::routing::post(admin_install_env))
+            .route(
+                "/api/install-env",
+                axum::routing::post(node_agent_install_env::admin_install_env),
+            )
             .route(
                 "/api/codex-cli/refresh",
                 axum::routing::post(admin_codex_cli_refresh),
@@ -4470,10 +4474,6 @@ fn git_value_at(path: &std::path::Path, args: &[&str]) -> Option<String> {
 
 // ── AI 编码工具 & Android 环境检查 / 安装 ────────────────────────────────────
 
-/// 安装向导脚本（嵌入二进制，管理页触发时写到临时目录执行）
-#[cfg(windows)]
-const SETUP_ENV_SCRIPT: &str = include_str!("../../scripts/setup-node-env.ps1");
-
 /// 检查单个命令行工具是否可用（PATH + 常见安装目录双路扫描）。
 fn tool_available(bin: &str) -> bool {
     if elon_pc_dev_runtime::command_path(bin).is_some() {
@@ -4556,86 +4556,6 @@ async fn admin_env_check(
     .await
     .unwrap_or_else(|_| serde_json::json!({}));
     axum::Json(result)
-}
-
-/// POST /api/install-env — 用户主动触发的后台安装/修复任务。
-async fn admin_install_env(
-    axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
-) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    #[cfg(windows)]
-    {
-        let tmp = std::env::temp_dir().join("elon-setup-node-env.ps1");
-        let mut script_bytes = vec![0xEF, 0xBB, 0xBF];
-        script_bytes.extend_from_slice(SETUP_ENV_SCRIPT.as_bytes());
-        if let Err(e) = std::fs::write(&tmp, script_bytes) {
-            return (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::json!({
-                    "ok": false,
-                    "error": format!("写入临时脚本失败: {e}")
-                })),
-            );
-        }
-        // 优先使用 exe 同目录的脚本（可能是更新版）
-        let script_path = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("setup-node-env.ps1")))
-            .filter(|p| p.exists())
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| tmp.to_string_lossy().to_string());
-
-        let shell = elon_pc_dev_runtime::command_path("pwsh")
-            .or_else(|| elon_pc_dev_runtime::command_path("powershell"))
-            .unwrap_or_else(|| PathBuf::from("powershell"));
-        let mut command = std::process::Command::new(shell);
-        command.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-WindowStyle",
-            "Hidden",
-            "-File",
-            &script_path,
-            "-Silent",
-        ]);
-        command.stdin(std::process::Stdio::null());
-        command.stdout(std::process::Stdio::null());
-        command.stderr(std::process::Stdio::null());
-        #[cfg(windows)]
-        {
-            use std::os::windows::process::CommandExt;
-            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-            const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-            command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
-        }
-
-        match command.spawn() {
-            Ok(_) => (
-                axum::http::StatusCode::OK,
-                axum::Json(serde_json::json!({
-                    "ok": true,
-                    "msg": "安装/修复任务已在后台启动，稍后刷新本页查看结果"
-                })),
-            ),
-            Err(e) => (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(serde_json::json!({
-                    "ok": false,
-                    "error": format!("启动脚本失败: {e}")
-                })),
-            ),
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        (
-            axum::http::StatusCode::BAD_REQUEST,
-            axum::Json(serde_json::json!({
-                "ok": false,
-                "error": "自动安装向导仅限 Windows。Linux 用户请手动执行：\nbash scripts/setup-node-env.sh\n（或参照文档手动安装 git / jdk17 / node / codex / android-sdk）"
-            })),
-        )
-    }
 }
 
 #[derive(Deserialize)]

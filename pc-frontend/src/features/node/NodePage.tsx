@@ -365,12 +365,19 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   }
 
   async function installEnv() {
-    setCodexBusy(true); setResult('正在启动安装修复向导…'); setError('')
+    setCodexBusy(true); setResult('正在启动 Codex CLI 安装/修复…'); setError('')
     try {
       const data = await nodeApi<{ msg?: string; message?: string }>(
-        adminUrl, '/api/install-env', { method: 'POST' }, 10000,
+        adminUrl,
+        '/api/install-env',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target: 'codex' }),
+        },
+        10000,
       )
-      setResult(data.msg || data.message || '安装修复向导已启动。')
+      setResult(data.msg || data.message || 'Codex CLI 安装/修复已启动。')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -436,7 +443,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           ['节点 ID', status.agent_id ?? '登录后自动生成'],
           ['版本', status.version ?? '未知'],
           ['开机自启动', autostart?.enabled ? '已开启' : autostart ? '未开启' : '检测中'],
-          ['本机AI', uniqueCliNames.length ? uniqueCliNames.join('、') : '未检测到 Codex/Copilot'],
+          ['可执行CLI', uniqueCliNames.length ? uniqueCliNames.join('、') : '未检测到 Codex/Copilot'],
           ['本机模型', localModelCount ? `${localModelCount} 个` : '未检测到'],
         ].map(([k, v]) => (
           <div key={k}><span>{k}</span><strong>{v}</strong></div>
@@ -603,7 +610,7 @@ function codexStatusCopy(status: LocalCliToolStatus | null, refreshing: boolean)
     return {
       tone: 'offline',
       title: 'Codex CLI 未安装',
-      body: status.detail || '需要安装 @openai/codex CLI。',
+      body: status.detail || '需要安装可由命令行调用的 Codex CLI；只安装桌面版通常不够。',
       action: 'install',
     }
   }
@@ -699,7 +706,7 @@ function CodexStatusCard({
       <div className={styles.codexActions}>
         {showInstall && (
           <button className={[styles.btn, styles.primary].join(' ')} onClick={onInstall} disabled={busy}>
-            安装/修复 Codex
+            安装/修复 Codex CLI
           </button>
         )}
         <button className={styles.btn} onClick={onRefresh} disabled={busy}>

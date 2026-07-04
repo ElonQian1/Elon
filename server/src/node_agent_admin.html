@@ -738,16 +738,16 @@ async function loadEnvCheck() {
   const items = [
     { name: 'Git',            key: 'git',          note: '代码操作必需',        required: true },
     { name: 'JDK 17',         key: 'java',         note: 'Android Gradle 必需', required: true },
-    { name: 'Node.js',        key: 'node',         note: 'Codex 运行时',        required: true },
+    { name: 'Node.js',        key: 'node',         note: '前端/项目工具链',      required: true },
     { name: 'npm',            key: 'npm',          note: 'Node 包管理器',       required: true },
-    { name: 'Codex 本机AI',   key: 'codex',        note: 'AI 编码工具',         required: true },
+    { name: 'Codex CLI',      key: 'codex',        note: '自带 Codex 账号/本机执行', required: false },
     { name: 'Copilot 本机AI', key: 'copilot',      note: '可选备用工具',         required: false },
     { name: 'Android SDK',    key: 'android_sdk',  note: 'APK 编译必需',        required: true },
     { name: 'Gradle 镜像',    key: 'gradle_mirror',note: '国内加速（阿里云）',   required: false },
     { name: 'Ollama',         key: 'ollama',       note: '本地 LLM（可选）',    required: false },
-    { name: 'API Key',        key: 'api_runtime_key',   note: '本机AI/我的Key鉴权', required: true },
-    { name: '我的Key模型',    key: 'api_runtime_model_configured', note: r.api_runtime_model || '未配置', required: true },
-    { name: '我的Key能力',    key: 'api_runtime_ready', note: r.api_runtime_ready ? '可用' : '需要 Key + 模型', required: true },
+    { name: 'API Key',        key: 'api_runtime_key',   note: '我的Key/备用本机运行时', required: false },
+    { name: '我的Key模型',    key: 'api_runtime_model_configured', note: r.api_runtime_model || '未配置', required: false },
+    { name: '我的Key能力',    key: 'api_runtime_ready', note: r.api_runtime_ready ? '可用' : '需要 Key + 模型', required: false },
   ];
   const modelInput = document.getElementById('apiModelInput');
   const baseInput = document.getElementById('apiBaseInput');
