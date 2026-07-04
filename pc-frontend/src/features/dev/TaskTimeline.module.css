@@ -409,165 +409,183 @@
   background: rgba(218, 55, 60, .07);
 }
 
-.shellProcessCard {
-  gap: 6px;
-  padding: 9px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .045);
+.commandRunGroup {
+  margin: 0 0 8px 28px;
+  color: #8d96a6;
 }
 
-.shellMetaRow {
-  min-height: 17px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: #9aa3b1;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.shellMetaRow span {
-  display: inline-flex;
-  align-items: center;
-  min-width: 0;
-  font-style: normal;
-}
-
-.shellMetaRow span[data-tone="done"] {
-  color: #8ee8af;
-}
-
-.shellMetaRow span[data-tone="failed"] {
-  color: #ff9da1;
-}
-
-.shellMetaRow span[data-tone="running"] {
-  color: #9fb2ff;
-}
-
-.shellMetaRow span[data-tone="muted"] {
-  color: #7f8ca3;
-}
-
-.shellCommandDetails,
-.shellOutputDetails {
-  min-width: 0;
-}
-
-.shellCommandDetails summary,
-.shellOutputDetails summary {
-  list-style: none;
-}
-
-.shellCommandDetails summary::-webkit-details-marker,
-.shellOutputDetails summary::-webkit-details-marker {
-  display: none;
-}
-
-.shellCommandDetails summary {
-  min-height: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  border-radius: 5px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.shellCommandDetails summary code {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #e2e8f0;
-  font-family: 'Cascadia Code', 'Consolas', monospace;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
-.shellCommandMore {
-  flex: 0 0 auto;
-  min-width: 24px;
-  height: 22px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(148, 163, 184, .12);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, .035);
-  color: #9aa8bd;
-  font-size: 15px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.shellCommandDetails summary:hover .shellCommandMore {
-  border-color: rgba(148, 163, 184, .24);
-  background: rgba(255, 255, 255, .07);
-  color: #d8e3f7;
-}
-
-.shellCommandDetails summary:focus-visible {
-  outline: 1px solid rgba(143, 211, 255, .45);
-  outline-offset: 2px;
-}
-
-.shellCommandDetails:not([open]) > pre,
-.shellOutputDetails:not([open]) > pre {
-  display: none;
-}
-
-.shellOutputDetails {
-  border-top: 1px solid rgba(148, 163, 184, .10);
-  padding-top: 5px;
-}
-
-.shellOutputDetails summary {
+.commandRunGroup > summary {
   width: max-content;
   max-width: 100%;
-  color: #8998b0;
-  font-size: 11px;
-  font-weight: 700;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  color: #8d96a6;
+  font-size: 12px;
+  font-weight: 650;
   line-height: 1.4;
   cursor: pointer;
   user-select: none;
 }
 
-.shellOutputDetails summary::before {
-  content: "▸";
-  display: inline-block;
-  margin-right: 5px;
-  color: #66748a;
+.commandRunGroup > summary::marker {
+  color: #6f7784;
 }
 
-.shellOutputDetails[open] summary::before {
-  content: "▾";
+.commandRunGroup > summary:hover {
+  color: #c9d4e5;
 }
 
-.shellCommandDetails pre,
-.shellOutputDetails pre {
-  max-height: 260px;
+.commandRunGroup[data-tone="failed"] > summary {
+  color: #ffb1b4;
+}
+
+.commandRunGroupIcon {
+  width: 15px;
+  height: 15px;
+  display: inline-grid;
+  place-items: center;
+  color: currentColor;
+  opacity: .78;
+}
+
+.commandRunBody {
+  display: grid;
+  gap: 2px;
+  padding: 1px 0 0;
+}
+
+.commandRunItem {
+  min-width: 0;
+}
+
+.commandRunItem > summary {
+  min-height: 25px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: #747d8d;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+}
+
+.commandRunItem > summary::marker {
+  color: #5f6876;
+}
+
+.commandRunItem > summary:hover {
+  color: #aeb8c9;
+}
+
+.commandRunItem > summary code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+}
+
+.commandRunOpenLabel {
+  display: none;
+}
+
+.commandRunItem[open] > summary code {
+  display: none;
+}
+
+.commandRunItem[open] .commandRunOpenLabel {
+  display: inline;
+}
+
+.shellProcessCard {
+  gap: 0;
+  margin: 4px 0 7px;
+  border-color: rgba(255, 255, 255, .065);
+  border-radius: 8px;
+  background: #2a2a2c;
+  padding: 8px;
+}
+
+.shellPanelHeader {
+  min-height: 18px;
+  display: flex;
+  align-items: center;
+  color: #b3b3b7;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.shellCode {
   min-width: 0;
   overflow: auto;
   scrollbar-width: thin;
-  margin: 6px 0 0;
-  border: 1px solid rgba(255, 255, 255, .07);
-  border-radius: 5px;
-  background: rgba(0, 0, 0, .24);
-  color: #cfd8e8;
-  padding: 8px;
+  margin: 9px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #d6d6db;
+  padding: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 11px;
-  line-height: 1.5;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
-.shellCommandDetails pre[data-monospace="true"],
-.shellOutputDetails pre[data-monospace="true"] {
+.shellCode + .shellCode {
+  margin-top: 18px;
+  color: #c5c5ca;
+}
+
+.shellCode[data-monospace="true"] {
   font-family: 'Cascadia Code', 'Consolas', monospace;
+}
+
+.shellPanelFooter {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+  margin-top: 8px;
+  color: #aaaeb8;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.shellPanelFooter span::before {
+  content: "✓";
+  margin-right: 4px;
+}
+
+.shellPanelFooter[data-tone="failed"] {
+  color: #ff9da1;
+}
+
+.shellPanelFooter[data-tone="running"] {
+  color: #9fb2ff;
+}
+
+.shellPanelFooter[data-tone="canceled"] {
+  color: #9aa3b1;
+}
+
+.shellPanelFooter[data-tone="failed"] span::before,
+.shellPanelFooter[data-tone="running"] span::before,
+.shellPanelFooter[data-tone="canceled"] span::before {
+  content: "";
+  margin-right: 0;
+}
+
+.shellPanelFooter em {
+  color: #8d96a6;
+  font-style: normal;
 }
 
 .embedded {

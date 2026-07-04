@@ -26,23 +26,32 @@ interface TaskTimelineProps {
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
+type PrimaryTimelineBlock =
+  | { type: 'item'; item: TimelineItem }
+  | { type: 'commands'; id: string; items: TimelineItem[] }
+
 export default function TaskTimeline({ model, taskContext, onCancel, onApprove }: TaskTimelineProps) {
   if (model.items.length === 0) return null
   const grouped = groupTimelineItems(model.items)
+  const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
   const showStageAtTop = (model.stage.key !== 'finished' && model.stage.key !== 'heartbeat') || model.stage.stuck
   const statusCount = (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
 
   return (
     <div className={styles.timeline}>
       {showStageAtTop && <StageCard stage={model.stage} />}
-      {grouped.primary.map((item) => (
-        <TimelineRow
-          key={item.id}
-          item={item}
-          taskContext={taskContext}
-          onCancel={onCancel}
-          onApprove={onApprove}
-        />
+      {primaryBlocks.map((block) => (
+        block.type === 'commands' ? (
+          <CommandRunGroup key={block.id} items={block.items} />
+        ) : (
+          <TimelineRow
+            key={block.item.id}
+            item={block.item}
+            taskContext={taskContext}
+            onCancel={onCancel}
+            onApprove={onApprove}
+          />
+        )
       ))}
       <TimelineFold title="连接信息" count={grouped.connection.length} defaultOpen={!model.coverage.finalReply && grouped.primary.length === 0}>
         {grouped.connection.map((item) => (
@@ -75,6 +84,36 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
       </TimelineFold>
     </div>
   )
+}
+
+function groupPrimaryTimelineBlocks(items: TimelineItem[]): PrimaryTimelineBlock[] {
+  const blocks: PrimaryTimelineBlock[] = []
+  let commandItems: TimelineItem[] = []
+
+  const flushCommands = () => {
+    if (!commandItems.length) return
+    blocks.push({
+      type: 'commands',
+      id: `commands-${commandItems[0].id}-${commandItems.length}`,
+      items: commandItems,
+    })
+    commandItems = []
+  }
+
+  for (const item of items) {
+    if (isCommandTimelineItem(item)) {
+      commandItems.push(item)
+      continue
+    }
+    flushCommands()
+    blocks.push({ type: 'item', item })
+  }
+  flushCommands()
+  return blocks
+}
+
+function isCommandTimelineItem(item: TimelineItem): boolean {
+  return Boolean(item.process?.commandText)
 }
 
 function TimelineFold({ title, count, defaultOpen = false, children }: {
@@ -212,6 +251,39 @@ function shouldRenderEmbeddedMessage(item: TimelineItem): boolean {
     || type === 'tool_approval_decision'
 }
 
+function CommandRunGroup({ items }: { items: TimelineItem[] }) {
+  const failed = items.some((item) => item.tone === 'failed')
+  return (
+    <details className={styles.commandRunGroup} data-tone={failed ? 'failed' : undefined}>
+      <summary>
+        <span className={styles.commandRunGroupIcon} aria-hidden="true"><Terminal size={13} /></span>
+        <span>已运行 {items.length} 条命令</span>
+      </summary>
+      <div className={styles.commandRunBody}>
+        {items.map((item) => (
+          <CommandRunItem key={item.id} item={item} />
+        ))}
+      </div>
+    </details>
+  )
+}
+
+function CommandRunItem({ item }: { item: TimelineItem }) {
+  const process = item.process
+  if (!process) return null
+  const commandText = process.commandText ?? process.subtitle
+  return (
+    <details className={styles.commandRunItem}>
+      <summary title={commandText}>
+        <span>已运行</span>
+        <span className={styles.commandRunOpenLabel}>命令</span>
+        <code>{commandSummary(commandText)}</code>
+      </summary>
+      <ShellProcessCardView process={process} />
+    </details>
+  )
+}
+
 function ProcessCardView({ process }: { process: ProcessCard }) {
   if (process.commandText) return <ShellProcessCardView process={process} />
   return (
@@ -244,31 +316,39 @@ function ProcessCardView({ process }: { process: ProcessCard }) {
 
 function ShellProcessCardView({ process }: { process: ProcessCard }) {
   const commandText = process.commandText ?? ''
-  const chips = process.truncated
-    ? [...process.chips, { label: '已截断', tone: 'muted' as TaskTone }]
-    : process.chips
+  const status = shellStatus(process)
   return (
     <div className={[styles.processCard, styles.shellProcessCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
-      <div className={styles.shellMetaRow}>
-        {chips.map((chip, index) => (
-          <span key={`${chip.label}-${index}`} data-tone={chip.tone || undefined}>{chip.label}</span>
-        ))}
+      <div className={styles.shellPanelHeader}>
+        <span>Shell</span>
       </div>
-      <details className={styles.shellCommandDetails}>
-        <summary title="点击查看完整命令">
-          <code>{commandText}</code>
-          <span className={styles.shellCommandMore} aria-hidden="true">...</span>
-        </summary>
-        <pre data-monospace="true">{commandText}</pre>
-      </details>
+      <pre className={styles.shellCode} data-monospace="true">{`$ ${commandText}`}</pre>
       {process.body && (
-        <details className={styles.shellOutputDetails}>
-          <summary>{process.bodyLabel || '输出'}</summary>
-          <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
-        </details>
+        <pre className={styles.shellCode} data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
       )}
+      <div className={styles.shellPanelFooter} data-tone={status.tone}>
+        <span>{status.label}</span>
+        {process.truncated && <em>已截断</em>}
+      </div>
     </div>
   )
+}
+
+function commandSummary(value: string): string {
+  const text = value.replace(/\s+/g, ' ').trim()
+  if (text.length <= 96) return text
+  return `${text.slice(0, 96)}...`
+}
+
+function shellStatus(process: ProcessCard): { label: string; tone: TaskTone } {
+  if (process.tone === 'failed') return { label: '失败', tone: 'failed' }
+  if (process.tone === 'running') return { label: '运行中', tone: 'running' }
+  if (process.tone === 'canceled') return { label: '已停止', tone: 'canceled' }
+  const exitChip = process.chips.find((chip) => /^exit=/i.test(chip.label))
+  if (exitChip && !/^exit=0$/i.test(exitChip.label)) {
+    return { label: exitChip.label, tone: exitChip.tone || process.tone }
+  }
+  return { label: '成功', tone: 'done' }
 }
 
 function iconFor(kind: TimelineItemKind, tone: TaskTone) {
