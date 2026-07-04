@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.util.AttributeSet
@@ -19,36 +20,54 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         alpha = 235
     }
+    private val boundsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = Color.WHITE
+        alpha = 220
+        strokeWidth = dp(2).toFloat()
+    }
     private val fallbackIcon: Bitmap? by lazy {
         BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation_filled)
             ?: BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation)
     }
+    private val annotationBubbleRenderer = ChatImageAnnotationBubbleRenderer(context)
 
     private var imageWidth = 0
     private var imageHeight = 0
     private var annotations: List<ChatImageAnnotation> = emptyList()
     private var pressedIndex: Int? = null
-
-    var onAnnotationClick: ((ChatImageAnnotation) -> Unit)? = null
+    private var collapseOnTouchUp = false
+    private var expandedIndex: Int? = null
 
     fun setImageInfo(width: Int?, height: Int?, nextAnnotations: List<ChatImageAnnotation>) {
         imageWidth = width?.takeIf { it > 0 } ?: 0
         imageHeight = height?.takeIf { it > 0 } ?: 0
         annotations = nextAnnotations.filter { it.hasNote() }
+        expandedIndex = expandedIndex?.takeIf { it in annotations.indices }
         visibility = if (imageWidth > 0 && imageHeight > 0 && annotations.isNotEmpty()) {
             VISIBLE
         } else {
+            expandedIndex = null
             GONE
         }
         invalidate()
+    }
+
+    fun collapseExpandedAnnotation(): Boolean {
+        if (expandedIndex == null) return false
+        expandedIndex = null
+        invalidate()
+        return true
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val icon = fallbackIcon ?: return
         val imageRect = displayedImageRect() ?: return
-        annotations.forEach { annotation ->
-            val iconRect = iconRectOnView(annotation, imageRect) ?: return@forEach
+        drawExpandedAnnotation(canvas, imageRect)
+        annotations.forEachIndexed { index, annotation ->
+            if (expandedIndex == index) return@forEachIndexed
+            val iconRect = iconRectOnView(annotation, imageRect) ?: return@forEachIndexed
             canvas.drawBitmap(icon, null, iconRect, iconPaint)
         }
     }
@@ -57,34 +76,56 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
         if (annotations.isEmpty()) return false
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                val hitIndex = findAnnotationAt(event.x, event.y) ?: return false
+                val hitIndex = findAnnotationAt(event.x, event.y)
+                if (hitIndex == null) {
+                    if (expandedIndex == null) return false
+                    collapseOnTouchUp = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                    return true
+                }
                 pressedIndex = hitIndex
                 parent?.requestDisallowInterceptTouchEvent(true)
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
-                return pressedIndex != null
+                return pressedIndex != null || collapseOnTouchUp
             }
             MotionEvent.ACTION_UP -> {
+                if (collapseOnTouchUp) {
+                    collapseOnTouchUp = false
+                    collapseExpandedAnnotation()
+                    return true
+                }
                 val hitIndex = pressedIndex ?: return false
                 pressedIndex = null
                 if (findAnnotationAt(event.x, event.y) == hitIndex) {
-                    annotations.getOrNull(hitIndex)?.let { onAnnotationClick?.invoke(it) }
+                    expandedIndex = hitIndex
+                    invalidate()
                 }
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                if (pressedIndex == null) return false
+                if (pressedIndex == null && !collapseOnTouchUp) return false
                 pressedIndex = null
+                collapseOnTouchUp = false
                 return true
             }
         }
         return false
     }
 
+    private fun drawExpandedAnnotation(canvas: Canvas, imageRect: RectF) {
+        val index = expandedIndex ?: return
+        val annotation = annotations.getOrNull(index) ?: return
+        val bounds = annotationBoundsOnView(annotation, imageRect) ?: return
+        canvas.drawRect(bounds, boundsPaint)
+        annotationBubbleRenderer.draw(canvas, annotation.note, bounds, width, height)
+    }
+
     private fun findAnnotationAt(x: Float, y: Float): Int? {
         val imageRect = displayedImageRect() ?: return null
         for (index in annotations.lastIndex downTo 0) {
+            if (index == expandedIndex) continue
             val iconRect = iconRectOnView(annotations[index], imageRect) ?: continue
             val hitRect = RectF(iconRect).apply {
                 val extraX = max(0f, (dp(48).toFloat() - width()) / 2f)
