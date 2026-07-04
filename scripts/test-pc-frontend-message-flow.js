@@ -516,6 +516,13 @@ try {
   );
   assert.strictEqual(validationTimeline.stage.label, '最后公开步骤：验证完成', 'completed validation output should become the current public stage');
 
+  const commandEchoBeforeCallTimeline = buildTaskTimeline([
+    { id: 'vecho1', kind: 'ai_progress', task_id: 'tsk-command-echo-before-call', content: 'AI 执行命令： powershell -ExecutionPolicy Bypass -File scripts\\cargo-dev.ps1 check --manifest-path server\\Cargo.toml' },
+    { id: 'vecho2', kind: 'ai_progress', task_id: 'tsk-command-echo-before-call', content: '{"type":"tool_call","tool":"shell","args":{"command":"powershell -ExecutionPolicy Bypass -File scripts\\\\cargo-dev.ps1 check --manifest-path server\\\\Cargo.toml"}}' },
+    { id: 'vecho3', kind: 'ai_progress', task_id: 'tsk-command-echo-before-call', content: '{"type":"tool_result","tool":"shell","result":"Finished `dev` profile target(s) in 2.33s"}' },
+  ]);
+  assert.deepStrictEqual(commandEchoBeforeCallTimeline.items.map((item) => [item.kind, item.title]), [['test', '验证完成']], 'shell command echo should not render as an extra process row even when it arrives before the structured tool event');
+
   const fileTimeline = buildTaskTimeline([
     {
       id: 'f1',

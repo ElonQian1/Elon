@@ -131,7 +131,7 @@ export function buildTaskTimeline(
       coverage.assistantEvent = true
       return
     }
-    if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
+    if (!parsedEvent && isShellCommandEcho(text)) return
 
     const heartbeat = parseHeartbeat(text, message, index)
     if (heartbeat) {

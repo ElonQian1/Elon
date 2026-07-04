@@ -426,6 +426,7 @@
   font-size: 12px;
   font-weight: 650;
   line-height: 1.4;
+  white-space: nowrap;
   cursor: pointer;
   user-select: none;
 }
@@ -474,6 +475,11 @@
   user-select: none;
 }
 
+.commandRunItem > summary > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .commandRunItem > summary::marker {
   color: #5f6876;
 }
@@ -483,6 +489,7 @@
 }
 
 .commandRunItem > summary code {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
