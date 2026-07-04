@@ -1,7 +1,27 @@
-import { ChevronDown, ChevronRight, Plus, User } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  MoreHorizontal,
+  Pencil,
+  Pin,
+  Plus,
+  User,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTime } from '../../lib/utils'
 import type { MemberConversationEntry } from './memberConversationApi'
+import { buildMemberConversationDeepLink, copyTextToClipboard } from './memberConversationLinks'
+import {
+  cleanMemberConversationPrefs,
+  memberConversationPrefsScope,
+  readMemberConversationPrefs,
+  writeMemberConversationPrefs,
+} from './memberConversationPrefs'
+import type { MemberConversationPrefs } from './memberConversationPrefs'
 import styles from './MemberConversationList.module.css'
 
 interface Props {
@@ -24,7 +44,190 @@ export default function MemberConversationList({
   onResetTarget,
 }: Props) {
   const [sectionCollapsed, setSectionCollapsed] = useState(false)
+  const [archiveCollapsed, setArchiveCollapsed] = useState(true)
+  const [openMenuId, setOpenMenuId] = useState('')
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const sectionTitle = isOwnTarget ? '我的会话' : `${targetName} 的会话`
+  const scope = useMemo(() => conversationScope(conversations), [conversations])
+  const scopeKey = memberConversationPrefsScope(scope.projectId, scope.targetUserId)
+  const conversationIds = useMemo(() => conversations.map((conversation) => conversation.id), [conversations])
+  const conversationIdsKey = conversationIds.join('\n')
+  const [prefs, setPrefs] = useState<MemberConversationPrefs>(() => readMemberConversationPrefs())
+  const rows = useMemo(() => buildRows(conversations, prefs), [conversations, prefs])
+  const activeRows = rows.filter((row) => !row.archived)
+  const archivedRows = rows.filter((row) => row.archived)
+
+  useEffect(() => {
+    const next = cleanMemberConversationPrefs(
+      readMemberConversationPrefs(scope.projectId, scope.targetUserId),
+      conversationIds,
+    )
+    setPrefs(next)
+    writeMemberConversationPrefs(scope.projectId, scope.targetUserId, next)
+  }, [scopeKey, conversationIdsKey])
+
+  useEffect(() => {
+    if (selectedId && archivedRows.some((row) => row.conversation.id === selectedId)) {
+      setArchiveCollapsed(false)
+    }
+  }, [selectedId, archivedRows])
+
+  useEffect(() => {
+    if (!openMenuId) return
+    function closeMenu(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setOpenMenuId('')
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpenMenuId('')
+    }
+    window.addEventListener('pointerdown', closeMenu)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      window.removeEventListener('pointerdown', closeMenu)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [openMenuId])
+
+  function savePrefs(update: (current: MemberConversationPrefs) => MemberConversationPrefs) {
+    setPrefs((current) => {
+      const next = cleanMemberConversationPrefs(update(current), conversationIds)
+      writeMemberConversationPrefs(scope.projectId, scope.targetUserId, next)
+      return next
+    })
+  }
+
+  function togglePinned(conversationId: string) {
+    savePrefs((current) => {
+      const pinned = current.pinnedIds.includes(conversationId)
+      return {
+        ...current,
+        pinnedIds: pinned
+          ? current.pinnedIds.filter((id) => id !== conversationId)
+          : [conversationId, ...current.pinnedIds],
+      }
+    })
+    setOpenMenuId('')
+  }
+
+  function renameConversation(conversation: MemberConversationEntry, title: string) {
+    const nextTitle = window.prompt('重命名对话', title)
+    if (nextTitle === null) return
+    const normalized = nextTitle.trim().slice(0, 34)
+    savePrefs((current) => {
+      const renamedTitles = { ...current.renamedTitles }
+      if (normalized && normalized !== conversationDisplayTitle(conversation)) {
+        renamedTitles[conversation.id] = normalized
+      } else {
+        delete renamedTitles[conversation.id]
+      }
+      return { ...current, renamedTitles }
+    })
+    setOpenMenuId('')
+  }
+
+  function toggleArchived(conversationId: string, archived: boolean) {
+    savePrefs((current) => ({
+      ...current,
+      pinnedIds: current.pinnedIds.filter((id) => id !== conversationId),
+      archivedIds: archived
+        ? current.archivedIds.filter((id) => id !== conversationId)
+        : [conversationId, ...current.archivedIds],
+    }))
+    setOpenMenuId('')
+  }
+
+  function copyConversationId(conversationId: string) {
+    copyMenuText(conversationId, '复制会话 ID')
+    setOpenMenuId('')
+  }
+
+  function copyDeepLink(conversation: MemberConversationEntry) {
+    copyMenuText(buildMemberConversationDeepLink(conversation), '复制深度链接')
+    setOpenMenuId('')
+  }
+
+  function openInNewWindow(conversation: MemberConversationEntry) {
+    const url = buildMemberConversationDeepLink(conversation)
+    if (url) window.open(url, '_blank', 'noopener')
+    setOpenMenuId('')
+  }
+
+  function renderConversationRow(row: ConversationRow) {
+    const conversation = row.conversation
+    const failed = conversation.last_task_status === 'error' || conversation.last_task_status === 'failed'
+    const active = conversation.id === selectedId
+    const menuOpen = openMenuId === conversation.id
+    return (
+      <div
+        key={conversation.id}
+        className={[styles.itemRow, active ? styles.itemRowActive : ''].join(' ')}
+      >
+        <button
+          type="button"
+          className={styles.itemMain}
+          onClick={() => onOpen(conversation.id)}
+        >
+          <span className={styles.itemTitleRow}>
+            <span className={styles.itemTitle}>{row.title}</span>
+            <span className={styles.itemBadges}>
+              {row.pinned && <span className={styles.pinPill}>置顶</span>}
+              {failed && <span className={styles.statusPill}>失败</span>}
+            </span>
+          </span>
+          <span className={styles.itemMeta}>
+            {conversation.updated_at ? formatTime(conversation.updated_at) : '未更新'}
+            {typeof conversation.message_count === 'number' && ` · ${conversation.message_count} 条`}
+          </span>
+        </button>
+        <div className={styles.moreWrap} ref={menuOpen ? menuRef : null}>
+          <button
+            type="button"
+            className={styles.moreBtn}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-label={`更多操作：${row.title}`}
+            onClick={(event) => {
+              event.stopPropagation()
+              setOpenMenuId(menuOpen ? '' : conversation.id)
+            }}
+          >
+            <MoreHorizontal size={15} strokeWidth={2.3} aria-hidden="true" />
+          </button>
+          {menuOpen && (
+            <div className={styles.menu} role="menu">
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => togglePinned(conversation.id)}>
+                <Pin size={13} strokeWidth={2.2} aria-hidden="true" />
+                {row.pinned ? '取消置顶' : '置顶对话'}
+              </button>
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => renameConversation(conversation, row.title)}>
+                <Pencil size={13} strokeWidth={2.2} aria-hidden="true" />
+                重命名对话
+              </button>
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => toggleArchived(conversation.id, row.archived)}>
+                {row.archived
+                  ? <ArchiveRestore size={13} strokeWidth={2.2} aria-hidden="true" />
+                  : <Archive size={13} strokeWidth={2.2} aria-hidden="true" />}
+                {row.archived ? '取消归档' : '归档对话'}
+              </button>
+              <span className={styles.menuDivider} aria-hidden="true" />
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => copyConversationId(conversation.id)}>
+                <Copy size={13} strokeWidth={2.2} aria-hidden="true" />
+                复制会话 ID
+              </button>
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => copyDeepLink(conversation)}>
+                <Copy size={13} strokeWidth={2.2} aria-hidden="true" />
+                复制深度链接
+              </button>
+              <button type="button" className={styles.menuItem} role="menuitem" onClick={() => openInNewWindow(conversation)}>
+                <ExternalLink size={13} strokeWidth={2.2} aria-hidden="true" />
+                在新窗口打开
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <section className={styles.section} aria-label={`${targetName} 的会话`}>
@@ -44,7 +247,7 @@ export default function MemberConversationList({
           </span>
         </button>
         <div className={styles.headerMeta}>
-          <small>{conversations.length}</small>
+          <small>{activeRows.length}</small>
         </div>
         <div className={styles.actions}>
           {!isOwnTarget && (
@@ -72,7 +275,7 @@ export default function MemberConversationList({
         </div>
       </div>
 
-      {!sectionCollapsed && conversations.length === 0 && (
+      {!sectionCollapsed && activeRows.length === 0 && (
         <div className={styles.empty}>
           {isOwnTarget ? '发送第一条消息自动创建会话' : '该成员暂无可见会话'}
         </div>
@@ -80,32 +283,72 @@ export default function MemberConversationList({
 
       {!sectionCollapsed && (
         <div className={styles.list}>
-          {conversations.map((conversation) => {
-            const failed = conversation.last_task_status === 'error' || conversation.last_task_status === 'failed'
-            const title = conversationDisplayTitle(conversation)
-            const active = conversation.id === selectedId
-            return (
-              <button
-                key={conversation.id}
-                type="button"
-                className={[styles.item, active ? styles.itemActive : ''].join(' ')}
-                onClick={() => onOpen(conversation.id)}
-              >
-                <span className={styles.itemTitleRow}>
-                  <span className={styles.itemTitle}>{title}</span>
-                  {failed && <span className={styles.statusPill}>失败</span>}
-                </span>
-                <span className={styles.itemMeta}>
-                  {conversation.updated_at ? formatTime(conversation.updated_at) : '未更新'}
-                  {typeof conversation.message_count === 'number' && ` · ${conversation.message_count} 条`}
-                </span>
-              </button>
-            )
-          })}
+          {activeRows.map(renderConversationRow)}
         </div>
       )}
+
+      <div className={styles.archiveSection}>
+        <button
+          type="button"
+          className={styles.archiveHeader}
+          aria-expanded={!archiveCollapsed}
+          onClick={() => setArchiveCollapsed((value) => !value)}
+        >
+          {archiveCollapsed
+            ? <ChevronRight size={13} strokeWidth={2.2} aria-hidden="true" />
+            : <ChevronDown size={13} strokeWidth={2.2} aria-hidden="true" />}
+          <span>归档</span>
+          <small>{archivedRows.length}</small>
+        </button>
+        {!archiveCollapsed && archivedRows.length === 0 && (
+          <div className={styles.empty}>暂无归档会话</div>
+        )}
+        {!archiveCollapsed && archivedRows.length > 0 && (
+          <div className={styles.list}>
+            {archivedRows.map(renderConversationRow)}
+          </div>
+        )}
+      </div>
     </section>
   )
+}
+
+function copyMenuText(text: string, title: string) {
+  void copyTextToClipboard(text).then((copied) => {
+    if (!copied) window.prompt(title, text)
+  })
+}
+
+interface ConversationRow {
+  conversation: MemberConversationEntry
+  title: string
+  pinned: boolean
+  archived: boolean
+  index: number
+}
+
+function buildRows(conversations: MemberConversationEntry[], prefs: MemberConversationPrefs): ConversationRow[] {
+  const pinned = new Set(prefs.pinnedIds)
+  const archived = new Set(prefs.archivedIds)
+  return conversations.map((conversation, index) => ({
+    conversation,
+    title: prefs.renamedTitles[conversation.id] || conversationDisplayTitle(conversation),
+    pinned: pinned.has(conversation.id),
+    archived: archived.has(conversation.id),
+    index,
+  })).sort((left, right) => {
+    if (left.archived !== right.archived) return left.archived ? 1 : -1
+    if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
+    return left.index - right.index
+  })
+}
+
+function conversationScope(conversations: MemberConversationEntry[]) {
+  const scoped = conversations.find((conversation) => conversation.project_id || conversation.user_id)
+  return {
+    projectId: scoped?.project_id ?? '',
+    targetUserId: scoped?.user_id ?? '',
+  }
 }
 
 function conversationDisplayTitle(conversation: MemberConversationEntry): string {

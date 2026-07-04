@@ -105,33 +105,47 @@
   padding: 0 0 4px;
 }
 
-.item {
+.itemRow {
+  position: relative;
   width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  align-items: stretch;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
+}
+
+.itemRow:hover,
+.itemRow:focus-within {
+  background: rgba(255, 255, 255, .045);
+  color: #fff;
+}
+
+.itemRowActive {
+  background: rgba(88, 156, 242, .13);
+  border-color: rgba(118, 161, 221, .18);
+  box-shadow: inset 2px 0 0 rgba(88, 156, 242, .9);
+  color: #fff;
+}
+
+.itemMain {
+  min-width: 0;
   min-height: 42px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  margin: 0;
-  padding: 6px 7px;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  padding: 6px 4px 6px 7px;
+  border: 0;
   background: transparent;
-  color: var(--text-soft);
+  color: inherit;
   text-align: left;
-  transition: background .12s, border-color .12s, color .12s, box-shadow .12s;
-}
-
-.item:hover {
-  background: rgba(255, 255, 255, .045);
-  color: #fff;
-}
-
-.itemActive {
-  background: rgba(88, 156, 242, .13);
-  border-color: rgba(118, 161, 221, .18);
-  box-shadow: inset 2px 0 0 rgba(88, 156, 242, .9);
-  color: #fff;
+  cursor: pointer;
 }
 
 .itemTitleRow {
@@ -161,6 +175,14 @@
   font-size: 10px;
 }
 
+.itemBadges {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pinPill,
 .statusPill {
   height: 18px;
   display: inline-flex;
@@ -173,4 +195,138 @@
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
+}
+
+.pinPill {
+  background: rgba(125, 172, 255, .12);
+  border: 1px solid rgba(125, 172, 255, .26);
+  color: #b8d0ff;
+}
+
+.moreWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.moreBtn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(217, 217, 217, .5);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity .12s, background .12s, color .12s, border-color .12s;
+}
+
+.itemRow:hover .moreBtn,
+.itemRow:focus-within .moreBtn,
+.moreBtn[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.moreBtn:hover,
+.moreBtn[aria-expanded="true"] {
+  background: rgba(255, 255, 255, .07);
+  border-color: rgba(255, 255, 255, .08);
+  color: #fff;
+}
+
+.menu {
+  position: absolute;
+  z-index: 20;
+  top: 28px;
+  right: 0;
+  width: 168px;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 7px;
+  background: #1f2024;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, .42);
+}
+
+.menuItem {
+  min-width: 0;
+  height: 28px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: rgba(168, 199, 250, .12);
+  color: #fff;
+}
+
+.menuItem svg {
+  color: rgba(168, 199, 250, .8);
+}
+
+.menuDivider {
+  height: 1px;
+  margin: 3px 2px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.archiveSection {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, .045);
+}
+
+.archiveHeader {
+  width: 100%;
+  height: 28px;
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 2px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-align: left;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.archiveHeader:hover,
+.archiveHeader:focus-visible {
+  background: rgba(255, 255, 255, .045);
+  color: var(--text-soft);
+}
+
+.archiveHeader span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archiveHeader small {
+  color: rgba(217, 217, 217, .42);
+  font-size: 10px;
+  font-weight: 800;
 }
