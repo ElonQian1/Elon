@@ -35,6 +35,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         BitmapFactory.decodeResource(resources, R.drawable.ic_chat_image_tool_annotation_filled)
     }
     private val annotationBubbleRenderer = ChatImageAnnotationBubbleRenderer(context)
+    private val annotationIconRenderer = ChatImageAnnotationIconRenderer()
 
     private var baseBitmap: Bitmap? = null
     private var mosaicBitmap: Bitmap? = null
@@ -398,8 +399,12 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
             )
         }
         if (includeAnnotationIcons) {
+            var badgeNumber = 0
             operations.forEach { op ->
-                (op as? ChatImageEditOp.Annotation)?.let { drawAnnotationIconOnBitmap(canvas, it) }
+                val annotation = op as? ChatImageEditOp.Annotation ?: return@forEach
+                val hasNote = annotation.note.trim().isNotEmpty()
+                if (hasNote) badgeNumber += 1
+                drawAnnotationIconOnBitmap(canvas, annotation, badgeNumber.takeIf { hasNote })
             }
         }
         activePath?.let { path ->
@@ -502,18 +507,25 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
     }
 
     private fun drawAnnotationIcons(canvas: Canvas) {
+        var badgeNumber = 0
         operations.forEach { op ->
             val annotation = op as? ChatImageEditOp.Annotation ?: return@forEach
+            val hasNote = annotation.note.trim().isNotEmpty()
+            if (hasNote) badgeNumber += 1
             val rect = annotationIconRectOnView(annotation) ?: return@forEach
             val icon = annotationIconFor(annotation) ?: return@forEach
-            canvas.drawBitmap(icon, null, rect, basePaint)
+            annotationIconRenderer.draw(canvas, icon, rect, badgeNumber.takeIf { hasNote })
         }
     }
 
-    private fun drawAnnotationIconOnBitmap(canvas: Canvas, annotation: ChatImageEditOp.Annotation) {
+    private fun drawAnnotationIconOnBitmap(
+        canvas: Canvas,
+        annotation: ChatImageEditOp.Annotation,
+        badgeNumber: Int?
+    ) {
         val icon = annotationIconFor(annotation) ?: return
         val rect = annotationIconRectOnBitmap(annotation)
-        canvas.drawBitmap(icon, null, rect, basePaint)
+        annotationIconRenderer.draw(canvas, icon, rect, badgeNumber)
     }
 
     private fun annotationIconFor(annotation: ChatImageEditOp.Annotation): Bitmap? {

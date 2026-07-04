@@ -18,9 +18,7 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
-    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
-        alpha = 235
-    }
+    private val annotationIconRenderer = ChatImageAnnotationIconRenderer()
     private val boundsPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = Color.WHITE
@@ -142,10 +140,13 @@ internal class ChatImageAnnotationOverlayView @JvmOverloads constructor(
             val insetY = iconRect.height() * (1f - scale) / 2f
             RectF(iconRect).apply { inset(insetX, insetY) }
         }
-        val oldAlpha = iconPaint.alpha
-        iconPaint.alpha = (235 * progress).toInt().coerceIn(0, 235)
-        canvas.drawBitmap(icon, null, drawRect, iconPaint)
-        iconPaint.alpha = oldAlpha
+        annotationIconRenderer.draw(
+            canvas = canvas,
+            icon = icon,
+            iconRect = drawRect,
+            number = index + 1,
+            alpha = (235 * progress).toInt().coerceIn(0, 235)
+        )
     }
 
     private fun startIconAppearAnimation(index: Int) {
