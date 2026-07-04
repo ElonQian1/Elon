@@ -36,9 +36,7 @@ internal class ChatImageAnnotationBubbleRenderer(context: Context) {
 
         val metrics = measure(cleanNote, viewWidth)
         val placement = placeBubble(anchor, metrics.width, metrics.height, viewWidth, viewHeight)
-        drawTail(canvas, placement)
-        canvas.drawRoundRect(placement.rect, dp(10).toFloat(), dp(10).toFloat(), fillPaint)
-        canvas.drawRoundRect(placement.rect, dp(10).toFloat(), dp(10).toFloat(), strokePaint)
+        drawBubbleShape(canvas, placement)
 
         canvas.save()
         canvas.translate(placement.rect.left + dp(14), placement.rect.top + dp(11))
@@ -71,7 +69,7 @@ internal class ChatImageAnnotationBubbleRenderer(context: Context) {
         viewHeight: Int
     ): BubblePlacement {
         val edgePad = dp(12).toFloat()
-        val tail = dp(12).toFloat()
+        val tail = dp(13).toFloat()
         val left = (anchor.centerX() - bubbleWidth / 2f)
             .coerceIn(edgePad, max(edgePad, viewWidth - bubbleWidth - edgePad))
         val topAbove = anchor.top - tail - bubbleHeight
@@ -80,24 +78,93 @@ internal class ChatImageAnnotationBubbleRenderer(context: Context) {
         val rawTop = if (showAbove) topAbove else topBelow
         val top = rawTop.coerceIn(edgePad, max(edgePad, viewHeight - bubbleHeight - edgePad))
         val rect = RectF(left, top, left + bubbleWidth, top + bubbleHeight)
-        val targetX = anchor.centerX().coerceIn(rect.left + dp(22), rect.right - dp(22))
+        val targetX = anchor.centerX().coerceIn(rect.left + dp(27), rect.right - dp(27))
         return BubblePlacement(rect, targetX, showAbove)
     }
 
-    private fun drawTail(canvas: Canvas, placement: BubblePlacement) {
-        val tailHalf = dp(11).toFloat()
-        val tailHeight = dp(12).toFloat()
+    private fun drawBubbleShape(canvas: Canvas, placement: BubblePlacement) {
+        val rect = placement.rect
+        val radius = dp(13).toFloat()
+        val tailHalf = dp(14).toFloat()
+        val tailHeight = dp(13).toFloat()
+        val tipHalf = dp(3).toFloat()
+        val tipRound = dp(2).toFloat()
         val path = Path()
+        val arc = RectF()
+
+        path.moveTo(rect.left + radius, rect.top)
         if (placement.aboveAnchor) {
-            val y = placement.rect.bottom
-            path.moveTo(placement.targetX - tailHalf, y - dp(1))
-            path.lineTo(placement.targetX, y + tailHeight)
-            path.lineTo(placement.targetX + tailHalf, y - dp(1))
+            path.lineTo(rect.right - radius, rect.top)
+            arc.set(rect.right - radius * 2f, rect.top, rect.right, rect.top + radius * 2f)
+            path.arcTo(arc, -90f, 90f)
+            path.lineTo(rect.right, rect.bottom - radius)
+            arc.set(rect.right - radius * 2f, rect.bottom - radius * 2f, rect.right, rect.bottom)
+            path.arcTo(arc, 0f, 90f)
+            path.lineTo(placement.targetX + tailHalf, rect.bottom)
+            path.cubicTo(
+                placement.targetX + tailHalf * 0.64f,
+                rect.bottom + tailHeight * 0.12f,
+                placement.targetX + tipHalf,
+                rect.bottom + tailHeight * 0.72f,
+                placement.targetX + tipHalf,
+                rect.bottom + tailHeight - tipRound
+            )
+            path.quadTo(
+                placement.targetX,
+                rect.bottom + tailHeight,
+                placement.targetX - tipHalf,
+                rect.bottom + tailHeight - tipRound
+            )
+            path.cubicTo(
+                placement.targetX - tipHalf,
+                rect.bottom + tailHeight * 0.72f,
+                placement.targetX - tailHalf * 0.64f,
+                rect.bottom + tailHeight * 0.12f,
+                placement.targetX - tailHalf,
+                rect.bottom
+            )
+            path.lineTo(rect.left + radius, rect.bottom)
+            arc.set(rect.left, rect.bottom - radius * 2f, rect.left + radius * 2f, rect.bottom)
+            path.arcTo(arc, 90f, 90f)
+            path.lineTo(rect.left, rect.top + radius)
+            arc.set(rect.left, rect.top, rect.left + radius * 2f, rect.top + radius * 2f)
+            path.arcTo(arc, 180f, 90f)
         } else {
-            val y = placement.rect.top
-            path.moveTo(placement.targetX - tailHalf, y + dp(1))
-            path.lineTo(placement.targetX, y - tailHeight)
-            path.lineTo(placement.targetX + tailHalf, y + dp(1))
+            path.lineTo(placement.targetX - tailHalf, rect.top)
+            path.cubicTo(
+                placement.targetX - tailHalf * 0.64f,
+                rect.top - tailHeight * 0.12f,
+                placement.targetX - tipHalf,
+                rect.top - tailHeight * 0.72f,
+                placement.targetX - tipHalf,
+                rect.top - tailHeight + tipRound
+            )
+            path.quadTo(
+                placement.targetX,
+                rect.top - tailHeight,
+                placement.targetX + tipHalf,
+                rect.top - tailHeight + tipRound
+            )
+            path.cubicTo(
+                placement.targetX + tipHalf,
+                rect.top - tailHeight * 0.72f,
+                placement.targetX + tailHalf * 0.64f,
+                rect.top - tailHeight * 0.12f,
+                placement.targetX + tailHalf,
+                rect.top
+            )
+            path.lineTo(rect.right - radius, rect.top)
+            arc.set(rect.right - radius * 2f, rect.top, rect.right, rect.top + radius * 2f)
+            path.arcTo(arc, -90f, 90f)
+            path.lineTo(rect.right, rect.bottom - radius)
+            arc.set(rect.right - radius * 2f, rect.bottom - radius * 2f, rect.right, rect.bottom)
+            path.arcTo(arc, 0f, 90f)
+            path.lineTo(rect.left + radius, rect.bottom)
+            arc.set(rect.left, rect.bottom - radius * 2f, rect.left + radius * 2f, rect.bottom)
+            path.arcTo(arc, 90f, 90f)
+            path.lineTo(rect.left, rect.top + radius)
+            arc.set(rect.left, rect.top, rect.left + radius * 2f, rect.top + radius * 2f)
+            path.arcTo(arc, 180f, 90f)
         }
         path.close()
         canvas.drawPath(path, fillPaint)
