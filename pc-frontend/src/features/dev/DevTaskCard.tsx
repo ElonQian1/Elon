@@ -164,23 +164,82 @@ function ApprovalBanner({ tool, event, taskId, closedState, canCancel, onCancel,
 }) {
   const [open, setOpen] = useState(false)
   const tone = closedState?.tone ?? 'approval'
+  const insight = approvalInsight(event, tool)
+  const active = !closedState && Boolean(approvalId && onApprove)
   return (
     <div className={[styles.approvalBanner, styles[`tone_${tone}`]].join(' ')}>
       <div className={styles.approvalHead}>
-        <span>🔐</span>
-        <strong>{closedState ? `${tool} ${closedState.label}` : `确认执行 ${tool}？`}</strong>
-        <button className={styles.approvalToggle} onClick={() => setOpen(!open)} type="button">{open ? '隐藏详情' : '查看详情'}</button>
-        {!closedState && approvalId && onApprove && (
+        <span className={styles.approvalIcon}>🔐</span>
+        <div className={styles.approvalTitleBlock}>
+          <strong>{closedState ? `${insight.title} · ${closedState.label}` : insight.title}</strong>
+          <span>{closedState?.meta ?? insight.summary}</span>
+        </div>
+        <span className={[styles.approvalRisk, styles[`risk_${insight.riskTone}`]].join(' ')}>{closedState ? closedState.label : insight.riskLabel}</span>
+      </div>
+      <div className={styles.approvalScope} aria-label="审批影响范围">
+        {insight.command && (
+          <div className={styles.scopeRow}>
+            <span>命令</span>
+            <code>{insight.command}</code>
+          </div>
+        )}
+        {insight.files.length > 0 && (
+          <div className={styles.scopeRow}>
+            <span>文件</span>
+            <div className={styles.fileList}>
+              {insight.files.slice(0, 4).map((file) => <code key={file}>{file}</code>)}
+              {insight.files.length > 4 && <em>另 {insight.files.length - 4} 个</em>}
+            </div>
+          </div>
+        )}
+        <div className={styles.scopeRow}>
+          <span>工作区</span>
+          <code>{insight.workspace || '当前项目工作区'}</code>
+        </div>
+        <div className={styles.scopeRow}>
+          <span>后果</span>
+          <p>{closedState ? closedApprovalNotice(closedState) : insight.consequence}</p>
+        </div>
+      </div>
+      <div className={styles.approvalActions}>
+        <button className={styles.approvalToggle} onClick={() => setOpen(!open)} type="button">
+          {open ? '隐藏 diff / 参数' : insight.detailLabel}
+        </button>
+        {active && approvalId && onApprove && (
           <>
-            <button className={styles.approveBtn} onClick={() => onApprove(taskId, approvalId, 'approve')}>批准</button>
-            <button className={styles.denyBtn} onClick={() => onApprove(taskId, approvalId, 'deny')}>拒绝</button>
+            <button className={styles.approveBtn} onClick={() => onApprove(taskId, approvalId, 'approve')}>
+              {insight.approveLabel}
+            </button>
+            <button className={styles.denyBtn} onClick={() => onApprove(taskId, approvalId, 'deny')}>
+              拒绝执行
+            </button>
           </>
         )}
+        {!active && (
+          <button className={styles.disabledApprovalBtn} type="button" disabled>
+            审批不可操作
+          </button>
+        )}
         {canCancel && onCancel && !closedState && (
-          <button className={styles.cancelSmall} onClick={() => { if (window.confirm('停止任务？')) onCancel(taskId) }}>停止</button>
+          <button className={styles.cancelSmall} onClick={() => { if (window.confirm('停止当前 AI 任务？停止后不会批准这个工具动作。')) onCancel(taskId) }}>
+            停止任务
+          </button>
         )}
       </div>
-      {open && <pre className={styles.toolChipPre}>{formatApprovalBody(event)}</pre>}
+      {open && (
+        <div className={styles.approvalDetails}>
+          {insight.diffPreview && (
+            <section>
+              <strong>Diff 预览</strong>
+              <pre className={styles.toolChipPre}>{insight.diffPreview}</pre>
+            </section>
+          )}
+          <section>
+            <strong>{insight.argsLabel}</strong>
+            <pre className={styles.toolChipPre}>{insight.argsPreview || '（没有参数）'}</pre>
+          </section>
+        </div>
+      )}
     </div>
   )
 }
@@ -221,8 +280,127 @@ function shortNode(value: string): string {
   return v.length > 18 ? `${v.slice(0, 11)}...${v.slice(-6)}` : v
 }
 
-function formatApprovalBody(event: ToolEvent): string {
-  const args = event.args ? JSON.stringify(event.args, null, 2) : ''
-  const diff = event.diff?.preview ? `\n\nDiff 预览:\n${event.diff.preview}` : ''
-  return `待审批参数:\n${args}${diff}`
+interface ApprovalInsight {
+  title: string
+  summary: string
+  riskLabel: string
+  riskTone: 'normal' | 'danger'
+  command: string
+  workspace: string
+  files: string[]
+  consequence: string
+  detailLabel: string
+  approveLabel: string
+  argsLabel: string
+  argsPreview: string
+  diffPreview: string
+}
+
+function approvalInsight(event: ToolEvent, tool: string): ApprovalInsight {
+  const command = approvalCommand(event)
+  const files = approvalFiles(event)
+  const workspace = clean(event.args?.cwd ?? event.args?.workdir ?? event.args?.workspace ?? event.args?.project_root ?? event.cwd)
+  const diffPreview = clean(event.diff?.preview ?? '')
+  const argsPreview = formatApprovalArgs(event)
+  const highRisk = approvalLooksHighRisk(tool, command)
+
+  if (tool === 'shell') {
+    return {
+      title: '请求执行命令',
+      summary: command ? 'AI CLI 需要在本机工作区运行这条命令。' : 'AI CLI 请求执行一条本机命令。',
+      riskLabel: highRisk ? '高风险命令' : '命令审批',
+      riskTone: highRisk ? 'danger' : 'normal',
+      command,
+      workspace,
+      files,
+      consequence: highRisk ? '批准后可能修改文件、安装依赖、推送代码或影响本机环境。' : '批准后命令会继续执行；拒绝后本轮工具动作不会运行。',
+      detailLabel: '查看命令 / 参数',
+      approveLabel: '批准执行命令',
+      argsLabel: '命令参数',
+      argsPreview,
+      diffPreview,
+    }
+  }
+
+  if (tool === 'file_change') {
+    return {
+      title: '请求修改文件',
+      summary: files.length ? `将影响 ${files.length} 个文件，批准前可查看 diff。` : 'AI CLI 请求写入或修改项目文件。',
+      riskLabel: '写文件审批',
+      riskTone: 'normal',
+      command,
+      workspace,
+      files,
+      consequence: '批准后文件会被写入当前工作区；拒绝后不会应用这次文件修改。',
+      detailLabel: diffPreview ? '查看 diff / 参数' : '查看文件参数',
+      approveLabel: '批准写入文件',
+      argsLabel: '写入参数',
+      argsPreview,
+      diffPreview,
+    }
+  }
+
+  return {
+    title: `请求调用 ${tool}`,
+    summary: 'AI CLI 请求执行一个需要用户确认的工具动作。',
+    riskLabel: highRisk ? '高风险工具' : '工具审批',
+    riskTone: highRisk ? 'danger' : 'normal',
+    command,
+    workspace,
+    files,
+    consequence: '批准后工具动作会继续执行；拒绝后本轮工具动作不会运行。',
+    detailLabel: diffPreview ? '查看 diff / 参数' : '查看工具参数',
+    approveLabel: '批准调用工具',
+    argsLabel: '工具参数',
+    argsPreview,
+    diffPreview,
+  }
+}
+
+function approvalCommand(event: ToolEvent): string {
+  return clean(event.args?.command ?? event.args?.cmd ?? event.command)
+}
+
+function approvalFiles(event: ToolEvent): string[] {
+  const files = new Set<string>()
+  const add = (value: unknown) => {
+    const text = clean(value)
+    if (text) files.add(text)
+  }
+  add(event.args?.path)
+  add(event.args?.file)
+  add(event.args?.target)
+  if (Array.isArray(event.args?.files)) {
+    for (const file of event.args.files) add(file)
+  }
+  if (Array.isArray(event.args?.changes)) {
+    for (const change of event.args.changes) {
+      if (change && typeof change === 'object') {
+        const record = change as Record<string, unknown>
+        add(record.path ?? record.file ?? record.target)
+      }
+    }
+  }
+  if (Array.isArray(event.diff?.files)) {
+    for (const file of event.diff.files) add(file)
+  }
+  return Array.from(files)
+}
+
+function approvalLooksHighRisk(tool: string, command: string): boolean {
+  const value = `${tool} ${command}`.toLowerCase()
+  return /\b(git\s+push|rm\s+-rf|del\s+\/|remove-item|npm\s+i|npm\s+install|pnpm\s+add|yarn\s+add|cargo\s+install|chmod|chown|sudo|ssh|scp|curl|wget)\b/.test(value)
+}
+
+function formatApprovalArgs(event: ToolEvent): string {
+  if (!event.args) return ''
+  try {
+    return JSON.stringify(event.args, null, 2)
+  } catch {
+    return clean(event.args)
+  }
+}
+
+function closedApprovalNotice(state: { label: string; meta: string }): string {
+  return `${state.label}：${state.meta || '这个审批已经处理，不能再次操作。'}`
 }
