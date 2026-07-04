@@ -155,7 +155,7 @@ function isConnectionItem(item: TimelineItem) {
   const phase = String(item.event?.phase ?? '')
   const text = [item.title, item.detail, item.meta, phase].filter(Boolean).join(' ')
   if (/^(Codex|Claude|Copilot|Gemini|AI CLI)$/i.test(text.trim())) return true
-  return /(执行权|会话隔离|PC 节点|pc 节点|绑定的 PC|正在直连|正在连接|快速检查|巡检|派发|确认接收|等待 .*CLI|正在处理中|重连)/i.test(text)
+  return /(执行权|会话隔离|PC 节点|pc 节点|绑定的 PC|正在直连|正在连接|快速检查|巡检|派发|确认接收|等待 .*CLI|正在处理中|重连|更新升级|恢复通信|自动恢复)/i.test(text)
 }
 
 function isSummaryItem(item: TimelineItem) {

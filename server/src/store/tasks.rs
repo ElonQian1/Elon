@@ -1,21 +1,10 @@
 use anyhow::Result;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{params, OptionalExtension};
 
 use super::{
     clean_optional, new_id, now, safe_external_id, Store, TaskEventRecord, TaskSnapshot,
     MAX_TASK_EVENTS_PER_TASK,
 };
-
-const CHANNEL_TASK_INTERRUPTED_RESULT: &str =
-    "任务已中断：服务器重启前任务未完成。请点击“继续”让 AI 检查当前工作区后接着处理。";
-const CHANNEL_TASK_STALE_RESULT: &str =
-    "任务失败：PC 节点断线或任务超时自动终止。请点击“继续”让 AI 检查当前工作区后接着处理。";
-#[derive(Debug, Clone)]
-struct ChannelTaskResultTarget {
-    task_id: String,
-    project_id: String,
-    channel_id: String,
-}
 
 impl Store {
     pub fn create_task(
@@ -184,8 +173,8 @@ impl Store {
             .map(|_| ())
     }
 
-    // 频道 AI runner 可能在恢复逻辑已经写入终态后才返回；这里用 running CAS
-    // 防止旧 runner 覆盖 interrupted/failed/canceled 等已经对用户可见的终态。
+    // 频道 AI runner 可能在恢复逻辑已经写入终态后才返回；这里用活动态 CAS
+    // 防止旧 runner 覆盖 failed/canceled 等已经对用户可见的终态。
     pub fn finish_running_task(
         &self,
         task_id: &str,
@@ -212,7 +201,7 @@ impl Store {
             "UPDATE tasks
              SET status = ?1, apk_url = ?2, error = ?3, updated_at = ?4
              WHERE id = ?5
-               AND (?6 = 0 OR status = 'running')",
+               AND (?6 = 0 OR status IN ('running', 'recovering'))",
             params![
                 status,
                 clean_optional(apk_url),
@@ -452,204 +441,6 @@ impl Store {
         }
         Ok(None)
     }
-
-    /// 服务重启恢复：标记运行中任务，并给频道 AI 任务补一条终态消息。
-    ///
-    /// `project_channel_messages` 是 PC 页面任务卡的权威输入；只更新 `tasks`
-    /// 表会让前端仍然看到一个没有 `ai_result` 的运行中任务卡。
-    pub fn mark_interrupted_running_tasks_with_channel_results(&self) -> Result<usize> {
-        let conn = self.conn()?;
-        let tx = conn.unchecked_transaction()?;
-        let targets = running_channel_task_result_targets(&tx)?;
-        let n = tx.execute(
-            "UPDATE tasks
-             SET status = 'interrupted',
-                 error = COALESCE(error, 'server restarted before task finished'),
-                 updated_at = ?1
-             WHERE status = 'running'",
-            params![now()],
-        )?;
-        insert_missing_channel_ai_results(&tx, &targets, CHANNEL_TASK_INTERRUPTED_RESULT)?;
-        tx.commit()?;
-        Ok(n)
-    }
-
-    /// 超时清理：把长期 running 的任务置为 failed，并补齐频道终态。
-    ///
-    /// 这一步不是“继续原进程”，只是避免用户界面卡在永久运行态；真正续跑仍由
-    /// 前端“继续”入口让 AI 重新检查工作区后接着处理。
-    pub fn mark_stale_running_tasks_with_channel_results(
-        &self,
-        older_than_secs: u64,
-    ) -> Result<usize> {
-        self.mark_stale_running_tasks_with_channel_results_excluding(older_than_secs, &[])
-    }
-
-    pub fn mark_stale_running_tasks_with_channel_results_excluding(
-        &self,
-        older_than_secs: u64,
-        excluded_task_ids: &[String],
-    ) -> Result<usize> {
-        use chrono::{Duration, Utc};
-        use std::collections::HashSet;
-
-        let cutoff = (Utc::now() - Duration::seconds(older_than_secs as i64)).to_rfc3339();
-        let excluded = excluded_task_ids
-            .iter()
-            .map(|value| value.trim())
-            .filter(|value| !value.is_empty())
-            .collect::<HashSet<_>>();
-        let conn = self.conn()?;
-        let tx = conn.unchecked_transaction()?;
-        let targets = stale_channel_task_result_targets(&tx, &cutoff)?
-            .into_iter()
-            .filter(|target| !excluded.contains(target.task_id.as_str()))
-            .collect::<Vec<_>>();
-        let n = if excluded.is_empty() {
-            tx.execute(
-                "UPDATE tasks
-             SET status = 'failed',
-                 error = COALESCE(error, 'PC节点断线或任务超时自动终止'),
-                 updated_at = ?1
-             WHERE status = 'running'
-               AND created_at < ?2",
-                params![now(), cutoff],
-            )?
-        } else {
-            let placeholders = std::iter::repeat("?")
-                .take(excluded.len())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let sql = format!(
-                "UPDATE tasks
-                 SET status = 'failed',
-                     error = COALESCE(error, 'PC节点断线或任务超时自动终止'),
-                     updated_at = ?
-                 WHERE status = 'running'
-                   AND created_at < ?
-                   AND id NOT IN ({placeholders})"
-            );
-            let now_value = now();
-            let mut values = vec![now_value, cutoff.clone()];
-            values.extend(excluded.iter().map(|value| (*value).to_string()));
-            tx.execute(&sql, rusqlite::params_from_iter(values.iter()))?
-        };
-        insert_missing_channel_ai_results(&tx, &targets, CHANNEL_TASK_STALE_RESULT)?;
-        tx.commit()?;
-        Ok(n)
-    }
-}
-
-fn running_channel_task_result_targets(conn: &Connection) -> Result<Vec<ChannelTaskResultTarget>> {
-    let mut stmt = conn.prepare(
-        "SELECT DISTINCT t.id, m.project_id, m.channel_id
-         FROM tasks t
-         JOIN project_channel_messages m
-           ON m.task_id = t.id
-          AND m.kind = 'ai_task'
-         WHERE t.status = 'running'
-           AND NOT EXISTS (
-             SELECT 1
-             FROM project_channel_messages r
-             WHERE r.project_id = m.project_id
-               AND r.channel_id = m.channel_id
-               AND r.task_id = t.id
-               AND r.kind = 'ai_result'
-           )",
-    )?;
-    let targets = stmt
-        .query_map([], |row| {
-            Ok(ChannelTaskResultTarget {
-                task_id: row.get(0)?,
-                project_id: row.get(1)?,
-                channel_id: row.get(2)?,
-            })
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(targets)
-}
-
-fn stale_channel_task_result_targets(
-    conn: &Connection,
-    cutoff: &str,
-) -> Result<Vec<ChannelTaskResultTarget>> {
-    let mut stmt = conn.prepare(
-        "SELECT DISTINCT t.id, m.project_id, m.channel_id
-         FROM tasks t
-         JOIN project_channel_messages m
-           ON m.task_id = t.id
-          AND m.kind = 'ai_task'
-         WHERE t.status = 'running'
-           AND t.created_at < ?1
-           AND NOT EXISTS (
-             SELECT 1
-             FROM project_channel_messages r
-             WHERE r.project_id = m.project_id
-               AND r.channel_id = m.channel_id
-               AND r.task_id = t.id
-               AND r.kind = 'ai_result'
-           )",
-    )?;
-    let targets = stmt
-        .query_map(params![cutoff], |row| {
-            Ok(ChannelTaskResultTarget {
-                task_id: row.get(0)?,
-                project_id: row.get(1)?,
-                channel_id: row.get(2)?,
-            })
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    Ok(targets)
-}
-
-fn insert_missing_channel_ai_results(
-    conn: &Connection,
-    targets: &[ChannelTaskResultTarget],
-    content: &str,
-) -> Result<usize> {
-    let mut inserted = 0;
-    for target in targets {
-        let existing: Option<String> = conn
-            .query_row(
-                "SELECT id
-                 FROM project_channel_messages
-                 WHERE project_id = ?1
-                   AND channel_id = ?2
-                   AND task_id = ?3
-                   AND kind = 'ai_result'
-                 LIMIT 1",
-                params![target.project_id, target.channel_id, target.task_id],
-                |row| row.get(0),
-            )
-            .optional()?;
-        if existing.is_some() {
-            continue;
-        }
-
-        let created_at = now();
-        conn.execute(
-            "INSERT INTO project_channel_messages (
-                id, project_id, channel_id, sender_user_id, kind, content, task_id, created_at
-             )
-             VALUES (?1, ?2, ?3, NULL, 'ai_result', ?4, ?5, ?6)",
-            params![
-                new_id("pcm"),
-                target.project_id,
-                target.channel_id,
-                content,
-                target.task_id,
-                created_at
-            ],
-        )?;
-        conn.execute(
-            "UPDATE project_channels
-             SET updated_at = ?1
-             WHERE project_id = ?2 AND id = ?3",
-            params![created_at, target.project_id, target.channel_id],
-        )?;
-        inserted += 1;
-    }
-    Ok(inserted)
 }
 
 #[cfg(test)]
@@ -823,9 +614,5 @@ mod tests {
             .get_channel_task_snapshot(&project.id, &discussion_channel.id, &snapshot.id)
             .expect("snapshot query should work")
             .is_none());
-    }
-
-    mod task_recovery_tests {
-        include!("task_recovery_tests.rs");
     }
 }

@@ -78,7 +78,7 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
           setBusy(false)
           setMessage('更新已触发，但还没确认到新版本；请稍后手动刷新状态。')
         } else {
-          setMessage('Win 端正在更新或重启，页面会自动确认。')
+          setMessage('Win 端正在更新升级，通信临时中断，会自动恢复。')
         }
       } catch {
         if (attempts >= 30) {
@@ -86,7 +86,7 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
           setBusy(false)
           setError('更新后仍未重新连接本机节点，请手动启动 Win 端或重新下载。')
         } else {
-          setMessage('Win 端正在重启，等待本机节点重新上线。')
+          setMessage('Win 端正在更新升级，通信临时中断，会自动恢复。')
         }
       }
     }, 3000)
@@ -102,7 +102,7 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
     setMessage('正在让本机 Win 端检查更新…')
     try {
       const data = await nodeApi<{ message?: string }>(adminUrl, '/api/client-maintenance/update', { method: 'POST' }, 12000)
-      setMessage(data.message || '已触发更新。Win 端会自动替换并重启。')
+      setMessage(data.message || 'Win 端正在更新升级，通信临时中断，会自动恢复。')
       setPolling(true)
     } catch (err) {
       setBusy(false)

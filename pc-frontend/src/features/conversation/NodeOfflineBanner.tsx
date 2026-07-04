@@ -98,7 +98,7 @@ export default function NodeOfflineBanner({ localNodeReady = false, localNodeId 
         ) : (
           <>
             <strong style={{ color: strongColor }}>{name}</strong> 正在重连。
-            服务器更新或 Win 端自更新后可能会短暂出现这种状态。
+            服务器正在更新升级，或 Win 端正在更新升级，通信临时中断，会自动恢复。
           </>
         )}
       </span>

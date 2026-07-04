@@ -144,6 +144,7 @@ export function statusForTask(task: TaskState | null): { tone: TaskTone; label: 
     return task.failed ? { tone: 'failed', label: '任务失败' } : { tone: 'done', label: '任务完成' }
   }
   if (['queued', 'pending'].includes(task.status)) return { tone: 'queued', label: '已排队' }
+  if (task.status === 'recovering') return { tone: 'running', label: '正在恢复通信' }
   if (['running', 'in_progress', 'processing'].includes(task.status)) {
     return { tone: 'running', label: task.progressCount > 0 ? '执行中' : '等待AI响应' }
   }
@@ -153,6 +154,10 @@ export function statusForTask(task: TaskState | null): { tone: TaskTone; label: 
 
 export function runtimeStatusLabel(phase: string): { tone: TaskTone; title: string; body: string } {
   if (phase === 'pc_dispatched') return { tone: 'running', title: '已派发到 PC 节点', body: '正在等待本机 AI CLI 输出。' }
+  if (phase === 'server_updating') return { tone: 'running', title: '服务器正在更新升级', body: '通信临时中断，会自动恢复。' }
+  if (phase === 'win_client_updating') return { tone: 'running', title: 'Win 端正在更新升级', body: '通信临时中断，会自动恢复。' }
+  if (phase === 'connection_recovering') return { tone: 'running', title: '通信正在恢复', body: '正在重连节点并回放任务现场。' }
+  if (phase === 'resume_required') return { tone: 'failed', title: '需要继续任务', body: '自动恢复没有完成，请点击继续让 AI 检查当前工作区后接着处理。' }
   if (phase === 'pc_cli_no_output_timeout') return { tone: 'failed', title: '未收到 AI CLI 输出', body: 'PC 节点没有返回命令、工具结果或最终完成事件。' }
   if (phase === 'pc_tool_result_timeout') return { tone: 'failed', title: '工具结果超时', body: 'PC 节点已开始执行工具，但没有返回工具结果或最终完成事件。' }
   if (phase === 'waiting_approval') return { tone: 'approval', title: '等待工具审批', body: '批准前不会执行工具。' }

@@ -71,6 +71,10 @@ export type TaskTimelineStageKey =
   | 'empty'
   | 'dispatch'
   | 'heartbeat'
+  | 'server-update'
+  | 'win-update'
+  | 'recovering'
+  | 'resume-required'
   | 'timeout'
   | 'tool-timeout'
   | 'command'
@@ -259,6 +263,18 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     const runtime = clean(event.runtime ?? '')
     const turn = Number(event.turn ?? 0)
     const eventMessage = clean(event.message ?? '')
+    if (isMaintenanceRuntimePhase(phase)) {
+      return {
+        id: itemId(message, index),
+        kind: 'node',
+        tone: label.tone,
+        title: label.title,
+        detail: eventMessage || label.body,
+        meta: runtime,
+        message,
+        event,
+      }
+    }
     if (phase === 'pc_cli_no_output_timeout' || phase === 'pc_tool_result_timeout') {
       return {
         id: itemId(message, index),
@@ -375,14 +391,15 @@ function isAssistantOutputEvent(event: ToolEvent | null): boolean {
 function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineDiagnostic[] {
   const diagnostics: TaskTimelineDiagnostic[] = []
   const { coverage } = model
-  if (coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
+  const maintenance = latestMaintenanceRuntimeStatus(model.items)
+  if (!maintenance && coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
     diagnostics.push({
       tone: 'failed',
       title: '只收到等待状态',
       detail: '后端已经派发任务或正在等待 AI CLI，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
     })
   }
-  if (coverage.dispatch && !coverage.command && !coverage.assistantEvent && !coverage.finalReply) {
+  if (!maintenance && coverage.dispatch && !coverage.command && !coverage.assistantEvent && !coverage.finalReply) {
     diagnostics.push({
       tone: 'running',
       title: '已到 PC 节点',
@@ -415,6 +432,22 @@ function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'
 
 function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineStage {
   const latest = model.items[model.items.length - 1]
+  const latestRuntime = latestRuntimeStatusItem(model.items)
+  const latestPhase = clean(latestRuntime?.event?.phase ?? '').toLowerCase()
+  if (latestRuntime && isMaintenanceRuntimePhase(latestPhase)) {
+    const label = runtimeStatusLabel(latestPhase)
+    const detail = clean(latestRuntime.event?.message ?? '') || label.body
+    return {
+      key: maintenanceStageKey(latestPhase),
+      tone: label.tone,
+      label: label.title,
+      detail,
+      meta: latestRuntime.meta,
+      summary: `当前：${label.title}`,
+      stuck: latestPhase === 'resume_required',
+    }
+  }
+
   const toolTimeout = latestRuntimePhase(model.items, 'pc_tool_result_timeout')
   if (toolTimeout) {
     return {
@@ -557,6 +590,31 @@ function latestRuntimePhase(items: TimelineItem[], phase: string): TimelineItem 
     }
   }
   return undefined
+}
+
+function latestRuntimeStatusItem(items: TimelineItem[]): TimelineItem | undefined {
+  for (let index = items.length - 1; index >= 0; index--) {
+    const item = items[index]
+    if (item.event?.type === 'runtime_status') return item
+  }
+  return undefined
+}
+
+function latestMaintenanceRuntimeStatus(items: TimelineItem[]): TimelineItem | undefined {
+  const item = latestRuntimeStatusItem(items)
+  const phase = clean(item?.event?.phase ?? '').toLowerCase()
+  return item && isMaintenanceRuntimePhase(phase) ? item : undefined
+}
+
+function isMaintenanceRuntimePhase(phase: string): boolean {
+  return ['server_updating', 'win_client_updating', 'connection_recovering', 'resume_required'].includes(phase)
+}
+
+function maintenanceStageKey(phase: string): TaskTimelineStageKey {
+  if (phase === 'server_updating') return 'server-update'
+  if (phase === 'win_client_updating') return 'win-update'
+  if (phase === 'resume_required') return 'resume-required'
+  return 'recovering'
 }
 
 function heartbeatWaitSeconds(item: TimelineItem | undefined): number | null {

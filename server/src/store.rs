@@ -62,6 +62,7 @@ mod social_ai_pending;
 mod social_ai_selected;
 mod store_types;
 mod system_projects;
+mod task_recovery;
 mod tasks;
 pub(crate) mod token_usage;
 #[cfg(test)]
@@ -71,7 +72,6 @@ mod user_memories;
 mod user_presence;
 mod user_progression;
 mod users;
-
 pub use admin_stats::{
     estimate_cost_cny, AdminAccountingAuditRow, AdminDayRow, AdminFeatureRow, AdminModelRow,
     AdminPlatformSummary, AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,

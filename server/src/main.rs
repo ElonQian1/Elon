@@ -257,18 +257,18 @@ async fn main() -> Result<()> {
     // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
     pc_relay_client::spawn_if_configured();
 
-    // 服务启动时：将上次运行中的任务标记为已中断
+    // 服务启动时：将上次运行中的频道 AI 任务标记为恢复中，而不是直接判失败。
     let interrupted = state.store.mark_interrupted_running_ws_tasks().unwrap_or(0);
     if interrupted > 0 {
         info!("{} 个进行中的任务因服务器重启被标记为已中断", interrupted);
     }
     let interrupted_tasks = state
         .store
-        .mark_interrupted_running_tasks_with_channel_results()
+        .mark_recovering_running_tasks_after_server_restart()
         .unwrap_or(0);
     if interrupted_tasks > 0 {
         info!(
-            "{} 个数据库运行中任务因服务器重启被标记为已中断",
+            "{} 个数据库运行中频道任务因服务器重启进入恢复中",
             interrupted_tasks
         );
     }

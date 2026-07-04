@@ -96,7 +96,7 @@ pub(crate) async fn update_handler() -> (StatusCode, Json<Value>) {
                 StatusCode::OK,
                 Json(json!({
                     "ok": true,
-                    "message": "已开始后台检查更新；如有新版本，客户端会自动替换并重启。"
+                    "message": "Win 端正在更新升级；如需替换重启，通信临时中断，会自动恢复。"
                 })),
             )
         }
@@ -759,8 +759,8 @@ pub(crate) async fn push_update_from_server(
     // 先试已安装的更新程序
     #[cfg(windows)]
     if spawn_client_action(ClientAction::Update).is_ok() {
-        record_maintenance_event("push_update", true, "via_installer");
-        return Ok("已通过安装程序触发更新，节点将在后台自动替换并重启。".to_string());
+        record_maintenance_event("push_update", true, "Win 端正在更新升级，通信临时中断，会自动恢复。via_installer");
+        return Ok("Win 端正在更新升级，通信临时中断，会自动恢复。".to_string());
     }
 
     // 没有安装程序时：直接下载新版 exe，写旁路 bat 脚本替换并重启
@@ -821,7 +821,7 @@ pub(crate) async fn push_update_from_server(
         cmd.spawn().map_err(|e| format!("启动更新脚本失败: {e}"))?;
     }
 
-    record_maintenance_event("push_update", true, "via_download_replace");
+    record_maintenance_event("push_update", true, "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace");
     // 异步退出（让当前响应先发出）
     tokio::spawn(async {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -829,7 +829,7 @@ pub(crate) async fn push_update_from_server(
     });
 
     Ok(format!(
-        "已下载新版本并启动替换脚本，节点将在 2 秒后自动重启。下载大小: {} KB",
+        "Win 端正在更新升级，通信临时中断，会自动恢复。下载大小: {} KB",
         bytes.len() / 1024
     ))
 }

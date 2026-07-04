@@ -2,6 +2,9 @@
 
 use std::collections::HashMap;
 
+use homecli_proto::NodeHardwareProfile;
+use serde::Serialize;
+
 use crate::{node_registry::NodeSummary, store::NodeQualityScore};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,6 +12,165 @@ pub struct NodeScheduleDecision {
     pub node_id: String,
     pub score: i64,
     pub route_reason: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PcNodeDispatchScore {
+    pub score: i64,
+    pub tier: String,
+    pub reasons: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy)]
+pub struct PcNodeDispatchCandidate<'a> {
+    pub online: bool,
+    pub cli_connected: bool,
+    pub can_accept_project: bool,
+    pub project_count: i64,
+    pub project_slots_remaining: i64,
+    pub route_a_ready: bool,
+    pub api_runtime_ready: bool,
+    pub server_runtime_ready: bool,
+    pub hardware: Option<&'a NodeHardwareProfile>,
+    pub quality: Option<&'a NodeQualityScore>,
+}
+
+#[allow(dead_code)]
+pub fn score_pc_node_dispatch(candidate: PcNodeDispatchCandidate<'_>) -> PcNodeDispatchScore {
+    let mut raw_score = 0_i64;
+    let mut reasons = Vec::new();
+    let mut warnings = Vec::new();
+
+    if candidate.online {
+        raw_score += 30;
+        reasons.push("节点在线".to_string());
+    } else {
+        warnings.push("节点离线".to_string());
+    }
+
+    if candidate.cli_connected {
+        raw_score += 10;
+        reasons.push("Win 端控制通道已连接".to_string());
+    } else if candidate.online {
+        warnings.push("CLI 控制通道未确认".to_string());
+    }
+
+    if candidate.route_a_ready {
+        raw_score += 20;
+        reasons.push("本机 Codex/Copilot/Claude/Gemini 可用".to_string());
+    }
+    if candidate.api_runtime_ready {
+        raw_score += 12;
+        reasons.push("本机 API runtime 可用".to_string());
+    }
+    if candidate.server_runtime_ready {
+        raw_score += 8;
+        reasons.push("平台 AI runtime 可兜底".to_string());
+    }
+    if !candidate.route_a_ready && !candidate.api_runtime_ready && !candidate.server_runtime_ready {
+        warnings.push("未发现可用 AI runtime".to_string());
+    }
+
+    if candidate.can_accept_project {
+        raw_score += 12;
+        reasons.push("仍可接收项目".to_string());
+    } else {
+        raw_score -= 25;
+        warnings.push("项目容量已满或工作区不可用".to_string());
+    }
+
+    if candidate.project_slots_remaining > 0 {
+        raw_score += (candidate.project_slots_remaining * 4).clamp(0, 16);
+        reasons.push(format!(
+            "剩余 {} 个项目槽位",
+            candidate.project_slots_remaining
+        ));
+    } else if candidate.project_count > 0 {
+        warnings.push(format!("当前已绑定 {} 个项目", candidate.project_count));
+    }
+
+    raw_score += hardware_score(candidate.hardware, &mut reasons);
+    raw_score += quality_score(candidate.quality, &mut reasons, &mut warnings);
+
+    let score = raw_score.clamp(0, 100);
+    PcNodeDispatchScore {
+        score,
+        tier: dispatch_tier(score).to_string(),
+        reasons,
+        warnings,
+    }
+}
+
+#[allow(dead_code)]
+fn hardware_score(hardware: Option<&NodeHardwareProfile>, reasons: &mut Vec<String>) -> i64 {
+    let Some(hardware) = hardware else {
+        return 0;
+    };
+    let mut score = 0;
+    if let Some(cores) = hardware.cpu_cores {
+        let bonus = (cores as i64).clamp(0, 16);
+        score += bonus;
+        if cores >= 8 {
+            reasons.push(format!("CPU {} 核", cores));
+        }
+    }
+    if let Some(bytes) = hardware.memory_total_bytes {
+        let gib = bytes / 1024 / 1024 / 1024;
+        let bonus = ((gib as i64) / 2).clamp(0, 16);
+        score += bonus;
+        if gib >= 16 {
+            reasons.push(format!("内存 {} GiB", gib));
+        }
+    }
+    if !hardware.gpu_names.is_empty() {
+        score += 8;
+        reasons.push("检测到 GPU".to_string());
+    }
+    if let Some(bytes) = hardware.gpu_memory_total_bytes {
+        let gib = bytes / 1024 / 1024 / 1024;
+        let bonus = (gib as i64).clamp(0, 10);
+        score += bonus;
+        if gib >= 8 {
+            reasons.push(format!("显存 {} GiB", gib));
+        }
+    }
+    score.clamp(0, 30)
+}
+
+#[allow(dead_code)]
+fn quality_score(
+    quality: Option<&NodeQualityScore>,
+    reasons: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) -> i64 {
+    let Some(quality) = quality else {
+        reasons.push("暂无历史质量，按冷启动候选处理".to_string());
+        return 6;
+    };
+    let success_bonus = (quality.success_rate_x1000.clamp(0, 1000) / 50).clamp(0, 20);
+    if quality.success_rate_x1000 >= 900 {
+        reasons.push(format!("历史成功率 {}‰", quality.success_rate_x1000));
+    } else if quality.total_runs >= 3 {
+        warnings.push(format!("历史成功率 {}‰", quality.success_rate_x1000));
+    }
+    let duration_bonus = quality
+        .avg_duration_ms
+        .map(|ms| if ms <= 10 * 60 * 1000 { 4 } else { 0 })
+        .unwrap_or(2);
+    success_bonus + duration_bonus
+}
+
+#[allow(dead_code)]
+fn dispatch_tier(score: i64) -> &'static str {
+    match score {
+        80..=100 => "excellent",
+        60..=79 => "good",
+        35..=59 => "limited",
+        _ => "unavailable",
+    }
 }
 
 pub fn select_best_node(
@@ -183,5 +345,68 @@ mod tests {
         let picked = select_best_node(&candidates, &HashMap::new(), "qwen").unwrap();
         assert_eq!(picked.node_id, "cold-a");
         assert!(picked.route_reason.contains("cold_start"));
+    }
+
+    #[test]
+    fn pc_dispatch_score_prefers_ready_capacity_and_quality() {
+        let hardware = NodeHardwareProfile {
+            cpu_cores: Some(12),
+            memory_total_bytes: Some(32 * 1024 * 1024 * 1024),
+            gpu_names: vec!["GPU".to_string()],
+            gpu_memory_total_bytes: Some(8 * 1024 * 1024 * 1024),
+            ..Default::default()
+        };
+        let quality = NodeQualityScore {
+            total_runs: 10,
+            successful_runs: 10,
+            success_rate_x1000: 1000,
+            avg_duration_ms: Some(300_000),
+            ..Default::default()
+        };
+        let score = score_pc_node_dispatch(PcNodeDispatchCandidate {
+            online: true,
+            cli_connected: true,
+            can_accept_project: true,
+            project_count: 1,
+            project_slots_remaining: 3,
+            route_a_ready: true,
+            api_runtime_ready: false,
+            server_runtime_ready: true,
+            hardware: Some(&hardware),
+            quality: Some(&quality),
+        });
+
+        assert_eq!(score.tier, "excellent");
+        assert!(score.score >= 80);
+        assert!(score
+            .reasons
+            .iter()
+            .any(|reason| reason.contains("历史成功率")));
+    }
+
+    #[test]
+    fn pc_dispatch_score_marks_offline_without_runtime_unavailable() {
+        let score = score_pc_node_dispatch(PcNodeDispatchCandidate {
+            online: false,
+            cli_connected: false,
+            can_accept_project: false,
+            project_count: 4,
+            project_slots_remaining: 0,
+            route_a_ready: false,
+            api_runtime_ready: false,
+            server_runtime_ready: false,
+            hardware: None,
+            quality: None,
+        });
+
+        assert_eq!(score.tier, "unavailable");
+        assert!(score
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("节点离线")));
+        assert!(score
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("AI runtime")));
     }
 }

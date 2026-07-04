@@ -62,6 +62,24 @@ fn result_messages_for_task(
         .collect()
 }
 
+fn progress_messages_for_task(
+    store: &Store,
+    user_id: &str,
+    project_id: &str,
+    channel_id: &str,
+    task_id: &str,
+) -> Vec<String> {
+    store
+        .list_project_channel_messages(user_id, project_id, channel_id, 50)
+        .expect("messages should list")
+        .into_iter()
+        .filter(|message| {
+            message.kind == "ai_progress" && message.task_id.as_deref() == Some(task_id)
+        })
+        .map(|message| message.content)
+        .collect()
+}
+
 fn task_status_and_error(store: &Store, task_id: &str) -> (String, Option<String>) {
     store
         .conn()
@@ -75,44 +93,44 @@ fn task_status_and_error(store: &Store, task_id: &str) -> (String, Option<String
 }
 
 #[test]
-fn interrupted_running_channel_task_gets_terminal_result_once() {
+fn running_channel_task_enters_recovering_once_after_server_restart() {
     let store = temp_store();
     let (user_id, project_id, channel_id, task_id) =
         temp_channel_task(&store, "interrupted-channel-task@example.com");
 
     let changed = store
-        .mark_interrupted_running_tasks_with_channel_results()
-        .expect("running tasks should be interrupted");
+        .mark_recovering_running_tasks_after_server_restart()
+        .expect("running tasks should enter recovery");
     assert_eq!(changed, 1);
     let (status, error) = task_status_and_error(&store, &task_id);
-    assert_eq!(status, "interrupted");
-    assert_eq!(
-        error.as_deref(),
-        Some("server restarted before task finished")
-    );
+    assert_eq!(status, "recovering");
+    assert_eq!(error.as_deref(), Some("server update recovery pending"));
 
     let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
-    assert_eq!(results.len(), 1);
-    assert!(results[0].contains("任务已中断"));
-    assert!(results[0].contains("继续"));
+    assert!(results.is_empty());
+    let progress = progress_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(progress.len(), 1);
+    assert!(progress[0].contains("\"phase\":\"server_updating\""));
+    assert!(progress[0].contains("服务器正在更新升级"));
+    assert!(progress[0].contains("会自动恢复"));
 
     let changed_again = store
-        .mark_interrupted_running_tasks_with_channel_results()
+        .mark_recovering_running_tasks_after_server_restart()
         .expect("second pass should be safe");
     assert_eq!(changed_again, 0);
-    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
-    assert_eq!(results.len(), 1);
+    let progress = progress_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(progress.len(), 1);
 }
 
 #[test]
-fn channel_messages_include_persisted_task_terminal_state() {
+fn channel_messages_include_persisted_task_recovering_state() {
     let store = temp_store();
     let (user_id, project_id, channel_id, task_id) =
         temp_channel_task(&store, "channel-message-task-state@example.com");
 
     store
-        .mark_interrupted_running_tasks_with_channel_results()
-        .expect("running task should be interrupted");
+        .mark_recovering_running_tasks_after_server_restart()
+        .expect("running task should enter recovery");
 
     let messages = store
         .list_project_channel_messages(&user_id, &project_id, &channel_id, 50)
@@ -123,10 +141,10 @@ fn channel_messages_include_persisted_task_terminal_state() {
             message.kind == "ai_task" && message.task_id.as_deref() == Some(task_id.as_str())
         })
         .expect("task message should exist");
-    assert_eq!(task_message.task_status.as_deref(), Some("interrupted"));
+    assert_eq!(task_message.task_status.as_deref(), Some("recovering"));
     assert_eq!(
         task_message.task_error.as_deref(),
-        Some("server restarted before task finished")
+        Some("server update recovery pending")
     );
 }
 
@@ -198,6 +216,47 @@ fn stale_running_channel_task_can_be_excluded_from_cleanup() {
         .mark_stale_running_tasks_with_channel_results(10 * 60)
         .expect("non-excluded stale task should fail");
     assert_eq!(changed, 1);
+}
+
+#[test]
+fn stale_recovering_channel_task_gets_recovery_failure_result() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "stale-recovering-channel-task@example.com");
+
+    store
+        .mark_recovering_running_tasks_after_server_restart()
+        .expect("running task should enter recovery");
+    let recent_changed = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("fresh recovery should not fail immediately");
+    assert_eq!(recent_changed, 0);
+    let (status, _) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "recovering");
+
+    let old_updated_at = (chrono::Utc::now() - chrono::Duration::minutes(20)).to_rfc3339();
+    store
+        .conn()
+        .expect("store lock should be healthy")
+        .execute(
+            "UPDATE tasks SET updated_at = ?1 WHERE id = ?2",
+            rusqlite::params![old_updated_at, task_id],
+        )
+        .expect("recovery should become stale");
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("stale recovering task should fail");
+    assert_eq!(changed, 1);
+    let (status, error) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "failed");
+    assert_eq!(error.as_deref(), Some("server update recovery timed out"));
+
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results.len(), 1);
+    assert!(results[0].contains("恢复失败"));
+    assert!(results[0].contains("更新升级"));
+    assert!(results[0].contains("继续"));
 }
 
 #[test]
@@ -282,35 +341,32 @@ fn interrupted_channel_task_with_existing_result_is_not_duplicated() {
         .expect("existing result should insert"));
 
     let changed = store
-        .mark_interrupted_running_tasks_with_channel_results()
-        .expect("running task should be interrupted");
+        .mark_recovering_running_tasks_after_server_restart()
+        .expect("running task should enter recovery");
     assert_eq!(changed, 1);
     let (status, _) = task_status_and_error(&store, &task_id);
-    assert_eq!(status, "interrupted");
+    assert_eq!(status, "recovering");
     let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
     assert_eq!(results, vec!["已有终态结果".to_string()]);
 }
 
 #[test]
-fn recovered_terminal_task_is_not_overwritten_by_late_runner_finish() {
+fn recovering_task_can_be_finished_by_late_runner() {
     let store = temp_store();
     let (_, _, _, task_id) = temp_channel_task(&store, "late-runner-finish@example.com");
 
     store
-        .mark_interrupted_running_tasks_with_channel_results()
-        .expect("running task should be interrupted");
+        .mark_recovering_running_tasks_after_server_restart()
+        .expect("running task should enter recovery");
 
     let changed = store
         .finish_running_task(&task_id, "done", Some("迟到的完成消息"), None, None)
-        .expect("late finish should be ignored safely");
-    assert!(!changed);
+        .expect("late finish should complete recovering task");
+    assert!(changed);
 
     let (status, error) = task_status_and_error(&store, &task_id);
-    assert_eq!(status, "interrupted");
-    assert_eq!(
-        error.as_deref(),
-        Some("server restarted before task finished")
-    );
+    assert_eq!(status, "done");
+    assert!(error.is_none());
 }
 
 #[test]
