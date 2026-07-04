@@ -37,7 +37,7 @@
   height: 7px;
   overflow: hidden;
   border-radius: 999px;
-  background: #fff;
+  background: rgba(255, 255, 255, .16);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
 }
 

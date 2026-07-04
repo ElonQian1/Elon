@@ -8,14 +8,52 @@ interface LevelExperienceBarProps {
 export default function LevelExperienceBar({ progression }: LevelExperienceBarProps) {
   if (!progression) return null
 
-  const ownCodexTokens = progression.own_codex_tokens ?? 0
-  const sharedCodexTokens = progression.shared_codex_tokens ?? 0
-  const platformTokens = progression.platform_tokens ?? Math.max(0, progression.consumed_tokens - ownCodexTokens - sharedCodexTokens)
-  const ownCodexCallCount = progression.own_codex_call_count ?? 0
-  const sharedCodexCallCount = progression.shared_codex_call_count ?? 0
-  const platformCallCount = progression.platform_call_count ?? Math.max(0, progression.consumed_call_count - ownCodexCallCount - sharedCodexCallCount)
+  const level = positiveInteger(progression.level, 1)
+  const tierName = progression.tier_name || '初阶算力'
+  const totalXpTokens = nonNegative(progression.total_xp_tokens)
+  const consumedTokens = nonNegative(progression.consumed_tokens)
+  const ownCodexTokens = nonNegative(progression.own_codex_tokens)
+  const sharedCodexTokens = nonNegative(progression.shared_codex_tokens)
+  const platformTokens = nonNegative(
+    progression.platform_tokens,
+    Math.max(0, consumedTokens - ownCodexTokens - sharedCodexTokens),
+  )
+  const providedTokens = nonNegative(progression.provided_tokens)
+  const levelFloorTokens = nonNegative(progression.level_floor_tokens)
+  const nextLevelTokens = Math.max(levelFloorTokens + 1, nonNegative(progression.next_level_tokens, levelFloorTokens + 1))
+  const levelSpan = Math.max(1, nextLevelTokens - levelFloorTokens)
+  const tokensIntoLevel = Math.min(levelSpan, nonNegative(progression.tokens_into_level))
+  const tokensToNextLevel = nonNegative(progression.tokens_to_next_level, Math.max(0, nextLevelTokens - totalXpTokens))
+  const consumedCallCount = nonNegative(progression.consumed_call_count)
+  const ownCodexCallCount = nonNegative(progression.own_codex_call_count)
+  const sharedCodexCallCount = nonNegative(progression.shared_codex_call_count)
+  const platformCallCount = nonNegative(
+    progression.platform_call_count,
+    Math.max(0, consumedCallCount - ownCodexCallCount - sharedCodexCallCount),
+  )
+  const providedRunCount = nonNegative(progression.provided_run_count)
+  const providerEarnedFen = nonNegative(progression.provider_earned_fen)
   const segments = progression.own_codex_progress_ratio == null
-    ? legacySegments(progression)
+    ? [
+        {
+          key: 'platform',
+          className: styles.platform,
+          label: '消耗',
+          caption: '历史统计',
+          value: consumedTokens,
+          ratio: safeRatio(progression.consumed_progress_ratio),
+          callCount: consumedCallCount,
+        },
+        {
+          key: 'provided',
+          className: styles.provided,
+          label: '分享给别人',
+          caption: '历史统计',
+          value: providedTokens,
+          ratio: safeRatio(progression.provided_progress_ratio),
+          callCount: providedRunCount,
+        },
+      ]
     : [
         {
           key: 'own',
@@ -23,7 +61,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
           label: '自用 Codex',
           caption: '不扣平台额度',
           value: ownCodexTokens,
-          ratio: progression.own_codex_progress_ratio ?? 0,
+          ratio: safeRatio(progression.own_codex_progress_ratio),
           callCount: ownCodexCallCount,
         },
         {
@@ -32,7 +70,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
           label: '借用 Codex',
           caption: '使用别人节点',
           value: sharedCodexTokens,
-          ratio: progression.shared_codex_progress_ratio ?? 0,
+          ratio: safeRatio(progression.shared_codex_progress_ratio),
           callCount: sharedCodexCallCount,
         },
         {
@@ -41,7 +79,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
           label: '平台/其他',
           caption: '平台余额承载',
           value: platformTokens,
-          ratio: progression.platform_progress_ratio ?? 0,
+          ratio: safeRatio(progression.platform_progress_ratio),
           callCount: platformCallCount,
         },
         {
@@ -49,21 +87,21 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
           className: styles.provided,
           label: '分享给别人',
           caption: '别人使用你的节点',
-          value: progression.provided_tokens,
-          ratio: progression.provided_progress_ratio,
-          callCount: progression.provided_run_count,
+          value: providedTokens,
+          ratio: safeRatio(progression.provided_progress_ratio),
+          callCount: providedRunCount,
         },
       ]
-  const progressPercent = Math.round(progression.level_progress_ratio * 100)
-  const levelSpan = progression.next_level_tokens - progression.level_floor_tokens
-  const nextLevel = progression.level + 1
+  const levelProgressRatio = safeRatio(progression.level_progress_ratio, tokensIntoLevel / levelSpan)
+  const progressPercent = Math.round(levelProgressRatio * 100)
+  const nextLevel = level + 1
   const title = [
-    `Lv.${progression.level} ${progression.tier_name}`,
-    `本级 ${formatTokens(progression.tokens_into_level)} / ${formatTokens(levelSpan)}`,
-    `距 Lv.${nextLevel} ${formatTokens(progression.tokens_to_next_level)}`,
+    `Lv.${level} ${tierName}`,
+    `本级 ${formatTokens(tokensIntoLevel)} / ${formatTokens(levelSpan)}`,
+    `距 Lv.${nextLevel} ${formatTokens(tokensToNextLevel)}`,
     `自用 Codex ${formatTokens(ownCodexTokens)} / ${formatCount(ownCodexCallCount)}`,
     `借用 Codex ${formatTokens(sharedCodexTokens)} / ${formatCount(sharedCodexCallCount)}`,
-    `分享给别人 ${formatTokens(progression.provided_tokens)} / ${formatCount(progression.provided_run_count)}`,
+    `分享给别人 ${formatTokens(providedTokens)} / ${formatCount(providedRunCount)}`,
   ].join(' · ')
   let left = 0
 
@@ -79,7 +117,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
       tabIndex={0}
     >
       <div className={styles.meta}>
-        <span>Lv.{progression.level}</span>
+        <span>Lv.{level}</span>
         <span>{progressPercent}%</span>
       </div>
       <div className={styles.track}>
@@ -92,20 +130,20 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
       </div>
       <div className={styles.panel} aria-hidden="true">
         <div className={styles.panelHead}>
-          <strong>{progression.tier_name}</strong>
-          <span>Lv.{progression.level}</span>
+          <strong>{tierName}</strong>
+          <span>Lv.{level}</span>
         </div>
         <div className={styles.nextLine}>
           <span>距 Lv.{nextLevel}</span>
-          <strong>{formatTokens(progression.tokens_to_next_level)}</strong>
+          <strong>{formatTokens(tokensToNextLevel)}</strong>
         </div>
         <div className={styles.detailRow}>
           <span>本级进度</span>
-          <strong>{formatTokens(progression.tokens_into_level)} / {formatTokens(levelSpan)}</strong>
+          <strong>{formatTokens(tokensIntoLevel)} / {formatTokens(levelSpan)}</strong>
         </div>
         <div className={styles.detailRow}>
           <span>总经验</span>
-          <strong>{formatTokens(progression.total_xp_tokens)}</strong>
+          <strong>{formatTokens(totalXpTokens)}</strong>
         </div>
         <div className={styles.split}>
           {segments.map((segment) => (
@@ -122,12 +160,12 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
         </div>
         <div className={styles.detailRow}>
           <span>调用 / 分享</span>
-          <strong>{progression.consumed_call_count} / {progression.provided_run_count}</strong>
+          <strong>{formatPlainCount(consumedCallCount)} / {formatPlainCount(providedRunCount)}</strong>
         </div>
-        {progression.provider_earned_fen > 0 && (
+        {providerEarnedFen > 0 && (
           <div className={styles.detailRow}>
             <span>贡献收益</span>
-            <strong>{formatFen(progression.provider_earned_fen)}</strong>
+            <strong>{formatFen(providerEarnedFen)}</strong>
           </div>
         )}
       </div>
@@ -135,32 +173,23 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
   )
 }
 
-function legacySegments(progression: UserProgressionSummary) {
-  return [
-    {
-      key: 'platform',
-      className: styles.platform,
-      label: '消耗',
-      caption: '历史统计',
-      value: progression.consumed_tokens,
-      ratio: progression.consumed_progress_ratio,
-      callCount: progression.consumed_call_count,
-    },
-    {
-      key: 'provided',
-      className: styles.provided,
-      label: '分享给别人',
-      caption: '历史统计',
-      value: progression.provided_tokens,
-      ratio: progression.provided_progress_ratio,
-      callCount: progression.provided_run_count,
-    },
-  ]
-}
-
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(100, value * 100))
+}
+
+function safeRatio(value: number | undefined, fallback = 0) {
+  const ratio = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return Math.max(0, Math.min(1, ratio))
+}
+
+function nonNegative(value: number | undefined, fallback = 0) {
+  const resolved = typeof value === 'number' && Number.isFinite(value) ? value : fallback
+  return Math.max(0, resolved)
+}
+
+function positiveInteger(value: number | undefined, fallback: number) {
+  return Math.max(1, Math.round(nonNegative(value, fallback)))
 }
 
 function formatTokens(value: number) {
@@ -174,6 +203,11 @@ function formatTokens(value: number) {
 function formatCount(value: number) {
   if (!Number.isFinite(value) || value <= 0) return '0 次'
   return `${Math.round(value)} 次`
+}
+
+function formatPlainCount(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '0'
+  return `${Math.round(value)}`
 }
 
 function formatFen(value: number) {
