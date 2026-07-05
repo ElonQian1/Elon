@@ -132,19 +132,32 @@ export function AttachmentButton({ disabled, uploading, onFilesSelected }: Props
 /** 已上传附件的预览 chip，可点击删除 */
 interface ChipProps {
   attachment: UploadedAttachment
+  onOpen?: (attachment: UploadedAttachment) => void
   onRemove: () => void
 }
 
-export function AttachmentChip({ attachment, onRemove }: ChipProps) {
-  const isImage = attachment.kind === 'image' || attachment.mime_type?.startsWith('image/')
+export function isImageAttachment(attachment: Pick<UploadedAttachment, 'kind' | 'mime_type'>): boolean {
+  return attachment.kind === 'image' || attachment.mime_type?.startsWith('image/')
+}
+
+export function AttachmentChip({ attachment, onOpen, onRemove }: ChipProps) {
+  const isImage = isImageAttachment(attachment)
   const sizeKB = Math.round((attachment.size_bytes ?? 0) / 1024)
   return (
     <div className={styles.chip}>
-      {isImage && <img src={attachment.url} alt={attachment.display_name} className={styles.chipThumb} />}
-      {!isImage && <FileText className={styles.chipIcon} size={14} aria-hidden="true" />}
-      <span className={styles.chipName}>{attachment.display_name}</span>
-      <span className={styles.chipSize}>{sizeKB} KB</span>
-      <button className={styles.chipRemove} onClick={onRemove} type="button" title="删除">
+      <button
+        className={styles.chipOpen}
+        onClick={() => onOpen?.(attachment)}
+        type="button"
+        title={onOpen ? '查看附件' : attachment.display_name}
+        disabled={!onOpen}
+      >
+        {isImage && <img src={attachment.url} alt={attachment.display_name} className={styles.chipThumb} />}
+        {!isImage && <FileText className={styles.chipIcon} size={14} aria-hidden="true" />}
+        <span className={styles.chipName}>{attachment.display_name}</span>
+        <span className={styles.chipSize}>{sizeKB} KB</span>
+      </button>
+      <button className={styles.chipRemove} onClick={onRemove} type="button" title="删除附件">
         <X size={12} aria-hidden="true" />
       </button>
     </div>
@@ -155,7 +168,7 @@ export function AttachmentChip({ attachment, onRemove }: ChipProps) {
 export function attachmentsToMarkdown(attachments: UploadedAttachment[]): string {
   return attachments
     .map((att) => {
-      const isImage = att.kind === 'image' || att.mime_type?.startsWith('image/')
+      const isImage = isImageAttachment(att)
       return isImage
         ? `\n![${att.display_name}](${att.url})`
         : `\n[${att.display_name}](${att.url})`

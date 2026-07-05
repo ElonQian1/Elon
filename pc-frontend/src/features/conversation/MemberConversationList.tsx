@@ -3,6 +3,7 @@ import {
   ArchiveRestore,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   Copy,
   ExternalLink,
   MoreHorizontal,
@@ -23,6 +24,9 @@ import {
 } from './memberConversationPrefs'
 import type { MemberConversationPrefs } from './memberConversationPrefs'
 import styles from './MemberConversationList.module.css'
+
+const COLLAPSED_CONVERSATION_LIMIT = 8
+const CONVERSATION_EXPAND_BATCH = 8
 
 interface Props {
   conversations: MemberConversationEntry[]
@@ -45,6 +49,7 @@ export default function MemberConversationList({
 }: Props) {
   const [sectionCollapsed, setSectionCollapsed] = useState(false)
   const [archiveCollapsed, setArchiveCollapsed] = useState(true)
+  const [visibleLimit, setVisibleLimit] = useState(COLLAPSED_CONVERSATION_LIMIT)
   const [openMenuId, setOpenMenuId] = useState('')
   const menuRef = useRef<HTMLDivElement | null>(null)
   const sectionTitle = isOwnTarget ? '我的会话' : `${targetName} 的会话`
@@ -56,6 +61,12 @@ export default function MemberConversationList({
   const rows = useMemo(() => buildRows(conversations, prefs), [conversations, prefs])
   const activeRows = rows.filter((row) => !row.archived)
   const archivedRows = rows.filter((row) => row.archived)
+  const visibleActiveRows = useMemo(
+    () => visibleConversationRows(activeRows, visibleLimit, selectedId),
+    [activeRows, selectedId, visibleLimit],
+  )
+  const hiddenActiveCount = Math.max(0, activeRows.length - visibleActiveRows.length)
+  const canCollapseVisibleRows = visibleLimit > COLLAPSED_CONVERSATION_LIMIT
 
   useEffect(() => {
     const next = cleanMemberConversationPrefs(
@@ -64,6 +75,7 @@ export default function MemberConversationList({
     )
     setPrefs(next)
     writeMemberConversationPrefs(scope.projectId, scope.targetUserId, next)
+    setVisibleLimit(COLLAPSED_CONVERSATION_LIMIT)
   }, [scopeKey, conversationIdsKey])
 
   useEffect(() => {
@@ -282,9 +294,36 @@ export default function MemberConversationList({
       )}
 
       {!sectionCollapsed && (
-        <div className={styles.list}>
-          {activeRows.map(renderConversationRow)}
-        </div>
+        <>
+          <div className={styles.list}>
+            {visibleActiveRows.map(renderConversationRow)}
+          </div>
+          {(hiddenActiveCount > 0 || canCollapseVisibleRows) && (
+            <div className={styles.listControls}>
+              {hiddenActiveCount > 0 && (
+                <button
+                  className={styles.listToggleBtn}
+                  type="button"
+                  onClick={() => setVisibleLimit((limit) => Math.min(activeRows.length, limit + CONVERSATION_EXPAND_BATCH))}
+                >
+                  <ChevronDown size={13} strokeWidth={2.2} aria-hidden="true" />
+                  <span>展开显示</span>
+                  <small>{hiddenActiveCount}</small>
+                </button>
+              )}
+              {canCollapseVisibleRows && (
+                <button
+                  className={styles.listToggleBtn}
+                  type="button"
+                  onClick={() => setVisibleLimit(COLLAPSED_CONVERSATION_LIMIT)}
+                >
+                  <ChevronUp size={13} strokeWidth={2.2} aria-hidden="true" />
+                  <span>折叠显示</span>
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <div className={styles.archiveSection}>
@@ -341,6 +380,26 @@ function buildRows(conversations: MemberConversationEntry[], prefs: MemberConver
     if (left.pinned !== right.pinned) return left.pinned ? -1 : 1
     return left.index - right.index
   })
+}
+
+function visibleConversationRows(
+  rows: ConversationRow[],
+  visibleLimit: number,
+  selectedId: string | 'new' | null,
+): ConversationRow[] {
+  if (rows.length <= COLLAPSED_CONVERSATION_LIMIT + 1 || visibleLimit >= rows.length) return rows
+  const visibleIds = new Set<string>()
+  for (const row of rows) {
+    if (visibleIds.size < visibleLimit) visibleIds.add(row.conversation.id)
+    if (shouldKeepConversationVisible(row, selectedId)) visibleIds.add(row.conversation.id)
+  }
+  return rows.filter((row) => visibleIds.has(row.conversation.id))
+}
+
+function shouldKeepConversationVisible(row: ConversationRow, selectedId: string | 'new' | null): boolean {
+  if (row.pinned || row.conversation.id === selectedId) return true
+  const status = String(row.conversation.last_task_status ?? '').toLowerCase()
+  return ['queued', 'pending', 'running', 'in_progress', 'processing', 'failed', 'error'].includes(status)
 }
 
 function conversationScope(conversations: MemberConversationEntry[]) {

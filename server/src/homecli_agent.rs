@@ -919,7 +919,7 @@ async fn run_agent_session(
                 "evicting previous agent session (same agent_id re-registered)"
             );
             // 通知旧连接的所有挂起请求立即失败
-            fail_pending_requests(&old_entry.pending, "节点重新注册，旧连接已关闭").await;
+            fail_pending_requests(&old_entry.pending, "PC 节点通信临时中断：Win 端正在更新升级/重启或节点重新注册，旧连接已关闭。").await;
             fail_pending_approvals(&old_entry.approval_acks).await;
             fail_pending_pings(&old_entry.ping_acks).await;
             let _ = old_entry.session_shutdown.send(true);
@@ -1194,7 +1194,7 @@ async fn run_agent_session(
     // 让 run_via_pc_agent 的 while rx.recv() 立即收到错误并返回，
     // 而不是永远阻塞到 HTTP 请求超时。
     {
-        fail_pending_requests(&pending, "PC节点已断线，请重试").await;
+        fail_pending_requests(&pending, "PC 节点通信临时中断：服务器正在更新升级或 Win 端正在更新升级/重启时会临时断开；系统会等待节点重新连接并尝试恢复。").await;
     }
     {
         fail_pending_approvals(&approval_acks).await;

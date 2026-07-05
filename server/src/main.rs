@@ -165,6 +165,7 @@ mod project_space_task_snapshot;
 mod project_space_task_watchdog;
 mod project_storage;
 mod project_storage_git;
+mod project_store_listing_migration;
 mod project_store;
 mod project_task_scheduler;
 mod project_tool_approval_recovery;

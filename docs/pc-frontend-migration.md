@@ -81,8 +81,9 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 项目广场列表（过滤/搜索）| 🟡 中 | `src/features/plaza/PlazaPage.tsx` | ⬜ 未开始 |
-| 加入/申请加入项目 | 🟡 中 | `src/features/plaza/` | ⬜ 未开始 |
+| 项目中心双 Tab（我的项目 / 项目广场）| 🔴 高 | `src/features/projects/ProjectsPage.tsx` | ✅ 已恢复，`/pc/projects` 成为项目中心入口 |
+| 项目广场列表（过滤/搜索/分页）| 🟡 中 | `src/features/plaza/ProjectPlazaView.tsx` | ✅ 已完成，`/pc/plaza` 与项目中心广场 Tab 复用同一视图 |
+| 加入/申请加入项目 | 🟡 中 | `src/features/plaza/` | ✅ 已完成，加入后刷新我的项目 |
 | 项目卡片分享 | 🟢 低 | `src/features/plaza/ProjectCard.tsx` | ⬜ 未开始 |
 
 ### 阶段 P6 — 账号 & 设置

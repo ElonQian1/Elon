@@ -158,6 +158,8 @@ export function runtimeStatusLabel(phase: string): { tone: TaskTone; title: stri
   if (phase === 'win_client_updating') return { tone: 'running', title: 'Win 端正在更新升级', body: '通信临时中断，会自动恢复。' }
   if (phase === 'connection_recovering') return { tone: 'running', title: '通信正在恢复', body: '正在重连节点并回放任务现场。' }
   if (phase === 'resume_required') return { tone: 'failed', title: '需要继续任务', body: '自动恢复没有完成，请点击继续让 AI 检查当前工作区后接着处理。' }
+  if (phase === 'pc_cli_communication_recovering') return { tone: 'running', title: '通信正在自动恢复', body: '服务器正在更新升级或 Win 端正在更新升级，通信临时中断，会自动恢复。' }
+  if (phase === 'pc_cli_recovery_timeout') return { tone: 'failed', title: '通信自动恢复超时', body: '系统已经等待恢复，但仍未收到新的命令、工具结果、回复片段或最终完成事件。' }
   if (phase === 'pc_cli_no_output_timeout') return { tone: 'failed', title: '未收到 AI CLI 输出', body: 'PC 节点没有返回命令、工具结果或最终完成事件。' }
   if (phase === 'pc_tool_result_timeout') return { tone: 'failed', title: '工具结果超时', body: 'PC 节点已开始执行工具，但没有返回工具结果或最终完成事件。' }
   if (phase === 'waiting_approval') return { tone: 'approval', title: '等待工具审批', body: '批准前不会执行工具。' }

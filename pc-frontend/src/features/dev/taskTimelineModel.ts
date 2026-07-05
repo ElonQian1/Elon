@@ -8,6 +8,18 @@ import {
   usageEventSummary,
 } from './devTaskUtils'
 import { processCardFromToolEvent, type ProcessCard } from './taskProcessCardModel'
+import {
+  assistantItemFromText,
+  assistantProgressNoteText,
+  buildTaskTimelineDiagnostics,
+  eventUniqueKey,
+  isMaintenanceRuntimePhase,
+  latestNonHeartbeatIndex,
+  latestRuntimePhase,
+  latestRuntimePhaseEntry,
+  latestRuntimeStatusItem,
+  maintenanceStageKey,
+} from './taskTimelineRuntime'
 import type { ChatMessage, TaskTone, ToolEvent } from './types'
 
 export type TimelineItemKind =
@@ -64,10 +76,6 @@ export interface TaskTimelineDiagnostic {
   detail: string
 }
 
-export interface TaskTimelineOptions {
-  assistantNoteCount?: number
-}
-
 export type TaskTimelineStageKey =
   | 'empty'
   | 'dispatch'
@@ -76,6 +84,8 @@ export type TaskTimelineStageKey =
   | 'win-update'
   | 'recovering'
   | 'resume-required'
+  | 'recovery'
+  | 'recovery-timeout'
   | 'timeout'
   | 'tool-timeout'
   | 'command'
@@ -98,12 +108,10 @@ export interface TaskTimelineStage {
 export function buildTaskTimeline(
   messages: ChatMessage[],
   finalMessage?: ChatMessage,
-  options: TaskTimelineOptions = {},
 ): TaskTimelineModel {
   const items: TimelineItem[] = []
   const seenText = new Set<string>()
   const finalText = finalMessage ? normalizedProgressText(messageText(finalMessage)) : ''
-  const assistantNoteCount = Math.max(0, Number(options.assistantNoteCount ?? 0) || 0)
   let lastHeartbeat: TimelineItem | undefined
   let latestHeartbeat: TimelineItem | undefined
   let heartbeatCount = 0
@@ -116,7 +124,7 @@ export function buildTaskTimeline(
     fileChange: false,
     toolResult: false,
     usage: false,
-    assistantEvent: assistantNoteCount > 0,
+    assistantEvent: false,
     finalReply: !!finalText,
   }
 
@@ -127,16 +135,27 @@ export function buildTaskTimeline(
   }
 
   messages.forEach((message, index) => {
-    const text = normalizedProgressText(messageText(message))
+    const rawText = messageText(message)
+    const assistantNote = assistantProgressNoteText(message, rawText)
+    if (assistantNote) {
+      const normalizedAssistantText = normalizedProgressText(assistantNote)
+      if (!normalizedAssistantText || isFinalAnswerEcho(normalizedAssistantText, finalText)) return
+      flushHeartbeat()
+      coverage.assistantEvent = true
+      const item = assistantItemFromText(assistantNote, message, index)
+      const uniqueKey = `assistant:${item.id}:${normalizedAssistantText}`
+      if (seenText.has(uniqueKey)) return
+      seenText.add(uniqueKey)
+      items.push(item)
+      return
+    }
+
+    const text = normalizedProgressText(rawText)
     if (!text) return
     const parsedEvent = parseToolEvent(text)
     const echoText = eventTextForEcho(parsedEvent) || text
     if (isFinalAnswerEcho(echoText, finalText)) return
-    if (isAssistantOutputEvent(parsedEvent)) {
-      coverage.assistantEvent = true
-      return
-    }
-    if (!parsedEvent && isShellCommandEcho(text)) return
+    if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
 
     const heartbeat = parseHeartbeat(text, message, index)
     if (heartbeat) {
@@ -155,7 +174,7 @@ export function buildTaskTimeline(
     if (event) markCoverage(coverage, event)
 
     const uniqueKey = event
-      ? `${event.type}:${clean(event.tool ?? '')}:${clean(event.status ?? '')}:${clean(event.approval_id ?? '')}:${clean(event.message ?? '')}`
+      ? eventUniqueKey(event, text)
       : text
     if (!event && seenText.has(uniqueKey)) return
     seenText.add(uniqueKey)
@@ -177,7 +196,7 @@ export function buildTaskTimeline(
   return {
     ...model,
     stage,
-    diagnostics: buildDiagnostics(model),
+    diagnostics: buildTaskTimelineDiagnostics(model),
   }
 }
 
@@ -242,6 +261,10 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
 
 function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): TimelineItem {
   const type = clean(event.type)
+  if (type === 'assistant_message' || type === 'assistant_chunk') {
+    return assistantItemFromText(clean(event.text ?? ''), message, index, event)
+  }
+
   if (type === 'pc_dispatch_started') {
     const cli = clean(event.cli ?? 'AI')
     const agentId = clean(event.agent_id ?? '')
@@ -281,7 +304,7 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
         event,
       }
     }
-    if (phase === 'pc_cli_no_output_timeout' || phase === 'pc_tool_result_timeout') {
+    if (phase === 'pc_cli_no_output_timeout' || phase === 'pc_tool_result_timeout' || phase === 'pc_cli_recovery_timeout') {
       return {
         id: itemId(message, index),
         kind: 'status',
@@ -404,52 +427,6 @@ function markCoverage(coverage: TaskTimelineCoverage, event: ToolEvent) {
   if (type === 'assistant_message' || type === 'assistant_chunk') coverage.assistantEvent = true
 }
 
-function isAssistantOutputEvent(event: ToolEvent | null): boolean {
-  return event?.type === 'assistant_message' || event?.type === 'assistant_chunk'
-}
-
-function buildDiagnostics(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineDiagnostic[] {
-  const diagnostics: TaskTimelineDiagnostic[] = []
-  const { coverage } = model
-  const maintenance = latestMaintenanceRuntimeStatus(model.items)
-  if (!maintenance && coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
-    diagnostics.push({
-      tone: 'failed',
-      title: '只收到等待状态',
-      detail: '后端已经派发任务或正在等待 AI CLI，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
-    })
-  }
-  if (!maintenance && coverage.dispatch && !coverage.command && !coverage.assistantEvent && !coverage.finalReply) {
-    diagnostics.push({
-      tone: 'running',
-      title: '已到 PC 节点',
-      detail: '任务已进入本机节点链路；如果持续只有这一项，优先检查节点是否重连、AI CLI 是否启动、sidecar 是否仍存活。'
-    })
-  }
-  if (coverage.command && !coverage.toolResult) {
-    diagnostics.push({
-      tone: 'running',
-      title: '命令已开始，等待结果',
-      detail: '前端已捕获命令调用，但还没有对应工具结果。长时间停在这里时，通常是命令仍在执行或 CLI 没有 flush 完成事件。'
-    })
-  }
-  if (coverage.assistantEvent && !coverage.finalReply) {
-    diagnostics.push({
-      tone: 'muted',
-      title: '已有公开回复',
-      detail: 'AI CLI 的回复片段已经作为气泡显示；如果后面还有等待状态，通常是在同步用量、终态或后续工具事件。'
-    })
-  }
-  if (coverage.finalReply && !coverage.command && !coverage.fileChange && !coverage.testRun) {
-    diagnostics.push({
-      tone: 'muted',
-      title: '本轮无公开工具过程',
-      detail: '最终回复已出现，但没有命令、文件修改或测试事件。需要改项目时，应继续检查是否真的产生了命令、文件或测试过程。'
-    })
-  }
-  return diagnostics
-}
-
 function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage'>): TaskTimelineStage {
   const latest = model.items[model.items.length - 1]
   const latestRuntime = latestRuntimeStatusItem(model.items)
@@ -465,6 +442,19 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
       meta: latestRuntime.meta,
       summary: `当前：${label.title}`,
       stuck: latestPhase === 'resume_required',
+    }
+  }
+
+  const recoveryTimeout = latestRuntimePhase(model.items, 'pc_cli_recovery_timeout')
+  if (recoveryTimeout) {
+    return {
+      key: 'recovery-timeout',
+      tone: 'failed',
+      label: '通信自动恢复超时',
+      detail: '服务器正在更新升级、Win 端正在更新升级/重启或节点连接中断时，系统已等待自动恢复，但仍没有收到新的公开输出或完成事件。',
+      meta: recoveryTimeout.meta,
+      summary: '卡点：通信自动恢复超时',
+      stuck: true,
     }
   }
 
@@ -491,6 +481,19 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
       meta: timeout.meta,
       summary: '卡点：CLI 无输出超时',
       stuck: true,
+    }
+  }
+
+  const recovery = latestRuntimePhaseEntry(model.items, 'pc_cli_communication_recovering')
+  if (!model.coverage.finalReply && recovery && recovery.index >= latestNonHeartbeatIndex(model.items)) {
+    return {
+      key: 'recovery',
+      tone: 'running',
+      label: '通信正在自动恢复',
+      detail: '服务器正在更新升级或 Win 端正在更新升级，通信临时中断，会自动恢复；前端正在等待后续公开输出或最终回复。',
+      meta: recovery.item.meta,
+      summary: '当前：通信正在自动恢复',
+      stuck: false,
     }
   }
 
@@ -600,41 +603,6 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
     summary: '当前：等待过程',
     stuck: false,
   }
-}
-
-function latestRuntimePhase(items: TimelineItem[], phase: string): TimelineItem | undefined {
-  for (let index = items.length - 1; index >= 0; index--) {
-    const item = items[index]
-    if (item.event?.type === 'runtime_status' && clean(item.event.phase ?? '').toLowerCase() === phase) {
-      return item
-    }
-  }
-  return undefined
-}
-
-function latestRuntimeStatusItem(items: TimelineItem[]): TimelineItem | undefined {
-  for (let index = items.length - 1; index >= 0; index--) {
-    const item = items[index]
-    if (item.event?.type === 'runtime_status') return item
-  }
-  return undefined
-}
-
-function latestMaintenanceRuntimeStatus(items: TimelineItem[]): TimelineItem | undefined {
-  const item = latestRuntimeStatusItem(items)
-  const phase = clean(item?.event?.phase ?? '').toLowerCase()
-  return item && isMaintenanceRuntimePhase(phase) ? item : undefined
-}
-
-function isMaintenanceRuntimePhase(phase: string): boolean {
-  return ['server_updating', 'win_client_updating', 'connection_recovering', 'resume_required'].includes(phase)
-}
-
-function maintenanceStageKey(phase: string): TaskTimelineStageKey {
-  if (phase === 'server_updating') return 'server-update'
-  if (phase === 'win_client_updating') return 'win-update'
-  if (phase === 'resume_required') return 'resume-required'
-  return 'recovering'
 }
 
 function heartbeatWaitSeconds(item: TimelineItem | undefined): number | null {

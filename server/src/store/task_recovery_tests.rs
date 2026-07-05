@@ -169,11 +169,11 @@ fn stale_running_channel_task_gets_terminal_result_once() {
     assert_eq!(changed, 1);
     let (status, error) = task_status_and_error(&store, &task_id);
     assert_eq!(status, "failed");
-    assert_eq!(error.as_deref(), Some("PC节点断线或任务超时自动终止"));
+    assert_eq!(error.as_deref(), Some("PC节点通信自动恢复超时"));
 
     let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
     assert_eq!(results.len(), 1);
-    assert!(results[0].contains("任务失败"));
+    assert!(results[0].contains("通信自动恢复超时"));
     assert!(results[0].contains("继续"));
 
     let changed_again = store
@@ -301,9 +301,9 @@ fn stale_cleanup_bulk_pressure_keeps_terminal_results_idempotent() {
             assert!(results.is_empty());
         } else {
             assert_eq!(status, "failed");
-            assert_eq!(error.as_deref(), Some("PC节点断线或任务超时自动终止"));
+            assert_eq!(error.as_deref(), Some("PC节点通信自动恢复超时"));
             assert_eq!(results.len(), 1);
-            assert!(results[0].contains("任务失败"));
+            assert!(results[0].contains("通信自动恢复超时"));
         }
     }
 

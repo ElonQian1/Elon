@@ -1043,7 +1043,7 @@ impl Store {
         let n = self.conn()?.execute(
             "UPDATE tasks
              SET status = 'interrupted',
-                 error = COALESCE(error, 'server restarted before task finished'),
+                 error = COALESCE(error, 'server update/restart interrupted task communication'),
                  updated_at = ?1
              WHERE status = 'running'",
             params![now()],
@@ -1059,7 +1059,7 @@ impl Store {
         let n = self.conn()?.execute(
             "UPDATE tasks
              SET status = 'failed',
-                 error = COALESCE(error, 'PC节点断线或任务超时自动终止'),
+                 error = COALESCE(error, 'PC节点通信自动恢复超时'),
                  updated_at = ?1
              WHERE status = 'running'
                AND created_at < ?2",

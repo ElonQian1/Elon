@@ -115,7 +115,7 @@ export default function ChannelNavList({ projectId, channels, activeChannelId, o
           {expanded && channels.length > COLLAPSED_CHANNEL_LIMIT + 1 && (
             <button className={styles.channelExpandBtn} type="button" onClick={() => setExpanded(false)}>
               <ChevronUp size={13} strokeWidth={2.2} aria-hidden="true" />
-              <span>收起频道</span>
+              <span>折叠显示</span>
             </button>
           )}
         </>

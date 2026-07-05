@@ -93,7 +93,7 @@ export default function NodeOfflineBanner({ localNodeReady = false, localNodeId 
         {isOffline ? (
           <>
             账号下的 <strong style={{ color: strongColor }}>{name}</strong> 持续未在线。
-            如果这是这台电脑，请启动 Win 端，并在节点设置里确认开机自启动。
+            通信已中断；如果这是这台电脑，请启动 Win 端，并在节点设置里确认开机自启动。
           </>
         ) : (
           <>

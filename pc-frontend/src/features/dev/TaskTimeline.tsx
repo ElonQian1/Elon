@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { DevTaskMessage } from './DevTaskCard'
+import MarkdownContent from '../markdown/MarkdownContent'
 import type { ProcessCard } from './taskProcessCardModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
 import { coverageLabels } from './taskTimelineModel'
@@ -216,6 +217,7 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }) {
   const embedded = shouldRenderEmbeddedMessage(item)
+  const assistantReply = isAssistantTimelineItem(item)
 
   return (
     <div className={[styles.item, styles[`tone_${item.tone}`], styles[`kind_${item.kind}`], item.compact ? styles.compact : ''].filter(Boolean).join(' ')}>
@@ -223,12 +225,18 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
         <span className={styles.icon}>{iconFor(item.kind, item.tone)}</span>
       </div>
       <div className={styles.content}>
-        <div className={styles.head}>
-          <span className={styles.title}>{item.title}</span>
-          {item.meta && <span className={styles.meta} title={item.metaTitle || item.meta}>{item.meta}</span>}
-        </div>
-        {item.process && <ProcessCardView process={item.process} />}
-        {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}
+        {assistantReply ? (
+          <AssistantTimelineReply item={item} />
+        ) : (
+          <>
+            <div className={styles.head}>
+              <span className={styles.title}>{item.title}</span>
+              {item.meta && <span className={styles.meta} title={item.metaTitle || item.meta}>{item.meta}</span>}
+            </div>
+            {item.process && <ProcessCardView process={item.process} />}
+            {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}
+          </>
+        )}
         {embedded && item.message && (
           <div className={styles.embedded}>
             <DevTaskMessage
@@ -242,6 +250,23 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
       </div>
     </div>
   )
+}
+
+function AssistantTimelineReply({ item }: { item: TimelineItem }) {
+  const text = item.detail ?? ''
+  const hasMarkdown = /[#*`\[\]>|]/.test(text)
+  return (
+    <div className={styles.assistantReply}>
+      {item.meta && <div className={styles.assistantReplyMeta}>{item.meta}</div>}
+      {hasMarkdown ? <MarkdownContent content={text} copy /> : <p>{text}</p>}
+    </div>
+  )
+}
+
+function isAssistantTimelineItem(item: TimelineItem): boolean {
+  return item.event?.type === 'assistant_message'
+    || item.event?.type === 'assistant_chunk'
+    || (item.message as Record<string, unknown> | undefined)?.assistant_progress_event === true
 }
 
 function shouldRenderEmbeddedMessage(item: TimelineItem): boolean {

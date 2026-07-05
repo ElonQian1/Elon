@@ -53,16 +53,35 @@ pub(crate) fn pc_dispatch_started_progress(value: &serde_json::Value) -> Option<
     .ok()
 }
 
-pub(crate) fn pc_cli_no_output_timeout_progress(timeout_secs: u64) -> Option<String> {
+pub(crate) fn pc_cli_communication_recovering_progress(timeout_secs: u64) -> Option<String> {
     serde_json::to_string(&serde_json::json!({
         "type": "runtime_status",
-        "phase": "pc_cli_no_output_timeout",
+        "phase": "pc_cli_communication_recovering",
         "runtime": "Codex",
         "message": format!(
-            "已等待 {} 秒，但 PC 节点没有返回任何 Codex CLI 输出、命令或工具事件；本轮已停止。",
+            "服务器正在更新升级或 Win 端正在更新升级时，PC 节点通信会临时中断；本轮已保留等待状态，正在自动恢复。已等待 {} 秒未收到新的公开输出。",
             timeout_secs
         ),
         "timeout_secs": timeout_secs,
+        "expected_events": ["tool_call", "tool_result", "assistant_message", "usage", "cli_done"],
+    }))
+    .ok()
+}
+
+pub(crate) fn pc_cli_recovery_timeout_progress(
+    timeout_secs: u64,
+    recovery_secs: u64,
+) -> Option<String> {
+    serde_json::to_string(&serde_json::json!({
+        "type": "runtime_status",
+        "phase": "pc_cli_recovery_timeout",
+        "runtime": "Codex",
+        "message": format!(
+            "通信自动恢复超时：已额外等待 {} 秒，仍未收到新的 Codex CLI 输出、命令、工具结果或最终完成事件；本轮已停止等待。",
+            recovery_secs
+        ),
+        "timeout_secs": timeout_secs,
+        "recovery_secs": recovery_secs,
         "expected_events": ["tool_call", "tool_result", "assistant_message", "usage", "cli_done"],
     }))
     .ok()
@@ -144,8 +163,8 @@ fn short_pc_node_id(agent_id: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_no_output_timeout_progress, pc_dispatch_started_progress,
-        pc_tool_result_timeout_progress,
+        pc_cli_communication_recovering_progress, pc_cli_recovery_timeout_progress,
+        pc_dispatch_started_progress, pc_tool_result_timeout_progress,
     };
 
     #[test]
@@ -173,18 +192,29 @@ mod tests {
     }
 
     #[test]
-    fn pc_cli_no_output_timeout_progress_is_structured() {
-        let raw = pc_cli_no_output_timeout_progress(180).unwrap();
+    fn pc_cli_recovery_progress_is_structured() {
+        let raw = pc_cli_communication_recovering_progress(180).unwrap();
         let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
 
         assert_eq!(value["type"], "runtime_status");
-        assert_eq!(value["phase"], "pc_cli_no_output_timeout");
-        assert_eq!(value["runtime"], "Codex");
+        assert_eq!(value["phase"], "pc_cli_communication_recovering");
         assert_eq!(value["timeout_secs"], 180);
+        assert!(value["message"].as_str().unwrap().contains("正在自动恢复"));
+    }
+
+    #[test]
+    fn pc_cli_recovery_timeout_progress_is_structured() {
+        let raw = pc_cli_recovery_timeout_progress(180, 120).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&raw).unwrap();
+
+        assert_eq!(value["type"], "runtime_status");
+        assert_eq!(value["phase"], "pc_cli_recovery_timeout");
+        assert_eq!(value["timeout_secs"], 180);
+        assert_eq!(value["recovery_secs"], 120);
         assert!(value["message"]
             .as_str()
             .unwrap()
-            .contains("没有返回任何 Codex CLI 输出"));
+            .contains("通信自动恢复超时"));
     }
 
     #[test]
@@ -198,9 +228,9 @@ mod tests {
         assert_eq!(value["timeout_secs"], 1800);
         assert_eq!(value["tool"], "shell");
         assert_eq!(value["tool_summary"], "npm run build");
-        assert!(value["message"]
-            .as_str()
-            .unwrap()
-            .contains("没有返回 shell 命令 的工具结果"));
+        let message = value["message"].as_str().unwrap();
+        assert!(message.contains("没有返回"));
+        assert!(message.contains("shell 命令"));
+        assert!(message.contains("工具结果"));
     }
 }

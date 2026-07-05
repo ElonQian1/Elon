@@ -105,6 +105,44 @@
   padding: 0 0 4px;
 }
 
+.listControls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 25px;
+  padding: 2px 4px 6px 8px;
+}
+
+.listToggleBtn {
+  min-width: 0;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+}
+
+.listToggleBtn:hover,
+.listToggleBtn:focus-visible {
+  background: rgba(255, 255, 255, .045);
+  color: var(--text-soft);
+}
+
+.listToggleBtn small {
+  color: rgba(217, 217, 217, .48);
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .itemRow {
   position: relative;
   width: 100%;

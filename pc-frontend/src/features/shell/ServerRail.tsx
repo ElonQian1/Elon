@@ -18,7 +18,7 @@ interface RailItem {
 
 const RAIL_ITEMS: RailItem[] = [
   { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#2a2b2f', hoverColor: '#34363b' },
-  { path: '/',        Icon: Boxes,        label: '项目中心',  color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/projects', Icon: Boxes,       label: '项目中心',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
@@ -36,15 +36,14 @@ export default function ServerRail() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   function isActive(path: string) {
-    if (path === '/') return pathname === '/' && !activeProjectId
     return pathname.startsWith(path)
   }
 
   function handleRailClick(path: string) {
-    // 点击「项目中心」时：如果当前有活跃项目，先清空选中（回到项目列表）
-    if (path === '/' && activeProjectId) {
+    // 点击「项目中心」时清空当前会话项目，避免项目快捷入口继续高亮。
+    if (path === '/projects' && activeProjectId) {
       useProjectStore.getState().selectProject('')
-      navigate('/')
+      navigate('/projects')
       return
     }
     navigate(path)

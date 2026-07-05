@@ -2,6 +2,7 @@
 ///
 /// 这是商城“加入项目”之后的协作空间入口。普通频道消息写入共享频道；
 /// AI 开发频道可以把一次成员发起的开发任务写回同一频道，供项目成员共同跟进。
+mod channel_ai_recovery;
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -12,10 +13,11 @@ use serde::Deserialize;
 use std::{
     collections::HashMap,
     sync::Arc,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tokio::sync::watch;
 
+use self::channel_ai_recovery::{pc_cli_communication_error_result, record_recovery_started, record_recovery_timeout, ChannelAiRecoveryTick, ChannelAiRecoveryWatchdog};
 use crate::{
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
@@ -27,8 +29,7 @@ use crate::{
     project_landing,
     project_mobile::ensure_mobile_project,
     project_space_ai_progress::{
-        is_pc_cli_heartbeat_progress, pc_cli_no_output_timeout_progress,
-        pc_dispatch_started_progress, pc_tool_result_timeout_progress,
+        is_pc_cli_heartbeat_progress, pc_dispatch_started_progress, pc_tool_result_timeout_progress,
     },
     project_space_task_control::{
         register_channel_ai_task_control, remove_channel_ai_task_control,
@@ -2011,7 +2012,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let mut final_done_result_pending = false;
         let mut error = None;
         let heartbeat_only_timeout = channel_ai_heartbeat_only_timeout();
-        let mut last_effective_progress_at = Instant::now();
+        let mut recovery_watchdog = ChannelAiRecoveryWatchdog::new(heartbeat_only_timeout);
         let mut pending_tools = ChannelAiPendingTools::new();
         let mut watchdog = tokio::time::interval(Duration::from_secs(5));
         loop {
@@ -2029,9 +2030,8 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .trim();
-                        if !is_pc_cli_heartbeat_progress(event_type, message) {
-                            last_effective_progress_at = Instant::now();
-                        }
+                        recovery_watchdog
+                            .note_cli_event(is_pc_cli_heartbeat_progress(event_type, message));
                         pending_tools.note_event(event_type, &value);
                         match event_type {
                             "pc_dispatch_started" => {
@@ -2088,11 +2088,15 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             "error" => {
                                 remove_channel_ai_task_control(&task.task_id);
                                 project_tool_approvals::clear_task(&task.task_id);
-                                final_status = "failed".to_string();
                                 let msg = message.if_blank("AI 开发任务失败。").to_string();
-                                final_reply = msg.clone();
+                                let (status, reply, label) = pc_cli_communication_error_result(&msg);
+                                final_status = status.to_string();
+                                final_reply = reply;
                                 error = Some(msg.clone());
-                                insert_channel_ai_result(&task, &result_message(&msg, None, Some("失败")));
+                                insert_channel_ai_result(
+                                    &task,
+                                    &result_message(&final_reply, None, Some(label)),
+                                );
                             }
                             _ => {}
                         }
@@ -2143,31 +2147,23 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                         );
                         insert_channel_ai_result(&task, &result_message(&msg, None, Some("超时")));
                         break;
-                    } else if pending_tools.idle_timed_out(last_effective_progress_at, heartbeat_only_timeout) {
-                        runner.abort();
-                        project_tool_approvals::clear_task(&task.task_id);
-                        final_status = "failed".to_string();
-                        let timeout_secs = heartbeat_only_timeout.as_secs();
-                        if let Some(raw_status) = pc_cli_no_output_timeout_progress(timeout_secs) {
-                            let _ = task.state.store.record_task_event(
-                                &task.task_id,
-                                &enrich_project_ws_event(raw_status.clone(), &task.task_id),
-                            );
-                            insert_channel_ai_progress(&task, &raw_status);
+                    } else if !pending_tools.has_pending() {
+                        match recovery_watchdog.tick() {
+                            ChannelAiRecoveryTick::Healthy => {}
+                            ChannelAiRecoveryTick::StartRecovery { timeout_secs } => {
+                                record_recovery_started(&task, timeout_secs);
+                                continue;
+                            }
+                            ChannelAiRecoveryTick::RecoveryTimeout { timeout_secs, recovery_secs } => {
+                                runner.abort();
+                                project_tool_approvals::clear_task(&task.task_id);
+                                final_status = "interrupted".to_string();
+                                let msg = record_recovery_timeout(&task, timeout_secs, recovery_secs);
+                                final_reply = msg.clone();
+                                error = Some(msg);
+                                break;
+                            }
                         }
-                        let msg = format!(
-                            "本机 AI 已被 PC 节点确认接收，但在 {} 秒内没有收到 Codex CLI 输出、命令、工具结果或最终完成事件；已停止本轮任务。请更新/重启一龙 PC 节点客户端，并检查 Codex 网络/代理状态。",
-                            timeout_secs
-                        );
-                        final_reply = msg.clone();
-                        error = Some(msg.clone());
-                        let raw_error = WsMessage::error(&msg).to_json();
-                        let _ = task.state.store.record_task_event(
-                            &task.task_id,
-                            &enrich_project_ws_event(raw_error, &task.task_id),
-                        );
-                        insert_channel_ai_result(&task, &result_message(&msg, None, Some("超时")));
-                        break;
                     }
                 }
             }

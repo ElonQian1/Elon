@@ -4,7 +4,7 @@
  * 将同一 task_id 的用户请求、过程消息和最终回复连成一个对话段：
  *  - 用户请求显示为右侧气泡
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
- *  - 工具调用 / 命令 / 过程默认可折叠，并放在回复气泡下方
+ *  - 中间回复片段和命令按发生顺序穿插在过程面板中，任务结束后再折叠
  */
 import { memo, useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronRight, StopCircle } from 'lucide-react'
@@ -50,17 +50,14 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
 
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
-  const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
+  const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress' || isAssistantProgressNote(m))
   const assistantNotes = messages.filter(isAssistantProgressNote)
-  const timeline = buildTaskTimeline(progressMsgs, resultMsg, {
-    assistantNoteCount: assistantNotes.length,
-  })
-  const progressCount = timeline.visibleStepCount + assistantNotes.length
+  const timeline = buildTaskTimeline(progressMsgs, resultMsg)
+  const progressCount = timeline.visibleStepCount
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const hasProgressDetails = progressCount > 0
-  const visibleAssistantNotes = resultMsg ? [] : assistantNotes
-  const showProcessingBubble = !isDone && !resultMsg && visibleAssistantNotes.length === 0
+  const showProcessingBubble = !isDone && !resultMsg && !timeline.coverage.assistantEvent
   const tone = status.tone
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const canCancel = !!taskId && !isDone && !!onCancel
@@ -68,9 +65,14 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
 
   useEffect(() => {
-    if (userCollapseOverride.current || isDone || progressCount <= 3) return
+    if (userCollapseOverride.current || isDone) return
+    if (timeline.coverage.assistantEvent) {
+      setCollapsed(false)
+      return
+    }
+    if (progressCount <= 3) return
     setCollapsed(true)
-  }, [isDone, progressCount])
+  }, [isDone, progressCount, timeline.coverage.assistantEvent])
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -112,15 +114,6 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
           />
         </div>
       )}
-
-      {visibleAssistantNotes.map((message, index) => (
-        <TaskAssistantBubble
-          key={clean(message.id ?? '') || `assistant-note-${index}`}
-          message={message}
-          tone={tone}
-          label={assistantNoteLabel(message)}
-        />
-      ))}
 
       {showProcessingBubble && <TaskProcessingBubble />}
 
@@ -248,17 +241,6 @@ function taskIdForGroup(messages: ChatMessage[]): string {
     if (taskId) return taskId
   }
   return ''
-}
-
-function assistantNoteLabel(message: ChatMessage): string {
-  const label = clean(
-    message.model_used
-    ?? message.modelUsed
-    ?? message.cli_name
-    ?? message.cliName
-    ?? '',
-  )
-  return label || 'AI CLI'
 }
 
 function statusForTaskGroup(

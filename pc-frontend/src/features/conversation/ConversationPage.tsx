@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { useMemberRealtimeRefresh } from './useMemberRealtimeRefresh'
-import { AttachmentButton, AttachmentChip } from './AttachmentButton'
+import { AttachmentButton, AttachmentChip } from './AttachmentButton'; import { AttachmentPreviewDialog } from './AttachmentPreviewDialog'; import { useAttachmentPreview } from './useAttachmentPreview'
 import {
   attachmentTitleFromAttachments,
   buildComposerContent,
@@ -764,10 +764,9 @@ export default function ConversationPage() {
   const composerSubmitDisabled = (!input.trim() && attachments.length === 0)
     || composerDisabled
     || attachmentUploading
+  const { attachmentPreview, openAttachmentPreview, closeAttachmentPreview, removeComposerAttachment } = useAttachmentPreview(setAttachments)
 
-  useEffect(() => {
-    clearAttachmentDraft()
-  }, [activeProjectId, projectHomeVersion, activeConversationTargetId, clearAttachmentDraft])
+  useEffect(() => { clearAttachmentDraft(); closeAttachmentPreview() }, [activeProjectId, projectHomeVersion, activeConversationTargetId, clearAttachmentDraft, closeAttachmentPreview])
 
   const { clearSavedComposerDraft } = useProjectComposerDraftPersistence({ userId: user?.id, input, setInput, attachments, draftConversationId, activeProjectId, activeChannelId, sessionView, setSessionView, activeConversationTarget, isOwnConversationTarget, setMemberConversationTarget, restoreAttachmentDraft, openConversation, autoResize, conversationLoadSeqRef, waitingForNewSession, setConvMessages, setSessionTaskMessages })
 
@@ -1354,7 +1353,7 @@ export default function ConversationPage() {
                   <AttachmentChip
                     key={att.attachment_id}
                     attachment={att}
-                    onRemove={() => setAttachments((prev) => prev.filter((a) => a.attachment_id !== att.attachment_id))}
+                    onOpen={openAttachmentPreview} onRemove={() => removeComposerAttachment(att.attachment_id)}
                   />
                 ))}
               </div>
@@ -1514,6 +1513,7 @@ export default function ConversationPage() {
           onClose={() => setShowModelPicker(false)}
         />
       )}
+      {attachmentPreview && <AttachmentPreviewDialog attachment={attachmentPreview} onClose={closeAttachmentPreview} />}
 
       {/* 新建项目弹窗 */}
       {showCreate && (
