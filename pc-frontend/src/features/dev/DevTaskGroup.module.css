@@ -219,6 +219,32 @@
   border-color: rgba(218, 55, 60, .40);
 }
 
+.processPanelDormant {
+  max-height: 0;
+  min-height: 0;
+  margin-top: -6px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-3px);
+  transition:
+    max-height .14s ease,
+    margin-top .14s ease,
+    opacity .12s ease,
+    transform .14s ease;
+}
+
+.thread:hover .processPanelDormant,
+.thread:focus-within .processPanelDormant,
+.processPanelDormant:focus-within {
+  max-height: 96px;
+  margin-top: 0;
+  opacity: 1;
+  overflow: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
 .assistantTurn {
   display: flex;
   align-items: flex-start;

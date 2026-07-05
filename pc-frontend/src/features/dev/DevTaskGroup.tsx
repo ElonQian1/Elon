@@ -65,6 +65,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
+  const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
 
   useEffect(() => {
     if (userCollapseOverride.current || isDone || progressCount <= 3) return
@@ -126,7 +127,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
       {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
       {(hasProgressDetails || !isDone) && (
-        <div className={styles.processPanel}>
+        <div className={[styles.processPanel, hideCompletedProcessPanel ? styles.processPanelDormant : ''].join(' ')}>
           {hasProgressDetails ? (
             <button
               type="button"
