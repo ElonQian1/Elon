@@ -1,30 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Copy,
-  ExternalLink,
-  GitBranch,
-  Loader2,
-  MessageSquareText,
-  PlayCircle,
-  RefreshCw,
-  SearchCode,
-} from 'lucide-react'
-import { fetchProjectGitWorktreeAudit } from './api'
+import { AlertTriangle, GitBranch, Loader2, RefreshCw, Search, X } from 'lucide-react'
+import { fetchGlobalGitWorktreeAudit, fetchProjectGitWorktreeAudit } from './api'
+import GitWorktreeRow from './GitWorktreeRow'
+import { conversationTarget, draftText, type DraftMode } from './gitWorktreeActions'
 import type {
+  GlobalGitWorktreeAuditProjectResult,
+  GlobalGitWorktreeAuditResponse,
+  GlobalGitWorktreeAuditSummary,
   ProjectGitWorktreeAuditEntry,
   ProjectGitWorktreeAuditResponse,
-  ProjectGitWorktreeConversation,
 } from './types'
 import { saveProjectComposerDraft } from '../updates/composerDrafts'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { useAuthStore } from '../../store/auth'
-import type { MemberConversationTarget } from '../conversation/memberConversationApi'
+import {
+  listMemberConversationMessages,
+  sendMemberConversationDiscussion,
+  type MemberConversationMessage,
+} from '../conversation/memberConversationApi'
 import styles from './GitWorktreesPage.module.css'
 
-type DraftMode = 'open' | 'ask' | 'continue'
+type ScopeMode = 'all' | 'project'
+type FilterMode = 'all' | 'dirty' | 'unknown'
+
+interface ContextPreview {
+  projectId: string
+  projectName: string
+  entry: ProjectGitWorktreeAuditEntry
+  messages: MemberConversationMessage[]
+}
 
 export default function GitWorktreesPage() {
   const navigate = useNavigate()
@@ -34,11 +39,20 @@ export default function GitWorktreesPage() {
   const loadProjects = useProjectStore((s) => s.loadProjects)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const user = useAuthStore((s) => s.user)
-  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('project') ?? '')
-  const [audit, setAudit] = useState<ProjectGitWorktreeAuditResponse | null>(null)
+  const initialProject = searchParams.get('project') ?? ''
+  const [scope, setScope] = useState<ScopeMode>(initialProject ? 'project' : 'all')
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProject)
+  const [globalAudit, setGlobalAudit] = useState<GlobalGitWorktreeAuditResponse | null>(null)
+  const [projectAudit, setProjectAudit] = useState<ProjectGitWorktreeAuditResponse | null>(null)
+  const [filter, setFilter] = useState<FilterMode>('all')
+  const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [copiedPath, setCopiedPath] = useState('')
+  const [askingKey, setAskingKey] = useState('')
+  const [contextLoadingKey, setContextLoadingKey] = useState('')
+  const [contextPreview, setContextPreview] = useState<ContextPreview | null>(null)
 
   useEffect(() => {
     if (!projectsLoaded) loadProjects().catch(() => {})
@@ -46,7 +60,8 @@ export default function GitWorktreesPage() {
 
   useEffect(() => {
     const queryProject = searchParams.get('project') ?? ''
-    if (queryProject && queryProject !== selectedProjectId) {
+    if (queryProject) {
+      setScope('project')
       setSelectedProjectId(queryProject)
       return
     }
@@ -62,28 +77,59 @@ export default function GitWorktreesPage() {
   )
 
   const loadAudit = useCallback(async () => {
-    if (!selectedProjectId) return
+    if (scope === 'project' && !selectedProjectId) return
     setLoading(true)
     setError('')
+    setNotice('')
     try {
-      const data = await fetchProjectGitWorktreeAudit(selectedProjectId)
-      setAudit(data)
+      if (scope === 'all') {
+        const data = await fetchGlobalGitWorktreeAudit()
+        setGlobalAudit(data)
+        setProjectAudit(null)
+      } else {
+        const data = await fetchProjectGitWorktreeAudit(selectedProjectId)
+        setProjectAudit(data)
+        setGlobalAudit(null)
+      }
     } catch (err) {
-      setAudit(null)
+      setGlobalAudit(null)
+      setProjectAudit(null)
       setError((err as { message?: string }).message ?? 'Git 现场读取失败')
     } finally {
       setLoading(false)
     }
-  }, [selectedProjectId])
+  }, [scope, selectedProjectId])
 
   useEffect(() => {
-    if (selectedProjectId) void loadAudit()
-  }, [loadAudit, selectedProjectId])
+    if (scope === 'all' || selectedProjectId) void loadAudit()
+  }, [loadAudit, scope, selectedProjectId])
+
+  function switchScope(nextScope: ScopeMode) {
+    setScope(nextScope)
+    setGlobalAudit(null)
+    setProjectAudit(null)
+    setError('')
+    setNotice('')
+    setContextPreview(null)
+    if (nextScope === 'all') {
+      setSearchParams({})
+      return
+    }
+    const projectId = selectedProjectId || activeProjectId || projects[0]?.id || ''
+    if (projectId) {
+      setSelectedProjectId(projectId)
+      setSearchParams({ project: projectId })
+    }
+  }
 
   function selectProject(projectId: string) {
+    setScope('project')
     setSelectedProjectId(projectId)
-    setAudit(null)
+    setGlobalAudit(null)
+    setProjectAudit(null)
     setError('')
+    setNotice('')
+    setContextPreview(null)
     setSearchParams(projectId ? { project: projectId } : {})
   }
 
@@ -97,34 +143,97 @@ export default function GitWorktreesPage() {
     }
   }
 
-  async function openConversation(entry: ProjectGitWorktreeAuditEntry, mode: DraftMode) {
+  async function openConversation(projectId: string, entry: ProjectGitWorktreeAuditEntry, mode: DraftMode) {
     const conversation = entry.conversation
-    if (!selectedProjectId || !conversation) return
+    if (!projectId || !conversation) return
     const store = useProjectStore.getState()
-    if (store.activeProjectId !== selectedProjectId) {
-      await store.selectProject(selectedProjectId)
+    if (store.activeProjectId !== projectId) {
+      await store.selectProject(projectId)
     }
     const fresh = useProjectStore.getState()
     const channel = fresh.channels.find((item) => item.kind === 'ai_development') ?? fresh.channels[0]
     if (channel?.id) {
       await fresh.selectChannel(channel.id)
     }
-    const target = conversationTarget(conversation, user?.id)
     saveProjectComposerDraft({
       userId: user?.id,
       input: draftText(mode, entry),
       attachments: [],
       draftConversationId: conversation.conversation_id,
-      activeProjectId: selectedProjectId,
+      activeProjectId: projectId,
       activeChannelId: channel?.id ?? '',
       sessionView: conversation.conversation_id,
-      conversationTarget: target,
+      conversationTarget: conversationTarget(conversation, user?.id),
     })
     navigate('/')
   }
 
-  const dirtyCount = audit?.summary.dirty_worktrees ?? 0
-  const unknownCount = audit?.summary.unknown_dirty_worktrees ?? 0
+  async function askConversation(projectId: string, entry: ProjectGitWorktreeAuditEntry) {
+    const conversation = entry.conversation
+    if (!projectId || !conversation) return
+    const key = rowKey(projectId, entry)
+    setAskingKey(key)
+    setError('')
+    setNotice('')
+    try {
+      await sendMemberConversationDiscussion(
+        projectId,
+        conversation.user_id,
+        conversation.conversation_id,
+        draftText('ask', entry),
+      )
+      setNotice('已把询问发送到该会话的讨论消息。')
+    } catch (err) {
+      setError((err as { message?: string }).message ?? '发送询问失败')
+    } finally {
+      setAskingKey('')
+    }
+  }
+
+  async function readConversation(project: GlobalGitWorktreeAuditProjectResult, entry: ProjectGitWorktreeAuditEntry) {
+    const conversation = entry.conversation
+    if (!conversation) return
+    const key = rowKey(project.project.id, entry)
+    setContextLoadingKey(key)
+    setError('')
+    try {
+      const messages = await listMemberConversationMessages(
+        project.project.id,
+        conversation.user_id,
+        conversation.conversation_id,
+      )
+      setContextPreview({
+        projectId: project.project.id,
+        projectName: project.project.name,
+        entry,
+        messages,
+      })
+    } catch (err) {
+      setError((err as { message?: string }).message ?? '读取会话上下文失败')
+    } finally {
+      setContextLoadingKey('')
+    }
+  }
+
+  const projectResults = useMemo(() => {
+    if (scope === 'all') return globalAudit?.projects ?? []
+    return projectAudit ? [singleProjectResult(projectAudit)] : []
+  }, [globalAudit, projectAudit, scope])
+
+  const summary = useMemo(() => {
+    if (scope === 'all') return globalAudit?.summary ?? emptyGlobalSummary()
+    if (!projectAudit) return emptyGlobalSummary()
+    return summaryFromProject(projectAudit)
+  }, [globalAudit, projectAudit, scope])
+
+  const visibleProjects = useMemo(
+    () => projectResults
+      .map((project) => ({ ...project, worktrees: project.worktrees.filter((entry) => entryMatches(entry, query, filter)) }))
+      .filter((project) => shouldShowProject(project, query, filter)),
+    [filter, projectResults, query],
+  )
+
+  const hasAnyRows = visibleProjects.some((project) => project.worktrees.length > 0 || project.status !== 'audited')
 
   return (
     <div className={styles.page}>
@@ -134,6 +243,10 @@ export default function GitWorktreesPage() {
           <h1>Git 现场</h1>
         </div>
         <div className={styles.headerActions}>
+          <div className={styles.segmented} role="tablist" aria-label="审计范围">
+            <button type="button" data-active={scope === 'all'} onClick={() => switchScope('all')}>全部</button>
+            <button type="button" data-active={scope === 'project'} onClick={() => switchScope('project')}>项目</button>
+          </div>
           <select
             value={selectedProjectId}
             onChange={(event) => selectProject(event.target.value)}
@@ -145,7 +258,7 @@ export default function GitWorktreesPage() {
               <option key={project.id} value={project.id}>{project.name}</option>
             ))}
           </select>
-          <button className={styles.iconBtn} onClick={loadAudit} disabled={!selectedProjectId || loading} title="刷新 Git 现场" type="button">
+          <button className={styles.iconBtn} onClick={loadAudit} disabled={(scope === 'project' && !selectedProjectId) || loading} title="刷新 Git 现场" type="button">
             {loading ? <Loader2 size={16} className={styles.spin} aria-hidden="true" /> : <RefreshCw size={16} aria-hidden="true" />}
             <span>刷新</span>
           </button>
@@ -153,47 +266,77 @@ export default function GitWorktreesPage() {
       </header>
 
       <section className={styles.summaryBar}>
-        <Metric label="工作树" value={audit?.summary.total_worktrees ?? 0} />
-        <Metric label="脏工作树" value={dirtyCount} tone={dirtyCount ? 'warn' : 'ok'} />
-        <Metric label="未提交/未跟踪条目" value={audit?.summary.uncommitted_entries ?? 0} tone={dirtyCount ? 'warn' : undefined} />
-        <Metric label="已归属" value={audit?.summary.matched_worktrees ?? 0} />
-        <Metric label="未知脏现场" value={unknownCount} tone={unknownCount ? 'bad' : 'ok'} />
+        <Metric label="项目" value={summary.total_projects} />
+        <Metric label="工作树" value={summary.total_worktrees} />
+        <Metric label="脏工作树" value={summary.dirty_worktrees} tone={summary.dirty_worktrees ? 'warn' : 'ok'} />
+        <Metric label="未提交/未跟踪条目" value={summary.uncommitted_entries} tone={summary.dirty_worktrees ? 'warn' : undefined} />
+        <Metric label="已归属" value={summary.matched_worktrees} />
+        <Metric label="未知脏现场" value={summary.unknown_dirty_worktrees} tone={summary.unknown_dirty_worktrees ? 'bad' : 'ok'} />
       </section>
 
-      {selectedProject && (
-        <section className={styles.projectStrip}>
-          <GitBranch size={16} aria-hidden="true" />
-          <span>{selectedProject.name}</span>
-          <code>{audit?.workspace_path ?? selectedProject.workspace_path ?? '-'}</code>
-        </section>
-      )}
+      <section className={styles.projectStrip}>
+        <GitBranch size={16} aria-hidden="true" />
+        <span>{scope === 'all' ? `全项目总览 · ${summary.audited_projects} 个已审计` : (selectedProject?.name ?? projectAudit?.project.name ?? '项目审计')}</span>
+        <code>{scope === 'all' ? `${summary.skipped_projects} 个跳过，${summary.error_projects} 个异常` : (projectAudit?.workspace_path ?? selectedProject?.workspace_path ?? '-')}</code>
+      </section>
 
-      {error && (
-        <div className={styles.errorBox}>
-          <AlertTriangle size={16} aria-hidden="true" />
-          <span>{error}</span>
+      <section className={styles.filterBar}>
+        <label className={styles.searchBox}>
+          <Search size={15} aria-hidden="true" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索路径、分支、会话、成员" />
+        </label>
+        <div className={styles.segmented}>
+          <button type="button" data-active={filter === 'all'} onClick={() => setFilter('all')}>全部</button>
+          <button type="button" data-active={filter === 'dirty'} onClick={() => setFilter('dirty')}>只看脏</button>
+          <button type="button" data-active={filter === 'unknown'} onClick={() => setFilter('unknown')}>未知归属</button>
         </div>
-      )}
+      </section>
 
-      {audit?.warnings?.length ? (
-        <div className={styles.warningList}>
-          {audit.warnings.map((warning) => (
-            <span key={warning}><AlertTriangle size={14} aria-hidden="true" />{warning}</span>
-          ))}
-        </div>
-      ) : null}
+      {error && <MessageBox tone="bad" message={error} />}
+      {notice && <MessageBox tone="ok" message={notice} />}
 
       <main className={styles.list}>
-        {loading && !audit && <div className={styles.loading}>正在读取节点 Git worktree 列表…</div>}
-        {!loading && !audit && !error && <div className={styles.empty}>选择项目后查看 Git 工作现场</div>}
-        {audit?.worktrees.map((entry) => (
-          <WorktreeRow
-            key={`${entry.path}-${entry.branch ?? ''}`}
-            entry={entry}
-            copied={copiedPath === entry.path}
-            onCopy={() => copyPath(entry.path)}
-            onOpen={(mode) => openConversation(entry, mode)}
-          />
+        {contextPreview && (
+          <ContextPanel preview={contextPreview} onClose={() => setContextPreview(null)} />
+        )}
+        {loading && !projectResults.length && <div className={styles.loading}>正在读取节点 Git worktree 列表...</div>}
+        {!loading && !projectResults.length && !error && <div className={styles.empty}>刷新后查看全项目 Git 工作现场</div>}
+        {!loading && projectResults.length > 0 && !hasAnyRows && <div className={styles.empty}>没有匹配的 Git 工作现场</div>}
+        {visibleProjects.map((project) => (
+          <section className={styles.projectGroup} key={project.project.id}>
+            <div className={styles.projectGroupHeader} data-status={project.status}>
+              <div>
+                <strong>{project.project.name}</strong>
+                <span>{project.workspace_path || project.project.workspace_path || '-'}</span>
+              </div>
+              <em>{projectStatusText(project)}</em>
+            </div>
+            {project.warnings?.length ? (
+              <div className={styles.warningList}>
+                {project.warnings.map((warning) => (
+                  <span key={warning}><AlertTriangle size={14} aria-hidden="true" />{warning}</span>
+                ))}
+              </div>
+            ) : null}
+            {project.status !== 'audited' && (
+              <div className={styles.skipBox}>{project.error || '该项目本次未审计'}</div>
+            )}
+            {project.worktrees.map((entry) => (
+              <GitWorktreeRow
+                key={`${project.project.id}-${entry.path}-${entry.branch ?? ''}`}
+                entry={entry}
+                copied={copiedPath === entry.path}
+                asking={askingKey === rowKey(project.project.id, entry)}
+                onCopy={() => copyPath(entry.path)}
+                onOpen={(mode) => openConversation(project.project.id, entry, mode)}
+                onAsk={() => askConversation(project.project.id, entry)}
+                onRead={() => readConversation(project, entry)}
+              />
+            ))}
+            {contextLoadingKey.startsWith(`${project.project.id}:`) && (
+              <div className={styles.loadingInline}>正在读取会话上下文...</div>
+            )}
+          </section>
         ))}
       </main>
     </div>
@@ -209,127 +352,122 @@ function Metric({ label, value, tone }: { label: string; value: number; tone?: '
   )
 }
 
-function WorktreeRow({
-  entry,
-  copied,
-  onCopy,
-  onOpen,
-}: {
-  entry: ProjectGitWorktreeAuditEntry
-  copied: boolean
-  onCopy: () => void
-  onOpen: (mode: DraftMode) => void
-}) {
-  const conversation = entry.conversation
-  const dirty = entry.has_uncommitted_changes
+function MessageBox({ tone, message }: { tone: 'ok' | 'bad'; message: string }) {
   return (
-    <article className={styles.worktree} data-dirty={dirty ? 'true' : undefined} data-current={entry.current ? 'true' : undefined}>
-      <div className={styles.worktreeMain}>
-        <div className={styles.statusIcon} data-state={dirty ? 'dirty' : 'clean'}>
-          {dirty ? <AlertTriangle size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
-        </div>
-        <div className={styles.pathBlock}>
-          <div className={styles.pathLine}>
-            <code title={entry.path}>{entry.path}</code>
-            {entry.current && <span className={styles.badge}>当前</span>}
-            {entry.bare && <span className={styles.badge}>bare</span>}
-            {entry.detached && <span className={styles.badge}>detached</span>}
-          </div>
-          <div className={styles.metaLine}>
-            <span>{entry.branch ?? '无分支'}</span>
-            <span>{entry.head ?? '无 HEAD'}</span>
-            <span>{entry.uncommitted_count} 项改动</span>
-            <span>{entry.untracked_count} 个未跟踪</span>
-          </div>
-        </div>
-      </div>
-
-      <div className={styles.ownerBlock}>
-        {conversation ? (
-          <>
-            <strong>{conversation.title || conversation.conversation_id}</strong>
-            <span>{conversation.user_account || conversation.user_id}</span>
-            <em>{matchLabel(conversation.match_kind)} · {conversation.match_confidence}%</em>
-          </>
-        ) : (
-          <>
-            <strong>{entry.current ? '项目主工作区' : '未识别会话'}</strong>
-            <span>{entry.current ? '不是会话 worktree' : '需要人工确认来源'}</span>
-            <em>{entry.recommended_action}</em>
-          </>
-        )}
-      </div>
-
-      <div className={styles.actions}>
-        <button className={styles.iconBtn} onClick={onCopy} title="复制路径" type="button">
-          <Copy size={15} aria-hidden="true" />
-          <span>{copied ? '已复制' : '路径'}</span>
-        </button>
-        <button className={styles.iconBtn} onClick={() => onOpen('open')} disabled={!conversation} title="打开会话" type="button">
-          <ExternalLink size={15} aria-hidden="true" />
-          <span>打开</span>
-        </button>
-        <button className={styles.iconBtn} onClick={() => onOpen('ask')} disabled={!conversation} title="询问此会话" type="button">
-          <MessageSquareText size={15} aria-hidden="true" />
-          <span>询问</span>
-        </button>
-        <button className={styles.iconBtn} onClick={() => onOpen('continue')} disabled={!conversation} title="继续处理草稿" type="button">
-          <PlayCircle size={15} aria-hidden="true" />
-          <span>继续</span>
-        </button>
-      </div>
-
-      {(entry.status_error || entry.status_preview?.length) && (
-        <details className={styles.statusPreview}>
-          <summary><SearchCode size={14} aria-hidden="true" />状态预览</summary>
-          {entry.status_error
-            ? <p>{entry.status_error}</p>
-            : (
-              <pre>
-                {(entry.status_preview ?? []).slice(0, 12).join('\n')}
-                {entry.status_truncated ? '\n...' : ''}
-              </pre>
-            )}
-        </details>
-      )}
-    </article>
+    <div className={tone === 'bad' ? styles.errorBox : styles.noticeBox}>
+      <AlertTriangle size={16} aria-hidden="true" />
+      <span>{message}</span>
+    </div>
   )
 }
 
-function conversationTarget(
-  conversation: ProjectGitWorktreeConversation,
-  currentUserId?: string,
-): MemberConversationTarget | null {
-  if (conversation.user_id === currentUserId) return null
+function ContextPanel({ preview, onClose }: { preview: ContextPreview; onClose: () => void }) {
+  const conversation = preview.entry.conversation
+  const recent = preview.messages.slice(-12)
+  return (
+    <section className={styles.contextPanel}>
+      <div className={styles.contextHeader}>
+        <div>
+          <strong>{conversation?.title || conversation?.conversation_id || '会话上下文'}</strong>
+          <span>{preview.projectName} · {conversation?.user_account || conversation?.user_id || '-'}</span>
+        </div>
+        <button className={styles.iconBtn} type="button" onClick={onClose} title="关闭">
+          <X size={15} aria-hidden="true" />
+          <span>关闭</span>
+        </button>
+      </div>
+      {conversation?.codex_thread_id && (
+        <code className={styles.threadLine}>codex://threads/{conversation.codex_thread_id}</code>
+      )}
+      <div className={styles.contextMessages}>
+        {recent.map((message) => (
+          <div key={message.id} className={styles.contextMessage} data-role={message.role}>
+            <span>{message.sender_name || message.role || 'message'}</span>
+            <p>{message.content}</p>
+          </div>
+        ))}
+        {!recent.length && <p className={styles.contextEmpty}>这个会话没有可展示的消息。</p>}
+      </div>
+    </section>
+  )
+}
+
+function singleProjectResult(audit: ProjectGitWorktreeAuditResponse): GlobalGitWorktreeAuditProjectResult {
   return {
-    userId: conversation.user_id,
-    account: conversation.user_account || conversation.user_id,
-    avatarDataUrl: null,
+    project: audit.project,
+    status: 'audited',
+    error: null,
+    workspace_path: audit.workspace_path,
+    git_root: audit.git_root,
+    warnings: audit.warnings ?? [],
+    summary: audit.summary,
+    worktrees: audit.worktrees,
   }
 }
 
-function draftText(mode: DraftMode, entry: ProjectGitWorktreeAuditEntry) {
-  if (mode === 'open') return ''
+function summaryFromProject(audit: ProjectGitWorktreeAuditResponse): GlobalGitWorktreeAuditSummary {
+  return {
+    ...emptyGlobalSummary(),
+    total_projects: 1,
+    audited_projects: 1,
+    total_worktrees: audit.summary.total_worktrees,
+    dirty_worktrees: audit.summary.dirty_worktrees,
+    uncommitted_entries: audit.summary.uncommitted_entries,
+    untracked_entries: audit.summary.untracked_entries,
+    matched_worktrees: audit.summary.matched_worktrees,
+    unknown_dirty_worktrees: audit.summary.unknown_dirty_worktrees,
+  }
+}
+
+function emptyGlobalSummary(): GlobalGitWorktreeAuditSummary {
+  return {
+    total_projects: 0,
+    audited_projects: 0,
+    skipped_projects: 0,
+    error_projects: 0,
+    total_worktrees: 0,
+    dirty_worktrees: 0,
+    uncommitted_entries: 0,
+    untracked_entries: 0,
+    matched_worktrees: 0,
+    unknown_dirty_worktrees: 0,
+  }
+}
+
+function entryMatches(entry: ProjectGitWorktreeAuditEntry, query: string, filter: FilterMode) {
+  if (filter === 'dirty' && !entry.has_uncommitted_changes) return false
+  if (filter === 'unknown' && (!entry.has_uncommitted_changes || entry.conversation)) return false
+  const text = query.trim().toLowerCase()
+  if (!text) return true
   const conversation = entry.conversation
-  const header = [
-    `worktree: ${entry.path}`,
-    `branch: ${entry.branch ?? '-'}`,
-    `HEAD: ${entry.head ?? '-'}`,
-    `未提交/未跟踪: ${entry.uncommitted_count}/${entry.untracked_count}`,
-    conversation?.codex_thread_id ? `Codex thread: ${conversation.codex_thread_id}` : '',
-  ].filter(Boolean).join('\n')
-  if (mode === 'ask') {
-    return `${header}\n\n请只读检查这个会话的工作现场，回答做到哪里了、为什么还有未提交/未跟踪、是否应提交或清理；不要修改、不要提交、不要清理。`
-  }
-  return `${header}\n\n继续处理这个会话的遗留 Git 现场。先只读确认状态和最近上下文，再按项目规则说明下一步；如果需要提交或清理，先列出范围。`
+  return [
+    entry.path,
+    entry.branch,
+    entry.head,
+    conversation?.title,
+    conversation?.conversation_id,
+    conversation?.user_account,
+    conversation?.user_id,
+  ].some((value) => value?.toLowerCase().includes(text))
 }
 
-function matchLabel(kind: string) {
-  const labels: Record<string, string> = {
-    active_workspace_path: '路径记录',
-    branch: '分支记录',
-    platform_branch_convention: '平台分支',
-    platform_path_convention: '平台路径',
+function shouldShowProject(project: GlobalGitWorktreeAuditProjectResult, query: string, filter: FilterMode) {
+  if (project.worktrees.length > 0) return true
+  if (filter !== 'all') return false
+  const text = query.trim().toLowerCase()
+  if (!text) return project.status !== 'audited'
+  return [project.project.name, project.workspace_path, project.error]
+    .some((value) => value?.toLowerCase().includes(text))
+}
+
+function rowKey(projectId: string, entry: ProjectGitWorktreeAuditEntry) {
+  return `${projectId}:${entry.path}:${entry.branch ?? ''}`
+}
+
+function projectStatusText(project: GlobalGitWorktreeAuditProjectResult) {
+  if (project.status === 'audited') {
+    return `${project.summary.dirty_worktrees}/${project.summary.total_worktrees} 脏工作树`
   }
-  return labels[kind] ?? kind
+  if (project.status === 'skipped') return '已跳过'
+  return '审计异常'
 }

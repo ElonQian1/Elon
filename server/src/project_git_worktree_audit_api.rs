@@ -11,15 +11,17 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, can_manage_project_members, json_error, project_access},
-    store::{AdminConversationEntry, ProjectExecutionSession},
+    store::{AdminConversationEntry, ProjectAccess, ProjectExecutionSession},
     types::AppState,
 };
 
 pub fn routes() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/api/projects/:project_id/git/worktrees/audit",
-        get(audit_project_git_worktrees),
-    )
+    Router::new()
+        .route(
+            "/api/projects/:project_id/git/worktrees/audit",
+            get(audit_project_git_worktrees),
+        )
+        .merge(crate::project_git_worktree_global_audit_api::routes())
 }
 
 #[derive(Debug, Serialize)]
@@ -90,6 +92,12 @@ pub struct ProjectGitWorktreeConversation {
     pub codex_thread_id: Option<String>,
     pub match_kind: String,
     pub match_confidence: u8,
+}
+
+#[derive(Debug)]
+pub struct ProjectGitWorktreeAuditFailure {
+    pub status: StatusCode,
+    pub message: String,
 }
 
 #[derive(Clone)]
@@ -237,13 +245,26 @@ pub async fn audit_project_git_worktrees(
         return json_error(StatusCode::FORBIDDEN, "需要项目管理员权限查看 Git 工作现场");
     }
 
+    match audit_project_git_worktrees_for_access(state, access).await {
+        Ok(response) => Json(response).into_response(),
+        Err(e) => json_error(e.status, e.message),
+    }
+}
+
+pub async fn audit_project_git_worktrees_for_access(
+    state: Arc<AppState>,
+    access: ProjectAccess,
+) -> Result<ProjectGitWorktreeAuditResponse, ProjectGitWorktreeAuditFailure> {
     let Some(node_id) = access
         .node_id
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
     else {
-        return json_error(StatusCode::BAD_REQUEST, "项目未绑定 PC 节点");
+        return Err(ProjectGitWorktreeAuditFailure {
+            status: StatusCode::BAD_REQUEST,
+            message: "项目未绑定 PC 节点".to_string(),
+        });
     };
     let Some(workspace_path) = access
         .workspace_path
@@ -251,7 +272,10 @@ pub async fn audit_project_git_worktrees(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     else {
-        return json_error(StatusCode::BAD_REQUEST, "项目缺少 workspace_path");
+        return Err(ProjectGitWorktreeAuditFailure {
+            status: StatusCode::BAD_REQUEST,
+            message: "项目缺少 workspace_path".to_string(),
+        });
     };
 
     let audit = match state
@@ -261,24 +285,42 @@ pub async fn audit_project_git_worktrees(
     {
         Ok(AgentToServer::ProjectGitWorktreesAudited { audit, .. }) => audit,
         Ok(AgentToServer::ProjectGitWorktreeAuditError { message, .. }) => {
-            return json_error(StatusCode::BAD_GATEWAY, message)
+            return Err(ProjectGitWorktreeAuditFailure {
+                status: StatusCode::BAD_GATEWAY,
+                message,
+            })
         }
         Ok(other) => {
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                format!("unexpected git worktree audit response: {other:?}"),
-            )
+            return Err(ProjectGitWorktreeAuditFailure {
+                status: StatusCode::BAD_GATEWAY,
+                message: format!("unexpected git worktree audit response: {other:?}"),
+            })
         }
-        Err(e) => return json_error(StatusCode::BAD_GATEWAY, e),
+        Err(e) => {
+            return Err(ProjectGitWorktreeAuditFailure {
+                status: StatusCode::BAD_GATEWAY,
+                message: e.to_string(),
+            })
+        }
     };
 
     let sessions = match state.store.list_project_execution_sessions(&access.id, 200) {
         Ok(sessions) => sessions,
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e),
+        Err(e) => {
+            return Err(ProjectGitWorktreeAuditFailure {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                message: e.to_string(),
+            })
+        }
     };
     let conversations = match state.store.list_conversations_for_project_admin(&access.id) {
         Ok(conversations) => conversations,
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e),
+        Err(e) => {
+            return Err(ProjectGitWorktreeAuditFailure {
+                status: StatusCode::INTERNAL_SERVER_ERROR,
+                message: e.to_string(),
+            })
+        }
     };
     let match_context = MatchContext::new(&access.id, sessions, conversations);
 
@@ -292,7 +334,7 @@ pub async fn audit_project_git_worktrees(
         .collect::<Vec<_>>();
     let summary = summarize_worktrees(&worktrees);
 
-    Json(ProjectGitWorktreeAuditResponse {
+    Ok(ProjectGitWorktreeAuditResponse {
         project: ProjectGitWorktreeAuditProject {
             id: access.id,
             name: access.name,
@@ -306,7 +348,6 @@ pub async fn audit_project_git_worktrees(
         summary,
         worktrees,
     })
-    .into_response()
 }
 
 fn enrich_worktree_entry(

@@ -7,6 +7,35 @@ export interface ProjectGitWorktreeAuditResponse {
   worktrees: ProjectGitWorktreeAuditEntry[]
 }
 
+export interface GlobalGitWorktreeAuditResponse {
+  summary: GlobalGitWorktreeAuditSummary
+  projects: GlobalGitWorktreeAuditProjectResult[]
+}
+
+export interface GlobalGitWorktreeAuditSummary {
+  total_projects: number
+  audited_projects: number
+  skipped_projects: number
+  error_projects: number
+  total_worktrees: number
+  dirty_worktrees: number
+  uncommitted_entries: number
+  untracked_entries: number
+  matched_worktrees: number
+  unknown_dirty_worktrees: number
+}
+
+export interface GlobalGitWorktreeAuditProjectResult {
+  project: ProjectGitWorktreeAuditProject
+  status: 'audited' | 'skipped' | 'error' | string
+  error?: string | null
+  workspace_path?: string | null
+  git_root?: string | null
+  warnings?: string[]
+  summary: ProjectGitWorktreeAuditSummary
+  worktrees: ProjectGitWorktreeAuditEntry[]
+}
+
 export interface ProjectGitWorktreeAuditProject {
   id: string
   name: string

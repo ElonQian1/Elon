@@ -152,6 +152,7 @@ mod project_execution_mode;
 mod project_git;
 mod project_git_worktree_audit;
 mod project_git_worktree_audit_api;
+mod project_git_worktree_global_audit_api;
 mod project_join_requests;
 mod project_keys;
 mod project_landing;
