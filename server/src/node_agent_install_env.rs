@@ -1,6 +1,10 @@
 use serde::Deserialize;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
+#[cfg(windows)]
+use std::path::PathBuf;
+
+#[cfg(windows)]
 const SETUP_ENV_SCRIPT: &str = include_str!("../../scripts/setup-node-env.ps1");
 
 #[derive(Deserialize)]
@@ -11,11 +15,11 @@ pub(crate) struct InstallEnvReq {
 /// POST /api/install-env - 用户主动触发的后台安装/修复任务。
 pub(crate) async fn admin_install_env(
     axum::extract::State(_rt): axum::extract::State<Arc<crate::NodeRuntime>>,
-    body: Option<axum::Json<InstallEnvReq>>,
+    _body: Option<axum::Json<InstallEnvReq>>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     #[cfg(windows)]
     {
-        let codex_only = body
+        let codex_only = _body
             .as_ref()
             .and_then(|payload| payload.target.as_deref())
             .map(|target| target.eq_ignore_ascii_case("codex"))

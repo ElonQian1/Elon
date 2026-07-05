@@ -72,10 +72,16 @@ fn cli_child_env_overrides_with_path(
 }
 
 pub(crate) fn common_child_env_overrides(current_path: Option<OsString>) -> Vec<(String, String)> {
-    let mut envs = Vec::new();
+    #[cfg(not(windows))]
+    {
+        let _ = current_path;
+        Vec::new()
+    }
 
     #[cfg(windows)]
     {
+        let mut envs = Vec::new();
+
         if let Ok(shim_dir) = ensure_command_shim_dir() {
             if let Some(path) = prepend_dirs_to_path(vec![shim_dir.clone()], current_path) {
                 envs.push(("PATH".to_string(), path));
@@ -85,12 +91,9 @@ pub(crate) fn common_child_env_overrides(current_path: Option<OsString>) -> Vec<
                 shim_dir.to_string_lossy().to_string(),
             ));
         }
+
+        envs
     }
-
-    #[cfg(not(windows))]
-    let _ = current_path;
-
-    envs
 }
 
 fn merge_child_env_overrides(envs: &mut Vec<(String, String)>, overrides: Vec<(String, String)>) {

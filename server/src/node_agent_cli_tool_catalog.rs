@@ -297,6 +297,7 @@ fn executable_name(name: &str) -> String {
     }
 }
 
+#[cfg(windows)]
 fn display_dir_name(name: &str) -> String {
     let mut chars = name.chars();
     match chars.next() {
