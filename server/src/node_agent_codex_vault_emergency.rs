@@ -68,6 +68,10 @@ pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
             "/api/codex-vault/sharing/grants/:grant_id",
             delete(revoke_grant_handler),
         )
+        .route(
+            "/api/codex-vault/sharing/usage-snapshots",
+            post(record_usage_snapshot_handler),
+        )
 }
 
 async fn emergency_restore_handler(
@@ -126,6 +130,24 @@ async fn revoke_grant_handler(
         grant_id
     );
     match cloud_delete(&url, &token).await {
+        Ok(value) => (StatusCode::OK, Json(value)),
+        Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+    }
+}
+
+async fn record_usage_snapshot_handler(
+    State(rt): State<Arc<crate::NodeRuntime>>,
+    Json(body): Json<Value>,
+) -> impl IntoResponse {
+    let token = match rt.user_token().await {
+        Some(token) => token,
+        None => return error_response(StatusCode::UNAUTHORIZED, "本机节点尚未绑定云端账号"),
+    };
+    let url = format!(
+        "{}/api/me/codex-vault/sharing/usage-snapshots",
+        rt.cloud_http_url().trim_end_matches('/')
+    );
+    match cloud_post_typed::<Value>(&url, &token, &body).await {
         Ok(value) => (StatusCode::OK, Json(value)),
         Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
     }

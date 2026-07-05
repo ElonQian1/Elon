@@ -11,7 +11,7 @@ mod billing_price_rules;
 mod billing_reservation_tests;
 mod billing_reservations;
 mod build_quota;
-mod codex_vault; pub(crate) mod codex_vault_emergency; mod codex_vault_sharing_health; #[cfg(test)] mod codex_vault_sharing_regression_tests;
+mod codex_vault; pub(crate) mod codex_vault_emergency; mod codex_vault_sharing_health; #[cfg(test)] mod codex_vault_sharing_regression_tests; pub(crate) mod codex_vault_usage_estimation;
 mod common;
 mod compute_metering;
 mod conversations;

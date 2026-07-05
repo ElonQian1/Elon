@@ -129,3 +129,42 @@ pub(crate) fn migration_v92(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+pub(crate) fn migration_v93(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS codex_vault_usage_snapshots (
+          id                       TEXT PRIMARY KEY,
+          provider_user_id          TEXT NOT NULL,
+          observed_by_user_id       TEXT NOT NULL,
+          lease_id                  TEXT,
+          account_hint_hash         TEXT,
+          source                    TEXT NOT NULL DEFAULT 'codex_app_server',
+          limit_id                  TEXT NOT NULL,
+          limit_name                TEXT,
+          plan_type                 TEXT,
+          used_percent              REAL,
+          remaining_percent         REAL,
+          window_duration_mins      INTEGER,
+          resets_at                 TEXT,
+          rate_limit_reached_type   TEXT,
+          credits_balance           TEXT,
+          lifetime_tokens           INTEGER,
+          daily_bucket_date         TEXT,
+          daily_tokens              INTEGER,
+          observed_at               TEXT NOT NULL,
+          created_at                TEXT NOT NULL,
+          FOREIGN KEY (provider_user_id) REFERENCES users(id),
+          FOREIGN KEY (observed_by_user_id) REFERENCES users(id),
+          FOREIGN KEY (lease_id) REFERENCES codex_vault_emergency_leases(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_codex_vault_usage_snapshots_provider_window
+          ON codex_vault_usage_snapshots(provider_user_id, limit_id, resets_at, observed_at);
+
+        CREATE INDEX IF NOT EXISTS idx_codex_vault_usage_snapshots_observer
+          ON codex_vault_usage_snapshots(observed_by_user_id, observed_at DESC);
+        "#,
+    )?;
+    Ok(())
+}

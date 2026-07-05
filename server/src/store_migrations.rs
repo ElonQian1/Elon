@@ -127,6 +127,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (89, "PC 节点开发期公开授权与自动握手状态", crate::node_public_dev_migration::migration_v89), (90, "项目广场公开列表索引", crate::project_store_listing_migration::migration_v90),
     (91, "Codex 保险箱机器人授权共享与租约账本", crate::codex_vault_emergency_migration::migration_v91),
     (92, "Codex 保险箱共享租约用量幂等账本", crate::codex_vault_emergency_migration::migration_v92),
+    (93, "Codex 保险箱官方用量快照与百分比估算", crate::codex_vault_emergency_migration::migration_v93),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

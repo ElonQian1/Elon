@@ -8,7 +8,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use axum::{
-    extract::State,
+    extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
@@ -22,6 +22,9 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
+    store::codex_vault_usage_estimation::{
+        CodexVaultUsageEstimateReport, CodexVaultUsageSnapshotRecord, CodexVaultUsageSnapshotWrite,
+    },
     store::{CodexVaultRecord, CodexVaultSlotRecord},
     types::AppState,
 };
@@ -78,6 +81,14 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/api/me/codex-vault/sharing/leases/clear",
             post(crate::codex_vault_emergency_api::clear_active_lease),
         )
+        .route(
+            "/api/me/codex-vault/sharing/usage-snapshots",
+            post(record_usage_snapshot),
+        )
+        .route(
+            "/api/me/codex-vault/sharing/usage-estimate",
+            get(usage_estimate),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +108,40 @@ pub struct LeaseCodexAuthCacheRequest {
     pub purpose: Option<String>,
     pub previous_account_hint_hash: Option<String>,
     pub failure_reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UsageSnapshotRequest {
+    pub provider_user_id: Option<String>,
+    pub lease_id: Option<String>,
+    pub account_hint_hash: Option<String>,
+    pub source: Option<String>,
+    pub observed_at: Option<String>,
+    pub lifetime_tokens: Option<i64>,
+    pub daily_bucket_date: Option<String>,
+    pub daily_tokens: Option<i64>,
+    pub buckets: Vec<UsageSnapshotBucket>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UsageSnapshotBucket {
+    pub limit_id: Option<String>,
+    pub limit_name: Option<String>,
+    pub plan_type: Option<String>,
+    pub used_percent: Option<f64>,
+    pub remaining_percent: Option<f64>,
+    pub window_duration_mins: Option<i64>,
+    pub resets_at: Option<String>,
+    pub rate_limit_reached_type: Option<String>,
+    pub credits_balance: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UsageEstimateQuery {
+    pub provider_user_id: Option<String>,
+    pub days: Option<i64>,
+    pub limit_id: Option<String>,
+    pub monthly_usd_cents: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -164,6 +209,100 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
         | (_, _, _, _, Err(error)) => {
             json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
+    }
+}
+
+pub async fn record_usage_snapshot(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<UsageSnapshotRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+    };
+    if req.buckets.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "缺少 Codex rate limit bucket");
+    }
+    let provider_user_id = req
+        .provider_user_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(user.id.as_str())
+        .to_string();
+    if let Err(error) = ensure_codex_usage_snapshot_access(&state, &user.id, &provider_user_id) {
+        return json_error(StatusCode::FORBIDDEN, error.to_string());
+    }
+    let mut records: Vec<CodexVaultUsageSnapshotRecord> = Vec::new();
+    for bucket in req.buckets {
+        let write = CodexVaultUsageSnapshotWrite {
+            provider_user_id: provider_user_id.clone(),
+            observed_by_user_id: user.id.clone(),
+            lease_id: req.lease_id.clone(),
+            account_hint_hash: req.account_hint_hash.clone(),
+            source: req.source.clone(),
+            limit_id: bucket.limit_id.unwrap_or_else(|| "codex".to_string()),
+            limit_name: bucket.limit_name,
+            plan_type: bucket.plan_type,
+            used_percent: bucket.used_percent,
+            remaining_percent: bucket.remaining_percent,
+            window_duration_mins: bucket.window_duration_mins,
+            resets_at: bucket.resets_at,
+            rate_limit_reached_type: bucket.rate_limit_reached_type,
+            credits_balance: bucket.credits_balance,
+            lifetime_tokens: req.lifetime_tokens,
+            daily_bucket_date: req.daily_bucket_date.clone(),
+            daily_tokens: req.daily_tokens,
+            observed_at: req.observed_at.clone(),
+        };
+        match state.store.record_codex_vault_usage_snapshot(&write) {
+            Ok(record) => records.push(record),
+            Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+        }
+    }
+    Json(serde_json::json!({
+        "ok": true,
+        "provider_user_id": provider_user_id,
+        "snapshots": records,
+    }))
+    .into_response()
+}
+
+pub async fn usage_estimate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<UsageEstimateQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+    };
+    let provider_user_id = query
+        .provider_user_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(user.id.as_str())
+        .to_string();
+    if let Err(error) = ensure_codex_usage_snapshot_access(&state, &user.id, &provider_user_id) {
+        return json_error(StatusCode::FORBIDDEN, error.to_string());
+    }
+    let days = query.days.unwrap_or(30).clamp(1, 365);
+    let limit_id = query.limit_id.as_deref().unwrap_or("codex");
+    let monthly_usd_cents = query.monthly_usd_cents.unwrap_or(20_000).max(0);
+    let report: anyhow::Result<CodexVaultUsageEstimateReport> = state
+        .store
+        .codex_vault_usage_estimate_report(&provider_user_id, days, limit_id, monthly_usd_cents);
+    match report {
+        Ok(report) => Json(serde_json::json!({
+            "ok": true,
+            "method": "official_percent_window_with_shared_token_attribution",
+            "caveat": "OpenAI does not publish a fixed token-per-percent conversion. This report estimates per-window percent attribution from official snapshots and platform shared_codex token events.",
+            "report": report,
+        }))
+        .into_response(),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
 
@@ -352,6 +491,31 @@ fn status_from_record(
                 updated_at: slot.updated_at.clone(),
             })
             .collect(),
+    }
+}
+
+fn ensure_codex_usage_snapshot_access(
+    state: &AppState,
+    requester_user_id: &str,
+    provider_user_id: &str,
+) -> anyhow::Result<()> {
+    if requester_user_id == provider_user_id {
+        return Ok(());
+    }
+    let grants = state
+        .store
+        .list_codex_vault_emergency_grants(requester_user_id)?;
+    let allowed = grants.iter().any(|grant| {
+        grant.status == "active"
+            && ((grant.provider_user_id == provider_user_id
+                && grant.consumer_user_id == requester_user_id)
+                || (grant.consumer_user_id == provider_user_id
+                    && grant.provider_user_id == requester_user_id))
+    });
+    if allowed {
+        Ok(())
+    } else {
+        anyhow::bail!("无权记录或查看该 Codex 账号的共享用量估算")
     }
 }
 
