@@ -23,6 +23,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
+
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -32,6 +34,8 @@ $WindowsClientPackageName = "elon-node-agent-windows.zip"
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $ServerDir = Join-Path $RepoRoot "server"
 $ServerManifest = Join-Path $ServerDir "Cargo.toml"
+$PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
+$PcDistDir = Join-Path $PcFrontendDir "dist"
 
 Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan
 
@@ -233,10 +237,60 @@ function Resolve-NodeAgentTargetDir {
     throw "无法解析无空格的 PC 节点 target 目录；请设置 ELON_NODE_AGENT_TARGET_DIR 为无空格路径。"
 }
 
+function Invoke-NodeAgentPcFrontendBuild {
+    if (-not (Test-Path (Join-Path $PcFrontendDir "package.json"))) {
+        throw "缺少 PC 前端工程：$PcFrontendDir"
+    }
+    if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
+        throw "npm 不在 PATH，无法构建节点包内置 PC 工作台"
+    }
+
+    Write-Host "[2.4/4] 构建节点包内置 PC 工作台..." -ForegroundColor Yellow
+    Push-Location $PcFrontendDir
+    try {
+        $lockFile = Join-Path $PcFrontendDir "package-lock.json"
+        $nmDir = Join-Path $PcFrontendDir "node_modules"
+        $nmInstalled = Join-Path $nmDir ".npm-installed-sha"
+        $lockHash = if (Test-Path $lockFile) {
+            (Get-FileHash $lockFile -Algorithm MD5).Hash
+        } else { '' }
+        $prevHash = if (Test-Path $nmInstalled) { Get-Content $nmInstalled -Raw } else { '' }
+        $needInstall = (-not (Test-Path $nmDir)) -or ($lockHash -ne $prevHash.Trim())
+        if ($needInstall) {
+            Write-Host "   安装/更新前端依赖（npm ci）..." -ForegroundColor Gray
+            $installExit = Invoke-LoggedCmd -Command "npm ci"
+            if ($installExit -ne 0) { throw "npm ci 失败，exit=$installExit" }
+            $lockHash | Set-Content $nmInstalled -NoNewline
+        }
+        Reset-PcFrontendBuildArtifacts -FrontendDir $PcFrontendDir
+        $buildExit = Invoke-LoggedCmd -Command "npm run build"
+        if ($buildExit -ne 0) { throw "npm run build 失败，exit=$buildExit" }
+    } catch {
+        $primaryBuildError = $_
+        try {
+            Reset-PcFrontendBuildArtifacts -FrontendDir $PcFrontendDir
+            Invoke-PcFrontendLocalBuild -FrontendDir $PcFrontendDir
+        } catch {
+            try {
+                Invoke-PcFrontendPnpmBuild -FrontendDir $PcFrontendDir
+            } catch {
+                throw "PC 前端构建失败：$primaryBuildError；fallback: $_"
+            }
+        }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path (Join-Path $PcDistDir "index.html"))) {
+        throw "PC 前端 dist 缺少 index.html：$PcDistDir"
+    }
+    Write-Host "   PC 工作台 dist 就绪: $PcDistDir" -ForegroundColor Green
+}
+
 $env:CARGO_TARGET_DIR = Resolve-NodeAgentTargetDir
 
 foreach ($requiredPath in @(
     $ServerManifest,
+    (Join-Path $PcFrontendDir "package.json"),
     (Join-Path $RepoRoot "default-project-docs\files"),
     (Join-Path $RepoRoot "scripts\setup-node-env.ps1"),
     (Join-Path $ServerDir "src\node_agent_admin.html")
@@ -307,6 +361,8 @@ try {
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 
+Invoke-NodeAgentPcFrontendBuild
+
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
 $LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
@@ -322,6 +378,9 @@ try {
     Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "卸载一龙开发平台.exe") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force
+    $PackagePcDist = Join-Path $PackageInternal "pc-next-dist"
+    New-Item -ItemType Directory -Force -Path $PackagePcDist | Out-Null
+    Copy-Item -Path (Join-Path $PcDistDir "*") -Destination $PackagePcDist -Recurse -Force
     $PackageVersionInfo = [ordered]@{
         version = $PackageVersion
         gitSha = $GitSha

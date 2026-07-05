@@ -94,6 +94,7 @@ mod node_agent_full_access;
 mod node_agent_install_env;
 mod node_agent_lifecycle;
 mod node_agent_local_admin;
+mod node_agent_local_pc_frontend;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
@@ -3947,7 +3948,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             )
             .route_layer(local_admin_guard);
         let app = axum::Router::new()
-            .route("/", axum::routing::get(admin_index))
+            .merge(node_agent_local_pc_frontend::routes())
             .route(
                 "/api/status",
                 axum::routing::get(node_agent_admin_status::admin_status),
@@ -3962,7 +3963,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .layer(node_agent_local_admin::private_network_header_layer());
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
-                info!("🖥️  本地管理页: http://127.0.0.1:{}/", port);
+                info!("🖥️  本地 PC 工作台: http://127.0.0.1:{}/pc", port);
                 if let Err(e) = axum::serve(listener, app).await {
                     warn!("admin server 退出: {e}");
                 }
@@ -4061,10 +4062,6 @@ async fn admin_storage_config_set(
             "profile": pc_storage_repo::storage_profile(&settings),
         })),
     )
-}
-
-async fn admin_index() -> axum::response::Html<&'static str> {
-    axum::response::Html(include_str!("node_agent_admin.html"))
 }
 
 /// GET /api/tts-status — 探测本地 TTS Worker 健康状态

@@ -6,6 +6,7 @@ import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
 import { useAuthStore } from '../../store/auth'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
+import LocalModeBanner from './LocalModeBanner'
 import styles from './Shell.module.css'
 
 function NodeConnectBanner() {
@@ -65,6 +66,7 @@ export default function Shell() {
     <div className={styles.shell}>
       <ServerRail />
       <div className={styles.content}>
+        <LocalModeBanner />
         <NodeConnectBanner />
         <main className={styles.routeFrame}>
           <Outlet />

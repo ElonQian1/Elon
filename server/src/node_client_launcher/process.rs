@@ -285,16 +285,19 @@ pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
 }
 
 pub(crate) fn open_pc_web_page(port: u16, env_values: &HashMap<String, String>) -> Result<()> {
-    let local_admin_url = format!("http://127.0.0.1:{port}/");
-    let url = if open_target_from_env_values(env_values) == OpenTarget::LocalAdmin {
-        local_admin_url
-    } else {
-        let base_url = web_base_url(env_values);
-        format!(
-            "{}/pc?node_admin={}",
-            base_url.trim_end_matches('/'),
-            encode_query_component(&local_admin_url)
-        )
+    let local_workbench_url = format!("http://127.0.0.1:{port}/pc");
+    let legacy_local_admin_url = format!("http://127.0.0.1:{port}/local-admin");
+    let url = match open_target_from_env_values(env_values) {
+        OpenTarget::LocalWorkbench => local_workbench_url,
+        OpenTarget::LocalAdmin => legacy_local_admin_url,
+        OpenTarget::CloudPc => {
+            let base_url = web_base_url(env_values);
+            format!(
+                "{}/pc?node_admin={}",
+                base_url.trim_end_matches('/'),
+                encode_query_component(&format!("http://127.0.0.1:{port}/"))
+            )
+        }
     };
     open_url(&url)
 }
@@ -316,13 +319,14 @@ fn open_url(url: &str) -> Result<()> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OpenTarget {
-    PcWeb,
+    LocalWorkbench,
+    CloudPc,
     LocalAdmin,
 }
 
 impl OpenTarget {
     fn requires_admin_ready(self) -> bool {
-        matches!(self, Self::LocalAdmin)
+        matches!(self, Self::LocalWorkbench | Self::LocalAdmin)
     }
 }
 
@@ -332,8 +336,9 @@ fn open_target_from_env_values(env_values: &HashMap<String, String>) -> OpenTarg
         .map(|value| value.trim().to_ascii_lowercase())
         .as_deref()
     {
+        Some("cloud_pc") => OpenTarget::CloudPc,
         Some("local_admin") => OpenTarget::LocalAdmin,
-        _ => OpenTarget::PcWeb,
+        _ => OpenTarget::LocalWorkbench,
     }
 }
 
@@ -519,8 +524,11 @@ mod tests {
     fn open_target_defaults_to_pc_workspace() {
         let env_values = HashMap::new();
 
-        assert_eq!(open_target_from_env_values(&env_values), OpenTarget::PcWeb);
-        assert!(!open_target_from_env_values(&env_values).requires_admin_ready());
+        assert_eq!(
+            open_target_from_env_values(&env_values),
+            OpenTarget::LocalWorkbench
+        );
+        assert!(open_target_from_env_values(&env_values).requires_admin_ready());
     }
 
     #[test]
@@ -549,6 +557,18 @@ mod tests {
             OpenTarget::LocalAdmin
         );
         assert!(open_target_from_env_values(&env_values).requires_admin_ready());
+    }
+
+    #[test]
+    fn cloud_pc_open_target_keeps_legacy_cloud_entry() {
+        let mut env_values = HashMap::new();
+        env_values.insert("NODE_AGENT_OPEN_TARGET".to_string(), "cloud_pc".to_string());
+
+        assert_eq!(
+            open_target_from_env_values(&env_values),
+            OpenTarget::CloudPc
+        );
+        assert!(!open_target_from_env_values(&env_values).requires_admin_ready());
     }
 
     #[test]

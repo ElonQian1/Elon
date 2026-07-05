@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { dispatchRealtimeEvent } from '../realtime/realtimeBus'
 import { normalizeRealtimeEvent, REALTIME_SERVER_TYPES } from '../realtime/realtimeEvents'
 import { useAuthStore } from '../../store/auth'
+import { cloudWebSocketUrl } from '../../api/runtime'
 
 const MAX_RECONNECT_MS = 30_000
 
@@ -26,8 +27,7 @@ export function useNotifications() {
     const s = stateRef.current
 
     function makeWsUrl(tok: string) {
-      const url = new URL('/ws/app', location.href)
-      url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const url = new URL(cloudWebSocketUrl('/ws/app'))
       url.searchParams.set('token', tok)
       return url.toString()
     }

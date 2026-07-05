@@ -16,6 +16,8 @@ const INTERNAL_FILES: &[&str] = &[
     "README.txt",
 ];
 
+const INTERNAL_DIRS: &[&str] = &["pc-next-dist"];
+
 const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
     "安装一龙PC节点.cmd",
     "启动一龙节点.cmd",
@@ -143,6 +145,40 @@ fn copy_internal_files(source: &Path, internal_dir: &Path) -> Result<()> {
             continue;
         }
         copy_if_needed(&src, &internal_dir.join(file))?;
+    }
+    for dir in INTERNAL_DIRS {
+        let src = source.join(dir);
+        if !src.exists() {
+            continue;
+        }
+        copy_dir_fresh(&src, &internal_dir.join(dir))?;
+    }
+    Ok(())
+}
+
+fn copy_dir_fresh(source: &Path, dest: &Path) -> Result<()> {
+    if dest.exists() {
+        std::fs::remove_dir_all(dest)
+            .with_context(|| format!("无法清理旧内部目录 {}", dest.display()))?;
+    }
+    copy_dir_recursive(source, dest)
+}
+
+fn copy_dir_recursive(source: &Path, dest: &Path) -> Result<()> {
+    std::fs::create_dir_all(dest)
+        .with_context(|| format!("无法创建内部目录 {}", dest.display()))?;
+    for entry in
+        std::fs::read_dir(source).with_context(|| format!("无法读取目录 {}", source.display()))?
+    {
+        let entry = entry?;
+        let src_path = entry.path();
+        let dest_path = dest.join(entry.file_name());
+        let file_type = entry.file_type()?;
+        if file_type.is_dir() {
+            copy_dir_recursive(&src_path, &dest_path)?;
+        } else if file_type.is_file() {
+            copy_if_needed(&src_path, &dest_path)?;
+        }
     }
     Ok(())
 }

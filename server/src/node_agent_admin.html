@@ -152,7 +152,7 @@
       只读体检、远程 AI 分析、白名单修复和问题记忆都在 PC 工作台的“电脑医生”项目里操作。
     </p>
     <div class="action-row">
-      <a id="pcDoctorLink" class="button-link" href="http://43.139.149.158:8080/pc?node_admin=http%3A%2F%2F127.0.0.1%3A7799%2F" target="_blank" rel="noopener">打开电脑医生项目</a>
+      <a id="pcDoctorLink" class="button-link" href="/pc/doctor" target="_blank" rel="noopener">打开电脑医生项目</a>
     </div>
   </div>
 
@@ -264,9 +264,8 @@ function hardwareLine(h) {
   return parts.filter(Boolean).join(' · ') || '未探测';
 }
 function pcWorkspaceUrl(r) {
-  const base = ((r && r.cloud_http_url) || 'http://43.139.149.158:8080').replace(/\/+$/, '');
-  const adminUrl = location.origin + '/';
-  return base + '/pc?node_admin=' + encodeURIComponent(adminUrl);
+  void r;
+  return location.origin + '/pc';
 }
 const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
 let localAdminToken = '';

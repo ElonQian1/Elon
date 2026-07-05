@@ -1,5 +1,7 @@
 /** 对 /api/* 的最小封装：自动带 token、统一错误格式 */
 
+import { resolveApiUrl } from './runtime'
+
 export function getAuthToken(): string | null {
   try {
     const raw = localStorage.getItem('elon_auth')
@@ -23,7 +25,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(init?.headers as Record<string, string> | undefined),
   }
-  const res = await fetch(path, { ...init, headers })
+  const res = await fetch(resolveApiUrl(path), { ...init, headers })
   if (!res.ok) {
     let message = res.statusText
     try {

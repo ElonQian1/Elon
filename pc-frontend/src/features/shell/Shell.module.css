@@ -74,3 +74,13 @@
   background: rgba(223, 92, 92, .14);
   color: #ffdede;
 }
+
+.localModeBanner {
+  background: rgba(42, 142, 217, .14);
+  color: #dceefe;
+}
+
+.localModeOffline {
+  background: rgba(245, 176, 76, .16);
+  color: #ffe2ad;
+}
