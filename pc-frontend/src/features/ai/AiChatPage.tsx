@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react'
+import { Bot, ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -125,6 +125,15 @@ export default function AiChatPage() {
 
   useEffect(() => {
     let cancelled = false
+    if (!user?.id) {
+      setConversations([])
+      setConversationsLoaded(true)
+      setFriends([])
+      setTotalUserCount(0)
+      setUsersLoading(false)
+      setUsersError('')
+      return () => { cancelled = true }
+    }
     loadConversations()
     setUsersLoading(true)
     setUsersError('')
@@ -145,6 +154,12 @@ export default function AiChatPage() {
 
   // ── 节点状态轮询（每 6s）──────────────────────────────────────────────
   useEffect(() => {
+    if (!user?.id) {
+      setOnlineNodeId(null)
+      setOnlineNodeName('')
+      setNodeStatusChecked(true)
+      return
+    }
     setNodeStatusChecked(false)
     function checkNode() {
       api.get<{ nodes?: Array<{ node_id: string; online: boolean; ai_cli_ready: boolean; display_name: string; device_name?: string }> }>('/api/me/nodes')
@@ -281,6 +296,10 @@ export default function AiChatPage() {
     e.preventDefault()
     const text = input.trim()
     if (!text || sending) return
+    if (!user?.id) {
+      setError('请先认证账号后开始对话。')
+      return
+    }
     const previousInput = input
     if (runtimeRoute === 'route_c2' || runtimeRoute === 'route_c3') {
       setError('普通聊天暂未绑定远程 PC 节点。请先在节点页选择远程节点，或切回自动/平台AI。')
@@ -366,6 +385,15 @@ export default function AiChatPage() {
           <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button">+</button>
         </div>
         <div className={styles.pinnedTools}>
+          <button className={[styles.pinnedTool, styles.pinnedToolPrimary].join(' ')} type="button" onClick={newConversation}>
+            <span className={styles.pinnedToolIcon}>
+              <Bot aria-hidden="true" size={18} strokeWidth={2.2} />
+            </span>
+            <span className={styles.pinnedToolCopy}>
+              <strong>一龙 AI 对话</strong>
+              <em>开始新的 AI 聊天</em>
+            </span>
+          </button>
           <button className={styles.pinnedTool} type="button" onClick={() => navigate('/doctor')}>
             <span className={styles.pinnedToolIcon}>
               <Stethoscope aria-hidden="true" size={18} strokeWidth={2.2} />
@@ -453,12 +481,17 @@ export default function AiChatPage() {
             if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
           }}
         >
-          {/* 本机节点状态横幅 */}
-          <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
+          {onlineNodeId && (
+            <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
+          )}
           {messages.length === 0 && !messagesLoading && (
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
-              <p>{onlineNodeId ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。` : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
+              <p>{!user?.id
+                ? '认证账号后即可开始对话，我会记住我们聊过的内容。'
+                : onlineNodeId
+                  ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。`
+                  : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
             </div>
           )}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
@@ -573,10 +606,13 @@ export default function AiChatPage() {
               <span />
             </div>
           )}
-          {!usersLoading && usersError && (
+          {!user && (
+            <p className={styles.userPanelHint}>登录后显示全站用户、好友状态和协作入口。</p>
+          )}
+          {user && !usersLoading && usersError && (
             <p className={styles.userPanelHint}>{usersError}</p>
           )}
-          {!usersLoading && !usersError && friends.length === 0 && (
+          {user && !usersLoading && !usersError && friends.length === 0 && (
             <p className={styles.userPanelHint}>暂无推荐用户</p>
           )}
           {!usersLoading && !usersError && filteredFriends.length === 0 && userQuery && (

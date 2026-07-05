@@ -54,7 +54,7 @@ function AccountClaimBanner() {
 
   return (
     <div className={styles.claimBanner}>
-      <span>这是一个无人认领的帐户。失去之前来认领吧。</span>
+      <span>登录后同步你的项目、好友和电脑节点；未登录也可以先浏览工作台。</span>
       <button type="button" onClick={() => navigate('/login')}>
         认证账号
       </button>
