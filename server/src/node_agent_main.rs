@@ -61,6 +61,7 @@ mod git_command_error;
 mod node_agent_active_task;
 mod node_agent_active_task_registry;
 mod node_agent_admin_open;
+mod node_agent_admin_status;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
@@ -91,6 +92,7 @@ mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_install_env;
+mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
@@ -2664,6 +2666,8 @@ async fn run_session(
     // The cloud requires the first WebSocket frame to be Register within 10s.
     // Discover capabilities first so the registered session can immediately
     // answer protocol pings and accept dispatched work.
+    let lifecycle =
+        node_agent_lifecycle::runtime_report(runtime, true, true, "正在注册云端会话").await;
     out_tx.send(ws_text(&AgentToServer::Register {
         agent_id: creds.agent_id.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -2676,6 +2680,7 @@ async fn run_session(
         hardware: Some(hardware.clone()),
         storage: Some(storage.clone()),
         dev_runtime: Some(dev_runtime.clone()),
+        lifecycle: Some(lifecycle.clone()),
     }))?;
     // 发送 RegisterCapabilities（含 TTS Worker URL）
     let tts_url = runtime.tts_worker_url.read().await.clone();
@@ -2686,6 +2691,7 @@ async fn run_session(
         hardware: Some(hardware),
         storage: Some(storage),
         dev_runtime: Some(dev_runtime),
+        lifecycle: Some(lifecycle),
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
 
@@ -3172,6 +3178,7 @@ async fn run_session(
                         } => {
                             let ver = version.as_deref().unwrap_or("latest");
                             info!("⬆️  收到云端更新指令，目标版本: {}", ver);
+                            runtime.lifecycle.mark_planned_shutdown("update");
                             let cloud_http = runtime.cloud_http_url();
                             tokio::spawn(async move {
                                 match crate::node_agent_client_maintenance::push_update_from_server(
@@ -3363,13 +3370,24 @@ async fn run_agent_runtime() -> Result<()> {
     }
 
     let runtime = Arc::new(NodeRuntime::new(cfg, creds, storage_settings, install_id));
+    node_agent_lifecycle::spawn_heartbeat(runtime.lifecycle.clone());
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
     node_agent_admin_open::maybe_open_admin_page(admin_port);
     runtime.ensure_cli_probe_background(true).await;
     runtime.refresh_models_background();
 
-    run_loop(runtime).await;
+    let runtime_for_loop = runtime.clone();
+    tokio::select! {
+        _ = run_loop(runtime_for_loop) => {}
+        signal = tokio::signal::ctrl_c() => {
+            if let Err(error) = signal {
+                warn!("监听 Win 端关闭信号失败: {error}");
+            }
+            runtime.lifecycle.mark_planned_shutdown("user_interrupt");
+            runtime.lifecycle.mark_shutdown_completed("user_interrupt");
+        }
+    }
     Ok(())
 }
 
@@ -3406,6 +3424,8 @@ pub(crate) struct NodeRuntime {
     cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
     /// 本地任务 registry/jsonl，用于后续重启后恢复任务现场和 attach。
     task_journal: node_agent_task_journal::TaskJournal,
+    /// Win 端进程生命周期账本，用于识别重启前异常退出、心跳过期和恢复动作。
+    lifecycle: node_agent_lifecycle::NodeLifecycleTracker,
     /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
     tool_approvals: node_agent_tool_approval::ToolApprovalState,
     /// Route A 完全访问的本机项目级授权记录。
@@ -3443,6 +3463,7 @@ impl NodeRuntime {
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
             cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry::default(),
             task_journal: node_agent_task_journal::TaskJournal::default(),
+            lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
             wake: Notify::new(),
@@ -3927,7 +3948,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route_layer(local_admin_guard);
         let app = axum::Router::new()
             .route("/", axum::routing::get(admin_index))
-            .route("/api/status", axum::routing::get(admin_status))
+            .route(
+                "/api/status",
+                axum::routing::get(node_agent_admin_status::admin_status),
+            )
             .route(
                 "/storage/git/:token/*path",
                 axum::routing::any(admin_storage_git_http),
@@ -4084,95 +4108,6 @@ async fn admin_tts_status() -> axum::Json<serde_json::Value> {
             "port": port,
         })),
     }
-}
-
-async fn admin_status(
-    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
-    headers: axum::http::HeaderMap,
-) -> axum::Json<serde_json::Value> {
-    rt.refresh_models_background();
-    rt.ensure_cli_probe_background(false).await;
-    let creds = rt.creds().await;
-    let (connected, last_event, live) = {
-        let st = rt.status.read().await;
-        (
-            st.connected,
-            st.last_event.clone(),
-            st.models_cached.clone(),
-        )
-    };
-    let hardware = rt.hardware_profile().await;
-    let storage_settings = rt.storage_settings.read().await.clone();
-    let storage = pc_storage_repo::storage_profile(&storage_settings);
-    let full_access_grant_count = rt.full_access_grants.list().await.len();
-    let active_cli_prompts = rt.active_cli_prompts.views_without_approvals().await;
-    let active_cli_prompt_count = active_cli_prompts.len();
-    let recent_task_records = rt.task_journal.latest_records(20).unwrap_or_else(|error| {
-        warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
-        Vec::new()
-    });
-    let sidecar_sessions = rt.cli_sidecars.latest_sessions(20).unwrap_or_else(|error| {
-        warn!("PC CLI sidecar registry 读取失败，CLI 会话桥接 sidecar 状态降级为空摘要: {error}");
-        Vec::new()
-    });
-    let cli_probe = rt.cached_cli_probe().await;
-    let cli_refreshing = rt.cli_probe_refreshing.load(Ordering::Acquire);
-    let available_clis = cli_probe.available_names();
-    let codex_cli = cli_probe.codex_status();
-    let mut payload = serde_json::json!({
-        "version": env!("CARGO_PKG_VERSION"),
-        "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
-        "task_journal_supported": true,
-        "task_journal_schema_version": 1,
-        "active_cli_prompt_count": active_cli_prompt_count,
-        "logged_in": creds.is_some(),
-        "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
-        "device_name": machine_label(),
-        "owner_user_id": creds.as_ref().map(|c| c.owner_user_id.clone()),
-        "user_token_configured": creds.as_ref().map(|c| c.user_token.is_some()).unwrap_or(false),
-        "cloud_url": rt.cfg.cloud_url,
-        "cloud_http_url": rt.cfg.cloud_http_url,
-        "ollama_url": rt.cfg.ollama_url,
-        "lm_studio_url": rt.cfg.lm_studio_url,
-        "custom_url": rt.cfg.custom_url,
-        "price_per_1k": rt.cfg.price_per_1k,
-        "connected": connected,
-        "last_event": last_event,
-        "hardware": hardware,
-        "storage": storage,
-        "full_access_grant_count": full_access_grant_count,
-        "runtime_policy": node_agent_full_access::runtime_policy_summary(),
-        "cli_session_bridge": node_agent_cli_session_bridge::status_payload_for(
-            &active_cli_prompts,
-            &recent_task_records,
-            &sidecar_sessions,
-        ),
-        "cli_probe": {
-            "refreshing": cli_refreshing,
-            "refreshed_at_ms": cli_probe.refreshed_at_ms,
-            "stale": cli_probe.is_stale(),
-        },
-        "download_router": node_agent_download_router::status_payload(),
-        "cloud_network": node_agent_cloud_net::status_payload(&rt.cfg.cloud_url, &rt.cfg.cloud_http_url),
-        "codex_vault": node_agent_codex_vault::local_status_payload(),
-        "codex_cli": codex_cli,
-        "allowed_clis": available_clis,
-        "cli_tools": cli_probe.tools.clone(),
-        "local_ai": {
-            "cli_tools": cli_probe.tools.clone(),
-            "models": live.clone(),
-        },
-        "models": live,
-    });
-    if node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {
-        if let Some(obj) = payload.as_object_mut() {
-            obj.insert(
-                "local_admin_token".to_string(),
-                serde_json::json!(rt.local_admin_token()),
-            );
-        }
-    }
-    axum::Json(payload)
 }
 
 async fn admin_codex_cli_refresh(

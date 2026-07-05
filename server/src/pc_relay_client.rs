@@ -145,6 +145,7 @@ async fn run_relay_session(
         hardware: Some(crate::node_hardware_probe::collect_hardware_profile()),
         storage: None,
         dev_runtime: None,
+        lifecycle: None,
     };
     out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
     info!("[relay-client] Register 发送完毕，等待请求...");

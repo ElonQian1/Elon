@@ -284,6 +284,7 @@ mod tests {
             hardware: None,
             storage: None,
             dev_runtime,
+            lifecycle: None,
             display_name: "PC-A".to_string(),
             short_id: "node-a".to_string(),
             models: Vec::new(),

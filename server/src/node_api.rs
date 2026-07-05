@@ -15,9 +15,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use homecli_proto::{
-    ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile,
-};
+use homecli_proto::{NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile};
 use std::{collections::HashMap, sync::Arc};
 
 pub use crate::node_register_api::register_node;
@@ -32,6 +30,9 @@ use crate::{
     types::AppState,
 };
 use serde::{Deserialize, Serialize};
+
+mod responses;
+use responses::{MyNodeResponse, PublicNodeResponse};
 
 fn storage_can_cross_pc(storage: &NodeStorageProfile) -> bool {
     storage
@@ -128,6 +129,10 @@ pub async fn list_nodes(
             hardware_summary,
             storage: node.storage.clone(),
             dev_runtime,
+            lifecycle: node
+                .lifecycle
+                .clone()
+                .or_else(|| cli_agent.as_ref().and_then(|agent| agent.lifecycle.clone())),
             storage_ready: node
                 .storage
                 .as_ref()
@@ -214,6 +219,7 @@ pub async fn list_nodes(
             hardware_summary,
             storage: agent.storage.clone(),
             dev_runtime,
+            lifecycle: agent.lifecycle.clone(),
             storage_ready: agent
                 .storage
                 .as_ref()
@@ -548,6 +554,7 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 hardware_summary,
                 storage,
                 dev_runtime: node.dev_runtime,
+                lifecycle: node.lifecycle,
                 storage_ready,
                 storage_repo_url_configured,
                 display_name: node.display_name,
@@ -579,80 +586,6 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
         .collect::<Vec<_>>();
 
     Json(serde_json::json!({ "nodes": nodes })).into_response()
-}
-
-#[derive(Serialize)]
-struct PublicNodeResponse {
-    agent_id: String,
-    node_id: String,
-    owner_user_id: String,
-    device_name: Option<String>,
-    hardware: Option<NodeHardwareProfile>,
-    hardware_summary: String,
-    storage: Option<NodeStorageProfile>,
-    dev_runtime: Option<NodeDevRuntimeProfile>,
-    storage_ready: bool,
-    storage_repo_url_configured: bool,
-    display_name: String,
-    short_id: String,
-    models: Vec<ModelCapability>,
-    allowed_clis: Vec<String>,
-    cli_project_ready: bool,
-    workspace_provision_ready: bool,
-    ai_cli_ready: bool,
-    route_a_ready: bool,
-    api_runtime_ready: bool,
-    server_runtime_ready: bool,
-    project_count: i64,
-    project_limit: i64,
-    project_slots_remaining: i64,
-    disk_free_bytes: Option<u64>,
-    can_accept_project: bool,
-    capacity_label: String,
-    capacity_tone: String,
-    capacity_warnings: Vec<String>,
-    tts_worker_url: Option<String>,
-    connected_at: u64,
-    online: bool,
-}
-
-#[derive(Serialize)]
-struct MyNodeResponse {
-    agent_id: String,
-    node_id: String,
-    owner_user_id: String,
-    label: String,
-    device_name: Option<String>,
-    hardware: Option<NodeHardwareProfile>,
-    hardware_summary: String,
-    storage: Option<NodeStorageProfile>,
-    dev_runtime: Option<NodeDevRuntimeProfile>,
-    storage_ready: bool,
-    storage_repo_url_configured: bool,
-    display_name: String,
-    short_id: String,
-    models: Vec<ModelCapability>,
-    allowed_clis: Vec<String>,
-    allowed_cwds: Vec<String>,
-    cli_project_ready: bool,
-    workspace_provision_ready: bool,
-    ai_cli_ready: bool,
-    route_a_ready: bool,
-    api_runtime_ready: bool,
-    server_runtime_ready: bool,
-    project_count: i64,
-    project_limit: i64,
-    project_slots_remaining: i64,
-    disk_free_bytes: Option<u64>,
-    can_accept_project: bool,
-    capacity_label: String,
-    capacity_tone: String,
-    capacity_warnings: Vec<String>,
-    connected_at: u64,
-    created_at: String,
-    online: bool,
-    registry_online: bool,
-    cli_connected: bool,
 }
 
 fn runtime_route_flags(
@@ -713,6 +646,7 @@ fn capacity_for_response(
         hardware: None,
         storage: None,
         dev_runtime,
+        lifecycle: None,
         display_name: display_name.to_string(),
         short_id: short_node_id(node_id),
         models: Vec::new(),

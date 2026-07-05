@@ -115,6 +115,7 @@ mod tests {
             hardware: None,
             storage: None,
             dev_runtime,
+            lifecycle: None,
             allowed_clis,
             allowed_cwds: Vec::new(),
             connected_at: 1,

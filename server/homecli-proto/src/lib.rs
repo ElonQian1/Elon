@@ -96,6 +96,52 @@ pub struct NodeDevRuntimeProfile {
     pub issues: Vec<String>,
 }
 
+/// PC 节点生命周期摘要。节点每次注册/能力刷新时都会带上它，
+/// 让云端和 PC 网页在重连后知道上一轮会话是否异常结束。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NodeLifecycleReport {
+    #[serde(default)]
+    pub schema: String,
+    #[serde(default)]
+    pub session_id: Option<String>,
+    #[serde(default)]
+    pub state: String,
+    #[serde(default)]
+    pub severity: String,
+    #[serde(default)]
+    pub started_at_ms: Option<u64>,
+    #[serde(default)]
+    pub heartbeat_at_ms: Option<u64>,
+    #[serde(default)]
+    pub heartbeat_age_ms: Option<u64>,
+    #[serde(default)]
+    pub connected: bool,
+    #[serde(default)]
+    pub logged_in: bool,
+    #[serde(default)]
+    pub last_event: Option<String>,
+    #[serde(default)]
+    pub previous_session_id: Option<String>,
+    #[serde(default)]
+    pub previous_exit_kind: Option<String>,
+    #[serde(default)]
+    pub previous_exit_reason: Option<String>,
+    #[serde(default)]
+    pub previous_heartbeat_at_ms: Option<u64>,
+    #[serde(default)]
+    pub previous_heartbeat_age_ms: Option<u64>,
+    #[serde(default)]
+    pub active_task_count: u32,
+    #[serde(default)]
+    pub sidecar_session_count: u32,
+    #[serde(default)]
+    pub restart_recovery: bool,
+    #[serde(default)]
+    pub recommended_action: String,
+    #[serde(default)]
+    pub summary: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NodeDevRuntimeToolContract {
     #[serde(default)]
@@ -362,6 +408,9 @@ pub enum AgentToServer {
         /// PC 开发运行时能力；旧节点不发送时服务端会按 allowed_clis 做兼容推断。
         #[serde(default)]
         dev_runtime: Option<NodeDevRuntimeProfile>,
+        /// PC 节点生命周期摘要；旧节点不发送也兼容。
+        #[serde(default)]
+        lifecycle: Option<NodeLifecycleReport>,
     },
     TaskStarted {
         task_id: String,
@@ -468,6 +517,9 @@ pub enum AgentToServer {
         /// 能力刷新时顺带更新 PC 开发运行时状态。
         #[serde(default)]
         dev_runtime: Option<NodeDevRuntimeProfile>,
+        /// 能力刷新时顺带更新 PC 生命周期摘要。
+        #[serde(default)]
+        lifecycle: Option<NodeLifecycleReport>,
     },
     /// LLM 推理流式输出片段
     LlmStreamChunk {

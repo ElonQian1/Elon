@@ -292,6 +292,7 @@ mod tests {
             }),
             storage: None,
             dev_runtime: None,
+            lifecycle: None,
             models: vec![model(price)],
             tts_worker_url: None,
             connected_at: 1,

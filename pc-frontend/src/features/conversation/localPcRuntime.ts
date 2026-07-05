@@ -1,4 +1,5 @@
 import { nodeApi } from '../node/localNodeApi'
+import type { NodeLifecycleReport } from '../node/types'
 
 const DIRECT_PC_CLI_STORAGE_KEY = 'elon_pc_project_direct_pc_cli'
 
@@ -10,6 +11,7 @@ export interface LocalNodeStatus {
   connected?: boolean
   logged_in?: boolean
   last_event?: string
+  lifecycle?: NodeLifecycleReport | null
   codex_cli?: { available?: boolean; logged_in?: boolean; status?: string }
 }
 

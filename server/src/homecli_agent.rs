@@ -46,6 +46,7 @@ const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSP
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
 
 mod heartbeat;
+mod summary; pub use summary::AgentSummary;
 #[cfg(test)]
 #[path = "homecli_agent_tests.rs"]
 mod homecli_agent_tests;
@@ -60,6 +61,7 @@ pub struct AgentEntry {
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
     pub dev_runtime: Option<NodeDevRuntimeProfile>,
+    pub lifecycle: Option<homecli_proto::NodeLifecycleReport>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
@@ -300,6 +302,7 @@ impl AgentManager {
                 hardware: a.hardware.clone(),
                 storage: a.storage.clone(),
                 dev_runtime: a.dev_runtime.clone(),
+                lifecycle: a.lifecycle.clone(),
                 allowed_clis: a.allowed_clis.clone(),
                 allowed_cwds: a.allowed_cwds.clone(),
                 connected_at: a.connected_at,
@@ -716,19 +719,6 @@ impl AgentManager {
     }
 }
 
-#[derive(Debug, Serialize)]
-pub struct AgentSummary {
-    pub agent_id: String,
-    pub version: String,
-    pub device_name: Option<String>,
-    pub hardware: Option<NodeHardwareProfile>,
-    pub storage: Option<NodeStorageProfile>,
-    pub dev_runtime: Option<NodeDevRuntimeProfile>,
-    pub allowed_clis: Vec<String>,
-    pub allowed_cwds: Vec<String>,
-    pub connected_at: u64,
-}
-
 fn clean_optional(value: Option<String>) -> Option<String> {
     value
         .map(|v| v.trim().to_string())
@@ -820,6 +810,7 @@ async fn run_agent_session(
         hardware,
         storage,
         dev_runtime,
+        lifecycle,
     ) = match register {
         AgentToServer::Register {
             agent_id,
@@ -833,6 +824,7 @@ async fn run_agent_session(
             hardware,
             storage,
             dev_runtime,
+            lifecycle,
         } => (
             agent_id,
             version,
@@ -845,6 +837,7 @@ async fn run_agent_session(
             hardware,
             storage,
             dev_runtime,
+            lifecycle,
         ),
         _ => return Err(anyhow!("first frame must be register")),
     };
@@ -914,6 +907,7 @@ async fn run_agent_session(
         hardware: hardware.clone(),
         storage: storage.clone(),
         dev_runtime: dev_runtime.clone(),
+        lifecycle: lifecycle.clone(),
         allowed_clis,
         allowed_cwds,
         connected_at: SystemTime::now()
@@ -963,6 +957,7 @@ async fn run_agent_session(
             hardware,
             storage,
             dev_runtime,
+            lifecycle,
             vec![],
             connected_at,
         )
@@ -1089,6 +1084,7 @@ async fn run_agent_session(
                                     hardware,
                                     storage,
                                     dev_runtime,
+                                    lifecycle,
                                 } => {
                                     if let Some(hardware) = hardware.as_ref() {
                                         if !session_owner_user_id.is_empty() {
@@ -1123,6 +1119,9 @@ async fn run_agent_session(
                                             if dev_runtime.is_some() {
                                                 entry.dev_runtime = dev_runtime.clone();
                                             }
+                                            if lifecycle.is_some() {
+                                                entry.lifecycle = lifecycle.clone();
+                                            }
                                         }
                                     }
                                     state
@@ -1134,6 +1133,7 @@ async fn run_agent_session(
                                             hardware.clone(),
                                             storage.clone(),
                                             dev_runtime.clone(),
+                                            lifecycle.clone(),
                                         )
                                         .await;
                                 }

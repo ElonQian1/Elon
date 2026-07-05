@@ -41,6 +41,7 @@ export interface NodeSummary {
     api_runtime_contract?: Record<string, unknown>
     server_runtime_status?: Record<string, unknown>
   }
+  lifecycle?: NodeLifecycleReport | null
   models?: { model_id?: string; display_name?: string; provider?: string; price_per_1k_credits?: string }[]
   capacity_warnings?: string[]
   registry_online?: boolean
@@ -73,6 +74,9 @@ export interface LocalNodeStatus {
   cloud_url?: string
   local_admin_token?: string
   local_admin_token_header?: string
+  lifecycle_report_schema_version?: number
+  lifecycle?: NodeLifecycleReport | null
+  last_event?: string
   models?: NodeSummary['models']
   allowed_clis?: string[]
   cli_probe?: { refreshing?: boolean; refreshed_at_ms?: number; stale?: boolean }
@@ -83,6 +87,29 @@ export interface LocalNodeStatus {
     cli_tools?: LocalCliToolStatus[]
     models?: NodeSummary['models']
   }
+}
+
+export interface NodeLifecycleReport {
+  schema?: string
+  session_id?: string | null
+  state?: string
+  severity?: 'ok' | 'warning' | 'danger' | string
+  started_at_ms?: number | null
+  heartbeat_at_ms?: number | null
+  heartbeat_age_ms?: number | null
+  connected?: boolean
+  logged_in?: boolean
+  last_event?: string | null
+  previous_session_id?: string | null
+  previous_exit_kind?: string | null
+  previous_exit_reason?: string | null
+  previous_heartbeat_at_ms?: number | null
+  previous_heartbeat_age_ms?: number | null
+  active_task_count?: number
+  sidecar_session_count?: number
+  restart_recovery?: boolean
+  recommended_action?: string
+  summary?: string
 }
 
 export interface CodexVaultAuthInspection {

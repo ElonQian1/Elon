@@ -248,6 +248,95 @@
 .kvGrid span { color: var(--text-muted); }
 .kvGrid strong { color: var(--text-primary); text-align: right; word-break: break-all; }
 
+.lifecycleCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, .025);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lifecycleHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lifecycleHeader h4 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.lifecycleHeader p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.lifecycleBadge {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  white-space: nowrap;
+}
+
+.lifecycleFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lifecycleFacts > div {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  font-size: 12px;
+}
+
+.lifecycleFacts span { color: var(--text-muted); }
+.lifecycleFacts strong { color: var(--text-primary); word-break: break-word; text-align: right; }
+
+.lifecycleAction {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.lifecycle_ok {
+  border-color: rgba(76, 175, 120, .30);
+  background: rgba(76, 175, 120, .07);
+}
+
+.lifecycle_ok .lifecycleBadge { color: #4caf78; border-color: rgba(76, 175, 120, .36); }
+
+.lifecycle_warning {
+  border-color: rgba(216, 181, 91, .32);
+  background: rgba(216, 181, 91, .08);
+}
+
+.lifecycle_warning .lifecycleBadge { color: #d8b55b; border-color: rgba(216, 181, 91, .40); }
+
+.lifecycle_danger {
+  border-color: rgba(224, 112, 112, .34);
+  background: rgba(224, 112, 112, .08);
+}
+
+.lifecycle_danger .lifecycleBadge { color: #e07070; border-color: rgba(224, 112, 112, .42); }
+
 .resultOk { font-size: 12px; color: #4caf78; }
 .resultErr { font-size: 12px; color: var(--danger); }
 

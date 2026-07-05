@@ -1,6 +1,7 @@
 use anyhow::Result;
 use homecli_proto::{
-    ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile,
+    ModelCapability, NodeDevRuntimeProfile, NodeHardwareProfile, NodeLifecycleReport,
+    NodeStorageProfile,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -18,6 +19,7 @@ pub struct NodeRuntime {
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
     pub dev_runtime: Option<NodeDevRuntimeProfile>,
+    pub lifecycle: Option<NodeLifecycleReport>,
     pub display_name: String,
     pub short_id: String,
     pub models: Vec<ModelCapability>,
@@ -253,6 +255,9 @@ fn build_runtime_for_parts(
     let dev_runtime = registry
         .and_then(|node| node.dev_runtime.clone())
         .or_else(|| cli.and_then(|agent| agent.dev_runtime.clone()));
+    let lifecycle = registry
+        .and_then(|node| node.lifecycle.clone())
+        .or_else(|| cli.and_then(|agent| agent.lifecycle.clone()));
     let registry_online = registry.map(|node| node.online).unwrap_or(false);
     let cli_connected = cli.is_some();
     let connected_at = registry
@@ -268,6 +273,7 @@ fn build_runtime_for_parts(
         hardware,
         storage,
         dev_runtime,
+        lifecycle,
         display_name,
         short_id,
         models,
@@ -378,6 +384,7 @@ mod tests {
             hardware: None,
             storage: None,
             dev_runtime: None,
+            lifecycle: None,
             display_name: device_name.unwrap_or(node_id).to_string(),
             short_id: node_id.to_string(),
             models: Vec::new(),
@@ -461,6 +468,7 @@ mod tests {
             hardware: None,
             storage: None,
             dev_runtime: None,
+            lifecycle: None,
             display_name: "PC-A".to_string(),
             short_id: "node-a".to_string(),
             models: Vec::new(),

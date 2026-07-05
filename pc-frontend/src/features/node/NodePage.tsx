@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from './launchWinClient'
+import NodeLifecycleStatusCard from './NodeLifecycleStatusCard'
 import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
@@ -459,6 +460,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           <div key={k}><span>{k}</span><strong>{v}</strong></div>
         ))}
       </div>
+      <NodeLifecycleStatusCard localStatus={status} />
       <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
       <CodexStatusCard
         status={codex}
@@ -772,6 +774,8 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
           {warnings.map((w, i) => <div key={i}>{w}</div>)}
         </div>
       )}
+
+      <NodeLifecycleStatusCard node={node} />
 
       <div className={styles.kvGrid}>
         {rows.map(([k, v]) => <div key={k}><span>{k}</span><strong>{v}</strong></div>)}

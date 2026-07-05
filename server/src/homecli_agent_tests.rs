@@ -31,6 +31,7 @@ async fn registered_approval_agent() -> TestApprovalAgent {
             hardware: None,
             storage: None,
             dev_runtime: None,
+            lifecycle: None,
             allowed_clis: Vec::new(),
             allowed_cwds: Vec::new(),
             connected_at: 0,
