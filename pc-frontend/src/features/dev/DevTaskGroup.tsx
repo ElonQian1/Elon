@@ -12,7 +12,7 @@ import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
 import { clean, formatTime } from '../../lib/utils'
-import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
+import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal, taskResultTone } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
@@ -263,10 +263,11 @@ function statusForTaskGroup(
   if (!isDone) return statusForTask(task)
   const content = resultMsg ? messageText(resultMsg) : ''
   const status = clean(resultMsg?.task_status ?? resultMsg?.taskStatus ?? task?.status ?? '').toLowerCase()
-  if (['canceled', 'cancelled', 'interrupted'].includes(status) || /停止|取消|canceled|cancelled/i.test(content)) {
+  const tone = taskResultTone(status, content)
+  if (tone === 'canceled') {
     return { tone: 'canceled', label: status === 'interrupted' ? '已中断' : '任务已停止' }
   }
-  if (['failed', 'error'].includes(status) || /失败|错误|error|failed/i.test(content)) {
+  if (tone === 'failed') {
     return { tone: 'failed', label: '任务失败' }
   }
   return { tone: 'done', label: '任务完成' }

@@ -13,7 +13,7 @@ import { clean } from '../../lib/utils'
 import {
   taskIsTerminal, statusForTask, parseToolEvent, approvalFinalState,
   approvalStateFor, runtimeStatusLabel, shortId, toolEventSummary, toolEventTitle,
-  usageEventSummary, messageText,
+  usageEventSummary, messageText, taskResultTone,
 } from './devTaskUtils'
 import type { ChatMessage, TaskContext, ToolEvent, TaskTone } from './types'
 
@@ -249,9 +249,7 @@ function ApprovalBanner({ tool, event, taskId, closedState, canCancel, onCancel,
 /* ══ ResultBlock — 最终结果（突出展示） ══ */
 function ResultBlock({ message }: { message: ChatMessage }) {
   const content = messageText(message)
-  const canceled = /停止|取消|canceled|cancelled/i.test(content)
-  const failed = !canceled && /失败|错误|error|failed/i.test(content)
-  const tone: TaskTone = canceled ? 'canceled' : (failed ? 'failed' : 'done')
+  const tone: TaskTone = taskResultTone(message.task_status ?? message.taskStatus, content)
   return (
     <div className={[styles.resultBlock, styles[`r_${tone}`]].join(' ')}>
       <span className={styles.resultIcon}>{tone === 'done' ? '✓' : tone === 'canceled' ? '◉' : '✗'}</span>

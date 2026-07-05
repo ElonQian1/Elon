@@ -3,6 +3,10 @@ import { clean } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import type { TaskState, TaskTone, ToolEvent, ApprovalState, ChatMessage, TaskContext } from './types'
 
+const DONE_TASK_STATUSES = new Set(['done', 'completed', 'success', 'succeeded', 'finished'])
+const FAILED_TASK_STATUSES = new Set(['failed', 'error'])
+const CANCELED_TASK_STATUSES = new Set(['canceled', 'cancelled', 'interrupted', 'stopped'])
+
 export function messageKind(msg: ChatMessage): string {
   return clean(msg.kind ?? msg.role ?? msg.message_kind).toLowerCase()
 }
@@ -80,11 +84,32 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
       const content = messageText(msg)
       task.result = msg
       task.resultText = content
-      task.canceled = /停止|取消|canceled|cancelled/i.test(content)
-      task.failed = !task.canceled && /失败|错误|error|failed/i.test(content)
+      const tone = taskResultTone(status, content)
+      task.canceled = tone === 'canceled'
+      task.failed = tone === 'failed'
     }
   }
   return { tasks, approvals }
+}
+
+export function taskResultTone(statusValue: unknown, content: string): TaskTone {
+  const status = clean(statusValue ?? '').toLowerCase()
+  if (DONE_TASK_STATUSES.has(status)) return 'done'
+  if (CANCELED_TASK_STATUSES.has(status) || taskResultContentLooksCanceled(content)) return 'canceled'
+  if (FAILED_TASK_STATUSES.has(status) || taskResultContentLooksFailed(content)) return 'failed'
+  return 'done'
+}
+
+function taskResultContentLooksCanceled(content: string): boolean {
+  return /任务已?(?:停止|取消|中断)|已(?:停止|取消|中断)|canceled|cancelled|interrupted/i.test(clean(content))
+}
+
+function taskResultContentLooksFailed(content: string): boolean {
+  const text = clean(content)
+  if (!text) return false
+  return /^(?:任务|执行|运行|发布|部署|构建|编译|测试|检查|上传|合并|推送|提交)?\s*(?:失败|错误)[:：。！!\s]/.test(text)
+    || /(?:任务|执行|运行|发布|部署|构建|编译|测试|检查|上传|合并|推送|提交).{0,16}(?:失败|错误)/.test(text)
+    || /\b(error|failed|failure)\b/i.test(text)
 }
 
 function isAssistantProgressDisplay(msg: ChatMessage): boolean {
@@ -123,15 +148,15 @@ export function approvalFinalState(event: ToolEvent): ApprovalState {
 export function taskIsTerminal(task: TaskState | null): boolean {
   if (!task) return false
   if (task.result) return true
-  return ['done', 'failed', 'canceled', 'cancelled', 'interrupted'].includes(task.status)
+  return DONE_TASK_STATUSES.has(task.status) || FAILED_TASK_STATUSES.has(task.status) || CANCELED_TASK_STATUSES.has(task.status)
 }
 
 export function taskIsCanceled(task: TaskState): boolean {
-  return !!task.canceled || ['canceled', 'cancelled', 'interrupted'].includes(task.status)
+  return !!task.canceled || CANCELED_TASK_STATUSES.has(task.status)
 }
 
 export function taskIsFailed(task: TaskState): boolean {
-  return !!task.failed || ['failed', 'interrupted'].includes(task.status)
+  return !!task.failed || FAILED_TASK_STATUSES.has(task.status) || task.status === 'interrupted'
 }
 
 export function statusForTask(task: TaskState | null): { tone: TaskTone; label: string } {

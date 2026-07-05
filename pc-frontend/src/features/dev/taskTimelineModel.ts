@@ -148,13 +148,8 @@ export function buildTaskTimeline(
     if (assistantNote) {
       const normalizedAssistantText = normalizedProgressText(assistantNote)
       if (!normalizedAssistantText || isFinalAnswerEcho(normalizedAssistantText, finalText)) return
-      flushHeartbeat()
       coverage.assistantEvent = true
-      const item = assistantItemFromText(assistantNote, message, index)
-      const uniqueKey = `assistant:${item.id}:${normalizedAssistantText}`
-      if (seenText.has(uniqueKey)) return
-      seenText.add(uniqueKey)
-      items.push(item)
+      lastHeartbeat = undefined
       return
     }
 
@@ -165,6 +160,7 @@ export function buildTaskTimeline(
     if (isFinalAnswerEcho(echoText, finalText)) return
     if (isAssistantEvent(parsedEvent)) {
       coverage.assistantEvent = true
+      lastHeartbeat = undefined
       return
     }
     if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
@@ -183,7 +179,9 @@ export function buildTaskTimeline(
     const item = event
       ? itemFromEvent(event, message, index)
       : itemFromText(text, message, index)
-    if (event) markCoverage(coverage, event)
+    if (event) {
+      markCoverage(coverage, event)
+    }
 
     const uniqueKey = event
       ? eventUniqueKey(event, text)
