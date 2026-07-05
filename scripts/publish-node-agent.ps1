@@ -159,7 +159,8 @@ function Invoke-RemoteBash {
 function Invoke-RemoteBashRaw {
     param([Parameter(Mandatory = $true)][string]$Script)
 
-    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Script))
+    $normalizedScript = ConvertTo-RemoteBashScript -Script $Script
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($normalizedScript))
     $remoteCommand = "printf '%s' '$encoded' | base64 -d | bash"
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -173,6 +174,12 @@ function Invoke-RemoteBashRaw {
         ExitCode = $exitCode
         Output = ($output -join "`n").Trim()
     }
+}
+
+function ConvertTo-RemoteBashScript {
+    param([Parameter(Mandatory = $true)][string]$Script)
+
+    return (($Script -replace "`r`n", "`n") -replace "`r", "`n")
 }
 
 function Test-RemoteNodeAgentAdminToken {
