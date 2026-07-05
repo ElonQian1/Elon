@@ -23,9 +23,12 @@ export interface PlazaProject {
 
 interface StoreProjectsResponse {
   projects?: PlazaProject[]
-  total?: number
+  total?: number | null
   limit?: number
-  offset?: number
+  offset?: number | null
+  page_mode?: string
+  next_cursor?: string | null
+  has_more?: boolean
 }
 
 interface Filter {
@@ -56,12 +59,14 @@ export default function ProjectPlazaView() {
   const [activeFilter, setActiveFilter] = useState('all')
   const [joiningId, setJoiningId] = useState<string | null>(null)
   const [joinStatus, setJoinStatus] = useState<Record<string, 'joined' | 'requested' | 'error'>>({})
-  const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
+  const [total, setTotal] = useState<number | null>(null)
+  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(false)
 
   const load = useCallback(async (options?: { append?: boolean }) => {
     const append = options?.append ?? false
-    const nextOffset = append ? offset : 0
+    const cursor = append ? nextCursor : null
+    if (append && !cursor) return
     const filter = FILTERS.find((item) => item.key === activeFilter) ?? FILTERS[0]
     setError('')
     if (append) setLoadingMore(true)
@@ -84,14 +89,16 @@ export default function ProjectPlazaView() {
           : source
         setProjects(filtered)
         setTotal(filtered.length)
-        setOffset(filtered.length)
+        setNextCursor(null)
+        setHasMore(false)
         return
       }
 
       const params = new URLSearchParams({
         limit: String(PAGE_SIZE),
-        offset: String(nextOffset),
+        page_mode: 'cursor',
       })
+      if (cursor) params.set('cursor', cursor)
       if (submittedQ.trim()) params.set('q', submittedQ.trim())
       if (filter.params) {
         for (const [key, value] of Object.entries(filter.params)) {
@@ -101,15 +108,16 @@ export default function ProjectPlazaView() {
       const data = await api.get<StoreProjectsResponse>(`/api/store/projects?${params.toString()}`)
       const nextProjects = data.projects ?? []
       setProjects((prev) => append ? mergeProjects(prev, nextProjects) : nextProjects)
-      setTotal(data.total ?? nextProjects.length)
-      setOffset(nextOffset + nextProjects.length)
+      setTotal(typeof data.total === 'number' ? data.total : null)
+      setNextCursor(data.next_cursor ?? null)
+      setHasMore(Boolean(data.has_more && data.next_cursor))
     } catch (err) {
       setError((err as { message?: string }).message ?? '项目广场加载失败')
     } finally {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [activeFilter, offset, submittedQ])
+  }, [activeFilter, nextCursor, submittedQ])
 
   useEffect(() => {
     load().catch(() => {})
@@ -117,13 +125,17 @@ export default function ProjectPlazaView() {
 
   function handleSearch(event: React.FormEvent) {
     event.preventDefault()
-    setOffset(0)
+    setNextCursor(null)
+    setHasMore(false)
+    setTotal(null)
     setSubmittedQ(searchQ)
   }
 
   function switchFilter(key: string) {
     setActiveFilter(key)
-    setOffset(0)
+    setNextCursor(null)
+    setHasMore(false)
+    setTotal(null)
   }
 
   async function openProject(project: PlazaProject) {
@@ -151,7 +163,7 @@ export default function ProjectPlazaView() {
     }
   }
 
-  const hasMore = projects.length < total && activeFilter !== 'joined'
+  const canLoadMore = activeFilter !== 'joined' && hasMore
 
   return (
     <section className={styles.page} aria-label="项目广场">
@@ -203,7 +215,7 @@ export default function ProjectPlazaView() {
       ) : (
         <div className={styles.scrollArea}>
           <div className={styles.resultMeta}>
-            <span>已显示 {projects.length} / {total || projects.length}</span>
+            <span>{total === null ? `已显示 ${projects.length}` : `已显示 ${projects.length} / ${total || projects.length}`}</span>
           </div>
           <div className={styles.grid}>
             {projects.map((project) => (
@@ -217,7 +229,7 @@ export default function ProjectPlazaView() {
               />
             ))}
           </div>
-          {hasMore && (
+          {canLoadMore && (
             <div className={styles.loadMoreRow}>
               <button
                 className={styles.loadMoreBtn}

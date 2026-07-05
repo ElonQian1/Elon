@@ -707,7 +707,9 @@ impl Store {
     }
 }
 
-
+pub(crate) mod listing_cursor;
+#[cfg(test)]
+mod listing_cursor_tests;
 pub(crate) mod member_ops;
 #[cfg(test)]
 mod tests;

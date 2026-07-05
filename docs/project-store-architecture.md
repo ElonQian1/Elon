@@ -1,6 +1,6 @@
 # 项目商店与项目广场架构路线
 
-最后更新：2026-07-05
+最后更新：2026-07-06
 
 本文说明一龙平台“像应用商店一样展示、发现、安装和加入项目”的当前实现、短期补齐点和长期架构目标。
 
@@ -17,7 +17,7 @@
 
 当前后端已经有项目商店 API：
 
-- `GET /api/store/projects`：公开项目列表，支持搜索、加入方式、可安装 APK、排序、`limit/offset` 分页。
+- `GET /api/store/projects`：公开项目列表，支持搜索、加入方式、可安装 APK、排序；旧客户端可继续用 `limit/offset`，新客户端使用 `page_mode=cursor&cursor=...` 的 cursor/keyset 分页。
 - `GET /api/store/projects/:id`：公开项目详情预览。
 - `GET /api/store/joined`：当前用户已加入或拥有的项目。
 - `POST /api/projects/:id/join`：直接加入开放或只读项目。
@@ -29,7 +29,7 @@
 - `/pc/plaza`：兼容旧直达入口，复用同一套项目广场组件。
 - `/pc/`：仍是具体项目会话工作台。
 
-当前数据库仍以 SQLite 主库查询为主，项目广场列表直接从 `projects`、`project_members`、`tasks` 查询公开项目、成员数、最新 APK 等信息。
+当前数据库仍以 SQLite 主库查询为主，项目广场列表直接从 `projects`、`project_members`、`tasks` 查询公开项目、成员数、最新 APK 等信息。2026-07-06 起，PC 项目广场默认使用 cursor/keyset 加载更多；服务端仍保留 offset 兼容旧 APK/移动网页和调试脚本。
 
 ## 短期目标
 
@@ -40,6 +40,7 @@
 3. 项目广场支持搜索、筛选、已加入、最热门、加载更多。
 4. 用户加入公开项目后刷新“我的项目”，并可直接进入项目。
 5. SQLite 阶段补充公开项目列表索引，降低早期公开项目增长后的查询压力。
+6. 新 PC 前端不再使用深分页 offset，默认走 cursor/keyset，避免公开项目增长后“越翻越慢”。
 
 ## 当前规模边界
 
@@ -48,7 +49,7 @@
 主要限制：
 
 - `LIKE %关键词%` 搜索会随着项目数量上升变慢。
-- `OFFSET` 深分页在大数据量下会越来越慢。
+- 旧客户端 `OFFSET` 深分页在大数据量下会越来越慢；PC 新前端已经改为 cursor/keyset，但旧兼容入口仍存在。
 - 列表查询中包含成员数、最新任务、最新 APK 等相关子查询。
 - 成员数、安装量、评分、排行等商店指标还没有独立聚合表。
 - APK、图标、截图、商店详情媒体还没有完整 CDN 化。
@@ -68,7 +69,7 @@
 
 中期接口建议：
 
-- `GET /api/store/projects?cursor=...`：改用 cursor/keyset 分页。
+- `GET /api/store/projects?page_mode=cursor&cursor=...`：已具备基础 cursor/keyset 分页，下一步要把 APK/移动网页消费者也迁移到该模式。
 - `GET /api/store/categories`：分类入口。
 - `GET /api/store/rankings?kind=popular|new|installable`：榜单。
 - `GET /api/store/projects/:id/listing`：商店详情页读模型。
@@ -80,6 +81,18 @@
 - Redis 缓存热门榜单和首页卡片。
 - 对象存储 + CDN 承载 APK、图标、截图、视频。
 - 后台异步任务维护商店读模型和统计聚合。
+
+## 已落地的长期基础
+
+2026-07-06 已完成第一层可扩展基础，不再只停留在 MVP offset 列表：
+
+1. API 兼容升级：`GET /api/store/projects` 支持 `page_mode=cursor`，响应 `next_cursor`、`has_more` 和 `page_mode=cursor`。
+2. Keyset 排序：支持最近更新、最新创建、成员数排序的稳定游标，排序字段都带 `id` 作为 tie-breaker，避免翻页重复或漏项。
+3. 数据库索引：新增公开项目 `updated_at/id`、`created_at/id` 复合索引，服务 PC 项目广场的主路径。
+4. PC 前端：`ProjectPlazaView` 默认用 cursor 加载更多，不再维护 offset。
+5. 兼容边界：旧 offset 入口保留，用于旧 APK、移动网页版和人工调试；后续迁移完成后再考虑降级为只读兼容。
+
+这一步仍不是千万级完整商店。它解决的是“深分页基础姿势”，不是搜索服务、推荐服务、CDN、审核、榜单和风控。
 
 ## 长期架构
 

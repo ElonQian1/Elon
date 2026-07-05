@@ -34,6 +34,10 @@ pub struct StoreQuery {
     pub limit: Option<i64>,
     /// 偏移量，默认 0
     pub offset: Option<i64>,
+    /// 游标分页模式：cursor。用于项目广场大列表，避免深分页 OFFSET。
+    pub page_mode: Option<String>,
+    /// 下一页游标。与 page_mode=cursor 一起使用。
+    pub cursor: Option<String>,
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -45,9 +49,42 @@ pub async fn list_store_projects(
     Query(q): Query<StoreQuery>,
 ) -> Response {
     let limit = q.limit.unwrap_or(20).clamp(1, 50);
-    let offset = q.offset.unwrap_or(0).max(0);
     let viewer_user_id = auth_from_headers(&state, &headers).ok().map(|user| user.id);
+    let cursor_mode = q.page_mode.as_deref() == Some("cursor")
+        || q.cursor
+            .as_deref()
+            .is_some_and(|cursor| !cursor.trim().is_empty());
 
+    if cursor_mode {
+        let page = match state.store.list_public_projects_cursor_page_for_viewer(
+            q.q.as_deref(),
+            q.join_mode.as_deref(),
+            q.has_apk,
+            q.sort.as_deref(),
+            limit,
+            q.cursor.as_deref(),
+            viewer_user_id.as_deref(),
+        ) {
+            Ok(page) => page,
+            Err(e) if e.to_string().contains("分页游标") => {
+                return json_error(StatusCode::BAD_REQUEST, e.to_string())
+            }
+            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
+
+        return Json(serde_json::json!({
+            "projects": page.projects,
+            "total": null,
+            "limit": limit,
+            "offset": null,
+            "page_mode": "cursor",
+            "next_cursor": page.next_cursor,
+            "has_more": page.has_more,
+        }))
+        .into_response();
+    }
+
+    let offset = q.offset.unwrap_or(0).max(0);
     let projects = match state.store.list_public_projects_for_viewer(
         q.q.as_deref(),
         q.join_mode.as_deref(),
