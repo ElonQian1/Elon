@@ -154,7 +154,7 @@ function Invoke-RemoteBash {
 
 function Test-RemoteNodeAgentAdminToken {
     $script = @'
-set -euo pipefail
+set -eu
 load_env() {
   if [ -f "$1" ]; then
     set -a
@@ -174,7 +174,7 @@ test -n "${ADMIN_TOKEN:-}"
 
 function Invoke-RemoteNodeAgentUpdateBroadcast {
     $script = @'
-set -euo pipefail
+set -eu
 load_env() {
   if [ -f "$1" ]; then
     set -a
