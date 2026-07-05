@@ -41,12 +41,6 @@ export default function ServerRail() {
   }
 
   function handleRailClick(path: string) {
-    // 点击「项目中心」时清空当前会话项目，避免项目快捷入口继续高亮。
-    if (path === '/projects' && activeProjectId) {
-      useProjectStore.getState().selectProject('')
-      navigate('/projects')
-      return
-    }
     navigate(path)
   }
 
@@ -87,7 +81,7 @@ export default function ServerRail() {
 
       <div className={styles.projectStack} aria-label="项目快捷入口">
         {projects.map((p) => {
-          const isActiveProject = p.id === activeProjectId
+          const isActiveProject = pathname === '/' && p.id === activeProjectId
           const iconSrc = p.icon_data_url || p.icon || ''
           return (
             <button

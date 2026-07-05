@@ -55,74 +55,109 @@ export default function ProjectsPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
-        <div className={styles.titleBlock}>
-          <h1>项目中心</h1>
-          <p>管理你的应用项目，也可以在项目广场发现公开应用。</p>
+      <aside className={styles.sidebar} aria-label="项目中心导航">
+        <div className={styles.sidebarHeader}>
+          <div>
+            <strong>项目中心</strong>
+            <span>{activeTab === 'plaza' ? '发现公开应用' : '管理项目工作台'}</span>
+          </div>
+          <button className={styles.sideCreateBtn} onClick={() => setShowCreate(true)} type="button" title="新建项目">
+            <Plus size={16} aria-hidden="true" />
+          </button>
         </div>
-        <button className={styles.createBtn} onClick={() => setShowCreate(true)} type="button">
-          <Plus size={16} aria-hidden="true" />
-          <span>新建项目</span>
-        </button>
-      </header>
 
-      <div className={styles.tabs} role="tablist" aria-label="项目中心">
-        <button
-          className={styles.tab}
-          data-active={activeTab === 'mine' ? 'true' : 'false'}
-          role="tab"
-          aria-selected={activeTab === 'mine'}
-          onClick={() => switchTab('mine')}
-          type="button"
-        >
-          <FolderKanban size={16} aria-hidden="true" />
-          <span>我的项目</span>
-          <strong>{projects.length}</strong>
-        </button>
-        <button
-          className={styles.tab}
-          data-active={activeTab === 'plaza' ? 'true' : 'false'}
-          role="tab"
-          aria-selected={activeTab === 'plaza'}
-          onClick={() => switchTab('plaza')}
-          type="button"
-        >
-          <Store size={16} aria-hidden="true" />
-          <span>项目广场</span>
-        </button>
-      </div>
+        <div className={styles.sideNav} role="tablist" aria-label="项目中心">
+          <button
+            className={styles.sideNavBtn}
+            data-active={activeTab === 'mine' ? 'true' : 'false'}
+            role="tab"
+            aria-selected={activeTab === 'mine'}
+            onClick={() => switchTab('mine')}
+            type="button"
+          >
+            <FolderKanban size={16} aria-hidden="true" />
+            <span>我的项目</span>
+            <strong>{projects.length}</strong>
+          </button>
+          <button
+            className={styles.sideNavBtn}
+            data-active={activeTab === 'plaza' ? 'true' : 'false'}
+            role="tab"
+            aria-selected={activeTab === 'plaza'}
+            onClick={() => switchTab('plaza')}
+            type="button"
+          >
+            <Store size={16} aria-hidden="true" />
+            <span>项目广场</span>
+          </button>
+        </div>
 
-      <main className={styles.content}>
-        {activeTab === 'mine' ? (
-          <section className={styles.minePanel} aria-label="我的项目">
-            <div className={styles.mineToolbar}>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="搜索我的项目"
-              />
-              <button type="button" onClick={() => switchTab('plaza')}>去项目广场</button>
-            </div>
+        <div className={styles.sideSectionTitle}>最近项目</div>
+        <div className={styles.sideProjectList}>
+          {!projectsLoaded && <div className={styles.sideEmpty}>读取中...</div>}
+          {projectsLoaded && projects.length === 0 && <div className={styles.sideEmpty}>暂无项目</div>}
+          {projects.slice(0, 14).map((project) => (
+            <button
+              key={project.id}
+              className={styles.sideProject}
+              onClick={() => openProject(project.id)}
+              type="button"
+              title={project.name}
+            >
+              <ProjectIcon project={project} compact />
+              <span>
+                <strong>{project.name}</strong>
+                <small>{roleLabel(project.my_role || project.role)}</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      </aside>
 
-            {!projectsLoaded ? (
-              <div className={styles.emptyState}>读取项目列表…</div>
-            ) : filteredProjects.length === 0 ? (
-              <div className={styles.emptyState}>
-                <FolderKanban size={24} aria-hidden="true" />
-                <strong>{query ? '没有匹配的项目' : '还没有项目'}</strong>
-                <span>{query ? '换个关键词，或清空搜索。' : '可以新建项目，或去项目广场加入公开项目。'}</span>
+      <main className={styles.main}>
+        <header className={styles.header}>
+          <div className={styles.titleBlock}>
+            <h1>{activeTab === 'plaza' ? '项目广场' : '我的项目'}</h1>
+            <p>{activeTab === 'plaza' ? '发现公开应用，加入后会出现在你的项目工作台。' : '管理你的应用项目，进入项目后继续查看频道和会话。'}</p>
+          </div>
+          <button className={styles.createBtn} onClick={() => setShowCreate(true)} type="button">
+            <Plus size={16} aria-hidden="true" />
+            <span>新建项目</span>
+          </button>
+        </header>
+
+        <div className={styles.content}>
+          {activeTab === 'mine' ? (
+            <section className={styles.minePanel} aria-label="我的项目">
+              <div className={styles.mineToolbar}>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索我的项目"
+                />
+                <button type="button" onClick={() => switchTab('plaza')}>去项目广场</button>
               </div>
-            ) : (
-              <div className={styles.projectList}>
-                {filteredProjects.map((project) => (
-                  <ProjectRow key={project.id} project={project} onOpen={openProject} />
-                ))}
-              </div>
-            )}
-          </section>
-        ) : (
-          <ProjectPlazaView />
-        )}
+
+              {!projectsLoaded ? (
+                <div className={styles.emptyState}>读取项目列表...</div>
+              ) : filteredProjects.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <FolderKanban size={24} aria-hidden="true" />
+                  <strong>{query ? '没有匹配的项目' : '还没有项目'}</strong>
+                  <span>{query ? '换个关键词，或清空搜索。' : '可以新建项目，或去项目广场加入公开项目。'}</span>
+                </div>
+              ) : (
+                <div className={styles.projectList}>
+                  {filteredProjects.map((project) => (
+                    <ProjectRow key={project.id} project={project} onOpen={openProject} />
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : (
+            <ProjectPlazaView />
+          )}
+        </div>
       </main>
 
       {showCreate && (
@@ -137,14 +172,9 @@ export default function ProjectsPage() {
 }
 
 function ProjectRow({ project, onOpen }: { project: Project; onOpen: (projectId: string) => void }) {
-  const iconSrc = project.icon_data_url || project.icon || ''
   return (
     <button className={styles.projectRow} type="button" onClick={() => onOpen(project.id)}>
-      {iconSrc ? (
-        <img className={styles.projectIcon} src={iconSrc} alt="" />
-      ) : (
-        <span className={styles.projectIconFallback}>{project.name[0]?.toUpperCase() || '项'}</span>
-      )}
+      <ProjectIcon project={project} />
       <span className={styles.projectMain}>
         <strong>{project.name}</strong>
         <span>{project.description || '暂无简介'}</span>
@@ -155,6 +185,17 @@ function ProjectRow({ project, onOpen }: { project: Project; onOpen: (projectId:
       </span>
       <ChevronRight className={styles.projectChevron} size={17} aria-hidden="true" />
     </button>
+  )
+}
+
+function ProjectIcon({ project, compact = false }: { project: Project; compact?: boolean }) {
+  const iconSrc = project.icon_data_url || project.icon || ''
+  const className = compact ? styles.sideProjectIcon : styles.projectIcon
+  const fallbackClassName = compact ? styles.sideProjectIconFallback : styles.projectIconFallback
+  return iconSrc ? (
+    <img className={className} src={iconSrc} alt="" />
+  ) : (
+    <span className={fallbackClassName}>{project.name[0]?.toUpperCase() || '项'}</span>
   )
 }
 
