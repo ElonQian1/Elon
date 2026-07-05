@@ -328,6 +328,7 @@
   font-size: 12px;
 }
 .error {
+  align-self: start;
   margin: 10px 22px 0;
   padding: 9px 11px;
   border: 1px solid rgba(223, 92, 92, .28);

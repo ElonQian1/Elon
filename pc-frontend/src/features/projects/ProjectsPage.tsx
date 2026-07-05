@@ -39,7 +39,7 @@ export default function ProjectsPage() {
   }, [projects, query])
 
   function switchTab(tab: ProjectCenterTab) {
-    setSearchParams(tab === 'mine' ? {} : { tab })
+    setSearchParams(tab === 'plaza' ? {} : { tab })
   }
 
   async function openProject(projectId: string) {
@@ -59,7 +59,7 @@ export default function ProjectsPage() {
         <div className={styles.sidebarHeader}>
           <div>
             <strong>项目中心</strong>
-            <span>{activeTab === 'plaza' ? '发现公开应用' : '管理项目工作台'}</span>
+            <span>我的项目工作台</span>
           </div>
           <button className={styles.sideCreateBtn} onClick={() => setShowCreate(true)} type="button" title="新建项目">
             <Plus size={16} aria-hidden="true" />
@@ -92,11 +92,11 @@ export default function ProjectsPage() {
           </button>
         </div>
 
-        <div className={styles.sideSectionTitle}>最近项目</div>
+        <div className={styles.sideSectionTitle}>我的项目</div>
         <div className={styles.sideProjectList}>
           {!projectsLoaded && <div className={styles.sideEmpty}>读取中...</div>}
           {projectsLoaded && projects.length === 0 && <div className={styles.sideEmpty}>暂无项目</div>}
-          {projects.slice(0, 14).map((project) => (
+          {projects.map((project) => (
             <button
               key={project.id}
               className={styles.sideProject}
@@ -114,17 +114,19 @@ export default function ProjectsPage() {
         </div>
       </aside>
 
-      <main className={styles.main}>
-        <header className={styles.header}>
-          <div className={styles.titleBlock}>
-            <h1>{activeTab === 'plaza' ? '项目广场' : '我的项目'}</h1>
-            <p>{activeTab === 'plaza' ? '发现公开应用，加入后会出现在你的项目工作台。' : '管理你的应用项目，进入项目后继续查看频道和会话。'}</p>
-          </div>
-          <button className={styles.createBtn} onClick={() => setShowCreate(true)} type="button">
-            <Plus size={16} aria-hidden="true" />
-            <span>新建项目</span>
-          </button>
-        </header>
+      <main className={[styles.main, activeTab === 'plaza' ? styles.mainPlaza : ''].join(' ')}>
+        {activeTab === 'mine' && (
+          <header className={styles.header}>
+            <div className={styles.titleBlock}>
+              <h1>我的项目</h1>
+              <p>管理你的应用项目，进入项目后继续查看频道和会话。</p>
+            </div>
+            <button className={styles.createBtn} onClick={() => setShowCreate(true)} type="button">
+              <Plus size={16} aria-hidden="true" />
+              <span>新建项目</span>
+            </button>
+          </header>
+        )}
 
         <div className={styles.content}>
           {activeTab === 'mine' ? (
@@ -159,6 +161,45 @@ export default function ProjectsPage() {
           )}
         </div>
       </main>
+
+      <aside className={styles.rightPanel} aria-label="项目中心侧栏">
+        <section className={styles.rightSection}>
+          <span className={styles.rightEyebrow}>当前</span>
+          <strong>{activeTab === 'plaza' ? '正在浏览项目广场' : '正在管理我的项目'}</strong>
+          <p>{activeTab === 'plaza' ? '中间区域默认展示公开项目，左侧保留你的项目入口。' : '从左侧或列表进入项目后，会回到项目频道和会话工作台。'}</p>
+        </section>
+
+        <section className={styles.rightStats} aria-label="项目统计">
+          <div>
+            <strong>{projects.length}</strong>
+            <span>我的项目</span>
+          </div>
+          <div>
+            <strong>{filteredProjects.length}</strong>
+            <span>当前匹配</span>
+          </div>
+        </section>
+
+        <section className={styles.rightActions} aria-label="快捷操作">
+          <button type="button" onClick={() => switchTab('plaza')}>
+            <Store size={15} aria-hidden="true" />
+            <span>浏览项目广场</span>
+          </button>
+          <button type="button" onClick={() => switchTab('mine')}>
+            <FolderKanban size={15} aria-hidden="true" />
+            <span>查看我的项目</span>
+          </button>
+          <button type="button" onClick={() => setShowCreate(true)}>
+            <Plus size={15} aria-hidden="true" />
+            <span>新建项目</span>
+          </button>
+        </section>
+
+        <section className={styles.rightSection}>
+          <span className={styles.rightEyebrow}>结构</span>
+          <p>左侧是项目入口，中间是发现或管理内容，进入具体项目后再显示频道、会话和成员侧栏。</p>
+        </section>
+      </aside>
 
       {showCreate && (
         <CreateProjectModal
@@ -200,7 +241,7 @@ function ProjectIcon({ project, compact = false }: { project: Project; compact?:
 }
 
 function normalizeTab(value: string | null): ProjectCenterTab {
-  return value === 'plaza' ? 'plaza' : 'mine'
+  return value === 'mine' ? 'mine' : 'plaza'
 }
 
 function roleLabel(role?: string): string {
