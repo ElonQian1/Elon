@@ -108,6 +108,7 @@ mod node_exec_api;
 mod node_hardware_probe;
 mod node_install_id_migration;
 mod node_payout_admin;
+mod node_public_dev_migration;
 mod node_register_api;
 mod node_registry;
 mod node_router;

@@ -76,6 +76,16 @@ pub struct NodeCredential {
     pub label: String,
     pub device_name: Option<String>,
     pub install_id: Option<String>,
+    pub public_dev_enabled: bool,
+    pub public_dev_allowed_clis: Vec<String>,
+    pub public_dev_permission_level: String,
+    pub last_handshake_at: Option<String>,
+    pub last_handshake_agent_version: Option<String>,
+    pub last_handshake_allowed_clis: Vec<String>,
+    pub last_handshake_route_a_ready: bool,
+    pub last_handshake_api_runtime_ready: bool,
+    pub last_handshake_server_runtime_ready: bool,
+    pub last_handshake_ai_cli_ready: bool,
     pub created_at: String,
 }
 
@@ -318,19 +328,9 @@ impl Store {
     pub fn get_node_credential(&self, agent_id: &str) -> Result<Option<NodeCredential>> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(
-            "SELECT agent_id, owner_user_id, label, device_name, install_id, created_at
-             FROM node_credentials WHERE agent_id = ?1",
+            node_credential_select_sql("WHERE agent_id = ?1").as_str(),
             params![agent_id],
-            |row| {
-                Ok(NodeCredential {
-                    agent_id: row.get(0)?,
-                    owner_user_id: row.get(1)?,
-                    label: row.get(2)?,
-                    device_name: row.get(3)?,
-                    install_id: row.get(4)?,
-                    created_at: row.get(5)?,
-                })
-            },
+            read_node_credential,
         )
         .optional()
         .map_err(Into::into)
@@ -453,20 +453,10 @@ impl Store {
     pub fn list_node_credentials(&self, owner_user_id: &str) -> Result<Vec<NodeCredential>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
-            "SELECT agent_id, owner_user_id, label, device_name, install_id, created_at
-             FROM node_credentials WHERE owner_user_id = ?1
-             ORDER BY created_at DESC",
+            node_credential_select_sql("WHERE owner_user_id = ?1 ORDER BY created_at DESC")
+                .as_str(),
         )?;
-        let rows = stmt.query_map(params![owner_user_id], |row| {
-            Ok(NodeCredential {
-                agent_id: row.get(0)?,
-                owner_user_id: row.get(1)?,
-                label: row.get(2)?,
-                device_name: row.get(3)?,
-                install_id: row.get(4)?,
-                created_at: row.get(5)?,
-            })
-        })?;
+        let rows = stmt.query_map(params![owner_user_id], read_node_credential)?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
     }
@@ -506,6 +496,68 @@ fn read_node_transaction(row: &rusqlite::Row<'_>) -> rusqlite::Result<NodeTransa
         settlement_status: row.get(18)?,
         created_at: row.get(19)?,
     })
+}
+
+pub(super) fn node_credential_select_sql(where_clause: &str) -> String {
+    format!(
+        "SELECT agent_id, owner_user_id, label, device_name, install_id,
+                public_dev_enabled, public_dev_allowed_clis_json, public_dev_permission_level,
+                last_handshake_at, last_handshake_agent_version, last_handshake_allowed_clis_json,
+                last_handshake_route_a_ready, last_handshake_api_runtime_ready,
+                last_handshake_server_runtime_ready, last_handshake_ai_cli_ready,
+                created_at
+           FROM node_credentials {where_clause}"
+    )
+}
+
+pub(super) fn read_node_credential(row: &rusqlite::Row<'_>) -> rusqlite::Result<NodeCredential> {
+    let allowed_json: String = row.get(6)?;
+    let handshake_allowed_json: String = row.get(10)?;
+    Ok(NodeCredential {
+        agent_id: row.get(0)?,
+        owner_user_id: row.get(1)?,
+        label: row.get(2)?,
+        device_name: row.get(3)?,
+        install_id: row.get(4)?,
+        public_dev_enabled: row.get::<_, i64>(5)? != 0,
+        public_dev_allowed_clis: parse_cli_json(&allowed_json),
+        public_dev_permission_level: normalize_permission_level(&row.get::<_, String>(7)?),
+        last_handshake_at: row.get(8)?,
+        last_handshake_agent_version: row.get(9)?,
+        last_handshake_allowed_clis: parse_cli_json(&handshake_allowed_json),
+        last_handshake_route_a_ready: row.get::<_, i64>(11)? != 0,
+        last_handshake_api_runtime_ready: row.get::<_, i64>(12)? != 0,
+        last_handshake_server_runtime_ready: row.get::<_, i64>(13)? != 0,
+        last_handshake_ai_cli_ready: row.get::<_, i64>(14)? != 0,
+        created_at: row.get(15)?,
+    })
+}
+
+fn parse_cli_json(value: &str) -> Vec<String> {
+    serde_json::from_str::<Vec<String>>(value)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|item| {
+            let item = item.trim().to_ascii_lowercase();
+            (!item.is_empty()).then_some(item)
+        })
+        .fold(Vec::<String>::new(), |mut acc, item| {
+            if !acc.iter().any(|existing| existing == &item) {
+                acc.push(item);
+            }
+            acc
+        })
+}
+
+pub(super) fn normalize_permission_level(value: &str) -> String {
+    match value.trim() {
+        "" => "project_write".to_string(),
+        "read_only" => "read_only".to_string(),
+        "project_write" => "project_write".to_string(),
+        "full_access" => "full_access".to_string(),
+        "danger_full_access" => "danger_full_access".to_string(),
+        other => other.to_string(),
+    }
 }
 
 fn normalize_optional(value: Option<&str>) -> Option<&str> {

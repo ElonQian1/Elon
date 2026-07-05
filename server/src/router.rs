@@ -268,17 +268,16 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(agent_balloon::ensure_balloon_project),
         )
         .route("/api/llm/chat", post(lm_chat::lm_chat_handler))
-        .route(
-            "/api/me/ai/conversations",
-            get(lm_chat::list_ai_chat_conversations),
-        )
+        .route("/api/me/ai/conversations", get(lm_chat::list_ai_chat_conversations))
         .route(
             "/api/me/ai/conversations/:conversation_id/messages",
             get(lm_chat::list_ai_chat_conversation_messages),
         )
         .route("/api/me/nodes", get(node_api::my_nodes))
         .route("/api/me/nodes/register", post(node_api::register_node))
+        .route("/api/me/nodes/:node_id/sharing", axum::routing::patch(node_api::update_my_node_sharing))
         .route("/api/me/node/exec", post(crate::node_exec_api::node_exec_handler))
+        .route("/api/admin/nodes/public-dev-handshake", get(node_api::admin_public_dev_handshake))
         .route("/api/admin/nodes/push-update", post(node_api::push_node_update))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))

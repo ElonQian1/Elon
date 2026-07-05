@@ -19,6 +19,15 @@ export interface NodeSummary {
   cli_project_ready?: boolean
   ai_cli_ready?: boolean
   allowed_clis?: string[]
+  agent_version?: string | null
+  public_dev_enabled?: boolean
+  public_dev_allowed_clis?: string[]
+  public_dev_permission_level?: string
+  public_dev_handshake_ready?: boolean
+  public_dev_handshake_status?: string
+  last_handshake_at?: string | null
+  last_handshake_agent_version?: string | null
+  last_handshake_allowed_clis?: string[]
   hardware?: {
     os?: string
     arch?: string

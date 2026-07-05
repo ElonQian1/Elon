@@ -16,6 +16,16 @@ pub struct NodeRuntime {
     pub label: String,
     pub device_name: Option<String>,
     pub install_id: Option<String>,
+    pub public_dev_enabled: bool,
+    pub public_dev_allowed_clis: Vec<String>,
+    pub public_dev_permission_level: String,
+    pub last_handshake_at: Option<String>,
+    pub last_handshake_agent_version: Option<String>,
+    pub last_handshake_allowed_clis: Vec<String>,
+    pub last_handshake_route_a_ready: bool,
+    pub last_handshake_api_runtime_ready: bool,
+    pub last_handshake_server_runtime_ready: bool,
+    pub last_handshake_ai_cli_ready: bool,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
     pub dev_runtime: Option<NodeDevRuntimeProfile>,
@@ -25,6 +35,7 @@ pub struct NodeRuntime {
     pub models: Vec<ModelCapability>,
     pub allowed_clis: Vec<String>,
     pub allowed_cwds: Vec<String>,
+    pub agent_version: Option<String>,
     pub connected_at: u64,
     pub created_at: String,
     pub online: bool,
@@ -157,6 +168,7 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
         credential
             .as_ref()
             .and_then(|credential| credential.install_id.as_deref()),
+        credential.as_ref(),
         credential
             .as_ref()
             .map(|credential| credential.created_at.clone())
@@ -219,6 +231,7 @@ fn build_runtime(
         label,
         credential.and_then(|credential| credential.device_name.as_deref()),
         credential.and_then(|credential| credential.install_id.as_deref()),
+        credential,
         created_at,
         registry,
         cli,
@@ -232,6 +245,7 @@ fn build_runtime_for_parts(
     label: String,
     credential_device_name: Option<&str>,
     credential_install_id: Option<&str>,
+    credential: Option<&NodeCredential>,
     created_at: String,
     registry: Option<&NodeSummary>,
     cli: Option<&AgentSummary>,
@@ -270,6 +284,33 @@ fn build_runtime_for_parts(
         label,
         device_name,
         install_id,
+        public_dev_enabled: credential
+            .map(|credential| credential.public_dev_enabled)
+            .unwrap_or(false),
+        public_dev_allowed_clis: credential
+            .map(|credential| credential.public_dev_allowed_clis.clone())
+            .unwrap_or_default(),
+        public_dev_permission_level: credential
+            .map(|credential| credential.public_dev_permission_level.clone())
+            .unwrap_or_else(|| "project_write".to_string()),
+        last_handshake_at: credential.and_then(|credential| credential.last_handshake_at.clone()),
+        last_handshake_agent_version: credential
+            .and_then(|credential| credential.last_handshake_agent_version.clone()),
+        last_handshake_allowed_clis: credential
+            .map(|credential| credential.last_handshake_allowed_clis.clone())
+            .unwrap_or_default(),
+        last_handshake_route_a_ready: credential
+            .map(|credential| credential.last_handshake_route_a_ready)
+            .unwrap_or(false),
+        last_handshake_api_runtime_ready: credential
+            .map(|credential| credential.last_handshake_api_runtime_ready)
+            .unwrap_or(false),
+        last_handshake_server_runtime_ready: credential
+            .map(|credential| credential.last_handshake_server_runtime_ready)
+            .unwrap_or(false),
+        last_handshake_ai_cli_ready: credential
+            .map(|credential| credential.last_handshake_ai_cli_ready)
+            .unwrap_or(false),
         hardware,
         storage,
         dev_runtime,
@@ -283,6 +324,7 @@ fn build_runtime_for_parts(
         allowed_cwds: cli
             .map(|agent| agent.allowed_cwds.clone())
             .unwrap_or_default(),
+        agent_version: cli.map(|agent| agent.version.clone()),
         connected_at,
         created_at,
         online: registry_online || cli_connected,
@@ -381,6 +423,16 @@ mod tests {
             label: String::new(),
             device_name: device_name.map(ToOwned::to_owned),
             install_id: install_id.map(ToOwned::to_owned),
+            public_dev_enabled: false,
+            public_dev_allowed_clis: Vec::new(),
+            public_dev_permission_level: "project_write".to_string(),
+            last_handshake_at: None,
+            last_handshake_agent_version: None,
+            last_handshake_allowed_clis: Vec::new(),
+            last_handshake_route_a_ready: false,
+            last_handshake_api_runtime_ready: false,
+            last_handshake_server_runtime_ready: false,
+            last_handshake_ai_cli_ready: false,
             hardware: None,
             storage: None,
             dev_runtime: None,
@@ -390,6 +442,7 @@ mod tests {
             models: Vec::new(),
             allowed_clis: Vec::new(),
             allowed_cwds: Vec::new(),
+            agent_version: None,
             connected_at,
             created_at: format!("2026-07-05T00:00:{connected_at:02}Z"),
             online,
@@ -465,6 +518,16 @@ mod tests {
             label: "PC-A".to_string(),
             device_name: Some("PC-A".to_string()),
             install_id: None,
+            public_dev_enabled: false,
+            public_dev_allowed_clis: Vec::new(),
+            public_dev_permission_level: "project_write".to_string(),
+            last_handshake_at: None,
+            last_handshake_agent_version: None,
+            last_handshake_allowed_clis: Vec::new(),
+            last_handshake_route_a_ready: false,
+            last_handshake_api_runtime_ready: false,
+            last_handshake_server_runtime_ready: false,
+            last_handshake_ai_cli_ready: false,
             hardware: None,
             storage: None,
             dev_runtime: None,
@@ -474,6 +537,7 @@ mod tests {
             models: Vec::new(),
             allowed_clis,
             allowed_cwds: Vec::new(),
+            agent_version: None,
             connected_at: 1,
             created_at: String::new(),
             online: true,

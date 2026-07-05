@@ -33,6 +33,20 @@ use crate::{
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
 };
 
+mod pc_node_select;
+mod public_dev;
+use pc_node_select::{
+    connected_pc_agent_for_route, connected_pc_agent_with_existing_workspace,
+    connected_pc_agent_with_recorded_workspace_binding, connected_pc_project_agent_for_route,
+};
+#[cfg(test)]
+use public_dev::{cli_lists_intersect, public_dev_runtime_ready_for_route};
+use public_dev::{
+    pc_agent_authorized_for_bound_node, pc_agent_authorized_for_route,
+    pc_agent_belongs_to_user_quiet, pc_agent_public_dev_enabled_for_consumer,
+    pc_agent_runtime_ready_for_route, route_allows_public_dev_node,
+};
+
 const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
 const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
 
@@ -127,8 +141,15 @@ pub async fn run_pc_cli_passthrough_for_project(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    let Some(pc_binding) =
-        resolve_pc_project_binding(state, user_id, project, conversation_id, Some(&tx)).await
+    let Some(pc_binding) = resolve_pc_project_binding(
+        state,
+        user_id,
+        project,
+        conversation_id,
+        Some(&tx),
+        pc_runtime_route,
+    )
+    .await
     else {
         if project.source_type == "pc_managed" {
             send_pc_workspace_unavailable_error(project, &tx);
@@ -358,7 +379,9 @@ async fn run_for_project_in_workspace_with_routing(
             .unwrap_or(false);
         if project_chat_should_use_pc_cli(pc_runtime_route, agent_name, agent_is_local_cli) {
             let route_label = pc_cli_chat_route_label(pc_runtime_route);
-            let Some(agent_id) = resolve_pc_chat_agent(state, user_id, project).await else {
+            let Some(agent_id) =
+                resolve_pc_chat_agent(state, user_id, project, pc_runtime_route).await
+            else {
                 let msg = format!(
                     "项目会话默认交给{route_label}处理，但当前项目还没有绑定可用 PC 节点。请先连接节点，或手动切换到平台 AI。"
                 );
@@ -442,8 +465,15 @@ async fn run_for_project_in_workspace_with_routing(
     }
 
     if requires_project_workflow {
-        if let Some(pc_binding) =
-            resolve_pc_project_binding(state, user_id, project, conversation_id, Some(&tx)).await
+        if let Some(pc_binding) = resolve_pc_project_binding(
+            state,
+            user_id,
+            project,
+            conversation_id,
+            Some(&tx),
+            pc_runtime_route,
+        )
+        .await
         {
             let agent_id = pc_binding.agent_id.as_str();
             let pc_workspace = pc_binding.workspace.as_str();
@@ -674,8 +704,15 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some(pc_binding) =
-        resolve_pc_project_binding(state, user_id, project, conversation_id, Some(&tx)).await
+    if let Some(pc_binding) = resolve_pc_project_binding(
+        state,
+        user_id,
+        project,
+        conversation_id,
+        Some(&tx),
+        pc_runtime_route,
+    )
+    .await
     {
         let agent_id = pc_binding.agent_id.as_str();
         let pc_workspace = pc_binding.workspace.as_str();
@@ -807,6 +844,7 @@ async fn resolve_pc_chat_agent(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<String> {
     if let Some(agent_id) = project
         .node_id
@@ -814,13 +852,13 @@ async fn resolve_pc_chat_agent(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
-        if pc_agent_belongs_to_user(state, user_id, agent_id)
+        if pc_agent_authorized_for_bound_node(state, user_id, agent_id)
             && pc_agent_is_connected(state, agent_id).await
         {
             return Some(agent_id.to_string());
         }
     }
-    connected_pc_agent_for_user(state, user_id).await
+    connected_pc_agent_for_route(state, user_id, pc_runtime_route).await
 }
 
 async fn resolve_pc_project_binding(
@@ -829,6 +867,7 @@ async fn resolve_pc_project_binding(
     project: &ProjectAccess,
     conversation_id: Option<&str>,
     tx: Option<&UnboundedSender<String>>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<PcProjectBinding> {
     resolve_pc_project_binding_with_options(
         state,
@@ -838,6 +877,7 @@ async fn resolve_pc_project_binding(
         tx,
         true,
         true,
+        pc_runtime_route,
     )
     .await
 }
@@ -856,6 +896,7 @@ pub(crate) async fn prewarm_route_a_runtime_for_project(
         None,
         false,
         false,
+        Some(PcRuntimeRoutePreference::RouteA),
     )
     .await?;
     route_a_session_lease::prewarm_result(
@@ -877,6 +918,7 @@ async fn resolve_pc_project_binding_with_options(
     tx: Option<&UnboundedSender<String>>,
     wait_for_bound_reconnect: bool,
     allow_provision: bool,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<PcProjectBinding> {
     let workspace = project
         .workspace_path
@@ -897,8 +939,9 @@ async fn resolve_pc_project_binding_with_options(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
-        let belongs_to_user = pc_agent_belongs_to_user(state, user_id, agent_id);
-        if belongs_to_user {
+        let authorized = pc_agent_authorized_for_bound_node(state, user_id, agent_id)
+            || pc_agent_authorized_for_route(state, user_id, agent_id, pc_runtime_route);
+        if authorized {
             let connected = if pc_agent_is_connected(state, agent_id).await {
                 true
             } else if wait_for_bound_reconnect {
@@ -938,6 +981,7 @@ async fn resolve_pc_project_binding_with_options(
         project,
         conversation_id,
         project.node_id.as_deref(),
+        pc_runtime_route,
     )
     .await
     {
@@ -951,6 +995,7 @@ async fn resolve_pc_project_binding_with_options(
             user_id,
             workspace,
             project.node_id.as_deref(),
+            pc_runtime_route,
         )
         .await
         {
@@ -988,7 +1033,8 @@ async fn resolve_pc_project_binding_with_options(
         return None;
     }
 
-    let fallback_agent_id = connected_pc_project_agent_for_user(state, user_id).await?;
+    let fallback_agent_id =
+        connected_pc_project_agent_for_route(state, user_id, pc_runtime_route).await?;
     warn!(
         project_id = %project.id,
         user_id = %user_id,
@@ -1029,47 +1075,6 @@ async fn resolve_pc_project_binding_with_options(
         agent_id: fallback_agent_id,
         workspace: workspace.to_string(),
     })
-}
-
-async fn connected_pc_agent_with_recorded_workspace_binding(
-    state: &Arc<AppState>,
-    user_id: &str,
-    project: &ProjectAccess,
-    conversation_id: Option<&str>,
-    skip_agent_id: Option<&str>,
-) -> Option<PcProjectBinding> {
-    let skip_agent_id = skip_agent_id
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    for agent in state.agent_manager.list().await {
-        if skip_agent_id == Some(agent.agent_id.as_str()) {
-            continue;
-        }
-        if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
-            continue;
-        }
-        if let Some(binding) = usable_project_binding_for_agent(
-            state,
-            user_id,
-            project,
-            conversation_id,
-            &agent.agent_id,
-            false,
-            None,
-        )
-        .await
-        {
-            warn!(
-                project_id = %project.id,
-                user_id = %user_id,
-                fallback_agent_id = %binding.agent_id,
-                workspace_path = %binding.workspace,
-                "PC project will run on another online node using that node's recorded workspace"
-            );
-            return Some(binding);
-        }
-    }
-    None
 }
 
 async fn wait_for_bound_pc_agent_reconnect(
@@ -1308,18 +1313,35 @@ async fn provision_pc_project_binding(
         .filter(|origin| Some(*origin) != local_storage_path)
         .or(project.repo_url.as_deref());
 
-    if let Err(error) = state.store.bind_project_to_pc_workspace(
-        user_id,
-        &project.id,
-        &provisioned.workspace_path,
-        agent_id,
-        provisioned.git_head.as_deref(),
-        persisted_remote_origin,
-        provisioned
-            .git_branch
-            .as_deref()
-            .or(project.branch.as_deref()),
-    ) {
+    let persist_result =
+        if pc_agent_belongs_to_user_quiet(state, user_id, agent_id) && project.role == "owner" {
+            state.store.bind_project_to_pc_workspace(
+                user_id,
+                &project.id,
+                &provisioned.workspace_path,
+                agent_id,
+                provisioned.git_head.as_deref(),
+                persisted_remote_origin,
+                provisioned
+                    .git_branch
+                    .as_deref()
+                    .or(project.branch.as_deref()),
+            )
+        } else {
+            state.store.bind_project_member_to_pc_workspace(
+                user_id,
+                &project.id,
+                &provisioned.workspace_path,
+                agent_id,
+                provisioned.git_head.as_deref(),
+                persisted_remote_origin,
+                provisioned
+                    .git_branch
+                    .as_deref()
+                    .or(project.branch.as_deref()),
+            )
+        };
+    if let Err(error) = persist_result {
         warn!(
             project_id = %project.id,
             user_id = %user_id,
@@ -1384,33 +1406,6 @@ fn send_pc_workspace_unavailable_error(project: &ProjectAccess, tx: &UnboundedSe
     let _ = tx.send(WsMessage::error(msg).to_json());
 }
 
-fn pc_agent_belongs_to_user(state: &Arc<AppState>, user_id: &str, agent_id: &str) -> bool {
-    match state.store.get_node_credential_owner(agent_id) {
-        Ok(Some(owner)) if owner == user_id => true,
-        Ok(Some(owner)) => {
-            warn!(
-                agent_id = %agent_id,
-                owner_user_id = %owner,
-                request_user_id = %user_id,
-                "refusing PC node owned by another user"
-            );
-            false
-        }
-        Ok(None) => {
-            warn!(agent_id = %agent_id, "refusing PC node without credential owner");
-            false
-        }
-        Err(error) => {
-            warn!(
-                agent_id = %agent_id,
-                error = %error,
-                "failed to query PC node owner; refusing node"
-            );
-            false
-        }
-    }
-}
-
 async fn pc_agent_is_connected(state: &Arc<AppState>, agent_id: &str) -> bool {
     state
         .agent_manager
@@ -1418,76 +1413,6 @@ async fn pc_agent_is_connected(state: &Arc<AppState>, agent_id: &str) -> bool {
         .await
         .into_iter()
         .any(|agent| agent.agent_id == agent_id)
-}
-
-async fn connected_pc_agent_for_user(state: &Arc<AppState>, user_id: &str) -> Option<String> {
-    for agent in state.agent_manager.list().await {
-        if pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
-            return Some(agent.agent_id);
-        }
-    }
-    None
-}
-
-async fn connected_pc_project_agent_for_user(
-    state: &Arc<AppState>,
-    user_id: &str,
-) -> Option<String> {
-    for agent in state.agent_manager.list().await {
-        if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
-            continue;
-        }
-        if project_workspace_provision::resolve_pc_project_node(
-            state,
-            user_id,
-            Some(&agent.agent_id),
-        )
-        .await
-        .is_ok()
-        {
-            return Some(agent.agent_id);
-        }
-    }
-    None
-}
-
-async fn connected_pc_agent_with_existing_workspace(
-    state: &Arc<AppState>,
-    user_id: &str,
-    workspace: &str,
-    skip_agent_id: Option<&str>,
-) -> Option<String> {
-    let skip_agent_id = skip_agent_id
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    for agent in state.agent_manager.list().await {
-        if skip_agent_id == Some(agent.agent_id.as_str()) {
-            continue;
-        }
-        if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
-            continue;
-        }
-        match inspect_pc_agent_workspace(state, &agent.agent_id, workspace).await {
-            Ok(status) if pc_workspace_inspect_usable(&status) => return Some(agent.agent_id),
-            Ok(status) => {
-                warn!(
-                    agent_id = %agent.agent_id,
-                    workspace_path = %workspace,
-                    problem = %pc_workspace_inspect_problem(&status),
-                    "online PC node does not have a usable matching workspace"
-                );
-            }
-            Err(error) => {
-                warn!(
-                    agent_id = %agent.agent_id,
-                    workspace_path = %workspace,
-                    error = %error,
-                    "failed to inspect matching workspace on online PC node"
-                );
-            }
-        }
-    }
-    None
 }
 
 async fn inspect_pc_agent_workspace(

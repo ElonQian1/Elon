@@ -3,7 +3,6 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
-
 mod admin_stats;
 mod billing;
 mod billing_alerts;
@@ -39,6 +38,7 @@ mod node_ledger;
 #[cfg(test)]
 mod node_payout_tests;
 mod node_payouts;
+mod node_public_dev;
 mod pc_project_binding;
 mod project_branding;
 mod project_dev_profiles;
@@ -132,7 +132,6 @@ pub use user_progression::UserProgressionLedger;
 pub struct Store {
     conn: Mutex<Connection>,
 }
-
 const MAX_TASK_EVENTS_PER_TASK: i64 = 1000;
 
 impl Store {

@@ -68,11 +68,21 @@ impl Store {
         }
         self.conn()?
             .query_row(
-                "SELECT COUNT(*)
-                 FROM projects
-                 WHERE node_id = ?1
-                   AND status != 'deleted'
-                   AND source_type NOT IN ('agent_balloon', 'chat_memory')",
+                "SELECT COUNT(DISTINCT project_id)
+                   FROM (
+                     SELECT id AS project_id
+                       FROM projects
+                      WHERE node_id = ?1
+                        AND status != 'deleted'
+                        AND source_type NOT IN ('agent_balloon', 'chat_memory')
+                     UNION
+                     SELECT b.project_id
+                       FROM project_pc_workspace_bindings b
+                       JOIN projects p ON p.id = b.project_id
+                      WHERE b.node_id = ?1
+                        AND p.status != 'deleted'
+                        AND p.source_type NOT IN ('agent_balloon', 'chat_memory')
+                   ) active_pc_projects",
                 params![node_id],
                 |row| row.get(0),
             )

@@ -1,10 +1,13 @@
 use super::{
-    pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
-    pc_workspace_inspect_usable, requires_project_workflow_for_message,
+    cli_lists_intersect, pc_workspace_inspect_error_allows_bound_dispatch,
+    pc_workspace_inspect_problem, pc_workspace_inspect_usable, public_dev_runtime_ready_for_route,
+    requires_project_workflow_for_message, route_allows_public_dev_node,
     BOUND_PC_NODE_RECONNECT_WAIT_SECS,
 };
-use homecli_proto::ProjectWorkspaceInspectStatus;
+use homecli_proto::{NodeDevRuntimeProfile, ProjectWorkspaceInspectStatus};
 use std::path::Path;
+
+use crate::{node_runtime::NodeRuntime, pc_agent_runtime_choice::PcRuntimeRoutePreference};
 
 #[test]
 fn casual_greeting_does_not_require_project_workflow() {
@@ -79,6 +82,61 @@ fn bound_pc_node_reconnect_window_covers_server_restart() {
     assert!(BOUND_PC_NODE_RECONNECT_WAIT_SECS >= 90);
 }
 
+#[test]
+fn public_dev_nodes_are_auto_and_route_c_shared() {
+    assert!(route_allows_public_dev_node(None));
+    assert!(!route_allows_public_dev_node(Some(
+        PcRuntimeRoutePreference::RouteA
+    )));
+    assert!(!route_allows_public_dev_node(Some(
+        PcRuntimeRoutePreference::RouteB
+    )));
+    assert!(route_allows_public_dev_node(Some(
+        PcRuntimeRoutePreference::RouteC2
+    )));
+    assert!(route_allows_public_dev_node(Some(
+        PcRuntimeRoutePreference::RouteC3
+    )));
+}
+
+#[test]
+fn shared_cli_allowlist_matches_case_insensitively() {
+    assert!(cli_lists_intersect(
+        &["codex".to_string()],
+        &["Codex".to_string(), "copilot".to_string()]
+    ));
+    assert!(!cli_lists_intersect(
+        &["codex".to_string()],
+        &["gemini".to_string()]
+    ));
+}
+
+#[test]
+fn public_dev_auto_route_uses_remote_cli_readiness() {
+    let mut runtime = test_public_dev_runtime(vec!["Codex".to_string()]);
+    runtime.dev_runtime = Some(NodeDevRuntimeProfile {
+        route_a_ready: true,
+        api_runtime_ready: false,
+        ..Default::default()
+    });
+
+    assert!(public_dev_runtime_ready_for_route(
+        None,
+        &["codex".to_string()],
+        &runtime
+    ));
+    assert!(!public_dev_runtime_ready_for_route(
+        Some(PcRuntimeRoutePreference::RouteC2),
+        &["codex".to_string()],
+        &runtime
+    ));
+    assert!(!public_dev_runtime_ready_for_route(
+        Some(PcRuntimeRoutePreference::RouteA),
+        &["codex".to_string()],
+        &runtime
+    ));
+}
+
 fn inspect_status() -> ProjectWorkspaceInspectStatus {
     ProjectWorkspaceInspectStatus {
         workspace_path: r"D:\rust\active-projects\elon cli".to_string(),
@@ -93,5 +151,41 @@ fn inspect_status() -> ProjectWorkspaceInspectStatus {
         disk_free_bytes: Some(10 * 1024 * 1024 * 1024),
         codex_available: true,
         copilot_available: false,
+    }
+}
+
+fn test_public_dev_runtime(allowed_clis: Vec<String>) -> NodeRuntime {
+    NodeRuntime {
+        node_id: "node-public".to_string(),
+        owner_user_id: "user-provider".to_string(),
+        label: "Public PC".to_string(),
+        device_name: Some("Public PC".to_string()),
+        install_id: None,
+        public_dev_enabled: true,
+        public_dev_allowed_clis: vec!["codex".to_string()],
+        public_dev_permission_level: "project_write".to_string(),
+        last_handshake_at: Some("2026-07-06T00:00:00Z".to_string()),
+        last_handshake_agent_version: Some("1.0.0".to_string()),
+        last_handshake_allowed_clis: allowed_clis.clone(),
+        last_handshake_route_a_ready: true,
+        last_handshake_api_runtime_ready: false,
+        last_handshake_server_runtime_ready: false,
+        last_handshake_ai_cli_ready: true,
+        hardware: None,
+        storage: None,
+        dev_runtime: None,
+        lifecycle: None,
+        display_name: "Public PC".to_string(),
+        short_id: "public".to_string(),
+        models: Vec::new(),
+        allowed_clis,
+        allowed_cwds: Vec::new(),
+        agent_version: Some("1.0.0".to_string()),
+        connected_at: 1,
+        created_at: "2026-07-06T00:00:00Z".to_string(),
+        online: true,
+        registry_online: true,
+        cli_connected: true,
+        project_count: 0,
     }
 }

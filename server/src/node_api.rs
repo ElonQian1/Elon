@@ -10,7 +10,7 @@
 //! - `GET  /api/me/node-transactions`  查询最近积分流水（最多 50 条）
 
 use axum::{
-    extract::{Path, State},
+    extract::State,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
@@ -20,19 +20,26 @@ use std::{collections::HashMap, sync::Arc};
 
 pub use crate::node_register_api::register_node;
 use crate::{
+    admin,
     node_runtime::{
-        clean_string, display_node_name, short_node_id, supports_project_cli, user_node_runtimes,
-        NodeRuntime,
+        clean_string, display_node_name, short_node_id, supports_project_cli, NodeRuntime,
     },
     pc_node_capacity::{assess_pc_node_capacity, PcNodeCapacity},
     project_auth::auth_from_headers,
-    store::CreateNodePayout,
     types::AppState,
 };
 use serde::{Deserialize, Serialize};
+mod my_nodes;
+mod payouts;
+mod public_dev;
 mod responses;
 mod usage;
-use responses::{MyNodeResponse, PublicNodeResponse};
+pub use my_nodes::my_nodes;
+use payouts::node_payout_min_fen;
+pub use payouts::{cancel_node_payout, create_node_payout, my_node_payouts};
+pub use public_dev::{admin_public_dev_handshake, update_my_node_sharing};
+use public_dev::{public_dev_handshake_state, public_dev_handshake_value};
+use responses::PublicNodeResponse;
 pub use usage::my_node_usage;
 fn storage_can_cross_pc(storage: &NodeStorageProfile) -> bool {
     storage
@@ -120,6 +127,15 @@ pub async fn list_nodes(
         );
         let hardware = hardware_for_response(&state, &node_id, node.hardware);
         let hardware_summary = hardware_summary(hardware.as_ref());
+        let credential = state.store.get_node_credential(&node_id).ok().flatten();
+        let agent_version = cli_agent.as_ref().map(|agent| agent.version.clone());
+        let (public_dev_handshake_ready, public_dev_handshake_status) = public_dev_handshake_state(
+            credential.as_ref(),
+            node.online || cli_agent.is_some(),
+            agent_version.as_deref(),
+            &allowed_clis,
+            dev_runtime.as_ref(),
+        );
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
@@ -147,6 +163,31 @@ pub async fn list_nodes(
             short_id,
             models: node.models,
             allowed_clis: allowed_clis.clone(),
+            agent_version,
+            public_dev_enabled: credential
+                .as_ref()
+                .map(|credential| credential.public_dev_enabled)
+                .unwrap_or(false),
+            public_dev_allowed_clis: credential
+                .as_ref()
+                .map(|credential| credential.public_dev_allowed_clis.clone())
+                .unwrap_or_default(),
+            public_dev_permission_level: credential
+                .as_ref()
+                .map(|credential| credential.public_dev_permission_level.clone())
+                .unwrap_or_else(|| "project_write".to_string()),
+            public_dev_handshake_ready,
+            public_dev_handshake_status,
+            last_handshake_at: credential
+                .as_ref()
+                .and_then(|credential| credential.last_handshake_at.clone()),
+            last_handshake_agent_version: credential
+                .as_ref()
+                .and_then(|credential| credential.last_handshake_agent_version.clone()),
+            last_handshake_allowed_clis: credential
+                .as_ref()
+                .map(|credential| credential.last_handshake_allowed_clis.clone())
+                .unwrap_or_default(),
             cli_project_ready,
             workspace_provision_ready,
             ai_cli_ready,
@@ -210,6 +251,15 @@ pub async fn list_nodes(
         );
         let hardware = hardware_for_response(&state, &node_id, agent.hardware);
         let hardware_summary = hardware_summary(hardware.as_ref());
+        let credential = state.store.get_node_credential(&node_id).ok().flatten();
+        let agent_version = Some(agent.version.clone());
+        let (public_dev_handshake_ready, public_dev_handshake_status) = public_dev_handshake_state(
+            credential.as_ref(),
+            true,
+            agent_version.as_deref(),
+            &allowed_clis,
+            dev_runtime.as_ref(),
+        );
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
@@ -234,6 +284,31 @@ pub async fn list_nodes(
             short_id,
             models: Vec::new(),
             allowed_clis: allowed_clis.clone(),
+            agent_version,
+            public_dev_enabled: credential
+                .as_ref()
+                .map(|credential| credential.public_dev_enabled)
+                .unwrap_or(false),
+            public_dev_allowed_clis: credential
+                .as_ref()
+                .map(|credential| credential.public_dev_allowed_clis.clone())
+                .unwrap_or_default(),
+            public_dev_permission_level: credential
+                .as_ref()
+                .map(|credential| credential.public_dev_permission_level.clone())
+                .unwrap_or_else(|| "project_write".to_string()),
+            public_dev_handshake_ready,
+            public_dev_handshake_status,
+            last_handshake_at: credential
+                .as_ref()
+                .and_then(|credential| credential.last_handshake_at.clone()),
+            last_handshake_agent_version: credential
+                .as_ref()
+                .and_then(|credential| credential.last_handshake_agent_version.clone()),
+            last_handshake_allowed_clis: credential
+                .as_ref()
+                .map(|credential| credential.last_handshake_allowed_clis.clone())
+                .unwrap_or_default(),
             cli_project_ready,
             workspace_provision_ready,
             ai_cli_ready,
@@ -375,219 +450,6 @@ pub async fn my_node_transactions(
 
 // ── /api/me/node-payouts ─────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
-pub struct CreateNodePayoutBody {
-    pub amount_fen: Option<i64>,
-    pub amount_credits: Option<f64>,
-    pub payout_method: String,
-    pub payout_account: String,
-    pub contact: Option<String>,
-}
-
-/// GET /api/me/node-payouts — 当前用户的节点收益提现申请。
-pub async fn my_node_payouts(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> impl IntoResponse {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response()
-        }
-    };
-
-    match state.store.list_node_payout_requests(&user.id, 50) {
-        Ok(payouts) => Json(serde_json::json!({ "payouts": payouts })).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({"error": e.to_string()})),
-        )
-            .into_response(),
-    }
-}
-
-/// POST /api/me/node-payouts — 申请提现，申请成功后立即冻结节点可用余额。
-pub async fn create_node_payout(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(body): Json<CreateNodePayoutBody>,
-) -> impl IntoResponse {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response()
-        }
-    };
-    let amount_fen = match payout_amount_fen(&body) {
-        Some(amount) => amount,
-        None => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": "提现金额必须大于 0"})),
-            )
-                .into_response()
-        }
-    };
-    let min_fen = node_payout_min_fen(&state);
-    if amount_fen < min_fen {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "error": format!("提现金额不能低于 ¥{:.2}", min_fen as f64 / 100.0),
-                "payout_min_fen": min_fen
-            })),
-        )
-            .into_response();
-    }
-
-    match state.store.create_node_payout_request(CreateNodePayout {
-        provider_user_id: &user.id,
-        amount_fen,
-        payout_method: &body.payout_method,
-        payout_account: &body.payout_account,
-        contact: body.contact.as_deref(),
-    }) {
-        Ok(payout) => {
-            let balance = state.store.get_node_balance(&user.id).unwrap_or(0.0);
-            Json(serde_json::json!({ "ok": true, "payout": payout, "balance": balance }))
-                .into_response()
-        }
-        Err(e) => node_payout_error_response(e),
-    }
-}
-
-/// POST /api/me/node-payouts/:payout_id/cancel — 取消待处理提现并退回冻结余额。
-pub async fn cancel_node_payout(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Path(payout_id): Path<String>,
-) -> impl IntoResponse {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response()
-        }
-    };
-    match state.store.cancel_node_payout_request(&user.id, &payout_id) {
-        Ok(payout) => {
-            let balance = state.store.get_node_balance(&user.id).unwrap_or(0.0);
-            Json(serde_json::json!({ "ok": true, "payout": payout, "balance": balance }))
-                .into_response()
-        }
-        Err(e) => node_payout_error_response(e),
-    }
-}
-
-/// GET /api/me/nodes — 本用户自己的节点列表（含在线状态）
-pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) -> impl IntoResponse {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => {
-            return (
-                StatusCode::UNAUTHORIZED,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response()
-        }
-    };
-
-    let runtimes = match user_node_runtimes(&state, &user.id).await {
-        Ok(nodes) => nodes,
-        Err(e) => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response()
-        }
-    };
-
-    let nodes = runtimes
-        .into_iter()
-        .map(|node| {
-            let cli_project_ready = node.cli_project_ready();
-            let workspace_provision_ready = node.workspace_provision_ready();
-            let ai_cli_ready = node
-                .dev_runtime
-                .as_ref()
-                .map(|runtime| runtime.ai_cli_ready)
-                .unwrap_or(cli_project_ready);
-            let (route_a_ready, api_runtime_ready, server_runtime_ready) =
-                runtime_route_flags(node.dev_runtime.as_ref(), cli_project_ready);
-            let global_project_count = state
-                .store
-                .count_active_pc_projects_for_node(&node.node_id)
-                .unwrap_or(node.project_count);
-            let mut capacity_node = node.clone();
-            capacity_node.project_count = global_project_count;
-            let latest_snapshot = state
-                .store
-                .latest_workspace_health_snapshot_for_node(&node.node_id)
-                .ok()
-                .flatten();
-            let capacity = assess_pc_node_capacity(&capacity_node, latest_snapshot.as_ref());
-            let storage = node.storage.clone();
-            let storage_ready = node.storage_ready();
-            let storage_repo_url_configured =
-                storage.as_ref().map(storage_can_cross_pc).unwrap_or(false);
-            let hardware = hardware_for_response(&state, &node.node_id, node.hardware);
-            let hardware_summary = hardware_summary(hardware.as_ref());
-            MyNodeResponse {
-                agent_id: node.node_id.clone(),
-                node_id: node.node_id,
-                owner_user_id: node.owner_user_id,
-                label: node.label,
-                device_name: node.device_name,
-                hardware,
-                hardware_summary,
-                storage,
-                dev_runtime: node.dev_runtime,
-                lifecycle: node.lifecycle,
-                storage_ready,
-                storage_repo_url_configured,
-                display_name: node.display_name,
-                short_id: node.short_id,
-                models: node.models,
-                allowed_clis: node.allowed_clis,
-                allowed_cwds: node.allowed_cwds,
-                cli_project_ready,
-                workspace_provision_ready,
-                ai_cli_ready,
-                route_a_ready,
-                api_runtime_ready,
-                server_runtime_ready,
-                project_count: capacity.project_count,
-                project_limit: capacity.project_limit,
-                project_slots_remaining: capacity.project_slots_remaining,
-                disk_free_bytes: capacity.disk_free_bytes,
-                can_accept_project: capacity.can_accept_project,
-                capacity_label: capacity.label,
-                capacity_tone: capacity.tone,
-                capacity_warnings: capacity.warnings,
-                connected_at: node.connected_at,
-                created_at: node.created_at,
-                online: node.online,
-                registry_online: node.registry_online,
-                cli_connected: node.cli_connected,
-            }
-        })
-        .collect::<Vec<_>>();
-
-    Json(serde_json::json!({ "nodes": nodes })).into_response()
-}
-
 fn runtime_route_flags(
     runtime: Option<&NodeDevRuntimeProfile>,
     legacy_cli_ready: bool,
@@ -643,6 +505,16 @@ fn capacity_for_response(
         label: label.to_string(),
         device_name: device_name.map(ToOwned::to_owned),
         install_id: None,
+        public_dev_enabled: false,
+        public_dev_allowed_clis: Vec::new(),
+        public_dev_permission_level: "project_write".to_string(),
+        last_handshake_at: None,
+        last_handshake_agent_version: None,
+        last_handshake_allowed_clis: Vec::new(),
+        last_handshake_route_a_ready: false,
+        last_handshake_api_runtime_ready: false,
+        last_handshake_server_runtime_ready: false,
+        last_handshake_ai_cli_ready: false,
         hardware: None,
         storage: None,
         dev_runtime,
@@ -652,6 +524,7 @@ fn capacity_for_response(
         models: Vec::new(),
         allowed_clis: allowed_clis.to_vec(),
         allowed_cwds: Vec::new(),
+        agent_version: None,
         connected_at: 0,
         created_at: String::new(),
         online,
@@ -724,52 +597,6 @@ fn format_bytes(bytes: u64) -> Option<String> {
         format!("{} {}", value.round() as u64, units[idx])
     })
 }
-
-fn payout_amount_fen(body: &CreateNodePayoutBody) -> Option<i64> {
-    if let Some(amount_fen) = body.amount_fen {
-        return (amount_fen > 0).then_some(amount_fen);
-    }
-    let credits = body.amount_credits?;
-    if !credits.is_finite() || credits <= 0.0 {
-        return None;
-    }
-    Some((credits * 100.0).round() as i64)
-}
-
-fn node_payout_min_fen(state: &AppState) -> i64 {
-    state
-        .store
-        .billing_get_config("node_payout_min_fen")
-        .ok()
-        .flatten()
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(100)
-        .max(1)
-}
-
-fn node_payout_error_response(err: anyhow::Error) -> axum::response::Response {
-    let msg = err.to_string();
-    let status = if msg.contains("不存在") {
-        StatusCode::NOT_FOUND
-    } else if msg.contains("余额不足")
-        || msg.contains("待处理")
-        || msg.contains("不能为空")
-        || msg.contains("必须大于")
-    {
-        StatusCode::BAD_REQUEST
-    } else {
-        StatusCode::INTERNAL_SERVER_ERROR
-    };
-    (
-        status,
-        Json(serde_json::json!({
-            "error": msg
-        })),
-    )
-        .into_response()
-}
-
-// ── /api/nodes/chat ───────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
 pub struct NodeChatRequest {
@@ -1065,12 +892,7 @@ pub async fn push_node_update(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let presented = headers
-        .get("authorization")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.strip_prefix("Bearer "))
-        .unwrap_or("");
-    if presented.is_empty() || presented != state.admin_token {
+    if !admin::check_auth(&headers, &state.admin_token) {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"error":"admin token required"})),
@@ -1090,11 +912,22 @@ pub async fn push_node_update(
         .agent_manager
         .broadcast_update_client(version.clone(), None)
         .await;
-    Json(serde_json::json!({
-        "ok": true,
-        "broadcast_to": count,
-        "version": version,
-        "message": format!("{count} 个在线节点已收到更新指令"),
-    }))
-    .into_response()
+    match public_dev_handshake_value(&state).await {
+        Ok(report) => Json(serde_json::json!({
+            "ok": true,
+            "broadcast_to": count,
+            "version": version,
+            "message": format!("{count} 个在线节点已收到更新指令"),
+            "public_dev_handshake": report,
+        }))
+        .into_response(),
+        Err(e) => Json(serde_json::json!({
+            "ok": true,
+            "broadcast_to": count,
+            "version": version,
+            "message": format!("{count} 个在线节点已收到更新指令"),
+            "public_dev_handshake_error": e.to_string(),
+        }))
+        .into_response(),
+    }
 }

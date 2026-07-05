@@ -170,6 +170,7 @@ function MarketNodeCard({ node }: { node: NodeSummary }) {
     node.route_a_ready ? '本机 AI' : '',
     node.api_runtime_ready ? 'API Key' : '',
     node.server_runtime_ready ? '服务器模型' : '',
+    node.public_dev_enabled ? '公开开发' : '',
   ].filter(Boolean)
   return (
     <article className={styles.nodeCard}>
@@ -187,7 +188,7 @@ function MarketNodeCard({ node }: { node: NodeSummary }) {
         <div><span>容量</span><strong>{node.capacity_label ?? '未上报'}</strong></div>
         <div><span>项目</span><strong>{capacityLine(node)}</strong></div>
         <div><span>硬盘</span><strong>{node.storage_repo_url_configured ? '跨 PC' : node.storage_ready ? '本机' : '未配置'}</strong></div>
-        <div><span>状态</span><strong>{nodeCanAcceptProject(node) ? '可接入' : '已满'}</strong></div>
+        <div><span>共享</span><strong>{publicDevHandshakeText(node)}</strong></div>
       </div>
       <div className={styles.pills}>
         {(capabilities.length ? capabilities : ['待检测']).map((item) => <span key={item}>{item}</span>)}
@@ -257,6 +258,21 @@ function StatCard({ icon, label, value }: { icon: ReactNode; label: string; valu
 
 function MoneyCell({ label, value }: { label: string; value: string }) {
   return <div><span>{label}</span><strong>{value}</strong></div>
+}
+
+function publicDevHandshakeText(node: NodeSummary) {
+  if (node.public_dev_handshake_ready) return '握手就绪'
+  const status = node.public_dev_handshake_status ?? ''
+  const labels: Record<string, string> = {
+    sharing_disabled: '未开放',
+    offline: '离线',
+    waiting_for_handshake: '等握手',
+    version_reconnected_waiting_capabilities: '等能力',
+    no_allowed_cli: 'CLI 不符',
+    runtime_not_ready: '未就绪',
+    ready: '握手就绪',
+  }
+  return labels[status] ?? (node.public_dev_enabled ? '待确认' : '未开放')
 }
 
 function isOwnNode(node: NodeSummary, userId: string | undefined, myNodeIds: Set<string>) {

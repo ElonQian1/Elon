@@ -17,7 +17,9 @@
 
 param(
     [switch]$SkipBroadcast,
-    [string]$AdminToken = ""
+    [string]$AdminToken = "",
+    [int]$HandshakeWaitSec = 90,
+    [switch]$SkipHandshakeWait
 )
 
 Set-StrictMode -Version Latest
@@ -220,6 +222,120 @@ curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-upda
     $raw = Invoke-RemoteBash -Script $script
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
     return $raw | ConvertFrom-Json
+}
+
+function Invoke-RemoteNodePublicDevHandshakeStatus {
+    $script = @'
+set -eu
+for env_file in /etc/elon-server.env /root/Elon/server/.env; do
+  if [ -f "$env_file" ]; then
+    set -a
+    . "$env_file" >/dev/null 2>&1 || true
+    set +a
+  fi
+done
+if [ -z "${ADMIN_TOKEN:-}" ]; then
+  echo "ADMIN_TOKEN missing on server" >&2
+  exit 2
+fi
+curl --noproxy '*' -fsS 'http://127.0.0.1:8080/api/admin/nodes/public-dev-handshake' -H "Authorization: Bearer ${ADMIN_TOKEN}"
+'@
+    $raw = Invoke-RemoteBash -Script $script
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+    return $raw | ConvertFrom-Json
+}
+
+function Invoke-NodePublicDevHandshakeStatus {
+    param(
+        [string]$Token,
+        [bool]$UseRemoteToken
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($Token)) {
+        return Invoke-NoProxyJson `
+            -Uri "$BaseUrl/api/admin/nodes/public-dev-handshake" `
+            -Method "Get" `
+            -Headers @{ Authorization = "Bearer $Token" } `
+            -TimeoutSec 15
+    }
+
+    if ($UseRemoteToken) {
+        return Invoke-RemoteNodePublicDevHandshakeStatus
+    }
+
+    return $null
+}
+
+function Wait-NodePublicDevHandshake {
+    param(
+        [string]$Token,
+        [bool]$UseRemoteToken,
+        [int]$TimeoutSec
+    )
+
+    if ($SkipHandshakeWait) {
+        Write-Host "  已按 -SkipHandshakeWait 跳过公开开发握手等待。" -ForegroundColor Yellow
+        return
+    }
+    if ($TimeoutSec -le 0) {
+        Write-Host "  HandshakeWaitSec <= 0，跳过公开开发握手等待。" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "  等待在线公开开发节点重连并完成握手（最多 ${TimeoutSec}s）..." -ForegroundColor Yellow
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    $lastReport = $null
+    while ($true) {
+        try {
+            $status = Invoke-NodePublicDevHandshakeStatus -Token $Token -UseRemoteToken $UseRemoteToken
+            if ($null -eq $status -or $null -eq $status.public_dev_handshake) {
+                Write-Host "  服务器暂未返回公开开发握手诊断，跳过等待。" -ForegroundColor DarkYellow
+                return
+            }
+            $report = $status.public_dev_handshake
+            $lastReport = $report
+            $summary = $report.summary
+            Write-Host ("  握手状态：ready {0}/{1}，online {2}，pending-online {3}，offline {4}" -f `
+                $summary.ready_public_dev, `
+                $summary.public_dev_enabled, `
+                $summary.online_public_dev, `
+                $summary.pending_online_public_dev, `
+                $summary.offline_public_dev) -ForegroundColor DarkGray
+
+            $pending = @($report.nodes | Where-Object {
+                $_.public_dev_enabled -and $_.online -and -not $_.public_dev_handshake_ready
+            })
+            if ($pending.Count -eq 0) {
+                Write-Host "  在线公开开发节点握手已就绪。" -ForegroundColor Green
+                return
+            }
+
+            $sample = @($pending | Select-Object -First 5 | ForEach-Object {
+                $owner = if ($_.owner_nickname) { $_.owner_nickname } elseif ($_.owner_account) { $_.owner_account } else { $_.owner_user_id }
+                "$($_.display_name)/$owner/$($_.public_dev_handshake_status)"
+            })
+            if ($sample.Count -gt 0) {
+                Write-Host ("  待握手节点：" + ($sample -join "；")) -ForegroundColor DarkYellow
+            }
+        } catch {
+            Write-Host "  公开开发握手诊断接口暂不可用：$($_.Exception.Message)" -ForegroundColor DarkYellow
+            return
+        }
+
+        if ((Get-Date) -ge $deadline) { break }
+        Start-Sleep -Seconds 5
+    }
+
+    if ($null -ne $lastReport) {
+        $pending = @($lastReport.nodes | Where-Object {
+            $_.public_dev_enabled -and $_.online -and -not $_.public_dev_handshake_ready
+        })
+        if ($pending.Count -gt 0) {
+            Write-Host "  公开开发握手等待超时，仍有 $($pending.Count) 个在线节点未就绪；请查看 PC 节点页或 admin 诊断接口。" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  公开开发握手等待超时，未拿到诊断报告。" -ForegroundColor Yellow
+    }
 }
 
 function Resolve-NodeAgentTargetDir {
@@ -534,6 +650,13 @@ if ($SkipBroadcast) {
     Write-Host "  已通过服务器本机通知在线节点更新：$broadcastTo 个" -ForegroundColor Green
 } else {
     throw "无法广播在线节点更新：没有可用的本机或服务器 ADMIN_TOKEN。"
+}
+
+if (-not $SkipBroadcast) {
+    Wait-NodePublicDevHandshake `
+        -Token $BroadcastAdminToken `
+        -UseRemoteToken $UseRemoteAdminToken `
+        -TimeoutSec $HandshakeWaitSec
 }
 
 Write-Host ""

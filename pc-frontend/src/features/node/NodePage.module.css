@@ -248,6 +248,43 @@
 .kvGrid span { color: var(--text-muted); }
 .kvGrid strong { color: var(--text-primary); text-align: right; word-break: break-all; }
 
+.shareStatus {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: 12px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.shareStatus > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.shareStatus strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.shareStatus span {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shareStatus p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .lifecycleCard {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);

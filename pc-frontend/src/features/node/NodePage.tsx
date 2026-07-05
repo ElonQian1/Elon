@@ -9,6 +9,7 @@ import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
 import CodexToolboxCard from './CodexToolboxCard'
 import NodeMarketPanel from './NodeMarketPanel'
+import NodeShareStatus, { publicDevHandshakeText } from './NodeShareStatus'
 import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
@@ -652,7 +653,6 @@ function codexStatusCopy(status: LocalCliToolStatus | null, refreshing: boolean)
     action: 'refresh',
   }
 }
-
 function CodexStatusCard({
   status,
   refreshing,
@@ -731,18 +731,20 @@ function CodexStatusCard({
     </section>
   )
 }
-
 function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSummary; onBack: () => void; adminUrl: string }) {
   const hw = node.hardware ?? {}
   const runtime = node.dev_runtime ?? {}
   const warnings = [...(node.capacity_warnings ?? []), ...(runtime.issues ?? [])].filter(Boolean)
   const models = node.models ?? []
-
   const rows = [
     ['显示名称', nodeName(node)],
     ['节点 ID', nodeId(node) || '未知'],
     ['短 ID', node.short_id ?? '未知'],
+    ['客户端版本', node.agent_version ?? node.last_handshake_agent_version ?? '未知'],
     ['在线', node.online ? '是' : '否'],
+    ['开放开发授权', node.public_dev_enabled ? '已开放' : '未开放'],
+    ['公开握手', publicDevHandshakeText(node)],
+    ['开放 CLI', (node.public_dev_allowed_clis ?? []).join(' / ') || '未配置'],
     ['项目', `${node.project_count ?? 0}/${node.project_limit ?? '?'}`],
     ['系统', String(hw.os ?? '未知')],
     ['CPU', hw.cpu_brand ? `${hw.cpu_brand} · ${hw.cpu_cores ?? '?'} 核` : '未上报'],
@@ -754,7 +756,6 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
     ['本机API key', runtime.api_runtime_ready ? '就绪' : '未就绪'],
     ['一龙开发环境', node.ai_cli_ready ? '就绪' : '未就绪'],
   ]
-
   return (
     <div className={styles.detailPage}>
       <div className={styles.hero}>
@@ -767,19 +768,16 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
           {node.online ? '在线' : '离线'}
         </span>
       </div>
-
       {warnings.length > 0 && (
         <div className={styles.warnings}>
           {warnings.map((w, i) => <div key={i}>{w}</div>)}
         </div>
       )}
-
       <NodeLifecycleStatusCard node={node} />
-
+      <NodeShareStatus node={node} />
       <div className={styles.kvGrid}>
         {rows.map(([k, v]) => <div key={k}><span>{k}</span><strong>{v}</strong></div>)}
       </div>
-
       {models.length > 0 && (
         <div className={styles.section}>
           <h4>模型能力</h4>
@@ -792,7 +790,6 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
           </div>
         </div>
       )}
-
       <button className={styles.btn} onClick={onBack}>← 回到分享算力</button>
     </div>
   )

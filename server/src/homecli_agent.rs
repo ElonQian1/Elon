@@ -8,6 +8,7 @@
 //!
 //! Protocol: see [`homecli_proto`].
 
+use crate::types::AppState;
 use anyhow::{anyhow, Result};
 use axum::{
     extract::{
@@ -32,11 +33,7 @@ use std::{
 };
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 use uuid::Uuid;
-
-use crate::types::AppState;
-
 // ── manager state ────────────────────────────────────────────────────────────
-
 const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(40);
 const AGENT_DISPATCH_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -44,13 +41,14 @@ const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSPECT_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
-
 mod heartbeat;
-mod summary; pub use summary::AgentSummary;
+mod public_dev_handshake;
+mod summary;
+use public_dev_handshake::record_node_public_dev_handshake;
+pub use summary::AgentSummary;
 #[cfg(test)]
 #[path = "homecli_agent_tests.rs"]
 mod homecli_agent_tests;
-
 /// Snapshot of one connected PC agent.
 #[derive(Clone)]
 pub struct AgentEntry {
@@ -76,13 +74,11 @@ pub struct AgentEntry {
     /// Signals the session reader/writer to close when a newer connection replaces it.
     session_shutdown: watch::Sender<bool>,
 }
-
 pub struct CliPromptDispatch {
     pub req_id: String,
     pub rx: mpsc::UnboundedReceiver<AgentToServer>,
     cancel_handle: CliPromptCancelHandle,
 }
-
 impl CliPromptDispatch {
     pub fn into_parts(
         self,
@@ -94,18 +90,15 @@ impl CliPromptDispatch {
         (self.req_id, self.rx, self.cancel_handle)
     }
 }
-
 #[derive(Clone)]
 pub struct CliPromptCancelHandle {
     req_id: String,
     cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
 }
-
 impl CliPromptCancelHandle {
     pub fn req_id(&self) -> &str {
         &self.req_id
     }
-
     pub fn cancel(&self) -> bool {
         self.cmd_tx
             .send(ServerToAgent::Cancel {
@@ -114,22 +107,18 @@ impl CliPromptCancelHandle {
             .is_ok()
     }
 }
-
 #[derive(Default)]
 pub struct AgentManager {
     agents: RwLock<HashMap<String, AgentEntry>>,
 }
-
 impl AgentManager {
     pub fn new() -> Self {
         Self::default()
     }
-
     /// 返回第一个当前在线的 PC agent ID（优先用于 CLI 委托）
     pub async fn any_connected_agent_id(&self) -> Option<String> {
         self.agents.read().await.keys().next().cloned()
     }
-
     /// 把 AI 提示发给 PC agent，让 PC 用指定 CLI（copilot/codex）执行，流式返回 CliChunk/CliDone。
     pub async fn dispatch_cli_prompt(
         &self,
@@ -141,7 +130,6 @@ impl AgentManager {
         self.dispatch_cli_prompt_in_cwd(agent_id, cli, extra_args, None, prompt)
             .await
     }
-
     /// 把 AI 提示发给 PC agent，并可指定 PC 侧工作目录。
     pub async fn dispatch_cli_prompt_in_cwd(
         &self,
@@ -154,7 +142,6 @@ impl AgentManager {
         self.dispatch_cli_prompt_with_context(agent_id, cli, extra_args, cwd, None, prompt)
             .await
     }
-
     /// 把项目 AI 提示发给 PC agent，并带上会话上下文用于 PC 本地 worktree 隔离。
     pub async fn dispatch_cli_prompt_with_context(
         &self,
@@ -177,7 +164,6 @@ impl AgentManager {
             .await?;
         Ok((dispatch.req_id, dispatch.rx))
     }
-
     pub async fn dispatch_cli_prompt_with_context_control(
         &self,
         agent_id: &str,
@@ -233,7 +219,6 @@ impl AgentManager {
             cancel_handle,
         })
     }
-
     pub async fn send_tool_approval_decision(
         &self,
         req_id: &str,
@@ -258,7 +243,6 @@ impl AgentManager {
                 "pending CLI request not found for tool approval: {req_id}"
             ));
         };
-
         let dispatch_id = Uuid::new_v4().to_string();
         let ack_key = tool_approval_ack_key(req_id, approval_id, &dispatch_id);
         let (ack_tx, ack_rx) = oneshot::channel();
@@ -275,7 +259,6 @@ impl AgentManager {
             approval_acks.lock().await.remove(&ack_key);
             return Err(anyhow!("agent writer closed"));
         }
-
         match tokio::time::timeout(TOOL_APPROVAL_ACK_TIMEOUT, ack_rx).await {
             Ok(Ok(accepted)) => Ok(accepted),
             Ok(Err(_)) => Err(anyhow!(
@@ -289,7 +272,6 @@ impl AgentManager {
             }
         }
     }
-
     pub async fn list(&self) -> Vec<AgentSummary> {
         self.agents
             .read()
@@ -309,7 +291,6 @@ impl AgentManager {
             })
             .collect()
     }
-
     /// Close the currently registered session for an agent, forcing the PC client to reconnect.
     pub async fn close_agent_session(&self, agent_id: &str, reason: &str) -> bool {
         let shutdown = {
@@ -334,7 +315,6 @@ impl AgentManager {
         let _ = shutdown.send(true);
         true
     }
-
     /// 广播 UpdateClient 消息给所有在线节点，触发无感自动更新。
     /// 返回成功发送的节点数量。
     pub async fn broadcast_update_client(
@@ -358,7 +338,6 @@ impl AgentManager {
         }
         count
     }
-
     /// Send an HTTP request through the WS tunnel to the PC's local server.
     /// Returns a single AgentToServer::HttpResponse or HttpError.
     pub async fn dispatch_http(
@@ -394,7 +373,6 @@ impl AgentManager {
             Err(_) => Err(anyhow!("http relay timeout (60s)")),
         }
     }
-
     /// Dispatch a new exec task to the given agent. Returns a receiver that
     /// streams the agent's events for this task until `TaskExit` or `TaskError`.
     pub async fn dispatch(
@@ -424,7 +402,6 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         Ok((task_id, rx))
     }
-
     /// 向指定节点 agent 发起 LLM 流式推理请求。
     /// 返回 (req_id, receiver)，receiver 收到 LlmStreamChunk / LlmStreamEnd / LlmStreamError。
     pub async fn dispatch_llm_stream(
@@ -438,7 +415,6 @@ impl AgentManager {
         self.dispatch_llm_stream_with_req_id(agent_id, req_id, model, messages, max_tokens)
             .await
     }
-
     pub async fn dispatch_llm_stream_with_req_id(
         &self,
         agent_id: &str,
@@ -464,7 +440,6 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         Ok((req_id, rx))
     }
-
     /// Ask a PC node to create or reuse a managed project workspace.
     pub async fn dispatch_project_workspace_provision(
         &self,
@@ -501,7 +476,6 @@ impl AgentManager {
             return Err(error);
         }
         drop(agents);
-
         let timeout = project_workspace_provision_timeout();
         match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Some(msg)) => Ok(msg),
@@ -515,7 +489,6 @@ impl AgentManager {
             }
         }
     }
-
     /// Ask a storage-capable PC node to create or reuse a bare Git repo for a project.
     pub async fn dispatch_project_storage_repo_prepare(
         &self,
@@ -888,8 +861,21 @@ async fn run_agent_session(
             tracing::warn!(%agent_id, error = %e, "failed to update node hardware snapshot");
         }
     }
+    if let Some(owner) = &resolved_owner_user_id {
+        record_node_public_dev_handshake(
+            &state,
+            &agent_id,
+            owner,
+            &version,
+            &allowed_clis,
+            dev_runtime.as_ref(),
+            "failed to record node handshake",
+        )
+        .await;
+    }
     tracing::info!(%agent_id, %version, device_name = ?device_name, "agent registered");
     let session_id = Uuid::new_v4().to_string();
+    let session_version = version.clone();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
     let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
@@ -1103,6 +1089,18 @@ async fn run_agent_session(
                                                 );
                                             }
                                         }
+                                    }
+                                    if !session_owner_user_id.is_empty() {
+                                        record_node_public_dev_handshake(
+                                            &state,
+                                            &agent_id,
+                                            &session_owner_user_id,
+                                            &session_version,
+                                            &allowed_clis,
+                                            dev_runtime.as_ref(),
+                                            "failed to record node capability handshake",
+                                        )
+                                        .await;
                                     }
                                     {
                                         let mut agents = state.agent_manager.agents.write().await;
