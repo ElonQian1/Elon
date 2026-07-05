@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Bot, ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
-import type { ApiError } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import {
@@ -23,6 +22,7 @@ import {
   saveAiComposerDraft,
   type AiComposerDraft,
 } from '../updates/composerDrafts'
+import AuthDialog from '../auth/AuthDialog'
 import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import { formatTime } from '../../lib/utils'
@@ -67,8 +67,6 @@ interface Friend {
 export default function AiChatPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const login = useAuthStore((s) => s.login)
-  const register = useAuthStore((s) => s.register)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
   const modelOptions = useModelStore((s) => s.options)
@@ -101,12 +99,6 @@ export default function AiChatPage() {
       : false
   ))
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const [loginUsername, setLoginUsername] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('')
-  const [loginError, setLoginError] = useState('')
-  const [loginLoading, setLoginLoading] = useState(false)
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
@@ -200,15 +192,6 @@ export default function AiChatPage() {
       setRuntimeRoute('auto')
     }
   }, [nodeStatusChecked, onlineNodeId, runtimeRoute])
-
-  useEffect(() => {
-    if (!loginDialogOpen) return
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setLoginDialogOpen(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [loginDialogOpen])
 
   // 客户端搜索过滤
   const filteredFriends = useMemo(() => {
@@ -388,30 +371,6 @@ export default function AiChatPage() {
     }
   }
 
-  async function handleInlineLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoginError('')
-    if (authMode === 'register' && loginPassword !== registerPasswordConfirm) {
-      setLoginError('两次输入的密码不一致')
-      return
-    }
-    setLoginLoading(true)
-    try {
-      if (authMode === 'register') {
-        await register(loginUsername, loginPassword)
-      } else {
-        await login(loginUsername, loginPassword)
-      }
-      setLoginDialogOpen(false)
-      setLoginPassword('')
-      setRegisterPasswordConfirm('')
-    } catch (err) {
-      setLoginError((err as ApiError).message ?? (authMode === 'register' ? '注册失败，请重试' : '登录失败，请重试'))
-    } finally {
-      setLoginLoading(false)
-    }
-  }
-
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -540,11 +499,7 @@ export default function AiChatPage() {
                   <button
                     className={styles.startBtn}
                     type="button"
-                    onClick={() => {
-                      setLoginError('')
-                      setAuthMode('login')
-                      setLoginDialogOpen(true)
-                    }}
+                    onClick={() => setLoginDialogOpen(true)}
                   >
                     登录账号
                   </button>
@@ -746,86 +701,11 @@ export default function AiChatPage() {
         </button>
       )}
 
-      {loginDialogOpen && !user?.id && (
-        <div
-          className={styles.loginDialogBackdrop}
-          role="presentation"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setLoginDialogOpen(false)
-          }}
-        >
-          <form
-            className={styles.loginDialog}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="ai-login-title"
-            onSubmit={handleInlineLogin}
-          >
-            <button
-              className={styles.loginDialogClose}
-              type="button"
-              aria-label="关闭登录框"
-              onClick={() => setLoginDialogOpen(false)}
-            >
-              ×
-            </button>
-            <h3 id="ai-login-title">{authMode === 'register' ? '注册新账号' : '登录账号'}</h3>
-            <p className={styles.loginDialogSubtitle}>{authMode === 'register'
-              ? '注册后会自动登录，并同步你的项目、好友和电脑节点。'
-              : '登录后即可开始对话，并同步你的项目、好友和电脑节点。'}</p>
-            <input
-              className={styles.loginDialogInput}
-              type="text"
-              placeholder="用户名"
-              autoComplete="username"
-              value={loginUsername}
-              onChange={(e) => setLoginUsername(e.target.value)}
-              autoFocus
-              required
-            />
-            <input
-              className={styles.loginDialogInput}
-              type="password"
-              placeholder="密码"
-              autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
-              value={loginPassword}
-              onChange={(e) => setLoginPassword(e.target.value)}
-              required
-            />
-            {authMode === 'register' && (
-              <input
-                className={styles.loginDialogInput}
-                type="password"
-                placeholder="确认密码"
-                autoComplete="new-password"
-                value={registerPasswordConfirm}
-                onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
-                required
-              />
-            )}
-            {loginError && <p className={styles.loginDialogError}>{loginError}</p>}
-            <button className={styles.loginDialogSubmit} type="submit" disabled={loginLoading}>
-              {loginLoading
-                ? (authMode === 'register' ? '注册中...' : '登录中...')
-                : (authMode === 'register' ? '注册并登录' : '登录')}
-            </button>
-            <p className={styles.loginDialogHint}>
-              {authMode === 'register' ? '已有账号？' : '还没有账号？'}
-              <button
-                type="button"
-                onClick={() => {
-                  setLoginError('')
-                  setLoginPassword('')
-                  setRegisterPasswordConfirm('')
-                  setAuthMode(authMode === 'register' ? 'login' : 'register')
-                }}
-              >
-                {authMode === 'register' ? '登录账号' : '注册新账号'}
-              </button>
-            </p>
-          </form>
-        </div>
-      )}
+      <AuthDialog
+        open={loginDialogOpen && !user?.id}
+        initialMode="login"
+        onClose={() => setLoginDialogOpen(false)}
+      />
 
       {showModelPicker && (
         <ModelPickerPopover

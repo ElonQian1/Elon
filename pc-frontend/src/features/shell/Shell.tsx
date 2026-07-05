@@ -1,11 +1,12 @@
-import { useEffect } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
 import { useWorkbenchTabCoordinator } from './useWorkbenchTabCoordinator'
 import { useAuthStore } from '../../store/auth'
+import AuthDialog from '../auth/AuthDialog'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import LocalModeBanner from './LocalModeBanner'
 import styles from './Shell.module.css'
@@ -48,18 +49,25 @@ function NodeConnectBanner() {
 }
 
 function AccountClaimBanner() {
-  const navigate = useNavigate()
   const token = useAuthStore((s) => s.token)
   const user = useAuthStore((s) => s.user)
+  const [registerDialogOpen, setRegisterDialogOpen] = useState(false)
   if (token || user) return null
 
   return (
-    <div className={styles.claimBanner}>
-      <span>注册账号后同步项目、好友和电脑节点。</span>
-      <button type="button" onClick={() => navigate('/login?mode=register')}>
-        注册账号
-      </button>
-    </div>
+    <>
+      <div className={styles.claimBanner}>
+        <span>注册账号后同步项目、好友和电脑节点。</span>
+        <button type="button" onClick={() => setRegisterDialogOpen(true)}>
+          注册账号
+        </button>
+      </div>
+      <AuthDialog
+        open={registerDialogOpen}
+        initialMode="register"
+        onClose={() => setRegisterDialogOpen(false)}
+      />
+    </>
   )
 }
 
