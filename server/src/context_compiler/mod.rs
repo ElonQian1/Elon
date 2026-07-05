@@ -118,6 +118,8 @@ mod symbol_index_query;
 mod symbol_index_query_features;
 #[cfg(test)]
 mod symbol_index_query_tests;
+#[cfg(test)]
+mod symbol_index_query_tests_b;
 mod symbol_index_query_types;
 mod symbol_index_rank_profile;
 mod symbol_index_ranker;
