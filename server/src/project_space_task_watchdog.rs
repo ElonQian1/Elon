@@ -40,6 +40,18 @@ impl ChannelAiPendingTools {
         }
     }
 
+    pub(crate) fn has_pending(&self) -> bool {
+        !self.queue.is_empty()
+    }
+
+    pub(crate) fn idle_timed_out(
+        &self,
+        last_effective_progress_at: Instant,
+        timeout: Duration,
+    ) -> bool {
+        !self.has_pending() && last_effective_progress_at.elapsed() >= timeout
+    }
+
     pub(crate) fn timed_out(&self) -> Option<(&ChannelAiPendingTool, u64)> {
         let pending = self.queue.front()?;
         if pending.started_at.elapsed() < self.timeout {
@@ -131,4 +143,45 @@ fn truncate_tool_summary(value: &str) -> String {
         .collect::<String>();
     shortened.push('…');
     shortened
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ChannelAiPendingTools;
+
+    #[test]
+    fn pending_tools_tracks_tool_call_and_result() {
+        let mut pending_tools = ChannelAiPendingTools::new();
+        assert!(!pending_tools.has_pending());
+
+        pending_tools.note_event(
+            "tool_call",
+            &serde_json::json!({
+                "tool": "shell",
+                "args": { "command": "cargo test" }
+            }),
+        );
+        assert!(pending_tools.has_pending());
+
+        pending_tools.note_event("tool_result", &serde_json::json!({}));
+        assert!(!pending_tools.has_pending());
+    }
+
+    #[test]
+    fn pending_tools_clear_on_done_or_error() {
+        for terminal_event in ["done", "error"] {
+            let mut pending_tools = ChannelAiPendingTools::new();
+            pending_tools.note_event(
+                "tool_call",
+                &serde_json::json!({
+                    "tool": "shell",
+                    "args": { "command": "cargo build" }
+                }),
+            );
+            assert!(pending_tools.has_pending());
+
+            pending_tools.note_event(terminal_event, &serde_json::json!({}));
+            assert!(!pending_tools.has_pending());
+        }
+    }
 }

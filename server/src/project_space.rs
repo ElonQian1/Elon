@@ -2143,7 +2143,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                         );
                         insert_channel_ai_result(&task, &result_message(&msg, None, Some("超时")));
                         break;
-                    } else if last_effective_progress_at.elapsed() >= heartbeat_only_timeout {
+                    } else if pending_tools.idle_timed_out(last_effective_progress_at, heartbeat_only_timeout) {
                         runner.abort();
                         project_tool_approvals::clear_task(&task.task_id);
                         final_status = "failed".to_string();
