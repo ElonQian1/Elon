@@ -15,6 +15,13 @@ import {
   persistRuntimeRouteSelection,
 } from '../conversation/runtimeRoutes'
 import type { RuntimeRoute } from '../conversation/runtimeRoutes'
+import { APP_UPDATE_BEFORE_RELOAD_EVENT } from '../updates/appUpdateSession'
+import {
+  clearAiComposerDraft,
+  readAiComposerDraft,
+  saveAiComposerDraft,
+  type AiComposerDraft,
+} from '../updates/composerDrafts'
 import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import { formatTime } from '../../lib/utils'
@@ -64,11 +71,14 @@ export default function AiChatPage() {
   const modelOptions = useModelStore((s) => s.options)
 
   const [conversations, setConversations] = useState<AiConversation[]>([])
+  const [conversationsLoaded, setConversationsLoaded] = useState(false)
+  const pendingAiDraftRef = useRef<AiComposerDraft | null>(readAiComposerDraft())
+  const aiDraftReadyRef = useRef(false)
   // 初始即创建新会话 ID，保证输入框始终可见（与旧版一致）
-  const [activeConvId, setActiveConvId] = useState<string>(() => uuidv4())
+  const [activeConvId, setActiveConvId] = useState<string>(() => pendingAiDraftRef.current?.activeConvId || uuidv4())
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
-  const [input, setInput] = useState('')
+  const [input, setInput] = useState(() => pendingAiDraftRef.current?.input ?? '')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
@@ -185,12 +195,14 @@ export default function AiChatPage() {
   }, [messages])
 
   async function loadConversations() {
+    setConversationsLoaded(false)
     try {
       const data = await api.get<{ conversations?: AiConversation[] }>(
         '/api/me/ai/conversations?limit=50',
       )
       setConversations(data.conversations ?? [])
     } catch { /* ignore */ }
+    finally { setConversationsLoaded(true) }
   }
 
   async function selectConversation(convId: string) {
@@ -220,10 +232,56 @@ export default function AiChatPage() {
     el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
   }, [])
 
+  const persistAiComposerDraft = useCallback(() => {
+    if (!activeConvId && !input) return
+    saveAiComposerDraft({
+      userId: user?.id,
+      input,
+      activeConvId,
+    })
+  }, [activeConvId, input, user?.id])
+
+  useEffect(() => {
+    if (aiDraftReadyRef.current) return
+    const draft = pendingAiDraftRef.current
+    if (!draft) {
+      aiDraftReadyRef.current = true
+      return
+    }
+    if (draft.userId && user?.id && draft.userId !== user.id) {
+      pendingAiDraftRef.current = null
+      aiDraftReadyRef.current = true
+      clearAiComposerDraft()
+      return
+    }
+    if (draft.activeConvId && !conversationsLoaded) return
+    if (draft.activeConvId && conversations.some((conv) => conv.id === draft.activeConvId)) {
+      void selectConversation(draft.activeConvId)
+    }
+    setInput(draft.input ?? '')
+    pendingAiDraftRef.current = null
+    aiDraftReadyRef.current = true
+    window.setTimeout(autoResize, 0)
+  }, [autoResize, conversations, conversationsLoaded, user?.id])
+
+  useEffect(() => {
+    if (!aiDraftReadyRef.current) return
+    persistAiComposerDraft()
+  }, [persistAiComposerDraft])
+
+  useEffect(() => {
+    function saveBeforeReload() {
+      persistAiComposerDraft()
+    }
+    window.addEventListener(APP_UPDATE_BEFORE_RELOAD_EVENT, saveBeforeReload)
+    return () => window.removeEventListener(APP_UPDATE_BEFORE_RELOAD_EVENT, saveBeforeReload)
+  }, [persistAiComposerDraft])
+
   async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
     const text = input.trim()
     if (!text || sending) return
+    const previousInput = input
     if (runtimeRoute === 'route_c2' || runtimeRoute === 'route_c3') {
       setError('普通聊天暂未绑定远程 PC 节点。请先在节点页选择远程节点，或切回自动/平台AI。')
       return
@@ -236,6 +294,7 @@ export default function AiChatPage() {
       setRuntimeRoute('auto')
     }
     setInput('')
+    clearAiComposerDraft()
     setError('')
     if (textareaRef.current) textareaRef.current.style.height = '46px'
 
@@ -282,6 +341,9 @@ export default function AiChatPage() {
         loadConversations()
       }
     } catch (err) {
+      setInput(previousInput)
+      saveAiComposerDraft({ userId: user?.id, input: previousInput, activeConvId })
+      window.setTimeout(autoResize, 0)
       setError((err as { message?: string }).message ?? '发送失败')
     } finally {
       setSending(false)

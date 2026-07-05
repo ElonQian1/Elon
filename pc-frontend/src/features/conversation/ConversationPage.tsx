@@ -42,6 +42,7 @@ import {
   persistDirectPcCliSelection,
 } from './localPcRuntime'
 import { useWorkspacePanels } from './useWorkspacePanels'
+import { useProjectComposerDraftPersistence } from './useProjectComposerDraftPersistence'
 import type { LocalNodeStatus } from './localPcRuntime'
 import type {
   Message,
@@ -554,6 +555,7 @@ export default function ConversationPage() {
   function clearComposerDraft() {
     setInput('')
     clearAttachmentDraft()
+    clearSavedComposerDraft()
     if (textareaRef.current) { textareaRef.current.style.height = '40px' }
   }
 
@@ -766,6 +768,8 @@ export default function ConversationPage() {
   useEffect(() => {
     clearAttachmentDraft()
   }, [activeProjectId, projectHomeVersion, activeConversationTargetId, clearAttachmentDraft])
+
+  const { clearSavedComposerDraft } = useProjectComposerDraftPersistence({ userId: user?.id, input, setInput, attachments, draftConversationId, activeProjectId, activeChannelId, sessionView, setSessionView, activeConversationTarget, isOwnConversationTarget, setMemberConversationTarget, restoreAttachmentDraft, openConversation, autoResize, conversationLoadSeqRef, waitingForNewSession, setConvMessages, setSessionTaskMessages })
 
   const channelTaskMessagesById = useMemo(
     () => buildTaskProcessMessageMap([messages, sessionTaskMessages]),
@@ -1344,7 +1348,6 @@ export default function ConversationPage() {
             data-drop-active={attachmentDropActive ? 'true' : 'false'}
             onSubmit={handleSend}
           >
-            {/* P1.4：附件预览条 */}
             {attachments.length > 0 && (
               <div className={styles.attachmentTray}>
                 {attachments.map((att) => (
@@ -1357,7 +1360,6 @@ export default function ConversationPage() {
               </div>
             )}
             <div className={styles.composer}>
-              {/* AI 来源和模型选择按钮 */}
               <button
                 ref={modelBtnRef}
                 className={styles.composerModelBtn}
@@ -1385,7 +1387,6 @@ export default function ConversationPage() {
                 composerRuntimeRoute={composerRuntimeRoute}
               />
 
-              {/* Textarea */}
               <textarea
                 ref={textareaRef}
                 className={styles.composerTextarea}
@@ -1409,7 +1410,6 @@ export default function ConversationPage() {
                 rows={1}
               />
 
-              {/* P1.4：附件按钮 */}
               {activeProjectId && (
                 <AttachmentButton
                   disabled={composerDisabled}
@@ -1418,7 +1418,6 @@ export default function ConversationPage() {
                 />
               )}
 
-              {/* 发送按钮 */}
               <button
                 className={styles.sendBtn}
                 type="submit"

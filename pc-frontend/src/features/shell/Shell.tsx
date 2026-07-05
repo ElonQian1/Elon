@@ -5,6 +5,7 @@ import ServerRail from './ServerRail'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
 import { useAuthStore } from '../../store/auth'
+import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import styles from './Shell.module.css'
 
 function NodeConnectBanner() {
@@ -69,6 +70,7 @@ export default function Shell() {
           <Outlet />
         </main>
       </div>
+      <AppUpdateWatcher />
     </div>
   )
 }

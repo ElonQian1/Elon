@@ -21,12 +21,20 @@ const CHANNEL_MESSAGE_CACHE_FRESH_MS = 10000
 const CACHED_CHANNEL_REFRESH_DELAY_MS = 300
 const PROJECT_SPACE_CACHE_PREFIX = 'elon.pc.projectSpace.v1'
 const PROJECT_SPACE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const PROJECT_SELECTION_KEY = 'elon.pc.projectSelection.v1'
 
 interface ProjectSpaceCacheEntry {
   projectId: string
   userId: string
   cachedAt: number
   space: ProjectSpace
+}
+
+interface ProjectSelectionEntry {
+  userId: string
+  projectId: string
+  channelId: string
+  updatedAt: number
 }
 
 interface ProjectState {
@@ -95,12 +103,24 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
   loadProjects: async () => {
     const data = await api.get<ProjectListResponse>('/api/me/projects')
-    set({ projects: data.projects ?? [], projectsLoaded: true })
+    const projects = data.projects ?? []
+    set({ projects, projectsLoaded: true })
+
+    const currentProjectId = get().activeProjectId
+    const selection = readProjectSelection()
+    if (!currentProjectId && selection?.projectId && projects.some((p) => p.id === selection.projectId)) {
+      await get().selectProject(selection.projectId)
+      const channelId = selection.channelId
+      if (channelId && get().channels.some((c) => c.id === channelId)) {
+        await get().selectChannel(channelId)
+      }
+    }
   },
 
   selectProject: async (id: string) => {
     if (get().activeProjectId === id) {
       get().stopPolling()
+      writeProjectSelection(id, '')
       set((state) => ({
         activeChannelId: '',
         messages: [],
@@ -109,6 +129,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       return
     }
     get().stopPolling()
+    writeProjectSelection(id, '')
     const cachedSpace = id ? readProjectSpaceCache(id) : null
     const cachedChannels = cachedSpace?.channels ?? []
     set({
@@ -125,6 +146,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       projectHomeVersion: get().projectHomeVersion + 1,
     })
     if (!id) {
+      clearProjectSelection()
       set({ spaceLoading: false })
       return
     }  // 空 id = 返回项目列表，不加载 space
@@ -157,6 +179,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const channels = space.channels ?? []
       const nextActive = channels.some((c) => c.id === activeChannelId) ? activeChannelId : (channels[0]?.id ?? '')
       writeProjectSpaceCache(activeProjectId, space)
+      writeProjectSelection(activeProjectId, nextActive)
       set({
         space,
         landing: space.landing ?? null,
@@ -222,6 +245,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     if (!activeProjectId) return
     get().stopPolling()
     const cached = get().messageCache[channelMessageCacheKey(activeProjectId, id)]
+    writeProjectSelection(activeProjectId, id)
     set({
       activeChannelId: id,
       messages: cached?.messages ?? [],
@@ -401,5 +425,44 @@ function writeProjectSpaceCache(projectId: string, space: ProjectSpace): void {
     window.localStorage.setItem(projectSpaceCacheKey(projectId), JSON.stringify(entry))
   } catch {
     // Storage may be full or disabled; the live store still works.
+  }
+}
+
+function readProjectSelection(): ProjectSelectionEntry | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(PROJECT_SELECTION_KEY)
+    if (!raw) return null
+    const entry = JSON.parse(raw) as ProjectSelectionEntry
+    const userId = useAuthStore.getState().user?.id || 'anonymous'
+    if (entry.userId !== userId || !entry.projectId) return null
+    return entry
+  } catch {
+    return null
+  }
+}
+
+function writeProjectSelection(projectId: string, channelId: string) {
+  if (typeof window === 'undefined' || !projectId) return
+  try {
+    const userId = useAuthStore.getState().user?.id || 'anonymous'
+    const entry: ProjectSelectionEntry = {
+      userId,
+      projectId,
+      channelId,
+      updatedAt: Date.now(),
+    }
+    window.localStorage.setItem(PROJECT_SELECTION_KEY, JSON.stringify(entry))
+  } catch {
+    // Selection restore is best effort only.
+  }
+}
+
+function clearProjectSelection() {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(PROJECT_SELECTION_KEY)
+  } catch {
+    // ignore
   }
 }
