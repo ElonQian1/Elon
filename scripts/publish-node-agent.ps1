@@ -145,11 +145,30 @@ function Invoke-NoProxyJson {
 function Invoke-RemoteBash {
     param([Parameter(Mandatory = $true)][string]$Script)
 
-    $output = $Script | ssh -o ProxyCommand=none $Server "bash -s" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "服务器远程命令失败($LASTEXITCODE)：$(($output -join "`n").Trim())"
+    $result = Invoke-RemoteBashRaw -Script $Script
+    if ($result.ExitCode -ne 0) {
+        throw "服务器远程命令失败($($result.ExitCode))：$($result.Output)"
     }
-    return ($output -join "`n").Trim()
+    return $result.Output
+}
+
+function Invoke-RemoteBashRaw {
+    param([Parameter(Mandatory = $true)][string]$Script)
+
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($Script))
+    $remoteCommand = "printf '%s' '$encoded' | base64 -d | bash"
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = ssh -o ProxyCommand=none $Server $remoteCommand 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldPreference
+    }
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = ($output -join "`n").Trim()
+    }
 }
 
 function Test-RemoteNodeAgentAdminToken {
@@ -166,10 +185,10 @@ load_env /etc/elon-server.env
 load_env /root/Elon/server/.env
 test -n "${ADMIN_TOKEN:-}"
 '@
-    $output = $script | ssh -o ProxyCommand=none $Server "bash -s" 2>&1
-    if ($LASTEXITCODE -eq 0) { return $true }
-    if ($LASTEXITCODE -eq 1) { return $false }
-    throw "无法检查服务器 ADMIN_TOKEN：$(($output -join "`n").Trim())"
+    $result = Invoke-RemoteBashRaw -Script $script
+    if ($result.ExitCode -eq 0) { return $true }
+    if ($result.ExitCode -eq 1) { return $false }
+    throw "无法检查服务器 ADMIN_TOKEN：$($result.Output)"
 }
 
 function Invoke-RemoteNodeAgentUpdateBroadcast {
