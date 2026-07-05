@@ -341,6 +341,7 @@ function Write-ElonNodeUpdateLog {{
     Add-Content -LiteralPath $logFile -Encoding UTF8 -Value ((Get-Date).ToString('o') + ' ' + $Message)
   }} catch {{}}
 }}
+{replace_helpers}
 try {{
   Write-ElonNodeUpdateLog "scheduled package repair update from $zip"
   Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
@@ -350,6 +351,8 @@ try {{
   $packageClient = Join-Path $extractDir '一龙开发平台.exe'
   if (-not (Test-Path -LiteralPath $packageClient)) {{ $packageClient = Join-Path $extractDir '一龙PC节点.exe' }}
   if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
+  $installedClient = Join-Path $installDir '一龙开发平台.exe'
+  Stop-ElonNodeClientProcesses -Client $installedClient -TimeoutSeconds 30
   $repair = Start-Process -FilePath $packageClient -ArgumentList '--repair' -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
   if ($null -eq $repair) {{ throw 'Start-Process did not return a repair process handle' }}
   Wait-Process -Id $repair.Id -Timeout 120 -ErrorAction Stop
@@ -369,7 +372,8 @@ try {{
         pid_to_wait = pid_to_wait,
         tmp_zip = launcher_command::ps_single_quote(&tmp_zip.to_string_lossy()),
         install_dir = launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
-        tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy())
+        tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
+        replace_helpers = UPDATE_REPLACE_HELPERS
     )
 }
 
@@ -753,6 +757,7 @@ mod tests {
         assert!(script.contains("+ '.zip'"));
         assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
         assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
+        assert!(script.contains("Stop-ElonNodeClientProcesses -Client $installedClient"));
         assert!(script.contains("Start-Process -FilePath $packageClient -ArgumentList '--repair'"));
         assert!(script.contains("Wait-Process -Id $repair.Id -Timeout 120"));
         assert!(script.contains("client-update.log"));
