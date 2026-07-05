@@ -203,10 +203,7 @@ if [ -z "${ADMIN_TOKEN:-}" ]; then
   echo "ADMIN_TOKEN missing on server" >&2
   exit 2
 fi
-curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' \
-  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-  -H 'Content-Type: application/json' \
-  --data '{}'
+curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' -H "Authorization: Bearer ${ADMIN_TOKEN}" -H 'Content-Type: application/json' --data '{}'
 '@
     $raw = Invoke-RemoteBash -Script $script
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
