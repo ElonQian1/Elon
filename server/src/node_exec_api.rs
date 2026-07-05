@@ -220,7 +220,7 @@ fn clean_node_exec_output(output: &str) -> String {
         .join("\n")
         .trim()
         .to_string();
-    if filtered.is_empty() {
+    if filtered.is_empty() && !output.lines().any(is_codex_protocol_event_line) {
         output.trim().to_string()
     } else {
         filtered
@@ -284,5 +284,10 @@ codex
     #[test]
     fn node_exec_output_keeps_normal_text() {
         assert_eq!(clean_node_exec_output("普通输出\n第二行"), "普通输出\n第二行");
+    }
+
+    #[test]
+    fn node_exec_output_removes_protocol_only_events() {
+        assert_eq!(clean_node_exec_output(r#"{"type":"turn.started"}"#), "");
     }
 }

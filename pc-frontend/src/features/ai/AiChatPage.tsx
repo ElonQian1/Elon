@@ -572,7 +572,12 @@ export default function AiChatPage() {
         )
         const nodeMsg: AiMessage = {
           role: 'assistant',
-          content: res.output || (res.error ? `执行失败：${res.error}` : '（无输出）'),
+          content: res.output
+            || (res.error
+              ? `执行失败：${res.error}`
+              : res.exit_ok === false
+                ? '远程 Codex 执行失败，但节点没有返回错误详情。请稍后重试，或换一个远程节点。'
+                : '（无输出）'),
           created_at: new Date().toISOString(),
           node_exec: true,
           node_display_name: res.node_display_name || targetNodeName,
