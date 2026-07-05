@@ -4,6 +4,7 @@ import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
+import { useWorkbenchTabCoordinator } from './useWorkbenchTabCoordinator'
 import { useAuthStore } from '../../store/auth'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import LocalModeBanner from './LocalModeBanner'
@@ -62,7 +63,23 @@ function AccountClaimBanner() {
   )
 }
 
+function DuplicateWorkbenchNotice() {
+  return (
+    <div className={styles.duplicateTabPage} role="status">
+      <div className={styles.duplicateTabPanel}>
+        <CircleCheck size={26} aria-hidden="true" />
+        <h1>PC 工作台已在另一个标签打开</h1>
+        <p>已切回已有标签；本页可以关闭。</p>
+        <button type="button" onClick={() => window.close()}>
+          关闭本页
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Shell() {
+  const duplicateTab = useWorkbenchTabCoordinator()
   useNotifications()
   const token = useAuthStore((s) => s.token)
   const fetchMe = useAuthStore((s) => s.fetchMe)
@@ -77,6 +94,8 @@ export default function Shell() {
       }
     })
   }, [token])
+
+  if (duplicateTab) return <DuplicateWorkbenchNotice />
 
   return (
     <div className={styles.shell}>

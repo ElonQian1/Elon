@@ -75,3 +75,26 @@ export function cloudWebSocketUrl(path: string): string {
 export function localNodeUrl(path: string): string {
   return new URL(path.replace(/^\//, ''), `${localNodeBaseUrl()}/`).toString()
 }
+
+export function cloudWorkbenchUrl(
+  pathname = location.pathname,
+  search = location.search,
+  hash = location.hash,
+): string {
+  const url = new URL(normalizePcPath(pathname), `${cloudBaseUrl()}/`)
+  const params = new URLSearchParams(search)
+  params.delete('node_admin')
+  params.forEach((value, key) => {
+    url.searchParams.append(key, value)
+  })
+  url.searchParams.set('node_admin', new URL('/', `${localNodeBaseUrl()}/`).toString())
+  url.hash = hash
+  return url.toString()
+}
+
+function normalizePcPath(pathname: string): string {
+  if (pathname === '/pc-next') return '/pc'
+  if (pathname.startsWith('/pc-next/')) return `/pc${pathname.slice('/pc-next'.length)}`
+  if (pathname === '/pc' || pathname.startsWith('/pc/')) return pathname
+  return '/pc'
+}

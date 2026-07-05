@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MonitorCheck, RefreshCw, WifiOff } from 'lucide-react'
-import { cloudBaseUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
+import { cloudBaseUrl, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
 import styles from './Shell.module.css'
 
 type CloudState = 'checking' | 'online' | 'offline'
@@ -42,13 +42,20 @@ export default function LocalModeBanner() {
     }
   }, [localMode])
 
+  useEffect(() => {
+    if (!localMode || cloudState !== 'online') return
+    const target = cloudWorkbenchUrl()
+    if (new URL(target).origin === location.origin) return
+    window.location.replace(target)
+  }, [cloudState, localMode])
+
   if (!localMode) {
     if (cloudState !== 'offline') return null
     return (
       <div className={[styles.nodeBanner, styles.localModeOffline].join(' ')}>
         <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
         <span>云端连接异常 · 当前显示的是一龙 PC 工作台缓存壳，本机 Win 端可用于诊断网络或防火墙问题。</span>
-        <a href={localNodeUrl('/pc')} target="_blank" rel="noreferrer">打开本机工作台</a>
+        <a href={localNodeUrl('/pc')}>打开本机工作台</a>
       </div>
     )
   }

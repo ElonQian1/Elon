@@ -135,3 +135,57 @@
   background: rgba(245, 176, 76, .16);
   color: #ffe2ad;
 }
+
+.duplicateTabPage {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--bg-base);
+  color: var(--text);
+}
+
+.duplicateTabPanel {
+  width: min(420px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  border-radius: 8px;
+  background: var(--sidebar-2);
+  text-align: center;
+}
+
+.duplicateTabPanel svg {
+  color: #8ad7ff;
+}
+
+.duplicateTabPanel h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.duplicateTabPanel p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.duplicateTabPanel button {
+  min-width: 108px;
+  height: 34px;
+  border: 1px solid rgba(138, 215, 255, .52);
+  border-radius: 6px;
+  background: rgba(138, 215, 255, .12);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.duplicateTabPanel button:hover,
+.duplicateTabPanel button:focus-visible {
+  background: rgba(138, 215, 255, .2);
+}
