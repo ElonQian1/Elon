@@ -54,9 +54,9 @@ function AccountClaimBanner() {
 
   return (
     <div className={styles.claimBanner}>
-      <span>认证账号后同步项目、好友和电脑节点。</span>
+      <span>注册账号后同步项目、好友和电脑节点。</span>
       <button type="button" onClick={() => navigate('/login')}>
-        认证账号
+        注册账号
       </button>
     </div>
   )
