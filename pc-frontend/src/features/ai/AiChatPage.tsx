@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Bot, ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react'
+import { Bot, ChevronLeft, ChevronRight, Folder, Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -35,6 +35,9 @@ interface AiConversation {
   title?: string
   updated_at?: string
   message_count?: number
+  project_id?: string
+  project_name?: string
+  first_user_message?: string
 }
 
 interface AiMessage {
@@ -64,6 +67,57 @@ interface Friend {
   already_friend?: boolean
 }
 
+const GENERIC_AI_TITLES = new Set(['普通聊天会话', '新对话', 'AI 对话', '一龙 AI 对话'])
+
+function compactConversationText(text?: string, maxLength = 28) {
+  const normalized = (text ?? '').replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized
+}
+
+function isGenericConversationTitle(title?: string) {
+  const normalized = (title ?? '').trim()
+  return !normalized || GENERIC_AI_TITLES.has(normalized)
+}
+
+function displayProjectName(name?: string) {
+  const normalized = (name ?? '').trim()
+  if (!normalized || GENERIC_AI_TITLES.has(normalized)) return '一龙 AI'
+  return normalized
+}
+
+function makeConversationTitle(text: string) {
+  return compactConversationText(text, 32) || '新对话'
+}
+
+function conversationTitle(conversation: AiConversation | undefined, previews: Record<string, string>) {
+  if (!conversation) return '新对话'
+  const title = conversation.title?.trim()
+  if (title && !GENERIC_AI_TITLES.has(title)) return title
+  return compactConversationText(conversation.first_user_message, 32)
+    || compactConversationText(previews[conversation.id], 32)
+    || title
+    || '新对话'
+}
+
+function formatHistoryAge(input?: string) {
+  if (!input) return ''
+  const time = new Date(input).getTime()
+  if (!Number.isFinite(time)) return ''
+  const diffMs = Math.max(0, Date.now() - time)
+  const minute = 60 * 1000
+  const hour = 60 * minute
+  const day = 24 * hour
+  const week = 7 * day
+  const month = 30 * day
+  if (diffMs < minute) return '刚刚'
+  if (diffMs < hour) return `${Math.floor(diffMs / minute)}分`
+  if (diffMs < day) return `${Math.floor(diffMs / hour)}小时`
+  if (diffMs < week) return `${Math.floor(diffMs / day)}天`
+  if (diffMs < month) return `${Math.floor(diffMs / week)}周`
+  return formatTime(input)
+}
+
 export default function AiChatPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -73,6 +127,9 @@ export default function AiChatPage() {
 
   const [conversations, setConversations] = useState<AiConversation[]>([])
   const [conversationsLoaded, setConversationsLoaded] = useState(false)
+  const [conversationPreviews, setConversationPreviews] = useState<Record<string, string>>({})
+  const [historyProjectName, setHistoryProjectName] = useState('一龙 AI')
+  const [expandedHistoryGroups, setExpandedHistoryGroups] = useState<Record<string, boolean>>({})
   const pendingAiDraftRef = useRef<AiComposerDraft | null>(readAiComposerDraft())
   const aiDraftReadyRef = useRef(false)
   // 初始即创建新会话 ID，保证输入框始终可见（与旧版一致）
@@ -129,6 +186,8 @@ export default function AiChatPage() {
     let cancelled = false
     if (!user?.id) {
       setConversations([])
+      setConversationPreviews({})
+      setHistoryProjectName('一龙 AI')
       setConversationsLoaded(true)
       setFriends([])
       setTotalUserCount(0)
@@ -204,6 +263,68 @@ export default function AiChatPage() {
   const onlineFriends = useMemo(() => filteredFriends.filter(f => f.is_online), [filteredFriends])
   const offlineFriends = useMemo(() => filteredFriends.filter(f => !f.is_online), [filteredFriends])
   const visibleUserCount = totalUserCount || friends.length
+  const visibleConversations = useMemo(
+    () => conversations.filter((conversation) => (conversation.message_count ?? 0) > 0 || conversation.id === activeConvId),
+    [activeConvId, conversations],
+  )
+  const historyGroups = useMemo(() => {
+    const groups = new Map<string, { id: string; name: string; conversations: AiConversation[] }>()
+    visibleConversations.forEach((conversation) => {
+      const name = displayProjectName(conversation.project_name || historyProjectName)
+      const id = conversation.project_id || name
+      const group = groups.get(id) ?? { id, name, conversations: [] }
+      group.conversations.push(conversation)
+      groups.set(id, group)
+    })
+    return Array.from(groups.values())
+  }, [historyProjectName, visibleConversations])
+  const activeConversation = useMemo(
+    () => conversations.find((conversation) => conversation.id === activeConvId),
+    [activeConvId, conversations],
+  )
+  const activeConversationTitle = activeConversation
+    ? conversationTitle(activeConversation, conversationPreviews)
+    : conversationPreviews[activeConvId] || '新对话'
+
+  useEffect(() => {
+    if (!user?.id || visibleConversations.length === 0) return
+    let cancelled = false
+    const needsPreview = visibleConversations
+      .filter((conversation) =>
+        (conversation.message_count ?? 0) > 0
+        && isGenericConversationTitle(conversation.title)
+        && !conversation.first_user_message
+        && !conversationPreviews[conversation.id]
+      )
+      .slice(0, 24)
+    if (needsPreview.length === 0) return
+
+    Promise.all(needsPreview.map(async (conversation) => {
+      try {
+        const data = await api.get<{ messages?: AiMessage[] }>(
+          `/api/me/ai/conversations/${encodeURIComponent(conversation.id)}/messages?limit=12`,
+        )
+        const firstUserMessage = (data.messages ?? []).find((message) => message.role === 'user')?.content
+        const preview = compactConversationText(firstUserMessage, 32)
+        return preview ? [conversation.id, preview] as const : null
+      } catch {
+        return null
+      }
+    })).then((entries) => {
+      if (cancelled) return
+      const nextEntries = entries.filter((entry): entry is readonly [string, string] => Boolean(entry))
+      if (nextEntries.length === 0) return
+      setConversationPreviews((current) => {
+        const next = { ...current }
+        nextEntries.forEach(([id, preview]) => {
+          next[id] = preview
+        })
+        return next
+      })
+    })
+
+    return () => { cancelled = true }
+  }, [conversationPreviews, user?.id, visibleConversations])
 
   useEffect(() => {
     if (atBottomRef.current && feedRef.current) {
@@ -214,10 +335,16 @@ export default function AiChatPage() {
   async function loadConversations() {
     setConversationsLoaded(false)
     try {
-      const data = await api.get<{ conversations?: AiConversation[] }>(
+      const data = await api.get<{ conversations?: AiConversation[]; project_id?: string; project_name?: string }>(
         '/api/me/ai/conversations?limit=50',
       )
-      setConversations(data.conversations ?? [])
+      const projectName = displayProjectName(data.project_name)
+      setHistoryProjectName(projectName)
+      setConversations((data.conversations ?? []).map((conversation) => ({
+        ...conversation,
+        project_id: conversation.project_id ?? data.project_id,
+        project_name: conversation.project_name ?? projectName,
+      })))
     } catch { /* ignore */ }
     finally { setConversationsLoaded(true) }
   }
@@ -320,6 +447,13 @@ export default function AiChatPage() {
     if (textareaRef.current) textareaRef.current.style.height = '46px'
 
     const convId = activeConvId
+    const isExistingConversation = conversations.some(
+      (conversation) => conversation.id === convId && (conversation.message_count ?? 0) > 0,
+    )
+    const newConversationTitle = isExistingConversation ? undefined : makeConversationTitle(text)
+    if (newConversationTitle) {
+      setConversationPreviews((current) => ({ ...current, [convId]: newConversationTitle }))
+    }
 
     // 乐观更新：先显示用户消息
     const userMsg: AiMessage = { role: 'user', content: text, created_at: new Date().toISOString() }
@@ -354,6 +488,7 @@ export default function AiChatPage() {
           agent: requestAgent || null,
           runtimeRoute: requestRuntimeRoute,
           conversation_id: convId,
+          conversation_title: newConversationTitle,
           scope: 'chat_memory',
         })
         const reply = res.reply ?? res.content ?? ''
@@ -407,23 +542,55 @@ export default function AiChatPage() {
           </button>
         </div>
         <div className={styles.convList}>
-          {conversations.length === 0 && (
-            <p className={styles.hint}>还没有对话记录</p>
+          {historyGroups.length === 0 && (
+            <p className={styles.hint}>{conversationsLoaded ? '还没有对话记录' : '正在加载对话记录...'}</p>
           )}
-          {conversations.map((c) => (
-            <button
-              key={c.id}
-              className={[styles.convItem, c.id === activeConvId ? styles.convActive : ''].join(' ')}
-              onClick={() => selectConversation(c.id)}
-              type="button"
-            >
-              <strong className={styles.convTitle}>{c.title ?? '新对话'}</strong>
-              <span className={styles.convMeta}>
-                {c.message_count ? `${c.message_count} 条` : ''}
-                {c.updated_at ? ` · ${formatTime(c.updated_at)}` : ''}
-              </span>
-            </button>
-          ))}
+          {historyGroups.map((group) => {
+            const expanded = expandedHistoryGroups[group.id] ?? false
+            const visibleItems = expanded ? group.conversations : group.conversations.slice(0, 5)
+            return (
+              <section className={styles.historyGroup} key={group.id}>
+                <div className={styles.historyGroupHeader}>
+                  <Folder aria-hidden="true" size={14} strokeWidth={2} />
+                  <span>{group.name}</span>
+                </div>
+                {visibleItems.map((conversation) => (
+                  <button
+                    key={conversation.id}
+                    className={[styles.historyItem, conversation.id === activeConvId ? styles.historyItemActive : ''].join(' ')}
+                    onClick={() => selectConversation(conversation.id)}
+                    type="button"
+                  >
+                    <span className={styles.historyItemMain}>
+                      <strong className={styles.historyItemTitle}>
+                        {conversationTitle(conversation, conversationPreviews)}
+                      </strong>
+                      {conversation.updated_at && (
+                        <time className={styles.historyItemTime} dateTime={conversation.updated_at}>
+                          {formatHistoryAge(conversation.updated_at)}
+                        </time>
+                      )}
+                    </span>
+                    {(conversation.message_count ?? 0) > 1 && (
+                      <span className={styles.historyItemMeta}>{conversation.message_count} 条</span>
+                    )}
+                  </button>
+                ))}
+                {group.conversations.length > 5 && (
+                  <button
+                    className={styles.historyExpand}
+                    onClick={() => setExpandedHistoryGroups((current) => ({
+                      ...current,
+                      [group.id]: !expanded,
+                    }))}
+                    type="button"
+                  >
+                    {expanded ? '收起' : '展开显示'}
+                  </button>
+                )}
+              </section>
+            )
+          })}
         </div>
         <SidebarUserStrip />
       </aside>
@@ -432,7 +599,7 @@ export default function AiChatPage() {
       <div className={styles.chat}>
         <header className={styles.topbar}>
           <span className={styles.topbarTitle}>
-            {conversations.find((c) => c.id === activeConvId)?.title ?? '新对话'}
+            {activeConversationTitle}
           </span>
           <div className={styles.topbarRight}>
             <button

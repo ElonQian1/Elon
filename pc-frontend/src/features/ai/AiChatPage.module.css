@@ -131,35 +131,103 @@
 
 .convList {
   overflow-y: auto;
-  padding: 6px 8px;
+  padding: 8px 8px 14px;
   scrollbar-width: thin;
 }
 
-.convItem {
+.historyGroup {
+  margin-bottom: 16px;
+}
+
+.historyGroupHeader {
+  height: 26px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #b6bac4;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.historyGroupHeader span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyItem {
   width: 100%;
-  padding: 8px 10px;
+  min-height: 38px;
+  padding: 7px 9px;
   border-radius: 6px;
   text-align: left;
   background: transparent;
   color: var(--text-soft);
-  transition: background .1s;
+  transition: background .1s, color .1s;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  margin-bottom: 2px;
 }
-.convItem:hover { background: #303138; color: var(--text); }
-.convActive   { background: rgba(60, 111, 162, .2); color: #eaf2ff; }
 
-.convTitle {
+.historyItem:hover {
+  background: rgba(255, 255, 255, .055);
+  color: var(--text);
+}
+
+.historyItemActive {
+  background: rgba(60, 111, 162, .24);
+  color: #edf5ff;
+}
+
+.historyItemMain {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.historyItemTitle {
+  min-width: 0;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
+  line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  display: block;
 }
-.convMeta { font-size: 11px; color: var(--text-muted); }
+
+.historyItemTime {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.historyItemMeta {
+  color: #77808d;
+  font-size: 11px;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historyExpand {
+  margin-top: 4px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  color: #8e94a0;
+  font-size: 12px;
+  text-align: left;
+}
+
+.historyExpand:hover {
+  background: rgba(255, 255, 255, .05);
+  color: #c8ccd4;
+}
 
 /* ── 聊天区 ── */
 .chat {
