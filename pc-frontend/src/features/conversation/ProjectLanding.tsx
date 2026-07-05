@@ -353,7 +353,7 @@ function DownloadCard({ download }: { download: ProjectLandingDownload }) {
       </span>
       <span className={styles.downloadCopy}>
         <strong>{download.label || meta.label}</strong>
-        <small>{[download.version, download.size].filter(Boolean).join(' · ') || download.short || meta.short}</small>
+        <small>{[download.version, downloadSizeLabel(download)].filter(Boolean).join(' / ') || download.short || meta.short}</small>
         {download.note && <em>{download.note}</em>}
       </span>
       <span className={styles.downloadStatus}>{statusLabel(status, enabled)}</span>
@@ -518,6 +518,21 @@ function downloadLabel(download: ProjectLandingDownload) {
   const platform = normalizePlatform(download.platform)
   const meta = PLATFORM_META[platform]
   return download.label || meta?.label || download.platform || '下载项目'
+}
+
+function downloadSizeLabel(download: ProjectLandingDownload) {
+  if (download.size) return download.size
+  if (download.size_label) return download.size_label
+  if (download.sizeLabel) return download.sizeLabel
+  return formatDownloadBytes(download.size_bytes ?? download.sizeBytes)
+}
+
+function formatDownloadBytes(value: string | number | undefined) {
+  const bytes = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(bytes) || bytes <= 0) return ''
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${bytes} B`
 }
 
 function isDownloadEnabled(download: ProjectLandingDownload) {

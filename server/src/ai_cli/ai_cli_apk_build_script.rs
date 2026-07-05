@@ -67,6 +67,9 @@ $WrapperJarB64 = '__ELON_WRAPPER_JAR_B64__'
 $GradlewBatB64 = '__ELON_GRADLEW_BAT_B64__'
 $GradlewShB64 = '__ELON_GRADLEW_SH_B64__'
 $script:BootstrapTouched = $false
+$script:MinSelectedApkModifiedUtc = $null
+$script:ElonBuildVersionCode = [int][DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+$script:ElonBuildVersionName = ('0.' + $script:ElonBuildVersionCode)
 
 function Find-LatestApk {
   $roots = @(
@@ -87,6 +90,9 @@ function Find-LatestApk {
     if (Test-Path -LiteralPath $root) {
       $files += Get-ChildItem -LiteralPath $root -Recurse -Filter *.apk -File -ErrorAction SilentlyContinue
     }
+  }
+  if ($script:MinSelectedApkModifiedUtc) {
+    $files = @($files | Where-Object { $_.LastWriteTimeUtc -ge $script:MinSelectedApkModifiedUtc })
   }
 __ELON_FRESHNESS_FILTER__
   return ($files | Sort-Object LastWriteTimeUtc -Descending | Select-Object -First 1)
@@ -206,8 +212,8 @@ android {
         applicationId "$packageName"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode (project.findProperty("elonVersionCode") ?: "1").toInteger()
+        versionName (project.findProperty("elonVersionName") ?: "1.0").toString()
     }
 }
 "@
@@ -326,6 +332,52 @@ function Invoke-NativeToLog {
   }
 }
 
+function Find-AndroidSdkTool {
+  param([string]$ToolName)
+  $localSdk = if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Android\Sdk' } else { $null }
+  $roots = @(
+    $env:ANDROID_HOME,
+    $env:ANDROID_SDK_ROOT,
+    $localSdk
+  ) | Where-Object { $_ -and (Test-Path -LiteralPath $_) }
+  foreach ($root in $roots) {
+    $buildTools = Join-Path $root 'build-tools'
+    if (-not (Test-Path -LiteralPath $buildTools)) { continue }
+    $tool = Get-ChildItem -LiteralPath $buildTools -Recurse -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -eq $ToolName -or $_.Name -eq "$ToolName.exe" } |
+      Sort-Object FullName -Descending |
+      Select-Object -First 1
+    if ($tool) { return $tool.FullName }
+  }
+  $command = Get-Command $ToolName -ErrorAction SilentlyContinue
+  if ($command) { return $command.Source }
+  $command = Get-Command "$ToolName.exe" -ErrorAction SilentlyContinue
+  if ($command) { return $command.Source }
+  return $null
+}
+
+function Read-ApkMetadata {
+  param([string]$ApkPath)
+  $metadata = @{}
+  $aapt = Find-AndroidSdkTool -ToolName 'aapt'
+  if (-not $aapt) { return $metadata }
+  try {
+    $line = (& $aapt dump badging $ApkPath 2>$null | Select-Object -First 1)
+    if ($line -match "name='([^']+)'") { $metadata.Package = $Matches[1] }
+    if ($line -match "versionCode='([^']+)'") { $metadata.VersionCode = $Matches[1] }
+    if ($line -match "versionName='([^']+)'") { $metadata.VersionName = $Matches[1] }
+  } catch {}
+  return $metadata
+}
+
+function Get-GitSha {
+  try {
+    $sha = (& git rev-parse HEAD 2>$null)
+    if ($LASTEXITCODE -eq 0 -and $sha) { return ($sha | Select-Object -First 1).Trim() }
+  } catch {}
+  return $null
+}
+
 function Commit-BootstrapIfGit {
   if (-not $script:BootstrapTouched) { return }
   try {
@@ -357,7 +409,14 @@ function Invoke-AndroidDebugBuild {
     Ensure-AndroidBuildBootstrap
     Commit-BootstrapIfGit
     $file = $null
-    $args = @(':app:assembleDebug', '--no-daemon', '--stacktrace')
+    $args = @(
+      ':app:assembleDebug',
+      '--rerun-tasks',
+      '--no-daemon',
+      '--stacktrace',
+      "-PelonVersionCode=$script:ElonBuildVersionCode",
+      "-PelonVersionName=$script:ElonBuildVersionName"
+    )
     if (Test-Path -LiteralPath 'gradlew.bat') {
       $file = '.\gradlew.bat'
     } elseif (Test-Path -LiteralPath 'gradlew') {
@@ -385,14 +444,30 @@ function Invoke-AndroidDebugBuild {
 }
 
 if ($BuildIfMissing) {
+  $buildStartedUtc = [DateTime]::UtcNow
+  $script:MinSelectedApkModifiedUtc = $buildStartedUtc.AddSeconds(-60)
   Write-Output 'ELON_APK_BUILD_ATTEMPT_BEGIN'
+  Write-Output ('ELON_APK_BUILD_STARTED_AT:' + $buildStartedUtc.ToString('o'))
   Invoke-AndroidDebugBuild
   Write-Output 'ELON_APK_BUILD_ATTEMPT_END'
 }
 $apk = Find-LatestApk
-if (-not $apk) { exit 2 }
+if (-not $apk) {
+  if ($BuildIfMissing) {
+    Write-Error 'No fresh APK was produced by this build; refusing to reuse an older APK.'
+    exit 4
+  }
+  exit 2
+}
 if ($apk.Length -gt 104857600) { Write-Error 'APK too large to relay'; exit 3 }
+$metadata = Read-ApkMetadata -ApkPath $apk.FullName
+$gitSha = Get-GitSha
 Write-Output ('ELON_APK_NAME:' + $apk.Name)
+Write-Output ('ELON_APK_MODIFIED_AT:' + $apk.LastWriteTimeUtc.ToString('o'))
+if ($metadata.Package) { Write-Output ('ELON_APK_PACKAGE:' + $metadata.Package) }
+if ($metadata.VersionCode) { Write-Output ('ELON_APK_VERSION_CODE:' + $metadata.VersionCode) }
+if ($metadata.VersionName) { Write-Output ('ELON_APK_VERSION_NAME:' + $metadata.VersionName) }
+if ($gitSha) { Write-Output ('ELON_APK_GIT_SHA:' + $gitSha) }
 Write-Output 'ELON_APK_BASE64_BEGIN'
 $payload = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($apk.FullName))
 $chunkSize = 65536
@@ -428,6 +503,12 @@ mod tests {
         assert!(script.contains("Ensure-AndroidBuildBootstrap"));
         assert!(script.contains("Invoke-GitQuiet"));
         assert!(script.contains("Invoke-NativeToLog"));
+        assert!(script.contains("--rerun-tasks"));
+        assert!(script.contains("MinSelectedApkModifiedUtc"));
+        assert!(script.contains("No fresh APK was produced by this build"));
+        assert!(script.contains("ELON_APK_PACKAGE"));
+        assert!(script.contains("ELON_APK_VERSION_CODE"));
+        assert!(script.contains("ELON_APK_GIT_SHA"));
         assert!(script.contains("ELON_APK_BOOTSTRAP_COMMIT_SKIPPED"));
         assert!(script.contains("gradle-wrapper.jar"));
     }

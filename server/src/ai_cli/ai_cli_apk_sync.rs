@@ -21,6 +21,23 @@ struct SyncedPcApk {
     file_name: String,
     sha256: String,
     size_bytes: i64,
+    metadata: SyncedPcApkMetadata,
+}
+
+#[derive(Debug, Default)]
+struct SyncedPcApkMetadata {
+    package_name: Option<String>,
+    version_name: Option<String>,
+    version_code: Option<i64>,
+    build_started_at: Option<String>,
+    source_git_sha: Option<String>,
+    apk_modified_at: Option<String>,
+}
+
+struct PcApkRelayOutput {
+    file_name: String,
+    apk_bytes: Vec<u8>,
+    metadata: SyncedPcApkMetadata,
 }
 
 pub(crate) fn pc_apk_probe_since(request_mode: AiCliRequestMode, cwd: Option<&str>) -> Option<u64> {
@@ -124,6 +141,12 @@ fn register_synced_pc_release(
         return;
     }
     let file_path = apk.path.to_string_lossy();
+    let metadata_json = synced_pc_apk_metadata_json(&apk.metadata);
+    let version_name = apk
+        .metadata
+        .version_name
+        .as_deref()
+        .unwrap_or("PC node debug build");
     if let Err(error) =
         state
             .store
@@ -132,7 +155,9 @@ fn register_synced_pc_release(
                 project_id,
                 task_id: None,
                 uploaded_by: None,
-                version_name: Some("PC node debug build"),
+                version_name: Some(version_name),
+                package_name: apk.metadata.package_name.as_deref(),
+                version_code: apk.metadata.version_code,
                 channel: Some("pc_node"),
                 status: Some("published"),
                 apk_url,
@@ -141,6 +166,10 @@ fn register_synced_pc_release(
                 sha256: Some(&apk.sha256),
                 size_bytes: Some(apk.size_bytes),
                 changelog: Some("Synced from PC node after AI development task"),
+                build_started_at: apk.metadata.build_started_at.as_deref(),
+                source_git_sha: apk.metadata.source_git_sha.as_deref(),
+                source_worktree: None,
+                metadata_json: metadata_json.as_deref(),
             })
     {
         tracing::warn!(
@@ -220,25 +249,22 @@ async fn sync_pc_agent_apk_artifact(
         ));
     }
 
-    let Some((filename, apk_bytes)) = parse_pc_apk_relay_output(&output)? else {
+    let Some(relay) = parse_pc_apk_relay_output(&output)? else {
         return Ok(None);
     };
     let artifact_dir = artifact_workspace.join("artifacts");
     tokio::fs::create_dir_all(&artifact_dir).await?;
-    let artifact_path = artifact_dir.join(filename);
-    let sha256 = format!("{:x}", Sha256::digest(&apk_bytes));
-    let size_bytes = apk_bytes.len() as i64;
-    tokio::fs::write(&artifact_path, apk_bytes).await?;
-    let file_name = artifact_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("ElonSpeed-latest.apk")
-        .to_string();
+    let sha256 = format!("{:x}", Sha256::digest(&relay.apk_bytes));
+    let size_bytes = relay.apk_bytes.len() as i64;
+    let artifact_name = unique_pc_apk_artifact_name(&relay.file_name, &sha256);
+    let artifact_path = artifact_dir.join(artifact_name);
+    tokio::fs::write(&artifact_path, relay.apk_bytes).await?;
     Ok(Some(SyncedPcApk {
         path: artifact_path,
-        file_name,
+        file_name: relay.file_name,
         sha256,
         size_bytes,
+        metadata: relay.metadata,
     }))
 }
 
@@ -261,7 +287,7 @@ fn pc_task_text_chunk(data: &str) -> String {
     data.to_string()
 }
 
-fn parse_pc_apk_relay_output(output: &str) -> Result<Option<(String, Vec<u8>)>> {
+fn parse_pc_apk_relay_output(output: &str) -> Result<Option<PcApkRelayOutput>> {
     use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
     let Some(begin_index) = output.find("ELON_APK_BASE64_BEGIN") else {
@@ -288,7 +314,51 @@ fn parse_pc_apk_relay_output(output: &str) -> Result<Option<(String, Vec<u8>)>> 
         return Ok(None);
     }
     let apk_bytes = B64.decode(payload)?;
-    Ok(Some((filename, apk_bytes)))
+    Ok(Some(PcApkRelayOutput {
+        file_name: filename,
+        apk_bytes,
+        metadata: SyncedPcApkMetadata {
+            package_name: relay_metadata_line(output, "ELON_APK_PACKAGE:"),
+            version_name: relay_metadata_line(output, "ELON_APK_VERSION_NAME:"),
+            version_code: relay_metadata_line(output, "ELON_APK_VERSION_CODE:")
+                .and_then(|value| value.parse::<i64>().ok()),
+            build_started_at: relay_metadata_line(output, "ELON_APK_BUILD_STARTED_AT:"),
+            source_git_sha: relay_metadata_line(output, "ELON_APK_GIT_SHA:"),
+            apk_modified_at: relay_metadata_line(output, "ELON_APK_MODIFIED_AT:"),
+        },
+    }))
+}
+
+fn relay_metadata_line(output: &str, prefix: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let value = line.trim().strip_prefix(prefix)?.trim();
+        if value.is_empty() || value.len() > 512 {
+            return None;
+        }
+        let cleaned = value
+            .chars()
+            .filter(|ch| !ch.is_control())
+            .collect::<String>();
+        (!cleaned.is_empty()).then_some(cleaned)
+    })
+}
+
+fn unique_pc_apk_artifact_name(file_name: &str, sha256: &str) -> String {
+    let prefix = sha256.chars().take(12).collect::<String>();
+    format!("{prefix}-{}", safe_pc_apk_filename(file_name))
+}
+
+fn synced_pc_apk_metadata_json(metadata: &SyncedPcApkMetadata) -> Option<String> {
+    let value = serde_json::json!({
+        "source": "pc_node_apk_sync",
+        "package_name": metadata.package_name.as_deref(),
+        "version_name": metadata.version_name.as_deref(),
+        "version_code": metadata.version_code,
+        "build_started_at": metadata.build_started_at.as_deref(),
+        "source_git_sha": metadata.source_git_sha.as_deref(),
+        "apk_modified_at": metadata.apk_modified_at.as_deref(),
+    });
+    Some(value.to_string()).filter(|json| json != "{}")
 }
 
 pub(crate) fn safe_pc_apk_filename(raw: &str) -> String {
@@ -310,7 +380,10 @@ pub(crate) fn safe_pc_apk_filename(raw: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_pc_apk_relay_output, pc_task_text_chunk, project_id_from_download_base};
+    use super::{
+        parse_pc_apk_relay_output, pc_task_text_chunk, project_id_from_download_base,
+        unique_pc_apk_artifact_name,
+    };
     use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
     #[test]
@@ -336,17 +409,32 @@ mod tests {
         let apk_bytes = b"fake apk bytes";
         let payload = B64.encode(apk_bytes);
         let output = format!(
-            "ELON_APK_NAME:app-debug.apk\nELON_APK_BASE64_BEGIN\n{}\n{}\nELON_APK_BASE64_END\n",
+            "ELON_APK_NAME:app-debug.apk\nELON_APK_PACKAGE:com.example.app\nELON_APK_VERSION_CODE:42\nELON_APK_VERSION_NAME:1.2.3\nELON_APK_GIT_SHA:abc1234\nELON_APK_BASE64_BEGIN\n{}\n{}\nELON_APK_BASE64_END\n",
             &payload[..8],
             &payload[8..]
         );
 
-        let (filename, parsed) = parse_pc_apk_relay_output(&output)
+        let relay = parse_pc_apk_relay_output(&output)
             .expect("relay output should parse")
             .expect("apk should be present");
 
-        assert_eq!(filename, "app-debug.apk");
-        assert_eq!(parsed, apk_bytes);
+        assert_eq!(relay.file_name, "app-debug.apk");
+        assert_eq!(relay.apk_bytes, apk_bytes);
+        assert_eq!(
+            relay.metadata.package_name.as_deref(),
+            Some("com.example.app")
+        );
+        assert_eq!(relay.metadata.version_code, Some(42));
+        assert_eq!(relay.metadata.version_name.as_deref(), Some("1.2.3"));
+        assert_eq!(relay.metadata.source_git_sha.as_deref(), Some("abc1234"));
+    }
+
+    #[test]
+    fn unique_artifact_name_keeps_original_download_name_safe() {
+        assert_eq!(
+            unique_pc_apk_artifact_name("..\\app-debug.apk", "abcdef1234567890"),
+            "abcdef123456-app-debug.apk"
+        );
     }
 
     #[test]

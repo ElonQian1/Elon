@@ -51,9 +51,14 @@ pub fn routes() -> Router<Arc<AppState>> {
 pub struct ReleaseUploadQuery {
     pub file_name: Option<String>,
     pub version_name: Option<String>,
+    pub package_name: Option<String>,
+    pub version_code: Option<i64>,
     pub changelog: Option<String>,
     pub channel: Option<String>,
     pub task_id: Option<String>,
+    pub build_started_at: Option<String>,
+    pub source_git_sha: Option<String>,
+    pub source_worktree: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -139,6 +144,8 @@ pub async fn upload_project_release(
             task_id: query.task_id.as_deref(),
             uploaded_by: Some(&user.id),
             version_name: query.version_name.as_deref(),
+            package_name: query.package_name.as_deref(),
+            version_code: query.version_code,
             channel: query.channel.as_deref(),
             status: Some("published"),
             apk_url: &apk_url,
@@ -147,6 +154,10 @@ pub async fn upload_project_release(
             sha256: Some(&sha256),
             size_bytes: Some(body.len() as i64),
             changelog: query.changelog.as_deref(),
+            build_started_at: query.build_started_at.as_deref(),
+            source_git_sha: query.source_git_sha.as_deref(),
+            source_worktree: query.source_worktree.as_deref(),
+            metadata_json: None,
         }) {
         Ok(release) => Json(serde_json::json!({
             "release": release,

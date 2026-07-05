@@ -177,6 +177,10 @@ export interface ProjectLandingDownload {
   url?: string
   version?: string
   size?: string
+  size_label?: string
+  sizeLabel?: string
+  size_bytes?: string | number
+  sizeBytes?: string | number
   status?: string
   note?: string
   variants?: Array<{
@@ -185,6 +189,10 @@ export interface ProjectLandingDownload {
     url?: string
     version?: string
     size?: string
+    size_label?: string
+    sizeLabel?: string
+    size_bytes?: string | number
+    sizeBytes?: string | number
     status?: string
     note?: string
   }>
