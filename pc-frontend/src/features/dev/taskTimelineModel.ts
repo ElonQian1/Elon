@@ -28,6 +28,7 @@ export interface TimelineItem {
   title: string
   detail?: string
   meta?: string
+  metaTitle?: string
   message?: ChatMessage
   event?: ToolEvent
   process?: ProcessCard
@@ -214,6 +215,7 @@ function mergeShellResult(items: TimelineItem[], item: TimelineItem): boolean {
       title: item.title,
       detail: item.detail,
       meta: item.meta,
+      metaTitle: item.metaTitle,
       event: mergedEvent,
       process: mergedEvent === event ? item.process : processCardFromToolEvent(mergedEvent) ?? item.process,
       compact: item.compact,
@@ -243,6 +245,7 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
   if (type === 'pc_dispatch_started') {
     const cli = clean(event.cli ?? 'AI')
     const agentId = clean(event.agent_id ?? '')
+    const nodeDisplayName = clean(event.node_display_name ?? '')
     const cwdConfigured = Boolean(event.cwd_configured)
     return {
       id: itemId(message, index),
@@ -250,7 +253,8 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
       tone: 'running',
       title: '已派发到 PC 节点',
       detail: cwdConfigured ? `等待 ${cli} CLI 输出` : `等待 ${cli} CLI 确认`,
-      meta: agentId ? shortNode(agentId) : '',
+      meta: nodeDisplayName || (agentId ? shortNode(agentId) : ''),
+      metaTitle: agentId || undefined,
       message,
       event,
       compact: true,
@@ -263,6 +267,8 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     const runtime = clean(event.runtime ?? '')
     const turn = Number(event.turn ?? 0)
     const eventMessage = clean(event.message ?? '')
+    const agentId = clean(event.agent_id ?? '')
+    const nodeDisplayName = clean(event.node_display_name ?? '')
     if (isMaintenanceRuntimePhase(phase)) {
       return {
         id: itemId(message, index),
@@ -285,6 +291,20 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
         meta: runtime,
         message,
         event,
+      }
+    }
+    if (phase === 'pc_dispatched') {
+      return {
+        id: itemId(message, index),
+        kind: 'node',
+        tone: label.tone,
+        title: eventMessage || label.title,
+        detail: eventMessage ? undefined : label.body,
+        meta: [nodeDisplayName || (agentId ? shortNode(agentId) : ''), runtime].filter(Boolean).join(' · '),
+        metaTitle: agentId || undefined,
+        message,
+        event,
+        compact: true,
       }
     }
     return {

@@ -81,8 +81,10 @@ function ProgressLine({ message, context, onCancel, onApprove }: DevTaskMessageP
   }
   if (event.type === 'pc_dispatch_started') {
     const cli = clean(event.cli ?? 'AI')
-    const agent = shortNode(clean(event.agent_id ?? ''))
-    return <StatusLine text={`已派发到 PC 节点，等待 ${cli} CLI 输出`} tone="running" runtime={agent} />
+    const agentId = clean(event.agent_id ?? '')
+    const nodeDisplayName = clean(event.node_display_name ?? '')
+    const agent = nodeDisplayName || shortNode(agentId)
+    return <StatusLine text={`已派发到 PC 节点，等待 ${cli} CLI 输出`} tone="running" runtime={agent} runtimeTitle={agentId} />
   }
   if (event.type === 'assistant_message' || event.type === 'assistant_chunk') {
     return null
@@ -138,8 +140,8 @@ function ToolChip({ event }: { event: ToolEvent }) {
 }
 
 /* ══ StatusLine — 极简状态行 ══ */
-function StatusLine({ text, tone, runtime, turn }: {
-  text: string; tone?: TaskTone; runtime?: string; turn?: number
+function StatusLine({ text, tone, runtime, runtimeTitle, turn }: {
+  text: string; tone?: TaskTone; runtime?: string; runtimeTitle?: string; turn?: number
 }) {
   const dot = tone === 'done' ? styles.dotDone : tone === 'failed' ? styles.dotFail : tone === 'canceled' ? styles.dotCancel : styles.dotRun
   return (
@@ -147,7 +149,7 @@ function StatusLine({ text, tone, runtime, turn }: {
       <span className={[styles.dot, dot].join(' ')} />
       <span className={styles.statusText}>{text}</span>
       {(runtime || (turn && turn > 0)) && (
-        <span className={styles.statusMeta}>
+        <span className={styles.statusMeta} title={runtimeTitle || runtime || undefined}>
           {runtime || ''}{turn && turn > 0 ? ` · 第${turn}轮` : ''}
         </span>
       )}

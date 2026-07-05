@@ -615,14 +615,14 @@
   box-shadow: none;
   transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
-.ownRow:hover .messageContent,
-.ownRow:focus-within .messageContent {
+.ownRow .messageContent:hover,
+.ownRow .messageContent:focus-visible {
   border-color: rgba(88, 190, 106, .24);
   background: rgba(88, 190, 106, .09);
   color: var(--text);
 }
-.aiRow:hover .messageContent,
-.aiRow:focus-within .messageContent {
+.aiRow .messageContent:hover,
+.aiRow .messageContent:focus-visible {
   border-color: rgba(255, 255, 255, .16);
   background: rgba(255, 255, 255, .04);
 }

@@ -1373,9 +1373,11 @@ async fn run_via_pc_agent(
         pc_req_id.clone(),
         Some(display_model.clone()),
     );
+    let node_progress_name = pc_node_progress_name(state.as_ref(), agent_id).await;
     let _ = tx.send(pc_dispatch_started_event(
         &pc_req_id,
         agent_id,
+        &node_progress_name,
         cli_name,
         cwd,
         native_session_scope.as_ref(),
@@ -1397,7 +1399,6 @@ async fn run_via_pc_agent(
     // 进度心跳：开发/规划每 5s 发一次；轻量聊天只回流真实文本，不刷内部状态。
     let progress_tx = tx.clone();
     let cli_label = pc_cli_progress_label(cli_name);
-    let node_progress_name = pc_node_progress_name(state.as_ref(), agent_id).await;
     let disp_model_clone = pc_cli_heartbeat_subject(&display_model, &node_progress_name, agent_id);
     let mut progress_handle = if lightweight_pc_chat {
         None
@@ -1437,7 +1438,7 @@ async fn run_via_pc_agent(
                     if !lightweight_received_event {
                         let message = pc_lightweight_no_node_event_diagnostic(
                             cli_name,
-                            agent_id,
+                            &node_progress_name,
                             recv_timeout_secs,
                         );
                         let _ = state
@@ -2580,9 +2581,7 @@ fn extract_retry_fraction(text: &str) -> Option<String> {
 }
 
 fn pc_dispatch_started_event(
-    pc_req_id: &str,
-    agent_id: &str,
-    cli_name: &str,
+    pc_req_id: &str, agent_id: &str, node_display_name: &str, cli_name: &str,
     cwd: Option<&str>,
     native_session_scope: Option<&NativeSessionScope>,
     request_mode: AiCliRequestMode,
@@ -2592,6 +2591,7 @@ fn pc_dispatch_started_event(
         "pc_req_id": pc_req_id,
         "req_id": pc_req_id,
         "agent_id": agent_id,
+        "node_display_name": node_display_name,
         "cli": cli_name,
         "cwd_configured": cwd.is_some(),
         "project_id": native_session_scope.map(|scope| scope.project_id.as_str()),
@@ -2751,17 +2751,14 @@ mcp_native_chat_ok\n";
     #[test]
     fn pc_dispatch_started_event_exposes_local_req_id_without_prompt() {
         let event = pc_dispatch_started_event(
-            "req-1",
-            "agent-1",
-            "codex",
-            Some("D:/workspace"),
-            None,
-            AiCliRequestMode::Execute,
+            "req-1", "agent-1", "一龙4060（agent-1）", "codex",
+            Some("D:/workspace"), None, AiCliRequestMode::Execute,
         );
         let value: Value = serde_json::from_str(&event).unwrap();
         assert_eq!(value["type"], "pc_dispatch_started");
         assert_eq!(value["pc_req_id"], "req-1");
         assert_eq!(value["req_id"], "req-1");
+        assert_eq!(value["node_display_name"], "一龙4060（agent-1）");
         assert!(value.get("prompt").is_none());
         assert!(value.get("api_key").is_none());
     }
@@ -3026,11 +3023,11 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
 
     #[test]
     fn pc_lightweight_first_event_timeout_names_node_ack_gap() {
-        let diagnostic = pc_lightweight_no_node_event_diagnostic("codex", "node-a", 15);
+        let diagnostic = pc_lightweight_no_node_event_diagnostic("codex", "一龙4060（node-a）", 15);
 
         assert!(diagnostic.contains("Codex"));
-        assert!(diagnostic.contains("node-a"));
-        assert!(diagnostic.contains("15 秒内没有收到节点确认"));
+        assert!(diagnostic.contains("一龙4060（node-a）"));
+        assert!(diagnostic.contains("15 秒内没有返回任何 CLI 输出或完成事件"));
         assert!(diagnostic.contains("本轮已停止"));
     }
 

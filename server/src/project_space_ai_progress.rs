@@ -21,16 +21,23 @@ pub(crate) fn pc_dispatch_started_progress(value: &serde_json::Value) -> Option<
         .get("cwd_configured")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    let node_display_name = value
+        .get("node_display_name")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| short_pc_node_id(agent_id));
     let message = if cwd_configured {
         format!(
             "PC 节点 {} 已确认接收，等待 {} CLI 输出。",
-            short_pc_node_id(agent_id),
+            node_display_name,
             pc_cli_label(cli)
         )
     } else {
         format!(
             "PC 节点 {} 已确认接收，等待 {} CLI 输出。",
-            short_pc_node_id(agent_id),
+            node_display_name,
             pc_cli_label(cli)
         )
     };
@@ -40,6 +47,7 @@ pub(crate) fn pc_dispatch_started_progress(value: &serde_json::Value) -> Option<
         "runtime": pc_cli_label(cli),
         "message": message,
         "agent_id": agent_id,
+        "node_display_name": node_display_name,
         "cwd_configured": cwd_configured,
     }))
     .ok()
@@ -145,6 +153,7 @@ mod tests {
         let raw = serde_json::json!({
             "type": "pc_dispatch_started",
             "agent_id": "node-usr_5c-dd33ed36",
+            "node_display_name": "一龙4060（dd33ed36）",
             "cli": "codex",
             "cwd_configured": false
         });
@@ -157,7 +166,9 @@ mod tests {
         assert!(value["message"]
             .as_str()
             .unwrap()
-            .contains("node-usr_5c...33ed36"));
+            .contains("一龙4060（dd33ed36）"));
+        assert_eq!(value["agent_id"], "node-usr_5c-dd33ed36");
+        assert_eq!(value["node_display_name"], "一龙4060（dd33ed36）");
         assert!(value["message"].as_str().unwrap().contains("已确认接收"));
     }
 
@@ -190,6 +201,6 @@ mod tests {
         assert!(value["message"]
             .as_str()
             .unwrap()
-            .contains("没有返回 shell 命令的工具结果"));
+            .contains("没有返回 shell 命令 的工具结果"));
     }
 }

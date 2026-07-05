@@ -225,7 +225,7 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
       <div className={styles.content}>
         <div className={styles.head}>
           <span className={styles.title}>{item.title}</span>
-          {item.meta && <span className={styles.meta}>{item.meta}</span>}
+          {item.meta && <span className={styles.meta} title={item.metaTitle || item.meta}>{item.meta}</span>}
         </div>
         {item.process && <ProcessCardView process={item.process} />}
         {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}

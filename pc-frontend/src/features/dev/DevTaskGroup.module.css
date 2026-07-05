@@ -64,8 +64,8 @@
   transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
 
-.thread:hover .userBubble,
-.thread:focus-within .userBubble {
+.userBubble:hover,
+.userBubble:focus-visible {
   border-color: rgba(46, 168, 97, .24);
   background: rgba(46, 168, 97, .09);
   color: var(--text);
@@ -200,6 +200,10 @@
   flex: 0 0 auto;
 }
 
+.processToggle[aria-expanded="false"] .toggleArrow {
+  display: none;
+}
+
 .processBody {
   flex: 1 0 100%;
   display: grid;
@@ -313,8 +317,8 @@
   transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
 
-.thread:hover .assistantBubble,
-.thread:focus-within .assistantBubble {
+.assistantBubble:hover,
+.assistantBubble:focus-visible {
   border-color: rgba(255, 255, 255, .16);
   background: rgba(255, 255, 255, .04);
   color: var(--text-soft);
@@ -381,14 +385,14 @@
   color: var(--text-muted);
 }
 
-.thread:hover .replyFailed,
-.thread:focus-within .replyFailed {
+.replyFailed:hover,
+.replyFailed:focus-visible {
   border-color: rgba(218, 55, 60, .28);
   background: rgba(218, 55, 60, .07);
 }
 
-.thread:hover .replyCanceled,
-.thread:focus-within .replyCanceled {
+.replyCanceled:hover,
+.replyCanceled:focus-visible {
   border-color: rgba(136, 136, 136, .24);
   background: rgba(136, 136, 136, .06);
 }

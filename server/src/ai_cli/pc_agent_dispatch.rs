@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{
     homecli_agent::{CliPromptCancelHandle, CliPromptDispatch},
+    pc_node_display::pc_node_progress_name,
     types::{AppState, WsMessage},
 };
 
@@ -40,6 +41,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
     request: PcCliPromptDispatchRequest<'_>,
 ) -> Result<PcAcceptedCliPrompt> {
     let mut accept_retry_count = 0usize;
+    let node_progress_name = pc_node_progress_name(request.state.as_ref(), request.agent_id).await;
     loop {
         let previous_connected_at = agent_connected_at(request.state, request.agent_id).await;
         let dispatch = dispatch_pc_cli_prompt_once(&request).await?;
@@ -47,6 +49,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
         match wait_for_pc_cli_prompt_acceptance(
             request.state,
             request.agent_id,
+            &node_progress_name,
             &pc_req_id,
             request.cli_name,
             &mut rx,
@@ -72,7 +75,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
                 if !request.lightweight_pc_chat {
                     let _ = request.tx.send(
                         WsMessage::progress(format!(
-                            "PC 节点连接疑似假在线：{} 秒内未确认接收请求，已关闭旧连接，等待节点重新注册后自动重派（{}/{}）。",
+                            "PC 节点 {node_progress_name} 连接疑似假在线：{} 秒内未确认接收请求，已关闭旧连接，等待节点重新注册后自动重派（{}/{}）。",
                             timeout_secs,
                             accept_retry_count,
                             PC_AGENT_CLI_ACCEPT_RETRY_LIMIT
@@ -83,7 +86,7 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
                 if !wait_for_agent_reconnect(&request, previous_connected_at).await {
                     return Err(anyhow!(
                         "PC 节点 {} 在 {} 秒内没有重新连接；本轮已停止。请重启一龙 PC 节点客户端后重发。",
-                        request.agent_id,
+                        node_progress_name,
                         PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS
                     ));
                 }
