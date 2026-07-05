@@ -317,19 +317,22 @@ async fn run_relay_session(
                 req_id,
                 workspace_path,
             } => {
-                let tx = out_tx.clone();
-                tokio::spawn(async move {
-                    let response = match crate::project_workspace_inspect::inspect_project_workspace(
-                        &workspace_path,
-                    ) {
-                        Ok(status) => AgentToServer::ProjectWorkspaceInspected { req_id, status },
-                        Err(e) => AgentToServer::ProjectWorkspaceInspectError {
-                            req_id,
-                            message: e.to_string(),
-                        },
-                    };
-                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
-                });
+                crate::project_workspace_inspect::spawn_workspace_inspect_response(
+                    req_id,
+                    workspace_path,
+                    out_tx.clone(),
+                );
+            }
+
+            ServerToAgent::AuditProjectGitWorktrees {
+                req_id,
+                workspace_path,
+            } => {
+                crate::project_git_worktree_audit::spawn_git_worktree_audit_response(
+                    req_id,
+                    workspace_path,
+                    out_tx.clone(),
+                );
             }
 
             ServerToAgent::ReadProjectDocuments {

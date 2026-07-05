@@ -118,6 +118,13 @@
 }
 .tabCount { font-size: 12px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; }
 
+.workspaceActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .primaryBtn {
   height: 34px;
   padding: 0 14px;
@@ -134,6 +141,10 @@
 
 .textBtn {
   height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 0 10px;
   border: 1px solid var(--line);
   border-radius: 6px;

@@ -64,9 +64,9 @@ pub struct AgentEntry {
     pub allowed_cwds: Vec<String>,
     pub connected_at: u64,
     /// Outbound queue: server pushes ServerToAgent here, WS writer drains.
-    cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
+    pub(crate) cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
     /// For each in-flight task: where to forward AgentToServer events.
-    pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
+    pub(crate) pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
     /// One-shot ACK waiters keyed by req_id + approval_id + dispatch_id.
     approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
     /// One-shot protocol ping waiters keyed by nonce.
@@ -109,7 +109,7 @@ impl CliPromptCancelHandle {
 }
 #[derive(Default)]
 pub struct AgentManager {
-    agents: RwLock<HashMap<String, AgentEntry>>,
+    pub(crate) agents: RwLock<HashMap<String, AgentEntry>>,
 }
 impl AgentManager {
     pub fn new() -> Self {

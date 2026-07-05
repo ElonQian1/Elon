@@ -823,7 +823,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/user/:user_id/projects/:project_id/git/config",
             post(project_git::user_project_git_config),
         )
-        .merge(project_releases::routes())
+        .merge(project_releases::routes().merge(crate::project_git_worktree_audit_api::routes()))
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
         .route("/app/download", get(web::download_page))
         .route("/download", get(web::download_page))

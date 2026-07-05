@@ -114,6 +114,7 @@ mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
 mod project_docs_scan;
+mod project_git_worktree_audit;
 mod project_landing;
 mod project_workspace_inspect;
 mod tools_patch;
@@ -2869,24 +2870,21 @@ async fn run_session(
                             req_id,
                             workspace_path,
                         } => {
-                            info!("🔎 InspectProjectWorkspace: {}", req_id);
-                            let tx_c = out_tx_r.clone();
-                            tokio::spawn(async move {
-                                let response =
-                                    match project_workspace_inspect::inspect_project_workspace(
-                                        &workspace_path,
-                                    ) {
-                                        Ok(status) => AgentToServer::ProjectWorkspaceInspected {
-                                            req_id,
-                                            status,
-                                        },
-                                        Err(e) => AgentToServer::ProjectWorkspaceInspectError {
-                                            req_id,
-                                            message: e.to_string(),
-                                        },
-                                    };
-                                let _ = tx_c.send(ws_text(&response));
-                            });
+                            project_workspace_inspect::spawn_workspace_inspect_response(
+                                req_id,
+                                workspace_path,
+                                out_tx_r.clone(),
+                            );
+                        }
+                        ServerToAgent::AuditProjectGitWorktrees {
+                            req_id,
+                            workspace_path,
+                        } => {
+                            project_git_worktree_audit::spawn_git_worktree_audit_response(
+                                req_id,
+                                workspace_path,
+                                out_tx_r.clone(),
+                            );
                         }
                         ServerToAgent::ReadProjectDocuments {
                             req_id,

@@ -1,10 +1,12 @@
 use anyhow::Result;
-use homecli_proto::ProjectWorkspaceInspectStatus;
+use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
     time::{Duration, Instant},
 };
+use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::Message;
 
 #[cfg(not(windows))]
 use std::process::Command;
@@ -60,6 +62,28 @@ pub fn inspect_project_workspace(workspace_path: &str) -> Result<ProjectWorkspac
         codex_available: command_available("codex"),
         copilot_available: command_available("copilot"),
     })
+}
+
+pub fn spawn_workspace_inspect_response(
+    req_id: String,
+    workspace_path: String,
+    tx: mpsc::UnboundedSender<Message>,
+) {
+    tracing::info!("InspectProjectWorkspace: {}", req_id);
+    tokio::spawn(async move {
+        let response = workspace_inspect_response(req_id, &workspace_path);
+        let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+    });
+}
+
+fn workspace_inspect_response(req_id: String, workspace_path: &str) -> AgentToServer {
+    match inspect_project_workspace(workspace_path) {
+        Ok(status) => AgentToServer::ProjectWorkspaceInspected { req_id, status },
+        Err(e) => AgentToServer::ProjectWorkspaceInspectError {
+            req_id,
+            message: e.to_string(),
+        },
+    }
 }
 
 fn git_output(cwd: &Path, args: &[&str]) -> Option<String> {

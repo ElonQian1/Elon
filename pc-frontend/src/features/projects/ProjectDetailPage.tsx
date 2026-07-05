@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { GitBranch } from 'lucide-react'
 import { api } from '../../api/client'
 import GroupAiPanel from '../group-ai/GroupAiPanel'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -193,10 +194,12 @@ export default function ProjectDetailPage() {
               }}
             />
             <WorkspaceTab
+              projectId={id ?? ''}
               health={health}
               loading={healthLoading}
               onRefresh={loadHealth}
               channels={space?.channels ?? []}
+              onOpenGitWorktrees={() => navigate(`/git-worktrees?project=${encodeURIComponent(id ?? '')}`)}
               onOpenChannel={(channelId) => {
                 // 跳回主页并激活该频道
                 navigate('/')
@@ -679,11 +682,13 @@ function projectMemberBatchNote(action: ProjectMemberBatchAction) {
   return 'PC 成员管理页批量移除'
 }
 
-function WorkspaceTab({ health, loading, channels, onRefresh, onOpenChannel }: {
+function WorkspaceTab({ projectId, health, loading, channels, onRefresh, onOpenGitWorktrees, onOpenChannel }: {
+  projectId: string
   health: WorkspaceHealth | null
   loading: boolean
   channels: { id: string; name: string; kind?: string }[]
   onRefresh: () => void
+  onOpenGitWorktrees: () => void
   onOpenChannel: (channelId: string) => void
 }) {
   if (loading) return <div className={styles.loading}>检查工作区状态…</div>
@@ -725,7 +730,13 @@ function WorkspaceTab({ health, loading, channels, onRefresh, onOpenChannel }: {
 
       <div className={styles.tabToolbar}>
         <span className={styles.tabCount}>工作区详情</span>
-        <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
+        <div className={styles.workspaceActions}>
+          <button className={styles.textBtn} onClick={onOpenGitWorktrees} disabled={!projectId} type="button">
+            <GitBranch size={14} aria-hidden="true" />
+            <span>Git 现场</span>
+          </button>
+          <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
+        </div>
       </div>
       <div className={styles.overviewGrid}>
         {rows.map(([label, value]) => (

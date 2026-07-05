@@ -180,6 +180,32 @@ impl Store {
             .map_err(Into::into)
     }
 
+    pub fn list_project_execution_sessions(
+        &self,
+        project_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ProjectExecutionSession>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, conversation_id, user_id, node_id, request_id,
+                    base_workspace_path, active_workspace_path, branch, isolated,
+                    status, merge_status, last_error, model,
+                    prompt_tokens, cached_input_tokens, completion_tokens, reasoning_tokens,
+                    total_tokens, token_usage_event_id, billing_event_id,
+                    created_at, updated_at
+             FROM project_execution_sessions
+             WHERE project_id = ?1
+             ORDER BY updated_at DESC
+             LIMIT ?2",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id, limit.clamp(1, 200) as i64], |row| {
+                project_execution_session_from_row(row)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     pub fn get_project_execution_session_by_request_id(
         &self,
         request_id: &str,

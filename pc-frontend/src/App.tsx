@@ -12,6 +12,7 @@ import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
 import NodePage from './features/node/NodePage'
 import DevTasksPage from './features/dev/DevTasksPage'
+import GitWorktreesPage from './features/git-worktrees/GitWorktreesPage'
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="projects/:id/members" element={<ProjectDetailPage />} />
         <Route path="dev-tasks" element={<DevTasksPage />} />
+        <Route path="git-worktrees" element={<GitWorktreesPage />} />
         <Route path="voice" element={<VoicePage />} />
         <Route path="doctor" element={<DoctorPage />} />
         <Route path="node" element={<NodePage />} />

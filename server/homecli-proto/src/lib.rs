@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-pub const PROTO_VERSION: u32 = 3;
+pub const PROTO_VERSION: u32 = 4;
+
+mod project_workspace_status;
+pub use project_workspace_status::{
+    ProjectGitWorktreeAudit, ProjectGitWorktreeEntry, ProjectWorkspaceInspectStatus,
+};
 
 /// PC 节点上报的单个模型能力描述
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -196,27 +201,6 @@ pub struct CliWorkspaceStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectWorkspaceInspectStatus {
-    pub workspace_path: String,
-    pub path_exists: bool,
-    pub is_dir: bool,
-    pub is_git_worktree: bool,
-    #[serde(default)]
-    pub git_branch: Option<String>,
-    #[serde(default)]
-    pub git_head: Option<String>,
-    #[serde(default)]
-    pub git_remote_origin: Option<String>,
-    pub has_uncommitted_changes: bool,
-    #[serde(default)]
-    pub uncommitted_count: Option<u32>,
-    #[serde(default)]
-    pub disk_free_bytes: Option<u64>,
-    pub codex_available: bool,
-    pub copilot_available: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectDocumentEntry {
     pub path: String,
     pub title: String,
@@ -338,6 +322,11 @@ pub enum ServerToAgent {
     },
     /// 云端要求 PC 节点检查某个项目工作区是否仍可执行。
     InspectProjectWorkspace {
+        req_id: String,
+        workspace_path: String,
+    },
+    /// 云端要求 PC 节点审计某个 Git 仓库登记的所有 worktree。
+    AuditProjectGitWorktrees {
         req_id: String,
         workspace_path: String,
     },
@@ -586,6 +575,16 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC 节点返回项目 Git worktree 审计结果。
+    ProjectGitWorktreesAudited {
+        req_id: String,
+        audit: ProjectGitWorktreeAudit,
+    },
+    /// PC 节点审计项目 Git worktree 失败。
+    ProjectGitWorktreeAuditError {
+        req_id: String,
+        message: String,
+    },
     /// PC 节点返回项目文档频道快照。
     ProjectDocumentsRead {
         req_id: String,
@@ -652,6 +651,8 @@ impl AgentToServer {
             | Self::ProjectStorageRepoError { .. }
             | Self::ProjectWorkspaceInspected { .. }
             | Self::ProjectWorkspaceInspectError { .. }
+            | Self::ProjectGitWorktreesAudited { .. }
+            | Self::ProjectGitWorktreeAuditError { .. }
             | Self::ProjectDocumentsRead { .. }
             | Self::ProjectDocumentsReadError { .. }
             | Self::ProjectWorkspaceCleaned { .. }
@@ -677,6 +678,8 @@ impl AgentToServer {
             | Self::ProjectStorageRepoError { req_id, .. }
             | Self::ProjectWorkspaceInspected { req_id, .. }
             | Self::ProjectWorkspaceInspectError { req_id, .. }
+            | Self::ProjectGitWorktreesAudited { req_id, .. }
+            | Self::ProjectGitWorktreeAuditError { req_id, .. }
             | Self::ProjectDocumentsRead { req_id, .. }
             | Self::ProjectDocumentsReadError { req_id, .. }
             | Self::ProjectWorkspaceCleaned { req_id, .. }
