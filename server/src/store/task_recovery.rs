@@ -134,6 +134,19 @@ fn server_update_recovering_progress_message() -> String {
     .to_string()
 }
 
+fn server_update_resume_required_progress_message() -> String {
+    json!({
+        "type": "runtime_status",
+        "phase": "resume_required",
+        "runtime": "一龙",
+        "status": "interrupted",
+        "message": "服务器正在更新升级或 Win 端正在更新升级后，通信自动恢复没有在预期时间内完成。任务现场、云端过程和本机 journal 线索已保留，请点击“继续”让 AI 先检查当前工作区后接着处理。",
+        "auto_recover": false,
+        "next_action": "continue_from_snapshot",
+    })
+    .to_string()
+}
+
 fn running_channel_task_targets(conn: &Connection) -> Result<Vec<ChannelTaskTarget>> {
     channel_task_targets(conn, "t.status = 'running'", [])
 }
@@ -200,6 +213,12 @@ fn insert_missing_stale_channel_ai_results(
     let mut inserted = 0;
     for target in targets {
         let content = if target.status == "recovering" {
+            let _ = insert_missing_channel_messages(
+                conn,
+                std::slice::from_ref(target),
+                "ai_progress",
+                &server_update_resume_required_progress_message(),
+            )?;
             CHANNEL_TASK_SERVER_UPDATE_RECOVERY_RESULT
         } else {
             CHANNEL_TASK_STALE_RESULT

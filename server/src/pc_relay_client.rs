@@ -255,6 +255,22 @@ async fn run_relay_session(
                 }
             }
 
+            ServerToAgent::InspectCliTaskJournal {
+                req_id, task_id, ..
+            } => {
+                let response = AgentToServer::CliTaskJournalSnapshot {
+                    req_id,
+                    task_id,
+                    ok: false,
+                    snapshot: None,
+                    error: Some(
+                        "本地 relay 客户端不支持任务 journal 恢复查询，请使用 elon-node-agent"
+                            .to_string(),
+                    ),
+                };
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&response)?));
+            }
+
             ServerToAgent::Ping { nonce } => {
                 let pong = AgentToServer::Pong { nonce };
                 let _ = control_tx.send(Message::Text(serde_json::to_string(&pong)?));

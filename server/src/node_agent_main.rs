@@ -88,8 +88,7 @@ mod node_agent_server_runtime;
 mod node_agent_task_approval_cleanup_tests;
 mod node_agent_task_approval_snapshot;
 mod node_agent_task_journal;
-mod node_agent_task_journal_api;
-mod node_agent_task_journal_events;
+mod node_agent_task_journal_api; mod node_agent_task_journal_events; mod node_agent_task_journal_inspect;
 mod node_agent_task_journal_lock;
 #[cfg(test)]
 mod node_agent_task_journal_recovery_tests;
@@ -2929,6 +2928,7 @@ async fn run_session(
                                 let _ = tx_c.send(ws_text(&response));
                             });
                         }
+                        ServerToAgent::InspectCliTaskJournal { req_id, task_id, since, limit } => node_agent_task_journal_inspect::spawn(runtime.clone(), out_tx_r.clone(), req_id, task_id, since, limit),
                         ServerToAgent::CliPrompt {
                             req_id,
                             cli,

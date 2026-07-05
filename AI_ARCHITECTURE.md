@@ -78,11 +78,13 @@ Android APK / Web UI
 | 最小可用 | 已让 Codex 直接处理项目会话 | 仍可工作 | direct 适合排障；默认用 sidecar 管生命周期 |
 | JSON 干净度 | 好，仍然读 `codex exec --json` stdout pipe | 好，直接读 stdout pipe | 两者都不能退回 `PTY + JSON` |
 | 任务管理 | sidecar 独立管理进程生命周期、取消、session id、journal 和恢复入口 | 主要由 node-agent 当前 runner 和 task journal 管 | 默认路径已经补齐平台级生命周期 |
-| 重连 / 恢复 | sidecar registry 暴露 `managed_pipe_json_sidecar`，可回放输出、取消和恢复状态 | 依赖 journal、Codex session/thread id 和云端快照组合 | 后续增强重点是更完整的前端恢复入口 |
+| 重连 / 恢复 | sidecar registry 暴露 `managed_pipe_json_sidecar`；云端可通过节点 WS `InspectCliTaskJournal` 读取本机 journal、attach、resume 和审批状态；前端会把恢复快照合成为公开过程 | 依赖 journal、Codex session/thread id 和云端快照组合 | 当前已闭环“恢复可见 + 继续入口”；更强恢复还要把 Codex 原生 `resume <SESSION_ID>` 自动接进续接执行 |
 | 前端过程感 | JSON 事件和 sidecar output/journal 一起支撑公开过程卡片 | 只靠直接 stdout 和 journal | 当前还要继续把 UI 过程卡片做细 |
 | 多 CLI 扩展 | Codex 已走 pipe sidecar；PTY sidecar 继续服务终端型 CLI | Codex 专用回退 | 后续可把更多稳定 JSON CLI 接入 pipe sidecar |
 
 因此当前策略是：默认用 `pipe_sidecar + pipe + JSON` 管 Codex；继续完善前端公开过程卡片、任务恢复入口和多 CLI 管理。`pipe_sidecar` 是平台级会话管理层，不是对 Codex CLI 能力的替代。
+
+任务恢复目前已经不是只停留在“保留现场 + 允许继续”：服务器任务快照会带着 `pc_req_id` / `agent_id` 去问在线 Win 端，本机返回 task journal、sidecar attach、Codex session/thread、审批状态和 `resume` 合同；网页端把这些信息显示成公开过程，并在自动恢复失败时显示 `resume_required`。它仍不是强制热迁移：如果 Win 端离线、旧节点不支持协议、本机 journal 丢失或 Codex 原生 session 不可用，就只能从云端快照和当前工作区继续，而不能声称原进程已经无缝续上。
 
 当前 Codex CLI 的主路不是 PTY，而是：
 

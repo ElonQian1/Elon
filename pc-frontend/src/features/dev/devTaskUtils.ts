@@ -70,9 +70,11 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
     if (taskError) task.error = taskError
     const apkUrl = clean(msg.task_apk_url ?? msg.taskApkUrl ?? '')
     if (apkUrl) task.apkUrl = apkUrl
+    rememberTaskRecoveryState(task, msg)
     if (kind === 'ai_task') task.request = clean(messageText(msg)).replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '') || task.request
     if (kind === 'ai_progress') {
       const event = parseToolEvent(messageText(msg))
+      if (event) rememberTaskRecoveryEvent(task, event)
       if (event?.type === 'assistant_message' || event?.type === 'assistant_chunk') continue
       task.progressCount += 1
       if (event) rememberApprovalState(approvals, taskId, event)
@@ -90,6 +92,37 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
     }
   }
   return { tasks, approvals }
+}
+
+function rememberTaskRecoveryState(task: TaskState, msg: ChatMessage) {
+  const source = msg as Record<string, unknown>
+  const attach = objectValue(source.task_attach ?? source.taskAttach ?? source.attach)
+  if (attach) task.attach = attach
+  const resume = objectValue(source.task_resume ?? source.taskResume ?? source.resume)
+  if (resume) task.resume = resume
+  const approvalState = objectValue(source.approval_state ?? source.approvalState)
+  if (approvalState) task.approvalState = approvalState
+  const pcReqId = clean(source.pc_req_id ?? source.pcReqId)
+  if (pcReqId) task.pcReqId = pcReqId
+  const lastEventSeq = Number(source.last_event_seq ?? source.lastEventSeq ?? 0)
+  if (Number.isFinite(lastEventSeq) && lastEventSeq > task.lastEventSeq) task.lastEventSeq = lastEventSeq
+}
+
+function rememberTaskRecoveryEvent(task: TaskState, event: ToolEvent) {
+  const attach = objectValue(event.attach)
+  if (attach) task.attach = attach
+  const resume = objectValue(event.resume)
+  if (resume) task.resume = resume
+  const approvalState = objectValue(event.approval_state ?? event.approvalState)
+  if (approvalState) task.approvalState = approvalState
+  const pcReqId = clean(event.pc_req_id ?? event.pcReqId)
+  if (pcReqId) task.pcReqId = pcReqId
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
 }
 
 export function taskResultTone(statusValue: unknown, content: string): TaskTone {

@@ -130,7 +130,16 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 当前边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`pipe_sidecar + pipe + JSON` 已补齐基础生命周期管理、稳定运行句柄、恢复契约和 Codex JSON 输出回放；后续继续增强前端恢复入口和多 CLI 统一管理，不替代 Codex CLI 本身能力。
 
-服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器更新中，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
+服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
+
+当前 Route A 任务恢复闭环分为四段：
+
+1. 云端快照：服务端持久化 `task_id`、`pc_req_id`、`agent_id`、任务事件、最后公开步骤和云端 `attach` 状态；服务器重启时把未完成任务标记为 `recovering`，而不是立即写成普通失败。
+2. 本机 journal 查询：任务快照接口会通过节点 WebSocket 协议发送 `InspectCliTaskJournal`，让 Win 端按 `pc_req_id` 读取本机 task journal、sidecar session、Codex session/thread、审批状态和可续接合同；这个查询不绕过本机管理 HTTP token，也不依赖浏览器本地端口。
+3. 前端恢复展示：PC 网页端加载会话时会把本机 journal 快照合成为 `runtime_status` 公开过程，显示“正在恢复 / 需要继续 / 本机 journal 暂不可达”，并把 `attach`、`resume`、`approval_state`、`last_event_seq` 注入任务状态，继续用于过程折叠和恢复按钮。
+4. 失败收口：如果自动恢复在预期时间内没有完成，服务端会先写入 `resume_required` 公开过程，再写最终恢复失败说明。用户看到的是“服务器或 Win 端正在更新升级后未能自动恢复，请点击继续让 AI 检查当前工作区后接着处理”，而不是普通 CLI 无输出超时。
+
+仍需区分“可恢复现场”和“强恢复执行”。当前已经能做到恢复可见、journal 回放、sidecar/审批状态快照和继续入口闭环；但它不是任意外部终端进程的强制热迁移。强恢复必须满足 Win 端在线、节点版本支持 `InspectCliTaskJournal`、本机 journal 未损坏、Codex session/thread id 可用。对于已经脱离云端流式连接的进程，平台优先给出 `continue_from_snapshot`，由新的 Codex 轮次先检查工作区和 journal 后继续；后续增强方向才是更自动地把 Codex 原生 `resume <SESSION_ID>` 接进续接执行。
 
 节点客户端自更新属于一龙控制面链路，默认必须直连一龙服务器，不能继承开发机或子项目设置的系统代理；确需代理的环境用 `NODE_AGENT_UPDATE_USE_SYSTEM_PROXY=1` 或 `NODE_AGENT_UPDATE_PROXY_MODE=system` 显式开启。
 

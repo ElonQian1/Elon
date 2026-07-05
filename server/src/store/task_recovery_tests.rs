@@ -257,6 +257,11 @@ fn stale_recovering_channel_task_gets_recovery_failure_result() {
     assert!(results[0].contains("恢复失败"));
     assert!(results[0].contains("更新升级"));
     assert!(results[0].contains("继续"));
+
+    let progress = progress_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert!(progress
+        .iter()
+        .any(|message| message.contains(r#""phase":"resume_required""#)));
 }
 
 #[test]

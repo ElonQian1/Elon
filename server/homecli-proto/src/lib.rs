@@ -282,6 +282,18 @@ pub enum ServerToAgent {
         /// 完整的提示内容
         prompt: String,
     },
+    /// 云端要求 PC 节点读取某个本机 CLI 任务的 journal / sidecar 恢复快照。
+    ///
+    /// 这个请求走节点 WS 内部协议，不复用本机管理 HTTP token；用于服务器重启后
+    /// 把云端任务快照和本机 journal 恢复合同重新接上。
+    InspectCliTaskJournal {
+        req_id: String,
+        task_id: String,
+        #[serde(default)]
+        since: usize,
+        #[serde(default)]
+        limit: usize,
+    },
     /// 云端向 PC 节点发起 LLM 推理请求（流式）
     LlmStreamRequest {
         req_id: String,
@@ -481,6 +493,16 @@ pub enum AgentToServer {
         #[serde(default)]
         workspace_status: Option<CliWorkspaceStatus>,
     },
+    /// PC 节点返回某个本机 CLI 任务的 journal / sidecar 恢复快照。
+    CliTaskJournalSnapshot {
+        req_id: String,
+        task_id: String,
+        ok: bool,
+        #[serde(default)]
+        snapshot: Option<serde_json::Value>,
+        #[serde(default)]
+        error: Option<String>,
+    },
     /// PC 节点确认 ToolApprovalDecision 是否已交给对应待审批调用。
     ToolApprovalDecisionAck {
         req_id: String,
@@ -640,6 +662,7 @@ impl AgentToServer {
             | Self::CliPromptAccepted { .. }
             | Self::CliChunk { .. }
             | Self::CliDone { .. }
+            | Self::CliTaskJournalSnapshot { .. }
             | Self::ToolApprovalDecisionAck { .. }
             | Self::RegisterCapabilities { .. }
             | Self::LlmStreamChunk { .. }
@@ -669,6 +692,7 @@ impl AgentToServer {
             | Self::CliPromptAccepted { req_id, .. }
             | Self::CliChunk { req_id, .. }
             | Self::CliDone { req_id, .. }
+            | Self::CliTaskJournalSnapshot { req_id, .. }
             | Self::LlmStreamChunk { req_id, .. }
             | Self::LlmStreamEnd { req_id, .. }
             | Self::LlmStreamError { req_id, .. }
@@ -700,97 +724,4 @@ impl AgentToServer {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{AgentToServer, ServerToAgent};
-
-    #[test]
-    fn old_tool_approval_decision_without_dispatch_id_still_decodes() {
-        let json = r#"{
-            "type": "tool_approval_decision",
-            "req_id": "req",
-            "approval_id": "tap_1_1",
-            "decision": "approve"
-        }"#;
-
-        let msg: ServerToAgent = serde_json::from_str(json).expect("decode old decision message");
-        match msg {
-            ServerToAgent::ToolApprovalDecision {
-                req_id,
-                approval_id,
-                dispatch_id,
-                decision,
-            } => {
-                assert_eq!(req_id, "req");
-                assert_eq!(approval_id, "tap_1_1");
-                assert_eq!(dispatch_id, "");
-                assert_eq!(decision, "approve");
-            }
-            other => panic!("expected tool approval decision, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn tool_approval_ack_is_not_routed_as_req_stream_message() {
-        let msg = AgentToServer::ToolApprovalDecisionAck {
-            req_id: "req".to_string(),
-            approval_id: "tap_1_1".to_string(),
-            dispatch_id: "dispatch".to_string(),
-            accepted: true,
-        };
-
-        assert_eq!(msg.req_id(), None);
-        assert_eq!(msg.task_id(), None);
-    }
-
-    #[test]
-    fn cli_prompt_accepted_keeps_req_stream_open() {
-        let msg = AgentToServer::CliPromptAccepted {
-            req_id: "req".to_string(),
-            cli: Some("codex".to_string()),
-            cwd: Some("D:\\work".to_string()),
-            runtime_permission: Some("danger_full_access".to_string()),
-        };
-
-        assert_eq!(msg.req_id(), Some("req"));
-        assert_eq!(msg.task_id(), None);
-        assert!(!msg.is_final_req_msg());
-    }
-
-    #[test]
-    fn old_cli_done_without_session_id_still_decodes() {
-        let json = r#"{
-            "type": "cli_done",
-            "req_id": "req",
-            "exit_ok": true
-        }"#;
-
-        let msg: AgentToServer = serde_json::from_str(json).expect("decode old cli_done");
-        match msg {
-            AgentToServer::CliDone { session_id, .. } => {
-                assert_eq!(session_id, None);
-            }
-            other => panic!("expected cli_done, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn cli_done_decodes_session_id() {
-        let json = r#"{
-            "type": "cli_done",
-            "req_id": "req",
-            "exit_ok": true,
-            "session_id": "019f2125-41f3-7e01-b676-ef7a0e5ee392"
-        }"#;
-
-        let msg: AgentToServer = serde_json::from_str(json).expect("decode cli_done");
-        match msg {
-            AgentToServer::CliDone { session_id, .. } => {
-                assert_eq!(
-                    session_id.as_deref(),
-                    Some("019f2125-41f3-7e01-b676-ef7a0e5ee392")
-                );
-            }
-            other => panic!("expected cli_done, got {other:?}"),
-        }
-    }
-}
+mod tests;

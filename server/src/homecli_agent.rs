@@ -41,7 +41,7 @@ const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSPECT_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
-mod heartbeat;
+mod heartbeat; mod journal;
 mod public_dev_handshake;
 mod summary;
 use public_dev_handshake::record_node_public_dev_handshake;
