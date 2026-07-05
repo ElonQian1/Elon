@@ -20,7 +20,7 @@ handoffs:
 工作方式：
 
 - 只做 discovery、alignment、design、verification plan。
-- 先读取 `.github/copilot-instructions.md`、`.github/instructions/git-deploy-workflow.instructions.md`、`.github/instructions/modular-architecture.instructions.md`、`docs/ai-agent-workflow.md` 和相关源码。
+- 先读取 `AGENTS.md`，再按其中任务路由只读取当前计划真正相关的专项文档和源码；不要固定全量读取所有 instructions/docs。
 - 输出计划前要说明任务类型、影响模块、目标文件、验证命令、Git/部署注意事项。
 - 计划涉及巨型文件时，必须优先给出模块边界和拆分顺序，不要把新功能继续堆进入口文件。
 - 不直接编辑文件，不运行会改变状态的命令。

@@ -32,6 +32,7 @@
 | APP UI、主题、颜色、按钮、卡片、底部导航、状态胶囊 | `docs/Design.md`、`docs/APP 颜色规范.md`；涉及 APK 与网页同步时再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 当前版本代号、产品版本记忆 | `docs/app-version-memory.md` |
 | Copilot 配置或 VS Code Customizations | `.github/prompts/`、`.github/agents/`、`.github/skills/` |
+| Prompt / Agent / Skill token 体检、去重复、路由化 | `scripts/audit-ai-prompt-assets.ps1`，再按需读取 `.github/prompts/`、`.github/agents/`、`.github/skills/` |
 | 查询聊天记录、会话时间线、APK下载地址溯源、诊断"为什么这么慢" | `docs/query-chat-records.md` |
 
 ## 脚本优先
@@ -48,3 +49,4 @@
 - Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；并行任务若只要求代码先合并，运行 `scripts\check-task-complete.ps1 -Kind CodePushed` 即可收尾；明确负责 APK 发布的任务再运行 `-Kind AndroidFeature`。
 - 任务收尾清理 worktree：`scripts\cleanup-task-worktrees.ps1 -Apply`（Windows）或 `bash scripts/cleanup-task-worktrees.sh --apply`（Linux）。预览模式（不带 `-Apply`/`--apply`）只列不删；脏 worktree 和未合并分支会自动保留。
 - 脚本已经负责版本 claim/finish、构建、上传、并发保护和清理。AI 不要手搓这些步骤。
+- Prompt / Agent / Skill 文档体检：运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\audit-ai-prompt-assets.ps1`；发现固定全量读取多份 instructions/docs 时，优先改成先读 `AGENTS.md` 再按任务路由。
