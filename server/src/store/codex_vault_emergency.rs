@@ -117,7 +117,7 @@ impl Store {
         created_by_user_id: &str,
     ) -> Result<CodexVaultEmergencyGrantRecord> {
         if provider_user_id == consumer_user_id {
-            return Err(anyhow!("不能把 Codex 保险箱应急授权给自己"));
+            return Err(anyhow!("不能把 Codex 保险箱授权共享给自己"));
         }
         let ts = now();
         let max_lease_seconds = max_lease_seconds.unwrap_or(900).clamp(60, 7200);
@@ -179,7 +179,7 @@ impl Store {
         }
         drop(conn);
         self.get_codex_vault_emergency_grant(&id)?
-            .ok_or_else(|| anyhow!("应急授权保存后无法读取"))
+            .ok_or_else(|| anyhow!("授权共享保存后无法读取"))
     }
 
     pub fn get_codex_vault_emergency_grant(
@@ -286,7 +286,7 @@ impl Store {
             ],
         )?;
         self.get_codex_vault_emergency_lease(&id)?
-            .ok_or_else(|| anyhow!("应急租约保存后无法读取"))
+            .ok_or_else(|| anyhow!("共享租约保存后无法读取"))
     }
 
     pub fn get_codex_vault_emergency_lease(
@@ -434,7 +434,10 @@ impl Store {
                     provider_earned_fen = provider_earned_fen + ?9,
                     accounting_status = COALESCE(?10, accounting_status),
                     updated_at = ?11
-              WHERE id = ?1",
+              WHERE id = ?1
+                AND status = 'active'
+                AND cleared_at IS NULL
+                AND expires_at > ?11",
             params![
                 lease_id,
                 clean_optional(token_usage_event_id),
@@ -571,7 +574,7 @@ mod tests {
 
     fn temp_store() -> (Store, std::path::PathBuf) {
         let path = std::env::temp_dir().join(format!(
-            "elon-codex-emergency-test-{}.sqlite",
+            "elon-codex-sharing-test-{}.sqlite",
             uuid::Uuid::new_v4().simple()
         ));
         let _ = std::fs::remove_file(&path);
@@ -634,18 +637,7 @@ mod tests {
             .expect("active lease");
         assert_eq!(active.provider_user_id, a.id);
 
-        let cleared = store
-            .clear_codex_vault_emergency_lease_for_node(&b.id, "node-b", Some(&lease.id))
-            .unwrap()
-            .expect("cleared lease");
-        assert_eq!(cleared.status, "cleared");
-        assert!(cleared.cleared_at.is_some());
         assert!(store
-            .get_active_codex_vault_emergency_lease_for_node(&b.id, "node-b")
-            .unwrap()
-            .is_none());
-
-        store
             .attach_codex_vault_emergency_usage(
                 &lease.id,
                 Some("tok_1"),
@@ -657,13 +649,107 @@ mod tests {
                 5,
                 Some("billed"),
             )
+            .unwrap());
+        let billed = store
+            .get_codex_vault_emergency_lease(&lease.id)
+            .unwrap()
             .unwrap();
+        assert_eq!(billed.total_tokens, 150);
+        assert_eq!(billed.billed_cost_rmb_fen, 7);
+
+        let cleared = store
+            .clear_codex_vault_emergency_lease_for_node(&b.id, "node-b", Some(&lease.id))
+            .unwrap()
+            .expect("cleared lease");
+        assert_eq!(cleared.status, "cleared");
+        assert!(cleared.cleared_at.is_some());
+        assert!(store
+            .get_active_codex_vault_emergency_lease_for_node(&b.id, "node-b")
+            .unwrap()
+            .is_none());
+
+        assert!(!store
+            .attach_codex_vault_emergency_usage(
+                &lease.id,
+                Some("tok_after_clear"),
+                Some("bill_after_clear"),
+                Some("ntx_after_clear"),
+                100,
+                50,
+                7,
+                5,
+                Some("billed"),
+            )
+            .unwrap());
         let updated = store
             .get_codex_vault_emergency_lease(&lease.id)
             .unwrap()
             .unwrap();
         assert_eq!(updated.total_tokens, 150);
         assert_eq!(updated.billed_cost_rmb_fen, 7);
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn revoked_and_expired_grants_are_not_shareable() {
+        let (store, path) = temp_store();
+        let provider = store
+            .create_user(
+                "vault-provider@example.com",
+                "secret1",
+                Some("provider"),
+                None,
+            )
+            .unwrap();
+        let consumer = store
+            .create_user(
+                "vault-consumer@example.com",
+                "secret1",
+                Some("consumer"),
+                None,
+            )
+            .unwrap();
+        let grant = store
+            .upsert_codex_vault_emergency_grant(
+                &provider.id,
+                &consumer.id,
+                Some("provider to consumer"),
+                Some("robot_codex_vault_shared_access"),
+                Some(900),
+                None,
+                &provider.id,
+            )
+            .unwrap();
+        assert!(store
+            .find_active_codex_vault_emergency_grant(&provider.id, &consumer.id)
+            .unwrap()
+            .is_some());
+        assert!(store
+            .revoke_codex_vault_emergency_grant(&grant.id, &provider.id)
+            .unwrap());
+        assert!(store
+            .find_active_codex_vault_emergency_grant(&provider.id, &consumer.id)
+            .unwrap()
+            .is_none());
+
+        let reverse = store
+            .upsert_codex_vault_emergency_grant(
+                &consumer.id,
+                &provider.id,
+                Some("expired reverse"),
+                Some("robot_codex_vault_shared_access"),
+                Some(900),
+                Some("2000-01-01T00:00:00+00:00"),
+                &consumer.id,
+            )
+            .unwrap();
+        assert_eq!(reverse.status, "active");
+        assert!(store
+            .find_active_codex_vault_emergency_grant(&consumer.id, &provider.id)
+            .unwrap()
+            .is_none());
 
         drop(store);
         let _ = std::fs::remove_file(path);

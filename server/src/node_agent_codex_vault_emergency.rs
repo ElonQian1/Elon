@@ -1,4 +1,4 @@
-//! 本机节点 Codex 保险箱应急授权桥接。
+//! 本机节点 Codex 保险箱授权共享桥接。
 //!
 //! PC 页面调用本机节点；节点再带用户 token 与节点 secret 向云端申请租约。
 //! auth.json 只会落到节点托管的临时 CODEX_HOME。
@@ -49,11 +49,23 @@ pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
             post(emergency_restore_handler),
         )
         .route(
+            "/api/codex-vault/sharing/restore",
+            post(emergency_restore_handler),
+        )
+        .route(
             "/api/codex-vault/emergency-grants",
             post(create_grant_handler),
         )
         .route(
+            "/api/codex-vault/sharing/grants",
+            post(create_grant_handler),
+        )
+        .route(
             "/api/codex-vault/emergency-grants/:grant_id",
+            delete(revoke_grant_handler),
+        )
+        .route(
+            "/api/codex-vault/sharing/grants/:grant_id",
             delete(revoke_grant_handler),
         )
 }
@@ -91,7 +103,7 @@ async fn create_grant_handler(
         None => return error_response(StatusCode::UNAUTHORIZED, "本机节点尚未绑定云端账号"),
     };
     let url = format!(
-        "{}/api/me/codex-vault/emergency/grants",
+        "{}/api/me/codex-vault/sharing/grants",
         rt.cloud_http_url().trim_end_matches('/')
     );
     match cloud_post_typed::<Value>(&url, &token, &body).await {
@@ -109,7 +121,7 @@ async fn revoke_grant_handler(
         None => return error_response(StatusCode::UNAUTHORIZED, "本机节点尚未绑定云端账号"),
     };
     let url = format!(
-        "{}/api/me/codex-vault/emergency/grants/{}",
+        "{}/api/me/codex-vault/sharing/grants/{}",
         rt.cloud_http_url().trim_end_matches('/'),
         grant_id
     );
@@ -141,7 +153,7 @@ async fn restore_emergency_from_cloud(
         bail!("请指定授权提供方机器人账号");
     }
     let url = format!(
-        "{}/api/me/codex-vault/emergency/lease",
+        "{}/api/me/codex-vault/sharing/lease",
         rt.cloud_http_url().trim_end_matches('/')
     );
     let body = json!({
@@ -150,13 +162,13 @@ async fn restore_emergency_from_cloud(
         "agent_id": creds.agent_id,
         "agent_secret": creds.agent_secret,
         "device_name": crate::machine_label(),
-        "purpose": req.purpose.unwrap_or_else(|| "pc_web_emergency_codex_cli".to_string()),
+        "purpose": req.purpose.unwrap_or_else(|| "pc_web_robot_shared_codex_cli".to_string()),
     });
     let lease = cloud_post_typed::<EmergencyLeaseResponse>(&url, &token, &body).await?;
     let auth_value: Value =
         serde_json::from_str(&lease.auth_json).context("云端返回的 auth_json 不是有效 JSON")?;
     validate_chatgpt_auth_cache(&auth_value)
-        .map_err(|error| anyhow::anyhow!("云端应急凭据校验失败: {error}"))?;
+        .map_err(|error| anyhow::anyhow!("云端共享凭据校验失败: {error}"))?;
 
     let provider_key = lease
         .provider_user_id
@@ -164,7 +176,7 @@ async fn restore_emergency_from_cloud(
         .or(lease.provider_account.as_deref())
         .unwrap_or("provider");
     let provider_slot = lease.slot_id.as_deref().unwrap_or("legacy");
-    let local_slot_id = format!("emergency-{provider_key}-{provider_slot}");
+    let local_slot_id = format!("shared-{provider_key}-{provider_slot}");
     let home = managed_slot_codex_home(&local_slot_id);
     write_managed_auth_home(&home, &lease.auth_json)?;
     write_slot_meta(
@@ -187,7 +199,7 @@ pub(crate) async fn clear_cloud_emergency_lease(
 ) -> Value {
     let lease_id = meta.and_then(|meta| meta.lease_id.as_deref());
     if lease_id.is_none() {
-        return json!({"attempted": false, "reason": "no_active_emergency_lease"});
+        return json!({"attempted": false, "reason": "no_active_shared_lease"});
     }
     let creds = match rt.creds().await {
         Some(creds) => creds,
@@ -203,7 +215,7 @@ pub(crate) async fn clear_cloud_emergency_lease(
         None => return json!({"attempted": false, "reason": "missing_user_token"}),
     };
     let url = format!(
-        "{}/api/me/codex-vault/emergency/leases/clear",
+        "{}/api/me/codex-vault/sharing/leases/clear",
         rt.cloud_http_url().trim_end_matches('/')
     );
     let body = json!({

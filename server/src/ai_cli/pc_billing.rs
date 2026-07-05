@@ -150,7 +150,7 @@ pub(super) fn settle_pc_cli_node_usage(
             Ok(Some(lease)) if lease.provider_user_id != consumer_user_id => Some(lease),
             Ok(_) => None,
             Err(e) => {
-                tracing::warn!(node_id, error = %e, "查询 Codex 保险箱应急租约失败，按节点 owner 结算");
+                tracing::warn!(node_id, error = %e, "查询 Codex 保险箱共享租约失败，按节点 owner 结算");
                 None
             }
         }
@@ -261,7 +261,7 @@ pub(super) fn pc_cli_billing_context(
                     tracing::warn!(
                         node_id,
                         error = %e,
-                        "查询 Codex 保险箱应急租约失败，按自有 Codex 记账"
+                        "查询 Codex 保险箱共享租约失败，按自有 Codex 记账"
                     );
                 }
             }

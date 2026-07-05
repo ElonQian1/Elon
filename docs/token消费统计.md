@@ -70,7 +70,7 @@ PC 项目会话里的 Codex CLI 需要同时记录 token 和资源来源，不�
 | `billing_source` | 含义 | 是否扣平台额度 | 经验条展示 |
 |---|---|---:|---|
 | `own_codex` | 用户使用自己 PC 节点上登录的 Codex 账号 | 否 | 自用 Codex |
-| `shared_codex` | 用户借用其他用户 PC 节点 Codex，或在显式应急授权下临时借用其他机器人保险箱 | 是，按平台策略结算 | 借用 Codex；provider 侧显示分享给别人 |
+| `shared_codex` | 用户使用其他用户 PC 节点 Codex，或在显式授权共享下临时使用其他机器人保险箱 | 是，按平台策略结算 | 共享 Codex；provider 侧显示分享给别人 |
 | `platform` | 平台 API / 平台模型 / 未能归类的可信服务端调用 | 是 | 平台/其他 |
 | `user_api_key` | 用户自己的 API key 经服务端代理 | 否 | 不计平台额度，仍记录 token |
 | `client_reported` | 客户端参考上报 | 否 | 仅参考统计 |
@@ -79,7 +79,7 @@ PC 项目会话里的 Codex CLI 需要同时记录 token 和资源来源，不�
 
 1. 用户自己的 Codex 账号不消耗一龙平台余额；即使用户平台额度为 0，也允许继续使用自己的 Codex。
 2. 自有 Codex 仍必须写入 token 用量，便于用户看到自己实际用了多少上下文和输出。
-3. 借用别人 Codex / 远程节点 / 授权保险箱应急租约时，consumer 侧记录 `shared_codex`，provider 侧通过节点结算流水累计“分享给别人”的 token 和收益。
+3. 使用别人 Codex / 远程节点 / 授权保险箱共享租约时，consumer 侧记录 `shared_codex`，provider 侧通过节点结算流水累计“分享给别人”的 token 和收益。
 4. 自用自己的节点不能生成 provider 分享流水，避免经验条把“自己用自己”误算成贡献。
 5. 月度额度、余额预检和可用性判断必须排除 `own_codex`；共享或平台来源仍按平台策略检查额度。
 
@@ -87,7 +87,7 @@ PC 项目会话里的 Codex CLI 需要同时记录 token 和资源来源，不�
 
 ## 3.2 Codex `auth.json` 保险箱与共享算力边界
 
-用户可以选择把自己的 Codex ChatGPT / Pro `auth.json` 加密备份到一龙云端服务器，作为“保险箱”。默认这不是账号转租功能；只有平台上的机器人应急互授权可以触发短 TTL 租约，边界必须固定：
+用户可以选择把自己的 Codex ChatGPT / Pro `auth.json` 加密备份到一龙云端服务器，作为“保险箱”。默认这不是无条件账号转租功能；只有平台上的机器人授权共享可以触发短 TTL 租约，边界必须固定：
 
 | 场景 | 允许 | 说明 |
 |---|---:|---|
@@ -95,10 +95,10 @@ PC 项目会话里的 Codex CLI 需要同时记录 token 和资源来源，不�
 | 云端保存 `auth.json` 明文 | 否 | 云端只保存 AES-GCM 密文和 nonce，密钥来自服务器环境变量。 |
 | 本人节点从云端恢复到托管临时 `CODEX_HOME` | 是 | 需要用户登录 token + 本人节点 secret 双重证明。 |
 | 普通其他用户下载或恢复该 `auth.json` | 否 | 普通共享算力只允许别人把任务派发到 provider 的节点，不能拿到凭证明文。 |
-| 显式授权的机器人应急租约 | 是 | provider 授权 consumer，consumer 本人节点用节点 secret 证明后，写入托管临时 `CODEX_HOME`，不覆盖默认文件。 |
+| 显式授权的机器人共享租约 | 是 | provider 授权 consumer，consumer 本人节点用节点 secret 证明后，写入托管临时 `CODEX_HOME`，不覆盖默认文件。 |
 | 共享节点的 token / 收益统计 | 是 | consumer 侧记 `shared_codex`，provider 侧记节点结算流水。 |
 
-产品文案应把“共享 PC 节点 Codex 执行能力”和“机器人应急保险箱互授权”分开。后者只能用于已经互相信任的机器人账号，页面必须展示授权方向、是否互授权、最近租约、token、扣费和 provider 收益。
+产品文案应把“共享 PC 节点 Codex 执行能力”和“机器人保险箱授权共享”分开。后者不限定紧急场景，但只能用于已经显式互信的机器人账号，页面必须展示授权方向、是否互授权、最近租约、token、扣费和 provider 收益。
 
 ### 普通用户低门槛备份入口
 

@@ -127,7 +127,7 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
           icon={<ArrowRightLeft size={16} />}
           runs={usage?.consuming ?? []}
           nodeNames={nodeNames}
-          empty="暂无借用记录。"
+          empty="暂无共享使用记录。"
         />
         <UsagePanel
           title="我的节点被使用"

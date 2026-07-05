@@ -116,7 +116,7 @@ PC 项目会话的 AI 运行路线分为五类：
 
 Codex Pro `auth.json` 云端保险箱默认只属于账号所有者自己的备份/恢复能力：本机节点上传密文，云端只存 AES-GCM 密文，本人节点用用户 token + 节点 secret 恢复到托管临时 `CODEX_HOME`。普通 Route C3 共享仍不允许远程用户下载、恢复或复制 provider 的 `auth.json` 明文，只允许把任务派发到 provider 的 PC 节点。
 
-医疗机器人等高可用场景使用单独的 Codex 保险箱应急互授权：provider 机器人必须在平台上显式授权 consumer 机器人，consumer 自己的在线节点必须用节点 secret 证明身份，云端才会下发短 TTL 租约。节点只把租约写入托管临时 `CODEX_HOME`，不覆盖默认 `~/.codex/auth.json`。租约、provider/consumer、槽位、token 账单和 provider 收益分别记录在 `codex_vault_emergency_grants`、`codex_vault_emergency_leases`、`token_usage_events` 和 `node_transactions`，计费来源统一为 `shared_codex`。
+医疗机器人等高可用/协作场景使用 Codex 保险箱授权共享：provider 机器人必须在平台上显式授权 consumer 机器人，consumer 自己的在线节点必须用节点 secret 证明身份，云端才会下发短 TTL 租约。共享不要求一定是紧急场景，但必须是短租约、可撤销、可审计、可计费的授权行为。节点只把租约写入托管临时 `CODEX_HOME`，不覆盖默认 `~/.codex/auth.json`。租约、provider/consumer、槽位、token 账单和 provider 收益分别记录在 `codex_vault_emergency_grants`、`codex_vault_emergency_leases`、`token_usage_events` 和 `node_transactions`，计费来源统一为 `shared_codex`。表名保留 `emergency` 是历史兼容名，产品和 API 新入口使用 `sharing` 语义。
 
 Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是新的运行路线。Route A / Route C3 都可以在对应节点里选择下面的传输模式：
 

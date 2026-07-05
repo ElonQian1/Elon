@@ -67,7 +67,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
         {
           key: 'shared',
           className: styles.sharedCodex,
-          label: '借用 Codex',
+          label: '共享 Codex',
           caption: '使用别人节点',
           value: sharedCodexTokens,
           ratio: safeRatio(progression.shared_codex_progress_ratio),
@@ -100,7 +100,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
     `本级 ${formatTokens(tokensIntoLevel)} / ${formatTokens(levelSpan)}`,
     `距 Lv.${nextLevel} ${formatTokens(tokensToNextLevel)}`,
     `自用 Codex ${formatTokens(ownCodexTokens)} / ${formatCount(ownCodexCallCount)}`,
-    `借用 Codex ${formatTokens(sharedCodexTokens)} / ${formatCount(sharedCodexCallCount)}`,
+    `共享 Codex ${formatTokens(sharedCodexTokens)} / ${formatCount(sharedCodexCallCount)}`,
     `分享给别人 ${formatTokens(providedTokens)} / ${formatCount(providedRunCount)}`,
   ].join(' · ')
   let left = 0

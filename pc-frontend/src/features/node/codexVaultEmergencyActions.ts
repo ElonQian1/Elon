@@ -28,23 +28,23 @@ export function createCodexVaultEmergencyActions({
 }): CodexVaultEmergencyActions {
   return {
     async onCreateEmergencyGrant(consumerAccount: string) {
-      setVaultBusy(true); setResult('正在保存机器人应急授权…'); setError('')
+      setVaultBusy(true); setResult('正在保存机器人授权共享…'); setError('')
       try {
         const data = await nodeApi<{ message?: string }>(
           adminUrl,
-          '/api/codex-vault/emergency-grants',
+          '/api/codex-vault/sharing/grants',
           {
             method: 'POST',
             body: JSON.stringify({
               consumer_account: consumerAccount,
-              purpose: 'robot_medical_emergency_codex_vault',
+              purpose: 'robot_codex_vault_shared_access',
               max_lease_seconds: 900,
             }),
           },
           20000,
         )
         await loadCodexVaultStatus(true)
-        setResult(data.message || '机器人应急授权已保存。')
+        setResult(data.message || '机器人授权共享已保存。')
       } catch (err) {
         setError((err as Error).message)
       } finally {
@@ -52,16 +52,16 @@ export function createCodexVaultEmergencyActions({
       }
     },
     async onRevokeEmergencyGrant(grantId: string) {
-      setVaultBusy(true); setResult('正在撤销机器人应急授权…'); setError('')
+      setVaultBusy(true); setResult('正在撤销机器人授权共享…'); setError('')
       try {
         const data = await nodeApi<{ message?: string }>(
           adminUrl,
-          `/api/codex-vault/emergency-grants/${encodeURIComponent(grantId)}`,
+          `/api/codex-vault/sharing/grants/${encodeURIComponent(grantId)}`,
           { method: 'DELETE' },
           20000,
         )
         await loadCodexVaultStatus(true)
-        setResult(data.message || '机器人应急授权已撤销。')
+        setResult(data.message || '机器人授权共享已撤销。')
       } catch (err) {
         setError((err as Error).message)
       } finally {
@@ -69,16 +69,16 @@ export function createCodexVaultEmergencyActions({
       }
     },
     async onEmergencyRestore(providerUserId: string) {
-      setVaultBusy(true); setCodexBusy(true); setResult('正在切换到授权机器人的临时 Codex Pro 会话…'); setError('')
+      setVaultBusy(true); setCodexBusy(true); setResult('正在切换到授权机器人的共享 Codex Pro 会话…'); setError('')
       try {
         const data = await nodeApi<CodexVaultStatusResponse>(
           adminUrl,
-          '/api/codex-vault/emergency-restore',
+          '/api/codex-vault/sharing/restore',
           {
             method: 'POST',
             body: JSON.stringify({
               provider_user_id: providerUserId,
-              purpose: 'pc_web_robot_emergency_codex_cli',
+              purpose: 'pc_web_robot_shared_codex_cli',
             }),
           },
           30000,
@@ -92,7 +92,7 @@ export function createCodexVaultEmergencyActions({
         }))
         await refreshStatus(true)
         await loadCodexVaultStatus(true)
-        setResult(data.message || '已切换到授权机器人的临时 Codex Pro 会话。')
+        setResult(data.message || '已切换到授权机器人的共享 Codex Pro 会话。')
       } catch (err) {
         setError((err as Error).message)
       } finally {

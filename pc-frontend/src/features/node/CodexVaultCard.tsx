@@ -11,6 +11,12 @@ function formatVaultTime(value?: string | null): string {
   return date.toLocaleString()
 }
 
+function isFutureTime(value?: string | null): boolean {
+  if (!value) return true
+  const time = new Date(value).getTime()
+  return Number.isFinite(time) && time > Date.now()
+}
+
 function authStateText(auth?: CodexVaultLocalStatus['default_auth']): string {
   if (!auth?.present) return '未找到'
   if (auth.problem) return '读取异常'
@@ -53,11 +59,13 @@ export default function CodexVaultCard({
 }) {
   const [grantTarget, setGrantTarget] = useState('')
   const vault = cloud?.vault
-  const emergency = cloud?.emergency
+  const sharing = cloud?.sharing ?? cloud?.emergency
   const cloudSlots = vault?.slots ?? []
   const localSlots = status?.managed_slots ?? []
-  const grants = emergency?.grants ?? []
-  const leases = emergency?.leases ?? []
+  const grants = sharing?.grants ?? []
+  const leases = sharing?.leases ?? []
+  const sharingHealth = sharing?.health
+  const sharingAlerts = sharingHealth?.alerts ?? []
   const incomingGrants = grants.filter((grant) => grant.consumer_user_id === currentUserId)
   const outgoingGrants = grants.filter((grant) => grant.provider_user_id === currentUserId)
   const cloudReady = !!vault?.configured
@@ -80,8 +88,18 @@ export default function CodexVaultCard({
           ? `已备份 ${vault?.available_count ?? (cloudSlots.length || 1)} 个账号`
           : '未备份'
   const stateTone = cloudReady && bound ? styles.vaultOnline : cloud?.error ? styles.vaultOffline : styles.vaultChecking
-  const activeEmergencyLease = leases.find((lease) => lease.consumer_user_id === currentUserId && lease.status === 'active')
-  const activeEmergency = !!activeEmergencyLease
+  const activeSharedLease = leases.find((lease) => lease.consumer_user_id === currentUserId && lease.status === 'active' && isFutureTime(lease.expires_at))
+  const activeSharing = !!activeSharedLease
+  const sharingHealthText = sharingHealth?.status === 'critical'
+    ? `严重 · ${sharingHealth.alert_count ?? sharingAlerts.length} 项`
+    : sharingHealth?.status === 'warning'
+      ? `告警 · ${sharingHealth.alert_count ?? sharingAlerts.length} 项`
+      : `正常 · ${sharingHealth?.active_lease_count ?? 0} 个活动租约`
+  const sharingHealthTone = sharingHealth?.status === 'critical'
+    ? styles.vaultOffline
+    : sharingHealth?.status === 'warning'
+      ? styles.vaultChecking
+      : styles.vaultOnline
   async function submitGrant() {
     const target = grantTarget.trim()
     if (!target) return
@@ -103,7 +121,7 @@ export default function CodexVaultCard({
         <span className={[styles.vaultState, stateTone].join(' ')}>{state}</span>
       </div>
       <p className={styles.vaultNote}>
-        保险箱只给账号所有者自己的节点备份和恢复；共享算力时，别人只能派发任务到你的节点，不会拿到凭证明文。
+        保险箱默认只给账号所有者自己的节点备份和恢复；你显式授权后，其他机器人才能短期租用托管 CODEX_HOME，页面会记录共享租约、token 和收益。
       </p>
       <div className={styles.vaultGrid}>
         <div>
@@ -151,16 +169,27 @@ export default function CodexVaultCard({
       <div className={styles.emergencyPanel}>
         <div className={styles.emergencyHead}>
           <div>
-            <span>机器人应急互授权</span>
-            <strong>{incomingGrants.length} 个可借用 · {outgoingGrants.length} 个已授权</strong>
+            <span>机器人授权共享</span>
+            <strong>{incomingGrants.length} 个可使用 · {outgoingGrants.length} 个已共享</strong>
           </div>
-          <span className={activeEmergency ? styles.vaultOnline : styles.vaultChecking}>
-            {activeEmergency ? `当前借用 ${robotLabel(activeEmergencyLease?.provider_nickname, activeEmergencyLease?.provider_account, activeEmergencyLease?.provider_user_id)}` : '未借用'}
+          <span className={activeSharing ? styles.vaultOnline : sharingHealthTone}>
+            {activeSharing ? `当前使用 ${robotLabel(activeSharedLease?.provider_nickname, activeSharedLease?.provider_account, activeSharedLease?.provider_user_id)}` : sharingHealthText}
           </span>
         </div>
-        {activeEmergency && (
+        {sharingAlerts.length > 0 && (
+          <div className={styles.vaultSlotList}>
+            {sharingAlerts.slice(0, 3).map((alert) => (
+              <div key={alert.code ?? alert.message ?? 'sharing-alert'} className={styles.vaultSlot}>
+                <span>{alert.severity === 'critical' ? '严重告警' : '共享告警'} · {alert.code}</span>
+                <strong>{alert.count ?? 0} 项</strong>
+                <small>{alert.message}</small>
+              </div>
+            ))}
+          </div>
+        )}
+        {activeSharing && (
           <p className={styles.shareHint}>
-            当前 Codex CLI 用量按 shared_codex 记账，provider 为 {robotLabel(activeEmergencyLease?.provider_nickname, activeEmergencyLease?.provider_account, activeEmergencyLease?.provider_user_id)}，租约到期 {formatVaultTime(activeEmergencyLease?.expires_at)}。
+            当前 Codex CLI 用量按 shared_codex 记账，资源提供方为 {robotLabel(activeSharedLease?.provider_nickname, activeSharedLease?.provider_account, activeSharedLease?.provider_user_id)}，租约到期 {formatVaultTime(activeSharedLease?.expires_at)}。
           </p>
         )}
         <div className={styles.emergencyGrantForm}>
@@ -175,15 +204,15 @@ export default function CodexVaultCard({
             type="button"
             onClick={() => { void submitGrant() }}
             disabled={busy || !grantTarget.trim()}
-            title="授权对方机器人在应急时临时使用本账号的 Codex 保险箱"
+            title="授权对方机器人短期使用本账号的 Codex 保险箱"
           >
             <Handshake size={15} strokeWidth={2.2} aria-hidden="true" />
-            授权
+            共享授权
           </button>
         </div>
         {incomingGrants.length > 0 && (
           <div className={styles.emergencyList}>
-            <span className={styles.emergencyListTitle}>别人授权给我</span>
+            <span className={styles.emergencyListTitle}>别人共享给我</span>
             {incomingGrants.map((grant) => (
               <div className={styles.emergencyRow} key={grant.id ?? `${grant.provider_user_id}-in`}>
                 <div>
@@ -198,7 +227,7 @@ export default function CodexVaultCard({
                   title="把该授权机器人的保险箱凭据写入本机临时 CODEX_HOME"
                 >
                   <KeyRound size={15} strokeWidth={2.2} aria-hidden="true" />
-                  借用
+                  使用共享
                 </button>
               </div>
             ))}
@@ -206,7 +235,7 @@ export default function CodexVaultCard({
         )}
         {outgoingGrants.length > 0 && (
           <div className={styles.emergencyList}>
-            <span className={styles.emergencyListTitle}>我授权出去</span>
+            <span className={styles.emergencyListTitle}>我共享出去</span>
             {outgoingGrants.map((grant) => (
               <div className={styles.emergencyRow} key={grant.id ?? `${grant.consumer_user_id}-out`}>
                 <div>
@@ -218,7 +247,7 @@ export default function CodexVaultCard({
                   type="button"
                   disabled={busy || grant.status !== 'active' || !grant.id}
                   onClick={() => grant.id && void emergencyActions.onRevokeEmergencyGrant(grant.id)}
-                  title="撤销这个机器人账号的应急借用权限"
+                  title="撤销这个机器人账号的共享使用权限"
                 >
                   <XCircle size={15} strokeWidth={2.2} aria-hidden="true" />
                   撤销
@@ -234,7 +263,7 @@ export default function CodexVaultCard({
               const counterparty = lease.consumer_user_id === currentUserId
                 ? robotLabel(lease.provider_nickname, lease.provider_account, lease.provider_user_id)
                 : robotLabel(lease.consumer_nickname, lease.consumer_account, lease.consumer_user_id)
-              const direction = lease.consumer_user_id === currentUserId ? '我借用' : '对方借用'
+              const direction = lease.consumer_user_id === currentUserId ? '我使用' : '对方使用'
               return (
                 <div className={styles.emergencyRow} key={lease.id ?? lease.leased_at}>
                   <div>

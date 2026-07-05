@@ -60,7 +60,7 @@ mod node_agent_client_maintenance;
 mod node_agent_cloud_net;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
-mod node_agent_codex_vault; mod node_agent_codex_vault_active; mod node_agent_codex_vault_emergency;
+mod node_agent_codex_vault; mod node_agent_codex_vault_active; mod node_agent_codex_child_env; mod node_agent_codex_vault_emergency;
 mod node_agent_download_router;
 mod node_agent_env;
 mod node_agent_file_info;
@@ -1538,17 +1538,9 @@ async fn run_cli_prompt(run: CliPromptRun) {
         cwd.as_deref(),
     );
     if cli_name == "codex" {
-        let codex_home = node_agent_codex_vault_active::current_valid_codex_home_env()
-            .or_else(|| {
-                std::env::var("USERPROFILE")
-                    .or_else(|_| std::env::var("HOME"))
-                    .ok()
-                    .map(|h| format!("{}/.codex", h))
-                    .filter(|p| std::path::Path::new(p).exists())
-            });
-        if let Some(home) = codex_home {
-            cmd.env("CODEX_HOME", &home);
-            sidecar_env.push(("CODEX_HOME".to_string(), home));
+        if let Some((name, home)) = node_agent_codex_child_env::codex_child_home_env_assignment() {
+            cmd.env(name, &home);
+            sidecar_env.push((name.to_string(), home));
         }
     }
     let stdin_piped_empty = cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini";

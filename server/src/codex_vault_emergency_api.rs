@@ -1,6 +1,6 @@
-//! Codex 保险箱机器人应急互授权 API。
+//! Codex 保险箱机器人授权共享 API。
 //!
-//! 这里允许 provider 账号显式授权 consumer 账号在应急时临时租用
+//! 这里允许 provider 账号显式授权 consumer 账号临时租用
 //! provider 的保险箱槽位。云端只在通过 consumer 节点 secret 证明后
 //! 返回一次性租约响应；浏览器状态接口不会包含 auth.json 明文。
 
@@ -56,14 +56,16 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
     match (
         state.store.list_codex_vault_emergency_grants(&user.id),
         state.store.list_codex_vault_emergency_leases(&user.id, 50),
+        state.store.codex_vault_sharing_health(&user.id),
     ) {
-        (Ok(grants), Ok(leases)) => Json(serde_json::json!({
+        (Ok(grants), Ok(leases), Ok(health)) => Json(serde_json::json!({
             "ok": true,
             "grants": grants,
             "leases": leases,
+            "health": health,
         }))
         .into_response(),
-        (Err(error), _) | (_, Err(error)) => {
+        (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
             json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
         }
     }
@@ -96,7 +98,7 @@ pub async fn create_grant(
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
     if consumer.id == provider.id {
-        return json_error(StatusCode::BAD_REQUEST, "不能把保险箱应急授权给自己");
+        return json_error(StatusCode::BAD_REQUEST, "不能把保险箱授权共享给自己");
     }
     match state.store.upsert_codex_vault_emergency_grant(
         &provider.id,
@@ -110,7 +112,7 @@ pub async fn create_grant(
         Ok(grant) => Json(serde_json::json!({
             "ok": true,
             "grant": grant,
-            "message": "已保存 Codex 保险箱应急授权。",
+            "message": "已保存 Codex 保险箱授权共享。",
         }))
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
@@ -132,10 +134,10 @@ pub async fn revoke_grant(
     {
         Ok(true) => Json(serde_json::json!({
             "ok": true,
-            "message": "已撤销 Codex 保险箱应急授权。",
+            "message": "已撤销 Codex 保险箱授权共享。",
         }))
         .into_response(),
-        Ok(false) => json_error(StatusCode::NOT_FOUND, "没有可撤销的应急授权"),
+        Ok(false) => json_error(StatusCode::NOT_FOUND, "没有可撤销的授权共享"),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
@@ -172,7 +174,7 @@ pub async fn lease_auth_cache(
     if provider.id == consumer.id {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "自己的保险箱请使用普通恢复，不走应急借用",
+            "自己的保险箱请使用普通恢复，不走授权共享租约",
         );
     }
     let grant = match state
@@ -183,7 +185,7 @@ pub async fn lease_auth_cache(
         Ok(None) => {
             return json_error(
                 StatusCode::FORBIDDEN,
-                "授权提供方尚未给当前机器人开启 Codex 保险箱应急授权",
+                "授权提供方尚未给当前机器人开启 Codex 保险箱授权共享",
             )
         }
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
@@ -300,13 +302,13 @@ pub async fn clear_active_lease(
             "ok": true,
             "cleared": true,
             "lease": lease,
-            "message": "已清除当前节点 Codex 保险箱应急租约。",
+            "message": "已清除当前节点 Codex 保险箱共享租约。",
         }))
         .into_response(),
         Ok(None) => Json(serde_json::json!({
             "ok": true,
             "cleared": false,
-            "message": "当前节点没有需要清除的 Codex 保险箱应急租约。",
+            "message": "当前节点没有需要清除的 Codex 保险箱共享租约。",
         }))
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),

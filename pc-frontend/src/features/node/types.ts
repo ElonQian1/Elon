@@ -260,6 +260,7 @@ export interface CodexVaultStatusResponse {
   cloud?: {
     ok?: boolean
     vault?: CodexVaultCloudStatus
+    sharing?: CodexVaultEmergencyStatus
     emergency?: CodexVaultEmergencyStatus
     error?: string
   }
@@ -270,6 +271,25 @@ export interface CodexVaultStatusResponse {
 export interface CodexVaultEmergencyStatus {
   grants?: CodexVaultEmergencyGrant[]
   leases?: CodexVaultEmergencyLease[]
+  health?: CodexVaultSharingHealth
+}
+
+export interface CodexVaultSharingHealth {
+  status?: 'ok' | 'warning' | 'critical' | string
+  alert_count?: number
+  active_lease_count?: number
+  expired_uncleared_count?: number
+  accounting_anomaly_count?: number
+  unavailable_grant_count?: number
+  recent_failed_event_count?: number
+  alerts?: CodexVaultSharingAlert[]
+}
+
+export interface CodexVaultSharingAlert {
+  code?: string
+  severity?: 'warning' | 'critical' | string
+  message?: string
+  count?: number
 }
 
 export interface CodexVaultEmergencyGrant {

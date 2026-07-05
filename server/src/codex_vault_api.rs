@@ -12,8 +12,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
-    Json,
-    Router,
+    Json, Router,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -44,7 +43,15 @@ pub fn routes() -> Router<Arc<AppState>> {
             get(crate::codex_vault_emergency_api::status),
         )
         .route(
+            "/api/me/codex-vault/sharing",
+            get(crate::codex_vault_emergency_api::status),
+        )
+        .route(
             "/api/me/codex-vault/emergency/grants",
+            post(crate::codex_vault_emergency_api::create_grant),
+        )
+        .route(
+            "/api/me/codex-vault/sharing/grants",
             post(crate::codex_vault_emergency_api::create_grant),
         )
         .route(
@@ -52,11 +59,23 @@ pub fn routes() -> Router<Arc<AppState>> {
             delete(crate::codex_vault_emergency_api::revoke_grant),
         )
         .route(
+            "/api/me/codex-vault/sharing/grants/:grant_id",
+            delete(crate::codex_vault_emergency_api::revoke_grant),
+        )
+        .route(
             "/api/me/codex-vault/emergency/lease",
             post(crate::codex_vault_emergency_api::lease_auth_cache),
         )
         .route(
+            "/api/me/codex-vault/sharing/lease",
+            post(crate::codex_vault_emergency_api::lease_auth_cache),
+        )
+        .route(
             "/api/me/codex-vault/emergency/leases/clear",
+            post(crate::codex_vault_emergency_api::clear_active_lease),
+        )
+        .route(
+            "/api/me/codex-vault/sharing/leases/clear",
             post(crate::codex_vault_emergency_api::clear_active_lease),
         )
 }
@@ -122,20 +141,29 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
         state.store.list_user_codex_credential_slots(&user.id),
         state.store.list_codex_vault_emergency_grants(&user.id),
         state.store.list_codex_vault_emergency_leases(&user.id, 20),
+        state.store.codex_vault_sharing_health(&user.id),
     ) {
-        (Ok(record), Ok(slots), Ok(grants), Ok(leases)) => Json(serde_json::json!({
-            "ok": true,
-            "vault": status_from_record(record.as_ref(), &slots),
-            "emergency": {
+        (Ok(record), Ok(slots), Ok(grants), Ok(leases), Ok(health)) => {
+            let sharing = serde_json::json!({
                 "grants": grants,
                 "leases": leases,
-            },
-        }))
-        .into_response(),
-        (Err(error), _, _, _)
-        | (_, Err(error), _, _)
-        | (_, _, Err(error), _)
-        | (_, _, _, Err(error)) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+                "health": health,
+            });
+            Json(serde_json::json!({
+                "ok": true,
+                "vault": status_from_record(record.as_ref(), &slots),
+                "sharing": sharing,
+                "emergency": sharing,
+            }))
+            .into_response()
+        }
+        (Err(error), _, _, _, _)
+        | (_, Err(error), _, _, _)
+        | (_, _, Err(error), _, _)
+        | (_, _, _, Err(error), _)
+        | (_, _, _, _, Err(error)) => {
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
     }
 }
 
