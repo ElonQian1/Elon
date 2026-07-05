@@ -68,14 +68,18 @@ pub async fn node_exec_handler(
     let agent = if let Some(ref node_id) = req.node_id {
         let found = agents.iter().find(|a| a.agent_id == *node_id);
         match found {
-            Some(a) => match state.store.get_node_credential_owner(&a.agent_id) {
-                Ok(Some(owner)) if owner == user.id => PickedAgent {
+            Some(a) => {
+                if a.allowed_clis.is_empty() {
+                    return json_error(StatusCode::FORBIDDEN, "指定的节点没有可用的 Codex/Claude CLI");
+                }
+                // 远程 Codex 模式允许用户指定节点大厅里的在线公共 CLI 节点。
+                // 不指定 node_id 时下面已有公共节点兜底；这里保持同一语义，避免选中远程节点后反而被拦截。
+                PickedAgent {
                     agent_id: a.agent_id.clone(),
                     device_name: a.device_name.clone(),
                     allowed_clis: a.allowed_clis.clone(),
-                },
-                _ => return json_error(StatusCode::FORBIDDEN, "指定的节点不属于当前账号或不在线"),
-            },
+                }
+            }
             None => return json_error(StatusCode::NOT_FOUND, "指定的节点未在线"),
         }
     } else {

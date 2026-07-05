@@ -67,6 +67,18 @@ interface Friend {
   already_friend?: boolean
 }
 
+interface RemoteNodeInfo {
+  node_id?: string
+  agent_id?: string
+  display_name?: string
+  device_name?: string
+  owner_user_id?: string
+  online?: boolean
+  ai_cli_ready?: boolean
+  route_a_ready?: boolean
+  allowed_clis?: string[]
+}
+
 const GENERIC_AI_TITLES = new Set(['普通聊天会话', '新对话', 'AI 对话', '一龙 AI 对话'])
 
 function compactConversationText(text?: string, maxLength = 28) {
@@ -118,6 +130,28 @@ function formatHistoryAge(input?: string) {
   return formatTime(input)
 }
 
+function remoteNodeId(node: RemoteNodeInfo) {
+  return String(node.node_id ?? node.agent_id ?? '').trim()
+}
+
+function remoteNodeName(node: RemoteNodeInfo) {
+  const id = remoteNodeId(node)
+  return String(node.display_name ?? node.device_name ?? id.slice(0, 8) ?? '远程节点').trim()
+}
+
+function remoteNodeHasCli(node: RemoteNodeInfo) {
+  return !!node.online && (
+    node.ai_cli_ready === true
+    || node.route_a_ready === true
+    || (node.allowed_clis?.length ?? 0) > 0
+  )
+}
+
+function pickRemoteCliNode(nodes: RemoteNodeInfo[], userId?: string) {
+  const ready = nodes.filter((node) => remoteNodeId(node) && remoteNodeHasCli(node))
+  return ready.find((node) => node.owner_user_id && node.owner_user_id !== userId) ?? ready[0] ?? null
+}
+
 export default function AiChatPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -160,14 +194,27 @@ export default function AiChatPage() {
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
   const [nodeStatusChecked, setNodeStatusChecked] = useState(false)
+  const [remoteNodeIdValue, setRemoteNodeIdValue] = useState<string | null>(null)
+  const [remoteNodeNameValue, setRemoteNodeNameValue] = useState('')
+  const [remoteNodeStatusChecked, setRemoteNodeStatusChecked] = useState(false)
 
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)
   const modelButtonCopy = useMemo(
-    () => routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent),
-    [runtimeRoute, modelLabel, modelOptions, selectedAgent],
+    () => {
+      const copy = routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent)
+      if (runtimeRoute === 'route_c3' && remoteNodeNameValue) {
+        return {
+          ...copy,
+          detail: remoteNodeNameValue,
+          title: `AI来源：远程 Codex；节点：${remoteNodeNameValue}`,
+        }
+      }
+      return copy
+    },
+    [runtimeRoute, modelLabel, modelOptions, selectedAgent, remoteNodeNameValue],
   )
 
   useEffect(() => {
@@ -251,6 +298,46 @@ export default function AiChatPage() {
       setRuntimeRoute('auto')
     }
   }, [nodeStatusChecked, onlineNodeId, runtimeRoute])
+
+  // ── 远程 Codex 节点状态轮询 ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id || runtimeRoute !== 'route_c3') {
+      setRemoteNodeIdValue(null)
+      setRemoteNodeNameValue('')
+      setRemoteNodeStatusChecked(runtimeRoute !== 'route_c3')
+      return
+    }
+
+    let cancelled = false
+    setRemoteNodeStatusChecked(false)
+    function checkRemoteNodes() {
+      api.get<{ nodes?: RemoteNodeInfo[] }>('/api/nodes')
+        .then((data) => {
+          if (cancelled) return
+          const node = pickRemoteCliNode(data.nodes ?? [], user?.id)
+          if (node) {
+            setRemoteNodeIdValue(remoteNodeId(node))
+            setRemoteNodeNameValue(remoteNodeName(node))
+          } else {
+            setRemoteNodeIdValue(null)
+            setRemoteNodeNameValue('')
+          }
+          setRemoteNodeStatusChecked(true)
+        })
+        .catch(() => {
+          if (cancelled) return
+          setRemoteNodeIdValue(null)
+          setRemoteNodeNameValue('')
+          setRemoteNodeStatusChecked(true)
+        })
+    }
+    checkRemoteNodes()
+    const t = setInterval(checkRemoteNodes, 6000)
+    return () => {
+      cancelled = true
+      clearInterval(t)
+    }
+  }, [runtimeRoute, user?.id])
 
   // 客户端搜索过滤
   const filteredFriends = useMemo(() => {
@@ -430,8 +517,16 @@ export default function AiChatPage() {
       return
     }
     const previousInput = input
-    if (runtimeRoute === 'route_c2' || runtimeRoute === 'route_c3') {
-      setError('普通聊天暂未绑定远程 PC 节点。请先在节点页选择远程节点，或切回自动/平台AI。')
+    if (runtimeRoute === 'route_c2') {
+      setError('远程 AI 模型聊天还没有接入普通对话页，请先切到远程 Codex、自动选择或平台 AI。')
+      return
+    }
+    if (runtimeRoute === 'route_c3' && !remoteNodeStatusChecked) {
+      setError('正在同步远程 Codex 节点，请稍后再发送。')
+      return
+    }
+    if (runtimeRoute === 'route_c3' && !remoteNodeIdValue) {
+      setError('没有找到在线可用的远程 Codex 节点。请确认夜云 PC 节点在线且 Codex/Claude 已就绪。')
       return
     }
     let requestRuntimeRoute: RuntimeRoute = runtimeRoute
@@ -466,18 +561,21 @@ export default function AiChatPage() {
         ? ''
         : selectedAgentForRuntimeRoute(selectedAgent, modelOptions, requestRuntimeRoute)
       const useLocalNode = !!onlineNodeId && (requestRuntimeRoute === 'auto' || requestRuntimeRoute === 'route_a')
-      if (useLocalNode) {
-        // ── 节点在线：直接在用户电脑上执行 ────────────────────────────────
+      const useRemoteCodexNode = requestRuntimeRoute === 'route_c3' && !!remoteNodeIdValue
+      if (useLocalNode || useRemoteCodexNode) {
+        // ── 节点在线：直接在 PC 节点上执行 ────────────────────────────────
+        const targetNodeId = useRemoteCodexNode ? remoteNodeIdValue : onlineNodeId
+        const targetNodeName = useRemoteCodexNode ? remoteNodeNameValue : onlineNodeName
         const res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
           '/api/me/node/exec',
-          { prompt: text, node_id: onlineNodeId },
+          { prompt: text, node_id: targetNodeId },
         )
         const nodeMsg: AiMessage = {
           role: 'assistant',
           content: res.output || (res.error ? `执行失败：${res.error}` : '（无输出）'),
           created_at: new Date().toISOString(),
           node_exec: true,
-          node_display_name: res.node_display_name || onlineNodeName,
+          node_display_name: res.node_display_name || targetNodeName,
           exit_ok: res.exit_ok,
         }
         setMessages((prev) => [...prev, nodeMsg])
