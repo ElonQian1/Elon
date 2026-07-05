@@ -13,12 +13,15 @@ import {
   assistantProgressNoteText,
   buildTaskTimelineDiagnostics,
   eventUniqueKey,
+  isAssistantEvent,
   isMaintenanceRuntimePhase,
+  isShellCommandEcho,
   latestNonHeartbeatIndex,
   latestRuntimePhase,
   latestRuntimePhaseEntry,
   latestRuntimeStatusItem,
   maintenanceStageKey,
+  removeMatchingShellCommandEcho,
 } from './taskTimelineRuntime'
 import type { ChatMessage, TaskTone, ToolEvent } from './types'
 
@@ -76,6 +79,10 @@ export interface TaskTimelineDiagnostic {
   detail: string
 }
 
+export interface TaskTimelineOptions {
+  assistantNoteCount?: number
+}
+
 export type TaskTimelineStageKey =
   | 'empty'
   | 'dispatch'
@@ -108,6 +115,7 @@ export interface TaskTimelineStage {
 export function buildTaskTimeline(
   messages: ChatMessage[],
   finalMessage?: ChatMessage,
+  options: TaskTimelineOptions = {},
 ): TaskTimelineModel {
   const items: TimelineItem[] = []
   const seenText = new Set<string>()
@@ -124,7 +132,7 @@ export function buildTaskTimeline(
     fileChange: false,
     toolResult: false,
     usage: false,
-    assistantEvent: false,
+    assistantEvent: Number(options.assistantNoteCount ?? 0) > 0,
     finalReply: !!finalText,
   }
 
@@ -155,6 +163,10 @@ export function buildTaskTimeline(
     const parsedEvent = parseToolEvent(text)
     const echoText = eventTextForEcho(parsedEvent) || text
     if (isFinalAnswerEcho(echoText, finalText)) return
+    if (isAssistantEvent(parsedEvent)) {
+      coverage.assistantEvent = true
+      return
+    }
     if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
 
     const heartbeat = parseHeartbeat(text, message, index)
@@ -178,6 +190,7 @@ export function buildTaskTimeline(
       : text
     if (!event && seenText.has(uniqueKey)) return
     seenText.add(uniqueKey)
+    if (event) removeMatchingShellCommandEcho(items, item)
     if (mergeShellResult(items, item)) return
     items.push(item)
   })
@@ -681,10 +694,6 @@ function itemFromText(text: string, message: ChatMessage, index: number): Timeli
   }
 
   return textItem(message, index, 'status', 'running', shortText(text), text, nodeId)
-}
-
-function isShellCommandEcho(text: string): boolean {
-  return /^AI\s*执行命令\s*[：:]/i.test(text)
 }
 
 function parseHeartbeat(text: string, message: ChatMessage, index: number): TimelineItem | null {

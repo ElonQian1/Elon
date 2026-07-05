@@ -24,7 +24,9 @@
 
 .userMeta {
   display: flex;
+  align-items: baseline;
   justify-content: flex-end;
+  gap: 8px;
   margin-bottom: 3px;
 }
 
@@ -32,6 +34,11 @@
   color: var(--text);
   font-size: 12px;
   font-weight: 650;
+}
+
+.userMeta span {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .userAvatar {

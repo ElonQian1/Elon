@@ -152,6 +152,43 @@ export function buildTaskTimelineDiagnostics(
   return diagnostics
 }
 
+export function removeMatchingShellCommandEcho(items: TimelineItem[], item: TimelineItem): void {
+  const event = item.event
+  if (event?.type !== 'tool_call' || clean(event.tool ?? '') !== 'shell') return
+  const command = clean(event.args?.command ?? '')
+  if (!command) return
+  for (let index = items.length - 1; index >= 0 && index >= items.length - 5; index--) {
+    const previous = items[index]
+    if (previous.event) continue
+    const text = clean(previous.detail ?? previous.title)
+    if (isShellCommandEcho(text) && shellEchoMatchesCommand(text, command)) {
+      items.splice(index, 1)
+      return
+    }
+  }
+}
+
+export function isAssistantEvent(event: ToolEvent | null): boolean {
+  const type = clean(event?.type ?? '')
+  return type === 'assistant_message' || type === 'assistant_chunk'
+}
+
+export function isShellCommandEcho(text: string): boolean {
+  return /^AI\s*执行命令\s*[：:]/i.test(text)
+}
+
+function shellEchoMatchesCommand(text: string, command: string): boolean {
+  const echoCommand = clean(text.replace(/^AI\s*执行命令\s*[：:]\s*/i, ''))
+  if (!echoCommand) return false
+  const left = normalizeCommandForCompare(echoCommand)
+  const right = normalizeCommandForCompare(command)
+  return left === right || left.includes(right) || right.includes(left)
+}
+
+function normalizeCommandForCompare(value: string): string {
+  return value.replace(/\s+/g, ' ').trim()
+}
+
 function itemId(message: ChatMessage, index: number): string {
   return clean(message.id ?? '') || `timeline-${index}`
 }

@@ -11,7 +11,7 @@ import { ChevronDown, ChevronRight, StopCircle } from 'lucide-react'
 import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
-import { clean } from '../../lib/utils'
+import { clean, formatTime } from '../../lib/utils'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
@@ -52,7 +52,9 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress' || isAssistantProgressNote(m))
   const assistantNotes = messages.filter(isAssistantProgressNote)
-  const timeline = buildTaskTimeline(progressMsgs, resultMsg)
+  const timeline = buildTaskTimeline(progressMsgs, resultMsg, {
+    assistantNoteCount: assistantNotes.length,
+  })
   const progressCount = timeline.visibleStepCount
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
@@ -62,6 +64,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
+  const requestTime = messageTime(userMsg) || messageTime(headerMsg)
   const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
 
   useEffect(() => {
@@ -99,6 +102,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
           <div className={styles.userBody}>
             <div className={styles.userMeta}>
               <strong>{requestAuthor.name}</strong>
+              {requestTime && <span>{requestTime}</span>}
             </div>
             <div className={styles.userBubble}>{request}</div>
           </div>
@@ -115,7 +119,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
         </div>
       )}
 
-      {showProcessingBubble && <TaskProcessingBubble />}
+      {showProcessingBubble && <TaskProcessingBubble time={messageTime(headerMsg) || requestTime} />}
 
       {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
@@ -196,6 +200,7 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
   const failed = tone === 'failed'
   const canceled = tone === 'canceled'
   const hasMarkdown = /[#*`\[\]>|]/.test(content)
+  const time = messageTime(message)
 
   return (
     <div className={styles.assistantTurn}>
@@ -204,6 +209,7 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
         <div className={styles.assistantMeta}>
           <strong>一龙</strong>
           <span>{label}</span>
+          {time && <span>{time}</span>}
         </div>
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
@@ -213,11 +219,17 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
   )
 }
 
-function TaskProcessingBubble() {
+function TaskProcessingBubble({ time }: { time?: string }) {
   return (
     <div className={styles.assistantTurn}>
       <div className={styles.assistantAvatar}>AI</div>
       <div className={styles.assistantBody}>
+        {time && (
+          <div className={styles.assistantMeta}>
+            <strong>一龙</strong>
+            <span>{time}</span>
+          </div>
+        )}
         <div className={styles.processingBubble}>
           <span>AI 正在处理</span>
           <div className={styles.processingDots} aria-hidden="true">
@@ -304,6 +316,12 @@ function userDisplayName(
       ?? '',
     ),
   }
+}
+
+function messageTime(message: ChatMessage | undefined): string {
+  if (!message) return ''
+  const value = message.created_at ?? message.createdAt
+  return value ? formatTime(value) : ''
 }
 
 function latestMessageOfKind(messages: ChatMessage[], kind: string): ChatMessage | undefined {
