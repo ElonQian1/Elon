@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Bot, ChevronLeft, ChevronRight, Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
+import type { ApiError } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import {
@@ -66,6 +67,7 @@ interface Friend {
 export default function AiChatPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const login = useAuthStore((s) => s.login)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
   const modelOptions = useModelStore((s) => s.options)
@@ -97,6 +99,11 @@ export default function AiChatPage() {
       ? window.localStorage.getItem('elon.pc.aiUserPanelCollapsed') === 'true'
       : false
   ))
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false)
+  const [loginUsername, setLoginUsername] = useState('')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
@@ -190,6 +197,15 @@ export default function AiChatPage() {
       setRuntimeRoute('auto')
     }
   }, [nodeStatusChecked, onlineNodeId, runtimeRoute])
+
+  useEffect(() => {
+    if (!loginDialogOpen) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setLoginDialogOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [loginDialogOpen])
 
   // 客户端搜索过滤
   const filteredFriends = useMemo(() => {
@@ -297,7 +313,7 @@ export default function AiChatPage() {
     const text = input.trim()
     if (!text || sending) return
     if (!user?.id) {
-      setError('请先认证账号后开始对话。')
+      setError('请先登录账号后开始对话。')
       return
     }
     const previousInput = input
@@ -366,6 +382,21 @@ export default function AiChatPage() {
       setError((err as { message?: string }).message ?? '发送失败')
     } finally {
       setSending(false)
+    }
+  }
+
+  async function handleInlineLogin(e: React.FormEvent) {
+    e.preventDefault()
+    setLoginError('')
+    setLoginLoading(true)
+    try {
+      await login(loginUsername, loginPassword)
+      setLoginDialogOpen(false)
+      setLoginPassword('')
+    } catch (err) {
+      setLoginError((err as ApiError).message ?? '登录失败，请重试')
+    } finally {
+      setLoginLoading(false)
     }
   }
 
@@ -488,14 +519,21 @@ export default function AiChatPage() {
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
               <p>{!user?.id
-                ? '认证账号后即可开始和我对话。'
+                ? '登录账号后即可开始和我对话。'
                 : onlineNodeId
                   ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。`
                   : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
               {!user?.id && (
                 <div className={styles.loginPrompt}>
-                  <button className={styles.startBtn} type="button" onClick={() => navigate('/login')}>
-                    认证账号
+                  <button
+                    className={styles.startBtn}
+                    type="button"
+                    onClick={() => {
+                      setLoginError('')
+                      setLoginDialogOpen(true)
+                    }}
+                  >
+                    登录账号
                   </button>
                   <span>登录后可以开始对话，并同步你的项目、好友和电脑节点。</span>
                 </div>
@@ -693,6 +731,58 @@ export default function AiChatPage() {
         >
           <ChevronLeft size={17} aria-hidden="true" />
         </button>
+      )}
+
+      {loginDialogOpen && !user?.id && (
+        <div
+          className={styles.loginDialogBackdrop}
+          role="presentation"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setLoginDialogOpen(false)
+          }}
+        >
+          <form
+            className={styles.loginDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-login-title"
+            onSubmit={handleInlineLogin}
+          >
+            <button
+              className={styles.loginDialogClose}
+              type="button"
+              aria-label="关闭登录框"
+              onClick={() => setLoginDialogOpen(false)}
+            >
+              ×
+            </button>
+            <h3 id="ai-login-title">登录账号</h3>
+            <p>登录后即可开始对话，并同步你的项目、好友和电脑节点。</p>
+            <input
+              className={styles.loginDialogInput}
+              type="text"
+              placeholder="用户名"
+              autoComplete="username"
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              autoFocus
+              required
+            />
+            <input
+              className={styles.loginDialogInput}
+              type="password"
+              placeholder="密码"
+              autoComplete="current-password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              required
+            />
+            {loginError && <p className={styles.loginDialogError}>{loginError}</p>}
+            <button className={styles.loginDialogSubmit} type="submit" disabled={loginLoading}>
+              {loginLoading ? '登录中...' : '登录'}
+            </button>
+          </form>
+        </div>
       )}
 
       {showModelPicker && (
