@@ -195,8 +195,10 @@ fn autostart_status_payload() -> Value {
         let summary = if enabled {
             if source == "scheduled_task" {
                 "开机登录后会通过当前用户计划任务启动后台守护，并自动恢复本机节点。"
+            } else if source == "startup_shortcut" {
+                "开机登录后会通过当前用户启动文件夹快捷方式启动后台守护，并自动恢复本机节点。"
             } else {
-                "检测到旧版开机自启动；修复或更新后会迁移为当前用户计划任务。"
+                "检测到旧版开机自启动；修复或更新后会优先迁移为当前用户计划任务，权限不足时降级为启动文件夹快捷方式。"
             }
         } else {
             "未开启开机自动守护；开启后无需每次手动启动 Win 端。"
@@ -205,8 +207,9 @@ fn autostart_status_payload() -> Value {
             "supported": true,
             "enabled": enabled,
             "source": source,
-            "strategy": "current_user_scheduled_task",
+            "strategy": "current_user_scheduled_task_or_startup_shortcut",
             "task_name": crate::node_client_launcher::AUTOSTART_TASK_NAME,
+            "startup_shortcut_name": crate::node_client_launcher::AUTOSTART_STARTUP_SHORTCUT_NAME,
             "run_value_name": crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME,
             "legacy_detected": legacy_detected,
             "expected_command": expected_command,
@@ -221,8 +224,9 @@ fn autostart_status_payload() -> Value {
             "supported": false,
             "enabled": false,
             "source": "unsupported",
-            "strategy": "current_user_scheduled_task",
+            "strategy": "current_user_scheduled_task_or_startup_shortcut",
             "task_name": "ElonNodeAgent",
+            "startup_shortcut_name": "一龙开发平台开机守护.lnk",
             "run_value_name": "ElonNodeAgent",
             "legacy_detected": false,
             "expected_command": Value::Null,

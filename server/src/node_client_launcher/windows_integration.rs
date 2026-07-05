@@ -10,6 +10,7 @@ use super::{command as launcher_command, paths, APP_NAME, WATCHDOG_ARG};
 
 pub(crate) const RUN_VALUE_NAME: &str = "ElonNodeAgent";
 pub(crate) const TASK_NAME: &str = "ElonNodeAgent";
+pub(crate) const STARTUP_SHORTCUT_NAME: &str = "一龙开发平台开机守护.lnk";
 pub(crate) const LEGACY_TASK_NAMES: &[&str] = &["ElonNodeAgentTray"];
 const PROTOCOL_SCHEME: &str = "elon-node";
 pub(crate) const LEGACY_RUN_VALUE_NAMES: &[&str] = &[
@@ -81,7 +82,11 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
-        create_autostart_task(&client)?;
+        if create_autostart_task(&client).is_ok() {
+            remove_autostart_startup_shortcut();
+        } else {
+            create_autostart_startup_shortcut(&client, install_dir)?;
+        }
         remove_known_run_values();
         remove_legacy_startup_shortcuts();
         remove_legacy_scheduled_tasks();
@@ -228,6 +233,7 @@ pub(crate) fn disable_autostart() {
     {
         remove_scheduled_task(TASK_NAME);
         remove_legacy_scheduled_tasks();
+        remove_autostart_startup_shortcut();
         remove_known_run_values();
         remove_legacy_startup_shortcuts();
     }
@@ -326,6 +332,39 @@ fn autostart_task_run_command(client: &Path) -> String {
 }
 
 #[cfg(windows)]
+fn create_autostart_startup_shortcut(client: &Path, install_dir: &Path) -> Result<()> {
+    let script = format!(
+        r#"
+$startup = [Environment]::GetFolderPath('Startup')
+if ([string]::IsNullOrWhiteSpace($startup)) {{ throw '无法定位当前用户启动目录' }}
+New-Item -ItemType Directory -Force -Path $startup | Out-Null
+$shortcut = Join-Path $startup '{}'
+$client = '{}'
+$workdir = '{}'
+$shell = New-Object -ComObject WScript.Shell
+$link = $shell.CreateShortcut($shortcut)
+$link.TargetPath = $client
+$link.Arguments = '{}'
+$link.WorkingDirectory = $workdir
+$link.IconLocation = $client
+$link.Description = '登录 Windows 后启动一龙开发平台后台守护'
+$link.Save()
+"#,
+        launcher_command::ps_single_quote(STARTUP_SHORTCUT_NAME),
+        launcher_command::ps_single_quote(&client.to_string_lossy()),
+        launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
+        launcher_command::ps_single_quote(WATCHDOG_ARG)
+    );
+    let mut cmd = launcher_command::powershell_hidden_command(&script);
+    let status =
+        launcher_command::status_hidden(&mut cmd).context("无法创建当前用户启动快捷方式")?;
+    if !status.success() {
+        anyhow::bail!("创建当前用户启动快捷方式失败");
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
 fn autostart_marker_present() -> Result<bool> {
     let script = autostart_marker_probe_script();
     let mut cmd = launcher_command::powershell_hidden_command(&script);
@@ -365,7 +404,7 @@ if ($null -ne $key) {{
 }}
 $startup = [Environment]::GetFolderPath('Startup')
 if (Test-Path -LiteralPath $startup) {{
-  foreach ($shortcut in @('一龙开发平台.lnk','一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk')) {{
+  foreach ($shortcut in @('{startup_shortcut_name}','一龙开发平台.lnk','一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk')) {{
     if (Test-Path -LiteralPath (Join-Path $startup $shortcut)) {{
       [Console]::Out.Write('present')
       exit 0
@@ -375,6 +414,7 @@ if (Test-Path -LiteralPath $startup) {{
 "#,
         task_names = ps_string_array(&[&[TASK_NAME], LEGACY_TASK_NAMES].concat()),
         run_value_names = ps_string_array(&[&[RUN_VALUE_NAME], LEGACY_RUN_VALUE_NAMES].concat()),
+        startup_shortcut_name = ps_single_quote_for_script(STARTUP_SHORTCUT_NAME),
     )
 }
 
@@ -455,8 +495,19 @@ mod tests {
 
         assert!(script.contains("Get-ScheduledTask"));
         assert!(script.contains("ElonNodeAgent"));
+        assert!(script.contains("一龙开发平台开机守护.lnk"));
         assert!(script.contains("CurrentVersion\\Run"));
         assert!(!script.contains("CreateSubKey"));
+    }
+
+    #[test]
+    fn autostart_has_non_admin_startup_shortcut_fallback() {
+        assert_eq!(super::STARTUP_SHORTCUT_NAME, "一龙开发平台开机守护.lnk");
+        let source = include_str!("windows_integration.rs");
+
+        assert!(source.contains("create_autostart_startup_shortcut"));
+        assert!(source.contains("remove_autostart_startup_shortcut"));
+        assert!(source.contains("登录 Windows 后启动一龙开发平台后台守护"));
     }
 }
 
@@ -492,6 +543,21 @@ if (Test-Path -LiteralPath $startup) {
 }
 "#;
     let mut cmd = launcher_command::powershell_hidden_command(script);
+    let _ = launcher_command::status_hidden(&mut cmd);
+}
+
+#[cfg(windows)]
+fn remove_autostart_startup_shortcut() {
+    let script = format!(
+        r#"
+$startup = [Environment]::GetFolderPath('Startup')
+if (Test-Path -LiteralPath $startup) {{
+  Remove-Item -LiteralPath (Join-Path $startup '{}') -Force -ErrorAction SilentlyContinue
+}}
+"#,
+        launcher_command::ps_single_quote(STARTUP_SHORTCUT_NAME)
+    );
+    let mut cmd = launcher_command::powershell_hidden_command(&script);
     let _ = launcher_command::status_hidden(&mut cmd);
 }
 

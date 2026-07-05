@@ -31,6 +31,7 @@ pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
 pub(crate) const AUTOSTART_RUN_VALUE_NAME: &str = windows_integration::RUN_VALUE_NAME;
 pub(crate) const AUTOSTART_TASK_NAME: &str = windows_integration::TASK_NAME;
+pub(crate) const AUTOSTART_STARTUP_SHORTCUT_NAME: &str = windows_integration::STARTUP_SHORTCUT_NAME;
 pub(crate) const AUTOSTART_LEGACY_RUN_VALUE_NAMES: &[&str] =
     windows_integration::LEGACY_RUN_VALUE_NAMES;
 pub(crate) const AUTOSTART_LEGACY_TASK_NAMES: &[&str] = windows_integration::LEGACY_TASK_NAMES;

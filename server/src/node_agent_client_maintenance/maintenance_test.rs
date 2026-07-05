@@ -40,6 +40,17 @@ mod tests {
         assert!(info.legacy_detected);
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn autostart_query_detects_startup_shortcut_fallback() {
+        let script = super::autostart_query_script();
+
+        assert!(script.contains("Set-ShortcutCommand"));
+        assert!(script.contains("startup_shortcut"));
+        assert!(script.contains("legacy_startup_shortcut"));
+        assert!(script.contains("一龙开发平台开机守护.lnk"));
+    }
+
     #[test]
     fn only_fixed_open_targets_are_supported() {
         assert!(maintenance_target("task_journal").is_ok());

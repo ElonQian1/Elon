@@ -345,6 +345,7 @@ export interface AutostartStatus {
   source?: string
   strategy?: string
   task_name?: string
+  startup_shortcut_name?: string
   run_value_name?: string
   legacy_detected?: boolean
   expected_command?: string | null

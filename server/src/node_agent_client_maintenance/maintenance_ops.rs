@@ -203,6 +203,20 @@ function Set-TaskCommand($Task, $Source) {{
   }}
   $result.source = $Source
 }}
+function Set-ShortcutCommand($Path, $Source) {{
+  if (-not (Test-Path -LiteralPath $Path)) {{ return }}
+  $shell = New-Object -ComObject WScript.Shell
+  $link = $shell.CreateShortcut($Path)
+  $target = [string]$link.TargetPath
+  $arguments = [string]$link.Arguments
+  if ([string]::IsNullOrWhiteSpace($target)) {{ return }}
+  if ([string]::IsNullOrWhiteSpace($arguments)) {{
+    $result.command = '"' + $target + '"'
+  }} else {{
+    $result.command = '"' + $target + '" ' + $arguments
+  }}
+  $result.source = $Source
+}}
 if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {{
   $task = Get-ScheduledTask -TaskName '{task_name}' -ErrorAction SilentlyContinue
   if ($null -ne $task) {{
@@ -214,6 +228,24 @@ if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {{
       $result.legacy_detected = $true
       if ($result.source -eq 'none') {{
         Set-TaskCommand $legacyTask 'legacy_scheduled_task'
+      }}
+    }}
+  }}
+}}
+$startup = [Environment]::GetFolderPath('Startup')
+if (Test-Path -LiteralPath $startup) {{
+  $shortcut = Join-Path $startup '{startup_shortcut_name}'
+  if ($result.source -eq 'none') {{
+    Set-ShortcutCommand $shortcut 'startup_shortcut'
+  }} elseif (Test-Path -LiteralPath $shortcut) {{
+    $result.legacy_detected = $true
+  }}
+  foreach ($legacyShortcut in @('一龙开发平台.lnk','一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk')) {{
+    $legacyPath = Join-Path $startup $legacyShortcut
+    if (Test-Path -LiteralPath $legacyPath) {{
+      $result.legacy_detected = $true
+      if ($result.source -eq 'none') {{
+        Set-ShortcutCommand $legacyPath 'legacy_startup_shortcut'
       }}
     }}
   }}
@@ -243,6 +275,8 @@ if ($null -ne $key) {{
 "#,
         task_name = ps_single_quote(crate::node_client_launcher::AUTOSTART_TASK_NAME),
         run_value_name = ps_single_quote(crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME),
+        startup_shortcut_name =
+            ps_single_quote(crate::node_client_launcher::AUTOSTART_STARTUP_SHORTCUT_NAME),
         legacy_task_names =
             ps_string_array(crate::node_client_launcher::AUTOSTART_LEGACY_TASK_NAMES),
         run_value_names = ps_string_array(
