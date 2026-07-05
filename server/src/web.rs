@@ -342,3 +342,27 @@ pub async fn pc_spa_index(State(state): State<Arc<AppState>>) -> impl IntoRespon
             .into_response(),
     }
 }
+
+/// GET /pc/pc-workbench-sw.js — PC 工作台离线壳 Service Worker。
+pub async fn pc_workbench_service_worker(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let path = state.data_dir.join("pc-next-dist/pc-workbench-sw.js");
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => (
+            axum::http::StatusCode::OK,
+            [
+                (
+                    header::CONTENT_TYPE,
+                    "application/javascript; charset=utf-8",
+                ),
+                (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => (
+            axum::http::StatusCode::NOT_FOUND,
+            "PC Service Worker missing",
+        )
+            .into_response(),
+    }
+}

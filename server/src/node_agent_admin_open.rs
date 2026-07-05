@@ -3,6 +3,11 @@
 #[cfg(windows)]
 use std::time::Duration;
 
+#[cfg(windows)]
+const CLOUD_OPEN_PROBE_TIMEOUT: Duration = Duration::from_millis(2200);
+#[cfg(any(windows, test))]
+const DEFAULT_CLOUD_WS_URL: &str = "ws://43.139.149.158:8080/agent/ws";
+
 pub fn admin_port_from_env() -> u16 {
     std::env::var("NODE_ADMIN_PORT")
         .ok()
@@ -10,8 +15,8 @@ pub fn admin_port_from_env() -> u16 {
         .unwrap_or(7799)
 }
 
-/// 打开本地 PC 工作台。工作台资源由本机节点提供，云端 API 作为数据源。
-/// 旧本地管理页可通过 NODE_OPEN_LOCAL=1 切换，云端直开可通过 NODE_OPEN_CLOUD=1 切换。
+/// 默认打开用户熟悉的云端 PC 工作台；云端不可达时回退到本地 PC 工作台。
+/// 旧本地管理页可通过 NODE_OPEN_LOCAL=1 切换，云端直开可通过 NODE_OPEN_CLOUD=1 强制。
 #[cfg(windows)]
 fn admin_url(port: u16) -> String {
     if std::env::var("NODE_OPEN_LOCAL")
@@ -20,28 +25,90 @@ fn admin_url(port: u16) -> String {
     {
         return format!("http://127.0.0.1:{port}/local-admin");
     }
-    if !std::env::var("NODE_OPEN_CLOUD")
+    let cloud_url = cloud_pc_url(port);
+    if std::env::var("NODE_OPEN_CLOUD")
         .map(|v| v == "1")
         .unwrap_or(false)
+        || cloud_workbench_reachable()
     {
-        return format!("http://127.0.0.1:{port}/pc");
+        return cloud_url;
     }
-    let cloud_base = std::env::var("NODE_CLOUD_URL")
-        .unwrap_or_else(|_| "ws://43.139.149.158:8080/agent/ws".to_string());
-    let http_base = if let Some(rest) = cloud_base.strip_prefix("wss://") {
-        format!(
-            "https://{}",
-            rest.split('/').next().unwrap_or("43.139.149.158:8080")
-        )
-    } else if let Some(rest) = cloud_base.strip_prefix("ws://") {
-        format!(
-            "http://{}",
-            rest.split('/').next().unwrap_or("43.139.149.158:8080")
-        )
-    } else {
-        "http://43.139.149.158:8080".to_string()
+    format!("http://127.0.0.1:{port}/pc")
+}
+
+#[cfg(windows)]
+fn cloud_pc_url(port: u16) -> String {
+    format!(
+        "{}/pc?node_admin={}",
+        cloud_http_base().trim_end_matches('/'),
+        encode_query_component(&format!("http://127.0.0.1:{port}/"))
+    )
+}
+
+#[cfg(windows)]
+fn cloud_http_base() -> String {
+    let cloud_base =
+        std::env::var("NODE_CLOUD_URL").unwrap_or_else(|_| DEFAULT_CLOUD_WS_URL.to_string());
+    cloud_http_base_from(&cloud_base)
+}
+
+#[cfg(any(windows, test))]
+fn cloud_http_base_from(cloud_base: &str) -> String {
+    let parsed =
+        reqwest::Url::parse(cloud_base).or_else(|_| reqwest::Url::parse(DEFAULT_CLOUD_WS_URL));
+    let Ok(url) = parsed else {
+        return "http://43.139.149.158:8080".to_string();
     };
-    format!("{http_base}/pc")
+    let scheme = match url.scheme() {
+        "wss" | "https" => "https",
+        "ws" | "http" => "http",
+        _ => "http",
+    };
+    let Some(host) = url.host_str() else {
+        return "http://43.139.149.158:8080".to_string();
+    };
+    let host = if host.contains(':') && !host.starts_with('[') {
+        format!("[{host}]")
+    } else {
+        host.to_string()
+    };
+    match url.port() {
+        Some(port) => format!("{scheme}://{host}:{port}"),
+        None => format!("{scheme}://{host}"),
+    }
+}
+
+#[cfg(windows)]
+fn cloud_workbench_reachable() -> bool {
+    let health_url = format!("{}/health", cloud_http_base().trim_end_matches('/'));
+    let client = match reqwest::blocking::Client::builder()
+        .connect_timeout(CLOUD_OPEN_PROBE_TIMEOUT)
+        .timeout(CLOUD_OPEN_PROBE_TIMEOUT)
+        .build()
+    {
+        Ok(client) => client,
+        Err(_) => return false,
+    };
+    client
+        .get(health_url)
+        .header(reqwest::header::CACHE_CONTROL, "no-cache")
+        .send()
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn encode_query_component(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char);
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }
 
 #[cfg(windows)]
@@ -90,6 +157,22 @@ fn auto_open_enabled_from(value: Option<&str>) -> bool {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cloud_http_base_accepts_ws_and_http_urls() {
+        assert_eq!(
+            super::cloud_http_base_from("ws://cloud.test:8080/agent/ws"),
+            "http://cloud.test:8080"
+        );
+        assert_eq!(
+            super::cloud_http_base_from("wss://cloud.test/agent/ws"),
+            "https://cloud.test"
+        );
+        assert_eq!(
+            super::cloud_http_base_from("https://cloud.test/agent/ws"),
+            "https://cloud.test"
+        );
+    }
+
     #[test]
     fn auto_open_is_opt_in() {
         assert!(!super::auto_open_enabled_from(None));

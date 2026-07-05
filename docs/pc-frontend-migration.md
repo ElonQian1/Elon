@@ -99,7 +99,7 @@ server/src/
 |---|---|---|---|
 | 移动端响应式（< 780px）| 🟡 中 | 面板折叠、滑动抽屉 | ⬜ 未开始 |
 | 键盘快捷键（Esc 关弹窗等）| 🟢 低 | 体验细节 | ⬜ 未开始 |
-| PWA 离线壳 | 🟢 低 | service worker | ⬜ 未开始 |
+| PWA 离线壳 | 🟢 低 | service worker | 🟡 基础壳完成：缓存 `/pc` shell 和当前 hash 资源；浏览器要求 HTTPS/localhost 安全上下文 |
 
 ---
 

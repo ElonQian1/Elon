@@ -20,6 +20,7 @@ const ADMIN_LOCAL_READY_WAIT: Duration = Duration::from_secs(15);
 const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
 const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
 const ADMIN_HEALTH_READ_LIMIT: usize = 16 * 1024;
+const CLOUD_WORKBENCH_PROBE_TIMEOUT: Duration = Duration::from_millis(2200);
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     let client = paths::client_exe(install_dir);
@@ -301,18 +302,31 @@ pub(crate) fn open_pc_web_page(port: u16, env_values: &HashMap<String, String>) 
     let local_workbench_url = format!("http://127.0.0.1:{port}/pc");
     let legacy_local_admin_url = format!("http://127.0.0.1:{port}/local-admin");
     let url = match open_target_from_env_values(env_values) {
+        OpenTarget::SmartWorkbench => {
+            let cloud_url = cloud_pc_url(port, env_values);
+            if cloud_workbench_reachable(env_values) {
+                cloud_url
+            } else {
+                if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
+                    let _ = wait_for_admin_ready(port, ADMIN_LOCAL_RETRY_WAIT);
+                }
+                local_workbench_url
+            }
+        }
         OpenTarget::LocalWorkbench => local_workbench_url,
         OpenTarget::LocalAdmin => legacy_local_admin_url,
-        OpenTarget::CloudPc => {
-            let base_url = web_base_url(env_values);
-            format!(
-                "{}/pc?node_admin={}",
-                base_url.trim_end_matches('/'),
-                encode_query_component(&format!("http://127.0.0.1:{port}/"))
-            )
-        }
+        OpenTarget::CloudPc => cloud_pc_url(port, env_values),
     };
     open_url(&url)
+}
+
+fn cloud_pc_url(port: u16, env_values: &HashMap<String, String>) -> String {
+    let base_url = web_base_url(env_values);
+    format!(
+        "{}/pc?node_admin={}",
+        base_url.trim_end_matches('/'),
+        encode_query_component(&format!("http://127.0.0.1:{port}/"))
+    )
 }
 
 fn open_url(url: &str) -> Result<()> {
@@ -332,6 +346,7 @@ fn open_url(url: &str) -> Result<()> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OpenTarget {
+    SmartWorkbench,
     LocalWorkbench,
     CloudPc,
     LocalAdmin,
@@ -349,10 +364,40 @@ fn open_target_from_env_values(env_values: &HashMap<String, String>) -> OpenTarg
         .map(|value| value.trim().to_ascii_lowercase())
         .as_deref()
     {
+        Some("smart") | Some("smart_workbench") | Some("auto") => OpenTarget::SmartWorkbench,
+        Some("local_workbench") | Some("local_pc") => OpenTarget::LocalWorkbench,
         Some("cloud_pc") => OpenTarget::CloudPc,
         Some("local_admin") => OpenTarget::LocalAdmin,
-        _ => OpenTarget::LocalWorkbench,
+        _ => OpenTarget::SmartWorkbench,
     }
+}
+
+fn cloud_workbench_reachable(env_values: &HashMap<String, String>) -> bool {
+    let health_url = format!("{}/health", web_base_url(env_values).trim_end_matches('/'));
+    let timeout = cloud_probe_timeout(env_values);
+    let client = match reqwest::blocking::Client::builder()
+        .connect_timeout(timeout)
+        .timeout(timeout)
+        .build()
+    {
+        Ok(client) => client,
+        Err(_) => return false,
+    };
+    client
+        .get(health_url)
+        .header(reqwest::header::CACHE_CONTROL, "no-cache")
+        .send()
+        .map(|response| response.status().is_success())
+        .unwrap_or(false)
+}
+
+fn cloud_probe_timeout(env_values: &HashMap<String, String>) -> Duration {
+    let millis = env_values
+        .get("NODE_AGENT_CLOUD_PROBE_TIMEOUT_MS")
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(CLOUD_WORKBENCH_PROBE_TIMEOUT.as_millis() as u64)
+        .clamp(300, 10_000);
+    Duration::from_millis(millis)
 }
 
 fn web_base_url(env_values: &HashMap<String, String>) -> String {
@@ -539,9 +584,57 @@ mod tests {
 
         assert_eq!(
             open_target_from_env_values(&env_values),
+            OpenTarget::SmartWorkbench
+        );
+        assert!(!open_target_from_env_values(&env_values).requires_admin_ready());
+    }
+
+    #[test]
+    fn local_workbench_open_target_requires_ready_admin_api() {
+        let mut env_values = HashMap::new();
+        env_values.insert(
+            "NODE_AGENT_OPEN_TARGET".to_string(),
+            " local_workbench ".to_string(),
+        );
+
+        assert_eq!(
+            open_target_from_env_values(&env_values),
             OpenTarget::LocalWorkbench
         );
         assert!(open_target_from_env_values(&env_values).requires_admin_ready());
+    }
+
+    #[test]
+    fn cloud_pc_url_carries_selected_local_admin_port() {
+        let mut env_values = HashMap::new();
+        env_values.insert(
+            "NODE_AGENT_WEB_BASE_URL".to_string(),
+            "http://cloud.example/".to_string(),
+        );
+
+        assert_eq!(
+            cloud_pc_url(7803, &env_values),
+            "http://cloud.example/pc?node_admin=http%3A%2F%2F127.0.0.1%3A7803%2F"
+        );
+    }
+
+    #[test]
+    fn cloud_probe_timeout_is_bounded() {
+        let mut env_values = HashMap::new();
+        env_values.insert(
+            "NODE_AGENT_CLOUD_PROBE_TIMEOUT_MS".to_string(),
+            "10".to_string(),
+        );
+        assert_eq!(cloud_probe_timeout(&env_values), Duration::from_millis(300));
+
+        env_values.insert(
+            "NODE_AGENT_CLOUD_PROBE_TIMEOUT_MS".to_string(),
+            "50000".to_string(),
+        );
+        assert_eq!(
+            cloud_probe_timeout(&env_values),
+            Duration::from_millis(10_000)
+        );
     }
 
     #[test]

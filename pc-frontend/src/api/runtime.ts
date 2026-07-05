@@ -26,6 +26,18 @@ function isLoopbackHost(hostname: string): boolean {
   return host === '127.0.0.1' || host === 'localhost' || host === '[::1]' || host === '::1'
 }
 
+function safeLoopbackUrl(raw: string | null | undefined): string {
+  try {
+    const url = new URL(raw || '')
+    if (isLoopbackHost(url.hostname) && /^https?:$/.test(url.protocol)) {
+      return trimTrailingSlash(url.toString())
+    }
+  } catch {
+    // invalid URL
+  }
+  return ''
+}
+
 export function isLocalWorkbench(): boolean {
   const boot = bootstrap()
   if (boot.mode === 'local') return true
@@ -38,8 +50,11 @@ export function cloudBaseUrl(): string {
 }
 
 export function localNodeBaseUrl(): string {
-  const base = bootstrap().localNodeBaseUrl?.trim()
-    || (isLoopbackHost(location.hostname) ? location.origin : DEFAULT_LOCAL_NODE_BASE_URL)
+  const boot = safeLoopbackUrl(bootstrap().localNodeBaseUrl)
+  if (boot) return boot
+  const fromQuery = safeLoopbackUrl(new URLSearchParams(location.search).get('node_admin'))
+  if (fromQuery) return fromQuery
+  const base = isLoopbackHost(location.hostname) ? location.origin : DEFAULT_LOCAL_NODE_BASE_URL
   return trimTrailingSlash(base)
 }
 

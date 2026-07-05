@@ -93,6 +93,15 @@
   white-space: nowrap;
 }
 
+.nodeBanner a {
+  flex: 0 0 auto;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .nodeBannerIcon {
   flex: 0 0 auto;
 }

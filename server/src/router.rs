@@ -73,12 +73,12 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         header::CACHE_CONTROL,
         HeaderValue::from_static("no-cache, no-store, must-revalidate"),
     );
-    // /pc  — SPA 子路由器：assets 用 ServeDir，其余路径 fallback 到 index.html (200)
-    //        这样强刷 /pc/ai、/pc/friends 等子路径不会返回 404。
+    // /pc: assets 用 ServeDir，其余路径 fallback 到 index.html，支持强刷子路由。
     let pc_assets_svc = tower::ServiceBuilder::new()
         .layer(no_cache.clone())
         .service(ServeDir::new(pc_next_dist.join("assets")));
     let pc_router = axum::Router::new()
+        .route("/pc-workbench-sw.js", get(web::pc_workbench_service_worker))
         .nest_service("/assets", pc_assets_svc)
         .fallback(web::pc_spa_index)
         .with_state(Arc::clone(&state));

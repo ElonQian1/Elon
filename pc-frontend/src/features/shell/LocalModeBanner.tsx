@@ -17,9 +17,15 @@ export default function LocalModeBanner() {
   const localMode = isLocalWorkbench()
 
   useEffect(() => {
-    if (!localMode) return
     let cancelled = false
     async function refresh() {
+      if (!localMode) {
+        const cloudOk = await probeCloudHealth()
+        if (cancelled) return
+        setCloudState(cloudOk ? 'online' : 'offline')
+        setLocalStatus(null)
+        return
+      }
       const [cloudOk, status] = await Promise.all([
         probeCloudHealth(),
         probeLocalStatus(),
@@ -36,7 +42,16 @@ export default function LocalModeBanner() {
     }
   }, [localMode])
 
-  if (!localMode) return null
+  if (!localMode) {
+    if (cloudState !== 'offline') return null
+    return (
+      <div className={[styles.nodeBanner, styles.localModeOffline].join(' ')}>
+        <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
+        <span>云端连接异常 · 当前显示的是一龙 PC 工作台缓存壳，本机 Win 端可用于诊断网络或防火墙问题。</span>
+        <a href={localNodeUrl('/pc')} target="_blank" rel="noreferrer">打开本机工作台</a>
+      </div>
+    )
+  }
 
   const nodeConnected = localStatus?.connected !== false
   const bannerClass = [

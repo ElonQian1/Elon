@@ -8,6 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../../store/auth'
+import { localNodeBaseUrl } from '../../api/runtime'
 
 export type NodeConnectStatus =
   | 'idle'        // 未登录或节点探测未开始
@@ -23,7 +24,7 @@ interface NodeConnectState {
 }
 
 const LOCAL_NODE_PORT = 7799
-const LOCAL_NODE_BASES = [
+const FALLBACK_LOCAL_NODE_BASES = [
   `http://127.0.0.1:${LOCAL_NODE_PORT}`,
   `http://localhost:${LOCAL_NODE_PORT}`,
 ]
@@ -159,7 +160,7 @@ async function probeLocalNode(): Promise<{
   localAdminToken: string
   status: LocalNodeProbeStatus
 } | null> {
-  for (const baseUrl of LOCAL_NODE_BASES) {
+  for (const baseUrl of localNodeProbeBases()) {
     try {
       const res = await fetch(`${baseUrl}/api/status`, {
         credentials: 'omit',
@@ -174,5 +175,12 @@ async function probeLocalNode(): Promise<{
     }
   }
   return null
+}
+
+function localNodeProbeBases(): string[] {
+  const bases = [localNodeBaseUrl(), ...FALLBACK_LOCAL_NODE_BASES]
+    .map((value) => value.replace(/\/+$/, ''))
+    .filter(Boolean)
+  return Array.from(new Set(bases))
 }
 

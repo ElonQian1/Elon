@@ -26,6 +26,7 @@ pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
         .route("/", get(pc_root_redirect))
         .route("/local-admin", get(local_admin_index))
         .nest_service("/pc/assets", assets.clone())
+        .route("/pc/pc-workbench-sw.js", get(pc_service_worker))
         .route("/pc", get(pc_spa_index))
         .route("/pc/*path", get(pc_spa_index))
         .nest_service("/pc-next/assets", assets)
@@ -39,6 +40,25 @@ async fn local_admin_index() -> Html<&'static str> {
 
 async fn pc_root_redirect() -> Redirect {
     Redirect::temporary("/pc")
+}
+
+async fn pc_service_worker() -> impl IntoResponse {
+    let path = local_pc_dist_dir().join("pc-workbench-sw.js");
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => (
+            StatusCode::OK,
+            [
+                (
+                    header::CONTENT_TYPE,
+                    "application/javascript; charset=utf-8",
+                ),
+                (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+            ],
+            bytes,
+        )
+            .into_response(),
+        Err(_) => (StatusCode::NOT_FOUND, "PC Service Worker missing").into_response(),
+    }
 }
 
 async fn pc_spa_index(State(runtime): State<Arc<crate::NodeRuntime>>) -> impl IntoResponse {

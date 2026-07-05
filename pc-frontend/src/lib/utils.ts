@@ -1,4 +1,5 @@
 /** 纯工具函数，对应旧 pc_app_utils.js 的 window.ElonPcKit */
+import { localNodeBaseUrl } from '../api/runtime'
 
 export function clean(value: unknown): string {
   return String(value == null ? '' : value).trim()
@@ -23,14 +24,16 @@ export function formatTime(value: unknown): string {
 /** 验证 node_admin URL：只允许 127.0.0.1 / localhost，默认 http://127.0.0.1:7799/ */
 export function safeNodeAdminUrl(rawParam?: string | null): string {
   const raw = rawParam ?? new URLSearchParams(location.search).get('node_admin') ?? ''
-  try {
-    const url = new URL(raw || 'http://127.0.0.1:7799/')
-    const host = url.hostname.toLowerCase()
-    if ((host === '127.0.0.1' || host === 'localhost') && /^https?:$/.test(url.protocol)) {
-      return url.toString()
+  if (raw.trim()) {
+    try {
+      const url = new URL(raw)
+      const host = url.hostname.toLowerCase()
+      if ((host === '127.0.0.1' || host === 'localhost' || host === '::1') && /^https?:$/.test(url.protocol)) {
+        return url.toString()
+      }
+    } catch {
+      // invalid URL
     }
-  } catch {
-    // invalid URL
   }
-  return 'http://127.0.0.1:7799/'
+  return `${localNodeBaseUrl()}/`
 }
