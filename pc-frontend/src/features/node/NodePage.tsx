@@ -8,6 +8,8 @@ import NodeLifecycleStatusCard from './NodeLifecycleStatusCard'
 import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
 import CodexToolboxCard from './CodexToolboxCard'
+import LocalNodeHealthPanel from './LocalNodeHealthPanel'
+import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { useUserProgression } from '../billing/useUserProgression'
 import type { UserProgressionSummary } from '../billing/progressionApi'
@@ -155,16 +157,7 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
 
       {probeStatus === 'online' && localStatus
         ? <NodeAdminPanel adminUrl={adminUrl} initialStatus={localStatus} />
-        : probeStatus === 'offline' && (
-          <div className={styles.setupCard}>
-            <h3>还没有可用的本机节点</h3>
-            <div className={styles.stepList}>
-              <div><strong>1</strong><span>下载 Win 端压缩包并解压。</span></div>
-              <div><strong>2</strong><span>双击「一龙开发平台.exe」，它会自动安装并注册网页一键唤起。</span></div>
-              <div><strong>3</strong><span>安装后点击"启动 Win 端"，在本机页面登录并注册 PC 节点。</span></div>
-            </div>
-          </div>
-        )}
+        : probeStatus === 'offline' && <LocalNodeOfflineCard onLaunch={launchWinClient} onRetry={() => doProbe()} />}
     </div>
   )
 }
@@ -460,6 +453,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         ))}
       </div>
       <NodeLifecycleStatusCard localStatus={status} />
+      <LocalNodeHealthPanel status={status} onRefresh={() => refreshStatus()} />
       <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
       <CodexStatusCard
         status={codex}

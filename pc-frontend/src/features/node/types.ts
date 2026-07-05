@@ -75,6 +75,30 @@ export interface LocalNodeStatus {
   hardware?: Record<string, unknown>
   storage?: Record<string, unknown>
   cloud_url?: string
+  cloud_http_url?: string
+  cloud_network?: {
+    cloudWsMode?: string
+    cloudHttpMode?: string
+    proxyDefault?: string
+    userProxyOptIn?: string
+    cloudHostsNoProxy?: string[]
+    noProxyEnv?: string
+  }
+  download_router?: {
+    ok?: boolean
+    routerVersion?: string
+    profile?: {
+      enabled?: boolean
+      mode?: string
+      failOpen?: boolean
+      cacheMinutes?: number
+      updatedAt?: string
+    }
+    availableModes?: string[]
+    wrapperPolicy?: string
+    traceScope?: string
+  }
+  runtime_policy?: Record<string, unknown>
   local_admin_token?: string
   local_admin_token_header?: string
   lifecycle_report_schema_version?: number

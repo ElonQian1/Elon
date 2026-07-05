@@ -6,7 +6,7 @@ use anyhow::Result;
 use std::path::Path;
 
 #[cfg(windows)]
-use super::{command as launcher_command, paths, APP_NAME, BACKGROUND_START_ARG};
+use super::{command as launcher_command, paths, APP_NAME, WATCHDOG_ARG};
 
 #[cfg(windows)]
 pub(crate) const RUN_VALUE_NAME: &str = "ElonNodeAgent";
@@ -84,7 +84,7 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
-        let value = format!("\"{}\" {}", client.display(), BACKGROUND_START_ARG);
+        let value = format!("\"{}\" {}", client.display(), WATCHDOG_ARG);
         remove_legacy_scheduled_task();
         remove_legacy_run_values();
         remove_legacy_startup_shortcuts();
@@ -104,7 +104,7 @@ pub(crate) fn repair_existing_autostart(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
-        let value = format!("\"{}\" {}", client.display(), BACKGROUND_START_ARG);
+        let value = format!("\"{}\" {}", client.display(), WATCHDOG_ARG);
         let script = repair_existing_autostart_value_script(&value);
         let mut cmd = launcher_command::powershell_hidden_command(&script);
         let status = launcher_command::status_hidden(&mut cmd).context("无法修复已有开机自启")?;
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn autostart_script_writes_unicode_registry_value_without_reg_exe() {
         let script = super::set_autostart_value_script(
-            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe" --background"#,
+            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe" --watchdog"#,
         );
 
         assert!(script.contains("[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey"));
@@ -426,7 +426,7 @@ mod tests {
     #[test]
     fn repair_existing_autostart_script_does_not_create_missing_value() {
         let script = super::repair_existing_autostart_value_script(
-            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe" --background"#,
+            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe" --watchdog"#,
         );
 
         assert!(script.contains("OpenSubKey($keyPath, $true)"));

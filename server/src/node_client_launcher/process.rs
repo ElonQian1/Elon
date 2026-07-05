@@ -10,8 +10,8 @@ use std::{
 };
 
 use super::{
-    command as launcher_command, env_file, log_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME,
-    DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
+    command as launcher_command, env_file, fallback_page, log_file, paths, AGENT_RUNTIME_ARG,
+    CLIENT_EXE_NAME, DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
 };
 
 const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_secs(4);
@@ -52,7 +52,20 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
             if open_target.requires_admin_ready()
                 && !wait_for_admin_ready(port, ADMIN_LOCAL_RETRY_WAIT)
             {
-                bail!("一龙节点本机管理接口启动超时：http://127.0.0.1:{port}/api/status");
+                let detail = format!("本机管理接口启动超时：http://127.0.0.1:{port}/api/status");
+                log_file::record_event(
+                    install_dir,
+                    "launcher_local_admin_recovery_page",
+                    false,
+                    &detail,
+                );
+                fallback_page::open_recovery_page(
+                    install_dir,
+                    port,
+                    "本机节点未启动或管理接口无响应",
+                    &detail,
+                )?;
+                return Ok(());
             }
 
             if !open_target.requires_admin_ready() && !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
@@ -101,14 +114,14 @@ pub(crate) fn start_background(install_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn admin_port_from_env_values(env_values: &HashMap<String, String>) -> u16 {
+pub(crate) fn admin_port_from_env_values(env_values: &HashMap<String, String>) -> u16 {
     env_values
         .get("NODE_ADMIN_PORT")
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(DEFAULT_ADMIN_PORT)
 }
 
-fn spawn_agent_runtime(
+pub(crate) fn spawn_agent_runtime(
     client: &Path,
     install_dir: &Path,
     port: u16,
@@ -403,7 +416,7 @@ fn select_admin_port_for_runtime(preferred: u16, runtime_already_running: bool) 
     }
 }
 
-fn agent_runtime_running(install_dir: &Path) -> bool {
+pub(crate) fn agent_runtime_running(install_dir: &Path) -> bool {
     #[cfg(windows)]
     {
         let script = agent_runtime_query_script(&paths::client_exe(install_dir));
@@ -443,7 +456,7 @@ if ($targets) {{ Write-Output 'running' }}
     )
 }
 
-fn wait_for_admin_ready(port: u16, timeout: Duration) -> bool {
+pub(crate) fn wait_for_admin_ready(port: u16, timeout: Duration) -> bool {
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
         if admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
@@ -454,7 +467,7 @@ fn wait_for_admin_ready(port: u16, timeout: Duration) -> bool {
     admin_healthy(port, ADMIN_HEALTH_TIMEOUT)
 }
 
-fn admin_healthy(port: u16, timeout: Duration) -> bool {
+pub(crate) fn admin_healthy(port: u16, timeout: Duration) -> bool {
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
         return false;

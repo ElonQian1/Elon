@@ -2,12 +2,14 @@
 
 pub(crate) mod command;
 mod env_file;
+mod fallback_page;
 mod installer;
 pub(crate) mod log_file;
 mod maintenance_protocol;
 mod paths;
 mod process;
 mod updater;
+mod watchdog;
 mod windows_integration;
 
 use anyhow::Result;
@@ -23,6 +25,7 @@ pub(crate) const UNINSTALL_EXE_NAME: &str = "卸载一龙开发平台.exe";
 pub(crate) const INTERNAL_DIR_NAME: &str = "_internal";
 pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
 pub(crate) const BACKGROUND_START_ARG: &str = "--background";
+pub(crate) const WATCHDOG_ARG: &str = "--watchdog";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
 pub(crate) const AUTOSTART_RUN_VALUE_NAME: &str = windows_integration::RUN_VALUE_NAME;
@@ -31,6 +34,7 @@ pub(crate) const AUTOSTART_RUN_VALUE_NAME: &str = windows_integration::RUN_VALUE
 enum ClientCommand {
     Start,
     BackgroundStart,
+    Watchdog,
     Install,
     Uninstall,
     Update,
@@ -93,14 +97,24 @@ fn run_command(command: ClientCommand) -> Result<()> {
                 // 避免已有 /pc 工作页重连时又被插入一个重复 tab。
                 return Ok(());
             }
-            process::start_or_open(&install_dir)?;
+            let start_result = process::start_or_open(&install_dir);
+            let watchdog_result = watchdog::ensure_running(&install_dir);
+            start_result?;
+            watchdog_result?;
         }
         ClientCommand::BackgroundStart => {
             let install_dir = installer::ensure_installed()?;
             if updater::update_client_if_needed(&install_dir)? {
                 return Ok(());
             }
-            process::start_background(&install_dir)?;
+            let start_result = process::start_background(&install_dir);
+            let watchdog_result = watchdog::ensure_running(&install_dir);
+            start_result?;
+            watchdog_result?;
+        }
+        ClientCommand::Watchdog => {
+            let install_dir = paths::install_dir()?;
+            watchdog::run_loop(&install_dir)?;
         }
         ClientCommand::Install => {
             let install_dir = installer::install_or_repair()?;
@@ -108,7 +122,10 @@ fn run_command(command: ClientCommand) -> Result<()> {
                 // 旧安装包触发自更新时保持浏览器不动，更新脚本负责重启 runtime。
                 return Ok(());
             }
-            process::launch_installed_client(&install_dir)?;
+            let launch_result = process::launch_installed_client(&install_dir);
+            let watchdog_result = watchdog::ensure_running(&install_dir);
+            launch_result?;
+            watchdog_result?;
         }
         ClientCommand::Uninstall => installer::uninstall()?,
         ClientCommand::Update => {
@@ -136,6 +153,9 @@ impl ClientCommand {
     fn from_args(args: &[String], uninstall_exe: bool) -> Self {
         if args.iter().any(|arg| arg == "--uninstall") || uninstall_exe {
             return Self::Uninstall;
+        }
+        if args.iter().any(|arg| arg == WATCHDOG_ARG) {
+            return Self::Watchdog;
         }
         if args
             .iter()
@@ -172,6 +192,7 @@ impl ClientCommand {
         match self {
             Self::Start => "start",
             Self::BackgroundStart => "background_start",
+            Self::Watchdog => "watchdog",
             Self::Install => "install",
             Self::Uninstall => "uninstall",
             Self::Update => "update",
@@ -223,6 +244,10 @@ fn exe_stem_contains(needle: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{ClientCommand, UNINSTALL_NAME};
+    use std::time::Duration;
+
+    #[cfg(windows)]
+    use std::path::Path;
 
     #[test]
     fn client_command_accepts_productized_maintenance_aliases() {
@@ -237,6 +262,10 @@ mod tests {
         assert!(matches!(
             ClientCommand::from_args(&["--autostart".to_string()], false),
             ClientCommand::BackgroundStart
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["--watchdog".to_string()], false),
+            ClientCommand::Watchdog
         ));
         assert!(matches!(
             ClientCommand::from_args(&["--repair".to_string()], false),
@@ -275,5 +304,58 @@ mod tests {
 
         assert!(!source.contains(&removed_open_helper));
         assert!(source.contains("避免已有 /pc 工作页重连时又被插入一个重复 tab"));
+    }
+
+    #[test]
+    fn watchdog_restart_requires_consecutive_failures() {
+        assert!(!super::watchdog::should_restart(0, 3));
+        assert!(!super::watchdog::should_restart(2, 3));
+        assert!(super::watchdog::should_restart(3, 3));
+    }
+
+    #[test]
+    fn watchdog_interval_env_is_clamped() {
+        assert_eq!(
+            super::watchdog::watchdog_interval_from(Some("1")),
+            Duration::from_secs(5)
+        );
+        assert_eq!(
+            super::watchdog::watchdog_interval_from(Some("9999")),
+            Duration::from_secs(300)
+        );
+        assert_eq!(
+            super::watchdog::watchdog_interval_from(Some("not-a-number")),
+            Duration::from_secs(15)
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn watchdog_query_matches_same_client_and_skips_current_pid() {
+        let script = super::watchdog::watchdog_query_script(
+            Path::new(r"C:\ElonNode\一龙开发平台.exe"),
+            1234,
+        );
+
+        assert!(script.contains("--watchdog"));
+        assert!(script.contains("ProcessId -ne"));
+        assert!(script.contains("一龙开发平台.exe"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn watchdog_stop_terminates_only_other_watchdog_processes() {
+        let script =
+            super::watchdog::watchdog_stop_script(Path::new(r"C:\ElonNode\一龙开发平台.exe"), 1234);
+
+        assert!(script.contains("--watchdog"));
+        assert!(script.contains("ProcessId -ne"));
+        assert!(script.contains("Terminate"));
+        assert!(!script.contains("--agent-runtime"));
+    }
+
+    #[test]
+    fn watchdog_uses_client_exe_identity() {
+        assert_eq!(super::CLIENT_EXE_NAME, "一龙开发平台.exe");
     }
 }

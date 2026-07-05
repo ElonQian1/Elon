@@ -7,7 +7,8 @@ use std::{
 };
 
 use super::{
-    command as launcher_command, env_file, paths, process, windows_integration, DEFAULT_ADMIN_PORT,
+    command as launcher_command, env_file, paths, process, watchdog, windows_integration,
+    DEFAULT_ADMIN_PORT,
 };
 
 const INTERNAL_FILES: &[&str] = &[
@@ -74,6 +75,7 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
         .with_context(|| format!("无法创建安装目录 {}", internal_dir.display()))?;
 
     let previous_port = configured_admin_port(&install_dir);
+    watchdog::stop_running(&install_dir);
     process::stop_agent();
     process::wait_for_port_closed(previous_port, Duration::from_secs(5));
 
@@ -104,6 +106,7 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
 
 pub(crate) fn uninstall() -> Result<()> {
     let install_dir = paths::install_dir()?;
+    watchdog::stop_running(&install_dir);
     process::stop_agent();
     windows_integration::disable_autostart();
     windows_integration::remove_url_protocol();
