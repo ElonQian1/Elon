@@ -54,7 +54,7 @@ function AccountClaimBanner() {
 
   return (
     <div className={styles.claimBanner}>
-      <span>登录后同步你的项目、好友和电脑节点；未登录也可以先浏览工作台。</span>
+      <span>认证账号后同步项目、好友和电脑节点。</span>
       <button type="button" onClick={() => navigate('/login')}>
         认证账号
       </button>

@@ -488,10 +488,18 @@ export default function AiChatPage() {
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
               <p>{!user?.id
-                ? '认证账号后即可开始对话，我会记住我们聊过的内容。'
+                ? '认证账号后即可开始和我对话。'
                 : onlineNodeId
                   ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。`
                   : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
+              {!user?.id && (
+                <div className={styles.loginPrompt}>
+                  <button className={styles.startBtn} type="button" onClick={() => navigate('/login')}>
+                    认证账号
+                  </button>
+                  <span>登录后可以开始对话，并同步你的项目、好友和电脑节点。</span>
+                </div>
+              )}
             </div>
           )}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
