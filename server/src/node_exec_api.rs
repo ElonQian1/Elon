@@ -9,6 +9,7 @@ use axum::{
 };
 use homecli_proto::AgentToServer;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{sync::Arc, time::Duration};
 use tokio::time::timeout;
 
@@ -174,8 +175,10 @@ pub async fn node_exec_handler(
         }
     }
 
+    let display_output = clean_node_exec_output(&output);
+
     axum::Json(NodeExecResponse {
-        output,
+        output: display_output,
         req_id,
         node_id: agent_id,
         node_display_name: display_name,
@@ -203,4 +206,83 @@ fn pick_best_cli(allowed_clis: &[String]) -> String {
         .first()
         .cloned()
         .unwrap_or_else(|| "codex".to_string())
+}
+
+fn clean_node_exec_output(output: &str) -> String {
+    if let Some(message) = extract_json_agent_message(output) {
+        return message;
+    }
+
+    let filtered = output
+        .lines()
+        .filter(|line| !is_codex_protocol_event_line(line))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
+    if filtered.is_empty() {
+        output.trim().to_string()
+    } else {
+        filtered
+    }
+}
+
+fn extract_json_agent_message(output: &str) -> Option<String> {
+    let mut latest = None;
+    for line in output.lines() {
+        let Ok(value) = serde_json::from_str::<Value>(line.trim()) else {
+            continue;
+        };
+        if value.get("type").and_then(Value::as_str) != Some("item.completed") {
+            continue;
+        }
+        let Some(item) = value.get("item") else {
+            continue;
+        };
+        if item.get("type").and_then(Value::as_str) != Some("agent_message") {
+            continue;
+        }
+        if let Some(text) = item.get("text").and_then(Value::as_str) {
+            let clean = text.trim().strip_prefix("用户可见：").unwrap_or(text.trim()).trim();
+            if !clean.is_empty() {
+                latest = Some(clean.to_string());
+            }
+        }
+    }
+    latest
+}
+
+fn is_codex_protocol_event_line(line: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<Value>(line.trim()) else {
+        return false;
+    };
+    matches!(
+        value.get("type").and_then(Value::as_str),
+        Some("turn.started")
+            | Some("turn.completed")
+            | Some("token_count")
+            | Some("item.started")
+            | Some("item.completed")
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_node_exec_output;
+
+    #[test]
+    fn node_exec_output_extracts_codex_agent_message() {
+        let output = r#"{"type":"turn.started"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"你好。需要我帮你处理什么？"}}
+{"type":"turn.completed","usage":{"input_tokens":12695,"output_tokens":13}}
+codex
+你好。需要我帮你处理什么？"#;
+
+        assert_eq!(clean_node_exec_output(output), "你好。需要我帮你处理什么？");
+    }
+
+    #[test]
+    fn node_exec_output_keeps_normal_text() {
+        assert_eq!(clean_node_exec_output("普通输出\n第二行"), "普通输出\n第二行");
+    }
 }
