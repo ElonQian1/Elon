@@ -72,6 +72,35 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     open_pc_web_page(port, &env_values)
 }
 
+pub(crate) fn start_background(install_dir: &Path) -> Result<()> {
+    let client = paths::client_exe(install_dir);
+    if !client.exists() {
+        bail!("缺少客户端主程序：{}", client.display());
+    }
+
+    let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
+    let preferred_port = admin_port_from_env_values(&env_values);
+    let runtime_already_running = agent_runtime_running(install_dir);
+    let port = select_admin_port_for_runtime(preferred_port, runtime_already_running);
+
+    if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
+        if !runtime_already_running {
+            spawn_agent_runtime(&client, install_dir, port, &env_values)?;
+        }
+
+        if !wait_for_admin_ready(port, ADMIN_PC_WEB_READY_WAIT) {
+            log_file::record_event(
+                install_dir,
+                "launcher_background_admin_wait_timeout",
+                false,
+                &format!("runtime may still be warming: http://127.0.0.1:{port}/api/status"),
+            );
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn open_installed_pc_web_page(install_dir: &Path) -> Result<()> {
     let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
     open_pc_web_page(admin_port_from_env_values(&env_values), &env_values)

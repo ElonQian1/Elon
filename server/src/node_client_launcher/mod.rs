@@ -22,6 +22,7 @@ pub(crate) const UNINSTALL_NAME: &str = "卸载一龙开发平台";
 pub(crate) const UNINSTALL_EXE_NAME: &str = "卸载一龙开发平台.exe";
 pub(crate) const INTERNAL_DIR_NAME: &str = "_internal";
 pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
+pub(crate) const BACKGROUND_START_ARG: &str = "--background";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
 pub(crate) const AUTOSTART_RUN_VALUE_NAME: &str = windows_integration::RUN_VALUE_NAME;
@@ -29,6 +30,7 @@ pub(crate) const AUTOSTART_RUN_VALUE_NAME: &str = windows_integration::RUN_VALUE
 #[derive(Clone, Copy)]
 enum ClientCommand {
     Start,
+    BackgroundStart,
     Install,
     Uninstall,
     Update,
@@ -92,6 +94,13 @@ fn run_command(command: ClientCommand) -> Result<()> {
             }
             process::start_or_open(&install_dir)?;
         }
+        ClientCommand::BackgroundStart => {
+            let install_dir = installer::ensure_installed()?;
+            if updater::update_client_if_needed(&install_dir)? {
+                return Ok(());
+            }
+            process::start_background(&install_dir)?;
+        }
         ClientCommand::Install => {
             let install_dir = installer::install_or_repair()?;
             if updater::update_client_if_needed(&install_dir)? {
@@ -129,6 +138,12 @@ impl ClientCommand {
         }
         if args
             .iter()
+            .any(|arg| arg == BACKGROUND_START_ARG || arg == "--autostart")
+        {
+            return Self::BackgroundStart;
+        }
+        if args
+            .iter()
             .any(|arg| arg == "--install" || arg == "--repair")
             || repair_requested(args)
         {
@@ -155,6 +170,7 @@ impl ClientCommand {
     fn as_str(self) -> &'static str {
         match self {
             Self::Start => "start",
+            Self::BackgroundStart => "background_start",
             Self::Install => "install",
             Self::Uninstall => "uninstall",
             Self::Update => "update",
@@ -212,6 +228,14 @@ mod tests {
         assert!(matches!(
             ClientCommand::from_args(&["--check-update".to_string()], false),
             ClientCommand::Update
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["--background".to_string()], false),
+            ClientCommand::BackgroundStart
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["--autostart".to_string()], false),
+            ClientCommand::BackgroundStart
         ));
         assert!(matches!(
             ClientCommand::from_args(&["--repair".to_string()], false),

@@ -3,16 +3,24 @@
 use axum::{
     body::Body,
     extract::State,
-    http::{header::ORIGIN, HeaderMap, HeaderValue, Request, StatusCode},
+    http::{
+        header::CONTENT_TYPE, header::ORIGIN, HeaderMap, HeaderName, HeaderValue, Method, Request,
+        StatusCode,
+    },
     middleware::Next,
     response::{IntoResponse, Response},
     Json,
 };
 use serde_json::json;
 use std::sync::Arc;
+use tower_http::{
+    cors::{AllowOrigin, CorsLayer},
+    set_header::SetResponseHeaderLayer,
+};
 use uuid::Uuid;
 
 pub(crate) const LOCAL_ADMIN_TOKEN_HEADER: &str = "x-elon-local-admin-token";
+const LOCAL_ADMIN_PRIVATE_NETWORK_HEADER: &str = "access-control-allow-private-network";
 
 pub(crate) fn generate_local_admin_token() -> String {
     format!("la_{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple())
@@ -64,6 +72,25 @@ pub(crate) fn trusted_origin_header_values(cloud_http_url: &str) -> Vec<HeaderVa
         .into_iter()
         .filter_map(|origin| HeaderValue::from_str(&origin).ok())
         .collect()
+}
+
+pub(crate) fn cors_layer(cloud_http_url: &str) -> CorsLayer {
+    let origins = trusted_origin_header_values(cloud_http_url);
+
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(origins))
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_headers([
+            CONTENT_TYPE,
+            HeaderName::from_static(LOCAL_ADMIN_TOKEN_HEADER),
+        ])
+}
+
+pub(crate) fn private_network_header_layer() -> SetResponseHeaderLayer<HeaderValue> {
+    SetResponseHeaderLayer::overriding(
+        HeaderName::from_static(LOCAL_ADMIN_PRIVATE_NETWORK_HEADER),
+        HeaderValue::from_static("true"),
+    )
 }
 
 pub(crate) fn can_expose_local_admin_token(headers: &HeaderMap, cloud_http_url: &str) -> bool {

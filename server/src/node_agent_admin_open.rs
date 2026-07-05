@@ -68,12 +68,28 @@ fn wait_for_admin_port(port: u16) {
 
 #[cfg(windows)]
 fn auto_open_enabled() -> bool {
-    std::env::var("NODE_AUTO_OPEN_ADMIN")
+    auto_open_enabled_from(std::env::var("NODE_AUTO_OPEN_ADMIN").ok().as_deref())
+}
+
+fn auto_open_enabled_from(value: Option<&str>) -> bool {
+    value
         .map(|value| {
-            !matches!(
+            matches!(
                 value.trim().to_ascii_lowercase().as_str(),
-                "0" | "false" | "no" | "off"
+                "1" | "true" | "yes" | "on"
             )
         })
-        .unwrap_or(true)
+        .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn auto_open_is_opt_in() {
+        assert!(!super::auto_open_enabled_from(None));
+        assert!(super::auto_open_enabled_from(Some("true")));
+        assert!(super::auto_open_enabled_from(Some("1")));
+        assert!(!super::auto_open_enabled_from(Some("0")));
+        assert!(!super::auto_open_enabled_from(Some("false")));
+    }
 }

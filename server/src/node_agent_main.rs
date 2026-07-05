@@ -30,7 +30,6 @@
 //! 4. 断线后自动重连（指数退避 2s ~ 60s）；未登录时等待网页登录
 
 use anyhow::{anyhow, Result};
-use axum::http::{header::CONTENT_TYPE, HeaderName, Method};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliWorkspaceStatus, ModelCapability, NodeHardwareProfile, ServerToAgent,
@@ -45,7 +44,6 @@ use std::sync::{
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, watch, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
 use node_agent_cli_done::{
@@ -3814,7 +3812,7 @@ mod node_agent_cli_probe_status_tests {
 fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
     tokio::spawn(async move {
-        let cors = local_admin_cors(&runtime.cfg.cloud_http_url);
+        let cors = node_agent_local_admin::cors_layer(&runtime.cfg.cloud_http_url);
         let local_admin_guard = axum::middleware::from_fn_with_state(
             runtime.clone(),
             node_agent_local_admin::require_local_admin,
@@ -3939,7 +3937,8 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             )
             .merge(protected_routes)
             .with_state(runtime)
-            .layer(cors);
+            .layer(cors)
+            .layer(node_agent_local_admin::private_network_header_layer());
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
                 info!("🖥️  本地管理页: http://127.0.0.1:{}/", port);
@@ -3950,18 +3949,6 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             Err(e) => warn!("admin server 无法监听 {addr}: {e}"),
         }
     });
-}
-
-fn local_admin_cors(cloud_http_url: &str) -> CorsLayer {
-    let origins = node_agent_local_admin::trusted_origin_header_values(cloud_http_url);
-
-    CorsLayer::new()
-        .allow_origin(AllowOrigin::list(origins))
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
-        .allow_headers([
-            CONTENT_TYPE,
-            HeaderName::from_static(node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER),
-        ])
 }
 
 /// GET /api/tts-relay-config — 返回当前 TTS Worker URL 配置
