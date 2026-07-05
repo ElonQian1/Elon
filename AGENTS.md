@@ -1,6 +1,6 @@
 ﻿# 一龙项目 AI 工作入口
 
-最后更新：2026-06-29
+最后更新：2026-07-05
 
 本文件是所有 AI 工具（Codex / Codex CLI / Copilot / Copilot CLI）的共享路由层。
 
@@ -11,7 +11,8 @@
 
 1. 读 `.github/copilot-instructions.md`（规则权威来源，含部署速查、任务开始命令）
 2. 读本文件（按任务类型路由到专项文档）
-3. 只读和当前任务相关的专项文档，不全量读取
+3. **如使用 Codex CLI**，读 `CODEX.md`（含 Codex 专用脚本信号优先级、Prewarm 约束、Stale session 重试规则）
+4. 只读和当前任务相关的专项文档，不全量读取
 
 ## 按任务读取文档
 
