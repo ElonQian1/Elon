@@ -289,6 +289,10 @@ fn contains_quota_error(lower: &str) -> bool {
         || lower.contains("payment required")
         || lower.contains("insufficient quota")
         || lower.contains("quota exceeded")
+        || lower.contains("usage limit")
+        || lower.contains("limit reached")
+        || lower.contains("usage exhausted")
+        || lower.contains("额度已用尽")
         || lower.contains("endpoint is inactive")
 }
 
@@ -383,6 +387,14 @@ mod tests {
     fn classifies_auth_error_as_non_retryable() {
         let classified = classify_ai_error("invalid api key");
         assert_eq!(classified.code, "ai_auth_config_error");
+        assert!(!classified.retryable);
+    }
+
+    #[test]
+    fn classifies_codex_usage_limit_as_quota() {
+        let classified = classify_ai_error("Codex failed: usage limit reached for this account");
+        assert_eq!(classified.code, "ai_quota_unavailable");
+        assert_eq!(classified.category, AiErrorCategory::Quota);
         assert!(!classified.retryable);
     }
 

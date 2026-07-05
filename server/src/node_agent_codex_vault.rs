@@ -1,6 +1,4 @@
-//! 本机节点 Codex Pro 凭据保险箱桥接。
-//!
-//! 该模块只在本机节点进程内运行。浏览器触发操作，但不接触 `auth.json`
+//! 本机节点 Codex Pro 凭据保险箱桥接。浏览器触发操作，但不接触 `auth.json`
 //! 明文：读取、上传、租用和落盘都由本机节点完成。
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -27,8 +25,11 @@ pub(crate) struct CodexVaultLocalStatus {
     pub managed_home: String,
     pub active_codex_home: Option<String>,
     pub active_home_managed: bool,
+    pub active_slot_id: Option<String>,
+    pub active_account_hint_hash: Option<String>,
     pub managed_auth: AuthCacheInspection,
     pub default_auth: AuthCacheInspection,
+    pub managed_slots: Vec<ManagedAuthSlotInspection>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -41,6 +42,15 @@ pub(crate) struct AuthCacheInspection {
     pub problem: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ManagedAuthSlotInspection {
+    pub slot_id: String,
+    pub account_hint_hash: Option<String>,
+    pub active: bool,
+    pub home: String,
+    pub auth: AuthCacheInspection,
+}
+
 #[derive(Debug, Deserialize)]
 struct RestoreRequest {
     purpose: Option<String>,
@@ -50,7 +60,16 @@ struct RestoreRequest {
 struct CloudLeaseResponse {
     auth_json: String,
     lease_id: Option<String>,
+    slot_id: Option<String>,
+    account_hint_hash: Option<String>,
     message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ManagedSlotMeta {
+    slot_id: String,
+    account_hint_hash: Option<String>,
+    lease_id: Option<String>,
 }
 
 pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
@@ -107,7 +126,7 @@ async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoR
         Ok(path) => path,
         Err(error) => return error_response(StatusCode::BAD_REQUEST, error.to_string()),
     };
-    if auth_path.starts_with(managed_codex_home()) {
+    if path_in_managed_vault(&auth_path) {
         return error_response(
             StatusCode::BAD_REQUEST,
             "当前使用的是保险箱临时凭据，不能反向覆盖云端备份。",
@@ -148,9 +167,87 @@ async fn restore_handler(
     State(rt): State<Arc<crate::NodeRuntime>>,
     Json(req): Json<RestoreRequest>,
 ) -> impl IntoResponse {
+    match restore_from_cloud(
+        &rt,
+        req.purpose
+            .unwrap_or_else(|| "temporary_local_codex_cli".to_string()),
+        None,
+        None,
+    )
+    .await
+    {
+        Ok(lease) => (
+            StatusCode::OK,
+            Json(json!({
+                "ok": true,
+                "message": lease.message.unwrap_or_else(|| "已恢复为本机临时 Codex Pro 会话。".to_string()),
+                "lease_id": lease.lease_id,
+                "slot_id": lease.slot_id,
+                "account_hint_hash": lease.account_hint_hash,
+                "local": local_status(),
+            })),
+        ),
+        Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+    }
+}
+
+pub(crate) async fn try_auto_switch_after_codex_failure(
+    rt: &Arc<crate::NodeRuntime>,
+    stdout_text: &str,
+    stderr_text: &str,
+) -> Result<Option<String>> {
+    let combined = format!("{stdout_text}\n{stderr_text}");
+    let classified = crate::errors::classify_ai_error(&combined);
+    if !matches!(
+        classified.category,
+        crate::errors::AiErrorCategory::Quota | crate::errors::AiErrorCategory::AuthConfig
+    ) {
+        return Ok(None);
+    }
+    let previous = active_managed_slot_meta().and_then(|meta| meta.account_hint_hash);
+    let Some(previous_hint) = previous.as_deref() else {
+        return Ok(None);
+    };
+    let reason = classified
+        .operator_detail
+        .as_deref()
+        .unwrap_or(classified.code);
+    let lease = match restore_from_cloud(
+        rt,
+        "auto_switch_after_codex_failure".to_string(),
+        Some(previous_hint.to_string()),
+        Some(reason.to_string()),
+    )
+    .await
+    {
+        Ok(lease) => lease,
+        Err(error) => {
+            tracing::warn!("Codex 保险箱自动切换失败: {error:#}");
+            return Ok(None);
+        }
+    };
+    if lease.account_hint_hash.as_deref() == Some(previous_hint) {
+        return Ok(None);
+    }
+    Ok(Some(format!(
+        "Codex 当前账号额度或认证不可用，已自动切换到保险箱备用账号{}，正在重试本轮任务。",
+        lease
+            .account_hint_hash
+            .as_deref()
+            .map(|hint| format!(" ({hint})"))
+            .unwrap_or_default()
+    )))
+}
+
+async fn restore_from_cloud(
+    rt: &Arc<crate::NodeRuntime>,
+    purpose: String,
+    previous_account_hint_hash: Option<String>,
+    failure_reason: Option<String>,
+) -> Result<CloudLeaseResponse> {
     let creds = match rt.creds().await {
         Some(creds) => creds,
-        None => return error_response(StatusCode::UNAUTHORIZED, "请先绑定本机节点账号"),
+        None => bail!("请先绑定本机节点账号"),
     };
     let token = match creds
         .user_token
@@ -158,12 +255,7 @@ async fn restore_handler(
         .filter(|value| !value.trim().is_empty())
     {
         Some(token) => token.to_string(),
-        None => {
-            return error_response(
-                StatusCode::UNAUTHORIZED,
-                "本机节点缺少云端登录 token，请重新绑定",
-            )
-        }
+        None => bail!("本机节点缺少云端登录 token，请重新绑定"),
     };
     let url = format!(
         "{}/api/me/codex-vault/lease",
@@ -173,51 +265,48 @@ async fn restore_handler(
         "agent_id": creds.agent_id,
         "agent_secret": creds.agent_secret,
         "device_name": crate::machine_label(),
-        "purpose": req.purpose.unwrap_or_else(|| "temporary_local_codex_cli".to_string()),
+        "purpose": purpose,
+        "previous_account_hint_hash": previous_account_hint_hash,
+        "failure_reason": failure_reason,
     });
     let lease = match cloud_post_typed::<CloudLeaseResponse>(&url, &token, &body).await {
         Ok(lease) => lease,
-        Err(error) => return error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+        Err(error) => bail!(error),
     };
     let auth_value: Value = match serde_json::from_str(&lease.auth_json) {
         Ok(value) => value,
-        Err(_) => {
-            return error_response(
-                StatusCode::BAD_GATEWAY,
-                "云端返回的 auth_json 不是有效 JSON",
-            )
-        }
+        Err(_) => bail!("云端返回的 auth_json 不是有效 JSON"),
     };
     if let Err(error) = validate_chatgpt_auth_cache(&auth_value) {
-        return error_response(
-            StatusCode::BAD_GATEWAY,
-            format!("云端保险箱凭据校验失败: {error}"),
-        );
+        bail!("云端保险箱凭据校验失败: {error}");
     }
-    let home = managed_codex_home();
+    let slot_id = lease.slot_id.as_deref().unwrap_or("legacy");
+    let home = managed_slot_codex_home(slot_id);
     if let Err(error) = write_managed_auth_home(&home, &lease.auth_json) {
-        return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        bail!(error);
     }
+    write_slot_meta(
+        &home,
+        &ManagedSlotMeta {
+            slot_id: slot_id.to_string(),
+            account_hint_hash: lease.account_hint_hash.clone(),
+            lease_id: lease.lease_id.clone(),
+        },
+    )?;
     std::env::set_var("CODEX_HOME", &home);
     rt.refresh_cli_probe_now().await;
-    (
-        StatusCode::OK,
-        Json(json!({
-            "ok": true,
-            "message": lease.message.unwrap_or_else(|| "已恢复为本机临时 Codex Pro 会话。".to_string()),
-            "lease_id": lease.lease_id,
-            "local": local_status(),
-        })),
-    )
+    Ok(lease)
 }
 
 async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoResponse {
-    let home = managed_codex_home();
     let active = std::env::var("CODEX_HOME").ok().map(PathBuf::from);
-    if let Err(error) = safe_remove_managed_home(&home) {
+    if let Err(error) = safe_remove_all_managed_homes() {
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
-    if active.as_ref().is_some_and(|path| same_path(path, &home)) {
+    if active
+        .as_ref()
+        .is_some_and(|path| path_in_managed_vault(path))
+    {
         std::env::remove_var("CODEX_HOME");
     }
     rt.refresh_cli_probe_now().await;
@@ -268,7 +357,7 @@ async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl
 }
 
 fn local_status() -> CodexVaultLocalStatus {
-    let managed_home = managed_codex_home();
+    let legacy_home = managed_codex_home();
     let active_codex_home = std::env::var("CODEX_HOME")
         .ok()
         .map(|value| value.trim().to_string())
@@ -276,11 +365,25 @@ fn local_status() -> CodexVaultLocalStatus {
     let active_home_managed = active_codex_home
         .as_ref()
         .map(PathBuf::from)
-        .is_some_and(|path| same_path(&path, &managed_home));
+        .is_some_and(|path| path_in_managed_vault(&path));
+    let active_home = active_codex_home.as_ref().map(PathBuf::from);
+    let active_meta = active_home
+        .as_ref()
+        .filter(|path| active_home_managed && path.is_dir())
+        .and_then(|path| read_slot_meta(path).ok().flatten());
+    let managed_home = active_home
+        .as_ref()
+        .filter(|_| active_home_managed)
+        .cloned()
+        .unwrap_or_else(|| legacy_home.clone());
     CodexVaultLocalStatus {
         managed_home: managed_home.to_string_lossy().to_string(),
         active_codex_home,
         active_home_managed,
+        active_slot_id: active_meta.as_ref().map(|meta| meta.slot_id.clone()),
+        active_account_hint_hash: active_meta
+            .as_ref()
+            .and_then(|meta| meta.account_hint_hash.clone()),
         managed_auth: inspect_auth_home(&managed_home),
         default_auth: default_codex_home()
             .map(|home| inspect_auth_home(&home))
@@ -292,6 +395,7 @@ fn local_status() -> CodexVaultLocalStatus {
                 account_hint_hash: None,
                 problem: Some("无法定位默认用户目录".to_string()),
             }),
+        managed_slots: inspect_managed_slots(active_meta.as_ref()),
     }
 }
 
@@ -411,6 +515,63 @@ fn write_managed_auth_home(home: &Path, auth_json: &str) -> Result<()> {
     Ok(())
 }
 
+fn write_slot_meta(home: &Path, meta: &ManagedSlotMeta) -> Result<()> {
+    let meta_path = home.join("elon-codex-vault-slot.json");
+    std::fs::write(&meta_path, serde_json::to_string_pretty(meta)?)
+        .with_context(|| format!("无法写入保险箱槽位元数据 {}", meta_path.display()))?;
+    tighten_permissions(home, &meta_path);
+    Ok(())
+}
+
+fn read_slot_meta(home: &Path) -> Result<Option<ManagedSlotMeta>> {
+    let path = home.join("elon-codex-vault-slot.json");
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let text = std::fs::read_to_string(&path)
+        .with_context(|| format!("无法读取保险箱槽位元数据 {}", path.display()))?;
+    Ok(Some(serde_json::from_str(&text)?))
+}
+
+fn active_managed_slot_meta() -> Option<ManagedSlotMeta> {
+    let active = std::env::var("CODEX_HOME").ok().map(PathBuf::from)?;
+    if !path_in_managed_vault(&active) {
+        return None;
+    }
+    read_slot_meta(&active).ok().flatten()
+}
+
+fn inspect_managed_slots(active_meta: Option<&ManagedSlotMeta>) -> Vec<ManagedAuthSlotInspection> {
+    let slots_root = managed_slots_root();
+    let Ok(entries) = std::fs::read_dir(&slots_root) else {
+        return Vec::new();
+    };
+    let mut slots = entries
+        .flatten()
+        .filter_map(|entry| {
+            let home = entry.path().join("codex-home");
+            if !home.is_dir() {
+                return None;
+            }
+            let meta = read_slot_meta(&home).ok().flatten();
+            let slot_id = meta
+                .as_ref()
+                .map(|value| value.slot_id.clone())
+                .or_else(|| entry.file_name().to_str().map(ToOwned::to_owned))?;
+            let active = active_meta.is_some_and(|active| active.slot_id == slot_id);
+            Some(ManagedAuthSlotInspection {
+                slot_id,
+                account_hint_hash: meta.and_then(|value| value.account_hint_hash),
+                active,
+                home: home.to_string_lossy().to_string(),
+                auth: inspect_auth_home(&home),
+            })
+        })
+        .collect::<Vec<_>>();
+    slots.sort_by(|left, right| left.slot_id.cmp(&right.slot_id));
+    slots
+}
+
 fn safe_remove_managed_home(home: &Path) -> Result<()> {
     if !home.exists() {
         return Ok(());
@@ -427,6 +588,20 @@ fn safe_remove_managed_home(home: &Path) -> Result<()> {
     }
     std::fs::remove_dir_all(&full)
         .with_context(|| format!("无法清理临时 CODEX_HOME {}", full.display()))
+}
+
+fn safe_remove_all_managed_homes() -> Result<()> {
+    safe_remove_managed_home(&managed_codex_home())?;
+    let slots = managed_slots_root();
+    if slots.exists() {
+        let full = std::fs::canonicalize(&slots).unwrap_or_else(|_| slots.clone());
+        if !path_in_managed_vault(&full) {
+            bail!("拒绝清理非保险箱槽位目录: {}", slots.display());
+        }
+        std::fs::remove_dir_all(&full)
+            .with_context(|| format!("无法清理保险箱槽位目录 {}", full.display()))?;
+    }
+    Ok(())
 }
 
 fn tighten_permissions(home: &Path, auth_path: &Path) {
@@ -447,6 +622,32 @@ fn managed_codex_home() -> PathBuf {
         .join("Elon")
         .join("codex-vault")
         .join("codex-home")
+}
+
+fn managed_slots_root() -> PathBuf {
+    data_base_dir()
+        .join("Elon")
+        .join("codex-vault")
+        .join("slots")
+}
+
+fn managed_slot_codex_home(slot_id: &str) -> PathBuf {
+    managed_slots_root()
+        .join(safe_slot_id(slot_id))
+        .join("codex-home")
+}
+
+fn safe_slot_id(slot_id: &str) -> String {
+    let safe = slot_id
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_' || *ch == '-')
+        .take(80)
+        .collect::<String>();
+    if safe.is_empty() {
+        "legacy".to_string()
+    } else {
+        safe
+    }
 }
 
 fn default_codex_home() -> Option<PathBuf> {
@@ -479,10 +680,11 @@ fn data_base_dir() -> PathBuf {
     }
 }
 
-fn same_path(a: &Path, b: &Path) -> bool {
-    let ca = std::fs::canonicalize(a).unwrap_or_else(|_| a.to_path_buf());
-    let cb = std::fs::canonicalize(b).unwrap_or_else(|_| b.to_path_buf());
-    ca == cb
+fn path_in_managed_vault(path: &Path) -> bool {
+    let full = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let root = data_base_dir().join("Elon").join("codex-vault");
+    let root = std::fs::canonicalize(&root).unwrap_or(root);
+    full.starts_with(root)
 }
 
 async fn cloud_status(rt: &Arc<crate::NodeRuntime>) -> Result<Value> {

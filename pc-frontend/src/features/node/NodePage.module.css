@@ -668,6 +668,39 @@
   overflow-wrap: anywhere;
 }
 
+.vaultSlotList {
+  display: grid;
+  gap: 8px;
+}
+
+.vaultSlot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  font-size: 12px;
+}
+
+.vaultSlot span,
+.vaultSlot small {
+  min-width: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.vaultSlot strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.vaultSlot small {
+  grid-column: 1 / -1;
+}
+
 .vaultActions {
   display: flex;
   flex-wrap: wrap;

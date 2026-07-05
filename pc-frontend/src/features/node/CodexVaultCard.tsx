@@ -36,6 +36,8 @@ export default function CodexVaultCard({
   onRefresh: () => void
 }) {
   const vault = cloud?.vault
+  const cloudSlots = vault?.slots ?? []
+  const localSlots = status?.managed_slots ?? []
   const cloudReady = !!vault?.configured
   const bound = !!vault?.bound
   const defaultAuth = status?.default_auth
@@ -53,7 +55,7 @@ export default function CodexVaultCard({
       : !cloudReady
         ? '服务器未配置'
         : bound
-          ? `已备份 v${vault?.credential_version ?? 1}`
+          ? `已备份 ${vault?.available_count ?? (cloudSlots.length || 1)} 个账号`
           : '未备份'
   const stateTone = cloudReady && bound ? styles.vaultOnline : cloud?.error ? styles.vaultOffline : styles.vaultChecking
   return (
@@ -75,7 +77,7 @@ export default function CodexVaultCard({
         </div>
         <div>
           <span>托管 CODEX_HOME</span>
-          <strong>{activeManaged ? '当前生效' : managedAuth?.present ? '已写入' : '未写入'}</strong>
+          <strong>{activeManaged ? `当前生效${status?.active_account_hint_hash ? ` · ${status.active_account_hint_hash}` : ''}` : managedAuth?.present ? '已写入' : '未写入'}</strong>
         </div>
         <div>
           <span>最近备份</span>
@@ -88,6 +90,27 @@ export default function CodexVaultCard({
       </div>
       {cloud?.error && <p className={styles.codexFixHint}>{cloud.error}</p>}
       {defaultAuth?.problem && <p className={styles.codexFixHint}>{defaultAuth.problem}</p>}
+      {cloudSlots.length > 0 && (
+        <div className={styles.vaultSlotList}>
+          {cloudSlots.map((slot) => (
+            <div key={slot.slot_id ?? slot.account_hint_hash ?? 'slot'} className={styles.vaultSlot}>
+              <span>{slot.account_hint_hash ?? slot.slot_id ?? 'Codex 账号'}</span>
+              <strong>{slot.status === 'degraded' ? '备用受限' : '可用'} · v{slot.credential_version ?? 1}</strong>
+              {slot.last_error && <small>{slot.last_error}</small>}
+            </div>
+          ))}
+        </div>
+      )}
+      {localSlots.length > 0 && (
+        <div className={styles.vaultSlotList}>
+          {localSlots.map((slot) => (
+            <div key={slot.slot_id ?? slot.home ?? 'local'} className={styles.vaultSlot}>
+              <span>{slot.active ? '当前本机槽位' : '本机备用槽位'}</span>
+              <strong>{slot.account_hint_hash ?? slot.slot_id ?? '未知账号'}</strong>
+            </div>
+          ))}
+        </div>
+      )}
       {status?.managed_home && <code className={styles.codexPath}>{status.managed_home}</code>}
       <div className={styles.vaultActions}>
         <button

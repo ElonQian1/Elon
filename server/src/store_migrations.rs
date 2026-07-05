@@ -1,16 +1,16 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
-mod migrations_v1_v16;
+#[cfg(test)]
+mod migration_tests;
 mod migrations_v17_v34;
+mod migrations_v1_v16;
 mod migrations_v35_v53;
 mod migrations_v54_v70;
 mod migrations_v71_v82;
-#[cfg(test)]
-mod migration_tests;
 
-use migrations_v1_v16::*;
 use migrations_v17_v34::*;
+use migrations_v1_v16::*;
 use migrations_v35_v53::*;
 use migrations_v54_v70::*;
 use migrations_v71_v82::*;
@@ -123,6 +123,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (84, "新用户默认免费额度提升到 30000 分", crate::billing_trial_credit_migration::migration_v84),
     (85, "token 用量资源来源与自有 Codex 免扣费标记", crate::billing_usage_source_migration::migration_v85),
     (86, "PC 节点安装实例幂等注册", crate::node_install_id_migration::migration_v86), (87, "用户子项目 APK release 元数据与项目首页同步", crate::project_release_migration::migration_v87),
+    (88, "Codex auth.json 保险箱多账号槽位", crate::codex_vault_slot_migration::migration_v88),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

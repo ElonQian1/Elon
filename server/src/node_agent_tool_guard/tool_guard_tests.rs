@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::{
+    use crate::node_agent_tool_guard::{
         command_allowed, normalize_path, structured_command_allowed, RuntimeToolMode, ToolGuard,
     };
     use serde_json::json;

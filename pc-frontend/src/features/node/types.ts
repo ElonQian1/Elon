@@ -187,19 +187,48 @@ export interface CodexVaultLocalStatus {
   managed_home?: string
   active_codex_home?: string | null
   active_home_managed?: boolean
+  active_slot_id?: string | null
+  active_account_hint_hash?: string | null
   managed_auth?: CodexVaultAuthInspection
   default_auth?: CodexVaultAuthInspection
+  managed_slots?: CodexVaultManagedSlot[]
+}
+
+export interface CodexVaultManagedSlot {
+  slot_id?: string
+  account_hint_hash?: string | null
+  active?: boolean
+  home?: string
+  auth?: CodexVaultAuthInspection
 }
 
 export interface CodexVaultCloudStatus {
   configured?: boolean
   bound?: boolean
+  active_slot_id?: string | null
+  available_count?: number
   auth_mode?: string | null
   account_hint_hash?: string | null
   source_device?: string | null
   credential_version?: number | null
   last_backup_at?: string | null
   last_lease_at?: string | null
+  updated_at?: string | null
+  slots?: CodexVaultCloudSlot[]
+}
+
+export interface CodexVaultCloudSlot {
+  slot_id?: string
+  auth_mode?: string | null
+  account_hint_hash?: string | null
+  source_device?: string | null
+  credential_version?: number | null
+  status?: string
+  failure_count?: number
+  last_backup_at?: string | null
+  last_lease_at?: string | null
+  last_failure_at?: string | null
+  last_error?: string | null
   updated_at?: string | null
 }
 

@@ -40,6 +40,7 @@ mod cli_usage;
 mod codex_health;
 mod codex_stream;
 mod codex_vault_api;
+mod codex_vault_slot_migration;
 mod compute_usage;
 mod context_compiler;
 mod conversation_router;

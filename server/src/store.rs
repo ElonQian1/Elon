@@ -81,7 +81,7 @@ pub use billing::{AdminBalanceRow, AdminBillingEventRow, BillingEvent, RechargeR
 pub use billing_alerts::BillingAlertRow;
 pub use billing_price_rules::{BillingPriceRule, BillingPriceRuleUpsert, BillingPriceSnapshot};
 pub use billing_reservations::{BillingReservationOutcome, BillingReservationRequest};
-pub use codex_vault::CodexVaultRecord;
+pub use codex_vault::{CodexVaultRecord, CodexVaultSlotRecord};
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,

@@ -2,33 +2,6 @@
 
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
-//! elon-node-agent：用户 PC 端节点代理，将本机 LLM 算力贡献给 elon 平台。
-//!
-//! ## 使用方法（普通用户：零配置）
-//!
-//! 1. 普通用户只双击 `一龙PC节点.exe`。Windows 端只有这一个主程序入口，
-//!    后台节点 runtime 由同一个 exe 的内部启动模式承载。
-//! 2. 在管理页用 **账号 + 密码** 登录一次（也可直接粘贴 token）
-//! 3. 节点自动向云端注册，生成 agent_id + secret 并持久化到本地配置文件
-//! 4. 之后每次启动自动读取凭证、自动连接，无需再配置
-//!
-//! ## 高级用户（可选环境变量覆盖）
-//!
-//! ```bash
-//! NODE_CLOUD_URL       云端 WebSocket 地址（默认 ws://43.139.149.158:8080/agent/ws）
-//! NODE_USER_TOKEN      登录 token：设置后首次启动自动注册，无需网页登录
-//! NODE_AGENT_ID        手动指定节点 ID（搭配 NODE_AGENT_SECRET 跳过自动注册）
-//! NODE_AGENT_SECRET    手动指定密钥
-//! NODE_OLLAMA_URL      本地 Ollama 地址（默认 http://localhost:11434）
-//! ```
-//!
-//! ## 工作流
-//!
-//! 1. 启动后扫描本机 Ollama / LM Studio / 自定义 OpenAI-compatible 端口
-//! 2. 有凭证 → 连接云端 /agent/ws，发送 Register + RegisterCapabilities
-//! 3. 监听 LlmStreamRequest，转发给本地 LLM，流式返回 LlmStreamChunk + LlmStreamEnd
-//! 4. 断线后自动重连（指数退避 2s ~ 60s）；未登录时等待网页登录
-
 use anyhow::{anyhow, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
@@ -57,6 +30,8 @@ const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(35);
 
 mod agent_runtime_error_summary;
 mod cli_usage;
+#[allow(dead_code)]
+mod errors;
 mod git_command_error;
 mod node_agent_active_task;
 mod node_agent_active_task_registry;
@@ -759,17 +734,7 @@ impl LocalCliProbeSnapshot {
     }
 }
 
-/// 检测本机有哪些 CLI 可用。
 /// 检测本机可用的 CLI，返回 (cli名称, 完整路径) 对。
-///
-/// 直接用 Rust 扫描 PATH 和常见安装目录，避免 GUI 启动时调用 `where`
-/// 这类控制台程序造成黑色命令窗口闪烁。
-///
-/// 路径优先级（Windows）：
-///   a. 常见目录里找到的 .cmd（最可靠）
-///   b. PATH 里找到的 .cmd 且不含 VS Code globalStorage
-///   c. 其他非 globalStorage 路径
-///   d. 兜底：任何找到的路径
 fn local_cli_display_label(name: &str) -> &'static str {
     match name.trim().to_ascii_lowercase().as_str() {
         "codex" => "Codex",
@@ -1190,10 +1155,7 @@ fn now_epoch_ms() -> u128 {
         .unwrap_or_default()
 }
 
-/// 处理 extra_args 中的 `--attachment <url>` 参数：
-/// 下载图片到本地临时文件，然后根据 CLI 类型转换参数格式：
-/// - Copilot: `--attachment <url>` → `--attachment <local_path>`
-/// - Codex:   `--attachment <url>` → `-i <local_path>`
+/// 将附件 URL 下载到本地临时文件，并转换成对应 CLI 参数。
 async fn resolve_attachment_args(
     args: Vec<String>,
     cli_name: &str,
@@ -1249,7 +1211,6 @@ async fn resolve_attachment_args(
                             warn!("📎 attachment download error: {}", e);
                         }
                     }
-                    // 下载失败：跳过
                     i += 2;
                     continue;
                 }
@@ -1261,8 +1222,6 @@ async fn resolve_attachment_args(
     result
 }
 
-/// 执行 CliPrompt：启动 CLI 子进程，流式返回输出。
-/// `bin` 是完整路径（如 `C:\Users\...\copilot`），`cli_name` 是原始名称（用于路由判断）。
 fn cli_prompt_full_access(runtime_permission: Option<&str>) -> bool {
     matches!(
         runtime_permission.map(str::trim),
@@ -1300,6 +1259,7 @@ struct CliPromptRun {
     runtime: Arc<NodeRuntime>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
+    codex_vault_switch_attempted: bool,
 }
 
 async fn run_cli_prompt(run: CliPromptRun) {
@@ -1320,6 +1280,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         runtime,
         mut cancel_rx,
         out_tx,
+        codex_vault_switch_attempted,
     } = run;
     let bin_owned = bin;
     let cli_name_owned = cli_name;
@@ -1422,13 +1383,11 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }));
         return;
     }
-    // Windows 上 .cmd/.bat shim 必须通过 cmd 启动；统一包装，避免不同调用点遗漏隐藏策略。
     let batch_wrapper = node_agent_cli_security::windows_batch_wrapper(bin);
     let actual_bin = batch_wrapper
         .as_ref()
         .map(|(program, _)| *program)
         .unwrap_or(bin);
-    // 构建外部 CLI 命令；Codex 的 prompt 是位置参数，其他 CLI 使用 -p。
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
     let codex_scope_key = if cli_name == "codex" {
@@ -1477,7 +1436,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
         sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
     }
     if cli_name == "codex" {
-        // 从 extra_args 提取 Codex 模型/推理强度，在 exec 前插入。
         for a in &extra_args {
             if let Some(model) = a.strip_prefix("--codex-model=") {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "-m");
@@ -1523,7 +1481,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     path.to_string_lossy().to_string(),
                 );
             }
-            // 首次执行默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
             if full_access {
                 push_tracked_arg(
                     &mut cmd,
@@ -1540,7 +1497,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
             }
         }
-        // 跳过已处理的 Codex 专用 extra_args。
         for a in &extra_args {
             if !a.starts_with("--session-id=")
                 && !a.starts_with("--codex-model=")
@@ -1580,7 +1536,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
         actual_bin,
         cwd.as_deref(),
     );
-    // 使用本机实际 CODEX_HOME，避免继承服务器端 Linux 路径。
     if cli_name == "codex" {
         let codex_home = std::env::var("CODEX_HOME")
             .ok()
@@ -1589,7 +1544,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 !v.trim().is_empty() && p.exists()
             })
             .or_else(|| {
-                // Windows: %USERPROFILE%\.codex  /  Linux/Mac: $HOME/.codex
                 std::env::var("USERPROFILE")
                     .or_else(|_| std::env::var("HOME"))
                     .ok()
@@ -1604,8 +1558,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let stdin_piped_empty = cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini";
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        // copilot 用 --allow-all 时仍会检测 stdin 是否可读；
-        // 用 piped（而非 null）让它认为 stdin 存在但为空流，避免权限拒绝。
         .stdin(if stdin_piped_empty {
             std::process::Stdio::piped()
         } else {
@@ -1734,6 +1686,43 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     )));
                     return;
                 }
+                if !result.exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
+                    if let Ok(Some(message)) =
+                        node_agent_codex_vault::try_auto_switch_after_codex_failure(
+                            &runtime,
+                            &result.stdout_text,
+                            &result.stderr_text,
+                        )
+                        .await
+                    {
+                        send_cli_chunk(
+                            &out_tx,
+                            &task_journal,
+                            &req_id,
+                            "stdout",
+                            &format!("codex\n{message}\n"),
+                        );
+                        Box::pin(run_cli_prompt(CliPromptRun {
+                            req_id,
+                            bin: bin_owned,
+                            cli_name: cli_name_owned,
+                            extra_args,
+                            runtime_permission,
+                            cwd,
+                            conversation_workspace,
+                            prompt,
+                            server_runtime_config,
+                            approval_state,
+                            task_journal,
+                            runtime,
+                            cancel_rx,
+                            out_tx,
+                            codex_vault_switch_attempted: true,
+                        }))
+                        .await;
+                        return;
+                    }
+                }
                 if !result.exit_ok
                     && cli_name == "codex"
                     && codex_plan.is_resume()
@@ -1773,6 +1762,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                         runtime,
                         cancel_rx,
                         out_tx,
+                        codex_vault_switch_attempted,
                     }))
                     .await;
                     return;
@@ -1865,7 +1855,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let stdout = child.stdout.take().expect("stdout");
     let stderr = child.stderr.take().expect("stderr");
     let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
-    // stderr 使用字节级读取，以免 Windows 中文系统输出 GBK 编码导致 UTF-8 解析失败
     let (stderr_tx, mut stderr_rx) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
     {
         let stderr_tx = stderr_tx.clone();
@@ -1895,15 +1884,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let mut stdout_done = false;
     let mut stderr_done = false;
 
-    // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
-    // 并持久化到本地，以便下次用 exec resume <real_id> 续接
     while !stdout_done || !stderr_done {
         tokio::select! {
             line = stdout_lines.next_line(), if !stdout_done => match line {
                 Ok(Some(l)) => {
                     stdout_text.push_str(&l);
                     stdout_text.push('\n');
-                    // 提取 Codex 真实 session id 并持久化
                     if cli_name == "codex" {
                         if let Some(real_id) =
                             node_agent_codex_session::extract_session_id_from_text(&l)
@@ -1917,7 +1903,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
                                     &real_id,
                                 );
                             }
-                            // session id 行本身不发给用户
                             continue;
                         }
                     }
@@ -1951,8 +1936,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
                             }
                             continue;
                         }
-                        // Codex stderr 有"Reading additional input from stdin..."等噪音，不发给用户
-                        // 但写入本机 journal，页面恢复时可在本机上下文里回放诊断信息。
                         if !l.trim().is_empty() {
                             info!("[codex stderr] {}", l);
                             let _ = task_journal.record_cli_chunk(&req_id, "stderr", &(l + "\n"));
@@ -1984,7 +1967,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     return;
                 }
             },
-            // 超时保护：普通 Codex 聊天保留 5 分钟；full-access 开发/发布任务允许更长时间。
             _ = tokio::time::sleep(std::time::Duration::from_secs(
                 cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref())
             )) => {
@@ -2017,6 +1999,42 @@ async fn run_cli_prompt(run: CliPromptRun) {
         if let Some(text) = codex_last_message_chunk(codex_last_message_path.as_ref()) {
             send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &text);
             stdout_text.push_str(&text);
+        }
+    }
+    if !exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
+        if let Ok(Some(message)) = node_agent_codex_vault::try_auto_switch_after_codex_failure(
+            &runtime,
+            &stdout_text,
+            &stderr_text,
+        )
+        .await
+        {
+            send_cli_chunk(
+                &out_tx,
+                &task_journal,
+                &req_id,
+                "stdout",
+                &format!("codex\n{message}\n"),
+            );
+            Box::pin(run_cli_prompt(CliPromptRun {
+                req_id,
+                bin: bin_owned,
+                cli_name: cli_name_owned,
+                extra_args,
+                runtime_permission,
+                cwd,
+                conversation_workspace,
+                prompt,
+                server_runtime_config,
+                approval_state,
+                task_journal,
+                runtime,
+                cancel_rx,
+                out_tx,
+                codex_vault_switch_attempted: true,
+            }))
+            .await;
+            return;
         }
     }
     if !exit_ok
@@ -2055,6 +2073,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             runtime,
             cancel_rx,
             out_tx,
+            codex_vault_switch_attempted,
         }))
         .await;
         return;
@@ -3085,6 +3104,7 @@ async fn run_session(
                                     runtime: rt_c.clone(),
                                     cancel_rx,
                                     out_tx: tx_c,
+                                    codex_vault_switch_attempted: false,
                                 })
                                 .await;
                                 if let Err(error) =
@@ -3392,8 +3412,6 @@ async fn run_agent_runtime() -> Result<()> {
     Ok(())
 }
 
-// ── 本地 Web 管理页 (端口可通过 NODE_ADMIN_PORT 配置，默认 7799) ──────────
-
 #[derive(Default)]
 struct NodeStatus {
     connected: bool,
@@ -3406,34 +3424,20 @@ pub(crate) struct NodeRuntime {
     install_id: String,
     creds: RwLock<Option<Credentials>>,
     status: RwLock<NodeStatus>,
-    /// Hardware probing can spawn system commands on Windows; cache it so
-    /// status-page polling does not repeatedly hit WMI/PowerShell.
     hardware_cached: RwLock<NodeHardwareProfile>,
-    /// CLI 名称 → 完整路径映射（启动时检测，避免 PATH 不完整导致 program not found）
     cli_paths: RwLock<Vec<(String, String)>>,
-    /// 本机 CLI 探测缓存；状态页只读缓存，后台刷新，避免打开 Win 端或 /node 时卡住。
     cli_probe_cached: RwLock<LocalCliProbeSnapshot>,
     cli_probe_refreshing: AtomicBool,
     model_scan_refreshing: AtomicBool,
-    /// 本地 TTS Worker URL（如 http://127.0.0.1:5011）；由管理页或环境变量设置
     tts_worker_url: RwLock<Option<String>>,
-    /// 本机项目代码硬盘服务配置。
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
-    /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
     active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
-    /// 一龙托管的 CLI sidecar 会话 registry，用于节点重启后重新发现可 attach 的会话。
     cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
-    /// 本地任务 registry/jsonl，用于后续重启后恢复任务现场和 attach。
     task_journal: node_agent_task_journal::TaskJournal,
-    /// Win 端进程生命周期账本，用于识别重启前异常退出、心跳过期和恢复动作。
     lifecycle: node_agent_lifecycle::NodeLifecycleTracker,
-    /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
     tool_approvals: node_agent_tool_approval::ToolApprovalState,
-    /// Route A 完全访问的本机项目级授权记录。
     full_access_grants: node_agent_full_access::FullAccessGrantState,
-    /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
-    /// 本机 7799 管理 API 的启动期随机授权 token，只通过本机 /api/status 暴露给 PC 工作台。
     local_admin_token: String,
 }
 
@@ -3444,7 +3448,6 @@ impl NodeRuntime {
         storage_settings: pc_storage_repo::StorageSettings,
         install_id: String,
     ) -> Self {
-        // 从环境变量读取 TTS Worker URL 初始值
         let tts_url = std::env::var("NODE_TTS_WORKER_URL")
             .ok()
             .map(|v| v.trim().to_string())
@@ -3682,7 +3685,6 @@ impl NodeRuntime {
         hardware
     }
 
-    /// CLI 名称 → 本机允许执行的路径。找不到时直接拒绝，避免云端把 PC 节点当通用远程命令通道。
     async fn resolve_cli(
         self: &Arc<Self>,
         name: &str,
@@ -3715,7 +3717,6 @@ impl NodeRuntime {
         }
     }
 
-    /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
     async fn set_creds(&self, c: Option<Credentials>) {
         let storage = self.storage_settings.read().await.clone();
         save_persisted(&PersistedState::from_parts(
@@ -3973,7 +3974,6 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     });
 }
 
-/// GET /api/tts-relay-config — 返回当前 TTS Worker URL 配置
 async fn admin_tts_relay_get(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> axum::Json<serde_json::Value> {
@@ -3986,7 +3986,6 @@ struct TtsRelaySetReq {
     tts_worker_url: Option<String>,
 }
 
-/// POST /api/tts-relay-config — 设置本机 TTS Worker URL。空字符串表示清除。
 async fn admin_tts_relay_set(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
     axum::Json(req): axum::Json<TtsRelaySetReq>,
@@ -3996,7 +3995,6 @@ async fn admin_tts_relay_set(
         .map(|v| v.trim().trim_end_matches('/').to_string())
         .filter(|v| !v.is_empty());
     *rt.tts_worker_url.write().await = url.clone();
-    // 唤醒连接循环重新注册能力（让云端尽快知晓有 TTS 能力）
     rt.wake.notify_one();
     axum::Json(serde_json::json!({ "ok": true, "ttsWorkerUrl": url }))
 }
@@ -4064,8 +4062,6 @@ async fn admin_storage_config_set(
     )
 }
 
-/// GET /api/tts-status — 探测本地 TTS Worker 健康状态
-/// 代理到 http://127.0.0.1:<TTS_PORT>/health，无论 Worker 是否在运行都不返回错误
 async fn admin_tts_status() -> axum::Json<serde_json::Value> {
     let port = std::env::var("ELON_TTS_WORKER_PORT")
         .or_else(|_| std::env::var("TTS_WORKER_PORT"))

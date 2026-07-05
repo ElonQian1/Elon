@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
-    store::CodexVaultRecord,
+    store::{CodexVaultRecord, CodexVaultSlotRecord},
     types::AppState,
 };
 
@@ -33,6 +33,7 @@ const FALLBACK_MASTER_KEY_ENVS: [&str; 2] = ["USER_API_KEY_SECRET", "SECRET_KEY"
 pub struct SaveCodexAuthCacheRequest {
     pub auth_json: Value,
     pub source_device: Option<String>,
+    pub slot_label: Option<String>,
     pub agent_id: Option<String>,
     pub agent_secret: Option<String>,
 }
@@ -43,12 +44,16 @@ pub struct LeaseCodexAuthCacheRequest {
     pub agent_secret: String,
     pub device_name: Option<String>,
     pub purpose: Option<String>,
+    pub previous_account_hint_hash: Option<String>,
+    pub failure_reason: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 struct CodexVaultStatus {
     configured: bool,
     bound: bool,
+    active_slot_id: Option<String>,
+    available_count: usize,
     auth_mode: Option<String>,
     account_hint_hash: Option<String>,
     source_device: Option<String>,
@@ -56,6 +61,23 @@ struct CodexVaultStatus {
     last_backup_at: Option<String>,
     last_lease_at: Option<String>,
     updated_at: Option<String>,
+    slots: Vec<CodexVaultSlotStatus>,
+}
+
+#[derive(Debug, Serialize)]
+struct CodexVaultSlotStatus {
+    slot_id: String,
+    auth_mode: String,
+    account_hint_hash: Option<String>,
+    source_device: Option<String>,
+    credential_version: i64,
+    status: String,
+    failure_count: i64,
+    last_backup_at: Option<String>,
+    last_lease_at: Option<String>,
+    last_failure_at: Option<String>,
+    last_error: Option<String>,
+    updated_at: String,
 }
 
 pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -63,13 +85,18 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
         Ok(user) => user,
         Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
     };
-    match state.store.get_user_codex_credential(&user.id) {
-        Ok(record) => Json(serde_json::json!({
+    match (
+        state.store.get_user_codex_credential(&user.id),
+        state.store.list_user_codex_credential_slots(&user.id),
+    ) {
+        (Ok(record), Ok(slots)) => Json(serde_json::json!({
             "ok": true,
-            "vault": status_from_record(record.as_ref()),
+            "vault": status_from_record(record.as_ref(), &slots),
         }))
         .into_response(),
-        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+        (Err(error), _) | (_, Err(error)) => {
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+        }
     }
 }
 
@@ -96,6 +123,7 @@ pub async fn save_auth_cache(
         Ok(value) => value,
         Err(error) => return json_error(StatusCode::SERVICE_UNAVAILABLE, error.to_string()),
     };
+    let _ = req.slot_label.as_deref();
     match state.store.upsert_user_codex_credential(
         &user.id,
         &parsed.auth_mode,
@@ -104,12 +132,18 @@ pub async fn save_auth_cache(
         &ciphertext_b64,
         &nonce_b64,
     ) {
-        Ok(record) => Json(serde_json::json!({
-            "ok": true,
-            "vault": status_from_record(Some(&record)),
-            "message": "Codex Pro 凭据已加密保存到保险箱。",
-        }))
-        .into_response(),
+        Ok(record) => {
+            let slots = state
+                .store
+                .list_user_codex_credential_slots(&user.id)
+                .unwrap_or_default();
+            Json(serde_json::json!({
+                "ok": true,
+                "vault": status_from_record(Some(&record), &slots),
+                "message": "Codex Pro 凭据已加密保存到保险箱。",
+            }))
+            .into_response()
+        }
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
@@ -123,7 +157,7 @@ pub async fn delete_auth_cache(State(state): State<Arc<AppState>>, headers: Head
         Ok(deleted) => Json(serde_json::json!({
             "ok": true,
             "deleted": deleted,
-            "vault": status_from_record(None),
+            "vault": status_from_record(None, &[]),
         }))
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
@@ -149,12 +183,22 @@ pub async fn lease_auth_cache(
         );
         return json_error(StatusCode::FORBIDDEN, error.to_string());
     }
-    let record = match state.store.get_user_codex_credential(&user.id) {
-        Ok(Some(record)) => record,
-        Ok(None) => return json_error(StatusCode::NOT_FOUND, "尚未绑定 Codex Pro 凭据保险箱"),
+    if let Some(reason) = req.failure_reason.as_deref() {
+        let _ = state.store.mark_user_codex_credential_slot_failed(
+            &user.id,
+            req.previous_account_hint_hash.as_deref(),
+            reason,
+        );
+    }
+    let slot = match state
+        .store
+        .select_user_codex_credential_slot(&user.id, req.previous_account_hint_hash.as_deref())
+    {
+        Ok(Some(slot)) => slot,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "没有可租用的 Codex Pro 凭据槽位"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
-    let auth_json = match decrypt_auth_json(&record.ciphertext_b64, &record.nonce_b64) {
+    let auth_json = match decrypt_auth_json(&slot.ciphertext_b64, &slot.nonce_b64) {
         Ok(text) => text,
         Err(error) => {
             let _ = state.store.record_codex_vault_event(
@@ -167,19 +211,24 @@ pub async fn lease_auth_cache(
             return json_error(StatusCode::SERVICE_UNAVAILABLE, error.to_string());
         }
     };
-    if let Err(error) = state
-        .store
-        .mark_user_codex_credential_leased(&user.id, Some(&req.agent_id))
-    {
+    if let Err(error) = state.store.mark_user_codex_credential_slot_leased(
+        &user.id,
+        &slot.slot_id,
+        Some(&req.agent_id),
+    ) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
+    let _ = state
+        .store
+        .mark_user_codex_credential_leased(&user.id, Some(&req.agent_id));
     Json(serde_json::json!({
         "ok": true,
         "lease_id": format!("cvl_{}", uuid::Uuid::new_v4().simple()),
+        "slot_id": slot.slot_id,
         "auth_json": auth_json,
-        "auth_mode": record.auth_mode,
-        "credential_version": record.credential_version,
-        "account_hint_hash": record.account_hint_hash,
+        "auth_mode": slot.auth_mode,
+        "credential_version": slot.credential_version,
+        "account_hint_hash": slot.account_hint_hash,
         "device_name": req.device_name,
         "purpose": req.purpose,
         "cleanup_recommended_seconds": 900,
@@ -188,17 +237,54 @@ pub async fn lease_auth_cache(
     .into_response()
 }
 
-fn status_from_record(record: Option<&CodexVaultRecord>) -> CodexVaultStatus {
+fn status_from_record(
+    record: Option<&CodexVaultRecord>,
+    slots: &[CodexVaultSlotRecord],
+) -> CodexVaultStatus {
+    let active = slots.first();
     CodexVaultStatus {
         configured: master_key_configured(),
-        bound: record.is_some(),
-        auth_mode: record.map(|r| r.auth_mode.clone()),
-        account_hint_hash: record.and_then(|r| r.account_hint_hash.clone()),
-        source_device: record.and_then(|r| r.source_device.clone()),
-        credential_version: record.map(|r| r.credential_version),
-        last_backup_at: record.and_then(|r| r.last_backup_at.clone()),
-        last_lease_at: record.and_then(|r| r.last_lease_at.clone()),
-        updated_at: record.map(|r| r.updated_at.clone()),
+        bound: record.is_some() || !slots.is_empty(),
+        active_slot_id: active.map(|r| r.slot_id.clone()),
+        available_count: slots.iter().filter(|s| s.status != "deleted").count(),
+        auth_mode: active
+            .map(|r| r.auth_mode.clone())
+            .or_else(|| record.map(|r| r.auth_mode.clone())),
+        account_hint_hash: active
+            .and_then(|r| r.account_hint_hash.clone())
+            .or_else(|| record.and_then(|r| r.account_hint_hash.clone())),
+        source_device: active
+            .and_then(|r| r.source_device.clone())
+            .or_else(|| record.and_then(|r| r.source_device.clone())),
+        credential_version: active
+            .map(|r| r.credential_version)
+            .or_else(|| record.map(|r| r.credential_version)),
+        last_backup_at: active
+            .and_then(|r| r.last_backup_at.clone())
+            .or_else(|| record.and_then(|r| r.last_backup_at.clone())),
+        last_lease_at: active
+            .and_then(|r| r.last_lease_at.clone())
+            .or_else(|| record.and_then(|r| r.last_lease_at.clone())),
+        updated_at: active
+            .map(|r| r.updated_at.clone())
+            .or_else(|| record.map(|r| r.updated_at.clone())),
+        slots: slots
+            .iter()
+            .map(|slot| CodexVaultSlotStatus {
+                slot_id: slot.slot_id.clone(),
+                auth_mode: slot.auth_mode.clone(),
+                account_hint_hash: slot.account_hint_hash.clone(),
+                source_device: slot.source_device.clone(),
+                credential_version: slot.credential_version,
+                status: slot.status.clone(),
+                failure_count: slot.failure_count,
+                last_backup_at: slot.last_backup_at.clone(),
+                last_lease_at: slot.last_lease_at.clone(),
+                last_failure_at: slot.last_failure_at.clone(),
+                last_error: slot.last_error.clone(),
+                updated_at: slot.updated_at.clone(),
+            })
+            .collect(),
     }
 }
 
