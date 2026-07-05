@@ -8,6 +8,7 @@ import NodeLifecycleStatusCard from './NodeLifecycleStatusCard'
 import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
 import CodexToolboxCard from './CodexToolboxCard'
+import NodeMarketPanel from './NodeMarketPanel'
 import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
@@ -23,6 +24,8 @@ import type {
   NodeSummary,
 } from './types'
 import styles from './NodePage.module.css'
+
+const MARKET_VIEW = '__node_market__'
 
 export default function NodePage() {
   const [nodes, setNodes] = useState<NodeSummary[]>([])
@@ -50,7 +53,10 @@ export default function NodePage() {
             <small>下载、启动和注册</small>
           </span>
         </button>
-
+        <div className={styles.sideSection}>市场</div>
+        <button className={[styles.sideBtn, selectedNodeId === MARKET_VIEW ? styles.sideActive : ''].join(' ')} onClick={() => setSelectedNodeId(MARKET_VIEW)}>
+          <span className={styles.sideIcon}>◇</span><span className={styles.sideMeta}><strong>节点市场</strong><small>发现、使用和结算</small></span>
+        </button>
         <div className={styles.sideSection}>我的节点</div>
         {nodes.length === 0 && <p className={styles.sideEmpty}>暂无节点</p>}
         {nodes.map((n) => {
@@ -78,7 +84,9 @@ export default function NodePage() {
 
       <main className={styles.main}>
         {routeConfigKey && <RuntimeRouteConfigGuide route={routeConfigKey} />}
-        {!selectedNodeId
+        {selectedNodeId === MARKET_VIEW
+          ? <NodeMarketPanel myNodes={nodes} onOpenMyNode={setSelectedNodeId} />
+          : !selectedNodeId
           ? <LocalNodePanel adminUrl={adminUrl} />
           : selected
             ? <NodeDetailPanel node={selected} onBack={() => setSelectedNodeId('')} adminUrl={adminUrl} />
@@ -89,7 +97,6 @@ export default function NodePage() {
   )
 }
 
-/* ── 本机面板 ── */
 function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
   const [probeStatus, setProbeStatus] = useState<'checking' | 'online' | 'offline'>('checking')
   const [localStatus, setLocalStatus] = useState<LocalNodeStatus | null>(null)
@@ -162,7 +169,6 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
   )
 }
 
-/* ── 本机已连接时的管理面板（精简版） ── */
 function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initialStatus: LocalNodeStatus }) {
   const token = useAuthStore((s) => s.token)
   const user = useAuthStore((s) => s.user)
@@ -726,7 +732,6 @@ function CodexStatusCard({
   )
 }
 
-/* ── 远程节点详情 ── */
 function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSummary; onBack: () => void; adminUrl: string }) {
   const hw = node.hardware ?? {}
   const runtime = node.dev_runtime ?? {}

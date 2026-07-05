@@ -196,6 +196,38 @@ impl Store {
         }
     }
 
+    pub fn list_node_compute_runs_for_consumer(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<NodeComputeRun>> {
+        let limit = limit.clamp(1, 100);
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE consumer_user_id = ?1 ORDER BY started_at DESC LIMIT ?2",
+            run_select_sql()
+        ))?;
+        let rows = stmt.query_map(params![user_id, limit], read_run)?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
+    pub fn list_node_compute_runs_for_provider(
+        &self,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<NodeComputeRun>> {
+        let limit = limit.clamp(1, 100);
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE provider_user_id = ?1 ORDER BY started_at DESC LIMIT ?2",
+            run_select_sql()
+        ))?;
+        let rows = stmt.query_map(params![user_id, limit], read_run)?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
     pub fn node_quality_scores(&self) -> Result<HashMap<String, NodeQualityScore>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(

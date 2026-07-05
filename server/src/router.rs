@@ -1,5 +1,4 @@
 // server/src/router.rs
-
 use axum::{
     extract::DefaultBodyLimit,
     http::{header, HeaderValue},
@@ -283,6 +282,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/admin/nodes/push-update", post(node_api::push_node_update))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
+        .route("/api/me/node-usage", get(node_api::my_node_usage))
         .route(
             "/api/me/node-payouts",
             get(node_api::my_node_payouts).post(node_api::create_node_payout),

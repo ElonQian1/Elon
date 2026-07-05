@@ -44,6 +44,11 @@ export interface NodeSummary {
   lifecycle?: NodeLifecycleReport | null
   models?: { model_id?: string; display_name?: string; provider?: string; price_per_1k_credits?: string }[]
   capacity_warnings?: string[]
+  owner_user_id?: string
+  hardware_summary?: string
+  route_a_ready?: boolean
+  api_runtime_ready?: boolean
+  server_runtime_ready?: boolean
   registry_online?: boolean
   cli_connected?: boolean
   storage_repo_url_configured?: boolean
@@ -280,4 +285,43 @@ export interface ClientMaintenanceStatus {
   maintenance_recent_events?: Array<{ action?: string; ok?: boolean; detail?: string; ts?: number }>
   message?: string
   error?: string
+}
+
+export interface NodeBalanceResponse {
+  balance?: number
+  balance_fen?: number
+  lifetime_earned?: number
+  lifetime_earned_fen?: number
+  pending_payouts?: number
+  pending_payout_fen?: number
+  payout_min_fen?: number
+  provider_revenue_share_x1000?: number
+  provider_revenue_share_percent?: number
+}
+
+export interface NodeComputeRun {
+  id?: string
+  compute_call_id?: string
+  consumer_user_id?: string
+  provider_user_id?: string | null
+  node_id?: string
+  model_id?: string | null
+  feature?: string
+  usage_mode?: string
+  status?: string
+  started_at?: string
+  finished_at?: string | null
+  duration_ms?: number | null
+  prompt_tokens?: number
+  completion_tokens?: number
+  billed_cost_rmb_fen?: number
+  provider_earned_fen?: number
+  settlement_status?: string | null
+  route_reason?: string | null
+  error_message?: string | null
+}
+
+export interface NodeUsageResponse {
+  consuming?: NodeComputeRun[]
+  providing?: NodeComputeRun[]
 }

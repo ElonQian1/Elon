@@ -1,6 +1,6 @@
 import { api } from '../../api/client'
 import { formatBytes } from '../projects/nodeHelpers'
-import type { NodeAgentVersion, NodeSummary } from './types'
+import type { NodeAgentVersion, NodeBalanceResponse, NodeSummary, NodeUsageResponse } from './types'
 
 export { formatBytes }
 
@@ -16,6 +16,14 @@ export function nodeSummaryLine(node: NodeSummary): string {
   const status = node.online ? '在线' : '离线'
   const cap = String(node.capacity_label ?? '').trim()
   return cap ? `${status} · ${cap}` : status
+}
+
+export function nodeCanAcceptProject(node: NodeSummary): boolean {
+  const value = node.can_accept_project
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') return value !== 'false' && value !== '0'
+  return !!node.online
 }
 
 export function capacityText(node: NodeSummary): string {
@@ -40,6 +48,19 @@ export function formatUnixTime(value: unknown): string {
 export async function fetchMyNodes(): Promise<NodeSummary[]> {
   const data = await api.get<{ nodes?: NodeSummary[] }>('/api/me/nodes')
   return data.nodes ?? []
+}
+
+export async function fetchMarketNodes(): Promise<NodeSummary[]> {
+  const data = await api.get<{ nodes?: NodeSummary[] }>('/api/nodes')
+  return data.nodes ?? []
+}
+
+export async function fetchNodeBalance(): Promise<NodeBalanceResponse> {
+  return api.get('/api/me/node-balance')
+}
+
+export async function fetchNodeUsage(): Promise<NodeUsageResponse> {
+  return api.get('/api/me/node-usage')
 }
 
 export async function fetchNodeAgentVersion(): Promise<NodeAgentVersion> {

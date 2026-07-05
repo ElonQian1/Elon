@@ -1,0 +1,322 @@
+.marketPage {
+  max-width: 1120px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.kicker {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.hero h2 {
+  margin: 0 0 6px;
+  font-size: 21px;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.refreshBtn {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 7px 13px;
+  font-size: 12px;
+}
+
+.error {
+  border: 1px solid rgba(224, 112, 112, .34);
+  border-radius: var(--radius-sm);
+  background: rgba(224, 112, 112, .08);
+  color: #e07070;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.statsGrid,
+.nodeGrid,
+.ledgerGrid,
+.moneyGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.statsGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.statCard,
+.panel,
+.nodeCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.statCard {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+}
+
+.statCard > span {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.statCard div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.statCard strong {
+  color: var(--text-primary);
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.statCard small,
+.panelHead span,
+.nodeCard small,
+.nodeCard p,
+.metaGrid span,
+.runRow span,
+.moneyGrid span,
+.ownedList span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.panel {
+  padding: 14px;
+}
+
+.panelHead,
+.cardHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.panelHead {
+  margin-bottom: 12px;
+}
+
+.panelHead h3,
+.titleWithIcon h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.panelHead strong {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.nodeGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.nodeCard {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cardHead h4 {
+  margin: 0 0 3px;
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.online,
+.offline {
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.online {
+  color: #4caf78;
+  background: rgba(76, 175, 120, .12);
+}
+
+.offline {
+  color: #e07070;
+  background: rgba(224, 112, 112, .12);
+}
+
+.nodeCard p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.metaGrid,
+.moneyGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.metaGrid > div,
+.moneyGrid > div {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--bg-elevated);
+}
+
+.metaGrid strong,
+.moneyGrid strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pills span {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, .025);
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.ledgerGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.titleWithIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.titleWithIcon svg {
+  color: var(--accent);
+}
+
+.runList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.runRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(80px, .7fr) minmax(90px, .8fr);
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.runRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.runRow > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.runRow strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.good { color: #4caf78 !important; }
+.warn { color: #d8b55b !important; }
+.bad { color: #e07070 !important; }
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  padding: 18px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.ownedList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ownedList button {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 9px 10px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ownedList strong {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .statsGrid,
+  .nodeGrid,
+  .ledgerGrid,
+  .ownedList {
+    grid-template-columns: 1fr;
+  }
+
+  .runRow {
+    grid-template-columns: 1fr;
+  }
+}

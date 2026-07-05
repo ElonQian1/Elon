@@ -33,6 +33,7 @@ mod groups;
 mod join_requests;
 mod native_sessions;
 mod node_compute_runs;
+mod node_credentials;
 mod node_hardware;
 mod node_ledger;
 #[cfg(test)]
@@ -128,7 +129,6 @@ pub use user_memories::{
     MEMORY_SCOPE_PROJECT,
 };
 pub use user_progression::UserProgressionLedger;
-
 pub struct Store {
     conn: Mutex<Connection>,
 }

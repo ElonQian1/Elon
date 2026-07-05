@@ -153,6 +153,34 @@ pub async fn register_node(
         }
     }
 
+    if let (Some(install_id), Some(device_name)) = (install_id, device_name) {
+        match state.store.renew_legacy_node_credential_by_device_name(
+            &user.id,
+            install_id,
+            &new_secret_hash,
+            label,
+            Some(device_name),
+        ) {
+            Ok(Some(agent_id)) => {
+                return Json(RegisterNodeResponse {
+                    agent_id,
+                    agent_secret: new_secret,
+                    cloud_ws_url: node_cloud_ws_url(),
+                    owner_user_id: user.id,
+                })
+                .into_response();
+            }
+            Ok(None) => {}
+            Err(e) => {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({"error": format!("旧设备凭证合并失败: {e}")})),
+                )
+                    .into_response();
+            }
+        }
+    }
+
     let random_suffix = uuid::Uuid::new_v4()
         .to_string()
         .replace('-', "")
