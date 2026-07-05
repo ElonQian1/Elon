@@ -154,7 +154,10 @@ fn push_existing_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
     }
 }
 
-fn prepend_dirs_to_path(dirs: Vec<PathBuf>, current_path: Option<OsString>) -> Option<String> {
+pub(super) fn prepend_dirs_to_path(
+    dirs: Vec<PathBuf>,
+    current_path: Option<OsString>,
+) -> Option<String> {
     let mut merged = Vec::new();
     for dir in dirs {
         if dir.is_dir() && !contains_path(&merged, &dir) {

@@ -1,13 +1,75 @@
-use std::{env, ffi::OsString, path::Path};
+use std::{
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
 
 #[cfg(windows)]
-use std::{fs, io, path::PathBuf};
+use std::{fs, io};
 
 #[path = "node_agent_cli_tool_catalog.rs"]
 mod tool_catalog;
 
 #[cfg(windows)]
 const NODE_COMMAND_SHIMS: &[&str] = &["npm", "npx", "pnpm", "yarn", "bun", "corepack"];
+
+pub(crate) fn cli_child_env_overrides(
+    cli_name: &str,
+    cli_program: &str,
+    cwd: Option<&str>,
+) -> Vec<(String, String)> {
+    cli_child_env_overrides_with_path(cli_name, cli_program, cwd, env::var_os("PATH"))
+}
+
+pub(crate) fn apply_env(
+    cmd: &mut tokio::process::Command,
+    sidecar_env: &mut Vec<(String, String)>,
+    cli_name: &str,
+    cli_program: &str,
+    cwd: Option<&str>,
+) {
+    for (key, value) in cli_child_env_overrides(cli_name, cli_program, cwd) {
+        cmd.env(&key, &value);
+        sidecar_env.push((key, value));
+    }
+}
+
+fn cli_child_env_overrides_with_path(
+    cli_name: &str,
+    cli_program: &str,
+    cwd: Option<&str>,
+    current_path: Option<OsString>,
+) -> Vec<(String, String)> {
+    let mut envs = common_child_env_overrides(current_path.clone());
+    let common_path = child_env_value(&envs, "PATH").or(current_path);
+
+    let router = project_tool_router_bin(cwd);
+    let router_dirs = router.iter().cloned().collect::<Vec<_>>();
+    let path_with_router = router
+        .as_ref()
+        .and_then(|_| tool_catalog::prepend_dirs_to_path(router_dirs, common_path.clone()));
+    let merged_current_path = path_with_router.clone().map(OsString::from).or(common_path);
+
+    if cli_name == "codex" {
+        merge_child_env_overrides(
+            &mut envs,
+            tool_catalog::codex_child_env_overrides(Path::new(cli_program), merged_current_path),
+        );
+    } else if let Some(path) = path_with_router {
+        set_child_env_override(&mut envs, "PATH".to_string(), path);
+    }
+
+    if router.is_some() {
+        if let Some(root) = project_root(cwd) {
+            set_child_env_override(
+                &mut envs,
+                "ELON_ROUTER_PROJECT_ROOT".to_string(),
+                root.to_string_lossy().to_string(),
+            );
+        }
+    }
+    envs
+}
 
 pub(crate) fn common_child_env_overrides(current_path: Option<OsString>) -> Vec<(String, String)> {
     let mut envs = Vec::new();
@@ -31,47 +93,20 @@ pub(crate) fn common_child_env_overrides(current_path: Option<OsString>) -> Vec<
     envs
 }
 
-pub(crate) fn codex_child_env_overrides(
-    codex_program: &str,
-    current_path: Option<OsString>,
-) -> Vec<(String, String)> {
-    tool_catalog::codex_child_env_overrides(Path::new(codex_program), current_path)
-}
-
-pub(crate) fn apply_common_child_env_overrides(
-    cmd: &mut tokio::process::Command,
-    sidecar_env: &mut Vec<(String, String)>,
-) {
-    for (key, value) in common_child_env_overrides(env::var_os("PATH")) {
-        apply_child_env_override(cmd, sidecar_env, key, value);
+fn merge_child_env_overrides(envs: &mut Vec<(String, String)>, overrides: Vec<(String, String)>) {
+    for (key, value) in overrides {
+        set_child_env_override(envs, key, value);
     }
 }
 
-pub(crate) fn apply_codex_child_env_overrides(
-    cmd: &mut tokio::process::Command,
-    sidecar_env: &mut Vec<(String, String)>,
-    codex_program: &str,
-) {
-    let current_path = child_env_value(sidecar_env, "PATH").or_else(|| env::var_os("PATH"));
-    for (key, value) in codex_child_env_overrides(codex_program, current_path) {
-        apply_child_env_override(cmd, sidecar_env, key, value);
-    }
-}
-
-fn apply_child_env_override(
-    cmd: &mut tokio::process::Command,
-    sidecar_env: &mut Vec<(String, String)>,
-    key: String,
-    value: String,
-) {
-    cmd.env(&key, &value);
-    if let Some((_, existing_value)) = sidecar_env
+fn set_child_env_override(envs: &mut Vec<(String, String)>, key: String, value: String) {
+    if let Some((_, existing_value)) = envs
         .iter_mut()
         .find(|(existing_key, _)| env_key_matches(existing_key, &key))
     {
         *existing_value = value;
     } else {
-        sidecar_env.push((key, value));
+        envs.push((key, value));
     }
 }
 
@@ -89,6 +124,18 @@ fn env_key_matches(left: &str, right: &str) -> bool {
     } else {
         left == right
     }
+}
+
+fn project_tool_router_bin(cwd: Option<&str>) -> Option<PathBuf> {
+    let root = project_root(cwd)?;
+    let router = root.join("scripts").join("tool-router-bin");
+    router.is_dir().then_some(router)
+}
+
+fn project_root(cwd: Option<&str>) -> Option<PathBuf> {
+    cwd.map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
 }
 
 #[cfg(windows)]
@@ -217,8 +264,74 @@ fn path_key(path: &Path) -> String {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
 mod tests {
+    use super::*;
+    use std::{
+        fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn generic_cli_gets_project_tool_router_on_path() {
+        let root = unique_temp_dir("route-a-router");
+        let router = root.join("scripts").join("tool-router-bin");
+        let original = root.join("original-path");
+        fs::create_dir_all(&router).unwrap();
+        fs::create_dir_all(&original).unwrap();
+        let current_path = env::join_paths([original.clone()]).unwrap();
+
+        let envs = cli_child_env_overrides_with_path(
+            "copilot",
+            "copilot",
+            Some(root.to_str().unwrap()),
+            Some(current_path),
+        );
+        let path = envs
+            .iter()
+            .find_map(|(key, value)| (key == "PATH").then_some(value))
+            .expect("PATH should be overridden");
+        let parts = env::split_paths(&OsString::from(path)).collect::<Vec<_>>();
+
+        assert_eq!(parts[0], router);
+        assert!(parts.iter().any(|path| path == &original));
+        assert!(envs.iter().any(|(key, value)| {
+            key == "ELON_ROUTER_PROJECT_ROOT" && Path::new(value) == root.as_path()
+        }));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn missing_project_router_skips_project_router_env() {
+        let root = unique_temp_dir("route-a-no-router");
+        fs::create_dir_all(&root).unwrap();
+
+        let envs = cli_child_env_overrides_with_path(
+            "copilot",
+            "copilot",
+            Some(root.to_str().unwrap()),
+            None,
+        );
+
+        assert!(!envs
+            .iter()
+            .any(|(key, _)| key == "ELON_ROUTER_PROJECT_ROOT"));
+        #[cfg(not(windows))]
+        assert!(envs.is_empty());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn unique_temp_dir(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        env::temp_dir().join(format!("elon-{label}-{}-{nanos}", std::process::id()))
+    }
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
     use super::{
         command_shim_batch_script, command_shim_powershell_script, common_child_env_overrides,
         path_key, NODE_COMMAND_SHIMS,

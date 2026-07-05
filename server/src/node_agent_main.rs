@@ -49,6 +49,7 @@ use tracing::{info, warn};
 use node_agent_cli_done::{
     cli_done_message, cli_prompt_accepted, duplicate_cli_prompt_done, latest_codex_session_id,
 };
+use node_agent_cli_env::apply_env;
 use node_agent_env::{env_flag, node_agent_env_file_path};
 use node_agent_registration::provision_node;
 
@@ -1574,10 +1575,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
     }
-    node_agent_cli_env::apply_common_child_env_overrides(&mut cmd, &mut sidecar_env);
-    if cli_name == "codex" {
-        node_agent_cli_env::apply_codex_child_env_overrides(&mut cmd, &mut sidecar_env, actual_bin);
-    }
+    apply_env(&mut cmd, &mut sidecar_env, cli_name, actual_bin, cwd.as_deref());
     // 使用本机实际 CODEX_HOME，避免继承服务器端 Linux 路径。
     if cli_name == "codex" {
         let codex_home = std::env::var("CODEX_HOME")

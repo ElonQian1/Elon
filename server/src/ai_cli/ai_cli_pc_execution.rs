@@ -121,6 +121,90 @@ pub(crate) fn record_pc_execution_started(
     }
 }
 
+pub(crate) fn pc_route_a_prompt_bootstrapped(
+    state: &AppState,
+    scope: Option<&NativeSessionScope>,
+    cli_name: &str,
+    agent_id: &str,
+    cwd: Option<&str>,
+    native_session_id: Option<&str>,
+    development: bool,
+) -> bool {
+    let (Some(scope), Some(native_session_id)) = (scope, native_session_id) else {
+        return false;
+    };
+    let workspace_key = pc_route_a_workspace_key(cwd);
+    let _ = state.store.upsert_native_agent_session_if_no_active(
+        &scope.project_id,
+        &scope.user_id,
+        Some(&scope.conversation_id),
+        cli_name,
+        agent_id,
+        workspace_key,
+        native_session_id,
+    );
+    state
+        .store
+        .get_native_agent_session_state(
+            &scope.project_id,
+            &scope.user_id,
+            Some(&scope.conversation_id),
+            cli_name,
+            agent_id,
+            workspace_key,
+        )
+        .ok()
+        .flatten()
+        .map(|session| {
+            if development {
+                session.dev_bootstrapped
+            } else {
+                session.chat_bootstrapped
+            }
+        })
+        .unwrap_or(false)
+}
+
+pub(crate) fn mark_pc_route_a_prompt_bootstrapped(
+    state: &AppState,
+    scope: Option<&NativeSessionScope>,
+    cli_name: &str,
+    agent_id: &str,
+    cwd: Option<&str>,
+    native_session_id: Option<&str>,
+    development: bool,
+) {
+    let (Some(scope), Some(native_session_id)) = (scope, native_session_id) else {
+        return;
+    };
+    let workspace_key = pc_route_a_workspace_key(cwd);
+    let _ = state.store.upsert_native_agent_session(
+        &scope.project_id,
+        &scope.user_id,
+        Some(&scope.conversation_id),
+        cli_name,
+        agent_id,
+        workspace_key,
+        native_session_id,
+    );
+    let _ = state.store.mark_native_agent_session_bootstrapped(
+        &scope.project_id,
+        &scope.user_id,
+        Some(&scope.conversation_id),
+        cli_name,
+        agent_id,
+        workspace_key,
+        native_session_id,
+        development,
+    );
+}
+
+fn pc_route_a_workspace_key(cwd: Option<&str>) -> &str {
+    cwd.map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("")
+}
+
 pub(crate) fn record_pc_codex_thread_id(
     state: &AppState,
     scope: Option<&NativeSessionScope>,
