@@ -11,7 +11,9 @@ use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    routing::{delete, get, post},
     Json,
+    Router,
 };
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
@@ -28,6 +30,32 @@ use crate::{
 const MAX_AUTH_JSON_BYTES: usize = 256 * 1024;
 const MASTER_KEY_ENV: &str = "CODEX_VAULT_MASTER_KEY";
 const FALLBACK_MASTER_KEY_ENVS: [&str; 2] = ["USER_API_KEY_SECRET", "SECRET_KEY"];
+
+pub fn routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/api/me/codex-vault/status", get(status))
+        .route(
+            "/api/me/codex-vault/auth-cache",
+            post(save_auth_cache).delete(delete_auth_cache),
+        )
+        .route("/api/me/codex-vault/lease", post(lease_auth_cache))
+        .route(
+            "/api/me/codex-vault/emergency",
+            get(crate::codex_vault_emergency_api::status),
+        )
+        .route(
+            "/api/me/codex-vault/emergency/grants",
+            post(crate::codex_vault_emergency_api::create_grant),
+        )
+        .route(
+            "/api/me/codex-vault/emergency/grants/:grant_id",
+            delete(crate::codex_vault_emergency_api::revoke_grant),
+        )
+        .route(
+            "/api/me/codex-vault/emergency/lease",
+            post(crate::codex_vault_emergency_api::lease_auth_cache),
+        )
+}
 
 #[derive(Debug, Deserialize)]
 pub struct SaveCodexAuthCacheRequest {
@@ -88,15 +116,22 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
     match (
         state.store.get_user_codex_credential(&user.id),
         state.store.list_user_codex_credential_slots(&user.id),
+        state.store.list_codex_vault_emergency_grants(&user.id),
+        state.store.list_codex_vault_emergency_leases(&user.id, 20),
     ) {
-        (Ok(record), Ok(slots)) => Json(serde_json::json!({
+        (Ok(record), Ok(slots), Ok(grants), Ok(leases)) => Json(serde_json::json!({
             "ok": true,
             "vault": status_from_record(record.as_ref(), &slots),
+            "emergency": {
+                "grants": grants,
+                "leases": leases,
+            },
         }))
         .into_response(),
-        (Err(error), _) | (_, Err(error)) => {
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
-        }
+        (Err(error), _, _, _)
+        | (_, Err(error), _, _)
+        | (_, _, Err(error), _)
+        | (_, _, _, Err(error)) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
 
@@ -344,7 +379,7 @@ fn encrypt_auth_json(plaintext: &str) -> anyhow::Result<(String, String)> {
     Ok((BASE64.encode(ciphertext), BASE64.encode(nonce_bytes)))
 }
 
-fn decrypt_auth_json(ciphertext_b64: &str, nonce_b64: &str) -> anyhow::Result<String> {
+pub(crate) fn decrypt_auth_json(ciphertext_b64: &str, nonce_b64: &str) -> anyhow::Result<String> {
     let key = vault_master_key()?;
     let cipher = Aes256Gcm::new_from_slice(&key)
         .map_err(|_| anyhow::anyhow!("Codex vault master key 无效"))?;
@@ -403,7 +438,7 @@ fn read_master_secret() -> Option<String> {
         })
 }
 
-fn verify_node_proof(
+pub(crate) fn verify_node_proof(
     state: &AppState,
     user_id: &str,
     agent_id: &str,

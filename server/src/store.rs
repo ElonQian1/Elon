@@ -11,7 +11,7 @@ mod billing_price_rules;
 mod billing_reservation_tests;
 mod billing_reservations;
 mod build_quota;
-mod codex_vault;
+mod codex_vault; pub(crate) mod codex_vault_emergency;
 mod common;
 mod compute_metering;
 mod conversations;

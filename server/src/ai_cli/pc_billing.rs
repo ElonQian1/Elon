@@ -128,7 +128,7 @@ pub(super) fn settle_pc_cli_node_usage(
     {
         return None;
     }
-    let provider_user_id = match state.store.get_node_credential_owner(node_id) {
+    let node_owner = match state.store.get_node_credential_owner(node_id) {
         Ok(Some(owner)) if !owner.trim().is_empty() => owner,
         Ok(_) => {
             tracing::warn!(
@@ -142,6 +142,25 @@ pub(super) fn settle_pc_cli_node_usage(
             return None;
         }
     };
+    let emergency_lease = if node_owner == consumer_user_id {
+        match state
+            .store
+            .get_active_codex_vault_emergency_lease_for_node(consumer_user_id, node_id)
+        {
+            Ok(Some(lease)) if lease.provider_user_id != consumer_user_id => Some(lease),
+            Ok(_) => None,
+            Err(e) => {
+                tracing::warn!(node_id, error = %e, "查询 Codex 保险箱应急租约失败，按节点 owner 结算");
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let provider_user_id = emergency_lease
+        .as_ref()
+        .map(|lease| lease.provider_user_id.clone())
+        .unwrap_or(node_owner);
     if provider_user_id == consumer_user_id {
         return None;
     }
@@ -174,6 +193,19 @@ pub(super) fn settle_pc_cli_node_usage(
     };
     match state.store.settle_node_inference(params) {
         Ok(tx) => {
+            if let Some(lease_id) = emergency_lease.as_ref().map(|lease| lease.id.as_str()) {
+                let _ = state.store.attach_codex_vault_emergency_usage(
+                    lease_id,
+                    accounting_result.map(|result| result.token_usage_event_id.as_str()),
+                    accounting_result.and_then(|result| result.billing_event_id.as_deref()),
+                    Some(&tx.id),
+                    prompt_tokens as i64,
+                    completion_tokens as i64,
+                    tx.billed_cost_rmb_fen,
+                    tx.provider_earned_fen,
+                    Some(&tx.settlement_status),
+                );
+            }
             tracing::debug!(
                 consumer_user_id,
                 provider_user_id,
@@ -213,6 +245,26 @@ pub(super) fn pc_cli_billing_context(
     };
     if pc_cli_name_is_codex(cli_name) {
         if owner.as_deref() == Some(consumer_user_id) {
+            match state
+                .store
+                .get_active_codex_vault_emergency_lease_for_node(consumer_user_id, node_id)
+            {
+                Ok(Some(lease)) if lease.provider_user_id != consumer_user_id => {
+                    return PcCliBillingContext {
+                        billing_source: BILLING_SOURCE_SHARED_CODEX,
+                        resource_owner_user_id: Some(lease.provider_user_id),
+                        charge_platform_balance: true,
+                    };
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        node_id,
+                        error = %e,
+                        "查询 Codex 保险箱应急租约失败，按自有 Codex 记账"
+                    );
+                }
+            }
             return PcCliBillingContext {
                 billing_source: BILLING_SOURCE_OWN_CODEX,
                 resource_owner_user_id: owner,

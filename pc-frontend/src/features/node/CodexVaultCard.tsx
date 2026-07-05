@@ -1,5 +1,7 @@
-import { DownloadCloud, ShieldCheck, Trash2, UploadCloud } from 'lucide-react'
-import type { CodexVaultLocalStatus, CodexVaultStatusResponse } from './types'
+import { useState } from 'react'
+import { DownloadCloud, Handshake, KeyRound, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
+import type { CodexVaultEmergencyGrant, CodexVaultLocalStatus, CodexVaultStatusResponse } from './types'
+import type { CodexVaultEmergencyActions } from './codexVaultEmergencyActions'
 import styles from './NodePage.module.css'
 
 function formatVaultTime(value?: string | null): string {
@@ -16,6 +18,16 @@ function authStateText(auth?: CodexVaultLocalStatus['default_auth']): string {
   return auth.has_refresh_token ? 'ChatGPT / Pro' : '缺少 refresh_token'
 }
 
+function robotLabel(nickname?: string | null, account?: string | null, userId?: string | null): string {
+  return nickname || account || userId || '机器人账号'
+}
+
+function formatFen(value?: number | null): string {
+  const fen = Number(value ?? 0)
+  if (!Number.isFinite(fen) || fen <= 0) return '0.00 元'
+  return `${(fen / 100).toFixed(2)} 元`
+}
+
 export default function CodexVaultCard({
   status,
   cloud,
@@ -24,7 +36,9 @@ export default function CodexVaultCard({
   onRestore,
   onClear,
   onDeleteCloud,
+  emergencyActions,
   onRefresh,
+  currentUserId,
 }: {
   status: CodexVaultLocalStatus | null
   cloud?: CodexVaultStatusResponse['cloud']
@@ -33,11 +47,19 @@ export default function CodexVaultCard({
   onRestore: () => void
   onClear: () => void
   onDeleteCloud: () => void
+  emergencyActions: CodexVaultEmergencyActions
   onRefresh: () => void
+  currentUserId?: string
 }) {
+  const [grantTarget, setGrantTarget] = useState('')
   const vault = cloud?.vault
+  const emergency = cloud?.emergency
   const cloudSlots = vault?.slots ?? []
   const localSlots = status?.managed_slots ?? []
+  const grants = emergency?.grants ?? []
+  const leases = emergency?.leases ?? []
+  const incomingGrants = grants.filter((grant) => grant.consumer_user_id === currentUserId)
+  const outgoingGrants = grants.filter((grant) => grant.provider_user_id === currentUserId)
   const cloudReady = !!vault?.configured
   const bound = !!vault?.bound
   const defaultAuth = status?.default_auth
@@ -58,6 +80,19 @@ export default function CodexVaultCard({
           ? `已备份 ${vault?.available_count ?? (cloudSlots.length || 1)} 个账号`
           : '未备份'
   const stateTone = cloudReady && bound ? styles.vaultOnline : cloud?.error ? styles.vaultOffline : styles.vaultChecking
+  const activeEmergencyLease = leases.find((lease) => lease.consumer_user_id === currentUserId && lease.status === 'active')
+  const activeEmergency = !!activeEmergencyLease
+  async function submitGrant() {
+    const target = grantTarget.trim()
+    if (!target) return
+    await emergencyActions.onCreateEmergencyGrant(target)
+    setGrantTarget('')
+  }
+  function grantStatusText(grant: CodexVaultEmergencyGrant): string {
+    if (grant.status !== 'active') return '已撤销'
+    if (!grant.provider_vault_available) return '未备份保险箱'
+    return grant.reciprocal_active ? '互授权' : '单向授权'
+  }
   return (
     <section className={styles.vaultCard}>
       <div className={styles.vaultHead}>
@@ -106,11 +141,113 @@ export default function CodexVaultCard({
           {localSlots.map((slot) => (
             <div key={slot.slot_id ?? slot.home ?? 'local'} className={styles.vaultSlot}>
               <span>{slot.active ? '当前本机槽位' : '本机备用槽位'}</span>
-              <strong>{slot.account_hint_hash ?? slot.slot_id ?? '未知账号'}</strong>
+              <strong>
+                {slot.account_hint_hash ?? slot.slot_id ?? '未知账号'}
+              </strong>
             </div>
           ))}
         </div>
       )}
+      <div className={styles.emergencyPanel}>
+        <div className={styles.emergencyHead}>
+          <div>
+            <span>机器人应急互授权</span>
+            <strong>{incomingGrants.length} 个可借用 · {outgoingGrants.length} 个已授权</strong>
+          </div>
+          <span className={activeEmergency ? styles.vaultOnline : styles.vaultChecking}>
+            {activeEmergency ? `当前借用 ${robotLabel(activeEmergencyLease?.provider_nickname, activeEmergencyLease?.provider_account, activeEmergencyLease?.provider_user_id)}` : '未借用'}
+          </span>
+        </div>
+        {activeEmergency && (
+          <p className={styles.shareHint}>
+            当前 Codex CLI 用量按 shared_codex 记账，provider 为 {robotLabel(activeEmergencyLease?.provider_nickname, activeEmergencyLease?.provider_account, activeEmergencyLease?.provider_user_id)}，租约到期 {formatVaultTime(activeEmergencyLease?.expires_at)}。
+          </p>
+        )}
+        <div className={styles.emergencyGrantForm}>
+          <input
+            value={grantTarget}
+            onChange={(event) => setGrantTarget(event.target.value)}
+            placeholder="对方手机号 / 邮箱 / user id"
+            disabled={busy}
+          />
+          <button
+            className={[styles.btn, styles.iconBtn].join(' ')}
+            type="button"
+            onClick={() => { void submitGrant() }}
+            disabled={busy || !grantTarget.trim()}
+            title="授权对方机器人在应急时临时使用本账号的 Codex 保险箱"
+          >
+            <Handshake size={15} strokeWidth={2.2} aria-hidden="true" />
+            授权
+          </button>
+        </div>
+        {incomingGrants.length > 0 && (
+          <div className={styles.emergencyList}>
+            <span className={styles.emergencyListTitle}>别人授权给我</span>
+            {incomingGrants.map((grant) => (
+              <div className={styles.emergencyRow} key={grant.id ?? `${grant.provider_user_id}-in`}>
+                <div>
+                  <strong>{robotLabel(grant.provider_nickname, grant.provider_account, grant.provider_user_id)}</strong>
+                  <span>{grantStatusText(grant)} · 到期 {formatVaultTime(grant.expires_at)}</span>
+                </div>
+                <button
+                  className={[styles.btn, styles.iconBtn].join(' ')}
+                  type="button"
+                  disabled={busy || grant.status !== 'active' || !grant.provider_vault_available || !grant.provider_user_id}
+                  onClick={() => grant.provider_user_id && void emergencyActions.onEmergencyRestore(grant.provider_user_id)}
+                  title="把该授权机器人的保险箱凭据写入本机临时 CODEX_HOME"
+                >
+                  <KeyRound size={15} strokeWidth={2.2} aria-hidden="true" />
+                  借用
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {outgoingGrants.length > 0 && (
+          <div className={styles.emergencyList}>
+            <span className={styles.emergencyListTitle}>我授权出去</span>
+            {outgoingGrants.map((grant) => (
+              <div className={styles.emergencyRow} key={grant.id ?? `${grant.consumer_user_id}-out`}>
+                <div>
+                  <strong>{robotLabel(grant.consumer_nickname, grant.consumer_account, grant.consumer_user_id)}</strong>
+                  <span>{grantStatusText(grant)} · 到期 {formatVaultTime(grant.expires_at)}</span>
+                </div>
+                <button
+                  className={[styles.btn, styles.iconBtn].join(' ')}
+                  type="button"
+                  disabled={busy || grant.status !== 'active' || !grant.id}
+                  onClick={() => grant.id && void emergencyActions.onRevokeEmergencyGrant(grant.id)}
+                  title="撤销这个机器人账号的应急借用权限"
+                >
+                  <XCircle size={15} strokeWidth={2.2} aria-hidden="true" />
+                  撤销
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {leases.length > 0 && (
+          <div className={styles.emergencyList}>
+            <span className={styles.emergencyListTitle}>最近业务往来</span>
+            {leases.slice(0, 4).map((lease) => {
+              const counterparty = lease.consumer_user_id === currentUserId
+                ? robotLabel(lease.provider_nickname, lease.provider_account, lease.provider_user_id)
+                : robotLabel(lease.consumer_nickname, lease.consumer_account, lease.consumer_user_id)
+              const direction = lease.consumer_user_id === currentUserId ? '我借用' : '对方借用'
+              return (
+                <div className={styles.emergencyRow} key={lease.id ?? lease.leased_at}>
+                  <div>
+                    <strong>{direction} · {counterparty}</strong>
+                    <span>{lease.total_tokens ?? 0} tokens · 扣费 {formatFen(lease.billed_cost_rmb_fen)} · {formatVaultTime(lease.leased_at)}</span>
+                  </div>
+                  <small>{lease.accounting_status ?? lease.status ?? 'active'}</small>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
       {status?.managed_home && <code className={styles.codexPath}>{status.managed_home}</code>}
       <div className={styles.vaultActions}>
         <button

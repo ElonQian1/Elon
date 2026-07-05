@@ -202,6 +202,10 @@ export interface CodexVaultLocalStatus {
   active_home_managed?: boolean
   active_slot_id?: string | null
   active_account_hint_hash?: string | null
+  active_provider_user_id?: string | null
+  active_provider_nickname?: string | null
+  active_billing_source?: string | null
+  active_lease_expires_at?: string | null
   managed_auth?: CodexVaultAuthInspection
   default_auth?: CodexVaultAuthInspection
   managed_slots?: CodexVaultManagedSlot[]
@@ -210,6 +214,11 @@ export interface CodexVaultLocalStatus {
 export interface CodexVaultManagedSlot {
   slot_id?: string
   account_hint_hash?: string | null
+  lease_id?: string | null
+  provider_user_id?: string | null
+  provider_nickname?: string | null
+  billing_source?: string | null
+  lease_expires_at?: string | null
   active?: boolean
   home?: string
   auth?: CodexVaultAuthInspection
@@ -251,10 +260,64 @@ export interface CodexVaultStatusResponse {
   cloud?: {
     ok?: boolean
     vault?: CodexVaultCloudStatus
+    emergency?: CodexVaultEmergencyStatus
     error?: string
   }
   message?: string
   error?: string
+}
+
+export interface CodexVaultEmergencyStatus {
+  grants?: CodexVaultEmergencyGrant[]
+  leases?: CodexVaultEmergencyLease[]
+}
+
+export interface CodexVaultEmergencyGrant {
+  id?: string
+  provider_user_id?: string
+  provider_account?: string
+  provider_nickname?: string | null
+  consumer_user_id?: string
+  consumer_account?: string
+  consumer_nickname?: string | null
+  status?: string
+  label?: string | null
+  purpose?: string | null
+  max_lease_seconds?: number
+  expires_at?: string | null
+  created_at?: string
+  updated_at?: string
+  revoked_at?: string | null
+  reciprocal_active?: boolean
+  provider_vault_available?: boolean
+}
+
+export interface CodexVaultEmergencyLease {
+  id?: string
+  grant_id?: string
+  provider_user_id?: string
+  provider_account?: string
+  provider_nickname?: string | null
+  consumer_user_id?: string
+  consumer_account?: string
+  consumer_nickname?: string | null
+  consumer_node_id?: string
+  provider_slot_id?: string
+  account_hint_hash?: string | null
+  purpose?: string | null
+  billing_source?: string
+  status?: string
+  leased_at?: string
+  expires_at?: string
+  token_usage_event_id?: string | null
+  billing_event_id?: string | null
+  node_transaction_id?: string | null
+  input_tokens?: number
+  output_tokens?: number
+  total_tokens?: number
+  billed_cost_rmb_fen?: number
+  provider_earned_fen?: number
+  accounting_status?: string | null
 }
 
 export interface LocalCliToolStatus {

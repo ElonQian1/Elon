@@ -125,6 +125,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (86, "PC 节点安装实例幂等注册", crate::node_install_id_migration::migration_v86), (87, "用户子项目 APK release 元数据与项目首页同步", crate::project_release_migration::migration_v87),
     (88, "Codex auth.json 保险箱多账号槽位", crate::codex_vault_slot_migration::migration_v88),
     (89, "PC 节点开发期公开授权与自动握手状态", crate::node_public_dev_migration::migration_v89), (90, "项目广场公开列表索引", crate::project_store_listing_migration::migration_v90),
+    (91, "Codex 保险箱机器人应急互授权与租约账本", crate::codex_vault_emergency_migration::migration_v91),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

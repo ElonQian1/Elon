@@ -13,6 +13,7 @@ import NodeShareStatus, { publicDevHandshakeText } from './NodeShareStatus'
 import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
+import { createCodexVaultEmergencyActions } from './codexVaultEmergencyActions'
 import { useUserProgression } from '../billing/useUserProgression'
 import type { UserProgressionSummary } from '../billing/progressionApi'
 import { safeNodeAdminUrl } from '../../lib/utils'
@@ -224,6 +225,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
       if (!quiet) setError(message)
     }
   }, [adminUrl])
+  const emergencyVaultActions = createCodexVaultEmergencyActions({ adminUrl, setVaultBusy, setCodexBusy, setResult, setError, setVaultStatus, refreshStatus, loadCodexVaultStatus })
 
   const loadAutostart = useCallback(async () => {
     try {
@@ -484,6 +486,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         onClear={clearCodexVault}
         onDeleteCloud={deleteCloudCodexVault}
         onRefresh={() => loadCodexVaultStatus(false)}
+        emergencyActions={emergencyVaultActions} currentUserId={user?.id}
       />
       <ShareSettlementCard progression={progression} />
       <div className={styles.actions}>

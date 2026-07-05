@@ -60,7 +60,7 @@ mod node_agent_client_maintenance;
 mod node_agent_cloud_net;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
-mod node_agent_codex_vault;
+mod node_agent_codex_vault; mod node_agent_codex_vault_emergency;
 mod node_agent_download_router;
 mod node_agent_env;
 mod node_agent_file_info;

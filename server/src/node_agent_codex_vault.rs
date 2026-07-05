@@ -66,10 +66,10 @@ struct CloudLeaseResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct ManagedSlotMeta {
-    slot_id: String,
-    account_hint_hash: Option<String>,
-    lease_id: Option<String>,
+pub(crate) struct ManagedSlotMeta {
+    pub(crate) slot_id: String,
+    pub(crate) account_hint_hash: Option<String>,
+    pub(crate) lease_id: Option<String>,
 }
 
 pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
@@ -79,6 +79,7 @@ pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
         .route("/api/codex-vault/restore", post(restore_handler))
         .route("/api/codex-vault/delete-cloud", post(delete_cloud_handler))
         .route("/api/codex-vault/clear", post(clear_handler))
+        .merge(crate::node_agent_codex_vault_emergency::routes())
 }
 
 pub(crate) fn local_status_payload() -> Value {
@@ -470,7 +471,7 @@ fn read_auth_json_value(path: &Path) -> Result<Value> {
     serde_json::from_str(&text).context("Codex 登录文件不是有效 JSON")
 }
 
-fn validate_chatgpt_auth_cache(value: &Value) -> Result<()> {
+pub(crate) fn validate_chatgpt_auth_cache(value: &Value) -> Result<()> {
     let auth_mode = value
         .get("auth_mode")
         .and_then(Value::as_str)
@@ -504,7 +505,7 @@ fn account_hint_hash(value: &Value) -> Option<String> {
         })
 }
 
-fn write_managed_auth_home(home: &Path, auth_json: &str) -> Result<()> {
+pub(crate) fn write_managed_auth_home(home: &Path, auth_json: &str) -> Result<()> {
     safe_remove_managed_home(home)?;
     std::fs::create_dir_all(home)
         .with_context(|| format!("无法创建临时 CODEX_HOME {}", home.display()))?;
@@ -515,7 +516,7 @@ fn write_managed_auth_home(home: &Path, auth_json: &str) -> Result<()> {
     Ok(())
 }
 
-fn write_slot_meta(home: &Path, meta: &ManagedSlotMeta) -> Result<()> {
+pub(crate) fn write_slot_meta(home: &Path, meta: &ManagedSlotMeta) -> Result<()> {
     let meta_path = home.join("elon-codex-vault-slot.json");
     std::fs::write(&meta_path, serde_json::to_string_pretty(meta)?)
         .with_context(|| format!("无法写入保险箱槽位元数据 {}", meta_path.display()))?;
@@ -561,7 +562,9 @@ fn inspect_managed_slots(active_meta: Option<&ManagedSlotMeta>) -> Vec<ManagedAu
             let active = active_meta.is_some_and(|active| active.slot_id == slot_id);
             Some(ManagedAuthSlotInspection {
                 slot_id,
-                account_hint_hash: meta.and_then(|value| value.account_hint_hash),
+                account_hint_hash: meta
+                    .as_ref()
+                    .and_then(|value| value.account_hint_hash.clone()),
                 active,
                 home: home.to_string_lossy().to_string(),
                 auth: inspect_auth_home(&home),
@@ -631,7 +634,7 @@ fn managed_slots_root() -> PathBuf {
         .join("slots")
 }
 
-fn managed_slot_codex_home(slot_id: &str) -> PathBuf {
+pub(crate) fn managed_slot_codex_home(slot_id: &str) -> PathBuf {
     managed_slots_root()
         .join(safe_slot_id(slot_id))
         .join("codex-home")
@@ -731,7 +734,7 @@ async fn cloud_delete(url: &str, token: &str) -> Result<Value> {
     decode_cloud_response(resp).await
 }
 
-async fn cloud_post_typed<T: serde::de::DeserializeOwned>(
+pub(crate) async fn cloud_post_typed<T: serde::de::DeserializeOwned>(
     url: &str,
     token: &str,
     body: &Value,
