@@ -11,23 +11,23 @@ use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 
-use crate::node_agent_downloads::rg_win;
 use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, codex_vault_api, context_compiler,
-    external_app_api, external_app_chat_bootstrap, external_app_mvp_chat,
-    external_app_route_c_sdk, external_app_tool_report_api, friend_api, global_ws, group_ai,
-    group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin,
-    node_payout_admin, peer_relay, project_api, project_attachments, project_chat,
-    project_conversation_identity, project_deletion, project_docs, project_git,
+    external_app_api, external_app_chat_bootstrap, external_app_mvp_chat, external_app_route_c_sdk,
+    external_app_tool_report_api, friend_api, global_ws, group_ai, group_chat_retrieval_api,
+    group_summary_api, lan_peer, lm_chat, peer_relay, project_api, project_attachments,
+    project_chat, project_conversation_identity, project_deletion, project_docs, project_git,
     project_join_requests, project_landing_api, project_membership, project_releases,
     project_runtime_permission_api, project_space, project_space_task_snapshot,
     project_storage_git, project_store, project_workspace_health, project_workspace_recovery,
-    release_claim, route_c_admin, server_agent_runtime, speech_translate, token_usage_api,
-    user_api, user_archive_api, user_memory_api, user_progression, voice_asr_upload, voice_tts_api,
+    release_claim, server_agent_runtime, speech_translate, token_usage_api, user_api,
+    user_archive_api, user_memory_api, user_progression, voice_asr_upload, voice_tts_api,
     voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
+
+mod node_routes;
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
 ///
@@ -241,17 +241,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/me/workspaces", get(user_archive_api::get_user_archive))
         .route("/api/memories", get(user_memory_api::list_memories).post(user_memory_api::create_memory))
         .route("/api/memories/:id", delete(user_memory_api::delete_memory))
-        .route("/api/nodes", get(node_api::list_nodes))
-        .route("/api/nodes/models", get(node_api::list_available_models))
-        .route("/api/nodes/chat", post(node_api::chat_with_node))
-        .route("/api/node-agent/version", get(node_api::node_agent_version))
-        .route("/api/node-agent/download/windows", get(node_api::download_node_agent_windows))
-        .route(
-            "/api/node-agent/download/windows-client",
-            get(node_api::download_node_agent_windows_client),
-        )
-        .route("/api/node-agent/download/ripgrep-windows", get(rg_win))
-        .route("/api/node-agent/download/linux", get(node_api::download_node_agent_linux))
+        .merge(node_routes::routes())
         .route(
             "/api/agent-balloon/ensure",
             post(agent_balloon::ensure_balloon_project),
@@ -261,23 +251,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/me/ai/conversations/:conversation_id/messages",
             get(lm_chat::list_ai_chat_conversation_messages),
-        )
-        .route("/api/me/nodes", get(node_api::my_nodes))
-        .route("/api/me/nodes/register", post(node_api::register_node))
-        .route("/api/me/nodes/:node_id/sharing", axum::routing::patch(node_api::update_my_node_sharing))
-        .route("/api/me/node/exec", post(crate::node_exec_api::node_exec_handler))
-        .route("/api/admin/nodes/public-dev-handshake", get(node_api::admin_public_dev_handshake))
-        .route("/api/admin/nodes/push-update", post(node_api::push_node_update))
-        .route("/api/me/node-balance", get(node_api::my_node_balance))
-        .route("/api/me/node-transactions", get(node_api::my_node_transactions))
-        .route("/api/me/node-usage", get(node_api::my_node_usage))
-        .route(
-            "/api/me/node-payouts",
-            get(node_api::my_node_payouts).post(node_api::create_node_payout),
-        )
-        .route(
-            "/api/me/node-payouts/:payout_id/cancel",
-            post(node_api::cancel_node_payout),
         )
         // ───────────────────────────────────────────────────────────────────────
         .route(
@@ -1074,26 +1047,6 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/admin/billing/config",
             get(billing_admin::get_config).put(billing_admin::set_config),
-        )
-        .route(
-            "/api/admin/node-payouts",
-            get(node_payout_admin::list_payouts),
-        )
-        .route(
-            "/api/admin/node-compute-runs",
-            get(node_compute_admin::list_runs),
-        )
-        .route(
-            "/api/admin/route-c/budget",
-            get(route_c_admin::budget_report),
-        )
-        .route(
-            "/api/admin/node-payouts/:payout_id/paid",
-            post(node_payout_admin::mark_paid),
-        )
-        .route(
-            "/api/admin/node-payouts/:payout_id/reject",
-            post(node_payout_admin::reject),
         )
         .layer(CompressionLayer::new())
         .layer(cors)

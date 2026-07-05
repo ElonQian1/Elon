@@ -11,6 +11,7 @@ import AccountPage from './features/account/AccountPage'
 import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
 import NodePage from './features/node/NodePage'
+import PublicDevSmokePage from './features/node/PublicDevSmokePage'
 import DevTasksPage from './features/dev/DevTasksPage'
 import GitWorktreesPage from './features/git-worktrees/GitWorktreesPage'
 
@@ -32,6 +33,7 @@ export default function App() {
         <Route path="git-worktrees" element={<GitWorktreesPage />} />
         <Route path="voice" element={<VoicePage />} />
         <Route path="doctor" element={<DoctorPage />} />
+        <Route path="node/public-dev-smoke" element={<PublicDevSmokePage />} />
         <Route path="node" element={<NodePage />} />
       </Route>
     </Routes>
