@@ -787,7 +787,7 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground
         )
     }
-
+    private val chatSideMenuConversationHeaderActions by lazy { ChatSideMenuConversationHeaderActions(this, { conversationActions.createConversationAndOpen() }, { onComplete -> accountActions().syncProjectsFromServer(onComplete) }, { chatSideMenuController.refreshVisibleContent() }) }
     private val chatSideMenuController: ChatSideMenuController by lazy {
         ChatSideMenuController(
             activity = this,
@@ -814,7 +814,7 @@ class MainActivity : AppCompatActivity() {
             isProjectConversationWorking = ::isProjectConversationWorking,
             openProjectManagement = { openProjectSpaceForProject(s.activeProjectIndex, true) },
             sendProjectShare = chatProjectShareActions::sendToCurrentChat,
-            createConversationAndOpen = { conversationActions.createConversationAndOpen() },
+            conversationHeaderActions = chatSideMenuConversationHeaderActions,
             confirmLogout = { accountActions().confirmLogout() },
             dismissActionPopup = {
                 actionPopup?.dismiss()

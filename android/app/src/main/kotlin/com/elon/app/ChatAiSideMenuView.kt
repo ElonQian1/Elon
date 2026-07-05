@@ -31,7 +31,7 @@ internal class ChatAiSideMenuView(
     private val openProjectSpace: () -> Unit,
     private val renameConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
-    private val createConversationAndOpen: () -> Unit,
+    private val conversationHeaderActions: ChatSideMenuConversationHeaderActions,
     private val requestClose: (Boolean) -> Unit,
     private val bottomReservedHeightDp: Int,
     private val dp: (Int) -> Int,
@@ -367,24 +367,53 @@ internal class ChatAiSideMenuView(
                 }
             )
             addView(
-                ImageButton(context).apply {
-                    setImageResource(R.drawable.ic_side_menu_new_chat)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
-                    background = null
-                    scaleType = ImageView.ScaleType.FIT_CENTER
-                    contentDescription = "新建会话"
-                    isClickable = true
-                    foreground = selectableForeground()
-                    setPadding(dp(4), dp(4), dp(4), dp(4))
-                    setOnClickListener {
-                        requestClose(true)
-                        postDelayed({ createConversationAndOpen() }, DURATION_MS)
+                headerIconButton(
+                    iconRes = R.drawable.ic_side_menu_refresh,
+                    description = "刷新会话列表",
+                    onClick = { button ->
+                        button.animate()
+                            .rotationBy(360f)
+                            .setDuration(360L)
+                            .setInterpolator(LinearInterpolator())
+                            .start()
+                        conversationHeaderActions.refreshConversations()
                     }
-                },
+                ),
+                LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                    rightMargin = dp(2)
+                }
+            )
+            addView(
+                headerIconButton(
+                    iconRes = R.drawable.ic_side_menu_new_chat,
+                    description = "新建会话",
+                    onClick = {
+                        requestClose(true)
+                        postDelayed({ conversationHeaderActions.createConversationAndOpen() }, DURATION_MS)
+                    }
+                ),
                 LinearLayout.LayoutParams(dp(38), dp(38)).apply {
                     rightMargin = dp(8)
                 }
             )
+        }
+    }
+
+    private fun headerIconButton(
+        iconRes: Int,
+        description: String,
+        onClick: (ImageButton) -> Unit
+    ): ImageButton {
+        return ImageButton(context).apply {
+            setImageResource(iconRes)
+            imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
+            background = null
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = description
+            isClickable = true
+            foreground = selectableForeground()
+            setPadding(dp(4), dp(4), dp(4), dp(4))
+            setOnClickListener { onClick(this) }
         }
     }
 
