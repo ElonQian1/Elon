@@ -833,28 +833,7 @@
   gap: 8px;
 }
 
-.shareCard { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
-
-.shareHead { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
-
-.shareHead h4 { margin: 0; font-size: 14px; }
-
-.shareGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-
-.shareGrid > div {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-elevated);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.shareGrid span, .shareGrid small, .shareHint { color: var(--text-muted); font-size: 11px; }
-
-.shareGrid strong { color: var(--text-primary); font-size: 14px; font-weight: 800; }
+.shareHint { color: var(--text-muted); font-size: 11px; }
 
 .shareHint { margin: 0; line-height: 1.5; }
 
@@ -902,9 +881,6 @@
     grid-template-columns: 1fr;
   }
   .vaultGrid {
-    grid-template-columns: 1fr;
-  }
-  .shareGrid {
     grid-template-columns: 1fr;
   }
   .emergencyGrantForm,
