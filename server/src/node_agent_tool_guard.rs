@@ -1,5 +1,4 @@
-// server/src/node_agent_tool_guard.rs
-
+use crate::node_agent_program_resolver::resolve_structured_program;
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::{
@@ -470,7 +469,7 @@ impl ToolGuard {
                     request.display_command()
                 );
             }
-            let mut command_runner = Command::new(&request.program);
+            let mut command_runner = Command::new(resolve_structured_program(&request.program));
             command_runner.args(&request.args);
             command_runner
         };

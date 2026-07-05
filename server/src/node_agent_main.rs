@@ -91,6 +91,7 @@ mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_install_env;
 mod node_agent_local_admin;
+mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
 mod node_agent_project_manifest_identity;
@@ -1573,11 +1574,9 @@ async fn run_cli_prompt(run: CliPromptRun) {
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
     }
+    node_agent_cli_env::apply_common_child_env_overrides(&mut cmd, &mut sidecar_env);
     if cli_name == "codex" {
-        for (key, value) in node_agent_cli_env::codex_child_env_overrides(actual_bin) {
-            cmd.env(&key, &value);
-            sidecar_env.push((key, value));
-        }
+        node_agent_cli_env::apply_codex_child_env_overrides(&mut cmd, &mut sidecar_env, actual_bin);
     }
     // 使用本机实际 CODEX_HOME，避免继承服务器端 Linux 路径。
     if cli_name == "codex" {
