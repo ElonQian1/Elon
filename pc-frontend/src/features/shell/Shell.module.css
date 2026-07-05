@@ -28,6 +28,48 @@
   min-width: 0;
 }
 
+.claimBanner {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 6px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: #063b18;
+  color: #d7ffe1;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  flex-shrink: 0;
+}
+
+.claimBanner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.claimBanner button {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 14px;
+  border: 1px solid rgba(215, 255, 225, .86);
+  border-radius: 4px;
+  background: transparent;
+  color: #f2fff5;
+  font-size: 12px;
+  font-weight: 800;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.claimBanner button:hover,
+.claimBanner button:focus-visible {
+  background: rgba(255, 255, 255, .12);
+  border-color: #fff;
+}
+
 .nodeBanner {
   min-height: 28px;
   display: inline-flex;
