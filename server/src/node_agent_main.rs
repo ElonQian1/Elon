@@ -64,7 +64,7 @@ mod node_agent_client_maintenance;
 mod node_agent_cloud_net;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
-mod node_agent_codex_vault; mod node_agent_codex_vault_active; mod node_agent_codex_child_env; mod node_agent_codex_vault_emergency;
+mod node_agent_codex_vault; mod node_agent_codex_vault_active; mod node_agent_codex_child_env; mod node_agent_codex_vault_emergency; mod node_agent_codex_auth_switch;
 mod node_agent_config;
 pub use node_agent_config::{Credentials, machine_label, NodeConfig, state_path};
 use node_agent_config::{
@@ -837,13 +837,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     return;
                 }
                 if !result.exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
-                    if let Ok(Some(message)) =
-                        node_agent_codex_vault::try_auto_switch_after_codex_failure(
-                            &runtime,
-                            &result.stdout_text,
-                            &result.stderr_text,
-                        )
-                        .await
+                    if let Some(message) = node_agent_codex_auth_switch::try_after_failure(
+                        &runtime,
+                        &result.stdout_text,
+                        &result.stderr_text,
+                    )
+                    .await
                     {
                         send_cli_chunk(
                             &out_tx,
@@ -1152,12 +1151,9 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }
     }
     if !exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
-        if let Ok(Some(message)) = node_agent_codex_vault::try_auto_switch_after_codex_failure(
-            &runtime,
-            &stdout_text,
-            &stderr_text,
-        )
-        .await
+        if let Some(message) =
+            node_agent_codex_auth_switch::try_after_failure(&runtime, &stdout_text, &stderr_text)
+                .await
         {
             send_cli_chunk(
                 &out_tx,

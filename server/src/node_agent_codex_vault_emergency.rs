@@ -22,24 +22,25 @@ use crate::node_agent_codex_vault::{
 };
 
 #[derive(Debug, Deserialize)]
-struct EmergencyRestoreRequest {
-    provider_user_id: Option<String>,
-    provider_account: Option<String>,
-    purpose: Option<String>,
+pub(crate) struct EmergencyRestoreRequest {
+    pub(crate) provider_user_id: Option<String>,
+    pub(crate) provider_account: Option<String>,
+    pub(crate) purpose: Option<String>,
+    pub(crate) failure_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-struct EmergencyLeaseResponse {
-    auth_json: String,
-    lease_id: Option<String>,
-    slot_id: Option<String>,
-    account_hint_hash: Option<String>,
-    provider_user_id: Option<String>,
-    provider_nickname: Option<String>,
-    provider_account: Option<String>,
-    billing_source: Option<String>,
-    lease_expires_at: Option<String>,
-    message: Option<String>,
+pub(crate) struct EmergencyLeaseResponse {
+    pub(crate) auth_json: String,
+    pub(crate) lease_id: Option<String>,
+    pub(crate) slot_id: Option<String>,
+    pub(crate) account_hint_hash: Option<String>,
+    pub(crate) provider_user_id: Option<String>,
+    pub(crate) provider_nickname: Option<String>,
+    pub(crate) provider_account: Option<String>,
+    pub(crate) billing_source: Option<String>,
+    pub(crate) lease_expires_at: Option<String>,
+    pub(crate) message: Option<String>,
 }
 
 pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
@@ -153,7 +154,7 @@ async fn record_usage_snapshot_handler(
     }
 }
 
-async fn restore_emergency_from_cloud(
+pub(crate) async fn restore_emergency_from_cloud(
     rt: &Arc<crate::NodeRuntime>,
     req: EmergencyRestoreRequest,
 ) -> Result<EmergencyLeaseResponse> {
@@ -185,6 +186,7 @@ async fn restore_emergency_from_cloud(
         "agent_secret": creds.agent_secret,
         "device_name": crate::machine_label(),
         "purpose": req.purpose.unwrap_or_else(|| "pc_web_robot_shared_codex_cli".to_string()),
+        "failure_reason": req.failure_reason,
     });
     let lease = cloud_post_typed::<EmergencyLeaseResponse>(&url, &token, &body).await?;
     let auth_value: Value =
