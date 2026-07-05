@@ -11,7 +11,7 @@ use homecli_proto::AgentToServer;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{sync::Arc, time::Duration};
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 use crate::{
     project_auth::{auth_from_headers, json_error},
@@ -38,6 +38,14 @@ pub struct NodeExecResponse {
     pub error: Option<String>,
     /// 实际执行任务的 AI 模型名称（如 gpt-5.5）
     pub model: Option<String>,
+}
+
+struct NodeExecRun {
+    req_id: String,
+    output: String,
+    exit_ok: bool,
+    error: Option<String>,
+    model: Option<String>,
 }
 
 /// POST /api/me/node/exec
@@ -71,7 +79,10 @@ pub async fn node_exec_handler(
         match found {
             Some(a) => {
                 if a.allowed_clis.is_empty() {
-                    return json_error(StatusCode::FORBIDDEN, "指定的节点没有可用的 Codex/Claude CLI");
+                    return json_error(
+                        StatusCode::FORBIDDEN,
+                        "指定的节点没有可用的 Codex/Claude CLI",
+                    );
                 }
                 // 远程 Codex 模式允许用户指定节点大厅里的在线公共 CLI 节点。
                 // 不指定 node_id 时下面已有公共节点兜底；这里保持同一语义，避免选中远程节点后反而被拦截。
@@ -131,21 +142,57 @@ pub async fn node_exec_handler(
         .clone()
         .unwrap_or_else(|| agent_id[..8.min(agent_id.len())].to_string());
 
-    // ── 4. 分发给 PC 节点执行 ──────────────────────────────────────────────
-    let (req_id, mut rx) = match state
-        .agent_manager
-        .dispatch_cli_prompt(&agent_id, cli, vec![], req.prompt)
-        .await
-    {
-        Ok(v) => v,
-        Err(e) => return json_error(StatusCode::BAD_GATEWAY, format!("分发到 PC 节点失败：{e}")),
-    };
+    // ── 4. 分发给 PC 节点执行，并对节点重连导致的旧连接关闭自动重派一次 ───────
+    let mut run =
+        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &req.prompt).await {
+            Ok(run) => run,
+            Err(e) => return json_error(StatusCode::BAD_GATEWAY, e),
+        };
+    let mut display_output = clean_node_exec_output(&run.output);
+    if should_retry_node_exec_after_reconnect(run.error.as_deref(), &display_output) {
+        sleep(Duration::from_millis(700)).await;
+        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &req.prompt).await {
+            Ok(retry_run) => {
+                run = retry_run;
+                display_output = clean_node_exec_output(&run.output);
+            }
+            Err(e) => {
+                run.output.clear();
+                run.exit_ok = false;
+                run.error = Some(e);
+                display_output.clear();
+            }
+        }
+    }
 
-    // ── 5. 收集流式输出 ────────────────────────────────────────────────────
+    axum::Json(NodeExecResponse {
+        output: display_output,
+        req_id: run.req_id,
+        node_id: agent_id,
+        node_display_name: display_name,
+        exit_ok: run.exit_ok,
+        error: run.error,
+        model: run.model,
+    })
+    .into_response()
+}
+
+async fn dispatch_and_collect_node_exec(
+    state: &AppState,
+    agent_id: &str,
+    cli: &str,
+    prompt: &str,
+) -> Result<NodeExecRun, String> {
+    let (req_id, mut rx) = state
+        .agent_manager
+        .dispatch_cli_prompt(agent_id, cli.to_string(), vec![], prompt.to_string())
+        .await
+        .map_err(|e| format!("分发到 PC 节点失败：{e}"))?;
+
     let mut output = String::new();
     let mut exit_ok = false;
-    let mut exec_error: Option<String> = None;
-    let mut exec_model: Option<String> = None;
+    let error: Option<String>;
+    let model: Option<String>;
 
     loop {
         match timeout(Duration::from_secs(EXEC_TIMEOUT_SECS), rx.recv()).await {
@@ -159,34 +206,31 @@ pub async fn node_exec_handler(
                 ..
             })) => {
                 exit_ok = ok;
-                exec_error = e;
-                exec_model = m;
+                error = e;
+                model = m;
                 break;
             }
             Ok(Some(_)) => { /* 忽略其他消息类型 */ }
             Ok(None) => {
-                exec_error = Some("节点连接已关闭".to_string());
+                error = Some("节点连接已关闭".to_string());
+                model = None;
                 break;
             }
             Err(_) => {
-                exec_error = Some(format!("执行超时（{}s）", EXEC_TIMEOUT_SECS));
+                error = Some(format!("执行超时（{}s）", EXEC_TIMEOUT_SECS));
+                model = None;
                 break;
             }
         }
     }
 
-    let display_output = clean_node_exec_output(&output);
-
-    axum::Json(NodeExecResponse {
-        output: display_output,
+    Ok(NodeExecRun {
         req_id,
-        node_id: agent_id,
-        node_display_name: display_name,
+        output,
         exit_ok,
-        error: exec_error,
-        model: exec_model,
+        error,
+        model,
     })
-    .into_response()
 }
 
 /// 从允许的 CLI 列表中选最优的
@@ -227,6 +271,22 @@ fn clean_node_exec_output(output: &str) -> String {
     }
 }
 
+fn should_retry_node_exec_after_reconnect(error: Option<&str>, display_output: &str) -> bool {
+    if !display_output.trim().is_empty() {
+        return false;
+    }
+    let Some(error) = error else {
+        return false;
+    };
+    let lower = error.to_lowercase();
+    error.contains("节点重新注册")
+        || error.contains("旧连接已关闭")
+        || error.contains("节点连接已关闭")
+        || lower.contains("agent writer closed")
+        || lower.contains("channel closed")
+        || lower.contains("connection closed")
+}
+
 fn extract_json_agent_message(output: &str) -> Option<String> {
     let mut latest = None;
     for line in output.lines() {
@@ -243,7 +303,11 @@ fn extract_json_agent_message(output: &str) -> Option<String> {
             continue;
         }
         if let Some(text) = item.get("text").and_then(Value::as_str) {
-            let clean = text.trim().strip_prefix("用户可见：").unwrap_or(text.trim()).trim();
+            let clean = text
+                .trim()
+                .strip_prefix("用户可见：")
+                .unwrap_or(text.trim())
+                .trim();
             if !clean.is_empty() {
                 latest = Some(clean.to_string());
             }
@@ -268,7 +332,7 @@ fn is_codex_protocol_event_line(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::clean_node_exec_output;
+    use super::{clean_node_exec_output, should_retry_node_exec_after_reconnect};
 
     #[test]
     fn node_exec_output_extracts_codex_agent_message() {
@@ -283,11 +347,30 @@ codex
 
     #[test]
     fn node_exec_output_keeps_normal_text() {
-        assert_eq!(clean_node_exec_output("普通输出\n第二行"), "普通输出\n第二行");
+        assert_eq!(
+            clean_node_exec_output("普通输出\n第二行"),
+            "普通输出\n第二行"
+        );
     }
 
     #[test]
     fn node_exec_output_removes_protocol_only_events() {
         assert_eq!(clean_node_exec_output(r#"{"type":"turn.started"}"#), "");
+    }
+
+    #[test]
+    fn node_exec_retries_reconnect_without_output() {
+        assert!(should_retry_node_exec_after_reconnect(
+            Some("节点重新注册，旧连接已关闭"),
+            ""
+        ));
+    }
+
+    #[test]
+    fn node_exec_does_not_retry_reconnect_with_output() {
+        assert!(!should_retry_node_exec_after_reconnect(
+            Some("节点重新注册，旧连接已关闭"),
+            "已经拿到正文"
+        ));
     }
 }

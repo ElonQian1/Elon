@@ -25,6 +25,7 @@ import {
 import AuthDialog from '../auth/AuthDialog'
 import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
+import UserAvatar from '../shell/UserAvatar'
 import { formatTime } from '../../lib/utils'
 import NodeStatusBanner from './NodeStatusBanner'
 import styles from './AiChatPage.module.css'
@@ -48,6 +49,7 @@ interface AiMessage {
   // 节点本机执行输出扩展字段
   node_exec?: boolean
   node_display_name?: string
+  node_remote?: boolean
   exit_ok?: boolean
   model?: string
 }
@@ -581,6 +583,7 @@ export default function AiChatPage() {
           created_at: new Date().toISOString(),
           node_exec: true,
           node_display_name: res.node_display_name || targetNodeName,
+          node_remote: useRemoteCodexNode,
           exit_ok: res.exit_ok,
         }
         setMessages((prev) => [...prev, nodeMsg])
@@ -783,11 +786,13 @@ export default function AiChatPage() {
             const isUser = m.role === 'user'
             const isNode = !isUser && m.node_exec === true
             const hasMarkdown = !isUser && !isNode && /[#*`\[\]>|]/.test(m.content)
-            const avatarLabel = isUser ? (user?.account?.[0]?.toUpperCase() ?? '我') : (isNode ? '🖥' : 'AI')
-            const nameLabel = isUser ? (user?.nickname ?? user?.account ?? '我') : (isNode ? `本机 · ${m.node_display_name ?? ''}` : 'AI')
+            const nodePrefix = m.node_remote ? '远程' : '本机'
+            const nameLabel = isUser ? (user?.nickname ?? user?.account ?? '我') : (isNode ? `${nodePrefix} · ${m.node_display_name ?? ''}` : 'AI')
             return (
               <div key={i} className={[styles.msgRow, isUser ? styles.ownRow : ''].join(' ')}>
-                <div className={[styles.avatar, isNode ? styles.nodeAvatar : ''].join(' ')}>{avatarLabel}</div>
+                {isUser
+                  ? <UserAvatar user={user} size="compact" className={styles.avatar} />
+                  : <div className={[styles.avatar, isNode ? styles.nodeAvatar : ''].join(' ')}>{isNode ? '🖥' : 'AI'}</div>}
                 <div className={styles.msgBody}>
                   <div className={styles.msgMeta}>
                     <strong className={isNode ? styles.nodeLabel : ''}>{nameLabel}</strong>
