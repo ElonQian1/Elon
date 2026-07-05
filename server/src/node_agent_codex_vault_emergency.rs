@@ -173,6 +173,7 @@ async fn restore_emergency_from_cloud(
             slot_id: local_slot_id,
             account_hint_hash: lease.account_hint_hash.clone(),
             lease_id: lease.lease_id.clone(),
+            lease_expires_at: lease.lease_expires_at.clone(),
         },
     )?;
     std::env::set_var("CODEX_HOME", &home);

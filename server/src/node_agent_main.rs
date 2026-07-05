@@ -60,7 +60,7 @@ mod node_agent_client_maintenance;
 mod node_agent_cloud_net;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
-mod node_agent_codex_vault; mod node_agent_codex_vault_emergency;
+mod node_agent_codex_vault; mod node_agent_codex_vault_active; mod node_agent_codex_vault_emergency;
 mod node_agent_download_router;
 mod node_agent_env;
 mod node_agent_file_info;
@@ -1538,12 +1538,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         cwd.as_deref(),
     );
     if cli_name == "codex" {
-        let codex_home = std::env::var("CODEX_HOME")
-            .ok()
-            .filter(|v| {
-                let p = std::path::Path::new(v.trim());
-                !v.trim().is_empty() && p.exists()
-            })
+        let codex_home = node_agent_codex_vault_active::current_valid_codex_home_env()
             .or_else(|| {
                 std::env::var("USERPROFILE")
                     .or_else(|_| std::env::var("HOME"))

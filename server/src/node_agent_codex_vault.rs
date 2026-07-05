@@ -66,11 +66,7 @@ struct CloudLeaseResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ManagedSlotMeta {
-    pub(crate) slot_id: String,
-    pub(crate) account_hint_hash: Option<String>,
-    pub(crate) lease_id: Option<String>,
-}
+pub(crate) struct ManagedSlotMeta { pub(crate) slot_id: String, pub(crate) account_hint_hash: Option<String>, pub(crate) lease_id: Option<String>, pub(crate) lease_expires_at: Option<String> }
 
 pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
     Router::new()
@@ -292,6 +288,7 @@ async fn restore_from_cloud(
             slot_id: slot_id.to_string(),
             account_hint_hash: lease.account_hint_hash.clone(),
             lease_id: lease.lease_id.clone(),
+            lease_expires_at: None,
         },
     )?;
     std::env::set_var("CODEX_HOME", &home);
@@ -359,10 +356,7 @@ async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl
 
 fn local_status() -> CodexVaultLocalStatus {
     let legacy_home = managed_codex_home();
-    let active_codex_home = std::env::var("CODEX_HOME")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
+    let active_codex_home = crate::node_agent_codex_vault_active::current_valid_codex_home_env();
     let active_home_managed = active_codex_home
         .as_ref()
         .map(PathBuf::from)
