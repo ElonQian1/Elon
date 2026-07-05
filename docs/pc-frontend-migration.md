@@ -194,4 +194,5 @@ PC 前端动态刷新分三层，后续新增模块必须接入这条链路，�
 - 初期优先让新前端构建产物随 Rust binary 一起交付，保持现有后端发布模型简单稳定。
 - 如果改为上传 `dist/` 到服务器，必须同步更新 Windows 和 Linux 发布脚本，并在文档中写明远端路径、缓存策略和回滚方式。
 - 新前端任务至少验证 `npm run build`；涉及路由托管时还要验证 `/pc`、`/pc-next` 和静态资源路径。
+- Windows 本地预览 `/pc` 时用 `scripts\start-pc-frontend-dev.ps1`。这个脚本固定解析 `npm.cmd`；不要用 `Start-Process -FilePath npm`，否则某些机器会先命中 `npm.ps1` 并按系统文件关联打开到记事本。
 - 旧 PC 修复至少验证对应页面能加载；涉及服务端内嵌资源时运行最小 Rust 检查或相关测试。

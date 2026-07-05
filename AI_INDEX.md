@@ -51,6 +51,7 @@
 | 任务预检并创建隔离 worktree | `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree` |
 | 代码已推送检查 | `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed` |
 | 后端发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-server.ps1` |
+| PC 前端本地预览 | `powershell -ExecutionPolicy Bypass -File scripts\start-pc-frontend-dev.ps1` |
 | APK 发布 | `powershell -ExecutionPolicy Bypass -File scripts\publish-apk.ps1 -Changelog "<用户可见改动>"` |
 | worktree 清理 | `powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply` |
 

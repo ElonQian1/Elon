@@ -1,5 +1,5 @@
 ---
-applyTo: "pc-frontend/**/*,server/src/web.rs,server/src/router.rs,scripts/publish-server.*"
+applyTo: "pc-frontend/**/*,server/src/web.rs,server/src/router.rs,scripts/publish-server.*,scripts/start-pc-frontend-dev.ps1"
 ---
 
 # PC 工作台前端规则（收尾期 / 新功能期）
@@ -76,6 +76,7 @@ PC 前端任务开始写代码前，必须在普通模块化文件计划 JSON �
 
 - 修改旧静态 PC 资产：至少运行与服务端静态资源相关的最小 Rust 检查或对应测试；必要时用浏览器打开 `/pc` 验证。
 - 修改新前端工程：运行新前端的类型检查、lint/build；若还没有完整检查命令，至少运行 `npm run build`。
+- Windows 本地启动 `/pc` 前端预览时，使用 `powershell -ExecutionPolicy Bypass -File scripts\start-pc-frontend-dev.ps1`。如必须手写后台启动命令，`Start-Process -FilePath` 必须传 `(Get-Command npm.cmd).Source` 或等价的 `npm.cmd` 绝对路径，禁止传裸 `npm`，避免 PowerShell 解析到 `npm.ps1` 后被 Windows 文件关联打开成记事本。
 - 修改入口或发布链路：验证 `/pc`、`/pc-next`、静态资源路径和 `scripts/publish-server.*` 相关流程说明一致。
 
 ## 提交说明
