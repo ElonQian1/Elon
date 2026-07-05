@@ -2,7 +2,7 @@ param(
     [string]$ProviderUserId,
     [string]$ProviderAccount,
     [string]$NodeUrl = "http://127.0.0.1:7799",
-    [string]$Prompt = "只回复 OK，不要调用工具。",
+    [string]$Prompt = "Reply OK only. Do not call tools.",
     [int]$BadTimeoutSeconds = 90,
     [int]$SharedTimeoutSeconds = 180
 )
@@ -10,7 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($ProviderUserId) -and [string]::IsNullOrWhiteSpace($ProviderAccount)) {
-    throw "必须传入 -ProviderUserId 或 -ProviderAccount，指定授权共享提供方机器人。"
+    throw "Pass -ProviderUserId or -ProviderAccount to select the sharing provider robot."
 }
 
 function Shorten-Text([string]$Value, [int]$Max) {
@@ -59,26 +59,14 @@ function Invoke-NodeJsonWithFallback(
     throw $lastError
 }
 
-function Quote-ProcessArgument([string]$Value) {
-    if ($null -eq $Value) { return '""' }
-    if ($Value -notmatch '[\s"]' -and $Value.Length -gt 0) {
-        return $Value
-    }
-    return '"' + ($Value.Replace('"', '\"')) + '"'
-}
-
-function Join-ProcessArguments([string[]]$Args) {
-    return (($Args | ForEach-Object { Quote-ProcessArgument $_ }) -join " ")
-}
-
 $status = Invoke-NodeJson -Path "/api/status" -Headers @{ "Sec-Fetch-Site" = "same-origin" } -TimeoutSec 15
 $localAdminToken = $status.local_admin_token
 if ([string]::IsNullOrWhiteSpace($localAdminToken)) {
-    throw "本机节点没有暴露 local admin token；请确认从可信本机页面或 same-origin 上下文访问。"
+    throw "Local node did not expose local admin token. Confirm this runs from the trusted local PC context."
 }
 $codexExe = $status.codex_cli.path
 if ([string]::IsNullOrWhiteSpace($codexExe) -or -not (Test-Path -LiteralPath $codexExe)) {
-    throw "没有找到可运行的 Codex CLI。"
+    throw "No runnable Codex CLI was found."
 }
 
 $tempRootPath = [System.IO.Path]::GetTempPath().TrimEnd("\")
@@ -96,51 +84,70 @@ Set-Content -LiteralPath (Join-Path $badCodexHome "auth.json") -Value $badAuth -
 
 function Invoke-CodexProbe([string]$CodexHomePath, [string]$Label, [int]$TimeoutSeconds) {
     $outFile = Join-Path $root ("$Label-last.txt")
-    $psi = [System.Diagnostics.ProcessStartInfo]::new()
-    $psi.FileName = $codexExe
-    $psi.WorkingDirectory = $workDir
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardOutput = $true
-    $psi.RedirectStandardError = $true
-    $psi.CreateNoWindow = $true
     $codexArgs = @(
         "exec",
         "--skip-git-repo-check",
         "--ignore-user-config",
         "--ignore-rules",
         "--ephemeral",
+        "--json",
         "--sandbox", "read-only",
         "-C", $workDir,
         "-o", $outFile,
         $Prompt
     )
-    $psi.Arguments = Join-ProcessArguments $codexArgs
-    $psi.Environment["CODEX_HOME"] = $CodexHomePath
+    $allFile = Join-Path $root ("$Label-output.txt")
+    $savedProbeEnv = @{}
+    foreach ($name in @("CODEX_HOME", "OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE")) {
+        $savedProbeEnv[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    }
+    [Environment]::SetEnvironmentVariable("CODEX_HOME", $CodexHomePath, "Process")
     foreach ($name in @("OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE")) {
-        [void]$psi.Environment.Remove($name)
+        [Environment]::SetEnvironmentVariable($name, $null, "Process")
     }
-    $process = [System.Diagnostics.Process]::new()
-    $process.StartInfo = $psi
-    [void]$process.Start()
-    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-    $stderrTask = $process.StandardError.ReadToEndAsync()
-    $timedOut = -not $process.WaitForExit($TimeoutSeconds * 1000)
-    if ($timedOut) {
-        try { $process.Kill($true) } catch { try { $process.Kill() } catch {} }
-        try { $process.WaitForExit(5000) | Out-Null } catch {}
+    try {
+        Push-Location $workDir
+        try {
+            $oldErrorActionPreference = $ErrorActionPreference
+            $oldNativeCommandUseErrorActionPreference = $null
+            $hasNativePreference = Test-Path variable:PSNativeCommandUseErrorActionPreference
+            if ($hasNativePreference) {
+                $oldNativeCommandUseErrorActionPreference = $PSNativeCommandUseErrorActionPreference
+                $PSNativeCommandUseErrorActionPreference = $false
+            }
+            $ErrorActionPreference = "Continue"
+            & $codexExe @codexArgs *> $allFile
+            $exitCode = $LASTEXITCODE
+            $ErrorActionPreference = $oldErrorActionPreference
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativeCommandUseErrorActionPreference
+            }
+        } finally {
+            if ($null -ne $oldErrorActionPreference) {
+                $ErrorActionPreference = $oldErrorActionPreference
+            }
+            if ($hasNativePreference) {
+                $PSNativeCommandUseErrorActionPreference = $oldNativeCommandUseErrorActionPreference
+            }
+            Pop-Location
+        }
+    } finally {
+        foreach ($name in $savedProbeEnv.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $savedProbeEnv[$name], "Process")
+        }
     }
-    $stdout = $stdoutTask.GetAwaiter().GetResult()
-    $stderr = $stderrTask.GetAwaiter().GetResult()
+    $output = if (Test-Path -LiteralPath $allFile) { Get-Content -LiteralPath $allFile -Raw } else { "" }
     $last = if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile -Raw } else { "" }
-    $exitCode = if ($timedOut) { -1000 } else { $process.ExitCode }
     [pscustomobject]@{
         label = $Label
         exit_code = $exitCode
-        timed_out = $timedOut
-        success = ($exitCode -eq 0 -and -not $timedOut)
+        timed_out = $false
+        timeout_enforced = $false
+        timeout_seconds = $TimeoutSeconds
+        success = ($exitCode -eq 0)
         last_message = Shorten-Text $last 200
-        stdout_tail = Shorten-Text $stdout 700
-        stderr_tail = Shorten-Text $stderr 700
+        stdout_tail = Shorten-Text $output 700
+        stderr_tail = ""
     }
 }
 
@@ -162,7 +169,7 @@ try {
         -TimeoutSec 60
     $sharedCodexHome = $restore.local.active_codex_home
     if ([string]::IsNullOrWhiteSpace($sharedCodexHome)) {
-        throw "授权共享恢复没有设置 active CODEX_HOME。"
+        throw "Sharing restore did not set an active CODEX_HOME."
     }
     $sharedProbe = Invoke-CodexProbe -CodexHomePath $sharedCodexHome -Label "shared" -TimeoutSeconds $SharedTimeoutSeconds
     $clear = Invoke-NodeJson -Path "/api/codex-vault/clear" -Method "POST" -Headers $headers -TimeoutSec 60
