@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { clean } from '../../lib/utils'
+import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import type { Message } from './types'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { DevTaskMessage } from '../dev/DevTaskCard'
@@ -33,7 +34,7 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
   const isAi = ['assistant', 'ai', 'bot', 'system', 'ai_task', 'ai_progress', 'ai_result'].includes(kind)
   const isUserRole = !isAi && (kind === 'user' || kind === 'human' || kind === 'discussion')
   const isOwn = isAi ? false : (typeof message.outgoing === 'boolean' ? message.outgoing : isUserRole)
-  const content = clean(message.content ?? message.text ?? '')
+  const content = displayMessageContentOrAttachment(message.content ?? message.text ?? '')
   const time = message.created_at ? formatTime(message.created_at) : ''
   const senderName = clean(
     message.sender_name

@@ -53,6 +53,7 @@ pub(crate) async fn get_or_start_project_ws_job(
     download_base: String,
     conversation_id: String,
     message: String,
+    display_message: String,
     project_icon_data_url: Option<String>,
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
@@ -180,13 +181,16 @@ pub(crate) async fn get_or_start_project_ws_job(
         let _ = state.store.set_task_running(&task.id);
         (task.id, notice)
     } else {
-        match state.store.create_task_with_client_request(
-            &project.id,
-            &user_id,
-            Some(&conversation_id),
-            Some(&client_request_id),
-            &message,
-        ) {
+        match state
+            .store
+            .create_task_with_client_request_and_display_message(
+                &project.id,
+                &user_id,
+                Some(&conversation_id),
+                Some(&client_request_id),
+                &message,
+                &display_message,
+            ) {
             Ok(task_id) => (task_id, None),
             Err(error) => {
                 let raw = WsMessage::error(format!("创建任务记录失败: {}", error)).to_json();

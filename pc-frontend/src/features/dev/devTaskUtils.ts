@@ -1,5 +1,6 @@
 /** 对应 pc_app_dev_tasks.js 的纯业务逻辑层 */
 import { clean } from '../../lib/utils'
+import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import type { TaskState, TaskTone, ToolEvent, ApprovalState, ChatMessage, TaskContext } from './types'
 
 export function messageKind(msg: ChatMessage): string {
@@ -7,7 +8,7 @@ export function messageKind(msg: ChatMessage): string {
 }
 
 export function messageText(msg: ChatMessage): string {
-  return clean(msg.content ?? msg.text ?? msg.message)
+  return displayMessageContentOrAttachment(msg.content ?? msg.text ?? msg.message)
 }
 
 export function taskIdOf(msg: ChatMessage): string {

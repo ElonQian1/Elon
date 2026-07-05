@@ -131,11 +131,11 @@ pub(crate) async fn handle_project_ws(
             continue;
         }
 
-        let message = project_message_with_attachment_fallback(
+        let display_message = project_message_with_attachment_fallback(
             request.message.trim().to_string(),
             request.attachments.as_deref(),
         );
-        if message.is_empty() {
+        if display_message.is_empty() {
             continue;
         }
         let pc_runtime_route = match request.pc_runtime_route() {
@@ -202,7 +202,7 @@ pub(crate) async fn handle_project_ws(
             &state,
             &project,
             &conversation_id,
-            message,
+            display_message.clone(),
             request.attachments.as_deref(),
         );
 
@@ -218,6 +218,7 @@ pub(crate) async fn handle_project_ws(
                 "conversation_id": &conversation_id,
                 "client_request_id": &client_request_id,
                 "message_chars": message.chars().count(),
+                "display_message_chars": display_message.chars().count(),
                 "agent": request.agent.as_deref(),
                 "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
                 "direct_pc_cli": direct_pc_cli,
@@ -245,6 +246,7 @@ pub(crate) async fn handle_project_ws(
             download_base.clone(),
             conversation_id.clone(),
             message,
+            display_message,
             request.project_icon_data_url,
             request.agent,
             attachments,

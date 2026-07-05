@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTime } from '../../lib/utils'
+import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import type { MemberConversationEntry } from './memberConversationApi'
 import { buildMemberConversationDeepLink, copyTextToClipboard } from './memberConversationLinks'
 import {
@@ -411,7 +412,7 @@ function conversationScope(conversations: MemberConversationEntry[]) {
 }
 
 function conversationDisplayTitle(conversation: MemberConversationEntry): string {
-  const raw = String(conversation.title || conversation.last_message || '').trim()
+  const raw = displayMessageContentOrAttachment(conversation.title || conversation.last_message)
   if (!raw) return '新会话'
 
   const normalized = raw

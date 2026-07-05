@@ -13,7 +13,7 @@ import { clean } from '../../lib/utils'
 import {
   taskIsTerminal, statusForTask, parseToolEvent, approvalFinalState,
   approvalStateFor, runtimeStatusLabel, shortId, toolEventSummary, toolEventTitle,
-  usageEventSummary,
+  usageEventSummary, messageText,
 } from './devTaskUtils'
 import type { ChatMessage, TaskContext, ToolEvent, TaskTone } from './types'
 
@@ -37,7 +37,7 @@ function TaskHeader({ message, context, onCancel }: Omit<DevTaskMessageProps, 'o
   const taskId = clean(message.task_id ?? message.taskId ?? '')
   const task = taskId ? context.tasks.get(taskId) ?? null : null
   const status = statusForTask(task)
-  const request = clean(message.content ?? message.text ?? '').replace(/^发起\s*AI\s*开发任务[：:]\s*/i, '')
+  const request = messageText(message).replace(/^发起\s*AI\s*开发任务[：:]\s*/i, '')
   const canCancel = !!taskId && !taskIsTerminal(task)
   return (
     <div className={[styles.taskHeader, styles[`h_${status.tone}`]].join(' ')}>
@@ -60,7 +60,7 @@ function ProgressLine({ message, context, onCancel, onApprove }: DevTaskMessageP
   const taskId = clean(message.task_id ?? message.taskId ?? '')
   const task = taskId ? context.tasks.get(taskId) ?? null : null
   const canCancel = !!taskId && !taskIsTerminal(task)
-  const content = clean(message.content ?? message.text ?? '')
+  const content = messageText(message)
   const event = parseToolEvent(content)
 
   if (!event) {
@@ -248,7 +248,7 @@ function ApprovalBanner({ tool, event, taskId, closedState, canCancel, onCancel,
 
 /* ══ ResultBlock — 最终结果（突出展示） ══ */
 function ResultBlock({ message }: { message: ChatMessage }) {
-  const content = clean(message.content ?? message.text ?? '')
+  const content = messageText(message)
   const canceled = /停止|取消|canceled|cancelled/i.test(content)
   const failed = !canceled && /失败|错误|error|failed/i.test(content)
   const tone: TaskTone = canceled ? 'canceled' : (failed ? 'failed' : 'done')

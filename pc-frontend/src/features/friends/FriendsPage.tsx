@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Layers, List } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { clean, formatTime } from '../../lib/utils'
+import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import MarkdownContent from '../markdown/MarkdownContent'
 import styles from './FriendsPage.module.css'
 
@@ -162,7 +163,7 @@ export default function FriendsPage() {
         id: friend.id,
         title: friend.nickname ?? friend.account,
         subtitle: friendPreviewText(friend),
-        lastMessage: friend.last_message,
+        lastMessage: displayMessageContentOrAttachment(friend.last_message),
         lastMessageAt: friend.last_message_at,
         unreadCount: friend.unread_count ?? 0,
         isOnline: presence.status !== 'offline',
@@ -178,8 +179,8 @@ export default function FriendsPage() {
       kind: 'group',
       id: group.id,
       title: group.name || '群聊',
-      subtitle: group.last_message || `${group.member_count ?? 0} 位成员`,
-      lastMessage: group.last_message,
+      subtitle: displayMessageContentOrAttachment(group.last_message) || `${group.member_count ?? 0} 位成员`,
+      lastMessage: displayMessageContentOrAttachment(group.last_message),
       lastMessageAt: group.last_message_at ?? group.created_at,
       unreadCount: group.unread_count ?? 0,
       group,
@@ -525,7 +526,8 @@ export default function FriendsPage() {
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
           {messages.map((m, i) => {
             const isMe = m.outgoing || m.sender_user_id === me?.id
-            const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(m.content)
+            const content = displayMessageContentOrAttachment(m.content)
+            const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(content)
             const senderName = isMe
               ? (me?.nickname ?? me?.account ?? '我')
               : (activeItem?.kind === 'group'
@@ -542,8 +544,8 @@ export default function FriendsPage() {
                     <span>{formatTime(m.created_at)}</span>
                   </div>
                   {hasMarkdown
-                    ? <div className={styles.msgContent}><MarkdownContent content={m.content} copy={false} /></div>
-                    : <div className={styles.msgContent}>{m.content}</div>}
+                    ? <div className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
+                    : <div className={styles.msgContent}>{content}</div>}
                 </div>
               </div>
             )
@@ -628,7 +630,7 @@ function sortConversationItems(items: ConversationItem[]) {
 }
 
 function friendPreviewText(friend: Friend) {
-  return clean(friend.last_message) || '暂无消息'
+  return displayMessageContentOrAttachment(friend.last_message) || '暂无消息'
 }
 
 function truncateText(value: string, length: number) {

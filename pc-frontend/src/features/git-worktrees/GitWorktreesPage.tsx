@@ -14,6 +14,7 @@ import type {
 import { saveProjectComposerDraft } from '../updates/composerDrafts'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { useAuthStore } from '../../store/auth'
+import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import {
   listMemberConversationMessages,
   sendMemberConversationDiscussion,
@@ -383,7 +384,7 @@ function ContextPanel({ preview, onClose }: { preview: ContextPreview; onClose: 
         {recent.map((message) => (
           <div key={message.id} className={styles.contextMessage} data-role={message.role}>
             <span>{message.sender_name || message.role || 'message'}</span>
-            <p>{message.content}</p>
+            <p>{displayMessageContentOrAttachment(message.content)}</p>
           </div>
         ))}
         {!recent.length && <p className={styles.contextEmpty}>这个会话没有可展示的消息。</p>}

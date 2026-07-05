@@ -27,6 +27,7 @@ import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import UserAvatar from '../shell/UserAvatar'
 import { formatTime, safeNodeAdminUrl } from '../../lib/utils'
+import { compactDisplayMessageContent, displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
 import AiPinnedTools from './AiPinnedTools'
@@ -87,9 +88,7 @@ interface RemoteNodeInfo {
 const GENERIC_AI_TITLES = new Set(['普通聊天会话', '新对话', 'AI 对话', '一龙 AI 对话'])
 
 function compactConversationText(text?: string, maxLength = 28) {
-  const normalized = (text ?? '').replace(/\s+/g, ' ').trim()
-  if (!normalized) return ''
-  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized
+  return compactDisplayMessageContent(text, maxLength)
 }
 
 function isGenericConversationTitle(title?: string) {
@@ -784,7 +783,8 @@ export default function AiChatPage() {
           {messages.filter((m) => m.role !== 'system').map((m, i) => {
             const isUser = m.role === 'user'
             const isNode = !isUser && m.node_exec === true
-            const hasMarkdown = !isUser && !isNode && /[#*`\[\]>|]/.test(m.content)
+            const content = displayMessageContentOrAttachment(m.content)
+            const hasMarkdown = !isUser && !isNode && /[#*`\[\]>|]/.test(content)
             const nodePrefix = m.node_remote ? '远程' : '本机'
             const nameLabel = isUser ? (user?.nickname ?? user?.account ?? '我') : (isNode ? `${nodePrefix} · ${m.node_display_name ?? ''}` : 'AI')
             return (
@@ -800,10 +800,10 @@ export default function AiChatPage() {
                     {isNode && m.exit_ok === false && <span className={styles.exitFail}>执行失败</span>}
                   </div>
                   {isNode
-                    ? <pre className={styles.nodeOutput}>{m.content}</pre>
+                    ? <pre className={styles.nodeOutput}>{content}</pre>
                     : hasMarkdown
-                      ? <div className={styles.msgContent}><MarkdownContent content={m.content} copy /></div>
-                      : <div className={styles.msgContent}>{m.content}</div>}
+                      ? <div className={styles.msgContent}><MarkdownContent content={content} copy /></div>
+                      : <div className={styles.msgContent}>{content}</div>}
                 </div>
               </div>
             )

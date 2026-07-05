@@ -25,6 +25,43 @@ impl Store {
         client_request_id: Option<&str>,
         message: &str,
     ) -> Result<String> {
+        self.create_task_with_client_request_and_display_message(
+            project_id,
+            user_id,
+            conversation_id,
+            client_request_id,
+            message,
+            message,
+        )
+    }
+
+    pub fn create_task_with_display_message(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        message: &str,
+        display_message: &str,
+    ) -> Result<String> {
+        self.create_task_with_client_request_and_display_message(
+            project_id,
+            user_id,
+            conversation_id,
+            None,
+            message,
+            display_message,
+        )
+    }
+
+    pub fn create_task_with_client_request_and_display_message(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: Option<&str>,
+        client_request_id: Option<&str>,
+        message: &str,
+        display_message: &str,
+    ) -> Result<String> {
         let id = new_id("tsk");
         let now = now();
         let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
@@ -65,7 +102,7 @@ impl Store {
                 conversation_id,
                 id,
                 user_id,
-                message,
+                display_message,
                 now
             ],
         )?;
@@ -441,7 +478,6 @@ impl Store {
         }
         Ok(None)
     }
-
 }
 
 #[cfg(test)]
@@ -478,6 +514,46 @@ mod tests {
             .and_then(|value| value.as_str())
             .unwrap_or_default()
             .to_string()
+    }
+
+    #[test]
+    fn task_can_store_separate_display_message() {
+        let store = temp_store();
+        let user = store
+            .create_user("display-message@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Display Message", None, None)
+            .expect("project should be created")
+            .project;
+        let agent_message = "please inspect this\n\nUser uploaded real chat attachments for this project conversation (conversation_id=conv):\n- image.png [image; image/png; 1 bytes] -> /tmp/image.png\nThese attachments are part of the current message context, like images/files in a normal chat app. If the user asks about an uploaded image, inspect the exact local path listed above before answering.";
+        let display_message = "please inspect this";
+
+        let task_id = store
+            .create_task_with_client_request_and_display_message(
+                &project.id,
+                &user.id,
+                Some("conv"),
+                Some("req-display"),
+                agent_message,
+                display_message,
+            )
+            .expect("task should be created");
+
+        let task = store
+            .get_task_by_client_request(&project.id, &user.id, Some("conv"), "req-display")
+            .expect("task query should work")
+            .expect("task should exist");
+        assert_eq!(task.message, agent_message);
+
+        let messages = store
+            .list_user_conversation_messages(&project.id, &user.id, "conv", 20)
+            .expect("messages should list");
+        let user_message = messages
+            .iter()
+            .find(|message| message.task_id.as_deref() == Some(task_id.as_str()))
+            .expect("display message should exist");
+        assert_eq!(user_message.content, display_message);
     }
 
     #[test]

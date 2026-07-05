@@ -60,14 +60,14 @@ pub async fn chat_project(
     if !can_edit(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
-    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(
+    let display_message = crate::project_attachment_notes::project_message_with_attachment_fallback(
         req.message.trim().to_string(),
         req.attachments.as_deref(),
     );
-    if message.is_empty() {
+    if display_message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
-    if looks_like_replaced_unicode_mojibake(&message) {
+    if looks_like_replaced_unicode_mojibake(&display_message) {
         return json_error(
             StatusCode::BAD_REQUEST,
             "请求正文疑似发生字符编码损坏，中文已变成大量问号。请使用 UTF-8 发送 JSON；Windows 脚本建议使用 PowerShell 7，或先把 JSON 写成 UTF-8 文件后再用 curl.exe --data-binary @file 发送。",
@@ -128,7 +128,7 @@ pub async fn chat_project(
         &state,
         &project,
         &conversation_id,
-        message,
+        display_message.clone(),
         req.attachments.as_deref(),
     );
     let trace_id = clean_trace_id(req.trace_id.as_deref());
@@ -146,17 +146,12 @@ pub async fn chat_project(
             "plan_mode": req.plan_mode,
         }),
     );
-    // 提前保存 project_id 和原始消息，因为后面 project / message 会被 move 进调度器。
     let project_id_for_history = project.id.clone();
-    let original_user_message = message.clone();
-    let task_id =
-        match state
-            .store
-            .create_task(&project.id, &user.id, Some(&conversation_id), &message)
-        {
-            Ok(id) => id,
-            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
+    let original_user_message = display_message.clone();
+    let task_id = match state.store.create_task_with_display_message(&project.id, &user.id, Some(&conversation_id), &message, &display_message) {
+        Ok(id) => id,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
@@ -325,14 +320,14 @@ pub async fn chat_project_stream(
     if !can_edit(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
-    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(
+    let display_message = crate::project_attachment_notes::project_message_with_attachment_fallback(
         req.message.trim().to_string(),
         req.attachments.as_deref(),
     );
-    if message.is_empty() {
+    if display_message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
-    if looks_like_replaced_unicode_mojibake(&message) {
+    if looks_like_replaced_unicode_mojibake(&display_message) {
         return json_error(
             StatusCode::BAD_REQUEST,
             "请求正文疑似发生字符编码损坏，中文已变成大量问号。请使用 UTF-8 发送 JSON；Windows 脚本建议使用 PowerShell 7，或先把 JSON 写成 UTF-8 文件后再用 curl.exe --data-binary @file 发送。",
@@ -359,18 +354,14 @@ pub async fn chat_project_stream(
         &state,
         &project,
         &conversation_id,
-        message,
+        display_message.clone(),
         req.attachments.as_deref(),
     );
     let trace_id = clean_trace_id(req.trace_id.as_deref());
-    let task_id =
-        match state
-            .store
-            .create_task(&project.id, &user.id, Some(&conversation_id), &message)
-        {
-            Ok(id) => id,
-            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
+    let task_id = match state.store.create_task_with_display_message(&project.id, &user.id, Some(&conversation_id), &message, &display_message) {
+        Ok(id) => id,
+        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     run_project_agent_with_scheduler(
         state.clone(),
