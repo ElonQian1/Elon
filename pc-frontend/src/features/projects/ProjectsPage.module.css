@@ -166,6 +166,10 @@
 .sideProject:hover {
   background: rgba(255, 255, 255, .045);
 }
+.sideProject[data-active="true"] {
+  background: rgba(168, 199, 250, .12);
+  color: #eef4ff;
+}
 .sideProject span {
   min-width: 0;
   display: flex;
@@ -506,6 +510,180 @@
   color: var(--text-muted);
 }
 
+.projectHome {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  gap: 14px;
+  padding: 22px 26px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.projectHero {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+}
+
+.projectHeroText {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.projectHeroText span {
+  color: #a8c7fa;
+  font-size: 11px;
+  font-weight: 850;
+}
+.projectHeroText h1 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 900;
+}
+.projectHeroText p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.continueBtn {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(37, 211, 102, .28);
+  border-radius: 7px;
+  background: rgba(37, 211, 102, .16);
+  color: #dff6e8;
+  padding: 0 13px;
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+.continueBtn:hover {
+  background: rgba(37, 211, 102, .22);
+}
+
+.projectHomeGrid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr)) minmax(180px, 240px);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.projectHomeCard,
+.projectHomeActions,
+.projectHomeNote {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.projectHomeCard {
+  padding: 12px;
+}
+.projectHomeCard > strong {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+.projectHomeCard dl {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.projectHomeCard div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 28px;
+  align-items: center;
+}
+.projectHomeCard dt,
+.projectHomeCard dd {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.projectHomeCard dt {
+  color: var(--text-muted);
+}
+.projectHomeCard dd {
+  color: var(--text-soft);
+  text-align: right;
+}
+
+.projectHomeActions {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 7px;
+}
+.projectHomeActions button {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  padding: 0 8px;
+  text-align: left;
+  cursor: pointer;
+}
+.projectHomeActions button:hover {
+  background: rgba(255, 255, 255, .045);
+  color: var(--text);
+}
+.projectHomeActions span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.projectHomeNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.projectHomeNote svg {
+  color: #a8c7fa;
+  flex: 0 0 auto;
+}
+
 .emptyState {
   min-height: 0;
   display: grid;
@@ -534,6 +712,19 @@
   }
 }
 
+@media (max-width: 980px) {
+  .projectHomeGrid {
+    grid-template-columns: 1fr;
+  }
+  .projectHero {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+  .continueBtn {
+    grid-column: 1 / -1;
+    width: max-content;
+  }
+}
+
 @media (max-width: 760px) {
   .page {
     grid-template-columns: minmax(0, 1fr);
@@ -550,7 +741,8 @@
     display: none;
   }
   .mineToolbar,
-  .projectList {
+  .projectList,
+  .projectHome {
     padding-left: 16px;
     padding-right: 16px;
   }
