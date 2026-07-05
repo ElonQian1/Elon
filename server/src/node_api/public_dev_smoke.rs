@@ -13,6 +13,7 @@ use crate::{admin, types::AppState};
 
 use support::{
     clean, default_smoke_prompt, resolve_side, run_smoke_direction, PublicDevMutualSmokeResponse,
+    SmokeSide,
 };
 
 const DEFAULT_LEFT_OWNER: &str = "钱一龙";
@@ -100,10 +101,12 @@ async fn run_public_dev_mutual_smoke(
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
 
+    let left_uses_right = smoke_label(&left, &right);
+    let right_uses_left = smoke_label(&right, &left);
     let directions = vec![
         run_smoke_direction(
             &state,
-            "钱一龙使用志伟4060",
+            &left_uses_right,
             &left.owner,
             &right,
             &cli_name,
@@ -113,7 +116,7 @@ async fn run_public_dev_mutual_smoke(
         .await,
         run_smoke_direction(
             &state,
-            "夜云使用一龙4060",
+            &right_uses_left,
             &right.owner,
             &left,
             &cli_name,
@@ -145,4 +148,14 @@ fn json_error(status: StatusCode, error: anyhow::Error) -> axum::response::Respo
         Json(serde_json::json!({ "error": error.to_string() })),
     )
         .into_response()
+}
+
+fn smoke_label(consumer_side: &SmokeSide, provider_side: &SmokeSide) -> String {
+    let consumer = consumer_side
+        .owner
+        .nickname
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or(&consumer_side.owner.account);
+    format!("{}使用{}", consumer, provider_side.node.display_name)
 }

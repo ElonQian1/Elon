@@ -72,6 +72,7 @@
 }
 
 .controls input,
+.controls select,
 .controls textarea {
   width: 100%;
   box-sizing: border-box;
@@ -86,6 +87,74 @@
 .controls textarea {
   resize: vertical;
   min-height: 74px;
+}
+
+.nodePicker {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #28313a;
+  border-radius: 8px;
+  background: #12161b;
+  padding: 13px;
+}
+
+.nodePickerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nodePickerHeader div {
+  display: grid;
+  gap: 4px;
+}
+
+.nodePickerHeader strong {
+  color: #eef3f8;
+  font-size: 14px;
+}
+
+.nodePickerHeader span,
+.hint {
+  color: #8b99a7;
+  font-size: 12px;
+}
+
+.nodePickerHeader button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  border: 1px solid #39414d;
+  border-radius: 7px;
+  background: #20252b;
+  color: #eef3f8;
+  padding: 0 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nodePickerHeader button:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.selectorGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.miniError {
+  margin: 0;
+  color: #ffc1c1;
+  font-size: 13px;
+}
+
+.hint {
+  margin: 0;
 }
 
 .pairGrid {
@@ -301,6 +370,7 @@
   }
 
   .pairGrid,
+  .selectorGrid,
   .directionGrid {
     grid-template-columns: 1fr;
   }
