@@ -116,9 +116,18 @@ fn build_html() -> String {
             "__PROJECT_DOCUMENT_ICON_PNG_B64__",
             PROJECT_DOCUMENT_ICON_PNG_B64.trim(),
         )
-        .replace("__TOP_SEARCH_ICON_PNG_B64__", TOP_SEARCH_ICON_PNG_B64.trim())
-        .replace("__TOP_ADD_RING_ICON_PNG_B64__", TOP_ADD_RING_ICON_PNG_B64.trim())
-        .replace("__TOP_ADD_PLUS_ICON_PNG_B64__", TOP_ADD_PLUS_ICON_PNG_B64.trim())
+        .replace(
+            "__TOP_SEARCH_ICON_PNG_B64__",
+            TOP_SEARCH_ICON_PNG_B64.trim(),
+        )
+        .replace(
+            "__TOP_ADD_RING_ICON_PNG_B64__",
+            TOP_ADD_RING_ICON_PNG_B64.trim(),
+        )
+        .replace(
+            "__TOP_ADD_PLUS_ICON_PNG_B64__",
+            TOP_ADD_PLUS_ICON_PNG_B64.trim(),
+        )
         .replace(
             "__POPUP_NEW_PROJECT_PNG_B64__",
             POPUP_NEW_PROJECT_PNG_B64.trim(),

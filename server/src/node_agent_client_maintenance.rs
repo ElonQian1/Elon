@@ -759,10 +759,13 @@ pub(crate) async fn push_update_from_server(
     // 先试已安装的更新程序
     #[cfg(windows)]
     if spawn_client_action(ClientAction::Update).is_ok() {
-        record_maintenance_event("push_update", true, "Win 端正在更新升级，通信临时中断，会自动恢复。via_installer");
+        record_maintenance_event(
+            "push_update",
+            true,
+            "Win 端正在更新升级，通信临时中断，会自动恢复。via_installer",
+        );
         return Ok("Win 端正在更新升级，通信临时中断，会自动恢复。".to_string());
     }
-
     // 没有安装程序时：直接下载新版 exe，写旁路 bat 脚本替换并重启
     let url = download_url_override
         .map(str::to_string)
@@ -772,11 +775,9 @@ pub(crate) async fn push_update_from_server(
                 cloud_http_url.trim_end_matches('/')
             )
         });
-
     let current_exe = std::env::current_exe().map_err(|e| format!("无法定位当前 exe: {e}"))?;
     let download_path = current_exe.with_extension("new.exe");
     let bat_path = current_exe.with_extension("update.bat");
-
     // 异步下载
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
@@ -797,7 +798,6 @@ pub(crate) async fn push_update_from_server(
     tokio::fs::write(&download_path, &bytes)
         .await
         .map_err(|e| format!("写入新版 exe 失败: {e}"))?;
-
     // 写一个 bat 脚本：等待当前进程退出后替换并重启
     let cur_str = current_exe.to_string_lossy();
     let new_str = download_path.to_string_lossy();
@@ -807,7 +807,6 @@ pub(crate) async fn push_update_from_server(
     tokio::fs::write(&bat_path, bat_content.as_bytes())
         .await
         .map_err(|e| format!("写入更新脚本失败: {e}"))?;
-
     // 启动 bat 然后退出当前进程
     #[cfg(windows)]
     {
@@ -820,20 +819,21 @@ pub(crate) async fn push_update_from_server(
         cmd.creation_flags(0x0800_0000 | 0x0000_0200); // CREATE_NO_WINDOW | DETACHED
         cmd.spawn().map_err(|e| format!("启动更新脚本失败: {e}"))?;
     }
-
-    record_maintenance_event("push_update", true, "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace");
+    record_maintenance_event(
+        "push_update",
+        true,
+        "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace",
+    );
     // 异步退出（让当前响应先发出）
     tokio::spawn(async {
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
         std::process::exit(0);
     });
-
     Ok(format!(
         "Win 端正在更新升级，通信临时中断，会自动恢复。下载大小: {} KB",
         bytes.len() / 1024
     ))
 }
-
 fn spawn_client_action(action: ClientAction) -> Result<(), String> {
     #[cfg(windows)]
     {

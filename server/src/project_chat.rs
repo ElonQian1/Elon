@@ -60,7 +60,10 @@ pub async fn chat_project(
     if !can_edit(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
-    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(req.message.trim().to_string(), req.attachments.as_deref());
+    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(
+        req.message.trim().to_string(),
+        req.attachments.as_deref(),
+    );
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
@@ -111,7 +114,6 @@ pub async fn chat_project(
     if let Some(msg) = chat_billing_block(&state, &user.id, &project, &req, pc_runtime_route) {
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
-
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
         &user.id,
@@ -144,11 +146,9 @@ pub async fn chat_project(
             "plan_mode": req.plan_mode,
         }),
     );
-
     // 提前保存 project_id 和原始消息，因为后面 project / message 会被 move 进调度器。
     let project_id_for_history = project.id.clone();
     let original_user_message = message.clone();
-
     let task_id =
         match state
             .store
@@ -195,7 +195,6 @@ pub async fn chat_project(
         )
         .await;
     }
-
     let mut reply = String::new();
     let mut streamed_reply = String::new();
     let mut apk_url = None;
@@ -292,7 +291,6 @@ pub async fn chat_project(
             "has_image_url": image_url.is_some(),
         }),
     );
-
     Json(serde_json::json!({
         "task_id": task_id,
         "trace_id": trace_id,
@@ -316,7 +314,6 @@ pub async fn chat_project_stream(
     Json(req): Json<ProjectChatRequest>,
 ) -> Response {
     use axum::response::sse::{Event, Sse};
-
     let user = match auth_from_headers(&state, &headers) {
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
@@ -328,7 +325,10 @@ pub async fn chat_project_stream(
     if !can_edit(&project.role) {
         return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
     }
-    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(req.message.trim().to_string(), req.attachments.as_deref());
+    let message = crate::project_attachment_notes::project_message_with_attachment_fallback(
+        req.message.trim().to_string(),
+        req.attachments.as_deref(),
+    );
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }

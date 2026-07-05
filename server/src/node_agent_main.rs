@@ -1322,7 +1322,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let cli_name_owned = cli_name;
     let bin = bin_owned.as_str();
     let cli_name = cli_name_owned.as_str();
-
     if let Err(error) =
         node_agent_cli_security::validate_cli_extra_args(cli_name, extra_args.as_slice())
     {
@@ -1343,7 +1342,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }));
         return;
     }
-
     if cli_name == "api-runtime" {
         let result = crate::node_agent_server_runtime::run_api_runtime_prompt(
             crate::node_agent_server_runtime::RuntimePromptOptions {
@@ -1376,7 +1374,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }));
         return;
     }
-
     if cli_name == "server-runtime" {
         let result = match server_runtime_config {
             Some(config) => {
@@ -1422,14 +1419,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }));
         return;
     }
-
     // Windows 上 .cmd/.bat shim 必须通过 cmd 启动；统一包装，避免不同调用点遗漏隐藏策略。
     let batch_wrapper = node_agent_cli_security::windows_batch_wrapper(bin);
     let actual_bin = batch_wrapper
         .as_ref()
         .map(|(program, _)| *program)
         .unwrap_or(bin);
-
     // 构建外部 CLI 命令；Codex 的 prompt 是位置参数，其他 CLI 使用 -p。
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
@@ -1575,7 +1570,13 @@ async fn run_cli_prompt(run: CliPromptRun) {
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
     }
-    apply_env(&mut cmd, &mut sidecar_env, cli_name, actual_bin, cwd.as_deref());
+    apply_env(
+        &mut cmd,
+        &mut sidecar_env,
+        cli_name,
+        actual_bin,
+        cwd.as_deref(),
+    );
     // 使用本机实际 CODEX_HOME，避免继承服务器端 Linux 路径。
     if cli_name == "codex" {
         let codex_home = std::env::var("CODEX_HOME")
@@ -1608,7 +1609,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
             std::process::Stdio::null()
         });
     hide_tokio_command_window(&mut cmd);
-
     let codex_key = codex_plan.scope_key.clone();
 
     if node_agent_cli_sidecar_runner::sidecar_enabled_for_cli(cli_name) {

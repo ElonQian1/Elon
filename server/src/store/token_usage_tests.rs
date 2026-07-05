@@ -281,7 +281,10 @@ fn shared_codex_usage_bills_consumer_and_counts_provider_share() {
     let (store, path) = temp_store();
     let consumer = store
         .create_user(
-            &format!("shared-consumer-{}@example.com", uuid::Uuid::new_v4().simple()),
+            &format!(
+                "shared-consumer-{}@example.com",
+                uuid::Uuid::new_v4().simple()
+            ),
             "secret1",
             None,
             None,
@@ -289,7 +292,10 @@ fn shared_codex_usage_bills_consumer_and_counts_provider_share() {
         .unwrap();
     let provider = store
         .create_user(
-            &format!("shared-provider-{}@example.com", uuid::Uuid::new_v4().simple()),
+            &format!(
+                "shared-provider-{}@example.com",
+                uuid::Uuid::new_v4().simple()
+            ),
             "secret1",
             None,
             None,

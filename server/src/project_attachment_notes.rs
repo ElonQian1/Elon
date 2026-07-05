@@ -159,7 +159,10 @@ pub(crate) fn project_message_with_attachment_fallback(
             } else {
                 lines.extend(annotation_lines);
             }
-        } else if attachment.mime_type.as_deref().is_some_and(|mime| mime.starts_with("audio/"))
+        } else if attachment
+            .mime_type
+            .as_deref()
+            .is_some_and(|mime| mime.starts_with("audio/"))
             || attachment.kind.as_deref() == Some("audio")
         {
             lines.push(format!(
@@ -524,7 +527,8 @@ mod tests {
             }],
         };
 
-        let message = project_message_with_attachment_fallback("   ".to_string(), Some(&[attachment]));
+        let message =
+            project_message_with_attachment_fallback("   ".to_string(), Some(&[attachment]));
 
         assert!(message.contains("uploaded attachments"));
         assert!(message.contains("annotation #1"));
