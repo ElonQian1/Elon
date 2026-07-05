@@ -7,7 +7,7 @@ use std::{
 };
 
 use super::{
-    command as launcher_command, env_file, paths, process, watchdog, windows_integration,
+    command as launcher_command, env_file, log_file, paths, process, watchdog, windows_integration,
     DEFAULT_ADMIN_PORT,
 };
 
@@ -95,9 +95,15 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
     if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
         eprintln!("警告：创建开始菜单入口失败：{error:#}");
     }
-    if let Err(error) = windows_integration::enable_autostart(&install_dir) {
-        eprintln!("警告：注册开机自启失败：{error:#}");
+    if let Err(error) = windows_integration::repair_existing_autostart(&install_dir) {
+        eprintln!("警告：修复已有开机自启失败：{error:#}");
     }
+    log_file::record_event(
+        &install_dir,
+        "autostart_default_opt_in",
+        true,
+        "install_or_repair does not create startup persistence; user opt-in is required",
+    );
     if let Err(error) = windows_integration::register_url_protocol(&install_dir) {
         eprintln!("警告：注册网页一键唤起入口失败：{error:#}");
     }

@@ -175,6 +175,26 @@
   font-size: 12px;
 }
 
+.securityNote {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #f0c36d;
+  border-radius: 7px;
+  background: #fff8e8;
+  padding: 11px 12px;
+  color: #5f4720;
+  line-height: 1.55;
+}
+
+.securityNote strong {
+  font-size: 13px;
+  color: #7a4d00;
+}
+
+.securityNote span {
+  font-size: 12px;
+}
+
 @media (max-width: 640px) {
   .header {
     flex-direction: column;

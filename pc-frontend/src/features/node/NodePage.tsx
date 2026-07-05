@@ -431,7 +431,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     setRepairBusy(true); setResult(''); setError('')
     try {
       const data = await nodeApi<{ message?: string }>(adminUrl, '/api/client-maintenance/repair', { method: 'POST' }, 12000)
-      setResult(data.message || '已开始修复客户端入口，会重新创建网页唤起协议和开机自启动。')
+      setResult(data.message || '已开始修复客户端入口，会重新创建网页唤起协议；开机自启动需要手动开启。')
       window.setTimeout(() => { void loadAutostart(); void refreshStatus(true) }, 2500)
     } catch (err) { setError((err as Error).message) } finally { setRepairBusy(false) }
   }
@@ -511,6 +511,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         </button>
       </div>
       {autostart?.summary && <p className={styles.hintLine}>{autostart.summary}</p>}
+      <p className={styles.hintLine}>安装和修复不会默认写入开机自启动；需要常驻时请在这里手动开启。</p>
       {result && <p className={styles.resultOk}>{result}</p>}
       {error && <p className={styles.resultErr}>{error}</p>}
     </div>

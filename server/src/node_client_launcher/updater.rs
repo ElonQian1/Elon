@@ -1,24 +1,17 @@
 // server/src/node_client_launcher/updater.rs
 
 use anyhow::{Context, Result};
-use serde::Deserialize;
 use std::{collections::HashMap, path::Path, time::Duration};
 
-use super::{command as launcher_command, env_file, paths, process, DEFAULT_BASE_URL};
+use super::{
+    command as launcher_command, env_file, paths, process,
+    update_integrity::{preferred_sha256, read_local_git_sha, verify_optional_sha256, VersionInfo},
+    DEFAULT_BASE_URL,
+};
 
 const DEFAULT_UPDATE_CONNECT_TIMEOUT_SECS: u64 = 20;
 const DEFAULT_UPDATE_DOWNLOAD_TIMEOUT_SECS: u64 = 15 * 60;
 const DEFAULT_UPDATE_DOWNLOAD_RETRIES: usize = 3;
-
-#[derive(Debug, Deserialize)]
-struct VersionInfo {
-    #[serde(default, rename = "gitSha")]
-    git_sha: String,
-    #[serde(default, rename = "downloadUrl")]
-    download_url: String,
-    #[serde(default, rename = "windowsClientDownloadUrl")]
-    windows_client_download_url: String,
-}
 
 pub(crate) fn update_client_if_needed(install_dir: &Path) -> Result<bool> {
     match try_update_client_if_needed(install_dir) {
@@ -74,7 +67,13 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     } else {
         remote.windows_client_download_url.clone()
     };
-    match try_update_from_client_package(install_dir, &package_url, &remote_text, &env_values) {
+    match try_update_from_client_package(
+        install_dir,
+        &package_url,
+        &remote.windows_client_sha256,
+        &remote_text,
+        &env_values,
+    ) {
         Ok(updated) => return Ok(updated),
         Err(error) => {
             super::log_file::record_event(
@@ -105,6 +104,11 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     if bytes.len() < 1024 * 1024 {
         anyhow::bail!("下载的客户端程序过小，疑似异常响应");
     }
+    verify_optional_sha256(
+        &bytes,
+        preferred_sha256(&remote.download_sha256, &remote.file_sha256),
+        "客户端程序",
+    )?;
     std::fs::write(&tmp_exe, &bytes).with_context(|| format!("无法写入 {}", tmp_exe.display()))?;
     std::fs::write(&tmp_version, remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
@@ -136,6 +140,7 @@ fn auto_update_disabled(env_values: &std::collections::HashMap<String, String>) 
 fn try_update_from_client_package(
     install_dir: &Path,
     package_url: &str,
+    expected_sha256: &str,
     remote_text: &str,
     env_values: &HashMap<String, String>,
 ) -> Result<bool> {
@@ -150,6 +155,7 @@ fn try_update_from_client_package(
     if bytes.len() < 1024 * 1024 {
         anyhow::bail!("下载的完整客户端包过小，疑似异常响应");
     }
+    verify_optional_sha256(&bytes, expected_sha256, "完整客户端包")?;
     std::fs::write(&tmp_zip, &bytes).with_context(|| format!("无法写入 {}", tmp_zip.display()))?;
     std::fs::write(&tmp_version, remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
@@ -662,15 +668,6 @@ fn update_base_url(env_values: &std::collections::HashMap<String, String>) -> St
         .get("NODE_AGENT_UPDATE_BASE_URL")
         .cloned()
         .unwrap_or_else(|| DEFAULT_BASE_URL.to_string())
-}
-
-fn read_local_git_sha(path: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(path).ok()?;
-    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
-    value
-        .get("gitSha")
-        .and_then(|value| value.as_str())
-        .map(str::to_string)
 }
 
 #[cfg(test)]

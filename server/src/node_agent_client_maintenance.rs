@@ -115,7 +115,7 @@ pub(crate) async fn repair_handler() -> (StatusCode, Json<Value>) {
                 StatusCode::OK,
                 Json(json!({
                     "ok": true,
-                    "message": "已开始后台修复客户端入口；会重新创建主程序、卸载程序、开始菜单和开机自启。"
+                    "message": "已开始后台修复客户端入口；会重新创建主程序、卸载程序、开始菜单和网页唤起协议。开机自启动只在用户明确开启后保留。"
                 })),
             )
         }
@@ -199,7 +199,7 @@ fn autostart_status_payload() -> Value {
         let summary = if enabled {
             "开机后会自动启动一龙开发平台。"
         } else {
-            "开机后不会自动启动一龙开发平台。"
+            "默认不会开机自启动；只有在本页手动开启后才会注册。"
         };
         json!({
             "supported": true,
@@ -396,7 +396,7 @@ fn maintenance_actions(install: &Value) -> Value {
             "repair_client",
             "repair",
             "修复客户端入口",
-            "重新创建主程序、卸载程序、开始菜单、开机自启和网页唤起协议，不需要用户理解安装目录。",
+            "重新创建主程序、卸载程序、开始菜单和网页唤起协议；不会默认开启开机自启动。",
             "",
             supported,
             repair_tone,
@@ -752,7 +752,6 @@ fn open_path(path: &Path, select_file: bool) -> Result<(), String> {
 
 /// 服务端推送 UpdateClient 消息时调用：优先走已安装的更新程序，否则自行下载替换。
 /// 返回 Ok(message) 表示已安排更新，Err(reason) 表示无法自动更新。
-
 pub(crate) mod maintenance_ops;
 #[cfg(test)]
 mod maintenance_test;

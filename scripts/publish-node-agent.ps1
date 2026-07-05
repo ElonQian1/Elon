@@ -493,6 +493,7 @@ try {
 
 $LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
 if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
+$LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLowerInvariant()
 
 # ── 2. 编译 Windows 版本 ─────────────────────────────────────────────────────
 Write-Host "[2/5] 编译 Windows 版本..." -ForegroundColor Yellow
@@ -509,6 +510,7 @@ try {
 
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
+$WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerInvariant()
 
 Invoke-NodeAgentPcFrontendBuild
 
@@ -559,6 +561,9 @@ try {
         downloadUrl = $WindowsDownloadUrl
         linuxDownloadUrl = $LinuxDownloadUrl
         windowsClientDownloadUrl = $WindowsClientDownloadUrl
+        sha256 = $WinSha256
+        fileSha256 = $WinSha256
+        linuxSha256 = $LinuxSha256
         ripgrepZipUrl = $RipgrepDownloadUrl
         ripgrepZipSha256 = $RipgrepZipSha256
         ripgrepZipFileSize = [int64]$RipgrepZipFileSize
@@ -571,6 +576,7 @@ try {
     Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (-not (Test-Path $WindowsClientPackage)) { throw "Windows 客户端压缩包不存在：$WindowsClientPackage" }
+$WindowsClientSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WindowsClientPackage).Hash.ToLowerInvariant()
 
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
 Write-Host "[3/5] 上传到服务器..." -ForegroundColor Yellow
@@ -603,6 +609,10 @@ $VersionInfo = [ordered]@{
     linuxDownloadUrl = $LinuxDownloadUrl
     windowsClientDownloadUrl = $WindowsClientDownloadUrl
     ripgrepZipUrl = $RipgrepDownloadUrl
+    sha256 = $WinSha256
+    fileSha256 = $WinSha256
+    linuxSha256 = $LinuxSha256
+    windowsClientSha256 = $WindowsClientSha256
     ripgrepZipSha256 = $RipgrepZipSha256
     fileSize = [int64]$sizeWin
     linuxFileSize = [int64]$size
@@ -618,8 +628,11 @@ try {
     Remove-Item -LiteralPath $VersionFile -Force -ErrorAction SilentlyContinue
 }
 Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
+Write-Host "  Linux  $Bin sha256 = $LinuxSha256" -ForegroundColor DarkGray
 Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
+Write-Host "  Windows $Bin.exe sha256 = $WinSha256" -ForegroundColor DarkGray
 Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundColor Green
+Write-Host "  Windows client package sha256 = $WindowsClientSha256" -ForegroundColor DarkGray
 if ($RipgrepZipFileSize -gt 0) {
     Write-Host "  ripgrep package size = $RipgrepZipFileSize bytes" -ForegroundColor Green
 }

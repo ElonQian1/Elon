@@ -8,6 +8,7 @@ pub(crate) mod log_file;
 mod maintenance_protocol;
 mod paths;
 mod process;
+mod update_integrity;
 mod updater;
 mod watchdog;
 mod windows_integration;

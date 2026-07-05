@@ -50,6 +50,11 @@ export default function LocalNodeOfflineCard({ onLaunch, onRetry }: Props) {
           <div className={styles.step}><strong>2</strong><span>如果已安装，点击“启动 Win 端”；后台守护层会继续拉起或重启节点。</span></div>
           <div className={styles.step}><strong>3</strong><span>如果多次失败，点击“导出诊断”，把生成的脱敏文件发给客服或开发者。</span></div>
         </div>
+
+        <div className={styles.securityNote}>
+          <strong>安全软件提示</strong>
+          <span>如果 Windows 安全中心隔离了「一龙开发平台.exe」，请只还原这一个官方文件，再重新检测；不要把整个 ElonNode 目录加入白名单。</span>
+        </div>
       </div>
     </section>
   )

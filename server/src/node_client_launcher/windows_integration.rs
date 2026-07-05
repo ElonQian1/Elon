@@ -68,7 +68,7 @@ const START_MENU_SHORTCUTS: &[ShortcutSpec] = &[
         file_name: "修复客户端.lnk",
         target: ShortcutTarget::Client,
         arguments: "--repair",
-        description: "修复一龙开发平台主程序、卸载程序、开始菜单和自启动",
+        description: "修复一龙开发平台主程序、卸载程序、开始菜单和网页唤起入口",
     },
     ShortcutSpec {
         file_name: "卸载一龙开发平台.lnk",

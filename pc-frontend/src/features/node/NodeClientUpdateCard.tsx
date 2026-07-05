@@ -127,6 +127,7 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
         <div><span>服务器</span><strong>{updateState.latestLabel}</strong></div>
         <div><span>安装状态</span><strong>{maintenance?.installed === false ? '未完整安装' : maintenance?.installed === true ? '已安装' : '检测中'}</strong></div>
         <div><span>安装包</span><strong>{latest?.windowsClientFileSize ? formatBytes(latest.windowsClientFileSize) : '未知'}</strong></div>
+        <div><span>安装包 SHA256</span><strong>{latest?.windowsClientSha256 ? shortSha(latest.windowsClientSha256) : '待发布'}</strong></div>
         <div><span>rg 工具包</span><strong>{latest?.ripgrepZipFileSize ? formatBytes(latest.ripgrepZipFileSize) : '按需'}</strong></div>
       </div>
       {maintenance?.maintenance_overview?.detail && <p className={styles.updateHint}>{maintenance.maintenance_overview.detail}</p>}
@@ -141,4 +142,9 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
       {error && <p className={styles.resultErr}>{error}</p>}
     </section>
   )
+}
+
+function shortSha(value: string) {
+  const normalized = value.trim()
+  return normalized.length > 16 ? `${normalized.slice(0, 12)}...` : normalized || '待发布'
 }
