@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
-import { Bot, ChevronLeft, ChevronRight, Folder, Stethoscope } from 'lucide-react'
+import { ChevronLeft, Folder } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -26,8 +26,11 @@ import AuthDialog from '../auth/AuthDialog'
 import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import UserAvatar from '../shell/UserAvatar'
-import { formatTime } from '../../lib/utils'
+import { formatTime, safeNodeAdminUrl } from '../../lib/utils'
 import NodeStatusBanner from './NodeStatusBanner'
+import AiChatTopbar from './AiChatTopbar'
+import AiPinnedTools from './AiPinnedTools'
+import { isCodexVaultBackupIntent, runCodexVaultBackupFromAiChat } from './codexVaultQuickAction'
 import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -474,6 +477,64 @@ export default function AiChatPage() {
     })
   }, [activeConvId, input, user?.id])
 
+  function resetComposer() {
+    setInput('')
+    clearAiComposerDraft()
+    setError('')
+    if (textareaRef.current) textareaRef.current.style.height = '46px'
+  }
+
+  function enqueueUserMessage(text: string) {
+    const convId = activeConvId
+    const isExistingConversation = conversations.some(
+      (conversation) => conversation.id === convId && (conversation.message_count ?? 0) > 0,
+    )
+    const newConversationTitle = isExistingConversation ? undefined : makeConversationTitle(text)
+    if (newConversationTitle) {
+      setConversationPreviews((current) => ({ ...current, [convId]: newConversationTitle }))
+    }
+    setMessages((prev) => [...prev, { role: 'user', content: text, created_at: new Date().toISOString() }])
+    atBottomRef.current = true
+    return { convId, newConversationTitle }
+  }
+
+  function restoreComposerAfterError(previousInput: string, err: unknown) {
+    setInput(previousInput)
+    saveAiComposerDraft({ userId: user?.id, input: previousInput, activeConvId })
+    window.setTimeout(autoResize, 0)
+    setError((err as { message?: string }).message ?? '发送失败')
+  }
+
+  async function runCodexVaultBackupMessage() {
+    const reply = await runCodexVaultBackupFromAiChat(safeNodeAdminUrl())
+    setMessages((prev) => [...prev, {
+      role: 'assistant',
+      content: reply,
+      created_at: new Date().toISOString(),
+    }])
+  }
+
+  async function handleCodexVaultShortcut() {
+    if (sending) return
+    if (!user?.id) {
+      setError('请先登录账号后再备份 Codex auth.json。')
+      setLoginDialogOpen(true)
+      return
+    }
+    const text = '帮我把本机 Codex auth.json 备份到云端保险箱'
+    const previousInput = input
+    resetComposer()
+    enqueueUserMessage(text)
+    setSending(true)
+    try {
+      await runCodexVaultBackupMessage()
+    } catch (err) {
+      restoreComposerAfterError(previousInput, err)
+    } finally {
+      setSending(false)
+    }
+  }
+
   useEffect(() => {
     if (aiDraftReadyRef.current) return
     const draft = pendingAiDraftRef.current
@@ -519,46 +580,37 @@ export default function AiChatPage() {
       return
     }
     const previousInput = input
-    if (runtimeRoute === 'route_c2') {
+    const isVaultBackup = isCodexVaultBackupIntent(text)
+    if (!isVaultBackup && runtimeRoute === 'route_c2') {
       setError('远程 AI 模型聊天还没有接入普通对话页，请先切到远程 Codex、自动选择或平台 AI。')
       return
     }
-    if (runtimeRoute === 'route_c3' && !remoteNodeStatusChecked) {
+    if (!isVaultBackup && runtimeRoute === 'route_c3' && !remoteNodeStatusChecked) {
       setError('正在同步远程 Codex 节点，请稍后再发送。')
       return
     }
-    if (runtimeRoute === 'route_c3' && !remoteNodeIdValue) {
+    if (!isVaultBackup && runtimeRoute === 'route_c3' && !remoteNodeIdValue) {
       setError('没有找到在线可用的远程 Codex 节点。请确认夜云 PC 节点在线且 Codex/Claude 已就绪。')
       return
     }
     let requestRuntimeRoute: RuntimeRoute = runtimeRoute
     let forcePlatformFallback = false
-    if (runtimeRoute === 'route_a' && !onlineNodeId) {
+    if (!isVaultBackup && runtimeRoute === 'route_a' && !onlineNodeId) {
       requestRuntimeRoute = 'route_c'
       forcePlatformFallback = true
       setRuntimeRoute('auto')
     }
-    setInput('')
-    clearAiComposerDraft()
-    setError('')
-    if (textareaRef.current) textareaRef.current.style.height = '46px'
-
-    const convId = activeConvId
-    const isExistingConversation = conversations.some(
-      (conversation) => conversation.id === convId && (conversation.message_count ?? 0) > 0,
-    )
-    const newConversationTitle = isExistingConversation ? undefined : makeConversationTitle(text)
-    if (newConversationTitle) {
-      setConversationPreviews((current) => ({ ...current, [convId]: newConversationTitle }))
-    }
+    resetComposer()
 
     // 乐观更新：先显示用户消息
-    const userMsg: AiMessage = { role: 'user', content: text, created_at: new Date().toISOString() }
-    setMessages((prev) => [...prev, userMsg])
-    atBottomRef.current = true
+    const { convId, newConversationTitle } = enqueueUserMessage(text)
 
     setSending(true)
     try {
+      if (isVaultBackup) {
+        await runCodexVaultBackupMessage()
+        return
+      }
       const requestAgent = forcePlatformFallback
         ? ''
         : selectedAgentForRuntimeRoute(selectedAgent, modelOptions, requestRuntimeRoute)
@@ -603,10 +655,7 @@ export default function AiChatPage() {
         loadConversations()
       }
     } catch (err) {
-      setInput(previousInput)
-      saveAiComposerDraft({ userId: user?.id, input: previousInput, activeConvId })
-      window.setTimeout(autoResize, 0)
-      setError((err as { message?: string }).message ?? '发送失败')
+      restoreComposerAfterError(previousInput, err)
     } finally {
       setSending(false)
     }
@@ -627,26 +676,12 @@ export default function AiChatPage() {
           <span>一龙 AI</span>
           <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button">+</button>
         </div>
-        <div className={styles.pinnedTools}>
-          <button className={[styles.pinnedTool, styles.pinnedToolPrimary].join(' ')} type="button" onClick={newConversation}>
-            <span className={styles.pinnedToolIcon}>
-              <Bot aria-hidden="true" size={18} strokeWidth={2.2} />
-            </span>
-            <span className={styles.pinnedToolCopy}>
-              <strong>一龙 AI 对话</strong>
-              <em>开始新的 AI 聊天</em>
-            </span>
-          </button>
-          <button className={styles.pinnedTool} type="button" onClick={() => navigate('/doctor')}>
-            <span className={styles.pinnedToolIcon}>
-              <Stethoscope aria-hidden="true" size={18} strokeWidth={2.2} />
-            </span>
-            <span className={styles.pinnedToolCopy}>
-              <strong>电脑医生</strong>
-              <em>诊断和修复本机问题</em>
-            </span>
-          </button>
-        </div>
+        <AiPinnedTools
+          sending={sending}
+          onNewConversation={newConversation}
+          onOpenDoctor={() => navigate('/doctor')}
+          onCodexVaultBackup={handleCodexVaultShortcut}
+        />
         <div className={styles.convList}>
           {historyGroups.length === 0 && (
             <p className={styles.hint}>{conversationsLoaded ? '还没有对话记录' : '正在加载对话记录...'}</p>
@@ -703,50 +738,14 @@ export default function AiChatPage() {
 
       {/* 聊天区 */}
       <div className={styles.chat}>
-        <header className={styles.topbar}>
-          <span className={styles.topbarTitle}>
-            {activeConversationTitle}
-          </span>
-          <div className={styles.topbarRight}>
-            <button
-              className={[styles.topbarBtn, styles.panelToggleBtn].join(' ')}
-              type="button"
-              title={userPanelCollapsed ? '展开右侧用户栏' : '收起右侧用户栏'}
-              aria-label={userPanelCollapsed ? '展开右侧用户栏' : '收起右侧用户栏'}
-              aria-pressed={!userPanelCollapsed}
-              onClick={() => setUserPanelCollapsed((collapsed) => !collapsed)}
-            >
-              {userPanelCollapsed
-                ? <ChevronLeft size={14} aria-hidden="true" />
-                : <ChevronRight size={14} aria-hidden="true" />}
-            </button>
-            <span className={styles.modelBadge}>{modelButtonCopy.source} · {modelButtonCopy.detail}</span>
-            <button className={styles.topbarBtn} type="button"
-              title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
-              分享算力
-            </button>
-            <button className={styles.topbarBtn} type="button"
-              title="打开移动端入口" onClick={() => window.open('/app/download', '_blank', 'noopener')}>
-              打开移动端
-            </button>
-            <button className={styles.topbarBtn} type="button"
-              title="切换到旧版" onClick={() => {
-                try {
-                  const raw = localStorage.getItem('elon_auth')
-                  if (raw) {
-                    const tok = JSON.parse(raw)?.state?.token
-                    if (tok) {
-                      localStorage.setItem('lodex_token', tok)
-                      localStorage.setItem('elon_token', tok)
-                    }
-                  }
-                } catch {}
-                window.open('/pc-legacy', '_blank', 'noopener')
-              }}>
-              旧版
-            </button>
-          </div>
-        </header>
+        <AiChatTopbar
+          title={activeConversationTitle}
+          userPanelCollapsed={userPanelCollapsed}
+          modelButtonCopy={modelButtonCopy}
+          sending={sending}
+          onToggleUserPanel={() => setUserPanelCollapsed((collapsed) => !collapsed)}
+          onCodexVaultBackup={handleCodexVaultShortcut}
+        />
 
         <div
           className={styles.feed}

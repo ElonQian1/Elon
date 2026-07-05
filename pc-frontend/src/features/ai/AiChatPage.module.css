@@ -79,6 +79,11 @@
   color: #fff;
 }
 
+.pinnedTool:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
 .pinnedToolPrimary {
   background: rgba(46, 168, 97, .16);
   color: #effff4;
@@ -267,6 +272,10 @@
   white-space: nowrap;
 }
 .topbarBtn:hover { background: rgba(255,255,255,.06); color: #c8ccd4; }
+.topbarBtn:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
 .panelToggleBtn {
   width: 28px;
   padding: 0;
