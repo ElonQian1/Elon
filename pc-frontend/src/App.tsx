@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import Shell from './features/shell/Shell'
 import LoginPage from './features/auth/LoginPage'
 import ConversationPage from './features/conversation/ConversationPage'
@@ -12,26 +12,12 @@ import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
 import NodePage from './features/node/NodePage'
 import DevTasksPage from './features/dev/DevTasksPage'
-import { useAuthStore } from './store/auth'
-
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = useAuthStore((s) => s.token)
-  if (!token) return <Navigate to="/login" replace />
-  return <>{children}</>
-}
 
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <Shell />
-          </ProtectedRoute>
-        }
-      >
+      <Route path="/*" element={<Shell />}>
         {/* 首页：项目对话主视图 */}
         <Route index element={<ConversationPage />} />
         <Route path="ai" element={<AiChatPage />} />
