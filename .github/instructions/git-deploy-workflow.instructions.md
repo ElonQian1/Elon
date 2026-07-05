@@ -330,7 +330,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind N
 - 上传到 `/opt/elon/data/downloads/`，并更新 `/api/node-agent/version` 对应的 `node-agent-version.json`。
 - 默认调用 `/api/admin/nodes/push-update` 广播 `UpdateClient`，在线 Win 节点收到后自动更新、自动重连；离线节点下次启动会读取版本接口补更新。
 
-运行发布脚本需要本机环境变量 `ADMIN_TOKEN` 或 `ELON_ADMIN_TOKEN`。如果只允许上传产物、不允许广播，必须显式传 `-SkipBroadcast`，最终汇报也必须说明“未推送在线节点更新”。
+广播优先使用本机环境变量 `ADMIN_TOKEN` 或 `ELON_ADMIN_TOKEN`；本机没有时，脚本会通过 SSH 在服务器本机读取 `/etc/elon-server.env` 或 `/root/Elon/server/.env` 里的 `ADMIN_TOKEN` 并调用 `127.0.0.1:8080`，token 不回传到发布电脑。如果只允许上传产物、不允许广播，必须显式传 `-SkipBroadcast`，最终汇报也必须说明“未推送在线节点更新”。
 
 ---
 

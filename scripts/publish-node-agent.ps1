@@ -142,6 +142,62 @@ function Invoke-NoProxyJson {
     return Invoke-RestMethod @params
 }
 
+function Invoke-RemoteBash {
+    param([Parameter(Mandatory = $true)][string]$Script)
+
+    $output = $Script | ssh -o ProxyCommand=none $Server "bash -s" 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "服务器远程命令失败($LASTEXITCODE)：$(($output -join "`n").Trim())"
+    }
+    return ($output -join "`n").Trim()
+}
+
+function Test-RemoteNodeAgentAdminToken {
+    $script = @'
+set -euo pipefail
+load_env() {
+  if [ -f "$1" ]; then
+    set -a
+    . "$1" >/dev/null 2>&1 || true
+    set +a
+  fi
+}
+load_env /etc/elon-server.env
+load_env /root/Elon/server/.env
+test -n "${ADMIN_TOKEN:-}"
+'@
+    $output = $script | ssh -o ProxyCommand=none $Server "bash -s" 2>&1
+    if ($LASTEXITCODE -eq 0) { return $true }
+    if ($LASTEXITCODE -eq 1) { return $false }
+    throw "无法检查服务器 ADMIN_TOKEN：$(($output -join "`n").Trim())"
+}
+
+function Invoke-RemoteNodeAgentUpdateBroadcast {
+    $script = @'
+set -euo pipefail
+load_env() {
+  if [ -f "$1" ]; then
+    set -a
+    . "$1" >/dev/null 2>&1 || true
+    set +a
+  fi
+}
+load_env /etc/elon-server.env
+load_env /root/Elon/server/.env
+if [ -z "${ADMIN_TOKEN:-}" ]; then
+  echo "ADMIN_TOKEN missing on server" >&2
+  exit 2
+fi
+curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' \
+  -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+  -H 'Content-Type: application/json' \
+  --data '{}'
+'@
+    $raw = Invoke-RemoteBash -Script $script
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+    return $raw | ConvertFrom-Json
+}
+
 function Resolve-NodeAgentTargetDir {
     $candidates = @()
     if ($env:ELON_NODE_AGENT_TARGET_DIR) {
@@ -179,8 +235,14 @@ foreach ($requiredPath in @(
 }
 
 $BroadcastAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
+$UseRemoteAdminToken = $false
 if (-not $SkipBroadcast -and [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
-    throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，无法调用 /api/admin/nodes/push-update。若只想上传文件请显式传 -SkipBroadcast。"
+    if (Test-RemoteNodeAgentAdminToken) {
+        $UseRemoteAdminToken = $true
+        Write-Host "  本机未设置 ADMIN_TOKEN，将通过服务器本机环境广播更新（token 不回传）。" -ForegroundColor DarkGray
+    } else {
+        throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，且服务器环境未找到 ADMIN_TOKEN。若只想上传文件请显式传 -SkipBroadcast。"
+    }
 }
 
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
@@ -309,7 +371,7 @@ Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
 if ($SkipBroadcast) {
     Write-Host "  已按 -SkipBroadcast 跳过在线节点推送；离线/重启客户端仍会通过版本接口自动更新。" -ForegroundColor Yellow
-} else {
+} elseif (-not [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
     $broadcast = Invoke-NoProxyJson `
         -Uri "$BaseUrl/api/admin/nodes/push-update" `
         -Method "Post" `
@@ -321,6 +383,15 @@ if ($SkipBroadcast) {
         $broadcastTo = [string]$broadcast.broadcast_to
     }
     Write-Host "  已通知在线节点更新：$broadcastTo 个" -ForegroundColor Green
+} elseif ($UseRemoteAdminToken) {
+    $broadcast = Invoke-RemoteNodeAgentUpdateBroadcast
+    $broadcastTo = "unknown"
+    if ($null -ne $broadcast -and ($broadcast.PSObject.Properties.Name -contains "broadcast_to")) {
+        $broadcastTo = [string]$broadcast.broadcast_to
+    }
+    Write-Host "  已通过服务器本机通知在线节点更新：$broadcastTo 个" -ForegroundColor Green
+} else {
+    throw "无法广播在线节点更新：没有可用的本机或服务器 ADMIN_TOKEN。"
 }
 
 Write-Host ""

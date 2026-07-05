@@ -73,7 +73,7 @@
      scripts\publish-node-agent.ps1
      powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind NodeAgent
      ```
-   - `publish-node-agent.ps1` 会构建 Windows 客户端包，上传 `/api/node-agent/version` 指向的新版本，并默认调用 `/api/admin/nodes/push-update` 通知在线节点自动更新；需要 `ADMIN_TOKEN` 或 `ELON_ADMIN_TOKEN`。
+   - `publish-node-agent.ps1` 会构建 Windows 客户端包，上传 `/api/node-agent/version` 指向的新版本，并默认调用 `/api/admin/nodes/push-update` 通知在线节点自动更新；优先使用本机 `ADMIN_TOKEN` / `ELON_ADMIN_TOKEN`，没有时通过 SSH 在服务器本机读取 `ADMIN_TOKEN` 后调用 `127.0.0.1:8080`，token 不回传。
    - 在线节点收到推送后会更新并自动重连；离线节点或未收到推送的节点会在下次启动/更新检查时读取 `/api/node-agent/version` 自动补上。
 
 最终回复必须明确区分：本次是“代码已同步”还是“Win 节点客户端已发布并推送更新”。
