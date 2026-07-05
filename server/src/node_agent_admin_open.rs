@@ -71,6 +71,7 @@ fn auto_open_enabled() -> bool {
     auto_open_enabled_from(std::env::var("NODE_AUTO_OPEN_ADMIN").ok().as_deref())
 }
 
+#[cfg(any(windows, test))]
 fn auto_open_enabled_from(value: Option<&str>) -> bool {
     value
         .map(|value| {
