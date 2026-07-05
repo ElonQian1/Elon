@@ -3273,7 +3273,7 @@ fn main() -> Result<()> {
     #[cfg(windows)]
     {
         let runtime_mode =
-            std::env::args().any(|arg| arg == "--agent-runtime") || running_as_legacy_agent_exe();
+            node_client_launcher::runtime_mode_with_autostart_repair(running_as_legacy_agent_exe());
         if !runtime_mode {
             return node_client_launcher::run();
         }

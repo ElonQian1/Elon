@@ -93,6 +93,36 @@ pub(crate) fn set_autostart_enabled(_install_dir: &std::path::Path, _enabled: bo
     anyhow::bail!("当前平台不支持 Windows 开机自启动设置")
 }
 
+#[cfg(windows)]
+pub(crate) fn runtime_mode_with_autostart_repair(legacy_agent_exe: bool) -> bool {
+    let runtime_mode = std::env::args().any(|arg| arg == AGENT_RUNTIME_ARG) || legacy_agent_exe;
+    if runtime_mode {
+        repair_autostart_on_runtime_start();
+    }
+    runtime_mode
+}
+
+#[cfg(windows)]
+fn repair_autostart_on_runtime_start() {
+    let Ok(install_dir) = paths::install_dir() else {
+        return;
+    };
+    match windows_integration::repair_existing_autostart(&install_dir) {
+        Ok(()) => log_file::record_event(
+            &install_dir,
+            "autostart_runtime_repair",
+            true,
+            "checked existing autostart marker on runtime start",
+        ),
+        Err(error) => log_file::record_event(
+            &install_dir,
+            "autostart_runtime_repair",
+            false,
+            &format!("failed to repair existing autostart marker: {error:#}"),
+        ),
+    }
+}
+
 fn run_command(command: ClientCommand) -> Result<()> {
     match command {
         ClientCommand::Start => {
@@ -309,6 +339,15 @@ mod tests {
 
         assert!(!source.contains(&removed_open_helper));
         assert!(source.contains("避免已有 /pc 工作页重连时又被插入一个重复 tab"));
+    }
+
+    #[test]
+    fn runtime_start_checks_existing_autostart_marker() {
+        let source = include_str!("mod.rs");
+
+        assert!(source.contains("repair_autostart_on_runtime_start"));
+        assert!(source.contains("repair_existing_autostart"));
+        assert!(source.contains("checked existing autostart marker on runtime start"));
     }
 
     #[test]
