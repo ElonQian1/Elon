@@ -31,6 +31,68 @@ mod tests {
     }
 
     #[test]
+    fn custom_project_channels_can_be_created_renamed_and_deleted() {
+        let store = temp_store();
+        let owner = store
+            .create_user("channel-crud-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let project = store
+            .create_project(&owner.id, "Channel CRUD", None, None)
+            .expect("project should be created")
+            .project;
+        let feedback = store
+            .list_project_channel_categories(&project.id)
+            .expect("categories should list")
+            .into_iter()
+            .find(|category| category.kind == "feedback")
+            .expect("feedback category should exist");
+
+        let created = store
+            .create_project_channel(&owner.id, &project.id, "  版本   计划  ", Some(&feedback.id))
+            .expect("channel should be created");
+        assert_eq!(created.name, "版本 计划");
+        assert_eq!(created.category_id.as_deref(), Some(feedback.id.as_str()));
+        assert!(created.kind.starts_with("custom_"));
+
+        let renamed = store
+            .rename_project_channel(&owner.id, &project.id, &created.id, "发布节奏")
+            .expect("channel should rename");
+        assert_eq!(renamed.name, "发布节奏");
+
+        store
+            .delete_project_channel(&project.id, &created.id)
+            .expect("custom channel should delete");
+        assert!(!store
+            .list_project_space_channels(&owner.id, &project.id)
+            .expect("channels should list")
+            .iter()
+            .any(|channel| channel.id == created.id));
+    }
+
+    #[test]
+    fn default_project_channels_cannot_be_deleted() {
+        let store = temp_store();
+        let owner = store
+            .create_user("default-channel-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let project = store
+            .create_project(&owner.id, "Default Channel Guard", None, None)
+            .expect("project should be created")
+            .project;
+        let default_channel = store
+            .list_project_space_channels(&owner.id, &project.id)
+            .expect("channels should list")
+            .into_iter()
+            .find(|channel| channel.kind == "discussion")
+            .expect("discussion channel should exist");
+
+        let err = store
+            .delete_project_channel(&project.id, &default_channel.id)
+            .expect_err("default channel should be protected");
+        assert!(err.to_string().contains("默认频道不能删除"));
+    }
+
+    #[test]
     fn suggestion_message_can_be_marked_updated() {
         let store = temp_store();
         let owner = store

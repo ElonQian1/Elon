@@ -3,11 +3,14 @@ import type { RuntimeRoute } from './runtimeRoutes'
 export interface Project {
   id: string
   name: string
+  display_name?: string | null
   description?: string
   role?: string
   my_role?: string
   template?: string
   source_type?: string
+  repo_url?: string | null
+  branch?: string | null
   workspace_key?: string
   workspace_path?: string | null
   node_id?: string | null
@@ -17,8 +20,12 @@ export interface Project {
   updated_at?: string
   icon?: string           // 已废弃字段，保留兼容
   icon_data_url?: string  // 服务端实际字段
+  gallery_images?: string[]
   member_count?: number
   unread_count?: number
+  is_public?: boolean
+  join_mode?: string
+  last_apk_url?: string | null
 }
 
 export interface Channel {

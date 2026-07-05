@@ -675,7 +675,7 @@ impl Store {
     }
 }
 
-
+mod channel_management;
 mod messages;
 mod permissions;
 #[cfg(test)]

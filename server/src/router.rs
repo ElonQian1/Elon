@@ -18,8 +18,8 @@ use crate::{
     external_app_api, external_app_chat_bootstrap, external_app_mvp_chat, external_app_route_c_sdk,
     external_app_tool_report_api, friend_api, global_ws, group_ai, group_chat_retrieval_api,
     group_summary_api, lan_peer, lm_chat, peer_relay, project_api, project_attachments,
-    project_chat, project_conversation_identity, project_deletion, project_docs, project_git,
-    project_join_requests, project_landing_api, project_membership, project_releases,
+    project_channels, project_chat, project_conversation_identity, project_deletion, project_docs,
+    project_git, project_join_requests, project_landing_api, project_membership, project_releases,
     project_runtime_permission_api, project_space, project_space_task_snapshot,
     project_storage_git, project_store, project_workspace_health, project_workspace_recovery,
     release_claim, server_agent_runtime, speech_translate, token_usage_api, user_api,
@@ -785,7 +785,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/user/:user_id/projects/:project_id/git/config",
             post(project_git::user_project_git_config),
         )
-        .merge(project_releases::routes().merge(crate::project_git_worktree_audit_api::routes()))
+        .merge(project_channels::routes().merge(project_releases::routes()).merge(crate::project_git_worktree_audit_api::routes()))
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
         .route("/app/download", get(web::download_page))
         .route("/download", get(web::download_page))

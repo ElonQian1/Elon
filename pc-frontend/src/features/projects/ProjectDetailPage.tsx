@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { GitBranch } from 'lucide-react'
 import { api } from '../../api/client'
 import GroupAiPanel from '../group-ai/GroupAiPanel'
 import { useProjectStore } from '../conversation/useProjectStore'
-import ProjectReadinessCard from './ProjectReadinessCard'
+import ProjectChannelsTab from './ProjectChannelsTab'
+import ProjectGitSettingsPanel from './ProjectGitSettingsPanel'
+import ProjectReleasesTab from './ProjectReleasesTab'
+import ProjectSettingsTab from './ProjectSettingsTab'
 import WorkspaceAccessPanel from './WorkspaceAccessPanel'
+import WorkspaceStatusTab from './WorkspaceStatusTab'
 import type { ProjectMember, ProjectRole, ProjectRolesResponse } from '../conversation/types'
 import {
   filterMembers,
@@ -18,42 +21,25 @@ import {
   projectMemberHasRolePermission,
   ROLE_PERMISSION_INVITE_MEMBERS,
   ROLE_PERMISSION_MANAGE_MEMBERS,
+  ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS,
   ROLE_PERMISSION_MODERATE_MEMBERS,
   roleLabel,
 } from '../conversation/memberUtils'
 import { useAuthStore } from '../../store/auth'
+import type { WorkspaceHealth } from './projectManagementTypes'
 import styles from './ProjectDetailPage.module.css'
 
-type Tab = 'overview' | 'members' | 'workspace' | 'groupAi'
+type Tab = 'overview' | 'channels' | 'members' | 'workspace' | 'releases' | 'settings' | 'groupAi'
 
-interface WorkspaceHealth {
-  workspace_exists?: boolean
-  git_initialized?: boolean
-  git_remote?: string
-  node_online?: boolean
-  node_id?: string
-  disk_free_bytes?: number
-  issues?: string[]
-  cli_ready?: boolean
-  can_run_on_pc?: boolean
-  verified_can_run_on_pc?: boolean | null
-  warnings?: string[]
-  project?: {
-    workspace_path?: string | null
-    node_id?: string | null
-  }
-  node?: {
-    node_id?: string
-    online?: boolean
-    cli_connected?: boolean
-    cli_project_ready?: boolean
-  } | null
-  live_inspect?: {
-    is_git_worktree?: boolean
-    git_remote_origin?: string | null
-    disk_free_bytes?: number | null
-  } | null
-}
+const DETAIL_TABS: Array<{ key: Tab; label: string }> = [
+  { key: 'overview', label: '概览' },
+  { key: 'channels', label: '频道' },
+  { key: 'members', label: '成员' },
+  { key: 'workspace', label: '工作区' },
+  { key: 'releases', label: '发布/APK' },
+  { key: 'settings', label: '设置' },
+  { key: 'groupAi', label: '群体 AI' },
+]
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -64,6 +50,7 @@ export default function ProjectDetailPage() {
   const space = useProjectStore((s) => s.space)
   const selectProject = useProjectStore((s) => s.selectProject)
   const reloadProjectSpace = useProjectStore((s) => s.reloadProjectSpace)
+  const loadProjects = useProjectStore((s) => s.loadProjects)
 
   const [tab, setTab] = useState<Tab>(() => location.pathname.endsWith('/members') ? 'members' : 'overview')
   const [health, setHealth] = useState<WorkspaceHealth | null>(null)
@@ -78,6 +65,9 @@ export default function ProjectDetailPage() {
   const canInviteMembers = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_INVITE_MEMBERS, fallbackAdmin)
   const canManageMembers = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_MANAGE_MEMBERS, fallbackAdmin)
   const canModerateMembers = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_MODERATE_MEMBERS, fallbackAdmin)
+  const canManageSettings = canUseProjectPermission(currentMember, roles, ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS, fallbackAdmin)
+  const canEditProject = ['owner', 'admin', 'editor'].includes(activeRole)
+  const canDeleteProject = activeRole === 'owner'
 
   useEffect(() => {
     if (id) selectProject(id).catch(() => {})
@@ -154,20 +144,37 @@ export default function ProjectDetailPage() {
       </header>
 
       <nav className={styles.tabs}>
-        {(['overview', 'members', 'workspace', 'groupAi'] as Tab[]).map((key) => (
+        {DETAIL_TABS.map(({ key, label }) => (
           <button
             key={key}
             className={[styles.tab, tab === key ? styles.tabActive : ''].join(' ')}
             onClick={() => switchTab(key)}
             type="button"
           >
-            {{ overview: '概览', members: '成员', workspace: '工作区', groupAi: '群体 AI' }[key]}
+            {label}
           </button>
         ))}
       </nav>
 
       <div className={styles.content}>
         {tab === 'overview' && <OverviewTab project={project} space={space} />}
+        {tab === 'channels' && (
+          <ProjectChannelsTab
+            projectId={id ?? ''}
+            channels={space?.channels ?? []}
+            categories={space?.categories ?? []}
+            canEdit={canEditProject}
+            onChanged={reloadProjectSpace}
+            onOpenChannel={(channelId) => {
+              navigate('/')
+              setTimeout(() => {
+                if (id) useProjectStore.getState().selectProject(id).then(() => {
+                  useProjectStore.getState().selectChannel(channelId)
+                })
+              }, 100)
+            }}
+          />
+        )}
         {tab === 'members' && (
           <MembersTab
             members={memberList}
@@ -193,7 +200,7 @@ export default function ProjectDetailPage() {
                 await loadHealth()
               }}
             />
-            <WorkspaceTab
+            <WorkspaceStatusTab
               projectId={id ?? ''}
               health={health}
               loading={healthLoading}
@@ -210,7 +217,31 @@ export default function ProjectDetailPage() {
                 }, 100)
               }}
             />
+            <ProjectGitSettingsPanel
+              projectId={id ?? ''}
+              currentUserId={currentUserId}
+              canEdit={canEditProject}
+            />
           </>
+        )}
+        {tab === 'releases' && <ProjectReleasesTab projectId={id ?? ''} canEdit={canEditProject} />}
+        {tab === 'settings' && (
+          <ProjectSettingsTab
+            projectId={id ?? ''}
+            project={project}
+            space={space}
+            canEditProject={canEditProject}
+            canManageSettings={canManageSettings}
+            canUpdateBrand={canDeleteProject}
+            canDeleteProject={canDeleteProject}
+            onChanged={async () => {
+              await reloadProjectSpace()
+              await loadProjects()
+            }}
+            onDeleted={() => {
+              loadProjects().finally(() => navigate('/projects'))
+            }}
+          />
         )}
       </div>
     </div>
@@ -226,6 +257,8 @@ function OverviewTab({ project, space }: { project: StoreProject; space: StoreSp
     ['模板', project?.template ?? '-'],
     ['成员数', String(project?.member_count ?? space?.members?.length ?? '-')],
     ['频道数', String(space?.channels?.length ?? '-')],
+    ['可见性', project?.is_public ? `公开 · ${project.join_mode ?? 'open'}` : '私有'],
+    ['Git 仓库', project?.repo_url ?? '-'],
     ['创建时间', project?.created_at ? new Date(project.created_at).toLocaleString('zh-CN') : '-'],
     ['最后更新', project?.updated_at ? new Date(project.updated_at).toLocaleString('zh-CN') : '-'],
   ]
@@ -680,78 +713,4 @@ function projectMemberBatchNote(action: ProjectMemberBatchAction) {
   if (action === 'mute1d') return 'PC 成员管理页批量禁言 1 天'
   if (action === 'unmute') return 'PC 成员管理页批量解禁言'
   return 'PC 成员管理页批量移除'
-}
-
-function WorkspaceTab({ projectId, health, loading, channels, onRefresh, onOpenGitWorktrees, onOpenChannel }: {
-  projectId: string
-  health: WorkspaceHealth | null
-  loading: boolean
-  channels: { id: string; name: string; kind?: string }[]
-  onRefresh: () => void
-  onOpenGitWorktrees: () => void
-  onOpenChannel: (channelId: string) => void
-}) {
-  if (loading) return <div className={styles.loading}>检查工作区状态…</div>
-  if (!health) return (
-    <div className={styles.empty}>
-      无法读取工作区状态
-      <button className={styles.textBtn} style={{ marginLeft: 8 }} onClick={onRefresh} type="button">重试</button>
-    </div>
-  )
-
-  const nodeOnline = health.node_online ?? health.node?.online ?? false
-  const nodeId = health.node_id ?? health.node?.node_id ?? health.project?.node_id ?? '未知'
-  const cliReady = health.cli_ready ?? (health.node?.cli_connected && health.node?.cli_project_ready) ?? health.can_run_on_pc ?? false
-  const diskFreeBytes = health.disk_free_bytes ?? health.live_inspect?.disk_free_bytes ?? undefined
-  const gitInitialized = health.git_initialized ?? health.live_inspect?.is_git_worktree
-  const gitRemote = health.git_remote ?? health.live_inspect?.git_remote_origin ?? undefined
-  const issues = health.issues ?? health.warnings ?? []
-  const rows: [string, string][] = [
-    ['Git 初始化', gitInitialized === false ? '未初始化' : '已初始化'],
-    ['Git 远端', gitRemote ?? '未配置'],
-    ['节点在线', nodeOnline ? '在线' : '离线'],
-    ['节点 ID', nodeId],
-    ['AI Agent', cliReady ? '就绪' : '未就绪'],
-    ['磁盘剩余', diskFreeBytes
-      ? `${(diskFreeBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
-      : '未知'],
-  ]
-
-  return (
-    <div>
-      {/* P2.3：开发就绪进度卡片 */}
-      <ProjectReadinessCard
-        health={health}
-        loading={false}
-        channels={channels}
-        onRefresh={onRefresh}
-        onOpenChannel={onOpenChannel}
-      />
-
-      <div className={styles.tabToolbar}>
-        <span className={styles.tabCount}>工作区详情</span>
-        <div className={styles.workspaceActions}>
-          <button className={styles.textBtn} onClick={onOpenGitWorktrees} disabled={!projectId} type="button">
-            <GitBranch size={14} aria-hidden="true" />
-            <span>Git 现场</span>
-          </button>
-          <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
-        </div>
-      </div>
-      <div className={styles.overviewGrid}>
-        {rows.map(([label, value]) => (
-          <div key={label} className={styles.kv}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
-      {issues.length > 0 && (
-        <div className={styles.issues}>
-          <strong>问题：</strong>
-          {issues.map((issue, i) => <div key={i}>{issue}</div>)}
-        </div>
-      )}
-    </div>
-  )
 }

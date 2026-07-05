@@ -55,11 +55,12 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 项目详情页（概览/成员/工作区/群体 AI Tab）| 🔴 高 | `src/features/projects/ProjectDetailPage.tsx` | ✅ 已完成第一版：`/pc/projects/:id` 已接概览、成员、工作区、群体 AI；项目基础资料编辑、删除和完整设置继续补 |
+| 项目详情页（概览/频道/成员/工作区/发布/设置/群体 AI Tab）| 🔴 高 | `src/features/projects/ProjectDetailPage.tsx` | ✅ 已产品化：详情页已拆为 tab 编排器，频道、成员、工作区/Git、发布/APK、设置、群体 AI 都有入口 |
 | 成员列表 + 邀请 + 移除 | 🟡 中 | `src/features/projects/ProjectDetailPage.tsx::MembersTab` | ✅ 已完成第一版：列表、搜索、筛选、排序、邀请、单个/批量移除、禁言/解禁已在详情页内联实现 |
 | 项目任务进度面板 | 🟡 中 | `src/features/projects/ProjectReadinessCard.tsx`、`src/features/dev/` | 🟡 已有工作区就绪度卡、AI 开发频道入口和项目级任务现场；任务历史/多任务进度仍继续在 dev 面板细化 |
-| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceAccessPanel.tsx` | 🟡 已补本机目录选择、节点重绑、Route A 完全访问确认和健康检查；Git remote/branch 设置继续迁移 |
-| 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ChannelSettings.tsx` | ⬜ 未开始：当前只有频道列表、固定、展开/折叠，缺频道新建、改名、删除和分类设置 |
+| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceAccessPanel.tsx`、`ProjectGitSettingsPanel.tsx` | ✅ 已补本机目录选择、节点重绑、Route A 完全访问确认、健康检查、Git remote/branch 配置和 Deploy Key 管理 |
+| 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ProjectChannelsTab.tsx`、`server/src/project_channels.rs` | ✅ 已完成：支持频道新建、改名、删除自定义频道；默认频道有删除保护，改动后刷新项目空间 |
+| 发布历史 / APK 管理 | 🟢 低 | `src/features/projects/ProjectReleasesTab.tsx`、`server/src/project_releases.rs` | ✅ 已完成第一版：项目详情页可查看 releases、下载 APK、上传 APK 并记录版本/渠道/变更说明 |
 
 ### 阶段 P3 — 个人 AI 对话
 

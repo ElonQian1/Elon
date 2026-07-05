@@ -61,6 +61,7 @@
 /* ── Tabs ── */
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 0;
   padding: 0 22px;
   border-bottom: 1px solid var(--line-soft);
@@ -506,6 +507,230 @@
 }
 .issues strong { display: block; margin-bottom: 6px; font-size: 13px; }
 
+.managementStack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 980px;
+}
+
+.panel,
+.dangerPanel {
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #202126;
+  padding: 14px;
+}
+
+.dangerPanel {
+  border-color: rgba(223, 92, 92, .34);
+  background: rgba(223, 92, 92, .06);
+}
+
+.panelHeader {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.panelHeader > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.panelHeader strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.panelHeader span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.managementForm,
+.settingsForm {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.settingsForm {
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+}
+
+.field,
+.fieldWide,
+.toggleField {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldWide {
+  grid-column: 1 / -1;
+}
+
+.field span,
+.fieldWide span,
+.toggleField span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.toggleField {
+  min-height: 34px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggleField input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--green);
+}
+
+.field input,
+.field select,
+.fieldWide input,
+.fieldWide textarea,
+.rowMain input,
+.monoArea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #1a1c21;
+  color: var(--text);
+  outline: none;
+  font-size: 13px;
+}
+
+.field input,
+.field select,
+.rowMain input {
+  height: 34px;
+  padding: 0 10px;
+}
+
+.fieldWide textarea,
+.monoArea {
+  min-height: 72px;
+  padding: 9px 10px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.monoArea {
+  min-height: 96px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.field input:focus,
+.field select:focus,
+.fieldWide textarea:focus,
+.rowMain input:focus,
+.monoArea:focus {
+  border-color: var(--green);
+}
+
+.galleryGrid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.rowList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rowItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 8px;
+  background: rgba(255,255,255,.025);
+}
+
+.rowMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rowMain strong,
+.rowMain span,
+.rowMain em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowMain strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.rowMain span,
+.rowMain em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.5;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.keyBlock {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.inlineLink {
+  display: inline-flex;
+  margin-top: 8px;
+  color: #9bbcff;
+  font-size: 12px;
+}
+
+.formError,
+.formSuccess,
+.formHint {
+  margin: 8px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.formError { color: var(--red); }
+.formSuccess { color: #4caf78; }
+.settingsForm .formHint { grid-column: 1 / -1; }
+
 .empty { padding: 20px; color: var(--text-muted); font-size: 13px; }
 .loading { padding: 20px; color: var(--text-muted); font-size: 13px; }
 
@@ -526,6 +751,15 @@
   }
   .memberBatchBar > div:last-of-type,
   .memberRowActions {
+    justify-content: flex-start;
+  }
+  .managementForm,
+  .settingsForm,
+  .galleryGrid,
+  .rowItem {
+    grid-template-columns: 1fr;
+  }
+  .rowActions {
     justify-content: flex-start;
   }
 }
