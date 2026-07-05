@@ -298,6 +298,13 @@ async fn restore_from_cloud(
 
 async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoResponse {
     let active = std::env::var("CODEX_HOME").ok().map(PathBuf::from);
+    let active_meta = active
+        .as_ref()
+        .filter(|path| path_in_managed_vault(path))
+        .and_then(|path| read_slot_meta(path).ok().flatten());
+    let cloud_clear =
+        crate::node_agent_codex_vault_emergency::clear_cloud_emergency_lease(&rt, active_meta.as_ref())
+            .await;
     if let Err(error) = safe_remove_all_managed_homes() {
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
@@ -313,6 +320,7 @@ async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoRe
         Json(json!({
             "ok": true,
             "message": "已清理本机保险箱临时 CODEX_HOME。",
+            "cloud_clear": cloud_clear,
             "local": local_status(),
         })),
     )

@@ -41,6 +41,13 @@ pub struct LeaseEmergencyAuthCacheRequest {
     pub failure_reason: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ClearEmergencyLeaseRequest {
+    pub lease_id: Option<String>,
+    pub agent_id: String,
+    pub agent_secret: String,
+}
+
 pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(user) => user,
@@ -270,4 +277,38 @@ pub async fn lease_auth_cache(
         "message": "已租用授权机器人的 Codex 保险箱，应只写入本机节点托管的临时 CODEX_HOME。",
     }))
     .into_response()
+}
+
+pub async fn clear_active_lease(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<ClearEmergencyLeaseRequest>,
+) -> Response {
+    let consumer = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+    };
+    if let Err(error) = verify_node_proof(&state, &consumer.id, &req.agent_id, &req.agent_secret) {
+        return json_error(StatusCode::FORBIDDEN, error.to_string());
+    }
+    match state.store.clear_codex_vault_emergency_lease_for_node(
+        &consumer.id,
+        &req.agent_id,
+        req.lease_id.as_deref(),
+    ) {
+        Ok(Some(lease)) => Json(serde_json::json!({
+            "ok": true,
+            "cleared": true,
+            "lease": lease,
+            "message": "已清除当前节点 Codex 保险箱应急租约。",
+        }))
+        .into_response(),
+        Ok(None) => Json(serde_json::json!({
+            "ok": true,
+            "cleared": false,
+            "message": "当前节点没有需要清除的 Codex 保险箱应急租约。",
+        }))
+        .into_response(),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    }
 }

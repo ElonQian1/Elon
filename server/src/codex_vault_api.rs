@@ -55,6 +55,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/api/me/codex-vault/emergency/lease",
             post(crate::codex_vault_emergency_api::lease_auth_cache),
         )
+        .route(
+            "/api/me/codex-vault/emergency/leases/clear",
+            post(crate::codex_vault_emergency_api::clear_active_lease),
+        )
 }
 
 #[derive(Debug, Deserialize)]

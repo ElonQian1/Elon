@@ -181,6 +181,42 @@ async fn restore_emergency_from_cloud(
     Ok(lease)
 }
 
+pub(crate) async fn clear_cloud_emergency_lease(
+    rt: &Arc<crate::NodeRuntime>,
+    meta: Option<&ManagedSlotMeta>,
+) -> Value {
+    let lease_id = meta.and_then(|meta| meta.lease_id.as_deref());
+    if lease_id.is_none() {
+        return json!({"attempted": false, "reason": "no_active_emergency_lease"});
+    }
+    let creds = match rt.creds().await {
+        Some(creds) => creds,
+        None => return json!({"attempted": false, "reason": "node_not_bound"}),
+    };
+    let token = match creds
+        .user_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        Some(token) => token.to_string(),
+        None => return json!({"attempted": false, "reason": "missing_user_token"}),
+    };
+    let url = format!(
+        "{}/api/me/codex-vault/emergency/leases/clear",
+        rt.cloud_http_url().trim_end_matches('/')
+    );
+    let body = json!({
+        "lease_id": lease_id,
+        "agent_id": creds.agent_id,
+        "agent_secret": creds.agent_secret,
+    });
+    match cloud_post_typed::<Value>(&url, &token, &body).await {
+        Ok(value) => json!({"attempted": true, "ok": true, "response": value}),
+        Err(error) => json!({"attempted": true, "ok": false, "error": error.to_string()}),
+    }
+}
+
 async fn cloud_delete(url: &str, token: &str) -> Result<Value> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(20))

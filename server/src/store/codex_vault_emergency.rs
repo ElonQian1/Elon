@@ -315,6 +315,7 @@ impl Store {
                     "WHERE l.consumer_user_id = ?1
                        AND l.consumer_node_id = ?2
                        AND l.status = 'active'
+                       AND l.cleared_at IS NULL
                        AND l.expires_at > ?3
                      ORDER BY l.leased_at DESC
                      LIMIT 1",
@@ -325,6 +326,66 @@ impl Store {
             )
             .optional()
             .map_err(Into::into)
+    }
+
+    pub fn clear_codex_vault_emergency_lease_for_node(
+        &self,
+        consumer_user_id: &str,
+        consumer_node_id: &str,
+        lease_id: Option<&str>,
+    ) -> Result<Option<CodexVaultEmergencyLeaseRecord>> {
+        let ts = now();
+        let clean_lease_id = clean_optional(lease_id);
+        let conn = self.conn()?;
+        let target: Option<String> = if let Some(lease_id) = clean_lease_id {
+            conn.query_row(
+                "SELECT id
+                   FROM codex_vault_emergency_leases
+                  WHERE id = ?1
+                    AND consumer_user_id = ?2
+                    AND consumer_node_id = ?3
+                    AND status = 'active'
+                    AND cleared_at IS NULL
+                  LIMIT 1",
+                params![lease_id, consumer_user_id, consumer_node_id],
+                |row| row.get(0),
+            )
+            .optional()?
+        } else {
+            conn.query_row(
+                "SELECT id
+                   FROM codex_vault_emergency_leases
+                  WHERE consumer_user_id = ?1
+                    AND consumer_node_id = ?2
+                    AND status = 'active'
+                    AND cleared_at IS NULL
+                  ORDER BY leased_at DESC
+                  LIMIT 1",
+                params![consumer_user_id, consumer_node_id],
+                |row| row.get(0),
+            )
+            .optional()?
+        };
+        let Some(target) = target else {
+            return Ok(None);
+        };
+        let changed = conn.execute(
+            "UPDATE codex_vault_emergency_leases
+                SET status = 'cleared',
+                    cleared_at = ?2,
+                    updated_at = ?2
+              WHERE id = ?1
+                AND consumer_user_id = ?3
+                AND consumer_node_id = ?4
+                AND status = 'active'
+                AND cleared_at IS NULL",
+            params![target, ts, consumer_user_id, consumer_node_id],
+        )?;
+        drop(conn);
+        if changed == 0 {
+            return Ok(None);
+        }
+        self.get_codex_vault_emergency_lease(&target)
     }
 
     pub fn list_codex_vault_emergency_leases(
@@ -572,6 +633,17 @@ mod tests {
             .unwrap()
             .expect("active lease");
         assert_eq!(active.provider_user_id, a.id);
+
+        let cleared = store
+            .clear_codex_vault_emergency_lease_for_node(&b.id, "node-b", Some(&lease.id))
+            .unwrap()
+            .expect("cleared lease");
+        assert_eq!(cleared.status, "cleared");
+        assert!(cleared.cleared_at.is_some());
+        assert!(store
+            .get_active_codex_vault_emergency_lease_for_node(&b.id, "node-b")
+            .unwrap()
+            .is_none());
 
         store
             .attach_codex_vault_emergency_usage(
