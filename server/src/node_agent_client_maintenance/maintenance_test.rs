@@ -20,18 +20,24 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn autostart_command_decode_preserves_unicode_path() {
+    fn autostart_info_decode_preserves_unicode_path() {
         use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 
         let command = r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe""#;
-        let encoded = B64.encode(command.as_bytes());
-
-        assert_eq!(
-            super::decode_autostart_command(&encoded)
-                .unwrap()
-                .as_deref(),
-            Some(command)
+        let encoded = B64.encode(
+            serde_json::json!({
+                "source": "scheduled_task",
+                "command": command,
+                "legacy_detected": true
+            })
+            .to_string()
+            .as_bytes(),
         );
+        let info = super::decode_autostart_info(&encoded).unwrap();
+
+        assert_eq!(info.command.as_deref(), Some(command));
+        assert_eq!(info.source, "scheduled_task");
+        assert!(info.legacy_detected);
     }
 
     #[test]

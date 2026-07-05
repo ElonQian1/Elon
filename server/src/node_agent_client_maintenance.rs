@@ -1,16 +1,9 @@
 // server/src/node_agent_client_maintenance.rs
 
 use axum::{http::StatusCode, Json};
-#[cfg(windows)]
-use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::path::{Path, PathBuf};
 
 #[cfg(windows)]
 use std::process::{Command, Stdio};
@@ -50,9 +43,9 @@ pub(crate) async fn autostart_set_handler(
                     "message".to_string(),
                     Value::String(
                         if req.enabled {
-                            "已开启开机自启动。"
+                            "已开启开机自动守护。"
                         } else {
-                            "已关闭开机自启动。"
+                            "已关闭开机自动守护。"
                         }
                         .to_string(),
                     ),
@@ -115,7 +108,7 @@ pub(crate) async fn repair_handler() -> (StatusCode, Json<Value>) {
                 StatusCode::OK,
                 Json(json!({
                     "ok": true,
-                    "message": "已开始后台修复客户端入口；会重新创建主程序、卸载程序、开始菜单和网页唤起协议。开机自启动只在用户明确开启后保留。"
+                    "message": "已开始后台修复客户端入口；会重新创建主程序、卸载程序、开始菜单和网页唤起协议。已开启的开机守护会保留并迁移为当前用户计划任务。"
                 })),
             )
         }
@@ -182,11 +175,14 @@ fn autostart_status_payload() -> Value {
     #[cfg(windows)]
     {
         let installed = installed_paths();
-        let actual_command = query_autostart_command().unwrap_or(None);
+        let (actual_command, source, legacy_detected) = match query_autostart_info() {
+            Ok(info) => (info.command, info.source, info.legacy_detected),
+            Err(error) => (None, format!("query_error:{error}"), false),
+        };
         let expected_command = installed
             .as_ref()
             .ok()
-            .map(|paths| format!("\"{}\"", paths.client_exe.display()));
+            .map(|paths| format!("\"{}\" --watchdog", paths.client_exe.display()));
         let expected_path = installed
             .as_ref()
             .ok()
@@ -197,15 +193,22 @@ fn autostart_status_payload() -> Value {
             _ => false,
         };
         let summary = if enabled {
-            "开机后会自动启动一龙开发平台。"
+            if source == "scheduled_task" {
+                "开机登录后会通过当前用户计划任务启动后台守护，并自动恢复本机节点。"
+            } else {
+                "检测到旧版开机自启动；修复或更新后会迁移为当前用户计划任务。"
+            }
         } else {
-            "默认不会开机自启动；只有在本页手动开启后才会注册。"
+            "未开启开机自动守护；开启后无需每次手动启动 Win 端。"
         };
         json!({
             "supported": true,
             "enabled": enabled,
-            "source": "hkcu_run",
+            "source": source,
+            "strategy": "current_user_scheduled_task",
+            "task_name": crate::node_client_launcher::AUTOSTART_TASK_NAME,
             "run_value_name": crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME,
+            "legacy_detected": legacy_detected,
             "expected_command": expected_command,
             "actual_command": actual_command,
             "install_error": installed.err().map(|error| error.to_string()),
@@ -218,7 +221,10 @@ fn autostart_status_payload() -> Value {
             "supported": false,
             "enabled": false,
             "source": "unsupported",
+            "strategy": "current_user_scheduled_task",
+            "task_name": "ElonNodeAgent",
             "run_value_name": "ElonNodeAgent",
+            "legacy_detected": false,
             "expected_command": Value::Null,
             "actual_command": Value::Null,
             "install_error": "当前平台不支持 Windows 开机自启动设置。",
@@ -396,7 +402,7 @@ fn maintenance_actions(install: &Value) -> Value {
             "repair_client",
             "repair",
             "修复客户端入口",
-            "重新创建主程序、卸载程序、开始菜单和网页唤起协议；不会默认开启开机自启动。",
+            "重新创建主程序、卸载程序、开始菜单和网页唤起协议；只保留已开启的开机守护。",
             "",
             supported,
             repair_tone,

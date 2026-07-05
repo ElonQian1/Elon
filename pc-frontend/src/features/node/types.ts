@@ -343,7 +343,10 @@ export interface AutostartStatus {
   supported?: boolean
   enabled?: boolean
   source?: string
+  strategy?: string
+  task_name?: string
   run_value_name?: string
+  legacy_detected?: boolean
   expected_command?: string | null
   actual_command?: string | null
   install_error?: string | null

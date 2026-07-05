@@ -2,9 +2,22 @@ use axum::{http::StatusCode, Json};
 #[cfg(windows)]
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde_json::{json, Value};
-use std::{fs::{self, OpenOptions}, io::Write, path::{Path, PathBuf}, time::{SystemTime, UNIX_EPOCH}};
 #[cfg(windows)]
 use std::process::{Command, Stdio};
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+#[cfg(windows)]
+#[derive(Debug, Clone)]
+pub(crate) struct AutostartInfo {
+    pub(crate) source: String,
+    pub(crate) command: Option<String>,
+    pub(crate) legacy_detected: bool,
+}
 
 pub(crate) async fn push_update_from_server(
     cloud_http_url: &str,
@@ -136,7 +149,7 @@ pub(crate) fn spawn_client_action(action: ClientAction) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-pub(crate) fn query_autostart_command() -> Result<Option<String>, String> {
+pub(crate) fn query_autostart_info() -> Result<AutostartInfo, String> {
     let script = autostart_query_script();
     let mut command = Command::new("powershell");
     command.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]);
@@ -154,7 +167,7 @@ pub(crate) fn query_autostart_command() -> Result<Option<String>, String> {
         ));
     }
     let encoded = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    decode_autostart_command(&encoded)
+    decode_autostart_info(&encoded)
 }
 
 #[cfg(windows)]
@@ -166,44 +179,133 @@ pub(crate) fn command_targets_path(command: &str, expected_path: &str) -> bool {
 
 #[cfg(windows)]
 pub(crate) fn autostart_query_script() -> String {
-    format!(
+    let script = format!(
         r#"
 $ErrorActionPreference = 'Stop'
-$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
-$name = '{}'
-$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath)
-if ($null -eq $key) {{ exit 0 }}
-try {{
-  $value = $key.GetValue($name, $null)
-  if ($null -ne $value) {{
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes([string]$value)
-    [Console]::Out.Write([Convert]::ToBase64String($bytes))
+$result = [ordered]@{{
+  source = 'none'
+  command = $null
+  task_name = '{task_name}'
+  run_value_name = '{run_value_name}'
+  legacy_detected = $false
+}}
+function Set-TaskCommand($Task, $Source) {{
+  $actions = @($Task.Actions)
+  if ($actions.Count -eq 0) {{ return }}
+  $action = $actions[0]
+  $execute = [string]$action.Execute
+  $arguments = [string]$action.Arguments
+  if ([string]::IsNullOrWhiteSpace($execute)) {{ return }}
+  if ([string]::IsNullOrWhiteSpace($arguments)) {{
+    $result.command = '"' + $execute + '"'
+  }} else {{
+    $result.command = '"' + $execute + '" ' + $arguments
   }}
-}} finally {{
-  $key.Dispose()
+  $result.source = $Source
+}}
+if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {{
+  $task = Get-ScheduledTask -TaskName '{task_name}' -ErrorAction SilentlyContinue
+  if ($null -ne $task) {{
+    Set-TaskCommand $task 'scheduled_task'
+  }}
+  foreach ($legacyTaskName in @({legacy_task_names})) {{
+    $legacyTask = Get-ScheduledTask -TaskName $legacyTaskName -ErrorAction SilentlyContinue
+    if ($null -ne $legacyTask) {{
+      $result.legacy_detected = $true
+      if ($result.source -eq 'none') {{
+        Set-TaskCommand $legacyTask 'legacy_scheduled_task'
+      }}
+    }}
+  }}
+}}
+$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath)
+if ($null -ne $key) {{
+  try {{
+    foreach ($name in @({run_value_names})) {{
+      $value = $key.GetValue($name, $null)
+      if ($null -ne $value) {{
+        if ($name -ne '{run_value_name}') {{
+          $result.legacy_detected = $true
+        }} elseif ($result.source -eq 'scheduled_task') {{
+          $result.legacy_detected = $true
+        }}
+        if ($result.source -eq 'none') {{
+          $result.source = if ($name -eq '{run_value_name}') {{ 'hkcu_run' }} else {{ 'legacy_hkcu_run' }}
+          $result.command = [string]$value
+        }}
+      }}
+    }}
+  }} finally {{
+    $key.Dispose()
+  }}
 }}
 "#,
-        ps_single_quote(crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME)
+        task_name = ps_single_quote(crate::node_client_launcher::AUTOSTART_TASK_NAME),
+        run_value_name = ps_single_quote(crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME),
+        legacy_task_names =
+            ps_string_array(crate::node_client_launcher::AUTOSTART_LEGACY_TASK_NAMES),
+        run_value_names = ps_string_array(
+            &[
+                &[crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME],
+                crate::node_client_launcher::AUTOSTART_LEGACY_RUN_VALUE_NAMES,
+            ]
+            .concat(),
+        ),
+    );
+    format!(
+        r#"{script}
+$json = $result | ConvertTo-Json -Compress
+$bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+[Console]::Out.Write([Convert]::ToBase64String($bytes))
+"#
     )
 }
 
 #[cfg(windows)]
-pub(crate) fn decode_autostart_command(encoded: &str) -> Result<Option<String>, String> {
+pub(crate) fn decode_autostart_info(encoded: &str) -> Result<AutostartInfo, String> {
     let encoded = encoded.trim();
     if encoded.is_empty() {
-        return Ok(None);
+        return Ok(AutostartInfo {
+            source: "none".to_string(),
+            command: None,
+            legacy_detected: false,
+        });
     }
     let bytes = B64
         .decode(encoded)
         .map_err(|error| format!("开机自启动设置不是合法 base64: {error}"))?;
-    String::from_utf8(bytes)
-        .map(Some)
-        .map_err(|error| format!("开机自启动设置不是 UTF-8: {error}"))
+    let value: Value = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("开机自启动设置不是合法 JSON: {error}"))?;
+    Ok(AutostartInfo {
+        source: value
+            .get("source")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown")
+            .to_string(),
+        command: value
+            .get("command")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        legacy_detected: value
+            .get("legacy_detected")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    })
 }
 
 #[cfg(windows)]
 pub(crate) fn ps_single_quote(value: &str) -> String {
     value.replace('\'', "''")
+}
+
+#[cfg(windows)]
+fn ps_string_array(values: &[&str]) -> String {
+    values
+        .iter()
+        .map(|value| format!("'{}'", ps_single_quote(value)))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub(crate) fn maintenance_paths() -> MaintenancePaths {
@@ -377,4 +479,3 @@ pub(crate) enum ClientAction {
     Update,
     Uninstall,
 }
-

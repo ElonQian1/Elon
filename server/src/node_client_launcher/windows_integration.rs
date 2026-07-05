@@ -8,14 +8,11 @@ use std::path::Path;
 #[cfg(windows)]
 use super::{command as launcher_command, paths, APP_NAME, WATCHDOG_ARG};
 
-#[cfg(windows)]
 pub(crate) const RUN_VALUE_NAME: &str = "ElonNodeAgent";
-#[cfg(windows)]
-const LEGACY_TASK_NAME: &str = "ElonNodeAgentTray";
-#[cfg(windows)]
+pub(crate) const TASK_NAME: &str = "ElonNodeAgent";
+pub(crate) const LEGACY_TASK_NAMES: &[&str] = &["ElonNodeAgentTray"];
 const PROTOCOL_SCHEME: &str = "elon-node";
-#[cfg(windows)]
-const LEGACY_RUN_VALUE_NAMES: &[&str] = &[
+pub(crate) const LEGACY_RUN_VALUE_NAMES: &[&str] = &[
     "ElonNodeAgentTray",
     "ElonNodeClient",
     "一龙PC节点",
@@ -84,16 +81,10 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
-        let value = format!("\"{}\" {}", client.display(), WATCHDOG_ARG);
-        remove_legacy_scheduled_task();
-        remove_legacy_run_values();
+        create_autostart_task(&client)?;
+        remove_known_run_values();
         remove_legacy_startup_shortcuts();
-        let script = set_autostart_value_script(&value);
-        let mut cmd = launcher_command::powershell_hidden_command(&script);
-        let status = launcher_command::status_hidden(&mut cmd).context("无法注册开机自启")?;
-        if !status.success() {
-            anyhow::bail!("注册开机自启失败");
-        }
+        remove_legacy_scheduled_tasks();
     }
     Ok(())
 }
@@ -103,13 +94,8 @@ pub(crate) fn repair_existing_autostart(install_dir: &Path) -> Result<()> {
     let _ = install_dir;
     #[cfg(windows)]
     {
-        let client = paths::client_exe(install_dir);
-        let value = format!("\"{}\" {}", client.display(), WATCHDOG_ARG);
-        let script = repair_existing_autostart_value_script(&value);
-        let mut cmd = launcher_command::powershell_hidden_command(&script);
-        let status = launcher_command::status_hidden(&mut cmd).context("无法修复已有开机自启")?;
-        if !status.success() {
-            anyhow::bail!("修复已有开机自启失败");
+        if autostart_marker_present()? {
+            enable_autostart(install_dir)?;
         }
     }
     Ok(())
@@ -240,17 +226,9 @@ pub(crate) fn remove_url_protocol() {
 pub(crate) fn disable_autostart() {
     #[cfg(windows)]
     {
-        let mut cmd = launcher_command::silent_command("reg");
-        cmd.args([
-            "delete",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            RUN_VALUE_NAME,
-            "/f",
-        ]);
-        let _ = launcher_command::status_hidden(&mut cmd);
-        remove_legacy_run_values();
-        remove_legacy_scheduled_task();
+        remove_scheduled_task(TASK_NAME);
+        remove_legacy_scheduled_tasks();
+        remove_known_run_values();
         remove_legacy_startup_shortcuts();
     }
 }
@@ -328,53 +306,103 @@ fn start_menu_shortcut_ps_items() -> String {
 }
 
 #[cfg(windows)]
-fn set_autostart_value_script(value: &str) -> String {
-    format!(
-        r#"
-$ErrorActionPreference = 'Stop'
-$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
-$name = '{}'
-$value = '{}'
-$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($keyPath)
-try {{
-  $key.SetValue($name, $value, [Microsoft.Win32.RegistryValueKind]::String)
-}} finally {{
-  if ($null -ne $key) {{ $key.Dispose() }}
-}}
-"#,
-        launcher_command::ps_single_quote(RUN_VALUE_NAME),
-        launcher_command::ps_single_quote(value)
-    )
-}
-
-#[cfg(windows)]
-fn repair_existing_autostart_value_script(value: &str) -> String {
-    format!(
-        r#"
-$ErrorActionPreference = 'Stop'
-$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
-$name = '{}'
-$expected = '{}'
-$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath, $true)
-if ($null -eq $key) {{ return }}
-try {{
-  $actual = $key.GetValue($name, $null, [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-  if ($null -ne $actual -and ([string]$actual) -ne $expected) {{
-    $key.SetValue($name, $expected, [Microsoft.Win32.RegistryValueKind]::String)
-  }}
-}} finally {{
-  if ($null -ne $key) {{ $key.Dispose() }}
-}}
-"#,
-        launcher_command::ps_single_quote(RUN_VALUE_NAME),
-        launcher_command::ps_single_quote(value)
-    )
-}
-
-#[cfg(windows)]
-fn remove_legacy_scheduled_task() {
+fn create_autostart_task(client: &Path) -> Result<()> {
     let mut cmd = launcher_command::silent_command("schtasks");
-    cmd.args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"]);
+    let task_run = autostart_task_run_command(client);
+    cmd.args([
+        "/Create", "/TN", TASK_NAME, "/SC", "ONLOGON", "/TR", &task_run, "/RL", "LIMITED", "/F",
+    ]);
+    let status =
+        launcher_command::status_hidden(&mut cmd).context("无法注册当前用户开机计划任务")?;
+    if !status.success() {
+        anyhow::bail!("注册当前用户开机计划任务失败");
+    }
+    Ok(())
+}
+
+#[cfg(any(windows, test))]
+fn autostart_task_run_command(client: &Path) -> String {
+    format!("\"{}\" {}", client.display(), WATCHDOG_ARG)
+}
+
+#[cfg(windows)]
+fn autostart_marker_present() -> Result<bool> {
+    let script = autostart_marker_probe_script();
+    let mut cmd = launcher_command::powershell_hidden_command(&script);
+    let output = launcher_command::output_hidden(&mut cmd).context("无法读取已有开机自启设置")?;
+    if !output.status.success() {
+        anyhow::bail!("读取已有开机自启设置失败");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).contains("present"))
+}
+
+#[cfg(any(windows, test))]
+fn autostart_marker_probe_script() -> String {
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+if (Get-Command Get-ScheduledTask -ErrorAction SilentlyContinue) {{
+  foreach ($taskName in @({task_names})) {{
+    if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {{
+      [Console]::Out.Write('present')
+      exit 0
+    }}
+  }}
+}}
+$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath)
+if ($null -ne $key) {{
+  try {{
+    foreach ($name in @({run_value_names})) {{
+      if ($null -ne $key.GetValue($name, $null)) {{
+        [Console]::Out.Write('present')
+        exit 0
+      }}
+    }}
+  }} finally {{
+    $key.Dispose()
+  }}
+}}
+$startup = [Environment]::GetFolderPath('Startup')
+if (Test-Path -LiteralPath $startup) {{
+  foreach ($shortcut in @('一龙开发平台.lnk','一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk')) {{
+    if (Test-Path -LiteralPath (Join-Path $startup $shortcut)) {{
+      [Console]::Out.Write('present')
+      exit 0
+    }}
+  }}
+}}
+"#,
+        task_names = ps_string_array(&[&[TASK_NAME], LEGACY_TASK_NAMES].concat()),
+        run_value_names = ps_string_array(&[&[RUN_VALUE_NAME], LEGACY_RUN_VALUE_NAMES].concat()),
+    )
+}
+
+#[cfg(any(windows, test))]
+fn ps_string_array(values: &[&str]) -> String {
+    values
+        .iter()
+        .map(|value| format!("'{}'", ps_single_quote_for_script(value)))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+#[cfg(any(windows, test))]
+fn ps_single_quote_for_script(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
+#[cfg(windows)]
+fn remove_legacy_scheduled_tasks() {
+    for name in LEGACY_TASK_NAMES {
+        remove_scheduled_task(name);
+    }
+}
+
+#[cfg(windows)]
+fn remove_scheduled_task(name: &str) {
+    let mut cmd = launcher_command::silent_command("schtasks");
+    cmd.args(["/Delete", "/TN", name, "/F"]);
     let _ = launcher_command::status_hidden(&mut cmd);
 }
 
@@ -409,45 +437,48 @@ mod tests {
             .any(|spec| matches!(spec.target, ShortcutTarget::Uninstall)));
     }
 
-    #[cfg(windows)]
     #[test]
-    fn autostart_script_writes_unicode_registry_value_without_reg_exe() {
-        let script = super::set_autostart_value_script(
+    fn autostart_task_targets_installed_client_watchdog() {
+        let command = super::autostart_task_run_command(std::path::Path::new(
+            r"C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe",
+        ));
+
+        assert_eq!(
+            command,
             r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe" --watchdog"#,
         );
-
-        assert!(script.contains("[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey"));
-        assert!(script.contains("SetValue($name, $value"));
-        assert!(script.contains("一龙开发平台.exe"));
-        assert!(!script.contains("reg add"));
     }
 
-    #[cfg(windows)]
     #[test]
-    fn repair_existing_autostart_script_does_not_create_missing_value() {
-        let script = super::repair_existing_autostart_value_script(
-            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe" --watchdog"#,
-        );
+    fn autostart_repair_probe_checks_tasks_and_legacy_run_values() {
+        let script = super::autostart_marker_probe_script();
 
-        assert!(script.contains("OpenSubKey($keyPath, $true)"));
-        assert!(script.contains("$null -ne $actual"));
+        assert!(script.contains("Get-ScheduledTask"));
+        assert!(script.contains("ElonNodeAgent"));
+        assert!(script.contains("CurrentVersion\\Run"));
         assert!(!script.contains("CreateSubKey"));
     }
 }
 
 #[cfg(windows)]
-fn remove_legacy_run_values() {
+fn remove_known_run_values() {
+    remove_run_value(RUN_VALUE_NAME);
     for value_name in LEGACY_RUN_VALUE_NAMES {
-        let mut cmd = launcher_command::silent_command("reg");
-        cmd.args([
-            "delete",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            value_name,
-            "/f",
-        ]);
-        let _ = launcher_command::status_hidden(&mut cmd);
+        remove_run_value(value_name);
     }
+}
+
+#[cfg(windows)]
+fn remove_run_value(value_name: &str) {
+    let mut cmd = launcher_command::silent_command("reg");
+    cmd.args([
+        "delete",
+        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+        "/v",
+        value_name,
+        "/f",
+    ]);
+    let _ = launcher_command::status_hidden(&mut cmd);
 }
 
 #[cfg(windows)]

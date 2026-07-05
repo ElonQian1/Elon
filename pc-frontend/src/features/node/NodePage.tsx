@@ -14,17 +14,12 @@ import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { createCodexVaultEmergencyActions } from './codexVaultEmergencyActions'
+import { autostartSummaryLabel } from './autostartStatusModel'
 import { useUserProgression } from '../billing/useUserProgression'
 import type { UserProgressionSummary } from '../billing/progressionApi'
 import { safeNodeAdminUrl } from '../../lib/utils'
 import { useAuthStore } from '../../store/auth'
-import type {
-  AutostartStatus,
-  CodexVaultStatusResponse,
-  LocalCliToolStatus,
-  LocalNodeStatus,
-  NodeSummary,
-} from './types'
+import type { AutostartStatus, CodexVaultStatusResponse, LocalCliToolStatus, LocalNodeStatus, NodeSummary } from './types'
 import styles from './NodePage.module.css'
 
 const MARKET_VIEW = '__node_market__'
@@ -421,7 +416,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         body: JSON.stringify({ enabled: nextEnabled }),
       })
       setAutostart(data)
-      setResult(data.message || (nextEnabled ? '已开启开机自启动。' : '已关闭开机自启动。'))
+      setResult(data.message || (nextEnabled ? '已开启开机自动守护。' : '已关闭开机自动守护。'))
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -433,7 +428,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     setRepairBusy(true); setResult(''); setError('')
     try {
       const data = await nodeApi<{ message?: string }>(adminUrl, '/api/client-maintenance/repair', { method: 'POST' }, 12000)
-      setResult(data.message || '已开始修复客户端入口，会重新创建网页唤起协议；开机自启动需要手动开启。')
+      setResult(data.message || '已开始修复客户端入口；如果已开启开机自动守护，会保留并迁移为当前用户计划任务。')
       window.setTimeout(() => { void loadAutostart(); void refreshStatus(true) }, 2500)
     } catch (err) { setError((err as Error).message) } finally { setRepairBusy(false) }
   }
@@ -454,7 +449,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           ['登录', status.logged_in ? '已登录' : '未登录'],
           ['节点 ID', status.agent_id ?? '登录后自动生成'],
           ['版本', status.version ?? '未知'],
-          ['开机自启动', autostart?.enabled ? '已开启' : autostart ? '未开启' : '检测中'],
+          ['开机守护', autostartSummaryLabel(autostart)],
           ['可执行CLI', uniqueCliNames.length ? uniqueCliNames.join('、') : '未检测到 Codex/Copilot'],
           ['本机模型', localModelCount ? `${localModelCount} 个` : '未检测到'],
         ].map(([k, v]) => (
@@ -501,7 +496,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           title="配置开机自启动"
         >
           <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
-          {autostart?.enabled ? '关闭开机自启动' : '开启开机自启动'}
+          {autostart?.enabled ? '关闭开机守护' : '开启开机守护'}
         </button>
         <button className={styles.btn} onClick={repairClientEntry} disabled={repairBusy}>
           {repairBusy ? '修复中…' : '修复客户端入口'}
@@ -514,7 +509,10 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         </button>
       </div>
       {autostart?.summary && <p className={styles.hintLine}>{autostart.summary}</p>}
-      <p className={styles.hintLine}>安装和修复不会默认写入开机自启动；需要常驻时请在这里手动开启。</p>
+      {autostart?.legacy_detected && (
+        <p className={styles.hintLine}>检测到旧版自启残留，下一次修复或更新会迁移为当前用户计划任务。</p>
+      )}
+      <p className={styles.hintLine}>开启一次后，Windows 登录时会拉起后台守护层并自动恢复本机节点；修复流程不会在未开启时新增自启。</p>
       {result && <p className={styles.resultOk}>{result}</p>}
       {error && <p className={styles.resultErr}>{error}</p>}
     </div>
