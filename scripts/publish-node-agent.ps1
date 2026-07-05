@@ -174,15 +174,13 @@ function Invoke-RemoteBashRaw {
 function Test-RemoteNodeAgentAdminToken {
     $script = @'
 set -eu
-load_env() {
-  if [ -f "$1" ]; then
+for env_file in /etc/elon-server.env /root/Elon/server/.env; do
+  if [ -f "$env_file" ]; then
     set -a
-    . "$1" >/dev/null 2>&1 || true
+    . "$env_file" >/dev/null 2>&1 || true
     set +a
   fi
-}
-load_env /etc/elon-server.env
-load_env /root/Elon/server/.env
+done
 test -n "${ADMIN_TOKEN:-}"
 '@
     $result = Invoke-RemoteBashRaw -Script $script
@@ -194,15 +192,13 @@ test -n "${ADMIN_TOKEN:-}"
 function Invoke-RemoteNodeAgentUpdateBroadcast {
     $script = @'
 set -eu
-load_env() {
-  if [ -f "$1" ]; then
+for env_file in /etc/elon-server.env /root/Elon/server/.env; do
+  if [ -f "$env_file" ]; then
     set -a
-    . "$1" >/dev/null 2>&1 || true
+    . "$env_file" >/dev/null 2>&1 || true
     set +a
   fi
-}
-load_env /etc/elon-server.env
-load_env /root/Elon/server/.env
+done
 if [ -z "${ADMIN_TOKEN:-}" ]; then
   echo "ADMIN_TOKEN missing on server" >&2
   exit 2
