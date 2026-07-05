@@ -596,25 +596,35 @@
 .ownRow .messageContent {
   display: inline-block;
   padding: 8px 11px;
-  border: 1px solid rgba(88, 190, 106, .26);
+  border: 1px solid transparent;
   border-radius: 8px 8px 2px 8px;
-  background: var(--surface-2);
-  color: var(--text);
+  background: transparent;
+  color: var(--text-soft);
   text-align: left;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .14);
+  box-shadow: none;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
 .messageContent.aiContent { color: var(--text-soft); }
 .aiRow .messageContent {
   display: inline-block;
   padding: 8px 11px;
-  border: 1px solid rgba(255, 255, 255, .08);
+  border: 1px solid transparent;
   border-radius: 8px 8px 8px 2px;
-  background: #1b1c20;
+  background: transparent;
   color: var(--text-soft);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .12);
+  box-shadow: none;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
-.messageRow:hover .messageContent {
+.ownRow:hover .messageContent,
+.ownRow:focus-within .messageContent {
+  border-color: rgba(88, 190, 106, .24);
+  background: rgba(88, 190, 106, .09);
+  color: var(--text);
+}
+.aiRow:hover .messageContent,
+.aiRow:focus-within .messageContent {
   border-color: rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .04);
 }
 
 /* Markdown 消息：去掉 pre-wrap，交给 MarkdownContent 组件处理 */

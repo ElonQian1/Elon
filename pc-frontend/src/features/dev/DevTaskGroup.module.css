@@ -29,7 +29,7 @@
 }
 
 .userMeta strong {
-  color: #b9f4ca;
+  color: var(--text);
   font-size: 12px;
   font-weight: 650;
 }
@@ -52,22 +52,30 @@
 .userBubble {
   max-width: 100%;
   padding: 8px 11px;
-  border: 1px solid rgba(46, 168, 97, .34);
+  border: 1px solid transparent;
   border-radius: 8px 8px 2px 8px;
-  background: rgba(46, 168, 97, .18);
-  color: #effff4;
+  background: transparent;
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.48;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .14);
+  box-shadow: none;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.thread:hover .userBubble,
+.thread:focus-within .userBubble {
+  border-color: rgba(46, 168, 97, .24);
+  background: rgba(46, 168, 97, .09);
+  color: var(--text);
 }
 
 .processPanel {
   width: min(760px, calc(100% - 106px));
   margin: -1px 72px 0 44px;
   padding-left: 10px;
-  border-left: 1px solid rgba(148, 163, 184, .16);
+  border-left: 1px solid rgba(148, 163, 184, .09);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -79,8 +87,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, .028);
-  border: 1px solid rgba(148, 163, 184, .10);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 7px;
   color: var(--text-muted);
   font-size: 11.5px;
@@ -94,13 +102,13 @@
   flex: 1 1 320px;
   min-width: 0;
   cursor: pointer;
-  transition: color .1s;
+  transition: color .12s ease, background .12s ease, border-color .12s ease;
 }
 
 .processToggle:hover {
   color: var(--text-soft);
-  background: rgba(255, 255, 255, .045);
-  border-color: rgba(148, 163, 184, .18);
+  background: rgba(255, 255, 255, .032);
+  border-color: rgba(148, 163, 184, .14);
 }
 
 .processDot {
@@ -280,7 +288,7 @@
 }
 
 .assistantMeta strong {
-  color: #c9d8ff;
+  color: var(--text);
   font-size: 12px;
   font-weight: 650;
 }
@@ -293,15 +301,23 @@
 .assistantBubble {
   display: inline-block;
   padding: 9px 11px;
-  border: 1px solid rgba(96, 139, 214, .25);
+  border: 1px solid transparent;
   border-radius: 8px 8px 8px 2px;
-  background: rgba(55, 69, 102, .38);
-  color: #e5edff;
+  background: transparent;
+  color: var(--text-soft);
   font-size: 13px;
   line-height: 1.52;
   white-space: pre-wrap;
   word-break: break-word;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, .12);
+  box-shadow: none;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+
+.thread:hover .assistantBubble,
+.thread:focus-within .assistantBubble {
+  border-color: rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .04);
+  color: var(--text-soft);
 }
 
 .processingBubble {
@@ -354,13 +370,27 @@
 }
 
 .replyFailed {
-  border-color: rgba(218, 55, 60, .32);
-  background: rgba(218, 55, 60, .08);
+  border-color: transparent;
+  background: transparent;
+  color: #ffb1b4;
 }
 
 .replyCanceled {
-  border-color: rgba(136, 136, 136, .28);
-  background: rgba(136, 136, 136, .08);
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.thread:hover .replyFailed,
+.thread:focus-within .replyFailed {
+  border-color: rgba(218, 55, 60, .28);
+  background: rgba(218, 55, 60, .07);
+}
+
+.thread:hover .replyCanceled,
+.thread:focus-within .replyCanceled {
+  border-color: rgba(136, 136, 136, .24);
+  background: rgba(136, 136, 136, .06);
 }
 
 @media (max-width: 780px) {
