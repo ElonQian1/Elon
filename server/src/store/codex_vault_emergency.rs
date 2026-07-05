@@ -177,6 +177,7 @@ impl Store {
                 ],
             )?;
         }
+        drop(conn);
         self.get_codex_vault_emergency_grant(&id)?
             .ok_or_else(|| anyhow!("应急授权保存后无法读取"))
     }

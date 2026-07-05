@@ -237,14 +237,16 @@ impl Store {
         node_id: Option<&str>,
     ) -> Result<()> {
         let now = now();
-        let conn = self.conn()?;
-        conn.execute(
-            "UPDATE user_codex_credentials
-                SET last_lease_at = ?2,
-                    updated_at = ?2
-              WHERE user_id = ?1",
-            params![user_id, now],
-        )?;
+        {
+            let conn = self.conn()?;
+            conn.execute(
+                "UPDATE user_codex_credentials
+                    SET last_lease_at = ?2,
+                        updated_at = ?2
+                  WHERE user_id = ?1",
+                params![user_id, now],
+            )?;
+        }
         self.record_codex_vault_event(user_id, "lease", node_id, true, None)
     }
 
