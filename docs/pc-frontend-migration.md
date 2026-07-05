@@ -1,12 +1,14 @@
 # PC 工作台前端迁移路线
 
 > 本文记录 `/pc` PC 工作台从原生静态 HTML/CSS/JS 迁移到 `Vite + React + TypeScript` 的路线、边界和模块状态。硬规则见 `.github/instructions/pc-frontend-migration.instructions.md`。
+>
+> 最后状态校准：2026-07-06
 
 ## 当前判断
 
-- 当前 PC 工作台是后端内嵌静态资源：`server/src/assets/pc_app.html` 通过多个 `pc_*.js/css` 模块组成，服务端在 `server/src/web.rs` 用 `include_str!` 编译进 Rust binary，并在 `server/src/router.rs` 暴露 `/pc` 和 `/assets/pc_*`。
-- 当前方式能继续支撑修复和小功能，但复杂状态、组件复用、类型检查和自动化验证已经接近维护临界点。
-- 新 PC 功能应进入 `pc-frontend/`，旧 `pc_*` 静态资产只做修复、桥接和迁移删除。
+- `/pc` 已切到 `pc-frontend/` 的 Vite + React + TypeScript 前端，构建产物由服务器 `$DATA_DIR/pc-next-dist/` 托管。
+- 旧 `server/src/assets/pc_*.html/js/css` 源码和旧 `/assets/pc_*` 路由已经删除；`/pc-legacy` 只作为发布脚本从历史提交导出的只读对照快照。
+- 本文现在主要用于记录 PC 前端模块真实状态、剩余缺口和后续协作边界；新 PC 功能继续进入 `pc-frontend/src/features/`。
 
 ## 目标形态
 
@@ -28,13 +30,13 @@ server/src/
   router.rs   # 注册路由
 ```
 
-迁移完成后，`/pc` 指向新前端；旧 `server/src/assets/pc_*.html/js/css` 删除或只保留短期 `/pc-legacy`，最终归零。
+迁移主线已经完成：`/pc` 指向新前端；旧 `server/src/assets/pc_*.html/js/css` 已删除；`/pc-legacy` 仅保留为只读对照，不恢复旧源码。
 
 ## 分阶段迁移计划（长远路线图）
 
 > 每阶段完成后更新下方状态表。单次 AI 任务只迁移一个明确模块。
 
-### 阶段 P1 — 对话核心补全（当前优先）
+### 阶段 P1 — 对话核心补全
 
 目标：让 `/pc` 的消息体验与旧版对齐。
 
@@ -53,11 +55,11 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 项目详情页（概览/设置/成员 Tab）| 🔴 高 | `src/features/projects/ProjectDetailPage.tsx` | ⬜ 未开始 |
-| 成员列表 + 邀请 + 移除 | 🟡 中 | `src/features/projects/MemberPanel.tsx` | ⬜ 未开始 |
-| 项目任务进度面板 | 🟡 中 | `src/features/projects/ProjectReadiness.tsx` | ⬜ 未开始 |
-| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceAccessPanel.tsx` | 🟡 已补本机目录选择、节点重绑与 Route A 完全访问确认；Git 设置继续迁移 |
-| 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ChannelSettings.tsx` | ⬜ 未开始 |
+| 项目详情页（概览/成员/工作区/群体 AI Tab）| 🔴 高 | `src/features/projects/ProjectDetailPage.tsx` | ✅ 已完成第一版：`/pc/projects/:id` 已接概览、成员、工作区、群体 AI；项目基础资料编辑、删除和完整设置继续补 |
+| 成员列表 + 邀请 + 移除 | 🟡 中 | `src/features/projects/ProjectDetailPage.tsx::MembersTab` | ✅ 已完成第一版：列表、搜索、筛选、排序、邀请、单个/批量移除、禁言/解禁已在详情页内联实现 |
+| 项目任务进度面板 | 🟡 中 | `src/features/projects/ProjectReadinessCard.tsx`、`src/features/dev/` | 🟡 已有工作区就绪度卡、AI 开发频道入口和项目级任务现场；任务历史/多任务进度仍继续在 dev 面板细化 |
+| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceAccessPanel.tsx` | 🟡 已补本机目录选择、节点重绑、Route A 完全访问确认和健康检查；Git remote/branch 设置继续迁移 |
+| 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ChannelSettings.tsx` | ⬜ 未开始：当前只有频道列表、固定、展开/折叠，缺频道新建、改名、删除和分类设置 |
 
 ### 阶段 P3 — 个人 AI 对话
 
@@ -65,9 +67,9 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 个人 AI 会话列表（`/api/me/ai/conversations`）| 🔴 高 | `src/features/ai/AiConversationList.tsx` | ⬜ 未开始 |
-| AI 会话消息页 | 🔴 高 | `src/features/ai/AiChatPage.tsx` | ⬜ 未开始 |
-| 会话历史分页加载 | 🟡 中 | `src/features/ai/` | ⬜ 未开始 |
+| 个人 AI 会话列表（`/api/me/ai/conversations`）| 🔴 高 | `src/features/ai/AiChatPage.tsx` | ✅ 已完成第一版：`/pc/ai` 读取 `/api/me/ai/conversations?limit=50`，按项目分组展示历史会话 |
+| AI 会话消息页 | 🔴 高 | `src/features/ai/AiChatPage.tsx` | ✅ 已完成第一版：支持消息读取、发送、节点状态提示、快捷工具和 Codex 保险箱快捷动作 |
+| 会话历史分页加载 | 🟡 中 | `src/features/ai/AiChatPage.tsx` | 🟡 部分完成：会话和消息使用固定 `limit`，侧栏有展开/折叠；缺真正分页、加载更多和增量刷新 |
 
 ### 阶段 P4 — 好友 & 社交
 
@@ -90,9 +92,9 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 账号信息 + 修改密码 | 🟡 中 | `src/features/account/AccountPage.tsx` | ⬜ 未开始 |
+| 账号信息 + 修改密码 | 🟡 中 | `src/features/account/AccountPage.tsx` | 🟡 部分完成：账号信息、头像展示和昵称修改已完成；修改密码入口仍未补 |
 | 绑定手机/邮箱 | 🟢 低 | `src/features/account/` | ⬜ 未开始 |
-| 积分/余额查看 | 🟢 低 | `src/features/billing/BillingPage.tsx` | ⬜ 未开始 |
+| 积分/余额查看 | 🟢 低 | `src/features/account/AccountPage.tsx`、`src/features/billing/` | 🟡 部分完成：账号页已展示余额、试用额度和最近账单；独立账单分页/充值页继续补 |
 
 ### 阶段 P7 — 移动端适配 & 收尾
 
@@ -107,7 +109,7 @@ server/src/
 ## 执行原则
 
 1. **每次只做一个任务**：单次 AI 对话只迁移上表中一个模块，完成后更新状态为 ✅
-2. **先 P1，再 P2**：对话核心不完整时不开始项目管理
+2. **优先补真实缺口**：P1 对话核心已基本迁移，后续优先处理任务终态细化、项目设置、频道管理、AI 会话分页和移动端适配
 3. **有 API 先看路由**：开始前先查 `server/src/router.rs` 确认 API 端点
 4. **实时刷新复用**：`/ws/app` 消息先进入 `src/features/realtime/`，统一标准化为公开事件和资源 key；页面模块只声明自己关心的资源，并用共享刷新 hook 触发加载
 5. **Markdown 统一**：渲染逻辑放 `src/features/markdown/`，不在各页面各自实现
@@ -129,15 +131,14 @@ PC 前端动态刷新分三层，后续新增模块必须接入这条链路，�
 
 ---
 
-## 下一步行动
+## 下一步行动（状态校准后）
 
-**P1.1：Markdown 渲染** — 这是当前最高优先级，AI 回复纯文本严重影响体验。
-实现计划：
-- 安装 `marked` 或 `marked-react`
-- 创建 `src/features/markdown/MarkdownContent.tsx`
-- 在 `ConversationPage` 的 MessageItem 中集成
+当前不再把 P1.1 Markdown 渲染作为最高优先级；它已经完成。后续优先级按真实缺口排列：
 
-说"开始P1.1"即可直接实施。
+1. P1.7：继续细化 `task_done`、任务终态、恢复态和公开过程 UI 的实测验收。
+2. P2：补项目基础资料设置、项目删除/转让、频道新建/改名/删除和 Git remote/branch 设置。
+3. P3：补个人 AI 会话真正分页、加载更多、增量刷新和大历史检索。
+4. P7：补移动端响应式、键盘快捷键和 PWA 细节。
 
 - **全部 11 个旧 `pc_*` 模块迁移完成，27 个旧资产文件已删除**
 - `/pc` 现在直接指向新 Vite + React + TypeScript 前端（ServeDir from `$DATA_DIR/pc-next-dist/`）
@@ -158,29 +159,29 @@ PC 前端动态刷新分三层，后续新增模块必须接入这条链路，�
 | `/web` | 移动网页版（不变） |
 | `/` | 移动网页版（不变） |
 
-## 路由策略
+## 路由策略（历史阶段状态）
 
 | 阶段 | `/pc` | `/pc-next` | `/pc-legacy` |
 |---|---|---|---|
-| **准备期** ✅ | 旧原生 PC | 新前端（ServeDir 从 `$DATA_DIR/pc-next-dist/` 服务） | 无 |
-| 并行期 | 旧原生 PC | 新前端主要迁移入口 | 无 |
-| 切换期 | 新前端 | 新前端同源或重定向 | 旧原生 PC |
-| 收尾期 | 新前端 | 可重定向到 `/pc` | 删除 |
+| 准备期 | ✅ 已完成，历史状态为旧原生 PC | ✅ 已完成，历史状态为新前端验证入口 | 无 |
+| 并行期 | ✅ 已结束 | ✅ 已结束 | 无 |
+| 切换期 | ✅ 已完成，新前端成为主入口 | ✅ 保留同源别名 | ✅ 旧版快照可对照 |
+| 收尾期 | ✅ 当前状态，新前端主入口 | ✅ 当前状态，兼容别名 | 🟡 只读对照快照，后续可按需要下线 |
 
-## 模块迁移顺序
+## 旧模块收口状态
 
-| 模块 | 当前旧入口 | 目标状态 | 备注 |
+| 模块 | 原旧入口 | 当前状态 | 备注 |
 |---|---|---|---|
-| 应用壳、侧边栏、频道列表 | `pc_app.html`、`pc_app.js` | 未开始 | 新前端先建立壳和路由 |
-| 登录、注册、账号菜单 | `pc_app.js` | 未开始 | 可优先迁移为独立 auth feature |
-| 模型选择 | `pc_app_models.js`、`pc_app_models.css` | 未开始 | 状态清晰，适合早期迁移 |
-| 项目中心、新建项目 | `pc_app_project_create.js`、`pc_app.js` | 未开始 | 迁移后旧项目创建弹窗应删除 |
-| 项目广场 | `pc_app.js` | 未开始 | 注意与移动 `project_plaza.js` 区分 |
-| AI 开发任务消息、审批、取消 | `pc_app_dev_tasks.js`、`pc_app_agent_runs.js`、`pc_app_task_snapshots.js` | 未开始 | 复杂度最高，应在新前端有稳定数据层后迁移 |
-| 本机节点和客户端维护 | `pc_app_node.js`、`pc_app_node_admin.js`、`pc_app_client_maintenance.js` | 未开始 | 涉及 `elon-node://` 和本机 API，要保留兼容测试 |
-| 电脑医生 | `pc_app_doctor.js` | 未开始 | 可作为独立 feature 迁移 |
-| AI 声音/TTS | `pc_voice_project.js` | 未开始 | 与 `voice_tts_sdk.js` 边界要明确 |
-| 通知 | `pc_app_notifications.js` | 未开始 | 可先保留为共享桥接，再迁移到新前端 |
+| 应用壳、侧边栏、频道列表 | `pc_app.html`、`pc_app.js` | ✅ 已迁移到 `Shell`、`ConversationPage`、`ChannelNavList` | 频道固定、展开/折叠已在新前端维护 |
+| 登录、注册、账号菜单 | `pc_app.js` | ✅ 已迁移到 `auth/` 和 `shell/` | 旧入口源码已删除 |
+| 模型/运行路线选择 | `pc_app_models.js`、`pc_app_models.css` | 🟡 已迁移第一版到会话页运行路线控件 | 后续继续跟 Route A/B/C 产品文案对齐 |
+| 项目中心、新建项目 | `pc_app_project_create.js`、`pc_app.js` | ✅ 已迁移到 `ProjectsPage`、`CreateProjectModal` | 项目中心默认广场，项目点击先展示项目首页 |
+| 项目广场 | `pc_app.js` | ✅ 已迁移到 `ProjectPlazaView` | `/pc/plaza` 和项目中心广场复用同一视图 |
+| AI 开发任务消息、审批、取消 | `pc_app_dev_tasks.js`、`pc_app_agent_runs.js`、`pc_app_task_snapshots.js` | 🟡 已迁移到 `features/dev/` 第一版 | 公开过程、恢复态、终态细节仍继续实测打磨 |
+| 本机节点和客户端维护 | `pc_app_node.js`、`pc_app_node_admin.js`、`pc_app_client_maintenance.js` | ✅ 已迁移到 `features/node/` 第一版 | 继续保留 `elon-node://`、更新和本机维护链路验收 |
+| 电脑医生 | `pc_app_doctor.js` | ✅ 已迁移到 `DoctorPage` | 后续按诊断能力扩展 |
+| AI 声音/TTS | `pc_voice_project.js` | ✅ 已迁移到 `VoicePage` 第一版 | 与语音/TTS SDK 的边界继续在语音模块维护 |
+| 通知 | `pc_app_notifications.js` | ✅ 已迁移到 `useNotifications` + `features/realtime/` | 新模块应继续复用统一实时刷新链路 |
 
 ## 多 AI 协作约定
 
