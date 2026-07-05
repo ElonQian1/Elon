@@ -101,11 +101,6 @@ pub(crate) fn start_background(install_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn open_installed_pc_web_page(install_dir: &Path) -> Result<()> {
-    let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
-    open_pc_web_page(admin_port_from_env_values(&env_values), &env_values)
-}
-
 fn admin_port_from_env_values(env_values: &HashMap<String, String>) -> u16 {
     env_values
         .get("NODE_ADMIN_PORT")

@@ -89,7 +89,8 @@ fn run_command(command: ClientCommand) -> Result<()> {
         ClientCommand::Start => {
             let install_dir = installer::ensure_installed()?;
             if updater::update_client_if_needed(&install_dir)? {
-                process::open_installed_pc_web_page(&install_dir)?;
+                // 自动更新脚本会重启后台 runtime；不要在这里主动打开浏览器，
+                // 避免已有 /pc 工作页重连时又被插入一个重复 tab。
                 return Ok(());
             }
             process::start_or_open(&install_dir)?;
@@ -104,7 +105,7 @@ fn run_command(command: ClientCommand) -> Result<()> {
         ClientCommand::Install => {
             let install_dir = installer::install_or_repair()?;
             if updater::update_client_if_needed(&install_dir)? {
-                process::open_installed_pc_web_page(&install_dir)?;
+                // 旧安装包触发自更新时保持浏览器不动，更新脚本负责重启 runtime。
                 return Ok(());
             }
             process::launch_installed_client(&install_dir)?;
@@ -265,5 +266,14 @@ mod tests {
             ClientCommand::from_args(&[UNINSTALL_NAME.to_string()], true),
             ClientCommand::Uninstall
         ));
+    }
+
+    #[test]
+    fn scheduled_update_paths_do_not_open_browser_tabs() {
+        let source = include_str!("mod.rs");
+        let removed_open_helper = ["open_installed", "pc_web_page"].join("_");
+
+        assert!(!source.contains(&removed_open_helper));
+        assert!(source.contains("避免已有 /pc 工作页重连时又被插入一个重复 tab"));
     }
 }
