@@ -13,12 +13,27 @@ export function formatTime(value: unknown): string {
   if (!value) return ''
   const date = new Date(Number(value) || String(value))
   if (Number.isNaN(date.getTime())) return String(value).slice(0, 16)
-  return date.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const now = new Date()
+  const time = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`
+  if (sameLocalDay(date, now)) return `今天 ${time}`
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (sameLocalDay(date, yesterday)) return `昨天 ${time}`
+
+  const monthDay = `${date.getMonth() + 1}月${date.getDate()}日`
+  if (date.getFullYear() === now.getFullYear()) return `${monthDay} ${time}`
+  return `${date.getFullYear()}年${monthDay} ${time}`
+}
+
+function sameLocalDay(left: Date, right: Date): boolean {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate()
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0')
 }
 
 /** 验证 node_admin URL：只允许 127.0.0.1 / localhost，默认 http://127.0.0.1:7799/ */
