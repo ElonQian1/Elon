@@ -11,6 +11,13 @@ use super::{
 };
 
 impl Store {
+    /// 只规范化会话 ID，不创建或触碰数据库记录。
+    ///
+    /// 用于预热、诊断、深链解析等后台流程；这些流程不代表用户真的让会话活跃。
+    pub fn normalize_conversation_id(&self, conversation_id: Option<&str>) -> String {
+        safe_external_id(conversation_id.unwrap_or("default"), "default")
+    }
+
     /// 确保指定会话存在，不存在则创建；存在则幂等更新 title/updated_at。
     pub fn ensure_conversation(
         &self,

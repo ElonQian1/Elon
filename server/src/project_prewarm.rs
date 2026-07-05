@@ -80,15 +80,11 @@ async fn prewarm_project_response(
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
 
-    let conversation_id = match state.store.ensure_conversation(
-        &project.id,
-        &user.id,
-        req.conversation_id.as_deref(),
-        req.conversation_title.as_deref(),
-    ) {
-        Ok(id) => id,
-        Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    };
+    let conversation_id = state
+        .store
+        .normalize_conversation_id(req.conversation_id.as_deref());
+    // 保留旧客户端传入的标题字段兼容性；预热不能写会话 title/updated_at。
+    let _conversation_title = req.conversation_title.as_deref();
 
     let trace_id = req
         .trace_id

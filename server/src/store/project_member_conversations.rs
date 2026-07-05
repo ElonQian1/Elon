@@ -95,7 +95,7 @@ impl Store {
              WHERE c.project_id = ?1
                AND c.user_id = ?2
                AND (?3 = c.user_id OR COALESCE(c.is_public, 1) = 1)
-             ORDER BY c.updated_at DESC
+             ORDER BY COALESCE(last_message_at, c.created_at) DESC, c.created_at DESC, c.id DESC
              LIMIT ?4",
         )?;
         let rows = stmt
@@ -649,5 +649,82 @@ mod tests {
             .expect("owner can inspect reopened member conversations");
         assert_eq!(owner_view.len(), 1);
         assert!(owner_view[0].is_public);
+    }
+
+    #[test]
+    fn member_conversation_list_orders_by_real_message_time_not_background_updated_at() {
+        let store = temp_store();
+        let owner = store
+            .create_user("owner4@example.com", "secret1", Some("Owner"), None)
+            .expect("owner should be created");
+        let member = store
+            .create_user("member4@example.com", "secret1", Some("Member"), None)
+            .expect("member should be created");
+        let project = store
+            .create_project(&owner.id, "Member Conversation Activity Order", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .set_project_visibility(&project.id, true, "open")
+            .expect("project should be public");
+        store
+            .join_project(&member.id, &project.id)
+            .expect("member should join project");
+
+        store
+            .create_task(&project.id, &member.id, Some("may"), "may request")
+            .expect("old conversation task should be created");
+        store
+            .create_task(&project.id, &member.id, Some("june"), "june request")
+            .expect("newer conversation task should be created");
+
+        let conn = store.conn().expect("connection should open");
+        conn.execute(
+            "UPDATE conversations SET created_at = ?1, updated_at = ?2
+             WHERE project_id = ?3 AND user_id = ?4 AND id = 'may'",
+            params![
+                "2026-05-01T00:00:00Z",
+                "2026-07-06T00:00:00Z",
+                project.id,
+                member.id
+            ],
+        )
+        .expect("old conversation timestamps should update");
+        conn.execute(
+            "UPDATE messages SET created_at = ?1
+             WHERE project_id = ?2 AND conversation_id = 'may'",
+            params!["2026-05-01T00:00:00Z", project.id],
+        )
+        .expect("old message timestamp should update");
+        conn.execute(
+            "UPDATE conversations SET created_at = ?1, updated_at = ?1
+             WHERE project_id = ?2 AND user_id = ?3 AND id = 'june'",
+            params!["2026-06-01T00:00:00Z", project.id, member.id],
+        )
+        .expect("newer conversation timestamps should update");
+        conn.execute(
+            "UPDATE messages SET created_at = ?1
+             WHERE project_id = ?2 AND conversation_id = 'june'",
+            params!["2026-06-01T00:00:00Z", project.id],
+        )
+        .expect("newer message timestamp should update");
+        drop(conn);
+
+        let conversations = store
+            .list_project_member_conversations(&owner.id, &project.id, &member.id, 10)
+            .expect("owner can inspect member conversations");
+
+        assert_eq!(
+            conversations
+                .iter()
+                .map(|conversation| conversation.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["june", "may"]
+        );
+        assert_eq!(conversations[1].updated_at.as_str(), "2026-07-06T00:00:00Z");
+        assert_eq!(
+            conversations[1].last_message_at.as_deref(),
+            Some("2026-05-01T00:00:00Z")
+        );
     }
 }

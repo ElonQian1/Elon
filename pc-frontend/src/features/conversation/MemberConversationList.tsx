@@ -188,7 +188,7 @@ export default function MemberConversationList({
             </span>
           </span>
           <span className={styles.itemMeta}>
-            {conversation.updated_at ? formatTime(conversation.updated_at) : '未更新'}
+            {formatConversationActivityTime(conversation)}
             {typeof conversation.message_count === 'number' && ` · ${conversation.message_count} 条`}
           </span>
         </button>
@@ -434,4 +434,9 @@ function conversationDisplayTitle(conversation: MemberConversationEntry): string
   if (/mcp/i.test(raw)) return 'MCP 验收会话'
   if (/pch_[a-f0-9]+/i.test(raw) || raw.includes('项目频道')) return '项目频道会话'
   return raw.slice(0, 34)
+}
+
+function formatConversationActivityTime(conversation: MemberConversationEntry): string {
+  const value = conversation.last_message_at || conversation.created_at || conversation.updated_at
+  return value ? formatTime(value) : '暂无消息'
 }
