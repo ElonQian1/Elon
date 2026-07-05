@@ -113,7 +113,7 @@ if [[ ${#files[@]} -gt 0 ]]; then
       [[ -n "$edition_file" ]] && nonempty_files+=("$edition_file")
     done
     edition_files=("${nonempty_files[@]}")
-    args=(--edition "$edition")
+    args=(--edition "$edition" --config skip_children=true)
     if [[ "$apply" != true ]]; then
       args+=(--check)
     fi

@@ -44,6 +44,18 @@ function Get-CrateEdition {
     return $Matches[1]
 }
 
+function Invoke-NativeCommand {
+    param(
+        [string]$Command,
+        [string[]]$Arguments
+    )
+
+    & $Command @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
+}
+
 function Convert-ToRepoRelativePath {
     param([string]$Path)
 
@@ -106,7 +118,7 @@ if ($requestedFiles.Count -gt 0) {
     }
 
     foreach ($edition in $groups.Keys) {
-        $rustfmtArgs = @("--edition", $edition)
+        $rustfmtArgs = @("--edition", $edition, "--config", "skip_children=true")
         if (-not $Apply) {
             $rustfmtArgs += "--check"
         }
@@ -116,7 +128,7 @@ if ($requestedFiles.Count -gt 0) {
         } else {
             Write-Host "Checking $($groups[$edition].Count) Rust file(s) with edition $edition"
         }
-        rustfmt @rustfmtArgs
+        Invoke-NativeCommand "rustfmt" $rustfmtArgs
     }
     exit 0
 }
@@ -124,9 +136,9 @@ if ($requestedFiles.Count -gt 0) {
 foreach ($crate in $crates) {
     if ($Apply) {
         Write-Host "Formatting $($crate["Manifest"])"
-        cargo fmt --manifest-path $crate["Manifest"] --all
+        Invoke-NativeCommand "cargo" @("fmt", "--manifest-path", $crate["Manifest"], "--all")
     } else {
         Write-Host "Checking $($crate["Manifest"])"
-        cargo fmt --manifest-path $crate["Manifest"] --all -- --check
+        Invoke-NativeCommand "cargo" @("fmt", "--manifest-path", $crate["Manifest"], "--all", "--", "--check")
     }
 }
