@@ -56,7 +56,7 @@ function AccountClaimBanner() {
   return (
     <div className={styles.claimBanner}>
       <span>注册账号后同步项目、好友和电脑节点。</span>
-      <button type="button" onClick={() => navigate('/login')}>
+      <button type="button" onClick={() => navigate('/login?mode=register')}>
         注册账号
       </button>
     </div>

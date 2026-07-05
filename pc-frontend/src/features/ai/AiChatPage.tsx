@@ -68,6 +68,7 @@ export default function AiChatPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const login = useAuthStore((s) => s.login)
+  const register = useAuthStore((s) => s.register)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
   const modelOptions = useModelStore((s) => s.options)
@@ -100,8 +101,10 @@ export default function AiChatPage() {
       : false
   ))
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [loginUsername, setLoginUsername] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
+  const [registerPasswordConfirm, setRegisterPasswordConfirm] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginLoading, setLoginLoading] = useState(false)
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
@@ -388,13 +391,22 @@ export default function AiChatPage() {
   async function handleInlineLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoginError('')
+    if (authMode === 'register' && loginPassword !== registerPasswordConfirm) {
+      setLoginError('两次输入的密码不一致')
+      return
+    }
     setLoginLoading(true)
     try {
-      await login(loginUsername, loginPassword)
+      if (authMode === 'register') {
+        await register(loginUsername, loginPassword)
+      } else {
+        await login(loginUsername, loginPassword)
+      }
       setLoginDialogOpen(false)
       setLoginPassword('')
+      setRegisterPasswordConfirm('')
     } catch (err) {
-      setLoginError((err as ApiError).message ?? '登录失败，请重试')
+      setLoginError((err as ApiError).message ?? (authMode === 'register' ? '注册失败，请重试' : '登录失败，请重试'))
     } finally {
       setLoginLoading(false)
     }
@@ -530,6 +542,7 @@ export default function AiChatPage() {
                     type="button"
                     onClick={() => {
                       setLoginError('')
+                      setAuthMode('login')
                       setLoginDialogOpen(true)
                     }}
                   >
@@ -756,8 +769,10 @@ export default function AiChatPage() {
             >
               ×
             </button>
-            <h3 id="ai-login-title">登录账号</h3>
-            <p>登录后即可开始对话，并同步你的项目、好友和电脑节点。</p>
+            <h3 id="ai-login-title">{authMode === 'register' ? '注册新账号' : '登录账号'}</h3>
+            <p className={styles.loginDialogSubtitle}>{authMode === 'register'
+              ? '注册后会自动登录，并同步你的项目、好友和电脑节点。'
+              : '登录后即可开始对话，并同步你的项目、好友和电脑节点。'}</p>
             <input
               className={styles.loginDialogInput}
               type="text"
@@ -772,15 +787,42 @@ export default function AiChatPage() {
               className={styles.loginDialogInput}
               type="password"
               placeholder="密码"
-              autoComplete="current-password"
+              autoComplete={authMode === 'register' ? 'new-password' : 'current-password'}
               value={loginPassword}
               onChange={(e) => setLoginPassword(e.target.value)}
               required
             />
+            {authMode === 'register' && (
+              <input
+                className={styles.loginDialogInput}
+                type="password"
+                placeholder="确认密码"
+                autoComplete="new-password"
+                value={registerPasswordConfirm}
+                onChange={(e) => setRegisterPasswordConfirm(e.target.value)}
+                required
+              />
+            )}
             {loginError && <p className={styles.loginDialogError}>{loginError}</p>}
             <button className={styles.loginDialogSubmit} type="submit" disabled={loginLoading}>
-              {loginLoading ? '登录中...' : '登录'}
+              {loginLoading
+                ? (authMode === 'register' ? '注册中...' : '登录中...')
+                : (authMode === 'register' ? '注册并登录' : '登录')}
             </button>
+            <p className={styles.loginDialogHint}>
+              {authMode === 'register' ? '已有账号？' : '还没有账号？'}
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginError('')
+                  setLoginPassword('')
+                  setRegisterPasswordConfirm('')
+                  setAuthMode(authMode === 'register' ? 'login' : 'register')
+                }}
+              >
+                {authMode === 'register' ? '登录账号' : '注册新账号'}
+              </button>
+            </p>
           </form>
         </div>
       )}

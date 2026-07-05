@@ -15,6 +15,7 @@ interface AuthState {
   token: string | null
   user: User | null
   login: (username: string, password: string) => Promise<void>
+  register: (username: string, password: string, nickname?: string) => Promise<void>
   logout: () => void
   fetchMe: () => Promise<void>
 }
@@ -29,6 +30,14 @@ export const useAuthStore = create<AuthState>()(
         const res = await api.post<{ token: string; user: User }>(
           '/api/auth/login',
           { account: username, password },
+        )
+        set({ token: res.token, user: res.user })
+      },
+
+      register: async (username, password, nickname) => {
+        const res = await api.post<{ token: string; user: User }>(
+          '/api/auth/register',
+          { account: username, password, nickname: nickname || undefined },
         )
         set({ token: res.token, user: res.user })
       },
