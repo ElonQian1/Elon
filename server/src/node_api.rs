@@ -1028,7 +1028,7 @@ pub async fn download_node_agent_linux(State(state): State<Arc<AppState>>) -> im
     download_node_agent_binary(state, "elon-pc-node", "elon-pc-node").await
 }
 
-async fn download_node_agent_binary(
+pub(crate) async fn download_node_agent_binary(
     state: Arc<AppState>,
     file_name: &'static str,
     download_name: &'static str,

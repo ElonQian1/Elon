@@ -58,9 +58,12 @@ export interface NodeAgentVersion {
   downloadUrl?: string
   linuxDownloadUrl?: string
   windowsClientDownloadUrl?: string
+  ripgrepZipUrl?: string
+  ripgrepZipSha256?: string
   fileSize?: number
   linuxFileSize?: number
   windowsClientFileSize?: number
+  ripgrepZipFileSize?: number
 }
 
 export interface LocalNodeStatus {
@@ -81,6 +84,7 @@ export interface LocalNodeStatus {
   allowed_clis?: string[]
   cli_probe?: { refreshing?: boolean; refreshed_at_ms?: number; stale?: boolean }
   codex_cli?: LocalCliToolStatus | null
+  codex_toolbox?: CodexToolboxStatus | null
   codex_vault?: CodexVaultLocalStatus | null
   cli_tools?: LocalCliToolStatus[]
   local_ai?: {
@@ -110,6 +114,35 @@ export interface NodeLifecycleReport {
   restart_recovery?: boolean
   recommended_action?: string
   summary?: string
+}
+
+export interface CodexToolboxStatus {
+  ok?: boolean
+  codex_program?: string | null
+  path_scope?: string
+  summary?: string
+  tools?: CodexToolboxTool[]
+}
+
+export interface CodexToolboxTool {
+  id?: string
+  name?: string
+  aliases?: string[]
+  tier?: 'core' | 'profile' | 'optional' | string
+  install_policy?: 'AutoSmall' | 'ManualRepair' | 'NeverAuto' | string
+  env_path_var?: string
+  managed_dir?: string
+  installed?: boolean
+  runnable?: boolean
+  status?: 'ready' | 'missing' | 'not_runnable' | string
+  source?: string
+  path?: string | null
+  version?: string | null
+  reason?: string | null
+  candidate_count?: number
+  will_inject?: boolean
+  repair_action?: 'install_env_codex' | 'manual_repair' | 'none' | string
+  detail?: string
 }
 
 export interface CodexVaultAuthInspection {

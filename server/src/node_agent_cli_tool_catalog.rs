@@ -4,6 +4,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde_json::Value;
+
+#[path = "node_agent_cli_tool_status.rs"]
+mod tool_status;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ToolTier {
     Core,
@@ -11,11 +16,31 @@ enum ToolTier {
     Optional,
 }
 
+impl ToolTier {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Core => "core",
+            Self::Profile => "profile",
+            Self::Optional => "optional",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum InstallPolicy {
     AutoSmall,
     ManualRepair,
     NeverAuto,
+}
+
+impl InstallPolicy {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::AutoSmall => "AutoSmall",
+            Self::ManualRepair => "ManualRepair",
+            Self::NeverAuto => "NeverAuto",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +52,7 @@ struct ToolSpec {
     managed_dir: &'static str,
     tier: ToolTier,
     install_policy: InstallPolicy,
+    version_args: &'static [&'static str],
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +65,7 @@ pub(crate) fn codex_child_env_overrides(
     codex_program: &Path,
     current_path: Option<OsString>,
 ) -> Vec<(String, String)> {
-    let tools = resolve_codex_tools(codex_program);
+    let tools = resolve_codex_tools(Some(codex_program));
     let dirs = tools
         .iter()
         .filter_map(|tool| tool.path.parent().map(Path::to_path_buf))
@@ -58,7 +84,11 @@ pub(crate) fn codex_child_env_overrides(
     envs
 }
 
-fn resolve_codex_tools(codex_program: &Path) -> Vec<ResolvedTool> {
+pub(crate) fn codex_toolbox_status(codex_program: Option<&Path>) -> Value {
+    tool_status::codex_toolbox_status(codex_program)
+}
+
+fn resolve_codex_tools(codex_program: Option<&Path>) -> Vec<ResolvedTool> {
     codex_tool_catalog()
         .iter()
         .filter_map(|spec| {
@@ -80,6 +110,7 @@ fn codex_tool_catalog() -> &'static [ToolSpec] {
             managed_dir: "ripgrep",
             tier: ToolTier::Core,
             install_policy: InstallPolicy::AutoSmall,
+            version_args: &["--version"],
         },
         ToolSpec {
             id: "fd",
@@ -89,6 +120,7 @@ fn codex_tool_catalog() -> &'static [ToolSpec] {
             managed_dir: "fd",
             tier: ToolTier::Profile,
             install_policy: InstallPolicy::ManualRepair,
+            version_args: &["--version"],
         },
         ToolSpec {
             id: "jq",
@@ -98,6 +130,7 @@ fn codex_tool_catalog() -> &'static [ToolSpec] {
             managed_dir: "jq",
             tier: ToolTier::Profile,
             install_policy: InstallPolicy::ManualRepair,
+            version_args: &["--version"],
         },
         ToolSpec {
             id: "7zip",
@@ -107,15 +140,16 @@ fn codex_tool_catalog() -> &'static [ToolSpec] {
             managed_dir: "7zip",
             tier: ToolTier::Optional,
             install_policy: InstallPolicy::NeverAuto,
+            version_args: &[],
         },
     ]
 }
 
-fn candidate_tool_paths(spec: &'static ToolSpec, codex_program: &Path) -> Vec<PathBuf> {
+fn candidate_tool_paths(spec: &'static ToolSpec, codex_program: Option<&Path>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
     if can_borrow_from_codex_runtime(spec) {
-        if let Some(parent) = codex_program.parent() {
+        if let Some(parent) = codex_program.and_then(Path::parent) {
             push_existing_tool(&mut paths, parent, spec);
         }
     }
@@ -179,6 +213,10 @@ pub(super) fn prepend_dirs_to_path(
     env::join_paths(merged)
         .ok()
         .map(|value| value.to_string_lossy().to_string())
+}
+
+fn path_to_string(path: &Path) -> String {
+    path.to_string_lossy().to_string()
 }
 
 #[cfg(windows)]
@@ -312,7 +350,7 @@ mod tests {
         fs::write(&codex, b"").unwrap();
         fs::write(&rg, b"").unwrap();
 
-        let resolved = resolve_codex_tools(&codex);
+        let resolved = resolve_codex_tools(Some(&codex));
         let first = resolved.first().expect("rg should resolve");
 
         assert_eq!(first.spec.id, "rg");

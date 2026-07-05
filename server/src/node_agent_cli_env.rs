@@ -370,3 +370,7 @@ mod windows_tests {
         assert!(Path::new(shim_dir).join("elon-command-shim.ps1").is_file());
     }
 }
+
+pub(crate) fn codex_toolbox_status(codex_program: Option<&str>) -> serde_json::Value {
+    tool_catalog::codex_toolbox_status(codex_program.map(Path::new))
+}

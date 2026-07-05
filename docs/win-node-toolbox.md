@@ -36,11 +36,15 @@ node-agent 启动 Codex 任务
 
 这意味着用户机器上已经有 `jq` 或 `7z` 时，Codex 可以用；没有时不会自动下载，也不会弹出吓人的安装过程。
 
+`/api/status` 会暴露 `codex_toolbox` 诊断对象，PC 工作台可以显示每个工具是否找到、来源、版本、是否会注入 Codex 子进程 PATH，以及缺失时的修复动作。
+
 ## 安装/修复流程
 
 `scripts/setup-node-env.ps1` 当前只自动修复 core 小工具：
 
 - `rg`：优先发现现有安装；如果配置了 `ELON_RIPGREP_ZIP_URL`，使用平台绿色包；否则 fallback 到 winget。
+
+PC 节点发布脚本会在构建机能找到 `rg.exe` 时额外上传 `ripgrep-windows.zip`，并把 `ripgrepZipUrl`、`ripgrepZipSha256`、`ripgrepZipFileSize` 写进 `node-agent-version.json`。Win 端不会把该工具包预装进客户端压缩包；只有用户主动点击 Codex 环境修复、且本机缺少 `rg` 时，`setup-node-env.ps1` 才按需下载到 `%LOCALAPPDATA%\ElonNode\tools\ripgrep\bin\rg.exe`。
 
 后续新增工具时必须先进入 catalog，再决定安装策略：
 

@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
 const SETUP_ENV_SCRIPT: &str = include_str!("../../scripts/setup-node-env.ps1");
 
@@ -10,6 +10,7 @@ pub(crate) struct InstallEnvReq {
 
 /// POST /api/install-env - 用户主动触发的后台安装/修复任务。
 pub(crate) async fn admin_install_env(
+    axum::extract::State(_rt): axum::extract::State<Arc<crate::NodeRuntime>>,
     body: Option<axum::Json<InstallEnvReq>>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     #[cfg(windows)]
@@ -56,6 +57,14 @@ pub(crate) async fn admin_install_env(
         if codex_only {
             command.arg("-CodexOnly");
         }
+        let ripgrep_url = format!(
+            "{}/api/node-agent/download/ripgrep-windows",
+            _rt.cloud_http_url().trim_end_matches('/')
+        );
+        command.env("ELON_RIPGREP_ZIP_URL", ripgrep_url);
+        if let Some(sha) = installed_ripgrep_zip_sha256() {
+            command.env("ELON_RIPGREP_ZIP_SHA256", sha);
+        }
         command.stdin(std::process::Stdio::null());
         command.stdout(std::process::Stdio::null());
         command.stderr(std::process::Stdio::null());
@@ -98,4 +107,26 @@ pub(crate) async fn admin_install_env(
             })),
         )
     }
+}
+
+#[cfg(windows)]
+fn installed_ripgrep_zip_sha256() -> Option<String> {
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let candidates = [
+        dir.join("_internal").join("node-agent-version.json"),
+        dir.join("node-agent-version.json"),
+    ];
+    candidates.into_iter().find_map(|path| {
+        let value = std::fs::read_to_string(path)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())?;
+        value
+            .get("ripgrepZipSha256")
+            .or_else(|| value.get("ripgrep_zip_sha256"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    })
 }

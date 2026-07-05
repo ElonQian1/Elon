@@ -100,6 +100,7 @@ mod join_request_events;
 mod lan_peer;
 mod lm_chat;
 mod node_agent_cli_security;
+mod node_agent_downloads;
 mod node_api;
 mod node_compute_admin;
 mod node_exec_api;

@@ -522,6 +522,90 @@
   font-size: 12px;
 }
 
+.toolboxCard {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.toolboxHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.toolboxHead h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.toolboxCard p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.toolboxState {
+  flex: 0 0 auto;
+  border-radius: var(--radius-sm);
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.toolboxState.online { color: #4caf78; background: rgba(76, 175, 120, .12); }
+.toolboxState.offline { color: #e07070; background: rgba(224, 112, 112, .12); }
+.toolboxState.checking { color: #d8b55b; background: rgba(200, 160, 64, .12); }
+
+.toolboxPath,
+.toolboxTool code {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 7px;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.toolboxList {
+  display: grid;
+  gap: 8px;
+}
+
+.toolboxTool {
+  display: grid;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.toolboxTool > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.toolboxTool strong { font-size: 12px; color: var(--text-primary); }
+.toolboxTool span,
+.toolboxTool small { color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+.toolboxTool_ready { border-color: rgba(76, 175, 120, .28); }
+.toolboxTool_missing { border-color: rgba(200, 160, 64, .28); }
+.toolboxTool_warn { border-color: rgba(224, 112, 112, .28); }
+
+.toolboxCard .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .vaultCard {
   border-top: 1px solid var(--border);
   padding-top: 14px;

@@ -12,6 +12,7 @@ use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 
+use crate::node_agent_downloads::rg_win;
 use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
@@ -250,10 +251,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/api/me/archive", get(user_archive_api::get_user_archive))
         .route("/api/me/workspaces", get(user_archive_api::get_user_archive))
-        // ── 用户记忆 API ────────────────────────────────────────────────────────
         .route("/api/memories", get(user_memory_api::list_memories).post(user_memory_api::create_memory))
         .route("/api/memories/:id", delete(user_memory_api::delete_memory))
-        // ── 分布式节点 API ──────────────────────────────────────────────────────
         .route("/api/nodes", get(node_api::list_nodes))
         .route("/api/nodes/models", get(node_api::list_available_models))
         .route("/api/nodes/chat", post(node_api::chat_with_node))
@@ -263,6 +262,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/node-agent/download/windows-client",
             get(node_api::download_node_agent_windows_client),
         )
+        .route("/api/node-agent/download/ripgrep-windows", get(rg_win))
         .route("/api/node-agent/download/linux", get(node_api::download_node_agent_linux))
         .route(
             "/api/agent-balloon/ensure",

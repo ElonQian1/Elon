@@ -37,6 +37,7 @@ pub(super) async fn admin_status(
     let cli_refreshing = rt.cli_probe_refreshing.load(Ordering::Acquire);
     let available_clis = cli_probe.available_names();
     let codex_cli = cli_probe.codex_status();
+    let codex_path = codex_cli.as_ref().and_then(|tool| tool.path.as_deref());
     let lifecycle = rt
         .lifecycle
         .status_payload(super::node_agent_lifecycle::LifecycleInputs {
@@ -85,6 +86,7 @@ pub(super) async fn admin_status(
         "cloud_network": super::node_agent_cloud_net::status_payload(&rt.cfg.cloud_url, &rt.cfg.cloud_http_url),
         "codex_vault": super::node_agent_codex_vault::local_status_payload(),
         "codex_cli": codex_cli,
+        "codex_toolbox": super::node_agent_cli_env::codex_toolbox_status(codex_path),
         "allowed_clis": available_clis,
         "cli_tools": cli_probe.tools.clone(),
         "local_ai": {

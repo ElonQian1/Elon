@@ -31,6 +31,7 @@ $BaseUrl = "http://43.139.149.158:8080"
 $RemoteDir = "/opt/elon/data/downloads"
 $Bin = "elon-pc-node"
 $WindowsClientPackageName = "elon-node-agent-windows.zip"
+$RipgrepPackageName = "ripgrep-windows.zip"
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $ServerDir = Join-Path $RepoRoot "server"
 $ServerManifest = Join-Path $ServerDir "Cargo.toml"
@@ -293,6 +294,31 @@ function Invoke-NodeAgentPcFrontendBuild {
     Write-Host "   PC 工作台 dist 就绪: $PcDistDir" -ForegroundColor Green
 }
 
+function Resolve-RipgrepExe {
+    $candidates = @()
+    $cmd = Get-Command rg -ErrorAction SilentlyContinue
+    if ($cmd -and $cmd.Source) { $candidates += $cmd.Source }
+    if ($env:LOCALAPPDATA) {
+        $candidates += Join-Path $env:LOCALAPPDATA "ElonNode\tools\ripgrep\bin\rg.exe"
+        $roots = @(
+            (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\bin"),
+            (Join-Path $env:LOCALAPPDATA "ElonNode\tools\ripgrep")
+        )
+        foreach ($root in $roots) {
+            if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+            Get-ChildItem -LiteralPath $root -Recurse -Filter "rg.exe" -File -ErrorAction SilentlyContinue |
+                ForEach-Object { $candidates += $_.FullName }
+        }
+    }
+    foreach ($candidate in $candidates) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and
+            (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            return [System.IO.Path]::GetFullPath($candidate)
+        }
+    }
+    return $null
+}
+
 $env:CARGO_TARGET_DIR = Resolve-NodeAgentTargetDir
 
 foreach ($requiredPath in @(
@@ -375,10 +401,32 @@ Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
 $LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
 $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
+$RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
 $LauncherDir = Join-Path $PSScriptRoot "node-agent-launcher"
 $PackageRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-windows-" + [Guid]::NewGuid().ToString("N"))
 $PackageInternal = Join-Path $PackageRoot "_internal"
 $WindowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
+$RipgrepPackage = Join-Path $TargetDir "release\$RipgrepPackageName"
+$RipgrepZipSha256 = ""
+$RipgrepZipFileSize = 0
+Write-Host "  打包可选绿色 ripgrep..." -ForegroundColor DarkGray
+$RipgrepExe = Resolve-RipgrepExe
+if ($RipgrepExe) {
+    $RipgrepRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-ripgrep-windows-" + [Guid]::NewGuid().ToString("N"))
+    $RipgrepBinDir = Join-Path $RipgrepRoot "bin"
+    New-Item -ItemType Directory -Force -Path $RipgrepBinDir | Out-Null
+    try {
+        Copy-Item -LiteralPath $RipgrepExe -Destination (Join-Path $RipgrepBinDir "rg.exe") -Force
+        Compress-ArchiveWithRetry -Path (Join-Path $RipgrepRoot "*") -DestinationPath $RipgrepPackage
+        $RipgrepZipSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $RipgrepPackage).Hash.ToLowerInvariant()
+        $RipgrepZipFileSize = (Get-Item -LiteralPath $RipgrepPackage).Length
+        Write-Host "  ripgrep package sha256 = $RipgrepZipSha256" -ForegroundColor DarkGray
+    } finally {
+        Remove-Item -LiteralPath $RipgrepRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+} else {
+    Write-Host "  未找到 rg.exe，跳过绿色 ripgrep 包；客户端修复时会 fallback 到 winget。" -ForegroundColor DarkYellow
+}
 New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-Null
 try {
     Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "一龙开发平台.exe") -Force
@@ -395,6 +443,9 @@ try {
         downloadUrl = $WindowsDownloadUrl
         linuxDownloadUrl = $LinuxDownloadUrl
         windowsClientDownloadUrl = $WindowsClientDownloadUrl
+        ripgrepZipUrl = $RipgrepDownloadUrl
+        ripgrepZipSha256 = $RipgrepZipSha256
+        ripgrepZipFileSize = [int64]$RipgrepZipFileSize
     }
     Write-Utf8NoBom `
         -Path (Join-Path $PackageInternal "node-agent-version.json") `
@@ -414,6 +465,10 @@ ssh -o ProxyCommand=none $Server "chmod +x ${RemoteDir}/${Bin}"
 scp -o ProxyCommand=none $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
 scp -o ProxyCommand=none $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
+if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
+    scp -o ProxyCommand=none $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
+    if ($LASTEXITCODE -ne 0) { throw "上传 ripgrep 绿色包失败" }
+}
 
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
@@ -421,6 +476,9 @@ Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
 $size    = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}"
 $sizeWin = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
 $sizeWinClient = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
+if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
+    $RipgrepZipFileSize = [int64](ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${RipgrepPackageName}")
+}
 $VersionInfo = [ordered]@{
     version = $PackageVersion
     gitSha = $GitSha
@@ -428,9 +486,12 @@ $VersionInfo = [ordered]@{
     downloadUrl = $WindowsDownloadUrl
     linuxDownloadUrl = $LinuxDownloadUrl
     windowsClientDownloadUrl = $WindowsClientDownloadUrl
+    ripgrepZipUrl = $RipgrepDownloadUrl
+    ripgrepZipSha256 = $RipgrepZipSha256
     fileSize = [int64]$sizeWin
     linuxFileSize = [int64]$size
     windowsClientFileSize = [int64]$sizeWinClient
+    ripgrepZipFileSize = [int64]$RipgrepZipFileSize
 }
 $VersionFile = New-TemporaryFile
 try {
@@ -443,6 +504,9 @@ try {
 Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
 Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
 Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundColor Green
+if ($RipgrepZipFileSize -gt 0) {
+    Write-Host "  ripgrep package size = $RipgrepZipFileSize bytes" -ForegroundColor Green
+}
 Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 
 # ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
@@ -477,3 +541,4 @@ Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green
 Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
+Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"

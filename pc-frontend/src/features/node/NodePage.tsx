@@ -7,6 +7,7 @@ import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from './launchWinCli
 import NodeLifecycleStatusCard from './NodeLifecycleStatusCard'
 import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
+import CodexToolboxCard from './CodexToolboxCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { useUserProgression } from '../billing/useUserProgression'
 import type { UserProgressionSummary } from '../billing/progressionApi'
@@ -32,9 +33,7 @@ export default function NodePage() {
   useEffect(() => {
     fetchMyNodes().then(setNodes).catch(() => {})
   }, [])
-
   const selected = nodes.find((n) => nodeId(n) === selectedNodeId)
-
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
@@ -474,6 +473,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         onInstall={installEnv}
         onSaveKey={saveCodexKey}
       />
+      <CodexToolboxCard toolbox={status.codex_toolbox} busy={codexBusy} onRepair={installEnv} />
       <CodexVaultCard
         status={codexVault}
         cloud={vaultStatus?.cloud}
