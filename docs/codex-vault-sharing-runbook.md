@@ -2,7 +2,7 @@
 
 最后更新：2026-07-06
 
-本文用于验证机器人之间的 Codex `auth.json` 保险箱授权共享。共享不限定紧急场景，但必须满足显式授权、短租约、本机托管 `CODEX_HOME`、可撤销、可审计和可计费。
+本文用于验证机器人之间的 Codex `auth.json` 保险箱授权共享。共享可用于日常协作和高可用切换，但必须满足显式授权、短租约、本机托管 `CODEX_HOME`、可撤销、可审计和可计费。
 
 ## 安全边界
 
@@ -12,6 +12,22 @@
 - provider 必须在平台上显式授权 consumer。
 - 共享凭据只写入节点托管的临时 `CODEX_HOME`。
 - 所有共享用量记为 `shared_codex`，并能追溯 provider、consumer、lease、token usage、billing event 和 node transaction。
+
+## 一键上线演练
+
+默认推荐先跑无额度 readiness 演练；它会串起 fake CLI、过期托管租约、撤销/过期授权、互借不串账、平台 `shared_codex` 计费链、网络重放幂等和 sharing health 告警测试。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test-codex-vault-sharing-readiness.ps1
+```
+
+需要连真实 Codex CLI 做坏 auth / 共享 auth 证明时，再加 `-RunRealCli` 和 provider 参数：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test-codex-vault-sharing-readiness.ps1 `
+  -RunRealCli `
+  -ProviderUserId "<provider_user_id>"
+```
 
 ## 一键真实诊断
 
@@ -74,6 +90,7 @@ powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 test --manifest-p
 | 授权过期后申请共享租约 | 失败，不能下发 provider auth |
 | 租约过期后启动 Codex | 不再使用托管共享 `CODEX_HOME` |
 | 清理租约后继续挂账 | store 层拒绝继续 attach 用量 |
+| 网络断开后同一任务重放 | token usage、node transaction、lease usage 都按幂等键拒绝重复扣费 |
 | 两个机器人互相共享 | 每条租约独立记录 provider/consumer，账单不能串 |
 | 共享用量成功结算 | lease 关联 token usage、billing event、node transaction |
 | 共享用量缺少结算链 | sharing health 返回 `shared_codex_accounting_anomaly` |
@@ -95,11 +112,18 @@ PC 页面和云端 `/api/me/codex-vault/sharing` 返回 `health`：
 - `unavailable_grant_count`
 - `recent_failed_event_count`
 
-## 医疗服务演练
+后台 `billing_alerts` 也会持久化共享相关告警，管理员页面的计费告警列表会出现：
+
+- `billing:codex-sharing-expired-uncleared-leases`
+- `billing:codex-sharing-accounting-anomalies`
+- `billing:codex-sharing-recent-failures`
+- `billing:codex-sharing-active-leases-threshold`
+
+## 机器人服务演练
 
 1. 确认两台机器人都在线，且各自保险箱已备份。
 2. 在 PC 页面建立双向授权共享。
-3. 在 consumer 机器人运行一键真实诊断脚本。
+3. 在 consumer 机器人运行一键上线演练脚本。
 4. 发起一次真实平台任务，确认 `billing_source=shared_codex`。
 5. 查账：consumer 扣费，provider 获得收益。
 6. 清理租约，确认本机 `active_codex_home=null`。

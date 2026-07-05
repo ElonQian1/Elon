@@ -78,3 +78,54 @@ pub(crate) fn migration_v91(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+pub(crate) fn migration_v92(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS codex_vault_emergency_lease_usage_events (
+          id                    TEXT PRIMARY KEY,
+          lease_id              TEXT NOT NULL,
+          token_usage_event_id  TEXT NOT NULL,
+          billing_event_id      TEXT,
+          node_transaction_id   TEXT,
+          input_tokens          INTEGER NOT NULL DEFAULT 0,
+          output_tokens         INTEGER NOT NULL DEFAULT 0,
+          total_tokens          INTEGER NOT NULL DEFAULT 0,
+          billed_cost_rmb_fen   INTEGER NOT NULL DEFAULT 0,
+          provider_earned_fen   INTEGER NOT NULL DEFAULT 0,
+          accounting_status     TEXT,
+          created_at            TEXT NOT NULL,
+          FOREIGN KEY (lease_id) REFERENCES codex_vault_emergency_leases(id),
+          UNIQUE (lease_id, token_usage_event_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_codex_vault_emergency_lease_usage_lease
+          ON codex_vault_emergency_lease_usage_events(lease_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_codex_vault_emergency_lease_usage_token
+          ON codex_vault_emergency_lease_usage_events(token_usage_event_id);
+
+        INSERT OR IGNORE INTO codex_vault_emergency_lease_usage_events
+          (id, lease_id, token_usage_event_id, billing_event_id, node_transaction_id,
+           input_tokens, output_tokens, total_tokens, billed_cost_rmb_fen,
+           provider_earned_fen, accounting_status, created_at)
+        SELECT
+          'cvlu_' || lower(hex(randomblob(16))),
+          id,
+          token_usage_event_id,
+          billing_event_id,
+          node_transaction_id,
+          input_tokens,
+          output_tokens,
+          total_tokens,
+          billed_cost_rmb_fen,
+          provider_earned_fen,
+          accounting_status,
+          updated_at
+        FROM codex_vault_emergency_leases
+        WHERE token_usage_event_id IS NOT NULL
+          AND trim(token_usage_event_id) != '';
+        "#,
+    )?;
+    Ok(())
+}

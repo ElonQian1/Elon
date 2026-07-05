@@ -24,7 +24,6 @@ const DIRECT_SOCIAL_AI_SCENE: &str = "一龙AI私聊";
 pub(crate) const DEVELOPMENT_REDIRECT_REPLY: &str =
     "这个需求已经涉及项目开发，我在好友/群聊里不能直接写代码、改项目或打包。请到「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务；在那里我可以按完整开发流程帮你实现。";
 
-
 pub(super) async fn build_reply(
     state: &Arc<AppState>,
     user_id: &str,
@@ -458,10 +457,10 @@ pub(super) fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> 
 
 #[cfg(test)]
 mod tests {
+    use super::super::{contains_el_mention, social_ai_fallback_message};
     use super::{
-        contains_el_mention, ensure_fb2_grounded_answer_shape, ensure_fb2_opinion_memory_source,
+        ensure_fb2_grounded_answer_shape, ensure_fb2_opinion_memory_source,
         format_external_context, latest_request_user_text, social_ai_base_prompt,
-        social_ai_fallback_message,
     };
     use crate::store::SocialAiHistoryMessage;
     use serde_json::json;

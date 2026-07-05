@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod tests {
-    use super::{
-        install_dir_from_local_app_data, maintenance_actions, maintenance_overview,
-        maintenance_target, primary_maintenance_action, recent_maintenance_events, status_payload,
-        truncate_chars,
+    use super::super::{
+        autostart_query_script, decode_autostart_info, install_dir_from_local_app_data,
+        maintenance_actions, maintenance_overview, maintenance_target, primary_maintenance_action,
+        recent_maintenance_events, status_payload, truncate_chars,
     };
     use serde_json::json;
     use std::{fs, path::PathBuf};
@@ -33,7 +33,7 @@ mod tests {
             .to_string()
             .as_bytes(),
         );
-        let info = super::decode_autostart_info(&encoded).unwrap();
+        let info = decode_autostart_info(&encoded).unwrap();
 
         assert_eq!(info.command.as_deref(), Some(command));
         assert_eq!(info.source, "scheduled_task");
@@ -43,7 +43,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn autostart_query_detects_startup_shortcut_fallback() {
-        let script = super::autostart_query_script();
+        let script = autostart_query_script();
 
         assert!(script.contains("Set-ShortcutCommand"));
         assert!(script.contains("startup_shortcut"));

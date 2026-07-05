@@ -420,9 +420,46 @@ impl Store {
         provider_earned_fen: i64,
         accounting_status: Option<&str>,
     ) -> Result<bool> {
-        let total_tokens = input_tokens.max(0) + output_tokens.max(0);
+        let input_tokens = input_tokens.max(0);
+        let output_tokens = output_tokens.max(0);
+        let total_tokens = input_tokens + output_tokens;
+        let billed_cost_rmb_fen = billed_cost_rmb_fen.max(0);
+        let provider_earned_fen = provider_earned_fen.max(0);
+        let token_usage_event_id = clean_optional(token_usage_event_id);
+        let billing_event_id = clean_optional(billing_event_id);
+        let node_transaction_id = clean_optional(node_transaction_id);
+        let accounting_status = clean_optional(accounting_status);
         let ts = now();
-        let changed = self.conn()?.execute(
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        if let Some(token_usage_event_id) = token_usage_event_id.as_deref() {
+            let inserted = tx.execute(
+                "INSERT OR IGNORE INTO codex_vault_emergency_lease_usage_events
+                 (id, lease_id, token_usage_event_id, billing_event_id, node_transaction_id,
+                  input_tokens, output_tokens, total_tokens, billed_cost_rmb_fen,
+                  provider_earned_fen, accounting_status, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                params![
+                    new_id("cvlu"),
+                    lease_id,
+                    token_usage_event_id,
+                    billing_event_id.as_deref(),
+                    node_transaction_id.as_deref(),
+                    input_tokens,
+                    output_tokens,
+                    total_tokens,
+                    billed_cost_rmb_fen,
+                    provider_earned_fen,
+                    accounting_status.as_deref(),
+                    ts
+                ],
+            )?;
+            if inserted == 0 {
+                tx.commit()?;
+                return Ok(false);
+            }
+        }
+        let changed = tx.execute(
             "UPDATE codex_vault_emergency_leases
                 SET token_usage_event_id = COALESCE(?2, token_usage_event_id),
                     billing_event_id = COALESCE(?3, billing_event_id),
@@ -440,18 +477,23 @@ impl Store {
                 AND expires_at > ?11",
             params![
                 lease_id,
-                clean_optional(token_usage_event_id),
-                clean_optional(billing_event_id),
-                clean_optional(node_transaction_id),
-                input_tokens.max(0),
-                output_tokens.max(0),
+                token_usage_event_id.as_deref(),
+                billing_event_id.as_deref(),
+                node_transaction_id.as_deref(),
+                input_tokens,
+                output_tokens,
                 total_tokens,
-                billed_cost_rmb_fen.max(0),
-                provider_earned_fen.max(0),
-                clean_optional(accounting_status),
+                billed_cost_rmb_fen,
+                provider_earned_fen,
+                accounting_status.as_deref(),
                 ts
             ],
         )?;
+        if changed == 0 {
+            tx.rollback()?;
+            return Ok(false);
+        }
+        tx.commit()?;
         Ok(changed > 0)
     }
 }

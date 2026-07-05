@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests {
+    use super::super::{now, Store};
     use super::*;
+    use rusqlite::params;
     use uuid::Uuid;
 
     fn temp_store() -> Store {

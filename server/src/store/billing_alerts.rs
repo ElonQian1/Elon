@@ -42,6 +42,10 @@ const KNOWN_ALERTS: &[&str] = &[
     "billing:orphan-compute-billing-events",
     "billing:orphan-node-token-events",
     "billing:orphan-node-billing-events",
+    "billing:codex-sharing-active-leases-threshold",
+    "billing:codex-sharing-expired-uncleared-leases",
+    "billing:codex-sharing-accounting-anomalies",
+    "billing:codex-sharing-recent-failures",
 ];
 
 impl Store {
@@ -53,6 +57,12 @@ impl Store {
         let orphan_billing_events = self.count_orphan_compute_billing_events()?;
         let orphan_node_token_events = self.count_orphan_node_token_events()?;
         let orphan_node_billing_events = self.count_orphan_node_billing_events()?;
+        let codex_active_lease_threshold =
+            configured_i64(self, "codex_sharing_active_lease_alert_threshold", 20).max(1);
+        let codex_active_leases = self.count_codex_sharing_active_leases()?;
+        let codex_expired_uncleared = self.count_codex_sharing_expired_uncleared_leases()?;
+        let codex_accounting_anomalies = self.count_codex_sharing_accounting_anomalies()?;
+        let codex_recent_failures = self.count_codex_sharing_recent_failures()?;
 
         let mut candidates = Vec::new();
         push_if_positive(
@@ -138,6 +148,42 @@ impl Store {
             "节点收益流水引用了不存在的扣费事件",
             orphan_node_billing_events,
             "node_transactions.billing_event_id 找不到对应 billing_events，说明节点收益没有可靠扣费来源。",
+        );
+        if codex_active_leases > codex_active_lease_threshold {
+            candidates.push(BillingAlertCandidate {
+                fingerprint: "billing:codex-sharing-active-leases-threshold",
+                severity: "warning",
+                title: "Codex 保险箱共享活跃租约过多",
+                detail: format!(
+                    "当前活跃共享租约 {} 条，超过阈值 {} 条。若不是演练或高峰，需要检查是否有节点未及时清理租约。",
+                    codex_active_leases, codex_active_lease_threshold
+                ),
+                metric_value: codex_active_leases,
+            });
+        }
+        push_if_positive(
+            &mut candidates,
+            "billing:codex-sharing-expired-uncleared-leases",
+            "warning",
+            "存在过期未清理的 Codex 共享租约",
+            codex_expired_uncleared,
+            "Codex 保险箱共享租约已过期但节点未清理，可能导致节点重启后状态误判或运营页面显示异常。",
+        );
+        push_if_positive(
+            &mut candidates,
+            "billing:codex-sharing-accounting-anomalies",
+            "critical",
+            "存在 shared_codex 计费链路缺失",
+            codex_accounting_anomalies,
+            "共享租约已有 token 消费，但缺少 token_usage、billing_event、node_transaction 或幂等用量明细，需要立即对账。",
+        );
+        push_if_positive(
+            &mut candidates,
+            "billing:codex-sharing-recent-failures",
+            "warning",
+            "过去 24 小时存在 Codex 共享失败",
+            codex_recent_failures,
+            "Codex 保险箱共享恢复、解密或清理失败，可能影响机器人之间的授权共享可用性。",
         );
 
         let ts = now();
@@ -269,6 +315,72 @@ impl Store {
         )
         .map_err(Into::into)
     }
+
+    fn count_codex_sharing_active_leases(&self) -> Result<i64> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT COUNT(*)
+             FROM codex_vault_emergency_leases
+             WHERE status = 'active'
+               AND cleared_at IS NULL
+               AND expires_at > strftime('%Y-%m-%dT%H:%M:%f+00:00','now')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
+
+    fn count_codex_sharing_expired_uncleared_leases(&self) -> Result<i64> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT COUNT(*)
+             FROM codex_vault_emergency_leases
+             WHERE status = 'active'
+               AND cleared_at IS NULL
+               AND expires_at <= strftime('%Y-%m-%dT%H:%M:%f+00:00','now')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
+
+    fn count_codex_sharing_accounting_anomalies(&self) -> Result<i64> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT COUNT(*)
+             FROM codex_vault_emergency_leases l
+             WHERE l.total_tokens > 0
+               AND (
+                 l.token_usage_event_id IS NULL
+                 OR l.billing_event_id IS NULL
+                 OR l.node_transaction_id IS NULL
+                 OR COALESCE(NULLIF(TRIM(l.accounting_status), ''), 'missing') NOT IN ('billed', 'settled')
+                 OR NOT EXISTS (
+                   SELECT 1
+                   FROM codex_vault_emergency_lease_usage_events u
+                   WHERE u.lease_id = l.id
+                     AND u.token_usage_event_id = l.token_usage_event_id
+                 )
+               )",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
+
+    fn count_codex_sharing_recent_failures(&self) -> Result<i64> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT COUNT(*)
+             FROM user_codex_credential_events
+             WHERE success = 0
+               AND (event_type LIKE 'emergency_%' OR event_type LIKE 'sharing_%')
+               AND created_at > datetime('now', '-1 day')",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(Into::into)
+    }
 }
 
 fn configured_i64(store: &Store, key: &str, fallback: i64) -> i64 {
@@ -321,6 +433,7 @@ fn read_alert_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<BillingAlertRow> 
 
 #[cfg(test)]
 mod tests {
+    use super::super::codex_vault_emergency::CodexVaultEmergencyLeaseCreate;
     use super::*;
     use uuid::Uuid;
 
@@ -355,6 +468,89 @@ mod tests {
         assert!(alerts.iter().any(|alert| {
             alert.fingerprint == "billing:negative-balances" && alert.severity == "critical"
         }));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn codex_sharing_anomalies_create_admin_alerts() {
+        let (store, path) = temp_store();
+        let provider = store
+            .create_user(
+                "billing-alert-codex-provider@example.com",
+                "secret1",
+                Some("provider"),
+                None,
+            )
+            .unwrap();
+        let consumer = store
+            .create_user(
+                "billing-alert-codex-consumer@example.com",
+                "secret1",
+                Some("consumer"),
+                None,
+            )
+            .unwrap();
+        let grant = store
+            .upsert_codex_vault_emergency_grant(
+                &provider.id,
+                &consumer.id,
+                Some("provider shares to consumer"),
+                Some("robot_codex_vault_shared_access"),
+                Some(900),
+                None,
+                &provider.id,
+            )
+            .unwrap();
+        let lease = store
+            .create_codex_vault_emergency_lease(CodexVaultEmergencyLeaseCreate {
+                grant_id: &grant.id,
+                provider_user_id: &provider.id,
+                consumer_user_id: &consumer.id,
+                consumer_node_id: "node-consumer",
+                provider_slot_id: "slot-provider",
+                account_hint_hash: Some("hint-provider"),
+                purpose: Some("billing_alert_test"),
+                failure_reason: None,
+                max_lease_seconds: 900,
+            })
+            .unwrap();
+        store
+            .conn
+            .lock()
+            .unwrap()
+            .execute(
+                "UPDATE codex_vault_emergency_leases
+                    SET expires_at = '2000-01-01T00:00:00+00:00',
+                        total_tokens = 42
+                  WHERE id = ?1",
+                params![lease.id],
+            )
+            .unwrap();
+        store
+            .record_codex_vault_event(
+                &consumer.id,
+                "sharing_restore_failed",
+                Some("node-consumer"),
+                false,
+                Some("unit test failure"),
+            )
+            .unwrap();
+
+        let alerts = store.refresh_billing_alerts().unwrap();
+        assert!(alerts.iter().any(|alert| {
+            alert.fingerprint == "billing:codex-sharing-expired-uncleared-leases"
+                && alert.severity == "warning"
+        }));
+        assert!(alerts.iter().any(|alert| {
+            alert.fingerprint == "billing:codex-sharing-accounting-anomalies"
+                && alert.severity == "critical"
+        }));
+        assert!(alerts.iter().any(|alert| {
+            alert.fingerprint == "billing:codex-sharing-recent-failures"
+                && alert.severity == "warning"
+        }));
+
+        drop(store);
         let _ = std::fs::remove_file(path);
     }
 }

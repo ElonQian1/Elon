@@ -13,13 +13,15 @@ fn default_codex_home_env() -> Option<String> {
     std::env::var("USERPROFILE")
         .or_else(|_| std::env::var("HOME"))
         .ok()
-        .map(|home| format!("{home}/.codex"))
-        .filter(|path| Path::new(path).exists())
+        .map(|home| Path::new(&home).join(".codex"))
+        .filter(|path| path.exists())
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 #[cfg(test)]
 mod tests {
     use super::{codex_child_home_env, codex_child_home_env_assignment};
+    use std::path::Path;
     use std::process::Command;
     use std::sync::Mutex;
 
@@ -27,7 +29,7 @@ mod tests {
 
     #[test]
     fn codex_child_home_prefers_active_shared_vault_home() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock();
         let temp = std::env::temp_dir().join(format!(
             "elon-codex-child-env-{}",
             uuid::Uuid::new_v4().simple()
@@ -57,15 +59,12 @@ mod tests {
         restore_env("CODEX_HOME", old_codex);
         let _ = std::fs::remove_dir_all(&temp);
 
-        assert_eq!(
-            selected.as_deref(),
-            Some(shared_home.to_string_lossy().as_ref())
-        );
+        assert_path_eq(selected.as_deref(), &shared_home);
     }
 
     #[test]
     fn fake_codex_child_receives_shared_vault_home_without_real_cli() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock();
         let temp = std::env::temp_dir().join(format!(
             "elon-codex-child-fake-cli-{}",
             uuid::Uuid::new_v4().simple()
@@ -106,12 +105,12 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-        assert_eq!(home, shared_home.to_string_lossy());
+        assert_path_eq(Some(&home), &shared_home);
     }
 
     #[test]
     fn codex_child_home_ignores_expired_shared_vault_home() {
-        let _guard = ENV_LOCK.lock().unwrap();
+        let _guard = env_lock();
         let temp = std::env::temp_dir().join(format!(
             "elon-codex-child-env-{}",
             uuid::Uuid::new_v4().simple()
@@ -150,10 +149,18 @@ mod tests {
         restore_env("HOME", old_home);
         let _ = std::fs::remove_dir_all(&temp);
 
-        assert_eq!(
-            selected.as_deref(),
-            Some(default_home.to_string_lossy().as_ref())
-        );
+        assert_path_eq(selected.as_deref(), &default_home);
+    }
+
+    fn env_lock() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn assert_path_eq(actual: Option<&str>, expected: &Path) {
+        let actual = actual.expect("CODEX_HOME should be selected");
+        assert_eq!(Path::new(actual), expected);
     }
 
     fn restore_env(name: &str, value: Option<String>) {

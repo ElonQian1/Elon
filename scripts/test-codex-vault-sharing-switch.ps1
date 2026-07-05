@@ -84,6 +84,7 @@ Set-Content -LiteralPath (Join-Path $badCodexHome "auth.json") -Value $badAuth -
 
 function Invoke-CodexProbe([string]$CodexHomePath, [string]$Label, [int]$TimeoutSeconds) {
     $outFile = Join-Path $root ("$Label-last.txt")
+    $timeoutFlag = Join-Path $root ("$Label-timeout.flag")
     $codexArgs = @(
         "exec",
         "--skip-git-repo-check",
@@ -105,6 +106,30 @@ function Invoke-CodexProbe([string]$CodexHomePath, [string]$Label, [int]$Timeout
     foreach ($name in @("OPENAI_API_KEY", "CODEX_API_KEY", "OPENAI_BASE_URL", "OPENAI_API_BASE")) {
         [Environment]::SetEnvironmentVariable($name, $null, "Process")
     }
+    $watchdog = $null
+    if ($TimeoutSeconds -gt 0) {
+        $watchdog = Start-Job -ScriptBlock {
+            param(
+                [int]$ProbeTimeoutSeconds,
+                [string]$ProbeRoot,
+                [string]$ProbeTimeoutFlag
+            )
+            Start-Sleep -Seconds $ProbeTimeoutSeconds
+            $matches = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+                Where-Object {
+                    -not [string]::IsNullOrWhiteSpace($_.CommandLine) -and
+                    $_.CommandLine.IndexOf($ProbeRoot, [System.StringComparison]::OrdinalIgnoreCase) -ge 0
+                })
+            if ($matches.Count -gt 0) {
+                "timed_out" | Set-Content -LiteralPath $ProbeTimeoutFlag -Encoding UTF8
+                foreach ($process in $matches) {
+                    try {
+                        Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+                    } catch {}
+                }
+            }
+        } -ArgumentList $TimeoutSeconds, $root, $timeoutFlag
+    }
     try {
         Push-Location $workDir
         try {
@@ -123,6 +148,13 @@ function Invoke-CodexProbe([string]$CodexHomePath, [string]$Label, [int]$Timeout
                 $PSNativeCommandUseErrorActionPreference = $oldNativeCommandUseErrorActionPreference
             }
         } finally {
+            if ($null -ne $watchdog) {
+                if ($watchdog.State -eq "Running") {
+                    Stop-Job -Job $watchdog -ErrorAction SilentlyContinue
+                }
+                Receive-Job -Job $watchdog -ErrorAction SilentlyContinue | Out-Null
+                Remove-Job -Job $watchdog -Force -ErrorAction SilentlyContinue
+            }
             if ($null -ne $oldErrorActionPreference) {
                 $ErrorActionPreference = $oldErrorActionPreference
             }
@@ -138,16 +170,20 @@ function Invoke-CodexProbe([string]$CodexHomePath, [string]$Label, [int]$Timeout
     }
     $output = if (Test-Path -LiteralPath $allFile) { Get-Content -LiteralPath $allFile -Raw } else { "" }
     $last = if (Test-Path -LiteralPath $outFile) { Get-Content -LiteralPath $outFile -Raw } else { "" }
+    $timedOut = Test-Path -LiteralPath $timeoutFlag
+    if ($timedOut -and $null -eq $exitCode) {
+        $exitCode = 124
+    }
     [pscustomobject]@{
         label = $Label
         exit_code = $exitCode
-        timed_out = $false
-        timeout_enforced = $false
+        timed_out = $timedOut
+        timeout_enforced = ($TimeoutSeconds -gt 0)
         timeout_seconds = $TimeoutSeconds
-        success = ($exitCode -eq 0)
+        success = (($exitCode -eq 0) -and -not $timedOut)
         last_message = Shorten-Text $last 200
         stdout_tail = Shorten-Text $output 700
-        stderr_tail = ""
+        stderr_tail = $(if ($timedOut) { "Codex probe timed out after $TimeoutSeconds seconds." } else { "" })
     }
 }
 

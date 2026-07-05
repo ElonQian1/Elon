@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::{
+    use super::super::{
         api_runtime_chat_payload, api_runtime_config_from_lookup,
         api_runtime_should_retry_without_json_mode, ensure_runtime_response_size,
         parse_agent_response, run_runtime_loop, runtime_http_error_message,
@@ -626,9 +626,8 @@ mod tests {
                     .and_then(Value::as_str)
                     == Some("canceled")
         }));
+    }
 
-    // Integration tests (continued from tests_integration.rs)
-    include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/node_agent_server_runtime/tests_integration.rs"));
     #[tokio::test]
     async fn runtime_rejects_stale_write_file_after_approval() {
         let workspace = temp_test_dir("runtime_rejects_stale_write_file_after_approval");
