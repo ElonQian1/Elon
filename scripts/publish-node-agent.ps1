@@ -178,6 +178,11 @@ foreach ($requiredPath in @(
     }
 }
 
+$BroadcastAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
+if (-not $SkipBroadcast -and [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
+    throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，无法调用 /api/admin/nodes/push-update。若只想上传文件请显式传 -SkipBroadcast。"
+}
+
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
 $meta = cargo metadata --manifest-path $ServerManifest --no-deps --format-version 1 | ConvertFrom-Json
 $TargetDir = $meta.target_directory
@@ -305,15 +310,10 @@ Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
 if ($SkipBroadcast) {
     Write-Host "  已按 -SkipBroadcast 跳过在线节点推送；离线/重启客户端仍会通过版本接口自动更新。" -ForegroundColor Yellow
 } else {
-    $ResolvedAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
-    if ([string]::IsNullOrWhiteSpace($ResolvedAdminToken)) {
-        throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，无法调用 /api/admin/nodes/push-update。若只想上传文件请显式传 -SkipBroadcast。"
-    }
-
     $broadcast = Invoke-NoProxyJson `
         -Uri "$BaseUrl/api/admin/nodes/push-update" `
         -Method "Post" `
-        -Headers @{ Authorization = "Bearer $ResolvedAdminToken" } `
+        -Headers @{ Authorization = "Bearer $BroadcastAdminToken" } `
         -Body "{}" `
         -TimeoutSec 20
     $broadcastTo = "unknown"
