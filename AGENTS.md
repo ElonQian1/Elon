@@ -25,6 +25,7 @@
 | 模块化、拆文件、治理巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和任务相关源码 |
 | PC 工作台、`/pc` 页面、前端框架迁移、React/Vite/TypeScript | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md`、`AI_INDEX.md` |
+| Windows PC 节点客户端、启动器、安装/自更新、节点推送更新 | `.github/instructions/git-deploy-workflow.instructions.md` 的 Windows PC 节点客户端部署章节 |
 | 完整开发流程或任务卡住 | `docs/ai-agent-workflow.md` |
 | Android APK 发布 | `.github/instructions/git-deploy-workflow.instructions.md` 的 APK 部署章节 |
 | Gradle 下载或 Android 首次编译环境异常 | `docs/android-setup.md` |
@@ -43,6 +44,7 @@
 - 任务流程门禁：修改 `ai-task-preflight`、worktree 清理、并行 AI 说明或 Git 工作流文档后，必须运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`，防止 `-CreateWorktree`、`WORKTREE_PATH`、`main` 基线规则漂移。
 - Rust 日常验证：不要并行裸跑 `cargo check` / `cargo test` / `cargo build` / `cargo clippy` 到同一个 target。Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml`，Linux/macOS 用 `bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml`；脚本读取 `.env.local` / `ELON_DEV_CARGO_TARGET_DIR`，复用开发 target 并加锁。发布构建仍由 `RUST_SERVER_MUSL_TARGET_DIR` + `publish-server.*` 管理。
 - 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`；若发布期间被更新的 `origin/main` 或服务器版本超越，按脚本提示汇报“代码已合并，发布交给最新主线”，不要反复 rebase 重跑。
+- Windows PC 节点发布：影响 Win 节点客户端、启动器、安装/自更新、节点托盘或 `elon-pc-node` 的用户可见改动，业务代码 commit + push 后运行 `scripts\publish-node-agent.ps1`，再运行 `scripts\check-task-complete.ps1 -Kind NodeAgent`；脚本默认调用 `/api/admin/nodes/push-update` 通知在线节点自动更新并重连，需要 `ADMIN_TOKEN` 或 `ELON_ADMIN_TOKEN`。
 - Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；并行任务若只要求代码先合并，运行 `scripts\check-task-complete.ps1 -Kind CodePushed` 即可收尾；明确负责 APK 发布的任务再运行 `-Kind AndroidFeature`。
 - 任务收尾清理 worktree：`scripts\cleanup-task-worktrees.ps1 -Apply`（Windows）或 `bash scripts/cleanup-task-worktrees.sh --apply`（Linux）。预览模式（不带 `-Apply`/`--apply`）只列不删；脏 worktree 和未合并分支会自动保留。
 - 脚本已经负责版本 claim/finish、构建、上传、并发保护和清理。AI 不要手搓这些步骤。

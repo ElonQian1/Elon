@@ -11,6 +11,8 @@
     Server verifies /health and that /api/server/version.gitSha points at
     the pushed source commit. Server version numbers are assigned by the
     release claim API and are not compared with server/Cargo.toml.
+    NodeAgent verifies that /api/node-agent/version and the Windows download
+    endpoints point at the pushed source commit.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
@@ -20,9 +22,12 @@
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind NodeAgent
 #>
 param(
-    [ValidateSet("CodePushed", "CodeSync", "AndroidFeature", "DocsOnly", "Server")]
+    [ValidateSet("CodePushed", "CodeSync", "AndroidFeature", "NodeAgent", "DocsOnly", "Server")]
     [string]$Kind = "CodePushed",
 
     [switch]$SkipGitStatus
@@ -158,6 +163,44 @@ function Sync-MainWorktreeIfClean {
     }
 }
 
+function Test-DownloadUrl {
+    param(
+        [Parameter(Mandatory = $true)][string]$Url,
+        [Parameter(Mandatory = $true)][string]$Label
+    )
+
+    try {
+        $headParams = @{
+            Uri = $Url
+            Method = "Head"
+            TimeoutSec = 10
+            UseBasicParsing = $true
+        }
+        $headParams = Add-ElonProjectDirectRequestParameters -Params $headParams -CommandName "Invoke-WebRequest"
+        $response = Invoke-WebRequest @headParams
+    } catch {
+        try {
+            $getParams = @{
+                Uri = $Url
+                Method = "Get"
+                Headers = @{ Range = "bytes=0-0" }
+                TimeoutSec = 10
+                UseBasicParsing = $true
+            }
+            $getParams = Add-ElonProjectDirectRequestParameters -Params $getParams -CommandName "Invoke-WebRequest"
+            $response = Invoke-WebRequest @getParams
+        } catch {
+            Stop-Check "$Label download URL is unavailable: $_"
+        }
+    }
+
+    if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 400) {
+        Stop-Check "$Label download URL returned unexpected status: $($response.StatusCode)"
+    }
+
+    return $response.StatusCode
+}
+
 Set-Location $RepoRoot
 
 if (-not $SkipGitStatus) {
@@ -185,6 +228,7 @@ if ($Kind -eq "CodePushed" -or $Kind -eq "CodeSync") {
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  NODE_AGENT_RELEASE_STATUS=not_attempted"
     Write-Host "  APK_RELEASE_STATUS=not_attempted"
     Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     if ($head -eq $originMain) {
@@ -253,6 +297,7 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  NODE_AGENT_RELEASE_STATUS=not_attempted"
     Write-Host "  APK_RELEASE_STATUS=published"
     Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     Write-Host "  version:     v$($remoteVersion.versionName) (build $($remoteVersion.versionCode))"
@@ -261,11 +306,64 @@ if ($Kind -eq "AndroidFeature") {
     exit 0
 }
 
+if ($Kind -eq "NodeAgent") {
+    git merge-base --is-ancestor $head $originMain | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Stop-Check "Node agent task is not complete: local HEAD is not contained in origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
+    }
+
+    try {
+        $nodeVersionParams = @{
+            Uri = "$ServerUrl/api/node-agent/version"
+            TimeoutSec = 10
+        }
+        $nodeVersionParams = Add-ElonProjectDirectRequestParameters -Params $nodeVersionParams -CommandName "Invoke-RestMethod"
+        $nodeVersion = Invoke-RestMethod @nodeVersionParams
+    } catch {
+        Stop-Check "Could not read server /api/node-agent/version: $_"
+    }
+
+    $nodeGitSha = [string]$nodeVersion.gitSha
+    if ([string]::IsNullOrWhiteSpace($nodeGitSha)) {
+        Stop-Check "Server /api/node-agent/version does not include gitSha; node-agent deploy provenance is unknown."
+    }
+
+    if (-not ($head.StartsWith($nodeGitSha) -or $nodeGitSha.StartsWith($head))) {
+        Stop-Check "Server node-agent gitSha mismatch: local HEAD=$($head.Substring(0, 7)), server gitSha=$nodeGitSha."
+    }
+
+    $windowsClientUrl = [string]$nodeVersion.windowsClientDownloadUrl
+    if ([string]::IsNullOrWhiteSpace($windowsClientUrl)) {
+        $windowsClientUrl = "$ServerUrl/api/node-agent/download/windows-client"
+    }
+    $windowsExeUrl = [string]$nodeVersion.downloadUrl
+    if ([string]::IsNullOrWhiteSpace($windowsExeUrl)) {
+        $windowsExeUrl = "$ServerUrl/api/node-agent/download/windows"
+    }
+
+    $clientStatus = Test-DownloadUrl -Url $windowsClientUrl -Label "Windows client package"
+    $exeStatus = Test-DownloadUrl -Url $windowsExeUrl -Label "Windows node exe"
+
+    Write-Host "Node agent completion check passed:" -ForegroundColor Green
+    Write-Host "  HEAD:        $($head.Substring(0, 7))"
+    Write-Host "  origin/main: $($originMain.Substring(0, 7))"
+    Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  NODE_AGENT_RELEASE_STATUS=published"
+    Write-Host "  APK_RELEASE_STATUS=not_attempted"
+    Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
+    Write-Host "  version:     v$($nodeVersion.version)"
+    Write-Host "  gitSha:      $nodeGitSha"
+    Write-Host "  client zip:  $windowsClientUrl (HTTP $clientStatus)"
+    Write-Host "  exe:         $windowsExeUrl (HTTP $exeStatus)"
+    exit 0
+}
+
 if ($Kind -eq "DocsOnly") {
     Write-Host "DocsOnly completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  NODE_AGENT_RELEASE_STATUS=not_attempted"
     Write-Host "  APK_RELEASE_STATUS=not_attempted"
     Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     exit 0
@@ -310,6 +408,7 @@ if ($Kind -eq "Server") {
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  NODE_AGENT_RELEASE_STATUS=not_attempted"
     Write-Host "  APK_RELEASE_STATUS=not_attempted"
     Write-Host "  SERVER_RELEASE_STATUS=published"
     Write-Host "  health:      $($health | ConvertTo-Json -Compress)"

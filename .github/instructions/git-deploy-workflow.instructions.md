@@ -311,6 +311,29 @@ curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 
 ---
 
+## 🪟 Windows PC 节点客户端部署
+
+> 影响 Win 端节点客户端、启动器、安装/自更新、节点托盘、`elon-pc-node` 二进制或 `scripts/publish-node-agent.ps1` 的用户可见修复，代码进入 `origin/main` 后默认继续发布 Win 节点客户端，除非用户明确说只同步代码或暂不发布。
+
+```powershell
+git add server/src/node_agent_... scripts/publish-node-agent.ps1
+git commit -m "fix(node): 描述"
+git push origin HEAD:main
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
+
+scripts\publish-node-agent.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind NodeAgent
+```
+
+`publish-node-agent.ps1` 会：
+- 构建 Linux `elon-pc-node`、Windows `elon-pc-node.exe` 和完整 Windows 客户端 zip。
+- 上传到 `/opt/elon/data/downloads/`，并更新 `/api/node-agent/version` 对应的 `node-agent-version.json`。
+- 默认调用 `/api/admin/nodes/push-update` 广播 `UpdateClient`，在线 Win 节点收到后自动更新、自动重连；离线节点下次启动会读取版本接口补更新。
+
+运行发布脚本需要本机环境变量 `ADMIN_TOKEN` 或 `ELON_ADMIN_TOKEN`。如果只允许上传产物、不允许广播，必须显式传 `-SkipBroadcast`，最终汇报也必须说明“未推送在线节点更新”。
+
+---
+
 ## 📱 Android APK 部署
 
 > Android 新功能的代码完成标准是“业务提交已进入 `origin/main`”；APK 发布标准是“服务器 APK 指向最新主线”。并行任务先确保代码 push；只有明确负责发布的任务才必须等到 `AndroidFeature` 校验通过。
@@ -395,6 +418,8 @@ tls/
 ✅ 临时工作树已清理：是 / 不适用
 ✅ 服务健康验证结果：<curl 输出>
 ✅ 后端版本验证结果：<curl /api/server/version 输出>
+✅ Win 节点发布状态：已发布并推送 / 仅代码同步 / 未尝试发布
+✅ Win 节点版本与下载地址：<version/gitSha/windows-client-url>
 ✅ APK 发布状态：已发布 / 未发布（非 Android 任务或用户明确要求）
 ✅ APK 版本与下载地址：<versionName/build/downloadUrl>
 ```

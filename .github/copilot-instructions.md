@@ -56,6 +56,28 @@
 
 **脚本内置防慢构建覆盖和并发保护**。并发保护触发时不要为了让本代理“发布成功”继续追最新 main；强制覆盖仅用于明确的发布协调任务，参数为 `-Force`。
 
+### Windows PC 节点客户端完成定义
+
+涉及 Win 端节点客户端、启动器、安装/自更新、节点托盘、`elon-pc-node` 二进制或 `scripts/publish-node-agent.ps1` 的用户可见修复，不能只停在代码 push。默认分成两层：
+
+1. **代码同步完成**
+   - 业务代码已 `commit` 并 `git push origin HEAD:main` 进入 `origin/main`
+   - 可用：
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
+     ```
+
+2. **Win 节点发布完成**
+   - 明确影响用户 Win 端运行体验时，继续运行：
+     ```powershell
+     scripts\publish-node-agent.ps1
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind NodeAgent
+     ```
+   - `publish-node-agent.ps1` 会构建 Windows 客户端包，上传 `/api/node-agent/version` 指向的新版本，并默认调用 `/api/admin/nodes/push-update` 通知在线节点自动更新；需要 `ADMIN_TOKEN` 或 `ELON_ADMIN_TOKEN`。
+   - 在线节点收到推送后会更新并自动重连；离线节点或未收到推送的节点会在下次启动/更新检查时读取 `/api/node-agent/version` 自动补上。
+
+最终回复必须明确区分：本次是“代码已同步”还是“Win 节点客户端已发布并推送更新”。
+
 > 详细流程见：`docs/ai-agent-workflow.md`
 
 ---
@@ -106,8 +128,11 @@
 | 健康检查 | `curl --noproxy '*' http://43.139.149.158:8080/health` |
 | APK 版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/app/version.json` |
 | 后端版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/api/server/version` |
+| Win 节点版本信息 | `curl --noproxy '*' http://43.139.149.158:8080/api/node-agent/version` |
 | APK 下载 | `http://43.139.149.158:8080/app/ElonSpeed-latest.apk` |
+| Win 节点客户端包 | `http://43.139.149.158:8080/api/node-agent/download/windows-client` |
 | 部署脚本 | `scripts/publish-server.ps1`（自动 worktree 隔离，SHA staging，并发安全） |
+| Win 节点发布脚本 | `scripts/publish-node-agent.ps1`（上传后默认推送在线节点更新） |
 | 服务日志 | `ssh -o ProxyCommand=none root@43.139.149.158 'tail -50 /root/elon-server.log'` |
 
 > ⚠️ **绝对禁止**：改完代码不 commit 直接运行脚本部署——脚本基于 git HEAD，未提交内容不会进入部署。

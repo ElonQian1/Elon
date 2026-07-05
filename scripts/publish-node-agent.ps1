@@ -15,10 +15,16 @@
     .\scripts\publish-node-agent.ps1
 #>
 
+param(
+    [switch]$SkipBroadcast,
+    [string]$AdminToken = ""
+)
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $Server = "root@43.139.149.158"
+$BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
 $RemoteDir = "/opt/elon/data/downloads"
 $Bin = "elon-pc-node"
@@ -58,6 +64,82 @@ function Write-Utf8NoBom {
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
+function Invoke-GitFetchMain {
+    git -C $RepoRoot -c http.proxy= -c https.proxy= fetch origin main
+    if ($LASTEXITCODE -ne 0) { throw "git fetch origin main 失败，无法确认 PC 节点发布基线。" }
+}
+
+function Assert-NodeAgentPublishHeadCurrent {
+    param([Parameter(Mandatory = $true)][string]$Phase)
+
+    Invoke-GitFetchMain
+    $headSha = (git -C $RepoRoot rev-parse HEAD).Trim()
+    $originMainSha = (git -C $RepoRoot rev-parse origin/main).Trim()
+    if ($headSha -ne $originMainSha) {
+        throw "$Phase：PC 节点发布停止。当前 HEAD=$($headSha.Substring(0, 7))，origin/main=$($originMainSha.Substring(0, 7))。请先把最新 main 发布，避免用旧 Win 客户端覆盖新主线。"
+    }
+
+    return $headSha
+}
+
+function Resolve-NodeAgentAdminToken {
+    param([string]$ExplicitToken)
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitToken)) { return $ExplicitToken }
+    if (-not [string]::IsNullOrWhiteSpace($env:ELON_ADMIN_TOKEN)) { return $env:ELON_ADMIN_TOKEN }
+    if (-not [string]::IsNullOrWhiteSpace($env:ADMIN_TOKEN)) { return $env:ADMIN_TOKEN }
+    return ""
+}
+
+function Invoke-NoProxyJson {
+    param(
+        [Parameter(Mandatory = $true)][string]$Uri,
+        [string]$Method = "Get",
+        [hashtable]$Headers = @{},
+        [string]$Body = "",
+        [int]$TimeoutSec = 15
+    )
+
+    $irmCommand = Get-Command Invoke-RestMethod -ErrorAction Stop
+    $params = @{
+        Uri = $Uri
+        Method = $Method
+        TimeoutSec = $TimeoutSec
+    }
+    if ($Headers.Count -gt 0) { $params["Headers"] = $Headers }
+    if (-not [string]::IsNullOrWhiteSpace($Body)) {
+        $params["Body"] = $Body
+        $params["ContentType"] = "application/json"
+    }
+    if ($irmCommand.Parameters.ContainsKey("NoProxy")) {
+        $params["NoProxy"] = $true
+        return Invoke-RestMethod @params
+    }
+
+    $curl = Get-Command "curl.exe" -ErrorAction SilentlyContinue
+    if ($curl) {
+        $curlArgs = @(
+            "--noproxy", "*",
+            "--silent", "--show-error", "--fail",
+            "--max-time", [string]$TimeoutSec,
+            "-X", $Method
+        )
+        foreach ($key in $Headers.Keys) {
+            $curlArgs += @("-H", "${key}: $($Headers[$key])")
+        }
+        if (-not [string]::IsNullOrWhiteSpace($Body)) {
+            $curlArgs += @("-H", "Content-Type: application/json", "--data", $Body)
+        }
+        $curlArgs += $Uri
+        $raw = & $curl.Source @curlArgs
+        if ($LASTEXITCODE -ne 0) { throw "curl.exe 请求失败：$Uri" }
+        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+        return $raw | ConvertFrom-Json
+    }
+
+    return Invoke-RestMethod @params
 }
 
 function Resolve-NodeAgentTargetDir {
@@ -102,11 +184,12 @@ $TargetDir = $meta.target_directory
 if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
 if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
-$GitSha = (git -C $RepoRoot rev-parse HEAD).Trim()
+$GitSha = Assert-NodeAgentPublishHeadCurrent -Phase "发布开始"
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
+Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 
 # ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
-Write-Host "[1/4] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
+Write-Host "[1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
 try {
     # musl 交叉编译需要 C 工具链（ring 依赖 gcc）；用 cargo-zigbuild 提供 zig cc，
     # 与 publish-server.ps1 同方案，避免缺少 x86_64-linux-musl-gcc 时编译失败。
@@ -130,7 +213,7 @@ $LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
 if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
 
 # ── 2. 编译 Windows 版本 ─────────────────────────────────────────────────────
-Write-Host "[2/4] 编译 Windows 版本..." -ForegroundColor Yellow
+Write-Host "[2/5] 编译 Windows 版本..." -ForegroundColor Yellow
 try {
     # 强制通用 CPU，避免全局 target-cpu=native 产出用户机器无法运行的指令。
     $unitSeparator = [char]0x1f
@@ -146,8 +229,7 @@ $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
-Write-Host "[2.5/4] 打包 Windows 客户端..." -ForegroundColor Yellow
-$BaseUrl = "http://43.139.149.158:8080"
+Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
 $LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
 $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
@@ -179,7 +261,8 @@ try {
 if (-not (Test-Path $WindowsClientPackage)) { throw "Windows 客户端压缩包不存在：$WindowsClientPackage" }
 
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
-Write-Host "[3/4] 上传到服务器..." -ForegroundColor Yellow
+Write-Host "[3/5] 上传到服务器..." -ForegroundColor Yellow
+Assert-NodeAgentPublishHeadCurrent -Phase "上传前" | Out-Null
 ssh -o ProxyCommand=none $Server "mkdir -p $RemoteDir"
 scp -o ProxyCommand=none $LinuxBin "${Server}:${RemoteDir}/${Bin}"
 ssh -o ProxyCommand=none $Server "chmod +x ${RemoteDir}/${Bin}"
@@ -188,7 +271,7 @@ scp -o ProxyCommand=none $WindowsClientPackage "${Server}:${RemoteDir}/${Windows
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
 
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
-Write-Host "[4/4] 验证下载地址..." -ForegroundColor Yellow
+Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
 
 $size    = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}"
 $sizeWin = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
@@ -216,6 +299,29 @@ Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
 Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
 Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundColor Green
 Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
+
+# ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
+Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
+if ($SkipBroadcast) {
+    Write-Host "  已按 -SkipBroadcast 跳过在线节点推送；离线/重启客户端仍会通过版本接口自动更新。" -ForegroundColor Yellow
+} else {
+    $ResolvedAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
+    if ([string]::IsNullOrWhiteSpace($ResolvedAdminToken)) {
+        throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，无法调用 /api/admin/nodes/push-update。若只想上传文件请显式传 -SkipBroadcast。"
+    }
+
+    $broadcast = Invoke-NoProxyJson `
+        -Uri "$BaseUrl/api/admin/nodes/push-update" `
+        -Method "Post" `
+        -Headers @{ Authorization = "Bearer $ResolvedAdminToken" } `
+        -Body "{}" `
+        -TimeoutSec 20
+    $broadcastTo = "unknown"
+    if ($null -ne $broadcast -and ($broadcast.PSObject.Properties.Name -contains "broadcast_to")) {
+        $broadcastTo = [string]$broadcast.broadcast_to
+    }
+    Write-Host "  已通知在线节点更新：$broadcastTo 个" -ForegroundColor Green
+}
 
 Write-Host ""
 Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green
