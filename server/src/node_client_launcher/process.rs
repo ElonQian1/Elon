@@ -285,6 +285,52 @@ do {{
     }
 }
 
+pub(crate) fn stop_installed_client_processes(install_dir: &Path) {
+    #[cfg(windows)]
+    {
+        let client = paths::client_exe(install_dir);
+        let script = stop_installed_client_processes_script(&client, std::process::id());
+        let mut ps = launcher_command::powershell_hidden_command(&script);
+        let _ = launcher_command::status_hidden(&mut ps);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = install_dir;
+    }
+}
+
+#[cfg(any(windows, test))]
+fn stop_installed_client_processes_script(client: &Path, current_pid: u32) -> String {
+    format!(
+        r#"
+$target = [System.IO.Path]::GetFullPath('{client}')
+$currentPid = {current_pid}
+$deadline = (Get-Date).AddSeconds(20)
+do {{
+  $targets = @(Get-CimInstance Win32_Process | Where-Object {{
+    $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
+    $matchesClient = $false
+    if ($exe) {{
+      try {{
+        $matchesClient = [System.IO.Path]::GetFullPath($exe).Equals($target, [StringComparison]::OrdinalIgnoreCase)
+      }} catch {{
+        $matchesClient = $false
+      }}
+    }}
+    ([uint32]$_.ProcessId -ne [uint32]$currentPid) -and ($matchesClient -or ($_.Name -eq 'elon-node-agent.exe'))
+  }})
+  foreach ($targetProcess in $targets) {{
+    try {{ Invoke-CimMethod -InputObject $targetProcess -MethodName Terminate | Out-Null }} catch {{}}
+  }}
+  if ($targets.Count -eq 0) {{ break }}
+  Start-Sleep -Milliseconds 300
+}} while ((Get-Date) -lt $deadline)
+"#,
+        client = launcher_command::ps_single_quote(&client.to_string_lossy()),
+        current_pid = current_pid
+    )
+}
+
 pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
     let client = paths::client_exe(install_dir);
     if !client.exists() {
@@ -731,5 +777,20 @@ mod tests {
             .rfind("[Environment]::SetEnvironmentVariable('NODE_AUTO_OPEN_ADMIN', '0', 'Process')")
             .unwrap();
         assert!(launcher_auto_open > inherited_auto_open);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn stop_installed_client_processes_excludes_current_pid() {
+        let script = stop_installed_client_processes_script(
+            Path::new(r"C:\ElonNode\一龙开发平台.exe"),
+            1234,
+        );
+
+        assert!(script.contains(r"C:\ElonNode\一龙开发平台.exe"));
+        assert!(script.contains("$currentPid = 1234"));
+        assert!(script.contains("ProcessId -ne"));
+        assert!(script.contains("elon-node-agent.exe"));
+        assert!(script.contains("Terminate"));
     }
 }

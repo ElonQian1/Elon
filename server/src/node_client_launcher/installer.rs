@@ -77,6 +77,7 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
     let previous_port = configured_admin_port(&install_dir);
     watchdog::stop_running(&install_dir);
     process::stop_agent();
+    process::stop_installed_client_processes(&install_dir);
     process::wait_for_port_closed(previous_port, Duration::from_secs(5));
 
     let current_exe = std::env::current_exe().context("无法定位当前客户端 exe")?;
