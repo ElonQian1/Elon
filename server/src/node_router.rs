@@ -113,6 +113,7 @@ pub async fn dispatch_to_node_with_req_id(
                 state,
                 &compute_call_id,
                 crate::store::NodeComputeRunFinish {
+                    provider_user_id: provider_user_id.as_deref(),
                     status: "failed",
                     prompt_tokens: 0,
                     completion_tokens: 0,
@@ -188,6 +189,7 @@ pub fn settle_after_stream(
                     &state,
                     key,
                     crate::store::NodeComputeRunFinish {
+                        provider_user_id: provider.as_deref(),
                         status: "settlement_failed",
                         prompt_tokens: prompt_tokens as i64,
                         completion_tokens: completion_tokens as i64,
@@ -212,6 +214,7 @@ pub fn settle_after_stream(
                     &state,
                     key,
                     crate::store::NodeComputeRunFinish {
+                        provider_user_id: provider.as_deref(),
                         status: "deduplicated",
                         prompt_tokens: prompt_tokens as i64,
                         completion_tokens: completion_tokens as i64,
@@ -237,6 +240,7 @@ pub fn settle_after_stream(
                     &state,
                     key,
                     crate::store::NodeComputeRunFinish {
+                        provider_user_id: None,
                         status: "settled_no_provider",
                         prompt_tokens: prompt_tokens as i64,
                         completion_tokens: completion_tokens as i64,
@@ -281,6 +285,7 @@ pub fn settle_after_stream(
                         &state,
                         key,
                         crate::store::NodeComputeRunFinish {
+                            provider_user_id: Some(&provider),
                             status: "settled",
                             prompt_tokens: prompt_tokens as i64,
                             completion_tokens: completion_tokens as i64,
@@ -309,6 +314,7 @@ pub fn settle_after_stream(
                         &state,
                         key,
                         crate::store::NodeComputeRunFinish {
+                            provider_user_id: Some(&provider),
                             status: "settlement_failed",
                             prompt_tokens: prompt_tokens as i64,
                             completion_tokens: completion_tokens as i64,

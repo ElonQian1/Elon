@@ -44,6 +44,7 @@ pub struct NodeComputeRunStart<'a> {
 }
 
 pub struct NodeComputeRunFinish<'a> {
+    pub provider_user_id: Option<&'a str>,
     pub status: &'a str,
     pub prompt_tokens: i64,
     pub completion_tokens: i64,
@@ -135,6 +136,7 @@ impl Store {
                     provider_earned_fen = ?7,
                     settlement_status = ?8,
                     error_message = ?9,
+                    provider_user_id = COALESCE(?10, provider_user_id),
                     updated_at = ?3
               WHERE compute_call_id = ?1",
             params![
@@ -147,6 +149,7 @@ impl Store {
                 finish.provider_earned_fen.max(0),
                 clean_optional(finish.settlement_status),
                 truncate_optional(finish.error_message, 512),
+                clean_optional(finish.provider_user_id),
             ],
         )?;
         select_run_by_compute_call_id(&conn, compute_call_id)
@@ -356,7 +359,6 @@ fn truncate_optional(value: Option<&str>, max_len: usize) -> Option<String> {
     let value = value.map(str::trim).filter(|value| !value.is_empty())?;
     Some(value.chars().take(max_len).collect())
 }
-
 
 #[cfg(test)]
 #[path = "node_compute_runs_tests.rs"]

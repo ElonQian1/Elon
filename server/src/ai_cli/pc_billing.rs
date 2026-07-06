@@ -19,6 +19,18 @@ pub(super) struct PcCliBillingContext {
     pub(super) charge_platform_balance: bool,
 }
 
+impl PcCliBillingContext {
+    pub(super) fn refresh(
+        &mut self,
+        state: &AppState,
+        consumer_user_id: &str,
+        node_id: &str,
+        cli_name: &str,
+    ) {
+        *self = pc_cli_billing_context(state, consumer_user_id, node_id, cli_name);
+    }
+}
+
 pub(crate) fn pc_cli_request_is_own_codex(
     state: &AppState,
     user_id: &str,
@@ -236,7 +248,16 @@ pub(super) fn pc_cli_billing_context(
     node_id: &str,
     cli_name: &str,
 ) -> PcCliBillingContext {
-    let owner = match state.store.get_node_credential_owner(node_id) {
+    pc_cli_billing_context_from_store(&state.store, consumer_user_id, node_id, cli_name)
+}
+
+fn pc_cli_billing_context_from_store(
+    store: &Store,
+    consumer_user_id: &str,
+    node_id: &str,
+    cli_name: &str,
+) -> PcCliBillingContext {
+    let owner = match store.get_node_credential_owner(node_id) {
         Ok(owner) => owner,
         Err(e) => {
             tracing::warn!(node_id, error = %e, "查询 PC 节点 owner 失败，按平台来源记账");
@@ -245,10 +266,7 @@ pub(super) fn pc_cli_billing_context(
     };
     if pc_cli_name_is_codex(cli_name) {
         if owner.as_deref() == Some(consumer_user_id) {
-            match state
-                .store
-                .get_active_codex_vault_emergency_lease_for_node(consumer_user_id, node_id)
-            {
+            match store.get_active_codex_vault_emergency_lease_for_node(consumer_user_id, node_id) {
                 Ok(Some(lease)) if lease.provider_user_id != consumer_user_id => {
                     return PcCliBillingContext {
                         billing_source: BILLING_SOURCE_SHARED_CODEX,
@@ -292,4 +310,139 @@ fn pc_cli_name_is_codex(cli_name: &str) -> bool {
 
 fn clamp_i64_to_u32(value: i64) -> u32 {
     value.clamp(0, u32::MAX as i64) as u32
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{pc_cli_billing_context_from_store, record_pc_cli_trusted_usage};
+    use crate::{
+        cli_usage::CliTokenUsage,
+        store::{
+            codex_vault_emergency::CodexVaultEmergencyLeaseCreate,
+            token_usage::{BILLING_SOURCE_OWN_CODEX, BILLING_SOURCE_SHARED_CODEX},
+            Store,
+        },
+    };
+
+    fn temp_store() -> (Store, std::path::PathBuf) {
+        let path = std::env::temp_dir().join(format!(
+            "elon-pc-cli-billing-test-{}.sqlite",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let _ = std::fs::remove_file(&path);
+        (Store::open(&path).expect("store should open"), path)
+    }
+
+    #[test]
+    fn refreshed_context_bills_shared_codex_after_local_node_switches_to_provider_auth() {
+        let (store, path) = temp_store();
+        let consumer = store
+            .create_user(
+                "pc-billing-consumer@example.com",
+                "secret1",
+                Some("钱一龙"),
+                None,
+            )
+            .unwrap();
+        let provider = store
+            .create_user(
+                "pc-billing-provider@example.com",
+                "secret1",
+                Some("全嘉"),
+                None,
+            )
+            .unwrap();
+        store
+            .create_node_credential(
+                "node-consumer",
+                "secret-hash",
+                &consumer.id,
+                Some("钱一龙节点"),
+                Some("钱一龙 PC"),
+                Some("install-consumer"),
+            )
+            .unwrap();
+
+        let initial_context =
+            pc_cli_billing_context_from_store(&store, &consumer.id, "node-consumer", "codex");
+        assert_eq!(initial_context.billing_source, BILLING_SOURCE_OWN_CODEX);
+        assert_eq!(
+            initial_context.resource_owner_user_id.as_deref(),
+            Some(consumer.id.as_str())
+        );
+        assert!(
+            !initial_context.charge_platform_balance,
+            "own Codex should only be metered, not billed"
+        );
+
+        let grant = store
+            .upsert_codex_vault_emergency_grant(
+                &provider.id,
+                &consumer.id,
+                Some("全嘉 shares Codex to 钱一龙"),
+                Some("robot_codex_vault_shared_access"),
+                Some(900),
+                None,
+                &provider.id,
+            )
+            .unwrap();
+        let _lease = store
+            .create_codex_vault_emergency_lease(CodexVaultEmergencyLeaseCreate {
+                grant_id: &grant.id,
+                provider_user_id: &provider.id,
+                consumer_user_id: &consumer.id,
+                consumer_node_id: "node-consumer",
+                provider_slot_id: "slot-quanjia",
+                account_hint_hash: Some("hint-quanjia"),
+                purpose: Some("unit_test_default_provider_auth"),
+                failure_reason: None,
+                max_lease_seconds: 900,
+            })
+            .unwrap();
+
+        let refreshed_context =
+            pc_cli_billing_context_from_store(&store, &consumer.id, "node-consumer", "codex");
+        assert_eq!(
+            refreshed_context.billing_source,
+            BILLING_SOURCE_SHARED_CODEX
+        );
+        assert_eq!(
+            refreshed_context.resource_owner_user_id.as_deref(),
+            Some(provider.id.as_str())
+        );
+        assert!(
+            refreshed_context.charge_platform_balance,
+            "shared provider auth must be billable to the consumer"
+        );
+
+        let usage = CliTokenUsage {
+            input_tokens: 3_000,
+            cached_input_tokens: 0,
+            output_tokens: 2_000,
+            reasoning_tokens: 0,
+            total_tokens: 5_000,
+            model: Some("codex".to_string()),
+        };
+        let result = record_pc_cli_trusted_usage(
+            &store,
+            &consumer.id,
+            "pc_agent_cli_chat",
+            Some("codex"),
+            &usage,
+            "pc_agent_cli:test-shared-context-refresh",
+            &refreshed_context,
+        )
+        .expect("shared usage should be recorded");
+        assert_ne!(result.accounting_status, "unbilled_own_codex");
+
+        let stats = store.get_usage_stats(&consumer.id, 30).unwrap();
+        assert!(stats
+            .by_billing_source
+            .iter()
+            .any(|row| row.billing_source == BILLING_SOURCE_SHARED_CODEX
+                && row.total_tokens == 5_000
+                && row.call_count == 1));
+
+        let _ = std::fs::remove_file(path);
+    }
 }

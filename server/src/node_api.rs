@@ -603,6 +603,7 @@ pub async fn chat_with_node(
                     &state,
                     &accounting_key,
                     crate::store::NodeComputeRunFinish {
+                        provider_user_id: None,
                         status: "failed",
                         prompt_tokens: prompt_tokens as i64,
                         completion_tokens: completion_tokens as i64,

@@ -1345,7 +1345,7 @@ async fn run_via_pc_agent(
             10
         },
     );
-    let (mut pc_billing_call, pc_billing_context) = reserve_pc_cli_billing_call(
+    let (mut pc_billing_call, mut pc_billing_context) = reserve_pc_cli_billing_call(
         state.as_ref(),
         user_id,
         agent_id,
@@ -1772,6 +1772,7 @@ async fn run_via_pc_agent(
                     total_tokens,
                     model.clone().or_else(|| Some(display_model.clone())),
                 ) {
+                    pc_billing_context.refresh(state.as_ref(), user_id, agent_id, cli_name);
                     accounting_result = record_pc_cli_trusted_usage(
                         &state.store,
                         user_id,
@@ -1854,8 +1855,6 @@ async fn run_via_pc_agent(
                     &full_text,
                 );
                 if effective_exit_ok || allow_codex_output_despite_error {
-                    // Codex 过程事件会先流式给前端；HTTP/历史记录仍依赖 done.message，
-                    // 因此从完整输出中提取最终可读总结，避免聊天记录为空。
                     let reply = if lightweight_pc_chat {
                         extract_lightweight_pc_chat_reply(&full_text, is_codex)
                     } else if is_codex {

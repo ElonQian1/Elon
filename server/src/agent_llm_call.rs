@@ -558,6 +558,7 @@ pub(crate) async fn try_casual_chat_via_node(
                     state,
                     &accounting_key,
                     crate::store::NodeComputeRunFinish {
+                        provider_user_id: None,
                         status: "failed",
                         prompt_tokens: prompt_tokens as i64,
                         completion_tokens: completion_tokens as i64,
@@ -585,6 +586,7 @@ pub(crate) async fn try_casual_chat_via_node(
             state,
             &accounting_key,
             crate::store::NodeComputeRunFinish {
+                provider_user_id: None,
                 status: "failed",
                 prompt_tokens: prompt_tokens as i64,
                 completion_tokens: completion_tokens as i64,
@@ -609,6 +611,7 @@ pub(crate) async fn try_casual_chat_via_node(
             state,
             &accounting_key,
             crate::store::NodeComputeRunFinish {
+                provider_user_id: None,
                 status: "released_no_usage",
                 prompt_tokens: prompt_tokens as i64,
                 completion_tokens: completion_tokens as i64,

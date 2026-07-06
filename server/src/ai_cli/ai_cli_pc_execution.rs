@@ -80,6 +80,7 @@ pub(crate) fn finish_pc_node_compute_run(
     if let Err(e) = state.store.finish_node_compute_run(
         compute_call_id,
         crate::store::NodeComputeRunFinish {
+            provider_user_id: node_transaction.map(|tx| tx.provider_user_id.as_str()),
             status,
             prompt_tokens,
             completion_tokens,
