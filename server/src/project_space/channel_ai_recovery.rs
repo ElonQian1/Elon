@@ -9,7 +9,7 @@ use crate::{
     types::WsMessage,
 };
 
-use super::{insert_channel_ai_progress, insert_channel_ai_result, ChannelAiTask};
+use super::channel_ai_spawn::{insert_channel_ai_progress, insert_channel_ai_result, ChannelAiTask};
 
 pub(super) enum ChannelAiRecoveryTick {
     Healthy,
