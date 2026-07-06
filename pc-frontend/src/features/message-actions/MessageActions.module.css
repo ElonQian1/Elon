@@ -1,0 +1,138 @@
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  min-height: 26px;
+  margin-top: 3px;
+  color: var(--text-muted);
+  opacity: .64;
+}
+
+.actions:hover,
+.actions:focus-within {
+  opacity: 1;
+}
+
+.left {
+  align-self: flex-start;
+  justify-content: flex-start;
+}
+
+.right {
+  align-self: flex-end;
+  justify-content: flex-end;
+}
+
+.button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: currentColor;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background .12s ease, border-color .12s ease, color .12s ease, transform .12s ease;
+}
+
+.button:hover {
+  border-color: rgba(255, 255, 255, .12);
+  background: rgba(255, 255, 255, .06);
+  color: var(--text);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:focus-visible {
+  outline: 2px solid rgba(88, 190, 106, .5);
+  outline-offset: 2px;
+}
+
+.button svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.9;
+}
+
+.activePositive {
+  color: var(--green, #58be6a);
+  background: rgba(88, 190, 106, .12);
+  border-color: rgba(88, 190, 106, .24);
+}
+
+.activeNegative {
+  color: #ef8a8a;
+  background: rgba(239, 68, 68, .10);
+  border-color: rgba(239, 68, 68, .22);
+}
+
+.copied {
+  color: var(--green, #58be6a);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(11, 12, 16, .72);
+}
+
+.dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(78vh, 720px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 8px;
+  background: #202126;
+  color: var(--text);
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .38);
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.dialogContent {
+  margin: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  color: var(--text-soft);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .backdrop {
+    padding: 12px;
+  }
+
+  .dialog {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 24px);
+  }
+}

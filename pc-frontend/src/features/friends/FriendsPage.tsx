@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/auth'
 import { clean, formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import MarkdownContent from '../markdown/MarkdownContent'
+import MessageActions from '../message-actions/MessageActions'
 import styles from './FriendsPage.module.css'
 
 interface Friend {
@@ -528,6 +529,7 @@ export default function FriendsPage() {
             const isMe = m.outgoing || m.sender_user_id === me?.id
             const content = displayMessageContentOrAttachment(m.content)
             const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(content)
+            const messageActionKey = m.id || `${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}:${m.created_at}:${i}`
             const senderName = isMe
               ? (me?.nickname ?? me?.account ?? '我')
               : (activeItem?.kind === 'group'
@@ -546,6 +548,12 @@ export default function FriendsPage() {
                   {hasMarkdown
                     ? <div className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
                     : <div className={styles.msgContent}>{content}</div>}
+                  <MessageActions
+                    content={content}
+                    messageKey={messageActionKey}
+                    storageScope={`friends:${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}`}
+                    align={isMe ? 'right' : 'left'}
+                  />
                 </div>
               </div>
             )

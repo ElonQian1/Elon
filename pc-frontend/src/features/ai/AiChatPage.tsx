@@ -23,15 +23,14 @@ import {
   type AiComposerDraft,
 } from '../updates/composerDrafts'
 import AuthDialog from '../auth/AuthDialog'
-import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
-import UserAvatar from '../shell/UserAvatar'
 import { formatTime, safeNodeAdminUrl } from '../../lib/utils'
-import { compactDisplayMessageContent, displayMessageContentOrAttachment } from '../../lib/messageDisplay'
+import { compactDisplayMessageContent } from '../../lib/messageDisplay'
 import { DEFAULT_POPOVER_ANCHOR, fixedPopoverPosition, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
 import AiPinnedTools from './AiPinnedTools'
+import AiChatMessageRow, { type AiMessage } from './AiChatMessageRow'
 import { isCodexVaultBackupIntent, runCodexVaultBackupFromAiChat } from './codexVaultQuickAction'
 import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
@@ -44,19 +43,6 @@ interface AiConversation {
   project_id?: string
   project_name?: string
   first_user_message?: string
-}
-
-interface AiMessage {
-  id?: string
-  role: 'user' | 'assistant' | 'system'
-  content: string
-  created_at?: string
-  // 节点本机执行输出扩展字段
-  node_exec?: boolean
-  node_display_name?: string
-  node_remote?: boolean
-  exit_ok?: boolean
-  model?: string
 }
 
 interface LmChatResponse {
@@ -854,32 +840,15 @@ export default function AiChatPage() {
             </div>
           )}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
-          {messages.filter((m) => m.role !== 'system').map((m, i) => {
-            const isUser = m.role === 'user'
-            const isNode = !isUser && m.node_exec === true
-            const content = displayMessageContentOrAttachment(m.content)
-            const hasMarkdown = !isUser && /[#*`\[\]>|]/.test(content)
-            const nodePrefix = m.node_remote ? '远程' : '本机'
-            const nameLabel = isUser ? (user?.nickname ?? user?.account ?? '我') : (isNode ? `${nodePrefix} · ${m.node_display_name ?? ''}` : 'AI')
-            return (
-              <div key={i} className={[styles.msgRow, isUser ? styles.ownRow : ''].join(' ')}>
-                {isUser
-                  ? <UserAvatar user={user} size="compact" className={styles.avatar} />
-                  : <div className={[styles.avatar, isNode ? styles.nodeAvatar : ''].join(' ')}>{isNode ? '🖥' : 'AI'}</div>}
-                <div className={styles.msgBody}>
-                  <div className={styles.msgMeta}>
-                    <strong className={isNode ? styles.nodeLabel : ''}>{nameLabel}</strong>
-                    {m.created_at && <span>{formatTime(m.created_at)}</span>}
-                    {isNode && m.model && <span className={styles.modelTag}>{m.model}</span>}
-                    {isNode && m.exit_ok === false && <span className={styles.exitFail}>执行失败</span>}
-                  </div>
-                  {hasMarkdown
-                    ? <div className={styles.msgContent}><MarkdownContent content={content} copy /></div>
-                    : <div className={styles.msgContent}>{content}</div>}
-                </div>
-              </div>
-            )
-          })}
+          {messages.filter((m) => m.role !== 'system').map((m, i) => (
+            <AiChatMessageRow
+              key={m.id ?? `${m.role}:${m.created_at ?? i}`}
+              activeConvId={activeConvId}
+              index={i}
+              message={m}
+              user={user}
+            />
+          ))}
           {sending && (
             <div className={styles.msgRow}>
               <div className={styles.avatar}>AI</div>

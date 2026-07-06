@@ -7,6 +7,7 @@ import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext, taskResultDisplayText, taskResultTone } from '../dev/devTaskUtils'
 import { formatTime } from '../../lib/utils'
 import UserAvatar from '../shell/UserAvatar'
+import MessageActions from '../message-actions/MessageActions'
 import styles from './ConversationPage.module.css'
 
 interface MessageItemProps {
@@ -38,6 +39,12 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
   const content = terminalTask
     ? taskResultDisplayText(message)
     : displayMessageContentOrAttachment(message.content ?? message.text ?? '')
+  const messageActionKey = clean(
+    message.id
+      ?? message.task_id
+      ?? message.taskId
+      ?? `${kind}:${message.created_at ?? ''}:${content.slice(0, 80)}`,
+  )
   const taskTone = terminalTask ? taskResultTone(message.task_status ?? message.taskStatus, content) : null
   const taskStatusLabel = taskTone === 'failed' ? '任务失败' : taskTone === 'canceled' ? '任务已停止' : ''
   const contentClassName = [
@@ -81,6 +88,12 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
             {content}
           </div>
         )}
+        <MessageActions
+          content={content}
+          messageKey={messageActionKey || `${kind}:${content.length}`}
+          storageScope="project-conversation"
+          align={isOwn ? 'right' : 'left'}
+        />
       </div>
     </div>
   )
