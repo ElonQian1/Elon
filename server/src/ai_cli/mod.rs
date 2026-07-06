@@ -26,7 +26,7 @@ mod pc_cli_failure;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
 mod pc_passthrough_reply;
-mod pc_prompt_acceptance;
+pub(crate) mod pc_prompt_acceptance;
 
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 

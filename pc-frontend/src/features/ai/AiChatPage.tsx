@@ -169,6 +169,20 @@ function pickRemoteCliNode(
   return ready.find((node) => node.owner_user_id && node.owner_user_id !== userId) ?? ready[0] ?? null
 }
 
+function shouldRetryRemoteNodeExec(result: { output?: string; error?: string; exit_ok?: boolean }) {
+  if ((result.output ?? '').trim()) return false
+  const error = result.error ?? ''
+  return result.exit_ok === false && (
+    error.includes('指定的节点未在线')
+    || error.includes('没有确认接收')
+    || error.includes('没有返回任何 CLI 输出')
+    || error.includes('连接假在线')
+    || error.includes('通道在确认接收')
+    || error.includes('节点连接已关闭')
+    || error.includes('执行超时')
+  )
+}
+
 export default function AiChatPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
@@ -670,6 +684,17 @@ export default function AiChatPage() {
             '/api/me/node/exec',
             { prompt: text, node_id: targetNodeId },
           )
+        }
+        if (useRemoteCodexNode && shouldRetryRemoteNodeExec(res)) {
+          const nextNode = await selectFreshRemoteCodexNode(targetNodeId ? [targetNodeId] : [])
+          if (nextNode) {
+            targetNodeId = nextNode.id
+            targetNodeName = nextNode.name
+            res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
+              '/api/me/node/exec',
+              { prompt: text, node_id: targetNodeId },
+            )
+          }
         }
         const nodeMsg: AiMessage = {
           role: 'assistant',

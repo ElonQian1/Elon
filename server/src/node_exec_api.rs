@@ -14,11 +14,15 @@ use std::{sync::Arc, time::Duration};
 use tokio::time::{sleep, timeout};
 
 use crate::{
+    ai_cli::pc_prompt_acceptance::{
+        pc_lightweight_no_node_event_diagnostic, wait_for_pc_cli_prompt_acceptance,
+    },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
 };
 
-const EXEC_TIMEOUT_SECS: u64 = 120;
+const EXEC_FIRST_EVENT_TIMEOUT_SECS: u64 = 35;
+const EXEC_IDLE_TIMEOUT_SECS: u64 = 120;
 
 #[derive(Deserialize)]
 pub struct NodeExecRequest {
@@ -145,14 +149,18 @@ pub async fn node_exec_handler(
     // ── 4. 分发给 PC 节点执行，并对节点重连导致的旧连接关闭自动重派一次 ───────
     let node_prompt = build_node_exec_prompt(&req.prompt, &display_name, &agent_id);
     let mut run =
-        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &node_prompt).await {
+        match dispatch_and_collect_node_exec(&state, &agent_id, &display_name, &cli, &node_prompt)
+            .await
+        {
             Ok(run) => run,
             Err(e) => return json_error(StatusCode::BAD_GATEWAY, e),
         };
     let mut display_output = clean_node_exec_output(&run.output);
     if should_retry_node_exec_after_reconnect(run.error.as_deref(), &display_output) {
         sleep(Duration::from_millis(700)).await;
-        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &node_prompt).await {
+        match dispatch_and_collect_node_exec(&state, &agent_id, &display_name, &cli, &node_prompt)
+            .await
+        {
             Ok(retry_run) => {
                 run = retry_run;
                 display_output = clean_node_exec_output(&run.output);
@@ -197,46 +205,95 @@ fn build_node_exec_prompt(user_prompt: &str, node_display_name: &str, node_id: &
 }
 
 async fn dispatch_and_collect_node_exec(
-    state: &AppState,
+    state: &Arc<AppState>,
     agent_id: &str,
+    node_label: &str,
     cli: &str,
     prompt: &str,
 ) -> Result<NodeExecRun, String> {
-    let (req_id, mut rx) = state
+    let dispatch = state
         .agent_manager
-        .dispatch_cli_prompt(agent_id, cli.to_string(), vec![], prompt.to_string())
+        .dispatch_cli_prompt_with_context_control(
+            agent_id,
+            cli.to_string(),
+            vec![],
+            None,
+            None,
+            prompt.to_string(),
+        )
         .await
         .map_err(|e| format!("分发到 PC 节点失败：{e}"))?;
+    let (req_id, mut rx, cancel_handle) = dispatch.into_parts();
+    let mut first_cli_event =
+        match wait_for_pc_cli_prompt_acceptance(state, agent_id, node_label, &req_id, cli, &mut rx)
+            .await
+        {
+            Ok(event) => event,
+            Err(e) => {
+                let _ = cancel_handle.cancel();
+                return Ok(NodeExecRun {
+                    req_id,
+                    output: String::new(),
+                    exit_ok: false,
+                    error: Some(e.to_string()),
+                    model: None,
+                });
+            }
+        };
 
     let mut output = String::new();
     let mut exit_ok = false;
     let error: Option<String>;
     let model: Option<String>;
+    let mut saw_cli_event = false;
 
     loop {
-        match timeout(Duration::from_secs(EXEC_TIMEOUT_SECS), rx.recv()).await {
-            Ok(Some(AgentToServer::CliChunk { text, .. })) => {
+        let event = if let Some(event) = first_cli_event.take() {
+            Some(event)
+        } else {
+            let timeout_secs = if saw_cli_event {
+                EXEC_IDLE_TIMEOUT_SECS
+            } else {
+                EXEC_FIRST_EVENT_TIMEOUT_SECS
+            };
+            match timeout(Duration::from_secs(timeout_secs), rx.recv()).await {
+                Ok(event) => event,
+                Err(_) => {
+                    let _ = cancel_handle.cancel();
+                    error = Some(if saw_cli_event {
+                        format!("执行超时（{}s）", EXEC_IDLE_TIMEOUT_SECS)
+                    } else {
+                        pc_lightweight_no_node_event_diagnostic(
+                            cli,
+                            node_label,
+                            EXEC_FIRST_EVENT_TIMEOUT_SECS,
+                        )
+                    });
+                    model = None;
+                    break;
+                }
+            }
+        };
+
+        match event {
+            Some(AgentToServer::CliChunk { text, .. }) => {
+                saw_cli_event = true;
                 output.push_str(&text);
             }
-            Ok(Some(AgentToServer::CliDone {
+            Some(AgentToServer::CliDone {
                 exit_ok: ok,
                 error: e,
                 model: m,
                 ..
-            })) => {
+            }) => {
                 exit_ok = ok;
                 error = e;
                 model = m;
                 break;
             }
-            Ok(Some(_)) => { /* 忽略其他消息类型 */ }
-            Ok(None) => {
+            Some(_) => { /* 忽略其他消息类型 */ }
+            None => {
                 error = Some("节点连接已关闭".to_string());
-                model = None;
-                break;
-            }
-            Err(_) => {
-                error = Some(format!("执行超时（{}s）", EXEC_TIMEOUT_SECS));
                 model = None;
                 break;
             }
