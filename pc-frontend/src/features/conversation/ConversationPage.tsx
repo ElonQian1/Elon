@@ -5,7 +5,8 @@ import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { useMemberRealtimeRefresh } from './useMemberRealtimeRefresh'
-import { AttachmentButton, AttachmentChip } from './AttachmentButton'; import { AttachmentPreviewDialog } from './AttachmentPreviewDialog'; import { useAttachmentPreview } from './useAttachmentPreview'
+import { AttachmentPreviewDialog } from './AttachmentPreviewDialog'
+import { useAttachmentPreview } from './useAttachmentPreview'
 import {
   attachmentTitleFromAttachments,
   buildComposerContent,
@@ -20,7 +21,7 @@ import ProjectLanding from './ProjectLanding'
 import ChannelNavList from './ChannelNavList'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
-import ComposerRuntimeToggles from './ComposerRuntimeToggles'
+import ConversationComposer from './ConversationComposer'
 import LocalNodeProjectNotice from './LocalNodeProjectNotice'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import { useConversationAutoScroll } from './useConversationAutoScroll'
@@ -765,6 +766,17 @@ export default function ConversationPage() {
   const composerSubmitDisabled = (!input.trim() && attachments.length === 0)
     || composerDisabled
     || attachmentUploading
+  const composerPlaceholder = isAssistingMember
+    ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
+    : sessionView && sessionView !== 'new'
+      ? '继续这个项目会话… (Enter 发送，Shift+Enter 换行)'
+      : !activeChannelId
+        ? `向 ${activeProject?.name ?? '项目'} 发送消息或需求… (Enter 发送)`
+        : activeChannelIsNotAi
+          ? '通过 AI开发 频道发送需求'
+          : isDevChannel
+            ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
+            : `在 #${activeChannel?.name ?? ''} 发送消息`
   const { attachmentPreview, openAttachmentPreview, closeAttachmentPreview, removeComposerAttachment } = useAttachmentPreview(setAttachments)
 
   useEffect(() => { clearAttachmentDraft(); closeAttachmentPreview() }, [activeProjectId, projectHomeVersion, activeConversationTargetId, clearAttachmentDraft, closeAttachmentPreview])
@@ -1197,6 +1209,7 @@ export default function ConversationPage() {
       <div
         className={styles.chatColumn}
         data-drop-active={attachmentDropActive ? 'true' : 'false'}
+        data-has-composer={activeProjectId ? 'true' : 'false'}
         onPaste={handleComposerPaste} onDragEnter={handleComposerDragEnter} onDragOver={handleComposerDragOver} onDragLeave={handleComposerDragLeave} onDrop={handleComposerDrop}
       >
         {attachmentDropActive && <div className={styles.attachmentDropOverlay}>松开添加附件</div>}
@@ -1342,92 +1355,41 @@ export default function ConversationPage() {
 
         {/* 输入框（composer）——项目开启时始终可见 */}
         {activeProjectId && (
-          <form
-            className={styles.composerForm}
-            data-drop-active={attachmentDropActive ? 'true' : 'false'}
+          <ConversationComposer
+            activeProjectId={activeProjectId}
+            attachmentDropActive={attachmentDropActive}
+            attachments={attachments}
+            attachmentUploading={attachmentUploading}
+            composerDisabled={composerDisabled}
+            composerRuntimeRoute={composerRuntimeRoute}
+            directPcCliActive={directPcCliActive}
+            directPcCliAvailable={directPcCliAvailable}
+            input={input}
+            isOwnConversationTarget={isOwnConversationTarget}
+            localNodeReady={localNodeReady}
+            memberConversations={memberConversations}
+            modelButtonCopy={modelButtonCopy}
+            modelButtonRef={modelBtnRef}
+            modelOptions={modelOptions}
+            placeholder={composerPlaceholder}
+            selectedAgent={selectedAgent}
+            sendError={sendError}
+            attachmentError={attachmentError}
+            sending={sendingMessage || sendingMemberDiscussion}
+            sessionView={sessionView}
+            shouldPreferLocalNode={shouldPreferLocalNode}
+            submitDisabled={composerSubmitDisabled}
+            textareaRef={textareaRef}
+            onAutoResize={autoResize}
+            onDirectPcCliChange={setDirectPcCli}
+            onFilesSelected={(files) => uploadComposerFiles(files).catch(() => {})}
+            onInputChange={setInput}
+            onKeyDown={handleKeyDown}
+            onOpenAttachment={openAttachmentPreview}
+            onRemoveAttachment={removeComposerAttachment}
             onSubmit={handleSend}
-          >
-            {attachments.length > 0 && (
-              <div className={styles.attachmentTray}>
-                {attachments.map((att) => (
-                  <AttachmentChip
-                    key={att.attachment_id}
-                    attachment={att}
-                    onOpen={openAttachmentPreview} onRemove={() => removeComposerAttachment(att.attachment_id)}
-                  />
-                ))}
-              </div>
-            )}
-            <div className={styles.composer}>
-              <button
-                ref={modelBtnRef}
-                className={styles.composerModelBtn}
-                type="button"
-                title={modelButtonCopy.title}
-                onClick={() => setShowModelPicker((v) => !v)}
-              >
-                <span>{modelButtonCopy.source}</span>
-                <strong>{modelButtonCopy.detail}</strong>
-              </button>
-
-              <ComposerRuntimeToggles
-                activeProjectId={activeProjectId ?? ''}
-                directPcCliActive={directPcCliActive}
-                shouldPreferLocalNode={shouldPreferLocalNode}
-                localNodeReady={localNodeReady}
-                directPcCliAvailable={directPcCliAvailable}
-                composerDisabled={composerDisabled}
-                onDirectPcCliChange={setDirectPcCli}
-                isOwnConversationTarget={isOwnConversationTarget}
-                sessionView={sessionView}
-                memberConversations={memberConversations}
-                selectedAgent={selectedAgent}
-                modelOptions={modelOptions}
-                composerRuntimeRoute={composerRuntimeRoute}
-              />
-
-              <textarea
-                ref={textareaRef}
-                className={styles.composerTextarea}
-                value={input}
-                onChange={(e) => { setInput(e.target.value); autoResize() }}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  isAssistingMember
-                    ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
-                    : sessionView && sessionView !== 'new'
-                      ? '继续这个项目会话… (Enter 发送，Shift+Enter 换行)'
-                    : !activeChannelId
-                    ? `向 ${activeProject?.name ?? '项目'} 发送消息或需求… (Enter 发送)`
-                    : activeChannelIsNotAi
-                      ? '通过 AI开发 频道发送需求'
-                    : isDevChannel
-                      ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
-                      : `在 #${activeChannel?.name ?? ''} 发送消息`
-                }
-                disabled={composerDisabled}
-                rows={1}
-              />
-
-              {activeProjectId && (
-                <AttachmentButton
-                  disabled={composerDisabled}
-                  uploading={attachmentUploading}
-                  onFilesSelected={(files) => uploadComposerFiles(files).catch(() => {})}
-                />
-              )}
-
-              <button
-                className={styles.sendBtn}
-                type="submit"
-                disabled={composerSubmitDisabled}
-              >
-                {sendingMessage || sendingMemberDiscussion ? '…' : attachmentUploading ? '上传中' : '发送'}
-              </button>
-            </div>
-            {sendError && <p className={styles.sendError}>{sendError}</p>}
-            {attachmentError && <p className={styles.sendError}>{attachmentError}</p>}
-          </form>
+            onToggleModelPicker={() => setShowModelPicker((value) => !value)}
+          />
         )}
       </div>
 

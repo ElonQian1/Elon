@@ -4,7 +4,7 @@ import type { AgentOption } from '../models/types'
 import { selectedAgentForRuntimeRoute } from '../models/routeModelPolicy'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type { MemberConversationEntry } from './memberConversationApi'
-import styles from './ConversationPage.module.css'
+import styles from './ConversationComposer.module.css'
 
 const PROJECT_PREWARM_COOLDOWN_MS = 120000
 

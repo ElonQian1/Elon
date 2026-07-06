@@ -401,14 +401,14 @@
 
 /* ══════════════════════════════════════
    聊天区（中 1fr）
-   grid-rows: topbar | status | 1fr | composer
+   grid-rows: topbar | status | 1fr
    ══════════════════════════════════════ */
 .chatColumn {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: var(--topbar-height) auto minmax(0, 1fr) auto;
+  grid-template-rows: var(--topbar-height) auto minmax(0, 1fr);
   background: #141518;
   position: relative;   /* 新消息按钮的定位锚 */
   z-index: 0;
@@ -505,6 +505,9 @@
   padding: 14px clamp(14px, 1.8vw, 24px);
   scrollbar-width: thin;
   overscroll-behavior: contain;
+}
+.chatColumn[data-has-composer="true"] .messageList {
+  padding-bottom: 160px;
 }
 
 /* 空状态 */
@@ -711,7 +714,7 @@
 /* ── 新消息跳转按钮 ── */
 .newMsgBtn {
   position: absolute;
-  bottom: 68px;
+  bottom: 132px;
   left: 50%;
   transform: translateX(-50%);
   height: 32px;
@@ -729,22 +732,11 @@
 }
 .newMsgBtn:hover { background: var(--bg-hover); color: var(--text); }
 
-/* 输入框区（composer）6 列：AI 来源/模型 | 直连开关 | 预热 | 输入 | 附件 | 发送 */
-.composerForm {
-  position: relative;
-  border-top: 1px solid #1b1c20;
-  background: rgba(20, 21, 24, .98);
-}
-
-.composerForm[data-drop-active="true"] {
-  box-shadow: inset 0 0 0 1px rgba(168, 199, 250, .36);
-}
-
 .attachmentDropOverlay {
   position: absolute;
   top: calc(var(--topbar-height) + 10px);
   right: 12px;
-  bottom: 84px;
+  bottom: 138px;
   left: 12px;
   z-index: 24;
   display: grid;
@@ -758,13 +750,6 @@
   font-weight: 850;
   backdrop-filter: blur(2px);
   pointer-events: none;
-}
-
-.attachmentTray {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 7px 12px 0;
 }
 
 .attachmentPreviewBackdrop {
@@ -895,223 +880,6 @@
   text-decoration: none;
 }
 .attachmentPreviewFile a:hover { text-decoration: underline; }
-
-.composer {
-  display: grid;
-  grid-template-columns: minmax(118px, 148px) minmax(88px, 104px) 68px minmax(0, 1fr) 36px 58px;
-  gap: 8px;
-  align-items: end;
-  min-height: 60px;
-  padding: 9px 12px;
-}
-.composerModelBtn {
-  min-width: 0;
-  width: 100%;
-  height: var(--composer-control-height);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text-soft);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  padding: 6px 9px;
-  text-align: left;
-  overflow: hidden;
-  transition: background 0.1s;
-}
-.composerModelBtn:hover { background: var(--bg-hover); }
-.composerModelBtn span,
-.composerModelBtn strong {
-  display: block;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.composerModelBtn span {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 1;
-}
-.composerModelBtn strong {
-  color: var(--text-soft);
-  font-size: 12px;
-  font-weight: 850;
-  line-height: 1.2;
-}
-.directCliToggle {
-  height: var(--composer-control-height);
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text-soft);
-  cursor: pointer;
-  user-select: none;
-}
-.directCliToggle[data-active="true"] {
-  border-color: rgba(37, 211, 102, .45);
-  background: rgba(37, 211, 102, .11);
-}
-.directCliToggle[data-default-local="true"][data-active="false"] {
-  border-color: rgba(255, 255, 255, .18);
-  background: rgba(255, 255, 255, .055);
-}
-.directCliToggle[data-disabled="true"] {
-  opacity: .52;
-  cursor: not-allowed;
-}
-.directCliToggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.directCliSwitch {
-  position: relative;
-  flex: 0 0 auto;
-  width: 34px;
-  height: 18px;
-  border-radius: 999px;
-  background: #1f2229;
-  border: 1px solid #474b55;
-}
-.directCliSwitch::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  left: 3px;
-  top: 2px;
-  border-radius: 50%;
-  background: #8b92a0;
-  transition: transform .12s, background .12s;
-}
-.directCliToggle[data-active="true"] .directCliSwitch {
-  background: rgba(37, 211, 102, .22);
-  border-color: rgba(37, 211, 102, .55);
-}
-.directCliToggle[data-active="true"] .directCliSwitch::after {
-  transform: translateX(15px);
-  background: var(--green);
-}
-.directCliCopy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.directCliCopy strong,
-.directCliCopy em {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-style: normal;
-}
-.directCliCopy strong {
-  color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 850;
-  line-height: 1.05;
-}
-.directCliCopy em {
-  color: var(--text-muted);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
-}
-.projectPrewarmToggle {
-  height: var(--composer-control-height);
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
-  color: var(--text-muted);
-  cursor: pointer;
-  user-select: none;
-}
-.projectPrewarmToggle[data-active="true"] {
-  color: var(--text-soft);
-  border-color: rgba(82, 140, 255, .45);
-  background: rgba(82, 140, 255, .12);
-}
-.projectPrewarmToggle[data-disabled="true"] {
-  opacity: .52;
-  cursor: not-allowed;
-}
-.projectPrewarmToggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.projectPrewarmToggle span {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: #59606d;
-  box-shadow: 0 0 0 3px rgba(89, 96, 109, .16);
-}
-.projectPrewarmToggle[data-active="true"] span {
-  background: #70a2ff;
-  box-shadow: 0 0 0 3px rgba(112, 162, 255, .2);
-}
-.projectPrewarmToggle strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 850;
-}
-.composerTextarea {
-  height: var(--composer-control-height);
-  min-height: var(--composer-control-height);
-  max-height: 120px;
-  resize: none;
-  overflow-y: hidden;
-  border: 0;
-  border-radius: 8px;
-  outline: none;
-  background: var(--surface);
-  color: var(--text);
-  padding: 9px 11px;
-  line-height: 1.45;
-  font-family: inherit;
-  font-size: 13px;
-  width: 100%;
-}
-.composerTextarea::placeholder { color: var(--text-muted); }
-.sendBtn {
-  height: var(--composer-control-height);
-  border: 0;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 800;
-  font-size: 13px;
-  transition: background 0.1s;
-}
-.sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.sendBtn:disabled { background: #30323a; color: #777b86; cursor: not-allowed; }
-.sendError {
-  padding: 0 16px 10px;
-  font-size: 12px;
-  color: var(--red);
-}
 
 /* ══════════════════════════════════════
    成员面板（右 320px）
@@ -1303,27 +1071,6 @@
   .emptyState strong {
     font-size: 21px;
   }
-  .composer {
-    grid-template-columns: minmax(112px, 132px) minmax(86px, 102px) 62px minmax(0, 1fr) 38px 58px;
-    gap: 8px;
-    padding: 10px;
-  }
-  .directCliToggle {
-    padding: 6px 7px;
-    gap: 6px;
-  }
-  .directCliSwitch {
-    width: 28px;
-  }
-  .directCliToggle[data-active="true"] .directCliSwitch::after {
-    transform: translateX(9px);
-  }
-  .directCliCopy strong {
-    font-size: 10px;
-  }
-  .directCliCopy em {
-    font-size: 9px;
-  }
 }
 
 /* ── 消息分组：连续同一人发送时隐藏头像+元信息 ── */
@@ -1336,12 +1083,6 @@
 .messageRow.grouped .messageMeta {
   display: none;      /* 隐藏名字+时间 */
 }
-/* 禁用状态的输入框 */
-.composerTextarea:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 /* ══════════════════════════════════════
    成员面板增强样式
    ══════════════════════════════════════ */

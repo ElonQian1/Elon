@@ -3,17 +3,17 @@
 .hiddenInput { display: none; }
 
 .btn {
-  width: 36px; height: var(--composer-control-height);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--surface);
+  width: 34px; height: var(--composer-control-height);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
   color: var(--text-muted);
   font-size: 16px;
   display: grid; place-items: center;
   transition: background .1s, color .1s;
   cursor: pointer;
 }
-.btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
+.btn:hover:not(:disabled) { background: rgba(255, 255, 255, .08); color: var(--text); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn[data-uploading="true"] svg { animation: attachmentSpin 900ms linear infinite; }
 
