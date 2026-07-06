@@ -151,8 +151,21 @@ function remoteNodeHasCli(node: RemoteNodeInfo) {
   )
 }
 
-function pickRemoteCliNode(nodes: RemoteNodeInfo[], userId?: string) {
-  const ready = nodes.filter((node) => remoteNodeId(node) && remoteNodeHasCli(node))
+function pickRemoteCliNode(
+  nodes: RemoteNodeInfo[],
+  userId?: string,
+  preferredNodeId?: string | null,
+  excludedNodeIds: string[] = [],
+) {
+  const excluded = new Set(excludedNodeIds.filter(Boolean))
+  const ready = nodes.filter((node) => {
+    const id = remoteNodeId(node)
+    return id && !excluded.has(id) && remoteNodeHasCli(node)
+  })
+  if (preferredNodeId) {
+    const preferred = ready.find((node) => remoteNodeId(node) === preferredNodeId)
+    if (preferred) return preferred
+  }
   return ready.find((node) => node.owner_user_id && node.owner_user_id !== userId) ?? ready[0] ?? null
 }
 
@@ -206,6 +219,7 @@ export default function AiChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)
+  const remoteNodeIdRef = useRef<string | null>(null)
   const modelButtonCopy = useMemo(
     () => {
       const copy = routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent)
@@ -232,6 +246,10 @@ export default function AiChatPage() {
       // Layout preference is best-effort only.
     }
   }, [userPanelCollapsed])
+
+  useEffect(() => {
+    remoteNodeIdRef.current = remoteNodeIdValue
+  }, [remoteNodeIdValue])
 
   useEffect(() => {
     let cancelled = false
@@ -318,7 +336,7 @@ export default function AiChatPage() {
       api.get<{ nodes?: RemoteNodeInfo[] }>('/api/nodes')
         .then((data) => {
           if (cancelled) return
-          const node = pickRemoteCliNode(data.nodes ?? [], user?.id)
+          const node = pickRemoteCliNode(data.nodes ?? [], user?.id, remoteNodeIdRef.current)
           if (node) {
             setRemoteNodeIdValue(remoteNodeId(node))
             setRemoteNodeNameValue(remoteNodeName(node))
@@ -570,6 +588,18 @@ export default function AiChatPage() {
     return () => window.removeEventListener(APP_UPDATE_BEFORE_RELOAD_EVENT, saveBeforeReload)
   }, [persistAiComposerDraft])
 
+  async function selectFreshRemoteCodexNode(excludedNodeIds: string[] = []) {
+    const data = await api.get<{ nodes?: RemoteNodeInfo[] }>('/api/nodes')
+    const node = pickRemoteCliNode(data.nodes ?? [], user?.id, remoteNodeIdRef.current, excludedNodeIds)
+    if (!node) return null
+    const id = remoteNodeId(node)
+    const name = remoteNodeName(node)
+    setRemoteNodeIdValue(id)
+    setRemoteNodeNameValue(name)
+    setRemoteNodeStatusChecked(true)
+    return { id, name }
+  }
+
   async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
     const text = input.trim()
@@ -617,12 +647,30 @@ export default function AiChatPage() {
       const useRemoteCodexNode = requestRuntimeRoute === 'route_c3' && !!remoteNodeIdValue
       if (useLocalNode || useRemoteCodexNode) {
         // ── 节点在线：直接在 PC 节点上执行 ────────────────────────────────
-        const targetNodeId = useRemoteCodexNode ? remoteNodeIdValue : onlineNodeId
-        const targetNodeName = useRemoteCodexNode ? remoteNodeNameValue : onlineNodeName
-        const res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
-          '/api/me/node/exec',
-          { prompt: text, node_id: targetNodeId },
-        )
+        let targetNodeId = useRemoteCodexNode ? remoteNodeIdValue : onlineNodeId
+        let targetNodeName = useRemoteCodexNode ? remoteNodeNameValue : onlineNodeName
+        let res: { output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }
+        try {
+          res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
+            '/api/me/node/exec',
+            { prompt: text, node_id: targetNodeId },
+          )
+        } catch (err) {
+          const message = (err as { message?: string }).message ?? ''
+          if (!useRemoteCodexNode || !message.includes('指定的节点未在线')) {
+            throw err
+          }
+          const nextNode = await selectFreshRemoteCodexNode(targetNodeId ? [targetNodeId] : [])
+          if (!nextNode) {
+            throw err
+          }
+          targetNodeId = nextNode.id
+          targetNodeName = nextNode.name
+          res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
+            '/api/me/node/exec',
+            { prompt: text, node_id: targetNodeId },
+          )
+        }
         const nodeMsg: AiMessage = {
           role: 'assistant',
           content: res.output
