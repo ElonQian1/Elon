@@ -15,6 +15,19 @@ export function messageText(msg: ChatMessage): string {
   return displayMessageContentOrAttachment(msg.content ?? msg.text ?? msg.message)
 }
 
+export function taskResultDisplayText(msg: ChatMessage): string {
+  const content = messageText(msg)
+  if (content) return content
+
+  const taskError = clean(msg.task_error ?? msg.taskError ?? '')
+  if (taskError) return taskError
+
+  const status = clean(msg.task_status ?? msg.taskStatus ?? '').toLowerCase()
+  if (FAILED_TASK_STATUSES.has(status)) return '任务失败，未收到详细错误。'
+  if (CANCELED_TASK_STATUSES.has(status)) return '任务已停止。'
+  return ''
+}
+
 export function taskIdOf(msg: ChatMessage): string {
   return clean(msg.task_id ?? msg.taskId)
 }
@@ -83,7 +96,7 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
       kind === 'ai_result'
       || (isAssistantReplyKind(kind) && !isAssistantProgressDisplay(msg) && isTerminalStatus(status))
     ) {
-      const content = messageText(msg)
+      const content = taskResultDisplayText(msg)
       task.result = msg
       task.resultText = content
       const tone = taskResultTone(status, content)

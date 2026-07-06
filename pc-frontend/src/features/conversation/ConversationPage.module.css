@@ -626,6 +626,23 @@
   border-color: rgba(255, 255, 255, .16);
   background: rgba(255, 255, 255, .04);
 }
+.aiRow .messageContent.taskFailedContent {
+  border-color: rgba(239, 68, 68, .34);
+  background: rgba(239, 68, 68, .10);
+  color: #fecaca;
+}
+.aiRow .messageContent.taskCanceledContent {
+  border-color: rgba(245, 158, 11, .30);
+  background: rgba(245, 158, 11, .09);
+  color: #fde68a;
+}
+.taskStatusLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
 
 /* Markdown 消息：去掉 pre-wrap，交给 MarkdownContent 组件处理 */
 .messageContent.markdownMsg {

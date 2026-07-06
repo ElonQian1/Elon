@@ -4,7 +4,7 @@ import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import type { Message } from './types'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { DevTaskMessage } from '../dev/DevTaskCard'
-import { buildContext } from '../dev/devTaskUtils'
+import { buildContext, taskResultDisplayText, taskResultTone } from '../dev/devTaskUtils'
 import { formatTime } from '../../lib/utils'
 import UserAvatar from '../shell/UserAvatar'
 import styles from './ConversationPage.module.css'
@@ -34,7 +34,18 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
   const isAi = ['assistant', 'ai', 'bot', 'system', 'ai_task', 'ai_progress', 'ai_result'].includes(kind)
   const isUserRole = !isAi && (kind === 'user' || kind === 'human' || kind === 'discussion')
   const isOwn = isAi ? false : (typeof message.outgoing === 'boolean' ? message.outgoing : isUserRole)
-  const content = displayMessageContentOrAttachment(message.content ?? message.text ?? '')
+  const terminalTask = isAi && isTerminalTaskStatus(message.task_status ?? message.taskStatus)
+  const content = terminalTask
+    ? taskResultDisplayText(message)
+    : displayMessageContentOrAttachment(message.content ?? message.text ?? '')
+  const taskTone = terminalTask ? taskResultTone(message.task_status ?? message.taskStatus, content) : null
+  const taskStatusLabel = taskTone === 'failed' ? '任务失败' : taskTone === 'canceled' ? '任务已停止' : ''
+  const contentClassName = [
+    styles.messageContent,
+    isAi ? styles.aiContent : '',
+    taskTone === 'failed' ? styles.taskFailedContent : '',
+    taskTone === 'canceled' ? styles.taskCanceledContent : '',
+  ].filter(Boolean).join(' ')
   const time = message.created_at ? formatTime(message.created_at) : ''
   const senderName = clean(
     message.sender_name
@@ -60,11 +71,13 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
           {time && <span>{time}</span>}
         </div>
         {hasMarkdown ? (
-          <div className={[styles.messageContent, isAi ? styles.aiContent : '', styles.markdownMsg].filter(Boolean).join(' ')}>
+          <div className={[contentClassName, styles.markdownMsg].filter(Boolean).join(' ')}>
+            {taskStatusLabel && <span className={styles.taskStatusLabel}>{taskStatusLabel}</span>}
             <MarkdownContent content={content} copy={isAi} />
           </div>
         ) : (
-          <div className={[styles.messageContent, isAi ? styles.aiContent : ''].join(' ')}>
+          <div className={contentClassName}>
+            {taskStatusLabel && <span className={styles.taskStatusLabel}>{taskStatusLabel}</span>}
             {content}
           </div>
         )}
@@ -72,6 +85,11 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
     </div>
   )
 }, areMessageItemPropsEqual)
+
+function isTerminalTaskStatus(status: unknown): boolean {
+  return ['done', 'completed', 'success', 'succeeded', 'finished', 'failed', 'error', 'canceled', 'cancelled', 'interrupted', 'stopped']
+    .includes(clean(status ?? '').toLowerCase())
+}
 
 function MessageAvatar({
   message,

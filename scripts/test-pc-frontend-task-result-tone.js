@@ -30,6 +30,8 @@ require.extensions['.ts'] = function loadTsModule(module, filename) {
 
 try {
   const {
+    buildContext,
+    taskResultDisplayText,
     taskResultTone,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'devTaskUtils.ts'))
 
@@ -50,6 +52,45 @@ try {
     taskResultTone('failed', '已完成并发布。'),
     'failed',
     'failed task status should remain authoritative over success-looking content',
+  )
+  assert.strictEqual(
+    taskResultDisplayText({
+      kind: 'ai_result',
+      task_id: 'tsk-codex-limit',
+      task_status: 'failed',
+      content: '',
+      task_error: '当前 Codex 账号额度已用尽或被限流，请切换可用账号后重试。',
+    }),
+    '当前 Codex 账号额度已用尽或被限流，请切换可用账号后重试。',
+    'failed task result with empty content should display the classified Codex quota error',
+  )
+  assert.strictEqual(
+    taskResultDisplayText({
+      kind: 'ai_result',
+      task_id: 'tsk-auth-invalid',
+      task_status: 'failed',
+      task_error: '当前 Codex 账号登录已失效，auth.json 无法刷新；账号本人需要重新登录。',
+    }),
+    '当前 Codex 账号登录已失效，auth.json 无法刷新；账号本人需要重新登录。',
+    'failed shared auth switch should surface the auth.json refresh failure when no answer content exists',
+  )
+  const context = buildContext([
+    {
+      id: 'result-with-error-only',
+      kind: 'ai_result',
+      task_id: 'tsk-auth-invalid',
+      task_status: 'failed',
+      content: '',
+      task_error: '当前 Codex 账号登录已失效，auth.json 无法刷新；账号本人需要重新登录。',
+    },
+  ])
+  const task = context.tasks.get('tsk-auth-invalid')
+  assert.ok(task, 'failed result should create a task context entry')
+  assert.strictEqual(task.failed, true, 'empty-content auth failure should still be marked failed')
+  assert.strictEqual(
+    task.resultText,
+    '当前 Codex 账号登录已失效，auth.json 无法刷新；账号本人需要重新登录。',
+    'task cards should use task_error as the visible final result text',
   )
   console.log('pc-frontend task-result tone tests passed')
 } finally {
