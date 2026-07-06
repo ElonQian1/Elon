@@ -784,7 +784,7 @@ export default function AiChatPage() {
             const isUser = m.role === 'user'
             const isNode = !isUser && m.node_exec === true
             const content = displayMessageContentOrAttachment(m.content)
-            const hasMarkdown = !isUser && !isNode && /[#*`\[\]>|]/.test(content)
+            const hasMarkdown = !isUser && /[#*`\[\]>|]/.test(content)
             const nodePrefix = m.node_remote ? '远程' : '本机'
             const nameLabel = isUser ? (user?.nickname ?? user?.account ?? '我') : (isNode ? `${nodePrefix} · ${m.node_display_name ?? ''}` : 'AI')
             return (
@@ -799,11 +799,9 @@ export default function AiChatPage() {
                     {isNode && m.model && <span className={styles.modelTag}>{m.model}</span>}
                     {isNode && m.exit_ok === false && <span className={styles.exitFail}>执行失败</span>}
                   </div>
-                  {isNode
-                    ? <pre className={styles.nodeOutput}>{content}</pre>
-                    : hasMarkdown
-                      ? <div className={styles.msgContent}><MarkdownContent content={content} copy /></div>
-                      : <div className={styles.msgContent}>{content}</div>}
+                  {hasMarkdown
+                    ? <div className={styles.msgContent}><MarkdownContent content={content} copy /></div>
+                    : <div className={styles.msgContent}>{content}</div>}
                 </div>
               </div>
             )
