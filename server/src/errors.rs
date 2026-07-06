@@ -149,6 +149,32 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
     let lower = compact.to_ascii_lowercase();
     let detail = (!compact.is_empty()).then_some(compact);
 
+    if contains_codex_auth_json_error(&lower) {
+        return ClassifiedAiError {
+            code: "codex_auth_json_invalid",
+            category: AiErrorCategory::AuthConfig,
+            retryable: false,
+            retry_after_secs: None,
+            message:
+                "当前 Codex 账号登录已失效，auth.json 无法刷新。请账号所有者在对应 PC 上重新登录 Codex，并重新备份到保险箱后再试。"
+                    .into(),
+            operator_detail: detail,
+        };
+    }
+
+    if contains_codex_usage_limit_error(&lower) {
+        return ClassifiedAiError {
+            code: "codex_usage_limit_exhausted",
+            category: AiErrorCategory::Quota,
+            retryable: false,
+            retry_after_secs: None,
+            message:
+                "当前 Codex 账号额度已用尽或被限流，本轮没有完成。系统已尝试可用的共享账号；如果共享账号也失败，请切换其他授权账号或等待额度恢复后重试。"
+                    .into(),
+            operator_detail: detail,
+        };
+    }
+
     if contains_auth_error(&lower) {
         return ClassifiedAiError {
             code: "ai_auth_config_error",
@@ -296,6 +322,23 @@ fn contains_quota_error(lower: &str) -> bool {
         || lower.contains("endpoint is inactive")
 }
 
+fn contains_codex_usage_limit_error(lower: &str) -> bool {
+    (lower.contains("codex") || lower.contains("openai"))
+        && (lower.contains("hit your usage limit")
+            || lower.contains("usage limit")
+            || lower.contains("usage exhausted")
+            || lower.contains("额度已用尽"))
+}
+
+fn contains_codex_auth_json_error(lower: &str) -> bool {
+    lower.contains("refresh_token_reused")
+        || lower.contains("token_expired")
+        || lower.contains("failed to refresh token")
+        || lower.contains("refresh token has already been used")
+        || lower.contains("your refresh token")
+        || lower.contains("codex") && lower.contains("401 unauthorized")
+}
+
 fn contains_auth_error(lower: &str) -> bool {
     lower.contains("unauthorized")
         || lower.contains("invalid api key")
@@ -393,8 +436,21 @@ mod tests {
     #[test]
     fn classifies_codex_usage_limit_as_quota() {
         let classified = classify_ai_error("Codex failed: usage limit reached for this account");
-        assert_eq!(classified.code, "ai_quota_unavailable");
+        assert_eq!(classified.code, "codex_usage_limit_exhausted");
         assert_eq!(classified.category, AiErrorCategory::Quota);
+        assert!(!classified.retryable);
+    }
+
+    #[test]
+    fn classifies_codex_refresh_token_reuse_as_auth_json_failure() {
+        let classified = classify_ai_error(
+            "Failed to refresh token: 401 Unauthorized refresh_token_reused Your refresh token has already been used to generate a new access token.",
+        );
+
+        assert_eq!(classified.code, "codex_auth_json_invalid");
+        assert_eq!(classified.category, AiErrorCategory::AuthConfig);
+        assert!(classified.message.contains("auth.json"));
+        assert!(classified.message.contains("重新登录 Codex"));
         assert!(!classified.retryable);
     }
 

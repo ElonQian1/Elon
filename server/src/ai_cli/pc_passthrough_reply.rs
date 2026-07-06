@@ -21,6 +21,18 @@ pub(crate) fn pc_lightweight_no_readable_diagnostic(
     let lower = clean.to_ascii_lowercase();
     let cli_label = pc_cli_progress_label(cli_name);
 
+    if lower.contains("refresh_token_reused")
+        || lower.contains("token_expired")
+        || lower.contains("failed to refresh token")
+        || lower.contains("refresh token has already been used")
+        || lower.contains("401 unauthorized") && lower.contains("codex")
+    {
+        return Some(format!(
+            "{}登录已失效，auth.json 无法刷新；请账号所有者重新登录 Codex，并重新备份到保险箱后再试。",
+            cli_label
+        ));
+    }
+
     if lower.contains("usage limit") || lower.contains("hit your usage limit") {
         return Some(format!(
             "{}达到使用额度或限流，未返回可读内容；请稍后重发或检查本机 Codex 登录额度。",

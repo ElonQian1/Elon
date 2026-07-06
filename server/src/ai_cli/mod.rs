@@ -22,6 +22,7 @@ mod ai_cli_types;
 mod pc_agent_dispatch;
 mod pc_artifact_completion;
 mod pc_billing;
+mod pc_cli_failure;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
 mod pc_passthrough_reply;
@@ -53,6 +54,9 @@ use self::pc_artifact_completion::pc_project_execution_had_no_changes;
 pub(crate) use self::pc_billing::{pc_cli_request_is_own_codex, requested_pc_cli_looks_like_codex};
 use self::pc_billing::{
     record_pc_cli_trusted_usage, reserve_pc_cli_billing_call, settle_pc_cli_node_usage,
+};
+use self::pc_cli_failure::{
+    pc_cli_readable_output, pc_cli_terminal_error_message, pc_codex_error_output_can_complete,
 };
 pub(crate) use self::pc_dispatch_capture::{
     run_pc_agent_workspace_capture, PcAgentWorkspaceCaptureRequest, PcAgentWorkspaceCaptureResult,
@@ -1836,31 +1840,26 @@ async fn run_via_pc_agent(
                     );
                 }
                 pc_execution_guard.disarm();
-                let has_useful_output = !full_text.trim().is_empty();
-                let allow_codex_output_despite_error = is_codex
-                    && has_useful_output
-                    && !no_project_changes
-                    && effective_error
-                        .as_deref()
-                        .map(|e| {
-                            !e.contains("断线")
-                                && !e.contains("超时")
-                                && !e.contains("worktree")
-                                && !e.contains("合并")
-                        })
-                        .unwrap_or(true);
+                let readable_output = pc_cli_readable_output(
+                    is_codex,
+                    lightweight_pc_chat,
+                    stream_started,
+                    &full_text,
+                );
+                let allow_codex_output_despite_error = pc_codex_error_output_can_complete(
+                    is_codex,
+                    readable_output.has_success_output,
+                    no_project_changes,
+                    effective_error.as_deref(),
+                    &full_text,
+                );
                 if effective_exit_ok || allow_codex_output_despite_error {
                     // Codex 过程事件会先流式给前端；HTTP/历史记录仍依赖 done.message，
                     // 因此从完整输出中提取最终可读总结，避免聊天记录为空。
-                    let codex_final_reply = if is_codex {
-                        extract_codex_reply(&full_text)
-                    } else {
-                        String::new()
-                    };
                     let reply = if lightweight_pc_chat {
                         extract_lightweight_pc_chat_reply(&full_text, is_codex)
                     } else if is_codex {
-                        codex_final_reply.clone()
+                        readable_output.codex_final_reply.clone()
                     } else if stream_started {
                         String::new() // 已流式完毕，Done 不重复发
                     } else {
@@ -1986,11 +1985,12 @@ async fn run_via_pc_agent(
                     );
                     return Ok(PcAgentRunOutcome::Completed);
                 } else {
-                    let error_message = if no_project_changes {
-                        PC_PROJECT_NO_CHANGES_ERROR.to_string()
-                    } else {
-                        format!("PC CLI 执行失败: {}", effective_error.unwrap_or_default())
-                    };
+                    let error_message = pc_cli_terminal_error_message(
+                        cli_name,
+                        no_project_changes,
+                        effective_error.as_deref(),
+                        &full_text,
+                    );
                     finish_pc_node_compute_run(
                         state,
                         &pc_accounting_key,
