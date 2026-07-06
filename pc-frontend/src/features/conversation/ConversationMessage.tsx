@@ -60,7 +60,7 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
   // AI 回复默认支持 Markdown；用户消息至少支持图片、链接和代码片段。
   const hasMarkdown = isAi
     ? /[#*`\[\]>|]/.test(content)
-    : /!\[[^\]]*]\([^)]+\)|\[[^\]]+]\([^)]+\)|`/.test(content)
+    : /!\[[^\]]*]\([^)]+\)|\[[^\]]+]\([^)]+\)|`|^\s*https?:\/\/\S+?(?:\.(?:png|jpe?g|gif|webp)|\/(?:chat-)?attachments\/\S+)/im.test(content)
 
   return (
     <div className={[styles.messageRow, isOwn ? styles.ownRow : '', isAi ? styles.aiRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
