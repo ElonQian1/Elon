@@ -21,8 +21,9 @@
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. 如果任务在隔离 worktree 完成并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不要 stage、stash、删除或移动原主工作区的未跟踪文件，遇到同名路径冲突就报告。
-7. Android APK 新功能默认先以“业务提交已进入 `origin/main`”为第一层完成定义；并行任务可以先用 `CodePushed` 收尾。只有用户明确要求安装包交付、下载链接或线上发布时，才以“服务器 APK 指向最新主线”为最终完成定义。
-8. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
+7. AI 任务状态必须拆成两层：第一层是业务完成状态，例如代码已进入 `origin/main`、服务器已发布成功、APK/PC 节点已验证；第二层是本机收尾状态，例如主工作区 `main` 快进失败、worktree 清理失败。本机收尾失败只能记录为 `cleanup_failed` 或 `local_main_diverged`，不能把已经成立的业务完成状态改回失败。
+8. Android APK 新功能默认先以“业务提交已进入 `origin/main`”为第一层完成定义；并行任务可以先用 `CodePushed` 收尾。只有用户明确要求安装包交付、下载链接或线上发布时，才以“服务器 APK 指向最新主线”为最终完成定义。
+9. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
 
 ### 并行 rebase 边界
 
@@ -33,6 +34,7 @@
 3. 只有 push 被 non-fast-forward 拒绝：才 `git fetch origin` + `git rebase origin/main`，解决冲突后再 push。
 4. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
 5. 发布阶段：如果构建产物被更新的 main 超越，停止上传旧产物，汇报“代码已合并，发布交给最新主线”，而不是重跑。
+6. 收尾阶段：如果主工作区 `main` 不能快进或 worktree 清理失败，只报告 `cleanup_failed` / `local_main_diverged`；不要覆盖已经完成的代码同步或发布状态。
 
 ---
 

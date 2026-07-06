@@ -167,6 +167,14 @@ fn finalize_cli_workspace(
                 || message.starts_with("base workspace") =>
         {
             warn!("[relay-client] 会话 worktree 暂未合并: {message}");
+            if conversation_workspace_head_landed(&workspace) {
+                let cleanup_status = cleanup_failure_status(&message);
+                return (
+                    true,
+                    None,
+                    Some(workspace_status(&workspace, cleanup_status, Some(&message))),
+                );
+            }
             (
                 false,
                 Some(message.clone()),
@@ -189,12 +197,45 @@ fn finalize_cli_workspace(
         Err(e) => {
             warn!("[relay-client] 会话 worktree 合并失败: {e:#}");
             let message = format!("会话 worktree 合并失败: {e}");
+            if conversation_workspace_head_landed(&workspace) {
+                let cleanup_status = cleanup_failure_status(&message);
+                return (
+                    true,
+                    None,
+                    Some(workspace_status(&workspace, cleanup_status, Some(&message))),
+                );
+            }
             (
                 false,
                 Some(message.clone()),
                 Some(workspace_status(&workspace, "failed", Some(&message))),
             )
         }
+    }
+}
+
+fn conversation_workspace_head_landed(
+    workspace: &crate::pc_workspace_provisioner::ConversationWorkspaceResult,
+) -> bool {
+    crate::pc_workspace_provisioner::conversation_workspace_head_landed(workspace).unwrap_or_else(
+        |probe_error| {
+            warn!("[relay-client] 检查会话 worktree 是否已进入远端主线失败: {probe_error:#}");
+            false
+        },
+    )
+}
+
+fn cleanup_failure_status(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("non-fast-forward")
+        || lower.contains("ff-only")
+        || lower.contains("fast-forward")
+        || lower.contains("diverg")
+        || lower.contains("fetch first")
+    {
+        "local_main_diverged"
+    } else {
+        "cleanup_failed"
     }
 }
 

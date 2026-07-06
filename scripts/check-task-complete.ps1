@@ -127,6 +127,22 @@ function Get-GitWorktreeEntries {
     return $entries
 }
 
+function Get-CleanupStatusFromGitOutput {
+    param([string]$Output)
+
+    $lower = $Output.ToLowerInvariant()
+    if (
+        $lower.Contains("non-fast-forward") -or
+        $lower.Contains("ff-only") -or
+        $lower.Contains("fast-forward") -or
+        $lower.Contains("diverg") -or
+        $lower.Contains("fetch first")
+    ) {
+        return "local_main_diverged"
+    }
+    return "cleanup_failed"
+}
+
 function Sync-MainWorktreeIfClean {
     & git rev-parse --verify origin/main *> $null
     if ($LASTEXITCODE -ne 0) {
@@ -146,13 +162,18 @@ function Sync-MainWorktreeIfClean {
     $status = (& git -C $mainWorktree.Path status --porcelain=v1 --untracked-files=normal)
     if (-not [string]::IsNullOrWhiteSpace(($status -join "`n"))) {
         Write-Host "  MAIN_BASELINE_SYNC=blocked_dirty:$($mainWorktree.Path)"
+        Write-Host "  CLEANUP_STATUS=cleanup_failed"
+        Write-Host "  CLEANUP_STATUS_DETAIL=main_baseline_dirty_not_task_failure"
         return
     }
 
     $before = (& git -C $mainWorktree.Path rev-parse --short HEAD).Trim()
     $mergeOutput = & git -C $mainWorktree.Path merge --ff-only origin/main 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "  MAIN_BASELINE_SYNC=failed:$($mergeOutput -join ' ')" -ForegroundColor Yellow
+        $cleanupStatus = Get-CleanupStatusFromGitOutput -Output ($mergeOutput -join ' ')
+        Write-Host "  MAIN_BASELINE_SYNC=failed:${cleanupStatus}:$($mergeOutput -join ' ')" -ForegroundColor Yellow
+        Write-Host "  CLEANUP_STATUS=$cleanupStatus"
+        Write-Host "  CLEANUP_STATUS_DETAIL=main_baseline_sync_warning_not_task_failure"
         return
     }
     $after = (& git -C $mainWorktree.Path rev-parse --short HEAD).Trim()

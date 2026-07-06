@@ -412,6 +412,44 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     }
 }
 
+pub fn conversation_workspace_head_landed(workspace: &ConversationWorkspaceResult) -> Result<bool> {
+    if !workspace.isolated {
+        return Ok(false);
+    }
+    let active_workspace = git_path_buf(&PathBuf::from(&workspace.workspace_path));
+    if !is_git_work_tree(&active_workspace) {
+        return Ok(false);
+    }
+    if git_output(&active_workspace, &["remote", "get-url", "origin"]).is_err() {
+        return Ok(false);
+    }
+
+    git_fetch_origin(&active_workspace)?;
+    let head = git_output(&active_workspace, &["rev-parse", "HEAD"])?;
+    for reference in completion_origin_refs(workspace) {
+        if git_output(&active_workspace, &["rev-parse", "--verify", &reference]).is_ok()
+            && commit_contained_in_ref(&active_workspace, &head, &reference)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn completion_origin_refs(workspace: &ConversationWorkspaceResult) -> Vec<String> {
+    let mut refs = Vec::new();
+    if let Some(base_workspace_path) = workspace.base_workspace_path.as_ref() {
+        let base_workspace = git_path_buf(&PathBuf::from(base_workspace_path));
+        if let Some(base_branch) = current_branch(&base_workspace) {
+            refs.push(format!("origin/{base_branch}"));
+        }
+    }
+    refs.push("origin/main".to_string());
+    refs.sort();
+    refs.dedup();
+    refs
+}
+
 fn conversation_merge_lock(base_workspace: &Path) -> Result<Arc<Mutex<()>>> {
     let key =
         std::fs::canonicalize(base_workspace).unwrap_or_else(|_| base_workspace.to_path_buf());

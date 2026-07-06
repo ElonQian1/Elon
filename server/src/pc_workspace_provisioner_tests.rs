@@ -1,6 +1,7 @@
     use super::{
-        ensure_conversation_workspace_committed, git_output, git_path_arg, is_git_work_tree,
-        is_retryable_push_rejection, merge_conversation_workspace, prepare_conversation_workspace,
+        conversation_workspace_head_landed, ensure_conversation_workspace_committed, git_output,
+        git_path_arg, is_git_work_tree, is_retryable_push_rejection,
+        merge_conversation_workspace, prepare_conversation_workspace,
         recover_stale_conversation_worktree_path, worktree_clean,
     };
     use elon_pc_dev_runtime::safe_path_part;
@@ -212,6 +213,87 @@
             .expect("commit subject should be readable");
         assert_eq!(subject, "chore(ai): 保存会话工作区改动");
         let _ = fs::remove_dir_all(repo);
+    }
+
+    #[test]
+    fn conversation_workspace_head_landed_checks_origin_main() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_landed_conversation_{}",
+            Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&root).expect("root should create");
+        let origin = root.join("origin.git");
+        let base = root.join("base");
+        let active = root.join("active");
+        let unlanded = root.join("unlanded");
+
+        fs::create_dir_all(&origin).expect("origin should create");
+        run_git(&origin, &["init", "--bare"]);
+        let origin_arg = origin.to_string_lossy().to_string();
+        run_git(&root, &["clone", &origin_arg, "base"]);
+        run_git(&base, &["checkout", "-b", "main"]);
+        run_git(&base, &["config", "user.email", "ai@example.test"]);
+        run_git(&base, &["config", "user.name", "AI Test"]);
+        fs::write(base.join("README.md"), "seed\n").expect("seed file should write");
+        run_git(&base, &["add", "README.md"]);
+        run_git(&base, &["commit", "-m", "seed"]);
+        run_git(&base, &["push", "-u", "origin", "main"]);
+
+        let active_arg = active.to_string_lossy().to_string();
+        run_git(
+            &base,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "ai/session/project-a/conversation-a",
+                &active_arg,
+                "main",
+            ],
+        );
+        fs::write(active.join("README.md"), "landed\n").expect("landed file should write");
+        run_git(&active, &["add", "README.md"]);
+        run_git(&active, &["commit", "-m", "landed"]);
+        run_git(&active, &["push", "origin", "HEAD:main"]);
+        let landed_workspace = super::ConversationWorkspaceResult {
+            base_workspace_path: Some(base.to_string_lossy().to_string()),
+            workspace_path: active.to_string_lossy().to_string(),
+            isolated: true,
+            branch: Some("ai/session/project-a/conversation-a".into()),
+        };
+        assert!(
+            conversation_workspace_head_landed(&landed_workspace)
+                .expect("landed probe should succeed")
+        );
+
+        let unlanded_arg = unlanded.to_string_lossy().to_string();
+        run_git(
+            &base,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "ai/session/project-a/conversation-b",
+                &unlanded_arg,
+                "main",
+            ],
+        );
+        fs::write(unlanded.join("README.md"), "local only\n")
+            .expect("unlanded file should write");
+        run_git(&unlanded, &["add", "README.md"]);
+        run_git(&unlanded, &["commit", "-m", "local only"]);
+        let unlanded_workspace = super::ConversationWorkspaceResult {
+            base_workspace_path: Some(base.to_string_lossy().to_string()),
+            workspace_path: unlanded.to_string_lossy().to_string(),
+            isolated: true,
+            branch: Some("ai/session/project-a/conversation-b".into()),
+        };
+        assert!(
+            !conversation_workspace_head_landed(&unlanded_workspace)
+                .expect("unlanded probe should succeed")
+        );
+
+        let _ = fs::remove_dir_all(root);
     }
 
     fn run_git(repo: &Path, args: &[&str]) {

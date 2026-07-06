@@ -200,6 +200,18 @@ pub fn finalize_cli_prompt_workspace(
                 || message.starts_with("base workspace") =>
         {
             warn!("会话 worktree 暂未合并: {message}");
+            if conversation_workspace_head_landed(&workspace) {
+                let cleanup_status = cleanup_failure_status(&message);
+                return (
+                    true,
+                    None,
+                    Some(cli_workspace_status(
+                        &workspace,
+                        cleanup_status,
+                        Some(&message),
+                    )),
+                );
+            }
             (
                 false,
                 Some(message.clone()),
@@ -226,12 +238,49 @@ pub fn finalize_cli_prompt_workspace(
         Err(e) => {
             warn!("会话 worktree 合并失败: {e:#}");
             let message = format!("会话 worktree 合并失败: {e}");
+            if conversation_workspace_head_landed(&workspace) {
+                let cleanup_status = cleanup_failure_status(&message);
+                return (
+                    true,
+                    None,
+                    Some(cli_workspace_status(
+                        &workspace,
+                        cleanup_status,
+                        Some(&message),
+                    )),
+                );
+            }
             (
                 false,
                 Some(message.clone()),
                 Some(cli_workspace_status(&workspace, "failed", Some(&message))),
             )
         }
+    }
+}
+
+fn conversation_workspace_head_landed(
+    workspace: &pc_workspace_provisioner::ConversationWorkspaceResult,
+) -> bool {
+    pc_workspace_provisioner::conversation_workspace_head_landed(workspace).unwrap_or_else(
+        |probe_error| {
+            warn!("检查会话 worktree 是否已进入远端主线失败: {probe_error:#}");
+            false
+        },
+    )
+}
+
+pub fn cleanup_failure_status(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("non-fast-forward")
+        || lower.contains("ff-only")
+        || lower.contains("fast-forward")
+        || lower.contains("diverg")
+        || lower.contains("fetch first")
+    {
+        "local_main_diverged"
+    } else {
+        "cleanup_failed"
     }
 }
 

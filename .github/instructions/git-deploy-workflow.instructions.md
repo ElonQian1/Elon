@@ -82,6 +82,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 9. **每次 commit 后必须立即 `git push origin HEAD:main`**；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main` 一次，把自己的提交接到远端最新提交之后再推。
 10. push 成功后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed`（Linux/macOS 可用同等 git 祖先检查），确认本次 HEAD 已包含在 `origin/main`。
 11. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
+12. 完成状态和收尾状态必须分离：本任务 HEAD 已包含在 `origin/main`、或发布脚本已验证线上版本后，主工作区 `main` 同步失败只能作为 `cleanup_failed` / `local_main_diverged` 收尾告警记录，不得把 `CodePushed`、`Server`、`NodeAgent`、`AndroidFeature` 的业务完成结论改成失败。
 
 ### Rebase 触发条件
 
@@ -92,6 +93,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 | 提交前 `git fetch origin main` 发现远端前进 | 否 | 只作为态势信息；提交后立即 push |
 | `git push origin HEAD:main` 被 non-fast-forward 拒绝 | 是 | `git fetch origin` → `git rebase origin/main` → 解决冲突 → 重推 |
 | 本任务 HEAD 已包含在 `origin/main` | 否 | 代码同步完成；后续 main 前进不影响本任务完成状态 |
+| `check-task-complete` 末尾 `MAIN_BASELINE_SYNC=failed` | 否 | 业务完成状态不变；记录 `cleanup_failed` 或 `local_main_diverged`，后续单独清理主工作区 |
 | 发布构建期间被更新 main / 服务器版本超越 | 否 | 停止上传旧产物，汇报“代码已合并，发布交给最新主线” |
 
 **禁止把 `origin/main` 前进本身当作 rebase / 重跑构建 / 重新发布条件。** 这种追最新 HEAD 的行为会让多个代理互相追车，形成活锁。
