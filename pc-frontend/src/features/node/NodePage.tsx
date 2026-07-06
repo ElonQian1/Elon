@@ -526,7 +526,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
             onInstall={installEnv}
             onSaveKey={saveCodexKey}
           />
-          <CodexToolboxCard toolbox={status.codex_toolbox} busy={codexBusy} onRepair={installEnv} />
+          <CodexToolboxCard toolbox={status.codex_toolbox} codex={codex} busy={codexBusy} onRepair={installEnv} />
           <div className={styles.actions}>
             <button className={[styles.btn, styles.primary].join(' ')} onClick={login}>
               {status.logged_in ? '重新绑定当前账号' : '用当前账号注册节点'}

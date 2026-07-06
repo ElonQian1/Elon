@@ -588,6 +588,71 @@
   font-size: 14px;
 }
 
+.toolboxTitleLine {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.toolboxTitleLine .codexLabel {
+  margin-bottom: 3px;
+}
+
+.toolboxHelp {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.toolboxHelpButton {
+  width: 18px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .04);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.toolboxHelpButton:hover,
+.toolboxHelpButton:focus-visible {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, .26);
+  background: rgba(255, 255, 255, .08);
+  outline: none;
+}
+
+.toolboxHelpBubble {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 20;
+  width: min(340px, calc(100vw - 64px));
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: var(--radius-sm);
+  background: #171a1f;
+  box-shadow: 0 16px 44px rgba(0, 0, 0, .48);
+  color: var(--text-secondary);
+  padding: 9px 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.toolboxHelp:hover .toolboxHelpBubble,
+.toolboxHelp:focus-within .toolboxHelpBubble {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .toolboxCard p {
   margin: 0;
   color: var(--text-muted);
@@ -644,6 +709,7 @@
 .toolboxTool small { color: var(--text-muted); font-size: 11px; line-height: 1.45; }
 .toolboxTool_ready { border-color: rgba(76, 175, 120, .28); }
 .toolboxTool_missing { border-color: rgba(200, 160, 64, .28); }
+.toolboxTool_optional { border-color: rgba(255, 255, 255, .10); }
 .toolboxTool_warn { border-color: rgba(224, 112, 112, .28); }
 
 .toolboxCard .btn {
