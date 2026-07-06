@@ -73,6 +73,9 @@ use node_agent_config::{
 };
 mod node_agent_download_router;
 mod node_agent_env;
+mod node_agent_exec;
+use node_agent_exec::hide_tokio_command_window;
+pub use node_agent_exec::run_exec;
 mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
@@ -81,6 +84,7 @@ mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
 use node_agent_local_llm::discover_models;
+pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
@@ -134,160 +138,6 @@ mod project_landing;
 mod project_workspace_inspect;
 mod tools_patch;
 mod windows_doctor;
-
-// ── LLM 推理（OpenAI-compatible 流式）────────────────────────────────────────
-
-/// 调用本地 LLM（OpenAI-compatible stream 接口），把 chunk 通过 out_tx 发回云端
-async fn run_llm_inference(
-    cfg: &NodeConfig,
-    req_id: String,
-    model: &str,
-    messages: Vec<serde_json::Value>,
-    max_tokens: Option<u32>,
-    out_tx: mpsc::UnboundedSender<Message>,
-) {
-    // 选择端点
-    let base_url = if model.contains('/') || cfg.lm_studio_url.is_some() {
-        cfg.lm_studio_url.as_deref().unwrap_or(&cfg.ollama_url)
-    } else {
-        &cfg.ollama_url
-    };
-
-    // Ollama 使用 /api/chat，其余使用 /v1/chat/completions
-    let endpoint = if base_url.contains(":11434") {
-        format!("{}/api/chat", base_url)
-    } else {
-        format!("{}/v1/chat/completions", base_url)
-    };
-
-    let mut body = serde_json::json!({
-        "model": model,
-        "messages": messages,
-        "stream": true,
-    });
-    if let Some(mt) = max_tokens {
-        body["max_tokens"] = serde_json::json!(mt);
-    }
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(300))
-        .build()
-        .unwrap_or_default();
-
-    let resp = match client.post(&endpoint).json(&body).send().await {
-        Ok(r) => r,
-        Err(e) => {
-            let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamError {
-                req_id,
-                message: format!("LLM 请求失败: {e}"),
-            }));
-            return;
-        }
-    };
-
-    if !resp.status().is_success() {
-        let status = resp.status().as_u16();
-        let msg = resp.text().await.unwrap_or_default();
-        let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamError {
-            req_id,
-            message: format!("LLM 错误 {status}: {msg}"),
-        }));
-        return;
-    }
-
-    // 读取 SSE 流
-    let mut prompt_tokens = 0u32;
-    let mut completion_tokens = 0u32;
-    let mut finish_reason = "stop".to_string();
-    let mut stream = resp.bytes_stream();
-
-    let mut buf = String::new();
-    while let Some(chunk) = futures::StreamExt::next(&mut stream).await {
-        let bytes = match chunk {
-            Ok(b) => b,
-            Err(e) => {
-                warn!("LLM 流读取错误: {e}");
-                break;
-            }
-        };
-        buf.push_str(&String::from_utf8_lossy(&bytes));
-
-        // SSE 每行 "data: {...}\n\n" 或 Ollama JSON lines
-        while let Some(pos) = buf.find('\n') {
-            let line = buf[..pos].trim().to_string();
-            buf.drain(..=pos);
-
-            if line.is_empty() || line == "data: [DONE]" {
-                continue;
-            }
-
-            let json_str = line.strip_prefix("data: ").unwrap_or(&line);
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                // OpenAI-compatible delta
-                if let Some(delta) = val
-                    .pointer("/choices/0/delta/content")
-                    .and_then(|v| v.as_str())
-                {
-                    if !delta.is_empty() {
-                        completion_tokens += 1; // 近似计数
-                        let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamChunk {
-                            req_id: req_id.clone(),
-                            delta: delta.to_string(),
-                        }));
-                    }
-                }
-                // Ollama message.content
-                if let Some(content) = val.pointer("/message/content").and_then(|v| v.as_str()) {
-                    if !content.is_empty() {
-                        completion_tokens += 1;
-                        let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamChunk {
-                            req_id: req_id.clone(),
-                            delta: content.to_string(),
-                        }));
-                    }
-                }
-                // 完成信号
-                if let Some(r) = val
-                    .pointer("/choices/0/finish_reason")
-                    .and_then(|v| v.as_str())
-                {
-                    if !r.is_empty() && r != "null" {
-                        finish_reason = r.to_string();
-                    }
-                }
-                if val.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
-                    prompt_tokens = val
-                        .pointer("/prompt_eval_count")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0) as u32;
-                    completion_tokens =
-                        val.pointer("/eval_count")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(completion_tokens as u64) as u32;
-                }
-                // token usage from OpenAI response
-                if let Some(usage) = val.get("usage") {
-                    prompt_tokens = usage
-                        .get("prompt_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(prompt_tokens as u64) as u32;
-                    completion_tokens = usage
-                        .get("completion_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(completion_tokens as u64)
-                        as u32;
-                }
-            }
-        }
-    }
-
-    let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamEnd {
-        req_id,
-        prompt_tokens,
-        completion_tokens,
-        finish_reason,
-    }));
-}
 
 fn ws_text(msg: &AgentToServer) -> Message {
     Message::Text(serde_json::to_string(msg).unwrap_or_default())
@@ -1532,105 +1382,6 @@ fn cli_model_from_args(cli_name: &str, args: &[String]) -> Option<String> {
     }
     None
 }
-
-/// 执行 Exec：运行任意命令，流式返回 TaskStdout/TaskStderr/TaskExit。
-async fn run_exec(
-    task_id: String,
-    cli: String,
-    args: Vec<String>,
-    cwd: String,
-    env_vars: Vec<(String, String)>,
-    out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
-) {
-    use tokio::io::AsyncBufReadExt;
-
-    let mut cmd = tokio::process::Command::new(&cli);
-    cmd.args(&args).current_dir(&cwd);
-    for (k, v) in &env_vars {
-        cmd.env(k, v);
-    }
-    cmd.stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .stdin(std::process::Stdio::null());
-    hide_tokio_command_window(&mut cmd);
-
-    let mut child = match cmd.spawn() {
-        Ok(c) => c,
-        Err(e) => {
-            let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
-                task_id,
-                message: format!("无法启动 {}: {}", cli, e),
-            }));
-            return;
-        }
-    };
-
-    let pid = child.id().unwrap_or(0);
-    let _ = out_tx.send(ws_text(&AgentToServer::TaskStarted {
-        task_id: task_id.clone(),
-        pid,
-    }));
-
-    let stdout = child.stdout.take().expect("stdout");
-    let stderr = child.stderr.take().expect("stderr");
-    let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
-    // stderr 字节级读取，避免 Windows GBK 编码触发 UTF-8 错误
-    let (stderr_tx2, mut stderr_rx2) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
-    {
-        let tx = stderr_tx2.clone();
-        let task_id2 = task_id.clone();
-        tokio::spawn(async move {
-            use tokio::io::AsyncBufReadExt;
-            let mut reader = tokio::io::BufReader::new(stderr);
-            let mut buf = Vec::new();
-            loop {
-                buf.clear();
-                match reader.read_until(b'\n', &mut buf).await {
-                    Ok(0) | Err(_) => {
-                        let _ = tx.send(None);
-                        break;
-                    }
-                    Ok(_) => {
-                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) {
-                            buf.pop();
-                        }
-                        let _ = tx.send(Some(String::from_utf8_lossy(&buf).into_owned()));
-                    }
-                }
-            }
-            drop(task_id2); // 保持 task_id2 活跃直到 stderr 读完
-        });
-    }
-    let mut stdout_done = false;
-    let mut stderr_done = false;
-
-    while !stdout_done || !stderr_done {
-        tokio::select! {
-            line = stdout_lines.next_line(), if !stdout_done => match line {
-                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::TaskStdout { task_id: task_id.clone(), data: l + "\n" })); }
-                Ok(None) => { stdout_done = true; }
-                Err(e) => { warn!("stdout err: {e}"); stdout_done = true; }
-            },
-            opt = stderr_rx2.recv(), if !stderr_done => match opt {
-                Some(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::TaskStderr { task_id: task_id.clone(), data: l + "\n" })); }
-                Some(None) | None => { stderr_done = true; }
-            },
-        }
-    }
-
-    let code = child.wait().await.ok().and_then(|s| s.code());
-    let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
-}
-
-fn hide_tokio_command_window(_command: &mut tokio::process::Command) {
-    #[cfg(windows)]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-        _command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
-    }
-}
-
 async fn run_loop(runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);
     loop {
