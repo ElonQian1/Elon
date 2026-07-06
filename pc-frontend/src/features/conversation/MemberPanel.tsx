@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../../api/client'
 import { clean, formatTime } from '../../lib/utils'
+import { fixedPopoverPosition, popoverAnchorFromPoint, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import type { Channel, ProjectMember, ProjectMemberAuditEntry, ProjectMemberAuditResponse, ProjectRoleRef } from './types'
 import {
   memberPresenceStatus,
@@ -349,7 +350,7 @@ export function MemberSearch({
   channelId,
 }: {
   members: ProjectMember[]
-  onSelect: (member: ProjectMember, y: number) => void
+  onSelect: (member: ProjectMember, anchor: PopoverAnchor) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenMenu?: (request: MemberMenuRequest) => void
   activeConversationMemberId?: string | null
@@ -545,7 +546,7 @@ function MemberListItem({
   channelId,
 }: {
   member: ProjectMember
-  onSelect: (member: ProjectMember, y: number) => void
+  onSelect: (member: ProjectMember, anchor: PopoverAnchor) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenMenu?: (request: MemberMenuRequest) => void
   activeConversationMemberId?: string | null
@@ -565,8 +566,7 @@ function MemberListItem({
   const roleAccentStyle = roleColor ? { color: roleColor, borderColor: roleColor } : undefined
   const roleAvatarStyle = roleColor ? { boxShadow: `inset 0 0 0 2px ${roleColor}` } : undefined
   function openProfile(e: React.MouseEvent<HTMLElement>) {
-    const rect = e.currentTarget.getBoundingClientRect()
-    onSelect(member, rect.top + rect.height / 2)
+    onSelect(member, popoverAnchorFromRect(e.currentTarget.getBoundingClientRect()))
   }
   function openMenu(e: React.MouseEvent<HTMLElement>) {
     e.preventDefault()
@@ -639,7 +639,7 @@ export function MemberContextMenu({
   canModerate?: boolean
   canRemove?: boolean
   onClose: () => void
-  onOpenProfile: (member: ProjectMember, y: number) => void
+  onOpenProfile: (member: ProjectMember, anchor: PopoverAnchor) => void
   onOpenDetails?: (member: ProjectMember) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenPermissions?: (member: ProjectMember) => void
@@ -739,7 +739,7 @@ export function MemberContextMenu({
         </div>
       </div>
       <div className={styles.memberContextMenuGroup}>
-        <button type="button" role="menuitem" onClick={() => run(() => onOpenProfile(member, y))}>查看资料</button>
+        <button type="button" role="menuitem" onClick={() => run(() => onOpenProfile(member, popoverAnchorFromPoint(x, y)))}>查看资料</button>
         {onOpenDetails && (
           <button type="button" role="menuitem" onClick={() => run(() => onOpenDetails(member))}>完整资料</button>
         )}
@@ -780,7 +780,7 @@ export function MemberContextMenu({
 /* ── MemberProfilePopover ── */
 export function MemberProfilePopover({
   member,
-  anchorY,
+  anchor,
   projectId,
   channels,
   channel,
@@ -794,7 +794,7 @@ export function MemberProfilePopover({
   onRemove,
 }: {
   member: ProjectMember
-  anchorY: number
+  anchor: PopoverAnchor
   projectId?: string
   channels?: Channel[]
   channel?: Channel
@@ -970,11 +970,7 @@ export function MemberProfilePopover({
 
   const POPOVER_WIDTH = 328
   const POPOVER_HEIGHT = 580
-  const viewW = window.innerWidth
-  const viewH = window.innerHeight
-  const maxTop = Math.max(12, viewH - POPOVER_HEIGHT - 12)
-  const popTop = Math.min(Math.max(anchorY - 20, 12), maxTop)
-  const popLeft = Math.max(8, viewW - 280 - POPOVER_WIDTH - 8)
+  const { left: popLeft, top: popTop } = fixedPopoverPosition(anchor, POPOVER_WIDTH, POPOVER_HEIGHT)
 
   return (
     <div ref={popRef} className={styles.memberPopover}

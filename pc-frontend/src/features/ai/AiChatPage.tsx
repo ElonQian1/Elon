@@ -28,6 +28,7 @@ import SidebarUserStrip from '../shell/SidebarUserStrip'
 import UserAvatar from '../shell/UserAvatar'
 import { formatTime, safeNodeAdminUrl } from '../../lib/utils'
 import { compactDisplayMessageContent, displayMessageContentOrAttachment } from '../../lib/messageDisplay'
+import { DEFAULT_POPOVER_ANCHOR, fixedPopoverPosition, popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
 import AiPinnedTools from './AiPinnedTools'
@@ -214,7 +215,7 @@ export default function AiChatPage() {
   const [usersLoading, setUsersLoading] = useState(true)
   const [usersError, setUsersError] = useState('')
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
-  const [friendPopoverY, setFriendPopoverY] = useState(200)
+  const [friendPopoverAnchor, setFriendPopoverAnchor] = useState<PopoverAnchor>(DEFAULT_POPOVER_ANCHOR)
   const [userPanelCollapsed, setUserPanelCollapsed] = useState(() => (
     typeof window !== 'undefined'
       ? window.localStorage.getItem('elon.pc.aiUserPanelCollapsed') === 'true'
@@ -938,7 +939,7 @@ export default function AiChatPage() {
           {selectedFriend && createPortal(
             <UserProfilePopover
               friend={selectedFriend}
-              anchorY={friendPopoverY}
+              anchor={friendPopoverAnchor}
               onClose={() => setSelectedFriend(null)}
             />,
             document.body
@@ -986,7 +987,8 @@ export default function AiChatPage() {
               {onlineFriends.map(f => (
                 <button key={f.id} className={styles.userPanelItem} type="button" onClick={(e) => {
                   const r = e.currentTarget.getBoundingClientRect()
-                  setSelectedFriend(f); setFriendPopoverY(r.top + r.height / 2)
+                  setSelectedFriend(f)
+                  setFriendPopoverAnchor(popoverAnchorFromRect(r))
                 }}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOnline].join(' ')}>
                     {f.avatar_data_url
@@ -1011,7 +1013,8 @@ export default function AiChatPage() {
               {offlineFriends.map(f => (
                 <button key={f.id} className={styles.userPanelItem} type="button" onClick={(e) => {
                   const r = e.currentTarget.getBoundingClientRect()
-                  setSelectedFriend(f); setFriendPopoverY(r.top + r.height / 2)
+                  setSelectedFriend(f)
+                  setFriendPopoverAnchor(popoverAnchorFromRect(r))
                 }}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOffline].join(' ')}>
                     {f.avatar_data_url
@@ -1064,7 +1067,7 @@ export default function AiChatPage() {
   )
 }
 
-function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anchorY: number; onClose: () => void }) {
+function UserProfilePopover({ friend, anchor, onClose }: { friend: Friend; anchor: PopoverAnchor; onClose: () => void }) {
   const navigate = useNavigate()
   const popRef = useRef<HTMLDivElement>(null)
   const name = friend.nickname ?? friend.account
@@ -1083,10 +1086,7 @@ function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anch
 
   const POPOVER_WIDTH = 284
   const POPOVER_HEIGHT = 280
-  const viewW = window.innerWidth
-  const viewH = window.innerHeight
-  const popTop = Math.min(Math.max(anchorY - 20, 12), viewH - POPOVER_HEIGHT - 12)
-  const popLeft = Math.max(8, viewW - 280 - POPOVER_WIDTH - 8)
+  const { left: popLeft, top: popTop } = fixedPopoverPosition(anchor, POPOVER_WIDTH, POPOVER_HEIGHT)
 
   function copyId() {
     navigator.clipboard.writeText(friend.id).catch(() => {})

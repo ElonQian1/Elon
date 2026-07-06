@@ -110,6 +110,7 @@ import { PermissionDrawer } from './PermissionDrawer'
 import { MemberDetailDrawer } from './MemberDetailDrawer'
 import { MemberDirectoryDrawer } from './MemberDirectoryDrawer'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
+import { DEFAULT_POPOVER_ANCHOR, type PopoverAnchor } from '../../lib/popoverPosition'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
@@ -164,7 +165,7 @@ export default function ConversationPage() {
   const [detailMember, setDetailMember] = useState<ProjectMember | null>(null)
   const [memberPanelScope, setMemberPanelScope] = useState<MemberPanelScope>('project')
   const [moderationFocusMemberId, setModerationFocusMemberId] = useState('')
-  const [memberPopoverY, setMemberPopoverY] = useState(200)
+  const [memberPopoverAnchor, setMemberPopoverAnchor] = useState<PopoverAnchor>(DEFAULT_POPOVER_ANCHOR)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
   const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
   const [roleFocusMemberId, setRoleFocusMemberId] = useState('')
@@ -967,13 +968,12 @@ export default function ConversationPage() {
     setMemberConversationTarget(target)
     setSelectedMember(null)
     setMemberMenu(null)
-    setMemberPopoverY(200)
+    setMemberPopoverAnchor(DEFAULT_POPOVER_ANCHOR)
     setSendError('')
   }
 
-  function openMemberProfile(member: ProjectMember, y: number) {
-    setSelectedMember(member)
-    setMemberPopoverY(y)
+  function openMemberProfile(member: ProjectMember, anchor: PopoverAnchor) {
+    setSelectedMember(member); setMemberPopoverAnchor(anchor)
     setMemberMenu(null)
   }
 
@@ -1456,7 +1456,7 @@ export default function ConversationPage() {
         spaceError={spaceError}
         memberMenu={memberMenu}
         selectedMember={selectedMember}
-        memberPopoverY={memberPopoverY}
+        memberPopoverAnchor={memberPopoverAnchor}
         isDevChannel={isDevChannel}
         activeWorkspacePath={activeWorkspacePath}
         isAssistingMember={isAssistingMember}
@@ -1485,7 +1485,7 @@ export default function ConversationPage() {
         onRemoveMember={removeMemberFromProject}
         onCloseSelectedMember={() => setSelectedMember(null)}
         onSetMemberPanelScope={setMemberPanelScope}
-        onSelectMember={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
+        onSelectMember={(m, anchor) => { setSelectedMember(m); setMemberPopoverAnchor(anchor) }}
         onOpenMemberMenu={setMemberMenu}
       />
 

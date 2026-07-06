@@ -11,6 +11,7 @@ import {
   memberPresenceAvatarClass,
 } from './MemberPanel'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
+import type { PopoverAnchor } from '../../lib/popoverPosition'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
 import type { WorkspacePanels } from './useWorkspacePanels'
 import styles from './ConversationPage.module.css'
@@ -41,7 +42,7 @@ interface ConversationMemberSidebarProps {
   spaceError: string
   memberMenu: MemberMenuRequest | null
   selectedMember: ProjectMember | null
-  memberPopoverY: number
+  memberPopoverAnchor: PopoverAnchor
   isDevChannel: boolean
   activeWorkspacePath: string
   isAssistingMember: boolean
@@ -61,7 +62,7 @@ interface ConversationMemberSidebarProps {
   onShowAudit: () => void
   onOpenPermissionManager: () => void
   onCloseMemberMenu: () => void
-  onOpenMemberProfile: (member: ProjectMember, y: number) => void
+  onOpenMemberProfile: (member: ProjectMember, anchor: PopoverAnchor) => void
   onOpenMemberDetails: (member: ProjectMember) => void
   onOpenMemberConversations: (member: ProjectMember) => void
   onOpenMemberPermissions: (member: ProjectMember) => void
@@ -70,7 +71,7 @@ interface ConversationMemberSidebarProps {
   onRemoveMember: (member: ProjectMember) => Promise<boolean | void>
   onCloseSelectedMember: () => void
   onSetMemberPanelScope: (scope: MemberPanelScope) => void
-  onSelectMember: (member: ProjectMember, y: number) => void
+  onSelectMember: (member: ProjectMember, anchor: PopoverAnchor) => void
   onOpenMemberMenu: (request: MemberMenuRequest) => void
 }
 
@@ -98,7 +99,7 @@ export default function ConversationMemberSidebar({
   spaceError,
   memberMenu,
   selectedMember,
-  memberPopoverY,
+  memberPopoverAnchor,
   isDevChannel,
   activeWorkspacePath,
   isAssistingMember,
@@ -180,7 +181,7 @@ export default function ConversationMemberSidebar({
         {selectedMember && createPortal(
           <MemberProfilePopover
             member={selectedMember}
-            anchorY={memberPopoverY}
+            anchor={memberPopoverAnchor}
             projectId={activeProjectId ?? undefined}
             channels={channels}
             channel={activeChannel}
