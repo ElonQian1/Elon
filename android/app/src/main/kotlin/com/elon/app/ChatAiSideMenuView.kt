@@ -367,17 +367,11 @@ internal class ChatAiSideMenuView(
                 }
             )
             addView(
-                headerIconButton(
-                    iconRes = R.drawable.ic_side_menu_refresh,
-                    description = "刷新会话列表",
-                    onClick = { button ->
-                        button.animate()
-                            .rotationBy(360f)
-                            .setDuration(360L)
-                            .setInterpolator(LinearInterpolator())
-                            .start()
-                        conversationHeaderActions.refreshConversations()
-                    }
+                ChatSideMenuRefreshButton(
+                    context = context,
+                    dp = dp,
+                    selectableForeground = selectableForeground,
+                    onRefresh = conversationHeaderActions::refreshConversations
                 ),
                 LinearLayout.LayoutParams(dp(38), dp(38)).apply {
                     rightMargin = dp(2)

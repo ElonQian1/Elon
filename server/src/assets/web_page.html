@@ -687,7 +687,54 @@
       cursor: pointer;
     }
     .web-chat-side-menu-close { font-size: 24px; }
-    .web-chat-side-menu-refresh { font-size: 22px; }
+    .web-chat-side-menu-refresh {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .web-chat-side-menu-refresh-icon {
+      position: relative;
+      display: block;
+      width: 28px;
+      height: 28px;
+      --refresh-dot-size: 7px;
+      --refresh-radius: 7.76px;
+    }
+    .web-chat-side-menu-refresh-ring {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .web-chat-side-menu-refresh-orbit {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 0;
+      height: 0;
+      transform: rotate(21.8deg);
+      transform-origin: center;
+      pointer-events: none;
+    }
+    .web-chat-side-menu-refresh-dot {
+      position: absolute;
+      left: calc(var(--refresh-radius) - var(--refresh-dot-size) / 2);
+      top: calc(0px - var(--refresh-dot-size) / 2);
+      width: var(--refresh-dot-size);
+      height: var(--refresh-dot-size);
+      object-fit: contain;
+      pointer-events: none;
+    }
+    .web-chat-side-menu-refresh.is-orbiting .web-chat-side-menu-refresh-orbit {
+      animation: web-chat-side-menu-refresh-orbit 900ms linear 1;
+    }
+    @keyframes web-chat-side-menu-refresh-orbit {
+      from { transform: rotate(21.8deg); }
+      to { transform: rotate(381.8deg); }
+    }
     .web-chat-side-menu-refresh:disabled {
       opacity: 0.42;
       cursor: progress;
@@ -3459,7 +3506,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <div class="web-chat-side-menu-head">
         <h2 id="webChatSideMenuTitle">侧面工具栏</h2>
         <div class="web-chat-side-menu-head-actions">
-          <button class="web-chat-side-menu-refresh" id="webChatSideMenuRefresh" type="button" aria-label="刷新侧栏内容">↻</button>
+          <button class="web-chat-side-menu-refresh" id="webChatSideMenuRefresh" type="button" aria-label="刷新侧栏内容">
+            <span class="web-chat-side-menu-refresh-icon" aria-hidden="true">
+              <img class="web-chat-side-menu-refresh-ring" src="data:image/png;base64,__CHAT_SIDE_MENU_REFRESH_RING_PNG_B64__" alt="" />
+              <span class="web-chat-side-menu-refresh-orbit">
+                <img class="web-chat-side-menu-refresh-dot" src="data:image/png;base64,__CHAT_SIDE_MENU_REFRESH_DOT_PNG_B64__" alt="" />
+              </span>
+            </span>
+          </button>
           <button class="web-chat-side-menu-close" id="webChatSideMenuClose" type="button" aria-label="关闭侧面工具栏">×</button>
         </div>
       </div>
@@ -4252,8 +4306,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     });
     if (webSideMenuContinueBtn) webSideMenuContinueBtn.disabled = !isAnyChatActive();
   }
+  function playWebChatSideMenuRefreshAnimation() {
+    if (!webChatSideMenuRefresh) return;
+    webChatSideMenuRefresh.classList.remove('is-orbiting');
+    void webChatSideMenuRefresh.offsetWidth;
+    webChatSideMenuRefresh.classList.add('is-orbiting');
+    window.setTimeout(() => {
+      webChatSideMenuRefresh.classList.remove('is-orbiting');
+    }, 940);
+  }
   async function refreshWebChatSideMenuData() {
     if (!webChatSideMenuRefresh || webChatSideMenuRefresh.disabled) return;
+    playWebChatSideMenuRefreshAnimation();
     webChatSideMenuRefresh.disabled = true;
     try {
       await loadProjects();

@@ -37,6 +37,10 @@ const PROJECT_SPACE_POST_COMMENT_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_comment.png");
 const PROJECT_SPACE_POST_LIKE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_like.png");
+const CHAT_SIDE_MENU_REFRESH_RING_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_ring.png");
+const CHAT_SIDE_MENU_REFRESH_DOT_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_dot.png");
 const PROJECT_POST_COMPOSE_ICON_PNG: &[u8] = include_bytes!("assets/ic_project_post_compose.png");
 const PROJECT_PREVIEW_PLACEHOLDER_ICON_PNG: &[u8] =
     include_bytes!("assets/ic_project_preview_placeholder.png");
@@ -95,6 +99,14 @@ fn decode_brand_png() -> Vec<u8> {
 }
 
 fn build_html() -> String {
+    let refresh_ring_png_b64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        CHAT_SIDE_MENU_REFRESH_RING_PNG,
+    );
+    let refresh_dot_png_b64 = base64::Engine::encode(
+        &base64::engine::general_purpose::STANDARD,
+        CHAT_SIDE_MENU_REFRESH_DOT_PNG,
+    );
     WEB_HTML_TEMPLATE
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
         .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
@@ -135,6 +147,14 @@ fn build_html() -> String {
         .replace(
             "__CHAT_SIDE_MENU_HANDLE_PNG_B64__",
             CHAT_SIDE_MENU_HANDLE_PNG_B64.trim(),
+        )
+        .replace(
+            "__CHAT_SIDE_MENU_REFRESH_RING_PNG_B64__",
+            &refresh_ring_png_b64,
+        )
+        .replace(
+            "__CHAT_SIDE_MENU_REFRESH_DOT_PNG_B64__",
+            &refresh_dot_png_b64,
         )
 }
 
