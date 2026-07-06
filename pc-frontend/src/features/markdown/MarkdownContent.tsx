@@ -11,14 +11,25 @@ interface Props {
   copy?: boolean
 }
 
-interface MarkdownImagePreview {
-  src: string
-  alt: string
-}
-
 function MarkdownContent({ content, copy = true }: Props) {
-  const [preview, setPreview] = useState<MarkdownImagePreview | null>(null)
-  const components = useMemo(() => buildComponents(copy, setPreview), [copy])
+  const [expandedImageSrc, setExpandedImageSrc] = useState<string | null>(null)
+  useEffect(() => {
+    if (!expandedImageSrc) return undefined
+    const closeExpandedImage = () => setExpandedImageSrc(null)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeExpandedImage()
+    }
+    window.addEventListener('click', closeExpandedImage)
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('click', closeExpandedImage)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [expandedImageSrc])
+  const components = useMemo(
+    () => buildComponents(copy, expandedImageSrc, setExpandedImageSrc),
+    [copy, expandedImageSrc],
+  )
   return (
     <div className={styles.root}>
       <ReactMarkdown
@@ -28,14 +39,17 @@ function MarkdownContent({ content, copy = true }: Props) {
       >
         {content}
       </ReactMarkdown>
-      {preview && <ImagePreview image={preview} onClose={() => setPreview(null)} />}
     </div>
   )
 }
 
 export default memo(MarkdownContent)
 
-function buildComponents(showCopy: boolean, onOpenImage: (image: MarkdownImagePreview) => void): Components {
+function buildComponents(
+  showCopy: boolean,
+  expandedImageSrc: string | null,
+  setExpandedImageSrc: (src: string | null) => void,
+): Components {
   return {
     // 代码块（fenced code）
     code({ node: _node, className, children, ...props }) {
@@ -59,23 +73,30 @@ function buildComponents(showCopy: boolean, onOpenImage: (image: MarkdownImagePr
       const safe = safeMarkdownUrl(src, { image: true })
       if (!safe) return null
       const imageAlt = alt ?? ''
-      const open = () => onOpenImage({ src: safe, alt: imageAlt })
+      const expanded = expandedImageSrc === safe
+      const toggleExpanded = () => setExpandedImageSrc(expanded ? null : safe)
       const handleKeyDown = (event: ReactKeyboardEvent<HTMLImageElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
-          open()
+          event.stopPropagation()
+          toggleExpanded()
         }
       }
       return (
         <img
           src={safe}
           alt={imageAlt}
-          className={styles.image}
+          className={[styles.image, expanded ? styles.imageExpanded : ''].filter(Boolean).join(' ')}
           loading="lazy"
           role="button"
+          aria-pressed={expanded}
           tabIndex={0}
-          title={imageAlt ? `${imageAlt} - 点击放大` : '点击放大'}
-          onClick={open}
+          title={expanded ? '点击缩小' : (imageAlt ? `${imageAlt} - 点击放大` : '点击放大')}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            toggleExpanded()
+          }}
           onKeyDown={handleKeyDown}
         />
       )
@@ -102,37 +123,6 @@ function safeMarkdownUrl(value: string | undefined, options: { image: boolean })
   if (options.image && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(url)) return url
   if (url.startsWith('/') && !url.startsWith('//')) return url
   return undefined
-}
-
-function ImagePreview({ image, onClose }: { image: MarkdownImagePreview; onClose: () => void }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
-  return (
-    <div className={styles.previewBackdrop} onClick={onClose} role="presentation">
-      <div className={styles.previewPanel} onClick={(event) => event.stopPropagation()}>
-        <div className={styles.previewHeader}>
-          <span className={styles.previewTitle}>{image.alt || '图片预览'}</span>
-          <div className={styles.previewActions}>
-            <a href={image.src} target="_blank" rel="noopener noreferrer" className={styles.previewLink}>
-              新窗口打开
-            </a>
-            <button type="button" className={styles.previewClose} onClick={onClose} aria-label="关闭图片预览">
-              关闭
-            </button>
-          </div>
-        </div>
-        <div className={styles.previewImageWrap}>
-          <img src={image.src} alt={image.alt} className={styles.previewImage} />
-        </div>
-      </div>
-    </div>
-  )
 }
 
 /* 独立代码块组件（含复制按钮）*/
