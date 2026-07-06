@@ -9,7 +9,7 @@ interface Props {
   onRepair: () => void
 }
 
-const TOOLBOX_HELP_TEXT = 'Codex 工具箱是本机节点给 Codex CLI 准备的辅助命令。rg 是核心搜索工具，已可用即可正常处理大多数代码任务；fd、jq、7zip 是增强工具，缺失时只影响部分文件查找、JSON 处理或压缩解压能力，不代表节点不可用。'
+const TOOLBOX_HELP_TEXT = '你可以把 Codex 工具箱理解成 Codex 在这台电脑上干活时自动使用的随身工具包。它不是让你手动操作的功能；rg 正常时，Codex 就能快速搜索代码并处理大多数任务。fd、jq、7zip 只是少数场景的增强项，缺失不代表节点不可用。'
 
 export default function CodexToolboxCard({ toolbox, codex, busy, onRepair }: Props) {
   const tools = toolbox?.tools ?? []
@@ -40,7 +40,7 @@ export default function CodexToolboxCard({ toolbox, codex, busy, onRepair }: Pro
         </div>
         <span className={toolboxBadgeClass(rg, codexNeedsRepair)}>{toolboxBadgeText(rg, codexNeedsRepair)}</span>
       </div>
-      <p>{toolbox?.summary || 'Win 端会把已存在的小工具临时注入 Codex CLI 子进程。'}</p>
+      <p className={styles.toolboxIntro}>{toolboxIntro(rg, codexNeedsRepair)}</p>
       {toolbox?.codex_program && <code className={styles.toolboxPath}>{toolbox.codex_program}</code>}
       <div className={styles.toolboxList}>
         {tools.map((tool) => <ToolRow key={tool.id || tool.name} tool={tool} />)}
@@ -60,7 +60,7 @@ function ToolRow({ tool }: { tool: CodexToolboxTool }) {
     <div className={[styles.toolboxTool, styles[`toolboxTool_${toolTone(tool)}`]].join(' ')}>
       <div>
         <strong>{tool.id || tool.name}</strong>
-        <span>{toolLine(tool)}</span>
+        <span>{toolPurpose(tool)}</span>
       </div>
       <small>{toolStatusText(tool)}</small>
       {tool.path && <code>{tool.path}</code>}
@@ -95,16 +95,6 @@ function toolTone(tool: CodexToolboxTool) {
   return 'warn'
 }
 
-function toolLine(tool: CodexToolboxTool) {
-  const parts = [
-    tierLabel(tool.tier),
-    policyLabel(tool.install_policy),
-    tool.will_inject ? '会注入 PATH' : '不会注入',
-    tool.version || toolDiagnosticText(tool),
-  ].filter(Boolean)
-  return parts.join(' · ')
-}
-
 function toolStatusText(tool: CodexToolboxTool) {
   if (tool.status === 'ready') return '可正常使用'
   if (isOptionalEnhancement(tool) && tool.status === 'missing') return '可选增强未安装'
@@ -112,9 +102,23 @@ function toolStatusText(tool: CodexToolboxTool) {
   return '需确认'
 }
 
-function toolDiagnosticText(tool: CodexToolboxTool) {
-  if (isOptionalEnhancement(tool) && tool.status === 'missing') return ''
-  return tool.reason || tool.detail || ''
+function toolboxIntro(rg?: CodexToolboxTool, codexNeedsRepair = false) {
+  if (codexNeedsRepair) {
+    return '这是给 Codex 在本机干活时自动使用的工具包。当前 Codex CLI 需要修复，所以需要先处理 Codex 本体。'
+  }
+  if (rg?.status === 'ready') {
+    return '这是给 Codex 在本机干活时自动使用的工具包。核心搜索工具 rg 已正常，Codex 可以快速搜索代码并处理大多数任务；下面几个只是可选增强。'
+  }
+  return '这是给 Codex 在本机干活时自动使用的工具包。核心搜索工具 rg 还没准备好，修复后 Codex 搜索代码会更稳定、更快。'
+}
+
+function toolPurpose(tool: CodexToolboxTool) {
+  const id = String(tool.id ?? tool.name ?? '').toLowerCase()
+  if (id === 'rg') return '核心：帮 Codex 快速搜索项目里的代码和文字'
+  if (id === 'fd') return '增强：按文件名更快找到目标文件'
+  if (id === 'jq') return '增强：读取和整理 JSON 配置或接口数据'
+  if (id === '7zip') return '增强：处理压缩包、解压或打包文件'
+  return isOptionalEnhancement(tool) ? '增强：少数任务会用到的辅助能力' : '核心：Codex 执行任务时会自动使用'
 }
 
 function isOptionalEnhancement(tool: CodexToolboxTool) {
@@ -127,18 +131,4 @@ function codexCliNeedsRepair(status?: LocalCliToolStatus | null) {
   if (status.status === 'ready' || status.available) return false
   if (status.available === false) return true
   return ['not_installed', 'not_runnable', 'not_logged_in'].includes(String(status.status ?? ''))
-}
-
-function tierLabel(value?: string) {
-  if (value === 'core') return '核心'
-  if (value === 'profile') return '按需'
-  if (value === 'optional') return '可选'
-  return value || ''
-}
-
-function policyLabel(value?: string) {
-  if (value === 'AutoSmall') return '可自动修复'
-  if (value === 'ManualRepair') return '手动安装'
-  if (value === 'NeverAuto') return '不自动安装'
-  return value || ''
 }

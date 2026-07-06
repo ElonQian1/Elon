@@ -660,6 +660,10 @@
   line-height: 1.5;
 }
 
+.toolboxCard .toolboxIntro {
+  color: var(--text-secondary);
+}
+
 .toolboxState {
   flex: 0 0 auto;
   border-radius: var(--radius-sm);
