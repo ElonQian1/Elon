@@ -3,7 +3,7 @@
   left: 0;
   right: 0;
   bottom: calc(100% + 8px);
-  z-index: 30;
+  z-index: 120;
   overflow: hidden;
   border: 1px solid #343743;
   border-radius: 8px;
