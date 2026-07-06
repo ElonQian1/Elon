@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
-import type { RefObject } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { CSSProperties, RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, FolderPlus, LogOut, Settings } from 'lucide-react'
 import type { User } from '../../store/auth'
@@ -8,6 +9,9 @@ import UserAvatar, { userAccountMeta, userDisplayName } from './UserAvatar'
 import type { UserPresenceSettings } from './useMyPresence'
 import { presenceSummary } from './useMyPresence'
 import styles from './UserAccountMenu.module.css'
+
+const MENU_GAP = 8
+const VIEWPORT_MARGIN = 12
 
 interface Props {
   id: string
@@ -18,6 +22,13 @@ interface Props {
   anchorRef: RefObject<HTMLElement>
   onClose: () => void
   onLogout: () => void
+}
+
+interface MenuPosition {
+  left: number
+  width: number
+  bottom: number
+  maxHeight: number
 }
 
 export default function UserAccountMenu({
@@ -32,8 +43,41 @@ export default function UserAccountMenu({
 }: Props) {
   const navigate = useNavigate()
   const menuRef = useRef<HTMLDivElement>(null)
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null)
   const legacyUrl = getPcLegacyUrl()
   const displayName = userDisplayName(user)
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setMenuPosition(null)
+      return
+    }
+
+    function updatePosition() {
+      const anchor = anchorRef.current
+      if (!anchor) return
+
+      const rect = anchor.getBoundingClientRect()
+      const availableWidth = Math.max(180, window.innerWidth - VIEWPORT_MARGIN * 2)
+      const width = Math.min(rect.width, availableWidth)
+      const maxLeft = Math.max(VIEWPORT_MARGIN, window.innerWidth - width - VIEWPORT_MARGIN)
+
+      setMenuPosition({
+        left: Math.min(Math.max(rect.left, VIEWPORT_MARGIN), maxLeft),
+        width,
+        bottom: Math.max(VIEWPORT_MARGIN, window.innerHeight - rect.top + MENU_GAP),
+        maxHeight: Math.max(180, rect.top - MENU_GAP - VIEWPORT_MARGIN),
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [anchorRef, open])
 
   useEffect(() => {
     if (!open) return
@@ -73,14 +117,23 @@ export default function UserAccountMenu({
     onLogout()
   }
 
-  return (
+  if (!open || !menuPosition) return null
+
+  const menuStyle: CSSProperties = {
+    left: menuPosition.left,
+    width: menuPosition.width,
+    bottom: menuPosition.bottom,
+    maxHeight: menuPosition.maxHeight,
+  }
+
+  return createPortal(
     <div
       id={id}
       ref={menuRef}
       className={styles.menu}
+      style={menuStyle}
       role="menu"
       aria-label="账号中心"
-      hidden={!open}
     >
       <div className={styles.header}>
         <UserAvatar
@@ -147,6 +200,7 @@ export default function UserAccountMenu({
           <small>清除本机网页版登录态</small>
         </span>
       </button>
-    </div>
+    </div>,
+    document.body,
   )
 }
