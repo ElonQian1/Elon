@@ -10,6 +10,7 @@
 import { useState } from 'react'
 import styles from './DevTaskCard.module.css'
 import { clean } from '../../lib/utils'
+import MarkdownContent from '../markdown/MarkdownContent'
 import {
   taskIsTerminal, statusForTask, parseToolEvent, approvalFinalState,
   approvalStateFor, runtimeStatusLabel, shortId, toolEventSummary, toolEventTitle,
@@ -38,12 +39,17 @@ function TaskHeader({ message, context, onCancel }: Omit<DevTaskMessageProps, 'o
   const task = taskId ? context.tasks.get(taskId) ?? null : null
   const status = statusForTask(task)
   const request = messageText(message).replace(/^发起\s*AI\s*开发任务[：:]\s*/i, '')
+  const richRequest = taskRequestLooksMarkdown(request)
   const canCancel = !!taskId && !taskIsTerminal(task)
   return (
     <div className={[styles.taskHeader, styles[`h_${status.tone}`]].join(' ')}>
       <span className={styles.taskIcon}>{statusIcon(status.tone)}</span>
       <span className={styles.taskLabel}>{status.label}</span>
-      {request && <span className={styles.taskRequest}>{request}</span>}
+      {request && (
+        richRequest
+          ? <div className={styles.taskRequestRich}><MarkdownContent content={request} copy={false} /></div>
+          : <span className={styles.taskRequest}>{request}</span>
+      )}
       <div className={styles.taskMeta}>
         {taskId && <span className={styles.taskId}>{shortId(taskId)}</span>}
         {task?.progressCount ? <span>{task.progressCount} 步</span> : null}
@@ -53,6 +59,14 @@ function TaskHeader({ message, context, onCancel }: Omit<DevTaskMessageProps, 'o
       )}
     </div>
   )
+}
+
+function taskRequestLooksMarkdown(value: string): boolean {
+  return /!\[[^\]]*]\([^)]+\)/.test(value)
+    || /\[[^\]]+]\([^)]+\)/.test(value)
+    || /^#{1,6}\s+/m.test(value)
+    || /(^|\n)\s*[-*]\s+/.test(value)
+    || /`[^`]+`/.test(value)
 }
 
 /* ══ ProgressLine — 进度行（工具调用/状态） ══ */
