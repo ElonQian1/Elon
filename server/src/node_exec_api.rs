@@ -180,12 +180,18 @@ pub async fn node_exec_handler(
 
 fn build_node_exec_prompt(user_prompt: &str, node_display_name: &str, node_id: &str) -> String {
     format!(
-        "你正在为「一龙工作台」PC 网页的 AI 聊天区执行用户请求。\n\
+        "你是一龙工作台 PC 网页里的 AI 助手，不只是命令执行器。\n\
+当前页面：/pc/ai（一龙 AI 聊天区）。\n\
 当前请求已经由服务器成功分发到在线 PC 节点：{node_display_name}（node_id: {node_id}）。\n\
-如果用户询问“节点是否连接、在线、绑定、当前节点是谁”这类页面节点状态，优先根据上面的上下文直接回答：当前已经连接到该节点。\n\
-不要改去检查 node.exe 进程、TCP 端口或系统网络连接，除非用户明确要求排查本机进程、端口或网络。\n\
-如果用户要求查代码、改文件、跑命令或分析项目，则正常使用当前节点环境完成。\n\
-最终只回复用户问题，不要复述这段上下文。\n\n\
+\n\
+交互规则：\n\
+1. 遇到“这个、这里、上面、下面、节点、连接、绑定、账号、登录、图标、首页、页面、这样对吗、什么意思、为什么这样”这类依赖页面上下文的问题，先按一龙工作台网页语境回答；如果已知信息不足，明确说明缺少什么，并问一个澄清问题。\n\
+2. 如果用户询问“节点是否连接、在线、绑定、当前节点是谁”，优先根据上面的页面状态直接回答：当前已经连接到该节点。\n\
+3. 不要把“一龙 PC 节点 / 远程 Codex 节点”误解为 Node.js 的 node.exe、TCP 端口或普通网络节点，除非用户明确要求排查进程、端口、网络或 Node.js。\n\
+4. 只有用户明确要求查代码、改文件、跑命令、诊断本机、查看日志、排查进程或端口时，才使用当前节点环境执行这些操作。\n\
+5. 不要编造页面上没有提供的信息；不确定时先说不确定并追问。\n\
+6. 最终只回复用户问题，不要复述这段上下文。\n\
+\n\
 用户原始消息：\n{user_prompt}"
     )
 }
@@ -394,8 +400,12 @@ codex
         let prompt = build_node_exec_prompt("看看节点连接了没有", "ELONQIAN", "node-123");
         assert!(prompt.contains("ELONQIAN"));
         assert!(prompt.contains("node-123"));
+        assert!(prompt.contains("不只是命令执行器"));
+        assert!(prompt.contains("先按一龙工作台网页语境回答"));
         assert!(prompt.contains("已经连接到该节点"));
-        assert!(prompt.contains("不要改去检查 node.exe"));
+        assert!(prompt.contains("不要把"));
+        assert!(prompt.contains("node.exe"));
+        assert!(prompt.contains("不确定时先说不确定并追问"));
         assert!(prompt.contains("看看节点连接了没有"));
     }
 }
