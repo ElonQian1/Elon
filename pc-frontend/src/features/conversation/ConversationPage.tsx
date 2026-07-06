@@ -1230,16 +1230,8 @@ export default function ConversationPage() {
             </div>
           </div>
           <div className={styles.topbarActions}>
-            <button
-              className={[styles.textBtn, styles.panelControlBtn].join(' ')}
-              type="button"
-              title="在右侧成员栏选择成员"
-              aria-label="在右侧成员栏选择成员"
-              aria-pressed={memberSelectionMode}
-              onClick={() => setMemberSelectionMode(true)}
-            >
-              <UsersRound size={15} aria-hidden="true" />
-              <span>选择成员</span>
+            <button className={[styles.textBtn, styles.panelControlBtn].join(' ')} type="button" title="在右侧成员栏选择成员" aria-label="在右侧成员栏选择成员" aria-pressed={memberSelectionMode} onClick={() => setMemberSelectionMode(true)}>
+              <UsersRound size={15} aria-hidden="true" /><span>选择成员</span>
             </button>
             {activeChannelId && (
               <button className={styles.textBtn} type="button" title="刷新消息" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
