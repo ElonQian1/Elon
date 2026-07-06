@@ -61,6 +61,7 @@ internal fun ProjectChannelMessage.toChatMessage(
         },
         evidenceTitle = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceTitle),
         evidenceDetails = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceDetails),
+        finalReply = kind == "ai_result",
         suggestionStatus = suggestionStatus,
         suggestionResolvedByName = suggestionResolvedByName,
         suggestionResolvedAt = suggestionResolvedAt,

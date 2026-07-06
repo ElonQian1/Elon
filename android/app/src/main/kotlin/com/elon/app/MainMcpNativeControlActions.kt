@@ -409,6 +409,7 @@ internal class MainMcpNativeControlActions(
             .put("evidence_working", message.evidenceWorking)
             .put("evidence_expanded", message.evidenceExpanded)
             .put("process_layer", message.processLayer)
+            .put("final_reply", message.finalReply)
             .put("codex_thread_uri", message.codexThreadUri ?: JSONObject.NULL)
             .put("stream_id", message.streamId ?: JSONObject.NULL)
             .put("model_used", message.modelUsed ?: JSONObject.NULL)

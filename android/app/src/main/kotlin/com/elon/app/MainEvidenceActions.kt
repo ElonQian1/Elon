@@ -66,7 +66,8 @@ internal class MainEvidenceActions(
         val promoted = source.copy(
             role = "ai",
             modelUsed = modelUsed ?: source.modelUsed,
-            nodeId = nodeId ?: source.nodeId
+            nodeId = nodeId ?: source.nodeId,
+            finalReply = true
         )
         if (entries.isNotEmpty()) {
             clearDuplicateCurrentEvidenceFromActiveConversation(entries)

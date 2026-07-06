@@ -48,6 +48,8 @@ data class ChatMessage(
     var codexThreadUri: String? = null,
     /** 本条消息只是过程承载层，终态回复出现后会把 evidence 合并到最终回复。 */
     var processLayer: Boolean = false,
+    /** 只有任务结束时的真正终态回复为 true，用于显示“最终回复”标签。 */
+    var finalReply: Boolean = false,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
     var streamId: String? = null,
     var projectPostCard: ChatProjectPostCard? = null
@@ -590,6 +592,7 @@ class ChatAdapter(
         val label = holder.finalReplyLabel ?: return
         val show = message.role == "ai" &&
             !message.processLayer &&
+            message.finalReply &&
             !message.evidenceTitle.isNullOrBlank()
         label.visibility = if (show) View.VISIBLE else View.GONE
         label.text = "最终回复"

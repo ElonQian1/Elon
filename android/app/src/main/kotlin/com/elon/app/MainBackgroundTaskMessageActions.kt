@@ -81,7 +81,8 @@ internal class MainBackgroundTaskMessageActions(
         return ChatMessage(
             "ai",
             finalReplyMessage(content, visibleApkUrl, imageUrl, isDevelopment),
-            apkUrl = visibleApkUrl
+            apkUrl = visibleApkUrl,
+            finalReply = isDevelopment
         )
     }
 

@@ -62,6 +62,7 @@ internal class MainAssistantTerminalActions(
             finalReplyMessage(planAwareContent(content, wasPlanning), visibleApkUrl, imageUrl, wasDevelopment),
             chatAttachmentFromImageUrl(imageUrl)
         ).let { msg ->
+            msg.finalReply = wasDevelopment || wasPlanning
             var result = if (visibleApkUrl != null) msg.copy(apkUrl = visibleApkUrl) else msg
             if (modelUsed != null) result = result.copy(modelUsed = modelUsed)
             if (nodeId != null) result = result.copy(nodeId = nodeId)
