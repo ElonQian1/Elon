@@ -15,9 +15,9 @@ use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, codex_vault_api, context_compiler,
-    external_app_api, external_app_chat_bootstrap, external_app_mvp_chat, external_app_route_c_sdk,
-    external_app_tool_report_api, friend_api, global_ws, group_ai, group_chat_retrieval_api,
-    group_summary_api, lan_peer, lm_chat, peer_relay, project_api, project_attachments,
+    conversation_forks, external_app_api, external_app_chat_bootstrap, external_app_mvp_chat,
+    external_app_route_c_sdk, external_app_tool_report_api, friend_api, global_ws, group_ai,
+    group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, peer_relay, project_api, project_attachments,
     project_channels, project_chat, project_conversation_identity, project_deletion, project_docs,
     project_git, project_join_requests, project_landing_api, project_membership, project_releases,
     project_runtime_permission_api, project_space, project_space_task_snapshot,
@@ -248,10 +248,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/api/llm/chat", post(lm_chat::lm_chat_handler))
         .route("/api/me/ai/conversations", get(lm_chat::list_ai_chat_conversations))
-        .route(
-            "/api/me/ai/conversations/:conversation_id/messages",
-            get(lm_chat::list_ai_chat_conversation_messages),
-        )
+        .route("/api/me/ai/conversations/:conversation_id/messages", get(lm_chat::list_ai_chat_conversation_messages))
+        .route("/api/me/ai/conversations/:conversation_id/fork", post(conversation_forks::fork_ai_chat_conversation))
         // ───────────────────────────────────────────────────────────────────────
         .route(
             "/api/me/friends",
@@ -583,11 +581,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/projects/:project_id/members/:member_user_id/conversations",
             get(project_space::list_member_conversations),
         )
-        .route(
-            "/api/projects/:project_id/members/:member_user_id/conversations/:conversation_id/messages",
-            get(project_space::list_member_conversation_messages)
-                .post(project_space::send_member_conversation_message),
-        )
+        .route("/api/projects/:project_id/members/:member_user_id/conversations/:conversation_id/messages", get(project_space::list_member_conversation_messages).post(project_space::send_member_conversation_message))
+        .route("/api/projects/:project_id/members/:member_user_id/conversations/:conversation_id/fork", post(conversation_forks::fork_project_member_conversation))
         .route(
             "/api/projects/:project_id/conversations/:conversation_id/visibility",
             axum::routing::patch(project_space::update_member_conversation_visibility),

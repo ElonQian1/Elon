@@ -1,6 +1,7 @@
 import type { User } from '../../store/auth'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import { formatTime } from '../../lib/utils'
+import { forkAiConversation, forkTitleFromContent } from '../conversation/conversationForkApi'
 import MarkdownContent from '../markdown/MarkdownContent'
 import MessageActions from '../message-actions/MessageActions'
 import UserAvatar from '../shell/UserAvatar'
@@ -23,9 +24,16 @@ interface AiChatMessageRowProps {
   index: number
   message: AiMessage
   user: User | null
+  onConversationForked?: (conversationId: string) => void | Promise<void>
 }
 
-export default function AiChatMessageRow({ activeConvId, index, message, user }: AiChatMessageRowProps) {
+export default function AiChatMessageRow({
+  activeConvId,
+  index,
+  message,
+  user,
+  onConversationForked,
+}: AiChatMessageRowProps) {
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
   const content = displayMessageContentOrAttachment(message.content)
@@ -35,6 +43,7 @@ export default function AiChatMessageRow({ activeConvId, index, message, user }:
   const nameLabel = isUser
     ? (user?.nickname ?? user?.account ?? '我')
     : (isNode ? `${nodePrefix} · ${message.node_display_name ?? ''}` : 'AI')
+  const canFork = !!activeConvId && !!message.id
 
   return (
     <div className={[styles.msgRow, isUser ? styles.ownRow : ''].join(' ')}>
@@ -56,6 +65,10 @@ export default function AiChatMessageRow({ activeConvId, index, message, user }:
           messageKey={messageActionKey}
           storageScope="ai-chat"
           align={isUser ? 'right' : 'left'}
+          onFork={canFork ? async () => {
+            const fork = await forkAiConversation(activeConvId, message.id!, forkTitleFromContent(content))
+            await onConversationForked?.(fork.conversation_id)
+          } : undefined}
         />
       </div>
     </div>

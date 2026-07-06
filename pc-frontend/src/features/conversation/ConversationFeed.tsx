@@ -19,6 +19,7 @@ interface ConversationFeedProps {
   onScroll: UIEventHandler<HTMLDivElement>
   onCancelTask: (id: string) => Promise<void>
   onApproveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
+  onForkMessage?: (message: Message, content: string) => void | Promise<void>
 }
 
 export default function ConversationFeed({
@@ -34,6 +35,7 @@ export default function ConversationFeed({
   onScroll,
   onCancelTask,
   onApproveTool,
+  onForkMessage,
 }: ConversationFeedProps) {
   return (
     <div className={styles.messageList} ref={feedRef} onScroll={onScroll}>
@@ -70,6 +72,7 @@ export default function ConversationFeed({
             user={user}
             onCancel={onCancelTask}
             onApprove={onApproveTool}
+            onForkMessage={onForkMessage}
             grouped={group.grouped}
           />
         ),

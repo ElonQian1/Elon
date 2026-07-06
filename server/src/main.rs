@@ -45,6 +45,7 @@ mod codex_vault_emergency_migration;
 mod codex_vault_slot_migration;
 mod compute_usage;
 mod context_compiler;
+mod conversation_forks;
 mod conversation_router;
 mod errors;
 mod external_app_api;

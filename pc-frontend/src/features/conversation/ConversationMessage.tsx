@@ -17,10 +17,11 @@ interface MessageItemProps {
   user: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   onCancel: (id: string) => Promise<void>
   onApprove: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
+  onForkMessage?: (message: Message, content: string) => void | Promise<void>
   grouped?: boolean
 }
 
-export const MessageItem = memo(function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove, grouped }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove, onForkMessage, grouped }: MessageItemProps) {
   const kind = clean(message.kind ?? message.role ?? '').toLowerCase()
 
   // Dev 任务消息用 DevTaskCard 渲染
@@ -93,6 +94,7 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
           messageKey={messageActionKey || `${kind}:${content.length}`}
           storageScope="project-conversation"
           align={isOwn ? 'right' : 'left'}
+          onFork={onForkMessage ? () => onForkMessage(message, content) : undefined}
         />
       </div>
     </div>
@@ -144,6 +146,7 @@ function areMessageItemPropsEqual(
     && prev.isDevChannel === next.isDevChannel
     && prev.taskContext === next.taskContext
     && prev.grouped === next.grouped
+    && prev.onForkMessage === next.onForkMessage
     && prev.user?.nickname === next.user?.nickname
     && prev.user?.account === next.user?.account
     && prev.user?.avatar_data_url === next.user?.avatar_data_url

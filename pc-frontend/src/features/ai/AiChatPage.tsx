@@ -472,6 +472,7 @@ export default function AiChatPage() {
     finally { setMessagesLoading(false) }
   }
 
+  async function openForkedConversation(convId: string) { await loadConversations(); await selectConversation(convId) }
   function newConversation() {
     const id = uuidv4()
     setActiveConvId(id)
@@ -845,8 +846,7 @@ export default function AiChatPage() {
               key={m.id ?? `${m.role}:${m.created_at ?? i}`}
               activeConvId={activeConvId}
               index={i}
-              message={m}
-              user={user}
+              message={m} user={user} onConversationForked={openForkedConversation}
             />
           ))}
           {sending && (

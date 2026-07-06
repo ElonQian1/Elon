@@ -69,6 +69,7 @@ import {
   targetFromProjectMember,
   targetFromUser,
 } from './memberConversationApi'
+import { forkProjectConversation, forkTitleFromContent } from './conversationForkApi'
 import type {
   MemberConversationEntry,
   MemberConversationMessage,
@@ -176,8 +177,6 @@ export default function ConversationPage() {
   const [localBindStatus, setLocalBindStatus] = useState('')
   const autoBindRef = useRef('')
   const workspacePanels = useWorkspacePanels()
-
-  // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
   const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
   const [memberConversations, setMemberConversations] = useState<MemberConversationEntry[]>([])
   const [convMessages, setConvMessages] = useState<Message[]>([])
@@ -908,6 +907,7 @@ export default function ConversationPage() {
     }
   }
 
+  async function forkConversationMessage(message: Message, content: string) { if (!activeProjectId || !activeConversationTargetId || !sessionView || sessionView === 'new') return; if (!isOwnConversationTarget) throw new Error('只能分叉自己的项目会话'); const messageId = clean(message.id ?? ''); if (!messageId) throw new Error('这条消息还没有可分叉的消息 ID'); const fork = await forkProjectConversation(activeProjectId, activeConversationTargetId, String(sessionView), messageId, forkTitleFromContent(content)); conversationMessageCacheRef.current.delete(conversationMessageCacheKey(activeProjectId, activeConversationTargetId, fork.conversation_id)); setSessionTaskMessages([]); setMemberConversations(await listMemberConversations(activeProjectId, activeConversationTargetId)); await openConversation(fork.conversation_id, { force: true }) }
   async function refreshTaskSurface() {
     if (activeProjectId && activeConversationTargetId && sessionView && sessionView !== 'new') {
       const conversationId = String(sessionView)
@@ -1335,9 +1335,8 @@ export default function ConversationPage() {
             isDevChannel={isDevChannel}
             user={user}
             sendingMessage={sendingMessage}
-            onScroll={handleFeedScroll}
-            onCancelTask={handleCancelTask}
-            onApproveTool={handleApproveTool}
+            onScroll={handleFeedScroll} onCancelTask={handleCancelTask} onApproveTool={handleApproveTool}
+            onForkMessage={isOwnConversationTarget && typeof sessionView === 'string' && sessionView !== 'new' ? forkConversationMessage : undefined}
           />
         )}
         {/* P1.3：新消息跳转按钮 */}
