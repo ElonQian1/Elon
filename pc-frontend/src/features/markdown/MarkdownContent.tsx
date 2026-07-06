@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { ExternalLink, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
@@ -11,25 +12,30 @@ interface Props {
   copy?: boolean
 }
 
+interface PreviewImage {
+  src: string
+  alt: string
+}
+
 function MarkdownContent({ content, copy = true }: Props) {
-  const [expandedImageSrc, setExpandedImageSrc] = useState<string | null>(null)
+  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null)
   const normalizedContent = useMemo(() => normalizeBareImageUrls(content), [content])
   useEffect(() => {
-    if (!expandedImageSrc) return undefined
-    const closeExpandedImage = () => setExpandedImageSrc(null)
+    if (!previewImage) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeExpandedImage()
+      if (event.key === 'Escape') setPreviewImage(null)
     }
-    window.addEventListener('click', closeExpandedImage)
     window.addEventListener('keydown', handleKeyDown)
     return () => {
-      window.removeEventListener('click', closeExpandedImage)
+      document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [expandedImageSrc])
+  }, [previewImage])
   const components = useMemo(
-    () => buildComponents(copy, expandedImageSrc, setExpandedImageSrc),
-    [copy, expandedImageSrc],
+    () => buildComponents(copy, setPreviewImage),
+    [copy],
   )
   return (
     <div className={styles.root}>
@@ -40,6 +46,9 @@ function MarkdownContent({ content, copy = true }: Props) {
       >
         {normalizedContent}
       </ReactMarkdown>
+      {previewImage && (
+        <ImagePreviewOverlay image={previewImage} onClose={() => setPreviewImage(null)} />
+      )}
     </div>
   )
 }
@@ -48,8 +57,7 @@ export default memo(MarkdownContent)
 
 function buildComponents(
   showCopy: boolean,
-  expandedImageSrc: string | null,
-  setExpandedImageSrc: (src: string | null) => void,
+  setPreviewImage: (image: PreviewImage) => void,
 ): Components {
   return {
     // 代码块（fenced code）
@@ -74,29 +82,27 @@ function buildComponents(
       const safe = safeMarkdownUrl(src, { image: true })
       if (!safe) return null
       const imageAlt = alt ?? ''
-      const expanded = expandedImageSrc === safe
-      const toggleExpanded = () => setExpandedImageSrc(expanded ? null : safe)
+      const openPreview = () => setPreviewImage({ src: safe, alt: imageAlt })
       const handleKeyDown = (event: ReactKeyboardEvent<HTMLImageElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           event.stopPropagation()
-          toggleExpanded()
+          openPreview()
         }
       }
       return (
         <img
           src={safe}
           alt={imageAlt}
-          className={[styles.image, expanded ? styles.imageExpanded : ''].filter(Boolean).join(' ')}
+          className={styles.image}
           loading="lazy"
           role="button"
-          aria-pressed={expanded}
           tabIndex={0}
-          title={expanded ? '点击缩小' : (imageAlt ? `${imageAlt} - 点击放大` : '点击放大')}
+          title={imageAlt ? `${imageAlt} - 点击放大` : '点击放大'}
           onClick={(event) => {
             event.preventDefault()
             event.stopPropagation()
-            toggleExpanded()
+            openPreview()
           }}
           onKeyDown={handleKeyDown}
         />
@@ -114,6 +120,40 @@ function buildComponents(
     td({ children }) { return <td className={styles.td}>{children}</td> },
     // 段落、标题等保持原有样式，通过 CSS 控制
   }
+}
+
+function ImagePreviewOverlay({ image, onClose }: { image: PreviewImage; onClose: () => void }) {
+  return (
+    <div
+      className={styles.previewBackdrop}
+      role="dialog"
+      aria-modal="true"
+      aria-label={image.alt || '图片预览'}
+      onClick={onClose}
+    >
+      <div className={styles.previewToolbar} onClick={(event) => event.stopPropagation()}>
+        <a
+          className={styles.previewIconBtn}
+          href={image.src}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="新窗口打开"
+        >
+          <ExternalLink size={18} aria-hidden="true" />
+        </a>
+        <button className={styles.previewIconBtn} type="button" onClick={onClose} title="关闭">
+          <X size={20} aria-hidden="true" />
+        </button>
+      </div>
+      <img
+        src={image.src}
+        alt={image.alt}
+        className={styles.previewImage}
+        onClick={(event) => event.stopPropagation()}
+      />
+      {image.alt && <div className={styles.previewCaption}>{image.alt}</div>}
+    </div>
+  )
 }
 
 function safeMarkdownUrl(value: string | undefined, options: { image: boolean }): string | undefined {
