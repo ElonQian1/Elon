@@ -11,6 +11,10 @@ $NodeAgentMain = Join-Path $RepoRoot "server\src\node_agent_main.rs"
 $PressureModule = Join-Path $RepoRoot "server\src\node_agent_task_lifecycle_pressure_tests.rs"
 $JournalRecoveryModule = Join-Path $RepoRoot "server\src\node_agent_task_journal_recovery_tests.rs"
 $ProjectAgentRunsModule = Join-Path $RepoRoot "server\src\node_agent_project_agent_runs.rs"
+$ProjectAgentRunsTestsModule = Join-Path $RepoRoot "server\src\node_agent_project_agent_runs_tests.rs"
+$TaskResumeModule = Join-Path $RepoRoot "server\src\node_agent_task_resume.rs"
+$TaskResumeTtyModule = Join-Path $RepoRoot "server\src\node_agent_task_resume_tty.rs"
+$CargoDevScript = Join-Path $RepoRoot "scripts\cargo-dev.ps1"
 
 function Invoke-Step {
     param(
@@ -33,6 +37,21 @@ function Assert-FileContains {
     $text = Get-Content -LiteralPath $Path -Raw
     if (-not $text.Contains($Needle)) {
         throw $Message
+    }
+}
+
+function Invoke-CargoDevTest {
+    param(
+        [string]$Filter
+    )
+
+    $scriptPath = $CargoDevScript.Replace("'", "''")
+    $manifestPath = $ServerCargo.Replace("'", "''")
+    $filterArg = $Filter.Replace("'", "''")
+    $command = "& { `$cargoArgs = @('test', '--manifest-path', '$manifestPath', '$filterArg', '--', '--nocapture'); & '$scriptPath' @cargoArgs }"
+    & powershell -ExecutionPolicy Bypass -Command $command
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cargo test '$Filter' failed with exit code $LASTEXITCODE"
     }
 }
 
@@ -70,15 +89,15 @@ Invoke-Step "Static pressure-test contract" {
         -Needle "stress_restart_resume_contract_never_claims_lost_control_handles" `
         -Message "Restart resume pressure test is missing"
     Assert-FileContains `
-        -Path (Join-Path $RepoRoot "server\src\node_agent_task_resume.rs") `
+        -Path $TaskResumeTtyModule `
         -Needle "no_original_cli_tty_reattach" `
         -Message "Task resume contract must keep original CLI TTY reattach limitation structured"
     Assert-FileContains `
-        -Path (Join-Path $RepoRoot "server\src\node_agent_task_resume.rs") `
+        -Path $TaskResumeModule `
         -Needle "tool_approval_recovery" `
         -Message "Task resume contract must expose tool approval recovery state"
     Assert-FileContains `
-        -Path (Join-Path $RepoRoot "server\src\node_agent_task_resume.rs") `
+        -Path $TaskResumeModule `
         -Needle "lost_after_restart" `
         -Message "Task resume contract must distinguish approval waiters lost after restart"
     Assert-FileContains `
@@ -94,7 +113,7 @@ Invoke-Step "Static pressure-test contract" {
         -Needle "stress_stale_codex_session_clear_is_scoped_under_many_tasks" `
         -Message "Scoped stale Codex session cleanup pressure test is missing"
     Assert-FileContains `
-        -Path $ProjectAgentRunsModule `
+        -Path $ProjectAgentRunsTestsModule `
         -Needle "stress_agent_run_summary_reads_long_run_to_terminal_status" `
         -Message "Long agent-run lifecycle summary pressure test is missing"
     Assert-FileContains `
@@ -102,7 +121,7 @@ Invoke-Step "Static pressure-test contract" {
         -Needle "recovery_entry" `
         -Message "Project agent runs API must expose a top-level recovery entry"
     Assert-FileContains `
-        -Path $ProjectAgentRunsModule `
+        -Path $ProjectAgentRunsTestsModule `
         -Needle "recovery_entry_points_to_snapshot_continue_without_secrets" `
         -Message "Project agent runs recovery-entry secrecy/resume test is missing"
     Write-Host "Static pressure-test contract passed."
@@ -110,35 +129,23 @@ Invoke-Step "Static pressure-test contract" {
 
 if (-not $SkipJournalUnitTests) {
     Invoke-Step "Task journal unit tests" {
-        cargo test --manifest-path $ServerCargo node_agent_task_journal -- --nocapture
-        if ($LASTEXITCODE -ne 0) {
-            throw "Task journal unit tests failed with exit code $LASTEXITCODE"
-        }
+        Invoke-CargoDevTest -Filter "node_agent_task_journal"
     }
 
     Invoke-Step "Task journal registry recovery tests" {
-        cargo test --manifest-path $ServerCargo node_agent_task_journal_recovery_tests -- --nocapture
-        if ($LASTEXITCODE -ne 0) {
-            throw "Task journal registry recovery tests failed with exit code $LASTEXITCODE"
-        }
+        Invoke-CargoDevTest -Filter "node_agent_task_journal_recovery_tests"
     }
 }
 
 if (-not $SkipPressureTests) {
     Invoke-Step "Agent run lifecycle summary pressure tests" {
-        cargo test --manifest-path $ServerCargo node_agent_project_agent_runs -- --nocapture
-        if ($LASTEXITCODE -ne 0) {
-            throw "Agent run lifecycle summary pressure tests failed with exit code $LASTEXITCODE"
-        }
+        Invoke-CargoDevTest -Filter "node_agent_project_agent_runs"
     }
 }
 
 if (-not $SkipPressureTests) {
     Invoke-Step "Task lifecycle pressure tests" {
-        cargo test --manifest-path $ServerCargo node_agent_task_lifecycle_pressure_tests -- --nocapture
-        if ($LASTEXITCODE -ne 0) {
-            throw "Task lifecycle pressure tests failed with exit code $LASTEXITCODE"
-        }
+        Invoke-CargoDevTest -Filter "node_agent_task_lifecycle_pressure_tests"
     }
 }
 
