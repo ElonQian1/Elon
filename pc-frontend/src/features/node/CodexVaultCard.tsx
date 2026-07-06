@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { DownloadCloud, Handshake, KeyRound, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
+import { resolveApiUrl } from '../../api/runtime'
 import type { CodexVaultEmergencyGrant, CodexVaultLocalStatus, CodexVaultStatusResponse } from './types'
 import type { CodexVaultEmergencyActions } from './codexVaultEmergencyActions'
 import UserPickerDrawer, { type UserPickerUser } from '../users/UserPickerDrawer'
@@ -31,7 +32,39 @@ function robotLabel(nickname?: string | null, account?: string | null, userId?: 
 }
 
 function robotInitial(label?: string | null): string {
-  return (label || '龙').trim().slice(0, 1).toUpperCase() || '龙'
+  const clean = (label || '').trim()
+  if (!clean || clean === '全' || clean === '互') return '龙'
+  return clean.slice(0, 1).toUpperCase()
+}
+
+interface SharingAlertLike {
+  code?: string | null
+  message?: string | null
+  count?: number | null
+  severity?: string | null
+}
+
+function sharingAlertCopy(alert: SharingAlertLike): { title: string; body: string; count: string } {
+  const count = Number(alert.count ?? 0)
+  if (alert.code === 'expired_uncleared_lease') {
+    return {
+      title: '共享会话已过期但未清理',
+      body: '存在已过期的临时 Codex 会话，建议清理本机共享会话，避免继续占用或误用。',
+      count: count > 0 ? `${count} 项` : '待处理',
+    }
+  }
+  if (alert.code === 'missing_provider_vault') {
+    return {
+      title: '授权方还没有保存 Codex 账号',
+      body: '对方需要先保存自己的 Codex 账号，授权关系才能被实际使用。',
+      count: count > 0 ? `${count} 项` : '待处理',
+    }
+  }
+  return {
+    title: alert.severity === 'critical' ? '严重共享告警' : '共享告警',
+    body: alert.message || '共享状态需要人工确认。',
+    count: count > 0 ? `${count} 项` : '查看详情',
+  }
 }
 
 function formatFen(value?: number | null): string {
@@ -74,6 +107,8 @@ export default function CodexVaultCard({
   const sharingAlerts = sharingHealth?.alerts ?? []
   const incomingGrants = grants.filter((grant) => grant.consumer_user_id === currentUserId)
   const outgoingGrants = grants.filter((grant) => grant.provider_user_id === currentUserId)
+  const usableIncomingCount = incomingGrants.filter((grant) => grant.status === 'active' && grant.provider_vault_available).length
+  const activeOutgoingCount = outgoingGrants.filter((grant) => grant.status === 'active').length
   const cloudReady = !!vault?.configured
   const bound = !!vault?.bound
   const defaultAuth = status?.default_auth
@@ -122,12 +157,12 @@ export default function CodexVaultCard({
       <div className={styles.vaultHead}>
         <div>
           <span className={styles.codexLabel}>Codex 账号保险箱</span>
-          <h4>保存并分享自己的 Codex 账号</h4>
+          <h4>我的 Codex 账号保险箱</h4>
         </div>
         <span className={[styles.vaultState, stateTone].join(' ')}>{state}</span>
       </div>
       <p className={styles.vaultNote}>
-        Codex 账号默认只给账号所有者自己的节点保存和切换；你显式授权后，其他机器人才能使用共享 Codex 账号，页面会记录共享租约、token 和收益。
+        安全保存你的 Codex 登录态，并按授权临时共享给可信成员。这里同时展示账号状态、可用共享、授权关系和最近用量。
       </p>
       <div className={styles.vaultGrid}>
         <div>
@@ -176,7 +211,7 @@ export default function CodexVaultCard({
         <div className={styles.emergencyHead}>
           <div>
             <span>机器人授权共享</span>
-            <strong>{incomingGrants.length} 个可使用 · {outgoingGrants.length} 个已共享</strong>
+            <strong>{usableIncomingCount} 个可切换 · {activeOutgoingCount} 个正在共享</strong>
           </div>
           <span className={activeSharing ? styles.vaultOnline : sharingHealthTone}>
             {activeSharing ? `当前使用 ${robotLabel(activeSharedLease?.provider_nickname, activeSharedLease?.provider_account, activeSharedLease?.provider_user_id)}` : sharingHealthText}
@@ -184,24 +219,27 @@ export default function CodexVaultCard({
         </div>
         {sharingAlerts.length > 0 && (
           <div className={styles.vaultSlotList}>
-            {sharingAlerts.slice(0, 3).map((alert) => (
-              <div key={alert.code ?? alert.message ?? 'sharing-alert'} className={styles.vaultSlot}>
-                <span>{alert.severity === 'critical' ? '严重告警' : '共享告警'} · {alert.code}</span>
-                <strong>{alert.count ?? 0} 项</strong>
-                <small>{alert.message}</small>
-              </div>
-            ))}
+            {sharingAlerts.slice(0, 3).map((alert) => {
+              const copy = sharingAlertCopy(alert)
+              return (
+                <div key={alert.code ?? alert.message ?? 'sharing-alert'} className={[styles.vaultSlot, styles.vaultAlertSlot].join(' ')}>
+                  <span>{copy.title}</span>
+                  <strong>{copy.count}</strong>
+                  <small>{copy.body}</small>
+                </div>
+              )
+            })}
           </div>
         )}
         {activeSharing && (
           <p className={styles.shareHint}>
-            当前 Codex CLI 用量按 shared_codex 记账，资源提供方为 {robotLabel(activeSharedLease?.provider_nickname, activeSharedLease?.provider_account, activeSharedLease?.provider_user_id)}，租约到期 {formatVaultTime(activeSharedLease?.expires_at)}。
+            当前正在使用 {robotLabel(activeSharedLease?.provider_nickname, activeSharedLease?.provider_account, activeSharedLease?.provider_user_id)} 共享的 Codex 账号；用量会按 shared_codex 记账，租约到期 {formatVaultTime(activeSharedLease?.expires_at)}。
           </p>
         )}
         <div className={styles.emergencyGrantForm}>
           <div className={styles.shareTargetPreview}>
-            <strong>选择授权对象</strong>
-            <span>从项目成员、好友或全站用户中勾选机器人账号</span>
+            <strong>授权别人使用我的 Codex 账号</strong>
+            <span>从项目成员、好友或全站用户中选择可信机器人</span>
           </div>
           <button
             className={[styles.btn, styles.iconBtn].join(' ')}
@@ -211,12 +249,13 @@ export default function CodexVaultCard({
             title="授权对方机器人使用本账号的 Codex 账号"
           >
             <Handshake size={15} strokeWidth={2.2} aria-hidden="true" />
-            选择并授权
+            授权新成员
           </button>
         </div>
-        {incomingGrants.length > 0 && (
-          <div className={styles.emergencyList}>
-            <span className={styles.emergencyListTitle}>别人共享给我</span>
+        <div className={styles.emergencyList}>
+          <span className={styles.emergencyListTitle}>我可以使用的共享账号</span>
+          {incomingGrants.length > 0 ? (
+            <>
             {incomingGrants.map((grant) => (
               <div className={styles.emergencyRow} key={grant.id ?? `${grant.provider_user_id}-in`}>
                 <GrantAvatarLink
@@ -240,11 +279,15 @@ export default function CodexVaultCard({
                 </button>
               </div>
             ))}
-          </div>
-        )}
-        {outgoingGrants.length > 0 && (
-          <div className={styles.emergencyList}>
-            <span className={styles.emergencyListTitle}>我共享出去</span>
+            </>
+          ) : (
+            <div className={styles.emergencyEmpty}>还没有别人共享给你的 Codex 账号。</div>
+          )}
+        </div>
+        <div className={styles.emergencyList}>
+          <span className={styles.emergencyListTitle}>我授权出去的成员</span>
+          {outgoingGrants.length > 0 ? (
+            <>
             {outgoingGrants.map((grant) => (
               <div className={styles.emergencyRow} key={grant.id ?? `${grant.consumer_user_id}-out`}>
                 <GrantAvatarLink
@@ -268,11 +311,15 @@ export default function CodexVaultCard({
                 </button>
               </div>
             ))}
-          </div>
-        )}
-        {leases.length > 0 && (
-          <div className={styles.emergencyList}>
-            <span className={styles.emergencyListTitle}>最近业务往来</span>
+            </>
+          ) : (
+            <div className={styles.emergencyEmpty}>还没有对外授权。点击“授权新成员”开始共享。</div>
+          )}
+        </div>
+        <div className={styles.emergencyList}>
+          <span className={styles.emergencyListTitle}>最近共享用量</span>
+          {leases.length > 0 ? (
+            <>
             {leases.slice(0, 4).map((lease) => {
               const usingIncoming = lease.consumer_user_id === currentUserId
               const counterparty = usingIncoming
@@ -292,8 +339,11 @@ export default function CodexVaultCard({
                 </div>
               )
             })}
-          </div>
-        )}
+            </>
+          ) : (
+            <div className={styles.emergencyEmpty}>暂无共享租约记录。</div>
+          )}
+        </div>
       </div>
       {status?.managed_home && <code className={styles.codexPath}>{status.managed_home}</code>}
       <div className={styles.vaultActions}>
@@ -367,12 +417,21 @@ function GrantAvatarLink({
   label: string
   avatarDataUrl?: string | null
 }) {
-  const content = avatarDataUrl ? (
-    <img src={avatarDataUrl} alt="" />
+  const [imageFailed, setImageFailed] = useState(false)
+  const directSrc = avatarDataUrl?.trim() || ''
+  const fallbackSrc = userId ? resolveApiUrl('/api/users/' + encodeURIComponent(userId) + '/avatar') : ''
+  const avatarSrc = imageFailed ? '' : (directSrc || fallbackSrc)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [directSrc, fallbackSrc])
+
+  const content = avatarSrc ? (
+    <img src={avatarSrc} alt="" onError={() => setImageFailed(true)} />
   ) : (
     <span className={styles.grantAvatarFallback}>{robotInitial(label)}</span>
   )
-  const className = styles.grantAvatarLink
+  const className = [styles.grantAvatarLink, avatarSrc ? styles.grantAvatarImage : styles.grantAvatarGenerated].join(' ')
   if (!userId) {
     return <span className={className} title={label}>{content}</span>
   }
