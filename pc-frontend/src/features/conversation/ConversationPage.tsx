@@ -5,7 +5,6 @@ import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { useMemberRealtimeRefresh } from './useMemberRealtimeRefresh'
-import { AttachmentPreviewDialog } from './AttachmentPreviewDialog'
 import { useAttachmentPreview } from './useAttachmentPreview'
 import {
   attachmentTitleFromAttachments,
@@ -22,6 +21,7 @@ import ChannelNavList from './ChannelNavList'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
 import ConversationComposer from './ConversationComposer'
+import ComposerAttachmentDialogs from './ComposerAttachmentDialogs'
 import LocalNodeProjectNotice from './LocalNodeProjectNotice'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import { useConversationAutoScroll } from './useConversationAutoScroll'
@@ -749,11 +749,11 @@ export default function ConversationPage() {
     setAttachments,
     attachmentUploading,
     attachmentDropActive,
-    attachmentError,
+    attachmentError, imageEditItem, imageEditQueueCount,
     draftConversationId,
     clearAttachmentDraft,
     restoreAttachmentDraft,
-    uploadComposerFiles,
+    uploadComposerFiles, uploadEditedImage, uploadOriginalImage, discardImageEdit,
     handleComposerPaste,
     handleComposerDragEnter,
     handleComposerDragOver,
@@ -767,6 +767,7 @@ export default function ConversationPage() {
   const composerSubmitDisabled = (!input.trim() && attachments.length === 0)
     || composerDisabled
     || attachmentUploading
+    || imageEditQueueCount > 0
   const composerPlaceholder = isAssistingMember
     ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
     : sessionView && sessionView !== 'new'
@@ -1470,8 +1471,7 @@ export default function ConversationPage() {
           onClose={() => setShowModelPicker(false)}
         />
       )}
-      {attachmentPreview && <AttachmentPreviewDialog attachment={attachmentPreview} onClose={closeAttachmentPreview} />}
-
+      <ComposerAttachmentDialogs attachmentPreview={attachmentPreview} imageEditItem={imageEditItem} imageEditQueueCount={imageEditQueueCount} attachmentUploading={attachmentUploading} attachmentError={attachmentError} onCloseAttachmentPreview={closeAttachmentPreview} onApplyImageEdit={uploadEditedImage} onSendOriginalImage={uploadOriginalImage} onDiscardImageEdit={discardImageEdit} />
       {/* 新建项目弹窗 */}
       {showCreate && (
         <CreateProjectModal
