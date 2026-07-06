@@ -774,40 +774,6 @@ pub(crate) async fn get_symbol_retrieval_learning(
     }
 }
 
-fn clean(value: Option<String>) -> Option<String> {
-    value
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-}
 
-fn parse_must_include_value(value: &Value) -> Vec<String> {
-    match value {
-        Value::String(text) => split_must_include(Some(text)),
-        Value::Array(items) => items
-            .iter()
-            .filter_map(|item| item.as_str())
-            .flat_map(|text| split_must_include(Some(text)))
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-fn split_must_include(value: Option<&str>) -> Vec<String> {
-    value
-        .unwrap_or_default()
-        .split(|ch| ch == ',' || ch == ';' || ch == '\n' || ch == '\r')
-        .map(str::trim)
-        .filter(|item| !item.is_empty())
-        .map(ToOwned::to_owned)
-        .collect()
-}
-
-fn json_error(status: StatusCode, message: &str) -> Response {
-    (
-        status,
-        Json(serde_json::json!({
-            "error": message,
-        })),
-    )
-        .into_response()
-}
+mod query_helpers;
+use self::query_helpers::*;
