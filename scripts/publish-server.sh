@@ -479,7 +479,7 @@ if [ "$LOCAL_HEAD" != "$REMOTE_MAIN" ]; then
 fi
 
 SHA=$(git -C "$REPO_ROOT" rev-parse --short HEAD)
-SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD)
+SHA_BIG=$(git -C "$REPO_ROOT" rev-parse HEAD); RELEASE_CHANGELOG=$(git -C "$REPO_ROOT" log -1 --format=%s "$SHA_BIG" 2>/dev/null | tr -s '[:space:]' ' ' | sed 's/^ *//;s/ *$//' | cut -c1-240)
 REMOTE_MAIN=$(git -C "$REPO_ROOT" rev-parse origin/main)
 if [ "$SHA_BIG" != "$REMOTE_MAIN" ]; then
   echo ""
@@ -612,7 +612,7 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   enable_portable_release_rustflags
   if ! (
     cd "$TMP_SERVER_DIR"
-    ELON_SERVER_GIT_SHA="$SHA_BIG" ELON_BUILD_VERSION="$ASSIGNED_VERSION" cargo zigbuild --release --target "$TARGET"
+    ELON_SERVER_GIT_SHA="$SHA_BIG" ELON_BUILD_VERSION="$ASSIGNED_VERSION" ELON_RELEASE_CHANGELOG="$RELEASE_CHANGELOG" cargo zigbuild --release --target "$TARGET"
   ); then
     restore_release_rustflags
     unset CARGO_TARGET_DIR

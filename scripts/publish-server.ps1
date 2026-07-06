@@ -570,7 +570,7 @@ if ($localHead -ne $remoteHead) {
 }
 
 $Sha      = (git -C $RepoRoot rev-parse --short HEAD).Trim()
-$ShaBig   = (git -C $RepoRoot rev-parse HEAD).Trim()
+$ShaBig   = (git -C $RepoRoot rev-parse HEAD).Trim(); $ReleaseChangelog = ((git -C $RepoRoot log -1 --format=%s $ShaBig 2>$null | Select-Object -First 1) -join ' ').Trim()
 $CargoTomlPath = Join-Path $ServerDir "Cargo.toml"
 $FallbackVersion = [regex]::Match(
     (Get-Content $CargoTomlPath -Encoding UTF8 -Raw),
@@ -707,7 +707,7 @@ if (-not $SkipBuild) {
         # Build outside the temporary worktree when a machine-specific cache is configured.
         $env:CARGO_TARGET_DIR = $BuildTargetDir
         $env:ELON_SERVER_GIT_SHA = $ShaBig
-        $env:ELON_BUILD_VERSION  = $AssignedVersion
+        $env:ELON_BUILD_VERSION  = $AssignedVersion; $env:ELON_RELEASE_CHANGELOG = $ReleaseChangelog
         $savedReleaseRustflags = Enable-PortableReleaseRustflags -RepoRoot $RepoRoot -Target $Target
         cargo zigbuild --release --target $Target --bin elon-server
         $cargoExitCode = $LASTEXITCODE
@@ -715,7 +715,7 @@ if (-not $SkipBuild) {
         $savedReleaseRustflags = $null
         if ($cargoExitCode -ne 0) {
             Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
-            Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
+            Remove-Item Env:ELON_BUILD_VERSION, Env:ELON_RELEASE_CHANGELOG -ErrorAction SilentlyContinue
             Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
             Pop-Location
             Remove-Worktree
@@ -723,12 +723,12 @@ if (-not $SkipBuild) {
             Write-Error "❌ 编译失败"
         }
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
-        Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
+        Remove-Item Env:ELON_BUILD_VERSION, Env:ELON_RELEASE_CHANGELOG -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
     } catch {
         Restore-ReleaseRustflags -Saved $savedReleaseRustflags
         Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
-        Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
+        Remove-Item Env:ELON_BUILD_VERSION, Env:ELON_RELEASE_CHANGELOG -ErrorAction SilentlyContinue
         Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
         Pop-Location -ErrorAction SilentlyContinue
         Remove-Worktree
