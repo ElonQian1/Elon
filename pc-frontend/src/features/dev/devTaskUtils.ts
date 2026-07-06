@@ -28,6 +28,15 @@ export function taskResultDisplayText(msg: ChatMessage): string {
   return ''
 }
 
+export function taskRequestLooksMarkdown(value: string): boolean {
+  return /!\[[^\]]*]\([^)]+\)/.test(value)
+    || /\[[^\]]+]\([^)]+\)/.test(value)
+    || /^#{1,6}\s+/m.test(value)
+    || /(^|\n)\s*[-*]\s+/.test(value)
+    || /`[^`]+`/.test(value)
+    || /^\s*https?:\/\/\S+?(?:\.(?:png|jpe?g|gif|webp)|\/(?:chat-)?attachments\/\S+)/im.test(value)
+}
+
 export function taskIdOf(msg: ChatMessage): string {
   return clean(msg.task_id ?? msg.taskId)
 }

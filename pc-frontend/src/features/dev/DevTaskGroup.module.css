@@ -71,6 +71,14 @@
   transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
 
+.userBubbleRich {
+  white-space: normal;
+}
+
+.userBubbleRich img {
+  margin-top: 2px;
+}
+
 .userBubble:hover,
 .userBubble:focus-visible {
   border-color: rgba(46, 168, 97, .24);

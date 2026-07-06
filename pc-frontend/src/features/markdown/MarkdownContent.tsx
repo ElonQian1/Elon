@@ -13,6 +13,7 @@ interface Props {
 
 function MarkdownContent({ content, copy = true }: Props) {
   const [expandedImageSrc, setExpandedImageSrc] = useState<string | null>(null)
+  const normalizedContent = useMemo(() => normalizeBareImageUrls(content), [content])
   useEffect(() => {
     if (!expandedImageSrc) return undefined
     const closeExpandedImage = () => setExpandedImageSrc(null)
@@ -37,7 +38,7 @@ function MarkdownContent({ content, copy = true }: Props) {
         components={components}
         // 不使用 rehype-sanitize：react-markdown 本身不执行脚本，已足够安全
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   )
@@ -123,6 +124,22 @@ function safeMarkdownUrl(value: string | undefined, options: { image: boolean })
   if (options.image && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(url)) return url
   if (url.startsWith('/') && !url.startsWith('//')) return url
   return undefined
+}
+
+function normalizeBareImageUrls(value: string): string {
+  let inFence = false
+  return value
+    .split(/\r?\n/)
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        inFence = !inFence
+        return line
+      }
+      if (inFence) return line
+      const match = line.match(/^\s*(https?:\/\/\S+?(?:\.(?:png|jpe?g|gif|webp)|\/(?:chat-)?attachments\/\S+)(?:[?#]\S*)?)\s*$/i)
+      return match ? `![](${match[1]})` : line
+    })
+    .join('\n')
 }
 
 /* 独立代码块组件（含复制按钮）*/

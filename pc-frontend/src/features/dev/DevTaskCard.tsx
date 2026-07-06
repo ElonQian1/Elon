@@ -14,7 +14,7 @@ import MarkdownContent from '../markdown/MarkdownContent'
 import {
   taskIsTerminal, statusForTask, parseToolEvent, approvalFinalState,
   approvalStateFor, runtimeStatusLabel, shortId, toolEventSummary, toolEventTitle,
-  usageEventSummary, messageText, taskResultDisplayText, taskResultTone,
+  usageEventSummary, messageText, taskRequestLooksMarkdown, taskResultDisplayText, taskResultTone,
 } from './devTaskUtils'
 import type { ChatMessage, TaskContext, ToolEvent, TaskTone } from './types'
 
@@ -59,14 +59,6 @@ function TaskHeader({ message, context, onCancel }: Omit<DevTaskMessageProps, 'o
       )}
     </div>
   )
-}
-
-function taskRequestLooksMarkdown(value: string): boolean {
-  return /!\[[^\]]*]\([^)]+\)/.test(value)
-    || /\[[^\]]+]\([^)]+\)/.test(value)
-    || /^#{1,6}\s+/m.test(value)
-    || /(^|\n)\s*[-*]\s+/.test(value)
-    || /`[^`]+`/.test(value)
 }
 
 /* ══ ProgressLine — 进度行（工具调用/状态） ══ */

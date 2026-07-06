@@ -12,7 +12,7 @@ import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
 import { clean, formatTime } from '../../lib/utils'
-import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal, taskResultTone } from './devTaskUtils'
+import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal, taskRequestLooksMarkdown, taskResultTone } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
@@ -58,6 +58,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const progressCount = timeline.visibleStepCount
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
+  const richRequest = taskRequestLooksMarkdown(request)
   const hasProgressDetails = progressCount > 0
   const showProcessingBubble = !isDone && !resultMsg && !timeline.coverage.assistantEvent
   const tone = status.tone
@@ -104,7 +105,9 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
               <strong>{requestAuthor.name}</strong>
               {requestTime && <span>{requestTime}</span>}
             </div>
-            <div className={styles.userBubble}>{request}</div>
+            <div className={[styles.userBubble, richRequest ? styles.userBubbleRich : ''].join(' ')}>
+              {richRequest ? <MarkdownContent content={request} copy={false} /> : request}
+            </div>
           </div>
           <UserAvatar
             user={{
