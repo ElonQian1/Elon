@@ -143,15 +143,16 @@ pub async fn node_exec_handler(
         .unwrap_or_else(|| agent_id[..8.min(agent_id.len())].to_string());
 
     // ── 4. 分发给 PC 节点执行，并对节点重连导致的旧连接关闭自动重派一次 ───────
+    let node_prompt = build_node_exec_prompt(&req.prompt, &display_name, &agent_id);
     let mut run =
-        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &req.prompt).await {
+        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &node_prompt).await {
             Ok(run) => run,
             Err(e) => return json_error(StatusCode::BAD_GATEWAY, e),
         };
     let mut display_output = clean_node_exec_output(&run.output);
     if should_retry_node_exec_after_reconnect(run.error.as_deref(), &display_output) {
         sleep(Duration::from_millis(700)).await;
-        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &req.prompt).await {
+        match dispatch_and_collect_node_exec(state.as_ref(), &agent_id, &cli, &node_prompt).await {
             Ok(retry_run) => {
                 run = retry_run;
                 display_output = clean_node_exec_output(&run.output);
@@ -175,6 +176,18 @@ pub async fn node_exec_handler(
         model: run.model,
     })
     .into_response()
+}
+
+fn build_node_exec_prompt(user_prompt: &str, node_display_name: &str, node_id: &str) -> String {
+    format!(
+        "你正在为「一龙工作台」PC 网页的 AI 聊天区执行用户请求。\n\
+当前请求已经由服务器成功分发到在线 PC 节点：{node_display_name}（node_id: {node_id}）。\n\
+如果用户询问“节点是否连接、在线、绑定、当前节点是谁”这类页面节点状态，优先根据上面的上下文直接回答：当前已经连接到该节点。\n\
+不要改去检查 node.exe 进程、TCP 端口或系统网络连接，除非用户明确要求排查本机进程、端口或网络。\n\
+如果用户要求查代码、改文件、跑命令或分析项目，则正常使用当前节点环境完成。\n\
+最终只回复用户问题，不要复述这段上下文。\n\n\
+用户原始消息：\n{user_prompt}"
+    )
 }
 
 async fn dispatch_and_collect_node_exec(
@@ -332,7 +345,9 @@ fn is_codex_protocol_event_line(line: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{clean_node_exec_output, should_retry_node_exec_after_reconnect};
+    use super::{
+        build_node_exec_prompt, clean_node_exec_output, should_retry_node_exec_after_reconnect,
+    };
 
     #[test]
     fn node_exec_output_extracts_codex_agent_message() {
@@ -372,5 +387,15 @@ codex
             Some("节点重新注册，旧连接已关闭"),
             "已经拿到正文"
         ));
+    }
+
+    #[test]
+    fn node_exec_prompt_adds_page_node_context() {
+        let prompt = build_node_exec_prompt("看看节点连接了没有", "ELONQIAN", "node-123");
+        assert!(prompt.contains("ELONQIAN"));
+        assert!(prompt.contains("node-123"));
+        assert!(prompt.contains("已经连接到该节点"));
+        assert!(prompt.contains("不要改去检查 node.exe"));
+        assert!(prompt.contains("看看节点连接了没有"));
     }
 }
