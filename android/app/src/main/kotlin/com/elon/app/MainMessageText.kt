@@ -99,6 +99,14 @@ internal fun friendlyErrorMessage(raw: String, code: String? = null, retryable: 
     val source = listOf(raw, nestedMessage).joinToString(" ").lowercase(Locale.CHINA)
     val normalizedCode = code.orEmpty().lowercase(Locale.US)
     return when {
+        normalizedCode == "ai_service_busy" ->
+            "服务器 AI 通道刚才拥堵或短暂断开，本轮没有完成，也不会继续在后台处理。稍后重新发送即可从当前项目记录继续。"
+        normalizedCode == "ai_rate_limited" ->
+            "服务器 AI 通道当前请求过多，本轮没有完成，也不会继续在后台处理。请稍后重新发送即可继续。"
+        normalizedCode == "ai_service_timeout" ->
+            "服务器 AI 通道响应超时，本轮没有完成，也不会继续在后台处理。请稍后重新发送即可继续。"
+        normalizedCode == "ai_provider_connection_unstable" ->
+            "服务器连接 AI 服务时出现短暂不稳定，本轮没有完成，也不会继续在后台处理。请稍后重新发送。"
         isStructuredAiErrorCode(normalizedCode) && raw.isNotBlank() ->
             raw
         source.contains("conversation worktree still has uncommitted changes") ->
@@ -149,16 +157,16 @@ internal fun friendlyChatErrorMessage(raw: String, code: String? = null, retryab
             source.contains("429") ||
             source.contains("ai_rate_limited") ||
             source.contains("ai_service_busy") ->
-            "刚才 AI 通道有点忙，我没有拿到完整回复。你稍后直接重发一次就行。"
+            "刚才 AI 通道有点忙，本轮已经结束，没有继续在后台处理。你稍后直接重发一次就行。"
         source.contains("timeout") ||
             source.contains("超时") ||
             source.contains("ai_service_timeout") ->
-            "刚才 AI 回复超时了，本轮没有完成。你可以直接再发一次，我会重新接上。"
+            "刚才 AI 回复超时了，本轮没有完成，也不会继续在后台处理。你可以直接再发一次。"
         isTransientAiServiceConnectionError(source) ||
             source.contains("ai_provider_connection_unstable") ||
             source.contains("connection") ||
             source.contains("network") ->
-            "刚才连接 AI 服务不稳定，我没有拿到完整回复。你稍后重发一次就可以。"
+            "刚才连接 AI 服务不稳定，本轮已经结束，没有继续在后台处理。你稍后重发一次就可以。"
         else ->
             friendlyErrorMessage(raw, code, retryable)
     }
@@ -174,12 +182,8 @@ private fun isStructuredAiErrorCode(code: String): Boolean {
         code == "project_workspace_error"
 }
 
-private fun transientAiServiceConnectionMessage(retryable: Boolean?): String {
-    return if (retryable == false) {
-        "服务器 AI 通道刚才短暂断开，本轮没有完成。手机 WebSocket 临时断开会自动重连并同步进度；如果看到这条红色提示，说明服务端这轮已结束，请稍后重新发送。"
-    } else {
-        "服务器 AI 通道刚才拥堵或短暂断开，系统会先自动重试。手机 WebSocket 临时断开会自动重连并同步进度；如果连续重试后仍看到这条提示，说明本轮已暂停，稍后重新发送即可继续。"
-    }
+private fun transientAiServiceConnectionMessage(@Suppress("UNUSED_PARAMETER") retryable: Boolean?): String {
+    return "服务器 AI 通道刚才短暂断开，本轮没有完成，也不会继续在后台处理。请稍后重新发送。"
 }
 
 private fun isTransientAiServiceConnectionError(source: String): Boolean {

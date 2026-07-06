@@ -207,7 +207,7 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
             category: AiErrorCategory::RateLimited,
             retryable: true,
             retry_after_secs: Some(45),
-            message: "服务器 AI 通道当前请求过多，系统会先自动重试。若最终仍看到这条提示，说明本轮已暂停，稍后重新发送即可继续。".into(),
+            message: "服务器 AI 通道当前请求过多，本轮没有完成，也不会继续在后台处理。请稍后重新发送即可继续。".into(),
             operator_detail: detail,
         };
     }
@@ -218,7 +218,7 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
             category: AiErrorCategory::TemporaryCapacity,
             retryable: true,
             retry_after_secs: Some(15),
-            message: "服务器 AI 通道刚才拥堵或短暂断开，系统会先自动重试。手机 WebSocket 临时断开会自动重连并同步进度；如果连续重试后仍看到这条提示，说明本轮已暂停，稍后重新发送即可从当前项目记录继续。".into(),
+            message: "服务器 AI 通道刚才拥堵或短暂断开，本轮没有完成，也不会继续在后台处理。稍后重新发送即可从当前项目记录继续。".into(),
             operator_detail: detail,
         };
     }
@@ -229,7 +229,7 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
             category: AiErrorCategory::Timeout,
             retryable: true,
             retry_after_secs: Some(20),
-            message: "服务器 AI 通道响应超时，系统会先自动重试。若最终仍看到这条提示，说明本轮没有完成，稍后重新发送即可继续。".into(),
+            message: "服务器 AI 通道响应超时，本轮没有完成，也不会继续在后台处理。请稍后重新发送即可继续。".into(),
             operator_detail: detail,
         };
     }
@@ -240,7 +240,7 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
             category: AiErrorCategory::ProviderConnection,
             retryable: true,
             retry_after_secs: Some(20),
-            message: "服务器连接 AI 服务时出现短暂不稳定，系统会先自动重试。手机连接会继续自动恢复；若最终仍失败，请稍后重新发送。".into(),
+            message: "服务器连接 AI 服务时出现短暂不稳定，本轮没有完成，也不会继续在后台处理。请稍后重新发送。".into(),
             operator_detail: detail,
         };
     }
@@ -415,6 +415,9 @@ mod tests {
         assert_eq!(classified.code, "ai_service_busy");
         assert!(classified.retryable);
         assert!(classified.should_retry_local_cli());
+        assert!(classified.message.contains("本轮没有完成"));
+        assert!(classified.message.contains("不会继续在后台处理"));
+        assert!(!classified.message.contains("自动重试"));
     }
 
     #[test]
@@ -424,6 +427,8 @@ mod tests {
         );
         assert_eq!(classified.code, "ai_service_busy");
         assert_eq!(classified.category, AiErrorCategory::TemporaryCapacity);
+        assert!(classified.message.contains("本轮没有完成"));
+        assert!(!classified.message.contains("自动重试"));
     }
 
     #[test]
