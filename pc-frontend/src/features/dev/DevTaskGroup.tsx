@@ -7,8 +7,8 @@
  *  - 中间回复片段和命令按发生顺序穿插在过程面板中，任务结束后再折叠
  */
 import { memo, useState, useEffect, useRef } from 'react'
-import { ChevronDown, ChevronRight, StopCircle } from 'lucide-react'
 import TaskTimeline from './TaskTimeline'
+import TaskProgressCard from './TaskProgressCard'
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
 import { clean, formatTime } from '../../lib/utils'
@@ -60,7 +60,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const richRequest = taskRequestLooksMarkdown(request)
   const hasProgressDetails = progressCount > 0
-  const showProcessingBubble = !isDone && !resultMsg && !timeline.coverage.assistantEvent
+  const showProgressPanel = hasProgressDetails || !isDone
   const tone = status.tone
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const canCancel = !!taskId && !isDone && !!onCancel
@@ -96,6 +96,43 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
     })
   }, [taskId, status.label, isDone, processSummary])
 
+  const renderProgressPanel = (inline: boolean) => (
+    <div
+      className={[
+        styles.processPanel,
+        inline ? styles.processPanelInline : '',
+        hideCompletedProcessPanel ? styles.processPanelDormant : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <TaskProgressCard
+        status={status}
+        timeline={timeline}
+        progressCount={progressCount}
+        processSummary={processSummary}
+        collapsed={collapsed}
+        canCancel={canCancel}
+        onToggle={() => {
+          userCollapseOverride.current = true
+          setCollapsed((c) => !c)
+        }}
+        onCancel={() => {
+          if (!taskId) return
+          if (window.confirm('停止这个任务？')) onCancel?.(taskId)
+        }}
+      />
+      {!collapsed && hasProgressDetails && (
+        <div className={styles.processBody}>
+          <TaskTimeline
+            model={timeline}
+            taskContext={taskContext}
+            onCancel={onCancel}
+            onApprove={onApprove}
+          />
+        </div>
+      )}
+    </div>
+  )
+
   return (
     <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
       {request && (
@@ -122,66 +159,21 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
         </div>
       )}
 
-      {showProcessingBubble && <TaskProcessingBubble time={messageTime(headerMsg) || requestTime} />}
-
       {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
-      {(hasProgressDetails || !isDone) && (
-        <div className={[styles.processPanel, hideCompletedProcessPanel ? styles.processPanelDormant : ''].join(' ')}>
-          {hasProgressDetails ? (
-            <button
-              type="button"
-              className={styles.processToggle}
-              onClick={() => {
-                userCollapseOverride.current = true
-                setCollapsed((c) => !c)
-              }}
-              aria-expanded={!collapsed}
-            >
-              <span className={styles.processDot} />
-              <span className={styles.processLabel}>{status.label}</span>
-              <span className={styles.processStage} data-tone={timeline.stage.tone}>
-                {timeline.stage.label}{timeline.stage.meta ? ` · ${timeline.stage.meta}` : ''}
-              </span>
-              <span className={styles.processMeta}>
-                {collapsed ? `查看 ${processSummary || `${progressCount} 步过程`}` : `收起过程${processSummary ? ` · ${processSummary}` : ''}`}
-              </span>
-              <span className={styles.toggleArrow} aria-hidden="true">
-                {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
-              </span>
-            </button>
-          ) : (
-            <div className={styles.processStatic}>
-              <span className={styles.processDot} />
-              <span>{status.label}</span>
-              {taskId && <em>{shortId(taskId)}</em>}
+      {showProgressPanel && (
+        !resultMsg && !hideCompletedProcessPanel ? (
+          <div className={styles.assistantTurn}>
+            <div className={styles.assistantAvatar}>AI</div>
+            <div className={styles.assistantBody}>
+              <div className={styles.assistantMeta}>
+                <strong>一龙</strong>
+                {(messageTime(headerMsg) || requestTime) && <span>{messageTime(headerMsg) || requestTime}</span>}
+              </div>
+              {renderProgressPanel(true)}
             </div>
-          )}
-
-          {canCancel && (
-            <button
-              type="button"
-              className={styles.processCancel}
-              onClick={() => {
-                if (window.confirm('停止这个任务？')) onCancel?.(taskId)
-              }}
-            >
-              <StopCircle size={13} />
-              <span>停止</span>
-            </button>
-          )}
-
-          {!collapsed && (
-            <div className={styles.processBody}>
-              <TaskTimeline
-                model={timeline}
-                taskContext={taskContext}
-                onCancel={onCancel}
-                onApprove={onApprove}
-              />
-            </div>
-          )}
-        </div>
+          </div>
+        ) : renderProgressPanel(false)
       )}
     </div>
   )
@@ -216,28 +208,6 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
         </div>
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function TaskProcessingBubble({ time }: { time?: string }) {
-  return (
-    <div className={styles.assistantTurn}>
-      <div className={styles.assistantAvatar}>AI</div>
-      <div className={styles.assistantBody}>
-        {time && (
-          <div className={styles.assistantMeta}>
-            <strong>一龙</strong>
-            <span>{time}</span>
-          </div>
-        )}
-        <div className={styles.processingBubble}>
-          <span>AI 正在处理</span>
-          <div className={styles.processingDots} aria-hidden="true">
-            <span /><span /><span />
-          </div>
         </div>
       </div>
     </div>

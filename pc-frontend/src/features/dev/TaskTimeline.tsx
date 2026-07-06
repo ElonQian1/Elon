@@ -35,8 +35,8 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
   if (model.items.length === 0) return null
   const grouped = groupTimelineItems(model.items)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
-  const showStageAtTop = (model.stage.key !== 'finished' && model.stage.key !== 'heartbeat') || model.stage.stuck
-  const statusCount = (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
+  const showStageAtTop = model.stage.stuck || model.stage.tone === 'failed' || model.stage.key === 'approval'
+  const technicalCount = grouped.connection.length + (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
 
   return (
     <div className={styles.timeline}>
@@ -54,7 +54,7 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
           />
         )
       ))}
-      <TimelineFold title="连接信息" count={grouped.connection.length} defaultOpen={!model.coverage.finalReply && grouped.primary.length === 0}>
+      <TimelineFold title="技术详情" count={technicalCount} defaultOpen={model.stage.stuck || model.stage.tone === 'failed'}>
         {grouped.connection.map((item) => (
           <TimelineRow
             key={item.id}
@@ -64,15 +64,13 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
             onApprove={onApprove}
           />
         ))}
-      </TimelineFold>
-      <TimelineFold title="状态诊断" count={statusCount} defaultOpen={model.stage.stuck}>
         {!showStageAtTop && <StageCard stage={model.stage} />}
         {model.diagnostics.map((diagnostic, index) => (
           <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
         ))}
         <CoverageStrip model={model} />
       </TimelineFold>
-      <TimelineFold title="用量与摘要" count={grouped.summary.length}>
+      <TimelineFold title="运行摘要" count={grouped.summary.length}>
         {grouped.summary.map((item) => (
           <TimelineRow
             key={item.id}

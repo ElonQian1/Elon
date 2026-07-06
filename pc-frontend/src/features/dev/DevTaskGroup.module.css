@@ -88,13 +88,15 @@
 
 .processPanel {
   width: min(760px, calc(100% - 106px));
-  margin: -1px 72px 0 44px;
-  padding-left: 10px;
-  border-left: 1px solid rgba(148, 163, 184, .09);
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
+  margin: 3px 72px 0 44px;
+  display: grid;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.processPanelInline {
+  width: 100%;
+  margin: 0;
 }
 
 .processToggle,
@@ -220,10 +222,9 @@
 }
 
 .processBody {
-  flex: 1 0 100%;
   display: grid;
-  gap: 4px;
-  padding: 5px 0 2px;
+  gap: 5px;
+  padding: 0 0 2px;
 }
 
 .processCancel {
@@ -264,7 +265,7 @@
 .thread:hover .processPanelDormant,
 .thread:focus-within .processPanelDormant,
 .processPanelDormant:focus-within {
-  max-height: 96px;
+  max-height: 220px;
   margin-top: 0;
   opacity: 1;
   overflow: visible;
@@ -426,6 +427,10 @@
   .processPanel {
     width: calc(100% - 38px);
     margin: 0 10px 0 28px;
+  }
+  .processPanelInline {
+    width: 100%;
+    margin: 0;
   }
   .processToggle {
     flex-wrap: wrap;

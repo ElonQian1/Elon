@@ -1,0 +1,193 @@
+.card {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 8px;
+  padding: 12px 13px 10px;
+  background: #181b21;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .20);
+  color: var(--text-soft);
+}
+
+.header {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4f8cff;
+  box-shadow: 0 0 0 4px rgba(79, 140, 255, .14);
+}
+
+.card[data-tone="done"] .statusDot {
+  background: #23a55a;
+  box-shadow: 0 0 0 4px rgba(35, 165, 90, .14);
+}
+
+.card[data-tone="failed"] .statusDot {
+  background: #da373c;
+  box-shadow: 0 0 0 4px rgba(218, 55, 60, .14);
+}
+
+.card[data-tone="canceled"] .statusDot {
+  background: #8a93a3;
+  box-shadow: 0 0 0 4px rgba(138, 147, 163, .13);
+}
+
+.card[data-tone="approval"] .statusDot {
+  background: #f0b232;
+  box-shadow: 0 0 0 4px rgba(240, 178, 50, .16);
+}
+
+.headerText {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.headerText span {
+  color: #8d98aa;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.headerText strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #eef3fb;
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.cancelButton {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(218, 55, 60, .24);
+  border-radius: 7px;
+  padding: 0 9px;
+  background: rgba(218, 55, 60, .08);
+  color: #ffb1b4;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cancelButton:hover {
+  border-color: rgba(218, 55, 60, .38);
+  background: rgba(218, 55, 60, .13);
+}
+
+.current {
+  display: grid;
+  gap: 5px;
+  padding-left: 19px;
+}
+
+.currentHead {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.currentHead strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #dce6f4;
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.currentHead em {
+  flex: 0 0 auto;
+  color: #8d98aa;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.4;
+}
+
+.current p {
+  margin: 0;
+  color: #a3afc1;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.detailButton {
+  min-width: 0;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, .10);
+  border-radius: 7px;
+  padding: 0 9px 0 10px;
+  background: rgba(255, 255, 255, .026);
+  color: #98a6b8;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+
+.detailButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailButton:hover {
+  border-color: rgba(148, 163, 184, .18);
+  background: rgba(255, 255, 255, .04);
+  color: #c7d1e0;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 11px;
+  }
+
+  .header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cancelButton {
+    grid-column: 2;
+    width: max-content;
+  }
+
+  .current {
+    padding-left: 0;
+  }
+
+  .currentHead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .currentHead strong {
+    white-space: normal;
+  }
+}

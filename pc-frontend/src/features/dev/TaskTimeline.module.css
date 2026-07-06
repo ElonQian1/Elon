@@ -1,7 +1,7 @@
 .timeline {
   display: grid;
-  gap: 0;
-  padding: 7px 0 2px;
+  gap: 2px;
+  padding: 2px 0 2px;
 }
 
 .coverage {
@@ -31,24 +31,24 @@
 }
 
 .fold {
-  margin: 0 0 7px 28px;
-  border: 1px solid rgba(148, 163, 184, .10);
+  margin: 2px 0 6px 28px;
+  border: 1px solid rgba(148, 163, 184, .08);
   border-radius: 7px;
-  background: rgba(255, 255, 255, .018);
+  background: transparent;
 }
 
 .fold[open] {
-  background: rgba(255, 255, 255, .024);
+  background: rgba(255, 255, 255, .018);
 }
 
 .fold summary {
-  min-height: 28px;
+  min-height: 27px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 0 10px;
-  color: #9aa8bd;
+  padding: 0 9px;
+  color: #8d99aa;
   font-size: 11px;
   font-weight: 750;
   cursor: pointer;
@@ -83,10 +83,10 @@
   display: grid;
   gap: 5px;
   margin: 0 0 8px 28px;
-  border: 1px solid rgba(88, 101, 242, .22);
+  border: 1px solid rgba(148, 163, 184, .12);
   border-radius: 7px;
   padding: 8px 10px;
-  background: rgba(88, 101, 242, .075);
+  background: rgba(255, 255, 255, .026);
 }
 
 .stageCard > div {
@@ -97,7 +97,7 @@
 }
 
 .stageCard strong {
-  color: #d8e3f7;
+  color: #dce5f2;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -111,7 +111,7 @@
 }
 
 .stageCard span {
-  color: #a9b8d1;
+  color: #99a7ba;
   font-size: 12px;
   line-height: 1.55;
 }
@@ -153,8 +153,8 @@
 }
 
 .stageCard.tone_done {
-  border-color: rgba(43, 213, 118, .22);
-  background: rgba(35, 165, 90, .065);
+  border-color: rgba(43, 213, 118, .16);
+  background: rgba(35, 165, 90, .045);
 }
 
 .stageCard.tone_approval {
@@ -166,20 +166,20 @@
   display: grid;
   gap: 4px;
   margin: 0 0 8px 28px;
-  border: 1px solid rgba(148, 163, 184, .14);
+  border: 1px solid rgba(148, 163, 184, .10);
   border-radius: 7px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, .028);
+  background: rgba(255, 255, 255, .018);
 }
 
 .diagnostic strong {
-  color: #d8e3f7;
+  color: #d0d9e8;
   font-size: 12px;
   line-height: 1.4;
 }
 
 .diagnostic span {
-  color: #98a6bc;
+  color: #93a0b2;
   font-size: 12px;
   line-height: 1.55;
 }
@@ -190,8 +190,8 @@
 }
 
 .diagnostic.tone_running {
-  border-color: rgba(88, 101, 242, .22);
-  background: rgba(88, 101, 242, .07);
+  border-color: rgba(79, 140, 255, .18);
+  background: rgba(79, 140, 255, .05);
 }
 
 .item {
