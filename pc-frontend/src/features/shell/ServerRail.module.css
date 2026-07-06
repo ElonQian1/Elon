@@ -2,6 +2,8 @@
 
 .rail {
   grid-column: 1;
+  position: relative;
+  z-index: 10;
   width: var(--rail-width);
   height: 100vh;
   background: var(--rail);
