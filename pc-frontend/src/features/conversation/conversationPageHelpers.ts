@@ -133,6 +133,7 @@ interface LocalJournalProbe {
 }
 
 const SNAPSHOT_RECOVERY_TASK_LIMIT = 4
+const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'success', 'failed', 'error', 'canceled', 'cancelled'])
 
 async function appendTaskRecoverySnapshots(projectId: string, channelId: string, messages: Message[]): Promise<Message[]> {
   const taskIds = recoveryCandidateTaskIds(messages)
@@ -182,6 +183,8 @@ function recoveryCandidateTaskIds(messages: Message[]): string[] {
 
 function recoverySnapshotMessage(snapshot: TaskSnapshotResponse): Message | null {
   const taskId = clean(snapshot.task?.id ?? '')
+  const taskStatus = clean(snapshot.task?.status ?? '').toLowerCase()
+  if (TERMINAL_TASK_STATUSES.has(taskStatus)) return null
   const localJournal = snapshot.local_journal ?? snapshot.localJournal ?? null
   if (!taskId || !localJournal) return null
   const journalStatus = clean(localJournal.status ?? '')

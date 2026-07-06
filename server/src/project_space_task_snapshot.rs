@@ -24,6 +24,7 @@ use crate::{
 const TASK_MESSAGE_LIMIT: i64 = 200;
 const DEFAULT_EVENT_LIMIT: usize = 200;
 const LOCAL_JOURNAL_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
+const LOCAL_JOURNAL_PROBE_RETRY_DELAY: Duration = Duration::from_millis(400);
 
 #[derive(Deserialize)]
 pub struct TaskSnapshotQuery {
@@ -502,16 +503,14 @@ async fn resolve_local_journal(
         };
     };
 
-    match state
-        .agent_manager
-        .dispatch_cli_task_journal_inspect(
-            agent_id,
-            &dispatch.pc_req_id,
-            since.max(0) as usize,
-            limit.clamp(1, 100),
-            LOCAL_JOURNAL_PROBE_TIMEOUT,
-        )
-        .await
+    match dispatch_cli_task_journal_inspect_with_retry(
+        state,
+        agent_id,
+        &dispatch.pc_req_id,
+        since.max(0) as usize,
+        limit.clamp(1, 100),
+    )
+    .await
     {
         Ok(AgentToServer::CliTaskJournalSnapshot {
             ok: true,
@@ -568,6 +567,40 @@ async fn resolve_local_journal(
             snapshot: None,
         },
     }
+}
+
+async fn dispatch_cli_task_journal_inspect_with_retry(
+    state: &AppState,
+    agent_id: &str,
+    task_id: &str,
+    since: usize,
+    limit: usize,
+) -> std::result::Result<AgentToServer, anyhow::Error> {
+    let first = state
+        .agent_manager
+        .dispatch_cli_task_journal_inspect(
+            agent_id,
+            task_id,
+            since,
+            limit,
+            LOCAL_JOURNAL_PROBE_TIMEOUT,
+        )
+        .await;
+    if first.is_ok() {
+        return first;
+    }
+
+    tokio::time::sleep(LOCAL_JOURNAL_PROBE_RETRY_DELAY).await;
+    state
+        .agent_manager
+        .dispatch_cli_task_journal_inspect(
+            agent_id,
+            task_id,
+            since,
+            limit,
+            LOCAL_JOURNAL_PROBE_TIMEOUT,
+        )
+        .await
 }
 
 fn local_journal_message(snapshot: Option<&Value>) -> String {
