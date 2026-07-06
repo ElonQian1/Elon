@@ -1,9 +1,9 @@
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { ExternalLink, X } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
+import { MediaViewer, type MediaViewerImage } from './MediaViewer'
 import styles from './MarkdownContent.module.css'
 
 interface Props {
@@ -12,31 +12,32 @@ interface Props {
   copy?: boolean
 }
 
-interface PreviewImage {
+interface MarkdownImage extends MediaViewerImage {
   src: string
   alt: string
+  offset?: number
 }
 
+type OpenImageViewer = (image: MarkdownImage) => void
+
 function MarkdownContent({ content, copy = true }: Props) {
-  const [previewImage, setPreviewImage] = useState<PreviewImage | null>(null)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const normalizedContent = useMemo(() => normalizeBareImageUrls(content), [content])
+  const mediaImages = useMemo(() => extractMarkdownImages(normalizedContent), [normalizedContent])
+
   useEffect(() => {
-    if (!previewImage) return undefined
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setPreviewImage(null)
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [previewImage])
+    if (viewerIndex !== null && viewerIndex >= mediaImages.length) setViewerIndex(null)
+  }, [mediaImages.length, viewerIndex])
+
+  const openImageViewer = useCallback<OpenImageViewer>((image) => {
+    setViewerIndex(findImageIndex(mediaImages, image))
+  }, [mediaImages])
+
   const components = useMemo(
-    () => buildComponents(copy, setPreviewImage),
-    [copy],
+    () => buildComponents(copy, openImageViewer),
+    [copy, openImageViewer],
   )
+
   return (
     <div className={styles.root}>
       <ReactMarkdown
@@ -46,8 +47,8 @@ function MarkdownContent({ content, copy = true }: Props) {
       >
         {normalizedContent}
       </ReactMarkdown>
-      {previewImage && (
-        <ImagePreviewOverlay image={previewImage} onClose={() => setPreviewImage(null)} />
+      {viewerIndex !== null && (
+        <MediaViewer images={mediaImages} index={viewerIndex} onClose={() => setViewerIndex(null)} />
       )}
     </div>
   )
@@ -57,7 +58,7 @@ export default memo(MarkdownContent)
 
 function buildComponents(
   showCopy: boolean,
-  setPreviewImage: (image: PreviewImage) => void,
+  openImageViewer: OpenImageViewer,
 ): Components {
   return {
     // 代码块（fenced code）
@@ -78,11 +79,12 @@ function buildComponents(
         ? <a href={safe} target="_blank" rel="noopener noreferrer" className={styles.link}>{children}</a>
         : <span className={styles.link}>{children}</span>
     },
-    img({ src, alt }) {
+    img({ node, src, alt }) {
       const safe = safeMarkdownUrl(src, { image: true })
       if (!safe) return null
       const imageAlt = alt ?? ''
-      const openPreview = () => setPreviewImage({ src: safe, alt: imageAlt })
+      const image = { src: safe, alt: imageAlt, offset: getNodeOffset(node) }
+      const openPreview = () => openImageViewer(image)
       const handleKeyDown = (event: ReactKeyboardEvent<HTMLImageElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
@@ -108,6 +110,17 @@ function buildComponents(
         />
       )
     },
+    p({ node, children }) {
+      const imageCount = countImageOnlyParagraph(node)
+      if (imageCount > 1) {
+        return (
+          <div className={styles.mediaGrid} data-count={Math.min(imageCount, 4)}>
+            {children}
+          </div>
+        )
+      }
+      return <p>{children}</p>
+    },
     // 表格包裹层（水平滚动）
     table({ children }) {
       return (
@@ -122,40 +135,6 @@ function buildComponents(
   }
 }
 
-function ImagePreviewOverlay({ image, onClose }: { image: PreviewImage; onClose: () => void }) {
-  return (
-    <div
-      className={styles.previewBackdrop}
-      role="dialog"
-      aria-modal="true"
-      aria-label={image.alt || '图片预览'}
-      onClick={onClose}
-    >
-      <div className={styles.previewToolbar} onClick={(event) => event.stopPropagation()}>
-        <a
-          className={styles.previewIconBtn}
-          href={image.src}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="新窗口打开"
-        >
-          <ExternalLink size={18} aria-hidden="true" />
-        </a>
-        <button className={styles.previewIconBtn} type="button" onClick={onClose} title="关闭">
-          <X size={20} aria-hidden="true" />
-        </button>
-      </div>
-      <img
-        src={image.src}
-        alt={image.alt}
-        className={styles.previewImage}
-        onClick={(event) => event.stopPropagation()}
-      />
-      {image.alt && <div className={styles.previewCaption}>{image.alt}</div>}
-    </div>
-  )
-}
-
 function safeMarkdownUrl(value: string | undefined, options: { image: boolean }): string | undefined {
   if (!value) return undefined
   const url = value.trim()
@@ -164,6 +143,62 @@ function safeMarkdownUrl(value: string | undefined, options: { image: boolean })
   if (options.image && /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(url)) return url
   if (url.startsWith('/') && !url.startsWith('//')) return url
   return undefined
+}
+
+function extractMarkdownImages(value: string): MarkdownImage[] {
+  const images: MarkdownImage[] = []
+  const imagePattern = /!\[([^\]]*)]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g
+  let match: RegExpExecArray | null
+  while ((match = imagePattern.exec(value)) !== null) {
+    const safe = safeMarkdownUrl(match[2], { image: true })
+    if (safe) {
+      images.push({
+        src: safe,
+        alt: decodeMarkdownAlt(match[1]),
+        offset: match.index,
+      })
+    }
+  }
+  return images
+}
+
+function findImageIndex(images: MarkdownImage[], image: MarkdownImage): number {
+  if (typeof image.offset === 'number') {
+    const byOffset = images.findIndex((item) => item.offset === image.offset)
+    if (byOffset >= 0) return byOffset
+  }
+  const exact = images.findIndex((item) => item.src === image.src && item.alt === image.alt)
+  if (exact >= 0) return exact
+  const bySrc = images.findIndex((item) => item.src === image.src)
+  return bySrc >= 0 ? bySrc : 0
+}
+
+function decodeMarkdownAlt(value: string): string {
+  return value.replace(/\\([\[\]()])/g, '$1')
+}
+
+function getNodeOffset(node: unknown): number | undefined {
+  const offset = (node as { position?: { start?: { offset?: unknown } } }).position?.start?.offset
+  return typeof offset === 'number' ? offset : undefined
+}
+
+function countImageOnlyParagraph(node: unknown): number {
+  const children = (node as { children?: Array<{ type?: string; tagName?: string; value?: string }> }).children
+  if (!Array.isArray(children)) return 0
+
+  let imageCount = 0
+  for (const child of children) {
+    if (child.type === 'image' || (child.type === 'element' && child.tagName === 'img')) {
+      imageCount += 1
+    } else if (child.type === 'text' && (!child.value || child.value.trim() === '')) {
+      continue
+    } else if (child.type === 'break') {
+      continue
+    } else {
+      return 0
+    }
+  }
+  return imageCount
 }
 
 function normalizeBareImageUrls(value: string): string {
