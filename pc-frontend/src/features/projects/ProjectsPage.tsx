@@ -50,7 +50,7 @@ export default function ProjectsPage() {
 
   async function continueProject(projectId: string) {
     await useProjectStore.getState().selectProject(projectId)
-    navigate('/')
+    navigate('/workspace')
   }
 
   async function handleCreated(project: { id?: string }) {

@@ -166,7 +166,7 @@ export default function GitWorktreesPage() {
       sessionView: conversation.conversation_id,
       conversationTarget: conversationTarget(conversation, user?.id),
     })
-    navigate('/')
+    navigate('/workspace')
   }
 
   async function askConversation(projectId: string, entry: ProjectGitWorktreeAuditEntry) {

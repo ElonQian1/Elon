@@ -135,7 +135,7 @@ export default function ProjectDetailPage() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <button className={styles.backBtn} onClick={() => navigate('/')} type="button">{'← 返回'}</button>
+        <button className={styles.backBtn} onClick={() => navigate('/workspace')} type="button">{'← 返回'}</button>
         <div className={styles.headerInfo}>
           <h1 className={styles.title}>{project?.name ?? id}</h1>
           {project?.description && <p className={styles.desc}>{project.description}</p>}
@@ -166,7 +166,7 @@ export default function ProjectDetailPage() {
             canEdit={canEditProject}
             onChanged={reloadProjectSpace}
             onOpenChannel={(channelId) => {
-              navigate('/')
+              navigate('/workspace')
               setTimeout(() => {
                 if (id) useProjectStore.getState().selectProject(id).then(() => {
                   useProjectStore.getState().selectChannel(channelId)
@@ -208,8 +208,8 @@ export default function ProjectDetailPage() {
               channels={space?.channels ?? []}
               onOpenGitWorktrees={() => navigate(`/git-worktrees?project=${encodeURIComponent(id ?? '')}`)}
               onOpenChannel={(channelId) => {
-                // 跳回主页并激活该频道
-                navigate('/')
+                // 跳回项目对话页并激活该频道
+                navigate('/workspace')
                 setTimeout(() => {
                   if (id) useProjectStore.getState().selectProject(id).then(() => {
                     useProjectStore.getState().selectChannel(channelId)

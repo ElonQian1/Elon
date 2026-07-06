@@ -45,9 +45,9 @@ export default function ServerRail() {
   }
 
   async function openProject(id: string) {
-    // 先更新状态（高亮立即生效），再导航到 /
+    // 先更新状态（高亮立即生效），再导航到项目对话页
     await useProjectStore.getState().selectProject(id)
-    if (pathname !== '/') navigate('/')
+    if (pathname !== '/workspace') navigate('/workspace')
   }
 
   function showTip(e: React.MouseEvent<HTMLElement>, text: string) {
@@ -81,7 +81,7 @@ export default function ServerRail() {
 
       <div className={styles.projectStack} aria-label="项目快捷入口">
         {projects.map((p) => {
-          const isActiveProject = pathname === '/' && p.id === activeProjectId
+          const isActiveProject = pathname === '/workspace' && p.id === activeProjectId
           const iconSrc = p.icon_data_url || p.icon || ''
           return (
             <button

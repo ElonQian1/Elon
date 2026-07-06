@@ -140,7 +140,7 @@ export default function ProjectPlazaView() {
 
   async function openProject(project: PlazaProject) {
     await useProjectStore.getState().selectProject(project.id)
-    navigate('/')
+    navigate('/workspace')
   }
 
   async function handleJoin(project: PlazaProject) {

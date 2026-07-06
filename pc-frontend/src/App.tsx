@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Navigate, Routes, Route } from 'react-router-dom'
 import Shell from './features/shell/Shell'
 import LoginPage from './features/auth/LoginPage'
 import ConversationPage from './features/conversation/ConversationPage'
@@ -20,9 +20,10 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/*" element={<Shell />}>
-        {/* 首页：项目对话主视图 */}
-        <Route index element={<ConversationPage />} />
+        {/* 首页：一龙 AI 工作台 */}
+        <Route index element={<Navigate to="/ai" replace />} />
         <Route path="ai" element={<AiChatPage />} />
+        <Route path="workspace" element={<ConversationPage />} />
         <Route path="friends" element={<FriendsPage />} />
         <Route path="plaza" element={<PlazaPage />} />
         <Route path="account" element={<AccountPage />} />

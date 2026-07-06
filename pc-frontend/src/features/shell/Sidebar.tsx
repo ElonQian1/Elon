@@ -10,7 +10,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '/', icon: '💬', label: '项目对话' },
+  { to: '/workspace', icon: '💬', label: '项目对话' },
   { to: '/voice', icon: '🎙️', label: '声音' },
   { to: '/doctor', icon: '🩺', label: '电脑医生' },
   { to: '/node', icon: '🖥️', label: '本机节点' },
