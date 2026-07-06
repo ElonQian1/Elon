@@ -2,28 +2,20 @@
 
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
-use anyhow::{anyhow, Result};
-use futures::{SinkExt, StreamExt};
-use homecli_proto::{
-    AgentToServer, CliWorkspaceStatus, ModelCapability, NodeHardwareProfile, ServerToAgent,
-    PROTO_VERSION,
-};
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
+use homecli_proto::{AgentToServer, ModelCapability, NodeHardwareProfile};
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::sync::{mpsc, watch, Notify, RwLock};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use std::time::Duration;
+use tokio::sync::{watch, Notify, RwLock};
+use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
-use node_agent_cli_done::{
-    cli_done_message, cli_prompt_accepted, duplicate_cli_prompt_done, latest_codex_session_id,
-};
+use node_agent_cli_done::{cli_done_message, latest_codex_session_id};
 use node_agent_cli_env::apply_env;
-use node_agent_env::{env_flag, node_agent_env_file_path};
 use node_agent_registration::provision_node;
 
 const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(35);
@@ -44,7 +36,9 @@ mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
 mod node_agent_cli_probe;
-use node_agent_cli_probe::{cli_unavailable_after_refresh_error, LocalCliProbeSnapshot, probe_local_clis};
+use node_agent_cli_probe::{
+    cli_unavailable_after_refresh_error, probe_local_clis, LocalCliProbeSnapshot,
+};
 #[cfg(test)]
 mod node_agent_cli_prompt_timeout_tests;
 mod node_agent_cli_pty;
@@ -63,17 +57,21 @@ mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
 mod node_agent_cloud_net;
 mod node_agent_codex_approval;
+mod node_agent_codex_auth_switch;
+mod node_agent_codex_child_env;
 mod node_agent_codex_session;
-mod node_agent_codex_vault; mod node_agent_codex_vault_active; mod node_agent_codex_child_env; mod node_agent_codex_vault_emergency; mod node_agent_codex_auth_switch;
+mod node_agent_codex_vault;
+mod node_agent_codex_vault_active;
+mod node_agent_codex_vault_emergency;
 mod node_agent_config;
-pub use node_agent_config::{Credentials, machine_label, NodeConfig, state_path};
 use node_agent_config::{
-    cloud_login, ensure_install_id, initial_credentials, initial_storage_settings,
-    load_persisted, save_persisted, PersistedState,
+    ensure_install_id, initial_credentials, initial_storage_settings, load_persisted,
+    save_persisted, PersistedState,
 };
+pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
+mod node_agent_cli_runner;
 mod node_agent_download_router;
 mod node_agent_env;
-mod node_agent_cli_runner;
 use node_agent_cli_runner::*;
 pub use node_agent_cli_runner::{prepare_cli_prompt_cwd, PreparedCliPromptCwd};
 mod node_agent_exec;
@@ -109,7 +107,9 @@ use node_agent_session::run_session;
 mod node_agent_task_approval_cleanup_tests;
 mod node_agent_task_approval_snapshot;
 mod node_agent_task_journal;
-mod node_agent_task_journal_api; mod node_agent_task_journal_events; mod node_agent_task_journal_inspect;
+mod node_agent_task_journal_api;
+mod node_agent_task_journal_events;
+mod node_agent_task_journal_inspect;
 mod node_agent_task_journal_lock;
 #[cfg(test)]
 mod node_agent_task_journal_recovery_tests;

@@ -1,7 +1,3 @@
-use anyhow::Result;
-use std::path::Path;
-use tokio::process::Command;
-
 pub(crate) fn command_allowed(command: &str) -> bool {
     let lower = command.trim().to_ascii_lowercase();
     if lower.is_empty() {

@@ -11,19 +11,17 @@ use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
-use super::{
-    prepare_cli_prompt_cwd, resolve_attachment_args, run_cli_prompt, run_exec,
-    run_llm_inference, run_tts_synthesis, ws_text,
-    CliPromptRun, CLOUD_WS_READ_TIMEOUT, Credentials, NodeConfig, NodeRuntime,
-    node_agent_active_task, node_agent_client_maintenance, node_agent_full_access,
-    node_agent_lifecycle, node_agent_route_c_status, node_agent_server_runtime,
-    node_agent_task_journal, node_agent_task_journal_inspect,
-    node_agent_ws_control_queue, pc_storage_repo, pc_workspace_provisioner,
-    project_docs_scan, project_git_worktree_audit, project_workspace_inspect,
-};
 use super::node_agent_cli_done::{cli_prompt_accepted, duplicate_cli_prompt_done};
 use super::node_agent_config::machine_label;
 use super::node_agent_local_llm::discover_models;
+use super::{
+    node_agent_active_task, node_agent_full_access, node_agent_lifecycle,
+    node_agent_route_c_status, node_agent_task_journal, node_agent_task_journal_inspect,
+    node_agent_ws_control_queue, pc_storage_repo, pc_workspace_provisioner, prepare_cli_prompt_cwd,
+    project_docs_scan, project_git_worktree_audit, project_workspace_inspect,
+    resolve_attachment_args, run_cli_prompt, run_exec, run_llm_inference, run_tts_synthesis,
+    ws_text, CliPromptRun, Credentials, NodeConfig, NodeRuntime, CLOUD_WS_READ_TIMEOUT,
+};
 
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
 
@@ -376,7 +374,19 @@ pub(super) async fn run_session(
                                 let _ = tx_c.send(ws_text(&response));
                             });
                         }
-                        ServerToAgent::InspectCliTaskJournal { req_id, task_id, since, limit } => node_agent_task_journal_inspect::spawn(runtime.clone(), out_tx_r.clone(), req_id, task_id, since, limit),
+                        ServerToAgent::InspectCliTaskJournal {
+                            req_id,
+                            task_id,
+                            since,
+                            limit,
+                        } => node_agent_task_journal_inspect::spawn(
+                            runtime.clone(),
+                            out_tx_r.clone(),
+                            req_id,
+                            task_id,
+                            since,
+                            limit,
+                        ),
                         ServerToAgent::CliPrompt {
                             req_id,
                             cli,

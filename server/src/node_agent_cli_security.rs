@@ -145,6 +145,7 @@ pub(crate) fn validate_cli_extra_args(cli_name: &str, extra_args: &[String]) -> 
     Ok(())
 }
 
+#[allow(dead_code)]
 pub(crate) fn codex_session_scope_key(
     extra_args: &[String],
     runtime_permission: Option<&str>,
@@ -303,6 +304,7 @@ fn validate_attachment_arg(value: Option<&String>) -> Result<()> {
     Ok(())
 }
 
+#[allow(dead_code)]
 fn stable_hash(value: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
@@ -310,7 +312,6 @@ fn stable_hash(value: &str) -> String {
     let hash = hasher.finalize();
     hex::encode(&hash[..8])
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_cli_security_tests.rs"]

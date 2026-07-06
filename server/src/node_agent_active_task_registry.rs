@@ -73,11 +73,11 @@ impl ActiveCliPromptRegistry {
         self.prompts.write().await.remove(req_id).is_some()
     }
 
+    #[cfg(test)]
     pub(crate) async fn len(&self) -> usize {
         self.prompts.read().await.len()
     }
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_active_task_registry_tests.rs"]

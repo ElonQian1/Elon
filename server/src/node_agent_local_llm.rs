@@ -3,7 +3,6 @@
 
 use std::time::Duration;
 
-use futures::StreamExt;
 use homecli_proto::{AgentToServer, ModelCapability};
 use serde::Deserialize;
 use tokio::sync::mpsc;

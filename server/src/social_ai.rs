@@ -2,23 +2,19 @@
 //!
 //! 这里只做普通文本问答：不接工具、不修改代码、不触发构建。
 
-use anyhow::{anyhow, Result};
-use chrono::{SecondsFormat, Utc};
-use serde_json::{json, Value};
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex, OnceLock},
-};
+use anyhow::Result;
+use serde_json::Value;
+use std::collections::HashSet;
+use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
 use crate::{
-    friend_events, intent_router,
+    friend_events,
     store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
-    types::{AgentConfig, AppState, WsMessage},
+    types::{AppState, WsMessage},
 };
 
-static SOCIAL_AI_IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 const DIRECT_SOCIAL_AI_SCENE: &str = "一龙AI私聊";
 
 pub(crate) const DEVELOPMENT_REDIRECT_REPLY: &str =
@@ -518,7 +514,6 @@ fn is_billing_or_quota_error(error: &str) -> bool {
         || error.contains("token 用量已达上限")
         || error.contains("用户已被封禁")
 }
-
 
 pub(crate) mod reply_core;
 pub(crate) use self::reply_core::*;

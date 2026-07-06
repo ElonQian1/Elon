@@ -2,7 +2,6 @@ use crate::node_agent_program_resolver::resolve_structured_program;
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::{
-    collections::VecDeque,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -550,23 +549,16 @@ impl ToolGuard {
     }
 }
 
-pub(crate) mod file_ops;
 pub(crate) mod command_policy;
+pub(crate) mod file_ops;
 #[cfg(test)]
 mod tool_guard_tests;
 
+use self::command_policy::command_allowed;
 use self::file_ops::{
-    search_files_blocking, should_skip_search_dir, display_relative_path,
-    RuntimeCommandRequest, shell_command_runner, default_shell, hide_command_window,
-    required_str, optional_trimmed_string, optional_positive_usize,
-    safe_git_revision, normalize_path, reject_unsafe_path_components,
+    display_relative_path, hide_command_window, normalize_path, optional_positive_usize,
+    reject_unsafe_path_components, required_str, safe_git_revision, search_files_blocking,
+    shell_command_runner, RuntimeCommandRequest,
 };
-use self::command_policy::{
-    command_allowed, program_name_allowed, first_arg_in,
-    git_args_allowed, legacy_git_rebase_allowed, git_rebase_args_allowed,
-    legacy_git_push_has_high_risk_args, git_push_args_high_risk, high_risk_git_push_arg,
-    package_manager_args_allowed, allowed_package_script, command_arg_safe,
-    contains_absolute_path_argument,
-};
-pub(crate) use file_ops::truncate_chars;
 pub(crate) use command_policy::structured_command_allowed;
+pub(crate) use file_ops::truncate_chars;

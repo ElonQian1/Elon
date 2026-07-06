@@ -3,7 +3,6 @@
 
 use std::path::PathBuf;
 
-use anyhow::Result;
 use homecli_proto::{AgentToServer, CliWorkspaceStatus};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};

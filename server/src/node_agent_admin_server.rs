@@ -1,39 +1,25 @@
 //! PC 节点本地管理员 HTTP 服务器（登录/注销/设置/诊断等）。
 //! 从 node_agent_main.rs 拆分，保持行为不变。
 
-use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use tracing::{info, warn};
 
-use super::{
-    node_agent_admin_status,
-    node_agent_api_runtime_config,
-    node_agent_cli_sidecar_admin,
-    node_agent_client_diagnostics,
-    node_agent_client_maintenance,
-    node_agent_cloud_net,
-    node_agent_codex_vault,
-    node_agent_download_router,
-    node_agent_full_access,
-    node_agent_install_env,
-    node_agent_local_admin,
-    node_agent_local_pc_frontend,
-    node_agent_project_agent_runs,
-    node_agent_project_picker,
-    node_agent_task_journal_api,
-    pc_storage_git_http,
-    pc_storage_repo,
-    project_landing,
-    project_workspace_inspect,
-    windows_doctor,
-    NodeRuntime,
-};
 use super::node_agent_config::cloud_login;
 use super::node_agent_env::node_agent_env_file_path;
 use super::node_agent_registration::provision_node;
+use super::{
+    node_agent_admin_status, node_agent_api_runtime_config, node_agent_cli_sidecar_admin,
+    node_agent_client_diagnostics, node_agent_client_maintenance, node_agent_cloud_net,
+    node_agent_codex_vault, node_agent_download_router, node_agent_full_access,
+    node_agent_install_env, node_agent_local_admin, node_agent_local_pc_frontend,
+    node_agent_project_agent_runs, node_agent_project_picker, node_agent_task_journal_api,
+    pc_storage_git_http, pc_storage_repo, project_landing, project_workspace_inspect,
+    windows_doctor, NodeRuntime,
+};
 
 pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();

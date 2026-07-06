@@ -1,25 +1,21 @@
 // server/src/node_agent_server_runtime.rs
 
 use crate::{
-    agent_runtime_error_summary::operational_error_summary,
     node_agent_runtime_approval::{
         requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
     },
     node_agent_runtime_events::{
-        runtime_status_chunk, runtime_summary_chunk, tool_approval_checkpoint,
-        tool_approval_decision_chunk, tool_approval_id,
-        tool_approval_required_chunk_with_diff_and_checkpoint, tool_call_chunk, tool_name,
-        tool_result_chunk,
+        runtime_status_chunk, tool_approval_checkpoint, tool_approval_decision_chunk,
+        tool_approval_id, tool_approval_required_chunk_with_diff_and_checkpoint, tool_call_chunk,
+        tool_name, tool_result_chunk,
     },
     node_agent_task_journal::TaskJournal,
     node_agent_tool_approval::ToolApprovalState,
     node_agent_tool_guard::ToolGuard,
 };
-use anyhow::{anyhow, bail, Context, Result};
-use futures::StreamExt;
-use homecli_proto::AgentToServer;
+use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
-use std::{collections::VecDeque, future::Future, path::PathBuf, time::Duration};
+use std::{future::Future, time::Duration};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 
@@ -855,8 +851,8 @@ where
     })
 }
 
-pub(crate) mod utils;
 #[cfg(test)]
 mod runtime_test;
+pub(crate) mod utils;
 
 use self::utils::*;

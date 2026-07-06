@@ -1,15 +1,11 @@
+use super::{MAX_SEARCH_FILES_SCANNED, MAX_SEARCH_FILE_BYTES, SEARCH_SKIP_DIRS};
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::{
     collections::VecDeque,
     path::{Path, PathBuf},
-    time::Duration,
 };
 use tokio::process::Command;
-use super::{
-    MAX_FILE_CHARS, MAX_SEARCH_FILE_BYTES, MAX_SEARCH_FILES_SCANNED,
-    MAX_SEARCH_QUERY_CHARS, SEARCH_SKIP_DIRS,
-};
 
 // ── Search ────────────────────────────────────────────────────────────────────
 

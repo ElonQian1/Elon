@@ -9,20 +9,16 @@ use std::{
     collections::HashSet,
     sync::{Arc, Mutex, OnceLock},
 };
-use tokio::sync::mpsc::UnboundedSender;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::{
-    friend_events, intent_router,
-    store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
-    types::{AgentConfig, AppState, WsMessage},
+    intent_router,
+    store::SocialAiHistoryMessage,
+    types::{AgentConfig, AppState},
 };
 
 static SOCIAL_AI_IN_FLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 const DIRECT_SOCIAL_AI_SCENE: &str = "一龙AI私聊";
-
-pub(crate) const DEVELOPMENT_REDIRECT_REPLY: &str =
-    "这个需求已经涉及项目开发，我在好友/群聊里不能直接写代码、改项目或打包。请到「项目」页面新建项目，或进入已有项目后在项目聊天里发起开发任务；在那里我可以按完整开发流程帮你实现。";
 
 pub(super) async fn build_reply(
     state: &Arc<AppState>,
@@ -200,7 +196,7 @@ struct OpinionMemoryReference {
     source_message_id: Option<String>,
 }
 
-pub(super) fn first_grounded_opinion_memory_reference(
+fn first_grounded_opinion_memory_reference(
     external_tool_results: Option<&Value>,
 ) -> Option<OpinionMemoryReference> {
     let results = external_tool_results?

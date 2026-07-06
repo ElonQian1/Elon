@@ -7,6 +7,7 @@ use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
 const MAX_EVENT_RESULT_CHARS: usize = 6_000;
+#[cfg(test)]
 const MAX_DIFF_PREVIEW_CHARS: usize = 4_000;
 
 pub(crate) fn tool_name(action: &Value) -> String {
@@ -110,6 +111,7 @@ pub(crate) fn tool_approval_id(turn: usize, index: usize) -> String {
     format!("tap_{turn}_{index}")
 }
 
+#[cfg(test)]
 pub(crate) fn tool_approval_required_chunk(
     req_id: &str,
     turn: usize,
@@ -127,6 +129,7 @@ pub(crate) fn tool_approval_required_chunk(
     )
 }
 
+#[cfg(test)]
 pub(crate) fn tool_approval_required_chunk_with_diff(
     req_id: &str,
     turn: usize,
@@ -330,6 +333,7 @@ fn action_preview(action: &Value) -> Value {
     Value::Object(out)
 }
 
+#[cfg(test)]
 fn diff_preview(action: &Value) -> Value {
     if tool_name(action) != "apply_patch" {
         return Value::Null;
@@ -457,7 +461,6 @@ fn is_secret_key(key: &str) -> bool {
     .iter()
     .any(|needle| key.contains(needle))
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_runtime_events_tests.rs"]

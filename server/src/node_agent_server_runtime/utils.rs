@@ -1,24 +1,19 @@
-use anyhow::{anyhow, bail, Context, Result};
-use futures::StreamExt;
-use serde_json::{json, Value};
-use std::{collections::VecDeque, future::Future, path::PathBuf, time::Duration};
-use tokio::sync::mpsc;
-use tokio_tungstenite::tungstenite::Message;
-use homecli_proto::AgentToServer;
-use crate::{
-    agent_runtime_error_summary::operational_error_summary,
-    node_agent_runtime_events::{
-        runtime_status_chunk, runtime_summary_chunk, tool_approval_checkpoint,
-        tool_approval_decision_chunk, tool_approval_id,
-        tool_approval_required_chunk_with_diff_and_checkpoint, tool_call_chunk, tool_name,
-        tool_result_chunk,
-    },
-    node_agent_task_journal::TaskJournal,
-    node_agent_tool_approval::ToolApprovalState,
-    node_agent_tool_guard::ToolGuard,
+use super::{
+    ApiRuntimeConfig, ServerRuntimeRunResult, MAX_RUNTIME_HTTP_BODY_BYTES, MAX_TOOL_RESULT_CHARS,
 };
 pub(crate) use crate::node_agent_tool_guard::truncate_chars;
-use super::{MAX_TURNS, MAX_TOOL_RESULT_CHARS, MAX_RUNTIME_HTTP_BODY_BYTES, RuntimeLoopOptions, ServerRuntimeRunResult, ApiRuntimeConfig};
+use crate::{
+    agent_runtime_error_summary::operational_error_summary,
+    node_agent_runtime_events::{runtime_status_chunk, runtime_summary_chunk},
+    node_agent_task_journal::TaskJournal,
+};
+use anyhow::{anyhow, bail, Context, Result};
+use futures::StreamExt;
+use homecli_proto::AgentToServer;
+use serde_json::{json, Value};
+use std::{collections::VecDeque, path::PathBuf};
+use tokio::sync::mpsc;
+use tokio_tungstenite::tungstenite::Message;
 
 pub(crate) fn record_tool_result(
     results: &mut Vec<Value>,
@@ -362,7 +357,10 @@ pub(crate) fn api_runtime_chat_payload(
     payload
 }
 
-pub(crate) fn api_runtime_should_retry_without_json_mode(status: reqwest::StatusCode, body: &str) -> bool {
+pub(crate) fn api_runtime_should_retry_without_json_mode(
+    status: reqwest::StatusCode,
+    body: &str,
+) -> bool {
     if !matches!(
         status,
         reqwest::StatusCode::BAD_REQUEST
@@ -380,11 +378,18 @@ pub(crate) fn api_runtime_should_retry_without_json_mode(status: reqwest::Status
         || lower.contains("unrecognized request argument")
 }
 
-pub(crate) fn runtime_http_error_message(label: &str, status: reqwest::StatusCode, body: &str) -> String {
+pub(crate) fn runtime_http_error_message(
+    label: &str,
+    status: reqwest::StatusCode,
+    body: &str,
+) -> String {
     format!("{label} 返回 {status}: {}", operational_error_summary(body))
 }
 
-pub(crate) async fn limited_runtime_response_text(response: reqwest::Response, label: &str) -> Result<String> {
+pub(crate) async fn limited_runtime_response_text(
+    response: reqwest::Response,
+    label: &str,
+) -> Result<String> {
     if let Some(content_length) = response.content_length() {
         ensure_runtime_response_size(label, content_length as usize)?;
     }
@@ -417,7 +422,10 @@ pub(crate) fn runtime_response_too_large_message(label: &str, observed_bytes: us
     )
 }
 
-pub(crate) fn first_value(lookup: &impl Fn(&str) -> Option<String>, names: &[&str]) -> Option<String> {
+pub(crate) fn first_value(
+    lookup: &impl Fn(&str) -> Option<String>,
+    names: &[&str],
+) -> Option<String> {
     names.iter().find_map(|name| {
         lookup(name)
             .map(|value| value.trim().to_string())
