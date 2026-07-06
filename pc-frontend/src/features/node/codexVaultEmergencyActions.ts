@@ -69,7 +69,7 @@ export function createCodexVaultEmergencyActions({
       }
     },
     async onEmergencyRestore(providerUserId: string) {
-      setVaultBusy(true); setCodexBusy(true); setResult('正在切换到授权机器人的共享 Codex Pro 会话…'); setError('')
+      setVaultBusy(true); setCodexBusy(true); setResult('正在切换到授权机器人的共享 Codex 账号…'); setError('')
       try {
         const data = await nodeApi<CodexVaultStatusResponse>(
           adminUrl,
@@ -92,7 +92,7 @@ export function createCodexVaultEmergencyActions({
         }))
         await refreshStatus(true)
         await loadCodexVaultStatus(true)
-        setResult(data.message || '已切换到授权机器人的共享 Codex Pro 会话。')
+        setResult(data.message || '已切换到授权机器人的共享 Codex 账号。')
       } catch (err) {
         setError((err as Error).message)
       } finally {

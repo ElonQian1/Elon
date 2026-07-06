@@ -549,11 +549,11 @@ export default function AiChatPage() {
   async function handleCodexVaultShortcut() {
     if (sending) return
     if (!user?.id) {
-      setError('请先登录账号后再备份 Codex auth.json。')
+      setError('请先登录一龙账号后再保存 Codex 账号。')
       setLoginDialogOpen(true)
       return
     }
-    const text = '帮我把本机 Codex auth.json 备份到云端保险箱'
+    const text = '帮我把这台电脑的 Codex 账号保存到云端账号保险箱'
     const previousInput = input
     resetComposer()
     enqueueUserMessage(text)

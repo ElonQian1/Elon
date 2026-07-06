@@ -37,8 +37,8 @@ export default function AiPinnedTools({
           <ShieldCheck aria-hidden="true" size={18} strokeWidth={2.2} />
         </span>
         <span className={styles.pinnedToolCopy}>
-          <strong>Codex 保险箱</strong>
-          <em>备份本机 auth.json</em>
+          <strong>Codex 账号</strong>
+          <em>保存并分享 Codex 账号</em>
         </span>
       </button>
     </div>

@@ -1,7 +1,7 @@
 //! 本机节点 Codex 保险箱授权共享桥接。
 //!
 //! PC 页面调用本机节点；节点再带用户 token 与节点 secret 向云端申请租约。
-//! auth.json 只会落到节点托管的临时 CODEX_HOME。
+//! Codex 登录文件只会落到节点托管的临时 CODEX_HOME。
 
 use anyhow::{bail, Context, Result};
 use axum::{
@@ -190,9 +190,9 @@ pub(crate) async fn restore_emergency_from_cloud(
     });
     let lease = cloud_post_typed::<EmergencyLeaseResponse>(&url, &token, &body).await?;
     let auth_value: Value =
-        serde_json::from_str(&lease.auth_json).context("云端返回的 auth_json 不是有效 JSON")?;
+        serde_json::from_str(&lease.auth_json).context("云端返回的 Codex 账号凭据不是有效 JSON")?;
     validate_chatgpt_auth_cache(&auth_value)
-        .map_err(|error| anyhow::anyhow!("云端共享凭据校验失败: {error}"))?;
+        .map_err(|error| anyhow::anyhow!("云端共享 Codex 账号校验失败: {error}"))?;
 
     let provider_key = lease
         .provider_user_id

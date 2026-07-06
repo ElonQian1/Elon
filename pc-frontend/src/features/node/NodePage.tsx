@@ -61,7 +61,7 @@ export default function NodePage() {
             <ShieldCheck size={16} strokeWidth={2.2} />
           </span>
           <span className={styles.sideMeta}>
-            <strong>Codex 保险箱</strong>
+            <strong>Codex 账号</strong>
             <small>账号共享和用量</small>
           </span>
         </button>
@@ -158,11 +158,11 @@ function LocalNodePanel({ adminUrl, view = 'overview' }: { adminUrl: string; vie
     <div className={styles.localPage}>
       <div className={styles.hero}>
         <div>
-          <div className={styles.kicker}>{isVaultView ? 'Codex Pro 保险箱' : '一龙 Win 端'}</div>
+          <div className={styles.kicker}>{isVaultView ? 'Codex 账号保险箱' : '一龙 Win 端'}</div>
           <h2>{isVaultView ? '账号共享和用量统计' : '分享这台电脑算力'}</h2>
           <p>
             {isVaultView
-              ? '集中查看本机 Codex Pro 登录备份、共享授权、租约和 token 用量估算。'
+              ? '集中查看本机 Codex 账号保存状态、共享授权、租约和 token 用量估算。'
               : '首次使用需要下载并安装；安装后点击"启动 Win 端"，浏览器会拉起本机程序。'}
           </p>
         </div>
@@ -227,11 +227,11 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }, [adminUrl])
 
   const loadCodexVaultStatus = useCallback(async (quiet = true) => {
-    if (!quiet) { setResult('读取 Codex 保险箱状态…'); setError('') }
+    if (!quiet) { setResult('读取 Codex 账号保险箱状态…'); setError('') }
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(adminUrl, '/api/codex-vault/status', {}, 12000)
       setVaultStatus(data)
-      if (!quiet) setResult('Codex 保险箱状态已刷新。')
+      if (!quiet) setResult('Codex 账号保险箱状态已刷新。')
     } catch (err) {
       const message = (err as Error).message
       setVaultStatus((prev) => ({
@@ -308,7 +308,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function backupCodexVault() {
-    setVaultBusy(true); setResult('正在备份本机 Codex Pro 凭据…'); setError('')
+    setVaultBusy(true); setResult('正在保存这台电脑的 Codex 账号…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
@@ -317,7 +317,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
         30000,
       )
       setVaultStatus(data)
-      setResult(data.message || 'Codex Pro 凭据已加密备份到云端保险箱。')
+      setResult(data.message || '这台电脑的 Codex 账号已加密保存到云端账号保险箱。')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -326,7 +326,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function restoreCodexVault() {
-    setVaultBusy(true); setCodexBusy(true); setResult('正在恢复临时 Codex Pro 登录态…'); setError('')
+    setVaultBusy(true); setCodexBusy(true); setResult('正在切换临时 Codex 账号…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
@@ -337,7 +337,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
       setVaultStatus(data)
       await refreshStatus(true)
       await loadCodexVaultStatus(true)
-      setResult(data.message || '已恢复为本机临时 Codex Pro 会话。')
+      setResult(data.message || '已切换为本机临时 Codex 会话。')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -347,7 +347,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function clearCodexVault() {
-    setVaultBusy(true); setCodexBusy(true); setResult('正在清理本机临时 Codex 登录态…'); setError('')
+    setVaultBusy(true); setCodexBusy(true); setResult('正在清理本机临时 Codex 会话…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
@@ -358,7 +358,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
       setVaultStatus(data)
       await refreshStatus(true)
       await loadCodexVaultStatus(true)
-      setResult(data.message || '已清理本机保险箱临时 CODEX_HOME。')
+      setResult(data.message || '已清理本机临时 Codex 会话。')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -368,7 +368,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function deleteCloudCodexVault() {
-    setVaultBusy(true); setResult('正在删除云端 Codex Pro 保险箱备份…'); setError('')
+    setVaultBusy(true); setResult('正在删除云端 Codex 账号记录…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
@@ -377,7 +377,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
         20000,
       )
       setVaultStatus(data)
-      setResult(data.message || '已删除云端 Codex Pro 保险箱备份。')
+      setResult(data.message || '已删除云端 Codex 账号记录。')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -460,7 +460,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
     <div className={styles.adminPanel}>
       <div className={styles.adminRow}>
         <div>
-          <div className={styles.kicker}>{isVaultView ? 'Codex Pro 保险箱' : '本机节点'}</div>
+          <div className={styles.kicker}>{isVaultView ? 'Codex 账号保险箱' : '本机节点'}</div>
           <h3>{isVaultView ? '授权共享和用量对账' : status.device_name ?? '这台电脑'}</h3>
         </div>
         <span className={[styles.chip, status.connected ? styles.online : styles.checking].join(' ')}>
@@ -488,7 +488,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
           <ShareSettlementCard progression={progression} />
           <div className={styles.actions}>
             <button className={styles.btn} onClick={() => loadCodexVaultStatus(false)} disabled={vaultBusy}>
-              刷新保险箱
+              刷新账号保险箱
             </button>
             <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
               刷新本机状态

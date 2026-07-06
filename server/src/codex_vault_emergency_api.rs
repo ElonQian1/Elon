@@ -2,7 +2,7 @@
 //!
 //! 这里允许 provider 账号显式授权 consumer 账号临时租用
 //! provider 的保险箱槽位。云端只在通过 consumer 节点 secret 证明后
-//! 返回一次性租约响应；浏览器状态接口不会包含 auth.json 明文。
+//! 返回一次性租约响应；浏览器状态接口不会包含 Codex 登录文件明文。
 
 use axum::{
     extract::{Path, State},
@@ -112,7 +112,7 @@ pub async fn create_grant(
         Ok(grant) => Json(serde_json::json!({
             "ok": true,
             "grant": grant,
-            "message": "已保存 Codex 保险箱授权共享。",
+            "message": "已保存 Codex 账号授权共享。",
         }))
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
@@ -134,7 +134,7 @@ pub async fn revoke_grant(
     {
         Ok(true) => Json(serde_json::json!({
             "ok": true,
-            "message": "已撤销 Codex 保险箱授权共享。",
+            "message": "已撤销 Codex 账号授权共享。",
         }))
         .into_response(),
         Ok(false) => json_error(StatusCode::NOT_FOUND, "没有可撤销的授权共享"),
@@ -174,7 +174,7 @@ pub async fn lease_auth_cache(
     if provider.id == consumer.id {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "自己的保险箱请使用普通恢复，不走授权共享租约",
+            "自己的 Codex 账号请使用普通切换，不走授权共享租约",
         );
     }
     let grant = match state
@@ -185,7 +185,7 @@ pub async fn lease_auth_cache(
         Ok(None) => {
             return json_error(
                 StatusCode::FORBIDDEN,
-                "授权提供方尚未给当前机器人开启 Codex 保险箱授权共享",
+                "授权提供方尚未给当前机器人开启 Codex 账号授权共享",
             )
         }
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
@@ -196,10 +196,7 @@ pub async fn lease_auth_cache(
     {
         Ok(Some(slot)) => slot,
         Ok(None) => {
-            return json_error(
-                StatusCode::NOT_FOUND,
-                "授权提供方没有可用的 Codex Pro 保险箱槽位",
-            )
+            return json_error(StatusCode::NOT_FOUND, "授权提供方没有可用的 Codex 账号槽位")
         }
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
@@ -276,7 +273,7 @@ pub async fn lease_auth_cache(
         "billing_source": "shared_codex",
         "lease_expires_at": lease.expires_at,
         "cleanup_recommended_seconds": grant.max_lease_seconds,
-        "message": "已租用授权机器人的 Codex 保险箱，应只写入本机节点托管的临时 CODEX_HOME。",
+        "message": "已切换到授权机器人的共享 Codex 账号。",
     }))
     .into_response()
 }
@@ -302,13 +299,13 @@ pub async fn clear_active_lease(
             "ok": true,
             "cleared": true,
             "lease": lease,
-            "message": "已清除当前节点 Codex 保险箱共享租约。",
+            "message": "已清除当前节点 Codex 账号共享租约。",
         }))
         .into_response(),
         Ok(None) => Json(serde_json::json!({
             "ok": true,
             "cleared": false,
-            "message": "当前节点没有需要清除的 Codex 保险箱共享租约。",
+            "message": "当前节点没有需要清除的 Codex 账号共享租约。",
         }))
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),

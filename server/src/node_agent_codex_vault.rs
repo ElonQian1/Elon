@@ -1,4 +1,4 @@
-//! 本机节点 Codex Pro 凭据保险箱桥接。浏览器触发操作，但不接触 `auth.json`
+//! 本机节点 Codex 账号保险箱桥接。浏览器触发操作，但不接触登录文件
 //! 明文：读取、上传、租用和落盘都由本机节点完成。
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -126,7 +126,7 @@ async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoR
     if path_in_managed_vault(&auth_path) {
         return error_response(
             StatusCode::BAD_REQUEST,
-            "当前使用的是保险箱临时凭据，不能反向覆盖云端备份。",
+            "当前使用共享 Codex 账号，不能覆盖云端。",
         );
     }
     let auth_json = match read_auth_json_value(&auth_path) {
@@ -151,7 +151,7 @@ async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoR
             StatusCode::OK,
             Json(json!({
                 "ok": true,
-                "message": "已把本机 Codex Pro 凭据加密备份到云端保险箱。",
+                "message": "已把这台电脑的 Codex 账号加密保存到云端账号保险箱。",
                 "cloud": value,
                 "local": local_status(),
             })),
@@ -177,7 +177,7 @@ async fn restore_handler(
             StatusCode::OK,
             Json(json!({
                 "ok": true,
-                "message": lease.message.unwrap_or_else(|| "已恢复为本机临时 Codex Pro 会话。".to_string()),
+                "message": lease.message.unwrap_or_else(|| "已切换为本机临时 Codex 会话。".to_string()),
                 "lease_id": lease.lease_id,
                 "slot_id": lease.slot_id,
                 "account_hint_hash": lease.account_hint_hash,
@@ -272,10 +272,10 @@ async fn restore_from_cloud(
     };
     let auth_value: Value = match serde_json::from_str(&lease.auth_json) {
         Ok(value) => value,
-        Err(_) => bail!("云端返回的 auth_json 不是有效 JSON"),
+        Err(_) => bail!("云端返回的 Codex 账号凭据不是有效 JSON"),
     };
     if let Err(error) = validate_chatgpt_auth_cache(&auth_value) {
-        bail!("云端保险箱凭据校验失败: {error}");
+        bail!("云端 Codex 账号校验失败: {error}");
     }
     let slot_id = lease.slot_id.as_deref().unwrap_or("legacy");
     let home = managed_slot_codex_home(slot_id);
@@ -353,7 +353,7 @@ async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl
             StatusCode::OK,
             Json(json!({
                 "ok": true,
-                "message": "已删除云端 Codex Pro 保险箱备份。",
+                "message": "已删除云端 Codex 账号记录。",
                 "cloud": value,
                 "local": local_status(),
             })),
@@ -416,9 +416,7 @@ fn source_auth_json_path() -> Result<PathBuf> {
         .map(|home| home.join("auth.json"))
         .find(|path| path.is_file())
         .ok_or_else(|| {
-            anyhow!(
-                "没有找到可备份的 Codex auth.json；当前只支持备份 Codex ChatGPT / Pro auth.json。"
-            )
+            anyhow!("没有检测到可保存的 Codex 账号；当前只支持 Codex ChatGPT / Pro 登录态。")
         })
 }
 
@@ -479,10 +477,10 @@ pub(crate) fn validate_chatgpt_auth_cache(value: &Value) -> Result<()> {
         .and_then(Value::as_str)
         .unwrap_or("chatgpt");
     if auth_mode != "chatgpt" {
-        bail!("只支持 ChatGPT / Pro 登录态，不支持 API key 凭据");
+        bail!("账号保险箱只支持 ChatGPT / Pro 登录态，不支持 API key 模式");
     }
     if refresh_token(value).is_none() {
-        bail!("缺少 refresh_token，不能作为 Codex Pro 凭据使用");
+        bail!("Codex 账号缺少可续期登录凭据，不能作为共享账号使用");
     }
     Ok(())
 }

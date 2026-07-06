@@ -39,11 +39,11 @@ export default function AiChatTopbar({
         <button
           className={styles.topbarBtn}
           type="button"
-          title="把本机 Codex auth.json 备份到云端保险箱"
+          title="把这台电脑的 Codex 账号保存到云端账号保险箱"
           onClick={onCodexVaultBackup}
           disabled={sending}
         >
-          备份 auth.json
+          保存 Codex 账号
         </button>
         <button className={styles.topbarBtn} type="button" title="打开移动端入口" onClick={() => window.open('/app/download', '_blank', 'noopener')}>
           打开移动端

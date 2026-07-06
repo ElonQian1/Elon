@@ -1,7 +1,7 @@
 //! 用户 Codex Pro 登录态保险箱 API。
 //!
 //! 浏览器只拿到状态；上传/租用凭据要求本机节点提供 agent secret 证明，避免
-//! PC 前端 JS 直接接触 `auth.json` 明文。
+//! PC 前端 JS 直接接触 Codex 登录文件明文。
 
 use aes_gcm::{
     aead::{Aead, KeyInit},
@@ -346,7 +346,7 @@ pub async fn save_auth_cache(
             Json(serde_json::json!({
                 "ok": true,
                 "vault": status_from_record(Some(&record), &slots),
-                "message": "Codex Pro 凭据已加密保存到保险箱。",
+                "message": "Codex 账号已加密保存到账号保险箱。",
             }))
             .into_response()
         }
@@ -401,7 +401,7 @@ pub async fn lease_auth_cache(
         .select_user_codex_credential_slot(&user.id, req.previous_account_hint_hash.as_deref())
     {
         Ok(Some(slot)) => slot,
-        Ok(None) => return json_error(StatusCode::NOT_FOUND, "没有可租用的 Codex Pro 凭据槽位"),
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "没有可用的 Codex 账号槽位"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
     let auth_json = match decrypt_auth_json(&slot.ciphertext_b64, &slot.nonce_b64) {
@@ -527,9 +527,9 @@ struct ValidatedAuthCache {
 
 fn validate_auth_cache(value: &Value) -> Result<ValidatedAuthCache, String> {
     let canonical_json =
-        serde_json::to_string(value).map_err(|_| "auth_json 不是有效 JSON".to_string())?;
+        serde_json::to_string(value).map_err(|_| "Codex 账号凭据不是有效 JSON".to_string())?;
     if canonical_json.len() > MAX_AUTH_JSON_BYTES {
-        return Err("auth_json 过大".to_string());
+        return Err("Codex 账号凭据过大".to_string());
     }
     let auth_mode = value
         .get("auth_mode")
@@ -539,7 +539,7 @@ fn validate_auth_cache(value: &Value) -> Result<ValidatedAuthCache, String> {
         .unwrap_or("chatgpt")
         .to_string();
     if auth_mode != "chatgpt" {
-        return Err("只支持 ChatGPT / Pro 登录态备份，不支持 API key 凭据".to_string());
+        return Err("账号保险箱只支持 ChatGPT / Pro 登录态，不支持 API key 模式".to_string());
     }
     let refresh_token = value
         .pointer("/tokens/refresh_token")
@@ -548,7 +548,7 @@ fn validate_auth_cache(value: &Value) -> Result<ValidatedAuthCache, String> {
         .map(str::trim)
         .filter(|token| token.len() >= 20);
     if refresh_token.is_none() {
-        return Err("auth_json 缺少 refresh_token，不能作为 Codex Pro 长期凭据备份".to_string());
+        return Err("Codex 账号缺少可续期登录凭据，不能保存到账号保险箱".to_string());
     }
     let account_hint_hash = value
         .pointer("/tokens/account_id")

@@ -86,8 +86,8 @@ export default function CodexVaultCard({
       : !cloudReady
         ? '服务器未配置'
         : bound
-          ? `已备份 ${vault?.available_count ?? (cloudSlots.length || 1)} 个账号`
-          : '未备份'
+          ? `已保存 ${vault?.available_count ?? (cloudSlots.length || 1)} 个账号`
+          : '未保存'
   const stateTone = cloudReady && bound ? styles.vaultOnline : cloud?.error ? styles.vaultOffline : styles.vaultChecking
   const activeSharedLease = leases.find((lease) => lease.consumer_user_id === currentUserId && lease.status === 'active' && isFutureTime(lease.expires_at))
   const activeSharing = !!activeSharedLease
@@ -109,32 +109,32 @@ export default function CodexVaultCard({
   }
   function grantStatusText(grant: CodexVaultEmergencyGrant): string {
     if (grant.status !== 'active') return '已撤销'
-    if (!grant.provider_vault_available) return '未备份保险箱'
+    if (!grant.provider_vault_available) return '账号未保存'
     return grant.reciprocal_active ? '互授权' : '单向授权'
   }
   return (
     <section className={styles.vaultCard}>
       <div className={styles.vaultHead}>
         <div>
-          <span className={styles.codexLabel}>Codex Pro 保险箱</span>
-          <h4>云端保存自己的 auth.json</h4>
+          <span className={styles.codexLabel}>Codex 账号保险箱</span>
+          <h4>保存并分享自己的 Codex 账号</h4>
         </div>
         <span className={[styles.vaultState, stateTone].join(' ')}>{state}</span>
       </div>
       <p className={styles.vaultNote}>
-        保险箱默认只给账号所有者自己的节点备份和恢复；你显式授权后，其他机器人才能短期租用托管 CODEX_HOME，页面会记录共享租约、token 和收益。
+        Codex 账号默认只给账号所有者自己的节点保存和切换；你显式授权后，其他机器人才能使用共享 Codex 账号，页面会记录共享租约、token 和收益。
       </p>
       <div className={styles.vaultGrid}>
         <div>
-          <span>默认 auth.json</span>
+          <span>本机 Codex 账号</span>
           <strong>{authStateText(defaultAuth)}</strong>
         </div>
         <div>
-          <span>托管 CODEX_HOME</span>
+          <span>本机共享会话</span>
           <strong>{activeManaged ? `当前生效${status?.active_account_hint_hash ? ` · ${status.active_account_hint_hash}` : ''}` : managedAuth?.present ? '已写入' : '未写入'}</strong>
         </div>
         <div>
-          <span>最近备份</span>
+          <span>最近保存</span>
           <strong>{formatVaultTime(vault?.last_backup_at)}</strong>
         </div>
         <div>
@@ -203,7 +203,7 @@ export default function CodexVaultCard({
             type="button"
             onClick={() => setGrantPickerOpen(true)}
             disabled={busy}
-            title="授权对方机器人短期使用本账号的 Codex 保险箱"
+            title="授权对方机器人使用本账号的 Codex 账号"
           >
             <Handshake size={15} strokeWidth={2.2} aria-hidden="true" />
             选择并授权
@@ -223,7 +223,7 @@ export default function CodexVaultCard({
                   type="button"
                   disabled={busy || grant.status !== 'active' || !grant.provider_vault_available || !grant.provider_user_id}
                   onClick={() => grant.provider_user_id && void emergencyActions.onEmergencyRestore(grant.provider_user_id)}
-                  title="把该授权机器人的保险箱凭据写入本机临时 CODEX_HOME"
+                  title="切换到该授权机器人的共享 Codex 账号"
                 >
                   <KeyRound size={15} strokeWidth={2.2} aria-hidden="true" />
                   使用共享
@@ -282,25 +282,25 @@ export default function CodexVaultCard({
           className={[styles.btn, styles.primary, styles.iconBtn].join(' ')}
           onClick={onBackup}
           disabled={busy || !canBackup}
-          title="把本机默认 Codex Pro 登录态加密备份到云端保险箱"
+          title="把这台电脑的 Codex 账号加密保存到云端账号保险箱"
         >
           <UploadCloud size={15} strokeWidth={2.2} aria-hidden="true" />
-          备份本机登录
+          保存本机账号
         </button>
         <button
           className={[styles.btn, styles.iconBtn].join(' ')}
           onClick={onRestore}
           disabled={busy || !canRestore}
-          title="把云端保险箱凭据写入本机节点托管的临时 CODEX_HOME"
+          title="把云端账号保险箱切换为本机临时 Codex 会话"
         >
           <DownloadCloud size={15} strokeWidth={2.2} aria-hidden="true" />
-          临时恢复
+          临时切换
         </button>
         <button
           className={[styles.btn, styles.iconBtn].join(' ')}
           onClick={onClear}
           disabled={busy || !canClear}
-          title="删除本机节点托管的临时 CODEX_HOME，不影响默认 auth.json"
+          title="删除本机共享 Codex 会话，不影响默认账号"
         >
           <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
           清理本机
@@ -309,7 +309,7 @@ export default function CodexVaultCard({
           className={[styles.btn, styles.iconBtn].join(' ')}
           onClick={onDeleteCloud}
           disabled={busy || !bound}
-          title="删除云端保险箱中的 Codex Pro 备份，不影响本机文件"
+          title="删除云端账号保险箱中的 Codex 账号记录，不影响本机登录"
         >
           <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
           删除云端
@@ -318,7 +318,7 @@ export default function CodexVaultCard({
           className={[styles.btn, styles.iconBtn].join(' ')}
           onClick={onRefresh}
           disabled={busy}
-          title="刷新 Codex Pro 保险箱状态"
+          title="刷新 Codex 账号保险箱状态"
         >
           <ShieldCheck size={15} strokeWidth={2.2} aria-hidden="true" />
           刷新
@@ -327,7 +327,7 @@ export default function CodexVaultCard({
       <UserPickerDrawer
         open={grantPickerOpen}
         title="机器人授权共享"
-        subtitle="选择允许短期租用本账号 Codex 保险箱的成员、好友或全站用户。"
+        subtitle="选择允许使用本账号 Codex 共享能力的成员、好友或全站用户。"
         busy={busy}
         currentUserId={currentUserId}
         disabledUserIds={new Set(outgoingGrants.filter((grant) => grant.status === 'active').map((grant) => grant.consumer_user_id ?? '').filter(Boolean))}
