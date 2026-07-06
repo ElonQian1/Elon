@@ -155,7 +155,7 @@ function LocalNodePanel({ adminUrl, view = 'overview' }: { adminUrl: string; vie
   }
 
   return (
-    <div className={styles.localPage}>
+    <div className={[styles.localPage, isVaultView ? styles.vaultLocalPage : ''].join(' ')}>
       <div className={styles.hero}>
         <div>
           <div className={styles.kicker}>{isVaultView ? 'Codex 账号保险箱' : '一龙 Win 端'}</div>
@@ -457,7 +457,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   return (
-    <div className={styles.adminPanel}>
+    <div className={[styles.adminPanel, isVaultView ? styles.vaultAdminPanel : ''].join(' ')}>
       <div className={styles.adminRow}>
         <div>
           <div className={styles.kicker}>{isVaultView ? 'Codex 账号保险箱' : '本机节点'}</div>
@@ -468,35 +468,39 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
         </span>
       </div>
       {isVaultView ? (
-        <>
-          <CodexVaultCard
-            status={codexVault}
-            cloud={vaultStatus?.cloud}
-            busy={vaultBusy}
-            onBackup={backupCodexVault}
-            onRestore={restoreCodexVault}
-            onClear={clearCodexVault}
-            onDeleteCloud={deleteCloudCodexVault}
-            onRefresh={() => loadCodexVaultStatus(false)}
-            emergencyActions={emergencyVaultActions}
-            currentUserId={user?.id}
-          />
-          <CodexVaultUsageEstimateCard
-            sharing={vaultStatus?.cloud?.sharing ?? vaultStatus?.cloud?.emergency}
-            currentUserId={user?.id}
-          />
-          <ShareSettlementCard progression={progression} />
-          <div className={styles.actions}>
-            <button className={styles.btn} onClick={() => loadCodexVaultStatus(false)} disabled={vaultBusy}>
-              刷新账号保险箱
-            </button>
-            <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
-              刷新本机状态
-            </button>
+        <div className={styles.vaultDashboardGrid}>
+          <div className={styles.vaultDashboardPrimary}>
+            <CodexVaultCard
+              status={codexVault}
+              cloud={vaultStatus?.cloud}
+              busy={vaultBusy}
+              onBackup={backupCodexVault}
+              onRestore={restoreCodexVault}
+              onClear={clearCodexVault}
+              onDeleteCloud={deleteCloudCodexVault}
+              onRefresh={() => loadCodexVaultStatus(false)}
+              emergencyActions={emergencyVaultActions}
+              currentUserId={user?.id}
+            />
           </div>
-          {result && <p className={styles.resultOk}>{result}</p>}
-          {error && <p className={styles.resultErr}>{error}</p>}
-        </>
+          <aside className={styles.vaultDashboardSide}>
+            <CodexVaultUsageEstimateCard
+              sharing={vaultStatus?.cloud?.sharing ?? vaultStatus?.cloud?.emergency}
+              currentUserId={user?.id}
+            />
+            <ShareSettlementCard progression={progression} />
+            <div className={styles.actions}>
+              <button className={styles.btn} onClick={() => loadCodexVaultStatus(false)} disabled={vaultBusy}>
+                刷新账号保险箱
+              </button>
+              <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
+                刷新本机状态
+              </button>
+            </div>
+            {result && <p className={styles.resultOk}>{result}</p>}
+            {error && <p className={styles.resultErr}>{error}</p>}
+          </aside>
+        </div>
       ) : (
         <>
           <div className={styles.kvGrid}>

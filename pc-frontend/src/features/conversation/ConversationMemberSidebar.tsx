@@ -1,3 +1,4 @@
+import { useMemo, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { User } from '../../store/auth'
 import AgentRunsPanel from '../dev/AgentRunsPanel'
@@ -11,7 +12,8 @@ import {
   memberPresenceAvatarClass,
 } from './MemberPanel'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
-import type { PopoverAnchor } from '../../lib/popoverPosition'
+import { popoverAnchorFromRect, type PopoverAnchor } from '../../lib/popoverPosition'
+import { memberPresenceStatus, presenceLabel } from './memberUtils'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
 import type { WorkspacePanels } from './useWorkspacePanels'
 import styles from './ConversationPage.module.css'
@@ -36,6 +38,8 @@ interface ConversationMemberSidebarProps {
   panelUsesChannelScope: boolean
   panelUsesChannelPermissions: boolean
   memberPanelSummary: string
+  selectionMode: boolean
+  onSelectionModeChange: (value: boolean) => void
   panelMembers: ProjectMember[]
   spaceMembers: ProjectMember[]
   spaceLoading: boolean
@@ -93,6 +97,8 @@ export default function ConversationMemberSidebar({
   panelUsesChannelScope,
   panelUsesChannelPermissions,
   memberPanelSummary,
+  selectionMode,
+  onSelectionModeChange,
   panelMembers,
   spaceMembers,
   spaceLoading,
@@ -132,6 +138,10 @@ export default function ConversationMemberSidebar({
   onOpenMemberMenu,
 }: ConversationMemberSidebarProps) {
   const hasProject = !!activeProjectId
+  const onlineCount = useMemo(
+    () => panelMembers.filter((member) => memberPresenceStatus(member) !== 'offline').length,
+    [panelMembers],
+  )
 
   if (workspacePanels.memberCollapsed) return null
 
@@ -148,6 +158,11 @@ export default function ConversationMemberSidebar({
         </div>
         <div className={styles.memberActions}>
           <button className={styles.memberInviteBtn} type="button" onClick={onShowPresence}>状态</button>
+          {hasProject && (
+            <button className={styles.memberInviteBtn} type="button" onClick={() => onSelectionModeChange(!selectionMode)}>
+              {selectionMode ? '在线' : '选择'}
+            </button>
+          )}
           {hasProject && <button className={styles.memberInviteBtn} type="button" onClick={onShowDirectory}>目录</button>}
           {hasProject && <button className={styles.memberInviteBtn} type="button" onClick={onOpenMembersPage}>成员页</button>}
           {hasProject && canInviteMembers && <button className={styles.memberInviteBtn} type="button" onClick={onShowInvites}>邀请</button>}
@@ -224,7 +239,7 @@ export default function ConversationMemberSidebar({
         {hasProject && (
           <MemberContextSummary
             title={panelUsesChannelScope ? '当前频道' : '项目大厅'}
-            label={memberPanelSummary}
+            label={selectionMode ? memberPanelSummary : `在线 ${onlineCount} 人 · ${memberPanelSummary}`}
             members={panelMembers}
             channel={panelUsesChannelScope ? activeChannel : undefined}
             projectTotal={spaceMembers.length}
@@ -233,7 +248,15 @@ export default function ConversationMemberSidebar({
         )}
         {hasProject && spaceLoading && panelMembers.length === 0 && <MemberLoadingRows />}
         {hasProject && !spaceLoading && spaceError && <p className={styles.sideHint}>{spaceError}</p>}
-        {hasProject && panelMembers.length > 0 && (
+        {hasProject && !selectionMode && panelMembers.length > 0 && (
+          <MemberOnlineRoster
+            members={panelMembers}
+            onSelect={onSelectMember}
+            onOpenConversations={onOpenMemberConversations}
+            activeConversationMemberId={isAssistingMember ? activeConversationTargetId : null}
+          />
+        )}
+        {hasProject && selectionMode && panelMembers.length > 0 && (
           <MemberSearch
             members={panelMembers}
             onSelect={onSelectMember}
@@ -268,5 +291,96 @@ export default function ConversationMemberSidebar({
         )}
       </div>
     </aside>
+  )
+}
+
+function MemberOnlineRoster({
+  members,
+  onSelect,
+  onOpenConversations,
+  activeConversationMemberId,
+}: {
+  members: ProjectMember[]
+  onSelect: (member: ProjectMember, anchor: PopoverAnchor) => void
+  onOpenConversations: (member: ProjectMember) => void
+  activeConversationMemberId?: string | null
+}) {
+  const online = members.filter((member) => memberPresenceStatus(member) !== 'offline')
+  const offline = members.filter((member) => memberPresenceStatus(member) === 'offline')
+  return (
+    <>
+      <div className={styles.memberSection}>在线 · {online.length}</div>
+      {online.length === 0 && <p className={styles.sideHint}>当前没有在线成员</p>}
+      {online.map((member) => (
+        <MemberRosterRow
+          key={`online-${member.user_id}`}
+          member={member}
+          active={activeConversationMemberId === member.user_id}
+          onSelect={onSelect}
+          onOpenConversations={onOpenConversations}
+        />
+      ))}
+      {offline.length > 0 && (
+        <>
+          <div className={styles.memberSection}>离线 · {offline.length}</div>
+          {offline.map((member) => (
+            <MemberRosterRow
+              key={`offline-${member.user_id}`}
+              member={member}
+              active={activeConversationMemberId === member.user_id}
+              onSelect={onSelect}
+              onOpenConversations={onOpenConversations}
+            />
+          ))}
+        </>
+      )}
+    </>
+  )
+}
+
+function MemberRosterRow({
+  member,
+  active,
+  onSelect,
+  onOpenConversations,
+}: {
+  member: ProjectMember
+  active: boolean
+  onSelect: (member: ProjectMember, anchor: PopoverAnchor) => void
+  onOpenConversations: (member: ProjectMember) => void
+}) {
+  const status = memberPresenceStatus(member)
+  const name = member.member_display_name || member.account || member.global_account || member.user_id
+  const subtitle = member.activity || member.custom_status || presenceLabel(status)
+  function openProfile(event: MouseEvent<HTMLElement>) {
+    onSelect(member, popoverAnchorFromRect(event.currentTarget.getBoundingClientRect()))
+  }
+  return (
+    <div className={[styles.memberItem, active ? styles.memberItemActive : ''].join(' ')}>
+      <button
+        className={styles.memberAvatarButton}
+        type="button"
+        onClick={() => onOpenConversations(member)}
+        title={`打开 ${name} 的会话`}
+        aria-label={`打开 ${name} 的会话`}
+      >
+        <span className={[styles.memberAvatar, memberPresenceAvatarClass(status)].join(' ')}>
+          {member.avatar_data_url
+            ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+            : name[0]?.toUpperCase() ?? '?'}
+        </span>
+      </button>
+      <button className={styles.memberInfoButton} type="button" onClick={openProfile}>
+        <span className={styles.memberCopy}>
+          <span className={styles.memberLine}>
+            <strong className={styles.memberItemName}>{name}</strong>
+            <em className={[styles.memberPresencePill, status === 'online' ? styles.memberPresencePillOnline : ''].join(' ')}>
+              {presenceLabel(status)}
+            </em>
+          </span>
+          <span className={styles.memberSub}>{subtitle}</span>
+        </span>
+      </button>
+    </div>
   )
 }

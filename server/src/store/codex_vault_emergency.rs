@@ -13,6 +13,7 @@ pub struct CodexVaultEmergencyUserSummary {
     pub id: String,
     pub account: String,
     pub nickname: Option<String>,
+    pub avatar_data_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -21,9 +22,11 @@ pub struct CodexVaultEmergencyGrantRecord {
     pub provider_user_id: String,
     pub provider_account: String,
     pub provider_nickname: Option<String>,
+    pub provider_avatar_data_url: Option<String>,
     pub consumer_user_id: String,
     pub consumer_account: String,
     pub consumer_nickname: Option<String>,
+    pub consumer_avatar_data_url: Option<String>,
     pub status: String,
     pub label: Option<String>,
     pub purpose: Option<String>,
@@ -44,9 +47,11 @@ pub struct CodexVaultEmergencyLeaseRecord {
     pub provider_user_id: String,
     pub provider_account: String,
     pub provider_nickname: Option<String>,
+    pub provider_avatar_data_url: Option<String>,
     pub consumer_user_id: String,
     pub consumer_account: String,
     pub consumer_nickname: Option<String>,
+    pub consumer_avatar_data_url: Option<String>,
     pub consumer_node_id: String,
     pub provider_slot_id: String,
     pub account_hint_hash: Option<String>,
@@ -93,7 +98,7 @@ impl Store {
         }
         self.conn()?
             .query_row(
-                "SELECT id, COALESCE(email, phone, id), nickname
+                "SELECT id, COALESCE(email, phone, id), nickname, avatar_data_url
                    FROM users
                   WHERE status = 'active'
                     AND (id = ?1 OR email = ?1 OR phone = ?1 OR lower(trim(nickname)) = lower(trim(?1)))
@@ -501,8 +506,8 @@ impl Store {
 fn grant_select_sql(where_clause: &str) -> String {
     format!(
         "SELECT
-           g.id, g.provider_user_id, COALESCE(p.email, p.phone, p.id), p.nickname,
-           g.consumer_user_id, COALESCE(c.email, c.phone, c.id), c.nickname,
+           g.id, g.provider_user_id, COALESCE(p.email, p.phone, p.id), p.nickname, p.avatar_data_url,
+           g.consumer_user_id, COALESCE(c.email, c.phone, c.id), c.nickname, c.avatar_data_url,
            g.status, g.label, g.purpose, g.max_lease_seconds, g.expires_at,
            g.created_by_user_id, g.created_at, g.updated_at, g.revoked_at,
            EXISTS(
@@ -528,8 +533,8 @@ fn lease_select_sql(where_clause: &str) -> String {
     format!(
         "SELECT
            l.id, l.grant_id,
-           l.provider_user_id, COALESCE(p.email, p.phone, p.id), p.nickname,
-           l.consumer_user_id, COALESCE(c.email, c.phone, c.id), c.nickname,
+           l.provider_user_id, COALESCE(p.email, p.phone, p.id), p.nickname, p.avatar_data_url,
+           l.consumer_user_id, COALESCE(c.email, c.phone, c.id), c.nickname, c.avatar_data_url,
            l.consumer_node_id, l.provider_slot_id, l.account_hint_hash,
            l.purpose, l.failure_reason, l.billing_source, l.status,
            l.leased_at, l.expires_at, l.cleared_at,
@@ -549,6 +554,7 @@ fn read_user_summary(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexVaultEmer
         id: row.get(0)?,
         account: row.get(1)?,
         nickname: row.get(2)?,
+        avatar_data_url: row.get(3)?,
     })
 }
 
@@ -558,20 +564,22 @@ fn read_grant_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexVaultEmer
         provider_user_id: row.get(1)?,
         provider_account: row.get(2)?,
         provider_nickname: row.get(3)?,
-        consumer_user_id: row.get(4)?,
-        consumer_account: row.get(5)?,
-        consumer_nickname: row.get(6)?,
-        status: row.get(7)?,
-        label: row.get(8)?,
-        purpose: row.get(9)?,
-        max_lease_seconds: row.get(10)?,
-        expires_at: row.get(11)?,
-        created_by_user_id: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
-        revoked_at: row.get(15)?,
-        reciprocal_active: row.get::<_, i64>(16)? != 0,
-        provider_vault_available: row.get::<_, i64>(17)? != 0,
+        provider_avatar_data_url: row.get(4)?,
+        consumer_user_id: row.get(5)?,
+        consumer_account: row.get(6)?,
+        consumer_nickname: row.get(7)?,
+        consumer_avatar_data_url: row.get(8)?,
+        status: row.get(9)?,
+        label: row.get(10)?,
+        purpose: row.get(11)?,
+        max_lease_seconds: row.get(12)?,
+        expires_at: row.get(13)?,
+        created_by_user_id: row.get(14)?,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
+        revoked_at: row.get(17)?,
+        reciprocal_active: row.get::<_, i64>(18)? != 0,
+        provider_vault_available: row.get::<_, i64>(19)? != 0,
     })
 }
 
@@ -582,33 +590,34 @@ fn read_lease_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexVaultEmer
         provider_user_id: row.get(2)?,
         provider_account: row.get(3)?,
         provider_nickname: row.get(4)?,
-        consumer_user_id: row.get(5)?,
-        consumer_account: row.get(6)?,
-        consumer_nickname: row.get(7)?,
-        consumer_node_id: row.get(8)?,
-        provider_slot_id: row.get(9)?,
-        account_hint_hash: row.get(10)?,
-        purpose: row.get(11)?,
-        failure_reason: row.get(12)?,
-        billing_source: row.get(13)?,
-        status: row.get(14)?,
-        leased_at: row.get(15)?,
-        expires_at: row.get(16)?,
-        cleared_at: row.get(17)?,
-        token_usage_event_id: row.get(18)?,
-        billing_event_id: row.get(19)?,
-        node_transaction_id: row.get(20)?,
-        input_tokens: row.get(21)?,
-        output_tokens: row.get(22)?,
-        total_tokens: row.get(23)?,
-        billed_cost_rmb_fen: row.get(24)?,
-        provider_earned_fen: row.get(25)?,
-        accounting_status: row.get(26)?,
-        created_at: row.get(27)?,
-        updated_at: row.get(28)?,
+        provider_avatar_data_url: row.get(5)?,
+        consumer_user_id: row.get(6)?,
+        consumer_account: row.get(7)?,
+        consumer_nickname: row.get(8)?,
+        consumer_avatar_data_url: row.get(9)?,
+        consumer_node_id: row.get(10)?,
+        provider_slot_id: row.get(11)?,
+        account_hint_hash: row.get(12)?,
+        purpose: row.get(13)?,
+        failure_reason: row.get(14)?,
+        billing_source: row.get(15)?,
+        status: row.get(16)?,
+        leased_at: row.get(17)?,
+        expires_at: row.get(18)?,
+        cleared_at: row.get(19)?,
+        token_usage_event_id: row.get(20)?,
+        billing_event_id: row.get(21)?,
+        node_transaction_id: row.get(22)?,
+        input_tokens: row.get(23)?,
+        output_tokens: row.get(24)?,
+        total_tokens: row.get(25)?,
+        billed_cost_rmb_fen: row.get(26)?,
+        provider_earned_fen: row.get(27)?,
+        accounting_status: row.get(28)?,
+        created_at: row.get(29)?,
+        updated_at: row.get(30)?,
     })
 }
-
 
 #[cfg(test)]
 #[path = "codex_vault_emergency_tests.rs"]

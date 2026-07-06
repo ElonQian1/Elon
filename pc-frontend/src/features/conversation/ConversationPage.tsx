@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Cpu, History, RefreshCw, Smartphone } from 'lucide-react'
+import { Cpu, History, RefreshCw, Smartphone, UsersRound } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
@@ -165,6 +165,7 @@ export default function ConversationPage() {
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [detailMember, setDetailMember] = useState<ProjectMember | null>(null)
   const [memberPanelScope, setMemberPanelScope] = useState<MemberPanelScope>('project')
+  const [memberSelectionMode, setMemberSelectionMode] = useState(false)
   const [moderationFocusMemberId, setModerationFocusMemberId] = useState('')
   const [memberPopoverAnchor, setMemberPopoverAnchor] = useState<PopoverAnchor>(DEFAULT_POPOVER_ANCHOR)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
@@ -1232,13 +1233,13 @@ export default function ConversationPage() {
             <button
               className={[styles.textBtn, styles.panelControlBtn].join(' ')}
               type="button"
-              title={workspacePanels.memberCollapsed ? '展开右侧项目大厅' : '收起右侧项目大厅'}
-              aria-label={workspacePanels.memberCollapsed ? '展开右侧项目大厅' : '收起右侧项目大厅'}
-              aria-pressed={!workspacePanels.memberCollapsed}
-              onClick={workspacePanels.toggleMemberPanel}
+              title="在右侧成员栏选择成员"
+              aria-label="在右侧成员栏选择成员"
+              aria-pressed={memberSelectionMode}
+              onClick={() => setMemberSelectionMode(true)}
             >
-              {workspacePanels.memberCollapsed ? <ChevronLeft size={15} aria-hidden="true" /> : <ChevronRight size={15} aria-hidden="true" />}
-              <span>{workspacePanels.memberCollapsed ? '项目栏' : '收起右栏'}</span>
+              <UsersRound size={15} aria-hidden="true" />
+              <span>选择成员</span>
             </button>
             {activeChannelId && (
               <button className={styles.textBtn} type="button" title="刷新消息" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
@@ -1412,6 +1413,8 @@ export default function ConversationPage() {
         panelUsesChannelScope={panelUsesChannelScope}
         panelUsesChannelPermissions={panelUsesChannelPermissions}
         memberPanelSummary={memberPanelSummary}
+        selectionMode={memberSelectionMode}
+        onSelectionModeChange={setMemberSelectionMode}
         panelMembers={panelMembers}
         spaceMembers={spaceMembers}
         spaceLoading={spaceLoading}

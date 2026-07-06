@@ -15,7 +15,6 @@ interface StoredWorkspacePanelState extends Partial<WorkspacePanelState> {
 }
 
 const STORAGE_KEY = 'elon.pc.workspacePanels.v2'
-const COMPACT_RIGHT_PANEL_BREAKPOINT = 1440
 const COLLAPSED_CHANNEL_WIDTH = 44
 
 const CHANNEL_MIN = 220
@@ -37,7 +36,7 @@ export function useWorkspacePanels() {
     '--conversation-channel-width': `${state.channelWidth}px`,
     '--conversation-member-width': `${state.memberWidth}px`,
     '--conversation-channel-column': state.channelCollapsed ? `${COLLAPSED_CHANNEL_WIDTH}px` : `${state.channelWidth}px`,
-    '--conversation-member-column': state.memberCollapsed ? '0px' : `minmax(${MEMBER_MIN}px, ${state.memberWidth}px)`,
+    '--conversation-member-column': `minmax(${MEMBER_MIN}px, ${state.memberWidth}px)`,
   }) as CSSProperties, [state])
 
   const toggleChannelPanel = useCallback(() => {
@@ -50,7 +49,7 @@ export function useWorkspacePanels() {
   const toggleMemberPanel = useCallback(() => {
     setState((current) => ({
       ...current,
-      memberCollapsed: !current.memberCollapsed,
+      memberCollapsed: false,
     }))
   }, [])
 
@@ -111,7 +110,7 @@ export function useWorkspacePanels() {
     channelWidth: state.channelWidth,
     memberWidth: state.memberWidth,
     channelCollapsed: state.channelCollapsed,
-    memberCollapsed: state.memberCollapsed,
+    memberCollapsed: false,
     resizingSide,
     layoutStyle,
     toggleChannelPanel,
@@ -126,17 +125,11 @@ export type WorkspacePanels = ReturnType<typeof useWorkspacePanels>
 
 function initialWorkspacePanelState(): WorkspacePanelState {
   const stored = readWorkspacePanelState()
-  const compactRightPanel = typeof window !== 'undefined'
-    ? window.innerWidth <= COMPACT_RIGHT_PANEL_BREAKPOINT
-    : false
-
   return {
     channelWidth: clamp(Number(stored?.channelWidth ?? CHANNEL_DEFAULT), CHANNEL_MIN, CHANNEL_MAX),
     memberWidth: clamp(Number(stored?.memberWidth ?? MEMBER_DEFAULT), MEMBER_MIN, MEMBER_MAX),
     channelCollapsed: stored?.channelCollapsed === true,
-    memberCollapsed: typeof stored?.memberCollapsed === 'boolean'
-      ? stored.memberCollapsed
-      : compactRightPanel,
+    memberCollapsed: false,
   }
 }
 

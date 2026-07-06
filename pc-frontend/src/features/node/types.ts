@@ -300,9 +300,11 @@ export interface CodexVaultEmergencyGrant {
   provider_user_id?: string
   provider_account?: string
   provider_nickname?: string | null
+  provider_avatar_data_url?: string | null
   consumer_user_id?: string
   consumer_account?: string
   consumer_nickname?: string | null
+  consumer_avatar_data_url?: string | null
   status?: string
   label?: string | null
   purpose?: string | null
@@ -321,9 +323,11 @@ export interface CodexVaultEmergencyLease {
   provider_user_id?: string
   provider_account?: string
   provider_nickname?: string | null
+  provider_avatar_data_url?: string | null
   consumer_user_id?: string
   consumer_account?: string
   consumer_nickname?: string | null
+  consumer_avatar_data_url?: string | null
   consumer_node_id?: string
   provider_slot_id?: string
   account_hint_hash?: string | null

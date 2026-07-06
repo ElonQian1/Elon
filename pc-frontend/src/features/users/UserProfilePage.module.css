@@ -1,0 +1,100 @@
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: start center;
+  padding: 38px 20px;
+  background:
+    radial-gradient(circle at top left, rgba(53, 83, 107, .38), transparent 34%),
+    linear-gradient(145deg, #181a1f 0%, #25272d 52%, #15161a 100%);
+  overflow-y: auto;
+}
+
+.card {
+  width: min(720px, 100%);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 22px;
+  background: rgba(29, 31, 37, .94);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .36);
+}
+
+.banner {
+  height: 132px;
+  background:
+    linear-gradient(135deg, rgba(54, 79, 92, .95), rgba(34, 38, 47, .9)),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.08) 0 1px, transparent 1px 14px);
+}
+
+.body {
+  position: relative;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 0 24px 24px;
+}
+
+.avatar {
+  width: 112px;
+  height: 112px;
+  margin-top: -42px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 6px solid rgba(29, 31, 37, .98);
+  border-radius: 32px;
+  background: linear-gradient(135deg, #313842, #171a20);
+  color: #fff;
+  font-size: 38px;
+  font-weight: 900;
+}
+
+.avatar img,
+.avatar span {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
+
+.avatar img { object-fit: cover; }
+.avatar span { display: grid; place-items: center; }
+.avatar img:not([style*="display: none"]) + span { display: none; }
+
+.identity { min-width: 0; }
+.kicker { color: #8fb3c9; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.identity h1 { margin: 4px 0 6px; color: var(--text-primary); font-size: 28px; }
+.identity p { margin: 0 0 8px; color: var(--text-secondary); }
+.identity code { color: var(--text-muted); font-size: 12px; white-space: normal; overflow-wrap: anywhere; }
+
+.actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 999px;
+  color: var(--text-primary);
+  text-decoration: none;
+  background: rgba(255, 255, 255, .06);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.note {
+  margin: 0 24px 24px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 14px;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, .04);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+@media (max-width: 720px) {
+  .body {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+  .actions { justify-self: start; }
+}

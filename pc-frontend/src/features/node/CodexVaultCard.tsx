@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { DownloadCloud, Handshake, KeyRound, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import type { CodexVaultEmergencyGrant, CodexVaultLocalStatus, CodexVaultStatusResponse } from './types'
 import type { CodexVaultEmergencyActions } from './codexVaultEmergencyActions'
@@ -27,6 +28,10 @@ function authStateText(auth?: CodexVaultLocalStatus['default_auth']): string {
 
 function robotLabel(nickname?: string | null, account?: string | null, userId?: string | null): string {
   return nickname || account || userId || '机器人账号'
+}
+
+function robotInitial(label?: string | null): string {
+  return (label || '龙').trim().slice(0, 1).toUpperCase() || '龙'
 }
 
 function formatFen(value?: number | null): string {
@@ -214,9 +219,14 @@ export default function CodexVaultCard({
             <span className={styles.emergencyListTitle}>别人共享给我</span>
             {incomingGrants.map((grant) => (
               <div className={styles.emergencyRow} key={grant.id ?? `${grant.provider_user_id}-in`}>
+                <GrantAvatarLink
+                  userId={grant.provider_user_id}
+                  label={robotLabel(grant.provider_nickname, grant.provider_account, grant.provider_user_id)}
+                  avatarDataUrl={grant.provider_avatar_data_url}
+                />
                 <div>
-                  <strong>{robotLabel(grant.provider_nickname, grant.provider_account, grant.provider_user_id)}</strong>
-                  <span>{grantStatusText(grant)} · 到期 {formatVaultTime(grant.expires_at)}</span>
+                  <strong>{grantStatusText(grant)}</strong>
+                  <span>到期 {formatVaultTime(grant.expires_at)} · {robotLabel(grant.provider_nickname, grant.provider_account, grant.provider_user_id)}</span>
                 </div>
                 <button
                   className={[styles.btn, styles.iconBtn].join(' ')}
@@ -237,9 +247,14 @@ export default function CodexVaultCard({
             <span className={styles.emergencyListTitle}>我共享出去</span>
             {outgoingGrants.map((grant) => (
               <div className={styles.emergencyRow} key={grant.id ?? `${grant.consumer_user_id}-out`}>
+                <GrantAvatarLink
+                  userId={grant.consumer_user_id}
+                  label={robotLabel(grant.consumer_nickname, grant.consumer_account, grant.consumer_user_id)}
+                  avatarDataUrl={grant.consumer_avatar_data_url}
+                />
                 <div>
-                  <strong>{robotLabel(grant.consumer_nickname, grant.consumer_account, grant.consumer_user_id)}</strong>
-                  <span>{grantStatusText(grant)} · 到期 {formatVaultTime(grant.expires_at)}</span>
+                  <strong>{grantStatusText(grant)}</strong>
+                  <span>到期 {formatVaultTime(grant.expires_at)} · {robotLabel(grant.consumer_nickname, grant.consumer_account, grant.consumer_user_id)}</span>
                 </div>
                 <button
                   className={[styles.btn, styles.iconBtn].join(' ')}
@@ -259,15 +274,19 @@ export default function CodexVaultCard({
           <div className={styles.emergencyList}>
             <span className={styles.emergencyListTitle}>最近业务往来</span>
             {leases.slice(0, 4).map((lease) => {
-              const counterparty = lease.consumer_user_id === currentUserId
+              const usingIncoming = lease.consumer_user_id === currentUserId
+              const counterparty = usingIncoming
                 ? robotLabel(lease.provider_nickname, lease.provider_account, lease.provider_user_id)
                 : robotLabel(lease.consumer_nickname, lease.consumer_account, lease.consumer_user_id)
-              const direction = lease.consumer_user_id === currentUserId ? '我使用' : '对方使用'
+              const counterpartyId = usingIncoming ? lease.provider_user_id : lease.consumer_user_id
+              const counterpartyAvatar = usingIncoming ? lease.provider_avatar_data_url : lease.consumer_avatar_data_url
+              const direction = usingIncoming ? '我使用' : '对方使用'
               return (
                 <div className={styles.emergencyRow} key={lease.id ?? lease.leased_at}>
+                  <GrantAvatarLink userId={counterpartyId} label={counterparty} avatarDataUrl={counterpartyAvatar} />
                   <div>
-                    <strong>{direction} · {counterparty}</strong>
-                    <span>{lease.total_tokens ?? 0} tokens · 扣费 {formatFen(lease.billed_cost_rmb_fen)} · {formatVaultTime(lease.leased_at)}</span>
+                    <strong>{direction}</strong>
+                    <span>{counterparty} · {lease.total_tokens ?? 0} tokens · 扣费 {formatFen(lease.billed_cost_rmb_fen)} · {formatVaultTime(lease.leased_at)}</span>
                   </div>
                   <small>{lease.accounting_status ?? lease.status ?? 'active'}</small>
                 </div>
@@ -335,5 +354,31 @@ export default function CodexVaultCard({
         onConfirm={grantSelectedUsers}
       />
     </section>
+  )
+}
+
+
+function GrantAvatarLink({
+  userId,
+  label,
+  avatarDataUrl,
+}: {
+  userId?: string | null
+  label: string
+  avatarDataUrl?: string | null
+}) {
+  const content = avatarDataUrl ? (
+    <img src={avatarDataUrl} alt="" />
+  ) : (
+    <span className={styles.grantAvatarFallback}>{robotInitial(label)}</span>
+  )
+  const className = styles.grantAvatarLink
+  if (!userId) {
+    return <span className={className} title={label}>{content}</span>
+  }
+  return (
+    <Link className={className} to={'/users/' + encodeURIComponent(userId)} title={label} aria-label={'查看 ' + label + ' 的主页'}>
+      {content}
+    </Link>
   )
 }

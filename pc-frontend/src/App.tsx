@@ -8,6 +8,7 @@ import AiChatPage from './features/ai/AiChatPage'
 import FriendsPage from './features/friends/FriendsPage'
 import PlazaPage from './features/plaza/PlazaPage'
 import AccountPage from './features/account/AccountPage'
+import UserProfilePage from './features/users/UserProfilePage'
 import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
 import NodePage from './features/node/NodePage'
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="friends" element={<FriendsPage />} />
         <Route path="plaza" element={<PlazaPage />} />
         <Route path="account" element={<AccountPage />} />
+        <Route path="users/:userId" element={<UserProfilePage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="projects/:id/members" element={<ProjectDetailPage />} />
