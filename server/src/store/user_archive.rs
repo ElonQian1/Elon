@@ -3,7 +3,7 @@ use rusqlite::params;
 
 use super::{
     default_project_runtime_permission, is_system_project_source_type, project_branding,
-    store_types::{ProjectSummary, UserArchiveProject},
+    store_types_project::{ProjectSummary, UserArchiveProject},
     system_project_key_for_source_type, Store,
 };
 

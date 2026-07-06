@@ -5,7 +5,7 @@ use chrono::{Duration, Utc};
 use rusqlite::{params, OptionalExtension};
 
 use super::{
-    common::now, is_system_project_source_type, store_types::ProjectMemberModerationEntry, Store,
+    common::now, is_system_project_source_type, store_types_project::ProjectMemberModerationEntry, Store,
 };
 
 const DEFAULT_MUTE_MINUTES: i64 = 60;

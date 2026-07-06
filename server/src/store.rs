@@ -62,6 +62,7 @@ mod social_ai_messages;
 mod social_ai_pending;
 mod social_ai_selected;
 mod store_types;
+mod store_types_project;
 mod system_projects;
 mod task_recovery;
 mod tasks;
@@ -114,8 +115,9 @@ pub(crate) use social_ai_messages::{
     SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
 };
 pub(crate) use social_ai_pending::SocialAiPendingMention;
-pub use store_types::JoinRequestRecord;
+pub use store_types_project::JoinRequestRecord;
 pub use store_types::*;
+pub use store_types_project::*;
 pub(crate) use system_projects::{
     is_system_project_name, is_system_project_source_type, system_project_key_for_source_type,
     CHAT_MEMORY_PROJECT_NAME, PHONE_CONTROL_PROJECT_NAME,

@@ -7,7 +7,7 @@ use rusqlite::{params, OptionalExtension};
 
 use super::{
     common::{new_id, now},
-    store_types::JoinRequestRecord,
+    store_types_project::JoinRequestRecord,
     Store,
 };
 

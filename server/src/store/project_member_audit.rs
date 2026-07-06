@@ -5,7 +5,7 @@ use rusqlite::params;
 
 use super::{
     common::{new_id, now},
-    store_types::ProjectMemberAuditEntry,
+    store_types_project::ProjectMemberAuditEntry,
     Store,
 };
 
