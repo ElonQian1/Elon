@@ -101,35 +101,6 @@ export default function ConversationComposer({
           </div>
         )}
 
-        <div className={styles.metaDock}>
-          <button
-            ref={modelButtonRef}
-            className={styles.modelBtn}
-            type="button"
-            title={modelButtonCopy.title}
-            onClick={onToggleModelPicker}
-          >
-            <span>{modelButtonCopy.source}</span>
-            <strong>{modelButtonCopy.detail}</strong>
-          </button>
-
-          <ComposerRuntimeToggles
-            activeProjectId={activeProjectId}
-            directPcCliActive={directPcCliActive}
-            shouldPreferLocalNode={shouldPreferLocalNode}
-            localNodeReady={localNodeReady}
-            directPcCliAvailable={directPcCliAvailable}
-            composerDisabled={composerDisabled}
-            onDirectPcCliChange={onDirectPcCliChange}
-            isOwnConversationTarget={isOwnConversationTarget}
-            sessionView={sessionView}
-            memberConversations={memberConversations}
-            selectedAgent={selectedAgent}
-            modelOptions={modelOptions}
-            composerRuntimeRoute={composerRuntimeRoute}
-          />
-        </div>
-
         <div className={styles.inputDock}>
           <AttachmentButton
             disabled={composerDisabled}
@@ -149,6 +120,34 @@ export default function ConversationComposer({
             disabled={composerDisabled}
             rows={1}
           />
+          <div className={styles.inlineControls}>
+            <button
+              ref={modelButtonRef}
+              className={styles.modelBtn}
+              type="button"
+              title={modelButtonCopy.title}
+              onClick={onToggleModelPicker}
+            >
+              <span>{modelButtonCopy.source}</span>
+              <strong>{modelButtonCopy.detail}</strong>
+            </button>
+
+            <ComposerRuntimeToggles
+              activeProjectId={activeProjectId}
+              directPcCliActive={directPcCliActive}
+              shouldPreferLocalNode={shouldPreferLocalNode}
+              localNodeReady={localNodeReady}
+              directPcCliAvailable={directPcCliAvailable}
+              composerDisabled={composerDisabled}
+              onDirectPcCliChange={onDirectPcCliChange}
+              isOwnConversationTarget={isOwnConversationTarget}
+              sessionView={sessionView}
+              memberConversations={memberConversations}
+              selectedAgent={selectedAgent}
+              modelOptions={modelOptions}
+              composerRuntimeRoute={composerRuntimeRoute}
+            />
+          </div>
           <button
             className={styles.sendBtn}
             type="submit"
