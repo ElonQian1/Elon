@@ -7,6 +7,7 @@
   overflow: hidden;
   background: var(--bg-base);
   position: relative;
+  isolation: isolate;
 }
 
 .layout[data-user-panel-collapsed="true"] {
@@ -24,8 +25,13 @@
   background: var(--sidebar);
   border-right: 1px solid var(--line-soft);
   display: grid;
-  grid-template-rows: 58px auto minmax(0, 1fr) 78px;
+  grid-template-rows: 58px auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
 }
 
 .sideHeader {
@@ -135,7 +141,10 @@
 }
 
 .convList {
+  min-height: 0;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 8px 8px 14px;
   scrollbar-width: thin;
 }
@@ -238,8 +247,11 @@
 .chat {
   display: grid;
   grid-template-rows: 58px minmax(0, 1fr) auto;
+  min-width: 0;
   min-height: 0;
   background: #242529;
+  position: relative;
+  z-index: 0;
 }
 
 .topbar {

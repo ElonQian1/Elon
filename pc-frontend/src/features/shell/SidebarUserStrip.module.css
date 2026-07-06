@@ -5,6 +5,7 @@
   min-width: 0;
   min-height: 66px;
   max-width: 100%;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-areas:
