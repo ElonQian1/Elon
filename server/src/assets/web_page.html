@@ -2434,6 +2434,127 @@
       word-break: break-all; line-height: 1.5;
     }
 
+    /* ===== PWA 安装提示 ===== */
+    .pwa-install-card {
+      position: fixed;
+      left: 50%;
+      bottom: calc(var(--bottom-menu-height) + 18px + env(safe-area-inset-bottom));
+      z-index: 90;
+      display: grid;
+      grid-template-columns: 42px 1fr auto;
+      gap: 12px;
+      align-items: center;
+      width: min(calc(100vw - 32px), 420px);
+      padding: 13px 14px;
+      color: var(--ink);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      transform: translate(-50%, calc(100% + 36px));
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 220ms ease, opacity 220ms ease;
+    }
+    .pwa-install-card.active {
+      transform: translate(-50%, 0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .pwa-install-card.hidden { display: none; }
+    .pwa-install-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--brand);
+      flex: none;
+    }
+    .pwa-install-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .pwa-install-copy {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+    .pwa-install-title {
+      color: var(--ink-strong);
+      font-size: 14px;
+      line-height: 1.25;
+    }
+    .pwa-install-desc {
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .pwa-install-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pwa-install-primary,
+    .pwa-install-later {
+      height: 36px;
+      border-radius: 18px;
+      border: 0;
+      padding: 0 12px;
+      font-size: 13px;
+      line-height: 36px;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .pwa-install-primary {
+      background: var(--brand);
+      color: var(--brand-ink);
+    }
+    .pwa-install-later {
+      background: var(--panel-3);
+      color: var(--ink);
+      border: 1px solid var(--line);
+    }
+    .pwa-install-close {
+      width: 32px;
+      height: 32px;
+      border: 0;
+      border-radius: 16px;
+      background: transparent;
+      color: var(--ink-muted);
+      font-size: 22px;
+      line-height: 30px;
+      padding: 0;
+      cursor: pointer;
+    }
+    .pwa-install-close:hover { background: var(--panel-3); color: var(--ink); }
+    .pwa-install-card.expanded {
+      grid-template-columns: 42px 1fr;
+    }
+    .pwa-install-card.expanded .pwa-install-actions {
+      grid-column: 1 / -1;
+      justify-content: flex-end;
+    }
+    @media (max-width: 420px) {
+      .pwa-install-card {
+        grid-template-columns: 38px 1fr;
+        align-items: start;
+      }
+      .pwa-install-icon {
+        width: 38px;
+        height: 38px;
+      }
+      .pwa-install-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+      }
+      .pwa-install-primary,
+      .pwa-install-later {
+        height: 38px;
+        line-height: 38px;
+      }
+    }
+
     /* ===== 输入栏 ===== */
     .input-bar {
       grid-area: input;
@@ -3556,6 +3677,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </button>
   </nav>
 </main>
+
+<div class="pwa-install-card hidden" id="pwaInstallPrompt" role="dialog" aria-live="polite" aria-label="添加一龙到手机桌面">
+  <div class="pwa-install-icon" aria-hidden="true">
+    <img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" />
+  </div>
+  <div class="pwa-install-copy">
+    <div class="pwa-install-title" id="pwaInstallTitle">把一龙添加到手机桌面</div>
+    <div class="pwa-install-desc" id="pwaInstallDesc">添加后像手机 App 一样打开，不用每次输入网址。</div>
+  </div>
+  <div class="pwa-install-actions">
+    <button class="pwa-install-later" id="pwaInstallLaterBtn" type="button">稍后</button>
+    <button class="pwa-install-primary" id="pwaInstallActionBtn" type="button">生成快捷方式</button>
+    <button class="pwa-install-close" id="pwaInstallCloseBtn" type="button" aria-label="关闭安装提示">×</button>
+  </div>
+</div>
 
 <!-- ============ 新建项目对话框 ============ -->
 <div class="modal-mask" id="newProjectMask">
@@ -9197,6 +9333,161 @@ if (window.visualViewport) {
     }
   });
 }
+
+// ===== PWA 安装提示：iOS 只能自定义引导，Android 支持原生安装事件 =====
+(function () {
+  'use strict';
+
+  const promptEl = document.getElementById('pwaInstallPrompt');
+  if (!promptEl) return;
+
+  const titleEl = document.getElementById('pwaInstallTitle');
+  const descEl = document.getElementById('pwaInstallDesc');
+  const actionBtn = document.getElementById('pwaInstallActionBtn');
+  const laterBtn = document.getElementById('pwaInstallLaterBtn');
+  const closeBtn = document.getElementById('pwaInstallCloseBtn');
+  const params = new URLSearchParams(window.location.search || '');
+  const forcePrompt = params.get('pwaPrompt') === '1';
+  const snoozeKey = 'elon_pwa_install_prompt_snoozed_until_v1';
+  const installedKey = 'elon_pwa_install_prompt_installed_v1';
+  const snoozeMs = 3 * 24 * 60 * 60 * 1000;
+  let deferredInstallPrompt = null;
+  let iosStepsVisible = false;
+  let fallbackStepsVisible = false;
+
+  function storageGet(key) {
+    try { return localStorage.getItem(key); } catch (_) { return null; }
+  }
+
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, value); } catch (_) {}
+  }
+
+  function isStandaloneMode() {
+    return window.matchMedia('(display-mode: standalone)').matches
+      || window.navigator.standalone === true;
+  }
+
+  function isIosDevice() {
+    const ua = navigator.userAgent || '';
+    return /iPhone|iPad|iPod/i.test(ua)
+      || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function isMobileLike() {
+    if (forcePrompt) return true;
+    const ua = navigator.userAgent || '';
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(ua)
+      || window.matchMedia('(max-width: 720px)').matches;
+  }
+
+  function isSnoozed() {
+    const until = Number(storageGet(snoozeKey) || 0);
+    return until > Date.now();
+  }
+
+  function shouldSuppressPrompt() {
+    return !forcePrompt && (
+      isStandaloneMode()
+      || storageGet(installedKey) === '1'
+      || isSnoozed()
+      || !isMobileLike()
+    );
+  }
+
+  function configureCopy() {
+    promptEl.classList.remove('expanded');
+    iosStepsVisible = false;
+    fallbackStepsVisible = false;
+    titleEl.textContent = '把一龙添加到手机桌面';
+    if (isIosDevice()) {
+      descEl.textContent = 'iPhone 不会自动弹出安装框，点这里查看 Safari 添加到主屏幕的方法。';
+      actionBtn.textContent = '查看步骤';
+      return;
+    }
+    if (deferredInstallPrompt) {
+      descEl.textContent = '添加后像手机 App 一样打开，不用每次输入网址。';
+      actionBtn.textContent = '生成快捷方式';
+      return;
+    }
+    descEl.textContent = '打开浏览器菜单，选择“添加到主屏幕”即可生成一龙快捷方式。';
+    actionBtn.textContent = '查看步骤';
+  }
+
+  function showPrompt() {
+    if (shouldSuppressPrompt()) return;
+    configureCopy();
+    promptEl.classList.remove('hidden');
+    window.requestAnimationFrame(() => promptEl.classList.add('active'));
+  }
+
+  function hidePrompt(snooze) {
+    promptEl.classList.remove('active');
+    if (snooze) storageSet(snoozeKey, String(Date.now() + snoozeMs));
+    window.setTimeout(() => promptEl.classList.add('hidden'), 220);
+  }
+
+  function showIosSteps() {
+    promptEl.classList.add('expanded');
+    titleEl.textContent = '在 Safari 里添加到主屏幕';
+    descEl.textContent = '点底部分享按钮，选择“添加到主屏幕”，确认名称后一龙图标就会出现在桌面。';
+    actionBtn.textContent = '我知道了';
+    iosStepsVisible = true;
+  }
+
+  function showFallbackSteps() {
+    promptEl.classList.add('expanded');
+    titleEl.textContent = '添加一龙快捷方式';
+    descEl.textContent = '在浏览器菜单中选择“安装应用”或“添加到主屏幕”，确认后即可从手机桌面打开。';
+    actionBtn.textContent = '我知道了';
+    fallbackStepsVisible = true;
+  }
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    showPrompt();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    storageSet(installedKey, '1');
+    hidePrompt(false);
+  });
+
+  actionBtn.addEventListener('click', async () => {
+    if (isIosDevice()) {
+      if (iosStepsVisible) hidePrompt(true);
+      else showIosSteps();
+      return;
+    }
+
+    if (!deferredInstallPrompt) {
+      if (fallbackStepsVisible) hidePrompt(true);
+      else showFallbackSteps();
+      return;
+    }
+
+    const installEvent = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    installEvent.prompt();
+    const choice = await installEvent.userChoice.catch(() => null);
+    if (choice && choice.outcome === 'accepted') {
+      storageSet(installedKey, '1');
+      hidePrompt(false);
+    } else {
+      hidePrompt(true);
+    }
+  });
+
+  laterBtn.addEventListener('click', () => hidePrompt(true));
+  closeBtn.addEventListener('click', () => hidePrompt(true));
+
+  window.addEventListener('load', () => {
+    window.setTimeout(() => {
+      if (deferredInstallPrompt || isIosDevice() || forcePrompt) showPrompt();
+    }, 900);
+  });
+})();
 
 // ===== Service Worker 注册（离线缓存 / PWA 壳） =====
 if ('serviceWorker' in navigator) {
