@@ -1,14 +1,17 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 8500;
+  z-index: 2147483000;
   display: flex;
   justify-content: flex-end;
-  background: rgba(0, 0, 0, .45);
-  backdrop-filter: blur(2px);
+  isolation: isolate;
+  background: rgba(4, 5, 7, .72);
+  backdrop-filter: blur(4px);
 }
 
 .drawer {
+  position: relative;
+  z-index: 1;
   width: min(460px, 100vw);
   height: 100%;
   display: grid;

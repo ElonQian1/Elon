@@ -1034,8 +1034,17 @@
   min-width: 0;
   display: grid;
   gap: 12px;
+}
+
+.vaultDashboardPrimary {
+  position: relative;
+  z-index: 2;
+}
+
+.vaultDashboardSide {
   position: sticky;
   top: 16px;
+  z-index: 1;
 }
 
 .vaultAdminPanel .vaultCard {
