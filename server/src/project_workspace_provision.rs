@@ -46,7 +46,7 @@ pub async fn resolve_pc_project_node(
                 format!("PC 节点不在线或未连接 CLI 通道: {node_id}"),
             ));
         }
-        if runtime.owner_user_id.trim() != user_id {
+        if !runtime_owned_by_user(&runtime, user_id) {
             return Err((
                 StatusCode::FORBIDDEN,
                 format!("PC 节点不属于当前账号: {node_id}"),
@@ -75,7 +75,7 @@ pub async fn resolve_pc_project_node(
         return Ok(node_id.to_string());
     }
 
-    let cli_nodes = connected_project_workspace_nodes(state).await;
+    let cli_nodes = connected_project_workspace_nodes(state, user_id).await;
     let mut candidates = Vec::new();
     let mut blocked_messages = Vec::new();
     for node in cli_nodes {
@@ -99,7 +99,7 @@ pub async fn resolve_pc_project_node(
         )),
         _ => Err((
             StatusCode::CONFLICT,
-            "检测到多个在线 PC 开发运行时节点，请在请求中指定 node_id".into(),
+            "检测到多个属于你的在线 PC 开发运行时节点，请在请求中指定 node_id".into(),
         )),
     }
 }
@@ -201,7 +201,7 @@ async fn wait_for_requested_node_workspace_profile(
                 format!("PC 节点不在线或未连接 CLI 通道: {node_id}"),
             ));
         }
-        if runtime.owner_user_id.trim() != user_id {
+        if !runtime_owned_by_user(&runtime, user_id) {
             return Err((
                 StatusCode::FORBIDDEN,
                 format!("PC 节点不属于当前账号: {node_id}"),
@@ -229,11 +229,16 @@ fn requested_pc_node_runtime_ready_wait() -> Duration {
     )
 }
 
-async fn connected_project_workspace_nodes(state: &AppState) -> Vec<NodeRuntime> {
+async fn connected_project_workspace_nodes(state: &AppState, user_id: &str) -> Vec<NodeRuntime> {
     let mut nodes = Vec::new();
     for agent in state.agent_manager.list().await {
         match node_runtime_by_id(state, &agent.agent_id).await {
-            Ok(Some(runtime)) if runtime.workspace_provision_ready() => nodes.push(runtime),
+            Ok(Some(runtime))
+                if runtime_owned_by_user(&runtime, user_id)
+                    && runtime.workspace_provision_ready() =>
+            {
+                nodes.push(runtime)
+            }
             Ok(None) => {}
             Ok(Some(_)) => {}
             Err(e) => tracing::warn!(
@@ -244,6 +249,11 @@ async fn connected_project_workspace_nodes(state: &AppState) -> Vec<NodeRuntime>
         }
     }
     nodes
+}
+
+fn runtime_owned_by_user(runtime: &NodeRuntime, user_id: &str) -> bool {
+    let user_id = user_id.trim();
+    !user_id.is_empty() && runtime.owner_user_id.trim() == user_id
 }
 
 #[cfg(test)]
@@ -269,6 +279,16 @@ mod tests {
         assert!(!should_wait_for_workspace_capability_profile(
             &scanned_not_ready
         ));
+    }
+
+    #[test]
+    fn runtime_owner_match_requires_current_user() {
+        let runtime = test_runtime(None, vec!["codex".to_string()]);
+
+        assert!(runtime_owned_by_user(&runtime, "user-a"));
+        assert!(runtime_owned_by_user(&runtime, " user-a "));
+        assert!(!runtime_owned_by_user(&runtime, "user-b"));
+        assert!(!runtime_owned_by_user(&runtime, ""));
     }
 
     fn test_runtime(

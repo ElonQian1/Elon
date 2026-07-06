@@ -63,6 +63,7 @@ internal fun cleanStoreProjectDisplayText(value: String?): String? {
 
 internal data class ProjectCreateNodeOption(
     val nodeId: String,
+    val ownerUserId: String = "",
     val displayName: String,
     val shortId: String,
     val online: Boolean,
@@ -248,7 +249,7 @@ internal fun fetchProjectCreateNodes(
 ): List<ProjectCreateNodeOption> {
     val req = AuthManager.applyAuth(
         ctx,
-        Request.Builder().url("$serverUrl/api/nodes").get()
+        Request.Builder().url("$serverUrl/api/me/nodes").get()
     ).build()
     val resp = http.newCall(req).execute()
     val body = resp.body?.string().orEmpty()
@@ -258,6 +259,11 @@ internal fun fetchProjectCreateNodes(
         val obj = arr.optJSONObject(index) ?: return@mapNotNull null
         val nodeId = obj.optString("node_id", obj.optString("agent_id", "")).trim()
         if (nodeId.isBlank()) return@mapNotNull null
+        val ownerUserId = obj.optString("owner_user_id").trim()
+        val currentUserId = AuthManager.effectiveUserId(ctx)
+        if (ownerUserId.isNotBlank() && ownerUserId != currentUserId) {
+            return@mapNotNull null
+        }
         val shortId = obj.optString("short_id").ifBlank {
             if (nodeId.length > 16) "...${nodeId.takeLast(14)}" else nodeId
         }
@@ -310,6 +316,7 @@ internal fun fetchProjectCreateNodes(
         }
         ProjectCreateNodeOption(
             nodeId = nodeId,
+            ownerUserId = ownerUserId,
             displayName = displayName,
             shortId = shortId,
             online = obj.optBoolean("online", false),

@@ -43,7 +43,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
     setNodesLoading(true)
     setNodesError('')
     try {
-      const data = await api.get<{ nodes?: ProjectNode[] }>('/api/nodes')
+      const data = await api.get<{ nodes?: ProjectNode[] }>('/api/me/nodes')
       const online = (data.nodes ?? []).filter((n) => n?.online && nodeId(n))
       const ordered = [...online].sort(
         (a, b) => Number(!nodeCanAccept(a)) - Number(!nodeCanAccept(b)),

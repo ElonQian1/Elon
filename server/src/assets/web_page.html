@@ -7715,7 +7715,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectNodeSelect.innerHTML = '<option value="">正在加载可用开发环境...</option>';
     projectStorageNodeSelect.disabled = true;
     projectStorageNodeSelect.innerHTML = '<option value="">正在加载代码存储...</option>';
-    const res = await api('/api/nodes');
+    const res = await api('/api/me/nodes');
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '加载开发环境失败');
     const nodes = (data.nodes || []).filter((node) => node.online && (node.node_id || node.agent_id));
