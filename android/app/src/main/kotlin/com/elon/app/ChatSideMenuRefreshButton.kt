@@ -85,7 +85,7 @@ internal class ChatSideMenuRefreshButton(
     private companion object {
         const val BUTTON_SIZE_DP = 38
         const val RING_SIZE_DP = 28
-        const val DOT_SIZE_DP = 7
+        const val DOT_SIZE_DP = 9
         const val DOT_ORBIT_DURATION_MS = 900L
         const val DOT_PATH_RADIUS_RATIO = 0.27731958f
         const val DOT_START_ANGLE_RAD = 0.38050637f
