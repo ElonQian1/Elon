@@ -4,10 +4,11 @@ import {
   consumeReloadNotice,
   dispatchBeforeAppUpdateReload,
   readStoredVersion,
+  refreshingToastBody,
   saveReloadNotice,
   type ServerVersionInfo,
+  updatedToastBody,
   versionIdentity,
-  versionLabel,
   writeStoredVersion,
 } from './appUpdateSession'
 import styles from './AppUpdateWatcher.module.css'
@@ -34,7 +35,7 @@ export default function AppUpdateWatcher() {
     setToast({
       kind: 'updated',
       title: '已刷新到新版功能',
-      body: `刚刚已更新到 ${versionLabel(notice.to)}，页面和输入草稿已恢复。`,
+      body: updatedToastBody(notice.to),
     })
   }, [])
 
@@ -99,7 +100,7 @@ export default function AppUpdateWatcher() {
     setToast({
       kind: 'refreshing',
       title: '发现新版，正在刷新',
-      body: '正在保存当前页面和输入草稿，刷新后会自动回到这里。',
+      body: refreshingToastBody(to),
     })
     saveReloadNotice(notice)
     dispatchBeforeAppUpdateReload(notice)

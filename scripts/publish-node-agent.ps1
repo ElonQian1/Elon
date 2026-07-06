@@ -13,11 +13,13 @@
 
 .EXAMPLE
     .\scripts\publish-node-agent.ps1
+    .\scripts\publish-node-agent.ps1 -Changelog "修复 Win 端自动更新后的恢复提示"
 #>
 
 param(
     [switch]$SkipBroadcast,
     [string]$AdminToken = "",
+    [string]$Changelog = "",
     [int]$HandshakeWaitSec = 90,
     [switch]$SkipHandshakeWait
 )
@@ -71,6 +73,23 @@ function Write-Utf8NoBom {
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
+function Resolve-NodeAgentChangelog {
+    param(
+        [string]$Explicit,
+        [string]$Sha
+    )
+
+    $text = $Explicit
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        $text = (git -C $RepoRoot log -1 --format=%s $Sha 2>$null | Select-Object -First 1)
+    }
+    $text = ([string]$text).Trim() -replace '\s+', ' '
+    if ($text.Length -gt 240) {
+        return $text.Substring(0, 237) + "..."
+    }
+    return $text
 }
 
 function Invoke-GitFetchMain {
@@ -467,8 +486,12 @@ if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
 if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
 $GitSha = Assert-NodeAgentPublishHeadCurrent -Phase "发布开始"
+$ReleaseChangelog = Resolve-NodeAgentChangelog -Explicit $Changelog -Sha $GitSha
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
+if (-not [string]::IsNullOrWhiteSpace($ReleaseChangelog)) {
+    Write-Host "  更新内容: $ReleaseChangelog" -ForegroundColor DarkGray
+}
 
 # ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
 Write-Host "[1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
@@ -557,6 +580,7 @@ try {
     $PackageVersionInfo = [ordered]@{
         version = $PackageVersion
         gitSha = $GitSha
+        changelog = $ReleaseChangelog
         updated_at = (Get-Date).ToString("o")
         downloadUrl = $WindowsDownloadUrl
         linuxDownloadUrl = $LinuxDownloadUrl
@@ -604,6 +628,7 @@ if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
 $VersionInfo = [ordered]@{
     version = $PackageVersion
     gitSha = $GitSha
+    changelog = $ReleaseChangelog
     updated_at = (Get-Date).ToString("o")
     downloadUrl = $WindowsDownloadUrl
     linuxDownloadUrl = $LinuxDownloadUrl

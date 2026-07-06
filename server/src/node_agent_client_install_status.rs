@@ -375,6 +375,8 @@ fn version_manifest_summary(path: &Path) -> Value {
         "path": path_to_string(path),
         "version": value.get("version").and_then(Value::as_str),
         "gitSha": value.get("gitSha").and_then(Value::as_str),
+        "changelog": value.get("changelog").and_then(Value::as_str),
+        "releaseNotes": value.get("releaseNotes").and_then(Value::as_str),
         "updated_at": value.get("updated_at").and_then(Value::as_str),
         "downloadUrl": value.get("downloadUrl").and_then(Value::as_str),
         "linuxDownloadUrl": value.get("linuxDownloadUrl").and_then(Value::as_str),
@@ -410,7 +412,6 @@ fn file_meta(path: &Path) -> Value {
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_client_install_status_tests.rs"]

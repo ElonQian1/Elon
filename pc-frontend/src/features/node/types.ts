@@ -68,6 +68,9 @@ export interface NodeSummary {
 export interface NodeAgentVersion {
   version?: string
   gitSha?: string
+  changelog?: string
+  releaseNotes?: string
+  changes?: string[]
   updated_at?: string
   downloadUrl?: string
   linuxDownloadUrl?: string

@@ -9,6 +9,9 @@ export interface ServerVersionInfo {
   status?: string
   versionName?: string
   gitSha?: string
+  changelog?: string
+  releaseNotes?: string
+  changes?: string[]
 }
 
 export interface AppUpdateReloadNotice {
@@ -29,6 +32,33 @@ export function versionLabel(version: ServerVersionInfo | null | undefined): str
   const sha = version.gitSha?.trim()
   if (name && sha) return `${name} · ${sha.slice(0, 8)}`
   return name || (sha ? sha.slice(0, 8) : '新版')
+}
+
+export function versionChangelog(version: ServerVersionInfo | null | undefined): string {
+  if (!version) return ''
+  const direct = cleanSummary(version.changelog) || cleanSummary(version.releaseNotes)
+  if (direct) return direct
+  if (Array.isArray(version.changes)) {
+    for (const item of version.changes) {
+      const cleaned = cleanSummary(item)
+      if (cleaned) return cleaned
+    }
+  }
+  return ''
+}
+
+export function updatedToastBody(version: ServerVersionInfo | null | undefined): string {
+  const label = versionLabel(version)
+  const changelog = versionChangelog(version)
+  if (changelog) return `刚刚已更新到 ${label}：${changelog} 页面和输入草稿已恢复。`
+  return `刚刚已更新到 ${label}，页面和输入草稿已恢复。`
+}
+
+export function refreshingToastBody(version: ServerVersionInfo | null | undefined): string {
+  const label = versionLabel(version)
+  const changelog = versionChangelog(version)
+  if (changelog) return `即将更新到 ${label}：${changelog} 正在保存当前页面和输入草稿。`
+  return `即将更新到 ${label}，正在保存当前页面和输入草稿。`
 }
 
 export function readStoredVersion(): ServerVersionInfo | null {
@@ -78,6 +108,12 @@ function parseVersion(raw: string | null | undefined): ServerVersionInfo | null 
   } catch {
     return null
   }
+}
+
+function cleanSummary(value: string | null | undefined): string {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  return text.length > 120 ? `${text.slice(0, 117)}...` : text
 }
 
 function safeLocalStorage(): Storage | null {

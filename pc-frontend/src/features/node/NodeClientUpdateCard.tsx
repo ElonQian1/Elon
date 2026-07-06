@@ -48,6 +48,7 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
   )
   const updateAction = maintenance?.maintenance_actions?.find((action) => action.kind === 'update' || action.id === 'check_update')
   const canUpdate = updateAction?.enabled !== false && maintenance?.supported !== false
+  const releaseNote = releaseNoteText(latest ?? maintenance?.version_manifest)
 
   useEffect(() => {
     if (!polling) return
@@ -122,6 +123,7 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
         </span>
       </div>
       <p>{updateState.detail}</p>
+      {releaseNote && <p className={styles.updateHint}>更新内容：{releaseNote}</p>}
       <div className={styles.updateGrid}>
         <div><span>本机</span><strong>{updateState.localLabel}</strong></div>
         <div><span>服务器</span><strong>{updateState.latestLabel}</strong></div>
@@ -147,4 +149,18 @@ export default function NodeClientUpdateCard({ adminUrl, status, onStatus }: Pro
 function shortSha(value: string) {
   const normalized = value.trim()
   return normalized.length > 16 ? `${normalized.slice(0, 12)}...` : normalized || '待发布'
+}
+
+function releaseNoteText(version: NodeAgentVersion | null | undefined) {
+  const candidates = [
+    version?.changelog,
+    version?.releaseNotes,
+    ...(Array.isArray(version?.changes) ? version?.changes ?? [] : []),
+  ]
+  for (const candidate of candidates) {
+    const text = String(candidate ?? '').replace(/\s+/g, ' ').trim()
+    if (!text) continue
+    return text.length > 140 ? `${text.slice(0, 137)}...` : text
+  }
+  return ''
 }

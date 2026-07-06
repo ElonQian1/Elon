@@ -4,7 +4,13 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
-use std::sync::Arc;
+use std::{
+    path::PathBuf,
+    process::Command,
+    sync::{Arc, OnceLock},
+};
+
+static SERVER_RELEASE_CHANGELOG: OnceLock<Option<String>> = OnceLock::new();
 
 /// 健康检查
 pub async fn health() -> &'static str {
@@ -55,6 +61,8 @@ pub struct ServerVersionResponse {
     pub status: &'static str,
     pub version_name: &'static str,
     pub git_sha: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub changelog: Option<String>,
 }
 
 pub async fn server_version() -> Json<ServerVersionResponse> {
@@ -66,7 +74,72 @@ pub async fn server_version() -> Json<ServerVersionResponse> {
         status: "ok",
         version_name: option_env!("ELON_BUILD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")),
         git_sha: option_env!("ELON_SERVER_GIT_SHA").unwrap_or("dev"),
+        changelog: server_release_changelog(),
     })
+}
+
+fn server_release_changelog() -> Option<String> {
+    SERVER_RELEASE_CHANGELOG
+        .get_or_init(|| {
+            option_env!("ELON_RELEASE_CHANGELOG")
+                .and_then(clean_release_summary)
+                .or_else(git_commit_summary)
+        })
+        .clone()
+}
+
+fn clean_release_summary(value: &str) -> Option<String> {
+    let text = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        return None;
+    }
+    if text.chars().count() > 240 {
+        let mut short = text.chars().take(237).collect::<String>();
+        short.push_str("...");
+        return Some(short);
+    }
+    Some(text)
+}
+
+fn git_commit_summary() -> Option<String> {
+    let sha = option_env!("ELON_SERVER_GIT_SHA")?.trim();
+    if sha.is_empty() || sha == "dev" {
+        return None;
+    }
+
+    for dir in git_lookup_dirs() {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&dir)
+            .args(["log", "-1", "--format=%s", sha])
+            .output()
+            .ok()?;
+        if !output.status.success() {
+            continue;
+        }
+        let summary = String::from_utf8_lossy(&output.stdout);
+        if let Some(cleaned) = clean_release_summary(&summary) {
+            return Some(cleaned);
+        }
+    }
+    None
+}
+
+fn git_lookup_dirs() -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    if let Ok(current) = std::env::current_dir() {
+        dirs.push(current.clone());
+        if let Some(parent) = current.parent() {
+            dirs.push(parent.to_path_buf());
+        }
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            dirs.push(parent.to_path_buf());
+        }
+    }
+    dirs.push(PathBuf::from("/root/Elon"));
+    dirs
 }
 
 #[derive(serde::Deserialize)]
