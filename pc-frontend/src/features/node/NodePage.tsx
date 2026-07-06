@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { Settings, ShieldCheck } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from './launchWinClient'
@@ -24,6 +24,8 @@ import type { AutostartStatus, CodexVaultStatusResponse, LocalCliToolStatus, Loc
 import styles from './NodePage.module.css'
 
 const MARKET_VIEW = '__node_market__'
+const VAULT_VIEW = '__codex_vault__'
+type LocalNodePanelView = 'overview' | 'codex-vault'
 
 export default function NodePage() {
   const [nodes, setNodes] = useState<NodeSummary[]>([])
@@ -49,6 +51,18 @@ export default function NodePage() {
           <span className={styles.sideMeta}>
             <strong>分享算力</strong>
             <small>下载、启动和注册</small>
+          </span>
+        </button>
+        <button
+          className={[styles.sideBtn, selectedNodeId === VAULT_VIEW ? styles.sideActive : ''].join(' ')}
+          onClick={() => setSelectedNodeId(VAULT_VIEW)}
+        >
+          <span className={styles.sideIcon} aria-hidden="true">
+            <ShieldCheck size={16} strokeWidth={2.2} />
+          </span>
+          <span className={styles.sideMeta}>
+            <strong>Codex 保险箱</strong>
+            <small>账号共享和用量</small>
           </span>
         </button>
         <div className={styles.sideSection}>市场</div>
@@ -84,8 +98,10 @@ export default function NodePage() {
         {routeConfigKey && <RuntimeRouteConfigGuide route={routeConfigKey} />}
         {selectedNodeId === MARKET_VIEW
           ? <NodeMarketPanel myNodes={nodes} onOpenMyNode={setSelectedNodeId} />
+          : selectedNodeId === VAULT_VIEW
+          ? <LocalNodePanel adminUrl={adminUrl} view="codex-vault" />
           : !selectedNodeId
-          ? <LocalNodePanel adminUrl={adminUrl} />
+          ? <LocalNodePanel adminUrl={adminUrl} view="overview" />
           : selected
             ? <NodeDetailPanel node={selected} onBack={() => setSelectedNodeId('')} adminUrl={adminUrl} />
             : <p className={styles.notFound}>节点不存在</p>
@@ -95,11 +111,12 @@ export default function NodePage() {
   )
 }
 
-function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
+function LocalNodePanel({ adminUrl, view = 'overview' }: { adminUrl: string; view?: LocalNodePanelView }) {
   const [probeStatus, setProbeStatus] = useState<'checking' | 'online' | 'offline'>('checking')
   const [localStatus, setLocalStatus] = useState<LocalNodeStatus | null>(null)
   const [version, setVersion] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isVaultView = view === 'codex-vault'
 
   const doProbe = useCallback(async (quiet = false) => {
     if (!quiet) setProbeStatus('checking')
@@ -141,9 +158,13 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
     <div className={styles.localPage}>
       <div className={styles.hero}>
         <div>
-          <div className={styles.kicker}>一龙 Win 端</div>
-          <h2>分享这台电脑算力</h2>
-          <p>首次使用需要下载并安装；安装后点击"启动 Win 端"，浏览器会拉起本机程序。</p>
+          <div className={styles.kicker}>{isVaultView ? 'Codex Pro 保险箱' : '一龙 Win 端'}</div>
+          <h2>{isVaultView ? '账号共享和用量统计' : '分享这台电脑算力'}</h2>
+          <p>
+            {isVaultView
+              ? '集中查看本机 Codex Pro 登录备份、共享授权、租约和 token 用量估算。'
+              : '首次使用需要下载并安装；安装后点击"启动 Win 端"，浏览器会拉起本机程序。'}
+          </p>
         </div>
         <span className={[styles.chip, styles[probeStatus]].join(' ')}>
           {{ checking: '检测中', online: '已连接', offline: '未连接' }[probeStatus]}
@@ -161,13 +182,13 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
       {version && <p className={styles.versionLine}>{version}</p>}
 
       {probeStatus === 'online' && localStatus
-        ? <NodeAdminPanel adminUrl={adminUrl} initialStatus={localStatus} />
+        ? <NodeAdminPanel adminUrl={adminUrl} initialStatus={localStatus} view={view} />
         : probeStatus === 'offline' && <LocalNodeOfflineCard onLaunch={launchWinClient} onRetry={() => doProbe()} />}
     </div>
   )
 }
 
-function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initialStatus: LocalNodeStatus }) {
+function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; initialStatus: LocalNodeStatus; view: LocalNodePanelView }) {
   const token = useAuthStore((s) => s.token)
   const user = useAuthStore((s) => s.user)
   const progression = useUserProgression(user?.id, token)
@@ -192,6 +213,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   const localModelCount = status.local_ai?.models?.length ?? status.models?.length ?? 0
   const codex = codexStatusFrom(status)
   const codexVault = vaultStatus?.local ?? status.codex_vault ?? null
+  const isVaultView = view === 'codex-vault'
 
   const refreshStatus = useCallback(async (quiet = false) => {
     if (!quiet) { setResult('刷新中…'); setError('') }
@@ -438,88 +460,106 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     <div className={styles.adminPanel}>
       <div className={styles.adminRow}>
         <div>
-          <div className={styles.kicker}>本机节点</div>
-          <h3>{status.device_name ?? '这台电脑'}</h3>
+          <div className={styles.kicker}>{isVaultView ? 'Codex Pro 保险箱' : '本机节点'}</div>
+          <h3>{isVaultView ? '授权共享和用量对账' : status.device_name ?? '这台电脑'}</h3>
         </div>
         <span className={[styles.chip, status.connected ? styles.online : styles.checking].join(' ')}>
           {status.connected ? '云端在线' : '等待云端'}
         </span>
       </div>
-      <div className={styles.kvGrid}>
-        {[
-          ['登录', status.logged_in ? '已登录' : '未登录'],
-          ['节点 ID', status.agent_id ?? '登录后自动生成'],
-          ['版本', status.version ?? '未知'],
-          ['开机守护', autostartSummaryLabel(autostart)],
-          ['可执行CLI', uniqueCliNames.length ? uniqueCliNames.join('、') : '未检测到 Codex/Copilot'],
-          ['本机模型', localModelCount ? `${localModelCount} 个` : '未检测到'],
-        ].map(([k, v]) => (
-          <div key={k}><span>{k}</span><strong>{v}</strong></div>
-        ))}
-      </div>
-      <NodeLifecycleStatusCard localStatus={status} />
-      <LocalNodeHealthPanel status={status} onRefresh={() => refreshStatus()} />
-      <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
-      <CodexStatusCard
-        status={codex}
-        refreshing={!!status.cli_probe?.refreshing}
-        busy={codexBusy}
-        apiKey={apiKey}
-        apiModel={apiModel}
-        onApiKeyChange={setApiKey}
-        onApiModelChange={setApiModel}
-        onRefresh={refreshCodex}
-        onInstall={installEnv}
-        onSaveKey={saveCodexKey}
-      />
-      <CodexToolboxCard toolbox={status.codex_toolbox} busy={codexBusy} onRepair={installEnv} />
-      <CodexVaultCard
-        status={codexVault}
-        cloud={vaultStatus?.cloud}
-        busy={vaultBusy}
-        onBackup={backupCodexVault}
-        onRestore={restoreCodexVault}
-        onClear={clearCodexVault}
-        onDeleteCloud={deleteCloudCodexVault}
-        onRefresh={() => loadCodexVaultStatus(false)}
-        emergencyActions={emergencyVaultActions} currentUserId={user?.id}
-      />
-      <CodexVaultUsageEstimateCard
-        sharing={vaultStatus?.cloud?.sharing ?? vaultStatus?.cloud?.emergency}
-        currentUserId={user?.id}
-      />
-      <ShareSettlementCard progression={progression} />
-      <div className={styles.actions}>
-        <button className={[styles.btn, styles.primary].join(' ')} onClick={login}>
-          {status.logged_in ? '重新绑定当前账号' : '用当前账号注册节点'}
-        </button>
-        <button className={styles.btn} disabled={!status.logged_in} onClick={logout}>登出本机节点</button>
-        <button
-          className={[styles.btn, styles.iconBtn].join(' ')}
-          disabled={autostartBusy || autostart?.supported === false}
-          onClick={toggleAutostart}
-          title="配置开机自启动"
-        >
-          <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
-          {autostart?.enabled ? '关闭开机守护' : '开启开机守护'}
-        </button>
-        <button className={styles.btn} onClick={repairClientEntry} disabled={repairBusy}>
-          {repairBusy ? '修复中…' : '修复客户端入口'}
-        </button>
-        <button className={styles.btn} onClick={() => window.open(adminUrl, '_blank', 'noopener')}>
-          高级本机页
-        </button>
-        <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
-          刷新状态
-        </button>
-      </div>
-      {autostart?.summary && <p className={styles.hintLine}>{autostart.summary}</p>}
-      {autostart?.legacy_detected && (
-        <p className={styles.hintLine}>检测到旧版自启残留，下一次修复或更新会迁移为当前用户计划任务。</p>
+      {isVaultView ? (
+        <>
+          <CodexVaultCard
+            status={codexVault}
+            cloud={vaultStatus?.cloud}
+            busy={vaultBusy}
+            onBackup={backupCodexVault}
+            onRestore={restoreCodexVault}
+            onClear={clearCodexVault}
+            onDeleteCloud={deleteCloudCodexVault}
+            onRefresh={() => loadCodexVaultStatus(false)}
+            emergencyActions={emergencyVaultActions}
+            currentUserId={user?.id}
+          />
+          <CodexVaultUsageEstimateCard
+            sharing={vaultStatus?.cloud?.sharing ?? vaultStatus?.cloud?.emergency}
+            currentUserId={user?.id}
+          />
+          <ShareSettlementCard progression={progression} />
+          <div className={styles.actions}>
+            <button className={styles.btn} onClick={() => loadCodexVaultStatus(false)} disabled={vaultBusy}>
+              刷新保险箱
+            </button>
+            <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
+              刷新本机状态
+            </button>
+          </div>
+          {result && <p className={styles.resultOk}>{result}</p>}
+          {error && <p className={styles.resultErr}>{error}</p>}
+        </>
+      ) : (
+        <>
+          <div className={styles.kvGrid}>
+            {[
+              ['登录', status.logged_in ? '已登录' : '未登录'],
+              ['节点 ID', status.agent_id ?? '登录后自动生成'],
+              ['版本', status.version ?? '未知'],
+              ['开机守护', autostartSummaryLabel(autostart)],
+              ['可执行CLI', uniqueCliNames.length ? uniqueCliNames.join('、') : '未检测到 Codex/Copilot'],
+              ['本机模型', localModelCount ? `${localModelCount} 个` : '未检测到'],
+            ].map(([k, v]) => (
+              <div key={k}><span>{k}</span><strong>{v}</strong></div>
+            ))}
+          </div>
+          <NodeLifecycleStatusCard localStatus={status} />
+          <LocalNodeHealthPanel status={status} onRefresh={() => refreshStatus()} />
+          <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
+          <CodexStatusCard
+            status={codex}
+            refreshing={!!status.cli_probe?.refreshing}
+            busy={codexBusy}
+            apiKey={apiKey}
+            apiModel={apiModel}
+            onApiKeyChange={setApiKey}
+            onApiModelChange={setApiModel}
+            onRefresh={refreshCodex}
+            onInstall={installEnv}
+            onSaveKey={saveCodexKey}
+          />
+          <CodexToolboxCard toolbox={status.codex_toolbox} busy={codexBusy} onRepair={installEnv} />
+          <div className={styles.actions}>
+            <button className={[styles.btn, styles.primary].join(' ')} onClick={login}>
+              {status.logged_in ? '重新绑定当前账号' : '用当前账号注册节点'}
+            </button>
+            <button className={styles.btn} disabled={!status.logged_in} onClick={logout}>登出本机节点</button>
+            <button
+              className={[styles.btn, styles.iconBtn].join(' ')}
+              disabled={autostartBusy || autostart?.supported === false}
+              onClick={toggleAutostart}
+              title="配置开机自启动"
+            >
+              <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
+              {autostart?.enabled ? '关闭开机守护' : '开启开机守护'}
+            </button>
+            <button className={styles.btn} onClick={repairClientEntry} disabled={repairBusy}>
+              {repairBusy ? '修复中…' : '修复客户端入口'}
+            </button>
+            <button className={styles.btn} onClick={() => window.open(adminUrl, '_blank', 'noopener')}>
+              高级本机页
+            </button>
+            <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
+              刷新状态
+            </button>
+          </div>
+          {autostart?.summary && <p className={styles.hintLine}>{autostart.summary}</p>}
+          {autostart?.legacy_detected && (
+            <p className={styles.hintLine}>检测到旧版自启残留，下一次修复或更新会迁移为当前用户计划任务。</p>
+          )}
+          <p className={styles.hintLine}>开启一次后，Windows 登录时会拉起后台守护层并自动恢复本机节点；修复流程不会在未开启时新增自启。</p>
+          {result && <p className={styles.resultOk}>{result}</p>}
+          {error && <p className={styles.resultErr}>{error}</p>}
+        </>
       )}
-      <p className={styles.hintLine}>开启一次后，Windows 登录时会拉起后台守护层并自动恢复本机节点；修复流程不会在未开启时新增自启。</p>
-      {result && <p className={styles.resultOk}>{result}</p>}
-      {error && <p className={styles.resultErr}>{error}</p>}
     </div>
   )
 }
