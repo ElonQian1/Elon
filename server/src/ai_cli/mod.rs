@@ -24,6 +24,7 @@ mod pc_artifact_completion;
 mod pc_billing;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
+mod pc_passthrough_reply;
 mod pc_prompt_acceptance;
 
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
@@ -58,6 +59,13 @@ pub(crate) use self::pc_dispatch_capture::{
 };
 pub(crate) use self::pc_passthrough_events::{
     pc_cli_passthrough_event, pc_cli_passthrough_events_flush, pc_cli_passthrough_events_from_chunk,
+};
+#[cfg(test)]
+use self::pc_passthrough_reply::clean_codex_stream_chunk;
+use self::pc_passthrough_reply::{
+    extract_codex_reply, extract_marker_lightweight_reply, pc_lightweight_no_readable_diagnostic,
+    pc_passthrough_empty_reply_diagnostic, sanitize_lightweight_pc_reply,
+    strip_terminal_control_sequences,
 };
 use self::pc_prompt_acceptance::pc_lightweight_no_node_event_diagnostic;
 
@@ -1925,6 +1933,14 @@ async fn run_via_pc_agent(
                     } else {
                         sanitize_pc_development_reply(&reply, apk_url.as_deref())
                     };
+                    let reply = if raw_pc_passthrough
+                        && reply.trim().is_empty()
+                        && apk_url.is_none()
+                    {
+                        pc_passthrough_empty_reply_diagnostic(&full_text, cli_name, &display_model)
+                    } else {
+                        reply
+                    };
                     if lightweight_pc_chat && !reply.is_empty() && !stream_started {
                         let _ = tx.send(
                             WsMessage::AssistantMessage {
@@ -2118,64 +2134,6 @@ fn no_readable_lightweight_reply(output: &str, cli_name: &str) -> PcAgentRunOutc
     }
 }
 
-fn pc_lightweight_no_readable_diagnostic(output: &str, cli_name: &str) -> Option<String> {
-    let clean = strip_terminal_control_sequences(output);
-    let lower = clean.to_ascii_lowercase();
-    let cli_label = pc_cli_progress_label(cli_name);
-
-    if lower.contains("usage limit") || lower.contains("hit your usage limit") {
-        return Some(format!(
-            "{}达到使用额度或限流，未返回可读内容；请稍后重发或检查本机 Codex 登录额度。",
-            cli_label
-        ));
-    }
-
-    if lower.contains("request timed out")
-        || lower.contains("stream disconnected")
-        || lower.contains("reconnecting")
-    {
-        let reconnect_count = lower.matches("reconnecting").count();
-        let timeout_count = lower.matches("request timed out").count();
-        let mut detail = format!(
-            "{}网络请求超时，未返回可读内容；已观察到 {} 次重连、{} 次 request timed out，请稍后直接重发一次。",
-            cli_label, reconnect_count, timeout_count
-        );
-        if lower.contains("falling back to http") {
-            detail.push_str(" Codex 已尝试 fallback HTTP。");
-        }
-        return Some(detail);
-    }
-
-    if lower.contains("canceled") || clean.contains("用户已停止 PC CLI 任务") {
-        return Some(format!(
-            "{}任务被取消，未返回可读内容；请稍后直接重发一次。",
-            cli_label
-        ));
-    }
-
-    last_non_noise_cli_line(&clean).map(|line| {
-        format!(
-            "{}未返回可读内容；最后的本机 CLI 输出是：{}",
-            cli_label,
-            truncate_chars(line.trim(), 160)
-        )
-    })
-}
-
-fn last_non_noise_cli_line(output: &str) -> Option<String> {
-    output
-        .lines()
-        .rev()
-        .map(str::trim)
-        .find(|line| {
-            !line.is_empty()
-                && !is_lightweight_cli_noise_line(line)
-                && !is_codex_output_boundary(line)
-                && !line.starts_with("{\"type\":\"turn.started\"")
-        })
-        .map(ToOwned::to_owned)
-}
-
 fn lightweight_pc_reply_delta(
     output: &str,
     is_codex: bool,
@@ -2211,50 +2169,6 @@ fn lightweight_reply_text_delta(reply: &str, streamed_reply: &mut String) -> Opt
 fn extract_lightweight_pc_chat_timeout_reply(output: &str, is_codex: bool) -> Option<String> {
     let reply = extract_lightweight_pc_chat_reply(output, is_codex);
     (!reply.trim().is_empty()).then_some(reply)
-}
-
-fn extract_marker_lightweight_reply(output: &str) -> String {
-    let mut collecting = false;
-    let mut reply_lines = Vec::<String>::new();
-
-    for raw in output.lines() {
-        let line = raw.trim();
-        if is_lightweight_reply_marker(line) {
-            collecting = true;
-            reply_lines.clear();
-            continue;
-        }
-        if !collecting {
-            continue;
-        }
-        if is_codex_output_boundary(line) {
-            if reply_lines.is_empty() {
-                continue;
-            }
-            break;
-        }
-        if !is_lightweight_cli_noise_line(line) {
-            reply_lines.push(line.to_string());
-        }
-    }
-
-    reply_lines.join("\n").trim().to_string()
-}
-
-fn sanitize_lightweight_pc_reply(reply: &str) -> String {
-    let clean = strip_terminal_control_sequences(reply);
-    clean
-        .lines()
-        .map(str::trim)
-        .filter(|line| {
-            !line.is_empty()
-                && !is_lightweight_cli_noise_line(line)
-                && !is_codex_output_boundary(line)
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_string()
 }
 
 fn sanitize_pc_development_reply(reply: &str, apk_url: Option<&str>) -> String {
@@ -2353,174 +2267,6 @@ fn sanitize_user_reply_line(line: &str) -> String {
         .to_string()
 }
 
-#[cfg(test)]
-fn clean_codex_stream_chunk(text: &str) -> String {
-    let clean = strip_terminal_control_sequences(text);
-    let mut lines = Vec::<String>::new();
-
-    for raw in clean.lines() {
-        let trimmed = raw.trim();
-        if trimmed.is_empty()
-            || is_lightweight_cli_noise_line(trimmed)
-            || is_codex_output_boundary(trimmed)
-            || trimmed == "--------"
-        {
-            continue;
-        }
-        lines.push(raw.trim_end().to_string());
-    }
-
-    let mut out = lines.join("\n");
-    if !out.is_empty() && clean.ends_with('\n') {
-        out.push('\n');
-    }
-    out
-}
-
-fn strip_terminal_control_sequences(input: &str) -> String {
-    let chars = input.chars().collect::<Vec<_>>();
-    let mut out = String::with_capacity(input.len());
-    let mut i = 0;
-
-    while i < chars.len() {
-        let ch = chars[i];
-        if ch == '\u{1b}' {
-            i += 1;
-            if i < chars.len() && chars[i] == '[' {
-                i += 1;
-                while i < chars.len() {
-                    let next = chars[i];
-                    i += 1;
-                    if ('@'..='~').contains(&next) {
-                        break;
-                    }
-                }
-                continue;
-            }
-            if i < chars.len() && chars[i] == ']' {
-                i += 1;
-                while i < chars.len() {
-                    if chars[i] == '\u{7}' {
-                        i += 1;
-                        break;
-                    }
-                    if chars[i] == '\u{1b}' && i + 1 < chars.len() && chars[i + 1] == '\\' {
-                        i += 2;
-                        break;
-                    }
-                    i += 1;
-                }
-                continue;
-            }
-            continue;
-        }
-
-        if let Some(end) = orphan_csi_end(&chars, i) {
-            i = end;
-            continue;
-        }
-
-        if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
-            i += 1;
-            continue;
-        }
-
-        out.push(ch);
-        i += 1;
-    }
-
-    out
-}
-
-fn orphan_csi_end(chars: &[char], start: usize) -> Option<usize> {
-    if chars.get(start) != Some(&'[') {
-        return None;
-    }
-
-    let mut i = start + 1;
-    if chars.get(i) == Some(&'?') {
-        i += 1;
-    }
-
-    let mut saw_param = false;
-    while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == ';') {
-        saw_param = true;
-        i += 1;
-    }
-
-    if i < chars.len() && chars[i].is_ascii_alphabetic() && (saw_param || chars[i] == 'm') {
-        Some(i + 1)
-    } else {
-        None
-    }
-}
-
-fn is_lightweight_reply_marker(line: &str) -> bool {
-    matches!(
-        line.trim().to_ascii_lowercase().as_str(),
-        "codex" | "assistant"
-    )
-}
-
-fn is_codex_output_boundary(line: &str) -> bool {
-    let lower = line.trim().to_ascii_lowercase();
-    matches!(
-        lower.as_str(),
-        "user" | "exec" | "tokens used" | "tool" | "system" | "output:"
-    ) || lower.starts_with("openai codex")
-        || lower.starts_with("workdir:")
-        || lower.starts_with("model:")
-        || lower.starts_with("provider:")
-        || lower.starts_with("approval:")
-        || lower.starts_with("sandbox:")
-        || lower.starts_with("reasoning")
-        || lower.starts_with("session id:")
-        || lower.starts_with("wall time:")
-        || lower.starts_with("process exited")
-        || lower.starts_with("original token count:")
-        || lower.starts_with("succeeded in")
-        || lower.starts_with("failed in")
-        || lower.starts_with("error:")
-        || lower == "assistant"
-}
-
-fn is_lightweight_cli_noise_line(line: &str) -> bool {
-    let trimmed = line.trim();
-    if trimmed.is_empty() {
-        return true;
-    }
-    let lower = trimmed.to_ascii_lowercase();
-
-    is_lightweight_reply_marker(trimmed)
-        || lower.starts_with("]0;")
-        || lower.starts_with("[warn")
-        || lower.starts_with("warn ")
-        || lower.starts_with("warning:")
-        || lower.starts_with("2026-")
-        || lower.starts_with('{') && lower.contains("\"type\"")
-        || lower.contains("cmd.exe")
-        || lower.contains("windows\\system32")
-        || lower.contains("unc ")
-        || trimmed.contains("路径不受支持")
-        || trimmed.contains("默认值设为")
-        || lower.contains("sqlx::query")
-        || lower.contains("slow statement")
-        || lower.contains("delete from logs")
-        || lower.contains("rows_affected")
-        || lower.contains("rows_returned")
-        || lower.contains("db.statement")
-        || lower.contains("elapsed")
-        || lower.contains("event.timestamp=")
-        || lower.contains("mcp_server=")
-        || lower.contains("model_client.")
-        || lower.contains("memories startup: error returned from database")
-        || lower.contains("no such table: stage1_outputs")
-        || lower.contains("responses_websocket")
-        || lower.contains("feedback_tags")
-        || lower.contains("auth_header")
-        || lower.starts_with(r"\\?\")
-}
-
 fn pc_codex_progress_hint(text: &str, display_model: &str) -> Option<(&'static str, String)> {
     let clean = strip_terminal_control_sequences(text);
     let lower = clean.to_ascii_lowercase();
@@ -2581,7 +2327,10 @@ fn extract_retry_fraction(text: &str) -> Option<String> {
 }
 
 fn pc_dispatch_started_event(
-    pc_req_id: &str, agent_id: &str, node_display_name: &str, cli_name: &str,
+    pc_req_id: &str,
+    agent_id: &str,
+    node_display_name: &str,
+    cli_name: &str,
     cwd: Option<&str>,
     native_session_scope: Option<&NativeSessionScope>,
     request_mode: AiCliRequestMode,
@@ -2633,85 +2382,6 @@ fn pc_cli_price_per_1k_credits() -> f64 {
         .unwrap_or(0.1)
 }
 
-/// 从 Codex exec 的完整输出中提取最后一段 AI 回复文本。
-/// Codex exec 的输出格式：
-///   [启动信息头 ... ---]
-///   user
-///   <用户消息回放>
-///   [可能的错误日志]
-///   codex
-///   <AI 回复>
-///   [可能穿插 exec/tool/user 等边界后继续输出]
-///   codex
-///   <AI 最终回复>      ← 只取最后一段有用回复
-///   tokens used
-///   <AI 回复重复>       ← 丢弃
-///   <数字>
-///   <AI 回复重复>       ← 丢弃
-fn extract_codex_reply(output: &str) -> String {
-    let clean = strip_terminal_control_sequences(output);
-    let mut in_codex_reply = false;
-    let mut reply_lines: Vec<String> = Vec::new();
-    let mut replies: Vec<String> = Vec::new();
-
-    for line in clean.lines() {
-        let trimmed = line.trim();
-        if is_lightweight_reply_marker(trimmed) {
-            if !reply_lines.is_empty() {
-                replies.push(reply_lines.join("\n").trim().to_string());
-                reply_lines.clear();
-            }
-            in_codex_reply = true;
-            continue;
-        }
-        if in_codex_reply {
-            // tokens used 或纯数字行表示回复结束（后面是重复内容）
-            if trimmed == "tokens used"
-                || (!trimmed.is_empty() && trimmed.chars().all(|c| c.is_ascii_digit() || c == ','))
-            {
-                if !reply_lines.is_empty() {
-                    replies.push(reply_lines.join("\n").trim().to_string());
-                    reply_lines.clear();
-                }
-                in_codex_reply = false;
-                continue;
-            }
-            if is_codex_output_boundary(trimmed) {
-                if !reply_lines.is_empty() {
-                    replies.push(reply_lines.join("\n").trim().to_string());
-                    reply_lines.clear();
-                }
-                in_codex_reply = false;
-                continue;
-            }
-            if is_lightweight_cli_noise_line(trimmed) {
-                continue;
-            }
-            reply_lines.push(trimmed.to_string());
-        }
-    }
-
-    if !reply_lines.is_empty() {
-        replies.push(reply_lines.join("\n").trim().to_string());
-    }
-
-    replies
-        .into_iter()
-        .rev()
-        .find(|reply| is_useful_codex_reply(reply))
-        .unwrap_or_default()
-}
-
-fn is_useful_codex_reply(reply: &str) -> bool {
-    let trimmed = reply.trim();
-    if trimmed.is_empty() {
-        return false;
-    }
-    let lower = trimmed.to_ascii_lowercase();
-    !lower.contains("codex cli 执行完成，但没有返回可解析输出")
-        && !lower.contains("codex cli 执行完成，但输出里没有可解析的 codex 回复段")
-}
-
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
@@ -2719,9 +2389,10 @@ mod pc_cli_passthrough_tests {
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
         pc_codex_progress_hint, pc_dispatch_started_event, pc_display_model_label,
         pc_lightweight_chat_reasoning_effort, pc_lightweight_no_node_event_diagnostic,
-        pc_lightweight_no_readable_diagnostic, pc_project_reasoning_effort, pc_route_a_extra_args,
-        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        pc_lightweight_no_readable_diagnostic, pc_passthrough_empty_reply_diagnostic,
+        pc_project_reasoning_effort, pc_route_a_extra_args, sanitize_pc_development_reply,
+        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
+        NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2751,8 +2422,13 @@ mcp_native_chat_ok\n";
     #[test]
     fn pc_dispatch_started_event_exposes_local_req_id_without_prompt() {
         let event = pc_dispatch_started_event(
-            "req-1", "agent-1", "一龙4060（agent-1）", "codex",
-            Some("D:/workspace"), None, AiCliRequestMode::Execute,
+            "req-1",
+            "agent-1",
+            "一龙4060（agent-1）",
+            "codex",
+            Some("D:/workspace"),
+            None,
+            AiCliRequestMode::Execute,
         );
         let value: Value = serde_json::from_str(&event).unwrap();
         assert_eq!(value["type"], "pc_dispatch_started");
@@ -2958,6 +2634,27 @@ codex\n\
 Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查看 PC 节点日志确认是否已完成文件修改。\n";
 
         assert_eq!(extract_codex_reply(output), "完成。真实最终回复。");
+    }
+
+    #[test]
+    fn pc_codex_reply_reads_json_agent_message() {
+        let output = concat!(
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"用户可见：第一段过程"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"最终回复。已完成授权选择器。"}}"#
+        );
+
+        assert_eq!(extract_codex_reply(output), "最终回复。已完成授权选择器。");
+    }
+
+    #[test]
+    fn pc_passthrough_empty_reply_diagnostic_does_not_claim_success() {
+        let diagnostic = pc_passthrough_empty_reply_diagnostic("", "codex", "GPT-5.5 · 推理 xhigh");
+
+        assert!(diagnostic.contains("没有返回可展示的正文"));
+        assert!(diagnostic.contains("无法确认完成"));
+        assert!(!diagnostic.contains("已完成"));
+        assert!(!diagnostic.contains("任务已完成"));
     }
 
     #[test]

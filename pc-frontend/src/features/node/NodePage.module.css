@@ -869,6 +869,31 @@
   font-size: 12px;
 }
 
+.shareTargetPreview {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  padding: 7px 9px;
+}
+
+.shareTargetPreview strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.shareTargetPreview span {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .emergencyList {
   display: grid;
   gap: 7px;

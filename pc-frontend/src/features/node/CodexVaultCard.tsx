@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { DownloadCloud, Handshake, KeyRound, ShieldCheck, Trash2, UploadCloud, XCircle } from 'lucide-react'
 import type { CodexVaultEmergencyGrant, CodexVaultLocalStatus, CodexVaultStatusResponse } from './types'
 import type { CodexVaultEmergencyActions } from './codexVaultEmergencyActions'
+import UserPickerDrawer, { type UserPickerUser } from '../users/UserPickerDrawer'
 import styles from './NodePage.module.css'
 
 function formatVaultTime(value?: string | null): string {
@@ -57,7 +58,7 @@ export default function CodexVaultCard({
   onRefresh: () => void
   currentUserId?: string
 }) {
-  const [grantTarget, setGrantTarget] = useState('')
+  const [grantPickerOpen, setGrantPickerOpen] = useState(false)
   const vault = cloud?.vault
   const sharing = cloud?.sharing ?? cloud?.emergency
   const cloudSlots = vault?.slots ?? []
@@ -100,11 +101,11 @@ export default function CodexVaultCard({
     : sharingHealth?.status === 'warning'
       ? styles.vaultChecking
       : styles.vaultOnline
-  async function submitGrant() {
-    const target = grantTarget.trim()
-    if (!target) return
-    await emergencyActions.onCreateEmergencyGrant(target)
-    setGrantTarget('')
+  async function grantSelectedUsers(users: UserPickerUser[]) {
+    for (const user of users) {
+      await emergencyActions.onCreateEmergencyGrant(user.id)
+    }
+    setGrantPickerOpen(false)
   }
   function grantStatusText(grant: CodexVaultEmergencyGrant): string {
     if (grant.status !== 'active') return '已撤销'
@@ -193,21 +194,19 @@ export default function CodexVaultCard({
           </p>
         )}
         <div className={styles.emergencyGrantForm}>
-          <input
-            value={grantTarget}
-            onChange={(event) => setGrantTarget(event.target.value)}
-            placeholder="对方手机号 / 邮箱 / user id"
-            disabled={busy}
-          />
+          <div className={styles.shareTargetPreview}>
+            <strong>选择授权对象</strong>
+            <span>从项目成员、好友或全站用户中勾选机器人账号</span>
+          </div>
           <button
             className={[styles.btn, styles.iconBtn].join(' ')}
             type="button"
-            onClick={() => { void submitGrant() }}
-            disabled={busy || !grantTarget.trim()}
+            onClick={() => setGrantPickerOpen(true)}
+            disabled={busy}
             title="授权对方机器人短期使用本账号的 Codex 保险箱"
           >
             <Handshake size={15} strokeWidth={2.2} aria-hidden="true" />
-            共享授权
+            选择并授权
           </button>
         </div>
         {incomingGrants.length > 0 && (
@@ -325,6 +324,16 @@ export default function CodexVaultCard({
           刷新
         </button>
       </div>
+      <UserPickerDrawer
+        open={grantPickerOpen}
+        title="机器人授权共享"
+        subtitle="选择允许短期租用本账号 Codex 保险箱的成员、好友或全站用户。"
+        busy={busy}
+        currentUserId={currentUserId}
+        disabledUserIds={new Set(outgoingGrants.filter((grant) => grant.status === 'active').map((grant) => grant.consumer_user_id ?? '').filter(Boolean))}
+        onClose={() => setGrantPickerOpen(false)}
+        onConfirm={grantSelectedUsers}
+      />
     </section>
   )
 }
