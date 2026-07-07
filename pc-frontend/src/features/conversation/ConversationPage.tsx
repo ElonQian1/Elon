@@ -440,7 +440,12 @@ export default function ConversationPage() {
     const previousInput = input
     const previousAttachments = attachments
     const previousDraftConversationId = draftConversationId
+    const previousSessionView = sessionView
     const fullContent = buildComposerContent(text, attachments)
+    let optimisticMessageId = ''
+    let optimisticConversationId = ''
+    let optimisticWasInserted = false
+    let optimisticWasExistingConversation = false
     try {
       requestFeedAutoFollow()
       if (isMemberDiscussion) {
@@ -500,6 +505,34 @@ export default function ConversationPage() {
       const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
       const conversationId = isExistingConversation ? sessionView : (draftConversationId || uuidv4())
       const conversationTitle = isExistingConversation ? null : titleFromMessage(text || attachmentTitleFromAttachments(attachments))
+      optimisticWasExistingConversation = isExistingConversation
+      optimisticConversationId = conversationId
+      optimisticMessageId = `optimistic-${conversationId}-${Date.now()}`
+      const optimisticMessage: Message = {
+        id: optimisticMessageId,
+        kind: 'user',
+        role: 'user',
+        content: fullContent,
+        text: fullContent,
+        conversation_id: conversationId,
+        conversationId,
+        created_at: new Date().toISOString(),
+        user_id: user?.id,
+        sender_name: user?.nickname ?? user?.account ?? '我',
+        outgoing: true,
+      }
+      waitingForNewSession.current = false
+      setSessionView(conversationId)
+      setSessionTaskMessages([])
+      setConvMessages((prev) => {
+        const base = isExistingConversation ? prev : []
+        const next = [...base, optimisticMessage]
+        if (activeProjectId && activeConversationTargetId) {
+          writeConversationCache(activeProjectId, activeConversationTargetId, conversationId, next, [])
+        }
+        return next
+      })
+      optimisticWasInserted = true
       const response = await sendMessage(
         fullContent,
         requestAgent || null,
@@ -515,21 +548,23 @@ export default function ConversationPage() {
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
       setSessionView(openedConversationId)
-      setSessionTaskMessages([])
       const optimisticTaskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
-      const optimisticMessages: Message[] = [{
-        id: `optimistic-${openedConversationId}-${Date.now()}`,
-        role: 'user',
-        content: fullContent,
-        created_at: new Date().toISOString(),
-        user_id: user?.id,
-        sender_name: user?.nickname ?? user?.account ?? '我',
-        outgoing: true,
-        task_id: optimisticTaskId || undefined,
-      } as Message]
-      setConvMessages(optimisticMessages)
-      if (activeProjectId && activeConversationTargetId) {
-        writeConversationCache(activeProjectId, activeConversationTargetId, openedConversationId, optimisticMessages, [])
+      if (optimisticTaskId || openedConversationId !== conversationId) {
+        setConvMessages((prev) => {
+          const next = prev.map((message) => message.id === optimisticMessageId
+            ? {
+                ...message,
+                conversation_id: openedConversationId,
+                conversationId: openedConversationId,
+                task_id: optimisticTaskId || message.task_id,
+                taskId: optimisticTaskId || message.taskId,
+              }
+            : message)
+          if (activeProjectId && activeConversationTargetId) {
+            writeConversationCache(activeProjectId, activeConversationTargetId, openedConversationId, next, sessionTaskMessages)
+          }
+          return next
+        })
       }
       // 发送后刷新会话列表和当前会话消息，保证继续输入时仍在同一上下文。
       if (activeProjectId && activeConversationTargetId) {
@@ -542,6 +577,19 @@ export default function ConversationPage() {
         }, 400)
       }
     } catch (err) {
+      if (optimisticWasInserted) {
+        setConvMessages((prev) => prev.filter((message) => message.id !== optimisticMessageId))
+        if (!optimisticWasExistingConversation) setSessionView(previousSessionView)
+        if (activeProjectId && activeConversationTargetId && optimisticConversationId) {
+          writeConversationCache(
+            activeProjectId,
+            activeConversationTargetId,
+            optimisticConversationId,
+            convMessages,
+            sessionTaskMessages,
+          )
+        }
+      }
       setInput(previousInput)
       restoreAttachmentDraft({
         attachments: previousAttachments,

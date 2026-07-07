@@ -81,7 +81,7 @@ export default function ConversationFeed({
         <div className={styles.typingRow}>
           <div className={styles.typingAvatar}>AI</div>
           <div className={styles.typingBubble}>
-            <span>AI 正在处理</span>
+            <span>正在发送...</span>
             <div className={styles.typingDots}>
               <span /><span /><span />
             </div>
