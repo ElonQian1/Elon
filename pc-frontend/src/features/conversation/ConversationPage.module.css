@@ -17,6 +17,12 @@
   position: relative;
   isolation: isolate;
 }
+.layout[data-member-collapsed="true"] {
+  grid-template-columns:
+    var(--conversation-channel-column, var(--sidebar-width))
+    minmax(520px, 1fr)
+    0;
+}
 
 /* ══════════════════════════════════════
    频道面板
@@ -1101,6 +1107,25 @@
   transition: background 0.1s, color 0.1s;
 }
 .memberInviteBtn:hover { background: rgba(255,255,255,.06); color: var(--text-soft); }
+.memberIconBtn {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.memberIconBtn:hover,
+.memberIconBtn:focus-visible {
+  background: rgba(255,255,255,.06);
+  color: var(--text-soft);
+  outline: none;
+}
 
 /* 搜索框 */
 .memberSearch {
@@ -1569,7 +1594,7 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 4px;
-  max-width: 172px;
+  max-width: 198px;
 }
 
 .memberVirtualList {

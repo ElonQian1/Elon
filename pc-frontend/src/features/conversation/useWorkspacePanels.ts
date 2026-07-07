@@ -36,7 +36,7 @@ export function useWorkspacePanels() {
     '--conversation-channel-width': `${state.channelWidth}px`,
     '--conversation-member-width': `${state.memberWidth}px`,
     '--conversation-channel-column': state.channelCollapsed ? `${COLLAPSED_CHANNEL_WIDTH}px` : `${state.channelWidth}px`,
-    '--conversation-member-column': `minmax(${MEMBER_MIN}px, ${state.memberWidth}px)`,
+    '--conversation-member-column': state.memberCollapsed ? '0px' : `minmax(${MEMBER_MIN}px, ${state.memberWidth}px)`,
   }) as CSSProperties, [state])
 
   const toggleChannelPanel = useCallback(() => {
@@ -49,7 +49,7 @@ export function useWorkspacePanels() {
   const toggleMemberPanel = useCallback(() => {
     setState((current) => ({
       ...current,
-      memberCollapsed: false,
+      memberCollapsed: !current.memberCollapsed,
     }))
   }, [])
 
@@ -110,7 +110,7 @@ export function useWorkspacePanels() {
     channelWidth: state.channelWidth,
     memberWidth: state.memberWidth,
     channelCollapsed: state.channelCollapsed,
-    memberCollapsed: false,
+    memberCollapsed: state.memberCollapsed,
     resizingSide,
     layoutStyle,
     toggleChannelPanel,
@@ -129,7 +129,7 @@ function initialWorkspacePanelState(): WorkspacePanelState {
     channelWidth: clamp(Number(stored?.channelWidth ?? CHANNEL_DEFAULT), CHANNEL_MIN, CHANNEL_MAX),
     memberWidth: clamp(Number(stored?.memberWidth ?? MEMBER_DEFAULT), MEMBER_MIN, MEMBER_MAX),
     channelCollapsed: stored?.channelCollapsed === true,
-    memberCollapsed: false,
+    memberCollapsed: stored?.memberCollapsed === true,
   }
 }
 

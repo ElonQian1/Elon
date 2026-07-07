@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, History, RefreshCw, Smartphone, UsersRound } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
@@ -23,6 +22,7 @@ import ConversationFeed from './ConversationFeed'
 import ConversationComposer from './ConversationComposer'
 import ComposerAttachmentDialogs from './ComposerAttachmentDialogs'
 import LocalNodeProjectNotice from './LocalNodeProjectNotice'
+import ConversationTopbarActions from './ConversationTopbarActions'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import { useConversationAutoScroll } from './useConversationAutoScroll'
 import ConversationMemberSidebar from './ConversationMemberSidebar'
@@ -1230,32 +1230,15 @@ export default function ConversationPage() {
               )}
             </div>
           </div>
-          <div className={styles.topbarActions}>
-            <button className={[styles.textBtn, styles.panelControlBtn].join(' ')} type="button" title="在右侧成员栏选择成员" aria-label="在右侧成员栏选择成员" aria-pressed={memberSelectionMode} onClick={() => setMemberSelectionMode(true)}>
-              <UsersRound size={15} aria-hidden="true" /><span>选择成员</span>
-            </button>
-            {activeChannelId && (
-              <button className={styles.textBtn} type="button" title="刷新消息" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
-                <RefreshCw size={15} aria-hidden="true" /><span>刷新</span>
-              </button>
-            )}
-            <button className={styles.textBtn} type="button" title="分享这台电脑的算力并查看连接状态" onClick={() => navigate('/node')}>
-              <Cpu size={15} aria-hidden="true" /><span>分享算力</span>
-            </button>
-            <button className={styles.textBtn} type="button" title="打开移动端入口" onClick={() => window.open('/app/download', '_blank', 'noopener')}>
-              <Smartphone size={15} aria-hidden="true" /><span>移动端</span>
-            </button>
-            <button className={styles.textBtn} type="button" title="切换到旧版 PC 工作台" onClick={() => {
-              const tok = useAuthStore.getState().token
-              if (tok) {
-                localStorage.setItem('lodex_token', tok)
-                localStorage.setItem('elon_token', tok)
-              }
-              window.open('/pc-legacy', '_blank', 'noopener')
-            }}>
-              <History size={15} aria-hidden="true" /><span>旧版</span>
-            </button>
-          </div>
+          <ConversationTopbarActions
+            activeProjectId={activeProjectId}
+            activeChannelId={activeChannelId}
+            memberCollapsed={workspacePanels.memberCollapsed}
+            memberSelectionMode={memberSelectionMode}
+            onToggleMemberPanel={workspacePanels.toggleMemberPanel}
+            onEnableMemberSelection={() => setMemberSelectionMode(true)}
+            onNavigateNode={() => navigate('/node')}
+          />
         </header>
 
         <div className={styles.chatStatusStack}>

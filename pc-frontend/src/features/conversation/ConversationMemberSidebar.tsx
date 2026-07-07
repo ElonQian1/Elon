@@ -1,5 +1,6 @@
 import { useMemo, type MouseEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { ChevronRight } from 'lucide-react'
 import type { User } from '../../store/auth'
 import AgentRunsPanel from '../dev/AgentRunsPanel'
 import type { Channel, ProjectMember } from './types'
@@ -157,6 +158,15 @@ export default function ConversationMemberSidebar({
           <span>{context}</span>
         </div>
         <div className={styles.memberActions}>
+          <button
+            className={styles.memberIconBtn}
+            type="button"
+            title="隐藏右侧栏"
+            aria-label="隐藏右侧栏"
+            onClick={workspacePanels.toggleMemberPanel}
+          >
+            <ChevronRight size={14} aria-hidden="true" />
+          </button>
           <button className={styles.memberInviteBtn} type="button" onClick={onShowPresence}>状态</button>
           {hasProject && (
             <button className={styles.memberInviteBtn} type="button" onClick={() => onSelectionModeChange(!selectionMode)}>
