@@ -74,6 +74,8 @@ fn synthetic_message(
         suggestion_resolved_at: None,
         created_at: created_at.to_string(),
         outgoing: false,
+        recalled_at: None,
+        recalled_by: None,
     }
 }
 

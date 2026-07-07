@@ -46,6 +46,10 @@ interface SocialMessage {
   content: string
   created_at: string
   outgoing: boolean
+  recalled_at?: string | null
+  recalled_by?: string | null
+  recalledAt?: string | null
+  recalledBy?: string | null
 }
 
 interface SearchResult {
@@ -527,7 +531,10 @@ export default function FriendsPage() {
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
           {messages.map((m, i) => {
             const isMe = m.outgoing || m.sender_user_id === me?.id
-            const content = displayMessageContentOrAttachment(m.content)
+            const recalled = !!clean(m.recalled_at ?? m.recalledAt ?? '')
+            const content = recalled
+              ? (isMe ? '你撤回了一条消息' : (activeItem?.kind === 'group' && m.sender_name ? `${m.sender_name} 撤回了一条消息` : '对方撤回了一条消息'))
+              : displayMessageContentOrAttachment(m.content)
             const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(content)
             const messageActionKey = m.id || `${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}:${m.created_at}:${i}`
             const senderName = isMe

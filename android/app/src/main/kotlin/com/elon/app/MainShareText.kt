@@ -10,6 +10,7 @@ internal fun promotionText(apkDownloadUrl: String): String {
 }
 
 internal fun shareableMessageText(message: ChatMessage): String {
+    if (message.isRecalled()) return ""
     return buildString {
         append(message.content.trim())
         val details = message.evidenceDetails?.trim().orEmpty()

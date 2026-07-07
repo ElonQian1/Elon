@@ -5,6 +5,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
+use super::message_recall::{ensure_message_recall_allowed, recalled_content};
 use super::{
     clean_optional, new_id, now, safe_external_id, AdminConversationEntry, ConversationMessage,
     Store, UserConversationEntry, UserConversationMessage,
@@ -94,6 +95,7 @@ impl Store {
                 FROM messages
                 WHERE project_id = ?1
                   AND conversation_id = ?2
+                  AND recalled_at IS NULL
                 ORDER BY created_at DESC, id DESC
                 LIMIT ?3
              )
@@ -128,7 +130,11 @@ impl Store {
                (SELECT COUNT(*) FROM messages m
                 WHERE m.project_id = c.project_id
                   AND m.conversation_id = c.id) AS message_count,
-               (SELECT m2.content FROM messages m2
+               (SELECT CASE
+                         WHEN m2.recalled_at IS NOT NULL THEN '你撤回了一条消息'
+                         ELSE m2.content
+                       END
+                FROM messages m2
                 WHERE m2.project_id = c.project_id
                   AND m2.conversation_id = c.id
                 ORDER BY m2.created_at DESC, m2.id DESC LIMIT 1) AS last_message,
@@ -192,7 +198,7 @@ impl Store {
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, conversation_id, task_id, user_id, sender_name,
-                    role, content, created_at, outgoing
+                    role, content, created_at, outgoing, recalled_at, recalled_by
              FROM (
                 SELECT m.id,
                        m.project_id,
@@ -207,7 +213,9 @@ impl Store {
                        m.role,
                        m.content,
                        m.created_at,
-                       CASE WHEN m.user_id = ?2 OR LOWER(m.role) = 'user' THEN 1 ELSE 0 END AS outgoing
+                       CASE WHEN m.user_id = ?2 OR LOWER(m.role) = 'user' THEN 1 ELSE 0 END AS outgoing,
+                       m.recalled_at,
+                       m.recalled_by
                 FROM messages m
                 LEFT JOIN users u ON u.id = m.user_id
                 WHERE m.project_id = ?1
@@ -221,6 +229,8 @@ impl Store {
             .query_map(
                 params![project_id, user_id, conversation_id, limit.clamp(1, 200)],
                 |row| {
+                    let recalled_at: Option<String> = row.get(10)?;
+                    let recalled_by: Option<String> = row.get(11)?;
                     Ok(UserConversationMessage {
                         id: row.get(0)?,
                         project_id: row.get(1)?,
@@ -229,14 +239,75 @@ impl Store {
                         user_id: row.get(4)?,
                         sender_name: row.get(5)?,
                         role: row.get(6)?,
-                        content: row.get(7)?,
+                        content: recalled_content(row.get(7)?, recalled_at.as_deref()),
                         created_at: row.get(8)?,
                         outgoing: row.get::<_, i64>(9)? != 0,
+                        recalled_at,
+                        recalled_by,
                     })
                 },
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(rows)
+    }
+
+    pub fn recall_user_conversation_message(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+        message_id: &str,
+    ) -> Result<()> {
+        let conversation_id = safe_external_id(conversation_id, "default");
+        let conn = self.conn()?;
+        let message = conn
+            .query_row(
+                "SELECT created_at, recalled_at
+                 FROM messages
+                 WHERE project_id = ?1
+                   AND conversation_id = ?2
+                   AND id = ?3
+                   AND user_id = ?4
+                   AND LOWER(role) = 'user'",
+                params![project_id, conversation_id, message_id, user_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+        let Some((created_at, recalled_at)) = message else {
+            return Err(anyhow!("只能撤回自己发送的消息"));
+        };
+        if recalled_at.is_some() {
+            return Ok(());
+        }
+        ensure_message_recall_allowed(&created_at)?;
+        let recalled_at = now();
+        conn.execute(
+            "UPDATE messages
+                SET recalled_at = ?5,
+                    recalled_by = ?4
+              WHERE project_id = ?1
+                AND conversation_id = ?2
+                AND id = ?3
+                AND user_id = ?4
+                AND LOWER(role) = 'user'
+                AND recalled_at IS NULL",
+            params![
+                project_id,
+                conversation_id,
+                message_id,
+                user_id,
+                recalled_at
+            ],
+        )?;
+        conn.execute(
+            "UPDATE conversations
+                SET updated_at = ?4
+              WHERE project_id = ?1
+                AND user_id = ?2
+                AND id = ?3",
+            params![project_id, user_id, conversation_id, now()],
+        )?;
+        Ok(())
     }
 
     /// 管理员总览：列出某项目下所有会话，附带消息数、任务数和最后任务状态。

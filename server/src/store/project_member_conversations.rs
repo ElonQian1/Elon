@@ -8,6 +8,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
+use super::message_recall::recalled_content;
 use super::{new_id, now, ProjectMemberConversationEntry, ProjectMemberConversationMessage, Store};
 
 impl Store {
@@ -41,14 +42,18 @@ impl Store {
                 WHERE t.project_id = c.project_id
                   AND t.conversation_id = c.id
                   AND t.user_id = c.user_id) AS task_count,
-               (SELECT last.content FROM (
-                    SELECT m2.content, m2.created_at, m2.id
+               (SELECT CASE
+                         WHEN last.recalled_at IS NOT NULL THEN '你撤回了一条消息'
+                         ELSE last.content
+                       END
+                FROM (
+                    SELECT m2.content, m2.recalled_at, m2.created_at, m2.id
                       FROM messages m2
                      WHERE m2.project_id = c.project_id
                        AND m2.conversation_id = c.id
                        AND m2.user_id = c.user_id
                     UNION ALL
-                    SELECT d2.content, d2.created_at, d2.id
+                    SELECT d2.content, d2.recalled_at, d2.created_at, d2.id
                       FROM project_member_conversation_discussion_messages d2
                      WHERE d2.project_id = c.project_id
                        AND d2.member_user_id = c.user_id
@@ -148,13 +153,16 @@ impl Store {
 
         let mut stmt = conn.prepare(
             "SELECT id, project_id, conversation_id, task_id, user_id, sender_name,
-                    sender_avatar_data_url, role, content, created_at, outgoing
+                    sender_avatar_data_url, role, content, created_at, outgoing,
+                    recalled_at, recalled_by
              FROM (
                 SELECT m.id, m.project_id, m.conversation_id, m.task_id, m.user_id,
                        COALESCE(u.nickname, u.phone, u.email, m.user_id) AS sender_name,
                        u.avatar_data_url AS sender_avatar_data_url,
                        m.role, m.content, m.created_at,
-                       CASE WHEN LOWER(m.role) IN ('user', 'human') AND m.user_id = ?4 THEN 1 ELSE 0 END AS outgoing
+                       CASE WHEN LOWER(m.role) IN ('user', 'human') AND m.user_id = ?4 THEN 1 ELSE 0 END AS outgoing,
+                       m.recalled_at,
+                       m.recalled_by
                 FROM messages m
                 LEFT JOIN users u ON u.id = m.user_id
                 WHERE m.project_id = ?1
@@ -165,7 +173,9 @@ impl Store {
                        COALESCE(u.nickname, u.phone, u.email, d.sender_user_id) AS sender_name,
                        u.avatar_data_url AS sender_avatar_data_url,
                        'discussion' AS role, d.content, d.created_at,
-                       CASE WHEN d.sender_user_id = ?4 THEN 1 ELSE 0 END AS outgoing
+                       CASE WHEN d.sender_user_id = ?4 THEN 1 ELSE 0 END AS outgoing,
+                       d.recalled_at,
+                       d.recalled_by
                 FROM project_member_conversation_discussion_messages d
                 LEFT JOIN users u ON u.id = d.sender_user_id
                 WHERE d.project_id = ?1
@@ -186,6 +196,8 @@ impl Store {
                     limit.clamp(1, 200)
                 ],
                 |row| {
+                    let recalled_at: Option<String> = row.get(11)?;
+                    let recalled_by: Option<String> = row.get(12)?;
                     Ok(ProjectMemberConversationMessage {
                         id: row.get(0)?,
                         project_id: row.get(1)?,
@@ -195,9 +207,11 @@ impl Store {
                         sender_name: row.get(5)?,
                         sender_avatar_data_url: row.get(6)?,
                         role: row.get(7)?,
-                        content: row.get(8)?,
+                        content: recalled_content(row.get(8)?, recalled_at.as_deref()),
                         created_at: row.get(9)?,
                         outgoing: row.get::<_, i64>(10)? != 0,
+                        recalled_at,
+                        recalled_by,
                     })
                 },
             )?
@@ -271,6 +285,8 @@ impl Store {
             content: content.to_string(),
             created_at,
             outgoing: true,
+            recalled_at: None,
+            recalled_by: None,
         })
     }
 
@@ -368,7 +384,6 @@ impl Store {
         }
     }
 }
-
 
 #[cfg(test)]
 #[path = "project_member_conversations_tests.rs"]

@@ -240,6 +240,10 @@ export interface Message {
   content?: string
   text?: string
   created_at?: string
+  recalled_at?: string | null
+  recalled_by?: string | null
+  recalledAt?: string | null
+  recalledBy?: string | null
   user_id?: string
   task_id?: string
   taskId?: string

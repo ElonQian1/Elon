@@ -45,6 +45,7 @@ pub use channel_ai::{
 };
 pub use channel_messages::{
     list_channel_messages, list_user_project_channel_messages,
+    recall_channel_message, recall_user_project_channel_message,
     send_channel_message, send_user_project_channel_message,
 };
 pub use member_conversations::{

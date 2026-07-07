@@ -1,8 +1,9 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{project_channel_message_from_row, CHANNEL_PERMISSION_VIEW};
+use super::super::message_recall::ensure_message_recall_allowed;
 use super::super::{new_id, now, ProjectChannelMessage, Store};
+use super::{project_channel_message_from_row, CHANNEL_PERMISSION_VIEW};
 
 impl Store {
     pub fn list_project_channel_messages(
@@ -28,7 +29,9 @@ impl Store {
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
                       AS suggestion_resolved_by_name,
                     m.suggestion_resolved_at,
-                    m.created_at
+                    m.created_at,
+                    m.recalled_at,
+                    m.recalled_by
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
@@ -122,7 +125,9 @@ impl Store {
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
                       AS suggestion_resolved_by_name,
                     m.suggestion_resolved_at,
-                    m.created_at
+                    m.created_at,
+                    m.recalled_at,
+                    m.recalled_by
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
@@ -249,7 +254,9 @@ impl Store {
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
                       AS suggestion_resolved_by_name,
                     m.suggestion_resolved_at,
-                    m.created_at
+                    m.created_at,
+                    m.recalled_at,
+                    m.recalled_by
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
@@ -259,6 +266,56 @@ impl Store {
             |row| project_channel_message_from_row(row, user_id),
         )
         .map_err(Into::into)
+    }
+
+    pub fn recall_project_channel_message(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        channel_id: &str,
+        message_id: &str,
+    ) -> Result<()> {
+        self.ensure_project_default_channels(project_id)?;
+        let conn = self.conn()?;
+        let message = conn
+            .query_row(
+                "SELECT created_at, recalled_at
+                 FROM project_channel_messages
+                 WHERE project_id = ?1
+                   AND channel_id = ?2
+                   AND id = ?3
+                   AND sender_user_id = ?4",
+                params![project_id, channel_id, message_id, user_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+        let Some((created_at, recalled_at)) = message else {
+            return Err(anyhow!("只能撤回自己发送的消息"));
+        };
+        if recalled_at.is_some() {
+            return Ok(());
+        }
+        ensure_message_recall_allowed(&created_at)?;
+        let recalled_at = now();
+        conn.execute(
+            "UPDATE project_channel_messages
+                SET recalled_at = ?5,
+                    recalled_by = ?4
+              WHERE project_id = ?1
+                AND channel_id = ?2
+                AND id = ?3
+                AND sender_user_id = ?4
+                AND recalled_at IS NULL",
+            params![project_id, channel_id, message_id, user_id, recalled_at],
+        )?;
+        conn.execute(
+            "UPDATE project_channels
+                SET updated_at = ?1
+              WHERE project_id = ?2
+                AND id = ?3",
+            params![now(), project_id, channel_id],
+        )?;
+        Ok(())
     }
 
     pub fn ensure_project_default_channels(&self, project_id: &str) -> Result<()> {

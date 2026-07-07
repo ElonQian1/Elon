@@ -52,6 +52,8 @@ data class ChatMessage(
     var finalReply: Boolean = false,
     /** 流式气泡 ID，用于 AssistantChunk 追加内容（打字机效果） */
     var streamId: String? = null,
+    var recalledAt: String? = null,
+    var recalledBy: String? = null,
     var projectPostCard: ChatProjectPostCard? = null
 )
 
@@ -117,6 +119,7 @@ class ChatAdapter(
     }
 
     override fun getItemViewType(position: Int): Int {
+        if (messages[position].isRecalled()) return if (messages[position].role == "user") 0 else 4
         if (messages[position].projectPostCard != null) return 6
         if (parseChatProjectShareMessage(messages[position].content) != null) return 5
         return when (messages[position].role) {
@@ -151,22 +154,23 @@ class ChatAdapter(
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val message = messages[position]
+        val recalled = message.isRecalled()
         holder.stopShimmer()
         bindTimelineLabel(holder.timelineLabel, position)
         bindChatAttachmentViews(
             holder.attachmentList,
-            message.attachments,
+            if (recalled) null else message.attachments,
             isSent = message.role == "user",
             onVoiceLongPress = onVoiceAttachmentLongPress?.let { cb ->
                 { attachment -> cb.invoke(message, attachment) }
             }
         )
-        bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
-        val postCardBound = bindChatProjectPostCardView(holder.attachmentList, holder.text, message)
+        if (!recalled) bindChatSuggestionStatus(holder.attachmentList, message, onSuggestionResolve)
+        val postCardBound = !recalled && bindChatProjectPostCardView(holder.attachmentList, holder.text, message)
         val projectShareBound = if (postCardBound) {
             false
         } else {
-            bindChatProjectShareView(
+            !recalled && bindChatProjectShareView(
                 holder.attachmentList,
                 holder.text,
                 message,
@@ -179,15 +183,19 @@ class ChatAdapter(
         applyImageOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         applyVoiceOnlyBubbleStyle(holder.bubble, message, projectCardBound)
         if (!projectCardBound) {
-            holder.text.text = message.content
-            holder.text.visibility = if (message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
+            holder.text.text = if (recalled) message.recallNoticeText() else message.content
+            holder.text.visibility = if (!recalled && message.content.isBlank() && !message.attachments.isNullOrEmpty()) {
                 View.GONE
             } else {
                 View.VISIBLE
             }
-            holder.text.setTextColor(messageTextColor(message.role))
-            Linkify.addLinks(holder.text, Linkify.WEB_URLS)
-            holder.text.movementMethod = LinkMovementMethod.getInstance()
+            holder.text.setTextColor(if (recalled) Color.parseColor("#8A8A8A") else messageTextColor(message.role))
+            if (recalled) {
+                holder.text.movementMethod = null
+            } else {
+                Linkify.addLinks(holder.text, Linkify.WEB_URLS)
+                holder.text.movementMethod = LinkMovementMethod.getInstance()
+            }
         }
         bindSendStatus(holder, message)
         bindUserAvatar(holder.userAvatar)
@@ -247,6 +255,13 @@ class ChatAdapter(
 
     private fun bindSendStatus(holder: VH, message: ChatMessage) {
         val status = holder.status ?: return
+        if (message.isRecalled()) {
+            status.visibility = View.GONE
+            status.setOnClickListener(null)
+            status.isClickable = false
+            status.isFocusable = false
+            return
+        }
         val canRetry = message.canRetryFailedAttachmentSend()
         val text = when {
             canRetry -> "发送失败，点此重试"
@@ -477,6 +492,7 @@ class ChatAdapter(
     }
 
     private fun isActionableMessage(message: ChatMessage): Boolean {
+        if (message.isRecalled()) return false
         return message.content.isNotBlank() || !message.attachments.isNullOrEmpty()
     }
 

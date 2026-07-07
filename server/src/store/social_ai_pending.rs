@@ -25,6 +25,7 @@ impl Store {
              FROM friend_messages candidate
              WHERE candidate.sender_user_id = ?1
                AND candidate.receiver_user_id = ?2
+               AND candidate.recalled_at IS NULL
                AND LOWER(REPLACE(candidate.content, '＠', '@')) LIKE '%@el%'
                AND NOT EXISTS (
                    SELECT 1
@@ -61,6 +62,7 @@ impl Store {
              FROM friend_group_messages candidate
              WHERE candidate.group_id = ?1
                AND candidate.sender_user_id != ?2
+               AND candidate.recalled_at IS NULL
                AND LOWER(REPLACE(candidate.content, '＠', '@')) LIKE '%@el%'
                AND NOT EXISTS (
                    SELECT 1
@@ -122,7 +124,6 @@ fn ensure_group_member(conn: &Connection, user_id: &str, group_id: &str) -> Resu
         Err(anyhow!("user is not in friend group"))
     }
 }
-
 
 #[cfg(test)]
 #[path = "social_ai_pending_tests.rs"]

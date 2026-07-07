@@ -79,6 +79,8 @@ pub struct UserConversationMessage {
     pub content: String,
     pub created_at: String,
     pub outgoing: bool,
+    pub recalled_at: Option<String>,
+    pub recalled_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -151,6 +153,8 @@ pub struct FriendChatMessage {
     pub created_at: String,
     pub context_user_id: Option<String>,
     pub outgoing: bool,
+    pub recalled_at: Option<String>,
+    pub recalled_by: Option<String>,
 }
 
 // ── 群聊 ─────────────────────────────────────────────────────────────────────
@@ -184,6 +188,8 @@ pub struct FriendGroupMessage {
     pub attachments: Vec<ProjectAttachmentRef>,
     pub created_at: String,
     pub outgoing: bool,
+    pub recalled_at: Option<String>,
+    pub recalled_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -445,4 +451,3 @@ pub struct AdminConversationEntry {
     pub created_at: String,
     pub updated_at: String,
 }
-

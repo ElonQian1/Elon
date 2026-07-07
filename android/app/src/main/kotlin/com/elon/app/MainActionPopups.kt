@@ -23,6 +23,8 @@ internal class MainActionPopups(
     private val showCreateGroupDialog: () -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openSettings: () -> Unit,
+    private val canRecallMessage: (ChatMessage) -> Boolean,
+    private val recallMessage: (ChatMessage) -> Unit,
     private val deleteMessage: (ChatMessage) -> Unit,
     private val startMultiSelect: (ChatMessage) -> Unit,
     private val revokeProjectShare: (ChatMessage, ChatProjectShare) -> Unit,
@@ -82,6 +84,9 @@ internal class MainActionPopups(
             actions.add(TopAction("收藏", R.drawable.ic_msg_favorite) { shareActions().toastMessageAction("已收藏") })
         }
         actions.add(TopAction("时间", R.drawable.ic_msg_time) { showMessageTime(message) })
+        if (canRecallMessage(message)) {
+            actions.add(TopAction("撤回", R.drawable.ic_msg_delete) { recallMessage(message) })
+        }
         actions.add(TopAction("删除", R.drawable.ic_msg_delete) { deleteMessage(message) })
         actions.add(TopAction("多选", R.drawable.ic_msg_multi) { startMultiSelect(message) })
         if (hasText) {

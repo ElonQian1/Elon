@@ -129,6 +129,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (92, "Codex 保险箱共享租约用量幂等账本", crate::codex_vault_emergency_migration::migration_v92),
     (93, "Codex 保险箱官方用量快照与百分比估算", crate::codex_vault_emergency_migration::migration_v93),
     (94, "项目广场 cursor/keyset 分页索引", crate::project_store_listing_migration::migration_v94),
+    (95, "消息 1 分钟内撤回状态", crate::message_recall_migration::migration_v95),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 use std::collections::HashMap;
 
+use super::message_recall::recalled_content;
 use super::project_roles::{
     normalize_project_member_role_for_project, project_member_effective_role_locked,
     project_member_has_permission_locked, project_member_role_refs_locked,
@@ -104,6 +105,8 @@ fn project_channel_message_from_row(
     user_id: &str,
 ) -> rusqlite::Result<ProjectChannelMessage> {
     let sender_user_id: Option<String> = row.get(3)?;
+    let recalled_at: Option<String> = row.get(19)?;
+    let recalled_by: Option<String> = row.get(20)?;
     Ok(ProjectChannelMessage {
         id: row.get(0)?,
         project_id: row.get(1)?,
@@ -114,7 +117,7 @@ fn project_channel_message_from_row(
         sender_avatar_data_url: row.get(5)?,
         reply_to_message_id: row.get(6)?,
         kind: row.get(7)?,
-        content: row.get(8)?,
+        content: recalled_content(row.get(8)?, recalled_at.as_deref()),
         task_id: row.get(9)?,
         task_status: row.get(10)?,
         task_error: row.get(11)?,
@@ -125,6 +128,8 @@ fn project_channel_message_from_row(
         suggestion_resolved_by_name: row.get(16)?,
         suggestion_resolved_at: row.get(17)?,
         created_at: row.get(18)?,
+        recalled_at,
+        recalled_by,
     })
 }
 impl Store {
@@ -274,7 +279,11 @@ impl Store {
                     COALESCE(cat.position, 9999) AS category_position,
                     COALESCE(c.permission_sync, 1) AS permission_sync,
                     (
-                      SELECT m.content
+                      SELECT CASE
+                               WHEN m.recalled_at IS NOT NULL AND m.recalled_by = ?1 THEN '你撤回了一条消息'
+                               WHEN m.recalled_at IS NOT NULL THEN '对方撤回了一条消息'
+                               ELSE m.content
+                             END
                       FROM project_channel_messages m
                       WHERE m.project_id = c.project_id AND m.channel_id = c.id
                       ORDER BY m.created_at DESC LIMIT 1

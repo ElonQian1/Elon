@@ -70,7 +70,9 @@ internal data class ProjectMemberConversationMessage(
     val role: String,
     val content: String,
     val createdAt: String,
-    val outgoing: Boolean
+    val outgoing: Boolean,
+    val recalledAt: String? = null,
+    val recalledBy: String? = null
 )
 
 internal data class ProjectChannelMessage(
@@ -93,5 +95,7 @@ internal data class ProjectChannelMessage(
     val suggestionResolvedByName: String?,
     val suggestionResolvedAt: String?,
     val createdAt: String,
-    val outgoing: Boolean
+    val outgoing: Boolean,
+    val recalledAt: String? = null,
+    val recalledBy: String? = null
 )

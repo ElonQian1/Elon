@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
-use super::friend_messages::message_preview_from_parts;
+use super::friend_messages::message_preview_for_viewer;
 use super::{
     normalize_account, now, AddFriendResult, FriendProfile, FriendRecommendation,
     FriendSearchResult, Store, SOCIAL_AI_FRIEND_ACCOUNT, SOCIAL_AI_FRIEND_NAME,
@@ -149,6 +149,8 @@ impl Store {
             "SELECT u.id, u.phone, u.email, u.nickname, u.avatar_data_url, f.created_at,
                     lm.content,
                     lm.attachments_json,
+                    lm.recalled_at,
+                    lm.recalled_by,
                     lm.created_at,
                     (
                         SELECT COUNT(*)
@@ -202,6 +204,8 @@ impl Store {
                 let account = phone.clone().or(email).unwrap_or_else(|| id.clone());
                 let last_content: Option<String> = row.get(6)?;
                 let last_attachments_json: Option<String> = row.get(7)?;
+                let recalled_at: Option<String> = row.get(8)?;
+                let recalled_by: Option<String> = row.get(9)?;
                 Ok(FriendProfile {
                     id,
                     account,
@@ -209,16 +213,19 @@ impl Store {
                     phone,
                     avatar_data_url: row.get(4)?,
                     friend_since: row.get(5)?,
-                    last_message: message_preview_from_parts(
+                    last_message: message_preview_for_viewer(
                         last_content.as_deref(),
                         last_attachments_json.as_deref(),
+                        recalled_at.as_deref(),
+                        recalled_by.as_deref(),
+                        user_id,
                     )?,
-                    last_message_at: row.get(8)?,
-                    unread_count: row.get(9)?,
+                    last_message_at: row.get(10)?,
+                    unread_count: row.get(11)?,
                     is_online: false,
-                    presence_status: row.get(10)?,
-                    custom_status: row.get(11)?,
-                    activity: row.get(12)?,
+                    presence_status: row.get(12)?,
+                    custom_status: row.get(13)?,
+                    activity: row.get(14)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -256,7 +263,7 @@ fn latest_direct_social_ai_message(
     user_id: &str,
 ) -> Result<Option<(Option<String>, String)>> {
     conn.query_row(
-        "SELECT content, attachments_json, created_at
+        "SELECT content, attachments_json, recalled_at, recalled_by, created_at
          FROM friend_messages
          WHERE (
              sender_user_id = ?1
@@ -274,9 +281,17 @@ fn latest_direct_social_ai_message(
         |row| {
             let content: String = row.get(0)?;
             let attachments_json: Option<String> = row.get(1)?;
+            let recalled_at: Option<String> = row.get(2)?;
+            let recalled_by: Option<String> = row.get(3)?;
             Ok((
-                message_preview_from_parts(Some(content.as_str()), attachments_json.as_deref())?,
-                row.get(2)?,
+                message_preview_for_viewer(
+                    Some(content.as_str()),
+                    attachments_json.as_deref(),
+                    recalled_at.as_deref(),
+                    recalled_by.as_deref(),
+                    user_id,
+                )?,
+                row.get(4)?,
             ))
         },
     )
@@ -481,7 +496,6 @@ fn looks_like_phone(value: &str) -> bool {
         .chars()
         .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | ' ' | '-' | '(' | ')'))
 }
-
 
 #[cfg(test)]
 #[path = "friends_tests.rs"]

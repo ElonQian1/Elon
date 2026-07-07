@@ -247,6 +247,8 @@ private fun sameConversationMessages(
             left.content == right.content &&
             left.senderLabel == right.senderLabel &&
             left.senderAvatarDataUrl == right.senderAvatarDataUrl &&
-            left.createdAtMs == right.createdAtMs
+            left.createdAtMs == right.createdAtMs &&
+            left.recalledAt == right.recalledAt &&
+            left.recalledBy == right.recalledBy
     }
 }

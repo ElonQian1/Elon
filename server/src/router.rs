@@ -601,10 +601,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_space::get_channel_category_permissions)
                 .patch(project_space::update_channel_category_permissions),
         )
-        .route(
-            "/api/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion",
-            axum::routing::patch(project_space::mark_suggestion_updated),
-        )
+        .route("/api/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion", axum::routing::patch(project_space::mark_suggestion_updated))
+        .route("/api/projects/:project_id/channels/:channel_id/messages/:message_id", axum::routing::delete(project_space::recall_channel_message))
         .route(
             "/api/projects/:project_id/channels/:channel_id/ai-tasks",
             post(project_space::start_channel_ai_task),
@@ -645,10 +643,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/projects/:project_id/workspace/recover",
             post(project_workspace_recovery::recover_project_workspace),
         )
-        .route(
-            "/api/projects/:project_id/conversations/:conversation_id/identity",
-            get(project_conversation_identity::conversation_identity_project),
-        )
+        .route("/api/projects/:project_id/conversations/:conversation_id/identity", get(project_conversation_identity::conversation_identity_project))
+        .route("/api/projects/:project_id/conversations/:conversation_id/messages/:message_id", axum::routing::delete(project_chat::recall_project_conversation_message))
         .route(
             "/api/projects/:project_id/attachments",
             post(project_attachments::upload_project_attachment).layer(DefaultBodyLimit::max(
@@ -712,10 +708,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_space::list_user_project_channel_messages)
                 .post(project_space::send_user_project_channel_message),
         )
-        .route(
-            "/api/user/:user_id/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion",
-            axum::routing::patch(project_space::mark_user_project_suggestion_updated),
-        )
+        .route("/api/user/:user_id/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion", axum::routing::patch(project_space::mark_user_project_suggestion_updated))
+        .route("/api/user/:user_id/projects/:project_id/channels/:channel_id/messages/:message_id", axum::routing::delete(project_space::recall_user_project_channel_message))
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks",
             post(project_space::start_user_project_channel_ai_task),

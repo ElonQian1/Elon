@@ -29,6 +29,7 @@ mod group_summary;
 mod group_summary_tests;
 mod groups;
 mod join_requests;
+mod message_recall;
 mod native_sessions;
 mod node_compute_runs;
 mod node_credentials;

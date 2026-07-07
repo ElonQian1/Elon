@@ -1,6 +1,6 @@
+use homecli_proto::ProjectWorkspaceInspectStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use homecli_proto::ProjectWorkspaceInspectStatus;
 
 /// 项目加入申请记录
 #[derive(Debug, Clone, Serialize)]
@@ -256,6 +256,8 @@ pub struct ProjectChannelMessage {
     pub suggestion_resolved_at: Option<String>,
     pub created_at: String,
     pub outgoing: bool,
+    pub recalled_at: Option<String>,
+    pub recalled_by: Option<String>,
 }
 
 // ── 项目对话 / 任务 ───────────────────────────────────────────────────────────
@@ -292,6 +294,8 @@ pub struct ProjectMemberConversationMessage {
     pub content: String,
     pub created_at: String,
     pub outgoing: bool,
+    pub recalled_at: Option<String>,
+    pub recalled_by: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

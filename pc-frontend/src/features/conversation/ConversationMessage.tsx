@@ -23,9 +23,10 @@ interface MessageItemProps {
 
 export const MessageItem = memo(function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove, onForkMessage, grouped }: MessageItemProps) {
   const kind = clean(message.kind ?? message.role ?? '').toLowerCase()
+  const recalled = !!clean(message.recalled_at ?? message.recalledAt ?? '')
 
   // Dev 任务消息用 DevTaskCard 渲染
-  if (isDevChannel && ['ai_task', 'ai_progress', 'ai_result'].includes(kind)) {
+  if (!recalled && isDevChannel && ['ai_task', 'ai_progress', 'ai_result'].includes(kind)) {
     return (
       <div className={[styles.messageRow, styles.devTaskWrap].join(' ')}>
         <DevTaskMessage message={message} context={taskContext} onCancel={onCancel} onApprove={onApprove} />
@@ -37,9 +38,11 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
   const isUserRole = !isAi && (kind === 'user' || kind === 'human' || kind === 'discussion')
   const isOwn = isAi ? false : (typeof message.outgoing === 'boolean' ? message.outgoing : isUserRole)
   const terminalTask = isAi && isTerminalTaskStatus(message.task_status ?? message.taskStatus)
-  const content = terminalTask
-    ? taskResultDisplayText(message)
-    : displayMessageContentOrAttachment(message.content ?? message.text ?? '')
+  const content = recalled
+    ? (isOwn ? '你撤回了一条消息' : '对方撤回了一条消息')
+    : terminalTask
+      ? taskResultDisplayText(message)
+      : displayMessageContentOrAttachment(message.content ?? message.text ?? '')
   const messageActionKey = clean(
     message.id
       ?? message.task_id

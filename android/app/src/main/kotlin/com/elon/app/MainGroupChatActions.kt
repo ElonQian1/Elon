@@ -14,6 +14,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.time.Instant
 import kotlin.concurrent.thread
 
 internal class MainGroupChatActions(
@@ -193,6 +194,10 @@ internal class MainGroupChatActions(
     }
 
     fun deleteCurrentMessage(message: ChatMessage, onDeleted: () -> Unit) {
+        recallCurrentMessage(message, onDeleted)
+    }
+
+    fun recallCurrentMessage(message: ChatMessage, onRecalled: () -> Unit = {}) {
         val group = activeGroup ?: return
         val messageId = message.id?.trim().takeIf { !it.isNullOrEmpty() }
         if (messageId == null) {
@@ -208,11 +213,12 @@ internal class MainGroupChatActions(
                         val messages = messagesByGroup.getOrPut(group.id) { mutableListOf() }
                         val index = messages.indexOfFirst { it.id == messageId }
                         if (index >= 0) {
-                            messages.removeAt(index)
-                            activeAdapter?.notifyMessageRemoved(index)
+                            markMessageRecalled(messages[index])
+                            activeAdapter?.notifyMessageUpdated(index)
                         }
                         onGroupSummariesChanged()
-                        onDeleted()
+                        onRecalled()
+                        Toast.makeText(activity, "已撤回", Toast.LENGTH_SHORT).show()
                     }
                     .onFailure { error ->
                         Toast.makeText(
@@ -271,10 +277,12 @@ internal class MainGroupChatActions(
                     val changed = currentMessages.size != mergedMessages.size ||
                         currentMessages.zip(mergedMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
-                                current.content != incoming.content ||
+                            current.content != incoming.content ||
                                 current.senderLabel != incoming.senderLabel ||
                                 current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
-                                current.attachments != incoming.attachments
+                                current.attachments != incoming.attachments ||
+                                current.recalledAt != incoming.recalledAt ||
+                                current.recalledBy != incoming.recalledBy
                     }
                     currentMessages.clear()
                     currentMessages.addAll(mergedMessages)
@@ -381,6 +389,14 @@ internal class MainGroupChatActions(
         }
     }
 
+    private fun markMessageRecalled(message: ChatMessage) {
+        message.content = ""
+        message.attachments = null
+        message.sendStatus = null
+        message.recalledAt = message.recalledAt ?: Instant.now().toString()
+        message.recalledBy = message.recalledBy ?: userId()
+    }
+
     private fun groupMessageFromJson(group: AppGroup, json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
         val senderUserId = json.optString("sender_user_id", "").trim()
@@ -398,8 +414,16 @@ internal class MainGroupChatActions(
             senderLabel = if (outgoing || isElAssistant) null else senderName,
             id = json.optString("id").trim().takeIf { it.isNotEmpty() },
             senderAvatarDataUrl = senderAvatar,
-            createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L
+            createdAtMs = parseChatMessageCreatedAt(json.optString("created_at", "")) ?: 0L,
+            recalledAt = json.cleanRecallString("recalled_at"),
+            recalledBy = json.cleanRecallString("recalled_by")
         )
+    }
+
+    private fun JSONObject.cleanRecallString(key: String): String? {
+        return optString(key, "")
+            .trim()
+            .takeIf { it.isNotEmpty() && !it.equals("null", ignoreCase = true) }
     }
 
     private fun readErrorMessage(body: String, fallback: String): String {

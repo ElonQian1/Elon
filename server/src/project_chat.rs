@@ -148,7 +148,13 @@ pub async fn chat_project(
     );
     let project_id_for_history = project.id.clone();
     let original_user_message = display_message.clone();
-    let task_id = match state.store.create_task_with_display_message(&project.id, &user.id, Some(&conversation_id), &message, &display_message) {
+    let task_id = match state.store.create_task_with_display_message(
+        &project.id,
+        &user.id,
+        Some(&conversation_id),
+        &message,
+        &display_message,
+    ) {
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
@@ -297,6 +303,33 @@ pub async fn chat_project(
     .into_response()
 }
 
+pub async fn recall_project_conversation_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    AxumPath((project_id, conversation_id, message_id)): AxumPath<(String, String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    if !can_edit(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前用户没有修改项目的权限");
+    }
+    match state.store.recall_user_conversation_message(
+        &project.id,
+        &user.id,
+        &conversation_id,
+        &message_id,
+    ) {
+        Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
 pub use crate::project_prewarm::{prewarm_project, prewarm_user_project};
 
 /// POST /api/projects/:project_id/chat/stream
@@ -358,7 +391,13 @@ pub async fn chat_project_stream(
         req.attachments.as_deref(),
     );
     let trace_id = clean_trace_id(req.trace_id.as_deref());
-    let task_id = match state.store.create_task_with_display_message(&project.id, &user.id, Some(&conversation_id), &message, &display_message) {
+    let task_id = match state.store.create_task_with_display_message(
+        &project.id,
+        &user.id,
+        Some(&conversation_id),
+        &message,
+        &display_message,
+    ) {
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };

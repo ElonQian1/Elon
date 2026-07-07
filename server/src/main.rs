@@ -104,6 +104,7 @@ mod intent_router;
 mod join_request_events;
 mod lan_peer;
 mod lm_chat;
+mod message_recall_migration;
 mod node_agent_cli_security;
 mod node_agent_downloads;
 mod node_api;

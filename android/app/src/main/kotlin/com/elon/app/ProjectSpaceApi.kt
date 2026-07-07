@@ -391,6 +391,32 @@ internal fun markProjectSuggestionUpdated(
     }
 }
 
+internal fun recallProjectChannelMessage(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    channelId: String,
+    messageId: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
+) {
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url(projectSpaceUrl(
+                serverUrl,
+                projectId,
+                route,
+                "channels/${projectSpaceUrlPart(channelId)}/messages/${projectSpaceUrlPart(messageId)}"
+            ))
+            .delete()
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "撤回失败"))
+    }
+}
+
 private fun postProjectChannelPayload(
     http: OkHttpClient,
     serverUrl: String,
@@ -562,7 +588,9 @@ private fun parseProjectMemberConversationMessage(json: JSONObject) = ProjectMem
     role = json.optString("role", "user"),
     content = json.optString("content", ""),
     createdAt = json.optString("created_at", ""),
-    outgoing = json.optBoolean("outgoing", false)
+    outgoing = json.optBoolean("outgoing", false),
+    recalledAt = json.cleanProjectSpaceString("recalled_at"),
+    recalledBy = json.cleanProjectSpaceString("recalled_by")
 )
 
 internal fun parseProjectChannelMessage(json: JSONObject) = ProjectChannelMessage(
@@ -585,7 +613,9 @@ internal fun parseProjectChannelMessage(json: JSONObject) = ProjectChannelMessag
     suggestionResolvedByName = json.cleanProjectSpaceString("suggestion_resolved_by_name"),
     suggestionResolvedAt = json.cleanProjectSpaceString("suggestion_resolved_at"),
     createdAt = json.optString("created_at", ""),
-    outgoing = json.optBoolean("outgoing", false)
+    outgoing = json.optBoolean("outgoing", false),
+    recalledAt = json.cleanProjectSpaceString("recalled_at"),
+    recalledBy = json.cleanProjectSpaceString("recalled_by")
 )
 
 private fun JSONObject.cleanProjectSpaceString(key: String): String? {

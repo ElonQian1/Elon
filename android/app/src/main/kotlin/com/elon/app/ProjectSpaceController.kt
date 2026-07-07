@@ -27,10 +27,10 @@ import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
 
 internal class ProjectSpaceController(
-    private val activity: AppCompatActivity,
+    internal val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
-    private val http: OkHttpClient,
-    private val serverUrl: String,
+    internal val http: OkHttpClient,
+    internal val serverUrl: String,
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val showProjectSpace: (String, Boolean) -> Unit,
     private val showProjectChannelChat: (String, Boolean) -> Unit,
@@ -49,19 +49,19 @@ internal class ProjectSpaceController(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?
 ) {
     private val pollHandler = Handler(Looper.getMainLooper())
-    private val messagesByChannel = linkedMapOf<String, MutableList<ChatMessage>>()
+    internal val messagesByChannel = linkedMapOf<String, MutableList<ChatMessage>>()
     private val messagesByMemberConversation = linkedMapOf<String, MutableList<ChatMessage>>()
     private val spaceCache = linkedMapOf<String, ProjectSpace>()
     private var activeSpace: ProjectSpace? = null
-    private var activeProjectId: String? = null
+    internal var activeProjectId: String? = null
     private var activeProjectTitle: String = "项目空间"
-    private var activeChannel: ProjectChannel? = null
-    private var activePostMessageId: String? = null
-    private var activeMemberConversation: ActiveMemberConversation? = null
-    private var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
+    internal var activeChannel: ProjectChannel? = null
+    internal var activePostMessageId: String? = null
+    internal var activeMemberConversation: ActiveMemberConversation? = null
+    internal var activeRoute: ProjectSpaceRoute = ProjectSpaceRoute()
     private var activeMemberListUserId: String? = null
     private var pendingOpenSelfMemberList = false
-    private var activeAdapter: ChatAdapter? = null
+    internal var activeAdapter: ChatAdapter? = null
     private var activePostComposer = false
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
@@ -194,7 +194,7 @@ internal class ProjectSpaceController(
         setupProjectSpaceAiMenuMotion()
     }
 
-    private data class ActiveMemberConversation(
+    internal data class ActiveMemberConversation(
         val projectId: String,
         val memberUserId: String,
         val memberAccount: String,
@@ -204,7 +204,7 @@ internal class ProjectSpaceController(
         val key: String = "$projectId:$memberUserId:$conversationId"
     }
 
-    private fun activeChannelMessageKey(channel: ProjectChannel, postId: String? = activePostMessageId): String {
+    internal fun activeChannelMessageKey(channel: ProjectChannel, postId: String? = activePostMessageId): String {
         return postId?.takeIf { it.isNotBlank() }?.let { "${channel.id}:post:$it" } ?: channel.id
     }
 
@@ -740,7 +740,7 @@ internal class ProjectSpaceController(
         pollHandler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
     }
 
-    private fun loadMessages(
+    internal fun loadMessages(
         channel: ProjectChannel,
         silent: Boolean,
         scrollToBottom: Boolean,
@@ -779,10 +779,10 @@ internal class ProjectSpaceController(
                     val changed = currentMessages.size != remoteMessages.size ||
                         currentMessages.zip(remoteMessages).any { (current, incoming) ->
                             current.role != incoming.role ||
-                                current.content != incoming.content ||
+                            current.content != incoming.content ||
                                 current.senderLabel != incoming.senderLabel ||
                                 current.senderAvatarDataUrl != incoming.senderAvatarDataUrl ||
-                                current.projectPostCard != incoming.projectPostCard
+                                current.projectPostCard != incoming.projectPostCard || current.recalledAt != incoming.recalledAt || current.recalledBy != incoming.recalledBy
                         }
                     currentMessages.clear()
                     currentMessages.addAll(remoteMessages)
@@ -886,7 +886,7 @@ internal class ProjectSpaceController(
                             current.role != incoming.role ||
                                 current.content != incoming.content ||
                                 current.senderLabel != incoming.senderLabel ||
-                                current.id != incoming.id
+                                current.id != incoming.id || current.recalledAt != incoming.recalledAt || current.recalledBy != incoming.recalledBy
                         }
                     currentMessages.clear()
                     currentMessages.addAll(remoteMessages)

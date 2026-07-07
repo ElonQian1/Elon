@@ -70,6 +70,58 @@
     }
 
     #[test]
+    fn recalled_user_conversation_message_hides_content_and_context() {
+        let store = temp_store();
+        let user = store
+            .create_user("recall-message@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Recall Message", None, None)
+            .expect("project should be created")
+            .project;
+
+        let task_id = store
+            .create_task_with_client_request_and_display_message(
+                &project.id,
+                &user.id,
+                Some("conv"),
+                Some("req-recall"),
+                "secret prompt for ai context",
+                "secret visible message",
+            )
+            .expect("task should be created");
+
+        let message_id = store
+            .list_user_conversation_messages(&project.id, &user.id, "conv", 20)
+            .expect("messages should list")
+            .into_iter()
+            .find(|message| message.task_id.as_deref() == Some(task_id.as_str()))
+            .expect("user message should exist")
+            .id;
+
+        store
+            .recall_user_conversation_message(&project.id, &user.id, "conv", &message_id)
+            .expect("message should recall");
+
+        let recalled = store
+            .list_user_conversation_messages(&project.id, &user.id, "conv", 20)
+            .expect("messages should list")
+            .into_iter()
+            .find(|message| message.id == message_id)
+            .expect("recalled message should still list");
+        assert_eq!(recalled.content, "");
+        assert_eq!(recalled.recalled_by.as_deref(), Some(user.id.as_str()));
+        assert!(recalled.recalled_at.is_some());
+
+        let recent = store
+            .list_recent_conversation_messages(&project.id, Some("conv"), 20)
+            .expect("recent messages should list");
+        assert!(recent
+            .iter()
+            .all(|message| message.content != "secret prompt for ai context"));
+    }
+
+    #[test]
     fn lists_latest_task_events_in_chronological_order() {
         let store = temp_store();
         let task_id = temp_task(&store);

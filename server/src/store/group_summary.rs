@@ -85,6 +85,7 @@ impl Store {
              FROM friend_group_messages m
              JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1
+               AND m.recalled_at IS NULL
                AND (?2 IS NULL OR m.created_at >= ?2)
                AND (?3 IS NULL OR m.created_at <= ?3)
              ORDER BY m.created_at DESC
@@ -162,6 +163,7 @@ impl Store {
              FROM friend_group_messages m
              JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1
+               AND m.recalled_at IS NULL
                AND (?2 IS NULL OR m.created_at >= ?2)
                AND (?3 IS NULL OR m.created_at <= ?3)
                AND (?4 IS NULL
@@ -524,7 +526,8 @@ impl Store {
                             m.content, m.created_at
                      FROM friend_group_messages m
                      JOIN users u ON u.id = m.sender_user_id
-                     WHERE m.group_id = ?1 AND m.id = ?2",
+                     WHERE m.group_id = ?1 AND m.id = ?2
+                       AND m.recalled_at IS NULL",
                     params![group_id, message_id],
                     group_summary_source_from_row,
                 )
@@ -540,7 +543,6 @@ impl Store {
         Ok(messages)
     }
 }
-
 
 mod helpers;
 use self::helpers::*;

@@ -5906,7 +5906,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         : (Array.isArray(contact.members)
           ? contact.members.find((member) => member.id === senderId)
           : null);
-      appendBubble(kind, msg.content || '', null, null, null, {
+      const recalled = !!(msg.recalled_at || msg.recalledAt);
+      const bubbleText = recalled
+        ? (outgoing ? '你撤回了一条消息' : (msg.sender_name ? `${msg.sender_name} 撤回了一条消息` : '对方撤回了一条消息'))
+        : (msg.content || '');
+      appendBubble(kind, bubbleText, null, null, null, {
         createdAtMs: parseServerTime(msg.created_at) || Date.now(),
         senderName: msg.sender_name || (chatKind === 'friend' ? friendDisplayName(contact) : ''),
         avatarDataUrl: avatarSource && (avatarSource.avatar_data_url || avatarSource.avatarDataUrl),

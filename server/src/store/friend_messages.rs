@@ -3,6 +3,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
 
+use super::message_recall::{
+    ensure_message_recall_allowed, recall_preview_for_viewer, recalled_content,
+};
 use super::social_ai_messages::ensure_social_ai_user;
 use super::{new_id, now, FriendChatMessage, Store, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID};
 
@@ -72,6 +75,8 @@ impl Store {
             created_at,
             context_user_id: None,
             outgoing: true,
+            recalled_at: None,
+            recalled_by: None,
         })
     }
 
@@ -83,16 +88,34 @@ impl Store {
     ) -> Result<()> {
         self.ensure_friend_pair(user_id, friend_id)?;
         let conn = self.conn()?;
-        let changed = conn.execute(
-            "DELETE FROM friend_messages
-             WHERE id = ?1
-               AND sender_user_id = ?2
-               AND receiver_user_id = ?3",
-            params![message_id, user_id, friend_id],
-        )?;
-        if changed == 0 {
-            return Err(anyhow!("只能撤销自己发送的消息"));
+        let message = conn
+            .query_row(
+                "SELECT created_at, recalled_at
+                 FROM friend_messages
+                 WHERE id = ?1
+                   AND sender_user_id = ?2
+                   AND receiver_user_id = ?3",
+                params![message_id, user_id, friend_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+        let Some((created_at, recalled_at)) = message else {
+            return Err(anyhow!("只能撤回自己发送的消息"));
+        };
+        if recalled_at.is_some() {
+            return Ok(());
         }
+        ensure_message_recall_allowed(&created_at)?;
+        conn.execute(
+            "UPDATE friend_messages
+                SET recalled_at = ?4,
+                    recalled_by = ?2
+              WHERE id = ?1
+                AND sender_user_id = ?2
+                AND receiver_user_id = ?3
+                AND recalled_at IS NULL",
+            params![message_id, user_id, friend_id, now()],
+        )?;
         Ok(())
     }
 
@@ -155,7 +178,8 @@ fn list_regular_friend_messages(
     let sql = if after.is_some() {
         "SELECT m.id, m.sender_user_id, m.receiver_user_id,
                 COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                m.content, m.attachments_json, m.created_at, m.context_user_id
+                m.content, m.attachments_json, m.created_at, m.context_user_id,
+                m.recalled_at, m.recalled_by
          FROM friend_messages m
          LEFT JOIN users u ON u.id = m.sender_user_id
          WHERE (
@@ -172,11 +196,12 @@ fn list_regular_friend_messages(
          LIMIT ?5"
     } else {
         "SELECT id, sender_user_id, receiver_user_id, sender_name,
-                content, attachments_json, created_at, context_user_id
+                content, attachments_json, created_at, context_user_id, recalled_at, recalled_by
          FROM (
              SELECT m.id, m.sender_user_id, m.receiver_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content, m.attachments_json, m.created_at, m.context_user_id
+                    m.content, m.attachments_json, m.created_at, m.context_user_id,
+                    m.recalled_at, m.recalled_by
              FROM friend_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE (
@@ -220,7 +245,8 @@ fn list_direct_social_ai_messages(
     let sql = if after.is_some() {
         "SELECT m.id, m.sender_user_id, m.receiver_user_id,
                 COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                m.content, m.attachments_json, m.created_at, m.context_user_id
+                m.content, m.attachments_json, m.created_at, m.context_user_id,
+                m.recalled_at, m.recalled_by
          FROM friend_messages m
          LEFT JOIN users u ON u.id = m.sender_user_id
          WHERE (
@@ -240,11 +266,12 @@ fn list_direct_social_ai_messages(
          LIMIT ?4"
     } else {
         "SELECT id, sender_user_id, receiver_user_id, sender_name,
-                content, attachments_json, created_at, context_user_id
+                content, attachments_json, created_at, context_user_id, recalled_at, recalled_by
          FROM (
              SELECT m.id, m.sender_user_id, m.receiver_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content, m.attachments_json, m.created_at, m.context_user_id
+                    m.content, m.attachments_json, m.created_at, m.context_user_id,
+                    m.recalled_at, m.recalled_by
              FROM friend_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE (
@@ -300,6 +327,8 @@ fn row_to_friend_message(
 ) -> rusqlite::Result<FriendChatMessage> {
     let sender_user_id: String = row.get(1)?;
     let sender_name: String = row.get(3)?;
+    let recalled_at: Option<String> = row.get(8)?;
+    let recalled_by: Option<String> = row.get(9)?;
     Ok(FriendChatMessage {
         id: row.get(0)?,
         receiver_user_id: row.get(2)?,
@@ -308,11 +337,17 @@ fn row_to_friend_message(
         } else {
             sender_name
         }),
-        content: row.get(4)?,
-        attachments: parse_attachments(row.get::<_, Option<String>>(5)?.as_deref())?,
+        content: recalled_content(row.get(4)?, recalled_at.as_deref()),
+        attachments: if recalled_at.is_some() {
+            Vec::new()
+        } else {
+            parse_attachments(row.get::<_, Option<String>>(5)?.as_deref())?
+        },
         created_at: row.get(6)?,
         context_user_id: row.get(7)?,
         outgoing: sender_user_id == user_id,
+        recalled_at,
+        recalled_by,
         sender_user_id,
     })
 }
@@ -347,6 +382,19 @@ pub(super) fn message_preview_from_parts(
 
     let attachments = parse_attachments(attachments_json)?;
     Ok(message_preview_from_attachments(&attachments))
+}
+
+pub(super) fn message_preview_for_viewer(
+    content: Option<&str>,
+    attachments_json: Option<&str>,
+    recalled_at: Option<&str>,
+    recalled_by: Option<&str>,
+    viewer_user_id: &str,
+) -> rusqlite::Result<Option<String>> {
+    if let Some(preview) = recall_preview_for_viewer(recalled_at, recalled_by, viewer_user_id) {
+        return Ok(Some(preview));
+    }
+    message_preview_from_parts(content, attachments_json)
 }
 
 fn message_preview_from_attachments(attachments: &[ProjectAttachmentRef]) -> Option<String> {

@@ -14,9 +14,9 @@ use crate::{
 };
 
 use super::{
-    ensure_project_member_can_speak, ensure_user_project_for_space,
-    project_member_can_use_channel, project_space_access, publish_channel_message_updated,
-    query_limit, ChannelMessagesQuery, SendChannelMessageRequest, DOCS_CHANNEL_KIND,
+    ensure_project_member_can_speak, ensure_user_project_for_space, project_member_can_use_channel,
+    project_space_access, publish_channel_message_updated, query_limit, ChannelMessagesQuery,
+    SendChannelMessageRequest, DOCS_CHANNEL_KIND,
 };
 
 pub async fn list_user_project_channel_messages(
@@ -144,6 +144,88 @@ pub async fn send_channel_message(
     send_channel_message_response(state, user.id, project, channel_id, req)
 }
 
+pub async fn recall_user_project_channel_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id, message_id)): Path<(String, String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    recall_channel_message_response(state, user.id, project, channel_id, message_id)
+}
+
+pub async fn recall_channel_message(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id, message_id)): Path<(String, String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_space_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    recall_channel_message_response(state, user.id, project, channel_id, message_id)
+}
+
+fn recall_channel_message_response(
+    state: Arc<AppState>,
+    user_id: String,
+    project: ProjectAccess,
+    channel_id: String,
+    message_id: String,
+) -> Response {
+    let channel_kind = match state
+        .store
+        .get_project_channel_kind(&project.id, &channel_id)
+    {
+        Ok(kind) => kind,
+        Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
+    };
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_VIEW,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权查看该频道");
+    }
+    if channel_kind == DOCS_CHANNEL_KIND {
+        return json_error(StatusCode::BAD_REQUEST, "文档频道消息不能撤回");
+    }
+    match state.store.recall_project_channel_message(
+        &user_id,
+        &project.id,
+        &channel_id,
+        &message_id,
+    ) {
+        Ok(()) => {
+            publish_channel_message_updated(
+                state.as_ref(),
+                &project.id,
+                &channel_id,
+                None,
+                None,
+                "recall",
+            );
+            Json(serde_json::json!({ "ok": true })).into_response()
+        }
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
 fn send_channel_message_response(
     state: Arc<AppState>,
     user_id: String,
@@ -210,4 +292,3 @@ fn send_channel_message_response(
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
-

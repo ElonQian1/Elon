@@ -48,6 +48,7 @@ impl Store {
                      AND m.context_user_id = ?2
                  )
              )
+              AND m.recalled_at IS NULL
              ORDER BY m.created_at DESC
              LIMIT ?4",
         )?;
@@ -100,6 +101,8 @@ impl Store {
             created_at,
             context_user_id: None,
             outgoing: false,
+            recalled_at: None,
+            recalled_by: None,
         })
     }
 
@@ -119,6 +122,7 @@ impl Store {
              FROM friend_group_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1
+               AND m.recalled_at IS NULL
              ORDER BY m.created_at DESC
              LIMIT ?2",
         )?;
@@ -223,6 +227,8 @@ impl Store {
             attachments: Vec::new(),
             created_at,
             outgoing: false,
+            recalled_at: None,
+            recalled_by: None,
         })
     }
 }
@@ -269,6 +275,8 @@ fn social_ai_friend_message(
         created_at: created_at.to_string(),
         context_user_id: Some(context_user_id.to_string()),
         outgoing: false,
+        recalled_at: None,
+        recalled_by: None,
     }
 }
 
@@ -352,6 +360,7 @@ fn list_recent_direct_social_ai_messages(
                  AND m.context_user_id IS NULL
              )
          )
+           AND m.recalled_at IS NULL
          ORDER BY m.created_at DESC
          LIMIT ?3",
     )?;
@@ -421,7 +430,6 @@ fn normalize_reply_content(content: &str) -> Result<String> {
     }
     Ok(content.chars().take(4000).collect())
 }
-
 
 #[cfg(test)]
 #[path = "social_ai_messages_tests.rs"]

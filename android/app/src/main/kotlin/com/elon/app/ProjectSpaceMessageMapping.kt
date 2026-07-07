@@ -16,6 +16,7 @@ internal fun ProjectChannelMessage.toChatMessage(
         "system" -> "ai"
         else -> if (outgoing) "user" else "friend"
     }
+    val isRecalled = !recalledAt.isNullOrBlank()
     val postText = parseProjectSpacePostText(content)
     val displayContent = if (kind == "ai_progress") {
         assistantProgressText ?: projectSpaceAiProgressText(content)
@@ -23,7 +24,7 @@ internal fun ProjectChannelMessage.toChatMessage(
         postText.detailText
     }
     val cleanSenderName = senderName.cleanProjectSpaceDisplayName()
-    val postCard = if (postText.structured && channel?.isProjectSpaceFeedChannel() == true) {
+    val postCard = if (!isRecalled && postText.structured && channel?.isProjectSpaceFeedChannel() == true) {
         ChatProjectPostCard(
             title = postText.title,
             body = projectSpacePostBodyWithoutImages(postText.body),
@@ -41,32 +42,34 @@ internal fun ProjectChannelMessage.toChatMessage(
     } else {
         null
     }
-    val evidence = if (assistantProgressText != null) {
+    val evidence = if (isRecalled || assistantProgressText != null) {
         emptyList()
     } else {
         taskEvidenceEntries() + projectSpaceAiProgressEvidence(content)
     }
     return ChatMessage(
         role = role,
-        content = displayContent,
+        content = if (isRecalled) "" else displayContent,
         projectPostCard = postCard,
         senderLabel = if (role == "friend") cleanSenderName else null,
         senderAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
         id = id,
-        apkUrl = taskApkUrl.takeIf { kind == "ai_result" },
-        codexThreadUri = if (assistantProgressText == null) {
+        apkUrl = taskApkUrl.takeIf { !isRecalled && kind == "ai_result" },
+        codexThreadUri = if (!isRecalled && assistantProgressText == null) {
             taskCodexThreadId?.let { "codex://threads/$it" }
         } else {
             null
         },
         evidenceTitle = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceTitle),
         evidenceDetails = evidence.takeIf { it.isNotEmpty() }?.let(::evidenceDetails),
-        finalReply = kind == "ai_result",
-        suggestionStatus = suggestionStatus,
-        suggestionResolvedByName = suggestionResolvedByName,
-        suggestionResolvedAt = suggestionResolvedAt,
-        canResolveSuggestion = canResolveSuggestion(projectRole),
-        createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
+        finalReply = !isRecalled && kind == "ai_result",
+        suggestionStatus = suggestionStatus.takeIf { !isRecalled },
+        suggestionResolvedByName = suggestionResolvedByName.takeIf { !isRecalled },
+        suggestionResolvedAt = suggestionResolvedAt.takeIf { !isRecalled },
+        canResolveSuggestion = !isRecalled && canResolveSuggestion(projectRole),
+        createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L,
+        recalledAt = recalledAt,
+        recalledBy = recalledBy
     )
 }
 
@@ -134,13 +137,16 @@ internal fun ProjectMemberConversationMessage.toChatMessage(): ChatMessage {
         "assistant", "system" -> "ai"
         else -> if (outgoing) "user" else "friend"
     }
+    val isRecalled = !recalledAt.isNullOrBlank()
     return ChatMessage(
         role = chatRole,
-        content = content,
+        content = if (isRecalled) "" else content,
         senderLabel = if (chatRole == "friend") senderName ?: userId ?: "成员" else null,
         senderAvatarDataUrl = senderAvatarDataUrl.cleanProjectSpaceDisplayName(),
         id = id,
-        createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L
+        createdAtMs = parseChatMessageCreatedAt(createdAt) ?: 0L,
+        recalledAt = recalledAt,
+        recalledBy = recalledBy
     )
 }
 

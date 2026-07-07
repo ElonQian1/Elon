@@ -4,7 +4,8 @@ use std::collections::BTreeSet;
 
 use crate::project_ws_protocol::ProjectAttachmentRef;
 
-use super::friend_messages::{attachments_to_json, message_preview_from_parts, parse_attachments};
+use super::friend_messages::{attachments_to_json, message_preview_for_viewer, parse_attachments};
+use super::message_recall::{ensure_message_recall_allowed, recalled_content};
 use super::{new_id, now, FriendGroupMemberPreview, FriendGroupMessage, FriendGroupProfile, Store};
 
 impl Store {
@@ -19,6 +20,8 @@ impl Store {
                     ) AS member_count,
                     latest.content,
                     latest.attachments_json,
+                    latest.recalled_at,
+                    latest.recalled_by,
                     latest.created_at,
                     (
                         SELECT COUNT(*)
@@ -54,13 +57,18 @@ impl Store {
                     last_message: {
                         let last_content: Option<String> = row.get(4)?;
                         let last_attachments_json: Option<String> = row.get(5)?;
-                        message_preview_from_parts(
+                        let recalled_at: Option<String> = row.get(6)?;
+                        let recalled_by: Option<String> = row.get(7)?;
+                        message_preview_for_viewer(
                             last_content.as_deref(),
                             last_attachments_json.as_deref(),
+                            recalled_at.as_deref(),
+                            recalled_by.as_deref(),
+                            user_id,
                         )?
                     },
-                    last_message_at: row.get(6)?,
-                    unread_count: row.get(7)?,
+                    last_message_at: row.get(8)?,
+                    unread_count: row.get(9)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -146,18 +154,18 @@ impl Store {
         let sql = if after.is_some() {
             "SELECT m.id, m.group_id, m.sender_user_id,
                     COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                    m.content, m.attachments_json, m.created_at
+                    m.content, m.attachments_json, m.created_at, m.recalled_at, m.recalled_by
              FROM friend_group_messages m
              JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1 AND m.created_at > ?2
              ORDER BY m.created_at ASC
              LIMIT ?3"
         } else {
-            "SELECT id, group_id, sender_user_id, sender_name, content, attachments_json, created_at
+            "SELECT id, group_id, sender_user_id, sender_name, content, attachments_json, created_at, recalled_at, recalled_by
              FROM (
                  SELECT m.id, m.group_id, m.sender_user_id,
                         COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
-                        m.content, m.attachments_json, m.created_at
+                        m.content, m.attachments_json, m.created_at, m.recalled_at, m.recalled_by
                  FROM friend_group_messages m
                  JOIN users u ON u.id = m.sender_user_id
                  WHERE m.group_id = ?1
@@ -232,6 +240,8 @@ impl Store {
             attachments: attachments.unwrap_or(&[]).to_vec(),
             created_at,
             outgoing: true,
+            recalled_at: None,
+            recalled_by: None,
         })
     }
 
@@ -243,16 +253,34 @@ impl Store {
     ) -> Result<()> {
         self.ensure_group_member(user_id, group_id)?;
         let conn = self.conn()?;
-        let changed = conn.execute(
-            "DELETE FROM friend_group_messages
-             WHERE id = ?1
-               AND group_id = ?2
-               AND sender_user_id = ?3",
-            params![message_id, group_id, user_id],
-        )?;
-        if changed == 0 {
-            return Err(anyhow!("只能撤销自己发送的消息"));
+        let message = conn
+            .query_row(
+                "SELECT created_at, recalled_at
+                 FROM friend_group_messages
+                 WHERE id = ?1
+                   AND group_id = ?2
+                   AND sender_user_id = ?3",
+                params![message_id, group_id, user_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?;
+        let Some((created_at, recalled_at)) = message else {
+            return Err(anyhow!("只能撤回自己发送的消息"));
+        };
+        if recalled_at.is_some() {
+            return Ok(());
         }
+        ensure_message_recall_allowed(&created_at)?;
+        conn.execute(
+            "UPDATE friend_group_messages
+                SET recalled_at = ?4,
+                    recalled_by = ?3
+              WHERE id = ?1
+                AND group_id = ?2
+                AND sender_user_id = ?3
+                AND recalled_at IS NULL",
+            params![message_id, group_id, user_id, now()],
+        )?;
         conn.execute(
             "UPDATE friend_groups SET updated_at = ?1 WHERE id = ?2",
             params![now(), group_id],
@@ -481,14 +509,22 @@ fn row_to_group_message(
     user_id: &str,
 ) -> rusqlite::Result<FriendGroupMessage> {
     let sender_user_id: String = row.get(2)?;
+    let recalled_at: Option<String> = row.get(7)?;
+    let recalled_by: Option<String> = row.get(8)?;
     Ok(FriendGroupMessage {
         id: row.get(0)?,
         group_id: row.get(1)?,
         sender_name: row.get(3)?,
-        content: row.get(4)?,
-        attachments: parse_attachments(row.get::<_, Option<String>>(5)?.as_deref())?,
+        content: recalled_content(row.get(4)?, recalled_at.as_deref()),
+        attachments: if recalled_at.is_some() {
+            Vec::new()
+        } else {
+            parse_attachments(row.get::<_, Option<String>>(5)?.as_deref())?
+        },
         created_at: row.get(6)?,
         outgoing: sender_user_id == user_id,
+        recalled_at,
+        recalled_by,
         sender_user_id,
     })
 }

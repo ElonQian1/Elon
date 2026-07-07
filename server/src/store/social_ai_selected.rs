@@ -32,6 +32,7 @@ impl Store {
                        AND m.context_user_id = ?2
                    )
                )
+               AND m.recalled_at IS NULL
              LIMIT 1",
             params![user_id, friend_id, message_id, SOCIAL_AI_USER_ID],
             |row| {
@@ -64,6 +65,7 @@ impl Store {
              FROM friend_group_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              WHERE m.group_id = ?1 AND m.id = ?2
+               AND m.recalled_at IS NULL
              LIMIT 1",
             params![group_id, message_id],
             |row| {
