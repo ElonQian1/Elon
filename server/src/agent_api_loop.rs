@@ -5,7 +5,10 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
 use crate::{
-    agent_llm_call::{call_chat_llm, call_llm, execute_tool},
+    agent_fallback::{
+        call_chat_llm_with_default_fallback_options, call_tool_llm_with_default_fallback_options,
+    },
+    agent_llm_call::execute_tool,
     agent_prompts::system_prompt,
     agent_routing::{casual_chat_prompt, is_local_cli_option, quick_casual_reply},
     agent_tool_calls::extract_tool_calls,
@@ -20,6 +23,23 @@ pub(crate) async fn resolve_agent(
     workspace: &std::path::Path,
     agent_name: Option<&str>,
 ) -> Result<AgentConfig> {
+    Ok(
+        resolve_agent_with_fallback_policy(state, workspace, agent_name)
+            .await?
+            .agent,
+    )
+}
+
+struct ResolvedApiAgent {
+    agent: AgentConfig,
+    allow_server_fallback: bool,
+}
+
+async fn resolve_agent_with_fallback_policy(
+    state: &Arc<AppState>,
+    workspace: &std::path::Path,
+    agent_name: Option<&str>,
+) -> Result<ResolvedApiAgent> {
     let global = state.agents_config.read().await;
     if let Some(cfg) = UserAgentConfig::load(workspace) {
         let uses_local_cli = cfg
@@ -28,25 +48,39 @@ pub(crate) async fn resolve_agent(
             .map(|name| is_local_cli_option(state, name))
             .unwrap_or(false);
         if cfg.has_config() && !uses_local_cli {
-            return cfg.resolve(&global).ok_or_else(|| {
+            let agent = cfg.resolve(&global).ok_or_else(|| {
                 anyhow::anyhow!("未找到可用 API 代理，请在后台配置 AGENT_* 或切回 Codex CLI")
+            })?;
+            return Ok(ResolvedApiAgent {
+                agent,
+                allow_server_fallback: false,
             });
         }
     }
 
-    global
+    let agent = global
         .get_agent(agent_name)
         .cloned()
-        .ok_or_else(|| anyhow::anyhow!("未配置 API 代理，请设置 AGENT_* 或使用 Codex CLI"))
+        .ok_or_else(|| anyhow::anyhow!("未配置 API 代理，请设置 AGENT_* 或使用 Codex CLI"))?;
+    let allow_server_fallback = agent_name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .is_none()
+        && agent.usage_mode() == "server_api_key";
+    Ok(ResolvedApiAgent {
+        agent,
+        allow_server_fallback,
+    })
 }
 
 async fn run_casual_chat(
     state: &Arc<AppState>,
     agent: &AgentConfig,
+    allow_agent_fallback: bool,
     user_id: &str,
     user_message: &str,
     memories: &[crate::store::UserMemory],
-) -> Result<(String, Option<String>, String)> {
+) -> Result<(String, Option<String>, String, bool)> {
     let system_content = if memories.is_empty() {
         casual_chat_prompt().to_string()
     } else {
@@ -77,10 +111,20 @@ async fn run_casual_chat(
         crate::agent_llm_call::try_casual_chat_via_node(state, &agent.model, &messages, user_id)
             .await
     {
-        return Ok((content, Some(node_id), model_id));
+        return Ok((content, Some(node_id), model_id, false));
     }
 
-    let response = call_chat_llm(state, agent, &messages, user_id, "chat").await?;
+    let (response, used_agent, used_fallback) = call_chat_llm_with_default_fallback_options(
+        state,
+        agent,
+        allow_agent_fallback,
+        &messages,
+        user_id,
+        "chat",
+        0.8,
+        700,
+    )
+    .await?;
 
     let reply = response["choices"][0]["message"]["content"]
         .as_str()
@@ -95,7 +139,8 @@ async fn run_casual_chat(
             reply
         },
         None,
-        agent.model.clone(),
+        used_agent.model,
+        used_fallback,
     ))
 }
 
@@ -152,7 +197,9 @@ pub(crate) async fn run_api_inner_with_workspace(
             return Ok(());
         }
 
-        let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
+        let resolved_agent =
+            resolve_agent_with_fallback_policy(state, &user_config_workspace, agent_name).await?;
+        let agent = resolved_agent.agent;
         let _ = tx.send(
             WsMessage::progress(format!(
                 "正在使用 AI 代理聊天: {} ({})",
@@ -163,8 +210,19 @@ pub(crate) async fn run_api_inner_with_workspace(
 
         let memories =
             load_context_memories(state, user_id, memory_scope_type, memory_scope_id, 20);
-        let (reply, chat_node_id, chat_model) =
-            run_casual_chat(state, &agent, user_id, user_message, &memories).await?;
+        let (reply, chat_node_id, chat_model, used_fallback) = run_casual_chat(
+            state,
+            &agent,
+            resolved_agent.allow_server_fallback,
+            user_id,
+            user_message,
+            &memories,
+        )
+        .await?;
+        if used_fallback {
+            let _ =
+                tx.send(WsMessage::progress("默认 AI 通道不可用，已切换备用 AI 通道。").to_json());
+        }
         let state2 = state.clone();
         let uid = user_id.to_string();
         let umsg = user_message.to_string();
@@ -221,13 +279,16 @@ pub(crate) async fn run_api_inner_with_workspace(
             .current_dir(&workspace)
             .output();
     }
-    let agent = resolve_agent(state, &user_config_workspace, agent_name).await?;
+    let resolved_agent =
+        resolve_agent_with_fallback_policy(state, &user_config_workspace, agent_name).await?;
+    let mut active_agent = resolved_agent.agent;
     let workspace_str = workspace.to_string_lossy().to_string();
 
     if planning_mode {
         return run_api_plan(
             state,
-            &agent,
+            &active_agent,
+            resolved_agent.allow_server_fallback,
             user_id,
             &workspace_str,
             user_message,
@@ -240,7 +301,7 @@ pub(crate) async fn run_api_inner_with_workspace(
     let _ = tx.send(
         WsMessage::progress(format!(
             "正在使用 AI 代理: {} ({})",
-            agent.name, agent.model
+            active_agent.name, active_agent.model
         ))
         .to_json(),
     );
@@ -281,7 +342,25 @@ pub(crate) async fn run_api_inner_with_workspace(
 
     // 工具调用循环（最多 20 轮，防止死循环）
     for _round in 0..20 {
-        let response = call_llm(state, &agent, &messages, user_id, "agent_tool").await?;
+        let (response, used_agent, used_fallback) = call_tool_llm_with_default_fallback_options(
+            state,
+            &active_agent,
+            resolved_agent.allow_server_fallback,
+            &messages,
+            user_id,
+            "agent_tool",
+        )
+        .await?;
+        if used_fallback {
+            let _ = tx.send(
+                WsMessage::progress(format!(
+                    "默认 AI 通道不可用，已切换备用 AI 通道: {} ({})",
+                    used_agent.name, used_agent.model
+                ))
+                .to_json(),
+            );
+            active_agent = used_agent;
+        }
 
         let choice = &response["choices"][0];
         let finish_reason = choice["finish_reason"].as_str().unwrap_or("");
@@ -304,7 +383,7 @@ pub(crate) async fn run_api_inner_with_workspace(
                     message: final_text,
                     apk_url: apk_url.clone(),
                     image_url: None,
-                    model_used: Some(agent.model.clone()),
+                    model_used: Some(active_agent.model.clone()),
                     node_id: None,
                 }
                 .to_json(),
@@ -354,14 +433,26 @@ pub(crate) async fn run_api_inner_with_workspace(
                             .to_json(),
                         );
                         execute_tool(
-                            state, &workspace, &agent, &tool_name, &args, user_id, trace_id,
+                            state,
+                            &workspace,
+                            &active_agent,
+                            &tool_name,
+                            &args,
+                            user_id,
+                            trace_id,
                         )
                     } else {
                         r
                     }
                 } else {
                     execute_tool(
-                        state, &workspace, &agent, &tool_name, &args, user_id, trace_id,
+                        state,
+                        &workspace,
+                        &active_agent,
+                        &tool_name,
+                        &args,
+                        user_id,
+                        trace_id,
                     )
                 };
 
@@ -420,7 +511,7 @@ pub(crate) async fn run_api_inner_with_workspace(
             message: "任务执行完毕".into(),
             apk_url,
             image_url: None,
-            model_used: Some(agent.model.clone()),
+            model_used: Some(active_agent.model.clone()),
             node_id: None,
         }
         .to_json(),
@@ -432,6 +523,7 @@ pub(crate) async fn run_api_inner_with_workspace(
 async fn run_api_plan(
     state: &Arc<AppState>,
     agent: &crate::types::AgentConfig,
+    allow_agent_fallback: bool,
     user_id: &str,
     workspace: &str,
     user_message: &str,
@@ -459,7 +551,26 @@ async fn run_api_plan(
             )
         }),
     ];
-    let response = call_chat_llm(state, agent, &messages, user_id, "plan").await?;
+    let (response, used_agent, used_fallback) = call_chat_llm_with_default_fallback_options(
+        state,
+        agent,
+        allow_agent_fallback,
+        &messages,
+        user_id,
+        "plan",
+        0.8,
+        700,
+    )
+    .await?;
+    if used_fallback {
+        let _ = tx.send(
+            WsMessage::progress(format!(
+                "默认 AI 通道不可用，已切换备用 AI 通道: {} ({})",
+                used_agent.name, used_agent.model
+            ))
+            .to_json(),
+        );
+    }
     let reply = response["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("计划生成完成。确认后发送「按这个计划开始实现」。")
@@ -469,7 +580,7 @@ async fn run_api_plan(
             message: reply,
             apk_url: None,
             image_url: None,
-            model_used: Some(agent.model.clone()),
+            model_used: Some(used_agent.model),
             node_id: None,
         }
         .to_json(),

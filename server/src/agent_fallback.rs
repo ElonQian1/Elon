@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::{
-    agent_llm_call::call_chat_llm_with_options,
+    agent_llm_call::{call_chat_llm_with_options, call_llm},
     types::{AgentConfig, AgentsConfig, AppState},
 };
 
@@ -72,6 +72,59 @@ pub(crate) async fn call_chat_llm_with_default_fallback_options(
     ))
 }
 
+pub(crate) async fn call_tool_llm_with_default_fallback_options(
+    state: &Arc<AppState>,
+    preferred: &AgentConfig,
+    allow_fallback: bool,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+) -> Result<(Value, AgentConfig, bool)> {
+    let mut agents = vec![preferred.clone()];
+    if allow_fallback {
+        append_fallback_agents(state, preferred, &mut agents).await;
+    }
+
+    let mut last_retryable_error = None;
+    for (index, agent) in agents.iter().enumerate() {
+        match call_llm(state, agent, messages, user_id, feature).await {
+            Ok(response) => return Ok((response, agent.clone(), index > 0)),
+            Err(error) => {
+                let message = error.to_string();
+                let has_next = index + 1 < agents.len();
+                if !is_retryable_agent_error(&message) || !has_next {
+                    return Err(anyhow!(message));
+                }
+                warn!(
+                    feature,
+                    agent = %agent.name,
+                    model = %agent.model,
+                    "AI agent failed, trying fallback: {}",
+                    message
+                );
+                last_retryable_error = Some(message);
+            }
+        }
+    }
+
+    Err(anyhow!(
+        "{}",
+        last_retryable_error.unwrap_or_else(|| "未配置可用 AI 代理".to_string())
+    ))
+}
+
+async fn append_fallback_agents(
+    state: &Arc<AppState>,
+    preferred: &AgentConfig,
+    agents: &mut Vec<AgentConfig>,
+) {
+    for agent in server_api_agents_in_fallback_order(state).await {
+        if agent.name != preferred.name {
+            agents.push(agent);
+        }
+    }
+}
+
 pub(crate) async fn server_api_agents_in_fallback_order(state: &Arc<AppState>) -> Vec<AgentConfig> {
     let config = state.agents_config.read().await;
     ordered_server_api_agents(&config)
@@ -124,18 +177,23 @@ pub(crate) fn is_retryable_agent_error(message: &str) -> bool {
     }
 
     lower.contains("当前 ai 模型额度已用尽")
+        || lower.contains("当前 ai 模型已下线")
+        || lower.contains("当前 ai 模型配置不存在")
         || lower.contains("当前 ai 模型密钥无效")
         || lower.contains("当前 ai 模型请求过于频繁")
         || lower.contains("ai 服务暂时不可用")
         || lower.contains("ai 服务返回错误")
         || lower.contains("ai 请求失败")
         || lower.contains("ai 请求超时")
+        || lower.contains("模型已下线")
         || lower.contains("endpoint is inactive")
         || lower.contains("free_quota_exhausted")
+        || lower.contains("free trial quota")
+        || lower.contains("postpaid billing is not enabled")
+        || lower.contains("model or service id")
         || lower.contains("payment required")
         || lower.contains("rate limit")
 }
-
 
 #[cfg(test)]
 #[path = "agent_fallback_tests.rs"]

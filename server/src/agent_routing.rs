@@ -195,6 +195,11 @@ pub(crate) fn quick_casual_reply(user_message: &str) -> Option<String> {
         "谢谢" | "谢谢你" | "辛苦了" => {
             Some("不客气，我在这边。你继续说下一步想怎么改就行。".into())
         }
+        "真的能改吗" | "真的能改吗？" | "真的能改吗?" | "能改吗" | "能改代码吗"
+        | "你能改代码吗" | "可以改代码吗" => Some(
+            "能改。你把具体需求发过来，我会直接改代码、查问题、构建 APK 或部署；如果平台模型或节点通道不可用，我会明确告诉你卡在哪里。"
+                .into(),
+        ),
         _ => None,
     }
 }
@@ -261,6 +266,7 @@ mod tests {
         assert!(quick_casual_reply("你好，在吗").is_some());
         assert!(quick_casual_reply("你好吗？").is_some());
         assert!(quick_casual_reply("你好？").is_some());
+        assert!(quick_casual_reply("真的能改吗?").is_some());
     }
 
     #[test]

@@ -270,7 +270,7 @@ fn should_retry_without_json_response_mode(status: reqwest::StatusCode, body: &s
 #[cfg(test)]
 mod tests {
     use super::{
-        chat_completion_body, looks_like_node_casual_chat_failure,
+        chat_completion_body, friendly_ai_api_error, looks_like_node_casual_chat_failure,
         should_retry_without_json_response_mode,
     };
     use crate::types::AgentConfig;
@@ -310,6 +310,29 @@ mod tests {
             reqwest::StatusCode::TOO_MANY_REQUESTS,
             "rate limit"
         ));
+    }
+
+    #[test]
+    fn friendly_error_hides_deprecated_model_json() {
+        let message = friendly_ai_api_error(
+            reqwest::StatusCode::BAD_REQUEST,
+            r#"{"error":{"message":"该模型已下线，请根据迁移指南前往TokenHub平台体验最新模型服务。","code":"2030"}}"#,
+        );
+
+        assert!(message.contains("模型已下线"));
+        assert!(message.contains("TokenHub"));
+        assert!(!message.contains("{\"error\""));
+    }
+
+    #[test]
+    fn friendly_error_explains_tokenhub_postpaid_quota() {
+        let message = friendly_ai_api_error(
+            reqwest::StatusCode::PAYMENT_REQUIRED,
+            "The free trial quota for the service has been exhausted and postpaid billing is not enabled.",
+        );
+
+        assert!(message.contains("后付费"));
+        assert!(!message.contains("free trial quota"));
     }
 
     #[test]
@@ -353,12 +376,30 @@ fn ensure_api_call_allowed(
 
 pub(crate) fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> String {
     let lower = body.to_lowercase();
+    if lower.contains("该模型已下线")
+        || lower.contains("模型已下线")
+        || lower.contains("\"code\":\"2030\"")
+        || lower.contains("\"code\":2030")
+        || lower.contains("model has been discontinued")
+        || lower.contains("model is discontinued")
+    {
+        return "当前 AI 模型已下线，请管理员迁移到 TokenHub 的可用模型或切换其他可用模型通道"
+            .into();
+    }
+    if lower.contains("model or service id")
+        && (lower.contains("does not exist") || lower.contains("not exist"))
+    {
+        return "当前 AI 模型配置不存在，请管理员检查 TokenHub 服务 ID 或切换其他可用模型通道"
+            .into();
+    }
     if status.as_u16() == 402
         || lower.contains("free_quota_exhausted")
+        || lower.contains("free trial quota")
+        || lower.contains("postpaid billing is not enabled")
         || lower.contains("payment required")
         || lower.contains("endpoint is inactive")
     {
-        return "当前 AI 模型额度已用尽或接口不可用，请切换可用模型，或联系管理员补充额度后重试"
+        return "当前 AI 模型额度已用尽或未开启后付费，请切换可用模型，或联系管理员补充额度后重试"
             .into();
     }
     if status.as_u16() == 401 || lower.contains("unauthorized") || lower.contains("invalid api key")

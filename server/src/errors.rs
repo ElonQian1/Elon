@@ -188,6 +188,19 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
         };
     }
 
+    if contains_model_config_error(&lower) {
+        return ClassifiedAiError {
+            code: "ai_model_config_unavailable",
+            category: AiErrorCategory::AuthConfig,
+            retryable: false,
+            retry_after_secs: None,
+            message:
+                "当前平台 AI 模型已下线或模型服务 ID 配置不正确。请管理员迁移到 TokenHub 的可用模型，或切换到其他有效模型通道后再试。"
+                    .into(),
+            operator_detail: detail,
+        };
+    }
+
     if contains_quota_error(&lower) {
         return ClassifiedAiError {
             code: "ai_quota_unavailable",
@@ -313,6 +326,8 @@ fn contains_rate_limit_error(lower: &str) -> bool {
 fn contains_quota_error(lower: &str) -> bool {
     lower.contains("free_quota_exhausted")
         || lower.contains("payment required")
+        || lower.contains("free trial quota")
+        || lower.contains("postpaid billing is not enabled")
         || lower.contains("insufficient quota")
         || lower.contains("quota exceeded")
         || lower.contains("usage limit")
@@ -320,6 +335,17 @@ fn contains_quota_error(lower: &str) -> bool {
         || lower.contains("usage exhausted")
         || lower.contains("额度已用尽")
         || lower.contains("endpoint is inactive")
+}
+
+fn contains_model_config_error(lower: &str) -> bool {
+    lower.contains("该模型已下线")
+        || lower.contains("模型已下线")
+        || lower.contains("当前 ai 模型已下线")
+        || lower.contains("model has been discontinued")
+        || lower.contains("model is discontinued")
+        || lower.contains("\"code\":\"2030\"")
+        || lower.contains("\"code\":2030")
+        || lower.contains("model or service id") && lower.contains("does not exist")
 }
 
 fn contains_codex_usage_limit_error(lower: &str) -> bool {
@@ -403,7 +429,6 @@ fn truncate_chars(text: &str, max_chars: usize) -> String {
     }
     value
 }
-
 
 #[cfg(test)]
 #[path = "errors_tests.rs"]
