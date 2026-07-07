@@ -1,8 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
   Apple,
-  Bot,
-  ChevronRight,
   CircleCheck,
   Download,
   ExternalLink,
@@ -10,13 +8,10 @@ import {
   Globe2,
   Hash,
   Laptop,
-  Link2,
-  Megaphone,
   Monitor,
   PackageCheck,
   Rocket,
   Smartphone,
-  Sparkles,
   Terminal,
   UsersRound,
   Wrench,
@@ -65,13 +60,6 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
   const tagline = landing?.tagline || project.description || '项目空间'
   const description = landing?.summary || landing?.description || project.description
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
-  const quickActions = buildQuickActions({
-    firstDownload,
-    externalUrl,
-    buildChannel,
-    resources,
-    onSelectChannel,
-  })
   const primaryAction = buildPrimaryAction({
     devChannel,
     buildChannel,
@@ -79,10 +67,6 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
     externalUrl,
     onSelectChannel,
   })
-  const highlightTiles = buildHighlightTiles(landing, project, availableDownloads.length, channels.length)
-  const entryChannels = buildEntryChannels(channels)
-  const visibleEntryChannels = entryChannels.slice(0, 5)
-  const hiddenEntryCount = Math.max(entryChannels.length - visibleEntryChannels.length, 0)
 
   return (
     <div className={styles.landing}>
@@ -122,107 +106,19 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
             </span>
             <em>{primaryAction.label}</em>
           </button>
-
-          {quickActions.length > 0 && (
-            <div className={styles.quickActions}>
-              {quickActions.map((action) => (
-                <button key={action.key} className={styles.quickAction} type="button" onClick={action.onClick}>
-                  <action.icon size={15} aria-hidden="true" />
-                  <span>{action.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
-      <div className={styles.contentGrid}>
-        <main className={styles.mainStack}>
-          {downloads.length > 0 && (
-            <section id="landing-downloads" className={styles.section}>
-              <SectionHeader icon={Download} title="下载安装" note={availableDownloads.length ? '可用入口优先显示' : '等待发布'} />
-              <div className={styles.downloadGrid}>
-                {downloads.map((download, index) => (
-                  <DownloadCard key={`${download.platform ?? 'download'}-${index}`} download={download} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className={styles.section}>
-            <SectionHeader icon={Sparkles} title="项目预览" />
-            <div className={styles.previewGrid}>
-              {highlightTiles.map((tile) => (
-                <div key={tile.title} className={styles.previewTile}>
-                  <tile.icon size={18} aria-hidden="true" />
-                  <strong>{tile.title}</strong>
-                  <span>{tile.detail}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </main>
-
-        <aside className={styles.sideStack}>
-          {(channels.length > 0 || resources.length > 0 || externalUrl) && (
-            <section className={styles.sideSection}>
-              <SectionHeader icon={Hash} title="常用入口" />
-              <div className={styles.entryList}>
-                {visibleEntryChannels.map((channel) => (
-                  <button
-                    key={channel.id}
-                    className={styles.entryRow}
-                    type="button"
-                    onClick={() => onSelectChannel(channel.id)}
-                  >
-                    <span className={styles.entryIcon}>
-                      {channelIcon(channel.kind)}
-                    </span>
-                    <span className={styles.entryCopy}>
-                      <strong>{channel.name}</strong>
-                      {channel.description && <small>{channel.description}</small>}
-                    </span>
-                    <ChevronRight size={14} aria-hidden="true" />
-                  </button>
-                ))}
-                {hiddenEntryCount > 0 && (
-                  <div className={styles.entryMore}>
-                    <span className={styles.entryIcon}>
-                      <Hash size={14} aria-hidden="true" />
-                    </span>
-                    <span>还有 {hiddenEntryCount} 个频道</span>
-                  </div>
-                )}
-                {externalUrl && (
-                  <button className={styles.entryRow} type="button" onClick={() => openUrl(externalUrl)}>
-                    <span className={styles.entryIcon}><ExternalLink size={14} aria-hidden="true" /></span>
-                    <span className={styles.entryCopy}>
-                      <strong>完整介绍</strong>
-                      <small>打开项目主页或外部页面</small>
-                    </span>
-                    <ChevronRight size={14} aria-hidden="true" />
-                  </button>
-                )}
-                {resources.map((resource) => (
-                  <button
-                    key={resource.url}
-                    className={styles.entryRow}
-                    type="button"
-                    onClick={() => resource.url && openUrl(resource.url)}
-                  >
-                    <span className={styles.entryIcon}><Link2 size={14} aria-hidden="true" /></span>
-                    <span className={styles.entryCopy}>
-                      <strong>{resource.label || '相关链接'}</strong>
-                      <small>{resource.url}</small>
-                    </span>
-                    <ChevronRight size={14} aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
-            </section>
-          )}
-        </aside>
-      </div>
+      {downloads.length > 0 && (
+        <section id="landing-downloads" className={styles.downloadSection}>
+          <SectionHeader icon={Download} title="下载安装" note={availableDownloads.length ? '可用入口优先显示' : '等待发布'} />
+          <div className={styles.downloadGrid}>
+            {downloads.map((download, index) => (
+              <DownloadCard key={`${download.platform ?? 'download'}-${index}`} download={download} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
@@ -343,76 +239,6 @@ function buildPrimaryAction({
     disabled: true,
     onClick: () => undefined,
   }
-}
-
-function buildQuickActions({
-  firstDownload,
-  externalUrl,
-  buildChannel,
-  resources,
-  onSelectChannel,
-}: {
-  firstDownload?: ProjectLandingDownload
-  externalUrl?: string
-  buildChannel?: Channel
-  resources: Array<{ label?: string; url?: string }>
-  onSelectChannel: (id: string) => void
-}) {
-  const actions: Array<{ key: string; icon: LucideIcon; label: string; onClick: () => void }> = []
-  if (firstDownload) actions.push({ key: 'download', icon: Download, label: '下载', onClick: () => openDownload(firstDownload) })
-  if (buildChannel) actions.push({ key: 'build', icon: PackageCheck, label: '交付记录', onClick: () => onSelectChannel(buildChannel.id) })
-  if (externalUrl) actions.push({ key: 'external', icon: ExternalLink, label: '主页', onClick: () => openUrl(externalUrl) })
-  const firstResource = resources.find((resource) => resource.url && resource.url !== externalUrl)
-  if (firstResource?.url) actions.push({ key: 'resource', icon: Link2, label: firstResource.label || '链接', onClick: () => openUrl(firstResource.url!) })
-  return actions.slice(0, 3)
-}
-
-function buildHighlightTiles(
-  landing: ProjectLandingData | null,
-  project: Project,
-  availableDownloadCount: number,
-  channelCount: number,
-) {
-  const highlights = landing?.highlights ?? []
-  const targetUsers = landing?.target_users ?? []
-  const base = [
-    {
-      icon: Sparkles,
-      title: highlights[0] || '项目定位',
-      detail: landing?.summary || project.description || '围绕这个项目持续开发、沟通和交付',
-    },
-    {
-      icon: Download,
-      title: availableDownloadCount ? '可安装交付' : '交付准备中',
-      detail: availableDownloadCount ? `${availableDownloadCount} 个入口可用` : '安装包和网页入口会在发布后出现',
-    },
-    {
-      icon: UsersRound,
-      title: targetUsers[0] || '协作空间',
-      detail: `${channelCount} 个频道承载需求、讨论和构建记录`,
-    },
-  ]
-  return base
-}
-
-function buildEntryChannels(channels: Channel[]) {
-  const priority: Record<string, number> = {
-    ai_development: 0,
-    builds: 1,
-    announce: 2,
-  }
-  return [...channels].sort((left, right) => {
-    const leftPriority = priority[left.kind ?? ''] ?? 10
-    const rightPriority = priority[right.kind ?? ''] ?? 10
-    return leftPriority - rightPriority
-  })
-}
-
-function channelIcon(kind?: string) {
-  if (kind === 'ai_development') return <Bot size={14} aria-hidden="true" />
-  if (kind === 'builds') return <PackageCheck size={14} aria-hidden="true" />
-  if (kind === 'announce') return <Megaphone size={14} aria-hidden="true" />
-  return <Hash size={14} aria-hidden="true" />
 }
 
 function normalizePlatform(platform?: string) {

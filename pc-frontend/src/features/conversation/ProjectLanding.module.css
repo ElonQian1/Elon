@@ -1,14 +1,14 @@
 .landing {
-  width: min(920px, 100%);
+  width: min(700px, 100%);
   margin: 0 auto;
-  padding: 18px 18px 26px;
+  padding: 32px 18px 26px;
   color: var(--text);
 }
 
 .heroBand {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 238px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 205px;
+  gap: 14px;
   align-items: stretch;
   min-height: 132px;
   padding: 16px;
@@ -132,10 +132,9 @@
 
 .actionPanel {
   min-width: 0;
-  display: grid;
-  grid-template-rows: auto auto;
+  display: flex;
   align-content: center;
-  gap: 8px;
+  align-items: center;
 }
 
 .primaryAction {
@@ -212,65 +211,6 @@
   white-space: nowrap;
 }
 
-.quickActions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-}
-
-.quickAction {
-  min-width: 0;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 0 7px;
-  border: 1px solid #303641;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, .035);
-  color: #c4cdda;
-  font-size: 11.5px;
-  font-weight: 800;
-  transition: background var(--transition), border-color var(--transition);
-}
-
-.quickAction:hover {
-  border-color: #4c5260;
-  background: var(--bg-hover);
-}
-
-.quickAction span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.contentGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 16px;
-  align-items: start;
-  margin-top: 14px;
-}
-
-.mainStack,
-.sideStack {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-}
-
-.sideStack {
-  gap: 12px;
-}
-
-.section,
-.sideSection {
-  min-width: 0;
-}
-
 .sectionHeader {
   min-height: 20px;
   display: flex;
@@ -298,6 +238,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.downloadSection {
+  min-width: 0;
+  margin-top: 14px;
 }
 
 .downloadGrid {
@@ -428,127 +373,13 @@
   color: #d8e6ff;
 }
 
-.previewGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.previewTile {
-  min-height: 86px;
-  display: grid;
-  align-content: start;
-  gap: 7px;
-  padding: 10px;
-  border: 1px solid #2d333d;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .028);
-}
-
-.previewTile svg {
-  color: #8fc7ff;
-}
-
-.previewTile strong {
-  color: #eef2f7;
-  font-size: 13px;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
-}
-
-.previewTile span {
-  display: -webkit-box;
-  overflow: hidden;
-  color: #9ea5b3;
-  font-size: 12px;
-  line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.entryList {
-  display: grid;
-  gap: 2px;
-}
-
-.entryRow {
-  min-height: 38px;
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 14px;
-  gap: 8px;
-  align-items: center;
-  padding: 6px;
-  border-radius: 6px;
-  color: #c8d1dd;
-  text-align: left;
-  transition: background var(--transition), color var(--transition);
-}
-
-.entryRow:hover {
-  background: #262b33;
-  color: #fff;
-}
-
-.entryIcon {
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  background: #252a33;
-  color: #9ba6b8;
-}
-
-.entryCopy {
-  min-width: 0;
-}
-
-.entryCopy strong,
-.entryCopy small {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.entryCopy strong {
-  font-size: 12.5px;
-  line-height: 1.25;
-}
-
-.entryCopy small {
-  margin-top: 3px;
-  color: #8f98a8;
-  font-size: 11.5px;
-  line-height: 1.25;
-}
-
-.entryMore {
-  min-height: 34px;
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  padding: 5px 6px;
-  color: #818b9a;
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
 @media (max-width: 1180px) {
-  .heroBand,
-  .contentGrid {
+  .heroBand {
     grid-template-columns: 1fr;
   }
 
   .actionPanel {
-    grid-template-columns: minmax(0, 1fr) 220px;
-    grid-template-rows: auto;
-  }
-
-  .quickActions {
-    grid-template-columns: 1fr;
+    display: block;
   }
 }
 
@@ -574,7 +405,6 @@
   }
 
   .downloadGrid,
-  .previewGrid,
   .actionPanel {
     grid-template-columns: 1fr;
   }
