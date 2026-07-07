@@ -865,6 +865,15 @@
   font-size: 11px;
 }
 
+.emergencyListTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-weight: 850;
+  letter-spacing: .02em;
+}
+
 .emergencyHead strong {
   color: var(--text-primary);
   font-size: 12px;
@@ -928,13 +937,13 @@
 .emergencyRow {
   min-width: 0;
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   border: 1px solid rgba(255, 255, 255, .075);
   border-radius: 13px;
   background: rgba(255, 255, 255, .035);
-  padding: 9px;
+  padding: 8px;
 }
 
 .emergencyRow > div {
@@ -958,8 +967,8 @@
 }
 
 .grantAvatarLink {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -969,11 +978,17 @@
   background: linear-gradient(135deg, #35424f, #171b22);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 6px 18px rgba(0, 0, 0, .18);
   transition: transform .16s ease, box-shadow .16s ease;
+  cursor: pointer;
 }
 
 .grantAvatarLink:hover {
   transform: translateY(-1px);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18), 0 10px 24px rgba(0, 0, 0, .26);
+}
+
+.grantAvatarLink:focus-visible {
+  outline: 2px solid rgba(168, 199, 250, .75);
+  outline-offset: 2px;
 }
 
 .grantAvatarLink img {

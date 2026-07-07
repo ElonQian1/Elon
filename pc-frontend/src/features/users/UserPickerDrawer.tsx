@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Check, Search, UsersRound, X } from 'lucide-react'
+import { Check, CheckCircle2, Search, UsersRound, X } from 'lucide-react'
 import { api } from '../../api/client'
+import { resolveApiUrl } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
 import type { ProjectMember } from '../conversation/types'
 import styles from './UserPickerDrawer.module.css'
@@ -117,10 +118,12 @@ export default function UserPickerDrawer({
     const all = mergeUsers([...projectUsers, ...friends, ...globalUsers, ...(remoteSearchUser ? [remoteSearchUser] : [])])
     return all.filter((user) => selectedIds.has(user.id))
   }, [friends, globalUsers, projectUsers, remoteSearchUser, selectedIds])
+  const selectedPreviewUsers = selectedUsers.slice(0, 4)
   const selectedLine = selectedUsers.length
     ? selectedUsers.map((user) => displayName(user)).join('、')
     : '尚未选择用户'
-  const meta = sourceMeta(source, visibleUsers.length, sourceUsers.length, activeProject?.name, searching)
+  const meta = sourceMeta(source, visibleUsers.length, sourceUsers.length, activeProject?.name)
+  const searchLine = searchMeta(source, query, searching)
 
   async function loadUsers() {
     setLoading(true)
@@ -209,16 +212,25 @@ export default function UserPickerDrawer({
           ))}
         </div>
 
-        <label className={styles.searchBar}>
+        <div className={styles.searchBar} role="search">
           <Search size={15} aria-hidden="true" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={source === 'all' ? '搜索昵称、邮箱、手机号或 user id' : '搜索昵称、账号或 user id'}
+            aria-label="搜索用户"
             autoFocus
           />
-        </label>
-        <div className={styles.metaLine}>{loading ? '读取中...' : error || meta}</div>
+          {query.trim() && (
+            <button className={styles.clearSearch} type="button" onClick={() => setQuery('')} aria-label="清空搜索">
+              <X size={13} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        <div className={styles.metaLine} data-error={error ? 'true' : undefined}>
+          <span>{loading ? '读取中...' : error || meta}</span>
+          {!loading && !error && <span>{searchLine}</span>}
+        </div>
 
         <div className={styles.list}>
           {!loading && visibleUsers.length === 0 && (
@@ -232,6 +244,7 @@ export default function UserPickerDrawer({
           )}
           {visibleUsers.map((user) => {
             const disabled = isDisabled(user)
+            const disabledKind = user.id === currentUserId ? 'self' : disabled ? 'authorized' : undefined
             const selected = selectedIds.has(user.id)
             return (
               <label
@@ -239,18 +252,25 @@ export default function UserPickerDrawer({
                 className={styles.row}
                 data-selected={selected ? 'true' : undefined}
                 data-disabled={disabled || busy ? 'true' : undefined}
+                data-disabled-kind={disabledKind}
                 aria-disabled={disabled || busy ? 'true' : undefined}
-                title={disabledReason(user, currentUserId, disabledUserIds)}
+                title={disabled ? disabledReason(user, currentUserId, disabledUserIds) : `选择 ${displayName(user)}`}
               >
-                <input
-                  className={styles.checkbox}
-                  type="checkbox"
-                  checked={selected}
-                  disabled={disabled || busy}
-                  onChange={() => toggleUser(user)}
-                  aria-label={`选择 ${displayName(user)}`}
-                />
-                <span className={styles.avatar}>{user.avatar_data_url ? <img src={user.avatar_data_url} alt="" /> : initial(user)}</span>
+                {disabled ? (
+                  <span className={styles.disabledMarker} aria-label={disabledReason(user, currentUserId, disabledUserIds)}>
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                  </span>
+                ) : (
+                  <input
+                    className={styles.checkbox}
+                    type="checkbox"
+                    checked={selected}
+                    disabled={busy}
+                    onChange={() => toggleUser(user)}
+                    aria-label={`选择 ${displayName(user)}`}
+                  />
+                )}
+                <PickerAvatar user={user} />
                 <span className={styles.main}>
                   <strong>{displayName(user)}</strong>
                   <span>{user.account || user.id}</span>
@@ -259,7 +279,8 @@ export default function UserPickerDrawer({
                   {user.is_online && <em data-tone="active">在线</em>}
                   {user.role_label && <em>{user.role_label}</em>}
                   {user.already_friend && <em>好友</em>}
-                  {disabled && <em data-tone="warn">{user.id === currentUserId ? '自己' : '已授权'}</em>}
+                  {disabledKind === 'self' && <em data-tone="warn">自己</em>}
+                  {disabledKind === 'authorized' && <em data-tone="locked">已授权</em>}
                 </span>
               </label>
             )
@@ -267,7 +288,31 @@ export default function UserPickerDrawer({
         </div>
 
         <footer className={styles.footer}>
-          <span className={styles.selectedLine} title={selectedLine}>{selectedLine}</span>
+          <div className={styles.selectedSummary} data-empty={selectedUsers.length ? undefined : 'true'} title={selectedLine}>
+            <span className={styles.selectedAvatarStack} aria-hidden="true">
+              {selectedPreviewUsers.length > 0 ? (
+                <>
+                  {selectedPreviewUsers.map((user) => (
+                    <PickerAvatar key={user.id} user={user} className={styles.selectedAvatar} />
+                  ))}
+                  {selectedUsers.length > selectedPreviewUsers.length && (
+                    <span className={styles.selectedAvatarMore}>+{selectedUsers.length - selectedPreviewUsers.length}</span>
+                  )}
+                </>
+              ) : (
+                <span className={styles.selectedAvatarPlaceholder}>0</span>
+              )}
+            </span>
+            <span className={styles.selectedCopy}>
+              <strong>{selectedUsers.length ? `已选择 ${selectedUsers.length} 人` : '尚未选择用户'}</strong>
+              <small>{selectedUsers.length ? selectedLine : '勾选用户后会批量授权，授权后显示在已授权列表。'}</small>
+            </span>
+          </div>
+          {selectedUsers.length > 0 && (
+            <button className={[styles.button, styles.ghostButton].join(' ')} type="button" onClick={() => setSelectedIds(new Set())} disabled={busy}>
+              清空
+            </button>
+          )}
           <button className={styles.button} type="button" onClick={onClose} disabled={busy}>取消</button>
           <button
             className={[styles.button, styles.primary].join(' ')}
@@ -281,6 +326,23 @@ export default function UserPickerDrawer({
         </footer>
       </section>
     </div>
+  )
+}
+
+function PickerAvatar({ user, className = styles.avatar }: { user: UserPickerUser; className?: string }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const directSrc = user.avatar_data_url?.trim() || ''
+  const fallbackSrc = user.id ? resolveApiUrl('/api/users/' + encodeURIComponent(user.id) + '/avatar') : ''
+  const avatarSrc = imageFailed ? '' : (directSrc || fallbackSrc)
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [directSrc, fallbackSrc])
+
+  return (
+    <span className={className} data-generated={avatarSrc ? undefined : 'true'}>
+      {avatarSrc ? <img src={avatarSrc} alt="" onError={() => setImageFailed(true)} /> : <span>{initial(user)}</span>}
+    </span>
   )
 }
 
@@ -335,13 +397,27 @@ function mergeUsers(users: UserPickerUser[]) {
   return out
 }
 
-function sourceMeta(source: UserPickerSource, visible: number, total: number, projectName?: string, searching?: boolean) {
+function sourceMeta(source: UserPickerSource, visible: number, total: number, projectName?: string) {
   const prefix = source === 'project'
     ? projectName ? `项目 ${projectName}` : '项目成员'
     : source === 'friends'
       ? '好友列表'
       : '全站用户'
-  return `${prefix} · 显示 ${visible}/${total}${searching ? ' · 搜索中' : ''}`
+  return `${prefix} · 显示 ${visible}/${total}`
+}
+
+function searchMeta(source: UserPickerSource, query: string, searching: boolean) {
+  const needle = query.trim()
+  if (searching) return '正在全站精确搜索...'
+  if (!needle) {
+    return source === 'all'
+      ? '输入 2 个字符以上会继续查找站内用户'
+      : '输入关键词可在当前列表内过滤'
+  }
+  if (source === 'all' && needle.length < 2 && !needle.includes('@')) {
+    return '继续输入可触发全站用户搜索'
+  }
+  return `已按「${needle}」筛选`
 }
 
 function displayName(user: UserPickerUser) {
@@ -349,8 +425,13 @@ function displayName(user: UserPickerUser) {
 }
 
 function initial(user: UserPickerUser) {
-  const chars = Array.from(displayName(user).trim())
-  return (chars[0] || '用').toUpperCase()
+  const candidates = [user.nickname, user.account, user.id]
+  for (const candidate of candidates) {
+    const chars = Array.from((candidate || '').trim())
+    const useful = chars.find((char) => /[A-Za-z\u4e00-\u9fff]/.test(char))
+    if (useful) return useful.toUpperCase()
+  }
+  return '用'
 }
 
 function disabledReason(user: UserPickerUser, currentUserId?: string, disabledUserIds?: Set<string>) {

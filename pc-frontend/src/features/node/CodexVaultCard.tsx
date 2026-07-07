@@ -435,8 +435,9 @@ function GrantAvatarLink({
   if (!userId) {
     return <span className={className} title={label}>{content}</span>
   }
+  const profileTitle = '查看 ' + label + ' 的个人主页'
   return (
-    <Link className={className} to={'/users/' + encodeURIComponent(userId)} title={label} aria-label={'查看 ' + label + ' 的主页'}>
+    <Link className={className} to={'/users/' + encodeURIComponent(userId)} title={profileTitle} aria-label={profileTitle}>
       {content}
     </Link>
   )
