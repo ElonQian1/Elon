@@ -67,20 +67,9 @@ fn should_use_pc_node_fast_path(
     is_pc_node_project: bool,
     needs_project_workflow: bool,
     direct_pc_cli_enabled: bool,
-    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    _pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> bool {
-    is_pc_node_project
-        && (needs_project_workflow
-            || direct_pc_cli_enabled
-            || matches!(
-                pc_runtime_route,
-                Some(
-                    PcRuntimeRoutePreference::RouteA
-                        | PcRuntimeRoutePreference::RouteB
-                        | PcRuntimeRoutePreference::RouteC2
-                        | PcRuntimeRoutePreference::RouteC3
-                )
-            ))
+    is_pc_node_project && (needs_project_workflow || direct_pc_cli_enabled)
 }
 
 pub(crate) const MAX_PROJECT_ICON_CONTEXT_DATA_URL_BYTES: usize = 512 * 1024;
@@ -159,6 +148,12 @@ mod tests {
             false,
             Some(PcRuntimeRoutePreference::RouteC)
         ));
+        assert!(!should_use_pc_node_fast_path(
+            true,
+            false,
+            false,
+            Some(PcRuntimeRoutePreference::RouteC3)
+        ));
     }
 
     #[test]
@@ -167,13 +162,7 @@ mod tests {
         assert!(should_use_pc_node_fast_path(true, false, true, None));
         assert!(should_use_pc_node_fast_path(
             true,
-            false,
-            false,
-            Some(PcRuntimeRoutePreference::RouteA)
-        ));
-        assert!(should_use_pc_node_fast_path(
             true,
-            false,
             false,
             Some(PcRuntimeRoutePreference::RouteC3)
         ));

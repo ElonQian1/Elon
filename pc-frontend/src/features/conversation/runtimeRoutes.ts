@@ -19,6 +19,8 @@ export interface RuntimeRouteGroup {
 
 export const RUNTIME_ROUTE_STORAGE_KEY = 'elon_pc_project_runtime_route'
 export const RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_pc_project_runtime_route_default_v2'
+export const PROJECT_RUNTIME_ROUTE_STORAGE_KEY = 'elon_pc_project_runtime_route_v3'
+export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_pc_project_runtime_route_default_v3'
 const LEGACY_PLATFORM_DEFAULT_VERSION = 'platform-ai-default-20260630'
 const LEGACY_PROJECT_LOCAL_DEFAULT_VERSION = 'project-local-codex-default-20260702'
 const LEGACY_PROJECT_AUTO_DEFAULT_VERSION = 'project-auto-default-20260703'
@@ -140,8 +142,8 @@ export function initialRuntimeRouteFromStorage(storage?: Storage | null): Runtim
 
 export function initialProjectRuntimeRouteFromStorage(storage?: Storage | null): RuntimeRoute {
   if (!storage) return DEFAULT_PROJECT_RUNTIME_ROUTE
-  const stored = getStorageValue(storage, RUNTIME_ROUTE_STORAGE_KEY)
-  const defaultVersion = getStorageValue(storage, RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
+  const stored = getStorageValue(storage, PROJECT_RUNTIME_ROUTE_STORAGE_KEY)
+  const defaultVersion = getStorageValue(storage, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
   if (!stored || isLegacyImplicitDefault(stored, defaultVersion)) return DEFAULT_PROJECT_RUNTIME_ROUTE
   return normalizeRuntimeRoute(stored, DEFAULT_PROJECT_RUNTIME_ROUTE)
 }
@@ -157,8 +159,8 @@ export function persistRuntimeRouteSelection(storage: Storage | null | undefined
 
 export function persistProjectRuntimeRouteSelection(storage: Storage | null | undefined, value: RuntimeRoute): void {
   try {
-    storage?.setItem(RUNTIME_ROUTE_STORAGE_KEY, value)
-    storage?.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION)
+    storage?.setItem(PROJECT_RUNTIME_ROUTE_STORAGE_KEY, value)
+    storage?.setItem(PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION)
   } catch {
     // Ignore blocked storage; the selected value still works for the current session.
   }
