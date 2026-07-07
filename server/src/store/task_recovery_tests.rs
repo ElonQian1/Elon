@@ -257,11 +257,17 @@ fn stale_recovering_channel_task_gets_recovery_failure_result() {
     assert!(results[0].contains("恢复失败"));
     assert!(results[0].contains("更新升级"));
     assert!(results[0].contains("继续"));
+    assert!(results[0].contains("/api/server/version"));
+    assert!(results[0].contains("pc-next-dist"));
 
     let progress = progress_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
-    assert!(progress
+    let resume_required = progress
         .iter()
-        .any(|message| message.contains(r#""phase":"resume_required""#)));
+        .find(|message| message.contains(r#""phase":"resume_required""#))
+        .expect("resume_required progress should be recorded");
+    assert!(resume_required.contains("/api/server/version"));
+    assert!(resume_required.contains("pc-next-dist"));
+    assert!(resume_required.contains("CodePushed"));
 }
 
 #[test]

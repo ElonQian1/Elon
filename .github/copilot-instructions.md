@@ -78,6 +78,29 @@
 
 最终回复必须明确区分：本次是“代码已同步”还是“Win 节点客户端已发布并推送更新”。
 
+### PC 工作台前端完成定义
+
+涉及 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI 的修复，不能只停在 `CodePushed`。`/pc` 加载的是服务器 `$DATA_DIR/pc-next-dist/`，代码进入 `origin/main` 不等于用户页面已经更新。
+
+1. **代码同步完成**
+   - 业务代码已 `commit` 并 `git push origin HEAD:main` 进入 `origin/main`
+   - `pc-frontend` 至少通过 `npm run build`
+   - 运行：
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
+     ```
+
+2. **PC 前端线上完成**
+   - 除非用户明确说“只同步代码”“暂不发布”或“不要求这次发布成功”，继续运行：
+     ```powershell
+     scripts\publish-server.ps1
+     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind Server
+     ```
+   - 发布后必须确认 `/pc` 可访问，并确认 `/api/server/version` 的 `gitSha` 等于本次提交或脚本明确提示已被更新主线接管。
+   - 截图、遮挡、错位、层级、弹窗或按图修复类问题，完成前必须先把截图区域定位到真实组件/样式文件，并用本地预览、浏览器截图、DOM/坐标/层级检查之一做视觉验收；无法截图时必须说明替代证据，不能只凭构建通过宣称已解决。
+
+最终回复必须明确区分：本次是“代码已同步”还是“PC 前端已发布到线上 / 被最新主线接管 / 未尝试发布”。
+
 > 详细流程见：`docs/ai-agent-workflow.md`
 
 ---

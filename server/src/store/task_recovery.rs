@@ -7,7 +7,7 @@ use super::{new_id, now, Store};
 const SERVER_UPDATE_RECOVERY_ERROR: &str = "server update recovery pending";
 const SERVER_UPDATE_RECOVERY_TIMEOUT_ERROR: &str = "server update recovery timed out";
 const CHANNEL_TASK_SERVER_UPDATE_RECOVERY_RESULT: &str =
-    "恢复失败：服务器或 Win 端更新升级后，通信没有在预期时间内自动恢复。请点击“继续”让 AI 检查当前工作区后接着处理。";
+    "恢复失败：服务器或 Win 端更新升级后，通信没有在预期时间内自动恢复。请点击“继续”让 AI 检查当前工作区、origin/main、线上版本和发布状态后接着处理；若刚才正在发布 PC 前端，还需要核对 /pc、/api/server/version 与 pc-next-dist 是否已经生效。";
 const CHANNEL_TASK_STALE_RESULT: &str =
     "任务失败：PC 节点断线、任务超时或通信长期没有结果。请点击“继续”让 AI 检查当前工作区后接着处理。";
 
@@ -140,7 +140,7 @@ fn server_update_resume_required_progress_message() -> String {
         "phase": "resume_required",
         "runtime": "一龙",
         "status": "interrupted",
-        "message": "服务器正在更新升级或 Win 端正在更新升级后，通信自动恢复没有在预期时间内完成。任务现场、云端过程和本机 journal 线索已保留，请点击“继续”让 AI 先检查当前工作区后接着处理。",
+        "message": "服务器正在更新升级或 Win 端正在更新升级后，通信自动恢复没有在预期时间内完成。任务现场、云端过程和本机 journal 线索已保留，请点击“继续”让 AI 先检查当前工作区、origin/main、线上 /api/server/version 和本轮发布状态后接着处理；如果中断前正在发布 PC 前端，还要确认 /pc 可访问且 pc-next-dist 已上传，不能只按 CodePushed 判定完成。",
         "auto_recover": false,
         "next_action": "continue_from_snapshot",
     })
