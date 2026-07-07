@@ -89,17 +89,17 @@ internal class MainInputComposerSetup(
         root.minimumHeight = bottomMenuHeight
         root.clipChildren = false
         root.clipToPadding = false
-        root.setPadding(0, dp(18), 0, dp(8))
+        root.setPadding(0, dp(12), 0, dp(6))
         root.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
 
         val modeButtonRow = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(46)
+                dp(40)
             ).apply {
-                marginStart = dp(18)
-                marginEnd = dp(18)
-                bottomMargin = dp(8)
+                marginStart = dp(20)
+                marginEnd = dp(20)
+                bottomMargin = dp(6)
             }
             clipChildren = false
             clipToPadding = false
@@ -112,8 +112,8 @@ internal class MainInputComposerSetup(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = dp(16)
-                marginEnd = dp(16)
+                marginStart = dp(20)
+                marginEnd = dp(20)
             }
             clipChildren = false
             clipToPadding = false
@@ -136,8 +136,8 @@ internal class MainInputComposerSetup(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0
             ).apply {
-                marginStart = dp(106)
-                marginEnd = dp(54)
+                marginStart = dp(96)
+                marginEnd = dp(46)
             }
         }
 
@@ -149,11 +149,11 @@ internal class MainInputComposerSetup(
             minimumHeight = bottomMenuHeight
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(12), dp(5), dp(12), dp(5))
+            setPadding(dp(10), dp(4), dp(10), dp(4))
         }
 
         val inputModeButton = ImageButton(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END or Gravity.CENTER_VERTICAL)
+            layoutParams = FrameLayout.LayoutParams(dp(38), dp(38), Gravity.END or Gravity.CENTER_VERTICAL)
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_voice_wave_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -178,11 +178,11 @@ internal class MainInputComposerSetup(
         val inputCenterContainer = FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 0,
-                dp(40),
+                dp(38),
                 1f
             )
             background = ColorDrawable(Color.TRANSPARENT)
-            minimumHeight = dp(40)
+            minimumHeight = dp(38)
             isClickable = true
             isFocusable = false
             setOnClickListener { openCollapsedInputComposer() }
@@ -201,7 +201,7 @@ internal class MainInputComposerSetup(
             setPadding(dp(4), 0, dp(4), 0)
             text = "输入内容"
             setTextColor(Color.parseColor("#5E5E5E"))
-            textSize = 16f
+            textSize = 15f
             isClickable = true
             isFocusable = false
             isFocusableInTouchMode = false
@@ -210,9 +210,9 @@ internal class MainInputComposerSetup(
         }
 
         val expandEditorButton = ImageButton(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(34), dp(34), Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(3)
-                marginEnd = dp(2)
+            layoutParams = FrameLayout.LayoutParams(dp(30), dp(30), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(4)
+                marginEnd = dp(1)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_expand_new)
@@ -237,10 +237,10 @@ internal class MainInputComposerSetup(
             isVerticalScrollBarEnabled = false
             includeFontPadding = true
             setHorizontallyScrolling(false)
-            setPadding(0, dp(10), dp(36), dp(8))
+            setPadding(0, dp(8), dp(32), dp(6))
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#5E5E5E"))
-            textSize = 18f
+            textSize = 17f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!isVoiceMode()) {
                     if (hasFocus) {
@@ -289,8 +289,8 @@ internal class MainInputComposerSetup(
         }
 
         val modelButtonShell = FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(82), dp(42)).apply {
-                marginEnd = dp(12)
+            layoutParams = LinearLayout.LayoutParams(dp(76), dp(36)).apply {
+                marginEnd = dp(10)
             }
             background = activity.getDrawable(R.drawable.bg_bottom_mode_pill_new)
             alpha = 1f
@@ -312,16 +312,16 @@ internal class MainInputComposerSetup(
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setPadding(dp(20), 0, dp(28), 0)
+            setPadding(dp(16), 0, dp(24), 0)
             setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
             setTextColor(Color.parseColor("#D6D6D6"))
-            textSize = 15f
+            textSize = 14f
             setOnClickListener { showModelPopupOrLoad() }
         }
 
         val modelChevron = ImageView(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(18), dp(18), Gravity.END or Gravity.CENTER_VERTICAL).apply {
-                marginEnd = dp(14)
+            layoutParams = FrameLayout.LayoutParams(dp(16), dp(16), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                marginEnd = dp(10)
             }
             setImageResource(R.drawable.ic_input_chevron_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
@@ -334,7 +334,7 @@ internal class MainInputComposerSetup(
         modelButtonShell.addView(modelChevron)
 
         val planModeButton = TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(82), dp(42)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(72), dp(36)).apply {
                 marginEnd = dp(8)
             }
             gravity = Gravity.CENTER
@@ -342,7 +342,7 @@ internal class MainInputComposerSetup(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = "规划"
-            textSize = 15f
+            textSize = 14f
             alpha = 1f
             visibility = View.VISIBLE
             isClickable = true
@@ -352,8 +352,8 @@ internal class MainInputComposerSetup(
         }
 
         val emojiButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                marginEnd = dp(12)
+            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                marginEnd = dp(10)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_emoji_new)
@@ -369,12 +369,12 @@ internal class MainInputComposerSetup(
         expandedInputContainer.addView(expandEditorButton)
 
         val inputRightControls = FrameLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42))
+            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38))
         }
 
         val attachmentButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                marginEnd = dp(12)
+            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
+                marginEnd = dp(10)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_add_new)
@@ -385,7 +385,7 @@ internal class MainInputComposerSetup(
         }
 
         sendButton.apply {
-            layoutParams = FrameLayout.LayoutParams(dp(42), dp(42), Gravity.END or Gravity.CENTER_VERTICAL)
+            layoutParams = FrameLayout.LayoutParams(dp(38), dp(38), Gravity.END or Gravity.CENTER_VERTICAL)
             background = activity.getDrawable(R.drawable.ic_input_send_new)
             gravity = Gravity.CENTER
             includeFontPadding = false
@@ -394,7 +394,7 @@ internal class MainInputComposerSetup(
         }
 
         val ttsSpeakerButton = ImageButton(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
                 marginEnd = dp(0)
             }
             background = ColorDrawable(Color.TRANSPARENT)

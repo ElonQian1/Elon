@@ -28,7 +28,7 @@ internal class MainSendButtonVisualActions(
         val sendMode = (hasText || hasAttachments) && !isVoiceMode() && (composerExpanded || hasAttachments)
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (sendMode) {
-            params?.width = dp(42)
+            params?.width = dp(38)
             binding.sendButton.background = activity.getDrawable(R.drawable.ic_input_send_new)
             binding.sendButton.text = ""
             binding.sendButton.visibility = View.VISIBLE
@@ -37,13 +37,13 @@ internal class MainSendButtonVisualActions(
             binding.sendButton.visibility = View.GONE
             inputModeButton()?.visibility = View.VISIBLE
         }
-        params?.height = dp(42)
+        params?.height = dp(38)
         params?.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         params?.let { binding.sendButton.layoutParams = it }
 
         inputRightControls()?.let { controls ->
             val controlsParams = controls.layoutParams
-            val targetWidth = dp(42)
+            val targetWidth = dp(38)
             if (controlsParams.width != targetWidth) {
                 controlsParams.width = targetWidth
                 controls.layoutParams = controlsParams

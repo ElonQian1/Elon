@@ -17,11 +17,11 @@ internal class RuntimeInputModeStrip(
     val view: LinearLayout = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(46)
+            dp(40)
         ).apply {
-            marginStart = dp(18)
-            marginEnd = dp(18)
-            bottomMargin = dp(8)
+            marginStart = dp(20)
+            marginEnd = dp(20)
+            bottomMargin = dp(6)
         }
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
@@ -34,17 +34,17 @@ internal class RuntimeInputModeStrip(
         TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 when (mode) {
-                    RunningInputMode.REMIND_CURRENT -> dp(88)
-                    else -> dp(76)
+                    RunningInputMode.REMIND_CURRENT -> dp(80)
+                    else -> dp(68)
                 },
-                dp(42)
+                dp(36)
             ).apply {
-                marginEnd = dp(10)
+                marginEnd = dp(8)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = mode.label
-            textSize = 15f
+            textSize = 14f
             setTextColor(Color.parseColor("#D6D6D6"))
             setOnClickListener { onModeSelected(mode) }
         }
@@ -76,7 +76,7 @@ internal class RuntimeInputModeStrip(
     private fun roundedBg(fill: String, stroke: String): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(16).toFloat()
+            cornerRadius = dp(18).toFloat()
             setColor(Color.parseColor(fill))
             setStroke(dp(1), Color.parseColor(stroke))
         }

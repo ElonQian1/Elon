@@ -141,7 +141,7 @@ internal class InputComposerMotion(
     }
 
     private fun defaultExpandedTextHeight(): Int {
-        return (expandedInputContainer.resources.displayMetrics.density * 46f).toInt()
+        return (expandedInputContainer.resources.displayMetrics.density * 42f).toInt()
     }
 
     private fun animateHeight(view: View, target: Int, animate: Boolean) {
@@ -168,7 +168,7 @@ internal class InputComposerMotion(
     }
 
     private fun rightControlsTargetWidth(): Int {
-        val addWidth = rightControls.resources.displayMetrics.density * 42f
+        val addWidth = rightControls.resources.displayMetrics.density * 38f
         return addWidth.toInt()
     }
 

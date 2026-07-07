@@ -34,12 +34,12 @@ internal class MainAttachmentPanelActions(
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(100)
+                dp(88)
             )
             background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(50), dp(4), dp(18), dp(14))
+            setPadding(dp(46), 0, dp(16), dp(12))
             visibility = View.GONE
 
             addView(createAttachmentAction("拍照", R.drawable.ic_input_camera_new, addEndMargin = true) {
@@ -88,8 +88,8 @@ internal class MainAttachmentPanelActions(
         action: () -> Unit
     ): View {
         return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(64), dp(72)).apply {
-                if (addEndMargin) marginEnd = dp(14)
+            layoutParams = LinearLayout.LayoutParams(dp(56), dp(62)).apply {
+                if (addEndMargin) marginEnd = dp(12)
             }
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
@@ -102,7 +102,7 @@ internal class MainAttachmentPanelActions(
             foreground = selectableForeground()
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
                 setImageResource(iconRes)
                 scaleType = ImageView.ScaleType.FIT_CENTER
             })
@@ -111,12 +111,12 @@ internal class MainAttachmentPanelActions(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(5)
+                    topMargin = dp(4)
                 }
                 includeFontPadding = false
                 text = label
                 setTextColor(Color.parseColor("#D6D6D6"))
-                textSize = 13f
+                textSize = 12f
             })
             setOnClickListener {
                 collapseAttachmentPanel()

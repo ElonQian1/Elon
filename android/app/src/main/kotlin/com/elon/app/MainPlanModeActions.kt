@@ -60,7 +60,7 @@ internal class MainPlanModeActions(
         view.setTextColor(Color.parseColor(if (enabled) "#101010" else "#D6D6D6"))
         if (enabled) {
             view.background = GradientDrawable().apply {
-                cornerRadius = dp(22).toFloat()
+                cornerRadius = dp(18).toFloat()
                 setColor(Color.parseColor("#D6D6D6"))
             }
         } else {
