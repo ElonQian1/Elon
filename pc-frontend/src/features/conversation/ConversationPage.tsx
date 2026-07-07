@@ -752,7 +752,7 @@ export default function ConversationPage() {
     draftConversationId,
     clearAttachmentDraft,
     restoreAttachmentDraft,
-    uploadComposerFiles, uploadEditedImage, uploadOriginalImage, discardImageEdit,
+    uploadComposerFiles, uploadEditedImage, uploadOriginalImage, discardImageEdit, reopenEditableAttachment, forgetEditableAttachment,
     handleComposerPaste,
     handleComposerDragEnter,
     handleComposerDragOver,
@@ -1361,8 +1361,8 @@ export default function ConversationPage() {
             onFilesSelected={(files) => uploadComposerFiles(files).catch(() => {})}
             onInputChange={setInput}
             onKeyDown={handleKeyDown}
-            onOpenAttachment={openAttachmentPreview}
-            onRemoveAttachment={removeComposerAttachment}
+            onOpenAttachment={(attachment) => { if (reopenEditableAttachment(attachment)) { closeAttachmentPreview(); return } openAttachmentPreview(attachment) }}
+            onRemoveAttachment={(attachmentId) => { forgetEditableAttachment(attachmentId); removeComposerAttachment(attachmentId) }}
             onSubmit={handleSend}
             onToggleModelPicker={() => setShowModelPicker((value) => !value)}
           />

@@ -51,6 +51,10 @@ export function minCanvasSide(size: { width: number; height: number }) {
   return Math.max(1, Math.min(size.width, size.height))
 }
 
+export function textFontSizeForCanvas(sizeRatio: number, width: number, height: number) {
+  return Math.max(14, sizeRatio * Math.min(width, height) * 4)
+}
+
 export function clampUnit(value: number) {
   return Math.max(0, Math.min(1, value))
 }
@@ -166,16 +170,21 @@ function drawRect(context: CanvasRenderingContext2D, start: NormalizedPoint, end
 }
 
 function drawText(context: CanvasRenderingContext2D, annotation: TextAnnotation, width: number, height: number) {
-  const fontSize = Math.max(14, annotation.sizeRatio * Math.min(width, height) * 4)
+  const fontSize = textFontSizeForCanvas(annotation.sizeRatio, width, height)
   const x = annotation.point.x * width
   const y = annotation.point.y * height
+  const lineHeight = fontSize * 1.22
+  const lines = annotation.text.split(/\r?\n/)
   context.font = `800 ${fontSize}px Inter, "Microsoft YaHei", system-ui, sans-serif`
   context.textBaseline = 'top'
   context.lineWidth = Math.max(3, fontSize / 8)
   context.strokeStyle = 'rgba(0, 0, 0, .64)'
-  context.strokeText(annotation.text, x, y)
   context.fillStyle = annotation.color
-  context.fillText(annotation.text, x, y)
+  lines.forEach((line, index) => {
+    const lineY = y + index * lineHeight
+    context.strokeText(line, x, lineY)
+    context.fillText(line, x, lineY)
+  })
 }
 
 function exportMimeType(file: File) {

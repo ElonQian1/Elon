@@ -22,6 +22,7 @@ interface RestoreAttachmentDraft {
 export interface ComposerImageEditItem {
   id: string
   file: File
+  replaceAttachmentId?: string
 }
 
 export function useComposerAttachments({
@@ -35,6 +36,7 @@ export function useComposerAttachments({
   const [attachmentError, setAttachmentError] = useState('')
   const [draftConversationId, setDraftConversationId] = useState('')
   const [imageEditQueue, setImageEditQueue] = useState<ComposerImageEditItem[]>([])
+  const [editableAttachmentFiles, setEditableAttachmentFiles] = useState<Record<string, File>>({})
 
   const attachmentConversationId = useCallback(() => {
     if (typeof sessionView === 'string' && sessionView !== 'new') return sessionView
@@ -43,11 +45,19 @@ export function useComposerAttachments({
     return next
   }, [draftConversationId, sessionView])
 
-  const addUploadedAttachment = useCallback((uploaded: UploadedAttachment) => {
+  const addUploadedAttachment = useCallback((uploaded: UploadedAttachment, replaceAttachmentId?: string) => {
     setAttachments((prev) => {
-      if (prev.some((item) => item.attachment_id === uploaded.attachment_id)) return prev
-      if (prev.length >= MAX_ATTACHMENTS_PER_MESSAGE) return prev
-      return [...prev, uploaded]
+      const withoutDuplicate = prev.filter((item) => item.attachment_id !== uploaded.attachment_id)
+      if (replaceAttachmentId) {
+        const replaceIndex = withoutDuplicate.findIndex((item) => item.attachment_id === replaceAttachmentId)
+        if (replaceIndex >= 0) {
+          const next = [...withoutDuplicate]
+          next[replaceIndex] = uploaded
+          return next
+        }
+      }
+      if (withoutDuplicate.length >= MAX_ATTACHMENTS_PER_MESSAGE) return withoutDuplicate
+      return [...withoutDuplicate, uploaded]
     })
   }, [])
 
@@ -102,7 +112,10 @@ export function useComposerAttachments({
 
   const uploadImageEditFile = useCallback(async (itemId: string, file: File) => {
     if (!activeProjectId || composerDisabled || attachmentUploading) return
-    if (attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE) {
+    const queueItem = imageEditQueue.find((item) => item.id === itemId)
+    if (!queueItem) return
+    const replaceAttachmentId = queueItem.replaceAttachmentId
+    if (!replaceAttachmentId && attachments.length >= MAX_ATTACHMENTS_PER_MESSAGE) {
       setAttachmentError(`一次最多添加 ${MAX_ATTACHMENTS_PER_MESSAGE} 个附件`)
       return
     }
@@ -110,7 +123,12 @@ export function useComposerAttachments({
     try {
       const conversationId = attachmentConversationId()
       const uploaded = await uploadProjectAttachment(activeProjectId, file, { conversationId })
-      addUploadedAttachment(uploaded)
+      addUploadedAttachment(uploaded, replaceAttachmentId)
+      setEditableAttachmentFiles((prev) => {
+        const next = { ...prev, [uploaded.attachment_id]: file }
+        if (replaceAttachmentId && replaceAttachmentId !== uploaded.attachment_id) delete next[replaceAttachmentId]
+        return next
+      })
       setImageEditQueue((prev) => prev.filter((item) => item.id !== itemId))
       setAttachmentError('')
     } catch (err) {
@@ -125,6 +143,7 @@ export function useComposerAttachments({
     attachmentUploading,
     attachments.length,
     composerDisabled,
+    imageEditQueue,
   ])
 
   const uploadEditedImage = useCallback(async (itemId: string, file: File) => {
@@ -140,6 +159,16 @@ export function useComposerAttachments({
   const discardImageEdit = useCallback((itemId: string) => {
     setImageEditQueue((prev) => prev.filter((item) => item.id !== itemId))
   }, [])
+
+  const reopenEditableAttachment = useCallback((attachment: UploadedAttachment): boolean => {
+    const file = editableAttachmentFiles[attachment.attachment_id]
+    if (!file || !isEditableImageFile(file)) return false
+    setImageEditQueue((prev) => {
+      if (prev.some((item) => item.replaceAttachmentId === attachment.attachment_id)) return prev
+      return [{ id: uuidv4(), file, replaceAttachmentId: attachment.attachment_id }, ...prev]
+    })
+    return true
+  }, [editableAttachmentFiles])
 
   function handleComposerPaste(e: ClipboardEvent<HTMLElement>) {
     if (e.defaultPrevented) return
@@ -180,11 +209,22 @@ export function useComposerAttachments({
     setAttachmentError('')
     setDraftConversationId('')
     setImageEditQueue([])
+    setEditableAttachmentFiles({})
   }, [])
 
   const restoreAttachmentDraft = useCallback((draft: RestoreAttachmentDraft) => {
     setAttachments(draft.attachments)
     setDraftConversationId(draft.draftConversationId)
+    setEditableAttachmentFiles({})
+  }, [])
+
+  const forgetEditableAttachment = useCallback((attachmentId: string) => {
+    setEditableAttachmentFiles((prev) => {
+      if (!prev[attachmentId]) return prev
+      const next = { ...prev }
+      delete next[attachmentId]
+      return next
+    })
   }, [])
 
   return {
@@ -202,6 +242,8 @@ export function useComposerAttachments({
     uploadEditedImage,
     uploadOriginalImage,
     discardImageEdit,
+    reopenEditableAttachment,
+    forgetEditableAttachment,
     handleComposerPaste,
     handleComposerDragEnter,
     handleComposerDragOver,
@@ -222,6 +264,8 @@ export function useComposerAttachments({
     uploadEditedImage: (itemId: string, file: File) => Promise<void>
     uploadOriginalImage: (itemId: string) => Promise<void>
     discardImageEdit: (itemId: string) => void
+    reopenEditableAttachment: (attachment: UploadedAttachment) => boolean
+    forgetEditableAttachment: (attachmentId: string) => void
     handleComposerPaste: (e: ClipboardEvent<HTMLElement>) => void
     handleComposerDragEnter: (e: DragEvent<HTMLElement>) => void
     handleComposerDragOver: (e: DragEvent<HTMLElement>) => void
