@@ -35,7 +35,10 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
   if (model.items.length === 0) return null
   const grouped = groupTimelineItems(model.items)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
-  const showStageAtTop = model.stage.stuck || model.stage.tone === 'failed' || model.stage.key === 'approval'
+  const hasAssistantReply = grouped.primary.some(isAssistantTimelineItem)
+  const showStageAtTop = model.stage.key === 'approval'
+    || ((model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply)
+  const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply && primaryBlocks.length === 0
   const technicalCount = grouped.connection.length + (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
 
   return (
@@ -54,7 +57,7 @@ export default function TaskTimeline({ model, taskContext, onCancel, onApprove }
           />
         )
       ))}
-      <TimelineFold title="技术详情" count={technicalCount} defaultOpen={model.stage.stuck || model.stage.tone === 'failed'}>
+      <TimelineFold title="技术详情" count={technicalCount} defaultOpen={openTechnicalDetails}>
         {grouped.connection.map((item) => (
           <TimelineRow
             key={item.id}
