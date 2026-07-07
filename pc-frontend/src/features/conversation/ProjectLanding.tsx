@@ -1,6 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity,
   Apple,
   Bot,
   ChevronRight,
@@ -13,7 +12,6 @@ import {
   Laptop,
   Link2,
   Megaphone,
-  MessageSquare,
   Monitor,
   PackageCheck,
   Rocket,
@@ -59,8 +57,6 @@ const PLATFORM_META: Record<string, { label: string; short: string; icon: Lucide
 export default function ProjectLanding({ project, channels, landing, onSelectChannel }: Props) {
   const devChannel = channels.find((channel) => channel.kind === 'ai_development')
   const buildChannel = channels.find((channel) => channel.kind === 'builds')
-  const announcementChannel = channels.find((channel) => channel.kind === 'announce')
-  const chatChannels = channels.filter((channel) => !['ai_development', 'builds', 'announce'].includes(channel.kind ?? ''))
   const downloads = landing?.downloads ?? []
   const availableDownloads = downloads.filter((download) => isDownloadEnabled(download))
   const firstDownload = availableDownloads[0]
@@ -84,7 +80,9 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
     onSelectChannel,
   })
   const highlightTiles = buildHighlightTiles(landing, project, availableDownloads.length, channels.length)
-  const activityItems = buildActivityItems(project, updatedAt, channels.length, availableDownloads.length)
+  const entryChannels = buildEntryChannels(channels)
+  const visibleEntryChannels = entryChannels.slice(0, 5)
+  const hiddenEntryCount = Math.max(entryChannels.length - visibleEntryChannels.length, 0)
 
   return (
     <div className={styles.landing}>
@@ -138,33 +136,6 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
         </div>
       </section>
 
-      <section className={styles.startRail} aria-label="项目流程">
-        <StepButton
-          icon={Bot}
-          title="需求开发"
-          detail={devChannel ? devChannel.name : '待配置 AI 频道'}
-          active={!!devChannel}
-          disabled={!devChannel}
-          onClick={() => devChannel && onSelectChannel(devChannel.id)}
-        />
-        <StepButton
-          icon={PackageCheck}
-          title="构建交付"
-          detail={buildChannel ? buildChannel.name : '交付频道待配置'}
-          active={!devChannel && !!buildChannel}
-          disabled={!buildChannel}
-          onClick={() => buildChannel && onSelectChannel(buildChannel.id)}
-        />
-        <StepButton
-          icon={Download}
-          title="安装使用"
-          detail={firstDownload ? downloadLabel(firstDownload) : '生成后显示下载'}
-          active={!devChannel && !buildChannel && !!firstDownload}
-          disabled={!firstDownload}
-          onClick={() => firstDownload && openDownload(firstDownload)}
-        />
-      </section>
-
       <div className={styles.contentGrid}>
         <main className={styles.mainStack}>
           {downloads.length > 0 && (
@@ -179,7 +150,7 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
           )}
 
           <section className={styles.section}>
-            <SectionHeader icon={Sparkles} title="项目预览" note="项目能力与适用场景" />
+            <SectionHeader icon={Sparkles} title="项目预览" />
             <div className={styles.previewGrid}>
               {highlightTiles.map((tile) => (
                 <div key={tile.title} className={styles.previewTile}>
@@ -195,9 +166,9 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
         <aside className={styles.sideStack}>
           {(channels.length > 0 || resources.length > 0 || externalUrl) && (
             <section className={styles.sideSection}>
-              <SectionHeader icon={Hash} title="项目入口" />
+              <SectionHeader icon={Hash} title="常用入口" />
               <div className={styles.entryList}>
-                {channels.map((channel) => (
+                {visibleEntryChannels.map((channel) => (
                   <button
                     key={channel.id}
                     className={styles.entryRow}
@@ -214,6 +185,14 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
                     <ChevronRight size={14} aria-hidden="true" />
                   </button>
                 ))}
+                {hiddenEntryCount > 0 && (
+                  <div className={styles.entryMore}>
+                    <span className={styles.entryIcon}>
+                      <Hash size={14} aria-hidden="true" />
+                    </span>
+                    <span>还有 {hiddenEntryCount} 个频道</span>
+                  </div>
+                )}
                 {externalUrl && (
                   <button className={styles.entryRow} type="button" onClick={() => openUrl(externalUrl)}>
                     <span className={styles.entryIcon}><ExternalLink size={14} aria-hidden="true" /></span>
@@ -242,30 +221,6 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
               </div>
             </section>
           )}
-
-          <section className={styles.sideSection}>
-            <SectionHeader icon={Activity} title="最近动态" />
-            <div className={styles.activityList}>
-              {announcementChannel && (
-                <button className={styles.activityItem} type="button" onClick={() => onSelectChannel(announcementChannel.id)}>
-                  <Megaphone size={15} aria-hidden="true" />
-                  <span>查看 {announcementChannel.name}</span>
-                </button>
-              )}
-              {activityItems.map((item) => (
-                <div key={item} className={styles.activityItem}>
-                  <Activity size={15} aria-hidden="true" />
-                  <span>{item}</span>
-                </div>
-              ))}
-              {chatChannels.slice(0, 2).map((channel) => (
-                <button key={channel.id} className={styles.activityItem} type="button" onClick={() => onSelectChannel(channel.id)}>
-                  <MessageSquare size={15} aria-hidden="true" />
-                  <span>{channel.name}</span>
-                </button>
-              ))}
-            </div>
-          </section>
         </aside>
       </div>
     </div>
@@ -295,37 +250,6 @@ function SectionHeader({ icon: Icon, title, note }: { icon: LucideIcon; title: s
       <strong>{title}</strong>
       {note && <span>{note}</span>}
     </div>
-  )
-}
-
-function StepButton({
-  icon: Icon,
-  title,
-  detail,
-  active,
-  disabled,
-  onClick,
-}: {
-  icon: LucideIcon
-  title: string
-  detail: string
-  active?: boolean
-  disabled?: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      className={[styles.stepButton, active ? styles.stepActive : '', disabled ? styles.stepDisabled : ''].join(' ')}
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Icon size={18} aria-hidden="true" />
-      <span>
-        <strong>{title}</strong>
-        <small>{detail}</small>
-      </span>
-    </button>
   )
 }
 
@@ -471,13 +395,17 @@ function buildHighlightTiles(
   return base
 }
 
-function buildActivityItems(project: Project, updatedAt: string, channelCount: number, downloadCount: number) {
-  return [
-    updatedAt ? `项目最近更新于 ${updatedAt}` : '项目资料已同步到工作台',
-    channelCount ? `已配置 ${channelCount} 个项目频道` : '频道配置待补充',
-    downloadCount ? `${downloadCount} 个下载或外部入口可用` : '暂无可用下载入口',
-    project.unread_count ? `${project.unread_count} 条未读动态` : '',
-  ].filter(Boolean)
+function buildEntryChannels(channels: Channel[]) {
+  const priority: Record<string, number> = {
+    ai_development: 0,
+    builds: 1,
+    announce: 2,
+  }
+  return [...channels].sort((left, right) => {
+    const leftPriority = priority[left.kind ?? ''] ?? 10
+    const rightPriority = priority[right.kind ?? ''] ?? 10
+    return leftPriority - rightPriority
+  })
 }
 
 function channelIcon(kind?: string) {

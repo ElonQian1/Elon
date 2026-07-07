@@ -1,35 +1,35 @@
 .landing {
-  width: min(960px, 100%);
+  width: min(920px, 100%);
   margin: 0 auto;
-  padding: 18px 20px 28px;
+  padding: 18px 18px 26px;
   color: var(--text);
 }
 
 .heroBand {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) 238px;
+  gap: 12px;
   align-items: stretch;
-  min-height: 154px;
-  padding: 14px;
-  border: 1px solid var(--line);
+  min-height: 132px;
+  padding: 16px;
+  border: 1px solid #2b3038;
   border-radius: 8px;
-  background: var(--surface-2);
+  background: linear-gradient(180deg, #202227 0%, #191b20 100%);
 }
 
 .identity {
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 14px;
-  align-items: center;
+  grid-template-columns: 60px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
   min-width: 0;
 }
 
 .projectIcon,
 .projectIconFallback {
-  width: 72px;
-  height: 72px;
-  border-radius: 14px;
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -44,7 +44,7 @@
 
 .projectIconFallback {
   color: #fff;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 900;
 }
 
@@ -55,11 +55,11 @@
 .kicker {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 20px;
-  margin-bottom: 8px;
-  color: #9ea5b3;
-  font-size: 12px;
+  gap: 6px;
+  min-height: 18px;
+  margin-bottom: 6px;
+  color: #8f98a7;
+  font-size: 11.5px;
   font-weight: 800;
 }
 
@@ -78,7 +78,7 @@
 .identityCopy h2 {
   margin: 0;
   color: #f6f8fb;
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 900;
   line-height: 1.16;
   letter-spacing: 0;
@@ -87,13 +87,16 @@
 
 .identityCopy p,
 .summary {
-  display: block;
+  display: -webkit-box;
   max-width: 620px;
-  margin-top: 8px;
+  margin-top: 6px;
+  overflow: hidden;
   color: var(--text-soft);
   font-size: 13px;
   line-height: 1.48;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .summary {
@@ -103,22 +106,22 @@
 .metaRow {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .metaPill {
   min-width: 0;
-  height: 28px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 0 10px;
-  border: 1px solid #3a3e48;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid #303541;
   border-radius: 7px;
-  background: rgba(17, 18, 20, .28);
-  color: #c8d0dc;
-  font-size: 12px;
+  background: rgba(255, 255, 255, .035);
+  color: #b9c2cf;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -130,30 +133,31 @@
 .actionPanel {
   min-width: 0;
   display: grid;
-  grid-template-rows: minmax(108px, 1fr) auto;
-  gap: 10px;
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 8px;
 }
 
 .primaryAction {
   width: 100%;
-  min-height: 88px;
+  min-height: 72px;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
-  gap: 8px 12px;
+  gap: 6px 10px;
   align-items: center;
-  padding: 14px;
-  border: 1px solid rgba(255, 255, 255, .14);
+  padding: 12px;
+  border: 1px solid #3f7b58;
   border-radius: 8px;
-  background: #ffffff;
-  color: #000000;
+  background: #213328;
+  color: #f5fff7;
   text-align: left;
   transition: background var(--transition), border-color var(--transition);
 }
 
 .primaryAction:hover:not(:disabled) {
-  border-color: rgba(255, 255, 255, .22);
-  background: #e7e7e7;
+  border-color: #5aa878;
+  background: #263b2f;
 }
 
 .primaryAction:disabled {
@@ -163,13 +167,13 @@
 
 .primaryIcon {
   grid-row: 1 / 3;
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: rgba(0, 0, 0, .08);
-  color: #000;
+  background: rgba(124, 214, 152, .16);
+  color: #caf5d7;
 }
 
 .primaryCopy {
@@ -185,21 +189,21 @@
 }
 
 .primaryCopy strong {
-  color: #000;
+  color: #f6fff9;
   font-size: 15px;
   line-height: 1.25;
 }
 
 .primaryCopy small {
   margin-top: 4px;
-  color: rgba(0, 0, 0, .62);
+  color: rgba(228, 255, 235, .7);
   font-size: 12px;
   line-height: 1.35;
 }
 
 .primaryAction em {
   grid-column: 2;
-  color: rgba(0, 0, 0, .72);
+  color: #bfe7ca;
   font-size: 12px;
   font-style: normal;
   font-weight: 900;
@@ -211,22 +215,22 @@
 .quickActions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
 }
 
 .quickAction {
   min-width: 0;
-  height: 32px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 8px;
-  border: 1px solid #3a3e48;
+  padding: 0 7px;
+  border: 1px solid #303641;
   border-radius: 7px;
-  background: var(--surface);
-  color: #d8dee8;
-  font-size: 12px;
+  background: rgba(255, 255, 255, .035);
+  color: #c4cdda;
+  font-size: 11.5px;
   font-weight: 800;
   transition: background var(--transition), border-color var(--transition);
 }
@@ -243,101 +247,23 @@
   white-space: nowrap;
 }
 
-.startRail {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.stepButton {
-  min-height: 68px;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid #343944;
-  border-radius: 8px;
-  background: #22242a;
-  color: #d9dfe9;
-  text-align: left;
-  transition: background var(--transition), border-color var(--transition);
-}
-
-.stepButton:hover:not(:disabled) {
-  border-color: #4f5969;
-  background: #292c34;
-}
-
-.stepButton svg {
-  width: 34px;
-  height: 34px;
-  padding: 8px;
-  border-radius: 8px;
-  background: #303641;
-  color: #cfd8e6;
-}
-
-.stepActive {
-  border-color: #4f946e;
-  background: #223027;
-}
-
-.stepActive svg {
-  background: #2e7b52;
-  color: #f5fff9;
-}
-
-.stepDisabled {
-  cursor: default;
-  opacity: .62;
-}
-
-.stepButton span {
-  min-width: 0;
-}
-
-.stepButton strong,
-.stepButton small {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.stepButton strong {
-  color: #f1f4f8;
-  font-size: 13px;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.stepButton small {
-  margin-top: 4px;
-  color: #99a2b0;
-  font-size: 12px;
-  line-height: 1.35;
-  white-space: nowrap;
-}
-
 .contentGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 292px;
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
   align-items: start;
-  margin-top: 20px;
+  margin-top: 14px;
 }
 
 .mainStack,
 .sideStack {
   display: grid;
-  gap: 20px;
+  gap: 14px;
   min-width: 0;
 }
 
 .sideStack {
-  gap: 14px;
+  gap: 12px;
 }
 
 .section,
@@ -346,12 +272,12 @@
 }
 
 .sectionHeader {
-  min-height: 22px;
+  min-height: 20px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  color: #f0f3f7;
+  gap: 7px;
+  margin-bottom: 8px;
+  color: #e4e9f1;
 }
 
 .sectionHeader svg {
@@ -360,14 +286,14 @@
 }
 
 .sectionHeader strong {
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.3;
 }
 
 .sectionHeader span {
   margin-left: auto;
   color: #7f8795;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -505,18 +431,18 @@
 .previewGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .previewTile {
-  min-height: 112px;
+  min-height: 86px;
   display: grid;
   align-content: start;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid #343842;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #2d333d;
   border-radius: 8px;
-  background: #202126;
+  background: rgba(255, 255, 255, .028);
 }
 
 .previewTile svg {
@@ -525,7 +451,7 @@
 
 .previewTile strong {
   color: #eef2f7;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.25;
   overflow-wrap: anywhere;
 }
@@ -537,40 +463,39 @@
   font-size: 12px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
-.entryList,
-.activityList {
+.entryList {
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .entryRow {
-  min-height: 42px;
+  min-height: 38px;
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) 14px;
-  gap: 9px;
+  grid-template-columns: 24px minmax(0, 1fr) 14px;
+  gap: 8px;
   align-items: center;
-  padding: 8px 8px;
-  border-radius: 7px;
-  color: #d6dce6;
+  padding: 6px;
+  border-radius: 6px;
+  color: #c8d1dd;
   text-align: left;
   transition: background var(--transition), color var(--transition);
 }
 
 .entryRow:hover {
-  background: #2c2f37;
+  background: #262b33;
   color: #fff;
 }
 
 .entryIcon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
-  background: #2a2d35;
+  border-radius: 6px;
+  background: #252a33;
   color: #9ba6b8;
 }
 
@@ -588,44 +513,27 @@
 }
 
 .entryCopy strong {
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.25;
 }
 
 .entryCopy small {
   margin-top: 3px;
   color: #8f98a8;
-  font-size: 12px;
+  font-size: 11.5px;
   line-height: 1.25;
 }
 
-.activityItem {
+.entryMore {
   min-height: 34px;
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr);
+  grid-template-columns: 24px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  padding: 7px 8px;
-  border-radius: 7px;
-  color: #aeb7c6;
-  text-align: left;
-}
-
-button.activityItem:hover {
-  background: #2c2f37;
-  color: #fff;
-}
-
-.activityItem svg {
-  color: #7f8795;
-}
-
-.activityItem span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
+  padding: 5px 6px;
+  color: #818b9a;
+  font-size: 11.5px;
+  font-weight: 700;
 }
 
 @media (max-width: 1180px) {
@@ -655,17 +563,16 @@ button.activityItem:hover {
 
   .projectIcon,
   .projectIconFallback {
-    width: 72px;
-    height: 72px;
-    border-radius: 18px;
-    font-size: 26px;
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    font-size: 24px;
   }
 
   .identityCopy h2 {
-    font-size: 23px;
+    font-size: 21px;
   }
 
-  .startRail,
   .downloadGrid,
   .previewGrid,
   .actionPanel {
