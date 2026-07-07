@@ -63,6 +63,26 @@ fn should_append_project_icon_context_for_pc_fast_path(needs_project_workflow: b
     needs_project_workflow
 }
 
+fn should_use_pc_node_fast_path(
+    is_pc_node_project: bool,
+    needs_project_workflow: bool,
+    direct_pc_cli_enabled: bool,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+) -> bool {
+    is_pc_node_project
+        && (needs_project_workflow
+            || direct_pc_cli_enabled
+            || matches!(
+                pc_runtime_route,
+                Some(
+                    PcRuntimeRoutePreference::RouteA
+                        | PcRuntimeRoutePreference::RouteB
+                        | PcRuntimeRoutePreference::RouteC2
+                        | PcRuntimeRoutePreference::RouteC3
+                )
+            ))
+}
+
 pub(crate) const MAX_PROJECT_ICON_CONTEXT_DATA_URL_BYTES: usize = 512 * 1024;
 
 pub(crate) fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
@@ -101,7 +121,9 @@ pub(crate) fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
 mod tests {
     use super::{
         looks_like_replaced_unicode_mojibake, should_append_project_icon_context_for_pc_fast_path,
+        should_use_pc_node_fast_path,
     };
+    use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
 
     #[test]
     fn detects_windows_question_mark_mojibake() {
@@ -126,6 +148,35 @@ mod tests {
     fn pc_node_fast_path_keeps_lightweight_chat_message_plain() {
         assert!(!should_append_project_icon_context_for_pc_fast_path(false));
         assert!(should_append_project_icon_context_for_pc_fast_path(true));
+    }
+
+    #[test]
+    fn pc_node_fast_path_skips_default_platform_chat() {
+        assert!(!should_use_pc_node_fast_path(true, false, false, None));
+        assert!(!should_use_pc_node_fast_path(
+            true,
+            false,
+            false,
+            Some(PcRuntimeRoutePreference::RouteC)
+        ));
+    }
+
+    #[test]
+    fn pc_node_fast_path_keeps_development_and_explicit_pc_routes() {
+        assert!(should_use_pc_node_fast_path(true, true, false, None));
+        assert!(should_use_pc_node_fast_path(true, false, true, None));
+        assert!(should_use_pc_node_fast_path(
+            true,
+            false,
+            false,
+            Some(PcRuntimeRoutePreference::RouteA)
+        ));
+        assert!(should_use_pc_node_fast_path(
+            true,
+            false,
+            false,
+            Some(PcRuntimeRoutePreference::RouteC3)
+        ));
     }
 }
 
@@ -228,13 +279,15 @@ pub(crate) async fn run_project_agent_with_scheduler(
     let lightweight_chat_split_enabled = ai_cli::project_lightweight_chat_split_enabled();
     // force_cli: 悬浮球手机控制专用模式，绕过本地 intent_router 分流，
     // 直接进入 Codex CLI 意图门控，由 Codex 自己判断"闲聊还是生成脚本"。
-    let needs_project_workflow = if is_pc_node_project && !execution_mode.is_plan() {
-        false
-    } else {
-        execution_mode.is_plan()
-            || execution_mode.is_force_cli()
-            || routing_decision.route != intent_router::CapabilityRoute::ChatAgent
-    };
+    let needs_project_workflow = execution_mode.is_plan()
+        || execution_mode.is_force_cli()
+        || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
+    let use_pc_node_fast_path = should_use_pc_node_fast_path(
+        is_pc_node_project,
+        needs_project_workflow,
+        direct_pc_cli_enabled,
+        pc_runtime_route,
+    );
     if needs_project_workflow && !can_edit(&project.role) {
         let apk_url = if agent_intent::is_project_delivery_request(&message, &base_workspace)
             && tools::find_latest_apk(&base_workspace).is_some()
@@ -284,7 +337,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     }
     // 服务器上不应创建 worktree——直接透传给 agent 层，由 pc_project_binding 接管。
     // 同时 bypass 整个 scheduler（PC项目无需 worktree/合并锁），减少不必要的等待。
-    if is_pc_node_project {
+    if use_pc_node_fast_path {
         // PC 节点项目快速路径：服务器不创建 worktree，但仍按会话串行，避免同一
         // conversation 的多个 CLI 进程同时写同一个 PC 会话 worktree。
         if needs_project_workflow {

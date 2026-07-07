@@ -611,7 +611,7 @@ export default function ConversationPage() {
   const localNodeReady = localNodeOwnerOk
     && localNode?.connected !== false
     && localNode?.codex_cli?.available !== false
-  const shouldPreferLocalNode = !['route_c2', 'route_c3'].includes(runtimeRoute)
+  const shouldPreferLocalNode = ['route_a', 'route_b'].includes(runtimeRoute)
   const directPcCliAvailable = !!activeProjectId
     && !isAssistingMember
     && localNodeReady
@@ -622,6 +622,7 @@ export default function ConversationPage() {
     [composerRuntimeRoute, modelLabel, modelOptions, selectedAgent],
   )
   const projectBoundToLocalNode = !!localNodeId && activeProject?.node_id === localNodeId
+  const showLocalNodeStatus = directPcCliActive || shouldPreferLocalNode || projectBoundToLocalNode || !!localBindStatus
   const activeChannelBlocksAi = !!activeChannel && activeChannel.kind === 'ai_development' && !channelAllowsAiStart(activeChannel)
   const activeChannelIsNotAi = !!activeChannel && activeChannel.kind !== 'ai_development'
   const aiDevelopmentChannelBlocksAi = !!aiDevelopmentChannel && !channelAllowsAiStart(aiDevelopmentChannel)
@@ -1244,16 +1245,20 @@ export default function ConversationPage() {
         <div className={styles.chatStatusStack}>
           {activeProjectId && (
             <>
-              {/* 节点离线提示：电脑重启后节点未运行时出现 */}
-              <NodeOfflineBanner localNodeReady={localNodeReady} localNodeId={localNodeId} />
-              <LocalNodeProjectNotice
-                localNode={localNode}
-                localNodeReady={localNodeReady}
-                localNodeId={localNodeId}
-                localBindStatus={localBindStatus}
-                localNodeError={localNodeError}
-                projectBoundToLocalNode={projectBoundToLocalNode}
-              />
+              {showLocalNodeStatus && (
+                <>
+                  {/* 节点离线提示：电脑重启后节点未运行时出现 */}
+                  <NodeOfflineBanner localNodeReady={localNodeReady} localNodeId={localNodeId} />
+                  <LocalNodeProjectNotice
+                    localNode={localNode}
+                    localNodeReady={localNodeReady}
+                    localNodeId={localNodeId}
+                    localBindStatus={localBindStatus}
+                    localNodeError={localNodeError}
+                    projectBoundToLocalNode={projectBoundToLocalNode}
+                  />
+                </>
+              )}
               <div className={styles.projectRouteNotice}>
                 <span>
                   <strong>当前项目</strong>

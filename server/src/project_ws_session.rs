@@ -459,8 +459,8 @@ mod tests {
 }
 
 fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
-    !matches!(
+    matches!(
         route,
-        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+        Some(PcRuntimeRoutePreference::RouteA | PcRuntimeRoutePreference::RouteB)
     )
 }

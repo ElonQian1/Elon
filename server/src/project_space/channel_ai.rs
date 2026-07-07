@@ -13,19 +13,17 @@ use crate::{
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_keys::clean_trace_id,
     project_space_task_control::take_channel_ai_task_control,
-    project_tool_approval_recovery, project_tool_approvals,
-    project_workspace_recovery,
+    project_tool_approval_recovery, project_tool_approvals, project_workspace_recovery,
     store::{ProjectAccess, CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW},
     types::AppState,
 };
 
 use super::{
-    ensure_project_member_can_speak, ensure_user_project_for_space,
-    project_member_can_use_channel, project_space_access, publish_channel_message_updated,
-    DOCS_CHANNEL_KIND,
+    ensure_project_member_can_speak, ensure_user_project_for_space, project_member_can_use_channel,
+    project_space_access, publish_channel_message_updated, DOCS_CHANNEL_KIND,
 };
 
-use super::channel_ai_spawn::{BlankFallback, ChannelAiTask, spawn_channel_ai_task};
+use super::channel_ai_spawn::{spawn_channel_ai_task, BlankFallback, ChannelAiTask};
 
 #[derive(Deserialize)]
 pub struct StartChannelAiTaskRequest {
@@ -72,7 +70,6 @@ pub struct SummarizeChannelSelectionRequest {
     pub runtime_route: Option<String>,
     pub trace_id: Option<String>,
 }
-
 
 pub async fn start_user_project_channel_ai_task(
     State(state): State<Arc<AppState>>,
@@ -379,7 +376,6 @@ fn cancel_channel_ai_task_response(
     .into_response()
 }
 
-
 async fn start_channel_ai_task_response(
     state: Arc<AppState>,
     user_id: String,
@@ -557,9 +553,9 @@ async fn start_channel_ai_task_response(
 }
 
 fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
-    !matches!(
+    matches!(
         route,
-        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+        Some(PcRuntimeRoutePreference::RouteA | PcRuntimeRoutePreference::RouteB)
     )
 }
 
@@ -669,4 +665,3 @@ fn summarize_channel_selection_response(
     }))
     .into_response()
 }
-

@@ -7,6 +7,9 @@ import type { MemberConversationEntry } from './memberConversationApi'
 import styles from './ConversationComposer.module.css'
 
 const PROJECT_PREWARM_COOLDOWN_MS = 120000
+const PROJECT_PREWARM_STORAGE_KEY = 'elon_project_prewarm_enabled'
+const PROJECT_PREWARM_DEFAULT_VERSION_KEY = 'elon_project_prewarm_default_version'
+const PROJECT_PREWARM_DEFAULT_VERSION = 'manual-prewarm-default-off-20260707'
 
 interface ComposerRuntimeTogglesProps {
   activeProjectId: string
@@ -94,7 +97,7 @@ export default function ComposerRuntimeToggles({
         data-active={directPcCliActive ? 'true' : 'false'}
         data-default-local={shouldPreferLocalNode && localNodeReady ? 'true' : 'false'}
         data-disabled={!directPcCliAvailable || composerDisabled ? 'true' : 'false'}
-        title="自动模式会在可用时使用本机节点；打开后强制交给本机 AI CLI"
+        title="默认先使用平台 AI；打开后强制交给本机 AI CLI"
       >
         <input
           type="checkbox"
@@ -128,10 +131,12 @@ export default function ComposerRuntimeToggles({
 }
 
 function initialProjectPrewarmFromStorage(storage: Storage | null): boolean {
-  if (!storage) return true
-  return storage.getItem('elon_project_prewarm_enabled') !== 'false'
+  if (!storage) return false
+  return storage.getItem(PROJECT_PREWARM_STORAGE_KEY) === 'true'
+    && storage.getItem(PROJECT_PREWARM_DEFAULT_VERSION_KEY) === PROJECT_PREWARM_DEFAULT_VERSION
 }
 
 function persistProjectPrewarmSelection(storage: Storage, enabled: boolean) {
-  storage.setItem('elon_project_prewarm_enabled', enabled ? 'true' : 'false')
+  storage.setItem(PROJECT_PREWARM_STORAGE_KEY, enabled ? 'true' : 'false')
+  storage.setItem(PROJECT_PREWARM_DEFAULT_VERSION_KEY, PROJECT_PREWARM_DEFAULT_VERSION)
 }
