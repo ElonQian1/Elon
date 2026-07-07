@@ -68,13 +68,18 @@ mod routing;
 
 pub(crate) use pc_binding::prewarm_route_a_runtime_for_project;
 
-use routing::run_for_project_in_workspace_with_routing;
+use dispatch::run_backend_with_workspace;
 use pc_binding::{
     append_project_dev_profile_context, is_codex_fallback_error, node_cli_available,
     resolve_pc_project_binding, resolve_pc_project_binding_with_options,
     send_pc_workspace_unavailable_error,
 };
-use dispatch::run_backend_with_workspace;
+#[cfg(test)]
+use pc_binding::{
+    pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
+    pc_workspace_inspect_usable,
+};
+use routing::run_for_project_in_workspace_with_routing;
 
 pub fn elon_self_workspace() -> std::path::PathBuf {
     std::path::PathBuf::from(
@@ -521,4 +526,3 @@ pub async fn plan_for_project_in_workspace(
         let _ = tx.send(WsMessage::error(e.to_string()).to_json());
     }
 }
-

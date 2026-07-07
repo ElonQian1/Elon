@@ -1,9 +1,7 @@
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 
-use super::{
-    MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS, MANIFEST_PATHS,
-};
+use super::{MANIFEST_PATHS, MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS};
 
 pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
     let object = value.as_object()?;
@@ -311,7 +309,10 @@ pub(super) fn normalize_download(value: &Value, platform_hint: Option<&str>) -> 
     Some(Value::Object(object))
 }
 
-pub(super) fn download_platform(source: &Map<String, Value>, platform_hint: Option<&str>) -> Option<String> {
+pub(super) fn download_platform(
+    source: &Map<String, Value>,
+    platform_hint: Option<&str>,
+) -> Option<String> {
     first_string(source, &["platform", "os", "type"], MAX_SHORT_TEXT)
         .as_deref()
         .and_then(|value| normalize_platform(Some(value)))
@@ -589,7 +590,11 @@ pub(super) fn first_array<'a>(object: &'a Map<String, Value>, keys: &[&str]) -> 
     first_value(object, keys).filter(|value| value.is_array() || value.is_string())
 }
 
-pub(super) fn first_string(object: &Map<String, Value>, keys: &[&str], max_chars: usize) -> Option<String> {
+pub(super) fn first_string(
+    object: &Map<String, Value>,
+    keys: &[&str],
+    max_chars: usize,
+) -> Option<String> {
     keys.iter()
         .find_map(|key| object.get(*key))
         .and_then(|value| clean_text_value(value, max_chars))
@@ -660,7 +665,11 @@ pub(super) fn normalize_platform(value: Option<&str>) -> Option<String> {
     Some(platform.to_string())
 }
 
-pub(super) fn normalize_status(value: Option<&str>, url: Option<&str>, manifest_url: Option<&str>) -> String {
+pub(super) fn normalize_status(
+    value: Option<&str>,
+    url: Option<&str>,
+    manifest_url: Option<&str>,
+) -> String {
     let explicit = value
         .map(str::trim)
         .map(str::to_ascii_lowercase)
@@ -708,8 +717,3 @@ pub(super) fn source_value(relative_path: &str, status: &str, error: Option<Stri
 pub(super) fn manifest_path(workspace: &Path, relative_path: &str) -> PathBuf {
     workspace.join(relative_path)
 }
-
-
-#[cfg(test)]
-#[path = "project_landing_tests.rs"]
-mod tests;

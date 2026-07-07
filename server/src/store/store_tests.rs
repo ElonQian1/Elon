@@ -1,4 +1,4 @@
-    use super::*;
+    use crate::store::*;
     use uuid::Uuid;
 
     fn temp_store() -> Store {

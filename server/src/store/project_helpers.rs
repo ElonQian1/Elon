@@ -3,13 +3,15 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::common::{clean_optional, new_id, now};
 use super::{
-    project_branding, project_identities, project_roles, pc_project_binding,
-    CreateProjectResult, ProjectSummary,
+    pc_project_binding, project_branding, project_identities, project_roles, CreateProjectResult,
+    ProjectSummary,
 };
 
 // ── 私有帮助函数 ──────────────────────────────────────────────────────────────
 
-pub(super) fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectSummary> {
+pub(super) fn project_summary_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<ProjectSummary> {
     let mut project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use super::{
+    use super::super::{
         detect_project_identity, inspect_agent_runtime_freshness, local_project_info,
         local_project_registration_readiness, AgentRuntimeFreshness, LocalProjectInfo,
     };

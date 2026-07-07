@@ -9,11 +9,9 @@ use crate::{
 };
 
 use super::{
-    ExternalAppRouteCChatRequest, RouteCAction, RouteCChatMessage,
-    RouteCModelOutput, RuntimeRoute,
-    MAX_HISTORY_CONTENT_CHARS, MAX_HISTORY_ITEMS, MAX_JSON_CONTEXT_CHARS,
-    MAX_MESSAGE_CHARS, MAX_OUTPUT_TOKENS, MAX_TOOL_MANIFEST_CHARS,
-    MAX_TOOL_RESULT_CHARS, MAX_TOOL_RESULTS,
+    ExternalAppRouteCChatRequest, RouteCAction, RouteCChatMessage, RouteCModelOutput, RuntimeRoute,
+    MAX_HISTORY_CONTENT_CHARS, MAX_HISTORY_ITEMS, MAX_JSON_CONTEXT_CHARS, MAX_MESSAGE_CHARS,
+    MAX_OUTPUT_TOKENS, MAX_TOOL_MANIFEST_CHARS, MAX_TOOL_RESULTS, MAX_TOOL_RESULT_CHARS,
 };
 
 pub(super) fn route_c_sdk_enabled() -> bool {
@@ -255,7 +253,6 @@ pub(super) fn history_message(message: &RouteCChatMessage) -> Option<Value> {
     Some(json!({ "role": role, "content": content }))
 }
 
-
 pub(super) fn extract_content(value: &Value) -> Option<String> {
     value
         .pointer("/choices/0/message/content")
@@ -374,7 +371,11 @@ pub(super) fn sanitize_actions(
     sanitized
 }
 
-pub(super) fn allowed_tool_names(app_id: &str, manifest: &Value, local_context: &Value) -> BTreeSet<String> {
+pub(super) fn allowed_tool_names(
+    app_id: &str,
+    manifest: &Value,
+    local_context: &Value,
+) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     collect_tool_names(manifest, &mut names);
     if names.is_empty() {
@@ -505,8 +506,3 @@ pub(super) fn normalize_text(value: &str, max_chars: usize) -> String {
         .trim()
         .to_string()
 }
-
-
-#[cfg(test)]
-#[path = "external_app_route_c_sdk_tests.rs"]
-mod tests;

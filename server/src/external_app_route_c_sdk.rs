@@ -244,8 +244,11 @@ pub(crate) async fn route_c_chat_handler(
     .into_response()
 }
 
-
 mod api_client;
 mod helpers;
 use self::api_client::*;
 use self::helpers::*;
+
+#[cfg(test)]
+#[path = "external_app_route_c_sdk_tests.rs"]
+mod tests;
