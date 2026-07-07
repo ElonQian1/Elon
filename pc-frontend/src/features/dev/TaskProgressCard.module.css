@@ -11,6 +11,50 @@
   color: var(--text-soft);
 }
 
+.compactCard {
+  gap: 0;
+  border-color: rgba(148, 163, 184, .10);
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.compactButton {
+  min-width: 0;
+  min-height: 30px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 9px;
+  background: rgba(255, 255, 255, .022);
+  color: #9aa7ba;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.compactButton:hover {
+  background: rgba(255, 255, 255, .04);
+  color: #c7d2e2;
+}
+
+.compactTitle {
+  color: #dbe5f3;
+  font-weight: 750;
+}
+
+.compactSummary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .header {
   min-width: 0;
   display: grid;

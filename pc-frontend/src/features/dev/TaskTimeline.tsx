@@ -23,6 +23,7 @@ import styles from './TaskTimeline.module.css'
 interface TaskTimelineProps {
   model: TaskTimelineModel
   taskContext: TaskContext
+  completed?: boolean
   onCancel?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
@@ -31,9 +32,18 @@ type PrimaryTimelineBlock =
   | { type: 'item'; item: TimelineItem }
   | { type: 'commands'; id: string; items: TimelineItem[] }
 
-export default function TaskTimeline({ model, taskContext, onCancel, onApprove }: TaskTimelineProps) {
+interface RuntimeReply {
+  message: string
+  tone: TaskTone
+  runtime?: string
+  phase?: string
+  reqId?: string
+  fingerprint?: string
+}
+
+export default function TaskTimeline({ model, taskContext, completed = false, onCancel, onApprove }: TaskTimelineProps) {
   if (model.items.length === 0) return null
-  const grouped = groupTimelineItems(model.items)
+  const grouped = groupTimelineItems(model.items, completed)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
   const hasAssistantReply = grouped.primary.some(isAssistantTimelineItem)
   const showStageAtTop = model.stage.key === 'approval'
@@ -136,18 +146,25 @@ function TimelineFold({ title, count, defaultOpen = false, children }: {
   )
 }
 
-function groupTimelineItems(items: TimelineItem[]) {
+function groupTimelineItems(items: TimelineItem[], completed: boolean) {
   const grouped: { primary: TimelineItem[]; connection: TimelineItem[]; summary: TimelineItem[] } = {
     primary: [],
     connection: [],
     summary: [],
   }
   for (const item of items) {
-    if (isConnectionItem(item)) grouped.connection.push(item)
+    if (completed && isCompletedTechnicalItem(item)) grouped.connection.push(item)
+    else if (isConnectionItem(item)) grouped.connection.push(item)
     else if (isSummaryItem(item)) grouped.summary.push(item)
     else grouped.primary.push(item)
   }
   return grouped
+}
+
+function isCompletedTechnicalItem(item: TimelineItem) {
+  if (item.kind === 'heartbeat') return true
+  const text = [item.title, item.detail, item.meta].filter(Boolean).join(' ')
+  return /(同步 PC 构建产物|构建产物失败|安装按钮|AI CLI 正在处理中|正在处理中|累计前面全部流程总耗时)/i.test(text)
 }
 
 function isConnectionItem(item: TimelineItem) {
@@ -255,13 +272,59 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
 
 function AssistantTimelineReply({ item }: { item: TimelineItem }) {
   const text = item.detail ?? ''
+  const runtimeReply = runtimeReplyFromText(text)
   const hasMarkdown = /[#*`\[\]>|]/.test(text)
+  if (runtimeReply) return <RuntimeTimelineReply info={runtimeReply} />
   return (
     <div className={styles.assistantReply}>
       {item.meta && <div className={styles.assistantReplyMeta}>{item.meta}</div>}
       {hasMarkdown ? <MarkdownContent content={text} copy /> : <p>{text}</p>}
     </div>
   )
+}
+
+function RuntimeTimelineReply({ info }: { info: RuntimeReply }) {
+  const title = info.tone === 'failed' ? '平台 AI 暂时不可用' : '平台 AI 正在处理'
+  const meta = [info.runtime, info.phase].filter(Boolean).join(' · ')
+  return (
+    <div className={styles.runtimeReply} data-tone={info.tone}>
+      <strong>{title}</strong>
+      <p>{info.message}</p>
+      {(meta || info.reqId || info.fingerprint) && (
+        <details className={styles.runtimeReplyDetails}>
+          <summary>技术信息</summary>
+          {meta && <span>{meta}</span>}
+          {info.reqId && <span>req_id: {info.reqId}</span>}
+          {info.fingerprint && <span>fingerprint: {info.fingerprint}</span>}
+        </details>
+      )}
+    </div>
+  )
+}
+
+function runtimeReplyFromText(text: string): RuntimeReply | null {
+  const trimmed = text.trim()
+  if (!trimmed.startsWith('{')) return null
+  try {
+    const value = JSON.parse(trimmed) as Record<string, unknown>
+    const type = String(value.type ?? '')
+    const schema = String(value.schema ?? '')
+    if (type !== 'runtime_status' && type !== 'runtime_summary' && !schema.includes('runtime_')) return null
+    const status = String(value.status ?? '').toLowerCase()
+    const phase = String(value.phase ?? '').toLowerCase()
+    const failed = status === 'error' || phase === 'failed'
+    const message = String(value.message ?? '').trim()
+    return {
+      message: message || (failed ? '服务商返回错误，本轮没有生成有效回复。' : '正在调用平台模型。'),
+      tone: failed ? 'failed' : 'running',
+      runtime: String(value.runtime ?? '').trim() || undefined,
+      phase: phase || undefined,
+      reqId: String(value.req_id ?? '').trim() || undefined,
+      fingerprint: String(value.fingerprint ?? '').trim() || undefined,
+    }
+  } catch {
+    return null
+  }
 }
 
 function isAssistantTimelineItem(item: TimelineItem): boolean {

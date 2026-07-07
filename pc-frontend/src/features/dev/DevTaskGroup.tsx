@@ -62,6 +62,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const hasProgressDetails = progressCount > 0
   const showProgressPanel = hasProgressDetails || !isDone
   const tone = status.tone
+  const compactCompletedProcess = isDone && tone === 'done' && !!resultMsg
   const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
@@ -111,6 +112,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
         processSummary={processSummary}
         collapsed={collapsed}
         canCancel={canCancel}
+        compact={compactCompletedProcess}
         onToggle={() => {
           userCollapseOverride.current = true
           setCollapsed((c) => !c)
@@ -125,6 +127,7 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
           <TaskTimeline
             model={timeline}
             taskContext={taskContext}
+            completed={compactCompletedProcess}
             onCancel={onCancel}
             onApprove={onApprove}
           />

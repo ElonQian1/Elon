@@ -13,6 +13,7 @@ interface TaskProgressCardProps {
   processSummary: string
   collapsed: boolean
   canCancel: boolean
+  compact?: boolean
   onToggle: () => void
   onCancel: () => void
 }
@@ -24,6 +25,7 @@ export default function TaskProgressCard({
   processSummary,
   collapsed,
   canCancel,
+  compact = false,
   onToggle,
   onCancel,
 }: TaskProgressCardProps) {
@@ -32,6 +34,24 @@ export default function TaskProgressCard({
   const meta = readableMeta(timeline.stage.meta)
   const summary = compactProcessSummary(processSummary, progressCount)
   const hasDetails = progressCount > 0
+
+  if (compact) {
+    return (
+      <section className={[styles.card, styles.compactCard].join(' ')} data-tone={status.tone} aria-live="polite">
+        <button
+          type="button"
+          className={styles.compactButton}
+          onClick={onToggle}
+          aria-expanded={!collapsed}
+        >
+          <span className={styles.statusDot} aria-hidden="true" />
+          <span className={styles.compactTitle}>过程</span>
+          <span className={styles.compactSummary}>{summary}</span>
+          {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+        </button>
+      </section>
+    )
+  }
 
   return (
     <section className={styles.card} data-tone={status.tone} aria-live="polite">
