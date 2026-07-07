@@ -1,7 +1,7 @@
 .strip {
   position: sticky;
   bottom: 0;
-  z-index: 50;
+  z-index: 80;
   min-width: 0;
   min-height: 66px;
   max-width: 100%;
@@ -19,6 +19,7 @@
   box-shadow: 0 -10px 18px rgba(15, 16, 18, .72);
   transition: background var(--transition);
   isolation: isolate;
+  overflow: visible;
 }
 
 .strip:hover,
@@ -47,6 +48,8 @@
   grid-area: progress;
   min-width: 0;
   min-height: 15px;
+  position: relative;
+  z-index: 2;
 }
 
 .profileBtn:hover,
