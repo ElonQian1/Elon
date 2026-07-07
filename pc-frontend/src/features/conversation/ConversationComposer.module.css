@@ -210,6 +210,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  overflow: hidden;
 }
 
 .directCliCopy {
@@ -286,13 +287,14 @@
   font-size: 12px;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .form {
     padding: 34px 10px 12px;
   }
 
   .inputDock {
     grid-template-columns: 34px minmax(0, 1fr) 36px;
+    align-items: end;
   }
 
   .inlineControls {
@@ -300,10 +302,22 @@
     grid-row: 2;
     justify-content: flex-end;
     padding-top: 2px;
+    overflow: visible;
   }
 
   .sendBtn {
     grid-column: 3;
     grid-row: 1;
+  }
+}
+
+@media (max-width: 560px) {
+  .inlineControls {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .modelBtn {
+    max-width: min(100%, 180px);
   }
 }

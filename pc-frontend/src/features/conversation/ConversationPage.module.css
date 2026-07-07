@@ -8,7 +8,7 @@
   display: grid;
   grid-template-columns:
     var(--conversation-channel-column, var(--sidebar-width))
-    minmax(520px, 1fr)
+    minmax(480px, 1fr)
     var(--conversation-member-column, minmax(280px, var(--member-width)));
   height: 100%;
   min-height: 0;
@@ -20,7 +20,7 @@
 .layout[data-member-collapsed="true"] {
   grid-template-columns:
     var(--conversation-channel-column, var(--sidebar-width))
-    minmax(520px, 1fr)
+    minmax(480px, 1fr)
     0;
 }
 
@@ -438,6 +438,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1 1 auto;
   min-width: 0;
 }
 .chatTitleGlyph {
@@ -470,6 +471,12 @@
   gap: 7px;
   flex-shrink: 0;
   min-width: 0;
+  max-width: min(58vw, 520px);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.topbarActions::-webkit-scrollbar {
+  display: none;
 }
 .panelControlBtn {
   min-width: 36px;
@@ -477,6 +484,7 @@
 
 /* Text button（顶栏、面板等复用）*/
 .textBtn {
+  flex: 0 0 auto;
   height: var(--control-height);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -899,10 +907,10 @@
   position: relative;
 }
 .memberTitle {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 7px;
   min-height: var(--topbar-height);
   padding: 7px 10px;
   color: var(--text-muted);
@@ -911,6 +919,25 @@
   border-bottom: 1px solid rgba(255,255,255,.04);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.memberTitleCopy {
+  min-width: 0;
+}
+.memberTitleCopy strong,
+.memberTitleCopy span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberTitleCopy span {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
 }
 .memberList {
   overflow-y: auto;
@@ -1019,20 +1046,20 @@
    ══════════════════════════════════════ */
 @media (max-width: 1180px) {
   .layout {
-    grid-template-columns: var(--conversation-channel-column, var(--sidebar-width)) minmax(0, 1fr);
+    grid-template-columns: var(--conversation-channel-column, minmax(220px, 248px)) minmax(0, 1fr);
   }
   .memberPanel { display: none; }
 }
-@media (max-width: 1360px) {
+@media (max-width: 1500px) {
   .topbarActions .textBtn span {
     display: none;
-  }
-  .topbarActions .panelControlBtn span:first-child {
-    display: inline;
   }
   .topbarActions .textBtn {
     width: var(--control-height);
     padding: 0;
+  }
+  .topbarActions {
+    max-width: min(42vw, 260px);
   }
 }
 @media (max-width: 780px) {
@@ -1069,6 +1096,13 @@
   }
   .messageList {
     padding: 18px 14px;
+  }
+  .chatColumn[data-has-composer="true"] .messageList {
+    padding-bottom: 176px;
+  }
+  .messageBody,
+  .ownRow .messageBody {
+    max-width: min(100%, 680px);
   }
   .emptyState {
     margin-top: 8vh;
@@ -1592,9 +1626,9 @@
 .memberActions {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 4px;
-  max-width: 198px;
+  max-width: 100%;
 }
 
 .memberVirtualList {
@@ -1757,6 +1791,7 @@
   border-radius: 6px;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   font-size: 12px;
 }
