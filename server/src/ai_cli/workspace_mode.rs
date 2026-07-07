@@ -1,0 +1,578 @@
+use anyhow::{anyhow, Result};
+use std::{path::Path, sync::Arc};
+use tokio::sync::mpsc::UnboundedSender;
+use uuid::Uuid;
+
+use crate::{agent_routing::quick_casual_reply, billing, billing_lifecycle, intent_router, tools, types::{AppState, WsMessage}};
+
+use super::{AiCliRequestMode, NativeSessionScope, PcAgentRunOutcome, project_lightweight_chat_split_enabled, run_via_pc_agent};
+use super::{DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS, DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS};
+use super::ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message};
+use super::ai_cli_chat_policy;
+use super::ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task};
+use super::ai_cli_native_session::{append_native_session_continuity, native_session_continuity_note, retire_native_session_and_schedule_repair, should_retry_without_native_session};
+use super::ai_cli_output::{extract_json_agent_message, extract_thread_id, format_cli_reply, truncate_chars};
+use super::ai_cli_process::{cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions};
+use super::ai_cli_prompts::build_cli_prompt;
+use super::ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext};
+
+pub(super) async fn run_with_workspace_mode(
+    user_id: &str,
+    workspace: &Path,
+    download_base: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    option_id: Option<&str>,
+    route: intent_router::CapabilityRoute,
+    require_existing_git: bool,
+    native_session_scope: Option<NativeSessionScope>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+    request_mode: AiCliRequestMode,
+    started: std::time::Instant,
+) -> Result<()> {
+    let lightweight_chat_split_enabled = project_lightweight_chat_split_enabled();
+    if lightweight_chat_split_enabled
+        && request_mode == AiCliRequestMode::Execute
+        && route == intent_router::CapabilityRoute::ChatAgent
+        && !intent_router::looks_like_development_request(user_message)
+    {
+        if let Some(reply) = quick_casual_reply(user_message) {
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: reply.to_string(),
+                    apk_url: None,
+                    image_url: None,
+                    model_used: None,
+                    node_id: None,
+                }
+                .to_json(),
+            );
+            return Ok(());
+        }
+    }
+
+    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!(msg));
+    }
+
+    let planning_task = request_mode.is_plan();
+    let lightweight_chat_task = ai_cli_chat_policy::should_use_project_lightweight_chat(
+        lightweight_chat_split_enabled,
+        planning_task,
+        route,
+        user_message,
+    );
+    let development_task = planning_task || !lightweight_chat_task;
+    let tiny_chat_task = lightweight_chat_task && is_tiny_chat_message(user_message);
+    let prompt_route =
+        ai_cli_chat_policy::prompt_route_for_project_chat(lightweight_chat_split_enabled, route);
+
+    // ── PC agent 委托（优先）──────────────────────────────────────────────────
+    // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
+    // 利用 PC 性能处理项目开发请求，同时将结果流式返回给 APK。
+    // 只有显式开启轻量聊天分流时，普通聊天才留在轻量通道；默认项目消息直连 PC/Codex。
+    // 通过 PC_CLI_RELAY_ENABLED=false 可禁用此功能，回退到云端本地 CLI。
+    let pc_relay_enabled = std::env::var("PC_CLI_RELAY_ENABLED")
+        .map(|v| v != "false")
+        .unwrap_or(true);
+    if pc_relay_enabled && development_task {
+        if let Some(agent_id) = state.agent_manager.any_connected_agent_id().await {
+            let _ = tx.send(WsMessage::progress("正在连接 PC 开发节点。").to_json());
+            match run_via_pc_agent(
+                &agent_id,
+                user_id,
+                None,
+                user_message,
+                preflight_note,
+                request_mode,
+                None,
+                None,
+                None,
+                false,
+                "copilot",
+                None,
+                None, // codex_reasoning_effort
+                None,
+                state,
+                tx,
+            )
+            .await
+            {
+                Ok(PcAgentRunOutcome::Completed) => return Ok(()),
+                Ok(PcAgentRunOutcome::NoReadableLightweightReply { diagnostic }) => {
+                    tracing::warn!(
+                        diagnostic = diagnostic.as_deref().unwrap_or_default(),
+                        "[ai_cli] PC agent CLI 未返回可读内容，回退本地"
+                    );
+                    let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
+                }
+                Err(e) => {
+                    tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
+                    let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
+                }
+            }
+        }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
+    let mut option = state
+        .ai_cli
+        .find_option(option_id)
+        .cloned()
+        .ok_or_else(|| anyhow!("未找到可用本地 AI CLI 选项"))?;
+
+    std::fs::create_dir_all(workspace)?;
+
+    if lightweight_chat_task {
+        cap_option_timeout(&mut option, chat_timeout_cap_secs(tiny_chat_task));
+    }
+    if development_task && !planning_task {
+        ensure_git(workspace, user_id, require_existing_git)?;
+    }
+
+    let android_task = development_task && !planning_task && looks_like_android_task(user_message);
+    let cli_feature = if planning_task {
+        "codex_cli_plan"
+    } else if development_task {
+        "codex_cli_dev"
+    } else {
+        "codex_cli_chat"
+    };
+    let accounting_key = trace_id
+        .map(|trace_id| format!("codex_cli:{cli_feature}:{trace_id}"))
+        .unwrap_or_else(|| format!("codex_cli:{cli_feature}:{}", Uuid::new_v4()));
+    let reserve_fen = billing::configured_reservation_fen(
+        &state.store,
+        if development_task {
+            "billing_cli_dev_reservation_fen"
+        } else {
+            "billing_cli_chat_reservation_fen"
+        },
+        if development_task { 100 } else { 10 },
+    );
+    let mut billing_call = crate::billing_lifecycle::TrustedBillingCall::reserve(
+        &state.store,
+        user_id,
+        &accounting_key,
+        cli_feature,
+        "server_codex_cli",
+        Some(option.id.as_str()),
+        reserve_fen,
+    )
+    .map_err(|msg| anyhow!(msg))?;
+    if planning_task {
+        let _ =
+            tx.send(WsMessage::progress("已开启先规划模式：本轮只生成计划，不改代码。").to_json());
+    } else if development_task {
+        let _ = tx.send(WsMessage::progress("正在准备项目工作区。").to_json());
+        for note in environment_notes(user_message, &option) {
+            let _ = tx.send(WsMessage::progress(note).to_json());
+        }
+        let _ = tx.send(WsMessage::progress("AI 助手正在处理你的请求。").to_json());
+    } else {
+        let _ = tx.send(WsMessage::progress("正在思考。").to_json());
+    }
+
+    let workspace_key = workspace.display().to_string();
+    let skip_native_session = tiny_chat_task && supports_codex_sessions(&option);
+    if skip_native_session {
+        record_cli_session_skipped(state, trace_id, "run_workspace", "tiny_chat_fast_path");
+    }
+    let use_native_sessions = supports_codex_sessions(&option) && !skip_native_session;
+    let session_state = if use_native_sessions {
+        native_session_scope.as_ref().and_then(|scope| {
+            state
+                .store
+                .get_native_agent_session_state(
+                    &scope.project_id,
+                    &scope.user_id,
+                    Some(&scope.conversation_id),
+                    &option.provider,
+                    &option.id,
+                    &workspace_key,
+                )
+                .ok()
+                .flatten()
+        })
+    } else {
+        None
+    };
+    let mut native_session_id = session_state
+        .as_ref()
+        .map(|state| state.native_session_id.clone());
+    let mut prompt_bootstrapped = session_state
+        .as_ref()
+        .map(|state| {
+            if development_task && !planning_task {
+                state.dev_bootstrapped
+            } else {
+                state.chat_bootstrapped
+            }
+        })
+        .unwrap_or(false);
+    if lightweight_chat_task && native_session_id.is_some() && !prompt_bootstrapped {
+        record_cli_session_skipped(
+            state,
+            trace_id,
+            "run_workspace",
+            "unbootstrapped_chat_session",
+        );
+        native_session_id = None;
+        prompt_bootstrapped = false;
+    }
+    if native_session_id.is_some() {
+        let _ = tx.send(
+            WsMessage::progress("Restoring Codex CLI context for this conversation.").to_json(),
+        );
+    }
+    let runtime_permission = native_session_scope
+        .as_ref()
+        .map(|scope| scope.runtime_permission.as_str());
+
+    let mut prompt = build_cli_prompt(
+        workspace,
+        user_message,
+        preflight_note,
+        &option,
+        prompt_route,
+        prompt_bootstrapped,
+        request_mode,
+    );
+    let mut initial_option = option.clone();
+    if lightweight_chat_task && native_session_id.is_some() {
+        cap_option_timeout(
+            &mut initial_option,
+            configured_timeout_cap(
+                "AI_CLI_CHAT_RESUME_TIMEOUT_SECS",
+                DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS,
+            ),
+        );
+    }
+    let mut output = match run_cli_command_traced(
+        &initial_option,
+        workspace,
+        &prompt,
+        native_session_id.as_deref(),
+        runtime_permission,
+        tx,
+        Some(CliTraceContext {
+            state,
+            trace_id,
+            operation: "run_workspace",
+            attempt: "initial",
+            route: Some(route),
+            development_task: Some(development_task),
+            prompt_bootstrapped: Some(prompt_bootstrapped),
+        }),
+    )
+    .await
+    {
+        Ok(output) => output,
+        Err(error)
+            if lightweight_chat_task
+                && codex_network_or_timeout_error(&error)
+                && supports_codex_sessions(&option) =>
+        {
+            return Err(error);
+        }
+        Err(error) if lightweight_chat_task && native_session_id.is_some() => {
+            let stale_session_id = native_session_id.clone();
+            record_cli_retry(
+                state,
+                trace_id,
+                "run_workspace",
+                stale_session_id.as_deref(),
+                "resume_error_frontend_fresh_session",
+            );
+            retire_native_session_and_schedule_repair(
+                state,
+                trace_id,
+                native_session_scope.as_ref(),
+                &option,
+                workspace,
+                &workspace_key,
+                stale_session_id.as_deref(),
+                "initial_cli_error",
+                &error.to_string(),
+            );
+            let _ = tx.send(
+                WsMessage::progress("旧会话恢复超时，已切到新会话继续；旧上下文会在后台整理。")
+                    .to_json(),
+            );
+            native_session_id = None;
+            prompt_bootstrapped = false;
+            prompt = build_cli_prompt(
+                workspace,
+                user_message,
+                preflight_note,
+                &option,
+                prompt_route,
+                prompt_bootstrapped,
+                request_mode,
+            );
+            let mut fresh_option = option.clone();
+            cap_option_timeout(
+                &mut fresh_option,
+                configured_timeout_cap(
+                    "AI_CLI_CHAT_FRESH_TIMEOUT_SECS",
+                    DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS,
+                ),
+            );
+            match run_cli_command_traced(
+                &fresh_option,
+                workspace,
+                &prompt,
+                None,
+                runtime_permission,
+                tx,
+                Some(CliTraceContext {
+                    state,
+                    trace_id,
+                    operation: "run_workspace",
+                    attempt: "fresh_after_resume_error",
+                    route: Some(route),
+                    development_task: Some(development_task),
+                    prompt_bootstrapped: Some(prompt_bootstrapped),
+                }),
+            )
+            .await
+            {
+                Ok(output) => output,
+                Err(fresh_error)
+                    if codex_network_or_timeout_error(&fresh_error)
+                        && supports_codex_sessions(&option) =>
+                {
+                    return Err(fresh_error);
+                }
+                Err(fresh_error) => {
+                    return Err(fresh_error);
+                }
+            }
+        }
+        Err(error)
+            if lightweight_chat_task
+                && codex_network_or_timeout_error(&error)
+                && supports_codex_sessions(&option) =>
+        {
+            return Err(error);
+        }
+        Err(error) if lightweight_chat_task => {
+            return Err(error);
+        }
+        Err(error) => return Err(error),
+    };
+    if should_retry_without_native_session(&initial_option, native_session_id.as_deref(), &output) {
+        let stale_session_id = native_session_id.clone();
+        record_cli_retry(
+            state,
+            trace_id,
+            "run_workspace",
+            stale_session_id.as_deref(),
+            "stale_native_session",
+        );
+        retire_native_session_and_schedule_repair(
+            state,
+            trace_id,
+            native_session_scope.as_ref(),
+            &option,
+            workspace,
+            &workspace_key,
+            stale_session_id.as_deref(),
+            "stale_native_session",
+            "Codex native session reported stale or unavailable",
+        );
+        let _ = tx.send(
+            WsMessage::progress(if lightweight_chat_task {
+                "旧会话不可用，已切到新会话继续；旧上下文会在后台整理。"
+            } else {
+                "Codex CLI session expired; starting a fresh session."
+            })
+            .to_json(),
+        );
+        native_session_id = None;
+        prompt_bootstrapped = false;
+        prompt = build_cli_prompt(
+            workspace,
+            user_message,
+            preflight_note,
+            &option,
+            prompt_route,
+            prompt_bootstrapped,
+            request_mode,
+        );
+        if !lightweight_chat_task && !tiny_chat_task {
+            if let Some(note) = native_session_continuity_note(
+                state,
+                native_session_scope.as_ref(),
+                stale_session_id.as_deref(),
+            ) {
+                prompt = append_native_session_continuity(prompt, &note);
+            }
+        }
+        let mut fresh_option = option.clone();
+        if lightweight_chat_task {
+            cap_option_timeout(
+                &mut fresh_option,
+                configured_timeout_cap(
+                    "AI_CLI_CHAT_FRESH_TIMEOUT_SECS",
+                    DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS,
+                ),
+            );
+        }
+        output = match run_cli_command_traced(
+            &fresh_option,
+            workspace,
+            &prompt,
+            None,
+            runtime_permission,
+            tx,
+            Some(CliTraceContext {
+                state,
+                trace_id,
+                operation: "run_workspace",
+                attempt: "fresh_after_stale",
+                route: Some(route),
+                development_task: Some(development_task),
+                prompt_bootstrapped: Some(prompt_bootstrapped),
+            }),
+        )
+        .await
+        {
+            Ok(output) => output,
+            Err(error)
+                if lightweight_chat_task
+                    && codex_network_or_timeout_error(&error)
+                    && supports_codex_sessions(&option) =>
+            {
+                return Err(error);
+            }
+            Err(error) if lightweight_chat_task => {
+                return Err(error);
+            }
+            Err(error) => return Err(error),
+        };
+    }
+
+    if supports_codex_sessions(&option) && !output.success {
+        let combined = format!("{}\n{}", output.stdout, output.stderr);
+        if crate::codex_health::is_codex_network_error_text(&combined) {
+            if lightweight_chat_task {
+                // 轻量聊天遇到网络/超时错误：如果 CLI 已经流式输出了 agent_message，
+                // 则 AssistantMessage 已发给客户端，静默发 Done 结束本轮即可避免红色报错气泡。
+                // 否则使用友好降级消息，同样避免红色报错气泡。
+                if extract_json_agent_message(&output.stdout).is_some() {
+                    // agent_message 已经流式发给客户端，静默发 Done 结束本轮即可
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(),
+                            apk_url: None,
+                            image_url: None,
+                            model_used: None,
+                            node_id: None,
+                        }
+                        .to_json(),
+                    );
+                    return Ok(());
+                }
+                // 未流式输出任何内容，回传 Err 让 agent.rs API fallback 接管
+                return Err(anyhow!(
+                    "Codex CLI network unhealthy: {}",
+                    truncate_chars(&combined, 500)
+                ));
+            }
+            return Err(anyhow!(
+                "Codex CLI network unhealthy: {}",
+                truncate_chars(&combined, 500)
+            ));
+        }
+    }
+
+    let mut stored_session_id = native_session_id.clone();
+    if let (Some(scope), Some(thread_id)) = (
+        native_session_scope
+            .as_ref()
+            .filter(|_| use_native_sessions),
+        extract_thread_id(&output.stdout),
+    ) {
+        let _ = state.store.upsert_native_agent_session(
+            &scope.project_id,
+            &scope.user_id,
+            Some(&scope.conversation_id),
+            &option.provider,
+            &option.id,
+            &workspace_key,
+            &thread_id,
+        );
+        stored_session_id = Some(thread_id);
+    }
+    if output.success && !planning_task {
+        if let (Some(scope), Some(session_id)) = (
+            native_session_scope
+                .as_ref()
+                .filter(|_| use_native_sessions),
+            stored_session_id.as_deref(),
+        ) {
+            let _ = state.store.mark_native_agent_session_bootstrapped(
+                &scope.project_id,
+                &scope.user_id,
+                Some(&scope.conversation_id),
+                &option.provider,
+                &option.id,
+                &workspace_key,
+                session_id,
+                development_task,
+            );
+        }
+    }
+    // 从 Codex CLI stdout 解析 token 用量并写入数据库
+    let usage_text = format!("{}\n{}", output.stdout, output.stderr);
+    crate::token_usage_api::record_codex_usage_from_stdout_with_key(
+        &state.store,
+        user_id,
+        cli_feature,
+        Some(option.id.as_str()),
+        &usage_text,
+        Some(&accounting_key),
+    );
+    billing_call.mark_settled();
+
+    let reply = format_cli_reply(&output.stdout, &output.stderr, output.success);
+    tracing::info!(
+        route = ?route,
+        development_task,
+        elapsed_ms = started.elapsed().as_millis(),
+        "local AI CLI request completed"
+    );
+
+    let apk_url = if android_task && output.success {
+        let _ = tx.send(WsMessage::progress("AI 已完成处理，正在查找 APK 安装包。").to_json());
+        let apk_url =
+            tools::find_latest_apk(workspace).map(|_| tools::stable_apk_url(download_base));
+        if apk_url.is_none() {
+            let _ = tx.send(
+                WsMessage::progress(
+                    "未找到 APK 安装包；如果刚才是在打包，请检查最终回复里的失败原因。",
+                )
+                .to_json(),
+            );
+        }
+        apk_url
+    } else {
+        None
+    };
+
+    let _ = tx.send(
+        WsMessage::Done {
+            message: reply,
+            apk_url,
+            image_url: None,
+            model_used: None,
+            node_id: None,
+        }
+        .to_json(),
+    );
+
+    Ok(())
+}
