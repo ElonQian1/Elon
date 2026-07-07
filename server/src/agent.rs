@@ -23,7 +23,7 @@ use crate::{
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
-    pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     pc_node_display::pc_node_progress_name,
     project_workspace_provision,
     route_a_session_lease::{self, RouteARuntimePrewarmResult},
@@ -65,14 +65,14 @@ enum ProjectWorkflowRouting {
 mod dispatch;
 mod pc_binding;
 mod routing;
+mod runtime_binding;
 
 pub(crate) use pc_binding::prewarm_route_a_runtime_for_project;
 
 use dispatch::run_backend_with_workspace;
 use pc_binding::{
     append_project_dev_profile_context, is_codex_fallback_error, node_cli_available,
-    resolve_pc_project_binding, resolve_pc_project_binding_with_options,
-    send_pc_workspace_unavailable_error,
+    resolve_pc_project_binding_with_options, send_pc_workspace_unavailable_error,
 };
 #[cfg(test)]
 use pc_binding::{
@@ -80,6 +80,7 @@ use pc_binding::{
     pc_workspace_inspect_usable,
 };
 use routing::run_for_project_in_workspace_with_routing;
+use runtime_binding::resolve_pc_project_runtime_binding;
 
 pub fn elon_self_workspace() -> std::path::PathBuf {
     std::path::PathBuf::from(
@@ -160,32 +161,36 @@ pub async fn run_pc_cli_passthrough_for_project(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    let Some(pc_binding) = resolve_pc_project_binding(
+    let pc_runtime_binding = match resolve_pc_project_runtime_binding(
         state,
         user_id,
         project,
         conversation_id,
         Some(&tx),
+        agent_name,
         pc_runtime_route,
     )
     .await
-    else {
-        if project.source_type == "pc_managed" {
-            send_pc_workspace_unavailable_error(project, &tx);
-        } else {
-            let _ = tx.send(WsMessage::error("当前项目还没有绑定可用 PC 节点。").to_json());
+    {
+        Ok(Some(binding)) => binding,
+        Ok(None) => {
+            if project.source_type == "pc_managed" {
+                send_pc_workspace_unavailable_error(project, &tx);
+            } else {
+                let _ = tx.send(WsMessage::error("当前项目还没有绑定可用 PC 节点。").to_json());
+            }
+            return;
         }
-        return;
+        Err(error) => {
+            let _ = tx.send(WsMessage::error(error).to_json());
+            return;
+        }
     };
+    let pc_binding = pc_runtime_binding.binding;
+    let runtime_choice = pc_runtime_binding.runtime_choice;
 
     let agent_id = pc_binding.agent_id.as_str();
     let pc_workspace = pc_binding.workspace.as_str();
-    let runtime_choice =
-        choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-    if let Some(error) = runtime_choice.error {
-        let _ = tx.send(WsMessage::error(error).to_json());
-        return;
-    }
 
     let _ = tx.send(
         WsMessage::progress(format!(
@@ -379,8 +384,12 @@ fn latest_project_delivery_apk_url(
 
 fn pc_cli_chat_route_label(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> &'static str {
     match pc_runtime_route {
+        None => "自动选择",
+        Some(PcRuntimeRoutePreference::RouteA) => "本机 AI",
+        Some(PcRuntimeRoutePreference::RouteB) => "本机 API key",
+        Some(PcRuntimeRoutePreference::RouteC) => "平台 AI",
+        Some(PcRuntimeRoutePreference::RouteC2) => "远程 AI",
         Some(PcRuntimeRoutePreference::RouteC3) => "远程 Codex",
-        _ => "本机 AI",
     }
 }
 
@@ -397,24 +406,29 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some(pc_binding) = resolve_pc_project_binding(
+    let pc_runtime_binding = match resolve_pc_project_runtime_binding(
         state,
         user_id,
         project,
         conversation_id,
         Some(&tx),
+        agent_name,
         pc_runtime_route,
     )
     .await
     {
-        let agent_id = pc_binding.agent_id.as_str();
-        let pc_workspace = pc_binding.workspace.as_str();
-        let runtime_choice =
-            choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-        if let Some(error) = runtime_choice.error {
+        Ok(Some(binding)) => Some(binding),
+        Ok(None) => None,
+        Err(error) => {
             let _ = tx.send(WsMessage::error(error).to_json());
             return;
         }
+    };
+    if let Some(pc_runtime_binding) = pc_runtime_binding {
+        let pc_binding = pc_runtime_binding.binding;
+        let runtime_choice = pc_runtime_binding.runtime_choice;
+        let agent_id = pc_binding.agent_id.as_str();
+        let pc_workspace = pc_binding.workspace.as_str();
         let _ = tx.send(
             WsMessage::progress(format!(
                 "正在直连 PC 节点 {} 使用 {} 规划本地项目。",
@@ -522,7 +536,7 @@ pub async fn plan_for_project_in_workspace(
     )
     .await
     {
-        error!("项目级 AI 规划运行出错: {}", e);
+        error!("项目级规划 AI 运行出错: {}", e);
         let _ = tx.send(WsMessage::error(e.to_string()).to_json());
     }
 }

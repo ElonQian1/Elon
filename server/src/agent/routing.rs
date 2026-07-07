@@ -19,7 +19,7 @@ use crate::{
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
-    pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     pc_node_display::pc_node_progress_name,
     route_a_session_lease::{self, RouteARuntimePrewarmResult},
     source_hygiene,
@@ -28,17 +28,12 @@ use crate::{
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
 };
 
-use super::{
-    latest_project_delivery_apk_url, pc_cli_chat_route_label, requires_project_workflow_for_message,
-    ProjectWorkflowRouting,
-};
+use super::dispatch::{run_backend_with_workspace, run_dispatch_with_workspace};
 use super::pc_binding::{
     append_project_dev_profile_context, inspect_pc_agent_workspace, is_codex_fallback_error,
     node_cli_available, pc_workspace_inspect_problem, pc_workspace_inspect_usable,
-    resolve_pc_chat_agent, resolve_pc_project_binding, send_pc_workspace_unavailable_error,
-    usable_project_binding_for_agent, PcProjectBinding,
+    send_pc_workspace_unavailable_error, usable_project_binding_for_agent, PcProjectBinding,
 };
-use super::dispatch::{run_backend_with_workspace, run_dispatch_with_workspace};
 use super::pc_node_select::{
     connected_pc_agent_for_route, connected_pc_agent_with_existing_workspace,
     connected_pc_agent_with_recorded_workspace_binding, connected_pc_project_agent_for_route,
@@ -47,6 +42,11 @@ use super::public_dev::{
     pc_agent_authorized_for_bound_node, pc_agent_authorized_for_route,
     pc_agent_belongs_to_user_quiet, pc_agent_public_dev_enabled_for_consumer,
     pc_agent_runtime_ready_for_route, route_allows_public_dev_node,
+};
+use super::runtime_binding::{resolve_pc_chat_runtime_binding, resolve_pc_project_runtime_binding};
+use super::{
+    latest_project_delivery_apk_url, pc_cli_chat_route_label,
+    requires_project_workflow_for_message, ProjectWorkflowRouting,
 };
 
 pub(super) async fn run_for_project_in_workspace_with_routing(
@@ -103,25 +103,35 @@ pub(super) async fn run_for_project_in_workspace_with_routing(
             .unwrap_or(false);
         if project_chat_should_use_pc_cli(pc_runtime_route, agent_name, agent_is_local_cli) {
             let route_label = pc_cli_chat_route_label(pc_runtime_route);
-            let Some(agent_id) =
-                resolve_pc_chat_agent(state, user_id, project, pc_runtime_route).await
-            else {
-                let msg = format!(
-                    "项目会话默认交给{route_label}处理，但当前项目还没有绑定可用 PC 节点。请先连接节点，或手动切换到平台 AI。"
-                );
-                warn!("{msg}");
-                let _ = tx.send(WsMessage::error(msg).to_json());
-                return;
+            let chat_runtime = match resolve_pc_chat_runtime_binding(
+                state,
+                user_id,
+                project,
+                Some(&tx),
+                agent_name,
+                pc_runtime_route,
+            )
+            .await
+            {
+                Ok(Some(binding)) => binding,
+                Ok(None) => {
+                    let msg = format!(
+                        "项目会话默认交给{route_label}处理，但当前项目还没有绑定可用 PC 节点。请先连接节点，或手动切换到平台 AI。"
+                    );
+                    warn!("{msg}");
+                    let _ = tx.send(WsMessage::error(msg).to_json());
+                    return;
+                }
+                Err(error) => {
+                    warn!("PC CLI 轻量聊天不可用，不回退 API: {}", error);
+                    let _ = tx.send(WsMessage::error(error).to_json());
+                    return;
+                }
             };
-            let agent_id = agent_id.as_str();
-
-            let runtime_choice =
-                choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-            if let Some(error) = runtime_choice.error {
-                warn!("PC CLI 轻量聊天不可用，不回退 API: {}", error);
-                let _ = tx.send(WsMessage::error(error).to_json());
-                return;
-            }
+            let runtime_choice = chat_runtime.runtime_choice;
+            let agent_id_owned = chat_runtime.agent_id;
+            let agent_id = agent_id_owned.as_str();
+            let route_label = runtime_choice.progress_label().to_string();
 
             let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
                 project_id: project.id.clone(),
@@ -189,24 +199,29 @@ pub(super) async fn run_for_project_in_workspace_with_routing(
     }
 
     if requires_project_workflow {
-        if let Some(pc_binding) = resolve_pc_project_binding(
+        let pc_runtime_binding = match resolve_pc_project_runtime_binding(
             state,
             user_id,
             project,
             conversation_id,
             Some(&tx),
+            agent_name,
             pc_runtime_route,
         )
         .await
         {
-            let agent_id = pc_binding.agent_id.as_str();
-            let pc_workspace = pc_binding.workspace.as_str();
-            let runtime_choice =
-                choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-            if let Some(error) = runtime_choice.error {
+            Ok(Some(binding)) => Some(binding),
+            Ok(None) => None,
+            Err(error) => {
                 let _ = tx.send(WsMessage::error(error).to_json());
                 return;
             }
+        };
+        if let Some(pc_runtime_binding) = pc_runtime_binding {
+            let pc_binding = pc_runtime_binding.binding;
+            let runtime_choice = pc_runtime_binding.runtime_choice;
+            let agent_id = pc_binding.agent_id.as_str();
+            let pc_workspace = pc_binding.workspace.as_str();
             let _ = tx.send(
                 WsMessage::progress(format!(
                     "正在直连 PC 节点 {} 使用 {} 处理本地项目。",
@@ -374,4 +389,3 @@ pub(super) async fn run_for_project_in_workspace_with_routing(
         );
     }
 }
-

@@ -8,13 +8,13 @@ use crate::{
 };
 
 use super::pc_binding::{
-    inspect_pc_agent_workspace, pc_workspace_inspect_problem, pc_workspace_inspect_usable,
-    usable_project_binding_for_agent, PcProjectBinding,
+    inspect_pc_agent_workspace, pc_workspace_inspect_problem,
+    pc_workspace_inspect_usable_for_route, usable_project_binding_for_agent, PcProjectBinding,
 };
 use super::public_dev::{
     pc_agent_authorized_for_route, pc_agent_belongs_to_user_quiet,
     pc_agent_public_dev_enabled_for_consumer, pc_agent_runtime_ready_for_route,
-    route_allows_public_dev_node,
+    route_allows_public_dev_node, route_targets_public_dev_node,
 };
 
 pub(super) async fn connected_pc_agent_for_route(
@@ -23,6 +23,11 @@ pub(super) async fn connected_pc_agent_for_route(
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<String> {
     for agent in state.agent_manager.list().await {
+        if route_targets_public_dev_node(pc_runtime_route)
+            && pc_agent_belongs_to_user_quiet(state, user_id, &agent.agent_id)
+        {
+            continue;
+        }
         if pc_agent_authorized_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
             && pc_agent_runtime_ready_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
                 .await
@@ -39,6 +44,11 @@ pub(super) async fn connected_pc_project_agent_for_route(
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<String> {
     for agent in state.agent_manager.list().await {
+        if route_targets_public_dev_node(pc_runtime_route)
+            && pc_agent_belongs_to_user_quiet(state, user_id, &agent.agent_id)
+        {
+            continue;
+        }
         if !pc_agent_authorized_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
             || !pc_agent_runtime_ready_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
                 .await
@@ -113,6 +123,11 @@ pub(super) async fn connected_pc_agent_with_recorded_workspace_binding(
         if skip_agent_id == Some(agent.agent_id.as_str()) {
             continue;
         }
+        if route_targets_public_dev_node(pc_runtime_route)
+            && pc_agent_belongs_to_user_quiet(state, user_id, &agent.agent_id)
+        {
+            continue;
+        }
         if !pc_agent_authorized_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
             || !pc_agent_runtime_ready_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
                 .await
@@ -127,6 +142,7 @@ pub(super) async fn connected_pc_agent_with_recorded_workspace_binding(
             &agent.agent_id,
             false,
             None,
+            pc_runtime_route,
         )
         .await
         {
@@ -157,11 +173,21 @@ pub(super) async fn connected_pc_agent_with_existing_workspace(
         if skip_agent_id == Some(agent.agent_id.as_str()) {
             continue;
         }
-        if !pc_agent_authorized_for_route(state, user_id, &agent.agent_id, pc_runtime_route) {
+        if route_targets_public_dev_node(pc_runtime_route)
+            && pc_agent_belongs_to_user_quiet(state, user_id, &agent.agent_id)
+        {
+            continue;
+        }
+        if !pc_agent_authorized_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
+            || !pc_agent_runtime_ready_for_route(state, user_id, &agent.agent_id, pc_runtime_route)
+                .await
+        {
             continue;
         }
         match inspect_pc_agent_workspace(state, &agent.agent_id, workspace).await {
-            Ok(status) if pc_workspace_inspect_usable(&status) => return Some(agent.agent_id),
+            Ok(status) if pc_workspace_inspect_usable_for_route(&status, pc_runtime_route) => {
+                return Some(agent.agent_id)
+            }
             Ok(status) => {
                 warn!(
                     agent_id = %agent.agent_id,

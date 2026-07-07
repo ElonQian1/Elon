@@ -1,6 +1,7 @@
 use super::{
     cli_lists_intersect, pc_workspace_inspect_error_allows_bound_dispatch,
-    pc_workspace_inspect_problem, pc_workspace_inspect_usable, public_dev_runtime_ready_for_route,
+    pc_workspace_inspect_problem, pc_workspace_inspect_usable,
+    pc_workspace_inspect_usable_for_route, public_dev_runtime_ready_for_route,
     requires_project_workflow_for_message, route_allows_public_dev_node,
     BOUND_PC_NODE_RECONNECT_WAIT_SECS,
 };
@@ -62,6 +63,34 @@ fn pc_workspace_inspect_requires_existing_dir_and_cli() {
     status.copilot_available = false;
     assert!(!pc_workspace_inspect_usable(&status));
     assert_eq!(pc_workspace_inspect_problem(&status), "cli_unavailable");
+}
+
+#[test]
+fn pc_workspace_route_b_and_route_c_only_require_existing_dir() {
+    let mut status = inspect_status();
+    status.codex_available = false;
+    status.copilot_available = false;
+
+    assert!(!pc_workspace_inspect_usable_for_route(
+        &status,
+        Some(PcRuntimeRoutePreference::RouteA)
+    ));
+    assert!(pc_workspace_inspect_usable_for_route(
+        &status,
+        Some(PcRuntimeRoutePreference::RouteB)
+    ));
+    assert!(pc_workspace_inspect_usable_for_route(
+        &status,
+        Some(PcRuntimeRoutePreference::RouteC)
+    ));
+    assert!(pc_workspace_inspect_usable_for_route(
+        &status,
+        Some(PcRuntimeRoutePreference::RouteC2)
+    ));
+    assert!(!pc_workspace_inspect_usable_for_route(
+        &status,
+        Some(PcRuntimeRoutePreference::RouteC3)
+    ));
 }
 
 #[test]

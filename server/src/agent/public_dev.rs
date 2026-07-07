@@ -39,6 +39,13 @@ pub(super) fn route_allows_public_dev_node(route: Option<PcRuntimeRoutePreferenc
     )
 }
 
+pub(super) fn route_targets_public_dev_node(route: Option<PcRuntimeRoutePreference>) -> bool {
+    matches!(
+        route,
+        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+    )
+}
+
 pub(super) fn pc_agent_public_dev_enabled_for_consumer(
     state: &Arc<AppState>,
     user_id: &str,

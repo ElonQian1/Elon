@@ -24,10 +24,11 @@ export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_pc_project_runtim
 const LEGACY_PLATFORM_DEFAULT_VERSION = 'platform-ai-default-20260630'
 const LEGACY_PROJECT_LOCAL_DEFAULT_VERSION = 'project-local-codex-default-20260702'
 const LEGACY_PROJECT_AUTO_DEFAULT_VERSION = 'project-auto-default-20260703'
+const LEGACY_PROJECT_PLATFORM_DEFAULT_VERSION = 'project-platform-default-20260707'
 export const RUNTIME_ROUTE_DEFAULT_VERSION = 'auto-default-20260703'
 export const DEFAULT_RUNTIME_ROUTE: RuntimeRoute = 'auto'
-export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = 'project-platform-default-20260707'
-export const DEFAULT_PROJECT_RUNTIME_ROUTE: RuntimeRoute = 'route_c'
+export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = 'project-auto-priority-default-20260707'
+export const DEFAULT_PROJECT_RUNTIME_ROUTE: RuntimeRoute = 'auto'
 
 export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
@@ -36,7 +37,7 @@ export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
     shortLabel: '自动选择',
     title: '自动选择',
     subtitle: '一龙按当前项目选择合适的 AI',
-    description: '按当前选择和项目状态自动判断；项目首页默认先使用平台 AI，不会一进入就等待本机节点。',
+    description: '默认按本机AI/我的Key、其他用户节点AI、平台AI依次选择；手动切换后会记住上一次选择。',
   },
   {
     value: 'route_a',
@@ -128,6 +129,7 @@ function getStorageValue(storage: Storage, key: string): string | null {
 
 function isLegacyImplicitDefault(stored: string | null, defaultVersion: string | null): boolean {
   return (stored === 'route_c' && defaultVersion === LEGACY_PLATFORM_DEFAULT_VERSION)
+    || (stored === 'route_c' && defaultVersion === LEGACY_PROJECT_PLATFORM_DEFAULT_VERSION)
     || (stored === 'route_a' && defaultVersion === LEGACY_PROJECT_LOCAL_DEFAULT_VERSION)
     || (stored === 'auto' && defaultVersion === LEGACY_PROJECT_AUTO_DEFAULT_VERSION)
 }

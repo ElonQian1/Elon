@@ -25,6 +25,7 @@ use super::pc_node_select::{
 use super::public_dev::{
     pc_agent_authorized_for_bound_node, pc_agent_authorized_for_route,
     pc_agent_belongs_to_user_quiet, pc_agent_runtime_ready_for_route,
+    route_targets_public_dev_node,
 };
 
 #[derive(Debug, Clone)]
@@ -45,6 +46,11 @@ pub(super) async fn resolve_pc_chat_agent(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
+        if route_targets_public_dev_node(pc_runtime_route)
+            && pc_agent_belongs_to_user_quiet(state, user_id, agent_id)
+        {
+            return connected_pc_agent_for_route(state, user_id, pc_runtime_route).await;
+        }
         if pc_agent_authorized_for_bound_node(state, user_id, agent_id)
             && pc_agent_is_connected(state, agent_id).await
         {
@@ -132,40 +138,52 @@ pub(super) async fn resolve_pc_project_binding_with_options(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     {
-        let authorized = pc_agent_authorized_for_bound_node(state, user_id, agent_id)
-            || pc_agent_authorized_for_route(state, user_id, agent_id, pc_runtime_route);
-        if authorized {
-            let connected = if pc_agent_is_connected(state, agent_id).await {
-                true
-            } else if wait_for_bound_reconnect {
-                wait_for_bound_pc_agent_reconnect(state, agent_id, tx).await
-            } else {
-                false
-            };
-            if connected {
-                if let Some(binding) = usable_project_binding_for_agent(
-                    state,
-                    user_id,
-                    project,
-                    conversation_id,
-                    agent_id,
-                    true,
-                    tx,
-                )
-                .await
-                {
-                    return Some(binding);
-                }
-            }
+        let skip_own_node_for_remote_route = route_targets_public_dev_node(pc_runtime_route)
+            && pc_agent_belongs_to_user_quiet(state, user_id, agent_id);
+        if skip_own_node_for_remote_route {
+            info!(
+                project_id = %project.id,
+                user_id = %user_id,
+                bound_agent_id = %agent_id,
+                "remote PC route skips the current user's bound node"
+            );
         } else {
-            bound_agent_wrong_owner = true;
+            let authorized = pc_agent_authorized_for_bound_node(state, user_id, agent_id)
+                || pc_agent_authorized_for_route(state, user_id, agent_id, pc_runtime_route);
+            if authorized {
+                let connected = if pc_agent_is_connected(state, agent_id).await {
+                    true
+                } else if wait_for_bound_reconnect {
+                    wait_for_bound_pc_agent_reconnect(state, agent_id, tx).await
+                } else {
+                    false
+                };
+                if connected {
+                    if let Some(binding) = usable_project_binding_for_agent(
+                        state,
+                        user_id,
+                        project,
+                        conversation_id,
+                        agent_id,
+                        true,
+                        tx,
+                        pc_runtime_route,
+                    )
+                    .await
+                    {
+                        return Some(binding);
+                    }
+                }
+            } else {
+                bound_agent_wrong_owner = true;
+            }
+            warn!(
+                project_id = %project.id,
+                user_id = %user_id,
+                bound_agent_id = %agent_id,
+                "PC project bound node is not usable for the current user; trying an online user node"
+            );
         }
-        warn!(
-            project_id = %project.id,
-            user_id = %user_id,
-            bound_agent_id = %agent_id,
-            "PC project bound node is not usable for the current user; trying an online user node"
-        );
     }
 
     if let Some(binding) = connected_pc_agent_with_recorded_workspace_binding(
@@ -301,6 +319,7 @@ pub(super) async fn usable_project_binding_for_agent(
     agent_id: &str,
     is_bound_agent: bool,
     tx: Option<&UnboundedSender<String>>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<PcProjectBinding> {
     let recorded =
         match state
@@ -367,7 +386,7 @@ pub(super) async fn usable_project_binding_for_agent(
     }
 
     match inspect_pc_agent_workspace(state, agent_id, workspace).await {
-        Ok(status) if pc_workspace_inspect_usable(&status) => {
+        Ok(status) if pc_workspace_inspect_usable_for_route(&status, pc_runtime_route) => {
             route_a_session_lease::record_verified(
                 state,
                 user_id,
@@ -552,7 +571,10 @@ pub(super) async fn provision_pc_project_binding(
     })
 }
 
-pub(super) fn clone_url_for_project_access(project: &ProjectAccess, target_agent_id: &str) -> Option<String> {
+pub(super) fn clone_url_for_project_access(
+    project: &ProjectAccess,
+    target_agent_id: &str,
+) -> Option<String> {
     if let Some(repo_url) = project
         .repo_url
         .as_deref()
@@ -585,7 +607,10 @@ pub(super) fn send_optional_progress(tx: Option<&UnboundedSender<String>>, messa
     }
 }
 
-pub(super) fn send_pc_workspace_unavailable_error(project: &ProjectAccess, tx: &UnboundedSender<String>) {
+pub(super) fn send_pc_workspace_unavailable_error(
+    project: &ProjectAccess,
+    tx: &UnboundedSender<String>,
+) {
     let detail = project
         .workspace_path
         .as_deref()
@@ -629,6 +654,23 @@ pub(super) fn pc_workspace_inspect_usable(status: &ProjectWorkspaceInspectStatus
     status.path_exists && status.is_dir && (status.codex_available || status.copilot_available)
 }
 
+pub(super) fn pc_workspace_inspect_usable_for_route(
+    status: &ProjectWorkspaceInspectStatus,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+) -> bool {
+    if !status.path_exists || !status.is_dir {
+        return false;
+    }
+    match pc_runtime_route {
+        Some(
+            PcRuntimeRoutePreference::RouteB
+            | PcRuntimeRoutePreference::RouteC
+            | PcRuntimeRoutePreference::RouteC2,
+        ) => true,
+        _ => status.codex_available || status.copilot_available,
+    }
+}
+
 pub(super) fn pc_workspace_inspect_problem(status: &ProjectWorkspaceInspectStatus) -> &'static str {
     if !status.path_exists {
         "workspace_path_missing"
@@ -657,7 +699,11 @@ pub(super) fn is_codex_fallback_error(error: &str) -> bool {
 }
 
 /// 检查指定 PC 节点上某个 CLI 是否可用
-pub(super) async fn node_cli_available(state: &Arc<AppState>, agent_id: &str, cli_name: &str) -> bool {
+pub(super) async fn node_cli_available(
+    state: &Arc<AppState>,
+    agent_id: &str,
+    cli_name: &str,
+) -> bool {
     state
         .agent_manager
         .list()
@@ -731,4 +777,3 @@ fn push_profile_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
         lines.push(format!("{key}: {value}"));
     }
 }
-
