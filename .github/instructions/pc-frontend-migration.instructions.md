@@ -76,8 +76,8 @@ PC 前端任务开始写代码前，必须在普通模块化文件计划 JSON �
 
 - 修改旧静态 PC 资产：至少运行与服务端静态资源相关的最小 Rust 检查或对应测试；必要时用浏览器打开 `/pc` 验证。
 - 修改新前端工程：运行新前端的类型检查、lint/build；若还没有完整检查命令，至少运行 `npm run build`。
-- 修改 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI 时，`CodePushed` 只代表代码同步，不代表用户页面已经更新。除非用户明确要求只同步代码或暂不发布，否则必须在 push 后运行 `scripts\publish-server.ps1`（Linux/macOS：`bash scripts/publish-server.sh`），让服务器 `$DATA_DIR/pc-next-dist/` 指向本次构建，并用 `scripts\check-task-complete.ps1 -Kind Server`、`/api/server/version` 和 `/pc` 可访问性收尾。
-- 截图、遮挡、错位、层级、弹窗或按图修复类 UI 问题，必须先把截图里的区域定位到真实组件/样式文件，再用本地预览、浏览器截图、DOM/坐标/层级检查之一做视觉验收；无法截图时必须在最终回复说明替代证据，不能只凭 `npm run build` 宣称用户问题已解决。
+- 修改 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI 时，`CodePushed` 只代表代码同步，不代表用户页面已经更新。除非用户明确要求只同步代码或暂不发布，否则必须在 push 后运行 `scripts\publish-server.ps1`（Linux/macOS：`bash scripts/publish-server.sh`）上传 `pc-next-dist`，再运行 `scripts\check-task-complete.ps1 -Kind PcFrontend` 校验 `/pc` 和 `/api/server/version` 指向本次提交。
+- 截图、遮挡、错位、层级、弹窗或按图修复类 UI 问题，必须先把截图里的区域定位到真实组件/样式文件，再用本地预览、浏览器截图、DOM/坐标/层级检查之一做视觉验收；无法截图时必须在最终回复说明替代证据或“未完成视觉验收”，不能只凭 `npm run build` 宣称用户问题已解决。
 - Windows 本地启动 `/pc` 前端预览时，使用 `powershell -ExecutionPolicy Bypass -File scripts\start-pc-frontend-dev.ps1`。如必须手写后台启动命令，`Start-Process -FilePath` 必须传 `(Get-Command npm.cmd).Source` 或等价的 `npm.cmd` 绝对路径，禁止传裸 `npm`，避免 PowerShell 解析到 `npm.ps1` 后被 Windows 文件关联打开成记事本。
 - 修改入口或发布链路：验证 `/pc`、`/pc-next`、静态资源路径和 `scripts/publish-server.*` 相关流程说明一致。
 

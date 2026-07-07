@@ -187,6 +187,8 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("pc-next-dist"));
     assert!(prompt.contains("/api/server/version"));
     assert!(prompt.contains("DOM/坐标/层级检查"));
+    assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind PcFrontend"));
+    assert!(prompt.contains("不要把 CodePushed 当成用户问题已解决"));
     assert!(prompt.contains("不能只凭 `npm run build` 宣称用户问题已解决"));
     assert!(prompt.contains("脚本负责版本分配、构建、上传、并发保护和 finish"));
     assert!(prompt.contains("脚本负责版本分配、临时构建配置、上传、并发保护和 finish"));

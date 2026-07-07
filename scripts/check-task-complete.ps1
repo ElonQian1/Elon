@@ -9,8 +9,11 @@
     HEAD equals origin/main and that server /app/version.json points at the
     pushed source commit. APK version numbers are assigned by the server.
     Server verifies /health and that /api/server/version.gitSha points at
-    the pushed source commit. Server version numbers are assigned by the
-    release claim API and are not compared with server/Cargo.toml.
+    the pushed source commit. PcFrontend performs the same server release
+    provenance check and also verifies that /pc serves the built frontend
+    shell, because /pc user-visible changes are delivered through
+    pc-next-dist during server publish. Server version numbers are assigned by
+    the release claim API and are not compared with server/Cargo.toml.
     NodeAgent verifies that /api/node-agent/version and the Windows download
     endpoints point at the pushed source commit.
 
@@ -25,9 +28,12 @@
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind NodeAgent
+
+.EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind PcFrontend
 #>
 param(
-    [ValidateSet("CodePushed", "CodeSync", "AndroidFeature", "NodeAgent", "DocsOnly", "Server")]
+    [ValidateSet("CodePushed", "CodeSync", "AndroidFeature", "NodeAgent", "DocsOnly", "Server", "PcFrontend")]
     [string]$Kind = "CodePushed",
 
     [switch]$SkipGitStatus
@@ -390,9 +396,9 @@ if ($Kind -eq "DocsOnly") {
     exit 0
 }
 
-if ($Kind -eq "Server") {
+if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
     if ($head -ne $originMain) {
-        Stop-Check "Server task is not complete: HEAD is not pushed to origin/main."
+        Stop-Check "$Kind task is not complete: HEAD is not pushed to origin/main."
     }
 
     try {
@@ -425,13 +431,46 @@ if ($Kind -eq "Server") {
         Stop-Check "Server gitSha mismatch: local $($head.Substring(0, 7)), server $($serverSha.Substring(0, [Math]::Min(7, $serverSha.Length)))."
     }
 
-    Write-Host "Server completion check passed:" -ForegroundColor Green
+    $pcStatus = $null
+    if ($Kind -eq "PcFrontend") {
+        try {
+            $pcParams = @{
+                Uri = "$ServerUrl/pc"
+                Method = "Get"
+                TimeoutSec = 10
+                UseBasicParsing = $true
+            }
+            $pcParams = Add-ElonProjectDirectRequestParameters -Params $pcParams -CommandName "Invoke-WebRequest"
+            $pcResponse = Invoke-WebRequest @pcParams
+        } catch {
+            Stop-Check "PC frontend check failed: could not load /pc: $_"
+        }
+
+        if ($pcResponse.StatusCode -lt 200 -or $pcResponse.StatusCode -ge 400) {
+            Stop-Check "PC frontend /pc returned unexpected status: $($pcResponse.StatusCode)"
+        }
+        $pcContent = [string]$pcResponse.Content
+        if ($pcContent -notmatch '<div id="root"') {
+            Stop-Check "PC frontend /pc did not return the React shell; pc-next-dist may not have been published."
+        }
+        $pcStatus = $pcResponse.StatusCode
+    }
+
+    if ($Kind -eq "PcFrontend") {
+        Write-Host "PC frontend completion check passed:" -ForegroundColor Green
+    } else {
+        Write-Host "Server completion check passed:" -ForegroundColor Green
+    }
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
     Write-Host "  CODE_SYNC_STATUS=synced"
     Write-Host "  NODE_AGENT_RELEASE_STATUS=not_attempted"
     Write-Host "  APK_RELEASE_STATUS=not_attempted"
     Write-Host "  SERVER_RELEASE_STATUS=published"
+    if ($Kind -eq "PcFrontend") {
+        Write-Host "  PC_FRONTEND_RELEASE_STATUS=published"
+        Write-Host "  /pc:         HTTP $pcStatus"
+    }
     Write-Host "  health:      $($health | ConvertTo-Json -Compress)"
     Write-Host "  version:     v$($serverVersion.versionName) ($($serverVersion.gitSha))"
     exit 0
