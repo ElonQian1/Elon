@@ -41,6 +41,20 @@ const CHAT_SIDE_MENU_REFRESH_RING_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_ring.png");
 const CHAT_SIDE_MENU_REFRESH_DOT_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_dot.png");
+const BOTTOM_PANEL_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_panel_new.png");
+const BOTTOM_MODE_PILL_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_mode_pill_new.png");
+const INPUT_ADD_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_add_new.png");
+const INPUT_VOICE_WAVE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_voice_wave_new.png");
+const INPUT_EMOJI_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_emoji_new.png");
+const INPUT_CHEVRON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_chevron_new.png");
+const INPUT_SEND_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_send_new.png");
 const PROJECT_POST_COMPOSE_ICON_PNG: &[u8] = include_bytes!("assets/ic_project_post_compose.png");
 const PROJECT_PREVIEW_PLACEHOLDER_ICON_PNG: &[u8] =
     include_bytes!("assets/ic_project_preview_placeholder.png");
@@ -107,6 +121,13 @@ fn build_html() -> String {
         &base64::engine::general_purpose::STANDARD,
         CHAT_SIDE_MENU_REFRESH_DOT_PNG,
     );
+    let bottom_panel_png_b64 = encode_png(BOTTOM_PANEL_PNG);
+    let bottom_mode_pill_png_b64 = encode_png(BOTTOM_MODE_PILL_PNG);
+    let input_add_png_b64 = encode_png(INPUT_ADD_PNG);
+    let input_voice_wave_png_b64 = encode_png(INPUT_VOICE_WAVE_PNG);
+    let input_emoji_png_b64 = encode_png(INPUT_EMOJI_PNG);
+    let input_chevron_png_b64 = encode_png(INPUT_CHEVRON_PNG);
+    let input_send_png_b64 = encode_png(INPUT_SEND_PNG);
     WEB_HTML_TEMPLATE
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
         .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
@@ -156,6 +177,17 @@ fn build_html() -> String {
             "__CHAT_SIDE_MENU_REFRESH_DOT_PNG_B64__",
             &refresh_dot_png_b64,
         )
+        .replace("__BOTTOM_PANEL_PNG_B64__", &bottom_panel_png_b64)
+        .replace("__BOTTOM_MODE_PILL_PNG_B64__", &bottom_mode_pill_png_b64)
+        .replace("__INPUT_ADD_PNG_B64__", &input_add_png_b64)
+        .replace("__INPUT_VOICE_WAVE_PNG_B64__", &input_voice_wave_png_b64)
+        .replace("__INPUT_EMOJI_PNG_B64__", &input_emoji_png_b64)
+        .replace("__INPUT_CHEVRON_PNG_B64__", &input_chevron_png_b64)
+        .replace("__INPUT_SEND_PNG_B64__", &input_send_png_b64)
+}
+
+fn encode_png(bytes: &[u8]) -> String {
+    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes)
 }
 
 const WEB_HTML_TEMPLATE: &str = include_str!("assets/web_page.html");

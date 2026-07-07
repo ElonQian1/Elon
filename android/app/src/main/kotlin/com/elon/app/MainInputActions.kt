@@ -121,7 +121,7 @@ internal class MainInputActions(
                 openImageEditor(index)
             }
         )
-        binding.inputLayout.addView(requireNotNull(pendingAttachmentPreviewStrip).view, 1)
+        views.pendingAttachmentHost.addView(requireNotNull(pendingAttachmentPreviewStrip).view)
         voiceModeActions.applyVoiceMode()
         collapsedInputPreviewActions.updateCollapsedInputPreview()
         updateRunningInputModeStrip()
@@ -153,10 +153,16 @@ internal class MainInputActions(
     }
 
     fun updateRunningInputModeStrip() {
+        val visible = conversationTaskRegistryActions().isActiveConversationWorking() && !isFriendChatActive()
         inputComposerViewsOrNull()?.runtimeInputModeStrip?.refresh(
-            visible = conversationTaskRegistryActions().isActiveConversationWorking() && !isFriendChatActive(),
+            visible = visible,
             mode = runningInputMode
         )
+        inputComposerViewsOrNull()?.modeButtonRow?.visibility = if (visible) {
+            android.view.View.GONE
+        } else {
+            android.view.View.VISIBLE
+        }
     }
 
     fun destroySpeechInput() {
@@ -506,6 +512,7 @@ internal class MainInputActions(
             binding = binding,
             dp = uiTools()::dp,
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
+            inputModeButton = { inputComposerViewsOrNull()?.inputModeButton },
             inputRightControls = { inputComposerViewsOrNull()?.inputRightControls },
             inputComposerMotion = { inputComposerViewsOrNull()?.inputComposerMotion },
             isVoiceMode = { voiceMode },

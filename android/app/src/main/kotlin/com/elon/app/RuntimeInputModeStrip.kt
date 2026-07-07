@@ -17,50 +17,40 @@ internal class RuntimeInputModeStrip(
     val view: LinearLayout = LinearLayout(activity).apply {
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(42)
+            dp(46)
         ).apply {
             marginStart = dp(18)
             marginEnd = dp(18)
-            topMargin = dp(4)
+            bottomMargin = dp(8)
         }
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(4), dp(4), dp(4), dp(4))
-        background = roundedBg("#222222", "#2A2A2A")
+        setPadding(0, 0, 0, 0)
+        background = null
         visibility = View.GONE
-    }
-
-    private val labelView = TextView(activity).apply {
-        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-        gravity = Gravity.CENTER_VERTICAL
-        includeFontPadding = false
-        text = "运行中输入"
-        setTextColor(Color.parseColor("#A8A8A8"))
-        textSize = 12.5f
-        setPadding(dp(10), 0, dp(6), 0)
     }
 
     private val buttons = RunningInputMode.values().associateWith { mode ->
         TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.MATCH_PARENT
+                when (mode) {
+                    RunningInputMode.REMIND_CURRENT -> dp(88)
+                    else -> dp(76)
+                },
+                dp(42)
             ).apply {
-                marginStart = dp(4)
+                marginEnd = dp(10)
             }
-            minWidth = dp(68)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = mode.label
-            textSize = 12f
+            textSize = 15f
             setTextColor(Color.parseColor("#D6D6D6"))
-            setPadding(dp(10), 0, dp(10), 0)
             setOnClickListener { onModeSelected(mode) }
         }
     }
 
     init {
-        view.addView(labelView)
         buttons.values.forEach(view::addView)
         setSelected(RunningInputMode.REMIND_CURRENT)
     }
@@ -71,15 +61,14 @@ internal class RuntimeInputModeStrip(
     }
 
     private fun setSelected(selected: RunningInputMode) {
-        labelView.text = selected.activeHint
         buttons.forEach { (mode, button) ->
             val active = mode == selected
-            button.setTypeface(Typeface.DEFAULT, if (active) Typeface.BOLD else Typeface.NORMAL)
+            button.setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
             button.setTextColor(Color.parseColor(if (active) "#101010" else "#D6D6D6"))
             button.background = if (active) {
                 roundedBg("#D6D6D6", "#D6D6D6")
             } else {
-                roundedBg("#2A2A2A", "#2E2E2E")
+                activity.getDrawable(R.drawable.bg_bottom_mode_pill_new)
             }
         }
     }

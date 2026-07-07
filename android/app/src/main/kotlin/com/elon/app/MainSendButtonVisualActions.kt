@@ -12,6 +12,7 @@ internal class MainSendButtonVisualActions(
     private val binding: ActivityMainBinding,
     private val dp: (Int) -> Int,
     private val attachmentButton: () -> ImageButton?,
+    private val inputModeButton: () -> ImageButton?,
     private val inputRightControls: () -> FrameLayout?,
     private val inputComposerMotion: () -> InputComposerMotion?,
     private val isVoiceMode: () -> Boolean,
@@ -28,31 +29,21 @@ internal class MainSendButtonVisualActions(
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (sendMode) {
             params?.width = dp(42)
-            binding.sendButton.background = activity.getDrawable(R.drawable.ic_input_send_arrow_circle)
+            binding.sendButton.background = activity.getDrawable(R.drawable.ic_input_send_new)
             binding.sendButton.text = ""
             binding.sendButton.visibility = View.VISIBLE
-            attachmentButton()?.visibility = View.VISIBLE
+            inputModeButton()?.visibility = View.GONE
         } else {
             binding.sendButton.visibility = View.GONE
-            attachmentButton()?.visibility = View.VISIBLE
+            inputModeButton()?.visibility = View.VISIBLE
         }
         params?.height = dp(42)
         params?.gravity = Gravity.END or Gravity.CENTER_VERTICAL
         params?.let { binding.sendButton.layoutParams = it }
 
-        attachmentButton()?.let { button ->
-            val attachmentParams = button.layoutParams as? FrameLayout.LayoutParams
-            attachmentParams?.gravity = if (sendMode) {
-                Gravity.START or Gravity.CENTER_VERTICAL
-            } else {
-                Gravity.END or Gravity.CENTER_VERTICAL
-            }
-            attachmentParams?.let { button.layoutParams = it }
-        }
-
         inputRightControls()?.let { controls ->
             val controlsParams = controls.layoutParams
-            val targetWidth = dp(if (sendMode) 84 else 42)
+            val targetWidth = dp(42)
             if (controlsParams.width != targetWidth) {
                 controlsParams.width = targetWidth
                 controls.layoutParams = controlsParams
@@ -64,6 +55,10 @@ internal class MainSendButtonVisualActions(
         binding.sendButton.isEnabled = sendEnabled
         binding.sendButton.alpha = if (sendEnabled) 1f else 0.55f
         attachmentButton()?.let { button ->
+            button.isEnabled = !conversationEnded
+            button.alpha = if (conversationEnded) 0.55f else 1f
+        }
+        inputModeButton()?.let { button ->
             button.isEnabled = !conversationEnded
             button.alpha = if (conversationEnded) 0.55f else 1f
         }

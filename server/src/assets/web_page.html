@@ -74,7 +74,7 @@
       --bubble-error-ink: #c62828;
       --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
-      --bottom-menu-height: 52px;
+      --bottom-menu-height: 112px;
     }
     * { box-sizing: border-box; }
     * {
@@ -2561,37 +2561,97 @@
     /* ===== 输入栏 ===== */
     .input-bar {
       grid-area: input;
-      background: var(--nav-bg);
+      background: var(--bg);
       display: none;
-      min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
-      padding: 8px 10px;
-      /* iOS 键盘收起后底部安全区域 */
+      flex-direction: column;
+      min-height: calc(var(--bottom-menu-height) + 16px + env(safe-area-inset-bottom));
+      padding: 18px 16px 8px;
       padding-bottom: max(8px, env(safe-area-inset-bottom));
       gap: 8px;
-      align-items: flex-end;
+      align-items: stretch;
     }
     .input-bar.active { display: flex; }
-    .input-bar .image-edit-btn {
-      flex: 0 0 42px; height: 42px;
-      background: transparent;
+    .input-mode-row {
+      height: 42px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-left: 2px;
+    }
+    .input-bar .model-btn,
+    .input-bar .plan-btn {
+      flex: 0 0 82px;
+      height: 42px;
+      position: relative;
+      background: url("data:image/png;base64,__BOTTOM_MODE_PILL_PNG_B64__") center / 100% 100% no-repeat;
       border: 0;
-      color: var(--ink);
-      font-size: 26px;
-      border-radius: 21px;
+      color: var(--tab-icon);
+      font-size: 15px;
+      border-radius: 22px;
       cursor: pointer;
-      line-height: 42px;
       padding: 0;
     }
-    .input-bar .image-edit-btn:hover { background: #2A2A2A; }
+    .input-bar .model-btn {
+      text-align: left;
+      padding-left: 20px;
+      padding-right: 28px;
+    }
+    .input-bar .model-btn::after {
+      content: "";
+      position: absolute;
+      right: 13px;
+      top: 12px;
+      width: 18px;
+      height: 18px;
+      background: url("data:image/png;base64,__INPUT_CHEVRON_PNG_B64__") center / contain no-repeat;
+      pointer-events: none;
+    }
+    .input-panel {
+      min-height: 52px;
+      background: url("data:image/png;base64,__BOTTOM_PANEL_PNG_B64__") center / 100% 100% no-repeat;
+      border-radius: 999px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+      padding: 0 12px;
+    }
+    .input-main-row {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .input-bar .image-edit-btn,
+    .input-bar .emoji-btn,
+    .input-bar .voice-btn,
+    .input-bar .send-btn {
+      flex: 0 0 42px;
+      width: 42px;
+      height: 42px;
+      background: transparent;
+      border: 0;
+      border-radius: 21px;
+      cursor: pointer;
+      padding: 0;
+    }
+    .input-bar .image-edit-btn img,
+    .input-bar .emoji-btn img,
+    .input-bar .voice-btn img,
+    .input-bar .send-btn img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: contain;
+    }
     .input-bar textarea {
       flex: 1;
       min-width: 0;
-      background: var(--input-pill-bg);
-      border: 1px solid var(--input-pill-bg);
-      border-radius: 21px;
+      background: transparent;
+      border: 0;
       color: var(--ink-strong);
-      padding: 8px 14px;
-      font-size: 15px;
+      padding: 8px 4px;
+      font-size: 16px;
       min-height: 42px;
       max-height: 120px;
       resize: none;
@@ -2599,40 +2659,37 @@
       line-height: 1.4;
     }
     .input-bar textarea::placeholder { color: var(--ink-faint); }
-    .input-bar .model-btn {
-      flex: 0 0 76px; height: 42px;
-      background: var(--panel-3);
-      border: 0;
-      color: var(--ink);
-      font-size: 13px;
-      border-radius: 21px;
-      cursor: pointer;
-    }
-    .input-bar .model-btn:hover { background: #2A2A2A; }
-    .input-bar .send-btn {
-      flex: 0 0 64px; height: 42px;
-      background: var(--brand);
-      border: 0;
-      color: var(--brand-ink);
-      font-size: 15px;
-      border-radius: 21px;
-      cursor: pointer;
-    }
-    .input-bar .send-btn:hover { background: var(--brand-hover); }
+    .input-bar .send-btn { display: none; }
+    .input-bar.has-text .send-btn { display: block; }
+    .input-bar.has-text .voice-btn { display: none; }
     .input-bar .send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
     /* ===== Tab 栏 ===== */
     .tabs-bar {
       grid-area: tabs;
-      background: var(--nav-bg);
+      position: relative;
+      background: var(--bg);
       display: flex;
-      align-items: stretch;
+      align-items: flex-start;
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
-      /* iOS Home 条安全区域：防止内容被遮挡 */
-      padding-bottom: env(safe-area-inset-bottom);
+      padding: 10px 16px calc(28px + env(safe-area-inset-bottom));
+    }
+    .tabs-bar::before {
+      content: "";
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      top: 10px;
+      height: 64px;
+      background: url("data:image/png;base64,__BOTTOM_PANEL_PNG_B64__") center / 100% 100% no-repeat;
+      border-radius: 999px;
+      pointer-events: none;
     }
     .tab {
       flex: 1;
+      position: relative;
+      z-index: 1;
+      height: 64px;
       background: transparent;
       border: 0;
       color: var(--tab-icon);
@@ -2641,10 +2698,10 @@
       align-items: center; justify-content: center;
       gap: 1px;
       line-height: 14px;
-      padding: 4px 0 3px;
+      padding: 5px 0;
       cursor: pointer;
     }
-    .tab.active { color: var(--tab-active); background: var(--nav-active-bg); }
+    .tab.active { color: var(--tab-active); background: transparent; }
     .tab .ic { width: 28px; height: 28px; display: block; }
     .tab .ic img { width: 100%; height: 100%; object-fit: contain; }
     .tab .ic svg { width: 100%; height: 100%; }
@@ -3652,16 +3709,33 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </div>
 
   <form id="inputBar" class="input-bar">
-    <button class="image-edit-btn" type="button" id="imageEditBtn" title="图片编辑">✎</button>
-    <textarea id="messageInput" placeholder="描述你想开发的 App 功能" rows="1"></textarea>
-    <button class="model-btn" type="button" id="modelBtn" title="选择AI方式和模型">自动</button>
-    <button class="send-btn" type="submit" id="sendBtn">发送</button>
+    <div class="input-mode-row">
+      <button class="model-btn" type="button" id="modelBtn" title="选择AI方式和模型">自动</button>
+      <button class="plan-btn" type="button" id="planBtn" title="先规划">规划</button>
+    </div>
+    <div class="input-panel">
+      <div class="input-main-row">
+        <button class="image-edit-btn" type="button" id="imageEditBtn" title="图片编辑">
+          <img src="data:image/png;base64,__INPUT_ADD_PNG_B64__" alt="" aria-hidden="true" />
+        </button>
+        <button class="emoji-btn" type="button" id="emojiBtn" title="表情">
+          <img src="data:image/png;base64,__INPUT_EMOJI_PNG_B64__" alt="" aria-hidden="true" />
+        </button>
+        <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
+        <button class="voice-btn" type="button" id="voiceBtn" title="语音输入">
+          <img src="data:image/png;base64,__INPUT_VOICE_WAVE_PNG_B64__" alt="" aria-hidden="true" />
+        </button>
+        <button class="send-btn" type="submit" id="sendBtn" title="发送">
+          <img src="data:image/png;base64,__INPUT_SEND_PNG_B64__" alt="" aria-hidden="true" />
+        </button>
+      </div>
+    </div>
   </form>
 
   <nav class="tabs-bar">
     <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="好友" style="position:relative">
       <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
-      <span>会话</span>
+      <span>好友</span>
         <span id="tabChatBadge" style="display:none;position:absolute;top:4px;right:calc(50% - 26px);background:#F04B4F;color:#fff;font-size:12px;font-weight:700;min-width:22px;height:22px;border-radius:11px;line-height:22px;text-align:center;padding:0 6px;box-sizing:border-box;"></span>
     </button>
     <button class="tab" data-tab="projectPage" data-title="项目">
@@ -4164,9 +4238,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   const inputBar = $('inputBar');
   const imageEditBtn = $('imageEditBtn');
+  const emojiBtn = $('emojiBtn');
   const messageInput = $('messageInput');
   const sendBtn = $('sendBtn');
   const modelBtn = $('modelBtn');
+  const planBtn = $('planBtn');
+  const voiceBtn = $('voiceBtn');
   const chatSideMenuHandle = $('chatSideMenuHandle');
   const webChatSideMenuMask = $('webChatSideMenuMask');
   const webChatSideMenuClose = $('webChatSideMenuClose');
@@ -4292,10 +4369,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const DEFAULT_RUNTIME_ROUTE = 'auto';
   const runtimeRouteOptions = [
     { value: 'auto', button: '自动', label: '自动选择', subtitle: '一龙按当前项目选择合适的 AI' },
-    { value: 'route_a', button: '本机AI', label: '本机AI', subtitle: '连接自己 PC 上已经登录的 Codex / Copilot / Claude' },
+    { value: 'route_a', button: '本机', label: '本机AI', subtitle: '连接自己 PC 上已经登录的 Codex / Copilot / Claude' },
     { value: 'route_b', button: '我的Key', label: '我的Key', subtitle: '用自己的 API Key，手机里的 AI 服务也共用' },
-    { value: 'route_c', button: '平台AI', label: '平台AI', subtitle: '使用一龙平台提供的 AI' },
-    { value: 'route_c2', button: '远程AI', label: '远程一龙AI', subtitle: '其他用户 PC 节点 + 一龙 CLI' },
+    { value: 'route_c', button: '平台', label: '平台AI', subtitle: '使用一龙平台提供的 AI' },
+    { value: 'route_c2', button: '远程', label: '远程一龙AI', subtitle: '其他用户 PC 节点 + 一龙 CLI' },
     { value: 'route_c3', button: '远Codex', label: '远程 Codex / Claude', subtitle: '其他用户 PC 节点 + Codex / Claude' }
   ];
   let selectedRuntimeRoute = initialRuntimeRouteFromStorage();
@@ -5032,7 +5109,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       hideWebChatSideMenuHandle();
     }
     if (!inChat) closeWebChatSideMenu();
-    messageInput.placeholder = isContactChatActive() ? '发消息' : '描述你想开发的 App 功能';
+    messageInput.placeholder = '输入内容';
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !inGroupChat);
@@ -5583,7 +5660,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     setProjectTopTabsVisible(false, false);
     stageHint.classList.remove('hidden');
     modelBtn.style.display = '';
-    messageInput.placeholder = '描述你想开发的 App 功能';
+    messageInput.placeholder = '输入内容';
     topTitle.textContent = project.name || '会话';
     renderProjectPage(project);
     connectSocket();
@@ -5630,7 +5707,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     stageHint.classList.add('hidden');
     modelBtn.style.display = '';
-    messageInput.placeholder = '描述你想开发的 App 功能';
+    messageInput.placeholder = '输入内容';
     topTitle.textContent = contactFilterTitle();
     renderConversationList();
     loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
@@ -5653,7 +5730,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     modelBtn.style.display = currentGroup ? 'none' : '';
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !currentGroup);
-    messageInput.placeholder = '发消息';
+    messageInput.placeholder = '输入内容';
     topTitle.textContent = currentFriend ? friendDisplayName(currentFriend) : groupDisplayName(currentGroup);
     updateSendButtonState();
   }
@@ -7164,6 +7241,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (currentFriend || currentGroup) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
+      inputBar.classList.remove('has-text');
       const send = currentFriend ? sendFriendMessage(text) : sendGroupMessage(text);
       send.catch((err) => appendBubble('error', (err && err.message) || '发送失败'));
       return;
@@ -7183,11 +7261,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     appendBubble('user', text);
     messageInput.value = '';
     messageInput.style.height = 'auto';
+    inputBar.classList.remove('has-text');
     setBusy(true);
   });
   if (imageEditBtn) {
     imageEditBtn.addEventListener('click', () => {
       showNativeOnly('多图选择后会直接加入聊天输入栏；底部缩略图编辑入口，以及含取消/完成、同排收起按钮、拉起按钮、标注、横线、圆形/椭圆、方形/长方形圈选、马赛克的灰黑底部图片编辑工具栏请在 Android APK 中使用。网页版已同步入口位置。');
+    });
+  }
+  if (planBtn) {
+    planBtn.addEventListener('click', () => {
+      showNativeOnly('先规划模式请在 Android APK 中使用。网页版已同步入口位置。');
+    });
+  }
+  if (emojiBtn) {
+    emojiBtn.addEventListener('click', () => {
+      showNativeOnly('表情面板请在 Android APK 中使用。网页版已同步入口位置。');
+    });
+  }
+  if (voiceBtn) {
+    voiceBtn.addEventListener('click', () => {
+      showNativeOnly('语音输入请在 Android APK 中使用。网页版已同步入口位置。');
     });
   }
   messageInput.addEventListener('keydown', (e) => {
@@ -7199,6 +7293,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   messageInput.addEventListener('input', () => {
     messageInput.style.height = 'auto';
     messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+    inputBar.classList.toggle('has-text', messageInput.value.trim().length > 0);
     if (currentFriend && appSocket && appSocket.readyState === WebSocket.OPEN) {
       const now = Date.now();
       if (now - lastTypingSentMs >= 2000) {

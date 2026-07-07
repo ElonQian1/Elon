@@ -24,15 +24,15 @@
 
     <style name="MainTabText">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_height">64dp</item>
         <item name="android:layout_weight">1</item>
         <item name="android:gravity">center</item>
         <item name="android:textColor">@color/elon_text_nav</item>
         <item name="android:textSize">14sp</item>
         <item name="android:includeFontPadding">false</item>
-        <item name="android:drawablePadding">1dp</item>
-        <item name="android:paddingTop">4dp</item>
-        <item name="android:paddingBottom">3dp</item>
+        <item name="android:drawablePadding">0dp</item>
+        <item name="android:paddingTop">5dp</item>
+        <item name="android:paddingBottom">5dp</item>
         <item name="android:background">@android:color/transparent</item>
         <item name="android:clickable">true</item>
     </style>

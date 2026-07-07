@@ -662,7 +662,7 @@ internal class MainEmojiActions(
             val active = state != EmojiButtonState.CLOSED
             val showKeyboardIcon = state == EmojiButtonState.PANEL
             button.setImageResource(
-                if (showKeyboardIcon) R.drawable.ic_input_keyboard_circle else R.drawable.ic_input_emoji_circle
+                if (showKeyboardIcon) R.drawable.ic_input_keyboard_circle else R.drawable.ic_input_emoji_new
             )
             button.contentDescription = when (state) {
                 EmojiButtonState.CLOSED -> "Open emoji"

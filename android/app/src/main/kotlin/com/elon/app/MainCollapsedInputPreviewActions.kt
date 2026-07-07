@@ -18,10 +18,10 @@ internal class MainCollapsedInputPreviewActions(
         preview.text = when {
             hasDraft -> draft
             hasAttachments -> pendingAttachmentSummary(attachments)
-            else -> "文本内容在此输入。"
+            else -> "输入内容"
         }
         preview.setTextColor(
-            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#A8D0D0D0")
+            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#5E5E5E")
         )
     }
 }

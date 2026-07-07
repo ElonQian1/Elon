@@ -15,7 +15,7 @@ internal enum class AiRuntimeRoute(
     ),
     MyPcAi(
         wireValue = "route_a",
-        buttonLabel = "本机AI",
+        buttonLabel = "本机",
         title = "本机AI",
         subtitle = "连接自己 PC 上已经登录的 Codex / Copilot / Claude",
         configTitle = "连接我的电脑"
@@ -29,13 +29,13 @@ internal enum class AiRuntimeRoute(
     ),
     PlatformAi(
         wireValue = "route_c",
-        buttonLabel = "平台AI",
+        buttonLabel = "平台",
         title = "平台AI",
         subtitle = "使用一龙平台提供的 AI"
     ),
     RemoteAi(
         wireValue = "route_c2",
-        buttonLabel = "远程AI",
+        buttonLabel = "远程",
         title = "远程一龙AI",
         subtitle = "其他用户 PC 节点 + 一龙 CLI",
         configTitle = "选择远程节点"

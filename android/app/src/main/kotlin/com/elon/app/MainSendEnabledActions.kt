@@ -32,7 +32,7 @@ internal class MainSendEnabledActions(
         } else if (isWorking) {
             "输入提醒、下一轮消息或分叉方案"
         } else {
-            "文本内容在此输入。"
+            "输入内容"
         }
         binding.stagePauseWorkButton.visibility = if (isWorking) View.VISIBLE else View.GONE
         binding.stagePauseWorkButton.isEnabled = isWorking && !conversationEnded
@@ -52,11 +52,7 @@ internal class MainSendEnabledActions(
         binding.modelButton.isEnabled = !conversationEnded
         modelButtonShell()?.let { shell ->
             shell.isEnabled = !conversationEnded
-            shell.alpha = when {
-                conversationEnded -> 0.55f
-                inputComposerMotion()?.isExpanded == true -> 1f
-                else -> 0f
-            }
+            shell.alpha = if (conversationEnded) 0.55f else 1f
         }
         updateSendButtonVisual()
         updateRunningInputModeStrip()

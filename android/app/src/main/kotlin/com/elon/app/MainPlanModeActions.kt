@@ -51,17 +51,20 @@ internal class MainPlanModeActions(
 
     private fun refresh() {
         val view = button ?: return
-        view.text = if (enabled) "规划中" else "先规划"
+        view.text = if (enabled) "规划中" else "规划"
         view.contentDescription = if (enabled) {
             "已开启先规划，下次发送只生成计划"
         } else {
             "开启先规划"
         }
         view.setTextColor(Color.parseColor(if (enabled) "#101010" else "#D6D6D6"))
-        view.background = GradientDrawable().apply {
-            cornerRadius = dp(16).toFloat()
-            setColor(Color.parseColor(if (enabled) "#BDEFD3" else "#2A2A2A"))
-            setStroke(dp(1), Color.parseColor(if (enabled) "#D9FFE8" else "#2E2E2E"))
+        if (enabled) {
+            view.background = GradientDrawable().apply {
+                cornerRadius = dp(22).toFloat()
+                setColor(Color.parseColor("#D6D6D6"))
+            }
+        } else {
+            view.setBackgroundResource(R.drawable.bg_bottom_mode_pill_new)
         }
     }
 }

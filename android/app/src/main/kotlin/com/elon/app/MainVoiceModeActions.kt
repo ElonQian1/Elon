@@ -52,7 +52,6 @@ internal class MainVoiceModeActions(
             centerContainer.removeAllViews()
             centerContainer.addView(voiceButton)
             binding.inputEdit.visibility = View.GONE
-            modelButtonShell()?.visibility = View.GONE
             voiceButton.visibility = View.VISIBLE
             // 普通聊天的语音按钮保持按住说话；一龙AI 实时通话由顶部电话入口处理。
             val speakerBtn = ttsSpeakerButton()
@@ -68,7 +67,7 @@ internal class MainVoiceModeActions(
                 speakerBtn?.visibility = View.GONE
             }
         } else {
-            modeButton.setImageResource(R.drawable.ic_input_voice_circle)
+            modeButton.setImageResource(R.drawable.ic_input_voice_wave_new)
             emojiButton()?.visibility = View.VISIBLE
             collapsedPreview.detachFromParent()
             voiceButton.detachFromParent()
@@ -76,11 +75,6 @@ internal class MainVoiceModeActions(
             centerContainer.addView(collapsedPreview)
             expandedContainer.addView(voiceButton)
             binding.inputEdit.visibility = View.VISIBLE
-            modelButtonShell()?.visibility = if (inputComposerMotion()?.isExpanded == true) {
-                View.VISIBLE
-            } else {
-                View.GONE
-            }
             voiceButton.visibility = View.GONE
             ttsSpeakerButton()?.visibility = View.GONE
         }

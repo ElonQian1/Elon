@@ -34,21 +34,21 @@ internal class MainAttachmentPanelActions(
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(104)
+                dp(100)
             )
             background = ColorDrawable(Color.TRANSPARENT)
-            gravity = Gravity.CENTER
+            gravity = Gravity.CENTER_VERTICAL or Gravity.START
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(18), dp(8), dp(18), dp(8))
+            setPadding(dp(50), dp(4), dp(18), dp(14))
             visibility = View.GONE
 
-            addView(createAttachmentAction("相机", R.drawable.ic_attach_camera, addEndMargin = true) {
+            addView(createAttachmentAction("拍照", R.drawable.ic_input_camera_new, addEndMargin = true) {
                 openCameraAttachment()
             })
-            addView(createAttachmentAction("相册", R.drawable.ic_attach_photos, addEndMargin = true) {
+            addView(createAttachmentAction("图片", R.drawable.ic_input_photo_new, addEndMargin = true) {
                 openPhotoAttachment()
             })
-            addView(createAttachmentAction("文档", R.drawable.ic_attach_files, addEndMargin = false) {
+            addView(createAttachmentAction("文件", R.drawable.ic_input_file_new, addEndMargin = false) {
                 openDocumentAttachment()
             })
         }
@@ -88,13 +88,13 @@ internal class MainAttachmentPanelActions(
         action: () -> Unit
     ): View {
         return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-                if (addEndMargin) marginEnd = dp(8)
+            layoutParams = LinearLayout.LayoutParams(dp(64), dp(72)).apply {
+                if (addEndMargin) marginEnd = dp(14)
             }
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
-                setColor(Color.parseColor("#222222"))
-                setStroke(dp(1), Color.parseColor("#2E2E2E"))
+                setColor(Color.parseColor("#111111"))
+                setStroke(dp(1), Color.parseColor("#3A3A3A"))
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.VERTICAL
@@ -102,20 +102,21 @@ internal class MainAttachmentPanelActions(
             foreground = selectableForeground()
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(30), dp(30))
+                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
                 setImageResource(iconRes)
+                scaleType = ImageView.ScaleType.FIT_CENTER
             })
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(8)
+                    topMargin = dp(5)
                 }
                 includeFontPadding = false
                 text = label
                 setTextColor(Color.parseColor("#D6D6D6"))
-                textSize = 14f
+                textSize = 13f
             })
             setOnClickListener {
                 collapseAttachmentPanel()
@@ -148,9 +149,8 @@ internal class MainAttachmentPanelActions(
 
     private fun updateAttachmentButtonIcon(expanded: Boolean) {
         val button = attachmentButton() ?: return
-        button.setImageResource(
-            if (expanded) R.drawable.ic_input_chevron_down_circle else R.drawable.ic_add_circle_simple
-        )
+        button.setImageResource(R.drawable.ic_input_add_new)
+        button.rotation = if (expanded) 45f else 0f
         button.contentDescription = if (expanded) "收起更多输入功能" else "展开更多输入功能"
     }
 }
