@@ -200,6 +200,21 @@ pub(crate) fn quick_casual_reply(user_message: &str) -> Option<String> {
             "能改。你把具体需求发过来，我会直接改代码、查问题、构建 APK 或部署；如果平台模型或节点通道不可用，我会明确告诉你卡在哪里。"
                 .into(),
         ),
+        "需要怎么做呢"
+        | "需要怎么做呢？"
+        | "需要怎么做呢?"
+        | "我要怎么做"
+        | "我要怎么做？"
+        | "我要怎么做?"
+        | "那怎么做"
+        | "那怎么做？"
+        | "那怎么做?"
+        | "怎么做"
+        | "怎么做？"
+        | "怎么做?" => Some(
+            "你直接把想改的内容说清楚就行，比如“把首页改简洁”“修复登录失败”“打包 APK”。如果只是想聊天或确认方案，也可以直接问；真正执行开发时需要有可用的模型通道或 PC 节点。"
+                .into(),
+        ),
         _ => None,
     }
 }
@@ -267,6 +282,7 @@ mod tests {
         assert!(quick_casual_reply("你好吗？").is_some());
         assert!(quick_casual_reply("你好？").is_some());
         assert!(quick_casual_reply("真的能改吗?").is_some());
+        assert!(quick_casual_reply("需要怎么做呢？").is_some());
     }
 
     #[test]
