@@ -3,11 +3,16 @@
 .root {
   display: grid;
   gap: 8px;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+.root > * {
+  min-width: 0;
 }
 
 /* ── 段落 ── */
@@ -88,8 +93,10 @@
 /* ── 代码块 ── */
 .codeBlock {
   position: relative;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, .08);
   border-radius: 8px;
   background: #15181d;
@@ -109,6 +116,7 @@
 
 .pre {
   box-sizing: border-box;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   margin: 0;
@@ -118,15 +126,22 @@
   font-size: 13px;
   line-height: 1.55;
   color: #e8ecf2;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .pre code {
+  display: block;
+  min-width: 0;
   background: transparent;
   border: none;
   padding: 0;
   font-size: inherit;
   color: inherit;
+  white-space: inherit;
+  word-break: inherit;
+  overflow-wrap: inherit;
 }
 
 .copyBtn {

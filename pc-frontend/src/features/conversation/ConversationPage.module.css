@@ -678,6 +678,10 @@
 
 /* Markdown 消息：去掉 pre-wrap，交给 MarkdownContent 组件处理 */
 .messageContent.markdownMsg {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
   white-space: normal;
 }
 
