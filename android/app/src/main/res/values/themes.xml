@@ -5,7 +5,7 @@
         <item name="colorPrimaryVariant">@color/elon_bg_app</item>
         <item name="colorOnPrimary">@color/elon_text_primary</item>
         <item name="android:statusBarColor">@color/elon_bg_app</item>
-        <item name="android:navigationBarColor">@color/elon_nav_bg</item>
+        <item name="android:navigationBarColor">@color/elon_bg_app</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
         <item name="android:windowAnimationStyle">@style/ElonPageAnimation</item>
         <item name="android:scrollbarSize">0dp</item>

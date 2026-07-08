@@ -413,7 +413,7 @@ class MainActivity : AppCompatActivity() {
         val navigationColor = if (::binding.isInitialized && binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
             R.color.elon_store_detail_bg
         } else {
-            R.color.elon_nav_bg
+            R.color.elon_bg_app
         }
         window.navigationBarColor = ContextCompat.getColor(this, navigationColor)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
