@@ -387,11 +387,11 @@ button {
 .expandToggle,
 .scenarioTabs button {
   min-height: 30px;
-  border: 1px solid transparent;
-  border-radius: 7px;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   color: #8d99aa;
-  padding: 0 10px;
+  padding: 0;
   text-align: left;
   font-size: 12px;
   font-weight: 750;
@@ -399,15 +399,13 @@ button {
 }
 
 .expandToggle {
-  border-color: rgba(88, 101, 242, .20);
   color: #cbd6ff;
-  background: rgba(88, 101, 242, .10);
+  background: transparent;
 }
 
 .expandToggle[data-active="true"] {
-  border-color: rgba(43, 213, 118, .24);
   color: #b8f2cc;
-  background: rgba(35, 165, 90, .10);
+  background: transparent;
 }
 
 .scenarioTabs {
@@ -417,9 +415,15 @@ button {
 
 .scenarioTabs button:hover,
 .scenarioTabs button[data-active="true"] {
-  border-color: rgba(148, 163, 184, .18);
-  background: rgba(255, 255, 255, .055);
+  border-color: transparent;
+  background: transparent;
   color: #eef3fb;
+}
+
+.scenarioTabs button[data-active="true"] {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+  text-decoration-color: rgba(148, 163, 184, .45);
 }
 
 .previewMatrix {

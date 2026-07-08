@@ -32,6 +32,10 @@ export default function TaskProgressCard({
   const stage = readableStage(timeline.stage.label)
   const detail = readableText(timeline.stage.detail)
   const meta = readableMeta(timeline.stage.meta)
+  const headline = headlineForTone(status.tone)
+  const stageRepeatsHeadline = stage === headline || stage === status.label
+  const showCurrent = Boolean(detail || meta || !stageRepeatsHeadline)
+  const showStatusLabel = status.tone !== 'done' && status.tone !== 'canceled'
   const summary = compactProcessSummary(processSummary, progressCount)
   const terseSummary = terseProcessSummary(summary)
   const hasDetails = progressCount > 0
@@ -78,24 +82,28 @@ export default function TaskProgressCard({
           <div className={styles.header}>
             <span className={styles.statusDot} aria-hidden="true" />
             <div className={styles.headerText}>
-              <span>{status.label}</span>
-              <strong>{headlineForTone(status.tone)}</strong>
+              {showStatusLabel && <span>{status.label}</span>}
+              <strong>{headline}</strong>
             </div>
             {canCancel && (
-              <button type="button" className={styles.cancelButton} onClick={onCancel}>
+              <button type="button" className={styles.cancelButton} onClick={onCancel} aria-label="停止任务" title="停止任务">
                 <StopCircle size={14} />
                 <span>停止</span>
               </button>
             )}
           </div>
 
-          <div className={styles.current}>
-            <div className={styles.currentHead}>
-              <strong>{stage}</strong>
-              {meta && <em>{meta}</em>}
+          {showCurrent && (
+            <div className={styles.current}>
+              {(!stageRepeatsHeadline || meta) && (
+                <div className={styles.currentHead}>
+                  {!stageRepeatsHeadline && <strong>{stage}</strong>}
+                  {meta && <em>{meta}</em>}
+                </div>
+              )}
+              {detail && <p>{detail}</p>}
             </div>
-            {detail && <p>{detail}</p>}
-          </div>
+          )}
         </>
       )}
 

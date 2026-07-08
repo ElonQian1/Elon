@@ -3,12 +3,12 @@
   width: 100%;
   min-width: 0;
   display: grid;
-  gap: 10px;
-  border: 1px solid rgba(148, 163, 184, .16);
-  border-radius: 8px;
-  padding: 12px 13px 10px;
-  background: #181b21;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .20);
+  gap: 8px;
+  border: 0;
+  border-radius: 0;
+  padding: 2px 0 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--text-soft);
 }
 
@@ -28,9 +28,9 @@
   align-items: center;
   gap: 8px;
   border: 0;
-  border-radius: 7px;
-  padding: 0 9px;
-  background: rgba(255, 255, 255, .022);
+  border-radius: 6px;
+  padding: 0 7px 0 0;
+  background: transparent;
   color: #9aa7ba;
   font: inherit;
   font-size: 12px;
@@ -40,13 +40,17 @@
 }
 
 .compactButton:hover {
-  background: rgba(255, 255, 255, .04);
+  background: transparent;
   color: #c7d2e2;
 }
 
 .compactTitle {
   color: #dbe5f3;
   font-weight: 750;
+}
+
+.compactButton .statusDot {
+  margin-top: 0;
 }
 
 .compactSummary {
@@ -58,10 +62,6 @@
 
 .card[data-mode="stream"] {
   gap: 7px;
-  border-color: transparent;
-  padding: 2px 0 0;
-  background: transparent;
-  box-shadow: none;
 }
 
 .streamLine {
@@ -69,7 +69,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
-  gap: 10px;
+  gap: 9px;
   padding: 2px 0 0;
 }
 
@@ -105,20 +105,20 @@
 }
 
 .card[data-mode="stream"] .cancelButton {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   justify-content: center;
   align-self: start;
-  border-color: rgba(218, 55, 60, .18);
+  border-color: transparent;
   background: transparent;
-  color: #e59aa0;
+  color: #8d98aa;
   padding: 0;
-  opacity: .72;
+  opacity: .7;
 }
 
 .card[data-mode="stream"] .cancelButton:hover {
-  border-color: rgba(218, 55, 60, .34);
-  background: rgba(218, 55, 60, .09);
+  border-color: transparent;
+  background: transparent;
   color: #ffb1b4;
   opacity: 1;
 }
@@ -136,36 +136,37 @@
   min-width: 0;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
+  align-items: start;
+  gap: 9px;
 }
 
 .statusDot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: #4f8cff;
-  box-shadow: 0 0 0 4px rgba(79, 140, 255, .14);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, .13);
+  margin-top: 6px;
 }
 
 .card[data-tone="done"] .statusDot {
   background: #23a55a;
-  box-shadow: 0 0 0 4px rgba(35, 165, 90, .14);
+  box-shadow: 0 0 0 3px rgba(35, 165, 90, .13);
 }
 
 .card[data-tone="failed"] .statusDot {
   background: #da373c;
-  box-shadow: 0 0 0 4px rgba(218, 55, 60, .14);
+  box-shadow: 0 0 0 3px rgba(218, 55, 60, .13);
 }
 
 .card[data-tone="canceled"] .statusDot {
   background: #8a93a3;
-  box-shadow: 0 0 0 4px rgba(138, 147, 163, .13);
+  box-shadow: 0 0 0 3px rgba(138, 147, 163, .12);
 }
 
 .card[data-tone="approval"] .statusDot {
   background: #f0b232;
-  box-shadow: 0 0 0 4px rgba(240, 178, 50, .16);
+  box-shadow: 0 0 0 3px rgba(240, 178, 50, .14);
 }
 
 .headerText {
@@ -192,30 +193,40 @@
 }
 
 .cancelButton {
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
+  justify-content: center;
   align-items: center;
-  gap: 5px;
-  border: 1px solid rgba(218, 55, 60, .24);
-  border-radius: 7px;
-  padding: 0 9px;
-  background: rgba(218, 55, 60, .08);
-  color: #ffb1b4;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  color: #8d98aa;
   font: inherit;
-  font-size: 12px;
-  font-weight: 700;
   cursor: pointer;
+  opacity: .76;
 }
 
 .cancelButton:hover {
-  border-color: rgba(218, 55, 60, .38);
-  background: rgba(218, 55, 60, .13);
+  background: rgba(218, 55, 60, .08);
+  color: #ffb1b4;
+  opacity: 1;
+}
+
+.cancelButton span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .current {
   display: grid;
   gap: 5px;
-  padding-left: 19px;
+  padding-left: 17px;
 }
 
 .currentHead {
@@ -254,16 +265,18 @@
 
 .detailButton {
   min-width: 0;
-  min-height: 28px;
-  display: flex;
+  min-height: 24px;
+  width: max-content;
+  max-width: 100%;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border: 1px solid rgba(148, 163, 184, .10);
-  border-radius: 7px;
-  padding: 0 9px 0 10px;
-  background: rgba(255, 255, 255, .026);
-  color: #98a6b8;
+  justify-content: flex-start;
+  gap: 5px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 0 0 17px;
+  background: transparent;
+  color: #7f8ca3;
   font: inherit;
   font-size: 12px;
   font-weight: 650;
@@ -279,23 +292,12 @@
 }
 
 .detailButton:hover {
-  border-color: rgba(148, 163, 184, .18);
-  background: rgba(255, 255, 255, .04);
+  background: transparent;
   color: #c7d1e0;
 }
 
 .streamDetailButton {
-  width: max-content;
-  max-width: 100%;
-  min-height: 25px;
-  justify-content: flex-start;
-  gap: 5px;
-  border-color: transparent;
   padding: 0 0 0 19px;
-  background: transparent;
-  color: #7f8ca3;
-  font-size: 12px;
-  font-weight: 650;
 }
 
 .streamDetailButton:hover {
@@ -306,7 +308,7 @@
 
 @media (max-width: 640px) {
   .card {
-    padding: 11px;
+    padding: 1px 0 0;
   }
 
   .card[data-mode="stream"] {
@@ -332,7 +334,7 @@
 
   .cancelButton {
     grid-column: 2;
-    width: max-content;
+    width: 24px;
   }
 
   .current {

@@ -1,55 +1,56 @@
 .timeline {
   display: grid;
-  gap: 2px;
-  padding: 2px 0 2px;
+  gap: 1px;
+  padding: 0 0 2px;
 }
 
 .coverage {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  padding: 0 0 8px 28px;
+  gap: 10px;
+  padding: 2px 0 2px 28px;
 }
 
 .coveragePill {
-  height: 22px;
+  min-height: 18px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(148, 163, 184, .12);
-  border-radius: 5px;
-  padding: 0 7px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   color: #7f8ca3;
-  background: rgba(255, 255, 255, .025);
+  background: transparent;
   font-size: 11px;
   line-height: 1;
 }
 
 .coverageActive {
-  color: #d8e3f7;
-  border-color: rgba(88, 101, 242, .28);
-  background: rgba(88, 101, 242, .12);
+  color: #98a6ba;
+  border-color: transparent;
+  background: transparent;
 }
 
 .fold {
-  margin: 2px 0 6px 28px;
-  border: 1px solid rgba(148, 163, 184, .08);
-  border-radius: 7px;
+  margin: 0 0 6px 28px;
+  border: 0;
+  border-radius: 0;
   background: transparent;
 }
 
 .fold[open] {
-  border-color: rgba(148, 163, 184, .12);
-  background: rgba(255, 255, 255, .018);
+  border-color: transparent;
+  background: transparent;
 }
 
 .fold summary {
-  min-height: 27px;
-  display: flex;
+  width: max-content;
+  max-width: 100%;
+  min-height: 24px;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 9px;
-  color: #8d99aa;
+  gap: 7px;
+  padding: 0;
+  color: #7f8ca3;
   font-size: 11px;
   font-weight: 750;
   cursor: pointer;
@@ -61,15 +62,15 @@
 }
 
 .fold summary em {
-  color: #7d899c;
+  color: #6f7b8f;
   font-style: normal;
   font-weight: 650;
 }
 
 .foldBody {
   display: grid;
-  gap: 6px;
-  padding: 1px 10px 9px;
+  gap: 3px;
+  padding: 2px 0 7px;
 }
 
 .foldBody .coverage,
@@ -86,10 +87,11 @@
   display: grid;
   gap: 5px;
   margin: 0 0 8px 28px;
-  border: 1px solid rgba(148, 163, 184, .12);
-  border-radius: 7px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, .026);
+  border: 0;
+  border-left: 2px solid rgba(148, 163, 184, .22);
+  border-radius: 0;
+  padding: 2px 0 2px 10px;
+  background: transparent;
 }
 
 .stageCard > div {
@@ -122,20 +124,20 @@
 .recoveryActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 12px;
   padding-top: 2px;
 }
 
 .recoveryActions button,
 .recoveryActions a {
-  min-height: 26px;
+  min-height: 22px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(148, 163, 184, .18);
-  border-radius: 6px;
-  background: rgba(255, 255, 255, .055);
-  color: #d8e3f7;
-  padding: 0 9px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #c2cce0;
+  padding: 0;
   font: inherit;
   font-size: 12px;
   font-weight: 750;
@@ -146,33 +148,35 @@
 
 .recoveryActions button:hover,
 .recoveryActions a:hover {
-  background: rgba(255, 255, 255, .09);
-  border-color: rgba(148, 163, 184, .28);
+  background: transparent;
+  border-color: transparent;
+  color: #eef3fb;
 }
 
 .stageCard.tone_failed {
-  border-color: rgba(218, 55, 60, .25);
-  background: rgba(218, 55, 60, .075);
+  border-color: rgba(218, 55, 60, .42);
+  background: transparent;
 }
 
 .stageCard.tone_done {
-  border-color: rgba(43, 213, 118, .16);
-  background: rgba(35, 165, 90, .045);
+  border-color: rgba(43, 213, 118, .34);
+  background: transparent;
 }
 
 .stageCard.tone_approval {
-  border-color: rgba(255, 209, 102, .26);
-  background: rgba(255, 209, 102, .075);
+  border-color: rgba(255, 209, 102, .42);
+  background: transparent;
 }
 
 .diagnostic {
   display: grid;
   gap: 4px;
   margin: 0 0 8px 28px;
-  border: 1px solid rgba(148, 163, 184, .10);
-  border-radius: 7px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, .018);
+  border: 0;
+  border-left: 2px solid rgba(148, 163, 184, .20);
+  border-radius: 0;
+  padding: 2px 0 2px 10px;
+  background: transparent;
 }
 
 .diagnostic strong {
@@ -188,13 +192,13 @@
 }
 
 .diagnostic.tone_failed {
-  border-color: rgba(218, 55, 60, .25);
-  background: rgba(218, 55, 60, .07);
+  border-color: rgba(218, 55, 60, .42);
+  background: transparent;
 }
 
 .diagnostic.tone_running {
-  border-color: rgba(79, 140, 255, .18);
-  background: rgba(79, 140, 255, .05);
+  border-color: rgba(79, 140, 255, .34);
+  background: transparent;
 }
 
 .item {
@@ -221,13 +225,13 @@
 }
 
 .icon {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   display: grid;
   place-items: center;
   color: #9fb2d8;
-  background: #202632;
+  background: transparent;
   border: 1px solid rgba(148, 163, 184, .18);
   z-index: 1;
 }
@@ -352,10 +356,11 @@
   display: grid;
   gap: 7px;
   margin: 3px 8px 0 0;
-  border: 1px solid rgba(148, 163, 184, .14);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, .026);
-  padding: 8px;
+  border: 0;
+  border-left: 2px solid rgba(148, 163, 184, .18);
+  border-radius: 0;
+  background: transparent;
+  padding: 2px 0 2px 10px;
   min-width: 0;
 }
 
@@ -381,19 +386,19 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 4px;
+  gap: 7px;
   flex: 0 0 auto;
 }
 
 .processChips em {
-  height: 19px;
+  min-height: 17px;
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(148, 163, 184, .14);
-  border-radius: 4px;
-  padding: 0 6px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
   color: #92a2bb;
-  background: rgba(255, 255, 255, .025);
+  background: transparent;
   font-size: 10px;
   font-style: normal;
   line-height: 1;
@@ -401,14 +406,14 @@
 
 .processChips em[data-tone="running"] {
   color: #9fb2ff;
-  border-color: rgba(88, 101, 242, .25);
-  background: rgba(88, 101, 242, .08);
+  border-color: transparent;
+  background: transparent;
 }
 
 .processChips em[data-tone="failed"] {
   color: #ff9da1;
-  border-color: rgba(218, 55, 60, .26);
-  background: rgba(218, 55, 60, .08);
+  border-color: transparent;
+  background: transparent;
 }
 
 .processBody {
@@ -453,9 +458,9 @@
   overflow: auto;
   scrollbar-width: thin;
   margin: 0;
-  border: 1px solid rgba(255, 255, 255, .07);
-  border-radius: 5px;
-  background: rgba(0, 0, 0, .24);
+  border: 0;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .20);
   color: #cfd8e8;
   padding: 8px;
   white-space: pre-wrap;
@@ -470,30 +475,30 @@
 }
 
 .process_test {
-  border-color: rgba(143, 211, 255, .18);
-  background: rgba(37, 99, 235, .055);
+  border-color: rgba(143, 211, 255, .34);
+  background: transparent;
 }
 
 .process_file {
-  border-color: rgba(43, 213, 118, .18);
-  background: rgba(35, 165, 90, .045);
+  border-color: rgba(43, 213, 118, .34);
+  background: transparent;
 }
 
 .processCard.tone_failed {
-  border-color: rgba(218, 55, 60, .26);
-  background: rgba(218, 55, 60, .07);
+  border-color: rgba(218, 55, 60, .42);
+  background: transparent;
 }
 
 .commandRunGroup {
-  margin: 0 0 8px 28px;
+  margin: 0 0 7px 28px;
   color: #8d96a6;
 }
 
 .commandRunGroup[open] {
-  border: 1px solid rgba(148, 163, 184, .10);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, .018);
-  padding: 5px 8px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .commandRunGroup > summary {
@@ -536,7 +541,7 @@
 
 .commandRunBody {
   display: grid;
-  gap: 5px;
+  gap: 3px;
   padding: 2px 0 0;
 }
 
@@ -545,9 +550,9 @@
 }
 
 .commandRunItem[open] {
-  border-radius: 6px;
-  background: rgba(0, 0, 0, .12);
-  padding: 0 7px 7px;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 5px;
 }
 
 .commandRunItem > summary {
@@ -603,11 +608,11 @@
 
 .shellProcessCard {
   gap: 0;
-  margin: 4px 0 7px;
-  border-color: rgba(148, 163, 184, .12);
-  border-radius: 8px;
-  background: rgba(8, 11, 17, .72);
-  padding: 8px;
+  margin: 3px 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: rgba(8, 11, 17, .54);
+  padding: 8px 9px;
 }
 
 .shellPanelHeader {
@@ -701,45 +706,45 @@
 .tone_done .icon {
   color: #2bd576;
   border-color: rgba(43, 213, 118, .28);
-  background: rgba(35, 165, 90, .10);
+  background: transparent;
 }
 
 .tone_running .icon,
 .tone_queued .icon {
   color: #8ca4ff;
   border-color: rgba(88, 101, 242, .28);
-  background: rgba(88, 101, 242, .10);
+  background: transparent;
 }
 
 .tone_failed .icon {
   color: #ff7b7f;
   border-color: rgba(218, 55, 60, .30);
-  background: rgba(218, 55, 60, .10);
+  background: transparent;
 }
 
 .kind_test .icon {
   color: #8fd3ff;
   border-color: rgba(143, 211, 255, .28);
-  background: rgba(37, 99, 235, .10);
+  background: transparent;
 }
 
 .kind_file .icon {
   color: #8ee8af;
   border-color: rgba(43, 213, 118, .28);
-  background: rgba(35, 165, 90, .10);
+  background: transparent;
 }
 
 .tone_canceled .icon,
 .tone_muted .icon {
   color: #9aa3b1;
   border-color: rgba(148, 163, 184, .20);
-  background: rgba(148, 163, 184, .08);
+  background: transparent;
 }
 
 .tone_approval .icon {
   color: #ffd166;
   border-color: rgba(255, 209, 102, .28);
-  background: rgba(255, 209, 102, .10);
+  background: transparent;
 }
 
 @media (max-width: 780px) {

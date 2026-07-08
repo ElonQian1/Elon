@@ -191,7 +191,8 @@ function isSummaryItem(item: TimelineItem) {
 }
 
 function CoverageStrip({ model }: { model: TaskTimelineModel }) {
-  const labels = coverageLabels(model.coverage)
+  const labels = coverageLabels(model.coverage).filter((item) => item.active)
+  if (!labels.length) return null
   return (
     <div className={styles.coverage} aria-label="过程覆盖情况">
       {labels.map((item) => (
