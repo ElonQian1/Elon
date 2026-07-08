@@ -60,7 +60,6 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const progressStatus = progressStatusForStage(status, timeline.stage.tone, timeline.stage.label, isDone)
   const forceProcessOpen = timeline.stage.key === 'approval'
-  const displayCollapsed = forceProcessOpen ? false : collapsed
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const richRequest = taskRequestLooksMarkdown(request)
   const tone = status.tone
@@ -69,6 +68,8 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const terminalReason = terminalReasonFromTimeline(timeline, tone)
   const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
   const hasPublicAssistantItems = publicAssistantItems.length > 0
+  const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline, publicAssistantItems)
+  const displayCollapsed = forceProcessOpen ? false : collapsed
   const hideTimelineAssistantReplies = false
   const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
     completed: compactCompletedProcess,
@@ -94,12 +95,12 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
     && timeline.stage.key !== 'approval'
 
   useEffect(() => {
-    const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}`
+    const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}:${defaultProcessOpen ? 'process-open' : 'process-closed'}`
     if (prevCollapseKey.current === collapseKey) return
     prevCollapseKey.current = collapseKey
     prevDone.current = isDone
-    setCollapsed(expandAll || forceProcessOpen ? false : true)
-  }, [taskId, expandAll, forceProcessOpen, isDone])
+    setCollapsed(expandAll || forceProcessOpen || defaultProcessOpen ? false : true)
+  }, [taskId, expandAll, forceProcessOpen, defaultProcessOpen, isDone])
 
   // 任务从"运行中"变为"完成"时自动折叠（延迟一下让用户看到结果）
   useEffect(() => {
@@ -332,6 +333,16 @@ function taskStageAllowsContinue(stageKey: string, tone: TaskTone): boolean {
     'timeout',
     'tool-timeout',
   ].includes(stageKey)
+}
+
+function shouldDefaultOpenProcess(
+  isDone: boolean,
+  timeline: ReturnType<typeof buildTaskTimeline>,
+  publicAssistantItems: TimelineItem[],
+): boolean {
+  if (isDone) return false
+  if (timeline.stage.key === 'approval') return true
+  return publicAssistantItems.length > 0
 }
 
 function terminalReasonFromTimeline(timeline: ReturnType<typeof buildTaskTimeline>, tone: TaskTone): string {
