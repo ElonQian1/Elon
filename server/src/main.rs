@@ -140,6 +140,7 @@ mod project_chat;
 mod project_chat_executor;
 mod project_chat_pc_node;
 mod project_chat_reply;
+mod project_chat_helpers;
 mod project_chat_runner;
 mod project_completion;
 mod project_conversation_identity;
