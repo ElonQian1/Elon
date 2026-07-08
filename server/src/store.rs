@@ -6,6 +6,7 @@ use std::sync::{Mutex, MutexGuard};
 mod admin_stats;
 mod billing;
 mod billing_alerts;
+mod billing_pay;
 mod billing_price_rules;
 #[cfg(test)]
 mod billing_reservation_tests;
