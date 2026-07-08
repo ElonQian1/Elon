@@ -21,6 +21,7 @@ interface TaskProgressCardProps {
   canContinue?: boolean
   compact?: boolean
   lockedOpen?: boolean
+  processedDuration?: string
   onToggle: () => void
   onCancel: () => void
   onContinue?: () => void
@@ -37,6 +38,7 @@ export default function TaskProgressCard({
   canContinue = false,
   compact = false,
   lockedOpen = false,
+  processedDuration = '',
   onToggle,
   onCancel,
   onContinue,
@@ -46,14 +48,20 @@ export default function TaskProgressCard({
   const meta = readableMeta(timeline.stage.meta)
   const headline = headlineForTone(displayStatus.tone)
   const stageRepeatsHeadline = stage === headline || stage === displayStatus.label
-  const showCurrent = timeline.stage.key === 'approval' ? false : Boolean(detail || meta || !stageRepeatsHeadline)
   const showStatusLabel = displayStatus.tone !== 'done' && displayStatus.tone !== 'canceled' && displayStatus.tone !== 'approval'
   const summary = compactProcessSummary(processSummary, progressCount)
   const terseSummary = terseProcessSummary(summary)
   const hasDetails = progressCount > 0
+  const shouldExplainCurrentStage = shouldShowCurrentStageCopy(timeline.stage.key, timeline.stage.stuck, hasDetails)
+  const showCurrent = timeline.stage.key === 'approval'
+    ? false
+    : shouldExplainCurrentStage && Boolean(detail || meta || !stageRepeatsHeadline)
   const streamMode = !compact && (displayStatus.tone === 'running' || displayStatus.tone === 'queued') && !timeline.stage.stuck
-  const streamCopy = progressNarrative(displayStatus.tone, timeline.stage.key, stage, detail)
+  const streamCopy = shouldExplainCurrentStage
+    ? progressNarrative(displayStatus.tone, timeline.stage.key, stage, detail)
+    : { kicker: '正在处理', title: '我正在继续处理这轮任务。', detail: '' }
   const stageActions = actionStateForStage(timeline.stage.key, status.tone, canContinue)
+  const compactTitle = compactTitleForTone(displayStatus.tone, processedDuration)
 
   if (compact) {
     return (
@@ -66,7 +74,7 @@ export default function TaskProgressCard({
             aria-expanded={!collapsed}
           >
             <span className={styles.statusDot} aria-hidden="true" />
-            <span className={styles.compactTitle}>过程</span>
+            <span className={styles.compactTitle}>{compactTitle}</span>
             <span className={styles.compactSummary}>{terseSummary}</span>
             {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
           </button>
@@ -231,12 +239,38 @@ function looksInternalStatus(value: string): boolean {
   return /(journal|wait_or_cancel|恢复合同|运行控制句柄|任务快照|pc_req|sidecar|lease|tsk_)/i.test(value)
 }
 
+function shouldShowCurrentStageCopy(stageKey: string, stuck: boolean, hasDetails: boolean): boolean {
+  if (!hasDetails) return true
+  if (stuck) return true
+  return [
+    'command',
+    'dispatch',
+    'empty',
+    'heartbeat',
+    'recovery',
+    'recovery-timeout',
+    'recovering',
+    'resume-required',
+    'server-update',
+    'timeout',
+    'tool-timeout',
+    'win-update',
+  ].includes(stageKey)
+}
+
 function headlineForTone(tone: TaskTone): string {
   if (tone === 'done') return '任务已完成'
   if (tone === 'failed') return '任务遇到问题'
   if (tone === 'canceled') return '任务已停止'
   if (tone === 'approval') return '等待你的确认'
   return 'AI 正在处理'
+}
+
+function compactTitleForTone(tone: TaskTone, duration: string): string {
+  if (tone === 'done') return duration ? `已处理 ${duration}` : '已处理'
+  if (tone === 'failed') return duration ? `处理失败 ${duration}` : '处理失败'
+  if (tone === 'canceled') return duration ? `已停止 ${duration}` : '已停止'
+  return '过程'
 }
 
 function readableStage(value: string): string {

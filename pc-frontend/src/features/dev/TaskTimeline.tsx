@@ -356,13 +356,20 @@ function AssistantTimelineReply({ item, expandAll = false }: { item: TimelineIte
   const text = item.detail ?? ''
   const runtimeReply = runtimeReplyFromText(text)
   const hasMarkdown = /[#*`\[\]>|]/.test(text)
+  const meta = assistantReplyMeta(item.meta)
   if (runtimeReply) return <RuntimeTimelineReply info={runtimeReply} expandAll={expandAll} />
   return (
     <div className={styles.assistantReply}>
-      {item.meta && <div className={styles.assistantReplyMeta}>{item.meta}</div>}
+      {meta && <div className={styles.assistantReplyMeta}>{meta}</div>}
       {hasMarkdown ? <MarkdownContent content={text} copy /> : <p>{text}</p>}
     </div>
   )
+}
+
+function assistantReplyMeta(value: string | undefined): string {
+  const meta = String(value ?? '').trim()
+  if (/^(codex|claude|copilot|gemini|gpt|gpt-[\w.-]+|ai)$/i.test(meta)) return ''
+  return meta
 }
 
 function RuntimeTimelineReply({ info, expandAll = false }: { info: RuntimeReply; expandAll?: boolean }) {

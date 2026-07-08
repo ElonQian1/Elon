@@ -58,12 +58,11 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const richRequest = taskRequestLooksMarkdown(request)
   const tone = status.tone
   const compactCompletedProcess = isDone && !!resultMsg
-  const assistantTimelineItems = assistantTimelineItemsFromTimeline(timeline)
   const publicAssistantItems = publicAssistantTimelineItems(timeline)
   const terminalReason = terminalReasonFromTimeline(timeline, tone)
   const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
   const hasPublicAssistantItems = publicAssistantItems.length > 0
-  const hideTimelineAssistantReplies = assistantTimelineItems.length > 0
+  const hideTimelineAssistantReplies = false
   const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
     completed: compactCompletedProcess,
     hideAssistantReplies: hideTimelineAssistantReplies,
@@ -74,10 +73,8 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const requestAuthor = userDisplayName(userMsg, user)
   const requestTime = messageTime(userMsg) || messageTime(headerMsg)
   const assistantProcessTime = messageTime(headerMsg) || requestTime
-  const assistantMetaStatus = assistantMetaStatusForStage(timeline.stage.tone)
-  const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
-  const mergePublicNotesWithProcess = hasPublicAssistantItems && showProgressPanel && !resultMsg && !hideCompletedProcessPanel
-  const mergePublicNotesWithResult = hasPublicAssistantItems && !!resultMsg
+  const processedDuration = processDurationLabel(messages, isDone)
+  const hideCompletedProcessPanel = false
 
   useEffect(() => {
     const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}`
@@ -139,6 +136,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         canCancel={canCancel}
         compact={compactCompletedProcess}
         lockedOpen={forceProcessOpen}
+        processedDuration={processedDuration}
         canContinue={!!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)}
         onToggle={() => {
           if (forceProcessOpen) return
@@ -195,21 +193,6 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         </div>
       )}
 
-      {hasPublicAssistantItems && !mergePublicNotesWithProcess && !mergePublicNotesWithResult && (
-        <TaskProgressNotes items={publicAssistantItems} time={assistantProcessTime} />
-      )}
-
-      {resultMsg && (
-        <TaskAssistantBubble
-          message={resultMsg}
-          tone={tone}
-          label={replyLabelForTone(tone)}
-          notes={mergePublicNotesWithResult ? publicAssistantItems : undefined}
-          reason={terminalReason}
-          time={assistantProcessTime}
-        />
-      )}
-
       {showProgressPanel && (
         !resultMsg && !hideCompletedProcessPanel ? (
           <div className={styles.assistantTurn}>
@@ -217,14 +200,23 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
             <div className={styles.assistantBody}>
               <div className={styles.assistantMeta}>
                 <strong>一龙</strong>
-                {mergePublicNotesWithProcess && <span>{assistantMetaStatus}</span>}
+                {hasPublicAssistantItems && <span>正在处理</span>}
                 {assistantProcessTime && <span>{assistantProcessTime}</span>}
               </div>
-              {mergePublicNotesWithProcess && <TaskProgressNotesContent items={publicAssistantItems} />}
-              {renderProgressPanel(true, mergePublicNotesWithProcess)}
+              {renderProgressPanel(true, hasPublicAssistantItems)}
             </div>
           </div>
         ) : renderProgressPanel(false)
+      )}
+
+      {resultMsg && (
+        <TaskAssistantBubble
+          message={resultMsg}
+          tone={tone}
+          label={replyLabelForTone(tone)}
+          reason={terminalReason}
+          time={assistantProcessTime}
+        />
       )}
     </div>
   )
@@ -254,17 +246,10 @@ function progressStatusForStage(
   return status
 }
 
-function assistantMetaStatusForStage(stageTone: TaskTone): string {
-  if (stageTone === 'approval') return '等待确认'
-  if (stageTone === 'failed') return '需要处理'
-  return '正在处理'
-}
-
-function TaskAssistantBubble({ message, tone, label, notes, reason, time: fallbackTime }: {
+function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime }: {
   message: ChatMessage
   tone: TaskTone
   label: string
-  notes?: TimelineItem[]
   reason?: string
   time?: string
 }) {
@@ -285,45 +270,10 @@ function TaskAssistantBubble({ message, tone, label, notes, reason, time: fallba
           <span>{label}</span>
           {time && <span>{time}</span>}
         </div>
-        {!!notes?.length && <TaskProgressNotesContent items={notes} />}
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={displayContent} copy /> : displayContent}
         </div>
       </div>
-    </div>
-  )
-}
-
-function TaskProgressNotes({ items, time }: { items: TimelineItem[]; time?: string }) {
-  return (
-    <div className={[styles.assistantTurn, styles.progressNotesTurn].join(' ')}>
-      <div className={styles.assistantAvatar}>AI</div>
-      <div className={styles.assistantBody}>
-        <div className={styles.assistantMeta}>
-          <strong>一龙</strong>
-          <span>正在处理</span>
-          {time && <span>{time}</span>}
-        </div>
-        <TaskProgressNotesContent items={items} />
-      </div>
-    </div>
-  )
-}
-
-function TaskProgressNotesContent({ items }: { items: TimelineItem[] }) {
-  return (
-    <div className={styles.progressNotes}>
-      {items.map((item) => {
-        const content = item.detail ?? ''
-        const hasMarkdown = /[#*`\[\]>|]/.test(content)
-        const noteMeta = item.meta
-        return (
-          <div key={item.id} className={styles.progressNote}>
-            {noteMeta && <div className={styles.progressNoteMeta}>{noteMeta}</div>}
-            {hasMarkdown ? <MarkdownContent content={content} copy={false} /> : <p>{content}</p>}
-          </div>
-        )
-      })}
     </div>
   )
 }
@@ -459,6 +409,31 @@ function messageTime(message: ChatMessage | undefined): string {
   if (!message) return ''
   const value = message.created_at ?? message.createdAt
   return value ? formatTime(value) : ''
+}
+
+function processDurationLabel(messages: ChatMessage[], terminal: boolean): string {
+  const timestamps = messages
+    .map((message) => timestampMs(message))
+    .filter((value): value is number => Number.isFinite(value))
+  if (timestamps.length < 2) return ''
+  const start = Math.min(...timestamps)
+  const end = terminal ? Math.max(...timestamps) : Date.now()
+  const seconds = Math.max(0, Math.round((end - start) / 1000))
+  if (seconds < 1) return ''
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const restSeconds = seconds % 60
+  if (minutes < 60) return restSeconds ? `${minutes}m ${restSeconds}s` : `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const restMinutes = minutes % 60
+  return restMinutes ? `${hours}h ${restMinutes}m` : `${hours}h`
+}
+
+function timestampMs(message: ChatMessage): number {
+  const value = message.created_at ?? message.createdAt
+  if (!value) return Number.NaN
+  const timestamp = Date.parse(String(value))
+  return Number.isFinite(timestamp) ? timestamp : Number.NaN
 }
 
 function latestMessageOfKind(messages: ChatMessage[], kind: string): ChatMessage | undefined {
