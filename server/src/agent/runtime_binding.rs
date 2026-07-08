@@ -46,9 +46,16 @@ pub(super) async fn resolve_pc_project_runtime_binding(
 ) -> Result<Option<PcProjectRuntimeBinding>, String> {
     let explicit_route = pc_runtime_route.is_some();
     for candidate in runtime_route_candidates(pc_runtime_route) {
-        let Some(binding) =
-            resolve_pc_project_binding(state, user_id, project, conversation_id, tx, candidate)
-                .await
+        let Some(binding) = resolve_pc_project_binding(
+            state,
+            user_id,
+            project,
+            conversation_id,
+            tx,
+            candidate,
+            !explicit_route,
+        )
+        .await
         else {
             continue;
         };

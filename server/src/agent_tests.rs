@@ -3,7 +3,7 @@ use super::{
     pc_workspace_inspect_problem, pc_workspace_inspect_usable,
     pc_workspace_inspect_usable_for_route, public_dev_runtime_ready_for_route,
     requires_project_workflow_for_message, route_allows_public_dev_node,
-    BOUND_PC_NODE_RECONNECT_WAIT_SECS,
+    AUTO_BOUND_PC_NODE_RECONNECT_WAIT_SECS, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
 };
 use homecli_proto::{NodeDevRuntimeProfile, ProjectWorkspaceInspectStatus};
 use std::path::Path;
@@ -109,6 +109,12 @@ fn pc_workspace_inspect_timeout_keeps_bound_node() {
 #[test]
 fn bound_pc_node_reconnect_window_covers_server_restart() {
     assert!(BOUND_PC_NODE_RECONNECT_WAIT_SECS >= 90);
+}
+
+#[test]
+fn auto_bound_pc_node_reconnect_window_fails_fast() {
+    assert!(AUTO_BOUND_PC_NODE_RECONNECT_WAIT_SECS <= 15);
+    assert!(AUTO_BOUND_PC_NODE_RECONNECT_WAIT_SECS < BOUND_PC_NODE_RECONNECT_WAIT_SECS);
 }
 
 #[test]

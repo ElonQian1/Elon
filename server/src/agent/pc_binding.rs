@@ -4,7 +4,8 @@ use tracing::{info, warn};
 
 use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 
-const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
+pub(super) const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
+pub(super) const AUTO_BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 15;
 const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
 
 use crate::{
@@ -67,14 +68,20 @@ pub(super) async fn resolve_pc_project_binding(
     conversation_id: Option<&str>,
     tx: Option<&UnboundedSender<String>>,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    auto_runtime_route: bool,
 ) -> Option<PcProjectBinding> {
+    let reconnect_wait = if auto_runtime_route {
+        Some(Duration::from_secs(AUTO_BOUND_PC_NODE_RECONNECT_WAIT_SECS))
+    } else {
+        Some(Duration::from_secs(BOUND_PC_NODE_RECONNECT_WAIT_SECS))
+    };
     resolve_pc_project_binding_with_options(
         state,
         user_id,
         project,
         conversation_id,
         tx,
-        true,
+        reconnect_wait,
         true,
         pc_runtime_route,
     )
@@ -93,7 +100,7 @@ pub(crate) async fn prewarm_route_a_runtime_for_project(
         project,
         Some(conversation_id),
         None,
-        false,
+        None,
         false,
         Some(PcRuntimeRoutePreference::RouteA),
     )
@@ -115,7 +122,7 @@ pub(super) async fn resolve_pc_project_binding_with_options(
     project: &ProjectAccess,
     conversation_id: Option<&str>,
     tx: Option<&UnboundedSender<String>>,
-    wait_for_bound_reconnect: bool,
+    bound_reconnect_wait: Option<Duration>,
     allow_provision: bool,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<PcProjectBinding> {
@@ -153,8 +160,8 @@ pub(super) async fn resolve_pc_project_binding_with_options(
             if authorized {
                 let connected = if pc_agent_is_connected(state, agent_id).await {
                     true
-                } else if wait_for_bound_reconnect {
-                    wait_for_bound_pc_agent_reconnect(state, agent_id, tx).await
+                } else if let Some(wait) = bound_reconnect_wait {
+                    wait_for_bound_pc_agent_reconnect(state, agent_id, tx, wait).await
                 } else {
                     false
                 };
@@ -292,13 +299,21 @@ pub(super) async fn wait_for_bound_pc_agent_reconnect(
     state: &Arc<AppState>,
     agent_id: &str,
     tx: Option<&UnboundedSender<String>>,
+    wait: Duration,
 ) -> bool {
-    send_optional_progress(
-        tx,
-        "绑定的 PC 节点正在重连，最长等待 2 分钟让原节点恢复，避免把同一项目错误切到其它电脑。",
-    );
-    let deadline =
-        tokio::time::Instant::now() + Duration::from_secs(BOUND_PC_NODE_RECONNECT_WAIT_SECS);
+    let wait_secs = wait.as_secs().max(1);
+    let message = if wait_secs <= 30 {
+        format!(
+            "自动模式正在等待绑定的 PC 节点短暂重连，最多等待 {wait_secs} 秒；未恢复会继续尝试远程节点或平台 AI。"
+        )
+    } else {
+        format!(
+            "绑定的 PC 节点正在重连，最长等待 {} 分钟让原节点恢复，避免把同一项目错误切到其它电脑。",
+            (wait_secs + 59) / 60
+        )
+    };
+    send_optional_progress(tx, &message);
+    let deadline = tokio::time::Instant::now() + wait;
     loop {
         tokio::time::sleep(Duration::from_millis(BOUND_PC_NODE_RECONNECT_POLL_MS)).await;
         if pc_agent_is_connected(state, agent_id).await {

@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/auth'
 import AuthDialog from '../auth/AuthDialog'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import LocalModeBanner from './LocalModeBanner'
+import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
 import styles from './Shell.module.css'
 
 function NodeConnectBanner() {
@@ -102,6 +103,7 @@ export default function Shell() {
       }
     })
   }, [token])
+  useProjectOpenPrewarm(!duplicateTab)
 
   if (duplicateTab) return <DuplicateWorkbenchNotice />
 

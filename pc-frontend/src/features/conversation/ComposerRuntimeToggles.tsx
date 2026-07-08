@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { api } from '../../api/client'
 import type { AgentOption } from '../models/types'
 import { selectedAgentForRuntimeRoute } from '../models/routeModelPolicy'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type { MemberConversationEntry } from './memberConversationApi'
+import {
+  initialProjectPrewarmFromStorage,
+  persistProjectPrewarmSelection,
+  PROJECT_PREWARM_COOLDOWN_MS,
+  requestProjectPrewarm,
+} from './projectPrewarm'
 import styles from './ConversationComposer.module.css'
-
-const PROJECT_PREWARM_COOLDOWN_MS = 120000
-const PROJECT_PREWARM_STORAGE_KEY = 'elon_project_prewarm_enabled'
-const PROJECT_PREWARM_DEFAULT_VERSION_KEY = 'elon_project_prewarm_default_version'
-const PROJECT_PREWARM_DEFAULT_VERSION = 'manual-prewarm-default-off-20260707'
 
 interface ComposerRuntimeTogglesProps {
   activeProjectId: string
@@ -75,7 +75,7 @@ export default function ComposerRuntimeToggles({
     }
     if (agent) payload.agent = agent
 
-    api.post(`/api/projects/${encodeURIComponent(activeProjectId)}/prewarm`, payload)
+    requestProjectPrewarm(activeProjectId, payload)
       .catch((err: { status?: number; message?: string }) => {
         console.warn('[ProjectPrewarm] failed:', err?.status, err?.message)
       })
@@ -128,15 +128,4 @@ export default function ComposerRuntimeToggles({
       </label>
     </>
   )
-}
-
-function initialProjectPrewarmFromStorage(storage: Storage | null): boolean {
-  if (!storage) return false
-  return storage.getItem(PROJECT_PREWARM_STORAGE_KEY) === 'true'
-    && storage.getItem(PROJECT_PREWARM_DEFAULT_VERSION_KEY) === PROJECT_PREWARM_DEFAULT_VERSION
-}
-
-function persistProjectPrewarmSelection(storage: Storage, enabled: boolean) {
-  storage.setItem(PROJECT_PREWARM_STORAGE_KEY, enabled ? 'true' : 'false')
-  storage.setItem(PROJECT_PREWARM_DEFAULT_VERSION_KEY, PROJECT_PREWARM_DEFAULT_VERSION)
 }

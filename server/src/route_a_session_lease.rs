@@ -23,11 +23,23 @@ pub(crate) async fn is_hot(
         return false;
     };
     let lease_key = lease_key(project, user_id, conversation_id, agent_id, workspace);
-    state
+    if state
         .route_a_session_leases
         .get_valid(&lease_key, connected_at)
         .await
         .is_some()
+    {
+        return true;
+    }
+
+    let fallback_key =
+        route_a_session_lease_key(&project.id, user_id, "default", agent_id, workspace);
+    fallback_key != lease_key
+        && state
+            .route_a_session_leases
+            .get_valid(&fallback_key, connected_at)
+            .await
+            .is_some()
 }
 
 pub(crate) async fn record_verified(

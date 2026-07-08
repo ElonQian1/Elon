@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
 
@@ -47,9 +47,6 @@ use public_dev::{
     pc_agent_runtime_ready_for_route, route_allows_public_dev_node,
 };
 
-const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
-const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
-
 #[cfg(test)]
 #[path = "agent_tests.rs"]
 mod agent_tests;
@@ -68,6 +65,8 @@ mod routing;
 mod runtime_binding;
 
 pub(crate) use pc_binding::prewarm_route_a_runtime_for_project;
+#[cfg(test)]
+use pc_binding::{AUTO_BOUND_PC_NODE_RECONNECT_WAIT_SECS, BOUND_PC_NODE_RECONNECT_WAIT_SECS};
 
 use dispatch::run_backend_with_workspace;
 use pc_binding::{
