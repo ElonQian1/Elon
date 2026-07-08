@@ -38,6 +38,7 @@
 }
 
 .fold[open] {
+  border-color: rgba(148, 163, 184, .12);
   background: rgba(255, 255, 255, .018);
 }
 
@@ -66,7 +67,9 @@
 }
 
 .foldBody {
-  padding: 0 10px 7px;
+  display: grid;
+  gap: 6px;
+  padding: 1px 10px 9px;
 }
 
 .foldBody .coverage,
@@ -486,6 +489,13 @@
   color: #8d96a6;
 }
 
+.commandRunGroup[open] {
+  border: 1px solid rgba(148, 163, 184, .10);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .018);
+  padding: 5px 8px 8px;
+}
+
 .commandRunGroup > summary {
   width: max-content;
   max-width: 100%;
@@ -526,12 +536,18 @@
 
 .commandRunBody {
   display: grid;
-  gap: 2px;
-  padding: 1px 0 0;
+  gap: 5px;
+  padding: 2px 0 0;
 }
 
 .commandRunItem {
   min-width: 0;
+}
+
+.commandRunItem[open] {
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .12);
+  padding: 0 7px 7px;
 }
 
 .commandRunItem > summary {
@@ -581,14 +597,16 @@
 
 .commandRunItem[open] .commandRunOpenLabel {
   display: inline;
+  color: #aeb8c9;
+  font-weight: 700;
 }
 
 .shellProcessCard {
   gap: 0;
   margin: 4px 0 7px;
-  border-color: rgba(255, 255, 255, .065);
+  border-color: rgba(148, 163, 184, .12);
   border-radius: 8px;
-  background: #2a2a2c;
+  background: rgba(8, 11, 17, .72);
   padding: 8px;
 }
 
@@ -647,19 +665,27 @@
   color: #ff9da1;
 }
 
+.shellPanelFooter[data-tone="failed"] span::before {
+  content: "×";
+  margin-right: 4px;
+}
+
 .shellPanelFooter[data-tone="running"] {
   color: #9fb2ff;
+}
+
+.shellPanelFooter[data-tone="running"] span::before {
+  content: "…";
+  margin-right: 4px;
 }
 
 .shellPanelFooter[data-tone="canceled"] {
   color: #9aa3b1;
 }
 
-.shellPanelFooter[data-tone="failed"] span::before,
-.shellPanelFooter[data-tone="running"] span::before,
 .shellPanelFooter[data-tone="canceled"] span::before {
-  content: "";
-  margin-right: 0;
+  content: "–";
+  margin-right: 4px;
 }
 
 .shellPanelFooter em {

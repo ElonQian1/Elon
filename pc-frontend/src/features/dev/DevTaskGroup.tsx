@@ -14,6 +14,8 @@ import UserAvatar from '../shell/UserAvatar'
 import { clean, formatTime } from '../../lib/utils'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal, taskRequestLooksMarkdown, taskResultTone } from './devTaskUtils'
 import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
+import { isStatusEchoProgressText } from './taskTimelineRuntime'
+import type { TimelineItem } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
 
@@ -21,11 +23,12 @@ interface Props {
   messages: ChatMessage[]
   taskContext: TaskContext
   user?: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
+  expandAll?: boolean
   onCancel?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
-function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Props) {
+function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel, onApprove }: Props) {
   const taskId  = taskIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
@@ -35,18 +38,22 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const isDone  = taskIsTerminal(task) || !!explicitResultMsg || messages.some(isTerminalTaskMessage)
 
   // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
-  const [collapsed, setCollapsed] = useState(isDone)
+  const [collapsed, setCollapsed] = useState(expandAll ? false : isDone)
   const prevDone = useRef(isDone)
   const userCollapseOverride = useRef(false)
 
   // 任务从"运行中"变为"完成"时自动折叠（延迟一下让用户看到结果）
   useEffect(() => {
+    if (expandAll) {
+      setCollapsed(false)
+      return
+    }
     if (!prevDone.current && isDone) {
       const t = setTimeout(() => setCollapsed(true), 800)
       prevDone.current = true
       return () => clearTimeout(t)
     }
-  }, [isDone])
+  }, [expandAll, isDone])
 
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
@@ -63,21 +70,25 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
   const showProgressPanel = hasProgressDetails || !isDone
   const tone = status.tone
   const compactCompletedProcess = isDone && tone === 'done' && !!resultMsg
-  const processSummary = taskThreadSummary(timeline, assistantNotes.length, taskId, taskId ? shortId(taskId) : '')
+  const assistantTimelineItems = assistantTimelineItemsFromTimeline(timeline)
+  const publicAssistantItems = publicAssistantTimelineItems(timeline)
+  const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
+  const hasPublicAssistantItems = publicAssistantItems.length > 0
+  const hideTimelineAssistantReplies = assistantTimelineItems.length > 0
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
   const requestTime = messageTime(userMsg) || messageTime(headerMsg)
   const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
 
   useEffect(() => {
-    if (userCollapseOverride.current || isDone) return
+    if (expandAll || userCollapseOverride.current || isDone) return
     if (timeline.coverage.assistantEvent) {
       setCollapsed(false)
       return
     }
     if (progressCount <= 3) return
     setCollapsed(true)
-  }, [isDone, progressCount, timeline.coverage.assistantEvent])
+  }, [expandAll, isDone, progressCount, timeline.coverage.assistantEvent])
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -128,6 +139,8 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
             model={timeline}
             taskContext={taskContext}
             completed={compactCompletedProcess}
+            hideAssistantReplies={hideTimelineAssistantReplies}
+            expandAll={expandAll}
             onCancel={onCancel}
             onApprove={onApprove}
           />
@@ -162,6 +175,8 @@ function DevTaskGroup({ messages, taskContext, user, onCancel, onApprove }: Prop
         </div>
       )}
 
+      {hasPublicAssistantItems && <TaskProgressNotes items={publicAssistantItems} />}
+
       {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
       {showProgressPanel && (
@@ -188,6 +203,7 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.user?.nickname === next.user?.nickname
   && prev.user?.account === next.user?.account
   && prev.user?.avatar_data_url === next.user?.avatar_data_url
+  && prev.expandAll === next.expandAll
   && prev.onCancel === next.onCancel
   && prev.onApprove === next.onApprove
 )
@@ -211,6 +227,33 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
         </div>
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TaskProgressNotes({ items }: { items: TimelineItem[] }) {
+  return (
+    <div className={[styles.assistantTurn, styles.progressNotesTurn].join(' ')}>
+      <div className={styles.assistantAvatar}>AI</div>
+      <div className={styles.assistantBody}>
+        <div className={styles.assistantMeta}>
+          <strong>一龙</strong>
+          <span>正在处理</span>
+        </div>
+        <div className={styles.progressNotes}>
+          {items.map((item) => {
+            const content = item.detail ?? ''
+            const hasMarkdown = /[#*`\[\]>|]/.test(content)
+            const noteMeta = [item.meta, messageTime(item.message)].filter(Boolean).join(' · ')
+            return (
+              <div key={item.id} className={styles.progressNote}>
+                {noteMeta && <div className={styles.progressNoteMeta}>{noteMeta}</div>}
+                {hasMarkdown ? <MarkdownContent content={content} copy={false} /> : <p>{content}</p>}
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>
@@ -260,6 +303,21 @@ function taskThreadSummary(
   const noteSummary = `${assistantNoteCount} 条公开回复`
   if (!base) return [noteSummary, shortTaskId || taskId].filter(Boolean).join(' · ')
   return `${base} · ${noteSummary}`
+}
+
+function publicAssistantTimelineItems(timeline: ReturnType<typeof buildTaskTimeline>): TimelineItem[] {
+  return assistantTimelineItemsFromTimeline(timeline).filter((item) => !isStatusEchoProgressText(item.detail ?? ''))
+}
+
+function assistantTimelineItemsFromTimeline(timeline: ReturnType<typeof buildTaskTimeline>): TimelineItem[] {
+  return timeline.items.filter((item) =>
+    !!(item.detail ?? '').trim()
+    && (
+      item.event?.type === 'assistant_message'
+      || item.event?.type === 'assistant_chunk'
+      || (item.message as Record<string, unknown> | undefined)?.assistant_progress_event === true
+    )
+  )
 }
 
 function taskRequestText(message: ChatMessage | undefined): string {
@@ -353,6 +411,7 @@ function isFallbackAssistantTaskReply(message: ChatMessage, taskId: string): boo
 
 function isAssistantProgressNote(message: ChatMessage): boolean {
   return (message as Record<string, unknown>).assistant_progress_event === true
+    && !isStatusEchoProgressText(messageText(message))
 }
 
 function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined {

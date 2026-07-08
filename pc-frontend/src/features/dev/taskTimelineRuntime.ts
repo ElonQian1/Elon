@@ -46,7 +46,13 @@ export function assistantItemFromText(
 
 export function assistantProgressNoteText(message: ChatMessage, text: string): string {
   if ((message as Record<string, unknown>).assistant_progress_event !== true) return ''
-  return clean(text)
+  const value = clean(text)
+  return isStatusEchoProgressText(value) ? '' : value
+}
+
+export function isStatusEchoProgressText(value: string): boolean {
+  const text = value.replace(/\s+/g, ' ').trim()
+  return /我正在恢复本轮任务连接|先确认本地会话状态，再接上后续步骤|我已经收到部分回复，正在等待收尾|我正在等待本机 AI 输出|我正在连接本机节点/.test(text)
 }
 
 export function latestRuntimePhase(items: TimelineItem[], phase: string): TimelineItem | undefined {
@@ -104,6 +110,13 @@ export function buildTaskTimelineDiagnostics(
   const diagnostics: TaskTimelineDiagnostic[] = []
   const { coverage } = model
   const maintenance = latestMaintenanceRuntimeStatus(model.items)
+  const latestRuntime = latestRuntimeStatusItem(model.items)
+  const latestRuntimeStatus = clean(latestRuntime?.event?.status ?? '').toLowerCase()
+  const latestRuntimePhaseName = clean(latestRuntime?.event?.phase ?? '').toLowerCase()
+  const endedByRuntimeProblem = latestRuntimeStatus === 'error'
+    || latestRuntimePhaseName === 'failed'
+    || latestRuntimePhaseName === 'canceled'
+    || latestRuntimePhaseName === 'resume_required'
   const recovering = !!latestRuntimePhase(model.items, 'pc_cli_communication_recovering')
     && !latestRuntimePhase(model.items, 'pc_cli_recovery_timeout')
     && !coverage.finalReply
@@ -142,7 +155,7 @@ export function buildTaskTimelineDiagnostics(
       detail: 'AI CLI 的回复片段已经作为气泡显示；如果后面还有等待状态，通常是在同步用量、终态或后续工具事件。'
     })
   }
-  if (coverage.finalReply && !coverage.command && !coverage.fileChange && !coverage.testRun) {
+  if (coverage.finalReply && !endedByRuntimeProblem && !coverage.command && !coverage.fileChange && !coverage.testRun) {
     diagnostics.push({
       tone: 'muted',
       title: '本轮无公开工具过程',

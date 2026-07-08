@@ -24,6 +24,8 @@ interface TaskTimelineProps {
   model: TaskTimelineModel
   taskContext: TaskContext
   completed?: boolean
+  hideAssistantReplies?: boolean
+  expandAll?: boolean
   onCancel?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
@@ -41,54 +43,59 @@ interface RuntimeReply {
   fingerprint?: string
 }
 
-export default function TaskTimeline({ model, taskContext, completed = false, onCancel, onApprove }: TaskTimelineProps) {
-  if (model.items.length === 0) return null
-  const grouped = groupTimelineItems(model.items, completed)
+export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
+  const displayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
+  if (displayItems.length === 0 && model.diagnostics.length === 0) return null
+  const grouped = groupTimelineItems(displayItems, completed)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
   const hasAssistantReply = grouped.primary.some(isAssistantTimelineItem)
   const showStageAtTop = model.stage.key === 'approval'
     || ((model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply)
   const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply && primaryBlocks.length === 0
-  const technicalCount = grouped.connection.length + (showStageAtTop ? 0 : 1) + model.diagnostics.length + 1
+  const showStageInTechnicalDetails = !showStageAtTop && model.stage.key !== 'finished'
+  const technicalCount = grouped.connection.length + (showStageInTechnicalDetails ? 1 : 0) + model.diagnostics.length + 1
 
   return (
     <div className={styles.timeline}>
       {showStageAtTop && <StageCard stage={model.stage} />}
       {primaryBlocks.map((block) => (
         block.type === 'commands' ? (
-          <CommandRunGroup key={block.id} items={block.items} />
+          <CommandRunGroup key={block.id} items={block.items} expandAll={expandAll} />
         ) : (
           <TimelineRow
             key={block.item.id}
             item={block.item}
             taskContext={taskContext}
+            expandAll={expandAll}
             onCancel={onCancel}
             onApprove={onApprove}
           />
         )
       ))}
-      <TimelineFold title="技术详情" count={technicalCount} defaultOpen={openTechnicalDetails}>
+      <TimelineFold title="技术详情" count={technicalCount} defaultOpen={expandAll || openTechnicalDetails}>
         {grouped.connection.map((item) => (
           <TimelineRow
             key={item.id}
             item={item}
             taskContext={taskContext}
+            expandAll={expandAll}
             onCancel={onCancel}
             onApprove={onApprove}
           />
         ))}
-        {!showStageAtTop && <StageCard stage={model.stage} />}
+        {showStageInTechnicalDetails && <StageCard stage={model.stage} />}
         {model.diagnostics.map((diagnostic, index) => (
           <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
         ))}
         <CoverageStrip model={model} />
       </TimelineFold>
-      <TimelineFold title="运行摘要" count={grouped.summary.length}>
+      <TimelineFold title="运行摘要" count={grouped.summary.length} defaultOpen={expandAll}>
         {grouped.summary.map((item) => (
           <TimelineRow
             key={item.id}
             item={item}
             taskContext={taskContext}
+            expandAll={expandAll}
             onCancel={onCancel}
             onApprove={onApprove}
           />
@@ -228,9 +235,10 @@ function DiagnosticCard({ diagnostic }: { diagnostic: TaskTimelineDiagnostic }) 
   )
 }
 
-function TimelineRow({ item, taskContext, onCancel, onApprove }: {
+function TimelineRow({ item, taskContext, expandAll = false, onCancel, onApprove }: {
   item: TimelineItem
   taskContext: TaskContext
+  expandAll?: boolean
   onCancel?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }) {
@@ -244,14 +252,14 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
       </div>
       <div className={styles.content}>
         {assistantReply ? (
-          <AssistantTimelineReply item={item} />
+          <AssistantTimelineReply item={item} expandAll={expandAll} />
         ) : (
           <>
             <div className={styles.head}>
               <span className={styles.title}>{item.title}</span>
               {item.meta && <span className={styles.meta} title={item.metaTitle || item.meta}>{item.meta}</span>}
             </div>
-            {item.process && <ProcessCardView process={item.process} />}
+            {item.process && <ProcessCardView process={item.process} expandAll={expandAll} />}
             {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}
           </>
         )}
@@ -270,11 +278,11 @@ function TimelineRow({ item, taskContext, onCancel, onApprove }: {
   )
 }
 
-function AssistantTimelineReply({ item }: { item: TimelineItem }) {
+function AssistantTimelineReply({ item, expandAll = false }: { item: TimelineItem; expandAll?: boolean }) {
   const text = item.detail ?? ''
   const runtimeReply = runtimeReplyFromText(text)
   const hasMarkdown = /[#*`\[\]>|]/.test(text)
-  if (runtimeReply) return <RuntimeTimelineReply info={runtimeReply} />
+  if (runtimeReply) return <RuntimeTimelineReply info={runtimeReply} expandAll={expandAll} />
   return (
     <div className={styles.assistantReply}>
       {item.meta && <div className={styles.assistantReplyMeta}>{item.meta}</div>}
@@ -283,7 +291,7 @@ function AssistantTimelineReply({ item }: { item: TimelineItem }) {
   )
 }
 
-function RuntimeTimelineReply({ info }: { info: RuntimeReply }) {
+function RuntimeTimelineReply({ info, expandAll = false }: { info: RuntimeReply; expandAll?: boolean }) {
   const title = info.tone === 'failed' ? '平台 AI 暂时不可用' : '平台 AI 正在处理'
   const meta = [info.runtime, info.phase].filter(Boolean).join(' · ')
   return (
@@ -291,7 +299,7 @@ function RuntimeTimelineReply({ info }: { info: RuntimeReply }) {
       <strong>{title}</strong>
       <p>{info.message}</p>
       {(meta || info.reqId || info.fingerprint) && (
-        <details className={styles.runtimeReplyDetails}>
+        <details className={styles.runtimeReplyDetails} open={expandAll}>
           <summary>技术信息</summary>
           {meta && <span>{meta}</span>}
           {info.reqId && <span>req_id: {info.reqId}</span>}
@@ -340,29 +348,29 @@ function shouldRenderEmbeddedMessage(item: TimelineItem): boolean {
     || type === 'tool_approval_decision'
 }
 
-function CommandRunGroup({ items }: { items: TimelineItem[] }) {
+function CommandRunGroup({ items, expandAll = false }: { items: TimelineItem[]; expandAll?: boolean }) {
   const failed = items.some((item) => item.tone === 'failed')
   return (
-    <details className={styles.commandRunGroup} data-tone={failed ? 'failed' : undefined}>
+    <details className={styles.commandRunGroup} data-tone={failed ? 'failed' : undefined} open={expandAll}>
       <summary>
         <span className={styles.commandRunGroupIcon} aria-hidden="true"><Terminal size={13} /></span>
         <span>已运行 {items.length} 条命令</span>
       </summary>
       <div className={styles.commandRunBody}>
         {items.map((item) => (
-          <CommandRunItem key={item.id} item={item} />
+          <CommandRunItem key={item.id} item={item} expandAll={expandAll} />
         ))}
       </div>
     </details>
   )
 }
 
-function CommandRunItem({ item }: { item: TimelineItem }) {
+function CommandRunItem({ item, expandAll = false }: { item: TimelineItem; expandAll?: boolean }) {
   const process = item.process
   if (!process) return null
   const commandText = process.commandText ?? process.subtitle
   return (
-    <details className={styles.commandRunItem}>
+    <details className={styles.commandRunItem} open={expandAll}>
       <summary title={commandText}>
         <span className={styles.commandRunOpenLabel}>命令</span>
         <code>{commandSummary(commandText)}</code>
@@ -372,7 +380,7 @@ function CommandRunItem({ item }: { item: TimelineItem }) {
   )
 }
 
-function ProcessCardView({ process }: { process: ProcessCard }) {
+function ProcessCardView({ process, expandAll = false }: { process: ProcessCard; expandAll?: boolean }) {
   if (process.commandText) return <ShellProcessCardView process={process} />
   return (
     <div className={[styles.processCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
@@ -387,7 +395,7 @@ function ProcessCardView({ process }: { process: ProcessCard }) {
       </div>
       {process.body && (
         process.bodyCollapsed ? (
-          <details className={styles.processDetails}>
+          <details className={styles.processDetails} open={expandAll}>
             <summary>{process.bodyLabel}</summary>
             <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
           </details>

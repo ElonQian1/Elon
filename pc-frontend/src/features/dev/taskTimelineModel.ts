@@ -156,6 +156,7 @@ export function buildTaskTimeline(
       items.push(assistantItemFromText(normalizedAssistantText, message, index))
       return
     }
+    if ((message as Record<string, unknown>).assistant_progress_event === true) return
 
     const text = normalizedProgressText(rawText)
     if (!text) return
@@ -365,11 +366,13 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
     const status = clean(event.status ?? '').toLowerCase()
     const canceled = ['canceled', 'cancelled', 'stopped'].includes(status)
     const failedRun = failed > 0 || ['error', 'failed'].includes(status)
+    const runtimeMessage = clean(event.message ?? '')
+    const title = !failedRun && !canceled && /最终回复|公开过程/.test(runtimeMessage) ? `运行完成，${total} 个工具事件` : runtimeMessage || `运行完成，${total} 个工具事件`
     return {
       id: itemId(message, index),
       kind: 'agent',
       tone: canceled ? 'canceled' : failedRun ? 'failed' : 'done',
-      title: clean(event.message ?? '') || `运行完成，${total} 个工具事件`,
+      title,
       meta: failed > 0 ? `${failed} 个失败` : '',
       message,
       event,
@@ -396,10 +399,9 @@ function itemFromEvent(event: ToolEvent, message: ChatMessage, index: number): T
       id: itemId(message, index),
       kind: 'approval',
       tone: type === 'tool_approval_required' ? 'approval' : 'done',
-      title: type === 'tool_approval_required'
-        ? `等待确认 ${clean(event.tool ?? 'tool')}`
-        : `${clean(event.tool ?? 'tool')} 审批已处理`,
-      meta: clean(event.approval_id ?? ''),
+      title: type === 'tool_approval_required' ? '等待工具审批' : '审批已处理',
+      meta: clean(event.tool ?? 'tool'),
+      metaTitle: clean(event.approval_id ?? ''),
       message,
       event,
     }
@@ -514,6 +516,13 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
   }
 
   if (model.coverage.finalReply) {
+    const latestStatus = clean(latestRuntime?.event?.status ?? '').toLowerCase()
+    if (latestPhase === 'canceled' || latestStatus === 'canceled') {
+      return { key: 'finished', tone: 'canceled', label: '任务已停止', detail: '本轮任务已经停止；停止说明已在上方显示，技术状态保留在过程里。', summary: '已停止', stuck: false }
+    }
+    if (latestPhase === 'failed' || latestStatus === 'error') {
+      return { key: 'finished', tone: 'failed', label: '任务遇到问题', detail: '本轮没有完成；错误说明已在上方显示，技术状态保留在过程里。', summary: '任务失败', stuck: false }
+    }
     return {
       key: 'finished',
       tone: 'done',
