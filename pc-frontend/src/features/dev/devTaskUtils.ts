@@ -256,7 +256,7 @@ export function toolEventTitle(event: ToolEvent): string {
   const isResult = type === 'tool_result'
   if (tool === 'shell' && shellEventLooksLikeValidation(event)) return isResult ? '验证完成' : '运行测试/构建'
   if (tool === 'shell') return isResult ? '命令完成' : '执行命令'
-  if (tool === 'file_change') return isResult ? '文件修改完成' : '修改文件'
+  if (tool === 'file_change') return '文件修改'
   if (tool === 'web_search') return isResult ? '搜索完成' : '搜索网络'
   return `${isResult ? '完成' : '调用'} ${tool}`
 }

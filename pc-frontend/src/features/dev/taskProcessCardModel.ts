@@ -86,12 +86,11 @@ function fileProcessCard(event: ToolEvent, tone: TaskTone, isResult: boolean): P
   return {
     kind: 'file',
     tone,
-    title: isResult ? '文件修改完成' : '准备修改文件',
-    subtitle: files.length ? files.slice(0, 3).join(', ') : 'file_change',
-    bodyLabel: diffPreview ? 'Diff 预览' : isResult ? '结果' : '文件',
+    title: '文件修改',
+    subtitle: files.length ? files.slice(0, 3).join(', ') : '文件已更新',
+    bodyLabel: diffPreview ? '变更预览' : isResult ? '结果' : '文件',
     ...limitedBody(body),
     chips: [
-      { label: 'file_change' },
       files.length ? { label: `${files.length} 个文件`, tone: 'running' } : null,
       event.diff?.truncated ? { label: 'diff 已截断', tone: 'muted' } : null,
     ].filter(Boolean) as ProcessCardChip[],

@@ -23,6 +23,7 @@ import {
   maintenanceStageKey,
   removeMatchingShellCommandEcho,
 } from './taskTimelineRuntime'
+import { mergeFileChangeResult } from './taskTimelineFileChange'
 import type { ChatMessage, TaskTone, ToolEvent } from './types'
 
 export type TimelineItemKind =
@@ -196,6 +197,7 @@ export function buildTaskTimeline(
     seenText.add(uniqueKey)
     if (event) removeMatchingShellCommandEcho(items, item)
     if (mergeShellResult(items, item)) return
+    if (mergeFileChangeResult(items, item)) return
     items.push(item)
   })
 
