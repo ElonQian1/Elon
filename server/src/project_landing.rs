@@ -94,7 +94,9 @@ fn load_manifest_file(path: &Path, relative_path: &str) -> Value {
 }
 
 mod normalize;
-use self::normalize::{normalize_manifest, source_only, source_value};
+mod normalize_helpers;
+use self::normalize::normalize_manifest;
+use self::normalize_helpers::{source_only, source_value};
 
 #[cfg(test)]
 #[path = "project_landing_tests.rs"]

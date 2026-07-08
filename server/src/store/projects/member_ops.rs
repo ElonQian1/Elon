@@ -394,7 +394,7 @@ impl Store {
     }
 }
 
-pub(super) fn project_member_entry(
+pub(crate) fn project_member_entry(
     conn: &Connection,
     project_id: &str,
     user_id: &str,
@@ -456,7 +456,7 @@ pub(super) fn project_member_entry(
     Ok(entry)
 }
 
-pub(super) fn ensure_project_not_system(
+pub(crate) fn ensure_project_not_system(
     conn: &rusqlite::Connection,
     project_id: &str,
     message: &str,
