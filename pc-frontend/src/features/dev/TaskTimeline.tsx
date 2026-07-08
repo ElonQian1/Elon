@@ -51,8 +51,16 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
   const hasApprovalItem = grouped.primary.some((item) => item.kind === 'approval' && item.tone === 'approval')
   const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
-  const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && primaryBlocks.length === 0
-  const technicalCount = grouped.connection.length + model.diagnostics.length + 1
+  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, grouped.connection)
+  const showCoverageInDiagnostics = showDiagnosticDetails && hasActiveCoverage(model)
+  const diagnosticCount = showDiagnosticDetails
+    ? grouped.connection.length + model.diagnostics.length + (showCoverageInDiagnostics ? 1 : 0)
+    : 0
+  const hasVisibleTimeline = showStageAtTop
+    || primaryBlocks.length > 0
+    || diagnosticCount > 0
+    || grouped.summary.length > 0
+  if (!hasVisibleTimeline) return null
 
   return (
     <div className={styles.timeline}>
@@ -71,22 +79,24 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
           />
         )
       ))}
-      <TimelineFold title="技术详情" count={technicalCount} defaultOpen={expandAll || openTechnicalDetails}>
-        {grouped.connection.map((item) => (
-          <TimelineRow
-            key={item.id}
-            item={item}
-            taskContext={taskContext}
-            expandAll={expandAll}
-            onCancel={onCancel}
-            onApprove={onApprove}
-          />
-        ))}
-        {model.diagnostics.map((diagnostic, index) => (
-          <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
-        ))}
-        <CoverageStrip model={model} />
-      </TimelineFold>
+      {showDiagnosticDetails && (
+        <TimelineFold title={diagnosticFoldTitle(model)} count={diagnosticCount} defaultOpen={expandAll}>
+          {model.diagnostics.map((diagnostic, index) => (
+            <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
+          ))}
+          {grouped.connection.map((item) => (
+            <TimelineRow
+              key={item.id}
+              item={item}
+              taskContext={taskContext}
+              expandAll={expandAll}
+              onCancel={onCancel}
+              onApprove={onApprove}
+            />
+          ))}
+          {showCoverageInDiagnostics && <CoverageStrip model={model} />}
+        </TimelineFold>
+      )}
       <TimelineFold title="运行摘要" count={grouped.summary.length} defaultOpen={expandAll}>
         {grouped.summary.map((item) => (
           <TimelineRow
@@ -127,6 +137,22 @@ function groupPrimaryTimelineBlocks(items: TimelineItem[]): PrimaryTimelineBlock
   }
   flushCommands()
   return blocks
+}
+
+function shouldShowDiagnosticDetails(model: TaskTimelineModel, connectionItems: TimelineItem[]) {
+  if (model.diagnostics.length > 0) return true
+  if (model.stage.stuck) return connectionItems.length > 0 || hasActiveCoverage(model)
+  if (model.stage.tone === 'failed') return connectionItems.length > 0
+  return false
+}
+
+function diagnosticFoldTitle(model: TaskTimelineModel) {
+  const hasProblemDiagnostic = model.diagnostics.some((diagnostic) => diagnostic.tone === 'failed')
+  return model.stage.stuck || model.stage.tone === 'failed' || hasProblemDiagnostic ? '诊断' : '提示'
+}
+
+function hasActiveCoverage(model: TaskTimelineModel) {
+  return coverageLabels(model.coverage).some((item) => item.active)
 }
 
 function isCommandTimelineItem(item: TimelineItem): boolean {

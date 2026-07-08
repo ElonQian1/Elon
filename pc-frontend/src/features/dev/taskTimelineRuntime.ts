@@ -113,6 +113,8 @@ export function buildTaskTimelineDiagnostics(
   const latestRuntime = latestRuntimeStatusItem(model.items)
   const latestRuntimeStatus = clean(latestRuntime?.event?.status ?? '').toLowerCase()
   const latestRuntimePhaseName = clean(latestRuntime?.event?.phase ?? '').toLowerCase()
+  const heartbeatWaitedSeconds = heartbeatWaitSeconds(model.lastHeartbeat)
+  const heartbeatWaitedLong = heartbeatWaitedSeconds !== null && heartbeatWaitedSeconds >= 60
   const endedByRuntimeProblem = latestRuntimeStatus === 'error'
     || latestRuntimePhaseName === 'failed'
     || latestRuntimePhaseName === 'canceled'
@@ -120,10 +122,10 @@ export function buildTaskTimelineDiagnostics(
   const recovering = !!latestRuntimePhase(model.items, 'pc_cli_communication_recovering')
     && !latestRuntimePhase(model.items, 'pc_cli_recovery_timeout')
     && !coverage.finalReply
-  if (!maintenance && !recovering && coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
+  if (!maintenance && !recovering && heartbeatWaitedLong && coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
     diagnostics.push({
       tone: 'failed',
-      title: '只收到等待状态',
+      title: '长时间只收到等待状态',
       detail: '后端已经派发任务或正在等待 AI CLI，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
     })
   }
@@ -135,6 +137,13 @@ export function buildTaskTimelineDiagnostics(
     })
   }
   return diagnostics
+}
+
+function heartbeatWaitSeconds(item: TimelineItem | undefined): number | null {
+  const value = clean(item?.meta ?? '').match(/([0-9]+)\s*s/i)?.[1]
+  if (!value) return null
+  const seconds = Number(value)
+  return Number.isFinite(seconds) ? seconds : null
 }
 
 export function removeMatchingShellCommandEcho(items: TimelineItem[], item: TimelineItem): void {
