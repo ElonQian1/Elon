@@ -298,8 +298,24 @@
 .resultText { font-size: 13px; color: var(--text-secondary, #bbb); line-height: 1.6; margin: 0; white-space: pre-wrap; word-break: break-word; }
 
 /* ── Shared action buttons ── */
-.cancelSmall { min-height: 32px; border: 1px solid rgba(230,33,41,.36); color: #ffd8d8; border-radius: 999px; font-size: 12px; padding: 0 11px; cursor: pointer; margin-left: auto; }
-.cancelSmall:hover { background: rgba(230,33,41,.1); }
+.cancelSmall {
+  min-height: 30px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  color: #9aa3b1;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  padding: 0 10px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: color .12s ease, border-color .12s ease, background .12s ease;
+}
+.cancelSmall:hover,
+.cancelSmall:focus-visible {
+  border-color: rgba(218, 55, 60, .38);
+  background: rgba(218, 55, 60, .08);
+  color: #ffb1b4;
+}
 .approveBtn { min-height: 32px; padding: 0 14px; border-radius: 999px; font-size: 12px; font-weight: 700; background: #fff; color: #000; border: none; cursor: pointer; }
 .approveBtn:hover { background: #e7e7e7; }
 .denyBtn    { min-height: 32px; padding: 0 13px; border-radius: 999px; font-size: 12px; font-weight: 600; background: transparent; color: #ffd8d8; border: 1px solid rgba(230,33,41,.42); cursor: pointer; }

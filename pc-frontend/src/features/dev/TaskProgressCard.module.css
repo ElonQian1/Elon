@@ -111,9 +111,8 @@
   align-self: start;
   border-color: transparent;
   background: transparent;
-  color: #8d98aa;
+  color: #7a8596;
   padding: 0;
-  opacity: .7;
 }
 
 .card[data-mode="stream"] .cancelButton:hover {
@@ -205,13 +204,33 @@
   color: #8d98aa;
   font: inherit;
   cursor: pointer;
-  opacity: .76;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-1px) scale(.96);
+  transition:
+    opacity .12s ease,
+    color .12s ease,
+    background .12s ease,
+    transform .12s ease;
+}
+
+.card:hover .cancelButton,
+.card:focus-within .cancelButton,
+.cancelButton:focus-visible {
+  opacity: .72;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
 }
 
 .cancelButton:hover {
   background: rgba(218, 55, 60, .08);
   color: #ffb1b4;
   opacity: 1;
+}
+
+.cancelButton:focus-visible {
+  outline: 1px solid rgba(255, 177, 180, .58);
+  outline-offset: 2px;
 }
 
 .cancelButton span {
@@ -356,5 +375,14 @@
 
   .currentHead strong {
     white-space: normal;
+  }
+}
+
+@media (hover: none) {
+  .cancelButton,
+  .card[data-mode="stream"] .cancelButton {
+    opacity: .58;
+    pointer-events: auto;
+    transform: none;
   }
 }

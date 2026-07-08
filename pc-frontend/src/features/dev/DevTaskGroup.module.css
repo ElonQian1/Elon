@@ -233,18 +233,21 @@
   gap: 5px;
   min-height: 26px;
   margin-top: 0;
-  border: 1px solid rgba(218, 55, 60, .28);
+  border: 1px solid rgba(148, 163, 184, .16);
   border-radius: 6px;
-  background: rgba(218, 55, 60, .08);
-  color: #ffb1b4;
+  background: transparent;
+  color: #8d98aa;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition: color .12s ease, border-color .12s ease, background .12s ease;
 }
 
-.processCancel:hover {
-  background: rgba(218, 55, 60, .14);
-  border-color: rgba(218, 55, 60, .40);
+.processCancel:hover,
+.processCancel:focus-visible {
+  background: rgba(218, 55, 60, .08);
+  border-color: rgba(218, 55, 60, .34);
+  color: #ffb1b4;
 }
 
 .processPanelDormant {
