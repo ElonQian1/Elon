@@ -386,9 +386,9 @@ internal class ChatSideMenuController(
         aiMenuView = ChatAiSideMenuView(
             context = activity,
             conversations = conversations,
-            activeConversationIndex = activeConversationIndex,
             projects = projects,
             activeProjectIndex = activeProjectIndex,
+            activeConversationIndex = activeConversationIndex,
             openConversation = openConversation,
             openPersonalProject = openPersonalProject,
             openJointProject = openJointProject,
@@ -413,11 +413,9 @@ internal class ChatSideMenuController(
             context = activity,
             projects = projects,
             activeProjectIndex = activeProjectIndex,
-            activeConversationIndex = activeConversationIndex,
             openPersonalProject = openPersonalProject,
             openJointProject = openJointProject,
-            openRecentConversation = openRecentConversation,
-            isRecentConversationWorking = isProjectConversationWorking,
+            openProjectCenter = openProjectManagement,
             requestClose = { animate -> close(animate) },
             dp = dp,
             selectableForeground = selectableForeground
