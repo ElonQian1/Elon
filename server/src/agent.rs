@@ -60,6 +60,7 @@ enum ProjectWorkflowRouting {
 
 /// 一龙自项目路径（默认 /root/Elon，可由 ELON_SELF_PATH 环境变量覆盖）
 mod dispatch;
+mod pc_binding_utils;
 mod pc_binding;
 mod routing;
 mod runtime_binding;
