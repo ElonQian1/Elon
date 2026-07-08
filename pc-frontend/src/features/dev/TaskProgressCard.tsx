@@ -22,6 +22,7 @@ interface TaskProgressCardProps {
   compact?: boolean
   lockedOpen?: boolean
   processedDuration?: string
+  suppressNarrative?: boolean
   onToggle: () => void
   onCancel: () => void
   onContinue?: () => void
@@ -39,6 +40,7 @@ export default function TaskProgressCard({
   compact = false,
   lockedOpen = false,
   processedDuration = '',
+  suppressNarrative = false,
   onToggle,
   onCancel,
   onContinue,
@@ -62,6 +64,23 @@ export default function TaskProgressCard({
     : { kicker: '正在处理', title: '我正在继续处理这轮任务。', detail: '' }
   const stageActions = actionStateForStage(timeline.stage.key, status.tone, canContinue)
   const compactTitle = compactTitleForTone(displayStatus.tone, processedDuration)
+  const detailButton = hasDetails ? (
+    <button
+      type="button"
+      className={[
+        styles.detailButton,
+        streamMode ? styles.streamDetailButton : '',
+        suppressNarrative ? styles.summaryOnlyDetailButton : '',
+        lockedOpen ? styles.detailButtonLocked : '',
+      ].filter(Boolean).join(' ')}
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      disabled={lockedOpen}
+    >
+      <span>{lockedOpen ? `审批已展开 · ${terseSummary}` : collapsed ? `过程 · ${terseSummary}` : `收起过程 · ${terseSummary}`}</span>
+      {!lockedOpen && (collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />)}
+    </button>
+  ) : null
 
   if (compact) {
     return (
@@ -80,6 +99,26 @@ export default function TaskProgressCard({
           </button>
           <StageActions state={stageActions} onContinue={onContinue} />
         </div>
+      </section>
+    )
+  }
+
+  if (suppressNarrative) {
+    if (!detailButton && !canCancel && !stageActions.show) return null
+    return (
+      <section className={[styles.card, styles.summaryOnlyCard].join(' ')} data-tone={displayStatus.tone} aria-live="polite">
+        {(detailButton || canCancel) && (
+          <div className={styles.summaryOnlyRow}>
+            {detailButton}
+            {canCancel && (
+              <button type="button" className={styles.cancelButton} onClick={onCancel} aria-label="停止任务" title="停止任务">
+                <StopCircle size={14} />
+                <span>停止</span>
+              </button>
+            )}
+          </div>
+        )}
+        <StageActions state={stageActions} onContinue={onContinue} />
       </section>
     )
   }
@@ -133,18 +172,7 @@ export default function TaskProgressCard({
 
       <StageActions state={stageActions} onContinue={onContinue} />
 
-      {hasDetails && (
-        <button
-          type="button"
-          className={[styles.detailButton, streamMode ? styles.streamDetailButton : '', lockedOpen ? styles.detailButtonLocked : ''].filter(Boolean).join(' ')}
-          onClick={onToggle}
-          aria-expanded={!collapsed}
-          disabled={lockedOpen}
-        >
-          <span>{lockedOpen ? `审批已展开 · ${terseSummary}` : collapsed ? `过程 · ${terseSummary}` : `收起过程 · ${terseSummary}`}</span>
-          {!lockedOpen && (collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />)}
-        </button>
-      )}
+      {detailButton}
     </section>
   )
 }

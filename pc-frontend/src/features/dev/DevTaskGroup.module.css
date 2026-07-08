@@ -362,6 +362,63 @@
   max-width: min(760px, 100%);
 }
 
+.progressHighlights {
+  display: grid;
+  gap: 9px;
+  max-width: min(760px, 100%);
+  padding: 1px 0 1px;
+}
+
+.progressHighlight {
+  color: #eef3ff;
+  font-size: 13px;
+  line-height: 1.64;
+  word-break: break-word;
+}
+
+.progressHighlightTitle {
+  margin-bottom: 1px;
+  color: #7f8ca3;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.3;
+}
+
+.progressHighlight[data-tone="failed"],
+.progressHighlight[data-tone="canceled"] {
+  color: #ffb1b4;
+}
+
+.progressHighlight[data-tone="approval"] .progressHighlightTitle {
+  color: #d8b65e;
+}
+
+.progressHighlight p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.progressHighlight :global(p) {
+  margin: 0 0 8px;
+}
+
+.progressHighlight :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.progressHighlight :global(code) {
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .08);
+  padding: 1px 5px;
+}
+
+.progressHighlightMore {
+  color: #7f8ca3;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
 .progressNote {
   display: grid;
   gap: 3px;

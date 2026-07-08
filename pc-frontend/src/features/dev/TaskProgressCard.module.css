@@ -53,6 +53,18 @@
   color: #c7d2e2;
 }
 
+.summaryOnlyCard {
+  gap: 4px;
+  padding-top: 0;
+}
+
+.summaryOnlyRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .compactTitle {
   color: #dbe5f3;
   font-weight: 750;
@@ -380,6 +392,10 @@
 
 .streamDetailButton {
   padding: 0 0 0 19px;
+}
+
+.summaryOnlyDetailButton {
+  padding-left: 0;
 }
 
 .streamDetailButton:hover {

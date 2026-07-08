@@ -204,6 +204,28 @@
   z-index: 1;
 }
 
+.publicReplyItem .rail {
+  padding-top: 9px;
+}
+
+.publicReplyItem .icon {
+  width: 9px;
+  height: 9px;
+  margin-top: 0;
+  color: transparent;
+  border-color: rgba(116, 137, 255, .42);
+  background: rgba(88, 101, 242, .34);
+  box-shadow: 0 0 0 3px rgba(88, 101, 242, .08);
+}
+
+.publicReplyItem .icon svg {
+  display: none;
+}
+
+.publicReplyItem:not(:last-child)::before {
+  top: 22px;
+}
+
 .content {
   min-width: 0;
   padding: 3px 0 10px;

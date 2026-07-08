@@ -320,7 +320,13 @@ function TimelineRow({ item, taskContext, expandAll = false, onCancel, onApprove
   const assistantReply = isAssistantTimelineItem(item)
 
   return (
-    <div className={[styles.item, styles[`tone_${item.tone}`], styles[`kind_${item.kind}`], item.compact ? styles.compact : ''].filter(Boolean).join(' ')}>
+    <div className={[
+      styles.item,
+      styles[`tone_${item.tone}`],
+      styles[`kind_${item.kind}`],
+      assistantReply ? styles.publicReplyItem : '',
+      item.compact ? styles.compact : '',
+    ].filter(Boolean).join(' ')}>
       <div className={styles.rail}>
         <span className={styles.icon}>{iconFor(item.kind, item.tone)}</span>
       </div>
