@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronRight, StopCircle } from 'lucide-react'
+import { ChevronDown, ChevronRight, Monitor, PlayCircle, Settings, StopCircle } from 'lucide-react'
 import type { TaskTimelineModel } from './taskTimelineModel'
+import { launchWinClientProtocol } from '../node/launchWinClient'
 import type { TaskTone } from './types'
 import styles from './TaskProgressCard.module.css'
 
@@ -13,10 +14,12 @@ interface TaskProgressCardProps {
   processSummary: string
   collapsed: boolean
   canCancel: boolean
+  canContinue?: boolean
   compact?: boolean
   lockedOpen?: boolean
   onToggle: () => void
   onCancel: () => void
+  onContinue?: () => void
 }
 
 export default function TaskProgressCard({
@@ -26,10 +29,12 @@ export default function TaskProgressCard({
   processSummary,
   collapsed,
   canCancel,
+  canContinue = false,
   compact = false,
   lockedOpen = false,
   onToggle,
   onCancel,
+  onContinue,
 }: TaskProgressCardProps) {
   const stage = readableStage(timeline.stage.label)
   const detail = readableText(timeline.stage.detail)
@@ -43,6 +48,7 @@ export default function TaskProgressCard({
   const hasDetails = progressCount > 0
   const streamMode = !compact && (status.tone === 'running' || status.tone === 'queued') && !timeline.stage.stuck
   const streamCopy = progressNarrative(status.tone, timeline.stage.key, stage, detail)
+  const stageActions = actionStateForStage(timeline.stage.key, canContinue)
 
   if (compact) {
     return (
@@ -107,6 +113,29 @@ export default function TaskProgressCard({
             </div>
           )}
         </>
+      )}
+
+      {stageActions.show && (
+        <div className={styles.stageActions}>
+          {stageActions.canContinue && (
+            <button type="button" className={styles.stagePrimaryAction} onClick={onContinue}>
+              <PlayCircle size={13} aria-hidden="true" />
+              <span>继续处理</span>
+            </button>
+          )}
+          {stageActions.canOpenNode && (
+            <>
+              <button type="button" onClick={launchWinClientProtocol}>
+                <Monitor size={13} aria-hidden="true" />
+                <span>启动 Win 端</span>
+              </button>
+              <a href="/pc/node">
+                <Settings size={13} aria-hidden="true" />
+                <span>节点设置</span>
+              </a>
+            </>
+          )}
+        </div>
       )}
 
       {hasDetails && (
@@ -225,6 +254,22 @@ function compactProcessSummary(summary: string, progressCount: number): string {
   ].filter(Boolean)
   const compact = [step, ...priority].filter(Boolean).slice(0, 4)
   return compact.join(' · ') || parts.slice(0, 3).join(' · ') || fallback
+}
+
+function actionStateForStage(stageKey: string, canContinue: boolean): {
+  show: boolean
+  canContinue: boolean
+  canOpenNode: boolean
+} {
+  const continueStages = new Set(['heartbeat', 'resume-required', 'recovery-timeout', 'timeout', 'tool-timeout'])
+  const nodeStages = new Set(['heartbeat', 'recovery-timeout', 'timeout', 'tool-timeout'])
+  const showContinue = canContinue && continueStages.has(stageKey)
+  const showNode = nodeStages.has(stageKey)
+  return {
+    show: showContinue || showNode,
+    canContinue: showContinue,
+    canOpenNode: showNode,
+  }
 }
 
 function terseProcessSummary(summary: string): string {

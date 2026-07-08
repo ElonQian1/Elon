@@ -282,6 +282,47 @@
   line-height: 1.55;
 }
 
+.stageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+  padding-left: 17px;
+  margin-top: -1px;
+}
+
+.stageActions button,
+.stageActions a {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: #8f9caf;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.stageActions button:hover,
+.stageActions a:hover {
+  background: transparent;
+  color: #eef3fb;
+}
+
+.stageActions .stagePrimaryAction {
+  color: #d8e2ff;
+}
+
+.stageActions .stagePrimaryAction svg {
+  color: #9eb4ff;
+}
+
 .detailButton {
   min-width: 0;
   min-height: 24px;
@@ -364,6 +405,10 @@
   }
 
   .current {
+    padding-left: 0;
+  }
+
+  .stageActions {
     padding-left: 0;
   }
 

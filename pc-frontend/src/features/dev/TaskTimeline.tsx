@@ -17,7 +17,6 @@ import type { ProcessCard } from './taskProcessCardModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
 import { coverageLabels } from './taskTimelineModel'
 import type { TaskTimelineDiagnostic, TaskTimelineModel, TaskTimelineStage, TimelineItem, TimelineItemKind } from './taskTimelineModel'
-import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 import styles from './TaskTimeline.module.css'
 
 interface TaskTimelineProps {
@@ -209,7 +208,6 @@ function CoverageStrip({ model }: { model: TaskTimelineModel }) {
 }
 
 function StageCard({ stage }: { stage: TaskTimelineStage }) {
-  const showNodeRecovery = stage.stuck && (stage.key === 'heartbeat' || stage.key === 'timeout' || stage.key === 'dispatch')
   return (
     <div className={[styles.stageCard, styles[`tone_${stage.tone}`]].join(' ')} data-stuck={stage.stuck ? 'true' : undefined}>
       <div>
@@ -217,13 +215,6 @@ function StageCard({ stage }: { stage: TaskTimelineStage }) {
         {stage.meta && <em>{stage.meta}</em>}
       </div>
       <span>{stage.detail}</span>
-      {showNodeRecovery && (
-        <div className={styles.recoveryActions}>
-          <button type="button" onClick={launchWinClientProtocol}>启动 Win 端</button>
-          <a href={WIN_CLIENT_DOWNLOAD_URL} download>下载 Win 端</a>
-          <a href="/pc/node">节点设置</a>
-        </div>
-      )}
     </div>
   )
 }

@@ -121,38 +121,6 @@
   line-height: 1.55;
 }
 
-.recoveryActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 2px;
-}
-
-.recoveryActions button,
-.recoveryActions a {
-  min-height: 22px;
-  display: inline-flex;
-  align-items: center;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: #c2cce0;
-  padding: 0;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 750;
-  line-height: 1;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.recoveryActions button:hover,
-.recoveryActions a:hover {
-  background: transparent;
-  border-color: transparent;
-  color: #eef3fb;
-}
-
 .stageCard.tone_failed {
   border-color: rgba(218, 55, 60, .42);
   background: transparent;

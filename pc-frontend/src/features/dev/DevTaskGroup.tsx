@@ -25,10 +25,11 @@ interface Props {
   user?: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   expandAll?: boolean
   onCancel?: (taskId: string) => void
+  onContinue?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
-function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel, onApprove }: Props) {
+function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel, onContinue, onApprove }: Props) {
   const taskId  = taskIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
@@ -37,23 +38,10 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const explicitResultMsg = latestMessageOfKind(messages, 'ai_result') ?? terminalAssistantMsg ?? fallbackAssistantMsg
   const isDone  = taskIsTerminal(task) || !!explicitResultMsg || messages.some(isTerminalTaskMessage)
 
-  // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
-  const [collapsed, setCollapsed] = useState(expandAll ? false : isDone)
+  // 过程默认保持轻量；审批态和预览强制展开由后续逻辑处理。
+  const [collapsed, setCollapsed] = useState(!expandAll)
   const prevDone = useRef(isDone)
-  const userCollapseOverride = useRef(false)
-
-  // 任务从"运行中"变为"完成"时自动折叠（延迟一下让用户看到结果）
-  useEffect(() => {
-    if (expandAll) {
-      setCollapsed(false)
-      return
-    }
-    if (!prevDone.current && isDone) {
-      const t = setTimeout(() => setCollapsed(true), 800)
-      prevDone.current = true
-      return () => clearTimeout(t)
-    }
-  }, [expandAll, isDone])
+  const prevCollapseKey = useRef('')
 
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
@@ -83,16 +71,30 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const assistantProcessTime = messageTime(headerMsg) || requestTime
   const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
   const mergePublicNotesWithProcess = hasPublicAssistantItems && showProgressPanel && !resultMsg && !hideCompletedProcessPanel
+  const mergePublicNotesWithResult = hasPublicAssistantItems && !!resultMsg
 
   useEffect(() => {
-    if (expandAll || userCollapseOverride.current || isDone) return
-    if (timeline.coverage.assistantEvent) {
+    const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}`
+    if (prevCollapseKey.current === collapseKey) return
+    prevCollapseKey.current = collapseKey
+    prevDone.current = isDone
+    setCollapsed(expandAll || forceProcessOpen ? false : true)
+  }, [taskId, expandAll, forceProcessOpen, isDone])
+
+  // 任务从"运行中"变为"完成"时自动折叠（延迟一下让用户看到结果）
+  useEffect(() => {
+    if (expandAll || forceProcessOpen) {
       setCollapsed(false)
+      prevDone.current = isDone
       return
     }
-    if (progressCount <= 3) return
-    setCollapsed(true)
-  }, [expandAll, isDone, progressCount, timeline.coverage.assistantEvent])
+    if (!prevDone.current && isDone) {
+      const t = setTimeout(() => setCollapsed(true), 800)
+      prevDone.current = true
+      return () => clearTimeout(t)
+    }
+    prevDone.current = isDone
+  }, [expandAll, forceProcessOpen, isDone])
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -130,14 +132,18 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         canCancel={canCancel}
         compact={compactCompletedProcess}
         lockedOpen={forceProcessOpen}
+        canContinue={!!taskId && !!onContinue && taskStageNeedsContinue(timeline.stage.key)}
         onToggle={() => {
           if (forceProcessOpen) return
-          userCollapseOverride.current = true
           setCollapsed((c) => !c)
         }}
         onCancel={() => {
           if (!taskId) return
           if (window.confirm('停止这个任务？')) onCancel?.(taskId)
+        }}
+        onContinue={() => {
+          if (!taskId) return
+          onContinue?.(taskId)
         }}
       />
       {!displayCollapsed && hasProgressDetails && (
@@ -182,11 +188,19 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         </div>
       )}
 
-      {hasPublicAssistantItems && !mergePublicNotesWithProcess && (
+      {hasPublicAssistantItems && !mergePublicNotesWithProcess && !mergePublicNotesWithResult && (
         <TaskProgressNotes items={publicAssistantItems} time={assistantProcessTime} />
       )}
 
-      {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
+      {resultMsg && (
+        <TaskAssistantBubble
+          message={resultMsg}
+          tone={tone}
+          label={replyLabelForTone(tone)}
+          notes={mergePublicNotesWithResult ? publicAssistantItems : undefined}
+          time={assistantProcessTime}
+        />
+      )}
 
       {showProgressPanel && (
         !resultMsg && !hideCompletedProcessPanel ? (
@@ -216,16 +230,23 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.user?.avatar_data_url === next.user?.avatar_data_url
   && prev.expandAll === next.expandAll
   && prev.onCancel === next.onCancel
+  && prev.onContinue === next.onContinue
   && prev.onApprove === next.onApprove
 )
 
-function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; tone: TaskTone; label: string }) {
+function TaskAssistantBubble({ message, tone, label, notes, time: fallbackTime }: {
+  message: ChatMessage
+  tone: TaskTone
+  label: string
+  notes?: TimelineItem[]
+  time?: string
+}) {
   const content = messageText(message)
   if (!content) return null
   const failed = tone === 'failed'
   const canceled = tone === 'canceled'
   const hasMarkdown = /[#*`\[\]>|]/.test(content)
-  const time = messageTime(message)
+  const time = messageTime(message) || fallbackTime
 
   return (
     <div className={styles.assistantTurn}>
@@ -236,6 +257,7 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
           <span>{label}</span>
           {time && <span>{time}</span>}
         </div>
+        {!!notes?.length && <TaskProgressNotesContent items={notes} />}
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
         </div>
@@ -282,6 +304,16 @@ function replyLabelForTone(tone: TaskTone): string {
   if (tone === 'failed') return '任务失败'
   if (tone === 'canceled') return '任务已停止'
   return '最终回复'
+}
+
+function taskStageNeedsContinue(stageKey: string): boolean {
+  return [
+    'heartbeat',
+    'resume-required',
+    'recovery-timeout',
+    'timeout',
+    'tool-timeout',
+  ].includes(stageKey)
 }
 
 function taskIdForGroup(messages: ChatMessage[]): string {

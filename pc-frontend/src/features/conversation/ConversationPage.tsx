@@ -25,6 +25,7 @@ import LocalNodeProjectNotice from './LocalNodeProjectNotice'
 import ConversationTopbarActions from './ConversationTopbarActions'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import { useConversationAutoScroll } from './useConversationAutoScroll'
+import { useConversationTaskActions } from './useConversationTaskActions'
 import ConversationMemberSidebar from './ConversationMemberSidebar'
 import type { MemberPanelScope } from './ConversationMemberSidebar'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
@@ -984,29 +985,28 @@ export default function ConversationPage() {
     }
   }
 
-  async function handleCancelTask(taskId: string) {
-    if (!activeProjectId || !taskActionChannelId) {
-      setSendError('当前项目没有可操作的 AI 开发频道')
-      return
-    }
-    await api.post(
-      `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(taskActionChannelId)}/ai-tasks/${encodeURIComponent(taskId)}/cancel`,
-      {},
-    )
-    await refreshTaskSurface()
-  }
-
-  async function handleApproveTool(taskId: string, approvalId: string, decision: 'approve' | 'deny') {
-    if (!activeProjectId || !taskActionChannelId) {
-      setSendError('当前项目没有可操作的 AI 开发频道')
-      return
-    }
-    await api.post(
-      `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(taskActionChannelId)}/ai-tasks/${encodeURIComponent(taskId)}/tool-approvals/${encodeURIComponent(approvalId)}/decision`,
-      { decision },
-    )
-    await refreshTaskSurface()
-  }
+  const { handleCancelTask, handleContinueTask, handleApproveTool } = useConversationTaskActions({
+    activeProjectId, activeProjectName: activeProject?.name,
+    activeWorkspacePath,
+    taskActionChannelId,
+    runtimePermission: activeProject?.runtime_permission,
+    sendingMessage,
+    directPcCliActive,
+    runtimeRoute,
+    shouldPreferLocalNode,
+    localNodeReady,
+    localNodeId,
+    selectedAgent,
+    modelOptions,
+    sessionView,
+    draftConversationId,
+    waitingForNewSession,
+    sendMessage,
+    refreshTaskSurface,
+    requestFeedAutoFollow,
+    setSendError,
+    setSessionView,
+  })
 
   function startNewSession() {
     if (!isOwnConversationTarget) {
@@ -1371,7 +1371,7 @@ export default function ConversationPage() {
             isDevChannel={isDevChannel}
             user={user}
             sendingMessage={sendingMessage}
-            onScroll={handleFeedScroll} onCancelTask={handleCancelTask} onApproveTool={handleApproveTool}
+            onScroll={handleFeedScroll} onCancelTask={handleCancelTask} onContinueTask={handleContinueTask} onApproveTool={handleApproveTool}
             onForkMessage={isOwnConversationTarget && typeof sessionView === 'string' && sessionView !== 'new' ? forkConversationMessage : undefined}
           />
         )}

@@ -274,6 +274,7 @@ function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAl
         user={{ nickname: '钱一龙', account: 'elon' }}
         expandAll={expandAll}
         onCancel={() => undefined}
+        onContinue={() => undefined}
         onApprove={() => undefined}
       />
     </article>
