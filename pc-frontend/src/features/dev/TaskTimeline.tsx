@@ -44,18 +44,15 @@ interface RuntimeReply {
 
 export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
   const rawDisplayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
-  const stageHasSourceItem = rawDisplayItems.some((item) => isCurrentStageSourceItem(model.stage, item))
   const displayItems = rawDisplayItems
     .filter((item) => !isCurrentStageSourceItem(model.stage, item))
   if (displayItems.length === 0 && model.diagnostics.length === 0) return null
   const grouped = groupTimelineItems(displayItems, completed, model.stage.tone)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
-  const hasAssistantReply = grouped.primary.some(isAssistantTimelineItem)
   const hasApprovalItem = grouped.primary.some((item) => item.kind === 'approval' && item.tone === 'approval')
   const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
-  const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply && primaryBlocks.length === 0
-  const showStageInTechnicalDetails = !stageHasSourceItem && !showStageAtTop && model.stage.key !== 'finished' && !(model.stage.key === 'approval' && hasApprovalItem)
-  const technicalCount = grouped.connection.length + (showStageInTechnicalDetails ? 1 : 0) + model.diagnostics.length + 1
+  const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && primaryBlocks.length === 0
+  const technicalCount = grouped.connection.length + model.diagnostics.length + 1
 
   return (
     <div className={styles.timeline}>
@@ -85,7 +82,6 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
             onApprove={onApprove}
           />
         ))}
-        {showStageInTechnicalDetails && <StageCard stage={model.stage} />}
         {model.diagnostics.map((diagnostic, index) => (
           <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
         ))}
@@ -193,9 +189,11 @@ function isCurrentStageSourceItem(stage: TaskTimelineStage, item: TimelineItem) 
   if (stage.key === 'tool-timeout') return phase === 'pc_tool_result_timeout'
   if (stage.key === 'recovery-timeout') return phase === 'pc_cli_recovery_timeout'
   if (stage.key === 'resume-required') return phase === 'resume_required'
-  if (stage.key === 'recovery') return phase === 'pc_cli_communication_recovering' || phase === 'connection_recovering'
+  if (stage.key === 'dispatch') return phase === 'pc_dispatched'
+  if (stage.key === 'recovery' || stage.key === 'recovering') return phase === 'pc_cli_communication_recovering' || phase === 'connection_recovering'
   if (stage.key === 'server-update') return phase === 'server_updating'
   if (stage.key === 'win-update') return phase === 'win_client_updating'
+  if (stage.key === 'latest') return item.event?.type === 'runtime_status'
   if (stage.key === 'finished' && stage.tone === 'failed') return phase === 'failed' || status === 'error'
   if (stage.key === 'finished' && stage.tone === 'canceled') return phase === 'canceled' || status === 'canceled'
   return false

@@ -52,6 +52,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   })
   const progressCount = timeline.visibleStepCount
   const status = statusForTaskGroup(task, isDone, resultMsg)
+  const progressStatus = progressStatusForStage(status, timeline.stage.tone, timeline.stage.label, isDone)
   const forceProcessOpen = timeline.stage.key === 'approval'
   const displayCollapsed = forceProcessOpen ? false : collapsed
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
@@ -70,6 +71,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const requestAuthor = userDisplayName(userMsg, user)
   const requestTime = messageTime(userMsg) || messageTime(headerMsg)
   const assistantProcessTime = messageTime(headerMsg) || requestTime
+  const assistantMetaStatus = assistantMetaStatusForStage(timeline.stage.tone)
   const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
   const mergePublicNotesWithProcess = hasPublicAssistantItems && showProgressPanel && !resultMsg && !hideCompletedProcessPanel
   const mergePublicNotesWithResult = hasPublicAssistantItems && !!resultMsg
@@ -126,6 +128,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
     >
       <TaskProgressCard
         status={status}
+        displayStatus={progressStatus}
         timeline={timeline}
         progressCount={progressCount}
         processSummary={processSummary}
@@ -211,7 +214,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
             <div className={styles.assistantBody}>
               <div className={styles.assistantMeta}>
                 <strong>一龙</strong>
-                {mergePublicNotesWithProcess && <span>正在处理</span>}
+                {mergePublicNotesWithProcess && <span>{assistantMetaStatus}</span>}
                 {assistantProcessTime && <span>{assistantProcessTime}</span>}
               </div>
               {mergePublicNotesWithProcess && <TaskProgressNotesContent items={publicAssistantItems} />}
@@ -235,6 +238,24 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.onContinue === next.onContinue
   && prev.onApprove === next.onApprove
 )
+
+function progressStatusForStage(
+  status: { tone: TaskTone; label: string },
+  stageTone: TaskTone,
+  stageLabel: string,
+  isDone: boolean,
+): { tone: TaskTone; label: string } {
+  if (isDone) return status
+  if (stageTone === 'approval') return { tone: 'approval', label: stageLabel || '等待确认' }
+  if (stageTone === 'failed') return { tone: 'failed', label: stageLabel || '需要处理' }
+  return status
+}
+
+function assistantMetaStatusForStage(stageTone: TaskTone): string {
+  if (stageTone === 'approval') return '等待确认'
+  if (stageTone === 'failed') return '需要处理'
+  return '正在处理'
+}
 
 function TaskAssistantBubble({ message, tone, label, notes, reason, time: fallbackTime }: {
   message: ChatMessage

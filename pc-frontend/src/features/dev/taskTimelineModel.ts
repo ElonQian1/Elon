@@ -588,7 +588,7 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
     }
   }
 
-  if (model.coverage.assistantEvent && !model.coverage.finalReply) {
+  if (latest && isLatestAssistantWaitingItem(latest) && !model.coverage.finalReply) {
     return {
       key: 'assistant',
       tone: 'running',
@@ -631,6 +631,12 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
     summary: '当前：等待过程',
     stuck: false,
   }
+}
+
+function isLatestAssistantWaitingItem(item: TimelineItem): boolean {
+  if (item.event && isAssistantEvent(item.event)) return true
+  const source = item.message as Record<string, unknown> | undefined
+  return source?.assistant_progress_event === true || item.title === 'AI 回复片段'
 }
 
 function heartbeatWaitSeconds(item: TimelineItem | undefined): number | null {

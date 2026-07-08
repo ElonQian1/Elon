@@ -9,6 +9,10 @@ interface TaskProgressCardProps {
     tone: TaskTone
     label: string
   }
+  displayStatus?: {
+    tone: TaskTone
+    label: string
+  }
   timeline: TaskTimelineModel
   progressCount: number
   processSummary: string
@@ -24,6 +28,7 @@ interface TaskProgressCardProps {
 
 export default function TaskProgressCard({
   status,
+  displayStatus = status,
   timeline,
   progressCount,
   processSummary,
@@ -39,20 +44,20 @@ export default function TaskProgressCard({
   const stage = readableStage(timeline.stage.label)
   const detail = readableText(timeline.stage.detail)
   const meta = readableMeta(timeline.stage.meta)
-  const headline = headlineForTone(status.tone)
-  const stageRepeatsHeadline = stage === headline || stage === status.label
-  const showCurrent = Boolean(detail || meta || !stageRepeatsHeadline)
-  const showStatusLabel = status.tone !== 'done' && status.tone !== 'canceled'
+  const headline = headlineForTone(displayStatus.tone)
+  const stageRepeatsHeadline = stage === headline || stage === displayStatus.label
+  const showCurrent = timeline.stage.key === 'approval' ? false : Boolean(detail || meta || !stageRepeatsHeadline)
+  const showStatusLabel = displayStatus.tone !== 'done' && displayStatus.tone !== 'canceled' && displayStatus.tone !== 'approval'
   const summary = compactProcessSummary(processSummary, progressCount)
   const terseSummary = terseProcessSummary(summary)
   const hasDetails = progressCount > 0
-  const streamMode = !compact && (status.tone === 'running' || status.tone === 'queued') && !timeline.stage.stuck
-  const streamCopy = progressNarrative(status.tone, timeline.stage.key, stage, detail)
+  const streamMode = !compact && (displayStatus.tone === 'running' || displayStatus.tone === 'queued') && !timeline.stage.stuck
+  const streamCopy = progressNarrative(displayStatus.tone, timeline.stage.key, stage, detail)
   const stageActions = actionStateForStage(timeline.stage.key, status.tone, canContinue)
 
   if (compact) {
     return (
-      <section className={[styles.card, styles.compactCard].join(' ')} data-tone={status.tone} aria-live="polite">
+      <section className={[styles.card, styles.compactCard].join(' ')} data-tone={displayStatus.tone} aria-live="polite">
         <div className={styles.compactRow}>
           <button
             type="button"
@@ -72,7 +77,7 @@ export default function TaskProgressCard({
   }
 
   return (
-    <section className={styles.card} data-tone={status.tone} data-mode={streamMode ? 'stream' : undefined} aria-live="polite">
+    <section className={styles.card} data-tone={displayStatus.tone} data-mode={streamMode ? 'stream' : undefined} aria-live="polite">
       {streamMode ? (
         <div className={styles.streamLine}>
           <span className={styles.statusDot} aria-hidden="true" />
@@ -93,7 +98,7 @@ export default function TaskProgressCard({
           <div className={styles.header}>
             <span className={styles.statusDot} aria-hidden="true" />
             <div className={styles.headerText}>
-              {showStatusLabel && <span>{status.label}</span>}
+              {showStatusLabel && <span>{displayStatus.label}</span>}
               <strong>{headline}</strong>
             </div>
             {canCancel && (
@@ -178,7 +183,7 @@ function progressNarrative(
   if (tone === 'queued') {
     return { kicker: '准备中', title: '我正在准备处理这轮请求。', detail: '连接到可用节点后会继续。' }
   }
-  if (['recovery', 'recovering', 'server-update', 'win-update'].includes(stageKey)) {
+  if (['recovery', 'recovering'].includes(stageKey)) {
     return { kicker: '恢复连接', title: '我正在恢复本轮任务连接。', detail: '先确认本地会话状态，再接上后续步骤。' }
   }
   if (stageKey === 'heartbeat') {
@@ -186,6 +191,12 @@ function progressNarrative(
   }
   if (stageKey === 'dispatch') {
     return { kicker: '连接节点', title: '我正在连接本机节点。', detail: '确认执行环境后会继续处理。' }
+  }
+  if (stageKey === 'server-update') {
+    return { kicker: '临时中断', title: '服务器正在更新升级。', detail: '更新完成后会自动恢复通信。' }
+  }
+  if (stageKey === 'win-update') {
+    return { kicker: '临时中断', title: 'Win 端正在更新升级。', detail: '客户端重启并重连后会继续。' }
   }
   if (stageKey === 'command') {
     return { kicker: '执行命令', title: '我正在等待命令执行结果。', detail: '命令返回后会继续推进下一步。' }
@@ -280,7 +291,7 @@ function actionStateForStage(stageKey: string, tone: TaskTone, canContinue: bool
     show: showContinue || showNode,
     canContinue: showContinue,
     canOpenNode: showNode,
-    continueLabel: tone === 'failed' ? '重试处理' : '继续处理',
+    continueLabel: tone === 'failed' && stageKey === 'finished' ? '重试处理' : '继续处理',
   }
 }
 

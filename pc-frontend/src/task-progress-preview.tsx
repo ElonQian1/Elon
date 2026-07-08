@@ -10,9 +10,14 @@ const startedAt = '2026-07-08T10:17:00+08:00'
 type ScenarioId =
   | 'queued'
   | 'dispatch'
+  | 'heartbeat'
   | 'recovery'
+  | 'server-update'
+  | 'win-update'
+  | 'recovery-timeout'
   | 'thinking'
   | 'command-running'
+  | 'tool-timeout'
   | 'tools'
   | 'tool-failed'
   | 'approval'
@@ -50,6 +55,16 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    id: 'heartbeat',
+    label: '等待输出',
+    width: 720,
+    messages: [
+      task('请继续处理这个任务。', 'running'),
+      event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
+      timelineText('AI CLI 正在处理中，已等待 35s。'),
+    ],
+  },
+  {
     id: 'recovery',
     label: '恢复连接',
     width: 599,
@@ -58,6 +73,37 @@ const scenarios: Scenario[] = [
       event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给节点执行。' }),
       event({ type: 'runtime_status', status: 'running', phase: 'connection_recovering', runtime: 'codex', message: '正在恢复本轮任务连接。' }),
       progress('我正在恢复本轮任务连接。\n\n先确认本地会话状态，再接上后续步骤。'),
+    ],
+  },
+  {
+    id: 'server-update',
+    label: '服务器更新',
+    width: 720,
+    messages: [
+      task('请继续上一轮任务。', 'running'),
+      event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
+      event({ type: 'runtime_status', status: 'running', phase: 'server_updating', runtime: 'codex', message: '服务器正在更新升级，通信临时中断，会自动恢复。' }),
+    ],
+  },
+  {
+    id: 'win-update',
+    label: 'Win端更新',
+    width: 720,
+    messages: [
+      task('请继续上一轮任务。', 'running'),
+      event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
+      event({ type: 'runtime_status', status: 'running', phase: 'win_client_updating', runtime: 'codex', message: 'Win 端正在更新升级，重启后会自动恢复连接。' }),
+    ],
+  },
+  {
+    id: 'recovery-timeout',
+    label: '恢复超时',
+    width: 860,
+    messages: [
+      task('请继续上一轮任务。', 'running'),
+      event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
+      event({ type: 'runtime_status', status: 'running', phase: 'pc_cli_communication_recovering', runtime: 'codex', message: '通信临时中断，正在等待自动恢复。' }),
+      event({ type: 'runtime_status', status: 'error', phase: 'pc_cli_recovery_timeout', runtime: 'codex', message: '自动恢复超时，仍未收到新的公开输出或完成事件。' }),
     ],
   },
   {
@@ -117,6 +163,18 @@ const scenarios: Scenario[] = [
       event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
       progress('我已经开始运行构建命令，等待命令返回后会继续判断是否需要修复。'),
       toolCall('npm.cmd run build'),
+    ],
+  },
+  {
+    id: 'tool-timeout',
+    label: '工具超时',
+    width: 860,
+    messages: [
+      task('请运行构建并告诉我结果。', 'running'),
+      event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
+      progress('我已经开始运行构建命令，等待命令返回后会继续判断是否需要修复。'),
+      toolCall('npm.cmd run build'),
+      event({ type: 'runtime_status', status: 'error', phase: 'pc_tool_result_timeout', runtime: 'codex', message: '构建命令长时间没有返回工具结果或完成事件。' }),
     ],
   },
   {
@@ -300,6 +358,17 @@ function progress(content: string): ChatMessage {
     task_id: taskId,
     content,
     assistant_progress_event: true,
+    cli_name: 'codex',
+    created_at: startedAt,
+  }
+}
+
+function timelineText(content: string): ChatMessage {
+  return {
+    id: `${taskId}-timeline-${content.slice(0, 12)}`,
+    kind: 'ai_progress',
+    task_id: taskId,
+    content,
     cli_name: 'codex',
     created_at: startedAt,
   }
