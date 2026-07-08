@@ -48,22 +48,25 @@ export default function TaskProgressCard({
   const hasDetails = progressCount > 0
   const streamMode = !compact && (status.tone === 'running' || status.tone === 'queued') && !timeline.stage.stuck
   const streamCopy = progressNarrative(status.tone, timeline.stage.key, stage, detail)
-  const stageActions = actionStateForStage(timeline.stage.key, canContinue)
+  const stageActions = actionStateForStage(timeline.stage.key, status.tone, canContinue)
 
   if (compact) {
     return (
       <section className={[styles.card, styles.compactCard].join(' ')} data-tone={status.tone} aria-live="polite">
-        <button
-          type="button"
-          className={styles.compactButton}
-          onClick={onToggle}
-          aria-expanded={!collapsed}
-        >
-          <span className={styles.statusDot} aria-hidden="true" />
-          <span className={styles.compactTitle}>过程</span>
-          <span className={styles.compactSummary}>{terseSummary}</span>
-          {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
-        </button>
+        <div className={styles.compactRow}>
+          <button
+            type="button"
+            className={styles.compactButton}
+            onClick={onToggle}
+            aria-expanded={!collapsed}
+          >
+            <span className={styles.statusDot} aria-hidden="true" />
+            <span className={styles.compactTitle}>过程</span>
+            <span className={styles.compactSummary}>{terseSummary}</span>
+            {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+          </button>
+          <StageActions state={stageActions} onContinue={onContinue} />
+        </div>
       </section>
     )
   }
@@ -115,28 +118,7 @@ export default function TaskProgressCard({
         </>
       )}
 
-      {stageActions.show && (
-        <div className={styles.stageActions}>
-          {stageActions.canContinue && (
-            <button type="button" className={styles.stagePrimaryAction} onClick={onContinue}>
-              <PlayCircle size={13} aria-hidden="true" />
-              <span>继续处理</span>
-            </button>
-          )}
-          {stageActions.canOpenNode && (
-            <>
-              <button type="button" onClick={launchWinClientProtocol}>
-                <Monitor size={13} aria-hidden="true" />
-                <span>启动 Win 端</span>
-              </button>
-              <a href="/pc/node">
-                <Settings size={13} aria-hidden="true" />
-                <span>节点设置</span>
-              </a>
-            </>
-          )}
-        </div>
-      )}
+      <StageActions state={stageActions} onContinue={onContinue} />
 
       {hasDetails && (
         <button
@@ -151,6 +133,39 @@ export default function TaskProgressCard({
         </button>
       )}
     </section>
+  )
+}
+
+interface StageActionState {
+  show: boolean
+  canContinue: boolean
+  canOpenNode: boolean
+  continueLabel: string
+}
+
+function StageActions({ state, onContinue }: { state: StageActionState; onContinue?: () => void }) {
+  if (!state.show) return null
+  return (
+    <div className={styles.stageActions}>
+      {state.canContinue && (
+        <button type="button" className={styles.stagePrimaryAction} onClick={onContinue}>
+          <PlayCircle size={13} aria-hidden="true" />
+          <span>{state.continueLabel}</span>
+        </button>
+      )}
+      {state.canOpenNode && (
+        <>
+          <button type="button" onClick={launchWinClientProtocol}>
+            <Monitor size={13} aria-hidden="true" />
+            <span>启动 Win 端</span>
+          </button>
+          <a href="/pc/node">
+            <Settings size={13} aria-hidden="true" />
+            <span>节点设置</span>
+          </a>
+        </>
+      )}
+    </div>
   )
 }
 
@@ -256,19 +271,16 @@ function compactProcessSummary(summary: string, progressCount: number): string {
   return compact.join(' · ') || parts.slice(0, 3).join(' · ') || fallback
 }
 
-function actionStateForStage(stageKey: string, canContinue: boolean): {
-  show: boolean
-  canContinue: boolean
-  canOpenNode: boolean
-} {
+function actionStateForStage(stageKey: string, tone: TaskTone, canContinue: boolean): StageActionState {
   const continueStages = new Set(['heartbeat', 'resume-required', 'recovery-timeout', 'timeout', 'tool-timeout'])
   const nodeStages = new Set(['heartbeat', 'recovery-timeout', 'timeout', 'tool-timeout'])
-  const showContinue = canContinue && continueStages.has(stageKey)
+  const showContinue = canContinue && (tone === 'failed' || continueStages.has(stageKey))
   const showNode = nodeStages.has(stageKey)
   return {
     show: showContinue || showNode,
     canContinue: showContinue,
     canOpenNode: showNode,
+    continueLabel: tone === 'failed' ? '重试处理' : '继续处理',
   }
 }
 

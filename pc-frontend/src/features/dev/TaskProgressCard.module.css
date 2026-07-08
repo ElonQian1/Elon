@@ -20,9 +20,18 @@
   box-shadow: none;
 }
 
+.compactRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
 .compactButton {
   min-width: 0;
   min-height: 30px;
+  flex: 0 1 auto;
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   align-items: center;
@@ -290,6 +299,12 @@
   margin-top: -1px;
 }
 
+.compactRow .stageActions {
+  flex: 0 0 auto;
+  padding-left: 0;
+  margin-top: 0;
+}
+
 .stageActions button,
 .stageActions a {
   min-height: 24px;
@@ -410,6 +425,10 @@
 
   .stageActions {
     padding-left: 0;
+  }
+
+  .compactRow {
+    gap: 4px 10px;
   }
 
   .currentHead {

@@ -43,16 +43,18 @@ interface RuntimeReply {
 }
 
 export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
-  const displayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
+  const rawDisplayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
+  const stageHasSourceItem = rawDisplayItems.some((item) => isCurrentStageSourceItem(model.stage, item))
+  const displayItems = rawDisplayItems
+    .filter((item) => !isCurrentStageSourceItem(model.stage, item))
   if (displayItems.length === 0 && model.diagnostics.length === 0) return null
-  const grouped = groupTimelineItems(displayItems, completed)
+  const grouped = groupTimelineItems(displayItems, completed, model.stage.tone)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
   const hasAssistantReply = grouped.primary.some(isAssistantTimelineItem)
   const hasApprovalItem = grouped.primary.some((item) => item.kind === 'approval' && item.tone === 'approval')
-  const showStageAtTop = (model.stage.key === 'approval' && !hasApprovalItem)
-    || ((model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply)
+  const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
   const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply && primaryBlocks.length === 0
-  const showStageInTechnicalDetails = !showStageAtTop && model.stage.key !== 'finished' && !(model.stage.key === 'approval' && hasApprovalItem)
+  const showStageInTechnicalDetails = !stageHasSourceItem && !showStageAtTop && model.stage.key !== 'finished' && !(model.stage.key === 'approval' && hasApprovalItem)
   const technicalCount = grouped.connection.length + (showStageInTechnicalDetails ? 1 : 0) + model.diagnostics.length + 1
 
   return (
@@ -153,19 +155,50 @@ function TimelineFold({ title, count, defaultOpen = false, children }: {
   )
 }
 
-function groupTimelineItems(items: TimelineItem[], completed: boolean) {
+function groupTimelineItems(items: TimelineItem[], completed: boolean, terminalTone: TaskTone) {
   const grouped: { primary: TimelineItem[]; connection: TimelineItem[]; summary: TimelineItem[] } = {
     primary: [],
     connection: [],
     summary: [],
   }
   for (const item of items) {
+    if (isRedundantTerminalSummary(item, terminalTone)) continue
+    if (isTerminalRuntimeDetail(item, terminalTone)) {
+      grouped.connection.push(item)
+      continue
+    }
     if (completed && isCompletedTechnicalItem(item)) grouped.connection.push(item)
     else if (isConnectionItem(item)) grouped.connection.push(item)
     else if (isSummaryItem(item)) grouped.summary.push(item)
     else grouped.primary.push(item)
   }
   return grouped
+}
+
+function isRedundantTerminalSummary(item: TimelineItem, terminalTone: TaskTone) {
+  return (terminalTone === 'failed' || terminalTone === 'canceled')
+    && item.event?.type === 'runtime_summary'
+}
+
+function isTerminalRuntimeDetail(item: TimelineItem, terminalTone: TaskTone) {
+  return (terminalTone === 'failed' || terminalTone === 'canceled')
+    && item.event?.type === 'runtime_status'
+}
+
+function isCurrentStageSourceItem(stage: TaskTimelineStage, item: TimelineItem) {
+  if (item.event?.type !== 'runtime_status') return false
+  const phase = String(item.event.phase ?? '').trim().toLowerCase()
+  const status = String(item.event.status ?? '').trim().toLowerCase()
+  if (stage.key === 'timeout') return phase === 'pc_cli_no_output_timeout'
+  if (stage.key === 'tool-timeout') return phase === 'pc_tool_result_timeout'
+  if (stage.key === 'recovery-timeout') return phase === 'pc_cli_recovery_timeout'
+  if (stage.key === 'resume-required') return phase === 'resume_required'
+  if (stage.key === 'recovery') return phase === 'pc_cli_communication_recovering' || phase === 'connection_recovering'
+  if (stage.key === 'server-update') return phase === 'server_updating'
+  if (stage.key === 'win-update') return phase === 'win_client_updating'
+  if (stage.key === 'finished' && stage.tone === 'failed') return phase === 'failed' || status === 'error'
+  if (stage.key === 'finished' && stage.tone === 'canceled') return phase === 'canceled' || status === 'canceled'
+  return false
 }
 
 function isCompletedTechnicalItem(item: TimelineItem) {

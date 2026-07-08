@@ -59,9 +59,10 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const hasProgressDetails = progressCount > 0
   const showProgressPanel = hasProgressDetails || !isDone
   const tone = status.tone
-  const compactCompletedProcess = isDone && tone === 'done' && !!resultMsg
+  const compactCompletedProcess = isDone && !!resultMsg
   const assistantTimelineItems = assistantTimelineItemsFromTimeline(timeline)
   const publicAssistantItems = publicAssistantTimelineItems(timeline)
+  const terminalReason = terminalReasonFromTimeline(timeline, tone)
   const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
   const hasPublicAssistantItems = publicAssistantItems.length > 0
   const hideTimelineAssistantReplies = assistantTimelineItems.length > 0
@@ -132,7 +133,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         canCancel={canCancel}
         compact={compactCompletedProcess}
         lockedOpen={forceProcessOpen}
-        canContinue={!!taskId && !!onContinue && taskStageNeedsContinue(timeline.stage.key)}
+        canContinue={!!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)}
         onToggle={() => {
           if (forceProcessOpen) return
           setCollapsed((c) => !c)
@@ -198,6 +199,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
           tone={tone}
           label={replyLabelForTone(tone)}
           notes={mergePublicNotesWithResult ? publicAssistantItems : undefined}
+          reason={terminalReason}
           time={assistantProcessTime}
         />
       )}
@@ -234,18 +236,20 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.onApprove === next.onApprove
 )
 
-function TaskAssistantBubble({ message, tone, label, notes, time: fallbackTime }: {
+function TaskAssistantBubble({ message, tone, label, notes, reason, time: fallbackTime }: {
   message: ChatMessage
   tone: TaskTone
   label: string
   notes?: TimelineItem[]
+  reason?: string
   time?: string
 }) {
   const content = messageText(message)
   if (!content) return null
+  const displayContent = terminalDisplayContent(content, tone, reason)
   const failed = tone === 'failed'
   const canceled = tone === 'canceled'
-  const hasMarkdown = /[#*`\[\]>|]/.test(content)
+  const hasMarkdown = /[#*`\[\]>|]/.test(displayContent)
   const time = messageTime(message) || fallbackTime
 
   return (
@@ -259,7 +263,7 @@ function TaskAssistantBubble({ message, tone, label, notes, time: fallbackTime }
         </div>
         {!!notes?.length && <TaskProgressNotesContent items={notes} />}
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
-          {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
+          {hasMarkdown ? <MarkdownContent content={displayContent} copy /> : displayContent}
         </div>
       </div>
     </div>
@@ -306,7 +310,8 @@ function replyLabelForTone(tone: TaskTone): string {
   return '最终回复'
 }
 
-function taskStageNeedsContinue(stageKey: string): boolean {
+function taskStageAllowsContinue(stageKey: string, tone: TaskTone): boolean {
+  if (tone === 'failed') return true
   return [
     'heartbeat',
     'resume-required',
@@ -314,6 +319,29 @@ function taskStageNeedsContinue(stageKey: string): boolean {
     'timeout',
     'tool-timeout',
   ].includes(stageKey)
+}
+
+function terminalReasonFromTimeline(timeline: ReturnType<typeof buildTaskTimeline>, tone: TaskTone): string {
+  if (tone !== 'failed' && tone !== 'canceled') return ''
+  for (let index = timeline.items.length - 1; index >= 0; index--) {
+    const item = timeline.items[index]
+    if (item.event?.type !== 'runtime_status') continue
+    if (tone === 'failed' && item.tone !== 'failed') continue
+    if (tone === 'canceled' && item.tone !== 'canceled') continue
+    return clean(item.detail || item.title)
+  }
+  return ''
+}
+
+function terminalDisplayContent(content: string, tone: TaskTone, reason = ''): string {
+  if (tone !== 'canceled' || !reason) return content
+  const normalizedContent = content.replace(/\s+/g, '')
+  const normalizedReason = reason.replace(/\s+/g, '')
+  if (normalizedContent.includes(normalizedReason) || normalizedReason.includes(normalizedContent)) return content
+  if (/^任务已(停止|取消)[。.!！]*$/.test(content.trim())) {
+    return `原因：${reason.replace(/[。.!！]+$/, '')}。`
+  }
+  return content
 }
 
 function taskIdForGroup(messages: ChatMessage[]): string {
