@@ -30,38 +30,6 @@ private const val MAX_IMPROVE_ATTEMPTS = 3
 
 // ===== [ScriptEngineUIHelpers.kt] =====
 // ===== [ScriptEngineUIHelpers.kt] =====
-package com.elon.app.agent.application
-
-import android.accessibilityservice.AccessibilityService
-import android.content.Context
-import android.util.Log
-import android.view.accessibility.AccessibilityNodeInfo
-import android.view.accessibility.AccessibilityWindowInfo
-import com.elon.app.agent.AgentService
-import com.elon.app.agent.application.executor.*
-import com.elon.app.agent.domain.execution.ExecutionConfig
-import com.elon.app.agent.domain.execution.ExecutionMode
-import com.elon.app.agent.domain.execution.ExecutionState
-import com.elon.app.agent.domain.execution.ExecutionStateManager
-import com.elon.app.agent.domain.screen.ScreenCaptureMode
-import com.elon.app.agent.domain.script.*
-import com.elon.app.agent.infrastructure.ai.AIClientFactory
-import com.elon.app.agent.infrastructure.debug.DebugInterface
-import com.elon.app.agent.infrastructure.popup.PopupDismisser
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
-import com.google.gson.reflect.TypeToken
-import kotlinx.coroutines.*
-import java.io.File
-import java.util.UUID
-
-// 本地常量(与companion object保持一致)
-private const val TAG = "ScriptEngine"
-private const val SCRIPTS_DIR = "scripts"
-private const val MAX_IMPROVE_ATTEMPTS = 3
-
-// ===== [ScriptEngineUIHelpers.kt] =====
-// ===== [ScriptEngineUIHelpers.kt] =====
 // ========== 辅助函数 ==========
 
 internal fun ScriptEngine.performTap(x: Int, y: Int): StepResult {

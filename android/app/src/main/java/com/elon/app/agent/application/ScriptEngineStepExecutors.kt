@@ -327,7 +327,7 @@ internal suspend fun ScriptEngine.executeScrollUntilFind(step: ScriptStep): Step
 /**
  * 🆕 验证点击后的页面是否有效（非直播、有评论区等）
  */
-private data class PageValidation(val isValid: Boolean, val reason: String)
+internal data class PageValidation(val isValid: Boolean, val reason: String)
 
 internal fun ScriptEngine.validatePageAfterTap(): PageValidation {
     val root = getRootNode() ?: return PageValidation(false, "无法获取页面")

@@ -5,8 +5,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.util.Log
 import android.view.accessibility.AccessibilityNodeInfo
-import com.elon.app.agent.application.AIAutonomousEngine
-import com.elon.app.agent.application.ScriptEngine
+import com.elon.app.agent.application.*
 import com.elon.app.agent.domain.screen.UINode
 import com.elon.app.agent.infrastructure.vision.ScreenAnalyzer
 import com.elon.app.agent.infrastructure.vision.ScriptGenerator
