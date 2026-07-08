@@ -20,6 +20,7 @@ const TAB_PROJECT_PNG_B64: &str = include_str!("assets/ic_tab_project_stack.b64"
 const TAB_PROFILE_PNG_B64: &str = include_str!("assets/ic_tab_profile_user.b64");
 const HOME_PROJECT_MARKER_PNG_B64: &str = include_str!("assets/ic_home_project_marker.b64");
 const HOME_PULL_FILTER_PNG_B64: &str = include_str!("assets/ic_home_pull_filter.b64");
+const HOME_MENU_ICON_PNG_B64: &str = include_str!("assets/ic_home_menu_custom.b64");
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
 const TOP_SEARCH_ICON_PNG_B64: &str = include_str!("assets/ic_top_search_custom.b64");
@@ -141,6 +142,7 @@ fn build_html() -> String {
             "__HOME_PULL_FILTER_PNG_B64__",
             HOME_PULL_FILTER_PNG_B64.trim(),
         )
+        .replace("__HOME_MENU_ICON_PNG_B64__", HOME_MENU_ICON_PNG_B64.trim())
         .replace(
             "__PROJECT_AI_ICON_PNG_B64__",
             PROJECT_AI_ICON_PNG_B64.trim(),

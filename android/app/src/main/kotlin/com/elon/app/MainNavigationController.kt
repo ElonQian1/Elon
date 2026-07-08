@@ -4,18 +4,15 @@ import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
-import kotlin.math.roundToInt
 
 internal class MainNavigationController(
     private val activity: AppCompatActivity,
@@ -58,7 +55,8 @@ internal class MainNavigationController(
     private val loadMarketplace: () -> Unit,
     private val onAgentTabSelected: () -> Unit,
     private val handleProjectSpaceInternalBack: () -> Boolean,
-    private val openProjectSpacePostComposer: () -> Unit
+    private val openProjectSpacePostComposer: () -> Unit,
+    private val showCreateProjectDialog: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -73,9 +71,17 @@ internal class MainNavigationController(
     private var nextProjectChatReturnTarget: ChatReturnTarget? = null
     private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
+    private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
+    private val homeChrome = HomeChromeController(
+        activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, showCreateProjectDialog,
+        { showConversationHome(animate = false) },
+        { showProjectHome(animate = false) },
+        { selectBottomTab(binding.tabProfile, animate = false) }
+    )
 
     fun setupNavigation() {
-        applyProjectManagementDesignMetrics()
+        designMetrics.apply()
+        homeChrome.setup()
         binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
         binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
         binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
@@ -117,16 +123,18 @@ internal class MainNavigationController(
         setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.visibility = View.GONE
+        homeChrome.hide()
     }
 
     private fun hideBottomMenus() {
         setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
+        homeChrome.hide()
     }
 
     private fun showProjectTopTabs(plazaSelected: Boolean) {
-        setProjectToolbarExpanded(true)
+        designMetrics.setProjectToolbarExpanded(true)
         binding.topTitleText.visibility = View.GONE
         binding.projectTopTabs.visibility = View.VISIBLE
         binding.projectTopTabs.setPadding(0, 0, 0, 0)
@@ -146,18 +154,12 @@ internal class MainNavigationController(
     }
 
     private fun hideProjectTopTabs() {
-        setProjectToolbarExpanded(false)
+        designMetrics.setProjectToolbarExpanded(false)
         binding.projectTopTabs.visibility = View.GONE
         binding.projectHomeTopTabWrap.visibility = View.GONE
         binding.projectPlazaTopTabWrap.visibility = View.VISIBLE
         setProjectHomeSegmentVisible(false)
         binding.topTitleText.visibility = View.VISIBLE
-    }
-
-    private fun setProjectToolbarExpanded(expanded: Boolean) {
-        binding.toolbar.layoutParams = binding.toolbar.layoutParams.apply {
-            height = designPx(if (expanded) PROJECT_TOP_TOOLBAR_HEIGHT_PX else PROJECT_TOOLBAR_HEIGHT_PX)
-        }
     }
 
     private fun setProjectHomeSegmentVisible(visible: Boolean) {
@@ -180,6 +182,7 @@ internal class MainNavigationController(
         setNavigationBarColor(R.color.elon_store_detail_bg)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
+        homeChrome.hide()
     }
 
     private fun setNavigationBarColor(colorRes: Int) {
@@ -246,7 +249,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        showMainTabs()
+        if (tab == binding.tabChat) homeChrome.showHome() else showMainTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
@@ -278,7 +281,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        showMainTabs()
+        if (tab == binding.tabChat) homeChrome.showHome() else showMainTabs()
     }
 
     private fun pageForBottomTab(tab: TextView): View? {
@@ -434,7 +437,7 @@ internal class MainNavigationController(
             WechatPageTransition.exitToRight(
                 container = binding.contentContainer,
                 outgoing = listOf(binding.chatPage, binding.inputLayout),
-                incoming = listOf(binding.conversationPage, binding.pageTabs),
+                incoming = listOf(binding.conversationPage),
                 onEnd = {
                     binding.chatPage.visibility = View.GONE
                     binding.inputLayout.visibility = View.GONE
@@ -442,7 +445,7 @@ internal class MainNavigationController(
                     binding.profilePage.visibility = View.GONE
                     binding.marketplacePage.visibility = View.GONE
                     binding.conversationPage.visibility = View.VISIBLE
-                    showMainTabs()
+                    homeChrome.showHome()
                     clearPageTranslations()
                     pageTransitionRunning = false
                     renderConversationList()
@@ -850,7 +853,7 @@ internal class MainNavigationController(
         binding.profilePage.visibility = View.GONE
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        showMainTabs()
+        homeChrome.showHome()
         hideProjectTopTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.VISIBLE
@@ -1029,62 +1032,6 @@ internal class MainNavigationController(
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
     }
 
-    private fun applyProjectManagementDesignMetrics() {
-        setProjectToolbarExpanded(false)
-        val topControlSize = designPx(PROJECT_ADD_BUTTON_SIZE_PX)
-        fun alignFrameTopControl(view: View, resizeWidth: Boolean) {
-            (view.layoutParams as? FrameLayout.LayoutParams)?.let {
-                if (resizeWidth) it.width = topControlSize
-                it.height = topControlSize
-                view.layoutParams = it
-            }
-        }
-        listOf(
-            binding.backButton,
-            binding.searchButton,
-            binding.addButton,
-            binding.projectMembersButton,
-            binding.voiceCallButton,
-            binding.moreButton
-        ).forEach { alignFrameTopControl(it, resizeWidth = true) }
-        alignFrameTopControl(binding.topTitleText, resizeWidth = false)
-        alignFrameTopControl(binding.projectTopTabs, resizeWidth = false)
-        binding.projectTopTabs.setPadding(
-            designPx(PROJECT_TOP_PADDING_START_PX),
-            0,
-            designPx(PROJECT_TOP_PADDING_END_PX),
-            0
-        )
-        (binding.projectHomeTopTabWrap.layoutParams as? LinearLayout.LayoutParams)?.let {
-            it.marginEnd = designPx(PROJECT_TOP_TAB_GAP_PX)
-            binding.projectHomeTopTabWrap.layoutParams = it
-        }
-        listOf(binding.projectHomeTopTab, binding.projectPlazaTopTab).forEach {
-            it.setTextSize(TypedValue.COMPLEX_UNIT_SP, PROJECT_TOP_TAB_TEXT_SP)
-        }
-        listOf(binding.projectHomeTabIndicator, binding.projectPlazaTabIndicator).forEach {
-            val params = it.layoutParams as? FrameLayout.LayoutParams ?: FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            )
-            it.layoutParams = params.apply {
-                width = designPx(PROJECT_TOP_INDICATOR_WIDTH_PX)
-                height = designPx(PROJECT_TOP_INDICATOR_HEIGHT_PX)
-                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-                bottomMargin = designPx(PROJECT_TOP_INDICATOR_BOTTOM_PX)
-            }
-        }
-        binding.addButton.setPadding(
-            designPx(PROJECT_ADD_BUTTON_PADDING_PX),
-            designPx(PROJECT_ADD_BUTTON_PADDING_PX),
-            designPx(PROJECT_ADD_BUTTON_PADDING_PX),
-            designPx(PROJECT_ADD_BUTTON_PADDING_PX)
-        )
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
-            updateBottomTabVisual(it, it.isSelected)
-        }
-    }
-
     private fun resetProjectHomeScroll() {
         binding.projectScrollView.post { binding.projectScrollView.scrollTo(0, 0) }
     }
@@ -1095,11 +1042,6 @@ internal class MainNavigationController(
 
     private fun applyProjectMemberMoreButtonIconInsets() {
         binding.moreButton.setPadding(dp(8), dp(11), dp(8), dp(5))
-    }
-
-    private fun designPx(value: Int): Int {
-        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
-        return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
     }
 
     /** 更新"好友"tab 未读消息角标。count=0 时隐藏角标。 */
@@ -1144,20 +1086,6 @@ internal class MainNavigationController(
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
         binding.projectSpaceAiMenu.translationX = 0f
-    }
-
-    private companion object {
-        const val DESIGN_WIDTH_PX = 1272
-        const val PROJECT_TOOLBAR_HEIGHT_PX = 176
-        const val PROJECT_TOP_TOOLBAR_HEIGHT_PX = PROJECT_TOOLBAR_HEIGHT_PX
-        const val PROJECT_TOP_PADDING_START_PX = 78
-        const val PROJECT_TOP_PADDING_END_PX = 250
-        const val PROJECT_TOP_TAB_GAP_PX = 188
-        const val PROJECT_TOP_TAB_TEXT_SP = 16f
-        const val PROJECT_TOP_INDICATOR_WIDTH_PX = 98
-        const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
-        const val PROJECT_TOP_INDICATOR_BOTTOM_PX = 18
-        const val PROJECT_ADD_BUTTON_SIZE_PX = 156
-        const val PROJECT_ADD_BUTTON_PADDING_PX = 28
+        homeChrome.clearTranslations()
     }
 }

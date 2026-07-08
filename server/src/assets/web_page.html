@@ -129,6 +129,7 @@
       display: flex;
       align-items: center;
       padding: 0 4px;
+      position: relative;
     }
     .app.project-tabs-visible .toolbar {
       height: 62px;
@@ -198,6 +199,40 @@
     .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--ink); }
     .icon-btn svg, .icon-btn img { width: 100%; height: 100%; display: block; }
     .icon-btn img { object-fit: contain; }
+    #homeMenuBtn {
+      padding: 8px;
+      margin-left: 0;
+    }
+    .home-nav-menu {
+      position: absolute;
+      left: 12px;
+      top: 48px;
+      width: 156px;
+      padding: 6px 0;
+      border-radius: 14px;
+      background: var(--popup-panel-bg);
+      z-index: 95;
+      transform-origin: top left;
+      animation: home-nav-pop 120ms ease both;
+    }
+    .home-nav-menu button {
+      width: 100%;
+      height: 44px;
+      border: 0;
+      background: transparent;
+      color: var(--tab-icon);
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      font-size: 15px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .home-nav-menu button:hover { background: rgba(255,255,255,0.06); }
+    @keyframes home-nav-pop {
+      from { opacity: 0; transform: scale(.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
     #moreBtn .toolbar-members-icon {
       display: none;
       width: 100%;
@@ -2779,6 +2814,64 @@
       opacity: 0;
       max-width: 0;
     }
+    .home-project-create-menu {
+      position: fixed;
+      right: max(20px, calc((100vw - 720px) / 2 + 20px));
+      bottom: calc(28px + env(safe-area-inset-bottom));
+      z-index: 70;
+      display: flex;
+      pointer-events: none;
+    }
+    .home-project-create-menu.hidden { display: none; }
+    .home-project-create-menu button {
+      width: 128px;
+      height: 56px;
+      border: 0;
+      border-radius: 28px;
+      background: var(--brand);
+      color: var(--brand-ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0;
+      font-size: 16px;
+      cursor: pointer;
+      overflow: hidden;
+      pointer-events: auto;
+      transition: width 220ms ease, height 220ms ease, gap 220ms ease;
+    }
+    .home-project-create-menu img {
+      width: 24px;
+      height: 24px;
+      flex: none;
+      object-fit: contain;
+      transition: width 220ms ease, height 220ms ease;
+    }
+    .home-project-create-menu span {
+      display: inline-block;
+      white-space: nowrap;
+      overflow: hidden;
+      max-width: 64px;
+      opacity: 1;
+      transition: opacity 220ms ease, max-width 220ms ease;
+    }
+    .home-project-create-menu.animating span,
+    .home-project-create-menu.compact span {
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
+    }
+    .home-project-create-menu.compact button {
+      width: 56px;
+      gap: 0;
+    }
+    .home-project-create-menu.compact span {
+      max-width: 0;
+      opacity: 0;
+    }
+    @media (max-width: 719px) {
+      .home-project-create-menu { right: 20px; }
+    }
 
     /* ===== 模态对话框 ===== */
     .modal-mask {
@@ -3250,6 +3343,14 @@
     <button class="icon-btn" id="backBtn" title="返回" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
     </button>
+    <button class="icon-btn hidden" id="homeMenuBtn" title="主菜单" aria-label="主菜单">
+      <img src="data:image/png;base64,__HOME_MENU_ICON_PNG_B64__" alt="" aria-hidden="true" />
+    </button>
+    <div class="home-nav-menu hidden" id="homeNavMenu" role="menu">
+      <button type="button" data-home-nav="chatPage">好友</button>
+      <button type="button" data-home-nav="projectPage">项目</button>
+      <button type="button" data-home-nav="profilePage">我的</button>
+    </div>
     <h1 id="topTitle">好友</h1>
     <div class="project-top-tabs hidden" id="projectTopTabs" aria-label="项目页面切换">
       <button class="project-top-tab" id="projectHomeTopTab" type="button" style="display:none">我的项目</button>
@@ -3754,6 +3855,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <span>发帖</span>
     </button>
   </nav>
+  <nav class="home-project-create-menu hidden" id="homeProjectCreateMenu">
+    <button type="button" id="homeProjectCreateMenuBtn" title="新建项目">
+      <img src="/assets/ic_project_post_compose.png" alt="" aria-hidden="true" />
+      <span>项目</span>
+    </button>
+  </nav>
 </main>
 
 <div class="pwa-install-card hidden" id="pwaInstallPrompt" role="dialog" aria-live="polite" aria-label="添加一龙到手机桌面">
@@ -4031,6 +4138,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectHomeTopTab = $('projectHomeTopTab');
   const projectPlazaTopTab = $('projectPlazaTopTab');
   const backBtn = $('backBtn');
+  const homeMenuBtn = $('homeMenuBtn');
+  const homeNavMenu = $('homeNavMenu');
   const voiceCallBtn = $('voiceCallBtn');
   const addBtn = $('addBtn');
   const moreBtn = $('moreBtn');
@@ -4038,7 +4147,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const tabsBar = document.querySelector('.tabs-bar');
   const projectSpaceAiMenu = $('projectSpaceAiMenu');
   const projectSpaceAiMenuBtn = $('projectSpaceAiMenuBtn');
+  const homeProjectCreateMenu = $('homeProjectCreateMenu');
+  const homeProjectCreateMenuBtn = $('homeProjectCreateMenuBtn');
 
+  const chatHomePage = $('chatPage');
   const conversationList = $('conversationList');
   const conversationFilterPull = $('conversationFilterPull');
   const projectPage = $('projectPage');
@@ -4197,6 +4309,62 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   if (projectPage && projectSpaceAiMenu) {
     projectPage.addEventListener('scroll', syncProjectSpaceAiMenuMotion, { passive: true });
+  }
+
+  function setHomeChromeVisible(visible) {
+    if (homeMenuBtn) homeMenuBtn.classList.toggle('hidden', !visible);
+    if (homeProjectCreateMenu) {
+      homeProjectCreateMenu.classList.toggle('hidden', !visible);
+      if (visible) {
+        homeProjectCreateMenu.classList.remove('compact', 'animating');
+        syncHomeProjectCreateMenuMotion();
+      }
+    }
+    if (!visible && homeNavMenu) homeNavMenu.classList.add('hidden');
+  }
+
+  let homeProjectCreateMenuMotionTimer = 0;
+  function syncHomeProjectCreateMenuMotion() {
+    if (!chatHomePage || !homeProjectCreateMenu || homeProjectCreateMenu.classList.contains('hidden')) return;
+    const shouldCompact = chatHomePage.scrollTop > 4;
+    if (homeProjectCreateMenu.classList.contains('compact') === shouldCompact) return;
+    homeProjectCreateMenu.classList.add('animating');
+    homeProjectCreateMenu.classList.toggle('compact', shouldCompact);
+    window.clearTimeout(homeProjectCreateMenuMotionTimer);
+    homeProjectCreateMenuMotionTimer = window.setTimeout(() => {
+      homeProjectCreateMenu.classList.remove('animating');
+    }, 240);
+  }
+
+  if (chatHomePage && homeProjectCreateMenu) {
+    chatHomePage.addEventListener('scroll', syncHomeProjectCreateMenuMotion, { passive: true });
+  }
+  if (homeProjectCreateMenuBtn) {
+    homeProjectCreateMenuBtn.addEventListener('click', () => openNewProject(false));
+  }
+  if (homeMenuBtn && homeNavMenu) {
+    homeMenuBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      homeNavMenu.classList.toggle('hidden');
+    });
+    homeNavMenu.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-home-nav]');
+      if (!button) return;
+      event.stopPropagation();
+      homeNavMenu.classList.add('hidden');
+      if (button.dataset.homeNav === 'chatPage') {
+        if (socket) { try { socket.close(); } catch {} socket = null; }
+        stopContactPolling();
+        stopGroupSummaryRefreshTimer();
+        currentProject = null;
+        currentFriend = null;
+        currentGroup = null;
+        groupSummaryPosts = [];
+        progressLog = [];
+      }
+      switchTab(button.dataset.homeNav);
+    });
+    document.addEventListener('click', () => homeNavMenu.classList.add('hidden'));
   }
 
   const profileAvatar = $('profileAvatar');
@@ -5071,6 +5239,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const inFriendChat = tabId === 'chatPage' && !!currentFriend;
     const inGroupChat = tabId === 'chatPage' && !!currentGroup;
     const inChat = inProjectChat || inFriendChat || inGroupChat;
+    const isChatHome = tabId === 'chatPage' && !inChat;
     const inProjectHome = tabId === 'projectPage';
     if (tabId !== 'chatPage') {
       searchBar.classList.add('hidden');
@@ -5114,8 +5283,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !inGroupChat);
-    if (tabsBar) tabsBar.classList.toggle('hidden', inChat);
+    if (tabsBar) tabsBar.classList.toggle('hidden', inChat || isChatHome);
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
+    setHomeChromeVisible(isChatHome);
     // 返回按钮：聊天详情页显示
     backBtn.style.display = inChat ? '' : 'none';
     voiceCallBtn.style.display = (inFriendChat && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
@@ -5178,8 +5348,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     addBtn.style.display = '';
     setAddButtonMode('friend');
     searchBtn.style.display = '';
-    if (tabsBar) tabsBar.classList.remove('hidden');
+    if (tabsBar) tabsBar.classList.add('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
+    setHomeChromeVisible(true);
     stageHint.classList.add('hidden');
     topTitle.textContent = contactFilterTitle();
     resetProjectPage();
@@ -5658,6 +5829,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     moreBtn.style.display = 'none';
     if (tabsBar) tabsBar.classList.add('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
+    setHomeChromeVisible(false);
     setProjectTopTabsVisible(false, false);
     stageHint.classList.remove('hidden');
     modelBtn.style.display = '';
@@ -5704,8 +5876,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     addBtn.style.display = '';
     setAddButtonMode('friend');
     searchBtn.style.display = '';
-    if (tabsBar) tabsBar.classList.remove('hidden');
+    if (tabsBar) tabsBar.classList.add('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
+    setHomeChromeVisible(true);
     stageHint.classList.add('hidden');
     modelBtn.style.display = '';
     messageInput.placeholder = '输入内容';
@@ -5729,6 +5902,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     voiceCallBtn.style.display = (currentFriend && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
     if (tabsBar) tabsBar.classList.add('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
+    setHomeChromeVisible(false);
     modelBtn.style.display = currentGroup ? 'none' : '';
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !currentGroup);
     messageInput.placeholder = '输入内容';
@@ -6965,6 +7139,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectSpaceAnnouncementExpanded = false;
     setMoreButtonMode('project-members');
     moreBtn.style.display = '';
+    setHomeChromeVisible(false);
     if (projectSpaceAiMenu) {
       projectSpaceAiMenu.classList.remove('hidden', 'compact', 'animating');
       syncProjectSpaceAiMenuMotion();
@@ -7930,7 +8105,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     addBtn.classList.toggle('add-plus-expanded', expanded);
   }
 
-  function openNewProject() {
+  function openNewProject(expandTopAdd = true) {
     newProjectError.textContent = '';
     projectNameInput.value = '';
     projectDescInput.value = '';
@@ -7946,7 +8121,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       newProjectError.textContent = err.message || '加载开发环境失败';
     });
     newProjectMask.classList.add('active');
-    setTopAddButtonExpanded(true);
+    if (expandTopAdd) setTopAddButtonExpanded(true);
     setTimeout(() => projectNameInput.focus(), 50);
   }
   function closeNewProject() {

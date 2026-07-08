@@ -32,6 +32,18 @@
                 android:textSize="27sp"
                 android:visibility="gone" />
 
+            <ImageButton
+                android:id="@+id/homeMenuButton"
+                android:layout_width="50dp"
+                android:layout_height="44dp"
+                android:layout_gravity="start|center_vertical"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="主菜单"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_home_menu_custom"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/topTitleText"
                 android:layout_width="wrap_content"
@@ -644,6 +656,44 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="发帖"
+                android:textColor="@color/elon_button_primary_text"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/homeProjectCreateMenu"
+            android:layout_width="128dp"
+            android:layout_height="56dp"
+            android:layout_gravity="end|bottom"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="28dp"
+            android:background="@drawable/bg_project_space_ai_menu_item"
+            android:clickable="true"
+            android:clipToOutline="true"
+            android:contentDescription="新建项目"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/homeProjectCreateIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_project_post_compose"
+                app:tint="@color/elon_button_primary_text" />
+
+            <com.elon.app.ProjectSpaceAiLabelView
+                android:id="@+id/homeProjectCreateLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="start|center_vertical"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:text="项目"
                 android:textColor="@color/elon_button_primary_text"
                 android:textSize="16sp" />
         </LinearLayout>
