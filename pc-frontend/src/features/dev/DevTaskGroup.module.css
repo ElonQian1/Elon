@@ -99,6 +99,10 @@
   margin: 0;
 }
 
+.processPanelAfterNotes {
+  margin-top: 8px;
+}
+
 .processToggle,
 .processStatic {
   display: flex;

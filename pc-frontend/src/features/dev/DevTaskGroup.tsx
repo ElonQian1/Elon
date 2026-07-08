@@ -80,7 +80,9 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
   const requestTime = messageTime(userMsg) || messageTime(headerMsg)
+  const assistantProcessTime = messageTime(headerMsg) || requestTime
   const hideCompletedProcessPanel = isDone && tone === 'done' && collapsed
+  const mergePublicNotesWithProcess = hasPublicAssistantItems && showProgressPanel && !resultMsg && !hideCompletedProcessPanel
 
   useEffect(() => {
     if (expandAll || userCollapseOverride.current || isDone) return
@@ -110,11 +112,12 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
     })
   }, [taskId, status.label, isDone, processSummary])
 
-  const renderProgressPanel = (inline: boolean) => (
+  const renderProgressPanel = (inline: boolean, afterNotes = false) => (
     <div
       className={[
         styles.processPanel,
         inline ? styles.processPanelInline : '',
+        afterNotes ? styles.processPanelAfterNotes : '',
         hideCompletedProcessPanel ? styles.processPanelDormant : '',
       ].filter(Boolean).join(' ')}
     >
@@ -179,7 +182,9 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         </div>
       )}
 
-      {hasPublicAssistantItems && <TaskProgressNotes items={publicAssistantItems} />}
+      {hasPublicAssistantItems && !mergePublicNotesWithProcess && (
+        <TaskProgressNotes items={publicAssistantItems} time={assistantProcessTime} />
+      )}
 
       {resultMsg && <TaskAssistantBubble message={resultMsg} tone={tone} label={replyLabelForTone(tone)} />}
 
@@ -190,9 +195,11 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
             <div className={styles.assistantBody}>
               <div className={styles.assistantMeta}>
                 <strong>一龙</strong>
-                {(messageTime(headerMsg) || requestTime) && <span>{messageTime(headerMsg) || requestTime}</span>}
+                {mergePublicNotesWithProcess && <span>正在处理</span>}
+                {assistantProcessTime && <span>{assistantProcessTime}</span>}
               </div>
-              {renderProgressPanel(true)}
+              {mergePublicNotesWithProcess && <TaskProgressNotesContent items={publicAssistantItems} />}
+              {renderProgressPanel(true, mergePublicNotesWithProcess)}
             </div>
           </div>
         ) : renderProgressPanel(false)
@@ -237,7 +244,7 @@ function TaskAssistantBubble({ message, tone, label }: { message: ChatMessage; t
   )
 }
 
-function TaskProgressNotes({ items }: { items: TimelineItem[] }) {
+function TaskProgressNotes({ items, time }: { items: TimelineItem[]; time?: string }) {
   return (
     <div className={[styles.assistantTurn, styles.progressNotesTurn].join(' ')}>
       <div className={styles.assistantAvatar}>AI</div>
@@ -245,21 +252,28 @@ function TaskProgressNotes({ items }: { items: TimelineItem[] }) {
         <div className={styles.assistantMeta}>
           <strong>一龙</strong>
           <span>正在处理</span>
+          {time && <span>{time}</span>}
         </div>
-        <div className={styles.progressNotes}>
-          {items.map((item) => {
-            const content = item.detail ?? ''
-            const hasMarkdown = /[#*`\[\]>|]/.test(content)
-            const noteMeta = [item.meta, messageTime(item.message)].filter(Boolean).join(' · ')
-            return (
-              <div key={item.id} className={styles.progressNote}>
-                {noteMeta && <div className={styles.progressNoteMeta}>{noteMeta}</div>}
-                {hasMarkdown ? <MarkdownContent content={content} copy={false} /> : <p>{content}</p>}
-              </div>
-            )
-          })}
-        </div>
+        <TaskProgressNotesContent items={items} />
       </div>
+    </div>
+  )
+}
+
+function TaskProgressNotesContent({ items }: { items: TimelineItem[] }) {
+  return (
+    <div className={styles.progressNotes}>
+      {items.map((item) => {
+        const content = item.detail ?? ''
+        const hasMarkdown = /[#*`\[\]>|]/.test(content)
+        const noteMeta = item.meta
+        return (
+          <div key={item.id} className={styles.progressNote}>
+            {noteMeta && <div className={styles.progressNoteMeta}>{noteMeta}</div>}
+            {hasMarkdown ? <MarkdownContent content={content} copy={false} /> : <p>{content}</p>}
+          </div>
+        )
+      })}
     </div>
   )
 }
