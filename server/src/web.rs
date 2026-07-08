@@ -54,6 +54,8 @@ const INPUT_EMOJI_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_emoji_new.png");
 const INPUT_CHEVRON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_chevron_new.png");
+const INPUT_EXPAND_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_expand_new.png");
 const INPUT_SEND_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_send_new.png");
 const PROJECT_POST_COMPOSE_ICON_PNG: &[u8] = include_bytes!("assets/ic_project_post_compose.png");
@@ -128,6 +130,7 @@ fn build_html() -> String {
     let input_voice_wave_png_b64 = encode_png(INPUT_VOICE_WAVE_PNG);
     let input_emoji_png_b64 = encode_png(INPUT_EMOJI_PNG);
     let input_chevron_png_b64 = encode_png(INPUT_CHEVRON_PNG);
+    let input_expand_png_b64 = encode_png(INPUT_EXPAND_PNG);
     let input_send_png_b64 = encode_png(INPUT_SEND_PNG);
     WEB_HTML_TEMPLATE
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
@@ -185,6 +188,7 @@ fn build_html() -> String {
         .replace("__INPUT_VOICE_WAVE_PNG_B64__", &input_voice_wave_png_b64)
         .replace("__INPUT_EMOJI_PNG_B64__", &input_emoji_png_b64)
         .replace("__INPUT_CHEVRON_PNG_B64__", &input_chevron_png_b64)
+        .replace("__INPUT_EXPAND_PNG_B64__", &input_expand_png_b64)
         .replace("__INPUT_SEND_PNG_B64__", &input_send_png_b64)
 }
 

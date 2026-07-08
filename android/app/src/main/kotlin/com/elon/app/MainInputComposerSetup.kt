@@ -3,6 +3,7 @@ package com.elon.app
 import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.InsetDrawable
 import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
@@ -136,8 +137,8 @@ internal class MainInputComposerSetup(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0
             ).apply {
-                marginStart = dp(96)
-                marginEnd = dp(46)
+                marginStart = dp(88)
+                marginEnd = dp(44)
             }
         }
 
@@ -157,7 +158,7 @@ internal class MainInputComposerSetup(
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_voice_wave_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(0, 0, 0, 0)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
             contentDescription = "切换语音输入"
             setOnClickListener { toggleVoiceMode() }
         }
@@ -210,14 +211,14 @@ internal class MainInputComposerSetup(
         }
 
         val expandEditorButton = ImageButton(activity).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(30), dp(30), Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(4)
+            layoutParams = FrameLayout.LayoutParams(dp(28), dp(28), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(5)
                 marginEnd = dp(1)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_expand_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(0, 0, 0, 0)
+            setPadding(dp(3), dp(3), dp(3), dp(3))
             contentDescription = "全屏编辑"
             setOnClickListener { showFullScreenEditor() }
         }
@@ -353,12 +354,12 @@ internal class MainInputComposerSetup(
 
         val emojiButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
-                marginEnd = dp(10)
+                marginEnd = dp(8)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_emoji_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(0, 0, 0, 0)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
             contentDescription = "打开表情"
             setOnClickListener { toggleEmojiPanel() }
         }
@@ -374,19 +375,19 @@ internal class MainInputComposerSetup(
 
         val attachmentButton = ImageButton(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(38), dp(38)).apply {
-                marginEnd = dp(10)
+                marginEnd = dp(8)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_add_new)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(0, 0, 0, 0)
+            setPadding(dp(4), dp(4), dp(4), dp(4))
             contentDescription = "展开更多输入功能"
             setOnClickListener { toggleAttachmentPanel() }
         }
 
         sendButton.apply {
             layoutParams = FrameLayout.LayoutParams(dp(38), dp(38), Gravity.END or Gravity.CENTER_VERTICAL)
-            background = activity.getDrawable(R.drawable.ic_input_send_new)
+            activity.getDrawable(R.drawable.ic_input_send_new)?.let { background = InsetDrawable(it, dp(3)) }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = ""
@@ -447,6 +448,7 @@ internal class MainInputComposerSetup(
 
         inputComposerMotion = InputComposerMotion(
             expandedInputContainer = expandedInputContainer,
+            inputPanelContainer = inputPanelContainer,
             collapsedInputContainer = inputCenterContainer,
             collapsedText = collapsedInputPreview,
             rightControls = inputRightControls

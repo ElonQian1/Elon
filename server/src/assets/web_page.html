@@ -2651,12 +2651,30 @@
       justify-content: flex-end;
       overflow: hidden;
       padding: 0 10px;
+      transition: border-radius 160ms ease, min-height 160ms ease, padding 160ms ease;
+    }
+    .input-bar.has-text .input-panel,
+    .input-bar.input-focused .input-panel {
+      min-height: 132px;
+      background: var(--side-menu-bg);
+      border-radius: 32px;
+      padding: 8px 10px 0;
+    }
+    .input-text-row {
+      display: none;
+      position: relative;
+      min-height: 42px;
+      margin: 0 38px 0 88px;
+    }
+    .input-bar.has-text .input-text-row,
+    .input-bar.input-focused .input-text-row {
+      display: block;
     }
     .input-main-row {
       height: 48px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
     .input-bar .image-edit-btn,
     .input-bar .emoji-btn,
@@ -2669,27 +2687,69 @@
       border: 0;
       border-radius: 19px;
       cursor: pointer;
-      padding: 0;
+      padding: 4px;
     }
     .input-bar .image-edit-btn img,
     .input-bar .emoji-btn img,
     .input-bar .voice-btn img,
     .input-bar .send-btn img {
-      width: 100%;
-      height: 100%;
+      width: 30px;
+      height: 30px;
+      display: block;
+      object-fit: contain;
+      margin: auto;
+    }
+    .input-bar .input-placeholder {
+      flex: 1;
+      min-width: 0;
+      height: 38px;
+      padding: 0 4px;
+      border: 0;
+      background: transparent;
+      color: var(--ink-faint);
+      font-size: 15px;
+      text-align: left;
+      cursor: text;
+    }
+    .input-bar.has-text .input-placeholder,
+    .input-bar.input-focused .input-placeholder {
+      display: none;
+    }
+    .input-row-spacer {
+      display: none;
+      flex: 1;
+      min-width: 0;
+    }
+    .input-bar.has-text .input-row-spacer,
+    .input-bar.input-focused .input-row-spacer {
+      display: block;
+    }
+    .input-bar .expand-editor-btn {
+      position: absolute;
+      right: -34px;
+      top: 5px;
+      width: 28px;
+      height: 28px;
+      padding: 3px;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .input-bar .expand-editor-btn img {
+      width: 22px;
+      height: 22px;
       display: block;
       object-fit: contain;
     }
     .input-bar textarea {
-      flex: 1;
-      min-width: 0;
+      width: 100%;
       background: transparent;
       border: 0;
       color: var(--ink-strong);
-      padding: 7px 4px;
+      padding: 6px 4px 4px 0;
       font-size: 15px;
       min-height: 38px;
-      max-height: 120px;
+      max-height: 96px;
       resize: none;
       outline: none;
       line-height: 1.4;
@@ -3816,6 +3876,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <button class="plan-btn" type="button" id="planBtn" title="先规划">规划</button>
     </div>
     <div class="input-panel">
+      <div class="input-text-row">
+        <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
+        <button class="expand-editor-btn" type="button" id="expandEditorBtn" title="全屏编辑">
+          <img src="data:image/png;base64,__INPUT_EXPAND_PNG_B64__" alt="" aria-hidden="true" />
+        </button>
+      </div>
       <div class="input-main-row">
         <button class="image-edit-btn" type="button" id="imageEditBtn" title="图片编辑">
           <img src="data:image/png;base64,__INPUT_ADD_PNG_B64__" alt="" aria-hidden="true" />
@@ -3823,7 +3889,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <button class="emoji-btn" type="button" id="emojiBtn" title="表情">
           <img src="data:image/png;base64,__INPUT_EMOJI_PNG_B64__" alt="" aria-hidden="true" />
         </button>
-        <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
+        <button class="input-placeholder" type="button" id="inputPlaceholder">输入内容</button>
+        <span class="input-row-spacer" aria-hidden="true"></span>
         <button class="voice-btn" type="button" id="voiceBtn" title="语音输入">
           <img src="data:image/png;base64,__INPUT_VOICE_WAVE_PNG_B64__" alt="" aria-hidden="true" />
         </button>
@@ -4409,6 +4476,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const imageEditBtn = $('imageEditBtn');
   const emojiBtn = $('emojiBtn');
   const messageInput = $('messageInput');
+  const inputPlaceholder = $('inputPlaceholder');
+  const expandEditorBtn = $('expandEditorBtn');
   const sendBtn = $('sendBtn');
   const modelBtn = $('modelBtn');
   const planBtn = $('planBtn');
@@ -7460,15 +7529,31 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       showNativeOnly('语音输入请在 Android APK 中使用。网页版已同步入口位置。');
     });
   }
+  if (inputPlaceholder) {
+    inputPlaceholder.addEventListener('click', () => {
+      messageInput.focus();
+    });
+  }
+  if (expandEditorBtn) {
+    expandEditorBtn.addEventListener('click', () => {
+      showNativeOnly('全屏编辑请在 Android APK 中使用。网页版已同步入口位置。');
+    });
+  }
   messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       inputBar.requestSubmit();
     }
   });
+  messageInput.addEventListener('focus', () => {
+    inputBar.classList.add('input-focused');
+  });
+  messageInput.addEventListener('blur', () => {
+    inputBar.classList.remove('input-focused');
+  });
   messageInput.addEventListener('input', () => {
     messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 96) + 'px';
     inputBar.classList.toggle('has-text', messageInput.value.trim().length > 0);
     if (currentFriend && appSocket && appSocket.readyState === WebSocket.OPEN) {
       const now = Date.now();

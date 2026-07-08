@@ -19,9 +19,9 @@ internal class MainAdaptiveInputHeightActions(
         inputEdit.post {
             val centerContainer = inputCenterContainer() ?: return@post
             if (inputBarContainer() == null) return@post
-            val collapsedHeight = dp(40)
-            val minTextHeight = dp(46)
-            val maxTextHeight = dp(112)
+            val collapsedHeight = dp(38)
+            val minTextHeight = dp(42)
+            val maxTextHeight = dp(100)
             val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
             val voiceMode = isVoiceMode()
             val desiredTextHeight = if (voiceMode) {

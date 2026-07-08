@@ -8,6 +8,7 @@ import android.widget.FrameLayout
 
 internal class InputComposerMotion(
     private val expandedInputContainer: FrameLayout,
+    private val inputPanelContainer: View,
     private val collapsedInputContainer: FrameLayout,
     private val collapsedText: View,
     private val rightControls: FrameLayout
@@ -17,6 +18,7 @@ internal class InputComposerMotion(
     private var expandAnimatorTarget: Boolean? = null
     private var textHeightAnimator: ValueAnimator? = null
     private var expandedTextHeight = 0
+    private var expandedPanelBackgroundApplied = false
 
     var isExpanded: Boolean = false
         private set
@@ -108,6 +110,7 @@ internal class InputComposerMotion(
     }
 
     private fun prepareTransition(transition: ComposerTransition) {
+        applyPanelBackground(transition.expanded)
         collapsedInputContainer.visibility = View.VISIBLE
     }
 
@@ -129,7 +132,16 @@ internal class InputComposerMotion(
     }
 
     private fun completeTransition(transition: ComposerTransition) {
+        applyPanelBackground(transition.expanded)
         collapsedInputContainer.visibility = if (transition.expanded) View.INVISIBLE else View.VISIBLE
+    }
+
+    private fun applyPanelBackground(expanded: Boolean) {
+        if (expandedPanelBackgroundApplied == expanded) return
+        inputPanelContainer.setBackgroundResource(
+            if (expanded) R.drawable.bg_bottom_panel_expanded else R.drawable.bg_bottom_panel_new
+        )
+        expandedPanelBackgroundApplied = expanded
     }
 
     private fun targetExpandedHeight(expanded: Boolean): Int {

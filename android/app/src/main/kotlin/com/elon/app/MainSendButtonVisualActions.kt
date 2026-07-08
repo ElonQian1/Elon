@@ -2,6 +2,7 @@ package com.elon.app
 
 import android.view.Gravity
 import android.view.View
+import android.graphics.drawable.InsetDrawable
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import androidx.appcompat.app.AppCompatActivity
@@ -29,7 +30,9 @@ internal class MainSendButtonVisualActions(
         val params = binding.sendButton.layoutParams as? FrameLayout.LayoutParams
         if (sendMode) {
             params?.width = dp(38)
-            binding.sendButton.background = activity.getDrawable(R.drawable.ic_input_send_new)
+            activity.getDrawable(R.drawable.ic_input_send_new)?.let {
+                binding.sendButton.background = InsetDrawable(it, dp(3))
+            }
             binding.sendButton.text = ""
             binding.sendButton.visibility = View.VISIBLE
             inputModeButton()?.visibility = View.GONE
