@@ -265,6 +265,7 @@ export function timelineSummary(model: TaskTimelineModel, taskId: string, shortT
   const parts: string[] = []
   if (model.visibleStepCount > 0) parts.push(`${model.visibleStepCount} 步过程`)
   if (model.heartbeatCount > 1) parts.push(`合并 ${model.heartbeatCount} 条等待状态`)
+  if (model.stage.key === 'approval') parts.push('等待审批')
   if (model.coverage.command) parts.push('有命令')
   if (model.coverage.fileChange) parts.push('有文件修改')
   if (model.coverage.testRun) parts.push('有测试/构建')

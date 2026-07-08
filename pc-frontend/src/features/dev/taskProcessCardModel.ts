@@ -96,6 +96,7 @@ function fileProcessCard(event: ToolEvent, tone: TaskTone, isResult: boolean): P
       event.diff?.truncated ? { label: 'diff 已截断', tone: 'muted' } : null,
     ].filter(Boolean) as ProcessCardChip[],
     monospace: true,
+    bodyCollapsed: true,
   }
 }
 

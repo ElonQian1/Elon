@@ -49,10 +49,11 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
   const grouped = groupTimelineItems(displayItems, completed)
   const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
   const hasAssistantReply = grouped.primary.some(isAssistantTimelineItem)
-  const showStageAtTop = model.stage.key === 'approval'
+  const hasApprovalItem = grouped.primary.some((item) => item.kind === 'approval' && item.tone === 'approval')
+  const showStageAtTop = (model.stage.key === 'approval' && !hasApprovalItem)
     || ((model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply)
   const openTechnicalDetails = (model.stage.stuck || model.stage.tone === 'failed') && !hasAssistantReply && primaryBlocks.length === 0
-  const showStageInTechnicalDetails = !showStageAtTop && model.stage.key !== 'finished'
+  const showStageInTechnicalDetails = !showStageAtTop && model.stage.key !== 'finished' && !(model.stage.key === 'approval' && hasApprovalItem)
   const technicalCount = grouped.connection.length + (showStageInTechnicalDetails ? 1 : 0) + model.diagnostics.length + 1
 
   return (
@@ -260,7 +261,7 @@ function TimelineRow({ item, taskContext, expandAll = false, onCancel, onApprove
               <span className={styles.title}>{item.title}</span>
               {item.meta && <span className={styles.meta} title={item.metaTitle || item.meta}>{item.meta}</span>}
             </div>
-            {item.process && <ProcessCardView process={item.process} expandAll={expandAll} />}
+            {item.process && <ProcessCardView process={item.process} />}
             {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}
           </>
         )}
@@ -358,30 +359,32 @@ function CommandRunGroup({ items, expandAll = false }: { items: TimelineItem[]; 
         <span>已运行 {items.length} 条命令</span>
       </summary>
       <div className={styles.commandRunBody}>
-        {items.map((item) => (
-          <CommandRunItem key={item.id} item={item} expandAll={expandAll} />
+        {items.map((item, index) => (
+          <CommandRunItem key={`${item.id}-${index}`} item={item} />
         ))}
       </div>
     </details>
   )
 }
 
-function CommandRunItem({ item, expandAll = false }: { item: TimelineItem; expandAll?: boolean }) {
+function CommandRunItem({ item }: { item: TimelineItem }) {
   const process = item.process
   if (!process) return null
   const commandText = process.commandText ?? process.subtitle
+  const openByDefault = item.tone === 'failed'
   return (
-    <details className={styles.commandRunItem} open={expandAll}>
+    <details className={styles.commandRunItem} open={openByDefault}>
       <summary title={commandText}>
         <span className={styles.commandRunOpenLabel}>命令</span>
         <code>{commandSummary(commandText)}</code>
+        <span className={styles.commandRunStatus} data-tone={item.tone}>{shellStatus(process).label}</span>
       </summary>
       <ShellProcessCardView process={process} />
     </details>
   )
 }
 
-function ProcessCardView({ process, expandAll = false }: { process: ProcessCard; expandAll?: boolean }) {
+function ProcessCardView({ process }: { process: ProcessCard }) {
   if (process.commandText) return <ShellProcessCardView process={process} />
   return (
     <div className={[styles.processCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
@@ -396,7 +399,7 @@ function ProcessCardView({ process, expandAll = false }: { process: ProcessCard;
       </div>
       {process.body && (
         process.bodyCollapsed ? (
-          <details className={styles.processDetails} open={expandAll}>
+          <details className={styles.processDetails} open={process.tone === 'failed'}>
             <summary>{process.bodyLabel}</summary>
             <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
           </details>

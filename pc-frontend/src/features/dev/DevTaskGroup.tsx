@@ -64,6 +64,8 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   })
   const progressCount = timeline.visibleStepCount
   const status = statusForTaskGroup(task, isDone, resultMsg)
+  const forceProcessOpen = timeline.stage.key === 'approval'
+  const displayCollapsed = forceProcessOpen ? false : collapsed
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const richRequest = taskRequestLooksMarkdown(request)
   const hasProgressDetails = progressCount > 0
@@ -121,10 +123,12 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         timeline={timeline}
         progressCount={progressCount}
         processSummary={processSummary}
-        collapsed={collapsed}
+        collapsed={displayCollapsed}
         canCancel={canCancel}
         compact={compactCompletedProcess}
+        lockedOpen={forceProcessOpen}
         onToggle={() => {
+          if (forceProcessOpen) return
           userCollapseOverride.current = true
           setCollapsed((c) => !c)
         }}
@@ -133,7 +137,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
           if (window.confirm('停止这个任务？')) onCancel?.(taskId)
         }}
       />
-      {!collapsed && hasProgressDetails && (
+      {!displayCollapsed && hasProgressDetails && (
         <div className={styles.processBody}>
           <TaskTimeline
             model={timeline}

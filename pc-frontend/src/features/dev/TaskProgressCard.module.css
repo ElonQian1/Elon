@@ -296,6 +296,13 @@
   color: #c7d1e0;
 }
 
+.detailButtonLocked,
+.detailButtonLocked:hover {
+  color: #9aa7ba;
+  cursor: default;
+  opacity: .9;
+}
+
 .streamDetailButton {
   padding: 0 0 0 19px;
 }

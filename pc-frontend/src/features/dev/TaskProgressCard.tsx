@@ -14,6 +14,7 @@ interface TaskProgressCardProps {
   collapsed: boolean
   canCancel: boolean
   compact?: boolean
+  lockedOpen?: boolean
   onToggle: () => void
   onCancel: () => void
 }
@@ -26,6 +27,7 @@ export default function TaskProgressCard({
   collapsed,
   canCancel,
   compact = false,
+  lockedOpen = false,
   onToggle,
   onCancel,
 }: TaskProgressCardProps) {
@@ -110,12 +112,13 @@ export default function TaskProgressCard({
       {hasDetails && (
         <button
           type="button"
-          className={[styles.detailButton, streamMode ? styles.streamDetailButton : ''].filter(Boolean).join(' ')}
+          className={[styles.detailButton, streamMode ? styles.streamDetailButton : '', lockedOpen ? styles.detailButtonLocked : ''].filter(Boolean).join(' ')}
           onClick={onToggle}
           aria-expanded={!collapsed}
+          disabled={lockedOpen}
         >
-          <span>{collapsed ? `过程 · ${terseSummary}` : `收起过程 · ${terseSummary}`}</span>
-          {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
+          <span>{lockedOpen ? `审批已展开 · ${terseSummary}` : collapsed ? `过程 · ${terseSummary}` : `收起过程 · ${terseSummary}`}</span>
+          {!lockedOpen && (collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />)}
         </button>
       )}
     </section>
@@ -212,7 +215,16 @@ function compactProcessSummary(summary: string, progressCount: number): string {
     .split(' · ')
     .map((part) => readableText(part))
     .filter((part) => part && !looksTechnical(part) && !looksInternalSummary(part) && !part.startsWith('当前：'))
-  return parts.slice(0, 2).join(' · ') || fallback
+  const step = parts.find((part) => /[0-9]+\s*(步|项)/.test(part))
+  const priority = [
+    parts.find((part) => part === '等待审批'),
+    parts.find((part) => part === '有文件修改'),
+    parts.find((part) => part === '有测试/构建'),
+    parts.find((part) => part === '有命令'),
+    parts.find((part) => /公开回复/.test(part)),
+  ].filter(Boolean)
+  const compact = [step, ...priority].filter(Boolean).slice(0, 4)
+  return compact.join(' · ') || parts.slice(0, 3).join(' · ') || fallback
 }
 
 function terseProcessSummary(summary: string): string {
