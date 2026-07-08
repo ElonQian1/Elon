@@ -3,6 +3,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
+import { copyTextToClipboard } from '../../lib/clipboard'
 import { MediaViewer, type MediaViewerImage } from './MediaViewer'
 import styles from './MarkdownContent.module.css'
 
@@ -219,21 +220,23 @@ function normalizeBareImageUrls(value: string): string {
 
 /* 独立代码块组件（含复制按钮）*/
 function CodeBlock({ code, className, showCopy }: { code: string; className?: string; showCopy: boolean }) {
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const lang = className?.replace('language-', '') ?? ''
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    const copied = await copyTextToClipboard(code)
+    setCopyState(copied ? 'copied' : 'failed')
+    setTimeout(() => setCopyState('idle'), 2000)
   }
+
+  const copyLabel = copyState === 'copied' ? '已复制' : copyState === 'failed' ? '复制失败' : '复制'
 
   return (
     <div className={styles.codeBlock}>
       {lang && <div className={styles.codeLang}>{lang}</div>}
       {showCopy && (
-        <button className={styles.copyBtn} onClick={handleCopy} type="button">
-          {copied ? '已复制' : '复制'}
+        <button className={styles.copyBtn} onClick={handleCopy} type="button" data-state={copyState}>
+          {copyLabel}
         </button>
       )}
       <pre className={styles.pre}>

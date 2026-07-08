@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy, GitFork, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { copyTextToClipboard } from '../../lib/clipboard'
 import styles from './MessageActions.module.css'
 
 export type MessageFeedbackValue = 'up' | 'down' | null
@@ -49,7 +50,7 @@ export default function MessageActions({
   if (!text) return null
 
   async function handleCopy() {
-    const ok = await copyText(text)
+    const ok = await copyTextToClipboard(text)
     setCopied(ok)
   }
 
@@ -128,33 +129,6 @@ export default function MessageActions({
       )}
     </div>
   )
-}
-
-async function copyText(text: string): Promise<boolean> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch {
-      // Fall back to a temporary textarea when clipboard permissions are denied.
-    }
-  }
-
-  if (typeof document === 'undefined') return false
-
-  const textarea = document.createElement('textarea')
-  textarea.value = text
-  textarea.setAttribute('readonly', '')
-  textarea.style.position = 'fixed'
-  textarea.style.left = '-9999px'
-  document.body.appendChild(textarea)
-  textarea.select()
-
-  try {
-    return document.execCommand('copy')
-  } finally {
-    document.body.removeChild(textarea)
-  }
 }
 
 function normalizeStorageSegment(value: string): string {
