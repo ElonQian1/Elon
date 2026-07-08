@@ -42,30 +42,19 @@ interface RuntimeReply {
   fingerprint?: string
 }
 
+interface TaskTimelineDisplayOptions {
+  completed?: boolean
+  hideAssistantReplies?: boolean
+}
+
 export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
-  const rawDisplayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
-  const displayItems = rawDisplayItems
-    .filter((item) => !isCurrentStageSourceItem(model.stage, item))
-  if (displayItems.length === 0 && model.diagnostics.length === 0) return null
-  const grouped = groupTimelineItems(displayItems, completed, model.stage.tone)
-  const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
-  const hasApprovalItem = grouped.primary.some((item) => item.kind === 'approval' && item.tone === 'approval')
-  const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
-  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, grouped.connection)
-  const showCoverageInDiagnostics = showDiagnosticDetails && hasActiveCoverage(model)
-  const diagnosticCount = showDiagnosticDetails
-    ? grouped.connection.length + model.diagnostics.length + (showCoverageInDiagnostics ? 1 : 0)
-    : 0
-  const hasVisibleTimeline = showStageAtTop
-    || primaryBlocks.length > 0
-    || diagnosticCount > 0
-    || grouped.summary.length > 0
-  if (!hasVisibleTimeline) return null
+  const display = buildTimelineDisplay(model, { completed, hideAssistantReplies })
+  if (!display.hasVisibleTimeline) return null
 
   return (
     <div className={styles.timeline}>
-      {showStageAtTop && <StageCard stage={model.stage} />}
-      {primaryBlocks.map((block) => (
+      {display.showStageAtTop && <StageCard stage={model.stage} />}
+      {display.primaryBlocks.map((block) => (
         block.type === 'commands' ? (
           <CommandRunGroup key={block.id} items={block.items} expandAll={expandAll} />
         ) : (
@@ -79,12 +68,12 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
           />
         )
       ))}
-      {showDiagnosticDetails && (
-        <TimelineFold title={diagnosticFoldTitle(model)} count={diagnosticCount} defaultOpen={expandAll}>
+      {display.showDiagnosticDetails && (
+        <TimelineFold title={diagnosticFoldTitle(model)} count={display.diagnosticCount} defaultOpen={expandAll}>
           {model.diagnostics.map((diagnostic, index) => (
             <DiagnosticCard key={`${diagnostic.title}-${index}`} diagnostic={diagnostic} />
           ))}
-          {grouped.connection.map((item) => (
+          {display.grouped.connection.map((item) => (
             <TimelineRow
               key={item.id}
               item={item}
@@ -94,11 +83,11 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
               onApprove={onApprove}
             />
           ))}
-          {showCoverageInDiagnostics && <CoverageStrip model={model} />}
+          {display.showCoverageInDiagnostics && <CoverageStrip model={model} />}
         </TimelineFold>
       )}
-      <TimelineFold title="运行摘要" count={grouped.summary.length} defaultOpen={expandAll}>
-        {grouped.summary.map((item) => (
+      <TimelineFold title="运行摘要" count={display.grouped.summary.length} defaultOpen={expandAll}>
+        {display.grouped.summary.map((item) => (
           <TimelineRow
             key={item.id}
             item={item}
@@ -111,6 +100,41 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
       </TimelineFold>
     </div>
   )
+}
+
+export function taskTimelineHasVisibleDetails(model: TaskTimelineModel, options: TaskTimelineDisplayOptions = {}) {
+  return buildTimelineDisplay(model, options).hasVisibleTimeline
+}
+
+function buildTimelineDisplay(model: TaskTimelineModel, {
+  completed = false,
+  hideAssistantReplies = false,
+}: TaskTimelineDisplayOptions) {
+  const rawDisplayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
+  const displayItems = rawDisplayItems
+    .filter((item) => !isCurrentStageSourceItem(model.stage, item))
+  const grouped = groupTimelineItems(displayItems, completed, model.stage.tone)
+  const primaryBlocks = groupPrimaryTimelineBlocks(grouped.primary)
+  const hasApprovalItem = grouped.primary.some((item) => item.kind === 'approval' && item.tone === 'approval')
+  const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
+  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, grouped.connection)
+  const showCoverageInDiagnostics = showDiagnosticDetails && hasActiveCoverage(model)
+  const diagnosticCount = showDiagnosticDetails
+    ? grouped.connection.length + model.diagnostics.length + (showCoverageInDiagnostics ? 1 : 0)
+    : 0
+  const hasVisibleTimeline = showStageAtTop
+    || primaryBlocks.length > 0
+    || diagnosticCount > 0
+    || grouped.summary.length > 0
+  return {
+    grouped,
+    primaryBlocks,
+    showStageAtTop,
+    showDiagnosticDetails,
+    showCoverageInDiagnostics,
+    diagnosticCount,
+    hasVisibleTimeline,
+  }
 }
 
 function groupPrimaryTimelineBlocks(items: TimelineItem[]): PrimaryTimelineBlock[] {

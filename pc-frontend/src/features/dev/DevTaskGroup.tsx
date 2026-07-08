@@ -7,7 +7,7 @@
  *  - 中间回复片段和命令按发生顺序穿插在过程面板中，任务结束后再折叠
  */
 import { memo, useState, useEffect, useRef } from 'react'
-import TaskTimeline from './TaskTimeline'
+import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
@@ -50,15 +50,12 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const timeline = buildTaskTimeline(progressMsgs, resultMsg, {
     assistantNoteCount: assistantNotes.length,
   })
-  const progressCount = timeline.visibleStepCount
   const status = statusForTaskGroup(task, isDone, resultMsg)
   const progressStatus = progressStatusForStage(status, timeline.stage.tone, timeline.stage.label, isDone)
   const forceProcessOpen = timeline.stage.key === 'approval'
   const displayCollapsed = forceProcessOpen ? false : collapsed
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const richRequest = taskRequestLooksMarkdown(request)
-  const hasProgressDetails = progressCount > 0
-  const showProgressPanel = hasProgressDetails || !isDone
   const tone = status.tone
   const compactCompletedProcess = isDone && !!resultMsg
   const assistantTimelineItems = assistantTimelineItemsFromTimeline(timeline)
@@ -67,6 +64,12 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
   const hasPublicAssistantItems = publicAssistantItems.length > 0
   const hideTimelineAssistantReplies = assistantTimelineItems.length > 0
+  const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
+    completed: compactCompletedProcess,
+    hideAssistantReplies: hideTimelineAssistantReplies,
+  })
+  const progressCount = hasProgressDetails ? timeline.visibleStepCount : 0
+  const showProgressPanel = hasProgressDetails || !isDone
   const canCancel = !!taskId && !isDone && !!onCancel
   const requestAuthor = userDisplayName(userMsg, user)
   const requestTime = messageTime(userMsg) || messageTime(headerMsg)
