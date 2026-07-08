@@ -55,6 +55,68 @@
   white-space: nowrap;
 }
 
+.card[data-mode="stream"] {
+  gap: 7px;
+  border-color: transparent;
+  padding: 2px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.streamLine {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 2px 0 0;
+}
+
+.streamText {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.streamKicker {
+  color: #7f8ca3;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.streamText strong {
+  color: #eef3fb;
+  font-size: 13px;
+  font-weight: 730;
+  line-height: 1.45;
+}
+
+.streamText p {
+  margin: 0;
+  color: #9daabd;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.card[data-mode="stream"] .statusDot {
+  margin-top: 7px;
+}
+
+.card[data-mode="stream"] .cancelButton {
+  height: 26px;
+  border-color: rgba(218, 55, 60, .18);
+  background: transparent;
+  color: #e59aa0;
+  padding: 0 8px;
+}
+
+.card[data-mode="stream"] .cancelButton:hover {
+  border-color: rgba(218, 55, 60, .34);
+  background: rgba(218, 55, 60, .09);
+  color: #ffb1b4;
+}
+
 .header {
   min-width: 0;
   display: grid;
@@ -207,12 +269,40 @@
   color: #c7d1e0;
 }
 
+.streamDetailButton {
+  width: max-content;
+  max-width: 100%;
+  min-height: 25px;
+  justify-content: flex-start;
+  gap: 5px;
+  border-color: transparent;
+  padding: 0 0 0 19px;
+  background: transparent;
+  color: #7f8ca3;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.streamDetailButton:hover {
+  border-color: transparent;
+  background: transparent;
+  color: #c7d1e0;
+}
+
 @media (max-width: 640px) {
   .card {
     padding: 11px;
   }
 
+  .card[data-mode="stream"] {
+    padding: 1px 0 0;
+  }
+
   .header {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .streamLine {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
