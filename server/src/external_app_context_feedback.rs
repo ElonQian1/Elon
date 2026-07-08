@@ -350,6 +350,9 @@ async fn send_feedback_request_with_client(
     }
 }
 
-
 mod helpers;
 use self::helpers::*;
+
+#[cfg(test)]
+#[path = "external_app_context_feedback_tests.rs"]
+mod tests;

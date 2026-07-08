@@ -76,7 +76,7 @@ use pc_binding::{
 #[cfg(test)]
 use pc_binding::{
     pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
-    pc_workspace_inspect_usable,
+    pc_workspace_inspect_usable, pc_workspace_inspect_usable_for_route,
 };
 use routing::run_for_project_in_workspace_with_routing;
 use runtime_binding::resolve_pc_project_runtime_binding;

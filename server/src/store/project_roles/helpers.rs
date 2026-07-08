@@ -3,16 +3,18 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashSet;
 
 use super::{
-    new_id, now, ProjectMemberRoleRef, ProjectRoleEntry,
-    ALL_ROLE_PERMISSIONS, BUILTIN_ROLES,
-    PERMISSION_VIEW_MEMBERS, PERMISSION_SEND_MESSAGES, PERMISSION_INVITE_MEMBERS,
-    PERMISSION_MANAGE_MEMBERS, PERMISSION_MODERATE_MEMBERS, PERMISSION_VIEW_AUDIT_LOG,
-    PERMISSION_MANAGE_ROLES, PERMISSION_MANAGE_PROJECT_SETTINGS,
-    project_role_level_locked, builtin_project_role_permissions,
-    builtin_project_role_level, normalize_builtin_project_member_role,
+    builtin_project_role_level, builtin_project_role_permissions, new_id,
+    normalize_builtin_project_member_role, now, project_role_level_locked, ProjectMemberRoleRef,
+    ProjectRoleEntry, ALL_ROLE_PERMISSIONS, BUILTIN_ROLES, PERMISSION_INVITE_MEMBERS,
+    PERMISSION_MANAGE_MEMBERS, PERMISSION_MANAGE_PROJECT_SETTINGS, PERMISSION_MANAGE_ROLES,
+    PERMISSION_MODERATE_MEMBERS, PERMISSION_SEND_MESSAGES, PERMISSION_VIEW_AUDIT_LOG,
+    PERMISSION_VIEW_MEMBERS,
 };
 
-pub(super) fn list_project_roles_locked(conn: &Connection, project_id: &str) -> Result<Vec<ProjectRoleEntry>> {
+pub(super) fn list_project_roles_locked(
+    conn: &Connection,
+    project_id: &str,
+) -> Result<Vec<ProjectRoleEntry>> {
     ensure_project_exists(conn, project_id)?;
     let mut entries = Vec::new();
     for (id, name, color, position) in BUILTIN_ROLES {
@@ -69,7 +71,9 @@ pub(super) fn project_role_entry_locked(
     Ok(entry)
 }
 
-pub(super) fn project_role_entry_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectRoleEntry> {
+pub(super) fn project_role_entry_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<ProjectRoleEntry> {
     let permissions_json: String = row.get(5)?;
     let permissions = serde_json::from_str::<Vec<String>>(&permissions_json).unwrap_or_default();
     Ok(ProjectRoleEntry {
@@ -169,7 +173,10 @@ pub(super) fn project_member_role_ref_locked(
     }))
 }
 
-pub(super) fn builtin_project_member_role_ref(project_id: &str, role: &str) -> Option<ProjectMemberRoleRef> {
+pub(super) fn builtin_project_member_role_ref(
+    project_id: &str,
+    role: &str,
+) -> Option<ProjectMemberRoleRef> {
     let key = canonical_project_role_key(role);
     BUILTIN_ROLES
         .iter()
@@ -197,7 +204,11 @@ pub(super) fn builtin_project_member_role_ref(project_id: &str, role: &str) -> O
         })
 }
 
-pub(super) fn custom_role_exists_locked(conn: &Connection, project_id: &str, role_id: &str) -> Result<bool> {
+pub(super) fn custom_role_exists_locked(
+    conn: &Connection,
+    project_id: &str,
+    role_id: &str,
+) -> Result<bool> {
     let count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM project_roles WHERE project_id = ?1 AND id = ?2",
         params![project_id, role_id],
@@ -206,7 +217,11 @@ pub(super) fn custom_role_exists_locked(conn: &Connection, project_id: &str, rol
     Ok(count > 0)
 }
 
-pub(super) fn ensure_custom_role_exists(conn: &Connection, project_id: &str, role_id: &str) -> Result<()> {
+pub(super) fn ensure_custom_role_exists(
+    conn: &Connection,
+    project_id: &str,
+    role_id: &str,
+) -> Result<()> {
     if !custom_role_exists_locked(conn, project_id, role_id)? {
         anyhow::bail!("角色不存在或不是自定义角色");
     }
@@ -248,7 +263,11 @@ pub(super) fn project_role_member_count_locked(
     .map_err(Into::into)
 }
 
-pub(super) fn sort_project_role_keys_locked(conn: &Connection, project_id: &str, roles: &mut [String]) {
+pub(super) fn sort_project_role_keys_locked(
+    conn: &Connection,
+    project_id: &str,
+    roles: &mut [String],
+) {
     roles.sort_by(|left, right| {
         let left_level = project_role_level_locked(conn, project_id, left).unwrap_or(0);
         let right_level = project_role_level_locked(conn, project_id, right).unwrap_or(0);
@@ -328,8 +347,3 @@ pub(super) fn canonical_project_role_key(role: &str) -> String {
         .unwrap_or(key.as_str())
         .to_string()
 }
-
-
-#[cfg(test)]
-#[path = "project_roles_tests.rs"]
-mod tests;

@@ -1,9 +1,9 @@
+use anyhow::{anyhow, bail, Context, Result};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use anyhow::{anyhow, bail, Context, Result};
 
 use elon_pc_dev_runtime::{ensure_project_scaffold, ProjectScaffoldRequest};
 
@@ -12,8 +12,8 @@ use crate::pc_workspace_git_remote::clean_git_branch;
 use crate::project_default_docs::ensure_default_docs_in_workspace;
 
 use super::{
-    ConversationWorkspaceResult, ProjectWorkspaceRequest,
-    CONVERSATION_MERGE_LOCKS, CONVERSATION_MERGE_PUSH_ATTEMPTS,
+    ConversationWorkspaceResult, ProjectWorkspaceRequest, CONVERSATION_MERGE_LOCKS,
+    CONVERSATION_MERGE_PUSH_ATTEMPTS,
 };
 
 pub(super) fn completion_origin_refs(workspace: &ConversationWorkspaceResult) -> Vec<String> {
@@ -323,8 +323,3 @@ pub(super) fn git_path_buf(path: &Path) -> PathBuf {
 pub(super) fn git_path_buf(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
-
-
-#[cfg(test)]
-#[path = "pc_workspace_provisioner_tests.rs"]
-mod tests;

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use crate::external_app_context_config::FB2_APP_ID;
 use crate::external_app_context_source_validation::validate_reply_sources;
 
-use super::{MAX_CITED_SOURCES, FEEDBACK_NOTE_MAX_CHARS};
+use super::{FEEDBACK_NOTE_MAX_CHARS, MAX_CITED_SOURCES};
 
 pub(super) fn feedback_context_needs_platform_order_scope(context: &Value) -> bool {
     // fb2 会按 context_audit_id 复核最初拉取 Context Pack 时的 scope。
@@ -416,8 +416,3 @@ pub(super) fn truncate_chars(value: &str, max_chars: usize) -> String {
     }
     out
 }
-
-
-#[cfg(test)]
-#[path = "external_app_context_feedback_tests.rs"]
-mod tests;

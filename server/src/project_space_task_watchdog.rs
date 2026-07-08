@@ -29,6 +29,14 @@ impl ChannelAiPendingTools {
         }
     }
 
+    #[cfg(test)]
+    fn new_with_timeout(timeout: Duration) -> Self {
+        Self {
+            queue: VecDeque::new(),
+            timeout,
+        }
+    }
+
     pub(crate) fn note_event(&mut self, event_type: &str, value: &serde_json::Value) {
         match event_type {
             "tool_call" => self.queue.push_back(pending_tool_from_event(value)),
@@ -44,11 +52,8 @@ impl ChannelAiPendingTools {
         !self.queue.is_empty()
     }
 
-    pub(crate) fn idle_timed_out(
-        &self,
-        last_effective_progress_at: Instant,
-        timeout: Duration,
-    ) -> bool {
+    #[cfg(test)]
+    fn idle_timed_out(&self, last_effective_progress_at: Instant, timeout: Duration) -> bool {
         !self.has_pending() && last_effective_progress_at.elapsed() >= timeout
     }
 
@@ -147,6 +152,8 @@ fn truncate_tool_summary(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
     use super::ChannelAiPendingTools;
 
     #[test]
@@ -183,5 +190,41 @@ mod tests {
             pending_tools.note_event(terminal_event, &serde_json::json!({}));
             assert!(!pending_tools.has_pending());
         }
+    }
+
+    #[test]
+    fn pending_tool_blocks_heartbeat_only_idle_timeout() {
+        let mut pending_tools = ChannelAiPendingTools::new();
+        let long_ago = Instant::now() - Duration::from_secs(3600);
+
+        assert!(pending_tools.idle_timed_out(long_ago, Duration::from_secs(180)));
+
+        pending_tools.note_event(
+            "tool_call",
+            &serde_json::json!({
+                "tool": "shell",
+                "args": { "command": "cargo test --workspace" }
+            }),
+        );
+
+        assert!(!pending_tools.idle_timed_out(long_ago, Duration::from_secs(180)));
+
+        pending_tools.note_event("tool_result", &serde_json::json!({}));
+        assert!(pending_tools.idle_timed_out(long_ago, Duration::from_secs(180)));
+    }
+
+    #[test]
+    fn pending_tool_uses_tool_result_timeout() {
+        let mut pending_tools = ChannelAiPendingTools::new_with_timeout(Duration::from_secs(1800));
+        pending_tools.note_event(
+            "tool_call",
+            &serde_json::json!({
+                "tool": "shell",
+                "args": { "command": "npm run build" }
+            }),
+        );
+
+        assert!(pending_tools.has_pending());
+        assert!(pending_tools.timed_out().is_none());
     }
 }

@@ -436,6 +436,9 @@ pub fn conversation_workspace_head_landed(workspace: &ConversationWorkspaceResul
     Ok(false)
 }
 
-
 mod git_helpers;
 use self::git_helpers::*;
+
+#[cfg(test)]
+#[path = "pc_workspace_provisioner_tests.rs"]
+mod tests;

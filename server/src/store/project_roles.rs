@@ -414,6 +414,9 @@ pub(super) fn builtin_project_role_permissions(role: &str) -> Option<Vec<String>
     )
 }
 
-
 mod helpers;
 use self::helpers::*;
+
+#[cfg(test)]
+#[path = "project_roles_tests.rs"]
+mod tests;
