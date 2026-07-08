@@ -30,27 +30,30 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const [storageNodes, setStorageNodes] = useState<ProjectNode[]>([])
   const [nodesLoading, setNodesLoading] = useState(true)
   const [nodesError, setNodesError] = useState('')
+  const [knownNodeCount, setKnownNodeCount] = useState(0)
   const [storageHint, setStorageHint] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     loadNodes()
-
   }, [])
 
   async function loadNodes() {
     setNodesLoading(true)
     setNodesError('')
+    setSelectedNode('')
     try {
       const data = await api.get<{ nodes?: ProjectNode[] }>('/api/me/nodes')
-      const online = (data.nodes ?? []).filter((n) => n?.online && nodeId(n))
+      const allNodes = data.nodes ?? []
+      const online = allNodes.filter((n) => n?.online && nodeId(n))
       const ordered = [...online].sort(
         (a, b) => Number(!nodeCanAccept(a)) - Number(!nodeCanAccept(b)),
       )
       const storage = online.filter(
         (n) => (n.storage_ready || n.storage?.enabled) && n.storage_repo_url_configured,
       )
+      setKnownNodeCount(allNodes.filter(nodeId).length)
       setNodes(ordered)
       setStorageNodes(storage)
       setStorageHint(
@@ -59,9 +62,12 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
           : '项目会直接创建在所选开发环境上。',
       )
       const firstSelectable = ordered.find(nodeCanAccept)
-      if (firstSelectable) setSelectedNode(nodeId(firstSelectable))
+      setSelectedNode(firstSelectable ? nodeId(firstSelectable) : '')
     } catch (err) {
       setNodesError((err as { message?: string }).message ?? '加载失败')
+      setKnownNodeCount(0)
+      setNodes([])
+      setStorageNodes([])
     } finally {
       setNodesLoading(false)
     }
@@ -97,6 +103,53 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
       setSubmitting(false)
     }
   }
+
+  const selectableNodeCount = nodes.filter(nodeCanAccept).length
+  const nodeSelectStatus = nodesLoading
+    ? (quickMode ? '正在加载…' : '正在加载可用开发环境…')
+    : nodesError
+      ? nodesError
+      : nodes.length === 0
+        ? (knownNodeCount > 0 ? '开发环境离线' : '没有在线开发环境')
+        : selectableNodeCount === 0
+          ? '暂无可创建项目的开发环境'
+          : ''
+  const firstBlockedNode = nodes.find((n) => !nodeCanAccept(n))
+  const firstBlockedWarning = Array.isArray(firstBlockedNode?.capacity_warnings)
+    ? clean(firstBlockedNode?.capacity_warnings[0])
+    : ''
+  const nodeHint = nodesLoading || nodesError
+    ? ''
+    : nodes.length === 0
+      ? (knownNodeCount > 0
+        ? '你的开发环境当前不在线。请启动本机 PC 节点，登录后再刷新页面。'
+        : '还没有检测到你的开发环境。请先启动本机 PC 节点，登录后它会自动绑定到当前账号。')
+      : selectableNodeCount === 0
+        ? (firstBlockedWarning || '在线开发环境暂不能创建项目，请到节点页检查运行时和容量状态。')
+        : ''
+  const nodeSelect = (
+    <label className={styles.field}>
+      <span>开发环境</span>
+      <select
+        value={selectedNode}
+        onChange={(e) => setSelectedNode(e.target.value)}
+        disabled={nodesLoading || !!nodesError}
+      >
+        {nodeSelectStatus && <option value="">{nodeSelectStatus}</option>}
+        {nodes.map((n) => {
+          const id = nodeId(n)
+          const canAccept = nodeCanAccept(n)
+          return (
+            <option key={id} value={id} disabled={!canAccept}>
+              {nodeLabel(n)}
+            </option>
+          )
+        })}
+      </select>
+      {nodeHint && <small className={styles.hint}>{nodeHint}</small>}
+    </label>
+  )
+  const submitDisabled = submitting || nodesLoading || !!nodesError || !selectedNode
 
   const modal = (
     <>
@@ -141,29 +194,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
 
           {!quickMode && (
             <>
-              <label className={styles.field}>
-                <span>开发环境</span>
-                <select
-                  value={selectedNode}
-                  onChange={(e) => setSelectedNode(e.target.value)}
-                  disabled={nodesLoading || !!nodesError}
-                >
-                  {nodesLoading && <option>正在加载可用开发环境…</option>}
-                  {nodesError && <option>{nodesError}</option>}
-                  {!nodesLoading && !nodesError && nodes.length === 0 && (
-                    <option value="">没有在线开发环境</option>
-                  )}
-                  {nodes.map((n) => {
-                    const id = nodeId(n)
-                    const canAccept = nodeCanAccept(n)
-                    return (
-                      <option key={id} value={id} disabled={!canAccept}>
-                        {nodeLabel(n)}
-                      </option>
-                    )
-                  })}
-                </select>
-              </label>
+              {nodeSelect}
 
               <label className={styles.field}>
                 <span>代码存储</span>
@@ -193,20 +224,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
           )}
 
           {quickMode && (
-            <label className={styles.field}>
-              <span>开发环境</span>
-              <select
-                value={selectedNode}
-                onChange={(e) => setSelectedNode(e.target.value)}
-                disabled={nodesLoading || !!nodesError}
-              >
-                {nodesLoading && <option>正在加载…</option>}
-                {!nodesLoading && nodes.map((n) => {
-                  const id = nodeId(n)
-                  return <option key={id} value={id} disabled={!nodeCanAccept(n)}>{nodeLabel(n)}</option>
-                })}
-              </select>
-            </label>
+            nodeSelect
           )}
 
           {error && <p className={styles.error}>{error}</p>}
@@ -217,7 +235,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
                 取消
               </button>
             )}
-            <button type="submit" className={styles.submitBtn} disabled={submitting}>
+            <button type="submit" className={styles.submitBtn} disabled={submitDisabled}>
               {submitting ? '创建中…' : quickMode ? '创建项目' : '创建'}
             </button>
           </div>
