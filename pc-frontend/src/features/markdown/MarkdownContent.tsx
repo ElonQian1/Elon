@@ -235,7 +235,7 @@ function CodeBlock({ code, className, showCopy }: { code: string; className?: st
     <div className={styles.codeBlock}>
       {lang && <div className={styles.codeLang}>{lang}</div>}
       {showCopy && (
-        <button className={styles.copyBtn} onClick={handleCopy} type="button" data-state={copyState}>
+        <button className={styles.copyBtn} onClick={handleCopy} type="button" data-state={copyState} data-copy-exclude="true">
           {copyLabel}
         </button>
       )}

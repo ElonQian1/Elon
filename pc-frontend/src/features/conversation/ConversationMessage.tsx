@@ -7,7 +7,7 @@ import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext, taskResultDisplayText, taskResultTone } from '../dev/devTaskUtils'
 import { formatTime } from '../../lib/utils'
 import UserAvatar from '../shell/UserAvatar'
-import MessageActions from '../message-actions/MessageActions'
+import MessageActions, { messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './ConversationPage.module.css'
 
 interface MessageItemProps {
@@ -49,6 +49,8 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
       ?? message.taskId
       ?? `${kind}:${message.created_at ?? ''}:${content.slice(0, 80)}`,
   )
+  const stableMessageActionKey = messageActionKey || `${kind}:${content.length}`
+  const copySourceId = messageCopySourceId('project-conversation', stableMessageActionKey)
   const taskTone = terminalTask ? taskResultTone(message.task_status ?? message.taskStatus, content) : null
   const taskStatusLabel = taskTone === 'failed' ? '任务失败' : taskTone === 'canceled' ? '任务已停止' : ''
   const contentClassName = [
@@ -82,20 +84,21 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
           {time && <span>{time}</span>}
         </div>
         {hasMarkdown ? (
-          <div className={[contentClassName, styles.markdownMsg].filter(Boolean).join(' ')}>
+          <div id={copySourceId} className={[contentClassName, styles.markdownMsg].filter(Boolean).join(' ')}>
             {taskStatusLabel && <span className={styles.taskStatusLabel}>{taskStatusLabel}</span>}
             <MarkdownContent content={content} copy={isAi} />
           </div>
         ) : (
-          <div className={contentClassName}>
+          <div id={copySourceId} className={contentClassName}>
             {taskStatusLabel && <span className={styles.taskStatusLabel}>{taskStatusLabel}</span>}
             {content}
           </div>
         )}
         <MessageActions
           content={content}
-          messageKey={messageActionKey || `${kind}:${content.length}`}
+          messageKey={stableMessageActionKey}
           storageScope="project-conversation"
+          richCopySourceId={copySourceId}
           align={isOwn ? 'right' : 'left'}
           onFork={onForkMessage ? () => onForkMessage(message, content) : undefined}
         />

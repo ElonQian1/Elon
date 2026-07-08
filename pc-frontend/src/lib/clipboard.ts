@@ -36,3 +36,64 @@ function fallbackCopyText(text: string): boolean {
     document.body.removeChild(textarea)
   }
 }
+
+export type RichClipboardResult = 'rich' | 'text' | 'failed'
+
+export async function copyRichTextToClipboard(html: string, fallbackText: string): Promise<RichClipboardResult> {
+  if (html && typeof navigator !== 'undefined' && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([fallbackText], { type: 'text/plain' }),
+        }),
+      ])
+      return 'rich'
+    } catch {
+      // Fall back to Markdown/plain text when rich clipboard writes are unavailable.
+    }
+  }
+
+  return await copyTextToClipboard(fallbackText) ? 'text' : 'failed'
+}
+
+export function sanitizedRichHtmlFromElement(element: HTMLElement | null): string {
+  if (!element) return ''
+
+  const clone = element.cloneNode(true) as HTMLElement
+  clone
+    .querySelectorAll('script, style, iframe, object, embed, form, input, textarea, select, button, [data-copy-exclude="true"]')
+    .forEach((node) => node.remove())
+
+  clone.querySelectorAll('*').forEach((node) => {
+    if (!(node instanceof HTMLElement)) return
+    for (const attr of Array.from(node.attributes)) {
+      const name = attr.name.toLowerCase()
+      if (name.startsWith('on') || name === 'style' || name === 'class' || name.startsWith('data-') || name.startsWith('aria-')) {
+        node.removeAttribute(attr.name)
+      }
+    }
+
+    if (node instanceof HTMLAnchorElement) {
+      if (!isSafeCopyUrl(node.getAttribute('href'))) node.removeAttribute('href')
+      node.removeAttribute('target')
+      node.removeAttribute('rel')
+    }
+
+    if (node instanceof HTMLImageElement && !isSafeCopyImageUrl(node.getAttribute('src'))) {
+      node.removeAttribute('src')
+    }
+  })
+
+  return `<div>${clone.innerHTML.trim()}</div>`
+}
+
+function isSafeCopyUrl(value: string | null): boolean {
+  if (!value) return false
+  return /^(https?:|mailto:|tel:|\/|#)/i.test(value)
+}
+
+function isSafeCopyImageUrl(value: string | null): boolean {
+  if (!value) return false
+  return /^(https?:|data:image\/(?:png|jpeg|jpg|gif|webp);base64,|\/)/i.test(value)
+}

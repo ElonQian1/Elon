@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/auth'
 import { clean, formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import MarkdownContent from '../markdown/MarkdownContent'
-import MessageActions from '../message-actions/MessageActions'
+import MessageActions, { messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './FriendsPage.module.css'
 
 interface Friend {
@@ -537,6 +537,8 @@ export default function FriendsPage() {
               : displayMessageContentOrAttachment(m.content)
             const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(content)
             const messageActionKey = m.id || `${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}:${m.created_at}:${i}`
+            const messageStorageScope = `friends:${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}`
+            const copySourceId = messageCopySourceId(messageStorageScope, messageActionKey)
             const senderName = isMe
               ? (me?.nickname ?? me?.account ?? '我')
               : (activeItem?.kind === 'group'
@@ -553,12 +555,13 @@ export default function FriendsPage() {
                     <span>{formatTime(m.created_at)}</span>
                   </div>
                   {hasMarkdown
-                    ? <div className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
-                    : <div className={styles.msgContent}>{content}</div>}
+                    ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy={false} /></div>
+                    : <div id={copySourceId} className={styles.msgContent}>{content}</div>}
                   <MessageActions
                     content={content}
                     messageKey={messageActionKey}
-                    storageScope={`friends:${activeConversation?.kind ?? 'chat'}:${activeConversation?.id ?? 'unknown'}`}
+                    storageScope={messageStorageScope}
+                    richCopySourceId={copySourceId}
                     align={isMe ? 'right' : 'left'}
                   />
                 </div>

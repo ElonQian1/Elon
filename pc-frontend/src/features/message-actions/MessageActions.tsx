@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, Copy, GitFork, ThumbsDown, ThumbsUp } from 'lucide-react'
-import { copyTextToClipboard } from '../../lib/clipboard'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Check, ChevronDown, Copy, GitFork, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { copyRichTextToClipboard, copyTextToClipboard, sanitizedRichHtmlFromElement } from '../../lib/clipboard'
 import styles from './MessageActions.module.css'
 
 export type MessageFeedbackValue = 'up' | 'down' | null
+type CopyStatus = 'idle' | 'markdown' | 'rich' | 'failed'
 
 interface MessageActionsProps {
   content: string
   messageKey: string
   storageScope: string
   align?: 'left' | 'right'
+  richCopySourceId?: string
   onFeedbackChange?: (value: MessageFeedbackValue) => void
   onFork?: () => void | Promise<void>
 }
@@ -21,13 +23,16 @@ export default function MessageActions({
   messageKey,
   storageScope,
   align = 'left',
+  richCopySourceId,
   onFeedbackChange,
   onFork,
 }: MessageActionsProps) {
   const text = content.trim()
-  const [copied, setCopied] = useState(false)
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle')
+  const [copyMenuOpen, setCopyMenuOpen] = useState(false)
   const [forking, setForking] = useState(false)
   const [feedback, setFeedback] = useState<MessageFeedbackValue>(null)
+  const copyMenuRef = useRef<HTMLDivElement>(null)
 
   const storageKey = useMemo(() => {
     const scope = normalizeStorageSegment(storageScope)
@@ -42,16 +47,44 @@ export default function MessageActions({
   }, [storageKey])
 
   useEffect(() => {
-    if (!copied) return
-    const timer = window.setTimeout(() => setCopied(false), 1200)
+    if (copyStatus === 'idle') return
+    const timer = window.setTimeout(() => setCopyStatus('idle'), 1400)
     return () => window.clearTimeout(timer)
-  }, [copied])
+  }, [copyStatus])
+
+  useEffect(() => {
+    if (!copyMenuOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      if (copyMenuRef.current?.contains(event.target as Node)) return
+      setCopyMenuOpen(false)
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setCopyMenuOpen(false)
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [copyMenuOpen])
 
   if (!text) return null
 
-  async function handleCopy() {
+  async function copyMarkdown() {
     const ok = await copyTextToClipboard(text)
-    setCopied(ok)
+    setCopyStatus(ok ? 'markdown' : 'failed')
+    setCopyMenuOpen(false)
+  }
+
+  async function copyRichText() {
+    const html = sanitizedRichHtmlFromElement(richCopySourceId ? document.getElementById(richCopySourceId) : null)
+    const result = await copyRichTextToClipboard(html, text)
+    setCopyStatus(result === 'rich' ? 'rich' : result === 'text' ? 'markdown' : 'failed')
+    setCopyMenuOpen(false)
   }
 
   function handleFeedback(next: Exclude<MessageFeedbackValue, null>) {
@@ -82,18 +115,37 @@ export default function MessageActions({
     styles.actions,
     align === 'right' ? styles.right : styles.left,
   ].join(' ')
+  const copied = copyStatus === 'markdown' || copyStatus === 'rich'
+  const copyTitle = copyStatus === 'markdown'
+    ? '已复制为 Markdown'
+    : copyStatus === 'rich'
+      ? '已复制为富文本'
+      : copyStatus === 'failed'
+        ? '复制失败'
+        : '复制'
 
   return (
     <div className={containerClassName} role="group" aria-label="消息操作">
-      <button
-        className={[styles.button, copied ? styles.copied : ''].filter(Boolean).join(' ')}
-        type="button"
-        title={copied ? '已复制' : '复制'}
-        aria-label={copied ? '已复制' : '复制消息'}
-        onClick={handleCopy}
-      >
-        {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
-      </button>
+      <div className={styles.copyMenuWrap} ref={copyMenuRef}>
+        <button
+          className={[styles.button, copied ? styles.copied : copyStatus === 'failed' ? styles.copyFailed : ''].filter(Boolean).join(' ')}
+          type="button"
+          title={copyTitle}
+          aria-label={copyTitle}
+          aria-haspopup="menu"
+          aria-expanded={copyMenuOpen}
+          onClick={() => setCopyMenuOpen((open) => !open)}
+        >
+          {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+          <ChevronDown className={styles.chevron} aria-hidden="true" />
+        </button>
+        {copyMenuOpen && (
+          <div className={styles.copyMenu} role="menu">
+            <button type="button" role="menuitem" onClick={copyMarkdown}>复制为 Markdown</button>
+            <button type="button" role="menuitem" onClick={copyRichText}>复制为富文本</button>
+          </div>
+        )}
+      </div>
       <button
         className={[styles.button, feedback === 'up' ? styles.activePositive : ''].filter(Boolean).join(' ')}
         type="button"
@@ -136,4 +188,8 @@ function normalizeStorageSegment(value: string): string {
     .trim()
     .replace(/[^a-zA-Z0-9._:-]+/g, '_')
     .slice(0, 120) || 'message'
+}
+
+export function messageCopySourceId(storageScope: string, messageKey: string): string {
+  return `message-copy-${normalizeStorageSegment(storageScope)}-${normalizeStorageSegment(messageKey)}`
 }

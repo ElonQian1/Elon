@@ -63,6 +63,62 @@
   stroke-width: 1.9;
 }
 
+.copyMenuWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.copyMenuWrap .button {
+  width: 34px;
+  grid-template-columns: 15px 9px;
+  column-gap: 1px;
+}
+
+.chevron {
+  width: 9px !important;
+  height: 9px !important;
+  stroke-width: 2.4 !important;
+}
+
+.copyMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  min-width: 142px;
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 8px;
+  background: rgba(24, 27, 33, .98);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .34);
+}
+
+.right .copyMenu {
+  right: 0;
+  left: auto;
+}
+
+.copyMenu button {
+  display: block;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copyMenu button:hover,
+.copyMenu button:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, .08);
+}
+
 .activePositive {
   color: var(--green, #58be6a);
   background: rgba(88, 190, 106, .12);
@@ -77,4 +133,8 @@
 
 .copied {
   color: var(--green, #58be6a);
+}
+
+.copyFailed {
+  color: #ef8a8a;
 }
