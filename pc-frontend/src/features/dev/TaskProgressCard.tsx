@@ -53,6 +53,7 @@ export default function TaskProgressCard({
   const showStatusLabel = displayStatus.tone !== 'done' && displayStatus.tone !== 'canceled' && displayStatus.tone !== 'approval'
   const summary = compactProcessSummary(processSummary, progressCount)
   const terseSummary = terseProcessSummary(summary)
+  const compactSummary = compact ? compactCompletedProcessSummary(summary, progressCount) : terseSummary
   const hasDetails = progressCount > 0
   const shouldExplainCurrentStage = shouldShowCurrentStageCopy(timeline.stage.key, timeline.stage.stuck, hasDetails)
   const showCurrent = timeline.stage.key === 'approval'
@@ -94,7 +95,7 @@ export default function TaskProgressCard({
           >
             <span className={styles.statusDot} aria-hidden="true" />
             <span className={styles.compactTitle}>{compactTitle}</span>
-            <span className={styles.compactSummary}>{terseSummary}</span>
+            {compactSummary && <span className={styles.compactSummary}>{compactSummary}</span>}
             {collapsed ? <ChevronRight size={15} /> : <ChevronDown size={15} />}
           </button>
           <StageActions state={stageActions} onContinue={onContinue} />
@@ -342,6 +343,17 @@ function compactProcessSummary(summary: string, progressCount: number): string {
   ].filter(Boolean)
   const compact = [step, ...priority].filter(Boolean).slice(0, 4)
   return compact.join(' · ') || parts.slice(0, 3).join(' · ') || fallback
+}
+
+function compactCompletedProcessSummary(summary: string, progressCount: number): string {
+  const parts = summary
+    .split(' · ')
+    .map((part) => terseProcessSummary(readableText(part)))
+    .filter(Boolean)
+  const step = parts.find((part) => /^[0-9]+\s*(步|项)$/.test(part))
+    ?? parts.find((part) => /[0-9]+\s*(步|项)/.test(part))
+  if (step) return `· ${step}`
+  return progressCount > 0 ? `· ${progressCount} 步` : ''
 }
 
 function actionStateForStage(stageKey: string, tone: TaskTone, canContinue: boolean): StageActionState {
