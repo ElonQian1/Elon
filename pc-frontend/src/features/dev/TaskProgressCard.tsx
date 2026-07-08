@@ -67,7 +67,7 @@ export default function TaskProgressCard({
             {streamCopy.detail && <p>{streamCopy.detail}</p>}
           </div>
           {canCancel && (
-            <button type="button" className={styles.cancelButton} onClick={onCancel}>
+            <button type="button" className={styles.cancelButton} onClick={onCancel} aria-label="停止任务" title="停止任务">
               <StopCircle size={14} />
               <span>停止</span>
             </button>

@@ -104,17 +104,31 @@
 }
 
 .card[data-mode="stream"] .cancelButton {
+  width: 26px;
   height: 26px;
+  justify-content: center;
+  align-self: start;
   border-color: rgba(218, 55, 60, .18);
   background: transparent;
   color: #e59aa0;
-  padding: 0 8px;
+  padding: 0;
+  opacity: .72;
 }
 
 .card[data-mode="stream"] .cancelButton:hover {
   border-color: rgba(218, 55, 60, .34);
   background: rgba(218, 55, 60, .09);
   color: #ffb1b4;
+  opacity: 1;
+}
+
+.card[data-mode="stream"] .cancelButton span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .header {
@@ -304,6 +318,15 @@
 
   .streamLine {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .card[data-mode="stream"] .streamLine {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .card[data-mode="stream"] .cancelButton {
+    grid-column: auto;
+    width: 26px;
   }
 
   .cancelButton {
