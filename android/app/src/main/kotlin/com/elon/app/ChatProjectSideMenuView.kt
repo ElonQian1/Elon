@@ -67,14 +67,14 @@ internal class ChatProjectSideMenuView(
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         setTextColor(Color.parseColor("#D9D9D9"))
-        textSize = 22f
+        textSize = SIDE_MENU_PRIMARY_TEXT_SP
     }
     private val profileStatusText = TextView(context).apply {
         includeFontPadding = false
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         setTextColor(Color.parseColor("#777777"))
-        textSize = 14f
+        textSize = SIDE_MENU_META_TEXT_SP
         setPadding(0, dp(7), 0, 0)
     }
     private var avatarView: View? = null
@@ -136,7 +136,7 @@ internal class ChatProjectSideMenuView(
             includeFontPadding = false
             text = "项目"
             setTextColor(Color.parseColor("#D9D9D9"))
-            textSize = 22f
+            textSize = SIDE_MENU_PRIMARY_TEXT_SP
             setTypeface(typeface, Typeface.NORMAL)
         })
     }
@@ -202,7 +202,7 @@ internal class ChatProjectSideMenuView(
                 includeFontPadding = false
                 text = "项目中心"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 22f
+                textSize = SIDE_MENU_PRIMARY_TEXT_SP
             })
             addView(TextView(context).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(42), LinearLayout.LayoutParams.MATCH_PARENT)
@@ -210,7 +210,7 @@ internal class ChatProjectSideMenuView(
                 includeFontPadding = false
                 text = "›"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 36f
+                textSize = SIDE_MENU_CHEVRON_TEXT_SP
             })
         }
     }
@@ -227,13 +227,13 @@ internal class ChatProjectSideMenuView(
                 includeFontPadding = false
                 text = "推荐"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 22f
+                textSize = SIDE_MENU_PRIMARY_TEXT_SP
             })
             addView(TextView(context).apply {
                 includeFontPadding = false
                 text = " ↪"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 24f
+                textSize = SIDE_MENU_ICON_TEXT_SP
                 setPadding(dp(8), 0, 0, 0)
             })
         }
@@ -261,7 +261,7 @@ internal class ChatProjectSideMenuView(
                 ellipsize = TextUtils.TruncateAt.END
                 text = "应用介绍：${project?.projectCardIntroduction() ?: "一款自动化电商工作流的AI智能"}"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 16f
+                textSize = SIDE_MENU_BODY_TEXT_SP
                 setLineSpacing(dp(3).toFloat(), 1f)
             })
             addView(previewStrip())
@@ -308,7 +308,7 @@ internal class ChatProjectSideMenuView(
                     ellipsize = TextUtils.TruncateAt.END
                     text = project?.title?.takeIf { it.isNotBlank() } ?: "项目名称"
                     setTextColor(Color.parseColor("#D9D9D9"))
-                    textSize = 21f
+                    textSize = SIDE_MENU_PRIMARY_TEXT_SP
                 })
                 addView(metaText("创建者：${projectCreatorLabel(project)}"))
                 addView(metaText("版本：1.0"))
@@ -319,7 +319,7 @@ internal class ChatProjectSideMenuView(
                 includeFontPadding = false
                 text = "↗"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 34f
+                textSize = SIDE_MENU_OPEN_TEXT_SP
             })
         }
     }
@@ -422,7 +422,7 @@ internal class ChatProjectSideMenuView(
             contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(menuText(title).apply {
                 setTextColor(Color.parseColor("#D6D6D6"))
-                textSize = 22f
+                textSize = SIDE_MENU_PRIMARY_TEXT_SP
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.MATCH_PARENT
@@ -479,7 +479,7 @@ internal class ChatProjectSideMenuView(
     private fun emptyRow(text: String): TextView {
         return menuText(text).apply {
             setTextColor(Color.parseColor("#777777"))
-            textSize = 14f
+            textSize = SIDE_MENU_META_TEXT_SP
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
         }
     }
@@ -492,7 +492,7 @@ internal class ChatProjectSideMenuView(
             ellipsize = TextUtils.TruncateAt.END
             text = title
             setTextColor(Color.parseColor("#A8A8A8"))
-            textSize = 17f
+            textSize = SIDE_MENU_PRIMARY_TEXT_SP
         }
     }
 
@@ -503,7 +503,7 @@ internal class ChatProjectSideMenuView(
             ellipsize = TextUtils.TruncateAt.END
             text = value
             setTextColor(Color.parseColor("#777777"))
-            textSize = 15f
+            textSize = SIDE_MENU_SMALL_TEXT_SP
             setPadding(0, dp(6), 0, 0)
         }
     }
@@ -586,7 +586,7 @@ internal class ChatProjectSideMenuView(
             includeFontPadding = false
             text = value
             setTextColor(Color.parseColor("#D9D9D9"))
-            textSize = 14f
+            textSize = SIDE_MENU_META_TEXT_SP
         }
     }
 
@@ -664,7 +664,7 @@ internal class ChatProjectSideMenuView(
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(profile.displayName)
             setTextColor(Color.parseColor("#101010"))
-            textSize = 22f
+            textSize = SIDE_MENU_PRIMARY_TEXT_SP
             setTypeface(typeface, Typeface.BOLD)
             contentDescription = "头像"
         }
@@ -758,6 +758,13 @@ internal class ChatProjectSideMenuView(
         const val CLOSE_DELAY_MS = 220L
         const val PROFILE_DOCK_HEIGHT_DP = 148
         const val PROGRESSION_REFRESH_INTERVAL_MS = 60_000L
+        const val SIDE_MENU_PRIMARY_TEXT_SP = 17.5f
+        const val SIDE_MENU_BODY_TEXT_SP = 15f
+        const val SIDE_MENU_META_TEXT_SP = 14f
+        const val SIDE_MENU_SMALL_TEXT_SP = 13f
+        const val SIDE_MENU_ICON_TEXT_SP = 18f
+        const val SIDE_MENU_CHEVRON_TEXT_SP = 28f
+        const val SIDE_MENU_OPEN_TEXT_SP = 28f
         val progressionHttp = OkHttpClient()
     }
 }

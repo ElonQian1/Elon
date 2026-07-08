@@ -703,7 +703,7 @@
     .web-chat-side-menu h2 {
       margin: 0;
       color: var(--ink);
-      font-size: 22px;
+      font-size: 17.5px;
       font-weight: 400;
     }
     .web-chat-side-menu-head-actions {
@@ -839,12 +839,12 @@
       cursor: pointer;
     }
     .web-side-center-row span:first-child {
-      font-size: 22px;
+      font-size: 17.5px;
       font-weight: 400;
     }
     .web-side-chevron {
       color: var(--ink);
-      font-size: 36px;
+      font-size: 28px;
       line-height: 1;
       min-width: 42px;
       text-align: center;
@@ -855,7 +855,7 @@
       align-items: center;
       gap: 8px;
       color: var(--ink);
-      font-size: 22px;
+      font-size: 17.5px;
       font-weight: 400;
     }
     .web-side-feature {
@@ -899,26 +899,26 @@
     }
     .web-side-copy strong {
       color: var(--ink);
-      font-size: 21px;
+      font-size: 17.5px;
       font-weight: 400;
     }
     .web-side-copy small {
       margin-top: 6px;
       color: var(--ink-faint);
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 400;
     }
     .web-side-open {
       min-width: 48px;
       color: var(--ink);
-      font-size: 34px;
+      font-size: 28px;
       line-height: 1;
       text-align: center;
     }
     .web-side-desc {
       margin: 20px 0 0;
       color: var(--ink);
-      font-size: 16px;
+      font-size: 15px;
       line-height: 1.5;
     }
     .web-side-preview-row {
@@ -959,7 +959,7 @@
       cursor: pointer;
     }
     .web-side-folder-row span:first-child {
-      font-size: 22px;
+      font-size: 17.5px;
       font-weight: 400;
     }
     .web-side-folder-icon {
@@ -1026,7 +1026,7 @@
       display: grid;
       place-items: center;
       overflow: hidden;
-      font-size: 22px;
+      font-size: 17.5px;
       font-weight: 800;
     }
     .web-side-avatar img {
@@ -1047,7 +1047,7 @@
     }
     .web-side-user-copy strong {
       color: var(--ink);
-      font-size: 22px;
+      font-size: 17.5px;
       font-weight: 400;
     }
     .web-side-user-copy small {
@@ -3719,10 +3719,10 @@
           <span id="groupSummaryAction" class="summary-action">查看</span>
         </button>
         <div class="chat-list" id="chatList"></div>
-        <button id="chatSideMenuHandle" class="chat-side-menu-handle hidden" type="button" aria-label="展开侧面工具栏">
-          <img src="data:image/png;base64,__CHAT_SIDE_MENU_HANDLE_PNG_B64__" alt="" aria-hidden="true" />
-        </button>
       </div>
+      <button id="chatSideMenuHandle" class="chat-side-menu-handle hidden" type="button" aria-label="展开侧面工具栏">
+        <img src="data:image/png;base64,__CHAT_SIDE_MENU_HANDLE_PNG_B64__" alt="" aria-hidden="true" />
+      </button>
     </div>
 
     <!-- 项目页 -->
@@ -4996,13 +4996,22 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isAnyChatActive() {
     return !!currentProject || isContactChatActive();
   }
-  function isChatSideMenuHandleContextActive() {
+  function isChatHomeSideMenuContextActive() {
     return currentTab === 'chatPage' &&
+      !isAnyChatActive() &&
+      chatView &&
+      chatView.classList.contains('hidden') &&
+      conversationList &&
+      !conversationList.classList.contains('hidden');
+  }
+  function isChatSideMenuHandleContextActive() {
+    const activeChatContext = currentTab === 'chatPage' &&
       isAnyChatActive() &&
       chatView &&
       !chatView.classList.contains('hidden') &&
       inputBar &&
       inputBar.classList.contains('active');
+    return activeChatContext || isChatHomeSideMenuContextActive();
   }
   function updateChatSideMenuHandleToggleText() {
     if (chatHandleToggleSwitch) {
@@ -5243,7 +5252,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
   }
   function openWebChatSideMenu() {
-    if (!isAnyChatActive() || !webChatSideMenuMask) return;
+    if (!webChatSideMenuMask || !isChatSideMenuHandleContextActive()) return;
     syncWebChatSideMenu();
     retractWebChatSideMenuHandle();
     webChatSideMenuMask.classList.add('active');
@@ -5824,12 +5833,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     // 输入栏：聊天页进入项目/好友/群聊后显示
     inputBar.classList.toggle('active', inChat);
-    if (inChat) {
+    if (inChat || isChatHome) {
       syncChatSideMenuHandleVisibility(false);
     } else {
       hideWebChatSideMenuHandle();
     }
-    if (!inChat) closeWebChatSideMenu();
+    if (!inChat && !isChatHome) closeWebChatSideMenu();
     messageInput.placeholder = '输入内容';
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
@@ -5891,7 +5900,6 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
-    hideWebChatSideMenuHandle();
     closeWebChatSideMenu();
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
@@ -5907,6 +5915,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     resetProjectPage();
     renderConversationList();
     renderProjectHomePage();
+    syncChatSideMenuHandleVisibility(false);
   });
 
   voiceCallBtn.addEventListener('click', () => {
@@ -6368,11 +6377,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     progressLog = [];
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
-    syncChatSideMenuHandleVisibility(false);
     chatList.innerHTML = '';
     lastChatTimelineMs = 0;
     appendBubble('progress', '已进入项目「' + (project.name || '') + '」，可以开始描述需求。');
     inputBar.classList.add('active');
+    syncChatSideMenuHandleVisibility(false);
     backBtn.style.display = '';
     addBtn.style.display = 'none';
     searchBtn.style.display = 'none';
@@ -6419,7 +6428,6 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
-    hideWebChatSideMenuHandle();
     closeWebChatSideMenu();
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
@@ -6437,6 +6445,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     renderConversationList();
     loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
     updateSendButtonState();
+    syncChatSideMenuHandleVisibility(false);
   }
 
   function applyContactChatChrome() {

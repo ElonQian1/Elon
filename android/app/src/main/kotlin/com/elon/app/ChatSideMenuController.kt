@@ -140,6 +140,7 @@ internal class ChatSideMenuController(
             setOnClickListener { openFromHandle() }
             setOnTouchListener { view, event -> handleSideMenuHandleTouch(view, event) }
         }
+        binding.contentContainer.viewTreeObserver.addOnGlobalLayoutListener { applySideMenuHandleAvailability(animated = false) }
         applySideMenuHandleAvailability(animated = false)
         overlay.post { applyPanelWidth() }
     }
@@ -179,17 +180,14 @@ internal class ChatSideMenuController(
             })
             .start()
     }
-
     fun openFromHandle() {
-        if (!isSetup || !sideMenuHandleEnabled || binding.chatPage.visibility != View.VISIBLE) return
+        if (!isSetup || !sideMenuHandleEnabled || !isSideMenuHandleContextActive()) return
         show()
     }
-
     fun refreshVisibleContent() {
         if (!isSetup || overlay.visibility != View.VISIBLE) return
         applyContentMode()
     }
-
     private fun handleSideMenuHandleTouch(view: View, event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -260,7 +258,7 @@ internal class ChatSideMenuController(
     }
 
     fun handleDispatchTouchEvent(event: MotionEvent): Boolean {
-        if (!isSetup || binding.chatPage.visibility != View.VISIBLE) return false
+        if (!isSetup || !isSideMenuHandleContextActive()) return false
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
@@ -474,7 +472,7 @@ internal class ChatSideMenuController(
     }
 
     private fun applyContentMode() {
-        if (showProjectShareSideMenu()) {
+        if (showProjectShareSideMenu() || isConversationHomeVisible()) {
             aiMenuView.visibility = View.GONE
             aiMenuView.stopAnimations()
             projectMenuView.visibility = View.VISIBLE
@@ -485,7 +483,8 @@ internal class ChatSideMenuController(
             aiMenuView.render()
         }
     }
-
+    private fun isConversationHomeVisible(): Boolean = binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE
+    private fun isSideMenuHandleContextActive(): Boolean = binding.chatPage.visibility == View.VISIBLE || isConversationHomeVisible()
     private fun buildSettingsBubble(): FrameLayout {
         val bubble = FrameLayout(activity).apply {
             visibility = View.GONE
@@ -836,7 +835,7 @@ internal class ChatSideMenuController(
     private fun revealSideMenuHandle(animated: Boolean) {
         val handle = binding.chatSideMenuHandleButton
         handle.animate().cancel()
-        if (!sideMenuHandleEnabled) {
+        if (!sideMenuHandleEnabled || !isSideMenuHandleContextActive()) {
             handle.visibility = View.GONE
             handle.translationX = 0f
             return
@@ -844,7 +843,7 @@ internal class ChatSideMenuController(
         handle.visibility = View.VISIBLE
         handle.alpha = 1f
         handle.animate().setListener(null)
-        if (binding.chatPage.visibility != View.VISIBLE || !animated) {
+        if (!animated) {
             handle.translationX = 0f
             return
         }
