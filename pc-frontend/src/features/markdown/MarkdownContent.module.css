@@ -3,13 +3,17 @@
 .root {
   display: grid;
   gap: 8px;
+  max-width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
 
 /* ── 段落 ── */
 .root p {
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   line-height: 1.6;
 }
@@ -39,6 +43,8 @@
 /* ── 列表 ── */
 .root ul,
 .root ol {
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
   padding-left: 20px;
 }
@@ -74,11 +80,16 @@
   color: #eef1f6;
   font-family: Consolas, 'SFMono-Regular', monospace;
   font-size: .92em;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* ── 代码块 ── */
 .codeBlock {
   position: relative;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, .08);
   border-radius: 8px;
   background: #15181d;
@@ -97,6 +108,9 @@
 }
 
 .pre {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
   padding: 11px 12px;
   overflow-x: auto;
@@ -191,7 +205,9 @@
 
 /* ── 表格 ── */
 .tableWrap {
-  max-width: min(780px, 100%);
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
 }
 .table {
