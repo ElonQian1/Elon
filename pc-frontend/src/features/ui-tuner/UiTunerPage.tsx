@@ -20,7 +20,7 @@ import {
   Trash2,
   Type,
 } from 'lucide-react'
-import { createBlankElement, createInitialTunerDocument } from './presets'
+import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
 import {
   loadUiTunerDocument,
   saveUiTunerDocument,
@@ -56,7 +56,7 @@ function normalizeViewScale(value: number) {
 
 export default function UiTunerPage() {
   const [tunerDoc, setTunerDoc] = useState<UiTunerDocument>(() => (
-    loadUiTunerDocument() ?? createInitialTunerDocument()
+    loadUiTunerDocument(APK_STYLE_SOURCE_SIGNATURE) ?? createInitialTunerDocument()
   ))
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -183,11 +183,11 @@ export default function UiTunerPage() {
   }
 
   const resetDocument = () => {
-    if (!window.confirm('重置后会清空当前微调记录，确定继续吗？')) return
+    if (!window.confirm('重置后会清空当前微调记录，并重新读取当前 APK 样式源码，确定继续吗？')) return
     const next = createInitialTunerDocument()
     setTunerDoc(next)
     setSelectedId(next.elements[0]?.id ?? null)
-    setNotice('已恢复默认画布')
+    setNotice('已恢复当前 APK 样式')
   }
 
   const saveNow = () => {
@@ -296,7 +296,7 @@ export default function UiTunerPage() {
       <aside className={styles.layersPanel}>
         <div className={styles.panelHeader}>
           <h1>微调画布</h1>
-          <p>把设计稿还原后的板块拖到合适位置，再导出参数给我落代码。</p>
+          <p>默认读取当前 APK 样式源码，图层会标出对应资源和布局来源。</p>
         </div>
 
         <div className={styles.addGroup}>
@@ -437,6 +437,13 @@ export default function UiTunerPage() {
             value={tunerDoc.canvas.background}
             onChange={(background) => updateCanvas({ background })}
           />
+          {tunerDoc.source && (
+            <div className={styles.sourcePanel}>
+              <span>来源</span>
+              <strong>{tunerDoc.source.label}</strong>
+              <small>{tunerDoc.source.files?.join('\n') ?? tunerDoc.source.signature}</small>
+            </div>
+          )}
         </section>
 
         {selected ? (
@@ -470,6 +477,17 @@ export default function UiTunerPage() {
                   </div>
                 ))}
               </div>
+              {selected.source && (
+                <div className={styles.sourcePanel}>
+                  <span>源码来源</span>
+                  <strong>{selected.source.token ?? selected.source.label}</strong>
+                  <small>
+                    {selected.source.file}
+                    {selected.source.line ? `:${selected.source.line}` : ''}
+                    {selected.source.rawValue ? `\n${selected.source.rawValue}` : ''}
+                  </small>
+                </div>
+              )}
             </section>
 
             <section className={styles.section}>

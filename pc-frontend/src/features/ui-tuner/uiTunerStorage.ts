@@ -1,6 +1,6 @@
 import type { UiTunerDocument, UiTunerExportElement } from './types'
 
-const STORAGE_KEY = 'elon.pc.uiTuner.document.v1'
+const STORAGE_KEY = 'elon.pc.uiTuner.document.v2.apk-source'
 
 function isUiTunerDocument(value: unknown): value is UiTunerDocument {
   if (!value || typeof value !== 'object') return false
@@ -10,13 +10,15 @@ function isUiTunerDocument(value: unknown): value is UiTunerDocument {
     && Array.isArray(candidate.elements)
 }
 
-export function loadUiTunerDocument(): UiTunerDocument | null {
+export function loadUiTunerDocument(expectedSourceSignature?: string): UiTunerDocument | null {
   if (typeof window === 'undefined') return null
   const raw = window.localStorage.getItem(STORAGE_KEY)
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as unknown
-    return isUiTunerDocument(parsed) ? parsed : null
+    if (!isUiTunerDocument(parsed)) return null
+    if (expectedSourceSignature && parsed.source?.signature !== expectedSourceSignature) return null
+    return parsed
   } catch {
     return null
   }
@@ -53,10 +55,12 @@ export function buildUiTunerExport(document: UiTunerDocument) {
       borderColor: element.borderColor,
       opacity: element.opacity,
     },
+    source: element.source,
   }))
 
   return {
     version: 1,
+    source: document.source,
     canvas: document.canvas,
     elements,
     exportedAt: new Date().toISOString(),

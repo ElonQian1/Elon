@@ -5,6 +5,18 @@ export interface UiTunerCanvas {
   width: number
   height: number
   background: string
+  source?: UiTunerSource
+}
+
+export interface UiTunerSource {
+  kind: 'apk' | 'manual'
+  label: string
+  file?: string
+  line?: number
+  token?: string
+  rawValue?: string
+  signature?: string
+  files?: string[]
 }
 
 export interface UiTunerElement {
@@ -28,6 +40,7 @@ export interface UiTunerElement {
   background: string
   borderColor: string
   opacity: number
+  source?: UiTunerSource
 }
 
 export interface UiTunerDocument {
@@ -35,6 +48,7 @@ export interface UiTunerDocument {
   canvas: UiTunerCanvas
   elements: UiTunerElement[]
   updatedAt: string
+  source?: UiTunerSource
 }
 
 export interface UiTunerExportElement {
@@ -62,4 +76,5 @@ export interface UiTunerExportElement {
     borderColor: string
     opacity: number
   }
+  source?: UiTunerSource
 }
