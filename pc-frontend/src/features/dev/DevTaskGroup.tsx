@@ -69,9 +69,10 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const terminalReason = terminalReasonFromTimeline(timeline, tone)
   const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
   const hasPublicAssistantItems = publicAssistantItems.length > 0
-  const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline, publicAssistantItems)
+  const publicAssistantItemsInConversation = !resultMsg && hasPublicAssistantItems
+  const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline)
   const displayCollapsed = forceProcessOpen ? false : collapsed
-  const hideTimelineAssistantReplies = false
+  const hideTimelineAssistantReplies = publicAssistantItemsInConversation
   const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
     completed: compactCompletedProcess,
     hideAssistantReplies: hideTimelineAssistantReplies,
@@ -85,20 +86,20 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const processedDuration = processDurationLabel(messages, isDone)
   const hideCompletedProcessPanel = false
   const previewAssistantItems = publicAssistantPreviewItems(publicAssistantItems, 3)
-  const surfaceItems = !resultMsg && displayCollapsed
+  const publicSurfaceItems = publicAssistantItemsInConversation
+    ? publicAssistantSurfaceItems(publicAssistantItems)
+    : []
+  const surfaceItems = !resultMsg && displayCollapsed && !publicAssistantItemsInConversation
     ? progressSurfaceItems(timeline.stage, previewAssistantItems)
     : []
   const previewHiddenCount = Math.max(0, publicAssistantItems.length - previewAssistantItems.length)
   const suppressProgressNarrative = (
-    surfaceItems.length > 0
+    publicAssistantItemsInConversation
+    || surfaceItems.length > 0
     || (!displayCollapsed && hasPublicAssistantItems)
   )
     && timeline.stage.key !== 'approval'
-  const directPublicProcess = !resultMsg
-    && !displayCollapsed
-    && hasPublicAssistantItems
-    && !timeline.stage.stuck
-    && timeline.stage.key !== 'approval'
+  const directPublicProcess = false
 
   useEffect(() => {
     const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}:${defaultProcessOpen ? 'process-open' : 'process-closed'}`
@@ -244,10 +245,13 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
                   </button>
                 )}
               </div>
+              {publicSurfaceItems.length > 0 && (
+                <TaskProgressHighlights items={publicSurfaceItems} hiddenCount={0} />
+              )}
               {surfaceItems.length > 0 && (
                 <TaskProgressHighlights items={surfaceItems} hiddenCount={previewHiddenCount} />
               )}
-              {renderProgressPanel(true, hasPublicAssistantItems || surfaceItems.length > 0)}
+              {renderProgressPanel(true, publicSurfaceItems.length > 0 || surfaceItems.length > 0)}
             </div>
           </div>
         ) : renderProgressPanel(false)
@@ -360,11 +364,10 @@ function taskStageAllowsContinue(stageKey: string, tone: TaskTone): boolean {
 function shouldDefaultOpenProcess(
   isDone: boolean,
   timeline: ReturnType<typeof buildTaskTimeline>,
-  publicAssistantItems: TimelineItem[],
 ): boolean {
   if (isDone) return false
   if (timeline.stage.key === 'approval') return true
-  return publicAssistantItems.length > 0
+  return false
 }
 
 function terminalReasonFromTimeline(timeline: ReturnType<typeof buildTaskTimeline>, tone: TaskTone): string {
@@ -443,6 +446,14 @@ function publicAssistantPreviewItems(items: TimelineItem[], maxCount: number): T
     deduped.push(item)
   }
   return deduped.slice(Math.max(0, deduped.length - maxCount))
+}
+
+function publicAssistantSurfaceItems(items: TimelineItem[]): ProgressSurfaceItem[] {
+  return dedupeProgressSurfaceItems(items.map((item) => ({
+    id: item.id,
+    detail: clean(item.detail ?? ''),
+    tone: item.tone,
+  })))
 }
 
 function progressSurfaceItems(stage: TaskTimelineStage, assistantItems: TimelineItem[]): ProgressSurfaceItem[] {

@@ -57,10 +57,22 @@ try {
       content: '{"type":"tool_call","tool":"shell","args":{"command":"Get-Content CODEX.md"}}',
     },
     {
+      id: 'order-cmd-1-legacy-echo',
+      kind: 'ai_progress',
+      task_id: 'tsk-order',
+      content: 'AI 执行命令：Get-Content CODEX.md',
+    },
+    {
       id: 'order-result-1',
       kind: 'ai_progress',
       task_id: 'tsk-order',
       content: '{"type":"tool_result","tool":"shell","result":"CODEX Project Entry"}',
+    },
+    {
+      id: 'order-result-1-legacy-echo',
+      kind: 'ai_progress',
+      task_id: 'tsk-order',
+      content: '命令执行完毕',
     },
     {
       id: 'order-note-2',
@@ -80,6 +92,12 @@ try {
       kind: 'ai_progress',
       task_id: 'tsk-order',
       content: '{"type":"tool_result","tool":"shell","result":"{\\"versionName\\":\\"0.3.1365\\"}"}',
+    },
+    {
+      id: 'order-result-2-legacy-echo',
+      kind: 'ai_progress',
+      task_id: 'tsk-order',
+      content: '命令执行完毕。',
     },
   ]);
 

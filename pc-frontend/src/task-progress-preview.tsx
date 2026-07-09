@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { LivePreview, livePreviewConfigFromLocation } from './task-progress-live-preview'
 import ConversationFeed from './features/conversation/ConversationFeed'
 import { buildDisplayMessages, buildMessageGroups } from './features/conversation/messageFlow'
 import type { Message } from './features/conversation/types'
@@ -268,10 +269,20 @@ const scenarios: Scenario[] = [
 ]
 
 function Preview() {
+  const liveConfig = useMemo(() => livePreviewConfigFromLocation(), [])
   const [activeId, setActiveId] = useState<ViewId>(() => initialViewFromLocation())
   const [expandAll, setExpandAll] = useState(() => initialExpandFromLocation())
   const activeScenario = scenarios.find((item) => item.id === activeId)
   const visibleScenarios = activeId === 'all' ? scenarios : activeScenario ? [activeScenario] : scenarios
+
+  if (liveConfig.enabled) {
+    return (
+      <>
+        <style>{previewCss}</style>
+        <LivePreview config={liveConfig} expandAll={expandAll} onToggleExpand={() => setExpandAll((value) => !value)} />
+      </>
+    )
+  }
 
   return (
     <main className="previewPage">
@@ -682,6 +693,50 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.livePreviewPage {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.liveFacts {
+  display: grid;
+  gap: 7px;
+  padding-top: 4px;
+  color: #748198;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.liveFacts span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.livePreviewStage {
+  max-width: 1120px;
+}
+
+.liveScenarioFrame {
+  max-width: 100%;
+}
+
+.liveConversationReplay {
+  height: calc(100vh - 76px);
+  min-height: 560px;
+}
+
+.liveError {
+  display: grid;
+  align-content: center;
+  padding: 24px 44px;
+  color: #ffb1b4;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 720px) {

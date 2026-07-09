@@ -171,6 +171,10 @@ export function isShellCommandEcho(text: string): boolean {
   return /^AI\s*执行命令\s*[：:]/i.test(text)
 }
 
+export function isShellCommandCompletionEcho(text: string): boolean {
+  return /^命令执行完毕[。.!！]*$/i.test(text.trim())
+}
+
 function shellEchoMatchesCommand(text: string, command: string): boolean {
   const echoCommand = clean(text.replace(/^AI\s*执行命令\s*[：:]\s*/i, ''))
   if (!echoCommand) return false

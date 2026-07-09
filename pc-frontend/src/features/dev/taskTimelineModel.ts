@@ -15,6 +15,7 @@ import {
   eventUniqueKey,
   isAssistantEvent,
   isMaintenanceRuntimePhase,
+  isShellCommandCompletionEcho,
   isShellCommandEcho,
   latestNonHeartbeatIndex,
   latestRuntimePhase,
@@ -169,7 +170,7 @@ export function buildTaskTimeline(
       coverage.assistantEvent = true
       return
     }
-    if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
+    if (!parsedEvent && ((coverage.command && isShellCommandEcho(text)) || (coverage.toolResult && isShellCommandCompletionEcho(text)))) return
 
     const heartbeat = parseHeartbeat(text, message, index)
     if (heartbeat) {
@@ -550,7 +551,6 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
       stuck: false,
     }
   }
-
   if (model.coverage.command && !model.coverage.toolResult) {
     return {
       key: 'command',
