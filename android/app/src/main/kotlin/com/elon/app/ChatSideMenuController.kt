@@ -395,7 +395,7 @@ internal class ChatSideMenuController(
             isConversationWorking = isConversationWorking,
             conversationHeaderActions = conversationHeaderActions,
             requestClose = { animate -> close(animate) },
-            bottomReservedHeightDp = SETTINGS_DOCK_HEIGHT_DP,
+            bottomReservedHeightDp = 0,
             dp = dp,
             selectableForeground = selectableForeground
         )
@@ -414,6 +414,7 @@ internal class ChatSideMenuController(
             openPersonalProject = openPersonalProject,
             openJointProject = openJointProject,
             openProjectCenter = openProjectManagement,
+            openSettings = { toggleSettingsBubble() },
             requestClose = { animate -> close(animate) },
             dp = dp,
             selectableForeground = selectableForeground
@@ -425,40 +426,9 @@ internal class ChatSideMenuController(
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                bottomMargin = dp(SETTINGS_DOCK_HEIGHT_DP)
             }
         )
         projectMenuView.visibility = View.GONE
-
-        val settingsLabel = menuText("设置").apply {
-            isClickable = true
-            foreground = selectableForeground()
-            setPadding(0, 0, dp(8), 0)
-            setOnClickListener { toggleSettingsBubble() }
-        }
-        val settingsDock = FrameLayout(activity).apply {
-            isClickable = true
-            background = GradientDrawable().apply {
-                setColor(activity.getColor(R.color.elon_side_menu_bg))
-            }
-            addView(
-                settingsLabel,
-                FrameLayout.LayoutParams(dp(110), dp(40)).apply {
-                    gravity = Gravity.BOTTOM or Gravity.START
-                    leftMargin = dp(32)
-                    bottomMargin = dp(18)
-                }
-            )
-        }
-        panel.addView(
-            settingsDock,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(SETTINGS_DOCK_HEIGHT_DP)
-            ).apply {
-                gravity = Gravity.BOTTOM or Gravity.START
-            }
-        )
 
         settingsBubble = buildSettingsBubble()
         panel.addView(
@@ -966,7 +936,6 @@ internal class ChatSideMenuController(
 
     private companion object {
         private const val DURATION_MS = 260L
-        private const val SETTINGS_DOCK_HEIGHT_DP = 88
         private const val SIDE_MENU_HANDLE_PREFS = "chat_side_menu_handle"
         private const val SIDE_MENU_HANDLE_VISIBLE_KEY = "visible"
         private const val SIDE_MENU_HANDLE_DEFAULT_VISIBLE_MIGRATION_KEY = "default_visible_20260625"

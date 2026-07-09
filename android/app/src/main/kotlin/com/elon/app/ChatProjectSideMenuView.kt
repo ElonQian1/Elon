@@ -32,6 +32,7 @@ internal class ChatProjectSideMenuView(
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
     private val openProjectCenter: () -> Unit,
+    private val openSettings: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
@@ -145,11 +146,11 @@ internal class ChatProjectSideMenuView(
         val box = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(56)
+                dp(48)
             ).apply {
-                topMargin = dp(30)
+                topMargin = dp(26)
             }
-            background = roundedRect("#454545", dp(28))
+            background = roundedRect("#454545", dp(24))
             isClickable = true
             foreground = selectableForeground()
             contentDescription = "搜索项目"
@@ -165,9 +166,9 @@ internal class ChatProjectSideMenuView(
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
-            LayoutParams(dp(32), dp(32)).apply {
+            LayoutParams(dp(28), dp(28)).apply {
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
-                leftMargin = dp(22)
+                leftMargin = dp(20)
             }
         )
         content.addView(box)
@@ -185,7 +186,7 @@ internal class ChatProjectSideMenuView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(48)
             ).apply {
-                topMargin = dp(44)
+                topMargin = dp(34)
             }
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
@@ -219,7 +220,7 @@ internal class ChatProjectSideMenuView(
         return LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
+                dp(36)
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
@@ -254,7 +255,7 @@ internal class ChatProjectSideMenuView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(20)
+                    topMargin = dp(14)
                 }
                 includeFontPadding = false
                 maxLines = 2
@@ -270,7 +271,7 @@ internal class ChatProjectSideMenuView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     1
                 ).apply {
-                    topMargin = dp(30)
+                    topMargin = dp(22)
                     leftMargin = dp(48)
                     rightMargin = dp(48)
                 }
@@ -286,7 +287,7 @@ internal class ChatProjectSideMenuView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(76)
             ).apply {
-                topMargin = dp(10)
+                topMargin = dp(4)
             }
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
@@ -330,7 +331,7 @@ internal class ChatProjectSideMenuView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(148)
             ).apply {
-                topMargin = dp(28)
+                topMargin = dp(22)
             }
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
@@ -365,7 +366,7 @@ internal class ChatProjectSideMenuView(
     }
 
     private fun addPersonalProjects() {
-        content.addView(space(46))
+        content.addView(space(30))
         content.addView(sectionHeader("你的创建", personalProjectsExpanded) {
             personalProjectsExpanded = !personalProjectsExpanded
             render()
@@ -611,6 +612,10 @@ internal class ChatProjectSideMenuView(
             }
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = "打开账号设置"
+            setOnClickListener { openSettings() }
             addView(TextView(context).also { avatarView = it }, LinearLayout.LayoutParams(dp(56), dp(56)))
             addView(LinearLayout(context).apply {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
