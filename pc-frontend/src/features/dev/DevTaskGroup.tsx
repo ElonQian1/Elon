@@ -72,7 +72,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const publicAssistantItemsInConversation = !resultMsg && hasPublicAssistantItems
   const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline)
   const displayCollapsed = forceProcessOpen ? false : collapsed
-  const hideTimelineAssistantReplies = publicAssistantItemsInConversation
+  const hideTimelineAssistantReplies = publicAssistantItemsInConversation && displayCollapsed
   const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
     completed: compactCompletedProcess,
     hideAssistantReplies: hideTimelineAssistantReplies,
