@@ -201,7 +201,7 @@
     .icon-btn img { object-fit: contain; }
     #homeMenuBtn {
       padding: 8px;
-      margin-left: 0;
+      margin-left: 4px;
     }
     .home-nav-menu {
       position: absolute;
@@ -3134,26 +3134,26 @@
     }
     .home-project-create-menu.hidden { display: none; }
     .home-project-create-menu button {
-      width: 128px;
-      height: 56px;
+      width: 144px;
+      height: 60px;
       border: 0;
-      border-radius: 28px;
+      border-radius: 30px;
       background: var(--brand);
       color: var(--brand-ink);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 10px;
       padding: 0;
-      font-size: 16px;
+      font-size: 18px;
       cursor: pointer;
       overflow: hidden;
       pointer-events: auto;
       transition: width 220ms ease, height 220ms ease, gap 220ms ease;
     }
     .home-project-create-menu img {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       flex: none;
       object-fit: contain;
       transition: width 220ms ease, height 220ms ease;
@@ -3162,7 +3162,7 @@
       display: inline-block;
       white-space: nowrap;
       overflow: hidden;
-      max-width: 64px;
+      max-width: 72px;
       opacity: 1;
       transition: opacity 220ms ease, max-width 220ms ease;
     }
@@ -3172,7 +3172,7 @@
       mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
     }
     .home-project-create-menu.compact button {
-      width: 56px;
+      width: 60px;
       gap: 0;
     }
     .home-project-create-menu.compact span {
@@ -4996,22 +4996,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isAnyChatActive() {
     return !!currentProject || isContactChatActive();
   }
-  function isChatHomeSideMenuContextActive() {
-    return currentTab === 'chatPage' &&
-      !isAnyChatActive() &&
-      chatView &&
-      chatView.classList.contains('hidden') &&
-      conversationList &&
-      !conversationList.classList.contains('hidden');
-  }
   function isChatSideMenuHandleContextActive() {
-    const activeChatContext = currentTab === 'chatPage' &&
+    return currentTab === 'chatPage' &&
       isAnyChatActive() &&
       chatView &&
       !chatView.classList.contains('hidden') &&
       inputBar &&
       inputBar.classList.contains('active');
-    return activeChatContext || isChatHomeSideMenuContextActive();
   }
   function updateChatSideMenuHandleToggleText() {
     if (chatHandleToggleSwitch) {
@@ -5833,12 +5824,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     // 输入栏：聊天页进入项目/好友/群聊后显示
     inputBar.classList.toggle('active', inChat);
-    if (inChat || isChatHome) {
+    if (inChat) {
       syncChatSideMenuHandleVisibility(false);
     } else {
       hideWebChatSideMenuHandle();
     }
-    if (!inChat && !isChatHome) closeWebChatSideMenu();
+    if (!inChat) closeWebChatSideMenu();
     messageInput.placeholder = '输入内容';
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);

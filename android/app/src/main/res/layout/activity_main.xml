@@ -37,6 +37,7 @@
                 android:layout_width="50dp"
                 android:layout_height="44dp"
                 android:layout_gravity="start|center_vertical"
+                android:layout_marginStart="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="主菜单"
                 android:padding="8dp"
@@ -664,8 +665,8 @@
 
         <LinearLayout
             android:id="@+id/homeProjectCreateMenu"
-            android:layout_width="128dp"
-            android:layout_height="56dp"
+            android:layout_width="144dp"
+            android:layout_height="60dp"
             android:layout_gravity="end|bottom"
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="28dp"
@@ -680,9 +681,9 @@
 
             <ImageView
                 android:id="@+id/homeProjectCreateIcon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:layout_marginEnd="8dp"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="10dp"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_project_post_compose"
@@ -697,7 +698,7 @@
                 android:maxLines="1"
                 android:text="项目"
                 android:textColor="@color/elon_button_primary_text"
-                android:textSize="16sp" />
+                android:textSize="18sp" />
         </LinearLayout>
 
         <ScrollView

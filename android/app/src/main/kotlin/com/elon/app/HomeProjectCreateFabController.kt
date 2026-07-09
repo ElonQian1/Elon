@@ -177,11 +177,11 @@ internal class HomeProjectCreateFabController(
 
     private companion object {
         const val HOME_PROJECT_FAB_ANIMATION_MS = 220L
-        const val HOME_PROJECT_FAB_COLLAPSED_SIZE_DP = 56
-        const val HOME_PROJECT_FAB_EXPANDED_HEIGHT_DP = 56
-        const val HOME_PROJECT_FAB_EXPANDED_WIDTH_DP = 128
-        const val HOME_PROJECT_FAB_ICON_SIZE_DP = 24
+        const val HOME_PROJECT_FAB_COLLAPSED_SIZE_DP = 60
+        const val HOME_PROJECT_FAB_EXPANDED_HEIGHT_DP = 60
+        const val HOME_PROJECT_FAB_EXPANDED_WIDTH_DP = 144
+        const val HOME_PROJECT_FAB_ICON_SIZE_DP = 28
         const val HOME_PROJECT_FAB_EXPAND_AT_TOP_DP = 4
-        const val HOME_PROJECT_FAB_ICON_MARGIN_END_DP = 8
+        const val HOME_PROJECT_FAB_ICON_MARGIN_END_DP = 10
     }
 }

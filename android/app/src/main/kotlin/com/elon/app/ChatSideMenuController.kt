@@ -484,7 +484,7 @@ internal class ChatSideMenuController(
         }
     }
     private fun isConversationHomeVisible(): Boolean = binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE
-    private fun isSideMenuHandleContextActive(): Boolean = binding.chatPage.visibility == View.VISIBLE || isConversationHomeVisible()
+    private fun isSideMenuHandleContextActive(): Boolean = binding.chatPage.visibility == View.VISIBLE
     private fun buildSettingsBubble(): FrameLayout {
         val bubble = FrameLayout(activity).apply {
             visibility = View.GONE
