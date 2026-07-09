@@ -104,6 +104,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
     && clean(localNode?.owner_user_id) === user.id
     && localNode?.connected !== false
     && localNode?.codex_cli?.available !== false
+  const localNodeStatusText = describeLocalNodeStatus(localNode, localNodeReady, localNodeError, user?.id)
   const canStart = !!activeProject?.id
     && !!aiChannel?.id
     && channelAllowsAiStart(aiChannel)
@@ -124,7 +125,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       return
     }
     if (!localNodeReady || !workspacePath) {
-      setStatus(localNodeError || '本机 Codex CLI 或项目工作区未就绪')
+      setStatus(!workspacePath ? '自项目缺少本机工作区路径' : localNodeStatusText)
       return
     }
     if (!channelAllowsAiStart(aiChannel)) {
@@ -201,7 +202,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       <div className={panelStyles.sessionFacts}>
         <span>{activeProject ? `项目：${activeProject.display_name || activeProject.name}` : '未选择项目'}</span>
         <span>{aiChannel ? `频道：${aiChannel.name}` : '缺少 AI 开发频道'}</span>
-        <span>{localNodeReady ? '本机 Codex CLI 就绪' : localNodeError || '本机 Codex CLI 未就绪'}</span>
+        <span>{localNodeStatusText}</span>
       </div>
 
       <div className={panelStyles.sessionMemory}>
@@ -238,12 +239,12 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
         </div>
       )}
 
-      {selectedSession?.taskId && localNodeReady && (
-        <div className={panelStyles.sidecarWrap}>
-          <div className={panelStyles.sidecarTitle}>
-            <TerminalSquare size={13} aria-hidden="true" />
-            <span>Codex sidecar</span>
-          </div>
+      <div className={panelStyles.sidecarWrap}>
+        <div className={panelStyles.sidecarTitle}>
+          <TerminalSquare size={13} aria-hidden="true" />
+          <span>Codex sidecar</span>
+        </div>
+        {selectedSession?.taskId && localNodeReady ? (
           <SidecarTerminalPanel
             adminUrl={nodeAdminUrl}
             session={{
@@ -254,8 +255,12 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
               capabilities: { terminal_attach: true, terminal_input: true, terminal_resize: true },
             }}
           />
-        </div>
-      )}
+        ) : (
+          <small className={panelStyles.sidecarHint}>
+            {selectedSession?.taskId ? localNodeStatusText : '启动继续/分叉会话后显示托管 Codex sidecar 终端'}
+          </small>
+        )}
+      </div>
     </div>
   )
 }
@@ -263,4 +268,22 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
 function uiTunerNodeAdminUrl() {
   const fromQuery = new URLSearchParams(location.search).get('node_admin')
   return safeNodeAdminUrl(fromQuery || 'http://127.0.0.1:7799')
+}
+
+function describeLocalNodeStatus(
+  localNode: LocalNodeStatus | null,
+  ready: boolean,
+  error: string,
+  userId?: string,
+) {
+  if (ready) return '本机 Codex CLI 就绪'
+  if (error) return `本机节点不可用：${error}`
+  if (!localNode) return '正在检测本机节点'
+  if (!clean(localNode.agent_id)) return '本机节点未返回 agent_id'
+  if (userId && clean(localNode.owner_user_id) && clean(localNode.owner_user_id) !== userId) return '本机节点属于其他账号'
+  if (localNode.connected === false) {
+    return localNode.codex_cli?.available === false ? '本机节点未连接云端，Codex CLI 未就绪' : 'Codex CLI 就绪，节点未连接云端'
+  }
+  if (localNode.codex_cli?.available === false) return '本机 Codex CLI 未就绪'
+  return '本机 Codex CLI 未就绪'
 }

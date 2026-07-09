@@ -489,3 +489,9 @@
 .sidecarTitle {
   justify-content: flex-start;
 }
+
+.sidecarHint {
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 15px;
+}
