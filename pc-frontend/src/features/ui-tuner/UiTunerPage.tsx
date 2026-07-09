@@ -38,7 +38,7 @@ interface DragState {
 }
 
 const MIN_SIZE = 24
-const DEFAULT_CANVAS_MAX = 2200
+const DEFAULT_CANVAS_MAX = 10000
 
 export default function UiTunerPage() {
   const [tunerDoc, setTunerDoc] = useState<UiTunerDocument>(() => (
