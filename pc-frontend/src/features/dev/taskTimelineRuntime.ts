@@ -125,7 +125,7 @@ export function buildTaskTimelineDiagnostics(
   if (!maintenance && !recovering && heartbeatWaitedLong && coverage.heartbeat && !coverage.finalReply && !coverage.command && !coverage.toolResult && !coverage.assistantEvent) {
     diagnostics.push({
       tone: 'failed',
-      title: '长时间只收到等待状态',
+      title: '只收到等待状态',
       detail: '后端已经派发任务或正在等待 AI CLI，但还没有收到公开的命令、文件修改、工具结果或回复片段。通常卡在 CLI 启动、节点输出、网络连接或旧节点进程。'
     })
   }

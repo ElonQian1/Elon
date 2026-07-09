@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import DevTaskGroup from './features/dev/DevTaskGroup'
+import ConversationFeed from './features/conversation/ConversationFeed'
+import { buildDisplayMessages, buildMessageGroups } from './features/conversation/messageFlow'
+import type { Message } from './features/conversation/types'
 import { buildContext } from './features/dev/devTaskUtils'
 import type { ChatMessage, ToolEvent } from './features/dev/types'
 
 const taskId = 'tsk_preview_20260708'
 const startedAt = '2026-07-08T10:17:00+08:00'
+const previewUser = { nickname: '钱一龙', account: 'elon', avatar_data_url: null }
 
 type ScenarioId =
   | 'queued'
@@ -315,29 +318,88 @@ function initialViewFromLocation(): ViewId {
 
 function initialExpandFromLocation(): boolean {
   const value = new URLSearchParams(window.location.search).get('expand')
-  return value == null ? true : value !== '0'
+  return value != null && value !== '0'
 }
 
 function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAll: boolean }) {
-  const taskContext = useMemo(() => buildContext(scenario.messages), [scenario])
+  const feedRef = useRef<HTMLDivElement>(null)
+  const conversationId = `preview-conversation-${scenario.id}`
+  const taskMessages = useMemo(() => scenario.messages as Message[], [scenario])
+  const conversationMessages = useMemo<Message[]>(() => [requestMessage(scenario, conversationId)], [conversationId, scenario])
+  const taskMessagesById = useMemo(() => new Map([[taskId, taskMessages]]), [taskMessages])
+  const displayMessages = useMemo(() => buildDisplayMessages({
+    sessionView: conversationId,
+    channelMessages: [],
+    conversationMessages,
+    conversationLoading: false,
+    taskMessagesById,
+  }), [conversationId, conversationMessages, taskMessagesById])
+  const messageGroups = useMemo(() => buildMessageGroups(displayMessages, true), [displayMessages])
+  const taskContext = useMemo(() => buildContext(displayMessages), [displayMessages])
+
   return (
     <article className="scenarioFrame" style={{ maxWidth: scenario.width }}>
       <header>
         <strong>{scenario.label}</strong>
         <span>{scenario.width}px</span>
       </header>
-      <DevTaskGroup
-        messages={scenario.messages}
-        taskContext={taskContext}
-        user={{ nickname: '钱一龙', account: 'elon' }}
-        expandAll={expandAll}
-        onCancel={() => undefined}
-        onContinue={() => undefined}
-        onApprove={() => undefined}
-      />
+      <div className="conversationReplay">
+        <div className="replayTopbar">
+          <strong>AI 开发频道</strong>
+          <span>{scenario.label}</span>
+        </div>
+        <ConversationFeed
+          sessionView={conversationId}
+          feedRef={feedRef}
+          feedLoading={false}
+          displayMessages={displayMessages}
+          messageGroups={messageGroups}
+          taskContext={taskContext}
+          isDevChannel
+          user={previewUser}
+          sendingMessage={false}
+          onScroll={() => undefined}
+          onCancelTask={noopTaskAction}
+          onContinueTask={noopTaskAction}
+          onApproveTool={noopApprovalAction}
+          debugExpandAll={expandAll}
+        />
+        <div className="replayComposer">
+          <button type="button" aria-label="添加附件">+</button>
+          <div className="replayInput">以钱一龙的账号在 AI 开发频道发送消息...</div>
+          <span>GPT-5.5</span>
+          <button type="button" aria-label="发送">›</button>
+        </div>
+      </div>
     </article>
   )
 }
+
+function requestMessage(scenario: Scenario, conversationId: string): Message {
+  const request = scenario.messages.find((message) => message.kind === 'ai_task')?.content
+    ?? scenario.messages[0]?.content
+    ?? scenario.label
+
+  return {
+    id: `preview-user-${scenario.id}`,
+    kind: 'user',
+    role: 'user',
+    task_id: taskId,
+    taskId,
+    conversation_id: conversationId,
+    conversationId,
+    sender_name: '钱一龙',
+    user_id: 'preview-user',
+    outgoing: true,
+    content: request,
+    text: request,
+    created_at: startedAt,
+  }
+}
+
+async function noopTaskAction() {}
+
+async function noopApprovalAction() {}
 
 function task(content: string, status: string): ChatMessage {
   return {
@@ -527,6 +589,100 @@ button {
   font-size: 11px;
 }
 
+.conversationReplay {
+  height: min(720px, calc(100vh - 76px));
+  min-height: 420px;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr) 66px;
+  overflow: hidden;
+  background: #111318;
+  border: 1px solid rgba(148, 163, 184, .14);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, .28);
+}
+
+.previewMatrix .conversationReplay {
+  height: 520px;
+}
+
+.replayTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(148, 163, 184, .10);
+  background: #151922;
+}
+
+.replayTopbar strong {
+  min-width: 0;
+  color: #edf3ff;
+  font-size: 13px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayTopbar span {
+  min-width: 0;
+  color: #7f8ca3;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayComposer {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border-top: 1px solid rgba(148, 163, 184, .10);
+  background: linear-gradient(180deg, rgba(17, 19, 24, .86), #111318);
+}
+
+.replayComposer button,
+.replayComposer span {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: #20242f;
+  color: #cdd7e7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.replayComposer button {
+  width: 32px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.replayComposer span {
+  padding: 0 10px;
+}
+
+.replayInput {
+  min-width: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: #1b1f29;
+  border: 1px solid rgba(148, 163, 184, .14);
+  color: #7f8ca3;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 720px) {
   .previewPage {
     grid-template-columns: 1fr;
@@ -539,6 +695,19 @@ button {
 
   .scenarioTabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .conversationReplay {
+    height: calc(100vh - 220px);
+    min-height: 420px;
+  }
+
+  .replayComposer {
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+  }
+
+  .replayComposer span {
+    display: none;
   }
 }
 `

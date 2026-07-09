@@ -167,6 +167,7 @@ export function buildTaskTimeline(
     if (isAssistantEvent(parsedEvent)) {
       if (!eventTextForEcho(parsedEvent)) return
       coverage.assistantEvent = true
+      return
     }
     if (!parsedEvent && coverage.command && isShellCommandEcho(text)) return
 
@@ -588,7 +589,10 @@ function buildCurrentStage(model: Omit<TaskTimelineModel, 'diagnostics' | 'stage
     }
   }
 
-  if (latest && isLatestAssistantWaitingItem(latest) && !model.coverage.finalReply) {
+  if (!model.coverage.finalReply && (
+    (latest && isLatestAssistantWaitingItem(latest))
+    || (model.coverage.assistantEvent && (!latest || latest.kind === 'heartbeat'))
+  )) {
     return {
       key: 'assistant',
       tone: 'running',

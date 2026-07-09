@@ -558,12 +558,12 @@ try {
   assert.strictEqual(fileTimeline.coverage.fileChange, true, 'file_change events should be visible in coverage');
   assert.deepStrictEqual(
     fileTimeline.items.map((item) => [item.kind, item.process && item.process.kind]),
-    [['file', 'file'], ['file', 'file']],
-    'file changes should render as structured file process rows',
+    [['file', 'file']],
+    'file changes should render as one structured file process row',
   );
   assert.ok(fileTimeline.items[0].process.subtitle.includes('TaskTimeline.tsx'), 'file call card should list target files');
-  assert.strictEqual(fileTimeline.items[1].process.bodyLabel, 'Diff 预览', 'file result card should prefer diff previews');
-  assert.ok(fileTimeline.items[1].process.body.includes('ProcessCardView'), 'file result card should show diff preview content');
+  assert.strictEqual(fileTimeline.items[0].process.bodyLabel, '变更预览', 'file result card should prefer change previews');
+  assert.ok(fileTimeline.items[0].process.body.includes('ProcessCardView'), 'file result card should show diff preview content');
 
   const liveRecovery = recoveryViewFromEntry({
     task_id: 'tsk_live_1234567890',
