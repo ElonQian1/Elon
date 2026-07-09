@@ -137,8 +137,8 @@ internal class MainInputComposerSetup(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0
             ).apply {
-                marginStart = dp(88)
-                marginEnd = dp(44)
+                marginStart = dp(102)
+                marginEnd = dp(10)
             }
         }
 
@@ -213,7 +213,7 @@ internal class MainInputComposerSetup(
         val expandEditorButton = ImageButton(activity).apply {
             layoutParams = FrameLayout.LayoutParams(dp(28), dp(28), Gravity.TOP or Gravity.END).apply {
                 topMargin = dp(5)
-                marginEnd = dp(1)
+                marginEnd = 0
             }
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_input_expand_new)

@@ -2903,7 +2903,9 @@
     .input-panel {
       min-height: 48px;
       background: url("data:image/png;base64,__BOTTOM_PANEL_PNG_B64__") center / 100% 100% no-repeat;
+      border: 0 solid transparent;
       border-radius: 999px;
+      box-sizing: border-box;
       display: flex;
       flex-direction: column;
       justify-content: flex-end;
@@ -2915,6 +2917,7 @@
     .input-bar.input-focused .input-panel {
       min-height: 132px;
       background: var(--side-menu-bg);
+      border: 1px solid #3B3B3E;
       border-radius: 32px;
       padding: 8px 10px 0;
     }
@@ -2922,7 +2925,7 @@
       display: none;
       position: relative;
       min-height: 42px;
-      margin: 0 38px 0 88px;
+      margin: 0 0 0 92px;
     }
     .input-bar.has-text .input-text-row,
     .input-bar.input-focused .input-text-row {
@@ -2984,7 +2987,7 @@
     }
     .input-bar .expand-editor-btn {
       position: absolute;
-      right: -34px;
+      right: 0;
       top: 5px;
       width: 28px;
       height: 28px;
@@ -3001,10 +3004,11 @@
     }
     .input-bar textarea {
       width: 100%;
+      box-sizing: border-box;
       background: transparent;
       border: 0;
       color: var(--ink-strong);
-      padding: 6px 4px 4px 0;
+      padding: 6px 36px 4px 0;
       font-size: 15px;
       min-height: 38px;
       max-height: 96px;
