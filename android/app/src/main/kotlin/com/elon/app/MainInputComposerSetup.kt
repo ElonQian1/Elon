@@ -231,14 +231,14 @@ internal class MainInputComposerSetup(
             background = ColorDrawable(Color.TRANSPARENT)
             hint = "输入内容"
             minLines = 1
-            maxLines = 4
+            maxLines = 6
             setSingleLine(false)
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             isVerticalScrollBarEnabled = false
             includeFontPadding = false
             setHorizontallyScrolling(false)
-            setPadding(dp(4), 0, dp(4), 0)
+            setPadding(dp(4), 0, dp(38), 0)
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#5E5E5E"))
             textSize = 17f
@@ -364,7 +364,8 @@ internal class MainInputComposerSetup(
             setOnClickListener { toggleEmojiPanel() }
         }
 
-        inputCenterContainer.addView(inputEdit)
+        inputCenterContainer.addView(collapsedInputPreview)
+        expandedInputContainer.addView(inputEdit)
         expandedInputContainer.addView(voiceHoldButton)
         expandedInputContainer.addView(expandEditorButton)
 

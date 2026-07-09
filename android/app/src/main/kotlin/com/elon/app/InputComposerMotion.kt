@@ -44,6 +44,8 @@ internal class InputComposerMotion(
         }
         isExpanded = expanded
         expandAnimator?.cancel()
+        textHeightAnimator?.cancel()
+        textHeightAnimator = null
         expandAnimatorTarget = null
 
         val transition = createTransition(expanded)

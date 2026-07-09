@@ -2933,6 +2933,7 @@
       position: relative;
       min-height: 42px;
       margin: 0 0 0 92px;
+      padding-right: 34px;
     }
     .input-bar.has-text .input-text-row,
     .input-bar.input-focused .input-text-row {
@@ -3023,14 +3024,14 @@
       background: transparent;
       border: 0;
       color: var(--ink-strong);
-      padding: 0 4px;
+      padding: 8px 4px 6px;
       font-size: 17px;
-      height: 38px;
-      min-height: 38px;
-      max-height: 96px;
+      height: 42px;
+      min-height: 42px;
+      max-height: 140px;
       resize: none;
       outline: none;
-      line-height: 38px;
+      line-height: 24px;
     }
     .input-bar.has-text textarea,
     .input-bar.input-focused textarea {
@@ -4245,6 +4246,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </div>
     <div class="input-panel">
       <div class="input-text-row">
+        <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
         <button class="expand-editor-btn" type="button" id="expandEditorBtn" title="全屏编辑">
           <img src="data:image/png;base64,__INPUT_EXPAND_PNG_B64__" alt="" aria-hidden="true" />
         </button>
@@ -4257,7 +4259,6 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <img src="data:image/png;base64,__INPUT_EMOJI_PNG_B64__" alt="" aria-hidden="true" />
         </button>
         <div class="input-edit-row">
-          <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
           <button class="input-placeholder" type="button" id="inputPlaceholder">输入内容</button>
         </div>
         <span class="input-row-spacer" aria-hidden="true"></span>
@@ -8066,6 +8067,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
   }
 
+  function resizeMessageInput() {
+    messageInput.style.height = 'auto';
+    const nextHeight = Math.min(Math.max(messageInput.scrollHeight || 42, 42), 140);
+    messageInput.style.height = `${nextHeight}px`;
+    messageInput.style.overflowY = (messageInput.scrollHeight > 140) ? 'auto' : 'hidden';
+  }
+
+  function resetMessageInputHeight() {
+    messageInput.style.height = '42px';
+    messageInput.style.overflowY = 'hidden';
+  }
+
   inputBar.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
@@ -8073,7 +8086,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     setInputAttachmentPanelOpen(false);
     if (currentFriend || currentGroup) {
       messageInput.value = '';
-      messageInput.style.height = 'auto';
+      resetMessageInputHeight();
       inputBar.classList.remove('has-text');
       const send = currentFriend ? sendFriendMessage(text) : sendGroupMessage(text);
       send.catch((err) => appendBubble('error', (err && err.message) || '发送失败'));
@@ -8093,7 +8106,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     socket.send(JSON.stringify(payload));
     appendBubble('user', text);
     messageInput.value = '';
-    messageInput.style.height = 'auto';
+    resetMessageInputHeight();
     inputBar.classList.remove('has-text');
     setBusy(true);
   });
@@ -8147,13 +8160,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   messageInput.addEventListener('focus', () => {
     setInputAttachmentPanelOpen(false);
     inputBar.classList.add('input-focused');
+    requestAnimationFrame(resizeMessageInput);
   });
   messageInput.addEventListener('blur', () => {
     inputBar.classList.remove('input-focused');
   });
   messageInput.addEventListener('input', () => {
-    messageInput.style.height = 'auto';
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 96) + 'px';
+    resizeMessageInput();
     inputBar.classList.toggle('has-text', messageInput.value.trim().length > 0);
     if (currentFriend && appSocket && appSocket.readyState === WebSocket.OPEN) {
       const now = Date.now();

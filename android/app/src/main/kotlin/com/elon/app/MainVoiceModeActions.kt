@@ -72,14 +72,21 @@ internal class MainVoiceModeActions(
             collapsedPreview.detachFromParent()
             voiceButton.detachFromParent()
             centerContainer.removeAllViews()
-            centerContainer.addView(binding.inputEdit)
-            expandedContainer.addView(voiceButton)
+            centerContainer.addView(collapsedPreview)
+            attachExpandedTextInput(expandedContainer)
+            expandedContainer.addView(voiceButton, minOf(1, expandedContainer.childCount))
             binding.inputEdit.visibility = View.VISIBLE
             voiceButton.visibility = View.GONE
             ttsSpeakerButton()?.visibility = View.GONE
         }
         updateSendButtonVisual()
         updateAdaptiveInputHeight()
+    }
+
+    private fun attachExpandedTextInput(expandedContainer: FrameLayout) {
+        if (binding.inputEdit.parent === expandedContainer) return
+        binding.inputEdit.detachFromParent()
+        expandedContainer.addView(binding.inputEdit, 0)
     }
 
     private fun hideKeyboard() {

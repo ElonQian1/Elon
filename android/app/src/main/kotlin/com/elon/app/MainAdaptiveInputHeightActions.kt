@@ -21,14 +21,15 @@ internal class MainAdaptiveInputHeightActions(
             if (inputBarContainer() == null) return@post
             val collapsedHeight = dp(38)
             val minTextHeight = dp(42)
-            val maxTextHeight = dp(100)
+            val maxVisibleLines = 6
+            val maxTextHeight = dp(140)
             val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
             val voiceMode = isVoiceMode()
             val desiredTextHeight = if (voiceMode) {
                 0
             } else {
                 val multilineTopGuard = if (rawLineCount > 1) dp(8) else 0
-                (rawLineCount.coerceAtMost(4) * inputEdit.lineHeight +
+                (rawLineCount.coerceAtMost(maxVisibleLines) * inputEdit.lineHeight +
                     inputEdit.paddingTop +
                     inputEdit.paddingBottom +
                     multilineTopGuard).coerceIn(minTextHeight, maxTextHeight)
@@ -49,7 +50,7 @@ internal class MainAdaptiveInputHeightActions(
 
             val multiline = !voiceMode && rawLineCount > 1
             inputEdit.gravity = (if (multiline) Gravity.TOP else Gravity.CENTER_VERTICAL) or Gravity.START
-            inputEdit.isVerticalScrollBarEnabled = !voiceMode && rawLineCount > 4
+            inputEdit.isVerticalScrollBarEnabled = !voiceMode && rawLineCount > maxVisibleLines
         }
     }
 }
