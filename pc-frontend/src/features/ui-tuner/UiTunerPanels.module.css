@@ -495,3 +495,237 @@
   font-size: 10.5px;
   line-height: 15px;
 }
+
+.conversationDrawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  border: 0;
+  background: rgba(0, 0, 0, .42);
+}
+
+.conversationDrawer {
+  position: fixed;
+  z-index: 61;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: clamp(420px, 36vw, 640px);
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  border: 1px solid rgba(168, 199, 250, .34);
+  border-radius: 8px;
+  background: #17191d;
+  box-shadow: 0 18px 54px rgba(0, 0, 0, .42);
+  overflow: hidden;
+}
+
+.conversationHeader,
+.conversationElement,
+.conversationSessionBar,
+.conversationComposer {
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, .028);
+}
+
+.conversationHeader {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.conversationHeader div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.conversationHeader span,
+.conversationSessionBar span,
+.conversationHint {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.conversationHeader strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 17px;
+}
+
+.conversationHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conversationHeaderActions button,
+.conversationActions button,
+.conversationNewMsg {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #242528;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.conversationHeaderActions button {
+  width: 30px;
+}
+
+.conversationHeaderActions button:hover,
+.conversationActions button:hover,
+.conversationNewMsg:hover {
+  background: #2c2e32;
+  border-color: rgba(255, 255, 255, .28);
+}
+
+.conversationElement {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+}
+
+.conversationElement svg {
+  color: rgba(168, 199, 250, .9);
+}
+
+.conversationElement div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.conversationElement strong,
+.conversationElement span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationElement strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.conversationElement span {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.conversationSessionBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.conversationSessionBar select {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #111317;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  outline: none;
+}
+
+.conversationFeedShell {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  background: #111317;
+}
+
+.conversationNewMsg {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  padding: 0 10px;
+  background: #30343a;
+}
+
+.conversationComposer {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  border-bottom: 0;
+  border-top: 1px solid var(--border);
+}
+
+.conversationHint {
+  margin: 0;
+}
+
+.conversationTextarea {
+  width: 100%;
+  min-height: 86px;
+  max-height: 180px;
+  resize: vertical;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #111317;
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 18px;
+  outline: none;
+  padding: 8px;
+}
+
+.conversationTextarea:focus {
+  border-color: rgba(168, 199, 250, .62);
+}
+
+.conversationActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.conversationActions button {
+  min-width: 92px;
+  padding: 0 10px;
+}
+
+.conversationActions button:disabled,
+.conversationHeaderActions button:disabled,
+.conversationNewMsg:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+@media (max-width: 760px) {
+  .conversationDrawer {
+    inset: 0;
+    width: auto;
+    border-radius: 0;
+  }
+
+  .conversationSessionBar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

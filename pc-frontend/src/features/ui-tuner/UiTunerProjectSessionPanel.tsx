@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { GitBranch, Play, RefreshCw, TerminalSquare } from 'lucide-react'
+import { GitBranch, MessageSquareText, Play, RefreshCw, TerminalSquare } from 'lucide-react'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { channelAllowsAiStart, mergeProjectRecords } from '../conversation/conversationPageHelpers'
 import { ensureLocalFullAccessGrant, type LocalNodeStatus } from '../conversation/localPcRuntime'
@@ -22,6 +22,8 @@ import {
   writeUiTunerModuleMemory,
   type UiTunerProjectSessionRecord,
 } from './projectSessions'
+import UiTunerConversationDrawer from './UiTunerConversationDrawer'
+import type { UiTunerConversationMode } from './uiTunerConversation'
 import panelStyles from './UiTunerPanels.module.css'
 
 interface UiTunerProjectSessionPanelProps {
@@ -55,6 +57,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
   const [sessions, setSessions] = useState<UiTunerProjectSessionRecord[]>(() => readUiTunerProjectSessions())
   const [activeSessionId, setActiveSessionId] = useState(() => sessions[0]?.id ?? '')
   const [memory, setMemory] = useState(() => readUiTunerModuleMemory())
+  const [conversationOpen, setConversationOpen] = useState(false)
 
   useEffect(() => {
     if (!projectsLoaded) loadProjects().catch(() => {})
@@ -119,18 +122,21 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       .slice(-4)
   }, [messages, selectedSession?.conversationId])
 
-  async function startSession(mode: 'continue' | 'fork') {
+  async function startSession(
+    mode: UiTunerConversationMode,
+    overrideIntent?: string,
+  ): Promise<UiTunerProjectSessionRecord | null> {
     if (!activeProject?.id || !aiChannel?.id) {
       setStatus('请先选择一个有 AI 开发频道的自项目')
-      return
+      return null
     }
     if (!localNodeReady || !workspacePath) {
       setStatus(!workspacePath ? '自项目缺少本机工作区路径' : localNodeStatusText)
-      return
+      return null
     }
     if (!channelAllowsAiStart(aiChannel)) {
       setStatus('当前角色不能在这个频道发起 AI 开发')
-      return
+      return null
     }
     const baseSession = selectedSession && mode === 'continue' ? selectedSession : null
     const session = baseSession ?? createUiTunerProjectSession({
@@ -142,6 +148,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
     })
     setStatus(mode === 'fork' ? '正在从最新记忆分叉 Codex 会话…' : '正在发送到项目 Codex 会话…')
     try {
+      const taskIntent = overrideIntent?.trim() || intent
       await selectChannel(aiChannel.id)
       await ensureLocalFullAccessGrant({
         adminUrl: nodeAdminUrl,
@@ -151,8 +158,8 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
         runtimePermission: activeProject.runtime_permission,
         useLocalRouteA: true,
       })
-      const nextMemory = rememberUiTunerIntent(memory, intent, pack.selectedElement?.name ?? '')
-      const content = buildUiTunerProjectTaskContent({ pack, intent, memory: nextMemory, session, mode })
+      const nextMemory = rememberUiTunerIntent(memory, taskIntent, pack.selectedElement?.name ?? '')
+      const content = buildUiTunerProjectTaskContent({ pack, intent: taskIntent, memory: nextMemory, session, mode })
       const agent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, CODEX_ROUTE)
       const response = await sendMessage(
         content,
@@ -174,9 +181,12 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       setMemory(nextMemory)
       setSessions(readUiTunerProjectSessions())
       setActiveSessionId(saved.id)
+      setConversationOpen(true)
       setStatus('已进入项目 Codex CLI 会话')
+      return saved
     } catch (error) {
       setStatus((error as { message?: string }).message ?? '项目 Codex 会话启动失败')
+      return null
     }
   }
 
@@ -219,6 +229,10 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       )}
 
       <div className={panelStyles.codexActions}>
+        <button type="button" onClick={() => setConversationOpen(true)}>
+          <MessageSquareText size={14} aria-hidden="true" />
+          打开聊天
+        </button>
         <button type="button" disabled={!canStart} onClick={() => void startSession('continue')}>
           <Play size={14} aria-hidden="true" />
           继续会话
@@ -261,6 +275,24 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
           </small>
         )}
       </div>
+
+      <UiTunerConversationDrawer
+        open={conversationOpen}
+        onClose={() => setConversationOpen(false)}
+        pack={pack}
+        intent={intent}
+        activeProject={activeProject}
+        aiChannel={aiChannel}
+        workspacePath={workspacePath}
+        canStart={canStart}
+        localNodeReady={localNodeReady}
+        localNodeStatusText={localNodeStatusText}
+        selectedSession={selectedSession}
+        visibleSessions={visibleSessions}
+        status={status}
+        onSelectSession={setActiveSessionId}
+        onStartSession={startSession}
+      />
     </div>
   )
 }
