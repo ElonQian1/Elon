@@ -255,17 +255,20 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
               {renderProgressPanel(true, publicSurfaceItems.length > 0 || surfaceItems.length > 0)}
             </div>
           </div>
-        ) : renderProgressPanel(false)
+        ) : null
       )}
 
       {resultMsg && (
-        <TaskAssistantBubble
-          message={resultMsg}
-          tone={tone}
-          label={replyLabelForTone(tone)}
-          reason={terminalReason}
-          time={assistantProcessTime}
-        />
+        <>
+          <TaskAssistantBubble
+            message={resultMsg}
+            tone={tone}
+            label={replyLabelForTone(tone)}
+            reason={terminalReason}
+            time={assistantProcessTime}
+          />
+          {showProgressPanel && renderProgressPanel(false, true)}
+        </>
       )}
     </div>
   )
