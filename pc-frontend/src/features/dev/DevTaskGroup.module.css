@@ -231,6 +231,10 @@
   padding: 0 0 2px;
 }
 
+.processBodyDirect {
+  padding-top: 1px;
+}
+
 .processCancel {
   display: inline-flex;
   align-items: center;
@@ -323,6 +327,49 @@
 .assistantMeta span {
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.assistantMetaCancel {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  align-self: center;
+  margin-left: 2px;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  color: #7f8ca3;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-1px) scale(.96);
+  transition:
+    opacity .12s ease,
+    color .12s ease,
+    background .12s ease,
+    transform .12s ease;
+}
+
+.assistantTurn:hover .assistantMetaCancel,
+.assistantTurn:focus-within .assistantMetaCancel,
+.assistantMetaCancel:focus-visible {
+  opacity: .72;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.assistantMetaCancel:hover,
+.assistantMetaCancel:focus-visible {
+  background: rgba(218, 55, 60, .08);
+  color: #ffb1b4;
+  opacity: 1;
+}
+
+.assistantMetaCancel:focus-visible {
+  outline: 1px solid rgba(255, 177, 180, .58);
+  outline-offset: 2px;
 }
 
 .assistantBubble {

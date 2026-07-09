@@ -6,6 +6,7 @@
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
  *  - 中间回复片段和命令按发生顺序穿插在过程面板中，任务结束后再折叠
  */
+import { StopCircle } from 'lucide-react'
 import { memo, useState, useEffect, useRef } from 'react'
 import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
@@ -93,6 +94,11 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
     || (!displayCollapsed && hasPublicAssistantItems)
   )
     && timeline.stage.key !== 'approval'
+  const directPublicProcess = !resultMsg
+    && !displayCollapsed
+    && hasPublicAssistantItems
+    && !timeline.stage.stuck
+    && timeline.stage.key !== 'approval'
 
   useEffect(() => {
     const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}:${defaultProcessOpen ? 'process-open' : 'process-closed'}`
@@ -144,34 +150,36 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
         hideCompletedProcessPanel ? styles.processPanelDormant : '',
       ].filter(Boolean).join(' ')}
     >
-      <TaskProgressCard
-        status={status}
-        displayStatus={progressStatus}
-        timeline={timeline}
-        progressCount={progressCount}
-        processSummary={processSummary}
-        collapsed={displayCollapsed}
-        canCancel={canCancel}
-        compact={compactCompletedProcess}
-        lockedOpen={forceProcessOpen}
-        processedDuration={processedDuration}
-        suppressNarrative={suppressProgressNarrative}
-        canContinue={!!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)}
-        onToggle={() => {
-          if (forceProcessOpen) return
-          setCollapsed((c) => !c)
-        }}
-        onCancel={() => {
-          if (!taskId) return
-          if (window.confirm('停止这个任务？')) onCancel?.(taskId)
-        }}
-        onContinue={() => {
-          if (!taskId) return
-          onContinue?.(taskId)
-        }}
-      />
+      {!directPublicProcess && (
+        <TaskProgressCard
+          status={status}
+          displayStatus={progressStatus}
+          timeline={timeline}
+          progressCount={progressCount}
+          processSummary={processSummary}
+          collapsed={displayCollapsed}
+          canCancel={canCancel}
+          compact={compactCompletedProcess}
+          lockedOpen={forceProcessOpen}
+          processedDuration={processedDuration}
+          suppressNarrative={suppressProgressNarrative}
+          canContinue={!!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)}
+          onToggle={() => {
+            if (forceProcessOpen) return
+            setCollapsed((c) => !c)
+          }}
+          onCancel={() => {
+            if (!taskId) return
+            if (window.confirm('停止这个任务？')) onCancel?.(taskId)
+          }}
+          onContinue={() => {
+            if (!taskId) return
+            onContinue?.(taskId)
+          }}
+        />
+      )}
       {!displayCollapsed && hasProgressDetails && (
-        <div className={styles.processBody}>
+        <div className={[styles.processBody, directPublicProcess ? styles.processBodyDirect : ''].filter(Boolean).join(' ')}>
           <TaskTimeline
             model={timeline}
             taskContext={taskContext}
@@ -221,6 +229,20 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
                 <strong>一龙</strong>
                 {hasPublicAssistantItems && <span>正在处理</span>}
                 {assistantProcessTime && <span>{assistantProcessTime}</span>}
+                {directPublicProcess && canCancel && (
+                  <button
+                    type="button"
+                    className={styles.assistantMetaCancel}
+                    onClick={() => {
+                      if (!taskId) return
+                      if (window.confirm('停止这个任务？')) onCancel?.(taskId)
+                    }}
+                    aria-label="停止任务"
+                    title="停止任务"
+                  >
+                    <StopCircle size={13} />
+                  </button>
+                )}
               </div>
               {surfaceItems.length > 0 && (
                 <TaskProgressHighlights items={surfaceItems} hiddenCount={previewHiddenCount} />
