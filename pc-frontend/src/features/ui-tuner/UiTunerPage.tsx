@@ -1,6 +1,8 @@
 import {
   useEffect,
+  useCallback,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
@@ -8,6 +10,8 @@ import {
 import {
   Copy,
   Download,
+  Maximize2,
+  Minus,
   MousePointer2,
   Move,
   Plus,
@@ -34,11 +38,21 @@ interface DragState {
   mode: DragMode
   startX: number
   startY: number
+  scale: number
   original: UiTunerElement
 }
 
 const MIN_SIZE = 24
 const DEFAULT_CANVAS_MAX = 10000
+const VIEW_SCALE_MIN = 0.08
+const VIEW_SCALE_MAX = 2
+const VIEW_SCALE_STEP = 0.1
+
+function normalizeViewScale(value: number) {
+  if (!Number.isFinite(value)) return 1
+  const bounded = Math.min(Math.max(value, VIEW_SCALE_MIN), VIEW_SCALE_MAX)
+  return Math.round(bounded * 100) / 100
+}
 
 export default function UiTunerPage() {
   const [tunerDoc, setTunerDoc] = useState<UiTunerDocument>(() => (
@@ -46,7 +60,10 @@ export default function UiTunerPage() {
   ))
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [viewScale, setViewScale] = useState(1)
+  const [fitToStage, setFitToStage] = useState(true)
   const [notice, setNotice] = useState('')
+  const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
 
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
@@ -57,10 +74,42 @@ export default function UiTunerPage() {
     () => (selected ? getMetrics(selected, tunerDoc.elements, tunerDoc.canvas) : []),
     [selected, tunerDoc.canvas, tunerDoc.elements],
   )
+  const viewScaleLabel = `${Math.round(viewScale * 100)}%`
+
+  const fitCanvasToStage = useCallback(() => {
+    const scroller = canvasScrollerRef.current
+    if (!scroller) return
+    const availableWidth = Math.max(scroller.clientWidth - 56, MIN_SIZE)
+    const availableHeight = Math.max(scroller.clientHeight - 56, MIN_SIZE)
+    const nextScale = Math.min(
+      availableWidth / tunerDoc.canvas.width,
+      availableHeight / tunerDoc.canvas.height,
+      1,
+    )
+    setViewScale(normalizeViewScale(nextScale))
+  }, [tunerDoc.canvas.height, tunerDoc.canvas.width])
+
+  const setManualViewScale = (nextScale: number) => {
+    setFitToStage(false)
+    setViewScale(normalizeViewScale(nextScale))
+  }
 
   useEffect(() => {
     saveUiTunerDocument(tunerDoc)
   }, [tunerDoc])
+
+  useEffect(() => {
+    if (!fitToStage) return undefined
+    fitCanvasToStage()
+    const scroller = canvasScrollerRef.current
+    if (typeof ResizeObserver === 'undefined' || !scroller) {
+      window.addEventListener('resize', fitCanvasToStage)
+      return () => window.removeEventListener('resize', fitCanvasToStage)
+    }
+    const observer = new ResizeObserver(fitCanvasToStage)
+    observer.observe(scroller)
+    return () => observer.disconnect()
+  }, [fitCanvasToStage, fitToStage])
 
   useEffect(() => {
     if (!notice) return undefined
@@ -73,8 +122,8 @@ export default function UiTunerPage() {
 
     const handlePointerMove = (event: PointerEvent) => {
       event.preventDefault()
-      const dx = event.clientX - dragState.startX
-      const dy = event.clientY - dragState.startY
+      const dx = (event.clientX - dragState.startX) / dragState.scale
+      const dy = (event.clientY - dragState.startY) / dragState.scale
 
       setTunerDoc((current) => {
         const elements = current.elements.map((element) => {
@@ -179,6 +228,7 @@ export default function UiTunerPage() {
       mode,
       startX: event.clientX,
       startY: event.clientY,
+      scale: viewScale,
       original: element,
     })
   }
@@ -287,6 +337,29 @@ export default function UiTunerPage() {
             <span>{tunerDoc.canvas.name}</span>
           </div>
           <div className={styles.toolbarActions}>
+            <div className={styles.viewControls} aria-label="画布缩放">
+              <button type="button" onClick={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)} aria-label="缩小画布">
+                <Minus size={14} aria-hidden="true" />
+              </button>
+              <strong>{viewScaleLabel}</strong>
+              <button type="button" onClick={() => setManualViewScale(viewScale + VIEW_SCALE_STEP)} aria-label="放大画布">
+                <Plus size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className={fitToStage ? styles.activeViewControl : ''}
+                onClick={() => {
+                  setFitToStage(true)
+                  fitCanvasToStage()
+                }}
+              >
+                <Maximize2 size={14} aria-hidden="true" />
+                适屏
+              </button>
+              <button type="button" onClick={() => setManualViewScale(1)}>
+                100%
+              </button>
+            </div>
             <button type="button" onClick={saveNow}>
               <Save size={14} aria-hidden="true" />
               保存调整
@@ -304,13 +377,21 @@ export default function UiTunerPage() {
           </div>
         </header>
 
-        <div className={styles.canvasScroller}>
+        <div className={styles.canvasScroller} ref={canvasScrollerRef}>
+          <div
+            className={styles.canvasViewport}
+            style={{
+              width: tunerDoc.canvas.width * viewScale,
+              height: tunerDoc.canvas.height * viewScale,
+            }}
+          >
           <div
             className={styles.canvas}
             style={{
               width: tunerDoc.canvas.width,
               height: tunerDoc.canvas.height,
               background: tunerDoc.canvas.background,
+              transform: `scale(${viewScale})`,
             }}
             tabIndex={0}
             onKeyDown={handleCanvasKeyDown}
@@ -320,6 +401,7 @@ export default function UiTunerPage() {
           >
             <div className={styles.canvasGrid} aria-hidden="true" />
             {tunerDoc.elements.map(renderElement)}
+          </div>
           </div>
         </div>
       </section>
