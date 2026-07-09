@@ -103,6 +103,10 @@
   margin-top: 8px;
 }
 
+.processPanelBeforeReply {
+  margin: 1px 0 6px;
+}
+
 .processToggle,
 .processStatic {
   display: flex;

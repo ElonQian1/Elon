@@ -7,7 +7,7 @@
  *  - 中间回复片段和命令按发生顺序穿插在过程面板中，任务结束后再折叠
  */
 import { StopCircle } from 'lucide-react'
-import { memo, useState, useEffect, useRef } from 'react'
+import { memo, useState, useEffect, useRef, type ReactNode } from 'react'
 import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
 import {
@@ -142,12 +142,13 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
     })
   }, [taskId, status.label, isDone, processSummary])
 
-  const renderProgressPanel = (inline: boolean, afterNotes = false) => (
+  const renderProgressPanel = (inline: boolean, placement: 'afterNotes' | 'beforeReply' | false = false) => (
     <div
       className={[
         styles.processPanel,
         inline ? styles.processPanelInline : '',
-        afterNotes ? styles.processPanelAfterNotes : '',
+        placement === 'afterNotes' ? styles.processPanelAfterNotes : '',
+        placement === 'beforeReply' ? styles.processPanelBeforeReply : '',
         hideCompletedProcessPanel ? styles.processPanelDormant : '',
       ].filter(Boolean).join(' ')}
     >
@@ -252,7 +253,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
               {surfaceItems.length > 0 && (
                 <TaskProgressHighlights items={surfaceItems} hiddenCount={previewHiddenCount} />
               )}
-              {renderProgressPanel(true, publicSurfaceItems.length > 0 || surfaceItems.length > 0)}
+              {renderProgressPanel(true, (publicSurfaceItems.length > 0 || surfaceItems.length > 0) ? 'afterNotes' : false)}
             </div>
           </div>
         ) : null
@@ -266,8 +267,8 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
             label={replyLabelForTone(tone)}
             reason={terminalReason}
             time={assistantProcessTime}
+            beforeBubble={showProgressPanel ? renderProgressPanel(true, 'beforeReply') : null}
           />
-          {showProgressPanel && renderProgressPanel(false, true)}
         </>
       )}
     </div>
@@ -298,12 +299,13 @@ function progressStatusForStage(
   return status
 }
 
-function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime }: {
+function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime, beforeBubble }: {
   message: ChatMessage
   tone: TaskTone
   label: string
   reason?: string
   time?: string
+  beforeBubble?: ReactNode
 }) {
   const content = messageText(message)
   if (!content) return null
@@ -322,6 +324,7 @@ function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime 
           <span>{label}</span>
           {time && <span>{time}</span>}
         </div>
+        {beforeBubble}
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={displayContent} copy /> : displayContent}
         </div>
