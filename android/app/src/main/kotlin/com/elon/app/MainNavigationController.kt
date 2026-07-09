@@ -73,9 +73,9 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
     private val homeChrome = HomeChromeController(
-        activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, showCreateProjectDialog,
+        activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor,
         { showConversationHome(animate = false) },
-        { showProjectHome(animate = false) },
+        { showProjectHome(animate = false) }, { showProjectPlaza() },
         { selectBottomTab(binding.tabProfile, animate = false) }
     )
 
@@ -249,7 +249,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        if (tab == binding.tabChat) homeChrome.showHome() else showMainTabs()
+        if (tab == binding.tabChat) homeChrome.showHome() else if (tab == binding.tabProfile) homeChrome.showMenuOnly() else showMainTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
@@ -281,7 +281,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        if (tab == binding.tabChat) homeChrome.showHome() else showMainTabs()
+        if (tab == binding.tabChat) homeChrome.showHome() else if (tab == binding.tabProfile) homeChrome.showMenuOnly() else showMainTabs()
     }
 
     private fun pageForBottomTab(tab: TextView): View? {
@@ -346,7 +346,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.VISIBLE
         binding.inputLayout.visibility = View.GONE
-        showMainTabs()
+        homeChrome.showMenuOnly()
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
@@ -934,7 +934,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.VISIBLE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
-        showMainTabs()
+        homeChrome.showProjectPlazaEntry()
         showProjectTopTabs(plazaSelected = true)
         setProjectHomeSegmentVisible(false)
         binding.backButton.visibility = View.GONE

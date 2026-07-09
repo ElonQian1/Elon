@@ -670,35 +670,34 @@
             android:layout_gravity="end|bottom"
             android:layout_marginEnd="20dp"
             android:layout_marginBottom="28dp"
-            android:background="@drawable/bg_project_space_ai_menu_item"
+            android:background="@drawable/bg_home_floating_nav"
             android:clickable="true"
             android:clipToOutline="true"
-            android:contentDescription="新建项目"
+            android:contentDescription="浮动导航"
             android:foreground="?attr/selectableItemBackground"
             android:gravity="center"
             android:orientation="horizontal"
             android:visibility="gone">
 
             <ImageView
-                android:id="@+id/homeProjectCreateIcon"
+                android:id="@+id/homeProjectHomeIcon"
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:layout_marginEnd="10dp"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
-                android:src="@drawable/ic_project_post_compose"
-                app:tint="@color/elon_button_primary_text" />
+                android:src="@drawable/ic_tab_chat_custom"
+                app:tint="@color/elon_text_primary" />
 
-            <com.elon.app.ProjectSpaceAiLabelView
-                android:id="@+id/homeProjectCreateLabel"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="start|center_vertical"
-                android:includeFontPadding="false"
-                android:maxLines="1"
-                android:text="项目"
-                android:textColor="@color/elon_button_primary_text"
-                android:textSize="18sp" />
+            <ImageView
+                android:id="@+id/homeProjectCreateIcon"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginEnd="0dp"
+                android:contentDescription="@null"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_tab_project_custom"
+                app:tint="@color/elon_text_primary" />
         </LinearLayout>
 
         <ScrollView

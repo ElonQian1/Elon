@@ -3209,48 +3209,51 @@
     .home-project-create-menu button {
       width: 144px;
       height: 60px;
-      border: 0;
+      border: 1px solid #3B3B3E;
       border-radius: 30px;
-      background: var(--brand);
-      color: var(--brand-ink);
+      background: #111111;
+      color: var(--ink);
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 0;
       padding: 0;
-      font-size: 18px;
       cursor: pointer;
       overflow: hidden;
       pointer-events: auto;
-      transition: width 220ms ease, height 220ms ease, gap 220ms ease;
+      transition: width 220ms ease, height 220ms ease, background 160ms ease, border-color 160ms ease;
+    }
+    .home-project-create-menu button:hover {
+      background: #171717;
+      border-color: #4A4A4D;
     }
     .home-project-create-menu img {
       width: 28px;
       height: 28px;
       flex: none;
       object-fit: contain;
-      transition: width 220ms ease, height 220ms ease;
+      transition: width 220ms ease, height 220ms ease, opacity 220ms ease, margin 220ms ease;
     }
-    .home-project-create-menu span {
-      display: inline-block;
-      white-space: nowrap;
-      overflow: hidden;
-      max-width: 72px;
-      opacity: 1;
-      transition: opacity 220ms ease, max-width 220ms ease;
+    .home-project-create-menu .home-floating-home-icon {
+      margin-right: 10px;
     }
-    .home-project-create-menu.animating span,
-    .home-project-create-menu.compact span {
-      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
-      mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
+    .home-project-create-menu.mode-project.compact .home-floating-home-icon {
+      width: 0;
+      opacity: 0;
+      margin-right: 0;
+    }
+    .home-project-create-menu.mode-home .home-floating-home-icon {
+      margin-right: 10px;
+    }
+    .home-project-create-menu.mode-home.compact .home-floating-home-icon {
+      margin-right: 0;
+    }
+    .home-project-create-menu.mode-home.compact .home-floating-project-icon {
+      width: 0;
+      opacity: 0;
     }
     .home-project-create-menu.compact button {
       width: 60px;
-      gap: 0;
-    }
-    .home-project-create-menu.compact span {
-      max-width: 0;
-      opacity: 0;
     }
     @media (max-width: 719px) {
       .home-project-create-menu { right: 20px; }
@@ -4309,10 +4312,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <span>发帖</span>
     </button>
   </nav>
-  <nav class="home-project-create-menu hidden" id="homeProjectCreateMenu">
-    <button type="button" id="homeProjectCreateMenuBtn" title="新建项目">
-      <img src="/assets/ic_project_post_compose.png" alt="" aria-hidden="true" />
-      <span>项目</span>
+  <nav class="home-project-create-menu mode-project hidden" id="homeProjectCreateMenu">
+    <button type="button" id="homeProjectCreateMenuBtn" title="项目广场" aria-label="项目广场">
+      <img class="home-floating-home-icon" src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" aria-hidden="true" />
+      <img class="home-floating-project-icon" src="data:image/png;base64,__TAB_PROJECT_PNG_B64__" alt="" aria-hidden="true" />
     </button>
   </nav>
 </main>
@@ -4765,16 +4768,34 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectPage.addEventListener('scroll', syncProjectSpaceAiMenuMotion, { passive: true });
   }
 
-  function setHomeChromeVisible(visible) {
-    if (homeMenuBtn) homeMenuBtn.classList.toggle('hidden', !visible);
+  function setHomeProjectCreateMenuMode(mode) {
+    if (!homeProjectCreateMenu || !homeProjectCreateMenuBtn) return;
+    const targetMode = mode === 'home' ? 'home' : 'project';
+    homeProjectCreateMenu.dataset.mode = targetMode;
+    homeProjectCreateMenu.classList.toggle('mode-home', targetMode === 'home');
+    homeProjectCreateMenu.classList.toggle('mode-project', targetMode === 'project');
+    const title = targetMode === 'home' ? '首页' : '项目广场';
+    homeProjectCreateMenuBtn.title = title;
+    homeProjectCreateMenuBtn.setAttribute('aria-label', title);
+  }
+
+  function setHomeChromeVisible(visible, options = {}) {
+    if (typeof options === 'string') options = { mode: options };
+    const showMenu = options.showMenu !== false;
+    const showFloating = options.floating !== false;
+    const floatingMode = options.mode === 'home' ? 'home' : 'project';
+    if (homeMenuBtn) homeMenuBtn.classList.toggle('hidden', !visible || !showMenu);
     if (homeProjectCreateMenu) {
-      homeProjectCreateMenu.classList.toggle('hidden', !visible);
-      if (visible) {
-        homeProjectCreateMenu.classList.remove('compact', 'animating');
-        syncHomeProjectCreateMenuMotion();
+      setHomeProjectCreateMenuMode(floatingMode);
+      const floatingVisible = visible && showFloating;
+      homeProjectCreateMenu.classList.toggle('hidden', !floatingVisible);
+      if (floatingVisible) {
+        homeProjectCreateMenu.classList.remove('animating');
+        homeProjectCreateMenu.classList.toggle('compact', !!options.compact);
+        if (!options.compact) syncHomeProjectCreateMenuMotion();
       }
     }
-    if (!visible && homeNavMenu) homeNavMenu.classList.add('hidden');
+    if ((!visible || !showMenu) && homeNavMenu) homeNavMenu.classList.add('hidden');
   }
 
   let homeProjectCreateMenuMotionTimer = 0;
@@ -4793,8 +4814,36 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   if (chatHomePage && homeProjectCreateMenu) {
     chatHomePage.addEventListener('scroll', syncHomeProjectCreateMenuMotion, { passive: true });
   }
+  function openFloatingChatHome() {
+    if (socket) { try { socket.close(); } catch {} socket = null; }
+    stopContactPolling();
+    stopGroupSummaryRefreshTimer();
+    currentProject = null;
+    currentFriend = null;
+    currentGroup = null;
+    groupSummaryPosts = [];
+    progressLog = [];
+    renderGroupSummaryStrip(null, true);
+    switchTab('chatPage');
+  }
+
+  function openFloatingProjectPlaza() {
+    currentProject = null;
+    currentFriend = null;
+    currentGroup = null;
+    groupSummaryPosts = [];
+    progressLog = [];
+    renderGroupSummaryStrip(null, true);
+    switchTab('projectPage');
+    showProjectPlazaTab();
+  }
+
   if (homeProjectCreateMenuBtn) {
-    homeProjectCreateMenuBtn.addEventListener('click', () => openNewProject(false));
+    homeProjectCreateMenuBtn.addEventListener('click', () => {
+      const mode = homeProjectCreateMenu ? homeProjectCreateMenu.dataset.mode : 'project';
+      if (mode === 'home') openFloatingChatHome();
+      else openFloatingProjectPlaza();
+    });
   }
   if (homeMenuBtn && homeNavMenu) {
     homeMenuBtn.addEventListener('click', (event) => {
@@ -5891,6 +5940,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const inChat = inProjectChat || inFriendChat || inGroupChat;
     const isChatHome = tabId === 'chatPage' && !inChat;
     const inProjectHome = tabId === 'projectPage';
+    const isProfileHome = tabId === 'profilePage';
     if (tabId !== 'chatPage') {
       searchBar.classList.add('hidden');
       searchQuery = '';
@@ -5933,9 +5983,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !inGroupChat);
-    if (tabsBar) tabsBar.classList.toggle('hidden', inChat || isChatHome);
+    if (tabsBar) tabsBar.classList.toggle('hidden', inChat || isChatHome || inProjectHome || isProfileHome);
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
-    setHomeChromeVisible(isChatHome);
+    setHomeChromeVisible(isChatHome || inProjectHome || isProfileHome, {
+      mode: inProjectHome ? 'home' : 'project',
+      compact: inProjectHome,
+      floating: isChatHome || inProjectHome,
+      showMenu: isChatHome || isProfileHome
+    });
     // 返回按钮：聊天详情页显示
     backBtn.style.display = inChat ? '' : 'none';
     voiceCallBtn.style.display = (inFriendChat && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
