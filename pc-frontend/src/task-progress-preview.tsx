@@ -131,6 +131,7 @@ const scenarios: Scenario[] = [
       progress('我已经定位到任务过程组件；接下来会先调整信息分层，再验证展开态样式。'),
       toolCall('git log --oneline -5'),
       toolResult('33850f10 fix(pc): 钱一龙弱化任务停止按钮\nc91db0f1 fix(pc): 钱一龙优化任务开始态展示', 0),
+      progress('命令结果回来后，我继续检查文件变更和验证步骤，展开过程应该按执行顺序继续往下读。'),
       event({
         type: 'tool_call',
         tool: 'file_change',
