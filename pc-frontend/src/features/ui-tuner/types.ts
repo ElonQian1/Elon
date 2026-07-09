@@ -19,7 +19,7 @@ export interface UiTunerReferenceImage {
 }
 
 export interface UiTunerSource {
-  kind: 'apk' | 'manual'
+  kind: 'apk' | 'manual' | 'device_snapshot' | 'runtime_xml'
   label: string
   file?: string
   line?: number
@@ -51,6 +51,7 @@ export interface UiTunerElement {
   borderColor: string
   opacity: number
   source?: UiTunerSource
+  runtime?: UiTunerRuntimeElement
 }
 
 export interface UiTunerDocument {
@@ -59,6 +60,33 @@ export interface UiTunerDocument {
   elements: UiTunerElement[]
   updatedAt: string
   source?: UiTunerSource
+  runtimeSnapshot?: UiTunerRuntimeSnapshot
+}
+
+export interface UiTunerRuntimeSnapshot {
+  deviceId: string
+  packageName?: string
+  activityName?: string
+  capturedAt: string
+  nodeCount: number
+  sourceRoot?: string
+}
+
+export interface UiTunerRuntimeElement {
+  nodeId: string
+  resourceId?: string
+  className?: string
+  packageName?: string
+  xpath: string
+  indexPath: number[]
+  originalBounds: {
+    left: number
+    top: number
+    right: number
+    bottom: number
+    width: number
+    height: number
+  }
 }
 
 export interface UiTunerExportElement {
@@ -87,4 +115,5 @@ export interface UiTunerExportElement {
     opacity: number
   }
   source?: UiTunerSource
+  runtime?: UiTunerRuntimeElement
 }

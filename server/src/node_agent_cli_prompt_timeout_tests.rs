@@ -1,4 +1,4 @@
-use super::cli_prompt_timeout_secs;
+use super::node_agent_cli_prompt_runner::cli_prompt_timeout_secs;
 
 #[test]
 fn codex_full_access_prompt_gets_development_timeout() {

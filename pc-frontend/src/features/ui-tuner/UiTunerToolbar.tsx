@@ -1,0 +1,169 @@
+import type { RefObject } from 'react'
+import {
+  Copy,
+  Download,
+  FileCode2,
+  ImagePlus,
+  Maximize2,
+  Minus,
+  MousePointer2,
+  Plus,
+  RefreshCw,
+  Redo2,
+  Save,
+  Smartphone,
+  Undo2,
+} from 'lucide-react'
+import type { AndroidInspectorDevice } from './device/deviceInspectorApi'
+import styles from './UiTunerPage.module.css'
+
+interface UiTunerToolbarProps {
+  canvasName: string
+  screenshotInputRef: RefObject<HTMLInputElement>
+  devices: AndroidInspectorDevice[]
+  selectedDeviceId: string
+  deviceBusy: boolean
+  captureBusy: boolean
+  viewScaleLabel: string
+  fitToStage: boolean
+  canUndo: boolean
+  canRedo: boolean
+  onImportScreenshot: (file: File) => void
+  onSelectDevice: (deviceId: string) => void
+  onRefreshDevices: () => void
+  onCaptureDeviceSnapshot: () => void
+  onZoomOut: () => void
+  onZoomIn: () => void
+  onFitToStage: () => void
+  onActualSize: () => void
+  onUndo: () => void
+  onRedo: () => void
+  onSave: () => void
+  onCopyExport: () => void
+  onCopyCliPatch: () => void
+  onDownloadExport: () => void
+  onReset: () => void
+}
+
+export function UiTunerToolbar({
+  canvasName,
+  screenshotInputRef,
+  devices,
+  selectedDeviceId,
+  deviceBusy,
+  captureBusy,
+  viewScaleLabel,
+  fitToStage,
+  canUndo,
+  canRedo,
+  onImportScreenshot,
+  onSelectDevice,
+  onRefreshDevices,
+  onCaptureDeviceSnapshot,
+  onZoomOut,
+  onZoomIn,
+  onFitToStage,
+  onActualSize,
+  onUndo,
+  onRedo,
+  onSave,
+  onCopyExport,
+  onCopyCliPatch,
+  onDownloadExport,
+  onReset,
+}: UiTunerToolbarProps) {
+  return (
+    <header className={styles.toolbar}>
+      <div className={styles.toolbarTitle}>
+        <MousePointer2 size={16} aria-hidden="true" />
+        <span>{canvasName}</span>
+      </div>
+      <div className={styles.toolbarActions}>
+        <input
+          ref={screenshotInputRef}
+          type="file"
+          accept="image/*"
+          className={styles.hiddenFileInput}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0]
+            event.currentTarget.value = ''
+            if (file) onImportScreenshot(file)
+          }}
+        />
+        <select
+          className={styles.deviceSelect}
+          value={selectedDeviceId}
+          onChange={(event) => onSelectDevice(event.currentTarget.value)}
+          aria-label="ADB 设备"
+        >
+          <option value="">ADB 设备</option>
+          {devices.map((device) => (
+            <option key={device.serial} value={device.serial}>
+              {device.model ?? device.serial} · {device.state}
+            </option>
+          ))}
+        </select>
+        <button type="button" onClick={onRefreshDevices} disabled={deviceBusy}>
+          <Smartphone size={14} aria-hidden="true" />
+          {deviceBusy ? '检测中' : '设备'}
+        </button>
+        <button type="button" onClick={onCaptureDeviceSnapshot} disabled={captureBusy || deviceBusy}>
+          <Smartphone size={14} aria-hidden="true" />
+          {captureBusy ? '捕获中' : '捕获真机'}
+        </button>
+        <div className={styles.viewControls} aria-label="画布缩放">
+          <button type="button" onClick={onZoomOut} aria-label="缩小画布">
+            <Minus size={14} aria-hidden="true" />
+          </button>
+          <strong>{viewScaleLabel}</strong>
+          <button type="button" onClick={onZoomIn} aria-label="放大画布">
+            <Plus size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={fitToStage ? styles.activeViewControl : ''}
+            onClick={onFitToStage}
+          >
+            <Maximize2 size={14} aria-hidden="true" />
+            适屏
+          </button>
+          <button type="button" onClick={onActualSize}>
+            100%
+          </button>
+        </div>
+        <button type="button" onClick={() => screenshotInputRef.current?.click()}>
+          <ImagePlus size={14} aria-hidden="true" />
+          导入截图
+        </button>
+        <div className={styles.historyControls} aria-label="历史记录">
+          <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤回一步" title="撤回一步">
+            <Undo2 size={14} aria-hidden="true" />
+            撤回
+          </button>
+          <button type="button" onClick={onRedo} disabled={!canRedo} aria-label="重做一步" title="重做一步">
+            <Redo2 size={14} aria-hidden="true" />
+            重做
+          </button>
+        </div>
+        <button type="button" onClick={onSave}>
+          <Save size={14} aria-hidden="true" />
+          保存调整
+        </button>
+        <button type="button" onClick={onCopyExport}>
+          <Copy size={14} aria-hidden="true" />
+          复制参数
+        </button>
+        <button type="button" onClick={onCopyCliPatch}>
+          <FileCode2 size={14} aria-hidden="true" />
+          CLI 包
+        </button>
+        <button type="button" onClick={onDownloadExport} aria-label="下载参数 JSON">
+          <Download size={15} aria-hidden="true" />
+        </button>
+        <button type="button" onClick={onReset} aria-label="重置画布">
+          <RefreshCw size={15} aria-hidden="true" />
+        </button>
+      </div>
+    </header>
+  )
+}

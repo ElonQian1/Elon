@@ -7,22 +7,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import {
-  Copy,
-  Download,
-  ImagePlus,
-  Maximize2,
-  Minus,
-  MousePointer2,
-  Move,
-  Plus,
-  RefreshCw,
-  Redo2,
-  Save,
-  Trash2,
-  Type,
-  Undo2,
-} from 'lucide-react'
+import { Move, Trash2 } from 'lucide-react'
 import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
 import {
   loadUiTunerDocument,
@@ -30,8 +15,17 @@ import {
   stringifyUiTunerExport,
 } from './uiTunerStorage'
 import { ColorField, NumberField } from './UiTunerFields'
-import { clamp, getMetrics, kindLabel, touch } from './uiTunerGeometry'
+import { clamp, getMetrics, touch } from './uiTunerGeometry'
+import {
+  captureAndroidSnapshot,
+  listAndroidDevices,
+  type AndroidInspectorDevice,
+} from './device/deviceInspectorApi'
+import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
+import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
+import { UiTunerLayersPanel } from './UiTunerLayersPanel'
+import { UiTunerToolbar } from './UiTunerToolbar'
 import styles from './UiTunerPage.module.css'
 
 type DragMode = 'move' | 'resize'
@@ -80,8 +74,13 @@ export default function UiTunerPage() {
   const [viewScale, setViewScale] = useState(1)
   const [fitToStage, setFitToStage] = useState(true)
   const [notice, setNotice] = useState('')
+  const [devices, setDevices] = useState<AndroidInspectorDevice[]>([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState('')
+  const [deviceBusy, setDeviceBusy] = useState(false)
+  const [captureBusy, setCaptureBusy] = useState(false)
+  const [showRuntimeLayers, setShowRuntimeLayers] = useState(true)
   const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
-  const screenshotInputRef = useRef<HTMLInputElement | null>(null)
+  const screenshotInputRef = useRef<HTMLInputElement>(null)
   const tunerDocRef = useRef(tunerDoc)
   const selectedIdRef = useRef<string | null>(selectedId)
   const dragSnapshotRef = useRef<UiTunerDocument | null>(null)
@@ -280,12 +279,60 @@ export default function UiTunerPage() {
     setNotice('已保存到本机')
   }
 
+  const refreshDevices = async () => {
+    setDeviceBusy(true)
+    try {
+      const nextDevices = await listAndroidDevices()
+      setDevices(nextDevices)
+      setSelectedDeviceId((current) => (
+        current && nextDevices.some((device) => device.serial === current)
+          ? current
+          : nextDevices.find((device) => device.state === 'device')?.serial ?? nextDevices[0]?.serial ?? ''
+      ))
+      setNotice(nextDevices.length ? `已发现 ${nextDevices.length} 台 ADB 设备` : '未发现可用 ADB 设备')
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '读取 ADB 设备失败')
+    } finally {
+      setDeviceBusy(false)
+    }
+  }
+
+  const captureDeviceSnapshot = async () => {
+    const deviceId = selectedDeviceId || devices[0]?.serial || ''
+    if (!deviceId) {
+      await refreshDevices()
+      return
+    }
+    setCaptureBusy(true)
+    try {
+      const snapshot = await captureAndroidSnapshot({ deviceId, packageName: 'com.elon.app' })
+      const next = snapshotToTunerDocument(snapshot)
+      commitDocument(() => next, next.elements[0]?.id ?? null)
+      setFitToStage(true)
+      setShowRuntimeLayers(true)
+      setNotice(`已捕获真机画面：${snapshot.xml.nodeCount} 个 XML 节点`)
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '真机捕获失败')
+    } finally {
+      setCaptureBusy(false)
+    }
+  }
+
   const copyExport = async () => {
     try {
       await navigator.clipboard.writeText(exportJson)
       setNotice('参数 JSON 已复制')
     } catch {
       setNotice('复制失败，可手动选中文本')
+    }
+  }
+
+  const copyCliPatch = async () => {
+    try {
+      await navigator.clipboard.writeText(stringifyCliPatchPackage(tunerDoc))
+      setNotice('CLI 修改包已复制')
+    } catch {
+      setNotice('复制失败，可先复制参数 JSON')
     }
   }
 
@@ -417,126 +464,44 @@ export default function UiTunerPage() {
 
   return (
     <div className={styles.page}>
-      <aside className={styles.layersPanel}>
-        <div className={styles.panelHeader}>
-          <h1>微调画布</h1>
-          <p>导入 APP 截图作为真实底图，再拖动图层调位置、尺寸、字号和间距。</p>
-        </div>
-
-        <div className={styles.addGroup}>
-          <button type="button" onClick={() => addElement('text')}>
-            <Type size={14} aria-hidden="true" />
-            文字
-          </button>
-          <button type="button" onClick={() => addElement('card')}>
-            <Plus size={14} aria-hidden="true" />
-            卡片
-          </button>
-          <button type="button" onClick={() => addElement('button')}>
-            <Plus size={14} aria-hidden="true" />
-            按钮
-          </button>
-        </div>
-
-        <div className={styles.layerList} aria-label="画布图层">
-          {tunerDoc.elements.map((element) => (
-            <button
-              key={element.id}
-              type="button"
-              className={[styles.layerItem, element.id === selectedId ? styles.activeLayer : ''].join(' ')}
-              onClick={() => setSelectedId(element.id)}
-            >
-              <span>{kindLabel(element.kind)}</span>
-              <strong>{element.name}</strong>
-              <small>{element.width} x {element.height}</small>
-            </button>
-          ))}
-        </div>
-      </aside>
+      <UiTunerLayersPanel
+        elements={tunerDoc.elements}
+        selectedId={selectedId}
+        onAddElement={addElement}
+        onSelectElement={setSelectedId}
+      />
 
       <section className={styles.stage}>
-        <header className={styles.toolbar}>
-          <div className={styles.toolbarTitle}>
-            <MousePointer2 size={16} aria-hidden="true" />
-            <span>{tunerDoc.canvas.name}</span>
-          </div>
-          <div className={styles.toolbarActions}>
-            <input
-              ref={screenshotInputRef}
-              type="file"
-              accept="image/*"
-              className={styles.hiddenFileInput}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0]
-                event.currentTarget.value = ''
-                if (file) importScreenshot(file)
-              }}
-            />
-            <div className={styles.viewControls} aria-label="画布缩放">
-              <button type="button" onClick={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)} aria-label="缩小画布">
-                <Minus size={14} aria-hidden="true" />
-              </button>
-              <strong>{viewScaleLabel}</strong>
-              <button type="button" onClick={() => setManualViewScale(viewScale + VIEW_SCALE_STEP)} aria-label="放大画布">
-                <Plus size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className={fitToStage ? styles.activeViewControl : ''}
-                onClick={() => {
-                  setFitToStage(true)
-                  fitCanvasToStage()
-                }}
-              >
-                <Maximize2 size={14} aria-hidden="true" />
-                适屏
-              </button>
-              <button type="button" onClick={() => setManualViewScale(1)}>
-                100%
-              </button>
-            </div>
-            <button type="button" onClick={() => screenshotInputRef.current?.click()}>
-              <ImagePlus size={14} aria-hidden="true" />
-              导入截图
-            </button>
-            <div className={styles.historyControls} aria-label="历史记录">
-              <button
-                type="button"
-                onClick={undoHistory}
-                disabled={history.past.length === 0}
-                aria-label="撤回一步"
-                title="撤回一步"
-              >
-                <Undo2 size={14} aria-hidden="true" />
-                撤回
-              </button>
-              <button
-                type="button"
-                onClick={redoHistory}
-                disabled={history.future.length === 0}
-                aria-label="重做一步"
-                title="重做一步"
-              >
-                <Redo2 size={14} aria-hidden="true" />
-                重做
-              </button>
-            </div>
-            <button type="button" onClick={saveNow}>
-              <Save size={14} aria-hidden="true" />
-              保存调整
-            </button>
-            <button type="button" onClick={copyExport}>
-              <Copy size={14} aria-hidden="true" />
-              复制参数
-            </button>
-            <button type="button" onClick={downloadExport} aria-label="下载参数 JSON">
-              <Download size={15} aria-hidden="true" />
-            </button>
-            <button type="button" onClick={resetDocument} aria-label="重置画布">
-              <RefreshCw size={15} aria-hidden="true" />
-            </button>
-          </div>
-        </header>
+        <UiTunerToolbar
+          canvasName={tunerDoc.canvas.name}
+          screenshotInputRef={screenshotInputRef}
+          devices={devices}
+          selectedDeviceId={selectedDeviceId}
+          deviceBusy={deviceBusy}
+          captureBusy={captureBusy}
+          viewScaleLabel={viewScaleLabel}
+          fitToStage={fitToStage}
+          canUndo={history.past.length > 0}
+          canRedo={history.future.length > 0}
+          onImportScreenshot={importScreenshot}
+          onSelectDevice={setSelectedDeviceId}
+          onRefreshDevices={refreshDevices}
+          onCaptureDeviceSnapshot={captureDeviceSnapshot}
+          onZoomOut={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)}
+          onZoomIn={() => setManualViewScale(viewScale + VIEW_SCALE_STEP)}
+          onFitToStage={() => {
+            setFitToStage(true)
+            fitCanvasToStage()
+          }}
+          onActualSize={() => setManualViewScale(1)}
+          onUndo={undoHistory}
+          onRedo={redoHistory}
+          onSave={saveNow}
+          onCopyExport={copyExport}
+          onCopyCliPatch={copyCliPatch}
+          onDownloadExport={downloadExport}
+          onReset={resetDocument}
+        />
 
         <div className={styles.canvasScroller} ref={canvasScrollerRef}>
           <div
@@ -569,7 +534,9 @@ export default function UiTunerPage() {
                 style={{ opacity: tunerDoc.canvas.referenceImage.opacity }}
               />
             )}
-            {tunerDoc.elements.map(renderElement)}
+            {tunerDoc.elements
+              .filter((element) => showRuntimeLayers || !element.runtime)
+              .map(renderElement)}
           </div>
           </div>
         </div>
@@ -650,6 +617,27 @@ export default function UiTunerPage() {
               </div>
             </>
           )}
+          {tunerDoc.runtimeSnapshot && (
+            <>
+              <div className={styles.sourcePanel}>
+                <span>真机 XML 快照</span>
+                <strong>{tunerDoc.runtimeSnapshot.packageName ?? 'APK'} · {tunerDoc.runtimeSnapshot.deviceId}</strong>
+                <small>
+                  {tunerDoc.runtimeSnapshot.nodeCount} nodes
+                  {tunerDoc.runtimeSnapshot.activityName ? `\n${tunerDoc.runtimeSnapshot.activityName}` : ''}
+                  {tunerDoc.runtimeSnapshot.sourceRoot ? `\n${tunerDoc.runtimeSnapshot.sourceRoot}` : ''}
+                </small>
+              </div>
+              <div className={styles.inlineActions}>
+                <button type="button" onClick={() => setShowRuntimeLayers((visible) => !visible)}>
+                  {showRuntimeLayers ? '隐藏 XML 框' : '显示 XML 框'}
+                </button>
+                <button type="button" onClick={copyCliPatch}>
+                  复制 CLI 包
+                </button>
+              </div>
+            </>
+          )}
           {tunerDoc.source && (
             <div className={styles.sourcePanel}>
               <span>来源</span>
@@ -698,6 +686,16 @@ export default function UiTunerPage() {
                     {selected.source.file}
                     {selected.source.line ? `:${selected.source.line}` : ''}
                     {selected.source.rawValue ? `\n${selected.source.rawValue}` : ''}
+                  </small>
+                </div>
+              )}
+              {selected.runtime && (
+                <div className={styles.sourcePanel}>
+                  <span>运行时节点</span>
+                  <strong>{selected.runtime.resourceId ?? selected.runtime.className ?? selected.runtime.nodeId}</strong>
+                  <small>
+                    {selected.runtime.xpath}
+                    {`\n原始 bounds: ${selected.runtime.originalBounds.left},${selected.runtime.originalBounds.top} ${selected.runtime.originalBounds.width}x${selected.runtime.originalBounds.height}`}
                   </small>
                 </div>
               )}

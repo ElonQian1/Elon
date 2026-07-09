@@ -12,13 +12,13 @@ use super::node_agent_config::cloud_login;
 use super::node_agent_env::node_agent_env_file_path;
 use super::node_agent_registration::provision_node;
 use super::{
-    node_agent_admin_status, node_agent_api_runtime_config, node_agent_cli_sidecar_admin,
-    node_agent_client_diagnostics, node_agent_client_maintenance, node_agent_cloud_net,
-    node_agent_codex_vault, node_agent_download_router, node_agent_full_access,
-    node_agent_install_env, node_agent_local_admin, node_agent_local_pc_frontend,
-    node_agent_project_agent_runs, node_agent_project_picker, node_agent_task_journal_api,
-    pc_storage_git_http, pc_storage_repo, project_landing, project_workspace_inspect,
-    windows_doctor, NodeRuntime,
+    node_agent_admin_status, node_agent_android_inspector, node_agent_api_runtime_config,
+    node_agent_cli_sidecar_admin, node_agent_client_diagnostics, node_agent_client_maintenance,
+    node_agent_cloud_net, node_agent_codex_vault, node_agent_download_router,
+    node_agent_full_access, node_agent_install_env, node_agent_local_admin,
+    node_agent_local_pc_frontend, node_agent_project_agent_runs, node_agent_project_picker,
+    node_agent_task_journal_api, pc_storage_git_http, pc_storage_repo, project_landing,
+    project_workspace_inspect, windows_doctor, NodeRuntime,
 };
 
 pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
@@ -67,6 +67,7 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::post(windows_doctor::repair_handler),
             )
             .merge(node_agent_download_router::routes())
+            .merge(node_agent_android_inspector::routes())
             .route(
                 "/api/save-openai-key",
                 axum::routing::post(admin_save_openai_key),
@@ -165,7 +166,6 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
         }
     });
 }
-
 
 #[path = "node_agent_admin_server_handlers.rs"]
 mod handlers;

@@ -1,6 +1,7 @@
 import type { UiTunerDocument, UiTunerExportElement } from './types'
 
 const STORAGE_KEY = 'elon.pc.uiTuner.document.v2.apk-source'
+const STORAGE_KEY_V3 = 'elon.pc.uiTuner.document.v3.runtime-source'
 
 function isUiTunerDocument(value: unknown): value is UiTunerDocument {
   if (!value || typeof value !== 'object') return false
@@ -12,11 +13,13 @@ function isUiTunerDocument(value: unknown): value is UiTunerDocument {
 
 export function loadUiTunerDocument(expectedSourceSignature?: string): UiTunerDocument | null {
   if (typeof window === 'undefined') return null
-  const raw = window.localStorage.getItem(STORAGE_KEY)
+  const rawV3 = window.localStorage.getItem(STORAGE_KEY_V3)
+  const raw = rawV3 ?? window.localStorage.getItem(STORAGE_KEY)
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw) as unknown
     if (!isUiTunerDocument(parsed)) return null
+    if (rawV3 && (parsed.runtimeSnapshot || parsed.source?.kind === 'device_snapshot')) return parsed
     if (expectedSourceSignature && parsed.source?.signature !== expectedSourceSignature) return null
     return parsed
   } catch {
@@ -26,7 +29,7 @@ export function loadUiTunerDocument(expectedSourceSignature?: string): UiTunerDo
 
 export function saveUiTunerDocument(document: UiTunerDocument) {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(document))
+  window.localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(document))
 }
 
 export function buildUiTunerExport(document: UiTunerDocument) {
@@ -56,11 +59,13 @@ export function buildUiTunerExport(document: UiTunerDocument) {
       opacity: element.opacity,
     },
     source: element.source,
+    runtime: element.runtime,
   }))
 
   return {
     version: 1,
     source: document.source,
+    runtimeSnapshot: document.runtimeSnapshot,
     canvas: document.canvas,
     elements,
     exportedAt: new Date().toISOString(),

@@ -1,4 +1,4 @@
-﻿// server/src/node_agent_main.rs
+// server/src/node_agent_main.rs
 
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
@@ -31,6 +31,7 @@ mod node_agent_admin_open;
 mod node_agent_admin_server;
 use node_agent_admin_server::spawn_admin_server;
 mod node_agent_admin_status;
+mod node_agent_android_inspector;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
@@ -148,9 +149,12 @@ pub(crate) use node_agent_runtime::NodeRuntime;
 mod node_agent_cli_prompt_direct;
 mod node_agent_cli_prompt_runner;
 pub(crate) use node_agent_cli_prompt_runner::{
-    CliPromptRun, run_cli_prompt,
+    cli_prompt_read_only,
+    resolve_attachment_args,
+    run_cli_prompt,
     // 保持 super:: 兼容性：子模块通过 super:: 访问这些辅助函数
-    ws_text, resolve_attachment_args, cli_prompt_read_only,
+    ws_text,
+    CliPromptRun,
 };
 async fn run_loop(runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);

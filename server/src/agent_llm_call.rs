@@ -270,7 +270,7 @@ fn should_retry_without_json_response_mode(status: reqwest::StatusCode, body: &s
 #[cfg(test)]
 mod tests {
     use super::{
-        should_retry_without_json_response_mode,
+        chat_completion_body, friendly_ai_api_error, should_retry_without_json_response_mode,
     };
     use crate::types::AgentConfig;
     use serde_json::json;
@@ -422,7 +422,6 @@ pub(crate) fn friendly_ai_api_error(status: reqwest::StatusCode, body: &str) -> 
         format!("AI 服务返回错误 {}：{}", status, visible)
     }
 }
-
 
 // 向后兼容：execute_tool 和 try_casual_chat_via_node 已移至 agent_llm_tools
 pub(crate) use crate::agent_llm_tools::{execute_tool, try_casual_chat_via_node};
