@@ -15,6 +15,7 @@ import NodePage from './features/node/NodePage'
 import PublicDevSmokePage from './features/node/PublicDevSmokePage'
 import DevTasksPage from './features/dev/DevTasksPage'
 import GitWorktreesPage from './features/git-worktrees/GitWorktreesPage'
+import UiTunerPage from './features/ui-tuner/UiTunerPage'
 
 export default function App() {
   return (
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="projects/:id/members" element={<ProjectDetailPage />} />
         <Route path="dev-tasks" element={<DevTasksPage />} />
         <Route path="git-worktrees" element={<GitWorktreesPage />} />
+        <Route path="ui-tuner" element={<UiTunerPage />} />
         <Route path="voice" element={<VoicePage />} />
         <Route path="doctor" element={<DoctorPage />} />
         <Route path="node/public-dev-smoke" element={<PublicDevSmokePage />} />
