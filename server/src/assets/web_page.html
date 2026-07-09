@@ -2937,6 +2937,12 @@
       align-items: center;
       gap: 8px;
     }
+    .input-edit-row {
+      flex: 1;
+      min-width: 0;
+      height: 38px;
+      position: relative;
+    }
     .input-bar .image-edit-btn,
     .input-bar .emoji-btn,
     .input-bar .voice-btn,
@@ -2961,7 +2967,7 @@
       margin: auto;
     }
     .input-bar .input-placeholder {
-      flex: 1;
+      width: 100%;
       min-width: 0;
       height: 38px;
       padding: 0 4px;
@@ -2982,9 +2988,7 @@
       min-width: 0;
     }
     .input-bar.has-text .input-row-spacer,
-    .input-bar.input-focused .input-row-spacer {
-      display: block;
-    }
+    .input-bar.input-focused .input-row-spacer { display: none; }
     .input-bar .expand-editor-btn {
       position: absolute;
       right: 0;
@@ -3003,18 +3007,24 @@
       object-fit: contain;
     }
     .input-bar textarea {
+      display: none;
       width: 100%;
       box-sizing: border-box;
       background: transparent;
       border: 0;
       color: var(--ink-strong);
-      padding: 6px 36px 4px 0;
-      font-size: 15px;
+      padding: 0 4px;
+      font-size: 17px;
+      height: 38px;
       min-height: 38px;
       max-height: 96px;
       resize: none;
       outline: none;
-      line-height: 1.4;
+      line-height: 38px;
+    }
+    .input-bar.has-text textarea,
+    .input-bar.input-focused textarea {
+      display: block;
     }
     .input-bar textarea::placeholder { color: var(--ink-faint); }
     .input-bar .send-btn { display: none; }
@@ -4187,7 +4197,6 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </div>
     <div class="input-panel">
       <div class="input-text-row">
-        <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
         <button class="expand-editor-btn" type="button" id="expandEditorBtn" title="全屏编辑">
           <img src="data:image/png;base64,__INPUT_EXPAND_PNG_B64__" alt="" aria-hidden="true" />
         </button>
@@ -4199,7 +4208,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <button class="emoji-btn" type="button" id="emojiBtn" title="表情">
           <img src="data:image/png;base64,__INPUT_EMOJI_PNG_B64__" alt="" aria-hidden="true" />
         </button>
-        <button class="input-placeholder" type="button" id="inputPlaceholder">输入内容</button>
+        <div class="input-edit-row">
+          <textarea id="messageInput" placeholder="输入内容" rows="1"></textarea>
+          <button class="input-placeholder" type="button" id="inputPlaceholder">输入内容</button>
+        </div>
         <span class="input-row-spacer" aria-hidden="true"></span>
         <button class="voice-btn" type="button" id="voiceBtn" title="语音输入">
           <img src="data:image/png;base64,__INPUT_VOICE_WAVE_PNG_B64__" alt="" aria-hidden="true" />

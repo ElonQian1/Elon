@@ -72,7 +72,7 @@ internal class MainVoiceModeActions(
             collapsedPreview.detachFromParent()
             voiceButton.detachFromParent()
             centerContainer.removeAllViews()
-            centerContainer.addView(collapsedPreview)
+            centerContainer.addView(binding.inputEdit)
             expandedContainer.addView(voiceButton)
             binding.inputEdit.visibility = View.VISIBLE
             voiceButton.visibility = View.GONE

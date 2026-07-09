@@ -96,8 +96,8 @@ internal class InputComposerMotion(
             expanded = expanded,
             startHeight = expandedInputContainer.height,
             endHeight = targetExpandedHeight(expanded),
-            startPillAlpha = collapsedInputContainer.alpha,
-            endPillAlpha = if (expanded) 0f else 1f,
+            startPillAlpha = 1f,
+            endPillAlpha = 1f,
             startTextTranslationY = collapsedText.translationY,
             endTextTranslationY = if (expanded) -textVerticalTravel else 0f,
             startTextTranslationX = collapsedText.translationX,
@@ -133,7 +133,7 @@ internal class InputComposerMotion(
 
     private fun completeTransition(transition: ComposerTransition) {
         applyPanelBackground(transition.expanded)
-        collapsedInputContainer.visibility = if (transition.expanded) View.INVISIBLE else View.VISIBLE
+        collapsedInputContainer.visibility = View.VISIBLE
     }
 
     private fun applyPanelBackground(expanded: Boolean) {
