@@ -3,6 +3,7 @@ import { DEFAULT_UI_TUNER_FILTER } from './filtering'
 import type { UiTunerFilterResult } from './filtering'
 import type { UiTunerStandardInsight } from './standards'
 import type { UiTunerDocument, UiTunerElement } from './types'
+import { UiTunerCodexPanel } from './UiTunerCodexPanel'
 import { ColorField, NumberField } from './UiTunerFields'
 import { UiTunerStandardsPanel } from './UiTunerStandardsPanel'
 import type { MetricItem } from './uiTunerGeometry'
@@ -68,6 +69,13 @@ export function UiTunerInspector({
             appliedStandard={selected.standard}
             onApplyStandard={onApplyStandard}
             onCopyStandardPackage={onCopyStandardPackage}
+          />
+          <UiTunerCodexPanel
+            tunerDoc={tunerDoc}
+            selected={selected}
+            metrics={metrics}
+            filterResult={filterResult}
+            standardInsight={standardInsight}
           />
           <GeometrySection tunerDoc={tunerDoc} selected={selected} onUpdateElement={onUpdateElement} />
           <TypographySection selected={selected} onUpdateElement={onUpdateElement} />

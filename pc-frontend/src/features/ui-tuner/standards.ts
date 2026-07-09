@@ -4,6 +4,7 @@ import type {
   UiTunerElementStandard,
   UiTunerStandardScope,
 } from './types'
+import { UI_TUNER_CLOSURE_PRIORITIES } from './closurePriorities'
 
 export interface UiTunerStandardInsight {
   standard: UiTunerElementStandard
@@ -81,10 +82,17 @@ export function stringifyStandardPackage(document: UiTunerDocument, selected: Ui
       '.elon/ui-standards/components.json',
       '.elon/ui-tuner/screens/<package>/<activity>.json',
     ],
+    rules: {
+      selectionIdentity: '每个标准必须优先绑定 resourceId/source token/xpath，低置信度节点只能保存为 screen_override 或 local_draft。',
+      reusePolicy: '颜色、字号、间距、圆角进入 tokens；按钮、卡片、导航进入 components；绝对坐标只进入 screens。',
+      codexContract: 'Codex 修改 APK UI 时必须读取 context pack、回写源码或 JSON 标准，并给出真机或构建验收。',
+      visibilityPolicy: '产品模式默认隐藏结构容器、重复边界和非目标包节点；debug 模式保留全部 XML 可追溯。',
+    },
     source: document.source,
     runtimeSnapshot: document.runtimeSnapshot,
     selected: selectedInsight,
     components,
+    closurePriorities: UI_TUNER_CLOSURE_PRIORITIES,
     exportedAt: new Date().toISOString(),
   }, null, 2)
 }
