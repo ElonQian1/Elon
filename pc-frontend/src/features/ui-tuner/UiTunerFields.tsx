@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { clamp } from './uiTunerGeometry'
 import styles from './UiTunerPage.module.css'
 
@@ -26,9 +26,15 @@ export function NumberField({
 }) {
   const [draft, setDraft] = useState(String(value))
   const [editing, setEditing] = useState(false)
+  const liveCommittedRef = useRef(value)
 
   useEffect(() => {
-    if (!editing) setDraft(String(value))
+    const externalChange = value !== liveCommittedRef.current
+    if (!editing || externalChange) {
+      setDraft(String(value))
+      liveCommittedRef.current = value
+      if (externalChange) setEditing(false)
+    }
   }, [editing, value])
 
   const commitDraft = () => {
@@ -38,7 +44,10 @@ export function NumberField({
       return
     }
     const clamped = clamp(next, min, max)
-    onChange(clamped)
+    if (clamped !== liveCommittedRef.current) {
+      liveCommittedRef.current = clamped
+      onChange(clamped)
+    }
     setDraft(String(clamped))
   }
 
@@ -60,7 +69,10 @@ export function NumberField({
           setEditing(true)
           setDraft(raw)
           const next = parseDraftNumber(raw)
-          if (next !== null && next >= min && next <= max) onChange(next)
+          if (next !== null && next >= min && next <= max) {
+            liveCommittedRef.current = next
+            onChange(next)
+          }
         }}
         onFocus={() => setEditing(true)}
         onKeyDown={(event) => {

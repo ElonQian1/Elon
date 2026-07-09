@@ -16,9 +16,11 @@ import {
   Move,
   Plus,
   RefreshCw,
+  Redo2,
   Save,
   Trash2,
   Type,
+  Undo2,
 } from 'lucide-react'
 import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
 import {
@@ -42,11 +44,24 @@ interface DragState {
   original: UiTunerElement
 }
 
+interface HistoryState {
+  past: UiTunerDocument[]
+  future: UiTunerDocument[]
+}
+
 const MIN_SIZE = 24
 const DEFAULT_CANVAS_MAX = 10000
+const HISTORY_LIMIT = 80
 const VIEW_SCALE_MIN = 0.08
 const VIEW_SCALE_MAX = 2
 const VIEW_SCALE_STEP = 0.1
+
+function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
+  if (preferredId && document.elements.some((element) => element.id === preferredId)) {
+    return preferredId
+  }
+  return document.elements[0]?.id ?? null
+}
 
 function normalizeViewScale(value: number) {
   if (!Number.isFinite(value)) return 1
@@ -60,10 +75,15 @@ export default function UiTunerPage() {
   ))
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
   const [dragState, setDragState] = useState<DragState | null>(null)
+  const [history, setHistory] = useState<HistoryState>({ past: [], future: [] })
   const [viewScale, setViewScale] = useState(1)
   const [fitToStage, setFitToStage] = useState(true)
   const [notice, setNotice] = useState('')
   const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
+  const tunerDocRef = useRef(tunerDoc)
+  const selectedIdRef = useRef<string | null>(selectedId)
+  const dragSnapshotRef = useRef<UiTunerDocument | null>(null)
+  const dragMovedRef = useRef(false)
 
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
@@ -94,6 +114,64 @@ export default function UiTunerPage() {
     setViewScale(normalizeViewScale(nextScale))
   }
 
+  const pushHistorySnapshot = useCallback((snapshot: UiTunerDocument) => {
+    setHistory((current) => ({
+      past: [...current.past.slice(-(HISTORY_LIMIT - 1)), snapshot],
+      future: [],
+    }))
+  }, [])
+
+  const commitDocument = useCallback((
+    update: (current: UiTunerDocument) => UiTunerDocument,
+    preferredSelectedId?: string | null,
+  ) => {
+    setTunerDoc((current) => {
+      const next = update(current)
+      pushHistorySnapshot(current)
+      const preferredId = preferredSelectedId === undefined ? selectedIdRef.current : preferredSelectedId
+      setSelectedId(getSelectedId(next, preferredId))
+      return next
+    })
+  }, [pushHistorySnapshot])
+
+  const undoHistory = useCallback(() => {
+    setHistory((current) => {
+      const previous = current.past[current.past.length - 1]
+      if (!previous) return current
+      const present = tunerDocRef.current
+      setTunerDoc(previous)
+      setSelectedId((id) => getSelectedId(previous, id))
+      setNotice('已撤回一步')
+      return {
+        past: current.past.slice(0, -1),
+        future: [present, ...current.future].slice(0, HISTORY_LIMIT),
+      }
+    })
+  }, [])
+
+  const redoHistory = useCallback(() => {
+    setHistory((current) => {
+      const next = current.future[0]
+      if (!next) return current
+      const present = tunerDocRef.current
+      setTunerDoc(next)
+      setSelectedId((id) => getSelectedId(next, id))
+      setNotice('已重做一步')
+      return {
+        past: [...current.past.slice(-(HISTORY_LIMIT - 1)), present],
+        future: current.future.slice(1),
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    tunerDocRef.current = tunerDoc
+  }, [tunerDoc])
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId
+  }, [selectedId])
+
   useEffect(() => {
     saveUiTunerDocument(tunerDoc)
   }, [tunerDoc])
@@ -122,6 +200,7 @@ export default function UiTunerPage() {
 
     const handlePointerMove = (event: PointerEvent) => {
       event.preventDefault()
+      dragMovedRef.current = true
       const dx = (event.clientX - dragState.startX) / dragState.scale
       const dy = (event.clientY - dragState.startY) / dragState.scale
 
@@ -145,48 +224,52 @@ export default function UiTunerPage() {
       })
     }
 
-    const handlePointerUp = () => setDragState(null)
+    const handlePointerUp = () => {
+      if (dragSnapshotRef.current && dragMovedRef.current) {
+        pushHistorySnapshot(dragSnapshotRef.current)
+      }
+      dragSnapshotRef.current = null
+      dragMovedRef.current = false
+      setDragState(null)
+    }
     window.addEventListener('pointermove', handlePointerMove)
     window.addEventListener('pointerup', handlePointerUp)
     return () => {
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
     }
-  }, [dragState])
+  }, [dragState, pushHistorySnapshot])
 
   const updateCanvas = (patch: Partial<UiTunerDocument['canvas']>) => {
-    setTunerDoc((current) => touch({ ...current, canvas: { ...current.canvas, ...patch } }))
+    commitDocument((current) => touch({ ...current, canvas: { ...current.canvas, ...patch } }))
   }
 
   const updateElement = (id: string, patch: Partial<UiTunerElement>) => {
-    setTunerDoc((current) => touch({
+    commitDocument((current) => touch({
       ...current,
       elements: current.elements.map((element) => (
         element.id === id ? { ...element, ...patch } : element
       )),
-    }))
+    }), id)
   }
 
   const addElement = (kind: UiTunerElementKind) => {
-    const next = createBlankElement(kind, tunerDoc.elements.length + 1)
-    setTunerDoc((current) => touch({ ...current, elements: [...current.elements, next] }))
-    setSelectedId(next.id)
+    const next = createBlankElement(kind, tunerDocRef.current.elements.length + 1)
+    commitDocument((current) => touch({ ...current, elements: [...current.elements, next] }), next.id)
   }
 
   const deleteSelected = () => {
     if (!selected) return
-    setTunerDoc((current) => touch({
+    commitDocument((current) => touch({
       ...current,
       elements: current.elements.filter((element) => element.id !== selected.id),
-    }))
-    setSelectedId(null)
+    }), null)
   }
 
   const resetDocument = () => {
     if (!window.confirm('重置后会清空当前微调记录，并重新读取当前 APK 样式源码，确定继续吗？')) return
     const next = createInitialTunerDocument()
-    setTunerDoc(next)
-    setSelectedId(next.elements[0]?.id ?? null)
+    commitDocument(() => next, next.elements[0]?.id ?? null)
     setNotice('已恢复当前 APK 样式')
   }
 
@@ -223,6 +306,8 @@ export default function UiTunerPage() {
     event.stopPropagation()
     event.preventDefault()
     setSelectedId(element.id)
+    dragSnapshotRef.current = tunerDocRef.current
+    dragMovedRef.current = false
     setDragState({
       id: element.id,
       mode,
@@ -358,6 +443,26 @@ export default function UiTunerPage() {
               </button>
               <button type="button" onClick={() => setManualViewScale(1)}>
                 100%
+              </button>
+            </div>
+            <div className={styles.historyControls} aria-label="历史记录">
+              <button
+                type="button"
+                onClick={undoHistory}
+                disabled={history.past.length === 0}
+                aria-label="撤回一步"
+                title="撤回一步"
+              >
+                <Undo2 size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={redoHistory}
+                disabled={history.future.length === 0}
+                aria-label="重做一步"
+                title="重做一步"
+              >
+                <Redo2 size={14} aria-hidden="true" />
               </button>
             </div>
             <button type="button" onClick={saveNow}>

@@ -57,6 +57,7 @@
 .addGroup button,
 .toolbarActions button,
 .viewControls button,
+.historyControls button,
 .sectionHeader button {
   height: 30px;
   display: inline-flex;
@@ -75,9 +76,19 @@
 .addGroup button:hover,
 .toolbarActions button:hover,
 .viewControls button:hover,
+.historyControls button:hover,
 .sectionHeader button:hover {
   background: #2c2e32;
   border-color: rgba(255, 255, 255, .28);
+}
+
+.addGroup button:disabled,
+.toolbarActions button:disabled,
+.viewControls button:disabled,
+.historyControls button:disabled,
+.sectionHeader button:disabled {
+  cursor: not-allowed;
+  opacity: .38;
 }
 
 .layerList {
@@ -218,6 +229,20 @@
   border-color: rgba(168, 199, 250, .62);
   background: rgba(168, 199, 250, .14);
   color: #eef5ff;
+}
+
+.historyControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-right: 7px;
+  margin-right: 2px;
+  border-right: 1px solid var(--border);
+}
+
+.historyControls button {
+  width: 30px;
+  padding: 0;
 }
 
 .canvasScroller {
