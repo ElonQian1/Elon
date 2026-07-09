@@ -18,6 +18,7 @@ import { ColorField, NumberField } from './UiTunerFields'
 import { clamp, getMetrics, touch } from './uiTunerGeometry'
 import {
   captureAndroidSnapshot,
+  connectAndroidDevice,
   listAndroidDevices,
   type AndroidInspectorDevice,
 } from './device/deviceInspectorApi'
@@ -50,7 +51,6 @@ const HISTORY_LIMIT = 80
 const VIEW_SCALE_MIN = 0.08
 const VIEW_SCALE_MAX = 2
 const VIEW_SCALE_STEP = 0.1
-
 function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
   if (preferredId && document.elements.some((element) => element.id === preferredId)) {
     return preferredId
@@ -76,7 +76,9 @@ export default function UiTunerPage() {
   const [notice, setNotice] = useState('')
   const [devices, setDevices] = useState<AndroidInspectorDevice[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
+  const [connectAddress, setConnectAddress] = useState('')
   const [deviceBusy, setDeviceBusy] = useState(false)
+  const [connectBusy, setConnectBusy] = useState(false)
   const [captureBusy, setCaptureBusy] = useState(false)
   const [showRuntimeLayers, setShowRuntimeLayers] = useState(true)
   const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
@@ -318,6 +320,20 @@ export default function UiTunerPage() {
     }
   }
 
+  const connectWirelessDevice = async () => {
+    const address = connectAddress.trim()
+    if (!address) return
+    setConnectBusy(true)
+    try {
+      const output = await connectAndroidDevice(address)
+      setNotice(output.trim() || `已连接 ${address}`)
+      await refreshDevices()
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '无线 ADB 连接失败')
+    } finally {
+      setConnectBusy(false)
+    }
+  }
   const copyExport = async () => {
     try {
       await navigator.clipboard.writeText(exportJson)
@@ -477,7 +493,9 @@ export default function UiTunerPage() {
           screenshotInputRef={screenshotInputRef}
           devices={devices}
           selectedDeviceId={selectedDeviceId}
+          connectAddress={connectAddress}
           deviceBusy={deviceBusy}
+          connectBusy={connectBusy}
           captureBusy={captureBusy}
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
@@ -485,7 +503,9 @@ export default function UiTunerPage() {
           canRedo={history.future.length > 0}
           onImportScreenshot={importScreenshot}
           onSelectDevice={setSelectedDeviceId}
+          onConnectAddressChange={setConnectAddress}
           onRefreshDevices={refreshDevices}
+          onConnectWirelessDevice={connectWirelessDevice}
           onCaptureDeviceSnapshot={captureDeviceSnapshot}
           onZoomOut={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)}
           onZoomIn={() => setManualViewScale(viewScale + VIEW_SCALE_STEP)}

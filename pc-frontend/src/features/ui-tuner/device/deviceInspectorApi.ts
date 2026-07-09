@@ -105,6 +105,19 @@ export async function listAndroidDevices(): Promise<AndroidInspectorDevice[]> {
   return data.devices ?? []
 }
 
+export async function connectAndroidDevice(address: string): Promise<string> {
+  const data = await nodeApi<{ output?: string }>(
+    inspectorAdminUrl(),
+    '/api/android-inspector/connect',
+    {
+      method: 'POST',
+      body: JSON.stringify({ address: address.trim() }),
+    },
+    12000,
+  )
+  return data.output ?? ''
+}
+
 export async function captureAndroidSnapshot(input: {
   deviceId: string
   packageName?: string

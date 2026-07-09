@@ -214,6 +214,19 @@
   outline: none;
 }
 
+.connectInput {
+  width: 118px;
+  min-width: 96px;
+  height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #111317;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  outline: none;
+}
+
 .toolbarActions button[aria-label] {
   width: 32px;
   padding: 0;
