@@ -190,7 +190,7 @@ function TimelineRow({ item, taskContext, expandAll = false, onCancel, onApprove
               <span className={styles.title}>{item.title}</span>
               {item.meta && <span className={styles.meta} title={item.metaTitle || item.meta}>{item.meta}</span>}
             </div>
-            {item.process && <ProcessCardView process={item.process} />}
+            {item.process && <ProcessCardView process={item.process} expandAll={expandAll} />}
             {item.detail && !embedded && !item.process && <div className={styles.detail}>{item.detail}</div>}
           </>
         )}
@@ -314,7 +314,7 @@ function CommandRunItem({ item }: { item: TimelineItem }) {
   )
 }
 
-function ProcessCardView({ process }: { process: ProcessCard }) {
+function ProcessCardView({ process, expandAll = false }: { process: ProcessCard; expandAll?: boolean }) {
   if (process.commandText) return <ShellProcessCardView process={process} />
   return (
     <div className={[styles.processCard, styles[`process_${process.kind}`], styles[`tone_${process.tone}`]].join(' ')}>
@@ -329,7 +329,7 @@ function ProcessCardView({ process }: { process: ProcessCard }) {
       </div>
       {process.body && (
         process.bodyCollapsed ? (
-          <details className={styles.processDetails} open={process.tone === 'failed'}>
+          <details className={styles.processDetails} open={expandAll || process.tone === 'failed'}>
             <summary>{process.bodyLabel}</summary>
             <pre data-monospace={process.monospace ? 'true' : undefined}>{process.body}</pre>
           </details>

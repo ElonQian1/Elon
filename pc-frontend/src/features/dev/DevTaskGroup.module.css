@@ -460,14 +460,16 @@
 }
 
 .progressCommandSingle,
-.progressCommandGroup {
+.progressCommandGroup,
+.progressArtifactSingle {
   min-width: 0;
   color: #767f8e;
   font-size: 12px;
   line-height: 1.45;
 }
 
-.progressCommandSingle {
+.progressCommandSingle,
+.progressArtifactSingle {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -475,20 +477,23 @@
 }
 
 .progressCommandSingle svg,
-.progressCommandGroup summary svg {
+.progressCommandGroup summary svg,
+.progressArtifactSingle svg {
   flex: 0 0 auto;
   color: #6f7887;
   opacity: .82;
 }
 
 .progressCommandSingle span,
-.progressCommandGroup summary span {
+.progressCommandGroup summary span,
+.progressArtifactSingle span {
   flex: 0 0 auto;
   color: #798391;
 }
 
 .progressCommandSingle code,
-.progressCommandLine code {
+.progressCommandLine code,
+.progressArtifactSingle em {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -501,17 +506,53 @@
   font-size: 12px;
 }
 
+.progressArtifactSingle strong {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #c8d3e4;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.progressArtifactSingle em {
+  flex: 1 1 auto;
+  font-style: normal;
+}
+
+.progressArtifactSingle[data-kind="file"] svg,
+.progressArtifactSingle[data-kind="file"] strong {
+  color: #8ee8af;
+}
+
+.progressArtifactSingle[data-kind="test"] svg,
+.progressArtifactSingle[data-kind="test"] strong {
+  color: #8fd3ff;
+}
+
+.progressArtifactSingle[data-kind="approval"] svg,
+.progressArtifactSingle[data-kind="approval"] strong {
+  color: #ffd166;
+}
+
 .progressCommandSingle[data-tone="failed"],
-.progressCommandGroup[data-tone="failed"] {
+.progressCommandGroup[data-tone="failed"],
+.progressArtifactSingle[data-tone="failed"] {
   color: #ff9da1;
 }
 
 .progressCommandSingle[data-tone="failed"] svg,
 .progressCommandGroup[data-tone="failed"] summary svg,
+.progressArtifactSingle[data-tone="failed"] svg,
 .progressCommandSingle[data-tone="failed"] span,
 .progressCommandGroup[data-tone="failed"] summary span,
+.progressArtifactSingle[data-tone="failed"] span,
 .progressCommandSingle[data-tone="failed"] code,
-.progressCommandGroup[data-tone="failed"] code {
+.progressCommandGroup[data-tone="failed"] code,
+.progressArtifactSingle[data-tone="failed"] strong,
+.progressArtifactSingle[data-tone="failed"] em {
   color: #ff9da1;
 }
 

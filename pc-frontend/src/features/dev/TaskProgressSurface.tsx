@@ -1,18 +1,20 @@
-import { Terminal } from 'lucide-react'
+import { AlertTriangle, FileCode2, KeyRound, ListChecks, Terminal } from 'lucide-react'
 import { clean } from '../../lib/utils'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { buildTimelineDisplay, isAssistantTimelineItem } from './taskTimelineDisplayModel'
 import { isStatusEchoProgressText } from './taskTimelineRuntime'
-import type { TimelineItem, TaskTimelineStage } from './taskTimelineModel'
+import type { TimelineItem, TimelineItemKind, TaskTimelineStage } from './taskTimelineModel'
 import type { buildTaskTimeline } from './taskTimelineModel'
 import type { TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
 
 export interface ProgressSurfaceItem {
-  surfaceType?: 'text' | 'commands'
+  surfaceType?: 'text' | 'commands' | 'artifact'
   id: string
   title?: string
   detail?: string
+  meta?: string
+  kind?: TimelineItemKind
   items?: TimelineItem[]
   tone?: TaskTone
 }
@@ -23,6 +25,9 @@ export function TaskProgressHighlights({ items, hiddenCount }: { items: Progress
       {items.map((item) => {
         if (item.surfaceType === 'commands') {
           return <ProgressCommandGroup key={item.id} item={item} />
+        }
+        if (item.surfaceType === 'artifact') {
+          return <ProgressArtifactSummary key={item.id} item={item} />
         }
         const content = item.detail ?? ''
         const hasMarkdown = /[#*`\[\]>|]/.test(content)
@@ -75,7 +80,12 @@ export function progressFlowSurfaceItems(
       items.push({ surfaceType: 'text', id: item.id, detail, tone: item.tone })
       continue
     }
-    if (item.kind === 'file' || item.kind === 'test' || item.kind === 'approval' || item.tone === 'failed') {
+    const artifactItem = progressArtifactSurfaceItem(item)
+    if (artifactItem) {
+      items.push(artifactItem)
+      continue
+    }
+    if (item.tone === 'failed') {
       const detail = clean(item.detail || item.title)
       if (!detail) continue
       items.push({
@@ -139,6 +149,18 @@ function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
         {hiddenCount > 0 && <div className={styles.progressCommandMore}>还有 {hiddenCount} 条命令在过程里</div>}
       </div>
     </details>
+  )
+}
+
+function ProgressArtifactSummary({ item }: { item: ProgressSurfaceItem }) {
+  const Icon = progressArtifactIcon(item.kind, item.tone)
+  return (
+    <div className={styles.progressArtifactSingle} data-kind={item.kind || undefined} data-tone={item.tone || undefined}>
+      <Icon size={13} aria-hidden="true" />
+      <span>{item.title}</span>
+      {item.detail && <strong title={item.detail}>{item.detail}</strong>}
+      {item.meta && <em title={item.meta}>{item.meta}</em>}
+    </div>
   )
 }
 
@@ -230,12 +252,140 @@ function dedupeProgressSurfaceItems(items: ProgressSurfaceItem[]): ProgressSurfa
       deduped.push({ ...item, items: commandItems })
       continue
     }
+    if (item.surfaceType === 'artifact') {
+      const signature = [
+        item.surfaceType,
+        item.kind ?? '',
+        item.title ?? '',
+        item.detail ?? '',
+        item.meta ?? '',
+      ].map(clean).join('\n')
+      if (!signature.trim()) continue
+      if (deduped.some((existing) => {
+        if (existing.surfaceType !== 'artifact') return false
+        return [
+          existing.surfaceType,
+          existing.kind ?? '',
+          existing.title ?? '',
+          existing.detail ?? '',
+          existing.meta ?? '',
+        ].map(clean).join('\n') === signature
+      })) continue
+      deduped.push(item)
+      continue
+    }
     const text = clean(item.detail ?? '')
     if (!text) continue
-    if (deduped.some((existing) => existing.surfaceType !== 'commands' && clean(existing.detail ?? '') === text)) continue
+    if (deduped.some((existing) => existing.surfaceType === 'text' && clean(existing.detail ?? '') === text)) continue
     deduped.push({ ...item, surfaceType: 'text', detail: text })
   }
   return deduped
+}
+
+function progressArtifactSurfaceItem(item: TimelineItem): ProgressSurfaceItem | null {
+  if (!['file', 'test', 'approval', 'artifact'].includes(item.kind)) return null
+  const title = progressArtifactVerb(item)
+  const detail = progressArtifactDetail(item)
+  const meta = progressArtifactMeta(item, detail)
+  if (!title && !detail && !meta) return null
+  return {
+    surfaceType: 'artifact',
+    id: item.id,
+    title,
+    detail,
+    meta,
+    kind: item.kind,
+    tone: item.tone,
+  }
+}
+
+function progressArtifactVerb(item: TimelineItem): string {
+  if (item.kind === 'file') {
+    if (item.tone === 'running' || item.tone === 'queued') return '正在修改文件'
+    if (item.tone === 'failed') return '文件修改失败'
+    return '修改文件'
+  }
+  if (item.kind === 'test') {
+    if (item.tone === 'running' || item.tone === 'queued') return '正在验证'
+    if (item.tone === 'failed') return '验证失败'
+    if (item.tone === 'canceled') return '验证已停止'
+    return '验证通过'
+  }
+  if (item.kind === 'approval') {
+    if (item.tone === 'approval' || item.tone === 'running' || item.tone === 'queued') return '等待审批'
+    if (item.tone === 'canceled') return '审批已取消'
+    return '审批已处理'
+  }
+  if (item.kind === 'artifact') return clean(item.title) || '同步产物'
+  return clean(item.title)
+}
+
+function progressArtifactDetail(item: TimelineItem): string {
+  if (item.kind === 'file') {
+    return processChipLabel(item, /文件/)
+      || fileCountFromDetail(item.detail)
+      || compactSurfaceText(item.process?.subtitle ?? item.detail ?? item.title)
+  }
+  if (item.kind === 'test') {
+    return testStatusLabel(item)
+  }
+  if (item.kind === 'approval') {
+    return clean(item.meta ?? item.process?.subtitle ?? item.detail ?? '')
+  }
+  if (item.kind === 'artifact') {
+    return compactSurfaceText(item.detail ?? item.process?.subtitle ?? '')
+  }
+  return ''
+}
+
+function progressArtifactMeta(item: TimelineItem, detail: string): string {
+  if (item.kind === 'file') {
+    const result = compactSurfaceText(item.detail ?? '')
+    if (result && result !== detail) return result
+    return compactSurfaceText(item.process?.subtitle ?? '')
+  }
+  if (item.kind === 'test') {
+    return compactSurfaceText(item.process?.commandText ?? item.process?.subtitle ?? item.detail ?? '')
+  }
+  if (item.kind === 'approval') {
+    const message = compactSurfaceText(item.detail ?? '')
+    if (message && message !== detail) return message
+  }
+  return ''
+}
+
+function processChipLabel(item: TimelineItem, pattern: RegExp): string {
+  return clean(item.process?.chips.find((chip) => pattern.test(chip.label))?.label ?? '')
+}
+
+function fileCountFromDetail(value: string | undefined): string {
+  const match = clean(value ?? '').match(/\b([0-9]+)\s+files?\s+changed\b/i)
+  if (!match) return ''
+  return `${match[1]} 个文件`
+}
+
+function testStatusLabel(item: TimelineItem): string {
+  const exitChip = processChipLabel(item, /^exit=/i)
+  if (exitChip && !/^exit=0$/i.test(exitChip)) return exitChip
+  if (item.tone === 'failed') return '未通过'
+  if (item.tone === 'running' || item.tone === 'queued') return '运行中'
+  if (item.tone === 'canceled') return '已停止'
+  return processChipLabel(item, /测试|构建/) || '已通过'
+}
+
+function compactSurfaceText(value: string | undefined): string {
+  const text = clean(value ?? '').replace(/\s+/g, ' ').trim()
+  if (text.length <= 96) return text
+  return `${text.slice(0, 96)}...`
+}
+
+function progressArtifactIcon(kind: TimelineItemKind | undefined, tone: TaskTone | undefined) {
+  if (tone === 'failed') return AlertTriangle
+  if (kind === 'file') return FileCode2
+  if (kind === 'test') return ListChecks
+  if (kind === 'approval') return KeyRound
+  if (kind === 'artifact') return FileCode2
+  return Terminal
 }
 
 function commandTextForSurface(item: TimelineItem): string {
