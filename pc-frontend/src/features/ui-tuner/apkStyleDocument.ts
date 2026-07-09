@@ -177,6 +177,7 @@ function element(
 
 const sourceFiles = [COLORS_PATH, DIMENS_PATH, THEMES_PATH, ACTIVITY_MAIN_PATH]
 export const APK_STYLE_SOURCE_SIGNATURE = stableHash([
+  'readable-ui-tuner-preset-v2',
   colorsXml,
   dimensXml,
   themesXml,
@@ -204,7 +205,7 @@ export function createApkStyleDocument(): UiTunerDocument {
 
   const documentSource: UiTunerSource = {
     kind: 'apk',
-    label: '当前 APK 样式源码',
+    label: 'APP 项目页布局来源',
     signature: APK_STYLE_SOURCE_SIGNATURE,
     files: sourceFiles,
   }
@@ -214,19 +215,19 @@ export function createApkStyleDocument(): UiTunerDocument {
     updatedAt: now(),
     source: documentSource,
     canvas: {
-      name: '当前 APK 样式画布',
+      name: 'APP 项目页布局草图',
       width: canvasWidth,
       height: canvasHeight,
       background: color('elon_bg_app', '#000000'),
-      source: colorSource('elon_bg_app', '画布背景 @color/elon_bg_app'),
+      source: colorSource('elon_bg_app', 'APP 背景色'),
     },
     elements: [
-      element('apk.toolbar', '顶部 Toolbar', 'card', {
+      element('apk.toolbar', '顶部栏', 'card', {
         x: 0,
         y: 0,
         width: canvasWidth,
         height: toolbarHeight,
-        text: `#toolbar\n${toolbarHeight}dp / @color/elon_bg_app`,
+        text: '顶部栏',
         fontSize: 12,
         lineHeight: 17,
         fontWeight: 700,
@@ -239,14 +240,14 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_bg_app', '#000000'),
         source: nodeSource(toolbar, 'activity_main.xml #toolbar'),
       }),
-      element('apk.projectTopTabs', '项目顶部 Tab', 'text', {
+      element('apk.projectTopTabs', '顶部项目切换', 'text', {
         x: 24,
         y: 7,
         width: 228,
         height: 36,
-        text: `我的项目     项目广场\nTab ${styleItem('MainTabText', 'android:textSize') ?? '14sp'} / 下划线 32x2dp`,
-        fontSize: 16,
-        lineHeight: 18,
+        text: '我的项目   项目广场',
+        fontSize: 15,
+        lineHeight: 20,
         fontWeight: 800,
         paddingX: 0,
         paddingY: 0,
@@ -256,7 +257,7 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_bg_app', '#000000'),
         source: nodeSource(projectTabs, 'activity_main.xml #projectTopTabs'),
       }),
-      element('apk.topAddButton', '顶部新增按钮', 'button', {
+      element('apk.topAddButton', '新增按钮', 'button', {
         x: canvasWidth - 56,
         y: 3,
         width: resolveSize(addButton?.attrs.layout_width, 44),
@@ -274,12 +275,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_border_subtle', '#4D4D4D'),
         source: nodeSource(addButton, 'activity_main.xml #addButton'),
       }),
-      element('apk.contentCanvas', '内容画布', 'card', {
+      element('apk.contentCanvas', '内容区域', 'card', {
         x: 0,
         y: toolbarHeight,
         width: canvasWidth,
         height: bottomPanelY - toolbarHeight,
-        text: `#contentContainer\n@color/elon_bg_app`,
+        text: '内容区域',
         fontSize: 13,
         lineHeight: 20,
         fontWeight: 700,
@@ -292,12 +293,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_bg_app', '#000000'),
         source: nodeSource(contentContainer, 'activity_main.xml #contentContainer'),
       }),
-      element('apk.surfaceCardToken', '@color/elon_surface_card', 'card', {
+      element('apk.surfaceCardToken', '项目卡片主体', 'card', {
         x: 20,
         y: toolbarHeight + 42,
         width: 160,
         height: 94,
-        text: `卡片主体\n${color('elon_surface_card', '#1A1A1A')}`,
+        text: '项目卡片主体',
         fontSize: 15,
         lineHeight: 22,
         fontWeight: 800,
@@ -309,12 +310,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_border_subtle', '#4D4D4D'),
         source: colorSource('elon_surface_card'),
       }),
-      element('apk.surfaceHeaderToken', '@color/elon_surface_header', 'card', {
+      element('apk.surfaceHeaderToken', '卡片头部区域', 'card', {
         x: 210,
         y: toolbarHeight + 42,
         width: 160,
         height: 94,
-        text: `卡片头部\n${color('elon_surface_header', '#1F2023')}`,
+        text: '卡片头部区域',
         fontSize: 15,
         lineHeight: 22,
         fontWeight: 800,
@@ -326,12 +327,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_border_subtle', '#4D4D4D'),
         source: colorSource('elon_surface_header'),
       }),
-      element('apk.primaryButtonToken', '@color/elon_button_primary_bg', 'button', {
+      element('apk.primaryButtonToken', '主按钮', 'button', {
         x: 20,
         y: toolbarHeight + 170,
         width: 160,
         height: 48,
-        text: `主按钮 ${color('elon_button_primary_bg', '#FFFFFF')}`,
+        text: '主按钮',
         fontSize: 14,
         lineHeight: 20,
         fontWeight: 800,
@@ -343,12 +344,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_button_primary_bg', '#FFFFFF'),
         source: colorSource('elon_button_primary_bg'),
       }),
-      element('apk.statusTokens', '状态色 token', 'card', {
+      element('apk.statusTokens', '状态标签', 'card', {
         x: 210,
         y: toolbarHeight + 170,
         width: 160,
         height: 86,
-        text: `成功 ${color('elon_accent_primary', '#58BE6A')}\n项目 ${color('elon_status_project', '#F2C94C')}\n危险 ${color('elon_status_danger', '#E62129')}`,
+        text: '成功 / 项目 / 危险',
         fontSize: 13,
         lineHeight: 19,
         fontWeight: 700,
@@ -365,7 +366,7 @@ export function createApkStyleDocument(): UiTunerDocument {
         y: bottomPanelY - inputHeight - 8,
         width: canvasWidth,
         height: inputHeight,
-        text: `#inputLayout\npadding 10/8dp · 输入 ${readNodeById('inputEdit')?.attrs.textSize ?? '15sp'}`,
+        text: '聊天输入栏',
         fontSize: 13,
         lineHeight: 19,
         fontWeight: 700,
@@ -378,12 +379,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_nav_bg', '#1A1A1A'),
         source: nodeSource(inputLayout, 'activity_main.xml #inputLayout'),
       }),
-      element('apk.pageTabs', '底部导航外层', 'card', {
+      element('apk.pageTabs', '底部导航区域', 'card', {
         x: 0,
         y: bottomPanelY,
         width: canvasWidth,
         height: bottomOuterHeight,
-        text: `#pageTabs\n@dimen/main_bottom_menu_outer_height = ${bottomOuterHeight}dp`,
+        text: '底部导航区域',
         fontSize: 12,
         lineHeight: 18,
         fontWeight: 700,
@@ -396,12 +397,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_bg_app', '#000000'),
         source: dimenSource('main_bottom_menu_outer_height', 'bottom menu outer height'),
       }),
-      element('apk.bottomNavPanel', '底部导航面板', 'card', {
+      element('apk.bottomNavPanel', '底部导航背景', 'card', {
         x: 20,
         y: bottomPanelY + 8,
         width: canvasWidth - 40,
         height: mainTabHeight,
-        text: `@color/elon_nav_bg ${color('elon_nav_bg', '#1A1A1A')}`,
+        text: '',
         fontSize: 12,
         lineHeight: 18,
         fontWeight: 700,
@@ -414,12 +415,12 @@ export function createApkStyleDocument(): UiTunerDocument {
         borderColor: color('elon_nav_bg', '#1A1A1A'),
         source: colorSource('elon_nav_bg'),
       }),
-      ...tabLabels.map((label, index) => element(`apk.bottomTab.${label}`, `底部 Tab ${label}`, 'text', {
+      ...tabLabels.map((label, index) => element(`apk.bottomTab.${label}`, `底部导航 ${label}`, 'text', {
         x: 20 + Math.round(tabWidth * index),
         y: bottomPanelY + 22,
         width: Math.round(tabWidth),
         height: 42,
-        text: `◎\n${label}`,
+        text: label,
         fontSize: mainTabTextSize,
         lineHeight: 19,
         fontWeight: 400,

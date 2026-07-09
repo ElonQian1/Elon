@@ -10,6 +10,7 @@ import {
 import {
   Copy,
   Download,
+  ImagePlus,
   Maximize2,
   Minus,
   MousePointer2,
@@ -80,6 +81,7 @@ export default function UiTunerPage() {
   const [fitToStage, setFitToStage] = useState(true)
   const [notice, setNotice] = useState('')
   const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
+  const screenshotInputRef = useRef<HTMLInputElement | null>(null)
   const tunerDocRef = useRef(tunerDoc)
   const selectedIdRef = useRef<string | null>(selectedId)
   const dragSnapshotRef = useRef<UiTunerDocument | null>(null)
@@ -297,6 +299,43 @@ export default function UiTunerPage() {
     URL.revokeObjectURL(url)
   }
 
+  const importScreenshot = (file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : ''
+      if (!dataUrl) return
+      const image = new Image()
+      image.onload = () => {
+        const width = Math.max(Math.round(image.naturalWidth), MIN_SIZE)
+        const height = Math.max(Math.round(image.naturalHeight), MIN_SIZE)
+        commitDocument((current) => touch({
+          ...current,
+          canvas: {
+            ...current.canvas,
+            name: `${file.name} 调试画布`,
+            width,
+            height,
+            background: '#000000',
+            referenceImage: {
+              dataUrl,
+              name: file.name,
+              width,
+              height,
+              opacity: 1,
+              visible: true,
+            },
+          },
+        }))
+        setFitToStage(true)
+        setNotice('已把 APP 截图放到画布底层')
+      }
+      image.onerror = () => setNotice('截图读取失败，请换一张图片')
+      image.src = dataUrl
+    }
+    reader.onerror = () => setNotice('截图读取失败，请换一张图片')
+    reader.readAsDataURL(file)
+  }
+
   const startDrag = (
     event: ReactPointerEvent<HTMLElement>,
     element: UiTunerElement,
@@ -381,7 +420,7 @@ export default function UiTunerPage() {
       <aside className={styles.layersPanel}>
         <div className={styles.panelHeader}>
           <h1>微调画布</h1>
-          <p>默认读取当前 APK 样式源码，图层会标出对应资源和布局来源。</p>
+          <p>导入 APP 截图作为真实底图，再拖动图层调位置、尺寸、字号和间距。</p>
         </div>
 
         <div className={styles.addGroup}>
@@ -422,6 +461,17 @@ export default function UiTunerPage() {
             <span>{tunerDoc.canvas.name}</span>
           </div>
           <div className={styles.toolbarActions}>
+            <input
+              ref={screenshotInputRef}
+              type="file"
+              accept="image/*"
+              className={styles.hiddenFileInput}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                if (file) importScreenshot(file)
+              }}
+            />
             <div className={styles.viewControls} aria-label="画布缩放">
               <button type="button" onClick={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)} aria-label="缩小画布">
                 <Minus size={14} aria-hidden="true" />
@@ -445,6 +495,10 @@ export default function UiTunerPage() {
                 100%
               </button>
             </div>
+            <button type="button" onClick={() => screenshotInputRef.current?.click()}>
+              <ImagePlus size={14} aria-hidden="true" />
+              导入截图
+            </button>
             <div className={styles.historyControls} aria-label="历史记录">
               <button
                 type="button"
@@ -454,6 +508,7 @@ export default function UiTunerPage() {
                 title="撤回一步"
               >
                 <Undo2 size={14} aria-hidden="true" />
+                撤回
               </button>
               <button
                 type="button"
@@ -463,6 +518,7 @@ export default function UiTunerPage() {
                 title="重做一步"
               >
                 <Redo2 size={14} aria-hidden="true" />
+                重做
               </button>
             </div>
             <button type="button" onClick={saveNow}>
@@ -505,6 +561,14 @@ export default function UiTunerPage() {
             }}
           >
             <div className={styles.canvasGrid} aria-hidden="true" />
+            {tunerDoc.canvas.referenceImage?.visible && (
+              <img
+                className={styles.referenceImage}
+                src={tunerDoc.canvas.referenceImage.dataUrl}
+                alt=""
+                style={{ opacity: tunerDoc.canvas.referenceImage.opacity }}
+              />
+            )}
             {tunerDoc.elements.map(renderElement)}
           </div>
           </div>
@@ -542,6 +606,50 @@ export default function UiTunerPage() {
             value={tunerDoc.canvas.background}
             onChange={(background) => updateCanvas({ background })}
           />
+          {tunerDoc.canvas.referenceImage && (
+            <>
+              <div className={styles.sourcePanel}>
+                <span>APP 截图底图</span>
+                <strong>{tunerDoc.canvas.referenceImage.name}</strong>
+                <small>
+                  {tunerDoc.canvas.referenceImage.width} x {tunerDoc.canvas.referenceImage.height}
+                </small>
+              </div>
+              <label className={styles.rangeField}>
+                <span>底图透明</span>
+                <input
+                  type="range"
+                  min={0.15}
+                  max={1}
+                  step={0.05}
+                  value={tunerDoc.canvas.referenceImage.opacity}
+                  onChange={(event) => updateCanvas({
+                    referenceImage: {
+                      ...tunerDoc.canvas.referenceImage!,
+                      opacity: Number(event.currentTarget.value),
+                    },
+                  })}
+                />
+                <strong>{Math.round(tunerDoc.canvas.referenceImage.opacity * 100)}%</strong>
+              </label>
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  onClick={() => updateCanvas({
+                    referenceImage: {
+                      ...tunerDoc.canvas.referenceImage!,
+                      visible: !tunerDoc.canvas.referenceImage!.visible,
+                    },
+                  })}
+                >
+                  {tunerDoc.canvas.referenceImage.visible ? '隐藏截图' : '显示截图'}
+                </button>
+                <button type="button" onClick={() => updateCanvas({ referenceImage: undefined })}>
+                  移除截图
+                </button>
+              </div>
+            </>
+          )}
           {tunerDoc.source && (
             <div className={styles.sourcePanel}>
               <span>来源</span>

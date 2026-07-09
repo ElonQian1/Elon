@@ -5,7 +5,17 @@ export interface UiTunerCanvas {
   width: number
   height: number
   background: string
+  referenceImage?: UiTunerReferenceImage
   source?: UiTunerSource
+}
+
+export interface UiTunerReferenceImage {
+  dataUrl: string
+  name: string
+  width: number
+  height: number
+  opacity: number
+  visible: boolean
 }
 
 export interface UiTunerSource {
