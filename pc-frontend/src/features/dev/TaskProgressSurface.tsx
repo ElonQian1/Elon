@@ -124,11 +124,14 @@ function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
   const verb = commandSurfaceVerb(tone)
   if (commandItems.length === 1) {
     return (
-      <div className={styles.progressCommandSingle} data-tone={tone}>
-        <Terminal size={13} aria-hidden="true" />
-        <span>{verb}</span>
-        <code title={commandTextForSurface(commandItems[0])}>{commandSummaryForSurface(commandTextForSurface(commandItems[0]))}</code>
-      </div>
+      <details className={styles.progressCommandSingleDetails} data-tone={tone}>
+        <summary className={styles.progressCommandSingle} data-tone={tone}>
+          <Terminal size={13} aria-hidden="true" />
+          <span>{verb}</span>
+          <code title={commandTextForSurface(commandItems[0])}>{commandSummaryForSurface(commandTextForSurface(commandItems[0]))}</code>
+        </summary>
+        <ProgressCommandDetail item={commandItems[0]} />
+      </details>
     )
   }
   const visibleCommands = commandItems.slice(0, 6)
@@ -141,10 +144,13 @@ function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
       </summary>
       <div className={styles.progressCommandList}>
         {visibleCommands.map((commandItem, index) => (
-          <div key={`${commandItem.id}-${index}`} className={styles.progressCommandLine}>
-            <span>{commandLineState(commandItem)}</span>
-            <code title={commandTextForSurface(commandItem)}>{commandSummaryForSurface(commandTextForSurface(commandItem))}</code>
-          </div>
+          <details key={`${commandItem.id}-${index}`} className={styles.progressCommandLine}>
+            <summary>
+              <span>{commandLineState(commandItem)}</span>
+              <code title={commandTextForSurface(commandItem)}>{commandSummaryForSurface(commandTextForSurface(commandItem))}</code>
+            </summary>
+            <ProgressCommandDetail item={commandItem} />
+          </details>
         ))}
         {hiddenCount > 0 && <div className={styles.progressCommandMore}>还有 {hiddenCount} 条命令在过程里</div>}
       </div>
@@ -152,8 +158,43 @@ function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
   )
 }
 
+function ProgressCommandDetail({ item }: { item: TimelineItem }) {
+  const process = item.process
+  const command = commandTextForSurface(item)
+  const output = clean(process?.body ?? '')
+  const chips = process?.chips ?? []
+  return (
+    <div className={styles.progressCommandDetail}>
+      {command && <pre data-monospace="true">{`$ ${command}`}</pre>}
+      {output && <pre data-monospace={process?.monospace ? 'true' : undefined}>{output}</pre>}
+      {chips.length > 0 && (
+        <div className={styles.progressCommandMeta}>
+          {chips.map((chip, index) => (
+            <em key={`${chip.label}-${index}`} data-tone={chip.tone || undefined}>{chip.label}</em>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ProgressArtifactSummary({ item }: { item: ProgressSurfaceItem }) {
   const Icon = progressArtifactIcon(item.kind, item.tone)
+  const body = clean(item.items?.[0]?.process?.body ?? '')
+  const process = item.items?.[0]?.process
+  if (body) {
+    return (
+      <details className={styles.progressArtifactDetails} data-kind={item.kind || undefined} data-tone={item.tone || undefined}>
+        <summary className={styles.progressArtifactSingle} data-kind={item.kind || undefined} data-tone={item.tone || undefined}>
+          <Icon size={13} aria-hidden="true" />
+          <span>{item.title}</span>
+          {item.detail && <strong title={item.detail}>{item.detail}</strong>}
+          {item.meta && <em title={item.meta}>{item.meta}</em>}
+        </summary>
+        <pre data-monospace={process?.monospace ? 'true' : undefined}>{body}</pre>
+      </details>
+    )
+  }
   return (
     <div className={styles.progressArtifactSingle} data-kind={item.kind || undefined} data-tone={item.tone || undefined}>
       <Icon size={13} aria-hidden="true" />
@@ -295,6 +336,7 @@ function progressArtifactSurfaceItem(item: TimelineItem): ProgressSurfaceItem | 
     detail,
     meta,
     kind: item.kind,
+    items: [item],
     tone: item.tone,
   }
 }

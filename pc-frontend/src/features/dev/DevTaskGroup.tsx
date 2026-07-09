@@ -88,7 +88,6 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const publicSurfaceItems = publicAssistantItemsInConversation
     ? progressFlowSurfaceItems(timeline, compactCompletedProcess)
     : []
-  const publicSurfaceHasCommands = publicSurfaceItems.some((item) => item.surfaceType === 'commands')
   const surfaceItems = !resultMsg && displayCollapsed && !publicAssistantItemsInConversation
     ? progressSurfaceItems(timeline.stage, previewAssistantItems)
     : []
@@ -187,7 +186,6 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
             taskContext={taskContext}
             completed={compactCompletedProcess}
             hideAssistantReplies={hideTimelineAssistantReplies}
-            hideCommands={publicSurfaceHasCommands}
             expandAll={expandAll}
             onCancel={onCancel}
             onApprove={onApprove}

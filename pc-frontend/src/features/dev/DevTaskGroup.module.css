@@ -465,6 +465,7 @@
 
 .progressCommandSingle,
 .progressCommandGroup,
+.progressCommandSingleDetails,
 .progressArtifactSingle {
   min-width: 0;
   color: #767f8e;
@@ -478,6 +479,11 @@
   align-items: center;
   gap: 7px;
   min-height: 22px;
+}
+
+.progressCommandSingleDetails,
+.progressArtifactDetails {
+  min-width: 0;
 }
 
 .progressCommandSingle svg,
@@ -547,16 +553,28 @@
   color: #ff9da1;
 }
 
+.progressCommandSingleDetails[data-tone="failed"] .progressCommandSingle,
+.progressArtifactDetails[data-tone="failed"] .progressArtifactSingle {
+  color: #ff9da1;
+}
+
 .progressCommandSingle[data-tone="failed"] svg,
+.progressCommandSingleDetails[data-tone="failed"] .progressCommandSingle svg,
 .progressCommandGroup[data-tone="failed"] summary svg,
 .progressArtifactSingle[data-tone="failed"] svg,
+.progressArtifactDetails[data-tone="failed"] .progressArtifactSingle svg,
 .progressCommandSingle[data-tone="failed"] span,
+.progressCommandSingleDetails[data-tone="failed"] .progressCommandSingle span,
 .progressCommandGroup[data-tone="failed"] summary span,
 .progressArtifactSingle[data-tone="failed"] span,
+.progressArtifactDetails[data-tone="failed"] .progressArtifactSingle span,
 .progressCommandSingle[data-tone="failed"] code,
+.progressCommandSingleDetails[data-tone="failed"] .progressCommandSingle code,
 .progressCommandGroup[data-tone="failed"] code,
 .progressArtifactSingle[data-tone="failed"] strong,
-.progressArtifactSingle[data-tone="failed"] em {
+.progressArtifactDetails[data-tone="failed"] .progressArtifactSingle strong,
+.progressArtifactSingle[data-tone="failed"] em,
+.progressArtifactDetails[data-tone="failed"] .progressArtifactSingle em {
   color: #ff9da1;
 }
 
@@ -581,6 +599,11 @@
   color: #687281;
 }
 
+.progressCommandSingleDetails > summary::marker,
+.progressArtifactDetails > summary::marker {
+  color: #687281;
+}
+
 .progressCommandGroup summary:hover,
 .progressCommandGroup summary:hover span {
   color: #a2adbd;
@@ -594,15 +617,97 @@
 
 .progressCommandLine {
   min-width: 0;
+}
+
+.progressCommandLine > summary {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+  user-select: none;
 }
 
-.progressCommandLine span {
+.progressCommandLine > summary::marker {
+  color: #687281;
+}
+
+.progressCommandLine > summary span {
   flex: 0 0 auto;
   color: #747d8b;
   font-size: 12px;
+}
+
+.progressCommandLine > summary:hover span,
+.progressCommandLine > summary:hover code {
+  color: #a2adbd;
+}
+
+.progressCommandSingle:hover span,
+.progressCommandSingle:hover code,
+.progressArtifactSingle:hover span,
+.progressArtifactSingle:hover strong,
+.progressArtifactSingle:hover em {
+  color: #a2adbd;
+}
+
+.progressCommandSingle,
+.progressArtifactSingle {
+  cursor: pointer;
+  user-select: none;
+}
+
+.progressCommandDetail,
+.progressArtifactDetails > pre {
+  margin: 4px 0 5px 20px;
+}
+
+.progressCommandDetail {
+  display: grid;
+  gap: 5px;
+}
+
+.progressCommandDetail pre,
+.progressArtifactDetails > pre {
+  max-width: 100%;
+  overflow: auto;
+  border-radius: 6px;
+  background: rgba(8, 11, 17, .52);
+  padding: 7px 8px;
+  color: #b8c3d4;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.progressCommandDetail pre {
+  margin: 0;
+}
+
+.progressCommandMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.progressCommandMeta em {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .05);
+  padding: 1px 6px;
+  color: #7f8ca3;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.45;
+}
+
+.progressCommandMeta em[data-tone="done"] {
+  color: #7fba98;
+}
+
+.progressCommandMeta em[data-tone="failed"] {
+  color: #ff9da1;
 }
 
 .progressCommandMore {
