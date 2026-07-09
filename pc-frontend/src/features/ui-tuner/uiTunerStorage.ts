@@ -59,6 +59,8 @@ export function buildUiTunerExport(document: UiTunerDocument) {
       opacity: element.opacity,
     },
     source: element.source,
+    visibility: element.visibility,
+    standard: element.standard,
     runtime: element.runtime,
   }))
 

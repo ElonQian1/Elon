@@ -7,14 +7,12 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { Move, Trash2 } from 'lucide-react'
 import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
 import {
   loadUiTunerDocument,
   saveUiTunerDocument,
   stringifyUiTunerExport,
 } from './uiTunerStorage'
-import { ColorField, NumberField } from './UiTunerFields'
 import { clamp, getMetrics, touch } from './uiTunerGeometry'
 import {
   captureAndroidSnapshot,
@@ -24,7 +22,15 @@ import {
 } from './device/deviceInspectorApi'
 import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
 import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
+import {
+  DEFAULT_UI_TUNER_FILTER,
+  filterUiTunerElements,
+  type UiTunerElementAnalysis,
+  type UiTunerFilterState,
+} from './filtering'
+import { buildStandardInsight, stringifyStandardPackage } from './standards'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
+import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import styles from './UiTunerPage.module.css'
@@ -46,7 +52,6 @@ interface HistoryState {
 }
 
 const MIN_SIZE = 24
-const DEFAULT_CANVAS_MAX = 10000
 const HISTORY_LIMIT = 80
 const VIEW_SCALE_MIN = 0.08
 const VIEW_SCALE_MAX = 2
@@ -80,7 +85,7 @@ export default function UiTunerPage() {
   const [deviceBusy, setDeviceBusy] = useState(false)
   const [connectBusy, setConnectBusy] = useState(false)
   const [captureBusy, setCaptureBusy] = useState(false)
-  const [showRuntimeLayers, setShowRuntimeLayers] = useState(true)
+  const [layerFilter, setLayerFilter] = useState<UiTunerFilterState>(DEFAULT_UI_TUNER_FILTER)
   const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
   const screenshotInputRef = useRef<HTMLInputElement>(null)
   const tunerDocRef = useRef(tunerDoc)
@@ -96,6 +101,14 @@ export default function UiTunerPage() {
   const metrics = useMemo(
     () => (selected ? getMetrics(selected, tunerDoc.elements, tunerDoc.canvas) : []),
     [selected, tunerDoc.canvas, tunerDoc.elements],
+  )
+  const filterResult = useMemo(
+    () => filterUiTunerElements(tunerDoc, layerFilter),
+    [layerFilter, tunerDoc],
+  )
+  const standardInsight = useMemo(
+    () => buildStandardInsight(tunerDoc, selected),
+    [selected, tunerDoc],
   )
   const viewScaleLabel = `${Math.round(viewScale * 100)}%`
 
@@ -256,6 +269,34 @@ export default function UiTunerPage() {
     }), id)
   }
 
+  const updateLayerFilter = (patch: Partial<UiTunerFilterState>) => {
+    setLayerFilter((current) => ({ ...current, ...patch }))
+  }
+
+  const resetLayerFilter = () => {
+    setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
+  }
+
+  const toggleElementVisibility = (id: string) => {
+    commitDocument((current) => touch({
+      ...current,
+      elements: current.elements.map((element) => {
+        if (element.id !== id) return element
+        return { ...element, visibility: element.visibility === 'hidden' ? 'visible' : 'hidden' }
+      }),
+    }), id)
+  }
+
+  const toggleElementLock = (id: string) => {
+    commitDocument((current) => touch({
+      ...current,
+      elements: current.elements.map((element) => {
+        if (element.id !== id) return element
+        return { ...element, visibility: element.visibility === 'locked' ? 'visible' : 'locked' }
+      }),
+    }), id)
+  }
+
   const addElement = (kind: UiTunerElementKind) => {
     const next = createBlankElement(kind, tunerDocRef.current.elements.length + 1)
     commitDocument((current) => touch({ ...current, elements: [...current.elements, next] }), next.id)
@@ -278,7 +319,7 @@ export default function UiTunerPage() {
 
   const saveNow = () => {
     saveUiTunerDocument(tunerDoc)
-    setNotice('已保存到本机')
+    setNotice('已保存到本机草稿')
   }
 
   const refreshDevices = async () => {
@@ -311,7 +352,7 @@ export default function UiTunerPage() {
       const next = snapshotToTunerDocument(snapshot)
       commitDocument(() => next, next.elements[0]?.id ?? null)
       setFitToStage(true)
-      setShowRuntimeLayers(true)
+      setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
       setNotice(`已捕获真机画面：${snapshot.xml.nodeCount} 个 XML 节点`)
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '真机捕获失败')
@@ -350,6 +391,21 @@ export default function UiTunerPage() {
     } catch {
       setNotice('复制失败，可先复制参数 JSON')
     }
+  }
+
+  const copyStandardPackage = async () => {
+    try {
+      await navigator.clipboard.writeText(stringifyStandardPackage(tunerDoc, selected))
+      setNotice('组件标准草案已复制')
+    } catch {
+      setNotice('复制失败，可先复制 CLI 包')
+    }
+  }
+
+  const applySelectedStandard = (standard: UiTunerElement['standard']) => {
+    if (!selected || !standard) return
+    updateElement(selected.id, { standard })
+    setNotice('已把选中节点标记为标准草案')
   }
 
   const downloadExport = () => {
@@ -438,8 +494,14 @@ export default function UiTunerPage() {
     }
   }
 
-  const renderElement = (element: UiTunerElement) => {
+  const renderElement = (element: UiTunerElement, analysis: UiTunerElementAnalysis) => {
     const selectedClass = element.id === selectedId ? styles.selectedElement : ''
+    const appearanceClass = analysis.appearance === 'ghost'
+      ? styles.ghostElement
+      : analysis.appearance === 'outline'
+        ? styles.outlineElement
+        : ''
+    const lockedClass = analysis.isLocked ? styles.lockedElement : ''
     const elementStyle: CSSProperties = {
       left: element.x,
       top: element.y,
@@ -462,12 +524,25 @@ export default function UiTunerPage() {
       <button
         key={element.id}
         type="button"
-        className={[styles.canvasElement, selectedClass, styles[`kind_${element.kind}`]].join(' ')}
+        className={[
+          styles.canvasElement,
+          selectedClass,
+          appearanceClass,
+          lockedClass,
+          styles[`kind_${element.kind}`],
+        ].join(' ')}
         style={elementStyle}
-        onPointerDown={(event) => startDrag(event, element, 'move')}
+        onPointerDown={(event) => {
+          if (analysis.isLocked) {
+            event.stopPropagation()
+            setSelectedId(element.id)
+            return
+          }
+          startDrag(event, element, 'move')
+        }}
       >
-        <span>{element.text}</span>
-        {element.id === selectedId && (
+        <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>
+        {element.id === selectedId && !analysis.isLocked && (
           <span
             className={styles.resizeHandle}
             aria-hidden="true"
@@ -481,10 +556,15 @@ export default function UiTunerPage() {
   return (
     <div className={styles.page}>
       <UiTunerLayersPanel
-        elements={tunerDoc.elements}
+        filter={layerFilter}
+        filterResult={filterResult}
         selectedId={selectedId}
         onAddElement={addElement}
+        onFilterChange={updateLayerFilter}
+        onResetFilter={resetLayerFilter}
         onSelectElement={setSelectedId}
+        onToggleElementVisibility={toggleElementVisibility}
+        onToggleElementLock={toggleElementLock}
       />
 
       <section className={styles.stage}>
@@ -519,6 +599,7 @@ export default function UiTunerPage() {
           onSave={saveNow}
           onCopyExport={copyExport}
           onCopyCliPatch={copyCliPatch}
+          onCopyStandardPackage={copyStandardPackage}
           onDownloadExport={downloadExport}
           onReset={resetDocument}
         />
@@ -554,242 +635,28 @@ export default function UiTunerPage() {
                 style={{ opacity: tunerDoc.canvas.referenceImage.opacity }}
               />
             )}
-            {tunerDoc.elements
-              .filter((element) => showRuntimeLayers || !element.runtime)
-              .map(renderElement)}
+            {filterResult.visible.map(({ element, analysis }) => renderElement(element, analysis))}
           </div>
           </div>
         </div>
       </section>
 
-      <aside className={styles.inspector}>
-        <section className={styles.section}>
-          <h2>画布</h2>
-          <label className={styles.fieldFull}>
-            <span>名称</span>
-            <input
-              value={tunerDoc.canvas.name}
-              onChange={(event) => updateCanvas({ name: event.currentTarget.value })}
-            />
-          </label>
-          <div className={styles.gridFields}>
-            <NumberField
-              label="宽"
-              value={tunerDoc.canvas.width}
-              min={280}
-              max={DEFAULT_CANVAS_MAX}
-              onChange={(width) => updateCanvas({ width })}
-            />
-            <NumberField
-              label="高"
-              value={tunerDoc.canvas.height}
-              min={360}
-              max={DEFAULT_CANVAS_MAX}
-              onChange={(height) => updateCanvas({ height })}
-            />
-          </div>
-          <ColorField
-            label="背景"
-            value={tunerDoc.canvas.background}
-            onChange={(background) => updateCanvas({ background })}
-          />
-          {tunerDoc.canvas.referenceImage && (
-            <>
-              <div className={styles.sourcePanel}>
-                <span>APP 截图底图</span>
-                <strong>{tunerDoc.canvas.referenceImage.name}</strong>
-                <small>
-                  {tunerDoc.canvas.referenceImage.width} x {tunerDoc.canvas.referenceImage.height}
-                </small>
-              </div>
-              <label className={styles.rangeField}>
-                <span>底图透明</span>
-                <input
-                  type="range"
-                  min={0.15}
-                  max={1}
-                  step={0.05}
-                  value={tunerDoc.canvas.referenceImage.opacity}
-                  onChange={(event) => updateCanvas({
-                    referenceImage: {
-                      ...tunerDoc.canvas.referenceImage!,
-                      opacity: Number(event.currentTarget.value),
-                    },
-                  })}
-                />
-                <strong>{Math.round(tunerDoc.canvas.referenceImage.opacity * 100)}%</strong>
-              </label>
-              <div className={styles.inlineActions}>
-                <button
-                  type="button"
-                  onClick={() => updateCanvas({
-                    referenceImage: {
-                      ...tunerDoc.canvas.referenceImage!,
-                      visible: !tunerDoc.canvas.referenceImage!.visible,
-                    },
-                  })}
-                >
-                  {tunerDoc.canvas.referenceImage.visible ? '隐藏截图' : '显示截图'}
-                </button>
-                <button type="button" onClick={() => updateCanvas({ referenceImage: undefined })}>
-                  移除截图
-                </button>
-              </div>
-            </>
-          )}
-          {tunerDoc.runtimeSnapshot && (
-            <>
-              <div className={styles.sourcePanel}>
-                <span>真机 XML 快照</span>
-                <strong>{tunerDoc.runtimeSnapshot.packageName ?? 'APK'} · {tunerDoc.runtimeSnapshot.deviceId}</strong>
-                <small>
-                  {tunerDoc.runtimeSnapshot.nodeCount} nodes
-                  {tunerDoc.runtimeSnapshot.activityName ? `\n${tunerDoc.runtimeSnapshot.activityName}` : ''}
-                  {tunerDoc.runtimeSnapshot.sourceRoot ? `\n${tunerDoc.runtimeSnapshot.sourceRoot}` : ''}
-                </small>
-              </div>
-              <div className={styles.inlineActions}>
-                <button type="button" onClick={() => setShowRuntimeLayers((visible) => !visible)}>
-                  {showRuntimeLayers ? '隐藏 XML 框' : '显示 XML 框'}
-                </button>
-                <button type="button" onClick={copyCliPatch}>
-                  复制 CLI 包
-                </button>
-              </div>
-            </>
-          )}
-          {tunerDoc.source && (
-            <div className={styles.sourcePanel}>
-              <span>来源</span>
-              <strong>{tunerDoc.source.label}</strong>
-              <small>{tunerDoc.source.files?.join('\n') ?? tunerDoc.source.signature}</small>
-            </div>
-          )}
-        </section>
-
-        {selected ? (
-          <>
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <h2>{selected.name}</h2>
-                <button type="button" onClick={deleteSelected} aria-label="删除选中元素">
-                  <Trash2 size={14} aria-hidden="true" />
-                </button>
-              </div>
-              <label className={styles.fieldFull}>
-                <span>图层名</span>
-                <input
-                  value={selected.name}
-                  onChange={(event) => updateElement(selected.id, { name: event.currentTarget.value })}
-                />
-              </label>
-              <label className={styles.fieldFull}>
-                <span>文本</span>
-                <textarea
-                  value={selected.text}
-                  onChange={(event) => updateElement(selected.id, { text: event.currentTarget.value })}
-                />
-              </label>
-              <div className={styles.metricGrid}>
-                {metrics.map((metric) => (
-                  <div key={metric.label}>
-                    <span>{metric.label}</span>
-                    <strong>{metric.value}</strong>
-                  </div>
-                ))}
-              </div>
-              {selected.source && (
-                <div className={styles.sourcePanel}>
-                  <span>源码来源</span>
-                  <strong>{selected.source.token ?? selected.source.label}</strong>
-                  <small>
-                    {selected.source.file}
-                    {selected.source.line ? `:${selected.source.line}` : ''}
-                    {selected.source.rawValue ? `\n${selected.source.rawValue}` : ''}
-                  </small>
-                </div>
-              )}
-              {selected.runtime && (
-                <div className={styles.sourcePanel}>
-                  <span>运行时节点</span>
-                  <strong>{selected.runtime.resourceId ?? selected.runtime.className ?? selected.runtime.nodeId}</strong>
-                  <small>
-                    {selected.runtime.xpath}
-                    {`\n原始 bounds: ${selected.runtime.originalBounds.left},${selected.runtime.originalBounds.top} ${selected.runtime.originalBounds.width}x${selected.runtime.originalBounds.height}`}
-                  </small>
-                </div>
-              )}
-            </section>
-
-            <section className={styles.section}>
-              <h2>位置和尺寸</h2>
-              <div className={styles.gridFields}>
-                <NumberField label="X" value={selected.x} min={0} max={tunerDoc.canvas.width} onChange={(x) => updateElement(selected.id, { x })} />
-                <NumberField label="Y" value={selected.y} min={0} max={tunerDoc.canvas.height} onChange={(y) => updateElement(selected.id, { y })} />
-                <NumberField label="W" value={selected.width} min={MIN_SIZE} max={tunerDoc.canvas.width} onChange={(width) => updateElement(selected.id, { width })} />
-                <NumberField label="H" value={selected.height} min={MIN_SIZE} max={tunerDoc.canvas.height} onChange={(height) => updateElement(selected.id, { height })} />
-              </div>
-            </section>
-
-            <section className={styles.section}>
-              <h2>文字和间距</h2>
-              <div className={styles.gridFields}>
-                <NumberField label="字号" value={selected.fontSize} min={8} max={96} onChange={(fontSize) => updateElement(selected.id, { fontSize })} />
-                <NumberField label="行高" value={selected.lineHeight} min={8} max={120} onChange={(lineHeight) => updateElement(selected.id, { lineHeight })} />
-                <NumberField label="字距" value={selected.letterSpacing} min={-2} max={12} onChange={(letterSpacing) => updateElement(selected.id, { letterSpacing })} />
-                <NumberField label="内距 X" value={selected.paddingX} min={0} max={80} onChange={(paddingX) => updateElement(selected.id, { paddingX })} />
-                <NumberField label="内距 Y" value={selected.paddingY} min={0} max={80} onChange={(paddingY) => updateElement(selected.id, { paddingY })} />
-                <NumberField label="圆角" value={selected.borderRadius} min={0} max={48} onChange={(borderRadius) => updateElement(selected.id, { borderRadius })} />
-              </div>
-              <label className={styles.fieldFull}>
-                <span>字重</span>
-                <select
-                  value={selected.fontWeight}
-                  onChange={(event) => updateElement(selected.id, { fontWeight: Number(event.currentTarget.value) })}
-                >
-                  <option value={400}>400</option>
-                  <option value={500}>500</option>
-                  <option value={600}>600</option>
-                  <option value={700}>700</option>
-                  <option value={800}>800</option>
-                </select>
-              </label>
-            </section>
-
-            <section className={styles.section}>
-              <h2>外观</h2>
-              <div className={styles.gridFields}>
-                <ColorField label="文字" value={selected.color} onChange={(color) => updateElement(selected.id, { color })} />
-                <ColorField label="背景" value={selected.background} onChange={(background) => updateElement(selected.id, { background })} />
-                <ColorField label="边框" value={selected.borderColor} onChange={(borderColor) => updateElement(selected.id, { borderColor })} />
-                <NumberField label="边框" value={selected.borderWidth} min={0} max={8} onChange={(borderWidth) => updateElement(selected.id, { borderWidth })} />
-              </div>
-              <label className={styles.rangeField}>
-                <span>透明度</span>
-                <input
-                  type="range"
-                  min={0.2}
-                  max={1}
-                  step={0.05}
-                  value={selected.opacity}
-                  onChange={(event) => updateElement(selected.id, { opacity: Number(event.currentTarget.value) })}
-                />
-                <strong>{Math.round(selected.opacity * 100)}%</strong>
-              </label>
-            </section>
-          </>
-        ) : (
-          <section className={styles.emptyState}>
-            <Move size={18} aria-hidden="true" />
-            <p>点击画布上的板块后，可在这里调位置、字号、行高、内边距和颜色。</p>
-          </section>
-        )}
-
-        <section className={styles.section}>
-          <h2>导出参数</h2>
-          <textarea className={styles.exportBox} value={exportJson} readOnly />
-        </section>
-      </aside>
+      <UiTunerInspector
+        tunerDoc={tunerDoc}
+        selected={selected}
+        metrics={metrics}
+        filterResult={filterResult}
+        standardInsight={standardInsight}
+        exportJson={exportJson}
+        onUpdateCanvas={updateCanvas}
+        onUpdateElement={updateElement}
+        onDeleteSelected={deleteSelected}
+        onCopyCliPatch={copyCliPatch}
+        onCopyStandardPackage={copyStandardPackage}
+        onApplyStandard={applySelectedStandard}
+        onSetProductMode={() => setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })}
+        onSetDebugMode={() => setLayerFilter(buildDebugFilter())}
+      />
 
       <div className={styles.notice} aria-live="polite">
         {notice}

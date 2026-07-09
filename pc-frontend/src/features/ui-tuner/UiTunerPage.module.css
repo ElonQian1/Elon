@@ -101,52 +101,6 @@
   overflow: auto;
 }
 
-.layerItem {
-  width: 100%;
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 2px 8px;
-  padding: 9px 10px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  text-align: left;
-  color: var(--text-secondary);
-}
-
-.layerItem span {
-  grid-row: span 2;
-  align-self: center;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.layerItem strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-primary);
-  font-size: 13px;
-}
-
-.layerItem small {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 15px;
-}
-
-.layerItem:hover,
-.activeLayer {
-  border-color: rgba(255, 255, 255, .14);
-  background: var(--bg-hover);
-}
-
-.activeLayer {
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-
 .stage {
   min-width: 0;
   min-height: 0;
@@ -357,6 +311,22 @@
 .selectedElement {
   outline: 2px solid #a8c7fa;
   box-shadow: 0 0 0 4px rgba(168, 199, 250, .16);
+}
+
+.ghostElement {
+  opacity: .34 !important;
+  background: rgba(255, 255, 255, .04) !important;
+}
+
+.outlineElement {
+  color: rgba(238, 245, 255, .76) !important;
+  background: transparent !important;
+  border-style: dashed;
+  opacity: .74 !important;
+}
+
+.lockedElement {
+  cursor: default;
 }
 
 .kind_button {
@@ -590,6 +560,23 @@
 .inlineActions button:hover {
   background: #2c2e32;
   border-color: rgba(255, 255, 255, .28);
+}
+
+.inspectorFooterActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.inspectorFooterActions button {
+  height: 30px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #242528;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .exportBox {

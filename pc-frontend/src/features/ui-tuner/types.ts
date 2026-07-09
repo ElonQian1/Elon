@@ -1,4 +1,6 @@
 export type UiTunerElementKind = 'text' | 'card' | 'button' | 'media'
+export type UiTunerElementVisibility = 'visible' | 'hidden' | 'locked'
+export type UiTunerStandardScope = 'local_draft' | 'screen_override' | 'project_component' | 'design_token'
 
 export interface UiTunerCanvas {
   name: string
@@ -50,8 +52,26 @@ export interface UiTunerElement {
   background: string
   borderColor: string
   opacity: number
+  visibility?: UiTunerElementVisibility
+  standard?: UiTunerElementStandard
   source?: UiTunerSource
   runtime?: UiTunerRuntimeElement
+}
+
+export interface UiTunerElementStandard {
+  scope: UiTunerStandardScope
+  role: string
+  component: string
+  variant: string
+  tokenRefs: {
+    color?: string
+    background?: string
+    typography?: string
+    spacing?: string
+    radius?: string
+  }
+  reuseKey?: string
+  note?: string
 }
 
 export interface UiTunerDocument {
@@ -115,5 +135,7 @@ export interface UiTunerExportElement {
     opacity: number
   }
   source?: UiTunerSource
+  visibility?: UiTunerElementVisibility
+  standard?: UiTunerElementStandard
   runtime?: UiTunerRuntimeElement
 }

@@ -123,7 +123,9 @@ function snapshotSource(snapshot: AndroidInspectorSnapshot): UiTunerSource {
 }
 
 function lastResourceName(resourceId?: string): string {
-  return resourceId?.split('/id/').pop() ?? ''
+  if (!resourceId) return ''
+  const normalized = resourceId.replace(/.*(?:[:/]id\/|\+id\/)/, '')
+  return normalized.split('/').pop() ?? normalized
 }
 
 function maxRight(nodes: AndroidInspectorNode[]): number {

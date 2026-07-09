@@ -1,20 +1,33 @@
-import { Plus, Type } from 'lucide-react'
-import type { UiTunerElement, UiTunerElementKind } from './types'
+import { Eye, EyeOff, Lock, Plus, Type, Unlock } from 'lucide-react'
+import type { UiTunerFilterResult, UiTunerFilterState } from './filtering'
+import type { UiTunerElementKind } from './types'
 import { kindLabel } from './uiTunerGeometry'
+import { UiTunerViewControls } from './UiTunerViewControls'
+import panelStyles from './UiTunerPanels.module.css'
 import styles from './UiTunerPage.module.css'
 
 interface UiTunerLayersPanelProps {
-  elements: UiTunerElement[]
+  filter: UiTunerFilterState
+  filterResult: UiTunerFilterResult
   selectedId: string | null
   onAddElement: (kind: UiTunerElementKind) => void
+  onFilterChange: (patch: Partial<UiTunerFilterState>) => void
+  onResetFilter: () => void
   onSelectElement: (id: string) => void
+  onToggleElementVisibility: (id: string) => void
+  onToggleElementLock: (id: string) => void
 }
 
 export function UiTunerLayersPanel({
-  elements,
+  filter,
+  filterResult,
   selectedId,
   onAddElement,
+  onFilterChange,
+  onResetFilter,
   onSelectElement,
+  onToggleElementVisibility,
+  onToggleElementLock,
 }: UiTunerLayersPanelProps) {
   return (
     <aside className={styles.layersPanel}>
@@ -38,19 +51,69 @@ export function UiTunerLayersPanel({
         </button>
       </div>
 
+      <UiTunerViewControls
+        filter={filter}
+        result={filterResult}
+        onChange={onFilterChange}
+        onReset={onResetFilter}
+      />
+
       <div className={styles.layerList} aria-label="画布图层">
-        {elements.map((element) => (
-          <button
-            key={element.id}
-            type="button"
-            className={[styles.layerItem, element.id === selectedId ? styles.activeLayer : ''].join(' ')}
-            onClick={() => onSelectElement(element.id)}
-          >
-            <span>{kindLabel(element.kind)}</span>
-            <strong>{element.name}</strong>
-            <small>{element.width} x {element.height}</small>
-          </button>
+        {filterResult.groups.map((group) => (
+          <section key={group.key} className={panelStyles.layerGroup}>
+            <h2>{group.label}<span>{group.items.length}</span></h2>
+            {group.items.map(({ element, analysis }) => (
+              <div
+                key={element.id}
+                className={[
+                  panelStyles.layerItem,
+                  element.id === selectedId ? panelStyles.activeLayer : '',
+                  analysis.appearance !== 'solid' ? panelStyles.mutedLayer : '',
+                ].join(' ')}
+              >
+                <button
+                  type="button"
+                  className={panelStyles.layerIconButton}
+                  onClick={() => onToggleElementVisibility(element.id)}
+                  aria-label={element.visibility === 'hidden' ? '显示图层' : '隐藏图层'}
+                  title={element.visibility === 'hidden' ? '显示图层' : '隐藏图层'}
+                >
+                  {element.visibility === 'hidden'
+                    ? <EyeOff size={13} aria-hidden="true" />
+                    : <Eye size={13} aria-hidden="true" />}
+                </button>
+                <button
+                  type="button"
+                  className={panelStyles.layerSelectButton}
+                  onClick={() => onSelectElement(element.id)}
+                >
+                  <span>{kindLabel(element.kind)}</span>
+                  <strong>{element.name}</strong>
+                  <small>
+                    {element.width} x {element.height}
+                    {analysis.hiddenReasons.length ? ` · ${analysis.hiddenReasons[0]}` : ''}
+                  </small>
+                </button>
+                <button
+                  type="button"
+                  className={panelStyles.layerIconButton}
+                  onClick={() => onToggleElementLock(element.id)}
+                  aria-label={element.visibility === 'locked' ? '解锁图层' : '锁定图层'}
+                  title={element.visibility === 'locked' ? '解锁图层' : '锁定图层'}
+                >
+                  {element.visibility === 'locked'
+                    ? <Lock size={13} aria-hidden="true" />
+                    : <Unlock size={13} aria-hidden="true" />}
+                </button>
+              </div>
+            ))}
+          </section>
         ))}
+        {filterResult.visible.length === 0 && (
+          <div className={panelStyles.layerEmpty}>
+            没有符合当前过滤条件的图层
+          </div>
+        )}
       </div>
     </aside>
   )

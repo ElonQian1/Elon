@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import {
   Copy,
+  Database,
   Download,
   FileCode2,
   ImagePlus,
@@ -45,6 +46,7 @@ interface UiTunerToolbarProps {
   onSave: () => void
   onCopyExport: () => void
   onCopyCliPatch: () => void
+  onCopyStandardPackage: () => void
   onDownloadExport: () => void
   onReset: () => void
 }
@@ -77,6 +79,7 @@ export function UiTunerToolbar({
   onSave,
   onCopyExport,
   onCopyCliPatch,
+  onCopyStandardPackage,
   onDownloadExport,
   onReset,
 }: UiTunerToolbarProps) {
@@ -169,7 +172,7 @@ export function UiTunerToolbar({
         </div>
         <button type="button" onClick={onSave}>
           <Save size={14} aria-hidden="true" />
-          保存调整
+          本机草稿
         </button>
         <button type="button" onClick={onCopyExport}>
           <Copy size={14} aria-hidden="true" />
@@ -178,6 +181,10 @@ export function UiTunerToolbar({
         <button type="button" onClick={onCopyCliPatch}>
           <FileCode2 size={14} aria-hidden="true" />
           CLI 包
+        </button>
+        <button type="button" onClick={onCopyStandardPackage}>
+          <Database size={14} aria-hidden="true" />
+          标准草案
         </button>
         <button type="button" onClick={onDownloadExport} aria-label="下载参数 JSON">
           <Download size={15} aria-hidden="true" />
