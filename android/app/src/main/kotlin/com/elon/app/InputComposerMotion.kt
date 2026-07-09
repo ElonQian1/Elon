@@ -149,8 +149,7 @@ internal class InputComposerMotion(
 
     private fun targetExpandedHeight(expanded: Boolean): Int {
         return if (expanded) {
-            (expandedTextHeight.takeIf { it > 0 } ?: defaultExpandedTextHeight()) +
-                expandedBottomOverlap
+            expandedTextHeight.takeIf { it > 0 } ?: defaultExpandedTextHeight()
         } else {
             0
         }

@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.view.Gravity
+import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.elon.app.databinding.ActivityMainBinding
@@ -21,6 +22,7 @@ internal class MainAdaptiveInputHeightActions(
             if (inputBarContainer() == null) return@post
             val collapsedHeight = dp(38)
             val minTextHeight = dp(42)
+            val singleLineAnchorTop = dp(48)
             val maxVisibleLines = 6
             val maxTextHeight = dp(140)
             val rawLineCount = inputEdit.lineCount.coerceAtLeast(1)
@@ -28,22 +30,28 @@ internal class MainAdaptiveInputHeightActions(
             val desiredTextHeight = if (voiceMode) {
                 0
             } else {
-                val multilineTopGuard = if (rawLineCount > 1) dp(8) else 0
                 (rawLineCount.coerceAtMost(maxVisibleLines) * inputEdit.lineHeight +
                     inputEdit.paddingTop +
-                    inputEdit.paddingBottom +
-                    multilineTopGuard).coerceIn(minTextHeight, maxTextHeight)
+                    inputEdit.paddingBottom).coerceIn(minTextHeight, maxTextHeight)
             }
+            val anchorTopOffset = if (voiceMode) {
+                0
+            } else {
+                val consumedAnchor = (desiredTextHeight - minTextHeight).coerceAtLeast(0)
+                (singleLineAnchorTop - consumedAnchor).coerceIn(0, singleLineAnchorTop)
+            }
+            val desiredExpandedHeight = if (voiceMode) 0 else desiredTextHeight + anchorTopOffset
 
             val centerParams = centerContainer.layoutParams as LinearLayout.LayoutParams
             if (centerParams.height != collapsedHeight) {
                 centerParams.height = collapsedHeight
                 centerContainer.layoutParams = centerParams
             }
+            applyInputTopMargin(inputEdit, anchorTopOffset)
 
             inputComposerMotion()?.let { motion ->
                 motion.updateExpandedTextHeight(
-                    desiredTextHeight,
+                    desiredExpandedHeight,
                     animate = motion.isExpanded
                 )
             }
@@ -52,5 +60,12 @@ internal class MainAdaptiveInputHeightActions(
             inputEdit.gravity = (if (multiline) Gravity.TOP else Gravity.CENTER_VERTICAL) or Gravity.START
             inputEdit.isVerticalScrollBarEnabled = !voiceMode && rawLineCount > maxVisibleLines
         }
+    }
+
+    private fun applyInputTopMargin(inputEdit: EditText, topMargin: Int) {
+        val params = inputEdit.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (params.topMargin == topMargin) return
+        params.topMargin = topMargin
+        inputEdit.layoutParams = params
     }
 }
