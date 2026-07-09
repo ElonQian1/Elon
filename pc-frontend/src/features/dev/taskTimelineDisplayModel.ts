@@ -9,6 +9,7 @@ export type PrimaryTimelineBlock =
 export interface TaskTimelineDisplayOptions {
   completed?: boolean
   hideAssistantReplies?: boolean
+  hideCommands?: boolean
 }
 
 export function taskTimelineHasVisibleDetails(model: TaskTimelineModel, options: TaskTimelineDisplayOptions = {}) {
@@ -18,18 +19,18 @@ export function taskTimelineHasVisibleDetails(model: TaskTimelineModel, options:
 export function buildTimelineDisplay(model: TaskTimelineModel, {
   completed = false,
   hideAssistantReplies = false,
+  hideCommands = false,
 }: TaskTimelineDisplayOptions) {
   const rawDisplayItems = hideAssistantReplies ? model.items.filter((item) => !isAssistantTimelineItem(item)) : model.items
   const displayItems = rawDisplayItems
     .filter((item) => !isCurrentStageSourceItem(model.stage, item))
     .filter((item) => !isRedundantTerminalSummary(item, model.stage.tone))
-  const chronologicalItems = displayItems
-    .filter((item) => !isTerminalRuntimeDetail(item, model.stage.tone) && !isSummaryItem(item))
   const grouped = groupTimelineItems(displayItems, completed, model.stage.tone)
-  const primaryBlocks = groupPrimaryTimelineBlocks(chronologicalItems)
-  const hasApprovalItem = chronologicalItems.some((item) => item.kind === 'approval' && item.tone === 'approval')
+  const primaryItems = hideCommands ? grouped.primary.filter((item) => !isCommandTimelineItem(item)) : grouped.primary
+  const primaryBlocks = groupPrimaryTimelineBlocks(primaryItems)
+  const hasApprovalItem = primaryItems.some((item) => item.kind === 'approval' && item.tone === 'approval')
   const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
-  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, [])
+  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, grouped.connection)
   const showCoverageInDiagnostics = showDiagnosticDetails && hasActiveCoverage(model)
   const diagnosticCount = showDiagnosticDetails
     ? model.diagnostics.length + (showCoverageInDiagnostics ? 1 : 0)
@@ -37,6 +38,7 @@ export function buildTimelineDisplay(model: TaskTimelineModel, {
   const hasVisibleTimeline = showStageAtTop
     || primaryBlocks.length > 0
     || diagnosticCount > 0
+    || grouped.connection.length > 0
     || grouped.summary.length > 0
   return {
     grouped,
@@ -156,7 +158,7 @@ function isCompletedTechnicalItem(item: TimelineItem) {
 }
 
 function isConnectionItem(item: TimelineItem) {
-  if (item.kind === 'heartbeat') return false
+  if (item.kind === 'heartbeat') return true
   if (item.kind === 'node') return true
   if (item.event?.type === 'pc_dispatch_started') return true
   const phase = String(item.event?.phase ?? '')

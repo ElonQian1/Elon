@@ -101,7 +101,8 @@ try {
     },
   ]);
 
-  const displayOrder = buildTimelineDisplay(mixedTimeline, {}).primaryBlocks.map((block) => (
+  const display = buildTimelineDisplay(mixedTimeline, {});
+  const displayOrder = display.primaryBlocks.map((block) => (
     block.type === 'commands'
       ? block.items.map((item) => item.process && item.process.commandText).join('\n')
       : block.item.kind === 'node' ? block.item.title : block.item.detail || block.item.title
@@ -110,13 +111,32 @@ try {
   assert.deepStrictEqual(
     displayOrder,
     [
-      '已派发到 PC 节点',
       '第一步：先读取入口规则。',
       'Get-Content CODEX.md',
       '第二步：再读取服务器版本。',
       'curl.exe http://127.0.0.1:8080/api/server/version',
     ],
-    'expanded timeline should keep mixed node, public replies, and commands in chronological order',
+    'expanded timeline should keep public replies and commands in chronological order',
+  );
+
+  assert.deepStrictEqual(
+    display.grouped.connection.map((item) => item.title),
+    ['已派发到 PC 节点'],
+    'node and connection events should stay out of the main reading flow',
+  );
+
+  const displayWithoutCommands = buildTimelineDisplay(mixedTimeline, { hideCommands: true });
+  assert.deepStrictEqual(
+    displayWithoutCommands.primaryBlocks.map((block) => (
+      block.type === 'commands'
+        ? 'unexpected command block'
+        : block.item.detail || block.item.title
+    )),
+    [
+      '第一步：先读取入口规则。',
+      '第二步：再读取服务器版本。',
+    ],
+    'timeline should be able to hide command blocks when command summaries are already surfaced',
   );
 
   console.log('pc-frontend task-timeline display tests passed');

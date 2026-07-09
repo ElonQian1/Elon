@@ -459,6 +459,113 @@
   padding: 1px 5px;
 }
 
+.progressCommandSingle,
+.progressCommandGroup {
+  min-width: 0;
+  color: #767f8e;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.progressCommandSingle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 22px;
+}
+
+.progressCommandSingle svg,
+.progressCommandGroup summary svg {
+  flex: 0 0 auto;
+  color: #6f7887;
+  opacity: .82;
+}
+
+.progressCommandSingle span,
+.progressCommandGroup summary span {
+  flex: 0 0 auto;
+  color: #798391;
+}
+
+.progressCommandSingle code,
+.progressCommandLine code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: 4px;
+  background: transparent;
+  padding: 0;
+  color: #8f98a7;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
+}
+
+.progressCommandSingle[data-tone="failed"],
+.progressCommandGroup[data-tone="failed"] {
+  color: #ff9da1;
+}
+
+.progressCommandSingle[data-tone="failed"] svg,
+.progressCommandGroup[data-tone="failed"] summary svg,
+.progressCommandSingle[data-tone="failed"] span,
+.progressCommandGroup[data-tone="failed"] summary span,
+.progressCommandSingle[data-tone="failed"] code,
+.progressCommandGroup[data-tone="failed"] code {
+  color: #ff9da1;
+}
+
+.progressCommandGroup {
+  display: grid;
+  gap: 3px;
+}
+
+.progressCommandGroup summary {
+  width: max-content;
+  max-width: 100%;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #798391;
+  cursor: pointer;
+  user-select: none;
+}
+
+.progressCommandGroup summary::marker {
+  color: #687281;
+}
+
+.progressCommandGroup summary:hover,
+.progressCommandGroup summary:hover span {
+  color: #a2adbd;
+}
+
+.progressCommandList {
+  display: grid;
+  gap: 4px;
+  padding: 1px 0 1px 20px;
+}
+
+.progressCommandLine {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.progressCommandLine span {
+  flex: 0 0 auto;
+  color: #747d8b;
+  font-size: 12px;
+}
+
+.progressCommandMore {
+  color: #6f7b8f;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
 .progressHighlightMore {
   color: #7f8ca3;
   font-size: 11.5px;

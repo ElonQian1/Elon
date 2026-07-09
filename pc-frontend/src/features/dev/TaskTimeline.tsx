@@ -30,6 +30,7 @@ interface TaskTimelineProps {
   taskContext: TaskContext
   completed?: boolean
   hideAssistantReplies?: boolean
+  hideCommands?: boolean
   expandAll?: boolean
   onCancel?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
@@ -44,8 +45,8 @@ interface RuntimeReply {
   fingerprint?: string
 }
 
-export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
-  const display = buildTimelineDisplay(model, { completed, hideAssistantReplies })
+export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, hideCommands = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
+  const display = buildTimelineDisplay(model, { completed, hideAssistantReplies, hideCommands })
   if (!display.hasVisibleTimeline) return null
 
   return (
@@ -65,6 +66,18 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
           />
         )
       ))}
+      <TimelineFold title="连接记录" count={display.grouped.connection.length} defaultOpen={false}>
+        {display.grouped.connection.map((item) => (
+          <TimelineRow
+            key={item.id}
+            item={item}
+            taskContext={taskContext}
+            expandAll={expandAll}
+            onCancel={onCancel}
+            onApprove={onApprove}
+          />
+        ))}
+      </TimelineFold>
       {display.showDiagnosticDetails && (
         <TimelineFold title={diagnosticFoldTitle(model)} count={display.diagnosticCount} defaultOpen={expandAll}>
           {model.diagnostics.map((diagnostic, index) => (
