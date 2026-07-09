@@ -3207,7 +3207,7 @@
     }
     .home-project-create-menu.hidden { display: none; }
     .home-project-create-menu button {
-      width: 144px;
+      width: 60px;
       height: 60px;
       border: 1px solid #3B3B3E;
       border-radius: 30px;
@@ -3221,7 +3221,7 @@
       cursor: pointer;
       overflow: hidden;
       pointer-events: auto;
-      transition: width 220ms ease, height 220ms ease, background 160ms ease, border-color 160ms ease;
+      transition: background 160ms ease, border-color 160ms ease;
     }
     .home-project-create-menu button:hover {
       background: #171717;
@@ -3232,28 +3232,21 @@
       height: 28px;
       flex: none;
       object-fit: contain;
-      transition: width 220ms ease, height 220ms ease, opacity 220ms ease, margin 220ms ease;
+      transition: opacity 160ms ease;
     }
-    .home-project-create-menu .home-floating-home-icon {
-      margin-right: 10px;
-    }
-    .home-project-create-menu.mode-project.compact .home-floating-home-icon {
+    .home-project-create-menu.mode-project .home-floating-home-icon {
       width: 0;
       opacity: 0;
       margin-right: 0;
     }
     .home-project-create-menu.mode-home .home-floating-home-icon {
-      margin-right: 10px;
-    }
-    .home-project-create-menu.mode-home.compact .home-floating-home-icon {
+      width: 28px;
+      opacity: 1;
       margin-right: 0;
     }
-    .home-project-create-menu.mode-home.compact .home-floating-project-icon {
+    .home-project-create-menu.mode-home .home-floating-project-icon {
       width: 0;
       opacity: 0;
-    }
-    .home-project-create-menu.compact button {
-      width: 60px;
     }
     @media (max-width: 719px) {
       .home-project-create-menu { right: 20px; }
@@ -4791,24 +4784,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       homeProjectCreateMenu.classList.toggle('hidden', !floatingVisible);
       if (floatingVisible) {
         homeProjectCreateMenu.classList.remove('animating');
-        homeProjectCreateMenu.classList.toggle('compact', !!options.compact);
-        if (!options.compact) syncHomeProjectCreateMenuMotion();
+        homeProjectCreateMenu.classList.add('compact');
       }
     }
     if ((!visible || !showMenu) && homeNavMenu) homeNavMenu.classList.add('hidden');
   }
 
-  let homeProjectCreateMenuMotionTimer = 0;
   function syncHomeProjectCreateMenuMotion() {
-    if (!chatHomePage || !homeProjectCreateMenu || homeProjectCreateMenu.classList.contains('hidden')) return;
-    const shouldCompact = chatHomePage.scrollTop > 4;
-    if (homeProjectCreateMenu.classList.contains('compact') === shouldCompact) return;
-    homeProjectCreateMenu.classList.add('animating');
-    homeProjectCreateMenu.classList.toggle('compact', shouldCompact);
-    window.clearTimeout(homeProjectCreateMenuMotionTimer);
-    homeProjectCreateMenuMotionTimer = window.setTimeout(() => {
-      homeProjectCreateMenu.classList.remove('animating');
-    }, 240);
+    if (!homeProjectCreateMenu || homeProjectCreateMenu.classList.contains('hidden')) return;
+    homeProjectCreateMenu.classList.remove('animating');
+    homeProjectCreateMenu.classList.add('compact');
   }
 
   if (chatHomePage && homeProjectCreateMenu) {
@@ -5987,7 +5972,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     setHomeChromeVisible(isChatHome || inProjectHome || isProfileHome, {
       mode: inProjectHome ? 'home' : 'project',
-      compact: inProjectHome,
+      compact: true,
       floating: isChatHome || inProjectHome,
       showMenu: isChatHome || isProfileHome
     });
