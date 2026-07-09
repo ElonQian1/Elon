@@ -17,8 +17,8 @@ pub(crate) fn attach_source_map(
 }
 
 fn find_resource_id_source(root: &Path, resource_id: &str) -> Option<SourceMapEntry> {
-    let id_name = resource_id.rsplit("/id/").next()?.trim();
-    if id_name.is_empty() || id_name == resource_id {
+    let id_name = resource_id_name(resource_id)?;
+    if id_name.is_empty() {
         return None;
     }
     let token_plus = format!("@+id/{id_name}");
@@ -39,6 +39,11 @@ fn find_resource_id_source(root: &Path, resource_id: &str) -> Option<SourceMapEn
             continue;
         }
         if content.contains(&token_plus) || content.contains(&token_ref) {
+            let matched_token = if content.contains(&token_plus) {
+                token_plus.clone()
+            } else {
+                token_ref.clone()
+            };
             let line = content
                 .lines()
                 .position(|line| line.contains(&token_plus) || line.contains(&token_ref))
@@ -51,13 +56,22 @@ fn find_resource_id_source(root: &Path, resource_id: &str) -> Option<SourceMapEn
             return Some(SourceMapEntry {
                 file,
                 line,
-                token: token_plus,
+                token: matched_token,
                 confidence: 0.92,
                 reason: "resource-id 精确匹配 Android res XML".to_string(),
             });
         }
     }
     None
+}
+
+fn resource_id_name(resource_id: &str) -> Option<&str> {
+    let value = resource_id.trim();
+    value
+        .rsplit_once(":id/")
+        .or_else(|| value.rsplit_once("/id/"))
+        .map(|(_, id)| id.trim())
+        .filter(|id| !id.is_empty())
 }
 
 fn resolve_source_root(explicit_root: Option<&str>) -> Option<PathBuf> {
@@ -117,5 +131,23 @@ fn collect_xml_files(root: &Path, output: &mut Vec<PathBuf>) {
         } else if path.extension().and_then(|value| value.to_str()) == Some("xml") {
             output.push(path);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::resource_id_name;
+
+    #[test]
+    fn extracts_runtime_resource_id_names() {
+        assert_eq!(
+            resource_id_name("com.elon.app:id/topTitleText"),
+            Some("topTitleText")
+        );
+        assert_eq!(
+            resource_id_name("android.view.View/id/title"),
+            Some("title")
+        );
+        assert_eq!(resource_id_name("topTitleText"), None);
     }
 }
