@@ -137,7 +137,7 @@ internal class MainInputComposerSetup(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 0
             ).apply {
-                marginStart = dp(102)
+                marginStart = dp(18)
                 marginEnd = dp(10)
             }
         }
@@ -228,19 +228,19 @@ internal class MainInputComposerSetup(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
-                topMargin = bottomMenuHeight
+                topMargin = dp(12)
             }
             background = ColorDrawable(Color.TRANSPARENT)
             hint = "输入内容"
             minLines = 1
             maxLines = 6
             setSingleLine(false)
-            gravity = Gravity.CENTER_VERTICAL or Gravity.START
+            gravity = Gravity.TOP or Gravity.START
             overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
             isVerticalScrollBarEnabled = false
             includeFontPadding = false
             setHorizontallyScrolling(false)
-            setPadding(dp(4), 0, dp(38), 0)
+            setPadding(dp(4), dp(2), dp(42), dp(2))
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#5E5E5E"))
             textSize = 17f
