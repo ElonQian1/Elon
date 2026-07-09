@@ -227,7 +227,9 @@ internal class MainInputComposerSetup(
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
-            )
+            ).apply {
+                topMargin = bottomMenuHeight
+            }
             background = ColorDrawable(Color.TRANSPARENT)
             hint = "输入内容"
             minLines = 1
@@ -451,7 +453,8 @@ internal class MainInputComposerSetup(
             inputPanelContainer = inputPanelContainer,
             collapsedInputContainer = inputCenterContainer,
             collapsedText = collapsedInputPreview,
-            rightControls = inputRightControls
+            rightControls = inputRightControls,
+            expandedBottomOverlap = bottomMenuHeight
         )
         inputEdit.setOnClickListener {
             if (!isVoiceMode()) {

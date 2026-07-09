@@ -11,7 +11,8 @@ internal class InputComposerMotion(
     private val inputPanelContainer: View,
     private val collapsedInputContainer: FrameLayout,
     private val collapsedText: View,
-    private val rightControls: FrameLayout
+    private val rightControls: FrameLayout,
+    private val expandedBottomOverlap: Int
 ) {
     private val interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
     private var expandAnimator: ValueAnimator? = null
@@ -28,7 +29,7 @@ internal class InputComposerMotion(
         expandedTextHeight = target
         if (!isExpanded) return
         if (expandAnimator?.isRunning == true && expandAnimatorTarget == true) return
-        animateHeight(expandedInputContainer, target, animate)
+        animateHeight(expandedInputContainer, targetExpandedHeight(expanded = true), animate)
     }
 
     fun expandForTextInput(animate: Boolean) {
@@ -148,7 +149,8 @@ internal class InputComposerMotion(
 
     private fun targetExpandedHeight(expanded: Boolean): Int {
         return if (expanded) {
-            expandedTextHeight.takeIf { it > 0 } ?: defaultExpandedTextHeight()
+            (expandedTextHeight.takeIf { it > 0 } ?: defaultExpandedTextHeight()) +
+                expandedBottomOverlap
         } else {
             0
         }
@@ -176,8 +178,23 @@ internal class InputComposerMotion(
 
     private fun setExpandedHeight(height: Int) {
         val params = expandedInputContainer.layoutParams
-        if (params.height == height) return
-        params.height = height
+        val bottomMargin = if (height > 0) {
+            -height.coerceAtMost(expandedBottomOverlap)
+        } else {
+            0
+        }
+        var changed = false
+        if (params.height != height) {
+            params.height = height
+            changed = true
+        }
+        (params as? ViewGroup.MarginLayoutParams)?.let { marginParams ->
+            if (marginParams.bottomMargin != bottomMargin) {
+                marginParams.bottomMargin = bottomMargin
+                changed = true
+            }
+        }
+        if (!changed) return
         expandedInputContainer.layoutParams = params
     }
 
