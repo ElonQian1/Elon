@@ -228,7 +228,7 @@ export function LivePreview({ config, expandAll, onToggleExpand }: {
                 onCancelTask={handleCancelTask}
                 onContinueTask={handleContinueTask}
                 onApproveTool={handleApproveTool}
-                debugOpenProcess={expandAll}
+                debugExpandAll={expandAll}
               />
             )}
             <div className="replayComposer">

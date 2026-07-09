@@ -72,7 +72,8 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const publicAssistantItemsInConversation = !resultMsg && hasPublicAssistantItems
   const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline)
   const displayCollapsed = forceProcessOpen ? false : collapsed
-  const hideTimelineAssistantReplies = publicAssistantItemsInConversation && displayCollapsed
+  const showPublicSurfaceItems = publicAssistantItemsInConversation && (displayCollapsed || debugOpenProcess)
+  const hideTimelineAssistantReplies = publicAssistantItemsInConversation && (displayCollapsed || debugOpenProcess)
   const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
     completed: compactCompletedProcess,
     hideAssistantReplies: hideTimelineAssistantReplies,
@@ -92,7 +93,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const surfaceItems = !resultMsg && displayCollapsed && !publicAssistantItemsInConversation
     ? progressSurfaceItems(timeline.stage, previewAssistantItems)
     : []
-  const visiblePublicSurfaceItems = displayCollapsed ? publicSurfaceItems : []
+  const visiblePublicSurfaceItems = showPublicSurfaceItems ? publicSurfaceItems : []
   const visibleSurfaceItems = displayCollapsed ? surfaceItems : []
   const hasVisibleSurfaceItems = visiblePublicSurfaceItems.length > 0 || visibleSurfaceItems.length > 0
   const previewHiddenCount = Math.max(0, publicAssistantItems.length - previewAssistantItems.length)

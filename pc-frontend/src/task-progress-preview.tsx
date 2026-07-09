@@ -336,6 +336,7 @@ function initialExpandFromLocation(): boolean {
 function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAll: boolean }) {
   const feedRef = useRef<HTMLDivElement>(null)
   const conversationId = `preview-conversation-${scenario.id}`
+  const openProcessInPlace = expandAll && scenario.id === 'tools'
   const taskMessages = useMemo(() => scenario.messages as Message[], [scenario])
   const conversationMessages = useMemo<Message[]>(() => [requestMessage(scenario, conversationId)], [conversationId, scenario])
   const taskMessagesById = useMemo(() => new Map([[taskId, taskMessages]]), [taskMessages])
@@ -374,7 +375,7 @@ function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAl
           onCancelTask={noopTaskAction}
           onContinueTask={noopTaskAction}
           onApproveTool={noopApprovalAction}
-          debugOpenProcess={expandAll}
+          debugOpenProcess={openProcessInPlace}
         />
         <div className="replayComposer">
           <button type="button" aria-label="添加附件">+</button>
