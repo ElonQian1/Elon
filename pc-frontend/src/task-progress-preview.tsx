@@ -295,7 +295,7 @@ function Preview() {
           data-active={expandAll ? 'true' : undefined}
           onClick={() => setExpandAll((value) => !value)}
         >
-          {expandAll ? '全部展开中' : '按真实默认'}
+          {expandAll ? '过程展开中' : '按真实默认'}
         </button>
         <div className="scenarioTabs">
           <button type="button" data-active={activeId === 'all' ? 'true' : undefined} onClick={() => setActiveId('all')}>
@@ -374,7 +374,7 @@ function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAl
           onCancelTask={noopTaskAction}
           onContinueTask={noopTaskAction}
           onApproveTool={noopApprovalAction}
-          debugExpandAll={expandAll}
+          debugOpenProcess={expandAll}
         />
         <div className="replayComposer">
           <button type="button" aria-label="添加附件">+</button>

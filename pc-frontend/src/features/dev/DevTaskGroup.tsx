@@ -31,12 +31,13 @@ interface Props {
   taskContext: TaskContext
   user?: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   expandAll?: boolean
+  debugOpenProcess?: boolean
   onCancel?: (taskId: string) => void
   onContinue?: (taskId: string) => void
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
-function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel, onContinue, onApprove }: Props) {
+function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpenProcess = false, onCancel, onContinue, onApprove }: Props) {
   const taskId  = taskIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
@@ -46,7 +47,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const isDone  = taskIsTerminal(task) || !!explicitResultMsg || messages.some(isTerminalTaskMessage)
 
   // 过程默认保持轻量；审批态和预览强制展开由后续逻辑处理。
-  const [collapsed, setCollapsed] = useState(!expandAll)
+  const [collapsed, setCollapsed] = useState(!(expandAll || debugOpenProcess))
   const prevDone = useRef(isDone)
   const prevCollapseKey = useRef('')
 
@@ -91,26 +92,29 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
   const surfaceItems = !resultMsg && displayCollapsed && !publicAssistantItemsInConversation
     ? progressSurfaceItems(timeline.stage, previewAssistantItems)
     : []
+  const visiblePublicSurfaceItems = displayCollapsed ? publicSurfaceItems : []
+  const visibleSurfaceItems = displayCollapsed ? surfaceItems : []
+  const hasVisibleSurfaceItems = visiblePublicSurfaceItems.length > 0 || visibleSurfaceItems.length > 0
   const previewHiddenCount = Math.max(0, publicAssistantItems.length - previewAssistantItems.length)
   const suppressProgressNarrative = (
     publicAssistantItemsInConversation
-    || surfaceItems.length > 0
+    || visibleSurfaceItems.length > 0
     || (!displayCollapsed && hasPublicAssistantItems)
   )
     && timeline.stage.key !== 'approval'
   const directPublicProcess = false
 
   useEffect(() => {
-    const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${forceProcessOpen ? 'locked' : 'free'}:${defaultProcessOpen ? 'process-open' : 'process-closed'}`
+    const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${debugOpenProcess ? 'debug-open' : 'debug-default'}:${forceProcessOpen ? 'locked' : 'free'}:${defaultProcessOpen ? 'process-open' : 'process-closed'}`
     if (prevCollapseKey.current === collapseKey) return
     prevCollapseKey.current = collapseKey
     prevDone.current = isDone
-    setCollapsed(expandAll || forceProcessOpen || defaultProcessOpen ? false : true)
-  }, [taskId, expandAll, forceProcessOpen, defaultProcessOpen, isDone])
+    setCollapsed(expandAll || debugOpenProcess || forceProcessOpen || defaultProcessOpen ? false : true)
+  }, [taskId, expandAll, debugOpenProcess, forceProcessOpen, defaultProcessOpen, isDone])
 
   // 任务从"运行中"变为"完成"时自动折叠（延迟一下让用户看到结果）
   useEffect(() => {
-    if (expandAll || forceProcessOpen) {
+    if (expandAll || debugOpenProcess || forceProcessOpen) {
       setCollapsed(false)
       prevDone.current = isDone
       return
@@ -121,7 +125,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
       return () => clearTimeout(t)
     }
     prevDone.current = isDone
-  }, [expandAll, forceProcessOpen, isDone])
+  }, [expandAll, debugOpenProcess, forceProcessOpen, isDone])
 
   useEffect(() => {
     if (!taskId || localStorage.getItem('elon_debug_task_timeline') !== '1') return
@@ -245,13 +249,13 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, onCancel
                   </button>
                 )}
               </div>
-              {publicSurfaceItems.length > 0 && (
-                <TaskProgressHighlights items={publicSurfaceItems} hiddenCount={0} />
+              {visiblePublicSurfaceItems.length > 0 && (
+                <TaskProgressHighlights items={visiblePublicSurfaceItems} hiddenCount={0} />
               )}
-              {surfaceItems.length > 0 && (
-                <TaskProgressHighlights items={surfaceItems} hiddenCount={previewHiddenCount} />
+              {visibleSurfaceItems.length > 0 && (
+                <TaskProgressHighlights items={visibleSurfaceItems} hiddenCount={previewHiddenCount} />
               )}
-              {renderProgressPanel(true, (publicSurfaceItems.length > 0 || surfaceItems.length > 0) ? 'afterNotes' : false)}
+              {renderProgressPanel(true, hasVisibleSurfaceItems ? 'afterNotes' : false)}
             </div>
           </div>
         ) : null
@@ -280,6 +284,7 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.user?.account === next.user?.account
   && prev.user?.avatar_data_url === next.user?.avatar_data_url
   && prev.expandAll === next.expandAll
+  && prev.debugOpenProcess === next.debugOpenProcess
   && prev.onCancel === next.onCancel
   && prev.onContinue === next.onContinue
   && prev.onApprove === next.onApprove

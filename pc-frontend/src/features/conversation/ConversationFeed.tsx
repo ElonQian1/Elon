@@ -22,6 +22,7 @@ interface ConversationFeedProps {
   onApproveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
   onForkMessage?: (message: Message, content: string) => void | Promise<void>
   debugExpandAll?: boolean
+  debugOpenProcess?: boolean
 }
 
 export default function ConversationFeed({
@@ -40,6 +41,7 @@ export default function ConversationFeed({
   onApproveTool,
   onForkMessage,
   debugExpandAll,
+  debugOpenProcess,
 }: ConversationFeedProps) {
   return (
     <div className={styles.messageList} ref={feedRef} onScroll={onScroll}>
@@ -67,6 +69,7 @@ export default function ConversationFeed({
               onContinue={onContinueTask}
               onApprove={onApproveTool}
               expandAll={debugExpandAll}
+              debugOpenProcess={debugOpenProcess}
             />
           </div>
         ) : (
