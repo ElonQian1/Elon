@@ -446,7 +446,7 @@ internal class MainInputActions(
             activeConversation = projectStateActions()::activeConversation,
             attachmentPanel = { inputComposerViewsOrNull()?.attachmentPanel },
             attachmentButton = { inputComposerViewsOrNull()?.attachmentButton },
-            collapseInputComposer = { inputFocusActions.collapseInputComposer() },
+            collapseInputComposer = { inputFocusActions.collapseInputComposer(animate = false) },
             collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },

@@ -58,6 +58,12 @@ const INPUT_EXPAND_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_expand_new.png");
 const INPUT_SEND_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_send_new.png");
+const INPUT_CAMERA_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_camera_new.png");
+const INPUT_PHOTO_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_photo_new.png");
+const INPUT_FILE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_file_new.png");
 const PROJECT_POST_COMPOSE_ICON_PNG: &[u8] = include_bytes!("assets/ic_project_post_compose.png");
 const PROJECT_PREVIEW_PLACEHOLDER_ICON_PNG: &[u8] =
     include_bytes!("assets/ic_project_preview_placeholder.png");
@@ -132,6 +138,9 @@ fn build_html() -> String {
     let input_chevron_png_b64 = encode_png(INPUT_CHEVRON_PNG);
     let input_expand_png_b64 = encode_png(INPUT_EXPAND_PNG);
     let input_send_png_b64 = encode_png(INPUT_SEND_PNG);
+    let input_camera_png_b64 = encode_png(INPUT_CAMERA_PNG);
+    let input_photo_png_b64 = encode_png(INPUT_PHOTO_PNG);
+    let input_file_png_b64 = encode_png(INPUT_FILE_PNG);
     WEB_HTML_TEMPLATE
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
         .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
@@ -190,6 +199,9 @@ fn build_html() -> String {
         .replace("__INPUT_CHEVRON_PNG_B64__", &input_chevron_png_b64)
         .replace("__INPUT_EXPAND_PNG_B64__", &input_expand_png_b64)
         .replace("__INPUT_SEND_PNG_B64__", &input_send_png_b64)
+        .replace("__INPUT_CAMERA_PNG_B64__", &input_camera_png_b64)
+        .replace("__INPUT_PHOTO_PNG_B64__", &input_photo_png_b64)
+        .replace("__INPUT_FILE_PNG_B64__", &input_file_png_b64)
 }
 
 fn encode_png(bytes: &[u8]) -> String {

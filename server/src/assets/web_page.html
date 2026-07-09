@@ -2921,6 +2921,13 @@
       border-radius: 32px;
       padding: 8px 10px 0;
     }
+    .input-bar.attachments-open .input-panel {
+      min-height: 156px;
+      background: var(--side-menu-bg);
+      border: 1px solid #3B3B3E;
+      border-radius: 32px;
+      padding: 8px 10px 0;
+    }
     .input-text-row {
       display: none;
       position: relative;
@@ -2930,6 +2937,9 @@
     .input-bar.has-text .input-text-row,
     .input-bar.input-focused .input-text-row {
       display: block;
+    }
+    .input-bar.attachments-open .input-text-row {
+      display: none;
     }
     .input-main-row {
       height: 48px;
@@ -3031,6 +3041,44 @@
     .input-bar.has-text .send-btn { display: block; }
     .input-bar.has-text .voice-btn { display: none; }
     .input-bar .send-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .input-attachment-panel {
+      display: none;
+      height: 108px;
+      align-items: center;
+      gap: 12px;
+      box-sizing: border-box;
+      padding: 4px 14px 16px 42px;
+    }
+    .input-bar.attachments-open .input-attachment-panel {
+      display: flex;
+    }
+    .input-attachment-action {
+      flex: 0 0 66px;
+      width: 66px;
+      height: 78px;
+      border: 1px solid #3B3B3E;
+      border-radius: 10px;
+      background: #111111;
+      color: var(--tab-icon);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0;
+      font-size: 14px;
+      line-height: 16px;
+      cursor: pointer;
+    }
+    .input-attachment-action img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      display: block;
+    }
+    .input-bar.attachments-open .image-edit-btn img {
+      transform: rotate(45deg);
+    }
 
     /* ===== Tab 栏 ===== */
     .tabs-bar {
@@ -4220,6 +4268,20 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <img src="data:image/png;base64,__INPUT_SEND_PNG_B64__" alt="" aria-hidden="true" />
         </button>
       </div>
+      <div class="input-attachment-panel" id="inputAttachmentPanel" aria-label="更多输入功能">
+        <button class="input-attachment-action" type="button" data-native-note="拍照上传请在 Android APK 中使用。网页版已同步入口样式。">
+          <img src="data:image/png;base64,__INPUT_CAMERA_PNG_B64__" alt="" aria-hidden="true" />
+          <span>拍照</span>
+        </button>
+        <button class="input-attachment-action" type="button" data-native-note="图片选择请在 Android APK 中使用。网页版已同步入口样式。">
+          <img src="data:image/png;base64,__INPUT_PHOTO_PNG_B64__" alt="" aria-hidden="true" />
+          <span>图片</span>
+        </button>
+        <button class="input-attachment-action" type="button" data-native-note="文件选择请在 Android APK 中使用。网页版已同步入口样式。">
+          <img src="data:image/png;base64,__INPUT_FILE_PNG_B64__" alt="" aria-hidden="true" />
+          <span>文件</span>
+        </button>
+      </div>
     </div>
   </form>
 
@@ -4796,6 +4858,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   const inputBar = $('inputBar');
   const imageEditBtn = $('imageEditBtn');
+  const inputAttachmentPanel = $('inputAttachmentPanel');
   const emojiBtn = $('emojiBtn');
   const messageInput = $('messageInput');
   const inputPlaceholder = $('inputPlaceholder');
@@ -4804,6 +4867,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const modelBtn = $('modelBtn');
   const planBtn = $('planBtn');
   const voiceBtn = $('voiceBtn');
+  const inputAttachmentActions = Array.from(document.querySelectorAll('.input-attachment-action'));
   const chatSideMenuHandle = $('chatSideMenuHandle');
   const webChatSideMenuMask = $('webChatSideMenuMask');
   const webChatSideMenuClose = $('webChatSideMenuClose');
@@ -7993,10 +8057,20 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     });
   }
 
+  function setInputAttachmentPanelOpen(open) {
+    if (!inputBar || !inputAttachmentPanel) return;
+    inputBar.classList.toggle('attachments-open', open);
+    if (open) {
+      messageInput.blur();
+      inputBar.classList.remove('input-focused');
+    }
+  }
+
   inputBar.addEventListener('submit', (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (!text || busy) return;
+    setInputAttachmentPanelOpen(false);
     if (currentFriend || currentGroup) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
@@ -8025,31 +8099,42 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   });
   if (imageEditBtn) {
     imageEditBtn.addEventListener('click', () => {
-      showNativeOnly('多图选择后会直接加入聊天输入栏；底部缩略图编辑入口，以及含取消/完成、同排收起按钮、拉起按钮、标注、横线、圆形/椭圆、方形/长方形圈选、马赛克的灰黑底部图片编辑工具栏请在 Android APK 中使用。网页版已同步入口位置。');
+      setInputAttachmentPanelOpen(!inputBar.classList.contains('attachments-open'));
     });
   }
+  inputAttachmentActions.forEach((button) => {
+    button.addEventListener('click', () => {
+      setInputAttachmentPanelOpen(false);
+      showNativeOnly(button.dataset.nativeNote || '附件上传请在 Android APK 中使用。网页版已同步入口样式。');
+    });
+  });
   if (planBtn) {
     planBtn.addEventListener('click', () => {
+      setInputAttachmentPanelOpen(false);
       showNativeOnly('先规划模式请在 Android APK 中使用。网页版已同步入口位置。');
     });
   }
   if (emojiBtn) {
     emojiBtn.addEventListener('click', () => {
+      setInputAttachmentPanelOpen(false);
       showNativeOnly('表情面板请在 Android APK 中使用。网页版已同步入口位置。');
     });
   }
   if (voiceBtn) {
     voiceBtn.addEventListener('click', () => {
+      setInputAttachmentPanelOpen(false);
       showNativeOnly('语音输入请在 Android APK 中使用。网页版已同步入口位置。');
     });
   }
   if (inputPlaceholder) {
     inputPlaceholder.addEventListener('click', () => {
+      setInputAttachmentPanelOpen(false);
       messageInput.focus();
     });
   }
   if (expandEditorBtn) {
     expandEditorBtn.addEventListener('click', () => {
+      setInputAttachmentPanelOpen(false);
       showNativeOnly('全屏编辑请在 Android APK 中使用。网页版已同步入口位置。');
     });
   }
@@ -8060,6 +8145,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
   });
   messageInput.addEventListener('focus', () => {
+    setInputAttachmentPanelOpen(false);
     inputBar.classList.add('input-focused');
   });
   messageInput.addEventListener('blur', () => {

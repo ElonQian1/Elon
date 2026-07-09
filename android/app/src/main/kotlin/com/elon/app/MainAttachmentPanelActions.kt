@@ -34,12 +34,12 @@ internal class MainAttachmentPanelActions(
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(88)
+                dp(108)
             )
             background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(46), 0, dp(16), dp(12))
+            setPadding(dp(42), dp(4), dp(14), dp(16))
             visibility = View.GONE
 
             addView(createAttachmentAction("拍照", R.drawable.ic_input_camera_new, addEndMargin = true) {
@@ -65,6 +65,7 @@ internal class MainAttachmentPanelActions(
         if (isOpen) return
         val panel = attachmentPanel() ?: return
         isOpen = true
+        applyAttachmentPanelBackground(expanded = true)
         panel.visibility = View.VISIBLE
         animateAttachmentButtonIcon(expanded = true)
     }
@@ -74,6 +75,7 @@ internal class MainAttachmentPanelActions(
         val wasOpen = isOpen || panel.visibility == View.VISIBLE
         isOpen = false
         panel.visibility = View.GONE
+        applyAttachmentPanelBackground(expanded = false)
         if (wasOpen) {
             animateAttachmentButtonIcon(expanded = false)
         } else {
@@ -88,13 +90,13 @@ internal class MainAttachmentPanelActions(
         action: () -> Unit
     ): View {
         return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(56), dp(62)).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(66), dp(78)).apply {
                 if (addEndMargin) marginEnd = dp(12)
             }
             background = GradientDrawable().apply {
-                cornerRadius = dp(8).toFloat()
+                cornerRadius = dp(10).toFloat()
                 setColor(Color.parseColor("#111111"))
-                setStroke(dp(1), Color.parseColor("#3A3A3A"))
+                setStroke(dp(1), Color.parseColor("#3B3B3E"))
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.VERTICAL
@@ -102,7 +104,7 @@ internal class MainAttachmentPanelActions(
             foreground = selectableForeground()
 
             addView(ImageView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(24), dp(24))
+                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
                 setImageResource(iconRes)
                 scaleType = ImageView.ScaleType.FIT_CENTER
             })
@@ -111,18 +113,25 @@ internal class MainAttachmentPanelActions(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(4)
+                    topMargin = dp(8)
                 }
                 includeFontPadding = false
                 text = label
                 setTextColor(Color.parseColor("#D6D6D6"))
-                textSize = 12f
+                textSize = 14f
             })
             setOnClickListener {
                 collapseAttachmentPanel()
                 action()
             }
         }
+    }
+
+    private fun applyAttachmentPanelBackground(expanded: Boolean) {
+        val panel = attachmentPanel() ?: return
+        (panel.parent as? View)?.setBackgroundResource(
+            if (expanded) R.drawable.bg_bottom_panel_expanded else R.drawable.bg_bottom_panel_new
+        )
     }
 
     private fun animateAttachmentButtonIcon(expanded: Boolean) {
