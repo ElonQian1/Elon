@@ -28,7 +28,7 @@ data class NodeData(
     val children: MutableList<NodeData>
 )
 
-class SocketServer(private val service: AccessibilityService) {
+class SocketServer(internal val service: AccessibilityService) {
     internal var serverSocket: ServerSocket? = null
     internal var isRunning = false
     internal val executor = Executors.newCachedThreadPool()
