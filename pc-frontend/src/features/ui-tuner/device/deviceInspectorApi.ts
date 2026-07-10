@@ -85,6 +85,26 @@ export interface AndroidInspectorStatus {
 
 const DEFAULT_PACKAGE = 'com.elon.app'
 
+function inspectorError(error: unknown, fallback: string): Error {
+  const raw = error instanceof Error ? error.message : String(error ?? '')
+  const message = raw.trim()
+  const lower = message.toLowerCase()
+  if (
+    lower.includes('failed to fetch')
+    || lower.includes('networkerror')
+    || lower.includes('load failed')
+    || lower.includes('abort')
+    || lower.includes('timeout')
+    || lower.includes('timed out')
+  ) {
+    return new Error(`${fallback}：本机节点没有响应，请先启动或更新 Windows PC 节点客户端`)
+  }
+  if (message.includes('HTTP 404')) {
+    return new Error(`${fallback}：本机节点版本过旧，请更新 Windows PC 节点客户端后重试`)
+  }
+  return new Error(message ? `${fallback}：${message}` : fallback)
+}
+
 export function inspectorAdminUrl(): string {
   return safeNodeAdminUrl()
 }
@@ -96,26 +116,34 @@ export async function probeAndroidInspector(): Promise<AndroidInspectorStatus> {
 }
 
 export async function listAndroidDevices(): Promise<AndroidInspectorDevice[]> {
-  const data = await nodeApi<{ devices?: AndroidInspectorDevice[] }>(
-    inspectorAdminUrl(),
-    '/api/android-inspector/devices',
-    {},
-    8000,
-  )
-  return data.devices ?? []
+  try {
+    const data = await nodeApi<{ devices?: AndroidInspectorDevice[] }>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/devices',
+      {},
+      8000,
+    )
+    return data.devices ?? []
+  } catch (error) {
+    throw inspectorError(error, '读取 ADB 设备失败')
+  }
 }
 
 export async function connectAndroidDevice(address: string): Promise<string> {
-  const data = await nodeApi<{ output?: string }>(
-    inspectorAdminUrl(),
-    '/api/android-inspector/connect',
-    {
-      method: 'POST',
-      body: JSON.stringify({ address: address.trim() }),
-    },
-    12000,
-  )
-  return data.output ?? ''
+  try {
+    const data = await nodeApi<{ output?: string }>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/connect',
+      {
+        method: 'POST',
+        body: JSON.stringify({ address: address.trim() }),
+      },
+      12000,
+    )
+    return data.output ?? ''
+  } catch (error) {
+    throw inspectorError(error, '无线 ADB 连接失败')
+  }
 }
 
 export async function captureAndroidSnapshot(input: {
@@ -124,20 +152,24 @@ export async function captureAndroidSnapshot(input: {
   launchApp?: boolean
   projectRoot?: string
 }): Promise<AndroidInspectorSnapshot> {
-  return nodeApi<AndroidInspectorSnapshot>(
-    inspectorAdminUrl(),
-    '/api/android-inspector/capture',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        deviceId: input.deviceId,
-        packageName: input.packageName?.trim() || DEFAULT_PACKAGE,
-        launchApp: input.launchApp ?? false,
-        includeRawXml: false,
-        includeScreenshotDataUrl: true,
-        projectRoot: input.projectRoot?.trim() || undefined,
-      }),
-    },
-    18000,
-  )
+  try {
+    return await nodeApi<AndroidInspectorSnapshot>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/capture',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          deviceId: input.deviceId,
+          packageName: input.packageName?.trim() || DEFAULT_PACKAGE,
+          launchApp: input.launchApp ?? false,
+          includeRawXml: false,
+          includeScreenshotDataUrl: true,
+          projectRoot: input.projectRoot?.trim() || undefined,
+        }),
+      },
+      18000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '真机捕获失败')
+  }
 }

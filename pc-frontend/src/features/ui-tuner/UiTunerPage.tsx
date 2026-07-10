@@ -74,6 +74,16 @@ function normalizeViewScale(value: number) {
   return Math.round(bounded * 100) / 100
 }
 
+function selectCaptureDevice(devices: AndroidInspectorDevice[], preferredId: string) {
+  const preferred = devices.find((device) => device.serial === preferredId)
+  if (preferred?.state === 'device') return preferred
+  return devices.find((device) => device.state === 'device') ?? preferred ?? devices[0] ?? null
+}
+
+function deviceDisplayName(device: AndroidInspectorDevice) {
+  return device.model ?? device.serial
+}
+
 export default function UiTunerPage() {
   const [tunerDoc, setTunerDoc] = useState<UiTunerDocument>(() => (
     loadUiTunerDocument(APK_STYLE_SOURCE_SIGNATURE) ?? createInitialTunerDocument()
@@ -349,7 +359,7 @@ export default function UiTunerPage() {
     setNotice('已保存到本机草稿')
   }
 
-  const refreshDevices = async () => {
+  const refreshDevices = async (): Promise<AndroidInspectorDevice[]> => {
     setDeviceBusy(true)
     try {
       const nextDevices = await listAndroidDevices()
@@ -360,21 +370,34 @@ export default function UiTunerPage() {
           : nextDevices.find((device) => device.state === 'device')?.serial ?? nextDevices[0]?.serial ?? ''
       ))
       setNotice(nextDevices.length ? `已发现 ${nextDevices.length} 台 ADB 设备` : '未发现可用 ADB 设备')
+      return nextDevices
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '读取 ADB 设备失败')
+      return []
     } finally {
       setDeviceBusy(false)
     }
   }
 
   const captureDeviceSnapshot = async () => {
-    const deviceId = selectedDeviceId || devices[0]?.serial || ''
-    if (!deviceId) {
-      await refreshDevices()
-      return
-    }
     setCaptureBusy(true)
     try {
+      let targetDevice = selectCaptureDevice(devices, selectedDeviceId)
+      if (!targetDevice || targetDevice.state !== 'device') {
+        setNotice('正在检测 ADB 设备并准备捕获')
+        const nextDevices = await refreshDevices()
+        targetDevice = selectCaptureDevice(nextDevices, selectedDeviceId)
+      }
+      if (!targetDevice) {
+        setNotice('未发现可用 ADB 设备，请先连接手机并确认 USB 调试授权')
+        return
+      }
+      setSelectedDeviceId(targetDevice.serial)
+      if (targetDevice.state !== 'device') {
+        setNotice(`ADB 设备未就绪：${deviceDisplayName(targetDevice)} · ${targetDevice.state}`)
+        return
+      }
+      const deviceId = targetDevice.serial
       const snapshot = await captureAndroidSnapshot({ deviceId, packageName: 'com.elon.app' })
       const next = snapshotToTunerDocument(snapshot)
       commitDocument(() => next, next.elements[0]?.id ?? null)
