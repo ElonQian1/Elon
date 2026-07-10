@@ -41,7 +41,7 @@ internal class HomeChromeController(
         binding.pageTabs.visibility = android.view.View.GONE
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.VISIBLE
-        projectCreateFab.showProjectPlazaEntry()
+        projectCreateFab.hide()
     }
 
     fun showProjectPlazaEntry() {
@@ -49,7 +49,7 @@ internal class HomeChromeController(
         binding.pageTabs.visibility = android.view.View.GONE
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.GONE
-        projectCreateFab.showHomeEntry()
+        projectCreateFab.hide()
     }
 
     fun showMenuOnly() {
