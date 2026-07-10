@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
@@ -29,7 +28,6 @@ import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
 import {
   DEFAULT_UI_TUNER_FILTER,
   filterUiTunerElements,
-  type UiTunerElementAnalysis,
   type UiTunerFilterState,
 } from './filtering'
 import { buildStandardInsight, stringifyStandardPackage } from './standards'
@@ -38,6 +36,7 @@ import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { useLiveUiSession } from './live/useLiveUiSession'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
+import { UiTunerCanvasSurface } from './UiTunerCanvasSurface'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { mergeProjectRecords } from '../conversation/conversationPageHelpers'
 import { clean } from '../../lib/utils'
@@ -607,65 +606,6 @@ export default function UiTunerPage() {
     }
   }
 
-  const renderElement = (element: UiTunerElement, analysis: UiTunerElementAnalysis) => {
-    const selectedClass = element.id === selectedId ? styles.selectedElement : ''
-    const appearanceClass = analysis.appearance === 'ghost'
-      ? styles.ghostElement
-      : analysis.appearance === 'outline'
-        ? styles.outlineElement
-        : ''
-    const lockedClass = analysis.isLocked ? styles.lockedElement : ''
-    const elementStyle: CSSProperties = {
-      left: element.x,
-      top: element.y,
-      width: element.width,
-      height: element.height,
-      padding: `${element.paddingY}px ${element.paddingX}px`,
-      borderRadius: element.borderRadius,
-      borderWidth: element.borderWidth,
-      borderColor: element.borderColor,
-      color: element.color,
-      background: element.background,
-      opacity: element.opacity,
-      fontSize: element.fontSize,
-      lineHeight: `${element.lineHeight}px`,
-      fontWeight: element.fontWeight,
-      letterSpacing: element.letterSpacing,
-    }
-
-    return (
-      <button
-        key={element.id}
-        type="button"
-        className={[
-          styles.canvasElement,
-          selectedClass,
-          appearanceClass,
-          lockedClass,
-          styles[`kind_${element.kind}`],
-        ].join(' ')}
-        style={elementStyle}
-        onPointerDown={(event) => {
-          if (analysis.isLocked) {
-            event.stopPropagation()
-            setSelectedId(element.id)
-            return
-          }
-          startDrag(event, element, 'move')
-        }}
-      >
-        <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>
-        {element.id === selectedId && !analysis.isLocked && (
-          <span
-            className={styles.resizeHandle}
-            aria-hidden="true"
-            onPointerDown={(event) => startDrag(event, element, 'resize')}
-          />
-        )}
-      </button>
-    )
-  }
-
   return (
     <div className={styles.page}>
       <UiTunerLayersPanel
@@ -718,55 +658,18 @@ export default function UiTunerPage() {
           onReset={resetDocument}
         />
 
-        <div className={styles.canvasScroller} ref={canvasScrollerRef}>
-          <div
-            className={styles.canvasViewport}
-            style={{
-              width: tunerDoc.canvas.width * viewScale,
-              height: tunerDoc.canvas.height * viewScale,
-            }}
-          >
-          <div
-            className={styles.canvas}
-            style={{
-              width: tunerDoc.canvas.width,
-              height: tunerDoc.canvas.height,
-              background: tunerDoc.canvas.background,
-              transform: `scale(${viewScale})`,
-            }}
-            tabIndex={0}
-            onKeyDown={handleCanvasKeyDown}
-            onPointerDown={(event) => {
-              if (event.target === event.currentTarget) setSelectedId(null)
-            }}
-          >
-            <div className={styles.canvasGrid} aria-hidden="true" />
-            {liveUi.liveFrame ? (
-              <img
-                className={styles.referenceImage}
-                src={liveUi.liveFrame.dataUrl}
-                alt="真机实时画面"
-              />
-            ) : tunerDoc.canvas.referenceImage?.visible && (
-              <img
-                className={styles.referenceImage}
-                src={tunerDoc.canvas.referenceImage.dataUrl}
-                alt=""
-                style={{ opacity: tunerDoc.canvas.referenceImage.opacity }}
-              />
-            )}
-            {tunerDoc.canvas.targetDesign?.visible && (
-              <img
-                className={styles.targetDesignImage}
-                src={tunerDoc.canvas.targetDesign.dataUrl}
-                alt="目标设计图"
-                style={{ opacity: tunerDoc.canvas.targetDesign.opacity }}
-              />
-            )}
-            {filterResult.visible.map(({ element, analysis }) => renderElement(element, analysis))}
-          </div>
-          </div>
-        </div>
+        <UiTunerCanvasSurface
+          canvas={tunerDoc.canvas}
+          filterResult={filterResult}
+          liveFrame={liveUi.liveFrame}
+          scrollerRef={canvasScrollerRef}
+          selectedId={selectedId}
+          viewScale={viewScale}
+          onCanvasKeyDown={handleCanvasKeyDown}
+          onClearSelection={() => setSelectedId(null)}
+          onElementPointerDown={startDrag}
+          onSelectElement={setSelectedId}
+        />
       </section>
 
       <UiTunerInspector
