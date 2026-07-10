@@ -19,6 +19,7 @@ internal class HomeChromeController(
     private val actionPopupProvider: () -> PopupWindow?,
     private val dp: (Int) -> Int,
     private val setNavigationBarColor: (Int) -> Unit,
+    private val setBottomMenuVisible: (Boolean) -> Unit,
     private val showFriendsHome: () -> Unit,
     private val showProjectHome: () -> Unit,
     private val showProjectPlaza: () -> Unit,
@@ -38,7 +39,7 @@ internal class HomeChromeController(
 
     fun showHome() {
         setNavigationBarColor(R.color.elon_bg_app)
-        binding.pageTabs.visibility = android.view.View.GONE
+        setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.VISIBLE
         projectCreateFab.hide()
@@ -46,7 +47,7 @@ internal class HomeChromeController(
 
     fun showProjectPlazaEntry() {
         setNavigationBarColor(R.color.elon_bg_app)
-        binding.pageTabs.visibility = android.view.View.GONE
+        setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.GONE
         projectCreateFab.hide()
@@ -54,7 +55,7 @@ internal class HomeChromeController(
 
     fun showMenuOnly() {
         setNavigationBarColor(R.color.elon_bg_app)
-        binding.pageTabs.visibility = android.view.View.GONE
+        setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.VISIBLE
         projectCreateFab.hide()

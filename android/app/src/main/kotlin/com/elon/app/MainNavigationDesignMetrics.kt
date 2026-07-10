@@ -95,6 +95,6 @@ internal class MainNavigationDesignMetrics(
         const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
         const val PROJECT_TOP_INDICATOR_BOTTOM_PX = 18
         const val PROJECT_ADD_BUTTON_SIZE_PX = 156
-        const val PROJECT_ADD_BUTTON_PADDING_PX = 28
+        const val PROJECT_ADD_BUTTON_PADDING_PX = 16
     }
 }

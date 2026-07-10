@@ -74,6 +74,7 @@ internal class MainNavigationController(
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
     private val homeChrome = HomeChromeController(
         activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor,
+        ::setMainBottomMenuVisible,
         { showConversationHome(animate = false) },
         { showProjectHome(animate = false) }, { showProjectPlaza() },
         { selectBottomTab(binding.tabProfile, animate = false) }
@@ -85,6 +86,13 @@ internal class MainNavigationController(
         binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
         binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
         binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
+        binding.bottomNewProjectButton.setOnClickListener { showCreateProjectDialog() }
+        binding.bottomSearchButton.setOnClickListener {
+            if (!binding.tabChat.isSelected) {
+                selectBottomTab(binding.tabChat, animate = false)
+            }
+            showFriendLocalSearch()
+        }
         binding.projectHomeTopTabWrap.setOnClickListener { showProjectHome() }
         binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.conversationItem.setOnClickListener { openConversation(0) }
@@ -121,16 +129,34 @@ internal class MainNavigationController(
 
     private fun showMainTabs() {
         setNavigationBarColor(R.color.elon_bg_app)
-        binding.pageTabs.visibility = View.VISIBLE
+        setMainBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
     }
 
     private fun hideBottomMenus() {
         setNavigationBarColor(R.color.elon_bg_app)
-        binding.pageTabs.visibility = View.GONE
+        setMainBottomMenuVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
+    }
+
+    private fun setMainBottomMenuVisible(visible: Boolean) {
+        binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
+        val inset = if (visible) {
+            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
+        } else {
+            0
+        }
+        listOfNotNull(
+            binding.conversationPage.parent as? android.widget.ScrollView,
+            binding.projectScrollView,
+            binding.profilePage,
+            binding.marketplacePage
+        ).forEach { view ->
+            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, inset)
+            view.clipToPadding = false
+        }
     }
 
     private fun showProjectTopTabs(plazaSelected: Boolean) {
@@ -180,7 +206,7 @@ internal class MainNavigationController(
 
     private fun showProjectSpaceBottomMenu() {
         setNavigationBarColor(R.color.elon_store_detail_bg)
-        binding.pageTabs.visibility = View.GONE
+        setMainBottomMenuVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
     }
@@ -251,7 +277,7 @@ internal class MainNavigationController(
         binding.inputLayout.visibility = View.GONE
         if (tab == binding.tabChat) homeChrome.showHome() else if (tab == binding.tabProfile) homeChrome.showMenuOnly() else showMainTabs()
         binding.backButton.visibility = View.GONE
-        binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+        binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
@@ -856,7 +882,7 @@ internal class MainNavigationController(
         homeChrome.showHome()
         hideProjectTopTabs()
         binding.backButton.visibility = View.GONE
-        binding.searchButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()

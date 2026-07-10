@@ -24,8 +24,8 @@ const HOME_MENU_ICON_PNG_B64: &str = include_str!("assets/ic_home_menu_custom.b6
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
 const TOP_SEARCH_ICON_PNG_B64: &str = include_str!("assets/ic_top_search_custom.b64");
-const TOP_ADD_RING_ICON_PNG_B64: &str = include_str!("assets/ic_top_add_ring_custom.b64");
-const TOP_ADD_PLUS_ICON_PNG_B64: &str = include_str!("assets/ic_top_add_plus_custom.b64");
+const TOP_ADD_BUTTON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_top_add_button_new.png");
 const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] = include_bytes!(
     "../../android/app/src/main/res/drawable-xxxhdpi/ic_side_menu_folder_closed.png"
 );
@@ -38,14 +38,20 @@ const PROJECT_SPACE_POST_COMMENT_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_comment.png");
 const PROJECT_SPACE_POST_LIKE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_like.png");
-const CHAT_SIDE_MENU_REFRESH_RING_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_ring.png");
-const CHAT_SIDE_MENU_REFRESH_DOT_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_dot.png");
+const CHAT_SIDE_MENU_REFRESH_RING_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_ring.png"
+);
+const CHAT_SIDE_MENU_REFRESH_DOT_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/ic_chat_side_menu_refresh_dot.png"
+);
 const BOTTOM_PANEL_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_panel_new.png");
 const BOTTOM_MODE_PILL_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_mode_pill_new.png");
+const HOME_BOTTOM_NAV_PANEL_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_home_bottom_nav_panel.png");
+const HOME_BOTTOM_SEARCH_PILL_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_home_bottom_search_pill.png");
 const INPUT_ADD_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_add_new.png");
 const INPUT_VOICE_WAVE_PNG: &[u8] =
@@ -132,6 +138,9 @@ fn build_html() -> String {
     );
     let bottom_panel_png_b64 = encode_png(BOTTOM_PANEL_PNG);
     let bottom_mode_pill_png_b64 = encode_png(BOTTOM_MODE_PILL_PNG);
+    let top_add_button_png_b64 = encode_png(TOP_ADD_BUTTON_PNG);
+    let home_bottom_nav_panel_png_b64 = encode_png(HOME_BOTTOM_NAV_PANEL_PNG);
+    let home_bottom_search_pill_png_b64 = encode_png(HOME_BOTTOM_SEARCH_PILL_PNG);
     let input_add_png_b64 = encode_png(INPUT_ADD_PNG);
     let input_voice_wave_png_b64 = encode_png(INPUT_VOICE_WAVE_PNG);
     let input_emoji_png_b64 = encode_png(INPUT_EMOJI_PNG);
@@ -167,14 +176,7 @@ fn build_html() -> String {
             "__TOP_SEARCH_ICON_PNG_B64__",
             TOP_SEARCH_ICON_PNG_B64.trim(),
         )
-        .replace(
-            "__TOP_ADD_RING_ICON_PNG_B64__",
-            TOP_ADD_RING_ICON_PNG_B64.trim(),
-        )
-        .replace(
-            "__TOP_ADD_PLUS_ICON_PNG_B64__",
-            TOP_ADD_PLUS_ICON_PNG_B64.trim(),
-        )
+        .replace("__TOP_ADD_BUTTON_PNG_B64__", &top_add_button_png_b64)
         .replace(
             "__POPUP_NEW_PROJECT_PNG_B64__",
             POPUP_NEW_PROJECT_PNG_B64.trim(),
@@ -193,6 +195,14 @@ fn build_html() -> String {
         )
         .replace("__BOTTOM_PANEL_PNG_B64__", &bottom_panel_png_b64)
         .replace("__BOTTOM_MODE_PILL_PNG_B64__", &bottom_mode_pill_png_b64)
+        .replace(
+            "__HOME_BOTTOM_NAV_PANEL_PNG_B64__",
+            &home_bottom_nav_panel_png_b64,
+        )
+        .replace(
+            "__HOME_BOTTOM_SEARCH_PILL_PNG_B64__",
+            &home_bottom_search_pill_png_b64,
+        )
         .replace("__INPUT_ADD_PNG_B64__", &input_add_png_b64)
         .replace("__INPUT_VOICE_WAVE_PNG_B64__", &input_voice_wave_png_b64)
         .replace("__INPUT_EMOJI_PNG_B64__", &input_emoji_png_b64)

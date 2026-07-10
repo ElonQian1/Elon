@@ -75,7 +75,7 @@
       --bubble-error-ink: #c62828;
       --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
-      --bottom-menu-height: 90px;
+      --bottom-menu-height: 154px;
     }
     * { box-sizing: border-box; }
     * {
@@ -242,33 +242,21 @@
     }
     #moreBtn.project-members-mode .more-chat-icon { display: none; }
     #moreBtn.project-members-mode .toolbar-members-icon { display: block; }
-    #addBtn .add-btn-project-icon { display: none; }
-    #addBtn .add-btn-icon-stack {
+    #addBtn .add-btn-complete {
       display: block;
-      width: 100%;
-      height: 100%;
-      position: relative;
-      line-height: 0;
-    }
-    #addBtn .add-btn-ring,
-    #addBtn .add-btn-plus-mark {
-      position: absolute;
-      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: contain;
       pointer-events: none;
-    }
-    #addBtn .add-btn-plus-mark {
       transform-origin: center;
       transition: transform 160ms ease;
     }
-    #addBtn.add-plus-expanded .add-btn-plus-mark { transform: rotate(45deg); }
+    #addBtn.add-plus-expanded .add-btn-complete { transform: rotate(45deg); }
     #addBtn {
       width: 44px;
       height: 44px;
       margin-right: 12px;
-      padding: 8px;
+      padding: 4px;
       border-radius: 999px;
       background: transparent;
       border: 0;
@@ -3089,26 +3077,85 @@
       position: relative;
       background: var(--system-nav-bg);
       display: flex;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 5px;
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
-      padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
+      padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
     }
-    .tabs-bar::before {
+    .bottom-menu-actions {
+      width: 100%;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: none;
+    }
+    .bottom-action-button {
+      position: relative;
+      height: 48px;
+      border: 0;
+      background: transparent;
+      color: var(--tab-icon);
+      padding: 0;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .bottom-action-button::before {
       content: "";
       position: absolute;
-      left: 20px;
-      right: 20px;
-      top: 8px;
-      height: 62px;
-      background: url("data:image/png;base64,__BOTTOM_PANEL_PNG_B64__") center / 100% 100% no-repeat;
-      border-radius: 999px;
+      left: 0;
+      right: 0;
+      top: 6px;
+      height: 36px;
+      background-position: center;
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
       pointer-events: none;
+    }
+    .bottom-new-project {
+      width: 72px;
+      flex: none;
+      font-size: 14px;
+    }
+    .bottom-new-project::before {
+      background-image: url("data:image/png;base64,__BOTTOM_MODE_PILL_PNG_B64__");
+    }
+    .bottom-new-project span {
+      position: relative;
+      z-index: 1;
+    }
+    .bottom-search {
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+    }
+    .bottom-search::before {
+      background-image: url("data:image/png;base64,__HOME_BOTTOM_SEARCH_PILL_PNG_B64__");
+    }
+    .bottom-search img {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 24px;
+      height: 24px;
+      margin-left: 18px;
+      object-fit: contain;
+    }
+    .tabs-panel {
+      width: 100%;
+      height: 83px;
+      display: flex;
+      align-items: stretch;
+      flex: none;
+      background: url("data:image/png;base64,__HOME_BOTTOM_NAV_PANEL_PNG_B64__") center / 100% 100% no-repeat;
+      overflow: hidden;
     }
     .tab {
       flex: 1;
       position: relative;
       z-index: 1;
-      height: 62px;
+      height: 83px;
       background: transparent;
       border: 0;
       color: var(--tab-icon);
@@ -3738,14 +3785,11 @@
     <button class="icon-btn" id="voiceCallBtn" title="实时语音" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.61a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.47-1.17a2 2 0 0 1 2.11-.45c.84.29 1.71.5 2.61.62A2 2 0 0 1 22 16.92z"/></svg>
     </button>
-    <button class="icon-btn" id="searchBtn" title="搜索">
+    <button class="icon-btn" id="searchBtn" title="搜索" style="display:none">
       <img src="data:image/png;base64,__TOP_SEARCH_ICON_PNG_B64__" alt="" aria-hidden="true" />
     </button>
     <button class="icon-btn" id="addBtn" title="新建项目">
-      <span class="add-btn-icon-stack" aria-hidden="true">
-        <img class="add-btn-ring" src="data:image/png;base64,__TOP_ADD_RING_ICON_PNG_B64__" alt="" />
-        <img class="add-btn-plus-mark" src="data:image/png;base64,__TOP_ADD_PLUS_ICON_PNG_B64__" alt="" />
-      </span>
+      <img class="add-btn-complete" src="data:image/png;base64,__TOP_ADD_BUTTON_PNG_B64__" alt="" aria-hidden="true" />
       <img class="add-btn-project-icon" src="data:image/png;base64,__POPUP_NEW_PROJECT_PNG_B64__" alt="" aria-hidden="true" />
     </button>
     <button class="icon-btn" id="moreBtn" title="聊天设置" style="display:none">
@@ -4285,19 +4329,29 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </form>
 
   <nav class="tabs-bar">
-    <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="好友" style="position:relative">
-      <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
-      <span>好友</span>
-        <span id="tabChatBadge" style="display:none;position:absolute;top:4px;right:calc(50% - 26px);background:#F04B4F;color:#fff;font-size:12px;font-weight:700;min-width:22px;height:22px;border-radius:11px;line-height:22px;text-align:center;padding:0 6px;box-sizing:border-box;"></span>
-    </button>
-    <button class="tab" data-tab="projectPage" data-title="项目">
-      <span class="ic"><img src="data:image/png;base64,__TAB_PROJECT_PNG_B64__" alt="" /></span>
-      <span>项目</span>
-    </button>
-    <button class="tab" data-tab="profilePage" data-title="我的">
-      <span class="ic"><img src="data:image/png;base64,__TAB_PROFILE_PNG_B64__" alt="" /></span>
-      <span>我的</span>
-    </button>
+    <div class="bottom-menu-actions">
+      <button class="bottom-action-button bottom-new-project" id="bottomNewProjectBtn" type="button">
+        <span>新项目</span>
+      </button>
+      <button class="bottom-action-button bottom-search" id="bottomSearchBtn" type="button" title="搜索好友、项目或消息" aria-label="搜索好友、项目或消息">
+        <img src="data:image/png;base64,__TOP_SEARCH_ICON_PNG_B64__" alt="" aria-hidden="true" />
+      </button>
+    </div>
+    <div class="tabs-panel">
+      <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="好友" style="position:relative">
+        <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
+        <span>好友</span>
+        <span id="tabChatBadge" style="display:none;position:absolute;top:10px;right:calc(50% - 26px);background:#F04B4F;color:#fff;font-size:12px;font-weight:700;min-width:22px;height:22px;border-radius:11px;line-height:22px;text-align:center;padding:0 6px;box-sizing:border-box;"></span>
+      </button>
+      <button class="tab" data-tab="projectPage" data-title="项目">
+        <span class="ic"><img src="data:image/png;base64,__TAB_PROJECT_PNG_B64__" alt="" /></span>
+        <span>项目</span>
+      </button>
+      <button class="tab" data-tab="profilePage" data-title="我的">
+        <span class="ic"><img src="data:image/png;base64,__TAB_PROFILE_PNG_B64__" alt="" /></span>
+        <span>我的</span>
+      </button>
+    </div>
   </nav>
   <nav class="project-space-ai-menu hidden" id="projectSpaceAiMenu">
     <button type="button" id="projectSpaceAiMenuBtn" title="发布帖子">
@@ -4595,6 +4649,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const moreBtn = $('moreBtn');
   const searchBtn = $('searchBtn');
   const tabsBar = document.querySelector('.tabs-bar');
+  const tabChatBtn = $('tabChatBtn');
+  const bottomNewProjectBtn = $('bottomNewProjectBtn');
+  const bottomSearchBtn = $('bottomSearchBtn');
   const projectSpaceAiMenu = $('projectSpaceAiMenu');
   const projectSpaceAiMenuBtn = $('projectSpaceAiMenuBtn');
   const homeProjectCreateMenu = $('homeProjectCreateMenu');
@@ -5962,7 +6019,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !inGroupChat);
-    if (tabsBar) tabsBar.classList.toggle('hidden', inChat || isChatHome || inProjectHome || isProfileHome);
+    if (tabsBar) tabsBar.classList.toggle('hidden', inChat);
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     setHomeChromeVisible(isChatHome || inProjectHome || isProfileHome, {
       mode: inProjectHome ? 'home' : 'project',
@@ -5980,7 +6037,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const addAsProject = inProjectHome;
     addBtn.style.display = (addAsFriend || addAsProject) ? '' : 'none';
     setAddButtonMode(addAsProject ? 'project' : 'friend');
-    searchBtn.style.display = (tabId === 'chatPage' && !inChat) ? '' : 'none';
+    searchBtn.style.display = 'none';
     updateSendButtonState();
     // 下载页：切入"我的"时刷新版本信息
     if (tabId === 'profilePage') {
@@ -6030,8 +6087,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     moreBtn.style.display = 'none';
     addBtn.style.display = '';
     setAddButtonMode('friend');
-    searchBtn.style.display = '';
-    if (tabsBar) tabsBar.classList.add('hidden');
+    searchBtn.style.display = 'none';
+    if (tabsBar) tabsBar.classList.remove('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     setHomeChromeVisible(true);
     stageHint.classList.add('hidden');
@@ -6558,8 +6615,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     moreBtn.style.display = 'none';
     addBtn.style.display = '';
     setAddButtonMode('friend');
-    searchBtn.style.display = '';
-    if (tabsBar) tabsBar.classList.add('hidden');
+    searchBtn.style.display = 'none';
+    if (tabsBar) tabsBar.classList.remove('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     setHomeChromeVisible(true);
     stageHint.classList.add('hidden');
@@ -9016,6 +9073,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function closeAddFriendDialog() {
     addFriendMask.classList.remove('active');
     setTopAddButtonExpanded(false);
+  }
+  if (bottomNewProjectBtn) {
+    bottomNewProjectBtn.addEventListener('click', () => openNewProject(false));
+  }
+  if (bottomSearchBtn) {
+    bottomSearchBtn.addEventListener('click', () => {
+      if (currentTab !== 'chatPage' || isAnyChatActive()) {
+        if (tabChatBtn) tabChatBtn.click();
+      }
+      if (searchBar.classList.contains('hidden')) {
+        searchBtn.click();
+      } else {
+        searchInput.focus();
+      }
+    });
   }
   addBtn.addEventListener('click', () => {
     if (currentTab === 'chatPage' && !isAnyChatActive()) {
