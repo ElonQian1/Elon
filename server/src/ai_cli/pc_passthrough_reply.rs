@@ -234,6 +234,9 @@ fn is_useful_codex_reply(reply: &str) -> bool {
     let lower = trimmed.to_ascii_lowercase();
     !lower.contains("codex cli 执行完成，但没有返回可解析输出")
         && !lower.contains("codex cli 执行完成，但输出里没有可解析的 codex 回复段")
+        && !trimmed.contains("已发现本机 Codex session 失效")
+        && !trimmed.contains("正在清理旧 session 并自动重新开始本轮任务")
+        && !(trimmed.contains("已自动切换") && trimmed.contains("正在重试本轮任务"))
 }
 
 pub(crate) fn extract_marker_lightweight_reply(output: &str) -> String {

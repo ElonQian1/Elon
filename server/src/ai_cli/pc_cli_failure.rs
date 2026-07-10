@@ -107,11 +107,23 @@ pub(super) fn pc_codex_error_output_can_complete(
 
 fn pc_codex_failure_requires_error(error: Option<&str>, output: &str) -> bool {
     let combined = format!("{} {}", error.unwrap_or_default(), output);
+    let lower = combined.to_ascii_lowercase();
+    let terminal_auth_failure = [
+        "refresh_token_invalidated",
+        "refresh token was revoked",
+        "session has ended. please log in again",
+        "access token could not be refreshed",
+        "authentication token has been invalidated",
+        "token_invalidated",
+    ]
+    .iter()
+    .any(|signature| lower.contains(signature));
     let classified = crate::errors::classify_ai_error(&combined);
-    matches!(
-        classified.category,
-        crate::errors::AiErrorCategory::Quota | crate::errors::AiErrorCategory::AuthConfig
-    )
+    terminal_auth_failure
+        || matches!(
+            classified.category,
+            crate::errors::AiErrorCategory::Quota | crate::errors::AiErrorCategory::AuthConfig
+        )
 }
 
 pub(super) fn pc_cli_terminal_error_message(
@@ -175,6 +187,33 @@ mod tests {
         assert!(diagnostic.contains("auth.json 无法刷新"));
         assert!(message.contains("PC CLI 执行失败"));
         assert!(message.contains("auth.json 无法刷新"));
+    }
+
+    #[test]
+    fn pc_codex_revoked_refresh_token_cannot_be_treated_as_successful_output() {
+        let output = concat!(
+            "Failed to refresh token: 401 Unauthorized\n",
+            "Your session has ended. Please log in again.\n",
+            "refresh_token_invalidated\n",
+            r#"{"type":"turn.failed","error":{"message":"Your refresh token was revoked."}}"#,
+        );
+
+        assert!(pc_codex_failure_requires_error(
+            Some("codex CLI exited with status 1"),
+            output,
+        ));
+    }
+
+    #[test]
+    fn pc_codex_retry_notice_is_not_a_final_reply() {
+        let output = concat!(
+            "codex\n",
+            "已发现本机 Codex session 失效，正在清理旧 session 并自动重新开始本轮任务。\n",
+        );
+
+        let readable = pc_cli_readable_output(true, false, true, output);
+        assert!(!readable.has_success_output);
+        assert!(readable.codex_final_reply.is_empty());
     }
 
     #[test]
