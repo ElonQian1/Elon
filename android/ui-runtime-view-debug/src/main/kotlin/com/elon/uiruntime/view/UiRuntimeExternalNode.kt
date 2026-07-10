@@ -74,4 +74,9 @@ object UiRuntimeBridge {
     fun remove(runtimeNodeId: String) {
         if (runtimeNodeId.isNotBlank()) UiRuntimeController.removeExternalNode(runtimeNodeId)
     }
+
+    /** Clear renderer-owned nodes before a Preview Host switches to another screen. */
+    fun clear() {
+        UiRuntimeController.clearExternalNodes()
+    }
 }

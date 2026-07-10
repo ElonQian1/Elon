@@ -1,6 +1,5 @@
 package com.elon.uiruntime.view
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -9,9 +8,10 @@ import android.os.Bundle
 import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.ComponentActivity
 import java.util.Locale
 
-class UiRuntimePreviewHostActivity : Activity() {
+class UiRuntimePreviewHostActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         render(intent)
@@ -24,6 +24,9 @@ class UiRuntimePreviewHostActivity : Activity() {
     }
 
     private fun render(intent: Intent) {
+        // onNewIntent reuses this Activity, so renderer-owned nodes from the previous
+        // Compose/View scenario must not remain addressable while content is replaced.
+        UiRuntimeBridge.clear()
         val request = request(intent)
         val configuredContext = configuredContext(request)
         val scenario = UiRuntimePreviewRegistry.find(request.screenId)

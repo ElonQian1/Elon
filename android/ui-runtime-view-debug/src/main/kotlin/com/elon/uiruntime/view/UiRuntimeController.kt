@@ -59,6 +59,10 @@ internal object UiRuntimeController {
         mainHandler.post { registry?.removeExternalNode(runtimeNodeId) }
     }
 
+    fun clearExternalNodes() {
+        mainHandler.post { registry?.clearExternalNodes() }
+    }
+
     private fun handleMessage(text: String) {
         val root = runCatching { gson.fromJson(text, JsonObject::class.java) }
             .getOrElse {

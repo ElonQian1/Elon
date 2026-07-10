@@ -179,8 +179,24 @@ impl LiveUiBroker {
             }
         }
         writer.abort();
-        *session.runtime_tx.write().await = None;
-        session.state.write().await.connected = false;
+        // A replacement Runtime connection may have been installed while this older
+        // socket was winding down. Only clear the sender/state when this connection
+        // still owns the session; otherwise the stale task would disconnect the new one.
+        let cleared_current_connection = {
+            let mut runtime_tx = session.runtime_tx.write().await;
+            if runtime_tx
+                .as_ref()
+                .is_some_and(|current| current.same_channel(&tx))
+            {
+                *runtime_tx = None;
+                true
+            } else {
+                false
+            }
+        };
+        if cleared_current_connection {
+            session.state.write().await.connected = false;
+        }
         Ok(())
     }
 

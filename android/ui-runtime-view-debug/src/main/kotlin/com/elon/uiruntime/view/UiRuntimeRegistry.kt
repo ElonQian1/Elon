@@ -101,6 +101,13 @@ internal class UiRuntimeRegistry(
         if (externalNodes.remove(runtimeNodeId) != null) onActivityChanged()
     }
 
+    fun clearExternalNodes() {
+        if (externalNodes.isNotEmpty()) {
+            externalNodes.clear()
+            onActivityChanged()
+        }
+    }
+
     private fun visit(
         view: View,
         parentRuntimeId: String?,

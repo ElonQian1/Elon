@@ -78,6 +78,9 @@ private fun ComposeRuntimeGallery(request: UiRuntimePreviewRequest) {
         Box(
             modifier = Modifier
                 .width(style.width ?: 280.dp)
+                // Bind geometry at the component boundary. Placing uiNode after the
+                // inner padding would report content width instead of card width.
+                .uiNode(node)
                 .alpha(style.opacity ?: 1f)
                 .background(
                     color = style.backgroundColor ?: Color(0xFF5D3FD3),
@@ -88,8 +91,7 @@ private fun ComposeRuntimeGallery(request: UiRuntimePreviewRequest) {
                     top = style.paddingTop ?: 16.dp,
                     end = style.paddingEnd ?: 20.dp,
                     bottom = style.paddingBottom ?: 16.dp,
-                )
-                .uiNode(node),
+                ),
         ) {
             BasicText(
                 text = style.text.orEmpty(),

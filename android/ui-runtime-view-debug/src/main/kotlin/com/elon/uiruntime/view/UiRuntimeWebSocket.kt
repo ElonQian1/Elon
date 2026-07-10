@@ -28,8 +28,10 @@ internal class UiRuntimeWebSocket(
         open()
     }
 
+    @Synchronized
     fun send(text: String): Boolean = socket?.send(text) == true
 
+    @Synchronized
     fun close() {
         active = false
         mainHandler.removeCallbacksAndMessages(null)
@@ -38,15 +40,21 @@ internal class UiRuntimeWebSocket(
         client.dispatcher.executorService.shutdown()
     }
 
+    @Synchronized
     private fun open() {
-        if (!active) return
+        if (!active || socket != null) return
         val url = "ws://127.0.0.1:${config.devicePort}/api/android-live/runtime" +
             "?sessionId=${config.sessionId}&token=${config.token}"
         socket = client.newWebSocket(Request.Builder().url(url).build(), Listener())
     }
 
-    private fun reconnect(error: String) {
-        if (!active) return
+    @Synchronized
+    private fun reconnect(webSocket: WebSocket, error: String) {
+        // OkHttp may deliver a late close/failure callback from an older socket after a
+        // replacement connection has already opened. Only the current socket owns the
+        // connection state and is allowed to schedule another attempt.
+        if (!active || socket !== webSocket) return
+        socket = null
         onConnectionChanged(false, error)
         retry = (retry + 1).coerceAtMost(6)
         val delay = (1L shl retry).coerceAtMost(20L) * 500L
@@ -55,22 +63,26 @@ internal class UiRuntimeWebSocket(
 
     private inner class Listener : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            retry = 0
-            onConnectionChanged(true, null)
+            synchronized(this@UiRuntimeWebSocket) {
+                if (!active || socket !== webSocket) return
+                retry = 0
+                onConnectionChanged(true, null)
+            }
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            synchronized(this@UiRuntimeWebSocket) {
+                if (!active || socket !== webSocket) return
+            }
             onMessage(text)
         }
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-            socket = null
-            reconnect("连接已关闭: $code $reason")
+            reconnect(webSocket, "连接已关闭: $code $reason")
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-            socket = null
-            reconnect(t.message ?: "WebSocket 连接失败")
+            reconnect(webSocket, t.message ?: "WebSocket 连接失败")
         }
     }
 }

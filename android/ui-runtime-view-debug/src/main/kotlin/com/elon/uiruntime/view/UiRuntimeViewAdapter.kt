@@ -1,5 +1,6 @@
 package com.elon.uiruntime.view
 
+import android.os.Build
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
@@ -174,7 +175,7 @@ internal object UiRuntimeViewAdapter {
         "borderWidth" -> dp(view, reflectInt(view, "getStrokeWidth") ?: 0)
         "cornerRadius.all" -> dpValue(pxToDp(view, cornerRadius(view)))
         "text" -> textValue((view as? TextView)?.text?.toString().orEmpty())
-        "textSize" -> spValue((view as? TextView)?.textSize?.div(view.resources.displayMetrics.scaledDensity) ?: 0f)
+        "textSize" -> spValue((view as? TextView)?.let(::textSizeSp) ?: 0f)
         "opacity" -> floatValue(view.alpha)
         "visibility" -> enumValue(visibilityName(view.visibility))
         "translationX" -> dpValue(pxToDp(view, view.translationX))
@@ -195,7 +196,7 @@ internal object UiRuntimeViewAdapter {
         }
         if (view is TextView) {
             addProperty(properties, "text", textValue(view.text?.toString().orEmpty()), null, resourceId)
-            addProperty(properties, "textSize", spValue(view.textSize / view.resources.displayMetrics.scaledDensity), null, resourceId)
+            addProperty(properties, "textSize", spValue(textSizeSp(view)), null, resourceId)
             addProperty(properties, "contentColor", colorValue(view.currentTextColor), null, resourceId)
         }
     }
@@ -303,6 +304,17 @@ internal object UiRuntimeViewAdapter {
     private fun parseColor(value: String): Int = Color.parseColor(value)
     private fun pxToDp(view: View, value: Float): Double = value / view.resources.displayMetrics.density.toDouble()
     private fun dpToPx(view: View, value: Double): Double = value * view.resources.displayMetrics.density
+    private fun textSizeSp(view: TextView): Float = if (Build.VERSION.SDK_INT >= 34) {
+        // Android 14 introduced non-linear font scaling; dividing by scaledDensity no
+        // longer reverses the SP conversion at larger font scales.
+        TypedValue.deriveDimension(
+            TypedValue.COMPLEX_UNIT_SP,
+            view.textSize,
+            view.resources.displayMetrics,
+        )
+    } else {
+        view.textSize / view.resources.displayMetrics.scaledDensity
+    }
     private fun dp(view: View, px: Int): LivePropertyValue = dpValue(pxToDp(view, px.toFloat()))
     private fun dpValue(value: Double): LivePropertyValue = LivePropertyValue("dp", JsonPrimitive(round(value)))
     private fun spValue(value: Float): LivePropertyValue = LivePropertyValue("sp", JsonPrimitive(round(value.toDouble())))

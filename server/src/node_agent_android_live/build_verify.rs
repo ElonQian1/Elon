@@ -92,10 +92,11 @@ pub(crate) async fn build_and_verify(
     session.reset_for_redeploy().await;
     launch_app(&session.device_id, &session.package_name).await?;
     start_runtime(&session, host_port).await?;
+    let require_preview_nodes = request.preview.is_some();
     if let Some(preview) = request.preview {
         open_preview(&session, preview).await?;
     }
-    let runtime_view = wait_for_runtime(&session).await?;
+    let runtime_view = wait_for_runtime(&session, require_preview_nodes).await?;
     tokio::time::sleep(Duration::from_millis(650)).await;
     let screenshot = capture_screen_png(&session.device_id).await?;
     let (screenshot_width, screenshot_height) = png_dimensions(&screenshot)?;
@@ -161,7 +162,13 @@ async fn run_debug_build(
     let mut command =
         if cfg!(windows) && wrapper.extension().and_then(|v| v.to_str()) == Some("bat") {
             let mut command = Command::new("cmd.exe");
-            command.args(["/D", "/C"]).arg(wrapper);
+            // cmd.exe applies special quote stripping after /C. Passing an absolute
+            // \\?\ path containing spaces can therefore be truncated before Gradle is
+            // launched. The command already runs in gradle_root, so invoke only the
+            // wrapper file name and avoid both long-path and quoting ambiguity.
+            command
+                .args(["/D", "/C"])
+                .arg(wrapper.file_name().unwrap_or_default());
             command
         } else {
             Command::new(wrapper)
@@ -260,14 +267,23 @@ fn collect_debug_apks(
     Ok(())
 }
 
-async fn wait_for_runtime(session: &LiveUiSession) -> Result<super::protocol::LiveSessionView> {
+async fn wait_for_runtime(
+    session: &LiveUiSession,
+    require_nodes: bool,
+) -> Result<super::protocol::LiveSessionView> {
     let started = Instant::now();
     loop {
         let view = session.view().await;
-        if view.connected && view.runtime_build_id.is_some() {
+        if view.connected
+            && view.runtime_build_id.is_some()
+            && (!require_nodes || view.node_count > 0)
+        {
             return Ok(view);
         }
         if started.elapsed() > Duration::from_secs(15) {
+            if require_nodes && view.connected {
+                bail!("新 APK 已安装且 Runtime 已连接，但 Preview 节点树在 15 秒内没有上报");
+            }
             bail!("新 APK 已安装，但 Debug Runtime 在 15 秒内没有重新连接");
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
