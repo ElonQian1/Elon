@@ -80,6 +80,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .service(ServeDir::new(pc_next_dist.join("assets")));
     let pc_router = axum::Router::new()
         .route("/pc-workbench-sw.js", get(web::pc_workbench_service_worker))
+        .route_service(
+            "/task-progress-preview.html",
+            tower::ServiceBuilder::new()
+                .layer(no_cache.clone())
+                .service(ServeFile::new(
+                    pc_next_dist.join("task-progress-preview.html"),
+                )),
+        )
         .nest_service("/assets", pc_assets_svc)
         .fallback(web::pc_spa_index)
         .with_state(Arc::clone(&state));
@@ -88,6 +96,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .layer(no_cache.clone())
         .service(ServeDir::new(pc_next_dist.join("assets")));
     let pc_next_router = axum::Router::new()
+        .route_service(
+            "/task-progress-preview.html",
+            tower::ServiceBuilder::new()
+                .layer(no_cache.clone())
+                .service(ServeFile::new(
+                    pc_next_dist.join("task-progress-preview.html"),
+                )),
+        )
         .nest_service("/assets", pc_next_assets_svc)
         .fallback(web::pc_spa_index)
         .with_state(Arc::clone(&state));
