@@ -70,11 +70,15 @@ pub(crate) struct LivePropertyValue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LivePropertySnapshot {
+    #[serde(default)]
     pub effective: Option<LivePropertyValue>,
+    #[serde(default)]
     pub measured: Option<LivePropertyValue>,
     pub change_level: String,
     pub commit_mode: String,
+    #[serde(default)]
     pub binding: Option<Value>,
+    #[serde(default)]
     pub constraints: Option<Value>,
 }
 
@@ -83,13 +87,18 @@ pub(crate) struct LivePropertySnapshot {
 pub(crate) struct LiveUiNode {
     pub runtime_node_id: String,
     pub definition_id: String,
+    #[serde(default)]
     pub instance_key: Option<String>,
+    #[serde(default)]
     pub parent_runtime_node_id: Option<String>,
     pub screen_id: String,
     pub kind: String,
+    #[serde(default)]
     pub text: Option<String>,
+    #[serde(default)]
     pub resource_id: Option<String>,
     pub class_name: String,
+    #[serde(default)]
     pub source: Option<Value>,
     pub geometry: LiveGeometry,
     #[serde(default)]
@@ -102,8 +111,11 @@ pub(crate) struct LiveUiNode {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LivePatchTarget {
     pub scope: String,
+    #[serde(default)]
     pub runtime_node_id: Option<String>,
+    #[serde(default)]
     pub definition_id: Option<String>,
+    #[serde(default)]
     pub instance_key: Option<String>,
 }
 
@@ -125,9 +137,11 @@ pub(crate) struct LiveStylePatch {
     pub session_id: String,
     #[serde(default)]
     pub request_id: String,
+    #[serde(default)]
     pub gesture_id: Option<String>,
     #[serde(default)]
     pub sequence: u64,
+    #[serde(default)]
     pub base_tree_revision: Option<u64>,
     pub target: LivePatchTarget,
     #[serde(default = "default_true")]

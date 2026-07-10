@@ -1,7 +1,8 @@
 use serde_json::json;
 
 use super::protocol::{
-    LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch, PROTOCOL_VERSION,
+    LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch, LiveUiNode,
+    PROTOCOL_VERSION,
 };
 
 fn patch(property: &str, value_type: &str, value: serde_json::Value) -> LiveStylePatch {
@@ -59,4 +60,38 @@ fn prepare_binds_patch_to_session_and_request() {
     assert_eq!(value.session_id, "live_demo");
     assert_eq!(value.message_type, "patch.apply");
     assert!(value.request_id.starts_with("req_"));
+}
+
+#[test]
+fn accepts_android_tree_nodes_with_omitted_null_fields() {
+    let node: LiveUiNode = serde_json::from_value(json!({
+        "runtimeNodeId": "rn_1",
+        "definitionId": "checkout.pay_button",
+        "screenId": "checkout",
+        "kind": "material.button",
+        "className": "com.google.android.material.button.MaterialButton",
+        "geometry": {
+            "boundsInDisplayPx": {
+                "left": 0, "top": 10, "right": 100, "bottom": 58,
+                "width": 100, "height": 48
+            },
+            "density": 3.0,
+            "fontScale": 1.0,
+            "rotation": 0,
+            "visible": true
+        },
+        "properties": {
+            "height": {
+                "effective": { "type": "dp", "value": 48 },
+                "changeLevel": "LIVE",
+                "commitMode": "CODEX"
+            }
+        },
+        "capabilities": { "resizeHeight": true }
+    }))
+    .expect("Android Gson 默认省略 null 字段时仍应兼容");
+
+    assert_eq!(node.definition_id, "checkout.pay_button");
+    assert!(node.instance_key.is_none());
+    assert!(node.properties["height"].binding.is_none());
 }
