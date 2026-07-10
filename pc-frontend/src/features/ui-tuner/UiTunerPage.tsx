@@ -20,11 +20,9 @@ import {
 } from './appSidebarTemplate'
 import { clamp, getMetrics, touch } from './uiTunerGeometry'
 import {
-  captureAndroidSnapshot,
-  connectAndroidDevice,
-  listAndroidDevices,
-  type AndroidInspectorDevice,
+  type AndroidInspectorSnapshot,
 } from './device/deviceInspectorApi'
+import { useAndroidInspectorDevices } from './device/useAndroidInspectorDevices'
 import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
 import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
 import {
@@ -74,16 +72,6 @@ function normalizeViewScale(value: number) {
   return Math.round(bounded * 100) / 100
 }
 
-function selectCaptureDevice(devices: AndroidInspectorDevice[], preferredId: string) {
-  const preferred = devices.find((device) => device.serial === preferredId)
-  if (preferred?.state === 'device') return preferred
-  return devices.find((device) => device.state === 'device') ?? preferred ?? devices[0] ?? null
-}
-
-function deviceDisplayName(device: AndroidInspectorDevice) {
-  return device.model ?? device.serial
-}
-
 export default function UiTunerPage() {
   const [tunerDoc, setTunerDoc] = useState<UiTunerDocument>(() => (
     loadUiTunerDocument(APK_STYLE_SOURCE_SIGNATURE) ?? createInitialTunerDocument()
@@ -94,12 +82,6 @@ export default function UiTunerPage() {
   const [viewScale, setViewScale] = useState(1)
   const [fitToStage, setFitToStage] = useState(true)
   const [notice, setNotice] = useState('')
-  const [devices, setDevices] = useState<AndroidInspectorDevice[]>([])
-  const [selectedDeviceId, setSelectedDeviceId] = useState('')
-  const [connectAddress, setConnectAddress] = useState('')
-  const [deviceBusy, setDeviceBusy] = useState(false)
-  const [connectBusy, setConnectBusy] = useState(false)
-  const [captureBusy, setCaptureBusy] = useState(false)
   const [layerFilter, setLayerFilter] = useState<UiTunerFilterState>(DEFAULT_UI_TUNER_FILTER)
   const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
   const screenshotInputRef = useRef<HTMLInputElement>(null)
@@ -164,6 +146,31 @@ export default function UiTunerPage() {
       return next
     })
   }, [pushHistorySnapshot])
+
+  const handleDeviceCaptured = useCallback((snapshot: AndroidInspectorSnapshot) => {
+    const next = snapshotToTunerDocument(snapshot)
+    commitDocument(() => next, next.elements[0]?.id ?? null)
+    setFitToStage(true)
+    setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
+    setNotice(`已捕获真机画面：${snapshot.xml.nodeCount} 个 XML 节点`)
+  }, [commitDocument])
+
+  const {
+    devices,
+    selectedDeviceId,
+    connectAddress,
+    deviceBusy,
+    connectBusy,
+    captureBusy,
+    setSelectedDeviceId,
+    setConnectAddress,
+    refreshDevices,
+    connectWirelessDevice,
+    captureDeviceSnapshot,
+  } = useAndroidInspectorDevices({
+    onCaptured: handleDeviceCaptured,
+    onNotice: setNotice,
+  })
 
   const undoHistory = useCallback(() => {
     setHistory((current) => {
@@ -359,72 +366,6 @@ export default function UiTunerPage() {
     setNotice('已保存到本机草稿')
   }
 
-  const refreshDevices = async (): Promise<AndroidInspectorDevice[]> => {
-    setDeviceBusy(true)
-    try {
-      const nextDevices = await listAndroidDevices()
-      setDevices(nextDevices)
-      setSelectedDeviceId((current) => (
-        current && nextDevices.some((device) => device.serial === current)
-          ? current
-          : nextDevices.find((device) => device.state === 'device')?.serial ?? nextDevices[0]?.serial ?? ''
-      ))
-      setNotice(nextDevices.length ? `已发现 ${nextDevices.length} 台 ADB 设备` : '未发现可用 ADB 设备')
-      return nextDevices
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '读取 ADB 设备失败')
-      return []
-    } finally {
-      setDeviceBusy(false)
-    }
-  }
-
-  const captureDeviceSnapshot = async () => {
-    setCaptureBusy(true)
-    try {
-      let targetDevice = selectCaptureDevice(devices, selectedDeviceId)
-      if (!targetDevice || targetDevice.state !== 'device') {
-        setNotice('正在检测 ADB 设备并准备捕获')
-        const nextDevices = await refreshDevices()
-        targetDevice = selectCaptureDevice(nextDevices, selectedDeviceId)
-      }
-      if (!targetDevice) {
-        setNotice('未发现可用 ADB 设备，请先连接手机并确认 USB 调试授权')
-        return
-      }
-      setSelectedDeviceId(targetDevice.serial)
-      if (targetDevice.state !== 'device') {
-        setNotice(`ADB 设备未就绪：${deviceDisplayName(targetDevice)} · ${targetDevice.state}`)
-        return
-      }
-      const deviceId = targetDevice.serial
-      const snapshot = await captureAndroidSnapshot({ deviceId, packageName: 'com.elon.app' })
-      const next = snapshotToTunerDocument(snapshot)
-      commitDocument(() => next, next.elements[0]?.id ?? null)
-      setFitToStage(true)
-      setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
-      setNotice(`已捕获真机画面：${snapshot.xml.nodeCount} 个 XML 节点`)
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '真机捕获失败')
-    } finally {
-      setCaptureBusy(false)
-    }
-  }
-
-  const connectWirelessDevice = async () => {
-    const address = connectAddress.trim()
-    if (!address) return
-    setConnectBusy(true)
-    try {
-      const output = await connectAndroidDevice(address)
-      setNotice(output.trim() || `已连接 ${address}`)
-      await refreshDevices()
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '无线 ADB 连接失败')
-    } finally {
-      setConnectBusy(false)
-    }
-  }
   const copyExport = async () => {
     try {
       await navigator.clipboard.writeText(exportJson)
