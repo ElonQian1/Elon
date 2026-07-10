@@ -147,6 +147,7 @@ mod windows_doctor;
 mod node_agent_runtime;
 pub(crate) use node_agent_runtime::NodeRuntime;
 
+mod node_agent_cli_mcp;
 mod node_agent_cli_prompt_direct;
 mod node_agent_cli_prompt_runner;
 pub(crate) use node_agent_cli_prompt_runner::{

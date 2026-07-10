@@ -161,7 +161,7 @@ export function UiTunerToolbar({
         </div>
         <button type="button" onClick={() => screenshotInputRef.current?.click()}>
           <ImagePlus size={14} aria-hidden="true" />
-          导入截图
+          导入设计图/截图
         </button>
         <div className={styles.historyControls} aria-label="历史记录">
           <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤回一步" title="撤回一步">

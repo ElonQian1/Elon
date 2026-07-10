@@ -9,6 +9,7 @@ export interface UiTunerCanvas {
   height: number
   background: string
   referenceImage?: UiTunerReferenceImage
+  targetDesign?: UiTunerReferenceImage
   source?: UiTunerSource
 }
 
@@ -19,6 +20,7 @@ export interface UiTunerReferenceImage {
   height: number
   opacity: number
   visible: boolean
+  figmaUrl?: string
 }
 
 export interface UiTunerSource {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { UiTunerElement } from '../types'
+import type { UiTunerDocument, UiTunerElement } from '../types'
 import {
   applyLiveUiPatch,
   getLiveUiSession,
@@ -8,10 +8,20 @@ import {
   startLiveUiSession,
   stopLiveUiSession,
   type LivePatchOperation,
+  type LiveMcpDescriptor,
   type LiveUiNode,
   type LiveUiScope,
   type LiveUiSession,
 } from './liveUiApi'
+import {
+  bindLiveUiIr,
+  runLiveVisualSolver,
+  uploadLiveTargetDesign,
+  type LiveTargetDesign,
+  type LiveUiIrDocument,
+  type PixelRect,
+  type VisualSolverResult,
+} from './liveUiIrApi'
 import {
   commitLiveSource,
   getLiveSourceCommitPlan,
@@ -25,6 +35,7 @@ interface UseLiveUiSessionOptions {
   deviceId?: string
   packageName?: string
   projectRoot?: string
+  document: UiTunerDocument
   selected: UiTunerElement | null
   onNotice: (message: string) => void
 }
@@ -33,6 +44,7 @@ export function useLiveUiSession({
   deviceId,
   packageName,
   projectRoot,
+  document,
   selected,
   onNotice,
 }: UseLiveUiSessionOptions) {
@@ -43,9 +55,15 @@ export function useLiveUiSession({
   const [busy, setBusy] = useState(false)
   const [commitPlan, setCommitPlan] = useState<LiveSourceCommitPlan | null>(null)
   const [commitResult, setCommitResult] = useState<LiveSourceCommitResult | null>(null)
+  const [mcp, setMcp] = useState<LiveMcpDescriptor | null>(null)
+  const [uiIr, setUiIr] = useState<LiveUiIrDocument | null>(null)
+  const [targetDesign, setTargetDesign] = useState<LiveTargetDesign | null>(null)
+  const [solverResult, setSolverResult] = useState<VisualSolverResult | null>(null)
   const [restartRevision, setRestartRevision] = useState(0)
   const sessionRef = useRef<LiveUiSession | null>(null)
   const generationRef = useRef(0)
+  const targetDesignRef = useRef<LiveTargetDesign | null>(null)
+  const targetSignatureRef = useRef('')
 
   const refresh = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id
@@ -82,6 +100,10 @@ export function useLiveUiSession({
       setNodes([])
       setCommitPlan(null)
       setCommitResult(null)
+      setMcp(null)
+      setUiIr(null)
+      setTargetDesign(null)
+      setSolverResult(null)
       setState('idle')
       setError('')
       return () => undefined
@@ -94,20 +116,28 @@ export function useLiveUiSession({
       setNodes([])
       setCommitPlan(null)
       setCommitResult(null)
+      setMcp(null)
+      setUiIr(null)
+      setTargetDesign(null)
+      setSolverResult(null)
+      targetDesignRef.current = null
+      targetSignatureRef.current = ''
       setState('connecting')
       setError('')
       try {
-        const created = await startLiveUiSession({
+        const started = await startLiveUiSession({
           deviceId: cleanDevice,
           packageName: cleanPackage,
           projectRoot,
         })
+        const created = started.session
         if (disposed || generation !== generationRef.current) {
           await stopLiveUiSession(created.id).catch(() => undefined)
           return
         }
         sessionRef.current = created
         setSession(created)
+        setMcp(started.mcp)
         const startedAt = Date.now()
         const poll = async () => {
           if (disposed || generation !== generationRef.current) return
@@ -150,6 +180,60 @@ export function useLiveUiSession({
     () => matchLiveNode(selected, nodes),
     [nodes, selected],
   )
+
+  const syncContext = useCallback(async () => {
+    const current = sessionRef.current
+    if (!current?.connected || !document.runtimeSnapshot) return null
+    let target = targetDesignRef.current
+    const image = document.canvas.targetDesign
+    const signature = image
+      ? [
+          image.name,
+          image.dataUrl.length,
+          image.dataUrl.slice(-64),
+          image.width,
+          image.height,
+          image.figmaUrl ?? '',
+        ].join(':')
+      : ''
+    if (image && signature !== targetSignatureRef.current) {
+      target = await uploadLiveTargetDesign(current.id, image)
+      targetDesignRef.current = target
+      targetSignatureRef.current = signature
+      setTargetDesign(target)
+    } else if (!image) {
+      target = null
+      targetDesignRef.current = null
+      targetSignatureRef.current = ''
+      setTargetDesign(null)
+    }
+    const next = await bindLiveUiIr({
+      sessionId: current.id,
+      document,
+      selected,
+      selectedRuntimeNodeId: selectedNode?.runtimeNodeId,
+      targetDesign: target ?? undefined,
+    })
+    setUiIr(next)
+    return next
+  }, [document, selected, selectedNode?.runtimeNodeId])
+
+  useEffect(() => {
+    if (state !== 'connected' || !document.runtimeSnapshot) return
+    const timer = window.setTimeout(() => {
+      void syncContext().catch((syncError) => {
+        setError(messageOf(syncError, '无法同步 UI IR'))
+      })
+    }, 360)
+    return () => window.clearTimeout(timer)
+  }, [
+    document.canvas.targetDesign,
+    document.runtimeSnapshot,
+    selected?.id,
+    selectedNode?.runtimeNodeId,
+    state,
+    syncContext,
+  ])
 
   const apply = useCallback(async (
     operation: LivePatchOperation,
@@ -243,6 +327,40 @@ export function useLiveUiSession({
     }
   }, [onNotice])
 
+  const solve = useCallback(async (
+    targetRect: PixelRect,
+    properties?: string[],
+  ) => {
+    const current = sessionRef.current
+    const target = matchLiveNode(selected, nodes)
+    if (!current?.connected || !target) throw new Error('当前元素尚未绑定 Live Node')
+    if (!document.canvas.targetDesign) throw new Error('请先导入目标设计图')
+    setBusy(true)
+    setSolverResult(null)
+    try {
+      await syncContext()
+      const result = await runLiveVisualSolver({
+        sessionId: current.id,
+        runtimeNodeId: target.runtimeNodeId,
+        targetRect,
+        properties,
+      })
+      setSolverResult(result)
+      await refresh(current.id)
+      onNotice(result.status === 'APPLIED'
+        ? '本地视觉求解已应用：损失改善 ' + result.improvementPercent.toFixed(2) + '%，源码尚未写入'
+        : '本地视觉求解未找到更优参数，真机保持不变')
+      return result
+    } catch (solveError) {
+      const message = messageOf(solveError, '本地视觉求解失败')
+      setError(message)
+      onNotice(message)
+      throw solveError
+    } finally {
+      setBusy(false)
+    }
+  }, [document.canvas.targetDesign, nodes, onNotice, refresh, selected, syncContext])
+
   return {
     session,
     nodes,
@@ -252,6 +370,10 @@ export function useLiveUiSession({
     busy,
     commitPlan,
     commitResult,
+    mcp,
+    uiIr,
+    targetDesign,
+    solverResult,
     apply,
     undo: () => historyAction('undo'),
     redo: () => historyAction('redo'),
@@ -259,6 +381,8 @@ export function useLiveUiSession({
     refresh,
     previewCommit,
     commit,
+    syncContext,
+    solve,
   }
 }
 

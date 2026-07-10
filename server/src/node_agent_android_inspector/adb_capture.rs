@@ -165,6 +165,10 @@ async fn capture_screenshot(device_id: &str, include_data_url: bool) -> Result<C
     })
 }
 
+pub(crate) async fn capture_screen_png(device_id: &str) -> Result<Vec<u8>> {
+    Ok(capture_screenshot(device_id, false).await?.bytes)
+}
+
 async fn dump_xml(device_id: &str) -> Result<String> {
     let args = vec![
         "-s".to_string(),

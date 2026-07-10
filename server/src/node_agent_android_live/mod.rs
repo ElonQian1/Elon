@@ -5,15 +5,26 @@
 
 mod adb_session;
 mod broker;
+mod mcp;
+mod mcp_tools;
 mod protocol;
 mod routes;
 mod source_commit;
 mod source_xml;
+mod ui_ir;
+mod visual_diff;
+mod visual_solver;
 
+#[cfg(test)]
+mod mcp_tests;
+#[cfg(test)]
+mod source_commit_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-mod source_commit_tests;
+mod ui_ir_tests;
+#[cfg(test)]
+mod visual_diff_tests;
 
 pub(crate) use broker::LiveUiBroker;
 pub(crate) use routes::{protected_routes, runtime_routes};

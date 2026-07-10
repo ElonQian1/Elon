@@ -84,6 +84,11 @@ export function UiTunerInspector({
             busy={liveUi.busy}
             session={liveUi.session}
             node={liveUi.selectedNode}
+            selected={selected}
+            mcp={liveUi.mcp}
+            uiIr={liveUi.uiIr}
+            targetDesign={liveUi.targetDesign}
+            solverResult={liveUi.solverResult}
             onApply={liveUi.apply}
             onUndo={liveUi.undo}
             onRedo={liveUi.redo}
@@ -93,6 +98,7 @@ export function UiTunerInspector({
             commitResult={liveUi.commitResult}
             onPreviewCommit={liveUi.previewCommit}
             onCommit={liveUi.commit}
+            onSolve={liveUi.solve}
           />
           <UiTunerStandardsPanel
             insight={standardInsight}
@@ -109,6 +115,7 @@ export function UiTunerInspector({
             verificationReport={verificationReport}
             onMutationTaskStarted={onMutationTaskStarted}
             onRequestVerification={onRequestVerification}
+            liveUi={liveUi}
           />
           <GeometrySection tunerDoc={tunerDoc} selected={selected} onUpdateElement={onUpdateElement} />
           <TypographySection selected={selected} onUpdateElement={onUpdateElement} />
@@ -163,6 +170,9 @@ function CanvasSection({
       <ColorField label="背景" value={tunerDoc.canvas.background} onChange={(background) => onUpdateCanvas({ background })} />
       {tunerDoc.canvas.referenceImage && (
         <ReferenceImagePanel tunerDoc={tunerDoc} onUpdateCanvas={onUpdateCanvas} />
+      )}
+      {tunerDoc.canvas.targetDesign && (
+        <TargetDesignPanel tunerDoc={tunerDoc} onUpdateCanvas={onUpdateCanvas} />
       )}
       {tunerDoc.runtimeSnapshot && (
         <>
@@ -231,6 +241,56 @@ function ReferenceImagePanel({ tunerDoc, onUpdateCanvas }: ReferenceImagePanelPr
         </button>
         <button type="button" onClick={() => onUpdateCanvas({ referenceImage: undefined })}>
           移除截图
+        </button>
+      </div>
+    </>
+  )
+}
+
+function TargetDesignPanel({ tunerDoc, onUpdateCanvas }: ReferenceImagePanelProps) {
+  const targetDesign = tunerDoc.canvas.targetDesign!
+  return (
+    <>
+      <div className={styles.sourcePanel}>
+        <span>目标设计图</span>
+        <strong>{targetDesign.name}</strong>
+        <small>{targetDesign.width} x {targetDesign.height} · 与真机坐标对齐</small>
+      </div>
+      <label className={styles.rangeField}>
+        <span>叠加透明</span>
+        <input
+          type="range"
+          min={0.05}
+          max={1}
+          step={0.05}
+          value={targetDesign.opacity}
+          onChange={(event) => onUpdateCanvas({
+            targetDesign: { ...targetDesign, opacity: Number(event.currentTarget.value) },
+          })}
+        />
+        <strong>{Math.round(targetDesign.opacity * 100)}%</strong>
+      </label>
+      <label className={styles.fieldFull}>
+        <span>Figma 节点链接（可选）</span>
+        <input
+          value={targetDesign.figmaUrl ?? ''}
+          placeholder="https://www.figma.com/design/..."
+          onChange={(event) => onUpdateCanvas({
+            targetDesign: { ...targetDesign, figmaUrl: event.currentTarget.value },
+          })}
+        />
+      </label>
+      <div className={styles.inlineActions}>
+        <button
+          type="button"
+          onClick={() => onUpdateCanvas({
+            targetDesign: { ...targetDesign, visible: !targetDesign.visible },
+          })}
+        >
+          {targetDesign.visible ? '隐藏设计图' : '显示设计图'}
+        </button>
+        <button type="button" onClick={() => onUpdateCanvas({ targetDesign: undefined })}>
+          移除设计图
         </button>
       </div>
     </>

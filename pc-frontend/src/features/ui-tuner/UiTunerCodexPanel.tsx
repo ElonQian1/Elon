@@ -17,6 +17,7 @@ import pageStyles from './UiTunerPage.module.css'
 import panelStyles from './UiTunerPanels.module.css'
 import contextStyles from './UiTunerContext.module.css'
 import type { UiTunerVerificationReport } from './runtime/verification'
+import type { useLiveUiSession } from './live/useLiveUiSession'
 
 interface UiTunerCodexPanelProps {
   tunerDoc: UiTunerDocument
@@ -27,6 +28,7 @@ interface UiTunerCodexPanelProps {
   verificationReport: UiTunerVerificationReport | null
   onMutationTaskStarted: (pack: ReturnType<typeof buildUiTunerCodexContextPack>) => Promise<void> | void
   onRequestVerification: () => void
+  liveUi: ReturnType<typeof useLiveUiSession>
 }
 
 const DEFAULT_INTENT = '把这个节点调整成可复用的 APK UI 美观标准，并说明应该保存到 token、组件标准还是当前页面覆盖。'
@@ -40,6 +42,7 @@ export function UiTunerCodexPanel({
   verificationReport,
   onMutationTaskStarted,
   onRequestVerification,
+  liveUi,
 }: UiTunerCodexPanelProps) {
   const [intent, setIntent] = useState(DEFAULT_INTENT)
   const [copyState, setCopyState] = useState('')
@@ -50,6 +53,28 @@ export function UiTunerCodexPanel({
   )
   const [selectionScope, setSelectionScope] = useState<UiTunerSelectionScope>(repeatGroup ? 'component' : 'instance')
   const [selectionVisual, setSelectionVisual] = useState<UiTunerSelectionVisualContext | null>(null)
+  const liveContext = useMemo(() => ({
+    sessionId: liveUi.session?.id,
+    uiIrRevision: liveUi.uiIr?.revision,
+    treeRevision: liveUi.session?.treeRevision,
+    runtimeNodeId: liveUi.selectedNode?.runtimeNodeId,
+    definitionId: liveUi.selectedNode?.definitionId,
+    mcpConfigPath: liveUi.mcp?.configPath,
+    targetDesign: liveUi.targetDesign ? {
+      path: liveUi.targetDesign.path,
+      sha256: liveUi.targetDesign.sha256,
+      width: liveUi.targetDesign.width,
+      height: liveUi.targetDesign.height,
+    } : undefined,
+  }), [
+    liveUi.mcp?.configPath,
+    liveUi.selectedNode?.definitionId,
+    liveUi.selectedNode?.runtimeNodeId,
+    liveUi.session?.id,
+    liveUi.session?.treeRevision,
+    liveUi.targetDesign,
+    liveUi.uiIr?.revision,
+  ])
 
   useEffect(() => {
     setSelectionScope(repeatGroup ? 'component' : 'instance')
@@ -78,7 +103,8 @@ export function UiTunerCodexPanel({
     selectionScope,
     repeatGroup,
     selectionVisual,
-  }), [filterResult, metrics, repeatGroup, selected, selectionScope, selectionVisual, standardInsight, tunerDoc])
+    liveContext,
+  }), [filterResult, liveContext, metrics, repeatGroup, selected, selectionScope, selectionVisual, standardInsight, tunerDoc])
   const prompt = useMemo(() => buildUiTunerCodexTaskPrompt(pack, intent), [intent, pack])
   const stages = useMemo(() => summarizeClosurePriorities(), [])
   const binding = pack.runtimeBinding
@@ -175,6 +201,7 @@ export function UiTunerCodexPanel({
             selectionScope,
             repeatGroup,
             selectionVisual,
+            liveContext,
           }))}
         >
           <Clipboard size={14} aria-hidden="true" />

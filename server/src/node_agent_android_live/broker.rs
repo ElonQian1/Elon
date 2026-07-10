@@ -109,6 +109,14 @@ impl LiveUiBroker {
         Ok(self.session(session_id).await?.view().await)
     }
 
+    pub(crate) async fn authorize_session(&self, session_id: &str, token: &str) -> Result<()> {
+        let session = self.session(session_id).await?;
+        if !constant_time_eq(session.token.as_bytes(), token.as_bytes()) {
+            bail!("Live UI 会话令牌无效");
+        }
+        Ok(())
+    }
+
     pub(crate) async fn tree(&self, session_id: &str) -> Result<(u64, Vec<LiveUiNode>)> {
         let session = self.session(session_id).await?;
         let state = session.state.read().await;
@@ -185,6 +193,33 @@ impl LiveUiBroker {
         patch.validate().map_err(anyhow::Error::msg)?;
         let session = self.session(session_id).await?;
         session.send_patch(patch, JournalMode::Record).await
+    }
+
+    pub(crate) async fn apply_probe_patch(
+        &self,
+        session_id: &str,
+        mut patch: LiveStylePatch,
+    ) -> Result<(Value, LiveStylePatch)> {
+        patch.prepare(session_id);
+        patch.validate().map_err(anyhow::Error::msg)?;
+        let session = self.session(session_id).await?;
+        let ack = session.send_patch(patch.clone(), JournalMode::Skip).await?;
+        let inverse = inverse_patch(&patch, &ack)
+            .ok_or_else(|| anyhow!("Android Probe ACK 缺少 beforeValues，无法安全恢复"))?;
+        Ok((ack, inverse))
+    }
+
+    pub(crate) async fn restore_probe_patch(
+        &self,
+        session_id: &str,
+        mut inverse: LiveStylePatch,
+    ) -> Result<Value> {
+        inverse.prepare(session_id);
+        inverse.validate().map_err(anyhow::Error::msg)?;
+        self.session(session_id)
+            .await?
+            .send_patch(inverse, JournalMode::Skip)
+            .await
     }
 
     pub(crate) async fn undo(&self, session_id: &str) -> Result<Value> {

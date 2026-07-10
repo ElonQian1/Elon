@@ -12,10 +12,19 @@ use serde_json::json;
 use crate::NodeRuntime;
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
+use super::mcp::{
+    cleanup_descriptor, descriptor as mcp_descriptor, handle_request as handle_mcp_request,
+    McpQuery, McpRequest,
+};
 use super::protocol::{
     LiveStylePatch, RuntimeSocketQuery, StartLiveSessionRequest, PROTOCOL_VERSION,
 };
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
+use super::ui_ir::{
+    bind_ui_ir, load_or_build_ui_ir, persist_target_design, BindUiIrRequest, TargetDesignUpload,
+};
+use super::visual_diff::{compare_images, VisualDiffRequest};
+use super::visual_solver::{solve_visual_style, VisualSolverRequest};
 
 pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
@@ -48,10 +57,32 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/sessions/:session_id/commit",
             post(commit_source_handler),
         )
+        .route(
+            "/api/android-live/sessions/:session_id/ui-ir",
+            get(ui_ir_handler).post(bind_ui_ir_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/target-design",
+            post(target_design_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/visual-diff",
+            post(visual_diff_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/visual-solver",
+            post(visual_solver_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/mcp-descriptor",
+            get(mcp_descriptor_handler),
+        )
 }
 
 pub(crate) fn runtime_routes() -> Router<Arc<NodeRuntime>> {
-    Router::new().route("/api/android-live/runtime", get(runtime_socket_handler))
+    Router::new()
+        .route("/api/android-live/runtime", get(runtime_socket_handler))
+        .route("/api/android-live/mcp/:session_id", post(mcp_handler))
 }
 
 async fn create_session_handler(
@@ -73,19 +104,117 @@ async fn create_session_handler(
         .await;
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
     match start_runtime(&session, host_port).await {
-        Ok(output) => Json(json!({
-            "ok": true,
-            "protocolVersion": PROTOCOL_VERSION,
-            "session": session.view().await,
-            "adbOutput": output,
-        }))
-        .into_response(),
+        Ok(output) => match mcp_descriptor(&session, host_port) {
+            Ok(mcp) => Json(json!({
+                "ok": true,
+                "protocolVersion": PROTOCOL_VERSION,
+                "session": session.view().await,
+                "mcp": mcp,
+                "adbOutput": output,
+            }))
+            .into_response(),
+            Err(error) => {
+                let _ = stop_runtime(&session).await;
+                runtime.live_ui.remove_session(&session.id).await;
+                json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("{error:#}"))
+            }
+        },
         Err(error) => {
             let _ = stop_runtime(&session).await;
             runtime.live_ui.remove_session(&session.id).await;
             json_error(StatusCode::BAD_GATEWAY, format!("{error:#}"))
         }
     }
+}
+
+async fn ui_ir_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    match load_or_build_ui_ir(&runtime.live_ui, &session_id).await {
+        Ok(document) => Json(json!({ "ok": true, "document": document })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn bind_ui_ir_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<BindUiIrRequest>,
+) -> Response {
+    match bind_ui_ir(&runtime.live_ui, &session_id, request).await {
+        Ok(document) => Json(json!({ "ok": true, "document": document })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn target_design_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(upload): Json<TargetDesignUpload>,
+) -> Response {
+    match persist_target_design(&runtime.live_ui, &session_id, upload).await {
+        Ok(target) => Json(json!({ "ok": true, "targetDesign": target })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn visual_diff_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<VisualDiffRequest>,
+) -> Response {
+    if let Err(error) = runtime.live_ui.session(&session_id).await {
+        return json_error(StatusCode::NOT_FOUND, format!("{error:#}"));
+    }
+    match tokio::task::spawn_blocking(move || compare_images(&request)).await {
+        Ok(Ok(diff)) => Json(json!({ "ok": true, "diff": diff })).into_response(),
+        Ok(Err(error)) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("{error:#}")),
+    }
+}
+
+async fn visual_solver_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<VisualSolverRequest>,
+) -> Response {
+    match solve_visual_style(&runtime.live_ui, &session_id, request).await {
+        Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn mcp_descriptor_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    match runtime.live_ui.session(&session_id).await {
+        Ok(session) => {
+            let host_port = crate::node_agent_admin_open::admin_port_from_env();
+            match mcp_descriptor(&session, host_port) {
+                Ok(mcp) => Json(json!({ "ok": true, "mcp": mcp })).into_response(),
+                Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, format!("{error:#}")),
+            }
+        }
+        Err(error) => json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    }
+}
+
+async fn mcp_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Query(query): Query<McpQuery>,
+    Json(request): Json<McpRequest>,
+) -> Response {
+    if let Err(error) = runtime
+        .live_ui
+        .authorize_session(&session_id, &query.token)
+        .await
+    {
+        return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}"));
+    }
+    Json(handle_mcp_request(&runtime.live_ui, &session_id, request).await).into_response()
 }
 
 async fn session_handler(
@@ -184,6 +313,7 @@ async fn stop_session_handler(
     if let Err(error) = stop_runtime(&session).await {
         return json_error(StatusCode::BAD_GATEWAY, format!("{error:#}"));
     }
+    cleanup_descriptor(&session_id);
     Json(json!({ "ok": true, "stopped": session_id })).into_response()
 }
 

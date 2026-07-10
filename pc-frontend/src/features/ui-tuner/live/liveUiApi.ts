@@ -64,6 +64,20 @@ export interface LiveUiSession {
   lastError?: string
 }
 
+export interface LiveMcpDescriptor {
+  name: string
+  transport: 'streamable-http'
+  sessionId: string
+  protocolVersion: string
+  purpose: string
+  configPath: string
+}
+
+export interface LiveUiSessionStart {
+  session: LiveUiSession
+  mcp: LiveMcpDescriptor
+}
+
 export interface LivePatchOperation {
   property: string
   value: LivePropertyValue
@@ -83,8 +97,8 @@ export async function startLiveUiSession(input: {
   deviceId: string
   packageName: string
   projectRoot?: string
-}): Promise<LiveUiSession> {
-  const response = await nodeApi<{ session: LiveUiSession }>(
+}): Promise<LiveUiSessionStart> {
+  return nodeApi<LiveUiSessionStart>(
     inspectorAdminUrl(),
     '/api/android-live/sessions',
     {
@@ -93,7 +107,6 @@ export async function startLiveUiSession(input: {
     },
     15_000,
   )
-  return response.session
 }
 
 export async function getLiveUiSession(sessionId: string): Promise<LiveUiSession> {

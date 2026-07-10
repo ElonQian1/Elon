@@ -299,6 +299,17 @@
   user-select: none;
 }
 
+.targetDesignImage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
+}
+
 .canvasElement {
   position: absolute;
   z-index: 2;

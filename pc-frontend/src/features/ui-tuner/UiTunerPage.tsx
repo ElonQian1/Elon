@@ -217,6 +217,7 @@ export default function UiTunerPage() {
     deviceId: tunerDoc.runtimeSnapshot?.deviceId,
     packageName: tunerDoc.runtimeSnapshot?.packageName,
     projectRoot,
+    document: tunerDoc,
     selected,
     onNotice: setNotice,
   })
@@ -531,26 +532,34 @@ export default function UiTunerPage() {
       image.onload = () => {
         const width = Math.max(Math.round(image.naturalWidth), MIN_SIZE)
         const height = Math.max(Math.round(image.naturalHeight), MIN_SIZE)
-        commitDocument((current) => touch({
-          ...current,
-          canvas: {
-            ...current.canvas,
-            name: `${file.name} 调试画布`,
+        commitDocument((current) => {
+          const imported = {
+            dataUrl,
+            name: file.name,
             width,
             height,
-            background: '#000000',
-            referenceImage: {
-              dataUrl,
-              name: file.name,
+            opacity: current.runtimeSnapshot ? 0.5 : 1,
+            visible: true,
+          }
+          return touch({
+            ...current,
+            canvas: current.runtimeSnapshot ? {
+              ...current.canvas,
+              targetDesign: imported,
+            } : {
+              ...current.canvas,
+              name: file.name + ' 调试画布',
               width,
               height,
-              opacity: 1,
-              visible: true,
+              background: '#000000',
+              referenceImage: imported,
             },
-          },
-        }))
+          })
+        })
         setFitToStage(true)
-        setNotice('已把 APP 截图放到画布底层')
+        setNotice(tunerDocRef.current.runtimeSnapshot
+          ? '已导入目标设计图；可叠加对照并对选中节点运行本地视觉求解'
+          : '已把 APP 截图放到画布底层')
       }
       image.onerror = () => setNotice('截图读取失败，请换一张图片')
       image.src = dataUrl
@@ -738,6 +747,14 @@ export default function UiTunerPage() {
                 src={tunerDoc.canvas.referenceImage.dataUrl}
                 alt=""
                 style={{ opacity: tunerDoc.canvas.referenceImage.opacity }}
+              />
+            )}
+            {tunerDoc.canvas.targetDesign?.visible && (
+              <img
+                className={styles.targetDesignImage}
+                src={tunerDoc.canvas.targetDesign.dataUrl}
+                alt="目标设计图"
+                style={{ opacity: tunerDoc.canvas.targetDesign.opacity }}
               />
             )}
             {filterResult.visible.map(({ element, analysis }) => renderElement(element, analysis))}

@@ -8,7 +8,7 @@ import type { UiTunerRepeatGroup } from './runtime/repeatComponents'
 import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 
 export interface UiTunerCodexContextPack {
-  version: 2
+  version: 3
   kind: 'elon_ui_tuner_codex_context'
   generatedAt: string
   screen: {
@@ -57,6 +57,20 @@ export interface UiTunerCodexContextPack {
       scope?: string
     }>
   }
+  liveRuntime: {
+    sessionId: string
+    uiIrRevision?: string
+    treeRevision: number
+    runtimeNodeId?: string
+    definitionId?: string
+    mcpConfigPath?: string
+    targetDesign?: {
+      path: string
+      sha256: string
+      width: number
+      height: number
+    }
+  } | null
   selectionVisual: {
     available: boolean
     cropPath?: string
@@ -117,6 +131,22 @@ interface BuildPackArgs {
   selectionScope: UiTunerSelectionScope
   repeatGroup: UiTunerRepeatGroup | null
   selectionVisual: UiTunerSelectionVisualContext | null
+  liveContext?: UiTunerLiveContext
+}
+
+export interface UiTunerLiveContext {
+  sessionId?: string
+  uiIrRevision?: string
+  treeRevision?: number
+  runtimeNodeId?: string
+  definitionId?: string
+  mcpConfigPath?: string
+  targetDesign?: {
+    path: string
+    sha256: string
+    width: number
+    height: number
+  }
 }
 
 export function buildUiTunerCodexContextPack({
@@ -128,11 +158,12 @@ export function buildUiTunerCodexContextPack({
   selectionScope,
   repeatGroup,
   selectionVisual,
+  liveContext,
 }: BuildPackArgs): UiTunerCodexContextPack {
   const runtime = selected?.runtime
   const source = selected?.source
   return {
-    version: 2,
+    version: 3,
     kind: 'elon_ui_tuner_codex_context',
     generatedAt: new Date().toISOString(),
     screen: {
@@ -175,7 +206,7 @@ export function buildUiTunerCodexContextPack({
       sourceToken: source?.token,
       bindingConfidence: standardInsight?.bindingConfidence,
       bindingReason: standardInsight?.bindingReason,
-      sourceCandidates: (selected?.sourceCandidates ?? []).map((candidate) => ({
+      sourceCandidates: (selected?.sourceCandidates ?? []).slice(0, 8).map((candidate) => ({
         file: candidate.file,
         line: candidate.line,
         token: candidate.token,
@@ -186,6 +217,15 @@ export function buildUiTunerCodexContextPack({
         scope: candidate.scope,
       })),
     },
+    liveRuntime: liveContext?.sessionId ? {
+      sessionId: liveContext.sessionId,
+      uiIrRevision: liveContext.uiIrRevision,
+      treeRevision: liveContext.treeRevision ?? 0,
+      runtimeNodeId: liveContext.runtimeNodeId,
+      definitionId: liveContext.definitionId,
+      mcpConfigPath: liveContext.mcpConfigPath,
+      targetDesign: liveContext.targetDesign,
+    } : null,
     selectionVisual: {
       available: Boolean(selectionVisual?.previewDataUrl),
       cropPath: selectionVisual?.artifact?.cropPath,
@@ -272,13 +312,15 @@ export function buildUiTunerCodexTaskPrompt(pack: UiTunerCodexContextPack, userI
     `用户意图：${intent}`,
     '',
     '请按以下顺序执行：',
-    '1. 先读 context pack 中的选区截图、runtimeBinding、sourceCandidates、requestedAdjustments 和 codexContract。',
-    '2. 定位 Android 源码或 UI 标准配置，区分 design token、组件标准和页面覆盖。',
+    pack.liveRuntime?.mcpConfigPath
+      ? `1. 先读取本机 ${pack.liveRuntime.mcpConfigPath}，优先通过 yilong-ui-live 按需工具获取 screen summary、节点、局部源码和视觉差异。`
+      : '1. 先读 context pack 中的选区截图、runtimeBinding、sourceCandidates、requestedAdjustments 和 codexContract。',
+    '2. 不要重复读取整棵树或全仓库；定位 Android 源码或 UI 标准配置，区分 design token、组件标准和页面覆盖。',
     '3. 给出或实施可审查的源码/config 修改，不要只改截图坐标。',
     '4. 输出验证方式：构建检查、重新 ADB 捕获或可执行的验收命令。',
     '5. 如果绑定置信度不足，先列出需要人工确认的 resourceId/xpath/source 文件。',
     '',
-    'Context pack JSON:',
+    'Compact context pack JSON:',
     '```json',
     JSON.stringify(pack, null, 2),
     '```',

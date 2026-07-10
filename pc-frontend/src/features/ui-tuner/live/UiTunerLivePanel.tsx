@@ -8,6 +8,13 @@ import type {
 } from './liveUiApi'
 import type { LiveUiConnectionState } from './useLiveUiSession'
 import type { LiveSourceCommitPlan, LiveSourceCommitResult } from './liveUiCommitApi'
+import type {
+  LiveTargetDesign,
+  LiveUiIrDocument,
+  PixelRect,
+  VisualSolverResult,
+} from './liveUiIrApi'
+import type { LiveMcpDescriptor } from './liveUiApi'
 import styles from './UiTunerLivePanel.module.css'
 
 interface UiTunerLivePanelProps {
@@ -16,6 +23,11 @@ interface UiTunerLivePanelProps {
   busy: boolean
   session: LiveUiSession | null
   node: LiveUiNode | null
+  selected: UiTunerElement
+  mcp: LiveMcpDescriptor | null
+  uiIr: LiveUiIrDocument | null
+  targetDesign: LiveTargetDesign | null
+  solverResult: VisualSolverResult | null
   onApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
   onUndo: () => Promise<void>
   onRedo: () => Promise<void>
@@ -25,6 +37,7 @@ interface UiTunerLivePanelProps {
   commitResult: LiveSourceCommitResult | null
   onPreviewCommit: () => Promise<LiveSourceCommitPlan>
   onCommit: (plan: LiveSourceCommitPlan) => Promise<LiveSourceCommitResult>
+  onSolve: (targetRect: PixelRect) => Promise<VisualSolverResult>
 }
 
 const NUMBER_FIELDS = [
@@ -52,6 +65,11 @@ export function UiTunerLivePanel({
   busy,
   session,
   node,
+  selected,
+  mcp,
+  uiIr,
+  targetDesign,
+  solverResult,
   onApply,
   onUndo,
   onRedo,
@@ -61,6 +79,7 @@ export function UiTunerLivePanel({
   commitResult,
   onPreviewCommit,
   onCommit,
+  onSolve,
 }: UiTunerLivePanelProps) {
   const [scope, setScope] = useState<LiveUiScope>('INSTANCE')
   const connected = state === 'connected'
@@ -84,6 +103,11 @@ export function UiTunerLivePanel({
           <div className={styles.nodeInfo}>
             <strong>{node.definitionId}</strong>
             <small>{node.kind} · {node.runtimeNodeId}</small>
+          </div>
+          <div className={styles.irState}>
+            <span>{uiIr ? 'UI IR ' + uiIr.revision.slice(0, 16) : '正在生成 UI IR'}</span>
+            <span>{mcp ? 'Codex 按需工具已就绪' : 'Codex 工具待连接'}</span>
+            <span>{targetDesign ? '目标图 ' + targetDesign.sha256.slice(0, 12) : '尚未导入目标设计图'}</span>
           </div>
           <label className={styles.scopeField}>
             <span>作用范围</span>
@@ -144,6 +168,15 @@ export function UiTunerLivePanel({
               重做
             </button>
           </div>
+          <VisualSolverPanel
+            key={node.runtimeNodeId}
+            node={node}
+            selected={selected}
+            targetReady={Boolean(targetDesign)}
+            busy={busy}
+            result={solverResult}
+            onSolve={onSolve}
+          />
           <button
             className={styles.commitButton}
             type="button"
@@ -177,6 +210,81 @@ export function UiTunerLivePanel({
         </button>
       )}
     </section>
+  )
+}
+
+function VisualSolverPanel({
+  node,
+  selected,
+  targetReady,
+  busy,
+  result,
+  onSolve,
+}: {
+  node: LiveUiNode
+  selected: UiTunerElement
+  targetReady: boolean
+  busy: boolean
+  result: VisualSolverResult | null
+  onSolve: (targetRect: PixelRect) => Promise<VisualSolverResult>
+}) {
+  const bounds = node.geometry.boundsInDisplayPx
+  const [rect, setRect] = useState({
+    x: Math.round(selected.x || bounds.left),
+    y: Math.round(selected.y || bounds.top),
+    width: Math.round(selected.width || bounds.width),
+    height: Math.round(selected.height || bounds.height),
+  })
+  const setValue = (key: keyof typeof rect, value: number) => {
+    setRect((current) => ({ ...current, [key]: Number.isFinite(value) ? value : current[key] }))
+  }
+  const targetRect: PixelRect = {
+    left: rect.x,
+    top: rect.y,
+    right: rect.x + Math.max(1, rect.width),
+    bottom: rect.y + Math.max(1, rect.height),
+  }
+  return (
+    <div className={styles.solver}>
+      <div>
+        <strong>本地视觉求解</strong>
+        <span>目标图区域（px）</span>
+      </div>
+      <div className={styles.grid}>
+        {([
+          ['x', 'X'],
+          ['y', 'Y'],
+          ['width', '宽'],
+          ['height', '高'],
+        ] as const).map(([key, label]) => (
+          <label className={styles.field} key={key}>
+            <span>{label}</span>
+            <input
+              type="number"
+              value={rect[key]}
+              disabled={busy}
+              onChange={(event) => setValue(key, Number(event.currentTarget.value))}
+            />
+          </label>
+        ))}
+      </div>
+      <button
+        className={styles.commitButton}
+        type="button"
+        disabled={busy || !targetReady}
+        onClick={() => { void onSolve(targetRect) }}
+      >
+        {busy ? '正在真机试探…' : '自动逼近目标图'}
+      </button>
+      {!targetReady && <small>请先点击顶部“导入设计图/截图”。</small>}
+      {result && (
+        <small>
+          {result.evaluations} 次本地比较 · 损失
+          {' '}{result.baseline.visualLoss.toFixed(4)} → {result.finalDiff.visualLoss.toFixed(4)}
+          {' '}· 改善 {result.improvementPercent.toFixed(2)}%
+        </small>
+      )}
+    </div>
   )
 }
 

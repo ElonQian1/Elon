@@ -2,17 +2,18 @@
 //! CLI prompt 运行器：启动 CLI 子进程、流式输出、session 管理、Codex vault 切换。
 //! 从 node_agent_main.rs 抽取，保持原有逻辑不变。
 
+use homecli_proto::AgentToServer;
 use std::sync::Arc;
 use tokio::sync::watch;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
-use homecli_proto::AgentToServer;
 
+use crate::cli_usage;
 use crate::node_agent_active_task;
 use crate::node_agent_cli_done::{cli_done_message, latest_codex_session_id};
 use crate::node_agent_cli_env::apply_env;
-use crate::node_agent_cli_runner::*;
 use crate::node_agent_cli_pty;
+use crate::node_agent_cli_runner::*;
 use crate::node_agent_cli_security;
 use crate::node_agent_cli_sidecar_runner;
 use crate::node_agent_codex_auth_switch;
@@ -23,7 +24,6 @@ use crate::node_agent_runtime::NodeRuntime;
 use crate::node_agent_task_journal;
 use crate::node_agent_tool_approval;
 use crate::pc_workspace_provisioner;
-use crate::cli_usage;
 pub(crate) fn ws_text(msg: &AgentToServer) -> Message {
     Message::Text(serde_json::to_string(msg).unwrap_or_default())
 }
@@ -153,7 +153,8 @@ pub(crate) struct CliPromptRun {
     pub(crate) extra_args: Vec<String>,
     pub(crate) runtime_permission: Option<String>,
     pub(crate) cwd: Option<String>,
-    pub(crate) conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
+    pub(crate) conversation_workspace:
+        Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     pub(crate) prompt: String,
     pub(crate) server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     pub(crate) approval_state: node_agent_tool_approval::ToolApprovalState,
@@ -338,6 +339,11 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
     }
     if cli_name == "codex" {
+        if let Some(args) = crate::node_agent_cli_mcp::codex_mcp_config_args(&prompt) {
+            for arg in args {
+                push_tracked_arg(&mut cmd, &mut sidecar_args, arg);
+            }
+        }
         for a in &extra_args {
             if let Some(model) = a.strip_prefix("--codex-model=") {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "-m");
