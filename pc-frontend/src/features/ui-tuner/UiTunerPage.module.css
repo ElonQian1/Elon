@@ -50,11 +50,17 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
-  padding: 12px;
+  padding: 8px 12px 12px;
   border-bottom: 1px solid var(--border);
 }
 
+.templateGroup {
+  display: grid;
+  padding: 12px 12px 0;
+}
+
 .addGroup button,
+.templateGroup button,
 .toolbarActions button,
 .viewControls button,
 .historyControls button,
@@ -74,6 +80,7 @@
 }
 
 .addGroup button:hover,
+.templateGroup button:hover,
 .toolbarActions button:hover,
 .viewControls button:hover,
 .historyControls button:hover,
@@ -83,12 +90,20 @@
 }
 
 .addGroup button:disabled,
+.templateGroup button:disabled,
 .toolbarActions button:disabled,
 .viewControls button:disabled,
 .historyControls button:disabled,
 .sectionHeader button:disabled {
   cursor: not-allowed;
   opacity: .38;
+}
+
+.templateGroup button {
+  height: 34px;
+  justify-content: flex-start;
+  padding: 0 12px;
+  background: #1f2023;
 }
 
 .layerList {

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Lock, Plus, Type, Unlock } from 'lucide-react'
+import { Eye, EyeOff, Lock, PanelLeft, Plus, Type, Unlock } from 'lucide-react'
 import type { UiTunerFilterResult, UiTunerFilterState } from './filtering'
 import type { UiTunerElementKind } from './types'
 import { kindLabel } from './uiTunerGeometry'
@@ -11,6 +11,7 @@ interface UiTunerLayersPanelProps {
   filterResult: UiTunerFilterResult
   selectedId: string | null
   onAddElement: (kind: UiTunerElementKind) => void
+  onApplyAppSidebarTemplate: () => void
   onFilterChange: (patch: Partial<UiTunerFilterState>) => void
   onResetFilter: () => void
   onSelectElement: (id: string) => void
@@ -23,6 +24,7 @@ export function UiTunerLayersPanel({
   filterResult,
   selectedId,
   onAddElement,
+  onApplyAppSidebarTemplate,
   onFilterChange,
   onResetFilter,
   onSelectElement,
@@ -34,6 +36,13 @@ export function UiTunerLayersPanel({
       <div className={styles.panelHeader}>
         <h1>微调画布</h1>
         <p>导入 APP 截图作为真实底图，再拖动图层调位置、尺寸、字号和间距。</p>
+      </div>
+
+      <div className={styles.templateGroup}>
+        <button type="button" onClick={onApplyAppSidebarTemplate}>
+          <PanelLeft size={14} aria-hidden="true" />
+          APP 侧边栏模板
+        </button>
       </div>
 
       <div className={styles.addGroup}>

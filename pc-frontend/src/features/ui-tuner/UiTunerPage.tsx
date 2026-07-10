@@ -13,6 +13,11 @@ import {
   saveUiTunerDocument,
   stringifyUiTunerExport,
 } from './uiTunerStorage'
+import {
+  APP_SIDEBAR_TEMPLATE_SOURCE,
+  createAppSidebarTemplateElements,
+  isAppSidebarTemplateElement,
+} from './appSidebarTemplate'
 import { clamp, getMetrics, touch } from './uiTunerGeometry'
 import {
   captureAndroidSnapshot,
@@ -302,6 +307,28 @@ export default function UiTunerPage() {
     commitDocument((current) => touch({ ...current, elements: [...current.elements, next] }), next.id)
   }
 
+  const applyAppSidebarTemplate = () => {
+    const templateElements = createAppSidebarTemplateElements(tunerDocRef.current.canvas)
+    const selectedTemplate = templateElements.find((element) => element.id.endsWith('.search')) ?? templateElements[0]
+    commitDocument((current) => touch({
+      ...current,
+      source: APP_SIDEBAR_TEMPLATE_SOURCE,
+      canvas: {
+        ...current.canvas,
+        name: current.canvas.referenceImage ? `${current.canvas.referenceImage.name} 侧边栏模板` : 'APP 侧边栏模板画布',
+        source: APP_SIDEBAR_TEMPLATE_SOURCE,
+      },
+      elements: [
+        ...current.elements.filter((element) => (
+          !isAppSidebarTemplateElement(element) && !element.id.startsWith('apk.')
+        )),
+        ...templateElements,
+      ],
+    }), selectedTemplate?.id ?? null)
+    setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
+    setNotice('已生成 APP 侧边栏模板，可调搜索框、项目卡和底部用户栏')
+  }
+
   const deleteSelected = () => {
     if (!selected) return
     commitDocument((current) => touch({
@@ -560,6 +587,7 @@ export default function UiTunerPage() {
         filterResult={filterResult}
         selectedId={selectedId}
         onAddElement={addElement}
+        onApplyAppSidebarTemplate={applyAppSidebarTemplate}
         onFilterChange={updateLayerFilter}
         onResetFilter={resetLayerFilter}
         onSelectElement={setSelectedId}
