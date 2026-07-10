@@ -17,15 +17,25 @@ export function messageText(msg: ChatMessage): string {
 
 export function taskResultDisplayText(msg: ChatMessage): string {
   const content = messageText(msg)
-  if (content) return content
+  const status = clean(msg.task_status ?? msg.taskStatus ?? '').toLowerCase()
+  if (content) return FAILED_TASK_STATUSES.has(status) ? friendlyTaskFailure(content) : content
 
   const taskError = clean(msg.task_error ?? msg.taskError ?? '')
-  if (taskError) return taskError
+  if (taskError) return FAILED_TASK_STATUSES.has(status) ? friendlyTaskFailure(taskError) : taskError
 
-  const status = clean(msg.task_status ?? msg.taskStatus ?? '').toLowerCase()
   if (FAILED_TASK_STATUSES.has(status)) return '任务失败，未收到详细错误。'
   if (CANCELED_TASK_STATUSES.has(status)) return '任务已停止。'
   return ''
+}
+
+function friendlyTaskFailure(value: string): string {
+  if (/(?:server-runtime|平台\s*AI\s*runtime|provider_error).*(?:502|bad gateway)|(?:502|bad gateway).*(?:runtime|provider)/i.test(value)) {
+    return '平台 AI 暂时不可用，本轮没有生成有效回复，结果未确认完成。请重试处理。'
+  }
+  if (/没有返回(?:收尾|可展示的最终)回复|结果无法确认完成/.test(value)) {
+    return '本机 AI 没有返回完整的最终回复，本轮未标记为完成。请重试处理。'
+  }
+  return value
 }
 
 export function taskRequestLooksMarkdown(value: string): boolean {

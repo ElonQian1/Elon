@@ -66,7 +66,7 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
           />
         )
       ))}
-      <TimelineFold title="连接记录" count={display.grouped.connection.length} defaultOpen={false}>
+      <TimelineFold title="连接诊断" count={display.grouped.connection.length} defaultOpen={false}>
         {display.grouped.connection.map((item) => (
           <TimelineRow
             key={item.id}
@@ -199,7 +199,7 @@ function TimelineRow({ item, taskContext, expandAll = false, onCancel, onApprove
             <DevTaskMessage
               message={item.message as ChatMessage}
               context={taskContext}
-              onCancel={onCancel}
+              onCancel={item.event?.type === 'tool_approval_required' ? undefined : onCancel}
               onApprove={onApprove}
             />
           </div>

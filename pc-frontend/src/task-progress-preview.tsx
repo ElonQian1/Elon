@@ -28,6 +28,7 @@ type ScenarioId =
   | 'resume-required'
   | 'timeout'
   | 'done'
+  | 'incomplete'
   | 'failed'
   | 'canceled'
 type ViewId = 'all' | ScenarioId
@@ -243,6 +244,19 @@ const scenarios: Scenario[] = [
     ],
   },
   {
+    id: 'incomplete',
+    label: '回复未完成',
+    width: 960,
+    messages: [
+      task('请读取项目规则并完成只读诊断。', 'failed'),
+      progress('我先读取项目规则，再继续完成诊断。'),
+      toolCall('Get-Content -Raw CODEX.md'),
+      toolResult('CODEX Project Entry', 0),
+      event({ type: 'runtime_status', status: 'error', phase: 'final_reply_missing', runtime: 'codex', message: '最后一条公开说明之后仍有工具执行，但没有收到收尾回复。' }),
+      result('PC CLI 执行未完成：Codex 没有返回收尾回复；本轮结果无法确认完成。请点击“重试处理”继续。', 'failed'),
+    ],
+  },
+  {
     id: 'failed',
     label: '平台异常',
     width: 960,
@@ -274,12 +288,20 @@ function Preview() {
   const [expandAll, setExpandAll] = useState(() => initialExpandFromLocation())
   const activeScenario = scenarios.find((item) => item.id === activeId)
   const visibleScenarios = activeId === 'all' ? scenarios : activeScenario ? [activeScenario] : scenarios
-
+  const toggleExpand = () => setExpandAll((value) => {
+    const next = !value
+    updatePreviewLocation(undefined, next)
+    return next
+  })
+  const selectScenario = (view: ViewId) => {
+    setActiveId(view)
+    updatePreviewLocation(view, undefined)
+  }
   if (liveConfig.enabled) {
     return (
       <>
         <style>{previewCss}</style>
-        <LivePreview config={liveConfig} expandAll={expandAll} onToggleExpand={() => setExpandAll((value) => !value)} />
+        <LivePreview config={liveConfig} expandAll={expandAll} onToggleExpand={toggleExpand} />
       </>
     )
   }
@@ -293,12 +315,12 @@ function Preview() {
           type="button"
           className="expandToggle"
           data-active={expandAll ? 'true' : undefined}
-          onClick={() => setExpandAll((value) => !value)}
+          onClick={toggleExpand}
         >
           {expandAll ? '过程展开中' : '按真实默认'}
         </button>
         <div className="scenarioTabs">
-          <button type="button" data-active={activeId === 'all' ? 'true' : undefined} onClick={() => setActiveId('all')}>
+          <button type="button" data-active={activeId === 'all' ? 'true' : undefined} onClick={() => selectScenario('all')}>
             全部生命周期
           </button>
           {scenarios.map((item) => (
@@ -306,7 +328,7 @@ function Preview() {
               key={item.id}
               type="button"
               data-active={item.id === activeId ? 'true' : undefined}
-              onClick={() => setActiveId(item.id)}
+              onClick={() => selectScenario(item.id)}
             >
               {item.label}
             </button>
@@ -332,11 +354,16 @@ function initialExpandFromLocation(): boolean {
   const value = new URLSearchParams(window.location.search).get('expand')
   return value != null && value !== '0'
 }
-
+function updatePreviewLocation(view: ViewId | undefined, expand: boolean | undefined) {
+  const url = new URL(window.location.href)
+  if (view !== undefined) url.searchParams.set('view', view)
+  if (expand !== undefined) url.searchParams.set('expand', expand ? '1' : '0')
+  window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+}
 function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAll: boolean }) {
   const feedRef = useRef<HTMLDivElement>(null)
   const conversationId = `preview-conversation-${scenario.id}`
-  const openProcessInPlace = expandAll && scenario.id === 'tools'
+  const openProcessInPlace = expandAll
   const taskMessages = useMemo(() => scenario.messages as Message[], [scenario])
   const conversationMessages = useMemo<Message[]>(() => [requestMessage(scenario, conversationId)], [conversationId, scenario])
   const taskMessagesById = useMemo(() => new Map([[taskId, taskMessages]]), [taskMessages])

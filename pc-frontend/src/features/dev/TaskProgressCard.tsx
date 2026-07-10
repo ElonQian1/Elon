@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Monitor, PlayCircle, Settings, StopCircle } from 'lucide-react'
+import { ChevronDown, ChevronRight, CircleHelp, Monitor, PlayCircle, Settings, StopCircle } from 'lucide-react'
 import type { TaskTimelineModel } from './taskTimelineModel'
 import { launchWinClientProtocol } from '../node/launchWinClient'
 import type { TaskTone } from './types'
@@ -196,16 +196,22 @@ function StageActions({ state, onContinue }: { state: StageActionState; onContin
         </button>
       )}
       {state.canOpenNode && (
-        <>
-          <button type="button" onClick={launchWinClientProtocol}>
-            <Monitor size={13} aria-hidden="true" />
-            <span>启动 Win 端</span>
-          </button>
-          <a href="/pc/node">
-            <Settings size={13} aria-hidden="true" />
-            <span>节点设置</span>
-          </a>
-        </>
+        <details className={styles.stageHelp}>
+          <summary>
+            <CircleHelp size={13} aria-hidden="true" />
+            <span>节点帮助</span>
+          </summary>
+          <div className={styles.stageHelpMenu}>
+            <button type="button" onClick={launchWinClientProtocol}>
+              <Monitor size={13} aria-hidden="true" />
+              <span>启动 Win 端</span>
+            </button>
+            <a href="/pc/node">
+              <Settings size={13} aria-hidden="true" />
+              <span>打开节点设置</span>
+            </a>
+          </div>
+        </details>
       )}
     </div>
   )

@@ -8,6 +8,7 @@
         should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
         NativeSessionScope,
     };
+    use super::codex_reply_is_complete;
     use serde_json::Value;
 
     fn test_scope(conversation_id: &str) -> NativeSessionScope {
@@ -259,6 +260,26 @@ Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查
         );
 
         assert_eq!(extract_codex_reply(output), "最终回复。已完成授权选择器。");
+        assert!(codex_reply_is_complete(output));
+    }
+
+    #[test]
+    fn pc_codex_reply_requires_a_summary_after_the_last_tool() {
+        let incomplete = concat!(
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"我先读取规则。"}}"#,
+            "\n",
+            r#"{"type":"item.started","item":{"type":"command_execution","command":"Get-Content CODEX.md"}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"command_execution","exit_code":0}}"#,
+        );
+        let complete = format!(
+            "{}\n{}",
+            incomplete,
+            r#"{"type":"item.completed","item":{"type":"agent_message","text":"只读检查完成，规则已确认。"}}"#,
+        );
+
+        assert!(!codex_reply_is_complete(incomplete));
+        assert!(codex_reply_is_complete(&complete));
     }
 
     #[test]

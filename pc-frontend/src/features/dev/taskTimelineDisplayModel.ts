@@ -26,11 +26,15 @@ export function buildTimelineDisplay(model: TaskTimelineModel, {
     .filter((item) => !isCurrentStageSourceItem(model.stage, item))
     .filter((item) => !isRedundantTerminalSummary(item, model.stage.tone))
   const grouped = groupTimelineItems(displayItems, completed, model.stage.tone)
-  const primaryItems = hideCommands ? grouped.primary.filter((item) => !isCommandTimelineItem(item)) : grouped.primary
+  const visibleGrouped = {
+    ...grouped,
+    connection: shouldShowConnectionDetails(model) ? grouped.connection : [],
+  }
+  const primaryItems = hideCommands ? visibleGrouped.primary.filter((item) => !isCommandTimelineItem(item)) : visibleGrouped.primary
   const primaryBlocks = groupPrimaryTimelineBlocks(primaryItems)
   const hasApprovalItem = primaryItems.some((item) => item.kind === 'approval' && item.tone === 'approval')
   const showStageAtTop = model.stage.key === 'approval' && !hasApprovalItem
-  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, grouped.connection)
+  const showDiagnosticDetails = shouldShowDiagnosticDetails(model, visibleGrouped.connection)
   const showCoverageInDiagnostics = showDiagnosticDetails && hasActiveCoverage(model)
   const diagnosticCount = showDiagnosticDetails
     ? model.diagnostics.length + (showCoverageInDiagnostics ? 1 : 0)
@@ -38,10 +42,10 @@ export function buildTimelineDisplay(model: TaskTimelineModel, {
   const hasVisibleTimeline = showStageAtTop
     || primaryBlocks.length > 0
     || diagnosticCount > 0
-    || grouped.connection.length > 0
-    || grouped.summary.length > 0
+    || visibleGrouped.connection.length > 0
+    || visibleGrouped.summary.length > 0
   return {
-    grouped,
+    grouped: visibleGrouped,
     primaryBlocks,
     showStageAtTop,
     showDiagnosticDetails,
@@ -49,6 +53,18 @@ export function buildTimelineDisplay(model: TaskTimelineModel, {
     diagnosticCount,
     hasVisibleTimeline,
   }
+}
+
+function shouldShowConnectionDetails(model: TaskTimelineModel) {
+  if (model.stage.stuck || model.stage.tone === 'failed') return true
+  return [
+    'recovery',
+    'recovering',
+    'recovery-timeout',
+    'resume-required',
+    'timeout',
+    'tool-timeout',
+  ].includes(model.stage.key)
 }
 
 export function diagnosticFoldTitle(model: TaskTimelineModel) {

@@ -15,6 +15,10 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     rollupOptions: {
+      input: {
+        app: resolve(__dirname, 'index.html'),
+        taskProgressPreview: resolve(__dirname, 'task-progress-preview.html'),
+      },
       output: {
         // 按模块分 chunk，便于长期缓存
         manualChunks: {

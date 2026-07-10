@@ -356,6 +356,62 @@
   color: #9eb4ff;
 }
 
+.stageHelp {
+  position: relative;
+}
+
+.stageHelp > summary {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #8f9caf;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+  cursor: pointer;
+  list-style: none;
+}
+
+.stageHelp > summary::-webkit-details-marker {
+  display: none;
+}
+
+.stageHelp > summary:hover,
+.stageHelp[open] > summary {
+  color: #eef3fb;
+}
+
+.stageHelpMenu {
+  position: absolute;
+  z-index: 8;
+  top: 28px;
+  left: 0;
+  width: 156px;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid rgba(148, 163, 184, .16);
+  border-radius: 6px;
+  background: #1b1f27;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, .34);
+}
+
+.stageActions .stageHelpMenu button,
+.stageActions .stageHelpMenu a {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
+  color: #aeb9ca;
+  justify-content: flex-start;
+}
+
+.stageActions .stageHelpMenu button:hover,
+.stageActions .stageHelpMenu a:hover {
+  background: rgba(255, 255, 255, .055);
+  color: #eef3fb;
+}
+
 .detailButton {
   min-width: 0;
   min-height: 24px;

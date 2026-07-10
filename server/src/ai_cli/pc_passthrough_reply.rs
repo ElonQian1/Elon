@@ -142,6 +142,60 @@ pub(crate) fn extract_codex_reply(output: &str) -> String {
         .unwrap_or_default()
 }
 
+pub(crate) fn codex_reply_is_complete(output: &str) -> bool {
+    let clean = strip_terminal_control_sequences(output);
+    let mut last_agent_message = None;
+    let mut last_tool_event = None;
+
+    for (index, line) in clean.lines().enumerate() {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line.trim()) else {
+            continue;
+        };
+        let Some(event_type) = value.get("type").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        if event_type != "item.started" && event_type != "item.completed" {
+            continue;
+        }
+        let Some(item) = value.get("item") else {
+            continue;
+        };
+        let item_type = item
+            .get("type")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
+        if event_type == "item.completed" && item_type == "agent_message" {
+            let text = item
+                .get("text")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            if is_useful_codex_reply(text) {
+                last_agent_message = Some(index);
+            }
+        } else if is_codex_tool_item(item_type) {
+            last_tool_event = Some(index);
+        }
+    }
+
+    match (last_agent_message, last_tool_event) {
+        (Some(agent), Some(tool)) => agent > tool,
+        (Some(_), None) => true,
+        (None, _) => !extract_marker_lightweight_reply(&clean).is_empty(),
+    }
+}
+
+fn is_codex_tool_item(item_type: &str) -> bool {
+    matches!(
+        item_type,
+        "command_execution"
+            | "file_change"
+            | "mcp_tool_call"
+            | "web_search"
+            | "dynamic_tool_call"
+            | "tool_call"
+    )
+}
+
 fn extract_codex_json_agent_reply(output: &str) -> Option<String> {
     let mut replies = Vec::new();
     for line in output.lines() {

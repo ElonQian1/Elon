@@ -121,8 +121,29 @@ try {
 
   assert.deepStrictEqual(
     display.grouped.connection.map((item) => item.title),
+    [],
+    'healthy connection events should not add a second diagnostic fold',
+  );
+
+  const timeoutTimeline = buildTaskTimeline([
+    {
+      id: 'timeout-dispatch',
+      kind: 'ai_progress',
+      task_id: 'tsk-timeout',
+      content: '{"type":"pc_dispatch_started","status":"running","message":"已获得 PC 会话执行权。"}',
+    },
+    {
+      id: 'timeout-status',
+      kind: 'ai_progress',
+      task_id: 'tsk-timeout',
+      content: '{"type":"runtime_status","status":"error","phase":"pc_cli_no_output_timeout","message":"没有收到公开输出。"}',
+    },
+  ]);
+  const timeoutDisplay = buildTimelineDisplay(timeoutTimeline, {});
+  assert.deepStrictEqual(
+    timeoutDisplay.grouped.connection.map((item) => item.title),
     ['已派发到 PC 节点'],
-    'node and connection events should stay out of the main reading flow',
+    'stuck tasks should retain connection evidence inside diagnostics',
   );
 
   const displayWithoutCommands = buildTimelineDisplay(mixedTimeline, { hideCommands: true });

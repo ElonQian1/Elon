@@ -92,6 +92,26 @@ try {
     '当前 Codex 账号登录已失效，auth.json 无法刷新；账号本人需要重新登录。',
     'task cards should use task_error as the visible final result text',
   )
+  assert.strictEqual(
+    taskResultDisplayText({
+      kind: 'ai_result',
+      task_id: 'tsk-provider-error',
+      task_status: 'failed',
+      content: '任务遇到问题：平台 AI runtime 返回 502 Bad Gateway，本轮没有生成有效诊断。',
+    }),
+    '平台 AI 暂时不可用，本轮没有生成有效回复，结果未确认完成。请重试处理。',
+    'provider details should stay in diagnostics instead of the primary failure reply',
+  )
+  assert.strictEqual(
+    taskResultDisplayText({
+      kind: 'ai_result',
+      task_id: 'tsk-final-missing',
+      task_status: 'failed',
+      content: 'PC CLI 执行未完成：Codex 在最后一条公开说明之后仍执行了命令，但没有返回收尾回复；本轮结果无法确认完成。',
+    }),
+    '本机 AI 没有返回完整的最终回复，本轮未标记为完成。请重试处理。',
+    'missing final replies should never be phrased as completed work',
+  )
   console.log('pc-frontend task-result tone tests passed')
 } finally {
   if (originalTsLoader) require.extensions['.ts'] = originalTsLoader

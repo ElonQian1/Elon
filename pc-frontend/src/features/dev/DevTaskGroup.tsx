@@ -19,8 +19,8 @@ import {
 import MarkdownContent from '../markdown/MarkdownContent'
 import UserAvatar from '../shell/UserAvatar'
 import { clean, formatTime } from '../../lib/utils'
-import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal, taskRequestLooksMarkdown, taskResultTone } from './devTaskUtils'
-import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
+import { messageKind, messageText, statusForTask, taskIdOf, taskIsTerminal, taskRequestLooksMarkdown, taskResultDisplayText, taskResultTone } from './devTaskUtils'
+import { buildTaskTimeline } from './taskTimelineModel'
 import { isStatusEchoProgressText } from './taskTimelineRuntime'
 import type { TimelineItem } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
@@ -67,7 +67,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const compactCompletedProcess = isDone && !!resultMsg
   const publicAssistantItems = publicAssistantTimelineItems(timeline)
   const terminalReason = terminalReasonFromTimeline(timeline, tone)
-  const processSummary = taskThreadSummary(timeline, publicAssistantItems.length, taskId, taskId ? shortId(taskId) : '')
+  const processSummary = taskThreadSummary(timeline)
   const hasPublicAssistantItems = publicAssistantItems.length > 0
   const publicAssistantItemsInConversation = !resultMsg && hasPublicAssistantItems
   const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline)
@@ -311,7 +311,7 @@ function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime,
   time?: string
   beforeBubble?: ReactNode
 }) {
-  const content = messageText(message)
+  const content = taskResultDisplayText(message)
   if (!content) return null
   const displayContent = terminalDisplayContent(content, tone, reason)
   const failed = tone === 'failed'
@@ -414,15 +414,9 @@ function statusForTaskGroup(
 
 function taskThreadSummary(
   timeline: ReturnType<typeof buildTaskTimeline>,
-  assistantNoteCount: number,
-  taskId: string,
-  shortTaskId: string,
 ): string {
-  const base = timelineSummary(timeline, taskId, shortTaskId)
-  if (!assistantNoteCount) return base
-  const noteSummary = `${assistantNoteCount} 条公开回复`
-  if (!base) return [noteSummary, shortTaskId || taskId].filter(Boolean).join(' · ')
-  return `${base} · ${noteSummary}`
+  if (timeline.visibleStepCount <= 0) return ''
+  return `${timeline.visibleStepCount} 步`
 }
 
 function publicAssistantTimelineItems(timeline: ReturnType<typeof buildTaskTimeline>): TimelineItem[] {

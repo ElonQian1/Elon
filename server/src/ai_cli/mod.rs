@@ -65,7 +65,7 @@ pub(crate) use self::pc_passthrough_events::{
     pc_cli_passthrough_event, pc_cli_passthrough_events_flush, pc_cli_passthrough_events_from_chunk,
 };
 #[cfg(test)]
-use self::pc_passthrough_reply::clean_codex_stream_chunk;
+use self::pc_passthrough_reply::{clean_codex_stream_chunk, codex_reply_is_complete};
 use self::pc_passthrough_reply::{
     extract_codex_reply, extract_marker_lightweight_reply, pc_lightweight_no_readable_diagnostic,
     pc_passthrough_empty_reply_diagnostic, sanitize_lightweight_pc_reply,
@@ -194,7 +194,6 @@ pub async fn run_plan_with_workspace(
 
 mod workspace_mode;
 use self::workspace_mode::run_with_workspace_mode;
-
 
 // ── PC agent 委托辅助函数 ─────────────────────────────────────────────────────
 
@@ -1026,12 +1025,19 @@ async fn run_via_pc_agent(
                     workspace_status.as_ref(),
                     attempt_apk_sync || looks_like_android_task(user_message),
                 );
-                let effective_exit_ok = exit_ok && !no_project_changes;
-                let effective_error = if no_project_changes {
-                    Some(PC_PROJECT_NO_CHANGES_ERROR.to_string())
-                } else {
-                    error.clone()
-                };
+                let readable_output = pc_cli_readable_output(
+                    is_codex,
+                    lightweight_pc_chat,
+                    stream_started,
+                    &full_text,
+                );
+                let (effective_exit_ok, effective_error) = readable_output.completion_status(
+                    exit_ok,
+                    no_project_changes,
+                    is_codex,
+                    lightweight_pc_chat,
+                    error.as_deref(),
+                );
                 if is_codex {
                     record_pc_codex_thread_id(
                         state,
@@ -1065,12 +1071,6 @@ async fn run_via_pc_agent(
                     );
                 }
                 pc_execution_guard.disarm();
-                let readable_output = pc_cli_readable_output(
-                    is_codex,
-                    lightweight_pc_chat,
-                    stream_started,
-                    &full_text,
-                );
                 let allow_codex_output_despite_error = pc_codex_error_output_can_complete(
                     is_codex,
                     readable_output.has_success_output,
@@ -1325,7 +1325,6 @@ async fn run_via_pc_agent(
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
 }
-
 
 #[cfg(test)]
 #[path = "pc_cli_passthrough_tests.rs"]
