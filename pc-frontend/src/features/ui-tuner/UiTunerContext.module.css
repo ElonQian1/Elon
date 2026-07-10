@@ -1,0 +1,178 @@
+.selectionContext {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(76, 175, 120, 0.36);
+  border-radius: 12px;
+  background: rgba(76, 175, 120, 0.08);
+}
+
+.selectionPreview {
+  display: grid;
+  min-height: 72px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 9px;
+  background: rgba(8, 11, 16, 0.88);
+}
+
+.selectionPreview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 92px;
+  object-fit: contain;
+}
+
+.selectionPreview span {
+  padding: 8px;
+  color: rgba(244, 247, 251, 0.54);
+  font-size: 10px;
+  text-align: center;
+}
+
+.selectionFacts {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.selectionFacts strong {
+  color: #a8e6bf;
+  font-size: 12px;
+}
+
+.selectionFacts span,
+.selectionFacts small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.selectionFacts span {
+  color: #f4f7fb;
+  font: 11px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.selectionFacts small {
+  color: rgba(244, 247, 251, 0.62);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.scopePicker {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.scopePicker > span {
+  color: rgba(244, 247, 251, 0.62);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scopePicker > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scopePicker button {
+  min-height: 30px;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(244, 247, 251, 0.7);
+  font-size: 10px;
+}
+
+.scopePicker button:disabled {
+  opacity: 0.35;
+}
+
+.scopePicker .activeScope {
+  border-color: rgba(76, 175, 120, 0.66);
+  background: rgba(76, 175, 120, 0.18);
+  color: #d9ffe6;
+}
+
+.verificationPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid rgba(168, 199, 250, 0.24);
+  border-radius: 12px;
+  background: rgba(168, 199, 250, 0.07);
+}
+
+.verificationPanel[data-verification-phase='passed'] {
+  border-color: rgba(76, 175, 120, 0.58);
+  background: rgba(76, 175, 120, 0.1);
+}
+
+.verificationPanel[data-verification-phase='failed'] {
+  border-color: rgba(255, 130, 120, 0.52);
+  background: rgba(255, 86, 72, 0.08);
+}
+
+.verificationPanel > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.verificationPanel strong {
+  color: #f4f7fb;
+  font-size: 12px;
+}
+
+.verificationPanel span,
+.verificationPanel small {
+  color: rgba(244, 247, 251, 0.66);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.verificationImages {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.verificationImages figure {
+  margin: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.26);
+}
+
+.verificationImages img {
+  display: block;
+  width: 100%;
+  height: 86px;
+  object-fit: contain;
+}
+
+.verificationImages figcaption {
+  padding: 4px;
+  color: rgba(244, 247, 251, 0.58);
+  font-size: 9px;
+  text-align: center;
+}
+
+.verificationPanel button {
+  min-height: 30px;
+  border: 1px solid rgba(168, 199, 250, 0.3);
+  border-radius: 8px;
+  background: rgba(168, 199, 250, 0.12);
+  color: #dce9ff;
+  font-size: 10px;
+}

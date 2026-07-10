@@ -1,5 +1,11 @@
 import type { AndroidInspectorNode, AndroidInspectorSnapshot } from '../device/deviceInspectorApi'
-import type { UiTunerDocument, UiTunerElement, UiTunerElementKind, UiTunerSource } from '../types'
+import type {
+  UiTunerDocument,
+  UiTunerElement,
+  UiTunerElementKind,
+  UiTunerRuntimeStyle,
+  UiTunerSource,
+} from '../types'
 
 const MAX_RUNTIME_ELEMENTS = 180
 
@@ -39,6 +45,9 @@ export function snapshotToTunerDocument(snapshot: AndroidInspectorSnapshot): UiT
       capturedAt: snapshot.capturedAt,
       nodeCount: snapshot.xml.nodeCount,
       sourceRoot: snapshot.sourceRoot,
+      sourceFingerprint: snapshot.sourceFingerprint,
+      sourceBindingsPath: snapshot.sourceBindingsPath,
+      artifact: snapshot.artifact,
     },
     updatedAt: new Date().toISOString(),
   }
@@ -56,6 +65,7 @@ function usefulNodes(nodes: AndroidInspectorNode[]): AndroidInspectorNode[] {
 function nodeToElement(node: AndroidInspectorNode, index: number): UiTunerElement {
   const label = node.text || node.contentDesc || lastResourceName(node.resourceId) || node.className || `节点 ${index + 1}`
   const kind = nodeKind(node)
+  const style = styleForNode(node, kind)
   return {
     id: `runtime-${node.id}`,
     name: label,
@@ -65,6 +75,34 @@ function nodeToElement(node: AndroidInspectorNode, index: number): UiTunerElemen
     width: Math.max(node.bounds.width, 8),
     height: Math.max(node.bounds.height, 8),
     text: label,
+    ...style,
+    source: node.source
+      ? inspectorSource(node.source, node.resourceId)
+      : {
+          kind: 'runtime_xml',
+          label: node.resourceId ? 'runtime resource-id' : 'runtime XML node',
+          token: node.resourceId,
+          rawValue: node.xpath,
+        },
+    sourceCandidates: node.sourceCandidates?.map((source) => inspectorSource(source, node.resourceId)) ?? [],
+    runtime: {
+      nodeId: node.id,
+      resourceId: node.resourceId,
+      className: node.className,
+      packageName: node.packageName,
+      xpath: node.xpath,
+      indexPath: node.indexPath,
+      originalBounds: node.bounds,
+      originalStyle: style,
+    },
+  }
+}
+
+function styleForNode(
+  node: AndroidInspectorNode,
+  kind: UiTunerElementKind,
+): UiTunerRuntimeStyle {
+  return {
     fontSize: kind === 'text' ? 13 : 12,
     lineHeight: kind === 'text' ? 18 : 16,
     fontWeight: node.clickable ? 700 : 500,
@@ -77,30 +115,25 @@ function nodeToElement(node: AndroidInspectorNode, index: number): UiTunerElemen
     background: node.clickable ? 'rgba(76, 175, 120, 0.13)' : 'rgba(168, 199, 250, 0.08)',
     borderColor: node.source ? '#a8c7fa' : 'rgba(255, 255, 255, 0.24)',
     opacity: 1,
-    source: node.source
-      ? {
-          kind: 'runtime_xml',
-          label: node.source.reason,
-          file: node.source.file,
-          line: node.source.line,
-          token: node.source.token,
-          rawValue: node.resourceId,
-        }
-      : {
-          kind: 'runtime_xml',
-          label: node.resourceId ? 'runtime resource-id' : 'runtime XML node',
-          token: node.resourceId,
-          rawValue: node.xpath,
-        },
-    runtime: {
-      nodeId: node.id,
-      resourceId: node.resourceId,
-      className: node.className,
-      packageName: node.packageName,
-      xpath: node.xpath,
-      indexPath: node.indexPath,
-      originalBounds: node.bounds,
-    },
+  }
+}
+
+function inspectorSource(
+  source: NonNullable<AndroidInspectorNode['source']>,
+  resourceId?: string,
+): UiTunerSource {
+  return {
+    kind: 'runtime_xml',
+    label: source.reason,
+    file: source.file,
+    line: source.line,
+    token: source.token,
+    rawValue: resourceId,
+    confidence: source.confidence,
+    reason: source.reason,
+    matchKind: source.matchKind,
+    componentKey: source.componentKey,
+    scope: source.scope,
   }
 }
 

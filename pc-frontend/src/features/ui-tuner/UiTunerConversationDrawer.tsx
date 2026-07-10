@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { GitBranch, MessageSquareText, RefreshCw, Send, X } from 'lucide-react'
 import { api } from '../../api/client'
 import { clean } from '../../lib/utils'
@@ -40,12 +40,14 @@ interface UiTunerConversationDrawerProps {
   localNodeStatusText: string
   selectedSession: UiTunerProjectSessionRecord | null
   visibleSessions: UiTunerProjectSessionRecord[]
+  verificationTaskId: string
   status: string
   onSelectSession: (sessionId: string) => void
   onStartSession: (
     mode: UiTunerConversationMode,
     overrideIntent?: string,
   ) => Promise<UiTunerProjectSessionRecord | null>
+  onTaskSettled: () => void
 }
 
 export default function UiTunerConversationDrawer({
@@ -61,9 +63,11 @@ export default function UiTunerConversationDrawer({
   localNodeStatusText,
   selectedSession,
   visibleSessions,
+  verificationTaskId,
   status,
   onSelectSession,
   onStartSession,
+  onTaskSettled,
 }: UiTunerConversationDrawerProps) {
   const user = useAuthStore((state) => state.user)
   const messages = useProjectStore((state) => state.messages)
@@ -74,6 +78,7 @@ export default function UiTunerConversationDrawer({
   const [conversationMessages, setConversationMessages] = useState<Message[]>([])
   const [sessionTaskMessages, setSessionTaskMessages] = useState<Message[]>([])
   const [drawerError, setDrawerError] = useState('')
+  const settledTaskRef = useRef('')
 
   const projectId = activeProject?.id ?? ''
   const channelId = aiChannel?.id ?? ''
@@ -96,7 +101,7 @@ export default function UiTunerConversationDrawer({
     session: UiTunerProjectSessionRecord | null = selectedSession,
     showSpinner = true,
   ) => {
-    if (!open || !projectId || !channelId || !targetUserId || !session?.conversationId) {
+    if (!projectId || !channelId || !targetUserId || !session?.conversationId) {
       setConversationMessages([])
       setSessionTaskMessages([])
       return
@@ -116,13 +121,16 @@ export default function UiTunerConversationDrawer({
     } finally {
       if (showSpinner) setFeedLoading(false)
     }
-  }, [channelId, loadMessages, open, projectId, selectedSession, targetUserId])
+  }, [channelId, loadMessages, projectId, selectedSession, targetUserId])
 
   useEffect(() => {
     if (!open) return
     setDraft(uiTunerConversationSeed(pack, intent))
+  }, [intent, open, pack])
+
+  useEffect(() => {
     void loadConversation(selectedSession)
-  }, [intent, loadConversation, open, pack, selectedSession])
+  }, [loadConversation, selectedSession])
 
   const taskMessagesById = useMemo(
     () => buildTaskProcessMessageMap([messages, sessionTaskMessages]),
@@ -144,6 +152,11 @@ export default function UiTunerConversationDrawer({
     [displayMessages],
   )
   const taskRunning = useMemo(() => hasRunningTask(displayMessages), [displayMessages])
+  const selectedTaskVisible = useMemo(() => {
+    const taskId = clean(verificationTaskId)
+    if (!taskId) return false
+    return displayMessages.some((message) => clean(message.task_id ?? message.taskId) === taskId)
+  }, [displayMessages, verificationTaskId])
   const {
     feedRef,
     handleFeedScroll,
@@ -159,12 +172,20 @@ export default function UiTunerConversationDrawer({
   })
 
   useEffect(() => {
-    if (!open || !taskRunning) return
+    if (!verificationTaskId || clean(selectedSession?.taskId) !== verificationTaskId) return
     const timer = window.setInterval(() => {
       void loadConversation(selectedSession, false)
     }, 4000)
     return () => window.clearInterval(timer)
-  }, [loadConversation, open, selectedSession, taskRunning])
+  }, [loadConversation, selectedSession, verificationTaskId])
+
+  useEffect(() => {
+    const taskId = clean(verificationTaskId)
+    if (!taskId || clean(selectedSession?.taskId) !== taskId || feedLoading || taskRunning || !selectedTaskVisible) return
+    if (settledTaskRef.current === taskId) return
+    settledTaskRef.current = taskId
+    onTaskSettled()
+  }, [feedLoading, onTaskSettled, selectedSession?.taskId, selectedTaskVisible, taskRunning, verificationTaskId])
 
   const submit = useCallback(async (mode: UiTunerConversationMode) => {
     const content = draft.trim()

@@ -16,9 +16,10 @@ use super::adb_wireless::{
     connect_and_remember, enable_tcpip, forget_device, list_device_inventory, pair_device,
     reconnect_devices, register_device, wireless_status,
 };
+use super::snapshot_artifact::persist_selection;
 use super::types::{
     CaptureRequest, ConnectRequest, EnableTcpIpRequest, ForgetDeviceRequest, LaunchAppRequest,
-    PairDeviceRequest, ReconnectRequest, RegisterDeviceRequest,
+    PairDeviceRequest, ReconnectRequest, RegisterDeviceRequest, SelectionArtifactRequest,
 };
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -54,7 +55,21 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-inspector/launch-app",
             post(launch_app_handler),
         )
+        .route(
+            "/api/android-inspector/selection-artifact",
+            post(selection_artifact_handler),
+        )
         .route("/api/android-inspector/capture", post(capture_handler))
+}
+
+async fn selection_artifact_handler(
+    State(_runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<SelectionArtifactRequest>,
+) -> Response {
+    match persist_selection(req) {
+        Ok(artifact) => Json(json!({ "ok": true, "artifact": artifact })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
 }
 
 async fn status_handler(State(_runtime): State<Arc<NodeRuntime>>) -> Response {

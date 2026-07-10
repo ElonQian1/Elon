@@ -97,7 +97,10 @@ export function UiTunerLayersPanel({
                   onClick={() => onSelectElement(element.id)}
                 >
                   <span>{kindLabel(element.kind)}</span>
-                  <strong>{element.name}</strong>
+                  <strong>
+                    {element.name}
+                    {analysis.repeatCount > 1 ? ` × ${analysis.repeatCount}` : ''}
+                  </strong>
                   <small>
                     {element.width} x {element.height}
                     {analysis.hiddenReasons.length ? ` · ${analysis.hiddenReasons[0]}` : ''}

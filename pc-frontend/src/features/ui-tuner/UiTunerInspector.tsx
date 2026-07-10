@@ -7,6 +7,8 @@ import { UiTunerCodexPanel } from './UiTunerCodexPanel'
 import { ColorField, NumberField } from './UiTunerFields'
 import { UiTunerStandardsPanel } from './UiTunerStandardsPanel'
 import type { MetricItem } from './uiTunerGeometry'
+import type { UiTunerCodexContextPack } from './contextPack'
+import type { UiTunerVerificationReport } from './runtime/verification'
 import styles from './UiTunerPage.module.css'
 
 const MIN_SIZE = 24
@@ -27,6 +29,9 @@ interface UiTunerInspectorProps {
   onApplyStandard: (standard: UiTunerElement['standard']) => void
   onSetProductMode: () => void
   onSetDebugMode: () => void
+  verificationReport: UiTunerVerificationReport | null
+  onMutationTaskStarted: (pack: UiTunerCodexContextPack) => Promise<void> | void
+  onRequestVerification: () => void
 }
 
 export function UiTunerInspector({
@@ -44,6 +49,9 @@ export function UiTunerInspector({
   onApplyStandard,
   onSetProductMode,
   onSetDebugMode,
+  verificationReport,
+  onMutationTaskStarted,
+  onRequestVerification,
 }: UiTunerInspectorProps) {
   return (
     <aside className={styles.inspector}>
@@ -76,6 +84,9 @@ export function UiTunerInspector({
             metrics={metrics}
             filterResult={filterResult}
             standardInsight={standardInsight}
+            verificationReport={verificationReport}
+            onMutationTaskStarted={onMutationTaskStarted}
+            onRequestVerification={onRequestVerification}
           />
           <GeometrySection tunerDoc={tunerDoc} selected={selected} onUpdateElement={onUpdateElement} />
           <TypographySection selected={selected} onUpdateElement={onUpdateElement} />

@@ -9,6 +9,7 @@ use super::adb_command::{
 };
 use super::adb_path::adb_path;
 use super::png_probe::png_dimensions;
+use super::snapshot_artifact::{persist_snapshot, PersistSnapshotInput};
 use super::source_map::attach_source_map;
 use super::types::{
     AdbStatus, AndroidDevice, CaptureRequest, DeviceUiSnapshot, ScreenshotPayload, UiXmlSummary,
@@ -98,14 +99,29 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
         }
         Err(error) => (String::new(), Vec::new(), Some(format!("{error:#}"))),
     };
-    let source_root = attach_source_map(&mut nodes, req.project_root.as_deref());
+    let source_map = attach_source_map(&mut nodes, req.project_root.as_deref());
+    let captured_at = Utc::now().to_rfc3339();
+    let artifact = persist_snapshot(PersistSnapshotInput {
+        device_id: &device_id,
+        package_name: Some(&package_name),
+        activity_name: activity_name.as_deref(),
+        captured_at: &captured_at,
+        source_root: source_map.root.as_deref(),
+        source_fingerprint: source_map.fingerprint.as_deref(),
+        screenshot_png: &screenshot.bytes,
+        screenshot_width: screenshot.payload.width,
+        screenshot_height: screenshot.payload.height,
+        raw_xml: &xml_raw,
+        nodes: &nodes,
+    })
+    .context("持久化真机快照失败")?;
     Ok(DeviceUiSnapshot {
         ok: true,
         device_id,
         package_name: Some(package_name),
         activity_name,
-        captured_at: Utc::now().to_rfc3339(),
-        screenshot: Some(screenshot),
+        captured_at,
+        screenshot: Some(screenshot.payload),
         xml: UiXmlSummary {
             node_count: nodes.len(),
             length: xml_raw.len(),
@@ -113,11 +129,19 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
             error: xml_error,
         },
         nodes,
-        source_root,
+        source_root: source_map.root,
+        source_fingerprint: source_map.fingerprint,
+        source_bindings_path: source_map.bindings_path,
+        artifact: Some(artifact),
     })
 }
 
-async fn capture_screenshot(device_id: &str, include_data_url: bool) -> Result<ScreenshotPayload> {
+struct CapturedScreenshot {
+    payload: ScreenshotPayload,
+    bytes: Vec<u8>,
+}
+
+async fn capture_screenshot(device_id: &str, include_data_url: bool) -> Result<CapturedScreenshot> {
     let args = vec![
         "-s".to_string(),
         device_id.to_string(),
@@ -129,12 +153,15 @@ async fn capture_screenshot(device_id: &str, include_data_url: bool) -> Result<S
     let (width, height) = png_dimensions(&output.stdout)?;
     let data_url =
         include_data_url.then(|| format!("data:image/png;base64,{}", B64.encode(&output.stdout)));
-    Ok(ScreenshotPayload {
-        data_url,
-        mime_type: "image/png",
-        width,
-        height,
-        bytes: output.stdout.len(),
+    Ok(CapturedScreenshot {
+        payload: ScreenshotPayload {
+            data_url,
+            mime_type: "image/png",
+            width,
+            height,
+            bytes: output.stdout.len(),
+        },
+        bytes: output.stdout,
     })
 }
 

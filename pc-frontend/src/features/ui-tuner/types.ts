@@ -1,6 +1,7 @@
 export type UiTunerElementKind = 'text' | 'card' | 'button' | 'media'
 export type UiTunerElementVisibility = 'visible' | 'hidden' | 'locked'
 export type UiTunerStandardScope = 'local_draft' | 'screen_override' | 'project_component' | 'design_token'
+export type UiTunerSelectionScope = 'instance' | 'component' | 'screen' | 'project'
 
 export interface UiTunerCanvas {
   name: string
@@ -29,6 +30,11 @@ export interface UiTunerSource {
   rawValue?: string
   signature?: string
   files?: string[]
+  confidence?: number
+  reason?: string
+  matchKind?: string
+  componentKey?: string
+  scope?: string
 }
 
 export interface UiTunerElement {
@@ -55,6 +61,7 @@ export interface UiTunerElement {
   visibility?: UiTunerElementVisibility
   standard?: UiTunerElementStandard
   source?: UiTunerSource
+  sourceCandidates?: UiTunerSource[]
   runtime?: UiTunerRuntimeElement
 }
 
@@ -90,6 +97,18 @@ export interface UiTunerRuntimeSnapshot {
   capturedAt: string
   nodeCount: number
   sourceRoot?: string
+  sourceFingerprint?: string
+  sourceBindingsPath?: string
+  artifact?: UiTunerSnapshotArtifact
+}
+
+export interface UiTunerSnapshotArtifact {
+  id: string
+  rootDir: string
+  manifestPath: string
+  screenshotPath: string
+  hierarchyPath: string
+  rawXmlPath?: string
 }
 
 export interface UiTunerRuntimeElement {
@@ -107,6 +126,22 @@ export interface UiTunerRuntimeElement {
     width: number
     height: number
   }
+  originalStyle: UiTunerRuntimeStyle
+}
+
+export interface UiTunerRuntimeStyle {
+  fontSize: number
+  lineHeight: number
+  fontWeight: number
+  letterSpacing: number
+  paddingX: number
+  paddingY: number
+  borderRadius: number
+  borderWidth: number
+  color: string
+  background: string
+  borderColor: string
+  opacity: number
 }
 
 export interface UiTunerExportElement {

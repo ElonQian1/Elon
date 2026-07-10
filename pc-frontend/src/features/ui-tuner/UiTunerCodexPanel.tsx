@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Clipboard, FileCode2, MessageSquareCode } from 'lucide-react'
 import type { UiTunerFilterResult } from './filtering'
 import { stringifyStandardPackage, type UiTunerStandardInsight } from './standards'
 import type { UiTunerDocument, UiTunerElement } from './types'
+import type { UiTunerSelectionScope } from './types'
 import type { MetricItem } from './uiTunerGeometry'
 import { summarizeClosurePriorities } from './closurePriorities'
 import {
@@ -11,8 +12,11 @@ import {
   stringifyUiTunerCodexContextPack,
 } from './contextPack'
 import { UiTunerProjectSessionPanel } from './UiTunerProjectSessionPanel'
+import { buildSelectionVisualContext, type UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 import pageStyles from './UiTunerPage.module.css'
 import panelStyles from './UiTunerPanels.module.css'
+import contextStyles from './UiTunerContext.module.css'
+import type { UiTunerVerificationReport } from './runtime/verification'
 
 interface UiTunerCodexPanelProps {
   tunerDoc: UiTunerDocument
@@ -20,6 +24,9 @@ interface UiTunerCodexPanelProps {
   metrics: MetricItem[]
   filterResult: UiTunerFilterResult
   standardInsight: UiTunerStandardInsight | null
+  verificationReport: UiTunerVerificationReport | null
+  onMutationTaskStarted: (pack: ReturnType<typeof buildUiTunerCodexContextPack>) => Promise<void> | void
+  onRequestVerification: () => void
 }
 
 const DEFAULT_INTENT = '把这个节点调整成可复用的 APK UI 美观标准，并说明应该保存到 token、组件标准还是当前页面覆盖。'
@@ -30,17 +37,48 @@ export function UiTunerCodexPanel({
   metrics,
   filterResult,
   standardInsight,
+  verificationReport,
+  onMutationTaskStarted,
+  onRequestVerification,
 }: UiTunerCodexPanelProps) {
   const [intent, setIntent] = useState(DEFAULT_INTENT)
   const [copyState, setCopyState] = useState('')
   const [fallbackText, setFallbackText] = useState('')
+  const repeatGroup = useMemo(
+    () => filterResult.repeatGroups.find((group) => group.memberIds.includes(selected.id)) ?? null,
+    [filterResult.repeatGroups, selected.id],
+  )
+  const [selectionScope, setSelectionScope] = useState<UiTunerSelectionScope>(repeatGroup ? 'component' : 'instance')
+  const [selectionVisual, setSelectionVisual] = useState<UiTunerSelectionVisualContext | null>(null)
+
+  useEffect(() => {
+    setSelectionScope(repeatGroup ? 'component' : 'instance')
+  }, [repeatGroup?.id, selected.id])
+
+  useEffect(() => {
+    let canceled = false
+    setSelectionVisual(null)
+    const timer = window.setTimeout(() => {
+      void buildSelectionVisualContext(tunerDoc, selected).then((visual) => {
+        if (!canceled) setSelectionVisual(visual)
+      })
+    }, 240)
+    return () => {
+      canceled = true
+      window.clearTimeout(timer)
+    }
+  }, [selected, tunerDoc])
+
   const pack = useMemo(() => buildUiTunerCodexContextPack({
     document: tunerDoc,
     selected,
     metrics,
     filterResult,
     standardInsight,
-  }), [filterResult, metrics, selected, standardInsight, tunerDoc])
+    selectionScope,
+    repeatGroup,
+    selectionVisual,
+  }), [filterResult, metrics, repeatGroup, selected, selectionScope, selectionVisual, standardInsight, tunerDoc])
   const prompt = useMemo(() => buildUiTunerCodexTaskPrompt(pack, intent), [intent, pack])
   const stages = useMemo(() => summarizeClosurePriorities(), [])
   const binding = pack.runtimeBinding
@@ -84,6 +122,42 @@ export function UiTunerCodexPanel({
         </small>
       </div>
 
+      <div className={contextStyles.selectionContext}>
+        <div className={contextStyles.selectionPreview}>
+          {selectionVisual?.previewDataUrl ? (
+            <img src={selectionVisual.previewDataUrl} alt={`当前选中：${selected.name}`} />
+          ) : (
+            <span>{tunerDoc.canvas.referenceImage ? '正在生成选区预览…' : '当前画布没有真机截图'}</span>
+          )}
+        </div>
+        <div className={contextStyles.selectionFacts}>
+          <strong>已锁定当前元素</strong>
+          <span>{selected.runtime?.resourceId ?? selected.source?.componentKey ?? selected.id}</span>
+          <small>
+            {selectionVisual?.artifact?.cropPath
+              ? '选区截图和节点上下文会自动发送给 Codex'
+              : selectionVisual?.error ?? 'XML、源码候选和当前调节值会自动发送'}
+          </small>
+        </div>
+      </div>
+
+      <div className={contextStyles.scopePicker}>
+        <span>修改范围</span>
+        <div>
+          <ScopeButton scope="instance" current={selectionScope} onChange={setSelectionScope}>仅此实例</ScopeButton>
+          <ScopeButton
+            scope="component"
+            current={selectionScope}
+            onChange={setSelectionScope}
+            disabled={!repeatGroup && !selected.source?.componentKey}
+          >
+            同类组件{repeatGroup ? ` × ${repeatGroup.count}` : ''}
+          </ScopeButton>
+          <ScopeButton scope="screen" current={selectionScope} onChange={setSelectionScope}>当前页面</ScopeButton>
+          <ScopeButton scope="project" current={selectionScope} onChange={setSelectionScope}>全项目标准</ScopeButton>
+        </div>
+      </div>
+
       <label className={panelStyles.codexIntent}>
         <span>给 Codex 的修改意图</span>
         <textarea value={intent} onChange={(event) => setIntent(event.currentTarget.value)} />
@@ -98,6 +172,9 @@ export function UiTunerCodexPanel({
             metrics,
             filterResult,
             standardInsight,
+            selectionScope,
+            repeatGroup,
+            selectionVisual,
           }))}
         >
           <Clipboard size={14} aria-hidden="true" />
@@ -118,7 +195,37 @@ export function UiTunerCodexPanel({
         <textarea className={panelStyles.codexFallback} value={fallbackText} readOnly />
       )}
 
-      <UiTunerProjectSessionPanel pack={pack} intent={intent} />
+      <UiTunerProjectSessionPanel
+        pack={pack}
+        intent={intent}
+        onMutationTaskStarted={onMutationTaskStarted}
+        onTaskSettled={onRequestVerification}
+      />
+
+      {verificationReport && (
+        <div className={contextStyles.verificationPanel} data-verification-phase={verificationReport.phase}>
+          <div>
+            <strong>{verificationTitle(verificationReport.phase)}</strong>
+            <span>{verificationReport.message}</span>
+          </div>
+          {(verificationReport.beforePreviewDataUrl || verificationReport.afterPreviewDataUrl) && (
+            <div className={contextStyles.verificationImages}>
+              {verificationReport.beforePreviewDataUrl && (
+                <figure><img src={verificationReport.beforePreviewDataUrl} alt="修改前选区" /><figcaption>修改前</figcaption></figure>
+              )}
+              {verificationReport.afterPreviewDataUrl && (
+                <figure><img src={verificationReport.afterPreviewDataUrl} alt="修改后选区" /><figcaption>修改后</figcaption></figure>
+              )}
+            </div>
+          )}
+          {verificationReport.visualChangePercent !== undefined && (
+            <small>视觉变化 {verificationReport.visualChangePercent.toFixed(2)}%</small>
+          )}
+          {verificationReport.retryable && (
+            <button type="button" onClick={onRequestVerification}>重新采集验收</button>
+          )}
+        </div>
+      )}
 
       <div className={panelStyles.codexContract}>
         <span>Codex 必须输出</span>
@@ -135,6 +242,40 @@ export function UiTunerCodexPanel({
         ))}
       </div>
     </section>
+  )
+}
+
+function verificationTitle(phase: UiTunerVerificationReport['phase']) {
+  if (phase === 'waiting_codex') return '等待 Codex 完成'
+  if (phase === 'capturing') return '正在真机验收'
+  if (phase === 'passed') return '真机验收通过'
+  if (phase === 'review') return '需要人工确认'
+  if (phase === 'failed') return '验收未完成'
+  return '真机验收'
+}
+
+function ScopeButton({
+  scope,
+  current,
+  onChange,
+  disabled,
+  children,
+}: {
+  scope: UiTunerSelectionScope
+  current: UiTunerSelectionScope
+  onChange: (scope: UiTunerSelectionScope) => void
+  disabled?: boolean
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      className={current === scope ? contextStyles.activeScope : ''}
+      disabled={disabled}
+      onClick={() => onChange(scope)}
+    >
+      {children}
+    </button>
   )
 }
 

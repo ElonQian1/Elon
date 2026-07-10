@@ -100,6 +100,7 @@ export function UiTunerViewControls({
         <span>源码 {result.sourceMappedCount}</span>
         <span>结构 {result.structuralCount}</span>
         <span>重复 {result.duplicateCount}</span>
+        <span>同组件 {result.repeatedInstanceCount}</span>
       </div>
     </div>
   )

@@ -1,4 +1,9 @@
 import type { UiTunerDocument, UiTunerElement } from './types'
+import {
+  analyzeRepeatComponents,
+  type UiTunerRepeatAnalysis,
+  type UiTunerRepeatGroup,
+} from './runtime/repeatComponents'
 
 export type UiTunerViewMode = 'product' | 'layout' | 'source' | 'debug'
 
@@ -25,6 +30,9 @@ export interface UiTunerElementAnalysis {
   isTargetPackage: boolean
   isStructural: boolean
   isDuplicateBounds: boolean
+  repeatGroupId?: string
+  repeatCount: number
+  isRepeatRepresentative: boolean
   isVisible: boolean
   isLocked: boolean
   appearance: 'solid' | 'ghost' | 'outline'
@@ -51,6 +59,8 @@ export interface UiTunerFilterResult {
   structuralCount: number
   duplicateCount: number
   sourceMappedCount: number
+  repeatedInstanceCount: number
+  repeatGroups: UiTunerRepeatGroup[]
 }
 
 export const DEFAULT_UI_TUNER_FILTER: UiTunerFilterState = {
@@ -69,6 +79,7 @@ export function filterUiTunerElements(
   filter: UiTunerFilterState,
 ): UiTunerFilterResult {
   const duplicateWinners = pickDuplicateBoundsWinners(document.elements)
+  const repeatAnalysis = analyzeRepeatComponents(document.elements)
   const analysisById: Record<string, UiTunerElementAnalysis> = {}
   const visible: UiTunerFilteredElement[] = []
   let structuralCount = 0
@@ -76,7 +87,7 @@ export function filterUiTunerElements(
   let sourceMappedCount = 0
 
   for (const element of document.elements) {
-    const analysis = analyzeElement(document, element, duplicateWinners, filter)
+    const analysis = analyzeElement(document, element, duplicateWinners, repeatAnalysis, filter)
     analysisById[element.id] = analysis
     if (analysis.isStructural) structuralCount += 1
     if (analysis.isDuplicateBounds) duplicateCount += 1
@@ -95,6 +106,8 @@ export function filterUiTunerElements(
     structuralCount,
     duplicateCount,
     sourceMappedCount,
+    repeatedInstanceCount: repeatAnalysis.repeatedInstanceCount,
+    repeatGroups: repeatAnalysis.groups,
   }
 }
 
@@ -102,6 +115,7 @@ function analyzeElement(
   document: UiTunerDocument,
   element: UiTunerElement,
   duplicateWinners: Map<string, string>,
+  repeatAnalysis: UiTunerRepeatAnalysis,
   filter: UiTunerFilterState,
 ): UiTunerElementAnalysis {
   const hiddenReasons: string[] = []
@@ -118,6 +132,8 @@ function analyzeElement(
   const depth = element.runtime?.indexPath.length ?? 0
   const duplicateWinner = duplicateWinners.get(boundsKey(element))
   const isDuplicateBounds = Boolean(duplicateWinner && duplicateWinner !== element.id)
+  const repeatGroup = repeatAnalysis.groupByElementId[element.id]
+  const isRepeatRepresentative = !repeatGroup || repeatGroup.representativeId === element.id
   const role = inferRole(element)
   const groupLabel = inferGroupLabel(element, role)
   const query = filter.query.trim().toLowerCase()
@@ -130,6 +146,9 @@ function analyzeElement(
   if (query && !matchesQuery(element, role, query)) hiddenReasons.push('搜索不匹配')
 
   if (filter.mode !== 'debug' && isDuplicateBounds) hiddenReasons.push('同边界重复')
+  if (filter.mode === 'product' && repeatGroup && !isRepeatRepresentative) {
+    hiddenReasons.push(`同组件实例（共 ${repeatGroup.count} 个）`)
+  }
   if (filter.mode === 'product' && isStructural && !filter.showStructural && !isSourceMapped) {
     hiddenReasons.push('结构容器')
   }
@@ -152,6 +171,9 @@ function analyzeElement(
     isTargetPackage,
     isStructural,
     isDuplicateBounds,
+    repeatGroupId: repeatGroup?.id,
+    repeatCount: repeatGroup?.count ?? 1,
+    isRepeatRepresentative,
     isVisible,
     isLocked,
     appearance: resolveAppearance(filter.mode, isStructural, isSourceMapped, isVisible),

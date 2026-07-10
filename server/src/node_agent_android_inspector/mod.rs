@@ -5,6 +5,7 @@ pub(crate) mod adb_wireless;
 pub(crate) mod device_profiles;
 pub(crate) mod png_probe;
 pub(crate) mod routes;
+pub(crate) mod snapshot_artifact;
 pub(crate) mod source_map;
 pub(crate) mod types;
 pub(crate) mod xml_parser;

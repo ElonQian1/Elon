@@ -173,6 +173,7 @@ fn node_from_attributes(
         password,
         visible,
         source: None,
+        source_candidates: Vec::new(),
     })
 }
 

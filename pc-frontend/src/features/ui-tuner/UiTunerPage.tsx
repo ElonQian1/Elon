@@ -37,6 +37,17 @@ import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './type
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
+import { useProjectStore } from '../conversation/useProjectStore'
+import { mergeProjectRecords } from '../conversation/conversationPageHelpers'
+import { clean } from '../../lib/utils'
+import type { UiTunerCodexContextPack } from './contextPack'
+import {
+  createVerificationBaseline,
+  failedVerification,
+  verifyPostChangeSnapshot,
+  type UiTunerVerificationBaseline,
+  type UiTunerVerificationReport,
+} from './runtime/verification'
 import styles from './UiTunerPage.module.css'
 
 type DragMode = 'move' | 'resize'
@@ -74,6 +85,9 @@ function normalizeViewScale(value: number) {
 }
 
 export default function UiTunerPage() {
+  const projects = useProjectStore((state) => state.projects)
+  const activeProjectId = useProjectStore((state) => state.activeProjectId)
+  const projectSpace = useProjectStore((state) => state.space)
   const [tunerDoc, setTunerDoc] = useState<UiTunerDocument>(() => (
     loadUiTunerDocument(APK_STYLE_SOURCE_SIGNATURE) ?? createInitialTunerDocument()
   ))
@@ -90,6 +104,9 @@ export default function UiTunerPage() {
   const selectedIdRef = useRef<string | null>(selectedId)
   const dragSnapshotRef = useRef<UiTunerDocument | null>(null)
   const dragMovedRef = useRef(false)
+  const verificationCaptureRef = useRef(false)
+  const verificationBaselineRef = useRef<UiTunerVerificationBaseline | null>(null)
+  const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
 
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
@@ -109,6 +126,14 @@ export default function UiTunerPage() {
     [selected, tunerDoc],
   )
   const viewScaleLabel = `${Math.round(viewScale * 100)}%`
+  const activeProject = useMemo(
+    () => mergeProjectRecords(
+      projects.find((project) => project.id === activeProjectId),
+      projectSpace?.project,
+    ),
+    [activeProjectId, projectSpace?.project, projects],
+  )
+  const projectRoot = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
 
   const fitCanvasToStage = useCallback(() => {
     const scroller = canvasScrollerRef.current
@@ -149,12 +174,15 @@ export default function UiTunerPage() {
   }, [pushHistorySnapshot])
 
   const handleDeviceCaptured = useCallback((snapshot: AndroidInspectorSnapshot) => {
+    if (verificationCaptureRef.current) return
     const next = snapshotToTunerDocument(snapshot)
     commitDocument(() => next, next.elements[0]?.id ?? null)
     setFitToStage(true)
     setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
     setNotice(snapshot.xml.nodeCount > 0
-      ? `已捕获真实手机画面：${snapshot.xml.nodeCount} 个可调控件`
+      ? snapshot.sourceRoot
+        ? `已捕获真实手机画面：${snapshot.xml.nodeCount} 个节点，并已绑定项目源码`
+        : `已捕获真实手机画面：${snapshot.xml.nodeCount} 个节点；请选择自项目后重新捕获以绑定源码`
       : '已捕获真实手机画面；当前页面未提供可解析控件层级，但截图仍可用于微调')
   }, [commitDocument])
 
@@ -181,7 +209,61 @@ export default function UiTunerPage() {
   } = useAndroidInspectorDevices({
     onCaptured: handleDeviceCaptured,
     onNotice: setNotice,
+    projectRoot,
   })
+
+  const handleMutationTaskStarted = useCallback(async (pack: UiTunerCodexContextPack) => {
+    const currentSelected = tunerDocRef.current.elements.find((element) => element.id === selectedIdRef.current)
+    if (!currentSelected) return
+    verificationBaselineRef.current = await createVerificationBaseline(
+      tunerDocRef.current,
+      currentSelected,
+      pack,
+    )
+    setVerificationReport({
+      phase: 'waiting_codex',
+      message: 'Codex 正在修改、构建并安装；任务结束后会自动重新采集真机。',
+      beforePreviewDataUrl: verificationBaselineRef.current.beforePreviewDataUrl,
+      requestedAdjustmentCount: pack.requestedAdjustments.length,
+      verifiedAdjustmentCount: 0,
+      retryable: false,
+    })
+  }, [])
+
+  const requestPostTaskVerification = useCallback(async () => {
+    const baseline = verificationBaselineRef.current
+    if (!baseline) {
+      setVerificationReport(failedVerification('缺少修改前基线，请重新选择元素并发送一次 Codex 修改任务。'))
+      return
+    }
+    setVerificationReport((current) => ({
+      phase: 'capturing',
+      message: 'Codex 任务已结束，正在重新采集真机并定位同一组件…',
+      beforePreviewDataUrl: baseline.beforePreviewDataUrl,
+      requestedAdjustmentCount: baseline.pack.requestedAdjustments.length,
+      verifiedAdjustmentCount: current?.verifiedAdjustmentCount ?? 0,
+      retryable: false,
+    }))
+    verificationCaptureRef.current = true
+    const snapshot = await captureDeviceSnapshot()
+    verificationCaptureRef.current = false
+    if (!snapshot) {
+      setVerificationReport(failedVerification('真机重新采集失败。请确认手机仍在线并停留在目标页面，然后重试。'))
+      return
+    }
+    try {
+      const { report, document } = await verifyPostChangeSnapshot(baseline, snapshot)
+      commitDocument(() => document, report.matchedElementId ?? document.elements[0]?.id ?? null)
+      setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
+      setFitToStage(true)
+      setVerificationReport(report)
+      setNotice(report.message)
+    } catch (error) {
+      setVerificationReport(failedVerification(
+        error instanceof Error ? error.message : '前后快照验收失败，请重试',
+      ))
+    }
+  }, [captureDeviceSnapshot, commitDocument])
 
   const undoHistory = useCallback(() => {
     setHistory((current) => {
@@ -659,6 +741,9 @@ export default function UiTunerPage() {
         onApplyStandard={applySelectedStandard}
         onSetProductMode={() => setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })}
         onSetDebugMode={() => setLayerFilter(buildDebugFilter())}
+        verificationReport={verificationReport}
+        onMutationTaskStarted={handleMutationTaskStarted}
+        onRequestVerification={() => { void requestPostTaskVerification() }}
       />
 
       <UiTunerDeviceDialog

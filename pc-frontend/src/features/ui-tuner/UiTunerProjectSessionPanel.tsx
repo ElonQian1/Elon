@@ -31,11 +31,18 @@ import panelStyles from './UiTunerPanels.module.css'
 interface UiTunerProjectSessionPanelProps {
   pack: UiTunerCodexContextPack
   intent: string
+  onMutationTaskStarted: (pack: UiTunerCodexContextPack) => Promise<void> | void
+  onTaskSettled: () => void
 }
 
 const CODEX_ROUTE: RuntimeRoute = 'route_a'
 
-export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessionPanelProps) {
+export function UiTunerProjectSessionPanel({
+  pack,
+  intent,
+  onMutationTaskStarted,
+  onTaskSettled,
+}: UiTunerProjectSessionPanelProps) {
   const nodeAdminUrl = uiTunerNodeAdminUrl()
   const user = useAuthStore((state) => state.user)
   const selectedAgent = useModelStore((state) => state.selectedAgent)
@@ -51,6 +58,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [activeSessionId, setActiveSessionId] = useState('')
   const [conversationOpen, setConversationOpen] = useState(false)
+  const [verificationTaskId, setVerificationTaskId] = useState('')
 
   useEffect(() => {
     if (!projectsLoaded) loadProjects().catch(() => {})
@@ -230,6 +238,8 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
           : [{ ...session, taskId, status: 'running' }, ...previous.sessions],
       } : previous)
       setConversationOpen(true)
+      setVerificationTaskId(taskId)
+      await onMutationTaskStarted(pack)
       setStatus('已进入持续项目 Codex CLI 会话')
       window.setTimeout(() => { void refreshWorkspace(false) }, 600)
       return { ...session, taskId, status: 'running' }
@@ -363,9 +373,14 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
         localNodeStatusText={localNodeStatusText}
         selectedSession={selectedSession}
         visibleSessions={visibleSessions}
+        verificationTaskId={verificationTaskId}
         status={status}
         onSelectSession={setActiveSessionId}
         onStartSession={startSession}
+        onTaskSettled={() => {
+          setVerificationTaskId('')
+          onTaskSettled()
+        }}
       />
     </div>
   )

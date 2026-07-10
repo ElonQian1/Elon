@@ -147,6 +147,20 @@ pub(crate) struct DeviceUiSnapshot {
     pub xml: UiXmlSummary,
     pub nodes: Vec<RuntimeUiNode>,
     pub source_root: Option<String>,
+    pub source_fingerprint: Option<String>,
+    pub source_bindings_path: Option<String>,
+    pub artifact: Option<SnapshotArtifact>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SnapshotArtifact {
+    pub id: String,
+    pub root_dir: String,
+    pub manifest_path: String,
+    pub screenshot_path: String,
+    pub hierarchy_path: String,
+    pub raw_xml_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -168,7 +182,7 @@ pub(crate) struct UiXmlSummary {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BoundsRect {
     pub left: i32,
@@ -203,9 +217,10 @@ pub(crate) struct RuntimeUiNode {
     pub password: bool,
     pub visible: bool,
     pub source: Option<SourceMapEntry>,
+    pub source_candidates: Vec<SourceMapEntry>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SourceMapEntry {
     pub file: String,
@@ -213,4 +228,27 @@ pub(crate) struct SourceMapEntry {
     pub token: String,
     pub confidence: f32,
     pub reason: String,
+    pub match_kind: String,
+    pub component_key: String,
+    pub scope: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SelectionArtifactRequest {
+    pub snapshot_id: String,
+    pub selection_id: String,
+    pub crop_data_url: String,
+    pub bounds: BoundsRect,
+    pub resource_id: Option<String>,
+    pub component_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SelectionArtifact {
+    pub snapshot_id: String,
+    pub selection_id: String,
+    pub crop_path: String,
+    pub context_path: String,
 }

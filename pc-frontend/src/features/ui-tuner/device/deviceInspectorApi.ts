@@ -27,6 +27,9 @@ export interface AndroidInspectorSource {
   token: string
   confidence: number
   reason: string
+  matchKind: 'resource_id_xml' | 'resource_id_code' | 'compose_semantics' | string
+  componentKey: string
+  scope: 'component' | 'repeated_component' | string
 }
 
 export interface AndroidInspectorNode {
@@ -51,6 +54,23 @@ export interface AndroidInspectorNode {
   password: boolean
   visible: boolean
   source?: AndroidInspectorSource
+  sourceCandidates: AndroidInspectorSource[]
+}
+
+export interface AndroidSnapshotArtifact {
+  id: string
+  rootDir: string
+  manifestPath: string
+  screenshotPath: string
+  hierarchyPath: string
+  rawXmlPath?: string
+}
+
+export interface AndroidSelectionArtifact {
+  snapshotId: string
+  selectionId: string
+  cropPath: string
+  contextPath: string
 }
 
 export interface AndroidInspectorSnapshot {
@@ -74,6 +94,9 @@ export interface AndroidInspectorSnapshot {
   }
   nodes: AndroidInspectorNode[]
   sourceRoot?: string
+  sourceFingerprint?: string
+  sourceBindingsPath?: string
+  artifact?: AndroidSnapshotArtifact
 }
 
 export interface AndroidInspectorStatus {
@@ -322,5 +345,29 @@ export async function captureAndroidSnapshot(input: {
     )
   } catch (error) {
     throw inspectorError(error, '真机捕获失败')
+  }
+}
+
+export async function persistAndroidSelectionArtifact(input: {
+  snapshotId: string
+  selectionId: string
+  cropDataUrl: string
+  bounds: AndroidInspectorBounds
+  resourceId?: string
+  componentKey?: string
+}): Promise<AndroidSelectionArtifact> {
+  try {
+    const response = await nodeApi<{ artifact: AndroidSelectionArtifact }>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/selection-artifact',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      12000,
+    )
+    return response.artifact
+  } catch (error) {
+    throw inspectorError(error, '保存选中元素上下文失败')
   }
 }

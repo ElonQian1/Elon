@@ -17,6 +17,8 @@ import {
 interface UseAndroidInspectorDevicesOptions {
   onCaptured: (snapshot: AndroidInspectorSnapshot) => void
   onNotice: (message: string) => void
+  projectRoot?: string
+  packageName?: string
 }
 
 function selectCaptureDevice(devices: AndroidInspectorDevice[], preferredId: string) {
@@ -67,6 +69,8 @@ function captureFailureMessage(error: unknown) {
 export function useAndroidInspectorDevices({
   onCaptured,
   onNotice,
+  projectRoot,
+  packageName,
 }: UseAndroidInspectorDevicesOptions) {
   const [devices, setDevices] = useState<AndroidInspectorDevice[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
@@ -140,20 +144,23 @@ export function useAndroidInspectorDevices({
         } else {
           onNotice('未发现手机：请连接数据线、解锁手机并开启 USB 调试，然后直接重试')
         }
-        return
+        return null
       }
       setSelectedDeviceId(targetDevice.serial)
       const snapshot = await captureAndroidSnapshot({
         deviceId: targetDevice.serial,
-        packageName: 'com.elon.app',
+        packageName: packageName || 'com.elon.app',
+        projectRoot,
       })
       onCaptured(snapshot)
+      return snapshot
     } catch (error) {
       onNotice(captureFailureMessage(error))
+      return null
     } finally {
       setCaptureBusy(false)
     }
-  }, [onCaptured, onNotice, refreshDevices, selectedDeviceId])
+  }, [onCaptured, onNotice, packageName, projectRoot, refreshDevices, selectedDeviceId])
 
   const refreshWirelessStatus = useCallback(async () => {
     setWirelessBusy(true)

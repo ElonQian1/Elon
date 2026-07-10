@@ -62,10 +62,19 @@ fn validate_context_artifact(artifact: &ProjectModuleContextArtifact) -> Result<
             "Context Artifact kind 必须是 elon_ui_tuner_codex_context"
         ));
     }
-    if payload.get("version").and_then(|value| value.as_i64()) != Some(1) {
-        return Err(anyhow!("当前只支持 ui-tuner Context Artifact v1"));
+    if !supported_payload_version(&payload) {
+        return Err(anyhow!(
+            "当前只支持 ui-tuner Context Artifact payload v1/v2"
+        ));
     }
     Ok(())
+}
+
+fn supported_payload_version(payload: &serde_json::Value) -> bool {
+    matches!(
+        payload.get("version").and_then(|value| value.as_i64()),
+        Some(1 | 2)
+    )
 }
 
 fn build_preflight_note(
@@ -158,9 +167,10 @@ fn build_preflight_note(
 ## 完成契约
 1. 明确选中 XML 节点到源码/资源的映射证据和置信度。
 2. 实施需要的 Android 源码、PC 微调画布源码或 `.elon/ui-standards/*.json` 配置修改。
-3. 运行项目规定的最小充分验证；需要时重新 ADB 捕获真机页面。
-4. 最终回复列出改动文件、验证结果、仍需人工确认项和可进入模块记忆的候选标准。
-5. 不要只输出 Markdown 标准；可复用标准必须落入机器可读 JSON 配置。
+3. 按项目 `AGENTS.md` 规定的脚本完成构建；Context Artifact 含 `screen.deviceId` 时，必须安装到该设备并恢复 `screen.activityName` 对应的原目标页面。
+4. 只有源码已保存、构建/安装成功并回到目标页面后才结束任务；网页会在任务结束后自动重新 ADB 采集并做前后验收。
+5. 最终回复列出改动文件、构建/安装/页面恢复结果、验证结果、仍需人工确认项，并包含标记 `UI_TUNER_RECAPTURE_READY`。
+6. 不要只输出 Markdown 标准；可复用标准必须落入机器可读 JSON 配置。
 "#,
         stable_summary = bundle.workspace.stable_summary,
         accepted_memories = lines_or_none(&accepted),
@@ -204,10 +214,23 @@ fn lines_or_none(lines: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::lines_or_none;
+    use super::{lines_or_none, supported_payload_version};
 
     #[test]
     fn empty_context_section_is_explicit() {
         assert_eq!(lines_or_none(&[]), "- 暂无");
+    }
+
+    #[test]
+    fn context_payload_accepts_runtime_binding_v2() {
+        assert!(supported_payload_version(
+            &serde_json::json!({ "version": 1 })
+        ));
+        assert!(supported_payload_version(
+            &serde_json::json!({ "version": 2 })
+        ));
+        assert!(!supported_payload_version(
+            &serde_json::json!({ "version": 3 })
+        ));
     }
 }
