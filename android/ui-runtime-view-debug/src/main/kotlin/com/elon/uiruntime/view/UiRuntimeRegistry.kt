@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import com.google.gson.Gson
 import java.lang.ref.WeakReference
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -15,12 +16,19 @@ internal class UiRuntimeRegistry(
     private val application: Application,
     private val onActivityChanged: () -> Unit,
 ) : Application.ActivityLifecycleCallbacks {
+    internal data class ResolvedTargets(
+        val views: List<View>,
+        val externalNodes: List<UiRuntimeExternalNode>,
+    )
+
+    private val gson = Gson()
     private var currentActivity = WeakReference<Activity>(null)
     private val treeRevision = AtomicLong(0)
     private val viewsByRuntimeId = LinkedHashMap<String, WeakReference<View>>()
     private val runtimeIdByView = WeakHashMap<View, String>()
     private val definitionByRuntimeId = LinkedHashMap<String, String>()
     private val instanceByRuntimeId = LinkedHashMap<String, String?>()
+    private val externalNodes = LinkedHashMap<String, UiRuntimeExternalNode>()
 
     fun start() {
         application.registerActivityLifecycleCallbacks(this)
@@ -51,6 +59,7 @@ internal class UiRuntimeRegistry(
             path = "root",
             nodes = nodes,
         )
+        nodes += externalNodes.values.map(::externalSnapshot)
         return TreeSnapshotMessage(
             treeRevision = treeRevision.incrementAndGet(),
             nodes = nodes,
@@ -59,13 +68,16 @@ internal class UiRuntimeRegistry(
 
     fun nextTreeRevision(): Long = treeRevision.incrementAndGet()
 
-    fun resolve(target: LivePatchTarget): List<View> {
+    fun resolve(target: LivePatchTarget): ResolvedTargets {
         val requestedRuntimeId = target.runtimeNodeId
         if (!requestedRuntimeId.isNullOrBlank()) {
-            return listOfNotNull(viewsByRuntimeId[requestedRuntimeId]?.get())
+            return ResolvedTargets(
+                views = listOfNotNull(viewsByRuntimeId[requestedRuntimeId]?.get()),
+                externalNodes = listOfNotNull(externalNodes[requestedRuntimeId]),
+            )
         }
-        val definitionId = target.definitionId ?: return emptyList()
-        return definitionByRuntimeId.entries
+        val definitionId = target.definitionId ?: return ResolvedTargets(emptyList(), emptyList())
+        val views = definitionByRuntimeId.entries
             .asSequence()
             .filter { (_, definition) -> definition == definitionId }
             .filter { (runtimeId, _) ->
@@ -73,6 +85,20 @@ internal class UiRuntimeRegistry(
             }
             .mapNotNull { (runtimeId, _) -> viewsByRuntimeId[runtimeId]?.get() }
             .toList()
+        val external = externalNodes.values.filter { node ->
+            node.definitionId == definitionId &&
+                (target.instanceKey == null || node.instanceKey == target.instanceKey)
+        }
+        return ResolvedTargets(views, external)
+    }
+
+    fun upsertExternalNode(node: UiRuntimeExternalNode) {
+        externalNodes[node.runtimeNodeId] = node
+        onActivityChanged()
+    }
+
+    fun removeExternalNode(runtimeNodeId: String) {
+        if (externalNodes.remove(runtimeNodeId) != null) onActivityChanged()
     }
 
     private fun visit(
@@ -141,6 +167,7 @@ internal class UiRuntimeRegistry(
             definitionByRuntimeId.clear()
             instanceByRuntimeId.clear()
             runtimeIdByView.clear()
+            externalNodes.clear()
             onActivityChanged()
         }
     }
@@ -164,4 +191,51 @@ internal class UiRuntimeRegistry(
             else -> null
         }
     }
+
+    private fun externalSnapshot(node: UiRuntimeExternalNode): LiveUiNode {
+        val bounds = node.geometry
+        val rect = LiveRect(
+            left = bounds.leftPx,
+            top = bounds.topPx,
+            right = bounds.rightPx,
+            bottom = bounds.bottomPx,
+            width = (bounds.rightPx - bounds.leftPx).coerceAtLeast(0),
+            height = (bounds.bottomPx - bounds.topPx).coerceAtLeast(0),
+        )
+        return LiveUiNode(
+            runtimeNodeId = node.runtimeNodeId,
+            definitionId = node.definitionId,
+            instanceKey = node.instanceKey,
+            parentRuntimeNodeId = node.parentRuntimeNodeId,
+            screenId = node.screenId,
+            kind = node.kind,
+            text = node.text?.take(2_000),
+            resourceId = null,
+            className = node.className,
+            source = node.source?.let(gson::toJsonTree),
+            geometry = LiveGeometry(
+                boundsInDisplayPx = rect,
+                density = bounds.density,
+                fontScale = bounds.fontScale,
+                rotation = bounds.rotation,
+                visible = bounds.visible,
+            ),
+            properties = node.properties.mapValues { (_, property) ->
+                LivePropertySnapshot(
+                    effective = property.effective?.toProtocolValue(),
+                    measured = property.measured?.toProtocolValue(),
+                    changeLevel = property.changeLevel,
+                    commitMode = property.commitMode,
+                    binding = property.binding?.let(gson::toJsonTree),
+                    constraints = property.constraints?.let(gson::toJsonTree),
+                )
+            },
+            capabilities = node.capabilities,
+        )
+    }
+
+    private fun UiRuntimeValue.toProtocolValue(): LivePropertyValue = LivePropertyValue(
+        valueType = type,
+        value = gson.toJsonTree(value),
+    )
 }

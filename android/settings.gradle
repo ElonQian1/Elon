@@ -18,3 +18,4 @@ rootProject.name = "ElonApp"
 include ':app'
 include ':chat-voice-kit'
 include ':ui-runtime-view-debug'
+include ':ui-runtime-compose-debug'

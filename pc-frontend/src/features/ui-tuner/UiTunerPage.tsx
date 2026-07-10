@@ -741,7 +741,13 @@ export default function UiTunerPage() {
             }}
           >
             <div className={styles.canvasGrid} aria-hidden="true" />
-            {tunerDoc.canvas.referenceImage?.visible && (
+            {liveUi.liveFrame ? (
+              <img
+                className={styles.referenceImage}
+                src={liveUi.liveFrame.dataUrl}
+                alt="真机实时画面"
+              />
+            ) : tunerDoc.canvas.referenceImage?.visible && (
               <img
                 className={styles.referenceImage}
                 src={tunerDoc.canvas.referenceImage.dataUrl}

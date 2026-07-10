@@ -51,6 +51,14 @@ internal object UiRuntimeController {
         mainHandler.removeCallbacksAndMessages(null)
     }
 
+    fun upsertExternalNode(node: UiRuntimeExternalNode) {
+        mainHandler.post { registry?.upsertExternalNode(node) }
+    }
+
+    fun removeExternalNode(runtimeNodeId: String) {
+        mainHandler.post { registry?.removeExternalNode(runtimeNodeId) }
+    }
+
     private fun handleMessage(text: String) {
         val root = runCatching { gson.fromJson(text, JsonObject::class.java) }
             .getOrElse {
@@ -78,8 +86,27 @@ internal object UiRuntimeController {
             val currentRegistry = registry ?: return@post
             val session = config ?: return@post
             val result = runCatching {
-                val views = currentRegistry.resolve(patch.target)
-                UiRuntimeViewAdapter.apply(views, patch.operations)
+                val targets = currentRegistry.resolve(patch.target)
+                require(targets.views.isNotEmpty() || targets.externalNodes.isNotEmpty()) {
+                    "找不到目标节点，页面可能已经变化"
+                }
+                val viewResult = targets.views.takeIf { it.isNotEmpty() }?.let { views ->
+                    UiRuntimeViewAdapter.apply(views, patch.operations)
+                }
+                val externalResults = targets.externalNodes.map { node ->
+                    node.applyOperations(
+                        patch.operations.map { operation ->
+                            UiRuntimeExternalPatchOperation(
+                                property = operation.property,
+                                value = UiRuntimeValue(
+                                    type = operation.value.valueType,
+                                    value = operation.value.value.toPrimitiveValue(),
+                                ),
+                            )
+                        },
+                    )
+                }
+                mergeResults(viewResult, externalResults)
             }
             val treeRevision = currentRegistry.nextTreeRevision()
             val ack = result.fold(
@@ -163,5 +190,38 @@ internal object UiRuntimeController {
 
     private fun send(text: String) {
         if (socket?.send(text) != true) Log.w(TAG, "Live UI message not sent")
+    }
+
+    private fun mergeResults(
+        viewResult: UiRuntimeViewAdapter.ApplyResult?,
+        externalResults: List<UiRuntimeExternalApplyResult>,
+    ): UiRuntimeViewAdapter.ApplyResult {
+        val before = linkedMapOf<String, LivePropertyValue>()
+        val effective = linkedMapOf<String, LivePropertyValue>()
+        val measured = linkedMapOf<String, Double>()
+        viewResult?.let {
+            before.putAll(it.beforeValues)
+            effective.putAll(it.effectiveValues)
+            measured.putAll(it.measuredGeometry)
+        }
+        externalResults.forEach { result ->
+            result.beforeValues.forEach { (key, value) -> before.putIfAbsent(key, value.toProtocolValue()) }
+            result.effectiveValues.forEach { (key, value) -> effective[key] = value.toProtocolValue() }
+            measured.putAll(result.measuredGeometry)
+        }
+        return UiRuntimeViewAdapter.ApplyResult(before, effective, measured)
+    }
+
+    private fun UiRuntimeValue.toProtocolValue(): LivePropertyValue = LivePropertyValue(
+        valueType = type,
+        value = gson.toJsonTree(value),
+    )
+
+    private fun com.google.gson.JsonElement.toPrimitiveValue(): Any? = when {
+        isJsonNull -> null
+        isJsonPrimitive && asJsonPrimitive.isBoolean -> asBoolean
+        isJsonPrimitive && asJsonPrimitive.isNumber -> asDouble
+        isJsonPrimitive -> asString
+        else -> gson.fromJson(this, Any::class.java)
     }
 }

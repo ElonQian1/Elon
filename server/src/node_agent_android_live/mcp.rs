@@ -6,6 +6,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::broker::{LiveUiBroker, LiveUiSession};
+use super::build_verify::{build_and_verify, BuildVerifyRequest};
 use super::mcp_tools::tool_definitions;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
@@ -194,10 +195,12 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
                 "result": commit_source(session, SourceCommitRequest { source_revision }).await?
             })
         }
-        "ui_build_and_verify" => json!({
-            "status": "COMPILE_REQUIRED",
-            "message": "源码保存后的自动构建、安装、清空 Patch 与重新捕获由 P10 验证编排器执行；当前可继续使用现有构建验收链路。"
-        }),
+        "ui_build_and_verify" => {
+            let request: BuildVerifyRequest =
+                serde_json::from_value(arguments).context("构建验收参数无效")?;
+            let host_port = crate::node_agent_admin_open::admin_port_from_env();
+            json!({ "result": build_and_verify(broker, session_id, request, host_port).await? })
+        }
         _ => bail!("未知 UI MCP 工具: {name}"),
     };
     Ok(json!({

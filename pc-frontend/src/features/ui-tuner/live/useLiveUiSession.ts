@@ -2,14 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { UiTunerDocument, UiTunerElement } from '../types'
 import {
   applyLiveUiPatch,
+  buildAndVerifyLiveUi,
+  getLiveUiFrame,
   getLiveUiSession,
   getLiveUiTree,
   liveUiHistoryAction,
+  openLiveUiPreview,
   startLiveUiSession,
   stopLiveUiSession,
   type LivePatchOperation,
+  type LiveBuildVerifyResult,
+  type LivePreviewRequest,
   type LiveMcpDescriptor,
   type LiveUiNode,
+  type LiveUiFrame,
   type LiveUiScope,
   type LiveUiSession,
 } from './liveUiApi'
@@ -28,6 +34,7 @@ import {
   type LiveSourceCommitPlan,
   type LiveSourceCommitResult,
 } from './liveUiCommitApi'
+import { matchLiveNode, mergeEffectiveValues, messageOf } from './liveUiSessionHelpers'
 
 export type LiveUiConnectionState = 'idle' | 'connecting' | 'connected' | 'attach_only' | 'error'
 
@@ -59,6 +66,8 @@ export function useLiveUiSession({
   const [uiIr, setUiIr] = useState<LiveUiIrDocument | null>(null)
   const [targetDesign, setTargetDesign] = useState<LiveTargetDesign | null>(null)
   const [solverResult, setSolverResult] = useState<VisualSolverResult | null>(null)
+  const [liveFrame, setLiveFrame] = useState<LiveUiFrame | null>(null)
+  const [buildVerifyResult, setBuildVerifyResult] = useState<LiveBuildVerifyResult | null>(null)
   const [restartRevision, setRestartRevision] = useState(0)
   const sessionRef = useRef<LiveUiSession | null>(null)
   const generationRef = useRef(0)
@@ -104,6 +113,8 @@ export function useLiveUiSession({
       setUiIr(null)
       setTargetDesign(null)
       setSolverResult(null)
+      setLiveFrame(null)
+      setBuildVerifyResult(null)
       setState('idle')
       setError('')
       return () => undefined
@@ -120,6 +131,8 @@ export function useLiveUiSession({
       setUiIr(null)
       setTargetDesign(null)
       setSolverResult(null)
+      setLiveFrame(null)
+      setBuildVerifyResult(null)
       targetDesignRef.current = null
       targetSignatureRef.current = ''
       setState('connecting')
@@ -175,6 +188,30 @@ export function useLiveUiSession({
       if (current) void stopLiveUiSession(current.id).catch(() => undefined)
     }
   }, [deviceId, packageName, projectRoot, refresh, restartRevision])
+
+  useEffect(() => {
+    if (state !== 'connected' || !session?.id) {
+      setLiveFrame(null)
+      return
+    }
+    let disposed = false
+    let timer: number | undefined
+    const pollFrame = async () => {
+      if (disposed) return
+      try {
+        const frame = await getLiveUiFrame(session.id)
+        if (!disposed) setLiveFrame(frame)
+      } catch {
+        // 树与 Patch 连接仍然可用时，单帧截图失败不应降级整个 Live 会话。
+      }
+      if (!disposed) timer = window.setTimeout(() => { void pollFrame() }, 900)
+    }
+    void pollFrame()
+    return () => {
+      disposed = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [session?.id, state])
 
   const selectedNode = useMemo(
     () => matchLiveNode(selected, nodes),
@@ -361,6 +398,45 @@ export function useLiveUiSession({
     }
   }, [document.canvas.targetDesign, nodes, onNotice, refresh, selected, syncContext])
 
+  const openPreview = useCallback(async (request: LivePreviewRequest) => {
+    const current = sessionRef.current
+    if (!current?.connected) throw new Error('Live Runtime 尚未连接')
+    setBusy(true)
+    try {
+      await openLiveUiPreview(current.id, request)
+      onNotice(`Preview 已切换：${request.screenId} · ${request.scenario} · ${request.theme}`)
+      window.setTimeout(() => { void refresh(current.id).catch(() => undefined) }, 350)
+    } catch (previewError) {
+      const message = messageOf(previewError, '无法打开 Preview Host')
+      setError(message)
+      onNotice(message)
+      throw previewError
+    } finally {
+      setBusy(false)
+    }
+  }, [onNotice, refresh])
+
+  const buildVerify = useCallback(async (preview?: LivePreviewRequest) => {
+    const current = sessionRef.current
+    if (!current) throw new Error('Live UI 会话不存在')
+    setBusy(true)
+    setBuildVerifyResult(null)
+    try {
+      const result = await buildAndVerifyLiveUi(current.id, preview)
+      setBuildVerifyResult(result)
+      await refresh(current.id)
+      onNotice(`BUILD VERIFIED：${result.runtimeBuildId ?? '新 Debug APK'} 已安装，临时 Patch 已清空`)
+      return result
+    } catch (verifyError) {
+      const message = messageOf(verifyError, '构建安装验收失败')
+      setError(message)
+      onNotice(message)
+      throw verifyError
+    } finally {
+      setBusy(false)
+    }
+  }, [onNotice, refresh])
+
   return {
     session,
     nodes,
@@ -374,6 +450,8 @@ export function useLiveUiSession({
     uiIr,
     targetDesign,
     solverResult,
+    liveFrame,
+    buildVerifyResult,
     apply,
     undo: () => historyAction('undo'),
     redo: () => historyAction('redo'),
@@ -383,54 +461,7 @@ export function useLiveUiSession({
     commit,
     syncContext,
     solve,
+    openPreview,
+    buildVerify,
   }
-}
-
-function matchLiveNode(selected: UiTunerElement | null, nodes: LiveUiNode[]): LiveUiNode | null {
-  if (!selected?.runtime) return null
-  const resourceId = comparableResourceId(selected.runtime.resourceId)
-  if (resourceId) {
-    const exact = nodes.find((node) => comparableResourceId(node.resourceId) === resourceId)
-    if (exact) return exact
-  }
-  const original = selected.runtime.originalBounds
-  let best: { node: LiveUiNode; score: number } | null = null
-  for (const node of nodes) {
-    if (!node.geometry.visible) continue
-    const score = overlapScore(original, node.geometry.boundsInDisplayPx)
-    if (score > (best?.score ?? 0)) best = { node, score }
-  }
-  return best && best.score >= 0.45 ? best.node : null
-}
-
-function comparableResourceId(value?: string) {
-  return value?.trim().replace(/^.*:id\//, '').replace(/^.*\/id\//, '') || ''
-}
-
-function overlapScore(
-  left: NonNullable<UiTunerElement['runtime']>['originalBounds'],
-  right: LiveUiNode['geometry']['boundsInDisplayPx'],
-) {
-  const intersectionWidth = Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left))
-  const intersectionHeight = Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top))
-  const intersection = intersectionWidth * intersectionHeight
-  const leftArea = Math.max(1, left.width * left.height)
-  const rightArea = Math.max(1, right.width * right.height)
-  return intersection / Math.max(leftArea, rightArea)
-}
-
-function mergeEffectiveValues(
-  node: LiveUiNode,
-  values: Record<string, LiveUiNode['properties'][string]['effective']>,
-): LiveUiNode {
-  const properties = { ...node.properties }
-  for (const [name, value] of Object.entries(values)) {
-    if (!value || !properties[name]) continue
-    properties[name] = { ...properties[name], effective: value }
-  }
-  return { ...node, properties }
-}
-
-function messageOf(error: unknown, fallback: string) {
-  return error instanceof Error && error.message.trim() ? error.message : fallback
 }

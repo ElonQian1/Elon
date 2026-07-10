@@ -5,8 +5,11 @@
 
 mod adb_session;
 mod broker;
+mod build_verify;
+mod frame;
 mod mcp;
 mod mcp_tools;
+mod preview;
 mod protocol;
 mod routes;
 mod source_commit;

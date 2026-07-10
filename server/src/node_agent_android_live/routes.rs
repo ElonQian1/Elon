@@ -12,10 +12,13 @@ use serde_json::json;
 use crate::NodeRuntime;
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
+use super::build_verify::{build_and_verify, BuildVerifyRequest};
+use super::frame::capture_frame;
 use super::mcp::{
     cleanup_descriptor, descriptor as mcp_descriptor, handle_request as handle_mcp_request,
     McpQuery, McpRequest,
 };
+use super::preview::{open_preview, PreviewOpenRequest};
 use super::protocol::{
     LiveStylePatch, RuntimeSocketQuery, StartLiveSessionRequest, PROTOCOL_VERSION,
 };
@@ -38,6 +41,14 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             get(tree_handler),
         )
         .route(
+            "/api/android-live/sessions/:session_id/frame",
+            get(frame_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/preview",
+            post(preview_handler),
+        )
+        .route(
             "/api/android-live/sessions/:session_id/patch",
             post(patch_handler),
         )
@@ -56,6 +67,10 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/android-live/sessions/:session_id/commit",
             post(commit_source_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/build-verify",
+            post(build_verify_handler),
         )
         .route(
             "/api/android-live/sessions/:session_id/ui-ir",
@@ -243,6 +258,35 @@ async fn tree_handler(
     }
 }
 
+async fn frame_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    let session = match runtime.live_ui.session(&session_id).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    match capture_frame(&session).await {
+        Ok(frame) => Json(json!({ "ok": true, "frame": frame })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_GATEWAY, format!("{error:#}")),
+    }
+}
+
+async fn preview_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<PreviewOpenRequest>,
+) -> Response {
+    let session = match runtime.live_ui.session(&session_id).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    match open_preview(&session, request).await {
+        Ok(result) => Json(json!({ "ok": true, "preview": result })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
 async fn patch_handler(
     State(runtime): State<Arc<NodeRuntime>>,
     Path(session_id): Path<String>,
@@ -300,6 +344,18 @@ async fn commit_source_handler(
     match commit_source(session, request).await {
         Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
         Err(error) => json_error(StatusCode::CONFLICT, format!("{error:#}")),
+    }
+}
+
+async fn build_verify_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<BuildVerifyRequest>,
+) -> Response {
+    let host_port = crate::node_agent_admin_open::admin_port_from_env();
+    match build_and_verify(&runtime.live_ui, &session_id, request, host_port).await {
+        Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
     }
 }
 

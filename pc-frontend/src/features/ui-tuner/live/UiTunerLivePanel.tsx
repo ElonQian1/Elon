@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { UiTunerElement } from '../types'
 import type {
   LivePatchOperation,
+  LivePreviewRequest,
+  LiveBuildVerifyResult,
   LiveUiNode,
   LiveUiScope,
   LiveUiSession,
@@ -16,6 +18,7 @@ import type {
 } from './liveUiIrApi'
 import type { LiveMcpDescriptor } from './liveUiApi'
 import styles from './UiTunerLivePanel.module.css'
+import { UiTunerPreviewPanel } from './UiTunerPreviewPanel'
 
 interface UiTunerLivePanelProps {
   state: LiveUiConnectionState
@@ -38,6 +41,9 @@ interface UiTunerLivePanelProps {
   onPreviewCommit: () => Promise<LiveSourceCommitPlan>
   onCommit: (plan: LiveSourceCommitPlan) => Promise<LiveSourceCommitResult>
   onSolve: (targetRect: PixelRect) => Promise<VisualSolverResult>
+  onOpenPreview: (request: LivePreviewRequest) => Promise<void>
+  buildVerifyResult: LiveBuildVerifyResult | null
+  onBuildVerify: () => Promise<LiveBuildVerifyResult>
 }
 
 const NUMBER_FIELDS = [
@@ -80,6 +86,9 @@ export function UiTunerLivePanel({
   onPreviewCommit,
   onCommit,
   onSolve,
+  onOpenPreview,
+  buildVerifyResult,
+  onBuildVerify,
 }: UiTunerLivePanelProps) {
   const [scope, setScope] = useState<LiveUiScope>('INSTANCE')
   const connected = state === 'connected'
@@ -177,6 +186,7 @@ export function UiTunerLivePanel({
             result={solverResult}
             onSolve={onSolve}
           />
+          <UiTunerPreviewPanel busy={busy} onOpen={onOpenPreview} />
           <button
             className={styles.commitButton}
             type="button"
@@ -197,9 +207,30 @@ export function UiTunerLivePanel({
               <strong>SOURCE SAVED</strong>
               <span>已写入 {commitResult.changedFiles.length} 个文件；需重新构建并清空 Patch 后验收。</span>
               {commitResult.changedFiles.map((file) => <small key={file}>{file}</small>)}
+              <button
+                className={styles.commitButton}
+                type="button"
+                disabled={busy}
+                onClick={() => { void onBuildVerify() }}
+              >
+                构建、安装并真机验收
+              </button>
             </div>
           ) : (
             <p className={styles.previewWarning}>LIVE PREVIEW · 真机已变化，源码尚未写入</p>
+          )}
+          {buildVerifyResult && (
+            <div className={styles.savedState}>
+              <strong>BUILD VERIFIED</strong>
+              <span>{buildVerifyResult.message}</span>
+              <small>
+                {buildVerifyResult.screenshotWidth} × {buildVerifyResult.screenshotHeight}
+                {' · '}{buildVerifyResult.nodeCount} 节点
+                {buildVerifyResult.visualDiff
+                  ? ` · 视觉损失 ${buildVerifyResult.visualDiff.visualLoss.toFixed(4)}`
+                  : ''}
+              </small>
+            </div>
           )}
         </>
       )}

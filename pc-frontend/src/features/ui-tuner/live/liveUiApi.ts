@@ -93,6 +93,41 @@ export interface LivePatchAck {
   error?: string
 }
 
+export interface LiveUiFrame {
+  dataUrl: string
+  width: number
+  height: number
+  bytes: number
+  capturedAt: string
+}
+
+export interface LivePreviewRequest {
+  screenId: string
+  scenario: 'normal' | 'loading' | 'empty' | 'error'
+  theme: 'system' | 'light' | 'dark'
+  fontScale: number
+  locale: string
+}
+
+export interface LiveBuildVerifyResult {
+  status: 'BUILD_VERIFIED'
+  apkPath: string
+  buildDurationMs: number
+  installOutput: string
+  runtimeConnected: boolean
+  runtimeBuildId?: string
+  nodeCount: number
+  screenshotWidth: number
+  screenshotHeight: number
+  visualDiff?: {
+    visualLoss: number
+    meanAbsoluteColorError: number
+    edgeError: number
+    geometryError: number
+  }
+  message: string
+}
+
 export async function startLiveUiSession(input: {
   deviceId: string
   packageName: string
@@ -138,6 +173,42 @@ export async function getLiveUiTree(sessionId: string): Promise<{
     {},
     8_000,
   )
+}
+
+export async function getLiveUiFrame(sessionId: string): Promise<LiveUiFrame> {
+  const response = await nodeApi<{ frame: LiveUiFrame }>(
+    inspectorAdminUrl(),
+    `/api/android-live/sessions/${encodeURIComponent(sessionId)}/frame`,
+    {},
+    8_000,
+  )
+  return response.frame
+}
+
+export async function openLiveUiPreview(
+  sessionId: string,
+  request: LivePreviewRequest,
+): Promise<void> {
+  await nodeApi(
+    inspectorAdminUrl(),
+    `/api/android-live/sessions/${encodeURIComponent(sessionId)}/preview`,
+    { method: 'POST', body: JSON.stringify(request) },
+    15_000,
+  )
+}
+
+export async function buildAndVerifyLiveUi(
+  sessionId: string,
+  preview?: LivePreviewRequest,
+  debugApplicationIdSuffix?: string,
+): Promise<LiveBuildVerifyResult> {
+  const response = await nodeApi<{ result: LiveBuildVerifyResult }>(
+    inspectorAdminUrl(),
+    `/api/android-live/sessions/${encodeURIComponent(sessionId)}/build-verify`,
+    { method: 'POST', body: JSON.stringify({ preview, debugApplicationIdSuffix }) },
+    20 * 60_000,
+  )
+  return response.result
 }
 
 export async function applyLiveUiPatch(input: {

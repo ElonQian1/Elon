@@ -99,6 +99,9 @@ export function UiTunerInspector({
             onPreviewCommit={liveUi.previewCommit}
             onCommit={liveUi.commit}
             onSolve={liveUi.solve}
+            onOpenPreview={liveUi.openPreview}
+            buildVerifyResult={liveUi.buildVerifyResult}
+            onBuildVerify={liveUi.buildVerify}
           />
           <UiTunerStandardsPanel
             insight={standardInsight}

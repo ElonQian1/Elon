@@ -278,6 +278,20 @@ enum JournalMode {
 }
 
 impl LiveUiSession {
+    pub(crate) async fn reset_for_redeploy(&self) {
+        *self.runtime_tx.write().await = None;
+        self.pending.lock().await.clear();
+        let mut state = self.state.write().await;
+        state.connected = false;
+        state.runtime_build_id = None;
+        state.runtime_version = None;
+        state.tree_revision = state.tree_revision.saturating_add(1);
+        state.nodes.clear();
+        state.history.clear();
+        state.future.clear();
+        state.last_error = None;
+    }
+
     pub(crate) async fn commit_snapshot(&self) -> LiveCommitSnapshot {
         let state = self.state.read().await;
         LiveCommitSnapshot {

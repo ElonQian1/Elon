@@ -111,6 +111,7 @@ def releaseStorePassword = signingValue("ELON_RELEASE_STORE_PASSWORD")
 def releaseKeyAlias = signingValue("ELON_RELEASE_KEY_ALIAS", "elon")
 def releaseKeyPassword = signingValue("ELON_RELEASE_KEY_PASSWORD")
 def releaseKeystoreFile = file(releaseKeystorePath)
+def debugApplicationIdSuffix = signingValue("ELON_DEBUG_APPLICATION_ID_SUFFIX")
 
 gradle.taskGraph.whenReady { graph ->
     def needsReleaseSigning = graph.allTasks.any { it.name.toLowerCase(Locale.ROOT).contains("release") }
@@ -159,6 +160,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (debugApplicationIdSuffix) {
+                applicationIdSuffix debugApplicationIdSuffix.startsWith('.')
+                    ? debugApplicationIdSuffix
+                    : ".${debugApplicationIdSuffix}"
+                versionNameSuffix "-${debugApplicationIdSuffix.replace('.', '')}"
+            }
+        }
         release {
             minifyEnabled false
             signingConfig signingConfigs.release
@@ -262,6 +271,7 @@ tasks.matching { task ->
 dependencies {
     implementation project(':chat-voice-kit')
     debugImplementation project(':ui-runtime-view-debug')
+    debugImplementation project(':ui-runtime-compose-debug')
 
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.activity:activity-ktx:1.8.2'
@@ -299,4 +309,63 @@ dependencies {
     // LiveData（Agent 状态/进度）
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
     // 注：Room 暂不接入（android-agent 原本也禁用了 kapt），若后续需要持久化记忆库再启用
+}
+
+def forbiddenUiRuntimeMarkers = [
+    'ui-runtime-view-debug',
+    'ui-runtime-compose-debug',
+    'com/elon/uiruntime',
+    'UiRuntimePreviewHostActivity',
+    'UiRuntimeControlReceiver'
+]
+
+def assertReleaseRuntimeClasspathClean = {
+    def releaseConfig = configurations.findByName('releaseRuntimeClasspath')
+    if (releaseConfig == null) {
+        throw new GradleException('releaseRuntimeClasspath 不存在，无法验证 UI Runtime 隔离')
+    }
+    def componentNames = releaseConfig.incoming.resolutionResult.allComponents.collect {
+        it.id.displayName
+    }
+    def leaked = componentNames.findAll { component ->
+        forbiddenUiRuntimeMarkers.take(2).any { marker -> component.contains(marker) }
+    }
+    if (!leaked.isEmpty()) {
+        throw new GradleException("Release 依赖泄露 Debug UI Runtime: ${leaked.join(', ')}")
+    }
+}
+
+tasks.register('verifyUiRuntimeConfiguration') {
+    group = 'verification'
+    description = '验证 Release 运行时依赖不包含一龙 UI 调试 SDK。'
+    doLast { assertReleaseRuntimeClasspathClean() }
+}
+
+tasks.register('verifyReleaseUiRuntimeIsolation') {
+    group = 'verification'
+    description = '构建 Release APK 并扫描 Debug UI Runtime 类、Activity 和 Receiver。'
+    dependsOn('assembleRelease')
+    doLast {
+        assertReleaseRuntimeClasspathClean()
+        def apks = fileTree("${buildDir}/outputs/apk/release") {
+            include '**/*.apk'
+        }.files
+        if (apks.isEmpty()) {
+            throw new GradleException('没有找到 Release APK，无法执行 UI Runtime 安全扫描')
+        }
+        apks.each { apk ->
+            def payloads = zipTree(apk).matching {
+                include 'classes*.dex'
+                include 'AndroidManifest.xml'
+            }.files
+            def leaked = forbiddenUiRuntimeMarkers.findAll { marker ->
+                payloads.any { payload ->
+                    new String(payload.bytes, java.nio.charset.StandardCharsets.ISO_8859_1).contains(marker)
+                }
+            }
+            if (!leaked.isEmpty()) {
+                throw new GradleException("${apk.name} 包含 Debug UI Runtime 标记: ${leaked.join(', ')}")
+            }
+        }
+    }
 }

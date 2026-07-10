@@ -82,7 +82,27 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         tool(
             "ui_build_and_verify",
             "请求构建、安装、清 Patch、回页和真机验收。",
-            json!({"type":"object","properties":{}}),
+            json!({
+                "type":"object",
+                "properties":{
+                    "debugApplicationIdSuffix":{
+                        "type":"string",
+                        "pattern":"^\\.[A-Za-z0-9._]{1,39}$",
+                        "description":"可选；仅用于并行安装 Debug 验收包，例如 .uitest"
+                    },
+                    "preview":{
+                        "type":"object",
+                        "required":["screenId","scenario","theme","fontScale","locale"],
+                        "properties":{
+                            "screenId":{"type":"string"},
+                            "scenario":{"enum":["normal","loading","empty","error"]},
+                            "theme":{"enum":["system","light","dark"]},
+                            "fontScale":{"type":"number","minimum":0.5,"maximum":2.0},
+                            "locale":{"type":"string"}
+                        }
+                    }
+                }
+            }),
         ),
     ]
 }
