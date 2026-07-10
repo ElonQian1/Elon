@@ -2,6 +2,7 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use super::adb_path::adb_path;
@@ -58,6 +59,57 @@ pub(crate) async fn run_adb_text(
     max_stdout_bytes: usize,
 ) -> Result<String> {
     let output = run_adb(args, timeout_duration, max_stdout_bytes).await?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+pub(crate) async fn run_adb_text_with_stdin(
+    args: &[String],
+    input: &str,
+    timeout_duration: Duration,
+    max_stdout_bytes: usize,
+    action: &str,
+) -> Result<String> {
+    let mut command = Command::new(adb_path());
+    command
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    crate::node_agent_exec::hide_tokio_command_window(&mut command);
+
+    let mut child = command
+        .spawn()
+        .with_context(|| format!("无法启动 adb: {action}"))?;
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| anyhow::anyhow!("无法打开 adb 标准输入: {action}"))?;
+    stdin
+        .write_all(format!("{}\n", input.trim()).as_bytes())
+        .await
+        .with_context(|| format!("无法写入 adb 标准输入: {action}"))?;
+    drop(stdin);
+
+    let output = tokio::time::timeout(timeout_duration, child.wait_with_output())
+        .await
+        .with_context(|| format!("adb 命令超时: {action}"))?
+        .with_context(|| format!("adb 命令失败: {action}"))?;
+    if output.stdout.len() > max_stdout_bytes {
+        bail!(
+            "adb stdout 超过限制: {} > {}",
+            output.stdout.len(),
+            max_stdout_bytes
+        );
+    }
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        bail!(
+            "adb 命令失败 exit={:?}: {}",
+            output.status.code(),
+            if stderr.is_empty() { stdout } else { stderr }
+        );
+    }
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
@@ -118,6 +170,14 @@ pub(crate) fn validate_connect_address(address: &str) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn validate_pairing_code(code: &str) -> Result<()> {
+    let value = code.trim();
+    if value.len() != 6 || !value.chars().all(|ch| ch.is_ascii_digit()) {
+        bail!("无线 ADB 配对码必须是 6 位数字");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,5 +194,12 @@ mod tests {
         assert!(validate_connect_address("192.168.1.8:5555").is_ok());
         assert!(validate_connect_address("phone.local:5555").is_ok());
         assert!(validate_connect_address("192.168.1.8").is_err());
+    }
+
+    #[test]
+    fn validates_pairing_codes() {
+        assert!(validate_pairing_code("123456").is_ok());
+        assert!(validate_pairing_code("12345").is_err());
+        assert!(validate_pairing_code("12 456").is_err());
     }
 }

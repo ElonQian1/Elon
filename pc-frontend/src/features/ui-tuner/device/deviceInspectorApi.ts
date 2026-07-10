@@ -83,6 +83,43 @@ export interface AndroidInspectorStatus {
   }
 }
 
+export interface AndroidDeviceProfile {
+  id: string
+  displayName: string
+  hardwareSerial: string
+  manufacturer?: string
+  model?: string
+  androidSdk?: number
+  androidRelease?: string
+  wirelessMode: 'unknown' | 'tls' | 'legacy' | 'manual'
+  paired: boolean
+  lastEndpoint?: string
+  createdAt: string
+  lastSeenAt: string
+  connectionState: 'connected_usb' | 'connected_wireless' | 'paired_offline' | 'offline'
+  connectedDeviceId?: string
+}
+
+export interface AdbMdnsService {
+  name: string
+  serviceType: string
+  address: string
+}
+
+export interface AndroidWirelessStatus {
+  ok: boolean
+  adb: NonNullable<AndroidInspectorStatus['adb']>
+  devices: AndroidInspectorDevice[]
+  profiles: AndroidDeviceProfile[]
+  mdnsServices: AdbMdnsService[]
+}
+
+interface AndroidWirelessActionResponse {
+  ok: boolean
+  output?: string
+  status: AndroidWirelessStatus
+}
+
 const DEFAULT_PACKAGE = 'com.elon.app'
 
 function inspectorError(error: unknown, fallback: string): Error {
@@ -129,20 +166,131 @@ export async function listAndroidDevices(): Promise<AndroidInspectorDevice[]> {
   }
 }
 
-export async function connectAndroidDevice(address: string): Promise<string> {
+export async function connectAndroidDevice(address: string, profileId?: string): Promise<string> {
   try {
     const data = await nodeApi<{ output?: string }>(
       inspectorAdminUrl(),
       '/api/android-inspector/connect',
       {
         method: 'POST',
-        body: JSON.stringify({ address: address.trim() }),
+        body: JSON.stringify({ address: address.trim(), profileId }),
       },
       12000,
     )
     return data.output ?? ''
   } catch (error) {
     throw inspectorError(error, '无线 ADB 连接失败')
+  }
+}
+
+export async function getAndroidWirelessStatus(): Promise<AndroidWirelessStatus> {
+  try {
+    return await nodeApi<AndroidWirelessStatus>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/wireless/status',
+      {},
+      15000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '读取无线 ADB 状态失败')
+  }
+}
+
+export async function registerAndroidDevice(input: {
+  deviceId: string
+  displayName?: string
+}): Promise<{ profile: AndroidDeviceProfile; status: AndroidWirelessStatus }> {
+  try {
+    return await nodeApi<{ profile: AndroidDeviceProfile; status: AndroidWirelessStatus }>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/wireless/register',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          deviceId: input.deviceId,
+          displayName: input.displayName?.trim() || undefined,
+        }),
+      },
+      20000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '登记手机失败')
+  }
+}
+
+export async function pairAndroidDevice(input: {
+  pairingAddress: string
+  pairingCode: string
+  profileId?: string
+}): Promise<AndroidWirelessActionResponse> {
+  try {
+    return await nodeApi<AndroidWirelessActionResponse>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/wireless/pair',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          pairingAddress: input.pairingAddress.trim(),
+          pairingCode: input.pairingCode.trim(),
+          profileId: input.profileId,
+        }),
+      },
+      35000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '无线 ADB 配对失败')
+  }
+}
+
+export async function reconnectAndroidDevices(profileId?: string): Promise<AndroidWirelessStatus> {
+  try {
+    return await nodeApi<AndroidWirelessStatus>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/wireless/reconnect',
+      {
+        method: 'POST',
+        body: JSON.stringify({ profileId }),
+      },
+      22000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '自动重连无线 ADB 失败')
+  }
+}
+
+export async function enableAndroidTcpIp(input: {
+  deviceId: string
+  profileId?: string
+  port?: number
+}): Promise<AndroidWirelessActionResponse> {
+  try {
+    return await nodeApi<AndroidWirelessActionResponse>(
+      inspectorAdminUrl(),
+      '/api/android-inspector/wireless/enable-tcpip',
+      {
+        method: 'POST',
+        body: JSON.stringify(input),
+      },
+      30000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '启用传统无线 ADB 失败')
+  }
+}
+
+export async function forgetAndroidDevice(profileId: string): Promise<void> {
+  try {
+    await nodeApi(
+      inspectorAdminUrl(),
+      '/api/android-inspector/wireless/forget',
+      {
+        method: 'POST',
+        body: JSON.stringify({ profileId }),
+      },
+      10000,
+    )
+  } catch (error) {
+    throw inspectorError(error, '移除手机档案失败')
   }
 }
 

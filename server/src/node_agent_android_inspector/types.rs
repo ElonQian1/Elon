@@ -24,6 +24,95 @@ pub(crate) struct AndroidDevice {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ConnectRequest {
     pub address: String,
+    pub profile_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RegisterDeviceRequest {
+    pub device_id: String,
+    pub display_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PairDeviceRequest {
+    pub pairing_address: String,
+    pub pairing_code: String,
+    pub profile_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReconnectRequest {
+    pub profile_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct EnableTcpIpRequest {
+    pub device_id: String,
+    pub profile_id: Option<String>,
+    pub port: Option<u16>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ForgetDeviceRequest {
+    pub profile_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AndroidDeviceProfile {
+    pub id: String,
+    pub display_name: String,
+    pub hardware_serial: String,
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub android_sdk: Option<u32>,
+    pub android_release: Option<String>,
+    pub wireless_mode: String,
+    pub paired: bool,
+    pub last_endpoint: Option<String>,
+    pub created_at: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AndroidDeviceProfileView {
+    #[serde(flatten)]
+    pub profile: AndroidDeviceProfile,
+    pub connection_state: String,
+    pub connected_device_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdbMdnsService {
+    pub name: String,
+    pub service_type: String,
+    pub address: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AndroidWirelessStatus {
+    pub ok: bool,
+    pub adb: AdbStatus,
+    pub devices: Vec<AndroidDevice>,
+    pub profiles: Vec<AndroidDeviceProfileView>,
+    pub mdns_services: Vec<AdbMdnsService>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AndroidDeviceIdentity {
+    pub hardware_serial: String,
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub android_sdk: Option<u32>,
+    pub android_release: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

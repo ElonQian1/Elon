@@ -14,6 +14,7 @@ import {
   Save,
   Smartphone,
   Undo2,
+  Wifi,
 } from 'lucide-react'
 import type { AndroidInspectorDevice } from './device/deviceInspectorApi'
 import styles from './UiTunerPage.module.css'
@@ -23,19 +24,17 @@ interface UiTunerToolbarProps {
   screenshotInputRef: RefObject<HTMLInputElement>
   devices: AndroidInspectorDevice[]
   selectedDeviceId: string
-  connectAddress: string
   deviceBusy: boolean
-  connectBusy: boolean
   captureBusy: boolean
+  wirelessConnected: boolean
   viewScaleLabel: string
   fitToStage: boolean
   canUndo: boolean
   canRedo: boolean
   onImportScreenshot: (file: File) => void
   onSelectDevice: (deviceId: string) => void
-  onConnectAddressChange: (value: string) => void
   onRefreshDevices: () => void
-  onConnectWirelessDevice: () => void
+  onOpenDeviceManager: () => void
   onCaptureDeviceSnapshot: () => void
   onZoomOut: () => void
   onZoomIn: () => void
@@ -56,19 +55,17 @@ export function UiTunerToolbar({
   screenshotInputRef,
   devices,
   selectedDeviceId,
-  connectAddress,
   deviceBusy,
-  connectBusy,
   captureBusy,
+  wirelessConnected,
   viewScaleLabel,
   fitToStage,
   canUndo,
   canRedo,
   onImportScreenshot,
   onSelectDevice,
-  onConnectAddressChange,
   onRefreshDevices,
-  onConnectWirelessDevice,
+  onOpenDeviceManager,
   onCaptureDeviceSnapshot,
   onZoomOut,
   onZoomIn,
@@ -118,19 +115,13 @@ export function UiTunerToolbar({
           <Smartphone size={14} aria-hidden="true" />
           {deviceBusy ? '检测中' : '设备'}
         </button>
-        <input
-          className={styles.connectInput}
-          value={connectAddress}
-          onChange={(event) => onConnectAddressChange(event.currentTarget.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') onConnectWirelessDevice()
-          }}
-          placeholder="IP:端口"
-          aria-label="无线 ADB 地址"
-        />
-        <button type="button" onClick={onConnectWirelessDevice} disabled={connectBusy || !connectAddress.trim()}>
-          <Smartphone size={14} aria-hidden="true" />
-          {connectBusy ? '连接中' : '连接'}
+        <button
+          type="button"
+          className={wirelessConnected ? styles.activeViewControl : ''}
+          onClick={onOpenDeviceManager}
+        >
+          <Wifi size={14} aria-hidden="true" />
+          {wirelessConnected ? '无线已连' : '无线连接'}
         </button>
         <button type="button" onClick={onCaptureDeviceSnapshot} disabled={captureBusy || deviceBusy}>
           <Smartphone size={14} aria-hidden="true" />

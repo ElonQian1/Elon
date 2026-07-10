@@ -22,6 +22,7 @@ import { clamp, getMetrics, touch } from './uiTunerGeometry'
 import {
   type AndroidInspectorSnapshot,
 } from './device/deviceInspectorApi'
+import { UiTunerDeviceDialog } from './device/UiTunerDeviceDialog'
 import { useAndroidInspectorDevices } from './device/useAndroidInspectorDevices'
 import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
 import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
@@ -158,14 +159,22 @@ export default function UiTunerPage() {
   const {
     devices,
     selectedDeviceId,
-    connectAddress,
     deviceBusy,
-    connectBusy,
     captureBusy,
+    wirelessBusy,
+    deviceDialogOpen,
+    wirelessStatus,
     setSelectedDeviceId,
-    setConnectAddress,
+    setDeviceDialogOpen,
     refreshDevices,
-    connectWirelessDevice,
+    refreshWirelessStatus,
+    openDeviceManager,
+    reconnectWirelessDevices,
+    registerWiredDevice,
+    pairWirelessDevice,
+    enableLegacyWireless,
+    connectWirelessAddress,
+    forgetWirelessDevice,
     captureDeviceSnapshot,
   } = useAndroidInspectorDevices({
     onCaptured: handleDeviceCaptured,
@@ -565,19 +574,19 @@ export default function UiTunerPage() {
           screenshotInputRef={screenshotInputRef}
           devices={devices}
           selectedDeviceId={selectedDeviceId}
-          connectAddress={connectAddress}
           deviceBusy={deviceBusy}
-          connectBusy={connectBusy}
           captureBusy={captureBusy}
+          wirelessConnected={wirelessStatus?.profiles.some((profile) => (
+            profile.connectionState === 'connected_wireless'
+          )) ?? false}
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
           canUndo={history.past.length > 0}
           canRedo={history.future.length > 0}
           onImportScreenshot={importScreenshot}
           onSelectDevice={setSelectedDeviceId}
-          onConnectAddressChange={setConnectAddress}
           onRefreshDevices={refreshDevices}
-          onConnectWirelessDevice={connectWirelessDevice}
+          onOpenDeviceManager={openDeviceManager}
           onCaptureDeviceSnapshot={captureDeviceSnapshot}
           onZoomOut={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)}
           onZoomIn={() => setManualViewScale(viewScale + VIEW_SCALE_STEP)}
@@ -648,6 +657,23 @@ export default function UiTunerPage() {
         onApplyStandard={applySelectedStandard}
         onSetProductMode={() => setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })}
         onSetDebugMode={() => setLayerFilter(buildDebugFilter())}
+      />
+
+      <UiTunerDeviceDialog
+        open={deviceDialogOpen}
+        busy={wirelessBusy}
+        status={wirelessStatus}
+        devices={devices}
+        selectedDeviceId={selectedDeviceId}
+        onClose={() => setDeviceDialogOpen(false)}
+        onSelectDevice={setSelectedDeviceId}
+        onRefresh={() => { void refreshWirelessStatus() }}
+        onRegister={registerWiredDevice}
+        onPair={pairWirelessDevice}
+        onReconnect={(profileId) => { void reconnectWirelessDevices(profileId) }}
+        onEnableLegacy={enableLegacyWireless}
+        onConnectAddress={connectWirelessAddress}
+        onForget={(profileId) => { void forgetWirelessDevice(profileId) }}
       />
 
       <div className={styles.notice} aria-live="polite">
