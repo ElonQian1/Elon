@@ -54,6 +54,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) lifecycle: node_agent_lifecycle::NodeLifecycleTracker,
     pub(crate) tool_approvals: node_agent_tool_approval::ToolApprovalState,
     pub(crate) full_access_grants: node_agent_full_access::FullAccessGrantState,
+    pub(crate) live_ui: std::sync::Arc<crate::node_agent_android_live::LiveUiBroker>,
     pub(crate) wake: Notify,
     local_admin_token: String,
 }
@@ -87,6 +88,7 @@ impl NodeRuntime {
             lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
+            live_ui: std::sync::Arc::new(crate::node_agent_android_live::LiveUiBroker::new()),
             wake: Notify::new(),
             local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }
@@ -322,10 +324,8 @@ impl NodeRuntime {
             Err(cached_error) => {
                 let refreshed = self.refresh_cli_probe_now().await;
                 let refreshed_paths = refreshed.available_pairs();
-                match node_agent_cli_security::resolve_cli_request(
-                    name,
-                    refreshed_paths.as_slice(),
-                ) {
+                match node_agent_cli_security::resolve_cli_request(name, refreshed_paths.as_slice())
+                {
                     Ok(resolved) => {
                         info!(
                             "PC CLI 缓存刷新后找到 {} CLI: {}",
@@ -355,10 +355,7 @@ impl NodeRuntime {
         self.wake.notify_waiters();
     }
 
-    pub(crate) async fn set_storage_settings(
-        &self,
-        settings: pc_storage_repo::StorageSettings,
-    ) {
+    pub(crate) async fn set_storage_settings(&self, settings: pc_storage_repo::StorageSettings) {
         let creds = self.creds.read().await.clone();
         save_persisted(&PersistedState::from_parts(
             &self.install_id,

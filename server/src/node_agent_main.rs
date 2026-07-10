@@ -32,6 +32,7 @@ mod node_agent_admin_server;
 use node_agent_admin_server::spawn_admin_server;
 mod node_agent_admin_status;
 mod node_agent_android_inspector;
+mod node_agent_android_live;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
