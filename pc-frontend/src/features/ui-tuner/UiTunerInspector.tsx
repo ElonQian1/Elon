@@ -9,6 +9,8 @@ import { UiTunerStandardsPanel } from './UiTunerStandardsPanel'
 import type { MetricItem } from './uiTunerGeometry'
 import type { UiTunerCodexContextPack } from './contextPack'
 import type { UiTunerVerificationReport } from './runtime/verification'
+import { UiTunerLivePanel } from './live/UiTunerLivePanel'
+import type { useLiveUiSession } from './live/useLiveUiSession'
 import styles from './UiTunerPage.module.css'
 
 const MIN_SIZE = 24
@@ -32,6 +34,8 @@ interface UiTunerInspectorProps {
   verificationReport: UiTunerVerificationReport | null
   onMutationTaskStarted: (pack: UiTunerCodexContextPack) => Promise<void> | void
   onRequestVerification: () => void
+  liveUi: ReturnType<typeof useLiveUiSession>
+  onLiveOptimisticUpdate: (patch: Partial<UiTunerElement>) => void
 }
 
 export function UiTunerInspector({
@@ -52,6 +56,8 @@ export function UiTunerInspector({
   verificationReport,
   onMutationTaskStarted,
   onRequestVerification,
+  liveUi,
+  onLiveOptimisticUpdate,
 }: UiTunerInspectorProps) {
   return (
     <aside className={styles.inspector}>
@@ -71,6 +77,18 @@ export function UiTunerInspector({
             metrics={metrics}
             onUpdateElement={onUpdateElement}
             onDeleteSelected={onDeleteSelected}
+          />
+          <UiTunerLivePanel
+            state={liveUi.state}
+            error={liveUi.error}
+            busy={liveUi.busy}
+            session={liveUi.session}
+            node={liveUi.selectedNode}
+            onApply={liveUi.apply}
+            onUndo={liveUi.undo}
+            onRedo={liveUi.redo}
+            onReconnect={liveUi.reconnect}
+            onOptimisticUpdate={onLiveOptimisticUpdate}
           />
           <UiTunerStandardsPanel
             insight={standardInsight}

@@ -1,0 +1,135 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  margin: 12px;
+  padding: 14px;
+  border: 1px solid rgba(100, 116, 139, 0.34);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(17, 31, 48, 0.92));
+}
+
+.header,
+.actions,
+.scopeField,
+.nodeInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.header div,
+.nodeInfo {
+  min-width: 0;
+}
+
+.header strong,
+.nodeInfo strong {
+  display: block;
+  color: #f8fafc;
+  font-size: 13px;
+}
+
+.eyebrow,
+.field span,
+.fieldFull span,
+.scopeField span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #64748b;
+  box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.15);
+}
+
+.panel[data-state='connected'] .statusDot {
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.16);
+}
+
+.panel[data-state='connecting'] .statusDot {
+  background: #f59e0b;
+}
+
+.hint,
+.previewWarning {
+  margin: 0;
+  color: #cbd5e1;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.previewWarning {
+  color: #fbbf24;
+}
+
+.nodeInfo {
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.nodeInfo small {
+  overflow: hidden;
+  max-width: 100%;
+  color: #64748b;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopeField select,
+.field input,
+.fieldFull input {
+  min-width: 0;
+  border: 1px solid rgba(100, 116, 139, 0.42);
+  border-radius: 8px;
+  color: #e2e8f0;
+  background: rgba(2, 6, 23, 0.58);
+}
+
+.scopeField select {
+  padding: 6px 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.field,
+.fieldFull {
+  display: grid;
+  gap: 5px;
+}
+
+.field input,
+.fieldFull input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 8px;
+}
+
+.actions button,
+.reconnect {
+  border: 1px solid rgba(96, 165, 250, 0.42);
+  border-radius: 9px;
+  padding: 7px 10px;
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.16);
+  cursor: pointer;
+}
+
+.actions button:disabled,
+.reconnect:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

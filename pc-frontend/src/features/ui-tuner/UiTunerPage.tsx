@@ -35,6 +35,7 @@ import {
 import { buildStandardInsight, stringifyStandardPackage } from './standards'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
+import { useLiveUiSession } from './live/useLiveUiSession'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -211,6 +212,25 @@ export default function UiTunerPage() {
     onNotice: setNotice,
     projectRoot,
   })
+
+  const liveUi = useLiveUiSession({
+    deviceId: tunerDoc.runtimeSnapshot?.deviceId,
+    packageName: tunerDoc.runtimeSnapshot?.packageName,
+    projectRoot,
+    selected,
+    onNotice: setNotice,
+  })
+
+  const handleLiveOptimisticUpdate = useCallback((patch: Partial<UiTunerElement>) => {
+    const currentId = selectedIdRef.current
+    if (!currentId) return
+    setTunerDoc((current) => touch({
+      ...current,
+      elements: current.elements.map((element) => (
+        element.id === currentId ? { ...element, ...patch } : element
+      )),
+    }))
+  }, [])
 
   const handleMutationTaskStarted = useCallback(async (pack: UiTunerCodexContextPack) => {
     const currentSelected = tunerDocRef.current.elements.find((element) => element.id === selectedIdRef.current)
@@ -744,6 +764,8 @@ export default function UiTunerPage() {
         verificationReport={verificationReport}
         onMutationTaskStarted={handleMutationTaskStarted}
         onRequestVerification={() => { void requestPostTaskVerification() }}
+        liveUi={liveUi}
+        onLiveOptimisticUpdate={handleLiveOptimisticUpdate}
       />
 
       <UiTunerDeviceDialog
