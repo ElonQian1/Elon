@@ -49,6 +49,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     execution_mode: ProjectExecutionMode,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
     direct_pc_cli: bool,
+    project_preflight_note: Option<String>,
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
@@ -103,7 +104,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
     let lightweight_chat_split_enabled = ai_cli::project_lightweight_chat_split_enabled();
     // force_cli: 悬浮球手机控制专用模式，绕过本地 intent_router 分流，
     // 直接进入 Codex CLI 意图门控，由 Codex 自己判断"闲聊还是生成脚本"。
-    let needs_project_workflow = execution_mode.is_plan()
+    let needs_project_workflow = project_preflight_note.is_some()
+        || execution_mode.is_plan()
         || execution_mode.is_force_cli()
         || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
     let use_pc_node_fast_path = should_use_pc_node_fast_path(
@@ -268,6 +270,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
             &message,
             agent_name.as_deref(),
             pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
+            project_preflight_note.as_deref(),
             &download_base,
             &state,
             tx,

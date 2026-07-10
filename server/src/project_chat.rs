@@ -191,6 +191,7 @@ pub async fn chat_project(
             ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
             pc_runtime_route,
             req.direct_pc_cli.unwrap_or(false),
+            None,
             Some(trace_id.clone()),
             tx,
         )
@@ -415,6 +416,7 @@ pub async fn chat_project_stream(
         ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
         pc_runtime_route,
         req.direct_pc_cli.unwrap_or(false),
+        None,
         Some(trace_id),
         tx,
     )

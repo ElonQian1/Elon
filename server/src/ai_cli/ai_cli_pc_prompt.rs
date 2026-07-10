@@ -61,6 +61,19 @@ pub(crate) fn pc_project_passthrough_prompt(user_message: &str) -> String {
     user_message.to_string()
 }
 
+pub(crate) fn contextual_passthrough_message(
+    user_message: &str,
+    preflight_note: Option<&str>,
+) -> String {
+    match preflight_note.map(str::trim).filter(|note| !note.is_empty()) {
+        Some(note) => format!(
+            "以下是平台生成并审计的项目上下文，请先按其中 Harness/源码规则工作。\n\n{}\n\n# 用户本轮消息\n{}",
+            note, user_message
+        ),
+        None => user_message.to_string(),
+    }
+}
+
 pub(crate) fn pc_lightweight_chat_prompt(
     user_message: &str,
     _cli_name: &str,
@@ -84,7 +97,8 @@ pub(crate) fn pc_cli_progress_label(cli_name: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_lightweight_chat_prompt, pc_project_execution_prompt, pc_project_passthrough_prompt,
+        contextual_passthrough_message, pc_lightweight_chat_prompt, pc_project_execution_prompt,
+        pc_project_passthrough_prompt,
     };
 
     #[test]
@@ -111,6 +125,14 @@ mod tests {
         assert!(!prompt.contains("当前请求已经被判定为项目开发"));
         assert!(!prompt.contains("第一步必须使用工具"));
         assert!(!prompt.contains("缺一项都不能宣称完成"));
+    }
+
+    #[test]
+    fn contextual_passthrough_keeps_context_separate_from_user_message() {
+        let message = contextual_passthrough_message("修改按钮", Some("读取 AGENTS.md"));
+        assert!(message.contains("读取 AGENTS.md"));
+        assert!(message.ends_with("# 用户本轮消息\n修改按钮"));
+        assert_eq!(contextual_passthrough_message("普通消息", None), "普通消息");
     }
 
     #[test]

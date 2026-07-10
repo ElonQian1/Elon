@@ -348,6 +348,7 @@ async fn run_project_ws_job(
             execution_mode,
             task_pc_runtime_route,
             task_direct_pc_cli,
+            None,
             task_trace_id,
             tx,
         )

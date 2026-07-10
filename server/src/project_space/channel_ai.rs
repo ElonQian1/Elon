@@ -53,6 +53,10 @@ pub struct StartChannelAiTaskRequest {
     pub local_workspace_path: Option<String>,
     #[serde(default, alias = "directPcCli", alias = "pcDirectCli")]
     pub direct_pc_cli: Option<bool>,
+    #[serde(default, alias = "moduleKey")]
+    pub module_key: Option<String>,
+    #[serde(default, alias = "contextArtifactId")]
+    pub context_artifact_id: Option<String>,
     pub trace_id: Option<String>,
 }
 
@@ -431,6 +435,14 @@ async fn start_channel_ai_task_response(
         None => None,
     };
     let direct_pc_cli = req.direct_pc_cli.unwrap_or(false);
+    let module_key = req
+        .module_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if module_key.is_some_and(|value| value != crate::store::UI_TUNER_MODULE_KEY) {
+        return json_error(StatusCode::BAD_REQUEST, "当前不支持这个项目模块上下文");
+    }
     if should_auto_bind_local_node(runtime_route) {
         if let (Some(node_id), Some(workspace_path)) = (
             req.local_node_id
@@ -489,6 +501,34 @@ async fn start_channel_ai_task_response(
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
+    let module_preflight_note = if module_key == Some(crate::store::UI_TUNER_MODULE_KEY) {
+        let artifact_id = match req
+            .context_artifact_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            Some(value) => value,
+            None => {
+                return json_error(
+                    StatusCode::BAD_REQUEST,
+                    "ui-tuner 任务缺少 contextArtifactId",
+                )
+            }
+        };
+        match crate::ui_tuner_context::prepare_task(
+            state.as_ref(),
+            &project.id,
+            &user_id,
+            &conversation_id,
+            artifact_id,
+        ) {
+            Ok(prepared) => Some((artifact_id.to_string(), prepared.preflight_note)),
+            Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+        }
+    } else {
+        None
+    };
     let task_id =
         match state
             .store
@@ -497,6 +537,24 @@ async fn start_channel_ai_task_response(
             Ok(id) => id,
             Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
+    if let Some((artifact_id, _)) = module_preflight_note.as_ref() {
+        if let Err(error) = state.store.bind_ui_tuner_task(
+            &project.id,
+            &user_id,
+            &conversation_id,
+            artifact_id,
+            &task_id,
+        ) {
+            let _ = state.store.finish_task(
+                &task_id,
+                "failed",
+                Some("ui-tuner Context Artifact 绑定失败，任务未启动。"),
+                None,
+                Some(&error.to_string()),
+            );
+            return json_error(StatusCode::CONFLICT, error.to_string());
+        }
+    }
     let trace_id = clean_trace_id(req.trace_id.as_deref());
     let download_base = if use_user_download_route {
         format!(
@@ -540,6 +598,8 @@ async fn start_channel_ai_task_response(
         agent: req.agent,
         runtime_route,
         direct_pc_cli,
+        module_key: module_key.map(ToOwned::to_owned),
+        module_preflight_note: module_preflight_note.map(|(_, note)| note),
         trace_id: trace_id.clone(),
     });
 

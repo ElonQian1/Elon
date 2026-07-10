@@ -60,8 +60,8 @@ enum ProjectWorkflowRouting {
 
 /// 一龙自项目路径（默认 /root/Elon，可由 ELON_SELF_PATH 环境变量覆盖）
 mod dispatch;
-mod pc_binding_utils;
 mod pc_binding;
+mod pc_binding_utils;
 mod routing;
 mod runtime_binding;
 
@@ -157,6 +157,7 @@ pub async fn run_pc_cli_passthrough_for_project(
     user_message: &str,
     agent_name: Option<&str>,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    project_preflight_note: Option<&str>,
     download_base: &str,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
@@ -210,11 +211,26 @@ pub async fn run_pc_cli_passthrough_for_project(
     let server_artifact_workspace = state.get_project_workspace(&project.workspace_key);
     let attempt_apk_sync = should_attempt_pc_apk_sync(project, user_message);
 
-    let run_result = ai_cli::run_with_pc_agent_passthrough_workspace(
+    let compiler_note = if project_preflight_note.is_some() {
+        context_compiler::compile_preflight_note(
+            state,
+            server_artifact_workspace.as_path(),
+            user_id,
+            user_message,
+            None,
+        )
+        .await
+    } else {
+        None
+    };
+    let combined_preflight_note =
+        combine_project_preflight_notes(project_preflight_note, compiler_note.as_deref());
+    let run_result = run_pc_project_cli_workspace(
         agent_id,
         user_id,
         pc_workspace,
         user_message,
+        combined_preflight_note.as_deref(),
         session_scope.clone(),
         Some(download_base),
         Some(server_artifact_workspace.as_path()),
@@ -245,11 +261,12 @@ pub async fn run_pc_cli_passthrough_for_project(
                     conversation_id: cid.to_string(),
                     runtime_permission: fallback_permission.to_string(),
                 });
-                ai_cli::run_with_pc_agent_passthrough_workspace(
+                run_pc_project_cli_workspace(
                     agent_id,
                     user_id,
                     pc_workspace,
                     user_message,
+                    combined_preflight_note.as_deref(),
                     fallback_scope,
                     Some(download_base),
                     Some(server_artifact_workspace.as_path()),
@@ -286,6 +303,54 @@ pub async fn run_pc_cli_passthrough_for_project(
             );
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn run_pc_project_cli_workspace(
+    agent_id: &str,
+    user_id: &str,
+    workspace_path: &str,
+    user_message: &str,
+    preflight_note: Option<&str>,
+    native_session_scope: Option<ai_cli::NativeSessionScope>,
+    download_base: Option<&str>,
+    artifact_workspace: Option<&Path>,
+    attempt_apk_sync: bool,
+    cli_name: Option<&str>,
+    copilot_model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
+    model_label: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<ai_cli::PcAgentChatOutcome> {
+    ai_cli::run_with_pc_agent_passthrough_workspace(
+        agent_id,
+        user_id,
+        workspace_path,
+        user_message,
+        preflight_note,
+        native_session_scope,
+        download_base,
+        artifact_workspace,
+        attempt_apk_sync,
+        cli_name,
+        copilot_model,
+        codex_reasoning_effort,
+        model_label,
+        state,
+        tx,
+    )
+    .await
+}
+
+fn combine_project_preflight_notes(first: Option<&str>, second: Option<&str>) -> Option<String> {
+    let notes = [first, second]
+        .into_iter()
+        .flatten()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    (!notes.is_empty()).then(|| notes.join("\n\n---\n\n"))
 }
 
 pub async fn run_chat_only_for_project(

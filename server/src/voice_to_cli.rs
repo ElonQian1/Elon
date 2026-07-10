@@ -119,6 +119,7 @@ async fn dispatch_to_project_chat(
         ProjectExecutionMode::Execute,
         None,  // pc_runtime_route
         false, // direct_pc_cli
+        None,  // project_preflight_note
         None,  // trace_id
         ai_reply_tx,
     )

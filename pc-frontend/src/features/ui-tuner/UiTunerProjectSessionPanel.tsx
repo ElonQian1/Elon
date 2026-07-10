@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { GitBranch, MessageSquareText, Play, RefreshCw, TerminalSquare } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check, GitBranch, MessageSquareText, Play, RefreshCw, TerminalSquare, Users, X } from 'lucide-react'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { channelAllowsAiStart, mergeProjectRecords } from '../conversation/conversationPageHelpers'
 import { ensureLocalFullAccessGrant, type LocalNodeStatus } from '../conversation/localPcRuntime'
@@ -12,16 +12,18 @@ import { useAuthStore } from '../../store/auth'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
 import type { UiTunerCodexContextPack } from './contextPack'
 import {
-  buildUiTunerProjectTaskContent,
-  createUiTunerProjectSession,
-  readUiTunerModuleMemory,
-  readUiTunerProjectSessions,
-  rememberUiTunerIntent,
-  saveUiTunerProjectSession,
-  updateUiTunerProjectSession,
-  writeUiTunerModuleMemory,
+  clearLegacyUiTunerModuleMemory,
+  readLegacyUiTunerModuleMemory,
   type UiTunerProjectSessionRecord,
+  type UiTunerWorkspaceResponse,
 } from './projectSessions'
+import {
+  createUiTunerContextArtifact,
+  forkUiTunerConversation,
+  importLegacyUiTunerWorkspace,
+  loadUiTunerWorkspace,
+  reviewUiTunerMemory,
+} from './uiTunerWorkspaceApi'
 import UiTunerConversationDrawer from './UiTunerConversationDrawer'
 import type { UiTunerConversationMode } from './uiTunerConversation'
 import panelStyles from './UiTunerPanels.module.css'
@@ -39,24 +41,15 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
   const selectedAgent = useModelStore((state) => state.selectedAgent)
   const modelOptions = useModelStore((state) => state.options)
   const {
-    projects,
-    projectsLoaded,
-    activeProjectId,
-    space,
-    channels,
-    messages,
-    sendingMessage,
-    loadProjects,
-    selectProject,
-    selectChannel,
-    sendMessage,
+    projects, projectsLoaded, activeProjectId, space, channels, messages, sendingMessage,
+    loadProjects, selectProject, selectChannel, sendMessage,
   } = useProjectStore()
   const [localNode, setLocalNode] = useState<LocalNodeStatus | null>(null)
   const [localNodeError, setLocalNodeError] = useState('')
   const [status, setStatus] = useState('')
-  const [sessions, setSessions] = useState<UiTunerProjectSessionRecord[]>(() => readUiTunerProjectSessions())
-  const [activeSessionId, setActiveSessionId] = useState(() => sessions[0]?.id ?? '')
-  const [memory, setMemory] = useState(() => readUiTunerModuleMemory())
+  const [workspaceState, setWorkspaceState] = useState<UiTunerWorkspaceResponse | null>(null)
+  const [workspaceLoading, setWorkspaceLoading] = useState(false)
+  const [activeSessionId, setActiveSessionId] = useState('')
   const [conversationOpen, setConversationOpen] = useState(false)
 
   useEffect(() => {
@@ -68,10 +61,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
     async function loadLocalNode() {
       try {
         const data = await localJson<LocalNodeStatus>(nodeAdminUrl, '/api/status')
-        if (!canceled) {
-          setLocalNode(data)
-          setLocalNodeError('')
-        }
+        if (!canceled) { setLocalNode(data); setLocalNodeError('') }
       } catch (error) {
         if (!canceled) {
           setLocalNode(null)
@@ -81,10 +71,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
     }
     void loadLocalNode()
     const timer = window.setInterval(loadLocalNode, 10_000)
-    return () => {
-      canceled = true
-      window.clearInterval(timer)
-    }
+    return () => { canceled = true; window.clearInterval(timer) }
   }, [nodeAdminUrl])
 
   const listedProject = projects.find((project) => project.id === activeProjectId)
@@ -93,13 +80,53 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
     [listedProject, space?.project],
   )
   const aiChannel = channels.find((channel) => channel.kind === 'ai_development')
-  const visibleSessions = useMemo(
-    () => sessions.filter((session) => !activeProjectId || session.projectId === activeProjectId),
-    [activeProjectId, sessions],
-  )
+
+  const refreshWorkspace = useCallback(async (showSpinner = true) => {
+    if (!activeProject?.id) {
+      setWorkspaceState(null)
+      setActiveSessionId('')
+      return null
+    }
+    if (showSpinner) setWorkspaceLoading(true)
+    try {
+      let next = await loadUiTunerWorkspace(activeProject.id)
+      const legacyMemory = next.workspace.memoryRevision === 1 && !next.workspace.lastCheckpointId
+        ? readLegacyUiTunerModuleMemory(activeProject.id)
+        : null
+      if (legacyMemory) {
+        next = await importLegacyUiTunerWorkspace(activeProject.id, legacyMemory)
+        clearLegacyUiTunerModuleMemory()
+      }
+      setWorkspaceState(next)
+      setActiveSessionId((current) => {
+        if (next.sessions.some((session) => session.id === current)) return current
+        const preferred = next.workspace.activeConversationId || next.workspace.canonicalConversationId
+        return next.sessions.find((session) => session.conversationId === preferred)?.id
+          ?? next.sessions[0]?.id
+          ?? ''
+      })
+      return next
+    } catch (error) {
+      setStatus((error as { message?: string }).message ?? 'ui-tuner 服务端工作区加载失败')
+      return null
+    } finally {
+      if (showSpinner) setWorkspaceLoading(false)
+    }
+  }, [activeProject?.id])
+
+  useEffect(() => {
+    setWorkspaceState(null)
+    setActiveSessionId('')
+    void refreshWorkspace()
+  }, [refreshWorkspace])
+
+  const visibleSessions = workspaceState?.sessions ?? []
   const selectedSession = visibleSessions.find((session) => session.id === activeSessionId)
+    ?? visibleSessions.find((session) => session.conversationId === workspaceState?.workspace.activeConversationId)
     ?? visibleSessions[0]
     ?? null
+  const acceptedMemories = workspaceState?.memories.filter((memory) => memory.status === 'accepted') ?? []
+  const candidateMemories = workspaceState?.memories.filter((memory) => memory.status === 'candidate') ?? []
   const workspacePath = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
   const localNodeId = clean(localNode?.agent_id)
   const localNodeReady = !!localNodeId
@@ -110,17 +137,24 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
   const localNodeStatusText = describeLocalNodeStatus(localNode, localNodeReady, localNodeError, user?.id)
   const canStart = !!activeProject?.id
     && !!aiChannel?.id
+    && !!selectedSession
     && channelAllowsAiStart(aiChannel)
     && localNodeReady
     && !!workspacePath
+    && !workspaceLoading
     && !sendingMessage
   const sessionMessages = useMemo(() => {
-    const conversationId = selectedSession?.conversationId
-    if (!conversationId) return []
+    if (!selectedSession?.conversationId) return []
     return messages
-      .filter((message) => clean(message.conversation_id ?? message.conversationId) === conversationId)
+      .filter((message) => clean(message.conversation_id ?? message.conversationId) === selectedSession.conversationId)
       .slice(-4)
   }, [messages, selectedSession?.conversationId])
+
+  useEffect(() => {
+    if (!selectedSession || !['running', 'recovering'].includes(selectedSession.status)) return
+    const timer = window.setInterval(() => { void refreshWorkspace(false) }, 4_000)
+    return () => window.clearInterval(timer)
+  }, [refreshWorkspace, selectedSession])
 
   async function startSession(
     mode: UiTunerConversationMode,
@@ -138,17 +172,25 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       setStatus('当前角色不能在这个频道发起 AI 开发')
       return null
     }
-    const baseSession = selectedSession && mode === 'continue' ? selectedSession : null
-    const session = baseSession ?? createUiTunerProjectSession({
-      projectId: activeProject.id,
-      channelId: aiChannel.id,
-      elementName: pack.selectedElement?.name ?? pack.screen.canvasName,
-      source: selectedSession,
-      memory,
-    })
-    setStatus(mode === 'fork' ? '正在从最新记忆分叉 Codex 会话…' : '正在发送到项目 Codex 会话…')
+    const current = workspaceState ?? await refreshWorkspace()
+    const source = selectedSession
+      ?? current?.sessions.find((session) => session.conversationId === current.workspace.activeConversationId)
+      ?? current?.sessions[0]
+    if (!source) {
+      setStatus('服务端 ui-tuner 主会话尚未就绪')
+      return null
+    }
+    setStatus(mode === 'fork' ? '正在从最新稳定检查点分叉…' : '正在发送到持续项目会话…')
     try {
-      const taskIntent = overrideIntent?.trim() || intent
+      const taskIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
+      const session = mode === 'fork'
+        ? await forkUiTunerConversation({
+            projectId: activeProject.id,
+            conversationId: source.conversationId,
+            title: `微调画布 · ${pack.selectedElement?.name || pack.screen.canvasName}`.slice(0, 80),
+            selectedElementName: pack.selectedElement?.name,
+          })
+        : source
       await selectChannel(aiChannel.id)
       await ensureLocalFullAccessGrant({
         adminUrl: nodeAdminUrl,
@@ -158,11 +200,15 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
         runtimePermission: activeProject.runtime_permission,
         useLocalRouteA: true,
       })
-      const nextMemory = rememberUiTunerIntent(memory, taskIntent, pack.selectedElement?.name ?? '')
-      const content = buildUiTunerProjectTaskContent({ pack, intent: taskIntent, memory: nextMemory, session, mode })
+      const artifact = await createUiTunerContextArtifact({
+        projectId: activeProject.id,
+        conversationId: session.conversationId,
+        userIntent: taskIntent,
+        pack,
+      })
       const agent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, CODEX_ROUTE)
       const response = await sendMessage(
-        content,
+        taskIntent,
         agent || null,
         CODEX_ROUTE,
         session.conversationId,
@@ -171,22 +217,40 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
         workspacePath,
         aiChannel.id,
         true,
+        undefined,
+        { moduleKey: 'ui-tuner', contextArtifactId: artifact.id },
       )
-      const saved = updateUiTunerProjectSession(session, {
-        taskId: clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId),
-        status: 'running',
-      })
-      saveUiTunerProjectSession(saved)
-      writeUiTunerModuleMemory(nextMemory)
-      setMemory(nextMemory)
-      setSessions(readUiTunerProjectSessions())
-      setActiveSessionId(saved.id)
+      const taskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
+      setActiveSessionId(session.id)
+      setWorkspaceState((previous) => previous ? {
+        ...previous,
+        workspace: { ...previous.workspace, activeConversationId: session.conversationId },
+        sessions: previous.sessions.some((item) => item.id === session.id)
+          ? previous.sessions.map((item) => item.id === session.id ? { ...item, taskId, status: 'running' } : item)
+          : [{ ...session, taskId, status: 'running' }, ...previous.sessions],
+      } : previous)
       setConversationOpen(true)
-      setStatus('已进入项目 Codex CLI 会话')
-      return saved
+      setStatus('已进入持续项目 Codex CLI 会话')
+      window.setTimeout(() => { void refreshWorkspace(false) }, 600)
+      return { ...session, taskId, status: 'running' }
     } catch (error) {
       setStatus((error as { message?: string }).message ?? '项目 Codex 会话启动失败')
       return null
+    }
+  }
+
+  async function decideMemory(
+    memoryId: string,
+    decision: 'accepted' | 'rejected',
+    scopeType: 'user' | 'project' = 'user',
+  ) {
+    if (!activeProject?.id) return
+    try {
+      await reviewUiTunerMemory({ projectId: activeProject.id, memoryId, decision, scopeType })
+      await refreshWorkspace(false)
+      setStatus(decision === 'accepted' ? '候选记忆已接受' : '候选记忆已忽略')
+    } catch (error) {
+      setStatus((error as { message?: string }).message ?? '记忆审核失败')
     }
   }
 
@@ -194,15 +258,12 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
     <div className={panelStyles.projectSessionPanel}>
       <div className={panelStyles.projectSessionHeader}>
         <span>项目会话</span>
-        <button type="button" title="刷新项目" onClick={() => void loadProjects()}>
+        <button type="button" title="刷新项目与模块会话" onClick={() => { void loadProjects(); void refreshWorkspace() }}>
           <RefreshCw size={13} aria-hidden="true" />
         </button>
       </div>
 
-      <select
-        value={activeProjectId}
-        onChange={(event) => { void selectProject(event.currentTarget.value) }}
-      >
+      <select value={activeProjectId} onChange={(event) => { void selectProject(event.currentTarget.value) }}>
         <option value="">选择自项目</option>
         {projects.map((project) => (
           <option key={project.id} value={project.id}>{project.display_name || project.name}</option>
@@ -216,35 +277,51 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       </div>
 
       <div className={panelStyles.sessionMemory}>
-        <strong>模块记忆</strong>
-        <small>{memory.stableSummary}</small>
+        <strong>服务端模块记忆 · r{workspaceState?.workspace.memoryRevision ?? 0}</strong>
+        <small>{workspaceState?.workspace.stableSummary || (workspaceLoading ? '正在加载模块记忆…' : '选择项目后加载')}</small>
+        <span>{acceptedMemories.length} 条已接受 · {candidateMemories.length} 条待确认</span>
       </div>
+
+      {candidateMemories.slice(0, 3).map((memory) => (
+        <div className={panelStyles.memoryCandidate} key={memory.id}>
+          <small>{memory.content}</small>
+          <div>
+            <button type="button" title="接受为个人模块记忆" onClick={() => void decideMemory(memory.id, 'accepted')}>
+              <Check size={13} aria-hidden="true" />
+            </button>
+            <button type="button" title="接受为项目共享模块记忆" onClick={() => void decideMemory(memory.id, 'accepted', 'project')}>
+              <Users size={13} aria-hidden="true" />
+            </button>
+            <button type="button" title="忽略候选记忆" onClick={() => void decideMemory(memory.id, 'rejected')}>
+              <X size={13} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ))}
 
       {visibleSessions.length > 0 && (
         <select value={selectedSession?.id ?? ''} onChange={(event) => setActiveSessionId(event.currentTarget.value)}>
           {visibleSessions.map((session) => (
-            <option key={session.id} value={session.id}>{session.title}</option>
+            <option key={session.id} value={session.id}>
+              {session.isCanonical ? '主会话 · ' : '分叉 · '}{session.title}
+            </option>
           ))}
         </select>
       )}
 
       <div className={panelStyles.codexActions}>
-        <button type="button" onClick={() => setConversationOpen(true)}>
-          <MessageSquareText size={14} aria-hidden="true" />
-          打开聊天
+        <button type="button" disabled={!selectedSession} onClick={() => setConversationOpen(true)}>
+          <MessageSquareText size={14} aria-hidden="true" />打开聊天
         </button>
         <button type="button" disabled={!canStart} onClick={() => void startSession('continue')}>
-          <Play size={14} aria-hidden="true" />
-          继续会话
+          <Play size={14} aria-hidden="true" />继续会话
         </button>
         <button type="button" disabled={!canStart} onClick={() => void startSession('fork')}>
-          <GitBranch size={14} aria-hidden="true" />
-          分叉会话
+          <GitBranch size={14} aria-hidden="true" />分叉会话
         </button>
       </div>
 
       {status && <p className={panelStyles.codexCopyState}>{status}</p>}
-
       {sessionMessages.length > 0 && (
         <div className={panelStyles.sessionMessages}>
           {sessionMessages.map((message) => (
@@ -254,10 +331,7 @@ export function UiTunerProjectSessionPanel({ pack, intent }: UiTunerProjectSessi
       )}
 
       <div className={panelStyles.sidecarWrap}>
-        <div className={panelStyles.sidecarTitle}>
-          <TerminalSquare size={13} aria-hidden="true" />
-          <span>Codex sidecar</span>
-        </div>
+        <div className={panelStyles.sidecarTitle}><TerminalSquare size={13} aria-hidden="true" /><span>Codex sidecar</span></div>
         {selectedSession?.taskId && localNodeReady ? (
           <SidecarTerminalPanel
             adminUrl={nodeAdminUrl}

@@ -88,8 +88,8 @@ use self::{
         start_pc_node_compute_run,
     },
     ai_cli_pc_prompt::{
-        pc_cli_progress_label, pc_lightweight_chat_prompt, pc_project_execution_prompt,
-        pc_project_passthrough_prompt,
+        contextual_passthrough_message, pc_cli_progress_label, pc_lightweight_chat_prompt,
+        pc_project_execution_prompt, pc_project_passthrough_prompt,
     },
     ai_cli_prompts::build_cli_prompt,
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
@@ -330,6 +330,7 @@ pub async fn run_with_pc_agent_passthrough_workspace(
     user_id: &str,
     workspace_path: &str,
     user_message: &str,
+    preflight_note: Option<&str>,
     native_session_scope: Option<NativeSessionScope>,
     download_base: Option<&str>,
     artifact_workspace: Option<&Path>,
@@ -352,7 +353,7 @@ pub async fn run_with_pc_agent_passthrough_workspace(
         user_id,
         Some(workspace_path),
         user_message,
-        None,
+        preflight_note,
         AiCliRequestMode::Passthrough,
         native_session_scope,
         download_base,
@@ -492,9 +493,8 @@ async fn run_via_pc_agent(
     } else {
         false
     };
-    // prompt 构造
     let prompt = if raw_pc_passthrough {
-        pc_project_passthrough_prompt(user_message)
+        pc_project_passthrough_prompt(&contextual_passthrough_message(user_message, preflight_note))
     } else if lightweight_pc_chat {
         pc_lightweight_chat_prompt(user_message, cli_name, model_label.or(copilot_model))
     } else if request_mode.is_plan() {

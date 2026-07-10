@@ -8,8 +8,7 @@ use crate::{
     project_execution_mode::ProjectExecutionMode,
     project_landing,
     project_space_ai_progress::{
-        is_pc_cli_heartbeat_progress, pc_dispatch_started_progress,
-        pc_tool_result_timeout_progress,
+        is_pc_cli_heartbeat_progress, pc_dispatch_started_progress, pc_tool_result_timeout_progress,
     },
     project_space_task_control::{
         register_channel_ai_task_control, remove_channel_ai_task_control,
@@ -41,12 +40,12 @@ pub(super) struct ChannelAiTask {
     pub(crate) agent: Option<String>,
     pub(crate) runtime_route: Option<PcRuntimeRoutePreference>,
     pub(crate) direct_pc_cli: bool,
+    pub(crate) module_key: Option<String>,
+    pub(crate) module_preflight_note: Option<String>,
     pub(crate) trace_id: String,
 }
 
-
 fn publish_channel_task_updated(task: &ChannelAiTask, kind: &str) {
-
     publish_channel_message_updated(
         task.state.as_ref(),
         &task.project_id,
@@ -90,7 +89,6 @@ pub(super) fn insert_channel_ai_result(task: &ChannelAiTask, content: &str) {
     }
 }
 
-
 pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -109,6 +107,7 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
         let run_agent = task.agent.clone();
         let run_runtime_route = task.runtime_route;
         let run_direct_pc_cli = task.direct_pc_cli;
+        let run_module_preflight_note = task.module_preflight_note.clone();
         let run_trace_id = task.trace_id.clone();
         let download_base = task.download_base.clone();
         let runner = tokio::spawn(async move {
@@ -125,6 +124,7 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
                 ProjectExecutionMode::Execute,
                 run_runtime_route,
                 run_direct_pc_cli,
+                run_module_preflight_note,
                 Some(run_trace_id),
                 tx,
             )
@@ -310,6 +310,33 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
             Ok(true)
         );
         if task_finished {
+            if task.module_key.as_deref() == Some(crate::store::UI_TUNER_MODULE_KEY) {
+                if let Err(error) = task.state.store.record_ui_tuner_task_completion(
+                    &task.task_id,
+                    &final_status,
+                    &final_reply,
+                ) {
+                    tracing::warn!(task_id = %task.task_id, %error, "ui-tuner task completion writeback failed");
+                }
+                let memory_state = task.state.clone();
+                let memory_user_id = task.user_id.clone();
+                let memory_project_id = task.project_id.clone();
+                let memory_conversation_id = task.conversation_id.clone();
+                let memory_user_message = task.content.clone();
+                let memory_assistant_reply = final_reply.clone();
+                tokio::spawn(async move {
+                    crate::user_memory_extract::extract_and_save_memories_scoped(
+                        memory_state,
+                        memory_user_id,
+                        memory_user_message,
+                        memory_assistant_reply,
+                        crate::store::MEMORY_SCOPE_PROJECT.to_string(),
+                        Some(memory_project_id),
+                        Some(memory_conversation_id),
+                    )
+                    .await;
+                });
+            }
             if final_done_result_pending {
                 let result = result_message(&final_reply, apk_url.as_deref(), None);
                 insert_channel_ai_result(&task, &result);
@@ -324,7 +351,6 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
 fn can_start_channel_ai(role: &str) -> bool {
     can_edit(role)
 }
-
 
 pub(super) trait BlankFallback {
     fn if_blank<'a>(&'a self, fallback: &'a str) -> &'a str;

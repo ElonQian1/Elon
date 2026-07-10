@@ -469,11 +469,49 @@
 }
 
 .sessionFacts span,
+.sessionMemory span,
 .sessionMemory small,
 .sessionMessages small {
   color: var(--text-secondary);
   font-size: 10.5px;
   line-height: 15px;
+}
+
+.memoryCandidate {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 7px 8px;
+  border: 1px solid rgba(219, 177, 88, .3);
+  border-radius: 6px;
+  background: rgba(219, 177, 88, .07);
+}
+
+.memoryCandidate small {
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 15px;
+  overflow-wrap: anywhere;
+}
+
+.memoryCandidate div {
+  display: flex;
+  gap: 4px;
+}
+
+.memoryCandidate button {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: #242528;
+  color: var(--text-primary);
 }
 
 .sessionMemory strong {

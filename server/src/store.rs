@@ -52,6 +52,12 @@ mod project_landing_upload_tokens;
 mod project_member_audit;
 mod project_member_conversations;
 mod project_member_moderation;
+mod project_module_completion;
+mod project_module_queries;
+#[cfg(test)]
+mod project_module_tests;
+mod project_module_types;
+mod project_module_workspaces;
 pub(crate) mod project_releases;
 mod project_roles;
 mod project_runtime_permissions;
@@ -106,6 +112,11 @@ pub use node_payouts::CreateNodePayout;
 pub use project_dev_profiles::ProjectDevProfile;
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
+};
+pub(crate) use project_module_types::{
+    CreateUiTunerContextArtifact, ProjectModuleCheckpoint, ProjectModuleContextArtifact,
+    ProjectModuleConversation, ProjectModuleMemory, ProjectModuleWorkspace, UiTunerWorkspaceBundle,
+    UI_TUNER_MODULE_KEY,
 };
 pub use project_roles::{
     PERMISSION_INVITE_MEMBERS, PERMISSION_MANAGE_MEMBERS, PERMISSION_MANAGE_PROJECT_SETTINGS,
