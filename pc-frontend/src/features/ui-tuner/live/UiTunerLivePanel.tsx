@@ -7,6 +7,7 @@ import type {
   LiveUiSession,
 } from './liveUiApi'
 import type { LiveUiConnectionState } from './useLiveUiSession'
+import type { LiveSourceCommitPlan, LiveSourceCommitResult } from './liveUiCommitApi'
 import styles from './UiTunerLivePanel.module.css'
 
 interface UiTunerLivePanelProps {
@@ -20,6 +21,10 @@ interface UiTunerLivePanelProps {
   onRedo: () => Promise<void>
   onReconnect: () => void
   onOptimisticUpdate: (patch: Partial<UiTunerElement>) => void
+  commitPlan: LiveSourceCommitPlan | null
+  commitResult: LiveSourceCommitResult | null
+  onPreviewCommit: () => Promise<LiveSourceCommitPlan>
+  onCommit: (plan: LiveSourceCommitPlan) => Promise<LiveSourceCommitResult>
 }
 
 const NUMBER_FIELDS = [
@@ -52,6 +57,10 @@ export function UiTunerLivePanel({
   onRedo,
   onReconnect,
   onOptimisticUpdate,
+  commitPlan,
+  commitResult,
+  onPreviewCommit,
+  onCommit,
 }: UiTunerLivePanelProps) {
   const [scope, setScope] = useState<LiveUiScope>('INSTANCE')
   const connected = state === 'connected'
@@ -135,7 +144,30 @@ export function UiTunerLivePanel({
               重做
             </button>
           </div>
-          <p className={styles.previewWarning}>LIVE PREVIEW · 真机已变化，源码尚未写入</p>
+          <button
+            className={styles.commitButton}
+            type="button"
+            disabled={busy || !session?.historyCount}
+            onClick={() => { void onPreviewCommit() }}
+          >
+            生成源码写回计划
+          </button>
+          {commitPlan && (
+            <CommitPlanView
+              plan={commitPlan}
+              busy={busy}
+              onCommit={onCommit}
+            />
+          )}
+          {commitResult ? (
+            <div className={styles.savedState}>
+              <strong>SOURCE SAVED</strong>
+              <span>已写入 {commitResult.changedFiles.length} 个文件；需重新构建并清空 Patch 后验收。</span>
+              {commitResult.changedFiles.map((file) => <small key={file}>{file}</small>)}
+            </div>
+          ) : (
+            <p className={styles.previewWarning}>LIVE PREVIEW · 真机已变化，源码尚未写入</p>
+          )}
         </>
       )}
 
@@ -145,6 +177,50 @@ export function UiTunerLivePanel({
         </button>
       )}
     </section>
+  )
+}
+
+function CommitPlanView({
+  plan,
+  busy,
+  onCommit,
+}: {
+  plan: LiveSourceCommitPlan
+  busy: boolean
+  onCommit: (plan: LiveSourceCommitPlan) => Promise<LiveSourceCommitResult>
+}) {
+  const sharedImpact = plan.entries.filter((entry) => entry.impactCount > 1)
+  const confirmCommit = () => {
+    const impactText = sharedImpact.length > 0
+      ? `\n其中 ${sharedImpact.length} 项会修改共享资源，请核对影响范围。`
+      : ''
+    if (!window.confirm(
+      `将确定性写入 ${plan.deterministicCount} 项源码；${plan.codexCount} 项复杂修改保留给 Codex。${impactText}`,
+    )) return
+    void onCommit(plan)
+  }
+  return (
+    <div className={styles.commitPlan}>
+      <div>
+        <strong>{plan.deterministicCount} 项可直接写入</strong>
+        <span>{plan.codexCount} 项需 Codex</span>
+      </div>
+      {plan.entries.slice(0, 6).map((entry) => (
+        <div className={styles.commitEntry} key={`${entry.definitionId}:${entry.property}`}>
+          <span>{entry.property}</span>
+          <strong>{entry.sourceKey ?? entry.commitMode}</strong>
+          <small>{entry.reason}</small>
+        </div>
+      ))}
+      <button
+        className={styles.commitButton}
+        type="button"
+        disabled={busy || plan.deterministicCount === 0}
+        onClick={confirmCommit}
+      >
+        确认写入源码
+      </button>
+    </div>
   )
 }
 

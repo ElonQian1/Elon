@@ -15,6 +15,7 @@ use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::protocol::{
     LiveStylePatch, RuntimeSocketQuery, StartLiveSessionRequest, PROTOCOL_VERSION,
 };
+use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
 
 pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
@@ -38,6 +39,14 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/android-live/sessions/:session_id/redo",
             post(redo_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/commit-plan",
+            get(commit_plan_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/commit",
+            post(commit_source_handler),
         )
 }
 
@@ -133,6 +142,35 @@ async fn redo_handler(
     match runtime.live_ui.redo(&session_id).await {
         Ok(ack) => Json(json!({ "ok": true, "ack": ack })).into_response(),
         Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn commit_plan_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    let session = match runtime.live_ui.session(&session_id).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    match build_source_commit_plan(session).await {
+        Ok(plan) => Json(json!({ "ok": true, "plan": plan })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn commit_source_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<SourceCommitRequest>,
+) -> Response {
+    let session = match runtime.live_ui.session(&session_id).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    match commit_source(session, request).await {
+        Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::CONFLICT, format!("{error:#}")),
     }
 }
 

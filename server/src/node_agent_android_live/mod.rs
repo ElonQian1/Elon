@@ -7,9 +7,13 @@ mod adb_session;
 mod broker;
 mod protocol;
 mod routes;
+mod source_commit;
+mod source_xml;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod source_commit_tests;
 
 pub(crate) use broker::LiveUiBroker;
 pub(crate) use routes::{protected_routes, runtime_routes};

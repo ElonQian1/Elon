@@ -35,6 +35,13 @@ pub(crate) struct LiveUiSession {
     pending: Mutex<HashMap<String, oneshot::Sender<Value>>>,
 }
 
+#[derive(Clone)]
+pub(crate) struct LiveCommitSnapshot {
+    pub(crate) project_root: Option<String>,
+    pub(crate) nodes: Vec<LiveUiNode>,
+    pub(crate) patches: Vec<LiveStylePatch>,
+}
+
 #[derive(Default)]
 struct LiveSessionState {
     connected: bool,
@@ -236,6 +243,19 @@ enum JournalMode {
 }
 
 impl LiveUiSession {
+    pub(crate) async fn commit_snapshot(&self) -> LiveCommitSnapshot {
+        let state = self.state.read().await;
+        LiveCommitSnapshot {
+            project_root: self.project_root.clone(),
+            nodes: state.nodes.clone(),
+            patches: state
+                .history
+                .iter()
+                .map(|entry| entry.forward.clone())
+                .collect(),
+        }
+    }
+
     pub(crate) async fn view(&self) -> LiveSessionView {
         let state = self.state.read().await;
         LiveSessionView {

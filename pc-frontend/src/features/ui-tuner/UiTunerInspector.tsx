@@ -89,6 +89,10 @@ export function UiTunerInspector({
             onRedo={liveUi.redo}
             onReconnect={liveUi.reconnect}
             onOptimisticUpdate={onLiveOptimisticUpdate}
+            commitPlan={liveUi.commitPlan}
+            commitResult={liveUi.commitResult}
+            onPreviewCommit={liveUi.previewCommit}
+            onCommit={liveUi.commit}
           />
           <UiTunerStandardsPanel
             insight={standardInsight}

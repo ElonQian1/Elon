@@ -12,6 +12,12 @@ import {
   type LiveUiScope,
   type LiveUiSession,
 } from './liveUiApi'
+import {
+  commitLiveSource,
+  getLiveSourceCommitPlan,
+  type LiveSourceCommitPlan,
+  type LiveSourceCommitResult,
+} from './liveUiCommitApi'
 
 export type LiveUiConnectionState = 'idle' | 'connecting' | 'connected' | 'attach_only' | 'error'
 
@@ -35,6 +41,8 @@ export function useLiveUiSession({
   const [state, setState] = useState<LiveUiConnectionState>('idle')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [commitPlan, setCommitPlan] = useState<LiveSourceCommitPlan | null>(null)
+  const [commitResult, setCommitResult] = useState<LiveSourceCommitResult | null>(null)
   const [restartRevision, setRestartRevision] = useState(0)
   const sessionRef = useRef<LiveUiSession | null>(null)
   const generationRef = useRef(0)
@@ -72,6 +80,8 @@ export function useLiveUiSession({
       void stopCurrent()
       setSession(null)
       setNodes([])
+      setCommitPlan(null)
+      setCommitResult(null)
       setState('idle')
       setError('')
       return () => undefined
@@ -82,6 +92,8 @@ export function useLiveUiSession({
       if (disposed || generation !== generationRef.current) return
       setSession(null)
       setNodes([])
+      setCommitPlan(null)
+      setCommitResult(null)
       setState('connecting')
       setError('')
       try {
@@ -162,6 +174,8 @@ export function useLiveUiSession({
           ? mergeEffectiveValues(node, ack.effectiveValues ?? {})
           : node
       )))
+      setCommitPlan(null)
+      setCommitResult(null)
       onNotice(`LIVE PREVIEW：${operation.property} 已在真机生效，源码尚未写入`)
       window.setTimeout(() => { void refresh().catch(() => undefined) }, 180)
       return ack
@@ -183,11 +197,51 @@ export function useLiveUiSession({
       await liveUiHistoryAction(current.id, action)
       await new Promise((resolve) => window.setTimeout(resolve, 120))
       await refresh(current.id)
+      setCommitPlan(null)
+      setCommitResult(null)
       onNotice(action === 'undo' ? '已撤销一条真机实时修改' : '已重做一条真机实时修改')
     } finally {
       setBusy(false)
     }
   }, [onNotice, refresh])
+
+  const previewCommit = useCallback(async () => {
+    const current = sessionRef.current
+    if (!current?.connected) throw new Error('Live Runtime 尚未连接')
+    setBusy(true)
+    try {
+      const plan = await getLiveSourceCommitPlan(current.id)
+      setCommitPlan(plan)
+      return plan
+    } catch (planError) {
+      const message = messageOf(planError, '无法生成源码写回计划')
+      setError(message)
+      onNotice(message)
+      throw planError
+    } finally {
+      setBusy(false)
+    }
+  }, [onNotice])
+
+  const commit = useCallback(async (plan: LiveSourceCommitPlan) => {
+    const current = sessionRef.current
+    if (!current?.connected) throw new Error('Live Runtime 尚未连接')
+    setBusy(true)
+    try {
+      const result = await commitLiveSource(current.id, plan.sourceRevision)
+      setCommitResult(result)
+      setCommitPlan(null)
+      onNotice(`SOURCE SAVED：已写入 ${result.changedFiles.length} 个源码文件，等待构建验证`)
+      return result
+    } catch (commitError) {
+      const message = messageOf(commitError, '源码写回失败')
+      setError(message)
+      onNotice(message)
+      throw commitError
+    } finally {
+      setBusy(false)
+    }
+  }, [onNotice])
 
   return {
     session,
@@ -196,11 +250,15 @@ export function useLiveUiSession({
     state,
     error,
     busy,
+    commitPlan,
+    commitResult,
     apply,
     undo: () => historyAction('undo'),
     redo: () => historyAction('redo'),
     reconnect: () => setRestartRevision((value) => value + 1),
     refresh,
+    previewCommit,
+    commit,
   }
 }
 
