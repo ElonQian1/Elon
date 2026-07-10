@@ -72,9 +72,10 @@ internal class MainNavigationController(
     private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
+    private val bottomNavigation = MainBottomNavigationController(
+        activity, binding, { selectBottomTab(it, false) }, showCreateProjectDialog, showFriendLocalSearch)
     private val homeChrome = HomeChromeController(
-        activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor,
-        ::setMainBottomMenuVisible,
+        activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, bottomNavigation::setVisible,
         { showConversationHome(animate = false) },
         { showProjectHome(animate = false) }, { showProjectPlaza() },
         { selectBottomTab(binding.tabProfile, animate = false) }
@@ -83,16 +84,7 @@ internal class MainNavigationController(
     fun setupNavigation() {
         designMetrics.apply()
         homeChrome.setup()
-        binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
-        binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
-        binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
-        binding.bottomNewProjectButton.setOnClickListener { showCreateProjectDialog() }
-        binding.bottomSearchButton.setOnClickListener {
-            if (!binding.tabChat.isSelected) {
-                selectBottomTab(binding.tabChat, animate = false)
-            }
-            showFriendLocalSearch()
-        }
+        bottomNavigation.setup()
         binding.projectHomeTopTabWrap.setOnClickListener { showProjectHome() }
         binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.conversationItem.setOnClickListener { openConversation(0) }
@@ -129,34 +121,16 @@ internal class MainNavigationController(
 
     private fun showMainTabs() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setMainBottomMenuVisible(true)
+        bottomNavigation.setVisible(true)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
     }
 
     private fun hideBottomMenus() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setMainBottomMenuVisible(false)
+        bottomNavigation.setVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
-    }
-
-    private fun setMainBottomMenuVisible(visible: Boolean) {
-        binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
-        val inset = if (visible) {
-            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
-        } else {
-            0
-        }
-        listOfNotNull(
-            binding.conversationPage.parent as? android.widget.ScrollView,
-            binding.projectScrollView,
-            binding.profilePage,
-            binding.marketplacePage
-        ).forEach { view ->
-            view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, inset)
-            view.clipToPadding = false
-        }
     }
 
     private fun showProjectTopTabs(plazaSelected: Boolean) {
@@ -206,7 +180,7 @@ internal class MainNavigationController(
 
     private fun showProjectSpaceBottomMenu() {
         setNavigationBarColor(R.color.elon_store_detail_bg)
-        setMainBottomMenuVisible(false)
+        bottomNavigation.setVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
     }
