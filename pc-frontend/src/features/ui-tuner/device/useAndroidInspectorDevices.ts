@@ -128,13 +128,16 @@ export function useAndroidInspectorDevices({
     }
   }, [onNotice])
 
-  const captureDeviceSnapshot = useCallback(async () => {
+  const captureDeviceSnapshot = useCallback(async (override?: {
+    deviceId?: string
+    packageName?: string
+  }) => {
     setCaptureBusy(true)
     try {
       onNotice('正在自动识别并读取真机画面…')
       const nextDevices = await refreshDevices(false)
       const readyDevices = nextDevices.filter((device) => device.state === 'device')
-      const targetDevice = selectCaptureDevice(nextDevices, selectedDeviceId)
+      const targetDevice = selectCaptureDevice(nextDevices, override?.deviceId || selectedDeviceId)
       if (!targetDevice) {
         if (readyDevices.length > 1) {
           setDeviceDialogOpen(true)
@@ -149,7 +152,7 @@ export function useAndroidInspectorDevices({
       setSelectedDeviceId(targetDevice.serial)
       const snapshot = await captureAndroidSnapshot({
         deviceId: targetDevice.serial,
-        packageName: packageName || 'com.elon.app',
+        packageName: override?.packageName || packageName || 'com.elon.app',
         projectRoot,
       })
       onCaptured(snapshot)

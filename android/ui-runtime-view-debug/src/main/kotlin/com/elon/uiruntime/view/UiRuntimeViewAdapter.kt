@@ -13,8 +13,11 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonPrimitive
 import java.lang.reflect.Method
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 internal object UiRuntimeViewAdapter {
+    private val zeroArgMethodsByClass = ConcurrentHashMap<Class<*>, Map<String, Method>>()
+
     data class ApplyResult(
         val beforeValues: Map<String, LivePropertyValue>,
         val effectiveValues: Map<String, LivePropertyValue>,
@@ -230,9 +233,14 @@ internal object UiRuntimeViewAdapter {
     }
 
     private fun applyBackgroundColor(view: View, color: Int) {
-        if (!invoke(view, "setCardBackgroundColor", Int::class.javaPrimitiveType!!, color)) {
-            view.backgroundTintList = ColorStateList.valueOf(color)
-        }
+        if (invoke(view, "setCardBackgroundColor", Int::class.javaPrimitiveType!!, color)) return
+        // backgroundTintList alone is only metadata when a plain container has
+        // no drawable. In that case the Runtime used to ACK the new color while
+        // the phone stayed visually unchanged. Create a real drawable so the
+        // preview is truthful; keep tinting existing shape/ripple drawables to
+        // preserve their geometry.
+        if (view.background == null) view.setBackgroundColor(color)
+        else view.backgroundTintList = ColorStateList.valueOf(color)
     }
 
     private fun applyCornerRadius(view: View, radiusPx: Float) {
@@ -268,11 +276,15 @@ internal object UiRuntimeViewAdapter {
         ?: (view.background as? ColorDrawable)?.color
         ?: Color.TRANSPARENT
 
-    private fun hasMethod(view: View, method: String): Boolean =
-        view.javaClass.methods.any { it.name == method && it.parameterCount == 0 }
+    private fun hasMethod(view: View, method: String): Boolean = reflectMethod(view, method) != null
 
-    private fun reflectMethod(view: View, method: String): Method? =
-        view.javaClass.methods.firstOrNull { it.name == method && it.parameterCount == 0 }
+    private fun reflectMethod(view: View, method: String): Method? = zeroArgMethodsByClass
+        .getOrPut(view.javaClass) {
+            view.javaClass.methods
+                .asSequence()
+                .filter { it.parameterCount == 0 }
+                .associateBy(Method::getName)
+        }[method]
 
     private fun reflectNumber(view: View, method: String): Number? =
         runCatching { reflectMethod(view, method)?.invoke(view) as? Number }.getOrNull()

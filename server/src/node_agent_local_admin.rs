@@ -123,6 +123,12 @@ fn trusted_origins(cloud_http_url: &str) -> Vec<String> {
         "http://43.139.149.158:8080".to_string(),
         "http://127.0.0.1:7799".to_string(),
         "http://localhost:7799".to_string(),
+        // Local PC frontend development/preview servers. Keep this explicit
+        // instead of trusting arbitrary localhost ports.
+        "http://127.0.0.1:4179".to_string(),
+        "http://localhost:4179".to_string(),
+        "http://127.0.0.1:5173".to_string(),
+        "http://localhost:5173".to_string(),
     ];
     if let Some(origin) = origin_from_url(cloud_http_url) {
         if !origins.iter().any(|item| item == &origin) {
@@ -183,6 +189,12 @@ mod tests {
         assert!(
             verify_local_admin_request(&headers, "secret", "http://43.139.149.158:8080").is_ok()
         );
+    }
+
+    #[test]
+    fn accepts_explicit_pc_frontend_development_origin() {
+        let headers = headers(Some("secret"), Some("http://127.0.0.1:4179"));
+        assert!(verify_local_admin_request(&headers, "secret", "http://example.com").is_ok());
     }
 
     #[test]

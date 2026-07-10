@@ -1,4 +1,5 @@
 import { Move, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { DEFAULT_UI_TUNER_FILTER } from './filtering'
 import type { UiTunerFilterResult } from './filtering'
 import type { UiTunerStandardInsight } from './standards'
@@ -36,6 +37,13 @@ interface UiTunerInspectorProps {
   onRequestVerification: () => void
   liveUi: ReturnType<typeof useLiveUiSession>
   onLiveOptimisticUpdate: (patch: Partial<UiTunerElement>) => void
+  livePrepareBusy: boolean
+  livePrepareError: string
+  livePrepareReady: boolean
+  liveDebugPackage: string
+  liveProjectRoot: string
+  onLiveProjectRootChange: (value: string) => void
+  onPrepareLiveRuntime: () => void
 }
 
 export function UiTunerInspector({
@@ -58,7 +66,15 @@ export function UiTunerInspector({
   onRequestVerification,
   liveUi,
   onLiveOptimisticUpdate,
+  livePrepareBusy,
+  livePrepareError,
+  livePrepareReady,
+  liveDebugPackage,
+  liveProjectRoot,
+  onLiveProjectRootChange,
+  onPrepareLiveRuntime,
 }: UiTunerInspectorProps) {
+  const [showExportJson, setShowExportJson] = useState(false)
   return (
     <aside className={styles.inspector}>
       <CanvasSection
@@ -102,6 +118,13 @@ export function UiTunerInspector({
             onOpenPreview={liveUi.openPreview}
             buildVerifyResult={liveUi.buildVerifyResult}
             onBuildVerify={liveUi.buildVerify}
+            prepareBusy={livePrepareBusy}
+            prepareError={livePrepareError}
+            prepareReady={livePrepareReady}
+            debugPackage={liveDebugPackage}
+            projectRoot={liveProjectRoot}
+            onProjectRootChange={onLiveProjectRootChange}
+            onPrepareRuntime={onPrepareLiveRuntime}
           />
           <UiTunerStandardsPanel
             insight={standardInsight}
@@ -133,7 +156,10 @@ export function UiTunerInspector({
 
       <section className={styles.section}>
         <h2>导出参数</h2>
-        <textarea className={styles.exportBox} value={exportJson} readOnly />
+        <button type="button" onClick={() => setShowExportJson((current) => !current)}>
+          {showExportJson ? '收起完整参数' : '查看完整参数'}
+        </button>
+        {showExportJson && <textarea className={styles.exportBox} value={exportJson} readOnly />}
       </section>
 
       <div className={styles.inspectorFooterActions}>

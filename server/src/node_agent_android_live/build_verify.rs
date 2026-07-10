@@ -13,7 +13,7 @@ use crate::node_agent_android_inspector::{
     png_probe::png_dimensions,
 };
 
-use super::adb_session::start_runtime;
+use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::preview::{open_preview, PreviewOpenRequest};
 use super::ui_ir::load_or_build_ui_ir;
@@ -44,6 +44,69 @@ pub(crate) struct BuildVerifyResult {
     screenshot_height: u32,
     visual_diff: Option<VisualDiffResult>,
     message: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PrepareDebugRuntimeRequest {
+    pub(crate) device_id: String,
+    pub(crate) base_package_name: String,
+    pub(crate) project_root: String,
+    pub(crate) debug_application_id_suffix: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PrepareDebugRuntimeResult {
+    pub(crate) package_name: String,
+    pub(crate) build: BuildVerifyResult,
+}
+
+/// Builds and installs a side-by-side Debug APK before the normal Live session
+/// exists. The temporary session is deliberately removed afterwards: the PC
+/// page captures the newly installed package and then creates the user-owned
+/// Live session with a fresh token.
+pub(crate) async fn prepare_debug_runtime(
+    broker: &LiveUiBroker,
+    request: PrepareDebugRuntimeRequest,
+    host_port: u16,
+) -> Result<PrepareDebugRuntimeResult> {
+    let device_id = request.device_id.trim();
+    let base_package_name = validate_package_name(request.base_package_name.trim())?;
+    let project_root = request.project_root.trim();
+    let suffix = validate_debug_application_id_suffix(request.debug_application_id_suffix.trim())?;
+    if device_id.is_empty() {
+        bail!("deviceId 不能为空");
+    }
+    if project_root.is_empty() {
+        bail!("projectRoot 不能为空；请先在 PC 工作台选择本机项目");
+    }
+    let package_name = format!("{base_package_name}{suffix}");
+    let session = broker
+        .create_session(
+            device_id.to_string(),
+            package_name.clone(),
+            Some(project_root.to_string()),
+            DEFAULT_DEVICE_PORT,
+        )
+        .await;
+    let session_id = session.id.clone();
+    let result = build_and_verify(
+        broker,
+        &session_id,
+        BuildVerifyRequest {
+            preview: None,
+            debug_application_id_suffix: Some(suffix.to_string()),
+        },
+        host_port,
+    )
+    .await;
+    let _ = stop_runtime(&session).await;
+    broker.remove_session(&session_id).await;
+    result.map(|build| PrepareDebugRuntimeResult {
+        package_name,
+        build,
+    })
 }
 
 pub(crate) async fn build_and_verify(
@@ -91,12 +154,31 @@ pub(crate) async fn build_and_verify(
 
     session.reset_for_redeploy().await;
     launch_app(&session.device_id, &session.package_name).await?;
+    tokio::time::sleep(Duration::from_millis(650)).await;
     start_runtime(&session, host_port).await?;
-    let require_preview_nodes = request.preview.is_some();
+    // A connected socket with an empty tree is not a verified UI. Always wait
+    // for at least one runtime node, including normal Activity verification.
+    let require_preview_nodes = true;
     if let Some(preview) = request.preview {
         open_preview(&session, preview).await?;
     }
-    let runtime_view = wait_for_runtime(&session, require_preview_nodes).await?;
+    let runtime_view = match wait_for_runtime(&session, require_preview_nodes).await {
+        Ok(view) => view,
+        Err(first_error) => {
+            // Some vendor systems finish `adb install -r` before the replaced
+            // process and its debug receiver are fully ready. Re-launch and
+            // bootstrap once more instead of leaving the PC page in a false
+            // disconnected state after a successful install.
+            launch_app(&session.device_id, &session.package_name).await?;
+            tokio::time::sleep(Duration::from_millis(650)).await;
+            start_runtime(&session, host_port).await?;
+            wait_for_runtime(&session, require_preview_nodes)
+                .await
+                .with_context(|| {
+                    format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}")
+                })?
+        }
+    };
     tokio::time::sleep(Duration::from_millis(650)).await;
     let screenshot = capture_screen_png(&session.device_id).await?;
     let (screenshot_width, screenshot_height) = png_dimensions(&screenshot)?;
@@ -212,6 +294,20 @@ fn validate_debug_application_id_suffix(value: &str) -> Result<&str> {
     Ok(value)
 }
 
+fn validate_package_name(value: &str) -> Result<&str> {
+    let valid = !value.is_empty()
+        && value.len() <= 220
+        && value.split('.').all(|segment| {
+            let mut bytes = segment.bytes();
+            bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
+                && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        });
+    if !valid {
+        bail!("basePackageName 不是合法的 Android applicationId")
+    }
+    Ok(value)
+}
+
 fn newest_debug_apk(gradle_root: &Path) -> Result<PathBuf> {
     let mut candidates = Vec::new();
     let mut visited = 0;
@@ -321,6 +417,17 @@ mod tests {
         assert!(validate_debug_application_id_suffix(".uitest -Pbad=true").is_err());
         assert!(validate_debug_application_id_suffix("uitest").is_err());
         assert!(validate_debug_application_id_suffix(".").is_err());
+    }
+
+    #[test]
+    fn validates_android_base_package_name() {
+        assert_eq!(
+            validate_package_name("com.elon.app").unwrap(),
+            "com.elon.app"
+        );
+        assert!(validate_package_name("com.elon.app;rm").is_err());
+        assert!(validate_package_name("com..app").is_err());
+        assert!(validate_package_name("1com.elon.app").is_err());
     }
 
     #[test]

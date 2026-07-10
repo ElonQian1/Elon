@@ -128,6 +128,26 @@ export interface LiveBuildVerifyResult {
   message: string
 }
 
+export interface LiveDebugRuntimePrepareResult {
+  packageName: string
+  build: LiveBuildVerifyResult
+}
+
+export async function prepareLiveDebugRuntime(input: {
+  deviceId: string
+  basePackageName: string
+  projectRoot: string
+  debugApplicationIdSuffix: string
+}): Promise<LiveDebugRuntimePrepareResult> {
+  const response = await nodeApi<{ result: LiveDebugRuntimePrepareResult }>(
+    inspectorAdminUrl(),
+    '/api/android-live/debug-runtime/prepare',
+    { method: 'POST', body: JSON.stringify(input) },
+    20 * 60_000,
+  )
+  return response.result
+}
+
 export async function startLiveUiSession(input: {
   deviceId: string
   packageName: string

@@ -42,6 +42,7 @@ interface UseLiveUiSessionOptions {
   deviceId?: string
   packageName?: string
   projectRoot?: string
+  debugApplicationIdSuffix?: string
   document: UiTunerDocument
   selected: UiTunerElement | null
   onNotice: (message: string) => void
@@ -51,6 +52,7 @@ export function useLiveUiSession({
   deviceId,
   packageName,
   projectRoot,
+  debugApplicationIdSuffix,
   document,
   selected,
   onNotice,
@@ -70,6 +72,8 @@ export function useLiveUiSession({
   const [buildVerifyResult, setBuildVerifyResult] = useState<LiveBuildVerifyResult | null>(null)
   const [restartRevision, setRestartRevision] = useState(0)
   const sessionRef = useRef<LiveUiSession | null>(null)
+  const treeRevisionRef = useRef<number | null>(null)
+  const stopPromiseRef = useRef<Promise<void>>(Promise.resolve())
   const generationRef = useRef(0)
   const targetDesignRef = useRef<LiveTargetDesign | null>(null)
   const targetSignatureRef = useRef('')
@@ -81,12 +85,21 @@ export function useLiveUiSession({
       getLiveUiSession(id),
       getLiveUiTree(id),
     ])
+    const treeChanged = treeRevisionRef.current !== nextSession.treeRevision
     sessionRef.current = nextSession
+    treeRevisionRef.current = nextSession.treeRevision
     setSession(nextSession)
-    setNodes(tree.nodes)
+    if (treeChanged) setNodes(tree.nodes)
     if (nextSession.connected) {
       setState('connected')
       setError('')
+    } else {
+      // A Debug APK reinstall or process restart tears down the runtime socket.
+      // Do not keep presenting stale nodes as a usable LIVE connection: expose
+      // the existing reconnect action so the user can bootstrap the installed
+      // package again without rebuilding it.
+      setState('attach_only')
+      setError('Debug Runtime 已断开，请重新连接后继续实时修改。')
     }
   }, [])
 
@@ -97,15 +110,23 @@ export function useLiveUiSession({
     let timer: number | undefined
     let disposed = false
 
+    const queueStop = (current: LiveUiSession) => {
+      const next = stopPromiseRef.current
+        .catch(() => undefined)
+        .then(() => stopLiveUiSession(current.id).catch(() => undefined))
+      stopPromiseRef.current = next
+      return next
+    }
     const stopCurrent = async () => {
       const current = sessionRef.current
       sessionRef.current = null
-      if (current) await stopLiveUiSession(current.id).catch(() => undefined)
+      if (current) await queueStop(current)
     }
 
     if (!cleanDevice || !cleanPackage) {
       void stopCurrent()
       setSession(null)
+      treeRevisionRef.current = null
       setNodes([])
       setCommitPlan(null)
       setCommitResult(null)
@@ -121,9 +142,14 @@ export function useLiveUiSession({
     }
 
     void (async () => {
+      // React effect cleanup cannot be awaited. Serialize STOP before the
+      // next START so a stale session cannot remove the new adb reverse rule
+      // or stop the newly connected Android Runtime.
+      await stopPromiseRef.current.catch(() => undefined)
       await stopCurrent()
       if (disposed || generation !== generationRef.current) return
       setSession(null)
+      treeRevisionRef.current = null
       setNodes([])
       setCommitPlan(null)
       setCommitResult(null)
@@ -185,9 +211,16 @@ export function useLiveUiSession({
       if (timer !== undefined) window.clearTimeout(timer)
       const current = sessionRef.current
       sessionRef.current = null
-      if (current) void stopLiveUiSession(current.id).catch(() => undefined)
+      if (current) void queueStop(current)
     }
   }, [deviceId, packageName, projectRoot, refresh, restartRevision])
+
+  const refreshFrame = useCallback(async (sessionId?: string) => {
+    const id = sessionId ?? sessionRef.current?.id
+    if (!id) return
+    const frame = await getLiveUiFrame(id)
+    setLiveFrame(frame)
+  }, [])
 
   useEffect(() => {
     if (state !== 'connected' || !session?.id) {
@@ -196,22 +229,22 @@ export function useLiveUiSession({
     }
     let disposed = false
     let timer: number | undefined
-    const pollFrame = async () => {
+    const pollTree = async () => {
       if (disposed) return
       try {
-        const frame = await getLiveUiFrame(session.id)
-        if (!disposed) setLiveFrame(frame)
+        await refresh(session.id)
       } catch {
-        // 树与 Patch 连接仍然可用时，单帧截图失败不应降级整个 Live 会话。
+        // A transient tree read must not tear down the current live session.
       }
-      if (!disposed) timer = window.setTimeout(() => { void pollFrame() }, 900)
+      if (!disposed) timer = window.setTimeout(() => { void pollTree() }, 2_500)
     }
-    void pollFrame()
+    void refreshFrame(session.id).catch(() => undefined)
+    void pollTree()
     return () => {
       disposed = true
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [session?.id, state])
+  }, [refresh, refreshFrame, session?.id, state])
 
   const selectedNode = useMemo(
     () => matchLiveNode(selected, nodes),
@@ -298,7 +331,9 @@ export function useLiveUiSession({
       setCommitPlan(null)
       setCommitResult(null)
       onNotice(`LIVE PREVIEW：${operation.property} 已在真机生效，源码尚未写入`)
-      window.setTimeout(() => { void refresh().catch(() => undefined) }, 180)
+      window.setTimeout(() => {
+        void Promise.all([refresh(), refreshFrame(currentSession.id)]).catch(() => undefined)
+      }, 180)
       return ack
     } catch (applyError) {
       const message = messageOf(applyError, '真机实时修改失败')
@@ -308,7 +343,7 @@ export function useLiveUiSession({
     } finally {
       setBusy(false)
     }
-  }, [nodes, onNotice, refresh, selected])
+  }, [nodes, onNotice, refresh, refreshFrame, selected])
 
   const historyAction = useCallback(async (action: 'undo' | 'redo') => {
     const current = sessionRef.current
@@ -317,14 +352,14 @@ export function useLiveUiSession({
     try {
       await liveUiHistoryAction(current.id, action)
       await new Promise((resolve) => window.setTimeout(resolve, 120))
-      await refresh(current.id)
+      await Promise.all([refresh(current.id), refreshFrame(current.id)])
       setCommitPlan(null)
       setCommitResult(null)
       onNotice(action === 'undo' ? '已撤销一条真机实时修改' : '已重做一条真机实时修改')
     } finally {
       setBusy(false)
     }
-  }, [onNotice, refresh])
+  }, [onNotice, refresh, refreshFrame])
 
   const previewCommit = useCallback(async () => {
     const current = sessionRef.current
@@ -383,7 +418,7 @@ export function useLiveUiSession({
         properties,
       })
       setSolverResult(result)
-      await refresh(current.id)
+      await Promise.all([refresh(current.id), refreshFrame(current.id)])
       onNotice(result.status === 'APPLIED'
         ? '本地视觉求解已应用：损失改善 ' + result.improvementPercent.toFixed(2) + '%，源码尚未写入'
         : '本地视觉求解未找到更优参数，真机保持不变')
@@ -396,7 +431,7 @@ export function useLiveUiSession({
     } finally {
       setBusy(false)
     }
-  }, [document.canvas.targetDesign, nodes, onNotice, refresh, selected, syncContext])
+  }, [document.canvas.targetDesign, nodes, onNotice, refresh, refreshFrame, selected, syncContext])
 
   const openPreview = useCallback(async (request: LivePreviewRequest) => {
     const current = sessionRef.current
@@ -405,7 +440,9 @@ export function useLiveUiSession({
     try {
       await openLiveUiPreview(current.id, request)
       onNotice(`Preview 已切换：${request.screenId} · ${request.scenario} · ${request.theme}`)
-      window.setTimeout(() => { void refresh(current.id).catch(() => undefined) }, 350)
+      window.setTimeout(() => {
+        void Promise.all([refresh(current.id), refreshFrame(current.id)]).catch(() => undefined)
+      }, 350)
     } catch (previewError) {
       const message = messageOf(previewError, '无法打开 Preview Host')
       setError(message)
@@ -414,7 +451,7 @@ export function useLiveUiSession({
     } finally {
       setBusy(false)
     }
-  }, [onNotice, refresh])
+  }, [onNotice, refresh, refreshFrame])
 
   const buildVerify = useCallback(async (preview?: LivePreviewRequest) => {
     const current = sessionRef.current
@@ -422,9 +459,9 @@ export function useLiveUiSession({
     setBusy(true)
     setBuildVerifyResult(null)
     try {
-      const result = await buildAndVerifyLiveUi(current.id, preview)
+      const result = await buildAndVerifyLiveUi(current.id, preview, debugApplicationIdSuffix)
       setBuildVerifyResult(result)
-      await refresh(current.id)
+      await Promise.all([refresh(current.id), refreshFrame(current.id)])
       onNotice(`BUILD VERIFIED：${result.runtimeBuildId ?? '新 Debug APK'} 已安装，临时 Patch 已清空`)
       return result
     } catch (verifyError) {
@@ -435,7 +472,7 @@ export function useLiveUiSession({
     } finally {
       setBusy(false)
     }
-  }, [onNotice, refresh])
+  }, [debugApplicationIdSuffix, onNotice, refresh, refreshFrame])
 
   return {
     session,

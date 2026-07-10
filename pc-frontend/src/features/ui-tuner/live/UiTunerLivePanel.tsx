@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { UiTunerElement } from '../types'
 import type {
   LivePatchOperation,
@@ -44,6 +44,13 @@ interface UiTunerLivePanelProps {
   onOpenPreview: (request: LivePreviewRequest) => Promise<void>
   buildVerifyResult: LiveBuildVerifyResult | null
   onBuildVerify: () => Promise<LiveBuildVerifyResult>
+  prepareBusy: boolean
+  prepareError: string
+  prepareReady: boolean
+  debugPackage: string
+  projectRoot: string
+  onProjectRootChange: (value: string) => void
+  onPrepareRuntime: () => void
 }
 
 const NUMBER_FIELDS = [
@@ -89,6 +96,13 @@ export function UiTunerLivePanel({
   onOpenPreview,
   buildVerifyResult,
   onBuildVerify,
+  prepareBusy,
+  prepareError,
+  prepareReady,
+  debugPackage,
+  projectRoot,
+  onProjectRootChange,
+  onPrepareRuntime,
 }: UiTunerLivePanelProps) {
   const [scope, setScope] = useState<LiveUiScope>('INSTANCE')
   const connected = state === 'connected'
@@ -104,6 +118,32 @@ export function UiTunerLivePanel({
       </div>
 
       {error && <p className={styles.hint}>{error}</p>}
+      {!connected && (
+        <div className={styles.prepareCard}>
+          <strong>启用真正的 LIVE 修改</strong>
+          <p>正式 APK 只支持截图/XML 检查。安装并打开隔离的 Debug Runtime 包后，颜色、尺寸、间距、圆角和文字才能在真机立即变化。</p>
+          <small>调试包：{debugPackage}</small>
+          <label className={styles.projectField}>
+            <span>本机 Android 项目目录</span>
+            <input
+              value={projectRoot}
+              disabled={prepareBusy}
+              placeholder="例如 D:\\projects\\my-android-app"
+              onChange={(event) => onProjectRootChange(event.currentTarget.value)}
+            />
+          </label>
+          {prepareError && <span>{prepareError}</span>}
+          <button
+            className={styles.prepareButton}
+            type="button"
+            disabled={prepareBusy || !prepareReady}
+            onClick={onPrepareRuntime}
+          >
+            {prepareBusy ? '正在构建并安装…' : '一键安装并连接实时调试包'}
+          </button>
+          {!prepareReady && <small>请先连接手机，并选择项目或填写本机 Android 项目目录。</small>}
+        </div>
+      )}
       {connected && !node && (
         <p className={styles.hint}>当前元素未匹配到 Runtime Node。可继续用右侧 Codex 修改源码，或为 View 添加稳定 uiNode ID。</p>
       )}
@@ -217,7 +257,17 @@ export function UiTunerLivePanel({
               </button>
             </div>
           ) : (
-            <p className={styles.previewWarning}>LIVE PREVIEW · 真机已变化，源码尚未写入</p>
+            <>
+              <p className={styles.previewWarning}>LIVE PREVIEW · 真机已变化，源码尚未写入或尚未完成构建验收</p>
+              <button
+                className={styles.commitButton}
+                type="button"
+                disabled={busy}
+                onClick={() => { void onBuildVerify() }}
+              >
+                构建当前源码并真机验收
+              </button>
+            </>
           )}
           {buildVerifyResult && (
             <div className={styles.savedState}>
@@ -235,7 +285,7 @@ export function UiTunerLivePanel({
         </>
       )}
 
-      {!connected && (
+      {!connected && !prepareBusy && (
         <button className={styles.reconnect} type="button" disabled={state === 'connecting'} onClick={onReconnect}>
           {state === 'connecting' ? '正在自动连接…' : '重新连接 Debug Runtime'}
         </button>
@@ -329,15 +379,6 @@ function CommitPlanView({
   onCommit: (plan: LiveSourceCommitPlan) => Promise<LiveSourceCommitResult>
 }) {
   const sharedImpact = plan.entries.filter((entry) => entry.impactCount > 1)
-  const confirmCommit = () => {
-    const impactText = sharedImpact.length > 0
-      ? `\n其中 ${sharedImpact.length} 项会修改共享资源，请核对影响范围。`
-      : ''
-    if (!window.confirm(
-      `将确定性写入 ${plan.deterministicCount} 项源码；${plan.codexCount} 项复杂修改保留给 Codex。${impactText}`,
-    )) return
-    void onCommit(plan)
-  }
   return (
     <div className={styles.commitPlan}>
       <div>
@@ -351,11 +392,14 @@ function CommitPlanView({
           <small>{entry.reason}</small>
         </div>
       ))}
+      {sharedImpact.length > 0 && (
+        <small>其中 {sharedImpact.length} 项会修改共享资源，请先核对上方影响范围。</small>
+      )}
       <button
         className={styles.commitButton}
         type="button"
         disabled={busy || plan.deterministicCount === 0}
-        onClick={confirmCommit}
+        onClick={() => { void onCommit(plan) }}
       >
         确认写入源码
       </button>
@@ -377,25 +421,47 @@ function NumberLiveField({
   onCommit: (value: number) => Promise<unknown>
 }) {
   const [draft, setDraft] = useState(String(value))
+  const [committing, setCommitting] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => setDraft(String(value)), [value])
-  const commit = () => {
-    const next = Number(draft)
-    if (!Number.isFinite(next) || next === value) return
-    void onCommit(next).catch(() => setDraft(String(value)))
+  const isSameValue = (next: number) => Math.abs(next - value) < Math.max(0.0001, step / 2)
+  const commit = async () => {
+    // Read the element at commit time. This keeps rapid edit + Apply actions
+    // reliable even when a fresh Runtime tree arrives between input events.
+    const next = Number(inputRef.current?.value ?? draft)
+    if (!Number.isFinite(next) || isSameValue(next)) return
+    setCommitting(true)
+    try {
+      await onCommit(next)
+    } catch {
+      setDraft(String(value))
+    } finally {
+      setCommitting(false)
+    }
   }
   return (
-    <label className={styles.field}>
-      <span>{label}</span>
-      <input
-        type="number"
-        value={draft}
-        step={step}
-        disabled={disabled}
-        onChange={(event) => setDraft(event.currentTarget.value)}
-        onBlur={commit}
-        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
-      />
-    </label>
+    <div className={styles.liveFieldRow}>
+      <label className={styles.field}>
+        <span>{label}</span>
+        <input
+          ref={inputRef}
+          type="number"
+          value={draft}
+          step={step}
+          disabled={disabled || committing}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') void commit() }}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={disabled || committing || isSameValue(Number(draft))}
+        aria-label={`应用${label}`}
+        onClick={() => { void commit() }}
+      >
+        {committing ? '…' : '应用'}
+      </button>
+    </div>
   )
 }
 
@@ -411,23 +477,42 @@ function TextLiveField({
   onCommit: (value: string) => Promise<unknown>
 }) {
   const [draft, setDraft] = useState(value)
+  const [committing, setCommitting] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => setDraft(value), [value])
-  const commit = () => {
-    const next = draft.trim()
+  const commit = async () => {
+    const next = (inputRef.current?.value ?? draft).trim()
     if (!next || next === value) return
-    void onCommit(next).catch(() => setDraft(value))
+    setCommitting(true)
+    try {
+      await onCommit(next)
+    } catch {
+      setDraft(value)
+    } finally {
+      setCommitting(false)
+    }
   }
   return (
-    <label className={styles.fieldFull}>
-      <span>{label}</span>
-      <input
-        value={draft}
-        disabled={disabled}
-        onChange={(event) => setDraft(event.currentTarget.value)}
-        onBlur={commit}
-        onKeyDown={(event) => { if (event.key === 'Enter') event.currentTarget.blur() }}
-      />
-    </label>
+    <div className={styles.liveFieldRow}>
+      <label className={styles.fieldFull}>
+        <span>{label}</span>
+        <input
+          ref={inputRef}
+          value={draft}
+          disabled={disabled || committing}
+          onChange={(event) => setDraft(event.currentTarget.value)}
+          onKeyDown={(event) => { if (event.key === 'Enter') void commit() }}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={disabled || committing || draft.trim() === value}
+        aria-label={`应用${label}`}
+        onClick={() => { void commit() }}
+      >
+        {committing ? '…' : '应用'}
+      </button>
+    </div>
   )
 }
 

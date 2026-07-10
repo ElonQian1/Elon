@@ -34,6 +34,7 @@ import { buildStandardInsight, stringifyStandardPackage } from './standards'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { useLiveUiSession } from './live/useLiveUiSession'
+import { prepareLiveDebugRuntime } from './live/liveUiApi'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerCanvasSurface } from './UiTunerCanvasSurface'
@@ -71,6 +72,8 @@ const HISTORY_LIMIT = 80
 const VIEW_SCALE_MIN = 0.08
 const VIEW_SCALE_MAX = 2
 const VIEW_SCALE_STEP = 0.1
+const LIVE_DEBUG_SUFFIX = '.uituner'
+const DEFAULT_ANDROID_PACKAGE = 'com.elon.app'
 function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
   if (preferredId && document.elements.some((element) => element.id === preferredId)) {
     return preferredId
@@ -107,6 +110,12 @@ export default function UiTunerPage() {
   const verificationCaptureRef = useRef(false)
   const verificationBaselineRef = useRef<UiTunerVerificationBaseline | null>(null)
   const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
+  const [liveTargetPackage, setLiveTargetPackage] = useState(() => {
+    const captured = tunerDoc.runtimeSnapshot?.packageName ?? ''
+    return captured.endsWith(LIVE_DEBUG_SUFFIX) ? captured : ''
+  })
+  const [livePrepareBusy, setLivePrepareBusy] = useState(false)
+  const [livePrepareError, setLivePrepareError] = useState('')
 
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
@@ -134,6 +143,21 @@ export default function UiTunerPage() {
     [activeProjectId, projectSpace?.project, projects],
   )
   const projectRoot = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
+  const [liveProjectRoot, setLiveProjectRoot] = useState(() => (
+    window.localStorage.getItem('elon.uiTuner.liveProjectRoot') ?? ''
+  ))
+  const effectiveProjectRoot = projectRoot || clean(liveProjectRoot)
+
+  useEffect(() => {
+    if (projectRoot) setLiveProjectRoot(projectRoot)
+  }, [projectRoot])
+
+  const updateLiveProjectRoot = useCallback((value: string) => {
+    setLiveProjectRoot(value)
+    const cleanValue = value.trim()
+    if (cleanValue) window.localStorage.setItem('elon.uiTuner.liveProjectRoot', cleanValue)
+    else window.localStorage.removeItem('elon.uiTuner.liveProjectRoot')
+  }, [])
 
   const fitCanvasToStage = useCallback(() => {
     const scroller = canvasScrollerRef.current
@@ -209,13 +233,56 @@ export default function UiTunerPage() {
   } = useAndroidInspectorDevices({
     onCaptured: handleDeviceCaptured,
     onNotice: setNotice,
-    projectRoot,
+    projectRoot: effectiveProjectRoot,
+    packageName: liveTargetPackage || undefined,
   })
 
+  const prepareLiveRuntime = useCallback(async () => {
+    if (!selectedDeviceId) {
+      setDeviceDialogOpen(true)
+      setNotice('请先连接并选择一台 Android 手机')
+      return
+    }
+    if (!effectiveProjectRoot) {
+      setLivePrepareError('请先在 PC 工作台选择一个本机 Android 项目，才能构建实时调试包。')
+      setNotice('缺少本机项目目录，无法构建实时调试包')
+      return
+    }
+    const capturedPackage = tunerDocRef.current.runtimeSnapshot?.packageName ?? DEFAULT_ANDROID_PACKAGE
+    const basePackageName = capturedPackage.endsWith(LIVE_DEBUG_SUFFIX)
+      ? capturedPackage.slice(0, -LIVE_DEBUG_SUFFIX.length)
+      : capturedPackage
+    setLivePrepareBusy(true)
+    setLivePrepareError('')
+    setNotice('正在构建并安装实时调试包；首次构建可能需要几分钟…')
+    try {
+      const prepared = await prepareLiveDebugRuntime({
+        deviceId: selectedDeviceId,
+        basePackageName,
+        projectRoot: effectiveProjectRoot,
+        debugApplicationIdSuffix: LIVE_DEBUG_SUFFIX,
+      })
+      setLiveTargetPackage(prepared.packageName)
+      const snapshot = await captureDeviceSnapshot({
+        deviceId: selectedDeviceId,
+        packageName: prepared.packageName,
+      })
+      if (!snapshot) throw new Error('调试包已安装，但自动捕获失败；请保持手机解锁后重试')
+      setNotice(`实时调试包 ${prepared.packageName} 已安装，正在连接 Runtime…`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '实时调试包准备失败'
+      setLivePrepareError(message)
+      setNotice(message)
+    } finally {
+      setLivePrepareBusy(false)
+    }
+  }, [captureDeviceSnapshot, effectiveProjectRoot, selectedDeviceId, setDeviceDialogOpen])
+
   const liveUi = useLiveUiSession({
-    deviceId: tunerDoc.runtimeSnapshot?.deviceId,
-    packageName: tunerDoc.runtimeSnapshot?.packageName,
-    projectRoot,
+    deviceId: liveTargetPackage ? selectedDeviceId : tunerDoc.runtimeSnapshot?.deviceId,
+    packageName: liveTargetPackage || tunerDoc.runtimeSnapshot?.packageName,
+    projectRoot: effectiveProjectRoot,
+    debugApplicationIdSuffix: liveTargetPackage ? LIVE_DEBUG_SUFFIX : undefined,
     document: tunerDoc,
     selected,
     onNotice: setNotice,
@@ -692,6 +759,13 @@ export default function UiTunerPage() {
         onRequestVerification={() => { void requestPostTaskVerification() }}
         liveUi={liveUi}
         onLiveOptimisticUpdate={handleLiveOptimisticUpdate}
+        livePrepareBusy={livePrepareBusy}
+        livePrepareError={livePrepareError}
+        livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}
+        liveDebugPackage={liveTargetPackage || `${DEFAULT_ANDROID_PACKAGE}${LIVE_DEBUG_SUFFIX}`}
+        liveProjectRoot={liveProjectRoot}
+        onLiveProjectRootChange={updateLiveProjectRoot}
+        onPrepareLiveRuntime={() => { void prepareLiveRuntime() }}
       />
 
       <UiTunerDeviceDialog

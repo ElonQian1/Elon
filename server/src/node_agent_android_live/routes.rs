@@ -12,7 +12,9 @@ use serde_json::json;
 use crate::NodeRuntime;
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
-use super::build_verify::{build_and_verify, BuildVerifyRequest};
+use super::build_verify::{
+    build_and_verify, prepare_debug_runtime, BuildVerifyRequest, PrepareDebugRuntimeRequest,
+};
 use super::frame::capture_frame;
 use super::mcp::{
     cleanup_descriptor, descriptor as mcp_descriptor, handle_request as handle_mcp_request,
@@ -31,6 +33,10 @@ use super::visual_solver::{solve_visual_style, VisualSolverRequest};
 
 pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
+        .route(
+            "/api/android-live/debug-runtime/prepare",
+            post(prepare_debug_runtime_handler),
+        )
         .route("/api/android-live/sessions", post(create_session_handler))
         .route(
             "/api/android-live/sessions/:session_id",
@@ -92,6 +98,17 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/sessions/:session_id/mcp-descriptor",
             get(mcp_descriptor_handler),
         )
+}
+
+async fn prepare_debug_runtime_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(request): Json<PrepareDebugRuntimeRequest>,
+) -> Response {
+    let host_port = crate::node_agent_admin_open::admin_port_from_env();
+    match prepare_debug_runtime(&runtime.live_ui, request, host_port).await {
+        Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
 }
 
 pub(crate) fn runtime_routes() -> Router<Arc<NodeRuntime>> {

@@ -111,6 +111,28 @@
   gap: 5px;
 }
 
+.liveFieldRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
+}
+
+.liveFieldRow > button {
+  min-width: 44px;
+  border: 1px solid rgba(96, 165, 250, 0.36);
+  border-radius: 8px;
+  padding: 7px 6px;
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.16);
+  cursor: pointer;
+}
+
+.liveFieldRow > button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
 .field input,
 .fieldFull input {
   width: 100%;
@@ -138,13 +160,61 @@
 
 .commitPlan,
 .savedState,
-.solver {
+.solver,
+.prepareCard {
   display: grid;
   gap: 8px;
   padding: 10px;
   border: 1px solid rgba(96, 165, 250, 0.25);
   border-radius: 10px;
   background: rgba(2, 6, 23, 0.44);
+}
+
+.prepareCard p,
+.prepareCard small,
+.prepareCard span {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.prepareCard strong {
+  color: #f8fafc;
+  font-size: 12px;
+}
+
+.prepareCard span {
+  color: #fca5a5;
+}
+
+.prepareButton {
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 9px;
+  padding: 9px 11px;
+  color: #dcfce7;
+  background: rgba(22, 163, 74, 0.2);
+  cursor: pointer;
+}
+
+.prepareButton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.projectField {
+  display: grid;
+  gap: 5px;
+}
+
+.projectField input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid rgba(100, 116, 139, 0.42);
+  border-radius: 8px;
+  padding: 7px 8px;
+  color: #e2e8f0;
+  background: rgba(2, 6, 23, 0.58);
 }
 
 .irState,
