@@ -153,7 +153,9 @@ export default function UiTunerPage() {
     commitDocument(() => next, next.elements[0]?.id ?? null)
     setFitToStage(true)
     setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
-    setNotice(`已捕获真机画面：${snapshot.xml.nodeCount} 个 XML 节点`)
+    setNotice(snapshot.xml.nodeCount > 0
+      ? `已捕获真实手机画面：${snapshot.xml.nodeCount} 个可调控件`
+      : '已捕获真实手机画面；当前页面未提供可解析控件层级，但截图仍可用于微调')
   }, [commitDocument])
 
   const {

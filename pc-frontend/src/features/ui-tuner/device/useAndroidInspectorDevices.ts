@@ -22,11 +22,46 @@ interface UseAndroidInspectorDevicesOptions {
 function selectCaptureDevice(devices: AndroidInspectorDevice[], preferredId: string) {
   const preferred = devices.find((device) => device.serial === preferredId)
   if (preferred?.state === 'device') return preferred
-  return devices.find((device) => device.state === 'device') ?? preferred ?? devices[0] ?? null
+  const readyDevices = devices.filter((device) => device.state === 'device')
+  return readyDevices.length === 1 ? readyDevices[0] : null
 }
 
 function deviceDisplayName(device: AndroidInspectorDevice) {
   return device.model ?? device.serial
+}
+
+function devicePriority(device: AndroidInspectorDevice) {
+  const stateScore = device.state === 'device' ? 100 : 0
+  const connectionScore = device.connectionType === 'usb'
+    ? 20
+    : device.connectionType === 'wireless'
+      ? 10
+      : 0
+  return stateScore + connectionScore
+}
+
+function normalizeDeviceInventory(devices: AndroidInspectorDevice[]) {
+  const physicalDevices = new Map<string, AndroidInspectorDevice>()
+  for (const device of devices) {
+    const key = device.hardwareSerial?.trim() || device.serial
+    const current = physicalDevices.get(key)
+    if (!current || devicePriority(device) > devicePriority(current)) {
+      physicalDevices.set(key, device)
+    }
+  }
+  return [...physicalDevices.values()]
+}
+
+function captureFailureMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '')
+  const lower = message.toLowerCase()
+  if (lower.includes('unauthorized')) {
+    return '手机尚未授权：请解锁手机，勾选“始终允许这台电脑”，点击允许后重试'
+  }
+  if (lower.includes('offline') || lower.includes('device not found') || lower.includes('closed')) {
+    return '手机连接已断开：请检查数据线或无线网络，然后再次点击“调试真机”'
+  }
+  return message || '真机捕获失败，请检查手机是否解锁并保持连接'
 }
 
 export function useAndroidInspectorDevices({
@@ -42,29 +77,44 @@ export function useAndroidInspectorDevices({
   const [wirelessStatus, setWirelessStatus] = useState<AndroidWirelessStatus | null>(null)
 
   const applyWirelessStatus = useCallback((status: AndroidWirelessStatus) => {
+    const normalizedDevices = normalizeDeviceInventory(status.devices)
     setWirelessStatus(status)
-    setDevices(status.devices)
+    setDevices(normalizedDevices)
     setSelectedDeviceId((current) => {
       const connectedProfile = status.profiles.find((profile) => profile.connectedDeviceId)
-      if (connectedProfile?.connectedDeviceId) return connectedProfile.connectedDeviceId
-      if (current && status.devices.some((device) => device.serial === current)) return current
-      return status.devices.find((device) => device.state === 'device')?.serial
-        ?? status.devices[0]?.serial
-        ?? ''
+      const profileDevice = connectedProfile
+        ? normalizedDevices.find((device) => device.hardwareSerial === connectedProfile.hardwareSerial)
+        : null
+      if (profileDevice?.serial) return profileDevice.serial
+      if (current && normalizedDevices.some((device) => device.serial === current)) return current
+      const readyDevices = normalizedDevices.filter((device) => device.state === 'device')
+      return readyDevices.length === 1 ? readyDevices[0].serial : ''
     })
   }, [])
 
-  const refreshDevices = useCallback(async (): Promise<AndroidInspectorDevice[]> => {
+  const refreshDevices = useCallback(async (announce = true): Promise<AndroidInspectorDevice[]> => {
     setDeviceBusy(true)
     try {
-      const nextDevices = await listAndroidDevices()
+      const nextDevices = normalizeDeviceInventory(await listAndroidDevices())
+      const readyDevices = nextDevices.filter((device) => device.state === 'device')
       setDevices(nextDevices)
       setSelectedDeviceId((current) => (
         current && nextDevices.some((device) => device.serial === current)
           ? current
-          : nextDevices.find((device) => device.state === 'device')?.serial ?? nextDevices[0]?.serial ?? ''
+          : readyDevices.length === 1 ? readyDevices[0].serial : ''
       ))
-      onNotice(nextDevices.length ? `已发现 ${nextDevices.length} 台 ADB 设备` : '未发现可用 ADB 设备')
+      if (announce) {
+        const unauthorized = nextDevices.some((device) => device.state === 'unauthorized')
+        if (readyDevices.length > 1) {
+          onNotice(`检测到 ${readyDevices.length} 台手机，请先在设备下拉框选择要调试的手机`)
+        } else if (readyDevices.length === 1) {
+          onNotice(`已自动识别 ${deviceDisplayName(readyDevices[0])}`)
+        } else if (unauthorized) {
+          onNotice('已发现手机，但还未授权 USB 调试；请在手机弹窗中点击允许')
+        } else {
+          onNotice('未发现手机：请连接数据线、解锁手机并开启 USB 调试')
+        }
+      }
       return nextDevices
     } catch (error) {
       onNotice(error instanceof Error ? error.message : '读取 ADB 设备失败')
@@ -77,32 +127,33 @@ export function useAndroidInspectorDevices({
   const captureDeviceSnapshot = useCallback(async () => {
     setCaptureBusy(true)
     try {
-      let targetDevice = selectCaptureDevice(devices, selectedDeviceId)
-      if (!targetDevice || targetDevice.state !== 'device') {
-        onNotice('正在检测 ADB 设备并准备捕获')
-        const nextDevices = await refreshDevices()
-        targetDevice = selectCaptureDevice(nextDevices, selectedDeviceId)
-      }
+      onNotice('正在自动识别并读取真机画面…')
+      const nextDevices = await refreshDevices(false)
+      const readyDevices = nextDevices.filter((device) => device.state === 'device')
+      const targetDevice = selectCaptureDevice(nextDevices, selectedDeviceId)
       if (!targetDevice) {
-        onNotice('未发现可用 ADB 设备，请先连接手机并确认 USB 调试授权')
+        if (readyDevices.length > 1) {
+          setDeviceDialogOpen(true)
+          onNotice(`检测到 ${readyDevices.length} 台手机，请选择一台后再次点击“调试真机”`)
+        } else if (nextDevices.some((device) => device.state === 'unauthorized')) {
+          onNotice('手机已连接但未授权：请解锁手机，勾选“始终允许这台电脑”并点击允许')
+        } else {
+          onNotice('未发现手机：请连接数据线、解锁手机并开启 USB 调试，然后直接重试')
+        }
         return
       }
       setSelectedDeviceId(targetDevice.serial)
-      if (targetDevice.state !== 'device') {
-        onNotice(`ADB 设备未就绪：${deviceDisplayName(targetDevice)} · ${targetDevice.state}`)
-        return
-      }
       const snapshot = await captureAndroidSnapshot({
         deviceId: targetDevice.serial,
         packageName: 'com.elon.app',
       })
       onCaptured(snapshot)
     } catch (error) {
-      onNotice(error instanceof Error ? error.message : '真机捕获失败')
+      onNotice(captureFailureMessage(error))
     } finally {
       setCaptureBusy(false)
     }
-  }, [devices, onCaptured, onNotice, refreshDevices, selectedDeviceId])
+  }, [onCaptured, onNotice, refreshDevices, selectedDeviceId])
 
   const refreshWirelessStatus = useCallback(async () => {
     setWirelessBusy(true)

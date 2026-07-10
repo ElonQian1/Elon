@@ -89,9 +89,15 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
         capture_screenshot(&device_id, req.include_screenshot_data_url.unwrap_or(true))
             .await
             .context("ADB 截图失败")?;
-    let xml_raw = dump_xml(&device_id).await.context("ADB XML dump 失败")?;
-    validate_ui_xml(&xml_raw)?;
-    let mut nodes = parse_runtime_nodes(&xml_raw)?;
+    let (xml_raw, mut nodes, xml_error) = match dump_xml(&device_id).await {
+        Ok(xml_raw) => {
+            match validate_ui_xml(&xml_raw).and_then(|_| parse_runtime_nodes(&xml_raw)) {
+                Ok(nodes) => (xml_raw, nodes, None),
+                Err(error) => (xml_raw, Vec::new(), Some(format!("{error:#}"))),
+            }
+        }
+        Err(error) => (String::new(), Vec::new(), Some(format!("{error:#}"))),
+    };
     let source_root = attach_source_map(&mut nodes, req.project_root.as_deref());
     Ok(DeviceUiSnapshot {
         ok: true,
@@ -104,6 +110,7 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
             node_count: nodes.len(),
             length: xml_raw.len(),
             raw_xml: req.include_raw_xml.unwrap_or(false).then_some(xml_raw),
+            error: xml_error,
         },
         nodes,
         source_root,
@@ -192,9 +199,19 @@ fn parse_device_line(line: &str) -> Option<AndroidDevice> {
             transport_id = Some(value.to_string());
         }
     }
+    let connection_type = if serial.starts_with("emulator-") {
+        "emulator"
+    } else if serial.contains(':') {
+        "wireless"
+    } else {
+        "usb"
+    }
+    .to_string();
     Some(AndroidDevice {
         serial,
         state,
+        hardware_serial: None,
+        connection_type,
         product,
         model,
         device,

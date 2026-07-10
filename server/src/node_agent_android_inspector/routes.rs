@@ -11,10 +11,10 @@ use serde_json::json;
 
 use crate::NodeRuntime;
 
-use super::adb_capture::{adb_status, capture_snapshot, launch_app, list_devices};
+use super::adb_capture::{adb_status, capture_snapshot, launch_app};
 use super::adb_wireless::{
-    connect_and_remember, enable_tcpip, forget_device, pair_device, reconnect_devices,
-    register_device, wireless_status,
+    connect_and_remember, enable_tcpip, forget_device, list_device_inventory, pair_device,
+    reconnect_devices, register_device, wireless_status,
 };
 use super::types::{
     CaptureRequest, ConnectRequest, EnableTcpIpRequest, ForgetDeviceRequest, LaunchAppRequest,
@@ -62,7 +62,7 @@ async fn status_handler(State(_runtime): State<Arc<NodeRuntime>>) -> Response {
 }
 
 async fn devices_handler(State(_runtime): State<Arc<NodeRuntime>>) -> Response {
-    match list_devices().await {
+    match list_device_inventory().await {
         Ok(devices) => Json(json!({ "ok": true, "adb": adb_status().await, "devices": devices }))
             .into_response(),
         Err(error) => json_error(StatusCode::BAD_GATEWAY, format!("{error:#}")),

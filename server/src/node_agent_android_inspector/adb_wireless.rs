@@ -134,13 +134,18 @@ pub(crate) async fn reconnect_devices(req: ReconnectRequest) -> Result<AndroidWi
 }
 
 pub(crate) async fn wireless_status() -> Result<AndroidWirelessStatus> {
-    let devices = list_devices().await?;
+    let devices = list_device_inventory().await?;
     let profiles = list_profiles()?;
     let mdns_services = discover_mdns_services().await.unwrap_or_default();
     let mut connections = HashMap::new();
     for device in devices.iter().filter(|device| device.state == "device") {
-        if let Ok(identity) = probe_identity(&device.serial).await {
-            connections.insert(identity.hardware_serial, device.serial.clone());
+        if let Some(hardware_serial) = device.hardware_serial.as_ref() {
+            let replace = connections
+                .get(hardware_serial)
+                .is_none_or(|current: &String| current.contains(':'));
+            if replace {
+                connections.insert(hardware_serial.clone(), device.serial.clone());
+            }
         }
     }
     let profile_views = profiles
@@ -187,6 +192,17 @@ pub(crate) async fn wireless_status() -> Result<AndroidWirelessStatus> {
         profiles: profile_views,
         mdns_services,
     })
+}
+
+pub(crate) async fn list_device_inventory() -> Result<Vec<super::types::AndroidDevice>> {
+    let mut devices = list_devices().await?;
+    for device in devices.iter_mut().filter(|device| device.state == "device") {
+        device.hardware_serial = getprop(&device.serial, "ro.serialno")
+            .await
+            .ok()
+            .and_then(optional_text);
+    }
+    Ok(devices)
 }
 
 pub(crate) fn forget_device(profile_id: &str) -> Result<bool> {

@@ -19,6 +19,13 @@ import {
 import type { AndroidInspectorDevice } from './device/deviceInspectorApi'
 import styles from './UiTunerPage.module.css'
 
+function deviceConnectionLabel(device: AndroidInspectorDevice) {
+  if (device.connectionType === 'usb') return 'USB'
+  if (device.connectionType === 'wireless') return '无线'
+  if (device.connectionType === 'emulator') return '模拟器'
+  return 'ADB'
+}
+
 interface UiTunerToolbarProps {
   canvasName: string
   screenshotInputRef: RefObject<HTMLInputElement>
@@ -107,7 +114,7 @@ export function UiTunerToolbar({
           <option value="">ADB 设备</option>
           {devices.map((device) => (
             <option key={device.serial} value={device.serial}>
-              {device.model ?? device.serial} · {device.state}
+              {device.model ?? device.serial} · {deviceConnectionLabel(device)} · {device.state}
             </option>
           ))}
         </select>
@@ -123,9 +130,14 @@ export function UiTunerToolbar({
           <Wifi size={14} aria-hidden="true" />
           {wirelessConnected ? '无线已连' : '无线连接'}
         </button>
-        <button type="button" onClick={onCaptureDeviceSnapshot} disabled={captureBusy || deviceBusy}>
+        <button
+          type="button"
+          onClick={onCaptureDeviceSnapshot}
+          disabled={captureBusy || deviceBusy}
+          title="一台手机会自动识别；多台手机时请先在左侧选择"
+        >
           <Smartphone size={14} aria-hidden="true" />
-          {captureBusy ? '捕获中' : '捕获真机'}
+          {captureBusy ? '读取真机中' : '调试真机'}
         </button>
         <div className={styles.viewControls} aria-label="画布缩放">
           <button type="button" onClick={onZoomOut} aria-label="缩小画布">

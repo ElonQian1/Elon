@@ -44,6 +44,16 @@ const STATE_LABELS: Record<AndroidDeviceProfile['connectionState'], string> = {
   offline: '未配置无线连接',
 }
 
+function deviceConnectionLabel(device: AndroidInspectorDevice) {
+  return device.connectionType === 'usb'
+    ? 'USB'
+    : device.connectionType === 'wireless'
+      ? '无线'
+      : device.connectionType === 'emulator'
+        ? '模拟器'
+        : 'ADB'
+}
+
 export function UiTunerDeviceDialog({
   open,
   busy,
@@ -129,7 +139,7 @@ export function UiTunerDeviceDialog({
                 <option value="">选择 ADB 设备</option>
                 {devices.map((device) => (
                   <option key={device.serial} value={device.serial}>
-                    {device.model ?? device.serial} · {device.state}
+                    {device.model ?? device.serial} · {deviceConnectionLabel(device)} · {device.state}
                   </option>
                 ))}
               </select>

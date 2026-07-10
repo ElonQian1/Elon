@@ -4,6 +4,8 @@ import { safeNodeAdminUrl } from '../../../lib/utils'
 export interface AndroidInspectorDevice {
   serial: string
   state: string
+  hardwareSerial?: string
+  connectionType?: 'usb' | 'wireless' | 'emulator'
   product?: string
   model?: string
   device?: string
@@ -68,6 +70,7 @@ export interface AndroidInspectorSnapshot {
     nodeCount: number
     length: number
     rawXml?: string
+    error?: string
   }
   nodes: AndroidInspectorNode[]
   sourceRoot?: string

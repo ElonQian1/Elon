@@ -14,6 +14,8 @@ pub(crate) struct AdbStatus {
 pub(crate) struct AndroidDevice {
     pub serial: String,
     pub state: String,
+    pub hardware_serial: Option<String>,
+    pub connection_type: String,
     pub product: Option<String>,
     pub model: Option<String>,
     pub device: Option<String>,
@@ -163,6 +165,7 @@ pub(crate) struct UiXmlSummary {
     pub node_count: usize,
     pub length: usize,
     pub raw_xml: Option<String>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
