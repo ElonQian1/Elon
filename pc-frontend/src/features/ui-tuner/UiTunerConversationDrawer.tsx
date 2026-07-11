@@ -47,7 +47,7 @@ interface UiTunerConversationDrawerProps {
     mode: UiTunerConversationMode,
     overrideIntent?: string,
   ) => Promise<UiTunerProjectSessionRecord | null>
-  onTaskSettled: () => void
+  onTaskSettled: (succeeded: boolean) => void
 }
 
 export default function UiTunerConversationDrawer({
@@ -157,6 +157,16 @@ export default function UiTunerConversationDrawer({
     if (!taskId) return false
     return displayMessages.some((message) => clean(message.task_id ?? message.taskId) === taskId)
   }, [displayMessages, verificationTaskId])
+  const selectedTaskFailed = useMemo(() => {
+    const taskId = clean(verificationTaskId)
+    if (!taskId) return false
+    return displayMessages.some((message) => {
+      if (clean(message.task_id ?? message.taskId) !== taskId) return false
+      const status = clean(message.task_status ?? message.taskStatus).toLowerCase()
+      return ['failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
+        || Boolean(clean(message.task_error ?? message.taskError))
+    })
+  }, [displayMessages, verificationTaskId])
   const {
     feedRef,
     handleFeedScroll,
@@ -184,8 +194,8 @@ export default function UiTunerConversationDrawer({
     if (!taskId || clean(selectedSession?.taskId) !== taskId || feedLoading || taskRunning || !selectedTaskVisible) return
     if (settledTaskRef.current === taskId) return
     settledTaskRef.current = taskId
-    onTaskSettled()
-  }, [feedLoading, onTaskSettled, selectedSession?.taskId, selectedTaskVisible, taskRunning, verificationTaskId])
+    onTaskSettled(!selectedTaskFailed)
+  }, [feedLoading, onTaskSettled, selectedSession?.taskId, selectedTaskFailed, selectedTaskVisible, taskRunning, verificationTaskId])
 
   const submit = useCallback(async (mode: UiTunerConversationMode) => {
     const content = draft.trim()

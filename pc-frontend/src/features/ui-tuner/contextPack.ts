@@ -6,9 +6,10 @@ import type { MetricItem } from './uiTunerGeometry'
 import { UI_TUNER_CLOSURE_PRIORITIES } from './closurePriorities'
 import type { UiTunerRepeatGroup } from './runtime/repeatComponents'
 import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
+import type { FitRunDocument } from './fit-run/types'
 
 export interface UiTunerCodexContextPack {
-  version: 3
+  version: 4
   kind: 'elon_ui_tuner_codex_context'
   generatedAt: string
   screen: {
@@ -71,6 +72,19 @@ export interface UiTunerCodexContextPack {
       height: number
     }
   } | null
+  fitRun: {
+    runId: string
+    phase: string
+    targetRect: { left: number; top: number; right: number; bottom: number }
+    projectedTargetRect: { left: number; top: number; right: number; bottom: number }
+    currentRect: { left: number; top: number; right: number; bottom: number }
+    bestLoss?: number
+    failedMetrics: string[]
+    handoffPath?: string
+    handoffReason?: string
+    localEvaluations: number
+    codexRounds: number
+  } | null
   selectionVisual: {
     available: boolean
     cropPath?: string
@@ -132,6 +146,7 @@ interface BuildPackArgs {
   repeatGroup: UiTunerRepeatGroup | null
   selectionVisual: UiTunerSelectionVisualContext | null
   liveContext?: UiTunerLiveContext
+  fitRun?: FitRunDocument | null
 }
 
 export interface UiTunerLiveContext {
@@ -159,11 +174,12 @@ export function buildUiTunerCodexContextPack({
   repeatGroup,
   selectionVisual,
   liveContext,
+  fitRun,
 }: BuildPackArgs): UiTunerCodexContextPack {
   const runtime = selected?.runtime
   const source = selected?.source
   return {
-    version: 3,
+    version: 4,
     kind: 'elon_ui_tuner_codex_context',
     generatedAt: new Date().toISOString(),
     screen: {
@@ -225,6 +241,19 @@ export function buildUiTunerCodexContextPack({
       definitionId: liveContext.definitionId,
       mcpConfigPath: liveContext.mcpConfigPath,
       targetDesign: liveContext.targetDesign,
+    } : null,
+    fitRun: fitRun ? {
+      runId: fitRun.runId,
+      phase: fitRun.phase,
+      targetRect: fitRun.pair.targetRect,
+      projectedTargetRect: fitRun.pair.projectedTargetRect,
+      currentRect: fitRun.pair.currentRect,
+      bestLoss: fitRun.best?.score.overallLoss,
+      failedMetrics: fitRun.best?.score.hardFailures ?? [],
+      handoffPath: fitRun.handoff?.artifactPath,
+      handoffReason: fitRun.handoff?.reason,
+      localEvaluations: fitRun.usage.localEvaluations,
+      codexRounds: fitRun.usage.codexRounds,
     } : null,
     selectionVisual: {
       available: Boolean(selectionVisual?.previewDataUrl),
@@ -312,8 +341,10 @@ export function buildUiTunerCodexTaskPrompt(pack: UiTunerCodexContextPack, userI
     `用户意图：${intent}`,
     '',
     '请按以下顺序执行：',
-    pack.liveRuntime?.mcpConfigPath
-      ? `1. 先读取本机 ${pack.liveRuntime.mcpConfigPath}，优先通过 yilong-ui-live 按需工具获取 screen summary、节点、局部源码和视觉差异。`
+    pack.fitRun?.handoffPath
+      ? `1. 先读取 FitRun handoff ${pack.fitRun.handoffPath}，再通过 yilong-ui-live MCP 按需获取最新局部画面和源码。`
+      : pack.liveRuntime?.mcpConfigPath
+        ? `1. 先读取本机 ${pack.liveRuntime.mcpConfigPath}，优先通过 yilong-ui-live 按需工具获取 screen summary、节点、局部源码和视觉差异。`
       : '1. 先读 context pack 中的选区截图、runtimeBinding、sourceCandidates、requestedAdjustments 和 codexContract。',
     '2. 不要重复读取整棵树或全仓库；定位 Android 源码或 UI 标准配置，区分 design token、组件标准和页面覆盖。',
     '3. 给出或实施可审查的源码/config 修改，不要只改截图坐标。',

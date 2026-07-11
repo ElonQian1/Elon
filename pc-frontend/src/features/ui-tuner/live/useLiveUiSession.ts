@@ -22,12 +22,9 @@ import {
 } from './liveUiApi'
 import {
   bindLiveUiIr,
-  runLiveVisualSolver,
   uploadLiveTargetDesign,
   type LiveTargetDesign,
   type LiveUiIrDocument,
-  type PixelRect,
-  type VisualSolverResult,
 } from './liveUiIrApi'
 import {
   commitLiveSource,
@@ -36,6 +33,7 @@ import {
   type LiveSourceCommitResult,
 } from './liveUiCommitApi'
 import { matchLiveNode, mergeEffectiveValues, messageOf } from './liveUiSessionHelpers'
+import { buildVerificationNotice } from './verification/notice'
 
 export type LiveUiConnectionState = 'idle' | 'connecting' | 'connected' | 'attach_only' | 'error'
 
@@ -68,10 +66,10 @@ export function useLiveUiSession({
   const [mcp, setMcp] = useState<LiveMcpDescriptor | null>(null)
   const [uiIr, setUiIr] = useState<LiveUiIrDocument | null>(null)
   const [targetDesign, setTargetDesign] = useState<LiveTargetDesign | null>(null)
-  const [solverResult, setSolverResult] = useState<VisualSolverResult | null>(null)
   const [liveFrame, setLiveFrame] = useState<LiveUiFrame | null>(null)
   const [buildVerifyResult, setBuildVerifyResult] = useState<LiveBuildVerifyResult | null>(null)
   const [gestureActive, setGestureActiveState] = useState(false)
+  const [previewRequest, setPreviewRequest] = useState<LivePreviewRequest | null>(null)
   const sessionRef = useRef<LiveUiSession | null>(null)
   const treeRevisionRef = useRef<number | null>(null)
   const stopPromiseRef = useRef<Promise<void>>(Promise.resolve())
@@ -140,9 +138,9 @@ export function useLiveUiSession({
       setMcp(null)
       setUiIr(null)
       setTargetDesign(null)
-      setSolverResult(null)
       setLiveFrame(null)
       setBuildVerifyResult(null)
+      setPreviewRequest(null)
       setState('idle')
       setError('')
       return () => undefined
@@ -165,9 +163,9 @@ export function useLiveUiSession({
       setMcp(null)
       setUiIr(null)
       setTargetDesign(null)
-      setSolverResult(null)
       setLiveFrame(null)
       setBuildVerifyResult(null)
+      setPreviewRequest(null)
       targetDesignRef.current = null
       targetSignatureRef.current = ''
       setState('connecting')
@@ -497,40 +495,6 @@ export function useLiveUiSession({
     }
   }, [onNotice])
 
-  const solve = useCallback(async (
-    targetRect: PixelRect,
-    properties?: string[],
-  ) => {
-    const current = sessionRef.current
-    const target = matchLiveNode(selected, nodes)
-    if (!current?.connected || !target) throw new Error('当前元素尚未绑定 Live Node')
-    if (!document.canvas.targetDesign) throw new Error('请先导入目标设计图')
-    setBusy(true)
-    setSolverResult(null)
-    try {
-      await syncContext()
-      const result = await runLiveVisualSolver({
-        sessionId: current.id,
-        runtimeNodeId: target.runtimeNodeId,
-        targetRect,
-        properties,
-      })
-      setSolverResult(result)
-      await Promise.all([refresh(current.id), refreshFrame(current.id)])
-      onNotice(result.status === 'APPLIED'
-        ? '本地视觉求解已应用：损失改善 ' + result.improvementPercent.toFixed(2) + '%，源码尚未写入'
-        : '本地视觉求解未找到更优参数，真机保持不变')
-      return result
-    } catch (solveError) {
-      const message = messageOf(solveError, '本地视觉求解失败')
-      setError(message)
-      onNotice(message)
-      throw solveError
-    } finally {
-      setBusy(false)
-    }
-  }, [document.canvas.targetDesign, nodes, onNotice, refresh, refreshFrame, selected, syncContext])
-
   const openPreview = useCallback(async (request: LivePreviewRequest) => {
     const current = sessionRef.current
     if (!current?.connected) throw new Error('Live Runtime 尚未连接')
@@ -538,6 +502,7 @@ export function useLiveUiSession({
     try {
       await openLiveUiPreview(current.id, request)
       lastPreviewRef.current = request
+      setPreviewRequest(request)
       onNotice(`Preview 已切换：${request.screenId} · ${request.scenario} · ${request.theme}`)
       window.setTimeout(() => {
         void Promise.all([refresh(current.id), refreshFrame(current.id)]).catch(() => undefined)
@@ -563,13 +528,13 @@ export function useLiveUiSession({
         preview ?? lastPreviewRef.current ?? undefined,
         debugApplicationIdSuffix,
       )
+      if (preview) {
+        lastPreviewRef.current = preview
+        setPreviewRequest(preview)
+      }
       setBuildVerifyResult(result)
       await Promise.all([refresh(current.id), refreshFrame(current.id)])
-      onNotice(result.sourceParityVerified === true
-        ? `BUILD VERIFIED：${result.runtimeBuildId ?? '新 Debug APK'} 已安装，纯源码画面与 Live 预览一致`
-        : result.sourceParityDiff
-          ? `BUILD MISMATCH：已安装源码版本，但与 Live 预览仍有差异 ${result.sourceParityDiff.visualLoss.toFixed(4)}`
-          : 'BUILD MISMATCH：本机节点未返回源码一致性结果，请更新 Windows PC 节点后重试')
+      onNotice(buildVerificationNotice(result))
       return result
     } catch (verifyError) {
       const message = messageOf(verifyError, '构建安装验收失败')
@@ -593,10 +558,10 @@ export function useLiveUiSession({
     mcp,
     uiIr,
     targetDesign,
-    solverResult,
     liveFrame,
     buildVerifyResult,
     gestureActive,
+    previewRequest,
     apply,
     applyGesture,
     setGestureActive,
@@ -610,7 +575,6 @@ export function useLiveUiSession({
     previewCommit,
     commit,
     syncContext,
-    solve,
     openPreview,
     buildVerify,
   }

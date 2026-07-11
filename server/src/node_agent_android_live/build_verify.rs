@@ -18,36 +18,47 @@ use super::broker::{LiveCommitSnapshot, LiveUiBroker, LiveUiSession};
 use super::preview::{open_preview, PreviewOpenRequest};
 use super::protocol::{LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
-use super::visual_diff::{compare_pngs, compare_target_with_png, PixelRect, VisualDiffResult};
+use super::verification_gate::{
+    evaluate_verification_gates, VerificationGateInput, VerificationGateResult,
+    VerificationGateState,
+};
+use super::visual_diff::{
+    compare_pngs, compare_target_with_png_projected, PixelRect, VisualDiffResult,
+};
 
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_BUILD_OUTPUT: usize = 256 * 1024;
 const MAX_SCAN_FILES: usize = 40_000;
-const SOURCE_PARITY_MAX_LOSS: f64 = 0.035;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BuildVerifyRequest {
     pub(crate) preview: Option<PreviewOpenRequest>,
     pub(crate) debug_application_id_suffix: Option<String>,
+    pub(crate) target_rect: Option<PixelRect>,
+    pub(crate) current_rect: Option<PixelRect>,
+    pub(crate) projected_current_rect: Option<PixelRect>,
+    pub(crate) target_definition_id: Option<String>,
+    pub(crate) target_instance_key: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BuildVerifyResult {
-    status: &'static str,
-    apk_path: String,
-    build_duration_ms: u128,
-    install_output: String,
-    runtime_connected: bool,
-    runtime_build_id: Option<String>,
-    node_count: usize,
-    screenshot_width: u32,
-    screenshot_height: u32,
-    visual_diff: Option<VisualDiffResult>,
-    source_parity_diff: VisualDiffResult,
-    source_parity_verified: bool,
-    message: String,
+    pub(crate) status: &'static str,
+    pub(crate) apk_path: String,
+    pub(crate) build_duration_ms: u128,
+    pub(crate) install_output: String,
+    pub(crate) runtime_connected: bool,
+    pub(crate) runtime_build_id: Option<String>,
+    pub(crate) node_count: usize,
+    pub(crate) screenshot_width: u32,
+    pub(crate) screenshot_height: u32,
+    pub(crate) visual_diff: Option<VisualDiffResult>,
+    pub(crate) source_parity_diff: VisualDiffResult,
+    pub(crate) source_parity_verified: bool,
+    pub(crate) verification_gate: VerificationGateResult,
+    pub(crate) message: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -101,6 +112,7 @@ pub(crate) async fn prepare_debug_runtime(
         BuildVerifyRequest {
             preview: None,
             debug_application_id_suffix: Some(suffix.to_string()),
+            ..BuildVerifyRequest::default()
         },
         host_port,
     )
@@ -198,24 +210,51 @@ pub(crate) async fn build_and_verify(
     tokio::time::sleep(Duration::from_millis(2_200)).await;
     let screenshot = capture_stable_screen(&session.device_id).await?;
     let (screenshot_width, screenshot_height) = png_dimensions(&screenshot)?;
-    let visual_diff = target_path
-        .as_deref()
-        .map(|path| compare_target_with_png(path, &screenshot, None, None))
-        .transpose()?;
     let (_, redeployed_nodes) = broker.tree(session_id).await?;
     let source_rect = patched_bounds_for_nodes(&redeployed_nodes, &live_snapshot.patches, false);
+    // 重新部署后节点几何可能已经改变。目标门禁必须裁剪纯源码版本的
+    // 实际 Runtime bounds，而不是继续沿用设计会话开始时的旧 currentRect。
+    let verified_current_rect = target_bounds_for_nodes(
+        &redeployed_nodes,
+        request.target_definition_id.as_deref(),
+        request.target_instance_key.as_deref(),
+        request.current_rect,
+    )
+    .or(request.current_rect);
+    let visual_diff = target_path
+        .as_deref()
+        .map(|path| {
+            compare_target_with_png_projected(
+                path,
+                &screenshot,
+                request.target_rect,
+                verified_current_rect,
+                request.projected_current_rect,
+            )
+        })
+        .transpose()?;
     let source_parity_diff = compare_pngs(
         &live_preview_png,
         &screenshot,
         live_preview_rect,
         source_rect,
     )?;
-    let source_parity_verified = source_parity_diff.visual_loss <= SOURCE_PARITY_MAX_LOSS;
-    let status = if source_parity_verified {
-        "BUILD_VERIFIED"
-    } else {
-        "BUILD_MISMATCH"
-    };
+    let verification_gate = evaluate_verification_gates(VerificationGateInput::new(
+        Some(&source_parity_diff),
+        visual_diff.as_ref(),
+        target_path.is_some(),
+    ));
+    let source_parity_verified = verification_gate.source_parity == VerificationGateState::Passed;
+    let status = verification_gate.status;
+    let message = match status {
+        "BUILD_VERIFIED" => {
+            "已由源码重新构建并安装；临时 Patch 已清空，源码一致性和目标设计门禁均通过。"
+        }
+        "TARGET_MISMATCH" => "源码结果已与 Live 预览一致，但尚未达到目标设计门禁。",
+        "TARGET_NOT_CONFIGURED" => "源码结果已与 Live 预览一致，但设计拟合任务尚未配置目标配对。",
+        _ => "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。",
+    }
+    .to_string();
 
     Ok(BuildVerifyResult {
         status,
@@ -230,11 +269,8 @@ pub(crate) async fn build_and_verify(
         visual_diff,
         source_parity_diff,
         source_parity_verified,
-        message: if source_parity_verified {
-            "已由源码重新构建并安装；临时 Patch 已清空，纯源码画面与 Live 预览一致。".to_string()
-        } else {
-            "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。".to_string()
-        },
+        verification_gate,
+        message,
     })
 }
 
@@ -260,6 +296,42 @@ async fn capture_stable_screen(device_id: &str) -> Result<Vec<u8>> {
 
 fn patched_bounds(snapshot: &LiveCommitSnapshot, allow_runtime_id: bool) -> Option<PixelRect> {
     patched_bounds_for_nodes(&snapshot.nodes, &snapshot.patches, allow_runtime_id)
+}
+
+fn target_bounds_for_nodes(
+    nodes: &[LiveUiNode],
+    definition_id: Option<&str>,
+    instance_key: Option<&str>,
+    expected_rect: Option<PixelRect>,
+) -> Option<PixelRect> {
+    let definition_id = definition_id?;
+    let mut candidates = nodes.iter().filter_map(|node| {
+        if node.definition_id != definition_id
+            || instance_key.is_some_and(|key| node.instance_key.as_deref() != Some(key))
+            || !node.geometry.visible
+        {
+            return None;
+        }
+        let bounds = &node.geometry.bounds_in_display_px;
+        (bounds.right > bounds.left && bounds.bottom > bounds.top).then_some(PixelRect {
+            left: bounds.left,
+            top: bounds.top,
+            right: bounds.right,
+            bottom: bounds.bottom,
+        })
+    });
+    match expected_rect {
+        Some(expected) => {
+            candidates.min_by_key(|candidate| rect_center_distance(*candidate, expected))
+        }
+        None => candidates.next(),
+    }
+}
+
+fn rect_center_distance(left: PixelRect, right: PixelRect) -> i64 {
+    let dx = i64::from(left.left + left.right) - i64::from(right.left + right.right);
+    let dy = i64::from(left.top + left.bottom) - i64::from(right.top + right.bottom);
+    dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy))
 }
 
 fn patched_bounds_for_nodes(

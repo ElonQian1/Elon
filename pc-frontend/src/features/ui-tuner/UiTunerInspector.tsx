@@ -100,11 +100,9 @@ export function UiTunerInspector({
             busy={liveUi.busy}
             session={liveUi.session}
             node={liveUi.selectedNode}
-            selected={selected}
             mcp={liveUi.mcp}
             uiIr={liveUi.uiIr}
             targetDesign={liveUi.targetDesign}
-            solverResult={liveUi.solverResult}
             onApply={liveUi.apply}
             onApplyGesture={liveUi.applyGesture}
             onGestureActive={liveUi.setGestureActive}
@@ -116,7 +114,6 @@ export function UiTunerInspector({
             commitResult={liveUi.commitResult}
             onPreviewCommit={liveUi.previewCommit}
             onCommit={liveUi.commit}
-            onSolve={liveUi.solve}
             onOpenPreview={liveUi.openPreview}
             buildVerifyResult={liveUi.buildVerifyResult}
             onBuildVerify={liveUi.buildVerify}

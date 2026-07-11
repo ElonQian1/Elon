@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Check, GitBranch, MessageSquareText, Play, RefreshCw, TerminalSquare, Users, X } from 'lucide-react'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { channelAllowsAiStart, mergeProjectRecords } from '../conversation/conversationPageHelpers'
@@ -26,6 +26,12 @@ import {
 } from './uiTunerWorkspaceApi'
 import UiTunerConversationDrawer from './UiTunerConversationDrawer'
 import type { UiTunerConversationMode } from './uiTunerConversation'
+import {
+  listenForFitRunCodexRequests,
+  notifyFitRunCodexSettled,
+  readFitRunCodexLaunch,
+} from './fit-run/fitRunEvents'
+import { useFitRunStore } from './fit-run/fitRunStore'
 import panelStyles from './UiTunerPanels.module.css'
 
 interface UiTunerProjectSessionPanelProps {
@@ -36,6 +42,16 @@ interface UiTunerProjectSessionPanelProps {
 }
 
 const CODEX_ROUTE: RuntimeRoute = 'route_a'
+
+interface FitRunTaskRef {
+  runId: string
+  handoffId: string
+  taskId: string
+}
+
+interface SessionStartOptions {
+  fitRun?: Pick<FitRunTaskRef, 'runId' | 'handoffId'>
+}
 
 export function UiTunerProjectSessionPanel({
   pack,
@@ -59,6 +75,15 @@ export function UiTunerProjectSessionPanel({
   const [activeSessionId, setActiveSessionId] = useState('')
   const [conversationOpen, setConversationOpen] = useState(false)
   const [verificationTaskId, setVerificationTaskId] = useState('')
+  const [fitRunTask, setFitRunTask] = useState<FitRunTaskRef | null>(null)
+  const [fitRunStarting, setFitRunStarting] = useState(false)
+  const fitRunStartingRef = useRef(false)
+  const activeFitRun = useFitRunStore((state) => state.run)
+  const startSessionRef = useRef<(
+    mode: UiTunerConversationMode,
+    overrideIntent?: string,
+    options?: SessionStartOptions,
+  ) => Promise<UiTunerProjectSessionRecord | null>>(async () => null)
 
   useEffect(() => {
     if (!projectsLoaded) loadProjects().catch(() => {})
@@ -143,7 +168,7 @@ export function UiTunerProjectSessionPanel({
     && localNode?.connected !== false
     && localNode?.codex_cli?.available !== false
   const localNodeStatusText = describeLocalNodeStatus(localNode, localNodeReady, localNodeError, user?.id)
-  const canStart = !!activeProject?.id
+  const canStartBase = !!activeProject?.id
     && !!aiChannel?.id
     && !!selectedSession
     && channelAllowsAiStart(aiChannel)
@@ -151,6 +176,17 @@ export function UiTunerProjectSessionPanel({
     && !!workspacePath
     && !workspaceLoading
     && !sendingMessage
+  const restoredFitRunTask = useMemo<FitRunTaskRef | null>(() => {
+    const handoff = activeFitRun?.handoff
+    if (!activeFitRun || !handoff) return null
+    const taskId = handoff.taskId
+      ?? readFitRunCodexLaunch(activeFitRun.runId, handoff.handoffId)?.taskId
+    if (!taskId || !['AWAITING_CODEX', 'CODEX_RUNNING'].includes(activeFitRun.phase)) return null
+    return { runId: activeFitRun.runId, handoffId: handoff.handoffId, taskId }
+  }, [activeFitRun])
+  const trackedFitRunTask = fitRunTask ?? restoredFitRunTask
+  const canStart = canStartBase && !trackedFitRunTask && !fitRunStarting
+  const canStartFitRun = canStartBase && !trackedFitRunTask && !verificationTaskId && !fitRunStarting
   const sessionMessages = useMemo(() => {
     if (!selectedSession?.conversationId) return []
     return messages
@@ -167,7 +203,17 @@ export function UiTunerProjectSessionPanel({
   async function startSession(
     mode: UiTunerConversationMode,
     overrideIntent?: string,
+    options?: SessionStartOptions,
   ): Promise<UiTunerProjectSessionRecord | null> {
+    if (options?.fitRun) {
+      if (!canStartFitRun || fitRunStartingRef.current) {
+        setStatus('已有 Codex 任务正在启动或运行，请等待后再继续 FitRun')
+        return null
+      }
+    } else if (trackedFitRunTask || fitRunStartingRef.current) {
+      setStatus('设计稿 FitRun 正在使用 Codex，完成前不能并发启动手工源码任务')
+      return null
+    }
     if (!activeProject?.id || !aiChannel?.id) {
       setStatus('请先选择一个有 AI 开发频道的自项目')
       return null
@@ -237,10 +283,15 @@ export function UiTunerProjectSessionPanel({
           ? previous.sessions.map((item) => item.id === session.id ? { ...item, taskId, status: 'running' } : item)
           : [{ ...session, taskId, status: 'running' }, ...previous.sessions],
       } : previous)
-      setConversationOpen(true)
-      setVerificationTaskId(taskId)
-      await onMutationTaskStarted(pack)
-      setStatus('已进入持续项目 Codex CLI 会话')
+      if (options?.fitRun) {
+        setFitRunTask({ ...options.fitRun, taskId })
+        setStatus('FitRun 已交给持续项目 Codex CLI 会话；构建验收由 FitRun 统一调度')
+      } else {
+        setConversationOpen(true)
+        setVerificationTaskId(taskId)
+        await onMutationTaskStarted(pack)
+        setStatus('已进入持续项目 Codex CLI 会话')
+      }
       window.setTimeout(() => { void refreshWorkspace(false) }, 600)
       return { ...session, taskId, status: 'running' }
     } catch (error) {
@@ -248,6 +299,39 @@ export function UiTunerProjectSessionPanel({
       return null
     }
   }
+
+  startSessionRef.current = startSession
+
+  useEffect(() => listenForFitRunCodexRequests((request) => {
+    if (!canStartFitRun) {
+      request.reject(new Error('当前项目 Codex 会话或本机节点尚未就绪'))
+      return
+    }
+    const artifact = request.handoffPath
+      ? `先读取 FitRun handoff：${request.handoffPath}`
+      : '先通过 yilong-ui-live MCP 读取当前 FitRun handoff'
+    const taskIntent = [
+      `继续设计稿自动拟合任务 ${request.runId}。`,
+      artifact,
+      `平台期原因：${request.reason}`,
+      '只读取 handoff 指向的目标裁剪、当前裁剪、节点子树和局部源码。',
+      '优先修正布局结构或 Source Binding；不要用临时 translation 冒充可写回布局。',
+      '只修改并保存源码，不要自行构建、安装、截图或启动第二个验收流程；完成后由 FitRun 统一构建和评分。',
+    ].join('\n')
+    fitRunStartingRef.current = true
+    setFitRunStarting(true)
+    void startSessionRef.current('continue', taskIntent, {
+      fitRun: { runId: request.runId, handoffId: request.handoffId },
+    }).then((session) => {
+      if (!session?.taskId) throw new Error('Codex 任务未返回 taskId')
+      request.resolve({ taskId: session.taskId })
+    }).catch((error) => {
+      request.reject(error instanceof Error ? error : new Error('Codex FitRun 交接失败'))
+    }).finally(() => {
+      fitRunStartingRef.current = false
+      setFitRunStarting(false)
+    })
+  }), [canStartFitRun])
 
   async function decideMemory(
     memoryId: string,
@@ -373,13 +457,18 @@ export function UiTunerProjectSessionPanel({
         localNodeStatusText={localNodeStatusText}
         selectedSession={selectedSession}
         visibleSessions={visibleSessions}
-        verificationTaskId={verificationTaskId}
+        verificationTaskId={trackedFitRunTask?.taskId ?? verificationTaskId}
         status={status}
         onSelectSession={setActiveSessionId}
         onStartSession={startSession}
-        onTaskSettled={() => {
+        onTaskSettled={(succeeded) => {
+          if (trackedFitRunTask) {
+            notifyFitRunCodexSettled({ taskId: trackedFitRunTask.taskId, succeeded })
+            setFitRunTask(null)
+            return
+          }
           setVerificationTaskId('')
-          onTaskSettled()
+          if (succeeded) onTaskSettled()
         }}
       />
     </div>

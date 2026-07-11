@@ -18,6 +18,7 @@ import panelStyles from './UiTunerPanels.module.css'
 import contextStyles from './UiTunerContext.module.css'
 import type { UiTunerVerificationReport } from './runtime/verification'
 import type { useLiveUiSession } from './live/useLiveUiSession'
+import { useFitRunStore } from './fit-run/fitRunStore'
 
 interface UiTunerCodexPanelProps {
   tunerDoc: UiTunerDocument
@@ -44,6 +45,7 @@ export function UiTunerCodexPanel({
   onRequestVerification,
   liveUi,
 }: UiTunerCodexPanelProps) {
+  const fitRun = useFitRunStore((state) => state.run)
   const [intent, setIntent] = useState(DEFAULT_INTENT)
   const [copyState, setCopyState] = useState('')
   const [fallbackText, setFallbackText] = useState('')
@@ -104,7 +106,8 @@ export function UiTunerCodexPanel({
     repeatGroup,
     selectionVisual,
     liveContext,
-  }), [filterResult, liveContext, metrics, repeatGroup, selected, selectionScope, selectionVisual, standardInsight, tunerDoc])
+    fitRun,
+  }), [filterResult, fitRun, liveContext, metrics, repeatGroup, selected, selectionScope, selectionVisual, standardInsight, tunerDoc])
   const prompt = useMemo(() => buildUiTunerCodexTaskPrompt(pack, intent), [intent, pack])
   const stages = useMemo(() => summarizeClosurePriorities(), [])
   const binding = pack.runtimeBinding
@@ -202,6 +205,7 @@ export function UiTunerCodexPanel({
             repeatGroup,
             selectionVisual,
             liveContext,
+            fitRun,
           }))}
         >
           <Clipboard size={14} aria-hidden="true" />

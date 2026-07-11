@@ -36,6 +36,27 @@ export interface VisualDiffResult {
   alphaError: number
   geometryError: number
   visualLoss: number
+  scoreReport?: {
+    optimizationScore: number
+    targetGate: {
+      passed: boolean
+      failedMetrics: string[]
+    }
+    geometry: {
+      widthErrorPx: number
+      heightErrorPx: number
+      sizeErrorRatio: number
+      aspectErrorRatio: number
+    }
+    position: {
+      maxEdgeErrorPx: number
+      centerErrorPx: number
+    }
+    color: { meanAbsoluteError: number; p95AbsoluteError: number }
+    edge: { similarity: number; error: number }
+    perceptual: { luminanceError: number; structuralError: number }
+    coverage: { ratio: number }
+  }
 }
 
 export interface VisualSolverResult {
@@ -120,6 +141,7 @@ export async function runLiveVisualSolver(input: {
   sessionId: string
   runtimeNodeId: string
   targetRect: PixelRect
+  projectedCurrentRect: PixelRect
   properties?: string[]
   maxEvaluations?: number
 }) {
@@ -131,6 +153,7 @@ export async function runLiveVisualSolver(input: {
       body: JSON.stringify({
         runtimeNodeId: input.runtimeNodeId,
         targetRect: input.targetRect,
+        projectedCurrentRect: input.projectedCurrentRect,
         properties: input.properties,
         maxEvaluations: input.maxEvaluations ?? 12,
       }),

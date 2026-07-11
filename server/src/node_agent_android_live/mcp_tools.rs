@@ -29,22 +29,26 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_get_current_crop",
-            "返回当前真机截图本地路径、哈希和指定区域。",
+            "立即 ADB 捕获最新真机画面，真实裁剪后返回本地路径、哈希和尺寸。",
             rect_schema(),
         ),
         tool(
             "ui_get_visual_diff",
             "本地计算目标图与真机截图的颜色、边缘、几何损失。",
             json!({
-                "type":"object","properties":{"targetRect":rect_value_schema(),"currentRect":rect_value_schema()}
+                "type":"object","properties":{
+                    "targetRect":rect_value_schema(),
+                    "currentRect":rect_value_schema(),
+                    "projectedCurrentRect":rect_value_schema()
+                }
             }),
         ),
         tool(
             "ui_propose_live_patch",
-            "把目标几何映射为类型化 LIVE Patch，不修改真机。",
+            "把校准后的设备目标几何映射为类型化 LIVE Patch，不修改真机。",
             json!({
-                "type":"object","required":["runtimeNodeId","targetRect"],
-                "properties":{"runtimeNodeId":{"type":"string"},"targetRect":rect_value_schema()}
+                "type":"object","required":["runtimeNodeId","projectedCurrentRect"],
+                "properties":{"runtimeNodeId":{"type":"string"},"projectedCurrentRect":rect_value_schema()}
             }),
         ),
         tool(
@@ -58,9 +62,10 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             "ui_run_visual_solver",
             "在本机进行有限次 Patch→截图→比较，自动保留更优参数，不消耗模型 Token。",
             json!({
-                "type":"object","required":["runtimeNodeId","targetRect"],
+                "type":"object","required":["runtimeNodeId","targetRect","projectedCurrentRect"],
                 "properties":{
                     "runtimeNodeId":{"type":"string"},"targetRect":rect_value_schema(),
+                    "projectedCurrentRect":rect_value_schema(),
                     "properties":{"type":"array","items":{"type":"string"}},
                     "maxEvaluations":{"type":"integer","minimum":1,"maximum":24},
                     "initialStepDp":{"type":"number","minimum":0.25,"maximum":32}

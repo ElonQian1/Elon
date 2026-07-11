@@ -35,7 +35,8 @@ import { useRuntimeDocumentSync } from './live/useRuntimeDocumentSync'
 import { useRuntimeCanvasGesture } from './live/useRuntimeCanvasGesture'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
-import { UiTunerCanvasSurface } from './UiTunerCanvasSurface'
+import { UiTunerComparisonWorkspace } from './comparison/UiTunerComparisonWorkspace'
+import { useComparisonViewport } from './comparison/useComparisonViewport'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { mergeProjectRecords } from '../conversation/conversationPageHelpers'
 import { clean } from '../../lib/utils'
@@ -59,9 +60,6 @@ interface HistoryState {
 
 const MIN_SIZE = 24
 const HISTORY_LIMIT = 80
-const VIEW_SCALE_MIN = 0.08
-const VIEW_SCALE_MAX = 2
-const VIEW_SCALE_STEP = 0.1
 const LIVE_DEBUG_SUFFIX = '.uituner'
 const DEFAULT_ANDROID_PACKAGE = 'com.elon.app'
 const WORKSPACE_MODE_STORAGE_KEY = 'elon.uiTuner.workspaceMode.v2'
@@ -70,12 +68,6 @@ function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
     return preferredId
   }
   return document.elements[0]?.id ?? null
-}
-
-function normalizeViewScale(value: number) {
-  if (!Number.isFinite(value)) return 1
-  const bounded = Math.min(Math.max(value, VIEW_SCALE_MIN), VIEW_SCALE_MAX)
-  return Math.round(bounded * 100) / 100
 }
 
 export default function UiTunerPage() {
@@ -90,11 +82,8 @@ export default function UiTunerPage() {
   ))
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
   const [history, setHistory] = useState<HistoryState>({ past: [], future: [] })
-  const [viewScale, setViewScale] = useState(1)
-  const [fitToStage, setFitToStage] = useState(true)
   const [notice, setNotice] = useState('')
   const [layerFilter, setLayerFilter] = useState<UiTunerFilterState>(DEFAULT_UI_TUNER_FILTER)
-  const canvasScrollerRef = useRef<HTMLDivElement | null>(null)
   const screenshotInputRef = useRef<HTMLInputElement>(null)
   const tunerDocRef = useRef(tunerDoc)
   const selectedIdRef = useRef<string | null>(selectedId)
@@ -107,6 +96,13 @@ export default function UiTunerPage() {
   })
   const [livePrepareBusy, setLivePrepareBusy] = useState(false)
   const [livePrepareError, setLivePrepareError] = useState('')
+  const comparisonViewport = useComparisonViewport(
+    { width: tunerDoc.canvas.width, height: tunerDoc.canvas.height },
+    tunerDoc.canvas.targetDesign
+      ? { width: tunerDoc.canvas.targetDesign.width, height: tunerDoc.canvas.targetDesign.height }
+      : null,
+  )
+  const { viewScale, viewScaleLabel, fitToStage, requestFit } = comparisonViewport
 
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
@@ -125,7 +121,6 @@ export default function UiTunerPage() {
     () => buildStandardInsight(tunerDoc, selected),
     [selected, tunerDoc],
   )
-  const viewScaleLabel = `${Math.round(viewScale * 100)}%`
   const activeProject = useMemo(
     () => mergeProjectRecords(
       projects.find((project) => project.id === activeProjectId),
@@ -158,24 +153,6 @@ export default function UiTunerPage() {
     else window.localStorage.removeItem('elon.uiTuner.liveProjectRoot')
   }, [])
 
-  const fitCanvasToStage = useCallback(() => {
-    const scroller = canvasScrollerRef.current
-    if (!scroller) return
-    const availableWidth = Math.max(scroller.clientWidth - 56, MIN_SIZE)
-    const availableHeight = Math.max(scroller.clientHeight - 56, MIN_SIZE)
-    const nextScale = Math.min(
-      availableWidth / tunerDoc.canvas.width,
-      availableHeight / tunerDoc.canvas.height,
-      1,
-    )
-    setViewScale(normalizeViewScale(nextScale))
-  }, [tunerDoc.canvas.height, tunerDoc.canvas.width])
-
-  const setManualViewScale = (nextScale: number) => {
-    setFitToStage(false)
-    setViewScale(normalizeViewScale(nextScale))
-  }
-
   const pushHistorySnapshot = useCallback((snapshot: UiTunerDocument) => {
     setHistory((current) => ({
       past: [...current.past.slice(-(HISTORY_LIMIT - 1)), snapshot],
@@ -203,14 +180,14 @@ export default function UiTunerPage() {
     setLiveTargetPackage(foregroundPackage || snapshot.packageName || '')
     const next = snapshotToTunerDocument(snapshot)
     commitDocument(() => next, next.elements[0]?.id ?? null)
-    setFitToStage(true)
+    requestFit()
     setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
     setNotice(snapshot.xml.nodeCount > 0
       ? snapshot.sourceRoot
         ? `已捕获真实手机画面：${snapshot.xml.nodeCount} 个节点，并已绑定项目源码`
         : `已捕获真实手机画面：${snapshot.xml.nodeCount} 个节点；请选择自项目后重新捕获以绑定源码`
       : '已捕获真实手机画面；当前页面未提供可解析控件层级，但截图仍可用于微调')
-  }, [commitDocument])
+  }, [commitDocument, requestFit])
 
   const {
     devices,
@@ -364,7 +341,7 @@ export default function UiTunerPage() {
       const { report, document } = await verifyPostChangeSnapshot(baseline, snapshot)
       commitDocument(() => document, report.matchedElementId ?? document.elements[0]?.id ?? null)
       setLayerFilter({ ...DEFAULT_UI_TUNER_FILTER })
-      setFitToStage(true)
+      requestFit()
       setVerificationReport(report)
       setNotice(report.message)
     } catch (error) {
@@ -372,7 +349,7 @@ export default function UiTunerPage() {
         error instanceof Error ? error.message : '前后快照验收失败，请重试',
       ))
     }
-  }, [captureDeviceSnapshot, commitDocument])
+  }, [captureDeviceSnapshot, commitDocument, requestFit])
 
   const undoHistory = useCallback(() => {
     setHistory((current) => {
@@ -415,19 +392,6 @@ export default function UiTunerPage() {
   useEffect(() => {
     saveUiTunerDocument(tunerDoc)
   }, [tunerDoc])
-
-  useEffect(() => {
-    if (!fitToStage) return undefined
-    fitCanvasToStage()
-    const scroller = canvasScrollerRef.current
-    if (typeof ResizeObserver === 'undefined' || !scroller) {
-      window.addEventListener('resize', fitCanvasToStage)
-      return () => window.removeEventListener('resize', fitCanvasToStage)
-    }
-    const observer = new ResizeObserver(fitCanvasToStage)
-    observer.observe(scroller)
-    return () => observer.disconnect()
-  }, [fitCanvasToStage, fitToStage])
 
   useEffect(() => {
     if (!notice) return undefined
@@ -599,7 +563,7 @@ export default function UiTunerPage() {
             },
           })
         })
-        setFitToStage(true)
+        requestFit()
         setNotice(tunerDocRef.current.runtimeSnapshot
           ? '已导入目标设计图；可叠加对照并对选中节点运行本地视觉求解'
           : '已把 APP 截图放到画布底层')
@@ -654,13 +618,10 @@ export default function UiTunerPage() {
           onRefreshDevices={refreshDevices}
           onOpenDeviceManager={openDeviceManager}
           onCaptureDeviceSnapshot={captureDeviceSnapshot}
-          onZoomOut={() => setManualViewScale(viewScale - VIEW_SCALE_STEP)}
-          onZoomIn={() => setManualViewScale(viewScale + VIEW_SCALE_STEP)}
-          onFitToStage={() => {
-            setFitToStage(true)
-            fitCanvasToStage()
-          }}
-          onActualSize={() => setManualViewScale(1)}
+          onZoomOut={comparisonViewport.zoomOut}
+          onZoomIn={comparisonViewport.zoomIn}
+          onFitToStage={comparisonViewport.fitCanvasToStage}
+          onActualSize={comparisonViewport.actualSize}
           onUndo={() => { if (realRenderer) void liveUi.undo(); else undoHistory() }}
           onRedo={() => { if (realRenderer) void liveUi.redo(); else redoHistory() }}
           onSave={saveNow}
@@ -671,8 +632,8 @@ export default function UiTunerPage() {
           onReset={resetDocument}
         />
 
-        <UiTunerCanvasSurface
-          canvas={tunerDoc.canvas}
+        <UiTunerComparisonWorkspace
+          document={tunerDoc}
           filterResult={filterResult}
           liveFrame={liveUi.liveFrame}
           realRenderer={realRenderer}
@@ -680,13 +641,21 @@ export default function UiTunerPage() {
           runtimeGestureActive={canvasGesture.runtimeGestureActive}
           runtimeCanMove={canvasGesture.canMove}
           runtimeCanResize={canvasGesture.canResize}
-          scrollerRef={canvasScrollerRef}
+          liveNode={liveUi.selectedNode}
+          liveSession={liveUi.session}
+          previewRequest={liveUi.previewRequest}
+          uploadedTarget={liveUi.targetDesign}
           selectedId={selectedId}
           viewScale={viewScale}
+          targetScrollerRef={comparisonViewport.targetScrollerRef}
+          currentScrollerRef={comparisonViewport.currentScrollerRef}
+          onTargetScroll={comparisonViewport.onTargetScroll}
+          onCurrentScroll={comparisonViewport.onCurrentScroll}
           onCanvasKeyDown={handleCanvasKeyDown}
           onClearSelection={() => setSelectedId(null)}
           onElementPointerDown={canvasGesture.startGesture}
           onSelectElement={setSelectedId}
+          onNotice={setNotice}
         />
       </section>
 

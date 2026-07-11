@@ -3,6 +3,8 @@ import type {
   KeyboardEventHandler,
   PointerEvent as ReactPointerEvent,
   RefObject,
+  ReactNode,
+  UIEventHandler,
 } from 'react'
 import type { UiTunerFilterResult } from './filtering'
 import type { LiveUiFrame } from './live/liveUiApi'
@@ -21,6 +23,8 @@ interface UiTunerCanvasSurfaceProps {
   scrollerRef: RefObject<HTMLDivElement>
   selectedId: string | null
   viewScale: number
+  overlayLayer?: ReactNode
+  onScroll?: UIEventHandler<HTMLDivElement>
   onCanvasKeyDown: KeyboardEventHandler<HTMLDivElement>
   onClearSelection: () => void
   onElementPointerDown: (
@@ -43,13 +47,15 @@ export function UiTunerCanvasSurface({
   scrollerRef,
   selectedId,
   viewScale,
+  overlayLayer,
+  onScroll,
   onCanvasKeyDown,
   onClearSelection,
   onElementPointerDown,
   onSelectElement,
 }: UiTunerCanvasSurfaceProps) {
   return (
-    <div className={styles.canvasScroller} ref={scrollerRef}>
+    <div className={styles.canvasScroller} ref={scrollerRef} onScroll={onScroll}>
       {realRenderer && (
         <div className={runtimeConnected ? styles.runtimeSurfaceLive : styles.runtimeSurfaceFrozen}>
           {runtimeConnected
@@ -87,14 +93,7 @@ export function UiTunerCanvasSurface({
               style={{ opacity: canvas.referenceImage.opacity }}
             />
           )}
-          {canvas.targetDesign?.visible && (
-            <img
-              className={styles.targetDesignImage}
-              src={canvas.targetDesign.dataUrl}
-              alt="目标设计图"
-              style={{ opacity: canvas.targetDesign.opacity }}
-            />
-          )}
+          {overlayLayer}
           {filterResult.visible.map(({ element, analysis }) => {
             const elementStyle: CSSProperties = realRenderer ? {
               left: element.x,

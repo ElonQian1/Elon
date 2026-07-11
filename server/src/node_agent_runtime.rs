@@ -55,6 +55,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) tool_approvals: node_agent_tool_approval::ToolApprovalState,
     pub(crate) full_access_grants: node_agent_full_access::FullAccessGrantState,
     pub(crate) live_ui: std::sync::Arc<crate::node_agent_android_live::LiveUiBroker>,
+    pub(crate) ui_fit_runs: std::sync::Arc<crate::node_agent_android_live::fit_run::FitRunService>,
     pub(crate) wake: Notify,
     local_admin_token: String,
 }
@@ -70,6 +71,9 @@ impl NodeRuntime {
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
+        let live_ui = Arc::new(crate::node_agent_android_live::LiveUiBroker::new());
+        let ui_fit_runs =
+            Arc::new(crate::node_agent_android_live::fit_run::FitRunService::live(live_ui.clone()));
         Self {
             cfg,
             install_id,
@@ -88,7 +92,8 @@ impl NodeRuntime {
             lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
-            live_ui: std::sync::Arc::new(crate::node_agent_android_live::LiveUiBroker::new()),
+            live_ui,
+            ui_fit_runs,
             wake: Notify::new(),
             local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }

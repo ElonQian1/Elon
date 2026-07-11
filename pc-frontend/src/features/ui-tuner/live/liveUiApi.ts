@@ -1,5 +1,6 @@
 import { nodeApi } from '../../node/localNodeApi'
 import { inspectorAdminUrl } from '../device/deviceInspectorApi'
+import type { VisualDiffResult } from './liveUiIrApi'
 
 export type LiveUiScope = 'INSTANCE' | 'DEFINITION'
 
@@ -110,7 +111,7 @@ export interface LivePreviewRequest {
 }
 
 export interface LiveBuildVerifyResult {
-  status: 'BUILD_VERIFIED' | 'BUILD_MISMATCH'
+  status: 'BUILD_VERIFIED' | 'SOURCE_MISMATCH' | 'TARGET_MISMATCH' | 'TARGET_NOT_CONFIGURED'
   apkPath: string
   buildDurationMs: number
   installOutput: string
@@ -119,19 +120,16 @@ export interface LiveBuildVerifyResult {
   nodeCount: number
   screenshotWidth: number
   screenshotHeight: number
-  visualDiff?: {
-    visualLoss: number
-    meanAbsoluteColorError: number
-    edgeError: number
-    geometryError: number
-  }
-  sourceParityDiff?: {
-    visualLoss: number
-    meanAbsoluteColorError: number
-    edgeError: number
-    geometryError: number
-  }
+  visualDiff?: VisualDiffResult
+  sourceParityDiff?: VisualDiffResult
   sourceParityVerified?: boolean
+  verificationGate?: {
+    status: LiveBuildVerifyResult['status']
+    verified: boolean
+    sourceParity: 'PASSED' | 'FAILED' | 'NOT_REQUIRED' | 'NOT_CONFIGURED'
+    targetFidelity: 'PASSED' | 'FAILED' | 'NOT_REQUIRED' | 'NOT_CONFIGURED'
+    failedMetrics: string[]
+  }
   message: string
 }
 

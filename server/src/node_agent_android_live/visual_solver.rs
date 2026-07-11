@@ -3,16 +3,17 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use crate::node_agent_android_inspector::adb_capture::capture_screen_png;
 
 use super::broker::LiveUiBroker;
-use super::protocol::{
-    LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch, LiveUiNode,
-};
+use super::protocol::{LivePatchOperation, LivePatchTarget, LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
-use super::visual_diff::{compare_target_with_png, PixelRect, VisualDiffResult};
+use super::visual_diff::{compare_target_with_png_projected, PixelRect, VisualDiffResult};
+use super::visual_solver_values::{
+    constrained_value, initial_values, operations_from_values, predicted_rect,
+    seed_geometry_target, seed_prior_deltas, solver_properties,
+};
 
 const DEFAULT_MAX_EVALUATIONS: usize = 16;
 const HARD_MAX_EVALUATIONS: usize = 24;
@@ -22,10 +23,18 @@ const HARD_MAX_EVALUATIONS: usize = 24;
 pub(crate) struct VisualSolverRequest {
     pub(crate) runtime_node_id: String,
     pub(crate) target_rect: PixelRect,
+    /// The target rectangle after the design canvas has been projected into
+    /// Android display coordinates. Keeping it separate prevents design pixels
+    /// from being treated as device pixels.
+    pub(crate) projected_current_rect: Option<PixelRect>,
     #[serde(default)]
     pub(crate) properties: Vec<String>,
     pub(crate) max_evaluations: Option<usize>,
     pub(crate) initial_step_dp: Option<f64>,
+    /// 来自项目内已验收 FitCase 的属性增量先验。只作为求解起点，
+    /// 最终仍必须由当前真机帧和硬门禁重新验证。
+    #[serde(default)]
+    pub(crate) initial_property_deltas: BTreeMap<String, f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,6 +47,7 @@ pub(crate) struct VisualSolverResult {
     pub(crate) final_diff: VisualDiffResult,
     pub(crate) improvement_percent: f64,
     pub(crate) operations: Vec<LivePatchOperation>,
+    pub(crate) projected_current_rect: PixelRect,
 }
 
 pub(crate) async fn solve_visual_style(
@@ -66,15 +76,20 @@ pub(crate) async fn solve_visual_style(
     let initial_step = request.initial_step_dp.unwrap_or(4.0).clamp(0.25, 32.0);
     let session = broker.session(session_id).await?;
     let base_rect = rect_from_node(&node);
+    let projected_current_rect = request
+        .projected_current_rect
+        .unwrap_or(request.target_rect);
     let baseline_png = capture_screen_png(&session.device_id).await?;
-    let baseline = compare_target_with_png(
+    let baseline = compare_target_with_png_projected(
         &target.path,
         &baseline_png,
         Some(request.target_rect),
         Some(base_rect),
+        Some(projected_current_rect),
     )?;
     let mut best_values = initial_values(&node, &properties);
-    seed_geometry_target(&mut best_values, &node, request.target_rect);
+    seed_prior_deltas(&mut best_values, &node, &request.initial_property_deltas);
+    seed_geometry_target(&mut best_values, &node, projected_current_rect);
     let mut best = evaluate(
         broker,
         session_id,
@@ -82,6 +97,7 @@ pub(crate) async fn solve_visual_style(
         &target.path,
         &node,
         request.target_rect,
+        projected_current_rect,
         &best_values,
     )
     .await?;
@@ -111,6 +127,7 @@ pub(crate) async fn solve_visual_style(
                     &target.path,
                     &node,
                     request.target_rect,
+                    projected_current_rect,
                     &candidate,
                 )
                 .await?;
@@ -135,11 +152,12 @@ pub(crate) async fn solve_visual_style(
             .await?;
         tokio::time::sleep(Duration::from_millis(120)).await;
         let png = capture_screen_png(&session.device_id).await?;
-        compare_target_with_png(
+        compare_target_with_png_projected(
             &target.path,
             &png,
             Some(request.target_rect),
             Some(predicted_rect(&node, &best_values)),
+            Some(projected_current_rect),
         )?
     } else {
         baseline.clone()
@@ -159,6 +177,7 @@ pub(crate) async fn solve_visual_style(
         final_diff,
         improvement_percent,
         operations: if improved { operations } else { Vec::new() },
+        projected_current_rect,
     })
 }
 
@@ -169,17 +188,19 @@ async fn evaluate(
     target_path: &str,
     node: &LiveUiNode,
     target_rect: PixelRect,
+    projected_current_rect: PixelRect,
     values: &BTreeMap<String, f64>,
 ) -> Result<VisualDiffResult> {
     let patch = patch_for_node(node, operations_from_values(values), true);
     let (_, inverse) = broker.apply_probe_patch(session_id, patch).await?;
     tokio::time::sleep(Duration::from_millis(80)).await;
     let comparison = match capture_screen_png(device_id).await {
-        Ok(png) => compare_target_with_png(
+        Ok(png) => compare_target_with_png_projected(
             target_path,
             &png,
             Some(target_rect),
             Some(predicted_rect(node, values)),
+            Some(projected_current_rect),
         ),
         Err(error) => Err(error),
     };
@@ -188,141 +209,6 @@ async fn evaluate(
         return Err(anyhow!("视觉求解试探后恢复失败: {error:#}"));
     }
     comparison
-}
-
-fn solver_properties(node: &LiveUiNode, requested: &[String]) -> Result<Vec<String>> {
-    let defaults = ["width", "height", "translationX", "translationY"];
-    let source = if requested.is_empty() {
-        defaults
-            .iter()
-            .map(|value| value.to_string())
-            .collect::<Vec<_>>()
-    } else {
-        requested.to_vec()
-    };
-    let mut result = Vec::new();
-    for property in source {
-        if !matches!(
-            property.as_str(),
-            "width"
-                | "height"
-                | "translationX"
-                | "translationY"
-                | "opacity"
-                | "padding.start"
-                | "padding.top"
-                | "padding.end"
-                | "padding.bottom"
-                | "cornerRadius.all"
-                | "textSize"
-                | "borderWidth"
-        ) {
-            bail!("视觉求解不支持属性: {property}");
-        }
-        let editable = node
-            .properties
-            .get(&property)
-            .map(|value| value.change_level == "LIVE")
-            .unwrap_or(matches!(property.as_str(), "translationX" | "translationY"));
-        if editable && !result.contains(&property) {
-            result.push(property);
-        }
-    }
-    if result.is_empty() {
-        bail!("目标节点没有可用于视觉求解的 LIVE 数值属性");
-    }
-    Ok(result)
-}
-
-fn initial_values(node: &LiveUiNode, properties: &[String]) -> BTreeMap<String, f64> {
-    let density = node.geometry.density.max(0.01) as f64;
-    properties
-        .iter()
-        .map(|property| {
-            let fallback = match property.as_str() {
-                "width" => node.geometry.bounds_in_display_px.width as f64 / density,
-                "height" => node.geometry.bounds_in_display_px.height as f64 / density,
-                "opacity" => 1.0,
-                _ => 0.0,
-            };
-            let value = node
-                .properties
-                .get(property)
-                .and_then(|snapshot| snapshot.effective.as_ref())
-                .and_then(|value| value.value.as_f64())
-                .unwrap_or(fallback);
-            (property.clone(), value)
-        })
-        .collect()
-}
-
-fn seed_geometry_target(values: &mut BTreeMap<String, f64>, node: &LiveUiNode, target: PixelRect) {
-    let density = node.geometry.density.max(0.01) as f64;
-    let current = &node.geometry.bounds_in_display_px;
-    if values.contains_key("width") {
-        values.insert(
-            "width".to_string(),
-            (target.right - target.left).max(1) as f64 / density,
-        );
-    }
-    if values.contains_key("height") {
-        values.insert(
-            "height".to_string(),
-            (target.bottom - target.top).max(1) as f64 / density,
-        );
-    }
-    if values.contains_key("translationX") {
-        values.insert(
-            "translationX".to_string(),
-            values.get("translationX").copied().unwrap_or_default()
-                + (target.left - current.left) as f64 / density,
-        );
-    }
-    if values.contains_key("translationY") {
-        values.insert(
-            "translationY".to_string(),
-            values.get("translationY").copied().unwrap_or_default()
-                + (target.top - current.top) as f64 / density,
-        );
-    }
-}
-
-fn constrained_value(node: &LiveUiNode, property: &str, value: f64) -> f64 {
-    let constraints = node
-        .properties
-        .get(property)
-        .and_then(|item| item.constraints.as_ref());
-    let minimum = constraints
-        .and_then(|value| value.get("minimum"))
-        .and_then(|value| value.as_f64())
-        .unwrap_or(if property == "opacity" {
-            0.0
-        } else {
-            -10_000.0
-        });
-    let maximum = constraints
-        .and_then(|value| value.get("maximum"))
-        .and_then(|value| value.as_f64())
-        .unwrap_or(if property == "opacity" { 1.0 } else { 10_000.0 });
-    value.clamp(minimum, maximum)
-}
-
-fn operations_from_values(values: &BTreeMap<String, f64>) -> Vec<LivePatchOperation> {
-    values
-        .iter()
-        .map(|(property, value)| LivePatchOperation {
-            property: property.clone(),
-            value: LivePropertyValue {
-                value_type: match property.as_str() {
-                    "textSize" => "sp",
-                    "opacity" => "float",
-                    _ => "dp",
-                }
-                .to_string(),
-                value: json!((value * 1000.0).round() / 1000.0),
-            },
-        })
-        .collect()
 }
 
 fn patch_for_node(
@@ -361,30 +247,5 @@ fn rect_from_node(node: &LiveUiNode) -> PixelRect {
         top: value.top,
         right: value.right,
         bottom: value.bottom,
-    }
-}
-
-fn predicted_rect(node: &LiveUiNode, values: &BTreeMap<String, f64>) -> PixelRect {
-    let base = &node.geometry.bounds_in_display_px;
-    let density = node.geometry.density.max(0.01) as f64;
-    let tx = values.get("translationX").copied().unwrap_or_default() * density;
-    let ty = values.get("translationY").copied().unwrap_or_default() * density;
-    let width = values
-        .get("width")
-        .map(|value| value * density)
-        .unwrap_or(base.width as f64)
-        .max(1.0);
-    let height = values
-        .get("height")
-        .map(|value| value * density)
-        .unwrap_or(base.height as f64)
-        .max(1.0);
-    let left = base.left as f64 + tx;
-    let top = base.top as f64 + ty;
-    PixelRect {
-        left: left.round() as i32,
-        top: top.round() as i32,
-        right: (left + width).round() as i32,
-        bottom: (top + height).round() as i32,
     }
 }

@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::{build_and_verify, BuildVerifyRequest};
+use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_artifact};
 use super::mcp_tools::tool_definitions;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
@@ -154,17 +155,19 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             let target = ir
                 .target_design
                 .ok_or_else(|| anyhow!("尚未绑定目标设计图"))?;
-            json!({ "path": target.path, "sha256": target.sha256, "rect": rect_argument(&arguments) })
+            let session = broker.session(session_id).await?;
+            let artifact = persist_target_crop_artifact(
+                &session,
+                &target.path,
+                parse_rect(arguments.get("rect"))?,
+            )?;
+            json!({ "artifact": artifact, "targetSha256": target.sha256 })
         }
         "ui_get_current_crop" => {
-            let ir = load_or_build_ui_ir(broker, session_id).await?;
-            let snapshot = ir.snapshot.ok_or_else(|| anyhow!("尚未绑定当前真机截图"))?;
-            json!({
-                "path": snapshot.screenshot_path,
-                "sha256": snapshot.screenshot_sha256,
-                "rect": rect_argument(&arguments),
-                "snapshotId": snapshot.snapshot_id,
-            })
+            let session = broker.session(session_id).await?;
+            let artifact =
+                capture_latest_frame_artifact(&session, parse_rect(arguments.get("rect"))?).await?;
+            json!({ "artifact": artifact, "treeRevision": session.view().await.tree_revision })
         }
         "ui_get_visual_diff" => visual_diff_from_ir(broker, session_id, &arguments).await?,
         "ui_propose_live_patch" => propose_live_patch(broker, session_id, &arguments).await?,
@@ -299,14 +302,16 @@ async fn visual_diff_from_ir(
     let target = ir
         .target_design
         .ok_or_else(|| anyhow!("尚未绑定目标设计图"))?;
-    let snapshot = ir.snapshot.ok_or_else(|| anyhow!("尚未绑定当前真机截图"))?;
+    let session = broker.session(session_id).await?;
+    let current = capture_latest_frame_artifact(&session, None).await?;
     let request = VisualDiffRequest {
         target_path: target.path,
-        current_path: snapshot.screenshot_path,
+        current_path: current.path.clone(),
         target_rect: parse_rect(arguments.get("targetRect"))?,
         current_rect: parse_rect(arguments.get("currentRect"))?,
+        projected_current_rect: parse_rect(arguments.get("projectedCurrentRect"))?,
     };
-    Ok(json!({ "diff": compare_images(&request)? }))
+    Ok(json!({ "diff": compare_images(&request)?, "currentFrame": current }))
 }
 
 async fn propose_live_patch(
@@ -316,8 +321,8 @@ async fn propose_live_patch(
 ) -> Result<Value> {
     let ir = load_or_build_ui_ir(broker, session_id).await?;
     let node = find_node(&ir, arguments)?;
-    let target =
-        parse_rect(arguments.get("targetRect"))?.ok_or_else(|| anyhow!("缺少 targetRect"))?;
+    let target = parse_rect(arguments.get("projectedCurrentRect"))?
+        .ok_or_else(|| anyhow!("缺少校准后的 projectedCurrentRect"))?;
     let current = &node.geometry.bounds_in_display_px;
     let density = node.geometry.density.max(0.01) as f64;
     let mut operations = Vec::new();
@@ -398,10 +403,6 @@ fn numeric_operation(property: &str, value: f64) -> LivePatchOperation {
             value: json!((value * 1000.0).round() / 1000.0),
         },
     }
-}
-
-fn rect_argument(arguments: &Value) -> Value {
-    arguments.get("rect").cloned().unwrap_or(Value::Null)
 }
 
 fn parse_rect(value: Option<&Value>) -> Result<Option<PixelRect>> {

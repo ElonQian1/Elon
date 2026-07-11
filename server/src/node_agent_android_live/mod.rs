@@ -6,7 +6,11 @@
 mod adb_session;
 mod broker;
 mod build_verify;
+mod build_verify_apk;
+mod fit_learning;
+pub(crate) mod fit_run;
 mod frame;
+mod frame_artifact;
 mod mcp;
 mod mcp_tools;
 mod preview;
@@ -16,8 +20,10 @@ mod source_commit;
 mod source_json;
 mod source_xml;
 mod ui_ir;
+mod verification_gate;
 mod visual_diff;
 mod visual_solver;
+mod visual_solver_values;
 
 #[cfg(test)]
 mod mcp_tests;
@@ -27,6 +33,8 @@ mod source_commit_tests;
 mod tests;
 #[cfg(test)]
 mod ui_ir_tests;
+#[cfg(test)]
+mod verification_gate_tests;
 #[cfg(test)]
 mod visual_diff_tests;
 

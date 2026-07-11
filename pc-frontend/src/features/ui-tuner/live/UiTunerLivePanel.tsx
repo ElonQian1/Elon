@@ -13,8 +13,6 @@ import type { LiveSourceCommitPlan, LiveSourceCommitResult } from './liveUiCommi
 import type {
   LiveTargetDesign,
   LiveUiIrDocument,
-  PixelRect,
-  VisualSolverResult,
 } from './liveUiIrApi'
 import type { LiveMcpDescriptor } from './liveUiApi'
 import styles from './UiTunerLivePanel.module.css'
@@ -26,11 +24,9 @@ interface UiTunerLivePanelProps {
   busy: boolean
   session: LiveUiSession | null
   node: LiveUiNode | null
-  selected: UiTunerElement
   mcp: LiveMcpDescriptor | null
   uiIr: LiveUiIrDocument | null
   targetDesign: LiveTargetDesign | null
-  solverResult: VisualSolverResult | null
   onApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
   onApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
   onGestureActive: (active: boolean) => void
@@ -42,7 +38,6 @@ interface UiTunerLivePanelProps {
   commitResult: LiveSourceCommitResult | null
   onPreviewCommit: () => Promise<LiveSourceCommitPlan>
   onCommit: (plan: LiveSourceCommitPlan) => Promise<LiveSourceCommitResult>
-  onSolve: (targetRect: PixelRect) => Promise<VisualSolverResult>
   onOpenPreview: (request: LivePreviewRequest) => Promise<void>
   buildVerifyResult: LiveBuildVerifyResult | null
   onBuildVerify: () => Promise<LiveBuildVerifyResult>
@@ -84,11 +79,9 @@ export function UiTunerLivePanel({
   busy,
   session,
   node,
-  selected,
   mcp,
   uiIr,
   targetDesign,
-  solverResult,
   onApply,
   onApplyGesture,
   onGestureActive,
@@ -100,7 +93,6 @@ export function UiTunerLivePanel({
   commitResult,
   onPreviewCommit,
   onCommit,
-  onSolve,
   onOpenPreview,
   buildVerifyResult,
   onBuildVerify,
@@ -260,15 +252,6 @@ export function UiTunerLivePanel({
               重做
             </button>
           </div>
-          <VisualSolverPanel
-            key={node.runtimeNodeId}
-            node={node}
-            selected={selected}
-            targetReady={Boolean(targetDesign)}
-            busy={busy}
-            result={solverResult}
-            onSolve={onSolve}
-          />
           <UiTunerPreviewPanel busy={busy} onOpen={onOpenPreview} />
           <button
             className={styles.commitButton}
@@ -314,7 +297,7 @@ export function UiTunerLivePanel({
           )}
           {buildVerifyResult && (
             <div className={styles.savedState}>
-              <strong>{buildVerifyResult.sourceParityVerified === true ? 'BUILD VERIFIED' : 'BUILD MISMATCH'}</strong>
+              <strong>{buildVerifyResult.status.replace(/_/g, ' ')}</strong>
               <span>{buildVerifyResult.message}</span>
               <small>
                 {buildVerifyResult.screenshotWidth} × {buildVerifyResult.screenshotHeight}
@@ -323,6 +306,9 @@ export function UiTunerLivePanel({
                   ? ` · 源码一致性损失 ${buildVerifyResult.sourceParityDiff.visualLoss.toFixed(4)}`
                   : ' · 本机节点未返回源码一致性结果'}
                 {buildVerifyResult.visualDiff ? ` · 设计图损失 ${buildVerifyResult.visualDiff.visualLoss.toFixed(4)}` : ''}
+                {buildVerifyResult.verificationGate?.failedMetrics.length
+                  ? ` · 未通过：${buildVerifyResult.verificationGate.failedMetrics.join(', ')}`
+                  : ''}
               </small>
             </div>
           )}
@@ -335,81 +321,6 @@ export function UiTunerLivePanel({
         </button>
       )}
     </section>
-  )
-}
-
-function VisualSolverPanel({
-  node,
-  selected,
-  targetReady,
-  busy,
-  result,
-  onSolve,
-}: {
-  node: LiveUiNode
-  selected: UiTunerElement
-  targetReady: boolean
-  busy: boolean
-  result: VisualSolverResult | null
-  onSolve: (targetRect: PixelRect) => Promise<VisualSolverResult>
-}) {
-  const bounds = node.geometry.boundsInDisplayPx
-  const [rect, setRect] = useState({
-    x: Math.round(selected.x || bounds.left),
-    y: Math.round(selected.y || bounds.top),
-    width: Math.round(selected.width || bounds.width),
-    height: Math.round(selected.height || bounds.height),
-  })
-  const setValue = (key: keyof typeof rect, value: number) => {
-    setRect((current) => ({ ...current, [key]: Number.isFinite(value) ? value : current[key] }))
-  }
-  const targetRect: PixelRect = {
-    left: rect.x,
-    top: rect.y,
-    right: rect.x + Math.max(1, rect.width),
-    bottom: rect.y + Math.max(1, rect.height),
-  }
-  return (
-    <div className={styles.solver}>
-      <div>
-        <strong>本地视觉求解</strong>
-        <span>目标图区域（px）</span>
-      </div>
-      <div className={styles.grid}>
-        {([
-          ['x', 'X'],
-          ['y', 'Y'],
-          ['width', '宽'],
-          ['height', '高'],
-        ] as const).map(([key, label]) => (
-          <label className={styles.field} key={key}>
-            <span>{label}</span>
-            <input
-              type="number"
-              value={rect[key]}
-              disabled={busy}
-              onChange={(event) => setValue(key, Number(event.currentTarget.value))}
-            />
-          </label>
-        ))}
-      </div>
-      <button
-        className={styles.commitButton}
-        type="button"
-        disabled={busy || !targetReady}
-        onClick={() => { void onSolve(targetRect) }}
-      >
-        {busy ? '正在真机试探…' : '自动逼近目标图'}
-      </button>
-      {!targetReady && <small>请先点击顶部“导入设计图/截图”。</small>}
-      {result && (
-        <small>
-          {result.evaluations} 次本地比较 · 损失
-          {' '}{result.baseline.visualLoss.toFixed(4)} → {result.finalDiff.visualLoss.toFixed(4)}
-          {' '}· 改善 {result.improvementPercent.toFixed(2)}%
-        </small>
-      )}
-    </div>
   )
 }
 

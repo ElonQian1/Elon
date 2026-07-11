@@ -1,31 +1,157 @@
 use image::{DynamicImage, Rgba, RgbaImage};
 
-use super::visual_diff::{compare_dynamic_images, PixelRect};
+use super::visual_diff::{
+    compare_dynamic_images, compare_dynamic_images_with_projection, PixelRect, VisualMask,
+    VisualScoreProfile,
+};
 
-#[test]
-fn identical_images_have_zero_visual_loss() {
-    let image = DynamicImage::ImageRgba8(RgbaImage::from_pixel(10, 12, Rgba([20, 40, 60, 255])));
-    let result = compare_dynamic_images(&image, &image, None, None).unwrap();
-    assert_eq!(result.visual_loss, 0.0);
+fn solid(width: u32, height: u32, color: [u8; 4]) -> DynamicImage {
+    DynamicImage::ImageRgba8(RgbaImage::from_pixel(width, height, Rgba(color)))
 }
 
 #[test]
-fn visual_loss_detects_color_and_geometry_changes() {
-    let left = DynamicImage::ImageRgba8(RgbaImage::from_pixel(20, 20, Rgba([0, 0, 0, 255])));
-    let right = DynamicImage::ImageRgba8(RgbaImage::from_pixel(10, 12, Rgba([255, 255, 255, 255])));
-    let result = compare_dynamic_images(
-        &left,
-        &right,
+fn identical_images_pass_every_hard_gate() {
+    let image = solid(80, 24, [20, 40, 60, 255]);
+    let result = compare_dynamic_images(&image, &image, None, None).unwrap();
+    assert_eq!(result.visual_loss, 0.0);
+    assert!(result.score_report.target_gate.passed);
+    assert_eq!(result.score_report.comparison_width, 80);
+    assert_eq!(result.score_report.comparison_height, 24);
+}
+
+#[test]
+fn letterbox_preserves_aspect_ratio_instead_of_stretching_to_a_square() {
+    let target = solid(200, 40, [40, 80, 120, 255]);
+    let current = solid(100, 40, [40, 80, 120, 255]);
+    let result = compare_dynamic_images_with_projection(
+        &target,
+        &current,
+        None,
         Some(PixelRect {
             left: 0,
             top: 0,
-            right: 18,
-            bottom: 16,
+            right: 100,
+            bottom: 40,
         }),
-        None,
+        Some(PixelRect {
+            left: 0,
+            top: 0,
+            right: 200,
+            bottom: 40,
+        }),
+        &VisualMask::default(),
+        VisualScoreProfile::default(),
     )
     .unwrap();
-    assert!(result.mean_absolute_color_error > 0.99);
-    assert!(result.geometry_error > 0.0);
-    assert!(result.visual_loss > 0.5);
+    assert_eq!(result.score_report.comparison_width, 200);
+    assert_eq!(result.score_report.comparison_height, 40);
+    assert!(result.score_report.geometry.aspect_error_ratio > 0.4);
+    assert!(!result.score_report.target_gate.geometry_passed);
+}
+
+#[test]
+fn projected_position_is_checked_independently_from_design_crop_coordinates() {
+    let target = solid(60, 20, [80, 100, 120, 255]);
+    let current_frame = solid(240, 150, [80, 100, 120, 255]);
+    let result = compare_dynamic_images_with_projection(
+        &target,
+        &current_frame,
+        None,
+        Some(PixelRect {
+            left: 120,
+            top: 80,
+            right: 180,
+            bottom: 100,
+        }),
+        Some(PixelRect {
+            left: 100,
+            top: 70,
+            right: 160,
+            bottom: 90,
+        }),
+        &VisualMask::default(),
+        VisualScoreProfile::default(),
+    )
+    .unwrap();
+    assert_eq!(result.mean_absolute_color_error, 0.0);
+    assert_eq!(result.score_report.position.left_error_px, 20.0);
+    assert_eq!(result.score_report.position.top_error_px, 10.0);
+    assert!(!result.score_report.target_gate.position_passed);
+    assert!(!result.score_report.target_gate.passed);
+}
+
+#[test]
+fn excluded_region_does_not_pollute_color_score() {
+    let target = solid(20, 10, [0, 0, 0, 255]);
+    let mut current = RgbaImage::from_pixel(20, 10, Rgba([0, 0, 0, 255]));
+    for y in 0..10 {
+        for x in 10..20 {
+            current.put_pixel(x, y, Rgba([255, 255, 255, 255]));
+        }
+    }
+    let result = compare_dynamic_images_with_projection(
+        &target,
+        &DynamicImage::ImageRgba8(current),
+        None,
+        None,
+        None,
+        &VisualMask {
+            exclude_rects: vec![PixelRect {
+                left: 10,
+                top: 0,
+                right: 20,
+                bottom: 10,
+            }],
+        },
+        VisualScoreProfile::default(),
+    )
+    .unwrap();
+    assert_eq!(result.score_report.color.mean_absolute_error, 0.0);
+    assert_eq!(result.score_report.coverage.compared_pixels, 100);
+    assert!(result.score_report.target_gate.passed);
+}
+
+#[test]
+fn low_aggregate_score_cannot_override_a_failed_geometry_gate() {
+    let target = solid(100, 20, [25, 25, 25, 255]);
+    let current = solid(99, 20, [25, 25, 25, 255]);
+    let result = compare_dynamic_images_with_projection(
+        &target,
+        &current,
+        None,
+        Some(PixelRect {
+            left: 0,
+            top: 0,
+            right: 99,
+            bottom: 20,
+        }),
+        Some(PixelRect {
+            left: 0,
+            top: 0,
+            right: 100,
+            bottom: 20,
+        }),
+        &VisualMask::default(),
+        VisualScoreProfile {
+            max_size_error_ratio: 0.001,
+            ..VisualScoreProfile::default()
+        },
+    )
+    .unwrap();
+    assert!(result.visual_loss < 0.05);
+    assert!(!result.score_report.target_gate.geometry_passed);
+    assert!(!result.score_report.target_gate.passed);
+}
+
+#[test]
+fn color_metric_reports_perceptual_lab_distance() {
+    let dark = solid(30, 20, [20, 20, 20, 255]);
+    let light = solid(30, 20, [230, 230, 230, 255]);
+    let result = compare_dynamic_images(&dark, &light, None, None).unwrap();
+    assert!(result.score_report.color.mean_delta_e > 70.0);
+    assert_eq!(
+        result.score_report.color.mean_delta_e,
+        result.score_report.color.p95_delta_e
+    );
+    assert!(!result.score_report.target_gate.color_passed);
 }

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -15,6 +16,8 @@ use super::protocol::LiveUiNode;
 
 const UI_IR_VERSION: u32 = 1;
 const MAX_TARGET_BYTES: usize = 16 * 1024 * 1024;
+const MAX_IMAGE_SIDE: u32 = 16_384;
+const MAX_IMAGE_PIXELS: u64 = 40 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -101,8 +104,11 @@ pub(crate) async fn persist_target_design(
 ) -> Result<TargetDesignRef> {
     let session = broker.session(session_id).await?;
     let (mime_type, bytes) = decode_data_url(&upload.data_url)?;
+    let (width, height) = validated_image_dimensions(&bytes, "设计图")?;
     let image = image::load_from_memory(&bytes).context("设计图无法解码")?;
-    let (width, height) = image.dimensions();
+    if image.dimensions() != (width, height) {
+        bail!("设计图解码尺寸与文件头不一致");
+    }
     let sha256 = sha256_bytes(&bytes);
     let extension = match mime_type.as_str() {
         "image/jpeg" => "jpg",
@@ -250,6 +256,36 @@ pub(crate) fn ui_ir_path(project_root: Option<&str>, session_id: &str) -> Result
     Ok(live_artifact_dir(project_root, session_id)?.join("ui-ir.json"))
 }
 
+pub(crate) fn persisted_node_property_values(
+    project_root: &str,
+    session_id: &str,
+    runtime_node_id: &str,
+    definition_id: &str,
+    instance_key: Option<&str>,
+) -> Result<BTreeMap<String, Value>> {
+    let document = load_ui_ir_path(&ui_ir_path(Some(project_root), session_id)?)?;
+    let node = document
+        .nodes
+        .iter()
+        .find(|node| node.runtime_node_id == runtime_node_id)
+        .or_else(|| {
+            document.nodes.iter().find(|node| {
+                node.definition_id == definition_id
+                    && instance_key.map_or(true, |key| node.instance_key.as_deref() == Some(key))
+            })
+        })
+        .ok_or_else(|| anyhow!("持久化 UI IR 中找不到 FitRun 目标节点"))?;
+    node.properties
+        .iter()
+        .filter_map(|(property, snapshot)| {
+            snapshot.effective.as_ref().map(|value| {
+                serde_json::to_value(value)
+                    .map(|serialized| (property.clone(), serialized))
+            })
+        })
+        .collect()
+}
+
 fn live_artifact_dir(project_root: Option<&str>, session_id: &str) -> Result<PathBuf> {
     validate_session_id(session_id)?;
     let base = if let Some(value) = project_root.filter(|value| !value.trim().is_empty()) {
@@ -288,11 +324,39 @@ fn decode_data_url(value: &str) -> Result<(String, Vec<u8>)> {
         .trim_start_matches("data:")
         .trim_end_matches(";base64")
         .to_ascii_lowercase();
+    if !matches!(mime_type.as_str(), "image/jpeg" | "image/png") {
+        bail!("设计图只支持 PNG/JPEG");
+    }
+    let max_encoded_len = MAX_TARGET_BYTES.saturating_mul(4).div_ceil(3) + 8;
+    if payload.is_empty() || payload.len() > max_encoded_len {
+        bail!("设计图 Base64 体积超限");
+    }
     let bytes = B64.decode(payload).context("设计图 Base64 解码失败")?;
     if bytes.is_empty() || bytes.len() > MAX_TARGET_BYTES {
         bail!("设计图大小必须在 1..16MiB");
     }
     Ok((mime_type, bytes))
+}
+
+fn validated_image_dimensions(bytes: &[u8], label: &str) -> Result<(u32, u32)> {
+    let reader = image::ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()
+        .with_context(|| format!("{label}格式无法识别"))?;
+    let (width, height) = reader
+        .into_dimensions()
+        .with_context(|| format!("{label}尺寸无法读取"))?;
+    let pixels = u64::from(width).saturating_mul(u64::from(height));
+    if width == 0
+        || height == 0
+        || width > MAX_IMAGE_SIDE
+        || height > MAX_IMAGE_SIDE
+        || pixels > MAX_IMAGE_PIXELS
+    {
+        bail!(
+            "{label}尺寸超限：{width}x{height}，单边不超过 {MAX_IMAGE_SIDE}，总像素不超过 {MAX_IMAGE_PIXELS}"
+        );
+    }
+    Ok((width, height))
 }
 
 fn document_revision(

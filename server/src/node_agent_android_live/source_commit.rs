@@ -85,11 +85,30 @@ pub(crate) async fn build_source_commit_plan(
     build_plan(&session.id, snapshot)
 }
 
+/// Builds a source plan from an explicitly owned patch set while still using
+/// the current Runtime nodes for source bindings. FitRun uses this to avoid
+/// committing unrelated edits from the same Live session.
+pub(crate) async fn build_source_commit_plan_for_patches(
+    session: Arc<LiveUiSession>,
+    patches: Vec<LiveStylePatch>,
+) -> Result<SourceCommitPlan> {
+    let mut snapshot = session.commit_snapshot().await;
+    snapshot.patches = patches;
+    build_plan(&session.id, snapshot)
+}
+
 pub(crate) async fn commit_source(
     session: Arc<LiveUiSession>,
     request: SourceCommitRequest,
 ) -> Result<SourceCommitResult> {
     let plan = build_source_commit_plan(session).await?;
+    apply_source_commit_plan(plan, request)
+}
+
+pub(crate) fn commit_source_plan(
+    plan: SourceCommitPlan,
+    request: SourceCommitRequest,
+) -> Result<SourceCommitResult> {
     apply_source_commit_plan(plan, request)
 }
 

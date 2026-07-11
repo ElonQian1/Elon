@@ -102,6 +102,7 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/sessions/:session_id/mcp-descriptor",
             get(mcp_descriptor_handler),
         )
+        .merge(super::fit_run::protected_routes())
 }
 
 async fn prepare_debug_runtime_handler(
