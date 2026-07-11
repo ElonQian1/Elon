@@ -1095,7 +1095,7 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/main_bottom_menu_outer_height"
             android:layout_gravity="bottom"
-            android:background="@color/elon_bg_app"
+            android:background="@android:color/transparent"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:paddingStart="16dp"
