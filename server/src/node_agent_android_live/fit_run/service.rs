@@ -131,7 +131,9 @@ impl FitRunService {
                     if let Err(error) = self.backend.revert_best(run.clone()).await {
                         run.pause(
                             FitStopReason::BackendError,
-                            Some(format!("取消 FitRun 时无法安全撤销本任务的 Live Patch: {error:#}")),
+                            Some(format!(
+                                "取消 FitRun 时无法安全撤销本任务的 Live Patch: {error:#}"
+                            )),
                         )?;
                         return Ok(false);
                     }
@@ -374,7 +376,10 @@ fn validate_command_context(
     if run.session_id != context.session_id || run.device_id != context.device_id {
         bail!("FitRun 仍绑定其他 Live Session；请先执行 REBIND_SESSION");
     }
-    let lifecycle_only = matches!(command, FitCommand::Pause { .. } | FitCommand::Cancel { .. });
+    let lifecycle_only = matches!(
+        command,
+        FitCommand::Pause { .. } | FitCommand::Cancel { .. }
+    );
     let codex_result = matches!(
         command,
         FitCommand::CodexCompleted { .. } | FitCommand::CodexFailed { .. }

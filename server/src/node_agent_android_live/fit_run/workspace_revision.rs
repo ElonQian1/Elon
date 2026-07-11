@@ -18,17 +18,12 @@ pub(crate) fn workspace_fingerprint(project_root: &str) -> Result<Option<String>
     let Some(head) = git_output(&root, &["rev-parse", "--verify", "HEAD"])? else {
         return Ok(None);
     };
-    let diff = git_output_required(
-        &root,
-        &["diff", "--binary", "--no-ext-diff", "HEAD", "--"],
-    )?;
+    let diff = git_output_required(&root, &["diff", "--binary", "--no-ext-diff", "HEAD", "--"])?;
     if diff.len() > MAX_DIFF_BYTES {
         bail!("工作区差异超过 64MiB，拒绝生成不完整 Source Revision");
     }
-    let untracked = git_output_required(
-        &root,
-        &["ls-files", "--others", "--exclude-standard", "-z"],
-    )?;
+    let untracked =
+        git_output_required(&root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
 
     let mut hasher = Sha256::new();
     hasher.update(b"elon-workspace-v1\0");
@@ -45,7 +40,10 @@ pub(crate) fn workspace_fingerprint(project_root: &str) -> Result<Option<String>
 
 fn hash_untracked_files(root: &Path, names: &[u8], hasher: &mut Sha256) -> Result<()> {
     let mut total = 0_u64;
-    for raw in names.split(|byte| *byte == 0).filter(|value| !value.is_empty()) {
+    for raw in names
+        .split(|byte| *byte == 0)
+        .filter(|value| !value.is_empty())
+    {
         let relative = std::str::from_utf8(raw).context("Git 返回了非 UTF-8 的未跟踪文件名")?;
         let path = root.join(relative);
         let canonical = path
