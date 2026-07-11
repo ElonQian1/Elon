@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.view.View
 import android.widget.ScrollView
 import android.widget.TextView
@@ -27,14 +26,11 @@ internal class MainBottomNavigationController(
 
     fun setVisible(visible: Boolean) {
         binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
-        if (visible) {
-            activity.window.navigationBarColor = Color.TRANSPARENT
-            activity.window.decorView.systemUiVisibility =
-                activity.window.decorView.systemUiVisibility or
-                    View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+        val inset = if (visible) {
+            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
+        } else {
+            0
         }
-        val inset = 0
         listOfNotNull(
             binding.conversationPage.parent as? ScrollView,
             binding.projectScrollView,
