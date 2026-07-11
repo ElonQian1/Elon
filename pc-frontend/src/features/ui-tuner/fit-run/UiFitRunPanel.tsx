@@ -68,7 +68,7 @@ export function UiFitRunPanel({ fitRun, pairReady }: UiFitRunPanelProps) {
             {run.phase === 'CANDIDATE_READY' && (
               <CommandButton label="确认最佳结果" busy={interactionBusy} onClick={() => fitRun.command({ type: 'ACCEPT_BEST' })} />
             )}
-            {!terminal && (
+            {!terminal && run.phase !== 'CODEX_RUNNING' && (
               <CommandButton label="取消" busy={interactionBusy} onClick={() => fitRun.command({ type: 'CANCEL' })} />
             )}
             {terminal && (

@@ -32,6 +32,7 @@ import {
   readFitRunCodexLaunch,
 } from './fit-run/fitRunEvents'
 import { useFitRunStore } from './fit-run/fitRunStore'
+import { TERMINAL_FIT_RUN_PHASES } from './fit-run/types'
 import panelStyles from './UiTunerPanels.module.css'
 
 interface UiTunerProjectSessionPanelProps {
@@ -185,7 +186,8 @@ export function UiTunerProjectSessionPanel({
     return { runId: activeFitRun.runId, handoffId: handoff.handoffId, taskId }
   }, [activeFitRun])
   const trackedFitRunTask = fitRunTask ?? restoredFitRunTask
-  const canStart = canStartBase && !trackedFitRunTask && !fitRunStarting
+  const fitRunPipelineActive = Boolean(activeFitRun && !TERMINAL_FIT_RUN_PHASES.has(activeFitRun.phase))
+  const canStart = canStartBase && !fitRunPipelineActive && !trackedFitRunTask && !fitRunStarting
   const canStartFitRun = canStartBase && !trackedFitRunTask && !verificationTaskId && !fitRunStarting
   const sessionMessages = useMemo(() => {
     if (!selectedSession?.conversationId) return []
@@ -206,11 +208,11 @@ export function UiTunerProjectSessionPanel({
     options?: SessionStartOptions,
   ): Promise<UiTunerProjectSessionRecord | null> {
     if (options?.fitRun) {
-      if (!canStartFitRun || fitRunStartingRef.current) {
+      if (!canStartFitRun) {
         setStatus('已有 Codex 任务正在启动或运行，请等待后再继续 FitRun')
         return null
       }
-    } else if (trackedFitRunTask || fitRunStartingRef.current) {
+    } else if (fitRunPipelineActive || trackedFitRunTask || fitRunStartingRef.current) {
       setStatus('设计稿 FitRun 正在使用 Codex，完成前不能并发启动手工源码任务')
       return null
     }
@@ -303,7 +305,7 @@ export function UiTunerProjectSessionPanel({
   startSessionRef.current = startSession
 
   useEffect(() => listenForFitRunCodexRequests((request) => {
-    if (!canStartFitRun) {
+    if (!canStartFitRun || fitRunStartingRef.current) {
       request.reject(new Error('当前项目 Codex 会话或本机节点尚未就绪'))
       return
     }
