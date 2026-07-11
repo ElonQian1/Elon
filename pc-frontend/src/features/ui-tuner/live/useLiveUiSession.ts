@@ -82,6 +82,13 @@ export function useLiveUiSession({
   const reconnectAttemptRef = useRef(0)
   const lastPreviewRef = useRef<LivePreviewRequest | null>(null)
 
+  useEffect(() => {
+    // A Preview belongs to the selected APK/device, not to a particular
+    // source-root-backed Live session. Preserve it when the user corrects or
+    // switches the source directory so Build Verify can reopen the same scene.
+    lastPreviewRef.current = null
+  }, [deviceId, packageName])
+
   const refresh = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id
     if (!id) return
@@ -111,7 +118,6 @@ export function useLiveUiSession({
     const cleanDevice = deviceId?.trim()
     const cleanPackage = packageName?.trim()
     const generation = ++generationRef.current
-    lastPreviewRef.current = null
     let timer: number | undefined
     let disposed = false
 
