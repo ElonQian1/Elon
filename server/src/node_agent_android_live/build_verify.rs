@@ -1,10 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::time::{Duration, Instant, SystemTime};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use tokio::process::Command;
 
 use crate::node_agent_android_inspector::{
     adb_capture::{capture_screen_png, launch_app},
@@ -13,10 +10,9 @@ use crate::node_agent_android_inspector::{
 };
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
-use super::broker::{LiveCommitSnapshot, LiveUiBroker, LiveUiSession};
+use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify_apk::select_fresh_debug_apk;
 use super::preview::{open_preview, PreviewOpenRequest};
-use super::protocol::{LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
 use super::verification_gate::{
     evaluate_verification_gates, VerificationGateInput, VerificationGateResult,
@@ -26,8 +22,14 @@ use super::visual_diff::{
     compare_pngs, compare_target_with_png_projected, PixelRect, VisualDiffResult,
 };
 
-const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
-const MAX_BUILD_OUTPUT: usize = 256 * 1024;
+mod geometry;
+mod gradle;
+
+use geometry::{patched_bounds, patched_bounds_for_nodes, verification_bounds};
+use gradle::{
+    canonical_project_root, find_gradle_root, gradle_wrapper, run_debug_build,
+    validate_debug_application_id_suffix, validate_package_name,
+};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -300,198 +302,6 @@ async fn capture_stable_screen(device_id: &str) -> Result<Vec<u8>> {
     Ok(previous)
 }
 
-fn patched_bounds(snapshot: &LiveCommitSnapshot, allow_runtime_id: bool) -> Option<PixelRect> {
-    patched_bounds_for_nodes(&snapshot.nodes, &snapshot.patches, allow_runtime_id)
-}
-
-fn verification_bounds(
-    nodes: &[LiveUiNode],
-    definition_id: Option<&str>,
-    instance_key: Option<&str>,
-) -> Result<Option<PixelRect>> {
-    let Some(definition_id) = definition_id else {
-        return Ok(None);
-    };
-    let candidates = nodes
-        .iter()
-        .filter_map(|node| {
-            if node.definition_id != definition_id
-                || instance_key.is_some_and(|key| node.instance_key.as_deref() != Some(key))
-                || !node.geometry.visible
-            {
-                return None;
-            }
-            let bounds = &node.geometry.bounds_in_display_px;
-            (bounds.right > bounds.left && bounds.bottom > bounds.top).then_some(PixelRect {
-                left: bounds.left,
-                top: bounds.top,
-                right: bounds.right,
-                bottom: bounds.bottom,
-            })
-        })
-        .collect::<Vec<_>>();
-    match candidates.as_slice() {
-        [bounds] => Ok(Some(*bounds)),
-        [] => bail!(
-            "构建验收找不到目标节点 definitionId={definition_id} instanceKey={:?}",
-            instance_key
-        ),
-        _ => bail!("构建验收目标节点不唯一 definitionId={definition_id}；请提供稳定 instanceKey"),
-    }
-}
-
-fn patched_bounds_for_nodes(
-    nodes: &[LiveUiNode],
-    patches: &[LiveStylePatch],
-    allow_runtime_id: bool,
-) -> Option<PixelRect> {
-    let mut result: Option<PixelRect> = None;
-    for patch in patches {
-        let node = allow_runtime_id
-            .then(|| patch.target.runtime_node_id.as_deref())
-            .flatten()
-            .and_then(|id| nodes.iter().find(|node| node.runtime_node_id == id))
-            .or_else(|| {
-                patch
-                    .target
-                    .definition_id
-                    .as_deref()
-                    .and_then(|definition| {
-                        nodes.iter().find(|node| node.definition_id == definition)
-                    })
-            });
-        let Some(node) = node.filter(|node| node.geometry.visible) else {
-            continue;
-        };
-        let bounds = &node.geometry.bounds_in_display_px;
-        if bounds.right <= bounds.left || bounds.bottom <= bounds.top {
-            continue;
-        }
-        result = Some(match result {
-            Some(current) => PixelRect {
-                left: current.left.min(bounds.left),
-                top: current.top.min(bounds.top),
-                right: current.right.max(bounds.right),
-                bottom: current.bottom.max(bounds.bottom),
-            },
-            None => PixelRect {
-                left: bounds.left,
-                top: bounds.top,
-                right: bounds.right,
-                bottom: bounds.bottom,
-            },
-        });
-    }
-    result
-}
-
-fn canonical_project_root(session: &LiveUiSession) -> Result<PathBuf> {
-    let root = session
-        .project_root
-        .as_deref()
-        .ok_or_else(|| anyhow!("Live 会话未绑定 projectRoot"))?;
-    PathBuf::from(root)
-        .canonicalize()
-        .with_context(|| format!("项目目录不存在: {root}"))
-}
-
-fn find_gradle_root(project_root: &Path) -> Result<PathBuf> {
-    for candidate in [project_root.to_path_buf(), project_root.join("android")] {
-        if candidate.join("gradlew").is_file() || candidate.join("gradlew.bat").is_file() {
-            return candidate
-                .canonicalize()
-                .with_context(|| format!("Gradle 目录不可访问: {}", candidate.display()));
-        }
-    }
-    bail!("项目根目录及 android/ 下均未找到 Gradle Wrapper")
-}
-
-fn gradle_wrapper(gradle_root: &Path) -> Result<PathBuf> {
-    let candidates = if cfg!(windows) {
-        [gradle_root.join("gradlew.bat"), gradle_root.join("gradlew")]
-    } else {
-        [gradle_root.join("gradlew"), gradle_root.join("gradlew.bat")]
-    };
-    candidates
-        .into_iter()
-        .find(|path| path.is_file())
-        .ok_or_else(|| anyhow!("Gradle Wrapper 不存在"))
-}
-
-async fn run_debug_build(
-    gradle_root: &Path,
-    wrapper: &Path,
-    debug_application_id_suffix: Option<&str>,
-) -> Result<()> {
-    let mut command =
-        if cfg!(windows) && wrapper.extension().and_then(|v| v.to_str()) == Some("bat") {
-            let mut command = Command::new("cmd.exe");
-            // cmd.exe applies special quote stripping after /C. Passing an absolute
-            // \\?\ path containing spaces can therefore be truncated before Gradle is
-            // launched. The command already runs in gradle_root, so invoke only the
-            // wrapper file name and avoid both long-path and quoting ambiguity.
-            command
-                .args(["/D", "/C"])
-                .arg(wrapper.file_name().unwrap_or_default());
-            command
-        } else {
-            Command::new(wrapper)
-        };
-    command
-        .current_dir(gradle_root)
-        // Build verification must produce a fresh artifact. Otherwise a stale
-        // APK from an UP-TO-DATE task can be installed and falsely certified.
-        .args(["assembleDebug", "--no-daemon", "--rerun-tasks"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-    if let Some(suffix) = debug_application_id_suffix {
-        command.arg(format!("-PELON_DEBUG_APPLICATION_ID_SUFFIX={suffix}"));
-    }
-    crate::node_agent_exec::hide_tokio_command_window(&mut command);
-    let output = tokio::time::timeout(BUILD_TIMEOUT, command.output())
-        .await
-        .context("Android Debug 构建超时")?
-        .context("无法启动 Gradle Wrapper")?;
-    if output.stdout.len() + output.stderr.len() > MAX_BUILD_OUTPUT * 4 {
-        bail!("Gradle 输出异常过大，已停止验收");
-    }
-    if !output.status.success() {
-        let message = tail_output(&output.stdout, &output.stderr);
-        bail!("Android Debug 构建失败: {message}");
-    }
-    Ok(())
-}
-
-fn validate_debug_application_id_suffix(value: &str) -> Result<&str> {
-    if value.is_empty()
-        || value.len() > 40
-        || !value.starts_with('.')
-        || value == "."
-        || !value
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_'))
-    {
-        bail!("debugApplicationIdSuffix 仅允许以点开头的字母、数字、点和下划线，长度不超过 40")
-    }
-    Ok(value)
-}
-
-fn validate_package_name(value: &str) -> Result<&str> {
-    let valid = !value.is_empty()
-        && value.len() <= 220
-        && value.split('.').all(|segment| {
-            let mut bytes = segment.bytes();
-            bytes.next().is_some_and(|byte| byte.is_ascii_alphabetic())
-                && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
-        });
-    if !valid {
-        bail!("basePackageName 不是合法的 Android applicationId")
-    }
-    Ok(value)
-}
-
 async fn wait_for_runtime(
     broker: &LiveUiBroker,
     session_id: &str,
@@ -536,139 +346,5 @@ fn nodes_match_preview(nodes: &[LiveUiNode], expected_screen_id: &str) -> bool {
     })
 }
 
-fn tail_output(stdout: &[u8], stderr: &[u8]) -> String {
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(stdout),
-        String::from_utf8_lossy(stderr),
-    );
-    let start = combined.len().saturating_sub(MAX_BUILD_OUTPUT);
-    combined
-        .get(start..)
-        .unwrap_or(&combined)
-        .trim()
-        .to_string()
-}
-
 #[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-    use std::fs;
-
-    use super::*;
-    use crate::node_agent_android_live::protocol::{LiveGeometry, LiveRect};
-
-    #[test]
-    fn accepts_safe_debug_application_id_suffix() {
-        assert_eq!(
-            validate_debug_application_id_suffix(".uitest_2").unwrap(),
-            ".uitest_2"
-        );
-    }
-
-    #[test]
-    fn rejects_gradle_argument_injection() {
-        assert!(validate_debug_application_id_suffix(".uitest -Pbad=true").is_err());
-        assert!(validate_debug_application_id_suffix("uitest").is_err());
-        assert!(validate_debug_application_id_suffix(".").is_err());
-    }
-
-    #[test]
-    fn validates_android_base_package_name() {
-        assert_eq!(
-            validate_package_name("com.elon.app").unwrap(),
-            "com.elon.app"
-        );
-        assert!(validate_package_name("com.elon.app;rm").is_err());
-        assert!(validate_package_name("com..app").is_err());
-        assert!(validate_package_name("1com.elon.app").is_err());
-    }
-
-    #[test]
-    fn locates_android_gradle_root_without_leaving_project() {
-        let root = std::env::temp_dir().join(format!("elon-build-verify-{}", uuid::Uuid::new_v4()));
-        fs::create_dir_all(root.join("android")).unwrap();
-        fs::write(root.join("android/gradlew.bat"), "@echo off").unwrap();
-        assert_eq!(
-            find_gradle_root(&root).unwrap(),
-            root.join("android").canonicalize().unwrap()
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn matches_compose_and_view_preview_nodes() {
-        let mut node = LiveUiNode {
-            runtime_node_id: "runtime-1".to_string(),
-            definition_id: "preview.compose.primary_card".to_string(),
-            instance_key: None,
-            parent_runtime_node_id: None,
-            screen_id: "elon.compose.gallery".to_string(),
-            kind: "compose".to_string(),
-            text: None,
-            resource_id: None,
-            class_name: "PrimaryCard".to_string(),
-            source: None,
-            geometry: Default::default(),
-            properties: Default::default(),
-            capabilities: Default::default(),
-        };
-        assert!(nodes_match_preview(&[node.clone()], "elon.compose.gallery"));
-
-        node.screen_id = "com.elon.uiruntime.view.UiRuntimePreviewHostActivity".to_string();
-        node.definition_id = "preview.elon.view.gallery.root".to_string();
-        assert!(nodes_match_preview(&[node], "elon.view.gallery"));
-    }
-
-    #[test]
-    fn verification_target_requires_unique_stable_instance() {
-        let nodes = vec![
-            test_node("runtime-1", None, 0),
-            test_node("runtime-2", None, 100),
-        ];
-        assert!(verification_bounds(&nodes, Some("card.action"), None).is_err());
-    }
-
-    #[test]
-    fn verification_target_respects_instance_key() {
-        let nodes = vec![
-            test_node("runtime-1", Some("sku-1"), 0),
-            test_node("runtime-2", Some("sku-2"), 100),
-        ];
-        let bounds = verification_bounds(&nodes, Some("card.action"), Some("sku-2"))
-            .unwrap()
-            .unwrap();
-        assert_eq!(bounds.left, 100);
-    }
-
-    fn test_node(runtime_id: &str, instance_key: Option<&str>, left: i32) -> LiveUiNode {
-        LiveUiNode {
-            runtime_node_id: runtime_id.to_string(),
-            definition_id: "card.action".to_string(),
-            instance_key: instance_key.map(str::to_string),
-            parent_runtime_node_id: None,
-            screen_id: "catalog".to_string(),
-            kind: "button".to_string(),
-            text: None,
-            resource_id: None,
-            class_name: "Button".to_string(),
-            source: None,
-            geometry: LiveGeometry {
-                bounds_in_display_px: LiveRect {
-                    left,
-                    top: 0,
-                    right: left + 80,
-                    bottom: 40,
-                    width: 80,
-                    height: 40,
-                },
-                density: 2.0,
-                font_scale: 1.0,
-                rotation: 0,
-                visible: true,
-            },
-            properties: BTreeMap::new(),
-            capabilities: BTreeMap::new(),
-        }
-    }
-}
+mod tests;
