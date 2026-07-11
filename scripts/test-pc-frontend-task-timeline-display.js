@@ -35,6 +35,9 @@ try {
   const {
     buildTimelineDisplay,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskTimelineDisplayModel.ts'));
+  const {
+    taskStageActionModel,
+  } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskStageActionModel.ts'));
 
   const mixedTimeline = buildTaskTimeline([
     {
@@ -117,6 +120,34 @@ try {
       'curl.exe http://127.0.0.1:8080/api/server/version',
     ],
     'expanded timeline should keep public replies and commands in chronological order',
+  );
+
+  assert.deepStrictEqual(
+    taskStageActionModel('heartbeat', 'running', false),
+    { canContinue: false, canOpenNode: false, continueLabel: '' },
+    'normal heartbeat waiting must not offer a continue action',
+  );
+  assert.deepStrictEqual(
+    taskStageActionModel('heartbeat', 'failed', true),
+    { canContinue: true, canOpenNode: true, continueLabel: '检查并继续' },
+    'only a stale heartbeat should offer recovery actions',
+  );
+  assert.deepStrictEqual(
+    taskStageActionModel('recovery-timeout', 'failed', true),
+    { canContinue: true, canOpenNode: true, continueLabel: '重试恢复' },
+  );
+  assert.deepStrictEqual(
+    taskStageActionModel('tool-timeout', 'failed', true),
+    { canContinue: true, canOpenNode: true, continueLabel: '重试任务' },
+  );
+  assert.deepStrictEqual(
+    taskStageActionModel('finished', 'failed', false),
+    { canContinue: true, canOpenNode: false, continueLabel: '重试任务' },
+  );
+  assert.deepStrictEqual(
+    taskStageActionModel('latest', 'running', false),
+    { canContinue: false, canOpenNode: false, continueLabel: '' },
+    'an active command failure stays under AI control instead of asking the user to intervene',
   );
 
   assert.deepStrictEqual(

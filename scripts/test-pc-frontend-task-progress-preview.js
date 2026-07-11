@@ -84,6 +84,11 @@ assert.match(
   'tool approval must remain actionable in the direct progress flow',
 )
 assert.match(
+  progressSurfaceSource,
+  /命令失败后，AI 正在根据报错定位并修复/,
+  'an active command failure should explain that AI remains in control',
+)
+assert.match(
   previewSource,
   /window\.history\.replaceState/,
   'scenario and expansion controls should update the shareable preview URL',

@@ -22,6 +22,7 @@ import { clean, formatTime } from '../../lib/utils'
 import { messageKind, messageText, statusForTask, taskIdOf, taskIsTerminal, taskRequestLooksMarkdown, taskResultDisplayText, taskResultTone } from './devTaskUtils'
 import { buildTaskTimeline } from './taskTimelineModel'
 import { isStatusEchoProgressText } from './taskTimelineRuntime'
+import { taskStageActionModel } from './taskStageActionModel'
 import type { TimelineItem } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
@@ -104,7 +105,9 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   )
     && timeline.stage.key !== 'approval'
   const directPublicProcess = !resultMsg
-  const canContinue = !!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)
+  const stageAction = taskStageActionModel(timeline.stage.key, tone, timeline.stage.stuck)
+  const continueAvailable = !!taskId && !!onContinue
+  const canContinue = continueAvailable && stageAction.canContinue
   const expandToolDetails = expandAll || debugOpenProcess
 
   useEffect(() => {
@@ -171,7 +174,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
           lockedOpen={forceProcessOpen}
           processedDuration={processedDuration}
           suppressNarrative={suppressProgressNarrative}
-          canContinue={canContinue}
+          canContinue={continueAvailable}
           onToggle={() => {
             if (forceProcessOpen) return
             setCollapsed((c) => !c)
@@ -279,7 +282,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
                   onClick={() => taskId && onContinue?.(taskId)}
                 >
                   <PlayCircle size={14} aria-hidden="true" />
-                  <span>继续任务</span>
+                  <span>{stageAction.continueLabel}</span>
                 </button>
               )}
               {!directPublicProcess && renderProgressPanel(true, hasVisibleSurfaceItems ? 'afterNotes' : false)}
@@ -367,17 +370,6 @@ function replyLabelForTone(tone: TaskTone): string {
   if (tone === 'failed') return '任务失败'
   if (tone === 'canceled') return '任务已停止'
   return '最终回复'
-}
-
-function taskStageAllowsContinue(stageKey: string, tone: TaskTone): boolean {
-  if (tone === 'failed') return true
-  return [
-    'heartbeat',
-    'resume-required',
-    'recovery-timeout',
-    'timeout',
-    'tool-timeout',
-  ].includes(stageKey)
 }
 
 function shouldDefaultOpenProcess(

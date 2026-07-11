@@ -123,7 +123,28 @@ export function progressFlowSurfaceItems(
       })
     }
   }
+  const continuation = failedToolContinuationItem(timeline, completed)
+  if (continuation) items.push(continuation)
   return dedupeProgressSurfaceItems(items)
+}
+
+function failedToolContinuationItem(
+  timeline: ReturnType<typeof buildTaskTimeline>,
+  completed: boolean,
+): ProgressSurfaceItem | null {
+  if (completed || timeline.coverage.finalReply) return null
+  const failedTool = timeline.items.some((item) => (
+    item.tone === 'failed'
+    && (item.kind === 'tool' || item.kind === 'file' || item.kind === 'test')
+  ))
+  if (!failedTool || timeline.stage.stuck) return null
+  return {
+    surfaceType: 'text',
+    id: 'failed-tool-continuation',
+    title: 'AI 正在继续处理',
+    detail: '命令失败后，AI 正在根据报错定位并修复；当前无需手动操作。若任务最终失败，可使用“重试任务”。',
+    tone: 'running',
+  }
 }
 
 export function progressSurfaceItems(stage: TaskTimelineStage, assistantItems: TimelineItem[]): ProgressSurfaceItem[] {

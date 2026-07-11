@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, CircleHelp, Monitor, PlayCircle, Settings, StopCircle } from 'lucide-react'
 import type { TaskTimelineModel } from './taskTimelineModel'
+import { taskStageActionModel } from './taskStageActionModel'
 import { launchWinClientProtocol } from '../node/launchWinClient'
 import type { TaskTone } from './types'
 import styles from './TaskProgressCard.module.css'
@@ -63,7 +64,7 @@ export default function TaskProgressCard({
   const streamCopy = shouldExplainCurrentStage
     ? progressNarrative(displayStatus.tone, timeline.stage.key, stage, detail)
     : { kicker: '正在处理', title: '我正在继续处理这轮任务。', detail: '' }
-  const stageActions = actionStateForStage(timeline.stage.key, status.tone, canContinue)
+  const stageActions = actionStateForStage(timeline.stage.key, status.tone, timeline.stage.stuck, canContinue)
   const compactTitle = compactTitleForTone(displayStatus.tone, processedDuration)
   const detailButton = hasDetails ? (
     <button
@@ -362,16 +363,14 @@ function compactCompletedProcessSummary(summary: string, progressCount: number):
   return progressCount > 0 ? `· ${progressCount} 步` : ''
 }
 
-function actionStateForStage(stageKey: string, tone: TaskTone, canContinue: boolean): StageActionState {
-  const continueStages = new Set(['heartbeat', 'resume-required', 'recovery-timeout', 'timeout', 'tool-timeout'])
-  const nodeStages = new Set(['heartbeat', 'recovery-timeout', 'timeout', 'tool-timeout'])
-  const showContinue = canContinue && (tone === 'failed' || continueStages.has(stageKey))
-  const showNode = nodeStages.has(stageKey)
+function actionStateForStage(stageKey: string, tone: TaskTone, stuck: boolean, canContinue: boolean): StageActionState {
+  const action = taskStageActionModel(stageKey, tone, stuck)
+  const showContinue = canContinue && action.canContinue
   return {
-    show: showContinue || showNode,
+    show: showContinue || action.canOpenNode,
     canContinue: showContinue,
-    canOpenNode: showNode,
-    continueLabel: tone === 'failed' && stageKey === 'finished' ? '重试处理' : '继续处理',
+    canOpenNode: action.canOpenNode,
+    continueLabel: action.continueLabel,
   }
 }
 
