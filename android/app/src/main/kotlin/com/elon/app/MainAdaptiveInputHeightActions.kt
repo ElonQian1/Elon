@@ -47,7 +47,7 @@ internal class MainAdaptiveInputHeightActions(
                 centerParams.height = collapsedHeight
                 centerContainer.layoutParams = centerParams
             }
-            applyInputTopMargin(inputEdit, anchorTopOffset)
+            applyInputBounds(inputEdit, anchorTopOffset, desiredTextHeight)
 
             inputComposerMotion()?.let { motion ->
                 motion.updateExpandedTextHeight(
@@ -61,10 +61,17 @@ internal class MainAdaptiveInputHeightActions(
         }
     }
 
-    private fun applyInputTopMargin(inputEdit: EditText, topMargin: Int) {
+    private fun applyInputBounds(inputEdit: EditText, topMargin: Int, height: Int) {
         val params = inputEdit.layoutParams as? FrameLayout.LayoutParams ?: return
-        if (params.topMargin == topMargin) return
-        params.topMargin = topMargin
-        inputEdit.layoutParams = params
+        var changed = false
+        if (params.topMargin != topMargin) {
+            params.topMargin = topMargin
+            changed = true
+        }
+        if (params.height != height) {
+            params.height = height
+            changed = true
+        }
+        if (changed) inputEdit.layoutParams = params
     }
 }
