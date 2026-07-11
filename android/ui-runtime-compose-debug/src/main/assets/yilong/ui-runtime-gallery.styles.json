@@ -2,7 +2,7 @@
   "primaryCard": {
     "backgroundColor": "#FF5D3FD3",
     "contentColor": "#FFFFFFFF",
-    "cornerRadius": 19,
+    "cornerRadius": 20,
     "opacity": 1,
     "paddingBottom": 16,
     "paddingEnd": 20,
