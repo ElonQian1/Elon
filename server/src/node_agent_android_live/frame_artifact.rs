@@ -127,8 +127,8 @@ fn normalize_rect(rect: Option<PixelRect>, width: u32, height: u32) -> Result<Pi
 }
 
 fn read_bounded_image(path: &str) -> Result<Vec<u8>> {
-    let metadata = fs::metadata(path)
-        .with_context(|| format!("读取目标设计图元数据失败: {path}"))?;
+    let metadata =
+        fs::metadata(path).with_context(|| format!("读取目标设计图元数据失败: {path}"))?;
     if metadata.len() == 0 || metadata.len() > MAX_FRAME_BYTES as u64 {
         bail!("目标设计图大小必须在 1..32MiB");
     }
@@ -328,12 +328,8 @@ mod tests {
                 38917,
             )
             .await;
-        let error = persist_frame_artifact(
-            &session,
-            &test_png(MAX_IMAGE_SIDE + 1, 1),
-            None,
-        )
-        .unwrap_err();
+        let error =
+            persist_frame_artifact(&session, &test_png(MAX_IMAGE_SIDE + 1, 1), None).unwrap_err();
         assert!(format!("{error:#}").contains("尺寸超限"));
         fs::remove_dir_all(root).unwrap();
     }
@@ -358,8 +354,8 @@ mod tests {
                 38917,
             )
             .await;
-        let error = persist_target_crop_artifact(&session, target.to_str().unwrap(), None)
-            .unwrap_err();
+        let error =
+            persist_target_crop_artifact(&session, target.to_str().unwrap(), None).unwrap_err();
         assert!(format!("{error:#}").contains("大小必须"));
         fs::remove_dir_all(root).unwrap();
     }

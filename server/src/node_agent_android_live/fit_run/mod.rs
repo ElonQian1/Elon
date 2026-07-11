@@ -5,7 +5,9 @@
 
 mod candidate;
 mod handoff;
+mod live_artifacts;
 mod live_backend;
+mod live_values;
 mod model;
 mod orchestrator;
 mod routes;

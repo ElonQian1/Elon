@@ -1,15 +1,15 @@
-use std::fs::{self, File};
-use std::io::Read;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
 use crate::node_agent_android_inspector::adb_capture::capture_screen_png;
-use anyhow::{anyhow, bail, Context, Result};
-use sha2::{Digest, Sha256};
+use anyhow::{anyhow, bail, Result};
 
 use super::candidate::{from_build_value, from_diff, new_trial_id};
-use super::model::{FitRect, FitRunDocument};
+use super::live_artifacts::{build_verify_request, elapsed_ms, persist_frame, pixel_rect};
+use super::live_values::{
+    candidate_operation_value, inverse_operations, resolve_runtime_node, sha256_file,
+};
+use super::model::FitRunDocument;
 use super::orchestrator::{
     FitBackendResult, FitRunBackend, FitRunBackendFuture, FitSourceVerifyResult,
 };
@@ -17,16 +17,16 @@ use super::service::FitRunService;
 use super::store::FitRunStore;
 use super::workspace_revision::workspace_fingerprint;
 use crate::node_agent_android_live::broker::LiveUiBroker;
-use crate::node_agent_android_live::build_verify::{build_and_verify, BuildVerifyRequest};
+use crate::node_agent_android_live::build_verify::build_and_verify;
 use crate::node_agent_android_live::fit_learning::top_k_for_run;
 use crate::node_agent_android_live::protocol::{
-    LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch, LiveUiNode,
+    LivePatchOperation, LivePatchTarget, LiveStylePatch, LiveUiNode,
 };
 use crate::node_agent_android_live::source_commit::{
     build_source_commit_plan_for_patches, commit_source_plan, SourceCommitRequest,
 };
 use crate::node_agent_android_live::ui_ir::load_or_build_ui_ir;
-use crate::node_agent_android_live::visual_diff::{compare_target_with_png_projected, PixelRect};
+use crate::node_agent_android_live::visual_diff::compare_target_with_png_projected;
 use crate::node_agent_android_live::visual_solver::{solve_visual_style, VisualSolverRequest};
 
 pub(crate) struct LiveFitRunBackend {
@@ -139,7 +139,15 @@ impl LiveFitRunBackend {
         let operations = result
             .operations
             .iter()
-            .map(|operation| candidate_operation_value(operation, &baseline_node))
+            .map(|operation| {
+                candidate_operation_value(
+                    operation,
+                    &baseline_node,
+                    run.best
+                        .as_ref()
+                        .map(|candidate| candidate.operations.as_slice()),
+                )
+            })
             .collect::<serde_json::Result<Vec<_>>>()?;
         Ok(FitBackendResult {
             candidate: from_diff(
@@ -165,6 +173,7 @@ impl LiveFitRunBackend {
             host_port,
         )
         .await?;
+        self.ensure_target_identity(&run).await?;
         let value = serde_json::to_value(&result)?;
         let mut candidate = from_build_value(&run, &value)?;
         candidate.source_revision = workspace_fingerprint(&run.project_root)?;
@@ -216,6 +225,7 @@ impl LiveFitRunBackend {
             host_port,
         )
         .await?;
+        self.ensure_target_identity(&run).await?;
         let value = serde_json::to_value(&build)?;
         let mut candidate = from_build_value(&run, &value)?;
         candidate.source_revision = workspace_fingerprint(&run.project_root)?;
@@ -378,154 +388,4 @@ impl FitRunService {
     pub(crate) fn live(broker: Arc<LiveUiBroker>) -> Self {
         Self::new(FitRunStore::new(), Arc::new(LiveFitRunBackend::new(broker)))
     }
-}
-
-fn persist_frame(run: &FitRunDocument, trial_id: &str, png: &[u8]) -> Result<String> {
-    let root = PathBuf::from(&run.project_root)
-        .canonicalize()
-        .context("FitRun 项目目录不存在")?;
-    let dir = root
-        .join(".elon")
-        .join("ui-tuner")
-        .join("fit-runs")
-        .join(&run.run_id)
-        .join("frames");
-    fs::create_dir_all(&dir)?;
-    let path = dir.join(format!("{trial_id}.png"));
-    fs::write(&path, png)?;
-    Ok(path.display().to_string())
-}
-
-fn pixel_rect(value: FitRect) -> PixelRect {
-    PixelRect {
-        left: value.left,
-        top: value.top,
-        right: value.right,
-        bottom: value.bottom,
-    }
-}
-
-fn build_verify_request(run: &FitRunDocument) -> BuildVerifyRequest {
-    BuildVerifyRequest {
-        preview: None,
-        debug_application_id_suffix: None,
-        target_rect: Some(pixel_rect(run.pair.target_rect)),
-        current_rect: Some(pixel_rect(run.pair.current_rect)),
-        projected_current_rect: Some(pixel_rect(run.pair.projected_target_rect)),
-        target_definition_id: Some(run.pair.definition_id.clone()),
-        target_instance_key: run.pair.instance_key.clone(),
-    }
-}
-
-fn elapsed_ms(started: Instant) -> u64 {
-    started.elapsed().as_millis().min(u64::MAX as u128) as u64
-}
-
-fn resolve_runtime_node<'a>(
-    run: &FitRunDocument,
-    nodes: &'a [crate::node_agent_android_live::protocol::LiveUiNode],
-) -> Result<&'a crate::node_agent_android_live::protocol::LiveUiNode> {
-    if let Some(node) = nodes
-        .iter()
-        .find(|node| node.runtime_node_id == run.pair.runtime_node_id)
-    {
-        if node.definition_id == run.pair.definition_id
-            && node.instance_key == run.pair.instance_key
-        {
-            return Ok(node);
-        }
-        bail!("runtimeNodeId 已指向不同稳定节点，必须重新绑定");
-    }
-    let matches = nodes
-        .iter()
-        .filter(|node| {
-            node.definition_id == run.pair.definition_id
-                && run
-                    .pair
-                    .instance_key
-                    .as_ref()
-                    .is_none_or(|key| node.instance_key.as_ref() == Some(key))
-        })
-        .collect::<Vec<_>>();
-    match matches.as_slice() {
-        [node] => Ok(*node),
-        [] => bail!("FitRun 目标节点在当前 Runtime 树中不存在"),
-        _ => bail!("稳定 Node ID 对应多个运行实例；必须提供 instanceKey 后重新绑定"),
-    }
-}
-
-fn inverse_operations(values: &[serde_json::Value]) -> Result<Vec<LivePatchOperation>> {
-    values
-        .iter()
-        .map(|operation| {
-            let property = operation
-                .get("property")
-                .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| anyhow!("FitRun candidate operation 缺少 property"))?;
-            let before = operation
-                .get("beforeValue")
-                .cloned()
-                .ok_or_else(|| anyhow!("取消 FitRun 需要 operation.beforeValue: {property}"))?;
-            Ok(LivePatchOperation {
-                property: property.to_string(),
-                value: serde_json::from_value(before)?,
-            })
-        })
-        .collect()
-}
-
-fn candidate_operation_value(
-    operation: &LivePatchOperation,
-    node: &LiveUiNode,
-) -> serde_json::Result<serde_json::Value> {
-    let mut value = serde_json::to_value(operation)?;
-    if let Some(before) = baseline_property_value(node, &operation.property) {
-        if let Some(object) = value.as_object_mut() {
-            object.insert("beforeValue".to_string(), serde_json::to_value(before)?);
-        }
-    }
-    Ok(value)
-}
-
-fn baseline_property_value(node: &LiveUiNode, property: &str) -> Option<LivePropertyValue> {
-    if let Some(value) = node.properties.get(property).and_then(|snapshot| {
-        snapshot
-            .effective
-            .clone()
-            .or_else(|| snapshot.measured.clone())
-    }) {
-        return Some(value);
-    }
-    let density = node.geometry.density.max(0.01) as f64;
-    let (value_type, value) = match property {
-        "width" => (
-            "dp",
-            node.geometry.bounds_in_display_px.width as f64 / density,
-        ),
-        "height" => (
-            "dp",
-            node.geometry.bounds_in_display_px.height as f64 / density,
-        ),
-        "translationX" | "translationY" => ("dp", 0.0),
-        "opacity" => ("float", 1.0),
-        _ => return None,
-    };
-    Some(LivePropertyValue {
-        value_type: value_type.to_string(),
-        value: serde_json::json!((value * 1000.0).round() / 1000.0),
-    })
-}
-
-fn sha256_file(path: &str) -> Result<String> {
-    let mut file = File::open(path).with_context(|| format!("目标设计图不存在: {path}"))?;
-    let mut hasher = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-    }
-    Ok(hex::encode(hasher.finalize()))
 }

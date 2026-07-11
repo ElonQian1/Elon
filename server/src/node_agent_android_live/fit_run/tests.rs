@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::fs;
 use std::io::Write;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, Result};
@@ -73,7 +74,13 @@ fn trial_journal_reconciles_manifest_after_interrupted_checkpoint() {
     };
     store.append_trial(&run, &trial).unwrap();
     assert_eq!(store.read_trials(&run).unwrap().len(), 1);
-    assert_eq!(store.list_for_project(root.to_str().unwrap()).unwrap().len(), 1);
+    assert_eq!(
+        store
+            .list_for_project(root.to_str().unwrap())
+            .unwrap()
+            .len(),
+        1
+    );
     let loaded = store.load(root.to_str().unwrap(), &run.run_id).unwrap();
     assert_eq!(loaded.phase, FitRunPhase::Baselining);
     assert_eq!(loaded.last_sequence, 1);
@@ -267,7 +274,7 @@ async fn accepted_requires_target_score_and_source_parity() {
     assert_eq!(ready.run.phase, FitRunPhase::CandidateReady);
     let accepted = service
         .command(
-            context,
+            context.clone(),
             &created.run_id,
             FitCommand::AcceptBest {
                 command_id: "accept-best".to_string(),
@@ -277,6 +284,86 @@ async fn accepted_requires_target_score_and_source_parity() {
         .unwrap();
     assert_eq!(accepted.run.phase, FitRunPhase::Accepted);
     assert!(root.join(".elon/ui-standards/fit-cases.v1.json").is_file());
+    assert!(service
+        .command(
+            context.clone(),
+            &created.run_id,
+            FitCommand::RebindSession {
+                command_id: "rebind-terminal".to_string(),
+                new_session_id: context.session_id,
+                new_runtime_node_id: None,
+                new_current_rect: None,
+            },
+        )
+        .await
+        .is_err());
+    cleanup(root);
+}
+
+#[tokio::test]
+async fn commands_require_original_session_until_explicit_rebind() {
+    let (root, _) = run(false);
+    let original = context(root.to_str().unwrap());
+    let mut replacement = original.clone();
+    replacement.session_id = "live_replacement".to_string();
+    replacement.device_id = "device-2".to_string();
+    let backend = Arc::new(FakeBackend::new(Vec::new(), Vec::new()));
+    let service = FitRunService::new(FitRunStore::new(), backend);
+    let created = service.create_run(original, request(false)).await.unwrap();
+    assert!(service
+        .command(
+            replacement.clone(),
+            &created.run_id,
+            FitCommand::Start {
+                command_id: "wrong-session".to_string(),
+            },
+        )
+        .await
+        .is_err());
+    let rebound = service
+        .command(
+            replacement.clone(),
+            &created.run_id,
+            FitCommand::RebindSession {
+                command_id: "explicit-rebind".to_string(),
+                new_session_id: replacement.session_id.clone(),
+                new_runtime_node_id: None,
+                new_current_rect: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(rebound.run.session_id, replacement.session_id);
+    assert_eq!(rebound.run.device_id, replacement.device_id);
+    cleanup(root);
+}
+
+#[tokio::test]
+async fn cancel_reverts_the_fit_run_before_entering_terminal_state() {
+    let (root, mut run) = run(false);
+    let context = context(root.to_str().unwrap());
+    let mut best = candidate("best", 0.20);
+    best.operations = vec![json!({
+        "property": "height",
+        "value": {"type": "dp", "value": 56.0},
+        "beforeValue": {"type": "dp", "value": 48.0}
+    })];
+    run.best = Some(best);
+    FitRunStore::new().save(&run).unwrap();
+    let backend = Arc::new(FakeBackend::new(Vec::new(), Vec::new()));
+    let service = FitRunService::new(FitRunStore::new(), backend.clone());
+    let cancelled = service
+        .command(
+            context,
+            &run.run_id,
+            FitCommand::Cancel {
+                command_id: "cancel-run".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(cancelled.run.phase, FitRunPhase::Cancelled);
+    assert_eq!(backend.revert_calls.load(Ordering::SeqCst), 1);
     cleanup(root);
 }
 
@@ -284,6 +371,7 @@ struct FakeBackend {
     baseline: Mutex<VecDeque<FitBackendResult>>,
     local: Mutex<VecDeque<FitBackendResult>>,
     verify: Mutex<Option<FitSourceVerifyResult>>,
+    revert_calls: AtomicUsize,
 }
 
 impl FakeBackend {
@@ -292,6 +380,7 @@ impl FakeBackend {
             baseline: Mutex::new(baseline.into()),
             local: Mutex::new(local.into()),
             verify: Mutex::new(None),
+            revert_calls: AtomicUsize::new(0),
         }
     }
 
@@ -351,6 +440,7 @@ impl FitRunBackend for FakeBackend {
     }
 
     fn revert_best<'a>(&'a self, _run: FitRunDocument) -> FitRunBackendFuture<'a, ()> {
+        self.revert_calls.fetch_add(1, Ordering::SeqCst);
         Box::pin(async { Ok(()) })
     }
 }

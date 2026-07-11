@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, Instant, SystemTime};
@@ -15,6 +14,7 @@ use crate::node_agent_android_inspector::{
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::broker::{LiveCommitSnapshot, LiveUiBroker, LiveUiSession};
+use super::build_verify_apk::select_fresh_debug_apk;
 use super::preview::{open_preview, PreviewOpenRequest};
 use super::protocol::{LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
@@ -28,7 +28,6 @@ use super::visual_diff::{
 
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_BUILD_OUTPUT: usize = 256 * 1024;
-const MAX_SCAN_FILES: usize = 40_000;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -141,9 +140,17 @@ pub(crate) async fn build_and_verify(
     let wrapper = gradle_wrapper(&gradle_root)?;
     let live_snapshot = session.commit_snapshot().await;
     let live_preview_png = capture_screen_png(&session.device_id).await?;
-    let live_preview_rect = patched_bounds(&live_snapshot, true);
+    let live_preview_rect = verification_bounds(
+        &live_snapshot.nodes,
+        request.target_definition_id.as_deref(),
+        request.target_instance_key.as_deref(),
+    )?
+    .or_else(|| patched_bounds(&live_snapshot, true));
 
     let build_started = Instant::now();
+    let artifact_not_before = SystemTime::now()
+        .checked_sub(Duration::from_secs(2))
+        .unwrap_or(SystemTime::UNIX_EPOCH);
     let debug_application_id_suffix = request
         .debug_application_id_suffix
         .as_deref()
@@ -151,7 +158,7 @@ pub(crate) async fn build_and_verify(
         .transpose()?;
     run_debug_build(&gradle_root, &wrapper, debug_application_id_suffix).await?;
     let build_duration_ms = build_started.elapsed().as_millis();
-    let apk = newest_debug_apk(&gradle_root)?;
+    let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
 
     validate_device_id(&session.device_id)?;
     let install_output = run_adb_text(
@@ -211,16 +218,15 @@ pub(crate) async fn build_and_verify(
     let screenshot = capture_stable_screen(&session.device_id).await?;
     let (screenshot_width, screenshot_height) = png_dimensions(&screenshot)?;
     let (_, redeployed_nodes) = broker.tree(session_id).await?;
-    let source_rect = patched_bounds_for_nodes(&redeployed_nodes, &live_snapshot.patches, false);
-    // 重新部署后节点几何可能已经改变。目标门禁必须裁剪纯源码版本的
-    // 实际 Runtime bounds，而不是继续沿用设计会话开始时的旧 currentRect。
-    let verified_current_rect = target_bounds_for_nodes(
+    let source_rect = verification_bounds(
         &redeployed_nodes,
         request.target_definition_id.as_deref(),
         request.target_instance_key.as_deref(),
-        request.current_rect,
-    )
-    .or(request.current_rect);
+    )?
+    .or_else(|| patched_bounds_for_nodes(&redeployed_nodes, &live_snapshot.patches, false));
+    // 重新部署后节点几何可能已经改变。目标门禁必须裁剪纯源码版本的
+    // 实际 Runtime bounds，而不是继续沿用设计会话开始时的旧 currentRect。
+    let verified_current_rect = source_rect.or(request.current_rect);
     let visual_diff = target_path
         .as_deref()
         .map(|path| {
@@ -298,40 +304,40 @@ fn patched_bounds(snapshot: &LiveCommitSnapshot, allow_runtime_id: bool) -> Opti
     patched_bounds_for_nodes(&snapshot.nodes, &snapshot.patches, allow_runtime_id)
 }
 
-fn target_bounds_for_nodes(
+fn verification_bounds(
     nodes: &[LiveUiNode],
     definition_id: Option<&str>,
     instance_key: Option<&str>,
-    expected_rect: Option<PixelRect>,
-) -> Option<PixelRect> {
-    let definition_id = definition_id?;
-    let mut candidates = nodes.iter().filter_map(|node| {
-        if node.definition_id != definition_id
-            || instance_key.is_some_and(|key| node.instance_key.as_deref() != Some(key))
-            || !node.geometry.visible
-        {
-            return None;
-        }
-        let bounds = &node.geometry.bounds_in_display_px;
-        (bounds.right > bounds.left && bounds.bottom > bounds.top).then_some(PixelRect {
-            left: bounds.left,
-            top: bounds.top,
-            right: bounds.right,
-            bottom: bounds.bottom,
+) -> Result<Option<PixelRect>> {
+    let Some(definition_id) = definition_id else {
+        return Ok(None);
+    };
+    let candidates = nodes
+        .iter()
+        .filter_map(|node| {
+            if node.definition_id != definition_id
+                || instance_key.is_some_and(|key| node.instance_key.as_deref() != Some(key))
+                || !node.geometry.visible
+            {
+                return None;
+            }
+            let bounds = &node.geometry.bounds_in_display_px;
+            (bounds.right > bounds.left && bounds.bottom > bounds.top).then_some(PixelRect {
+                left: bounds.left,
+                top: bounds.top,
+                right: bounds.right,
+                bottom: bounds.bottom,
+            })
         })
-    });
-    match expected_rect {
-        Some(expected) => {
-            candidates.min_by_key(|candidate| rect_center_distance(*candidate, expected))
-        }
-        None => candidates.next(),
+        .collect::<Vec<_>>();
+    match candidates.as_slice() {
+        [bounds] => Ok(Some(*bounds)),
+        [] => bail!(
+            "构建验收找不到目标节点 definitionId={definition_id} instanceKey={:?}",
+            instance_key
+        ),
+        _ => bail!("构建验收目标节点不唯一 definitionId={definition_id}；请提供稳定 instanceKey"),
     }
-}
-
-fn rect_center_distance(left: PixelRect, right: PixelRect) -> i64 {
-    let dx = i64::from(left.left + left.right) - i64::from(right.left + right.right);
-    let dy = i64::from(left.top + left.bottom) - i64::from(right.top + right.bottom);
-    dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy))
 }
 
 fn patched_bounds_for_nodes(
@@ -433,7 +439,9 @@ async fn run_debug_build(
         };
     command
         .current_dir(gradle_root)
-        .args(["assembleDebug", "--no-daemon"])
+        // Build verification must produce a fresh artifact. Otherwise a stale
+        // APK from an UP-TO-DATE task can be installed and falsely certified.
+        .args(["assembleDebug", "--no-daemon", "--rerun-tasks"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -482,61 +490,6 @@ fn validate_package_name(value: &str) -> Result<&str> {
         bail!("basePackageName 不是合法的 Android applicationId")
     }
     Ok(value)
-}
-
-fn newest_debug_apk(gradle_root: &Path) -> Result<PathBuf> {
-    let mut candidates = Vec::new();
-    let mut visited = 0;
-    collect_debug_apks(gradle_root, 0, &mut visited, &mut candidates)?;
-    candidates
-        .into_iter()
-        .max_by_key(|path| {
-            fs::metadata(path)
-                .and_then(|metadata| metadata.modified())
-                .unwrap_or(SystemTime::UNIX_EPOCH)
-        })
-        .ok_or_else(|| anyhow!("assembleDebug 完成后没有找到 *-debug.apk"))
-}
-
-fn collect_debug_apks(
-    dir: &Path,
-    depth: usize,
-    visited: &mut usize,
-    output: &mut Vec<PathBuf>,
-) -> Result<()> {
-    if depth > 10 || *visited > MAX_SCAN_FILES {
-        return Ok(());
-    }
-    for entry in
-        fs::read_dir(dir).with_context(|| format!("读取构建目录失败: {}", dir.display()))?
-    {
-        let entry = entry?;
-        *visited += 1;
-        let path = entry.path();
-        if path.is_dir() {
-            if !matches!(
-                entry.file_name().to_str(),
-                Some(".git" | ".gradle" | "node_modules")
-            ) {
-                collect_debug_apks(&path, depth + 1, visited, output)?;
-            }
-        } else if path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .map(|name| name.ends_with("-debug.apk"))
-            .unwrap_or(false)
-            && path
-                .to_string_lossy()
-                .replace('\\', "/")
-                .contains("/build/outputs/apk/")
-        {
-            output.push(path);
-        }
-        if *visited > MAX_SCAN_FILES {
-            break;
-        }
-    }
-    Ok(())
 }
 
 async fn wait_for_runtime(
@@ -599,7 +552,11 @@ fn tail_output(stdout: &[u8], stderr: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+    use std::fs;
+
     use super::*;
+    use crate::node_agent_android_live::protocol::{LiveGeometry, LiveRect};
 
     #[test]
     fn accepts_safe_debug_application_id_suffix() {
@@ -661,5 +618,57 @@ mod tests {
         node.screen_id = "com.elon.uiruntime.view.UiRuntimePreviewHostActivity".to_string();
         node.definition_id = "preview.elon.view.gallery.root".to_string();
         assert!(nodes_match_preview(&[node], "elon.view.gallery"));
+    }
+
+    #[test]
+    fn verification_target_requires_unique_stable_instance() {
+        let nodes = vec![
+            test_node("runtime-1", None, 0),
+            test_node("runtime-2", None, 100),
+        ];
+        assert!(verification_bounds(&nodes, Some("card.action"), None).is_err());
+    }
+
+    #[test]
+    fn verification_target_respects_instance_key() {
+        let nodes = vec![
+            test_node("runtime-1", Some("sku-1"), 0),
+            test_node("runtime-2", Some("sku-2"), 100),
+        ];
+        let bounds = verification_bounds(&nodes, Some("card.action"), Some("sku-2"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(bounds.left, 100);
+    }
+
+    fn test_node(runtime_id: &str, instance_key: Option<&str>, left: i32) -> LiveUiNode {
+        LiveUiNode {
+            runtime_node_id: runtime_id.to_string(),
+            definition_id: "card.action".to_string(),
+            instance_key: instance_key.map(str::to_string),
+            parent_runtime_node_id: None,
+            screen_id: "catalog".to_string(),
+            kind: "button".to_string(),
+            text: None,
+            resource_id: None,
+            class_name: "Button".to_string(),
+            source: None,
+            geometry: LiveGeometry {
+                bounds_in_display_px: LiveRect {
+                    left,
+                    top: 0,
+                    right: left + 80,
+                    bottom: 40,
+                    width: 80,
+                    height: 40,
+                },
+                density: 2.0,
+                font_scale: 1.0,
+                rotation: 0,
+                visible: true,
+            },
+            properties: BTreeMap::new(),
+            capabilities: BTreeMap::new(),
+        }
     }
 }

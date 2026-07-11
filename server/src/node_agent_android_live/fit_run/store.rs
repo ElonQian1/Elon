@@ -52,7 +52,8 @@ impl FitRunStore {
         };
         let mut runs = Vec::new();
         for entry in entries {
-            let entry = entry.with_context(|| format!("读取 FitRun 列表失败: {}", root.display()))?;
+            let entry =
+                entry.with_context(|| format!("读取 FitRun 列表失败: {}", root.display()))?;
             if !entry.file_type()?.is_dir() {
                 continue;
             }
@@ -104,9 +105,7 @@ impl FitRunStore {
                     break;
                 }
                 Err(error) => {
-                    bail!(
-                        "FitRun trial journal 中段损坏（offset {cursor}）: {error}"
-                    );
+                    bail!("FitRun trial journal 中段损坏（offset {cursor}）: {error}");
                 }
             }
         }
@@ -201,7 +200,10 @@ fn earliest_before_values(trials: &[FitTrial]) -> BTreeMap<String, serde_json::V
         .filter_map(|trial| trial.candidate.as_ref())
         .flat_map(|candidate| &candidate.operations)
     {
-        let Some(property) = operation.get("property").and_then(serde_json::Value::as_str) else {
+        let Some(property) = operation
+            .get("property")
+            .and_then(serde_json::Value::as_str)
+        else {
             continue;
         };
         if let Some(value) = operation.get("beforeValue") {
@@ -224,9 +226,9 @@ fn geometry_baselines(run: &FitRunDocument, values: &mut BTreeMap<String, serde_
         ("translationY", 0.0, "dp"),
         ("opacity", 1.0, "float"),
     ] {
-        values.entry(property.to_string()).or_insert_with(|| {
-            serde_json::json!({ "type": value_type, "value": value })
-        });
+        values
+            .entry(property.to_string())
+            .or_insert_with(|| serde_json::json!({ "type": value_type, "value": value }));
     }
 }
 
