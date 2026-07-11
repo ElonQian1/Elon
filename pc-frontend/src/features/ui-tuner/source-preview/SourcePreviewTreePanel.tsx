@@ -1,4 +1,5 @@
 import { ChevronRight, CodeXml, EyeOff } from 'lucide-react'
+import { getSourcePreviewNodeLabels } from './sourcePreviewLabels'
 import type { SourcePreviewNode } from './types'
 import styles from './SourcePreview.module.css'
 
@@ -15,11 +16,19 @@ export function SourcePreviewTreePanel({ root, selectedKey, onSelect }: Props) {
 }
 
 function TreeNode({ node, depth, selectedKey, onSelect }: { node: SourcePreviewNode; depth: number; selectedKey: string | null; onSelect: (key: string) => void }) {
+  const labels = getSourcePreviewNodeLabels(node)
+  const indent = 10 + Math.min(depth, 8) * 12
   return <>
-    <button className={`${styles.treeRow} ${selectedKey === node.key ? styles.selectedTreeRow : ''}`} style={{ paddingLeft: 10 + depth * 14 }} onClick={() => onSelect(node.key)}>
+    <button
+      className={`${styles.treeRow} ${selectedKey === node.key ? styles.selectedTreeRow : ''}`}
+      style={{ paddingLeft: indent }}
+      onClick={() => onSelect(node.key)}
+      title={labels.tooltip}
+      aria-label={`${labels.primary}，${labels.type}`}
+    >
       {node.children.length ? <ChevronRight size={13} /> : <span className={styles.treeIndent} />}
       {!node.style.visible && <EyeOff size={12} />}
-      <span>{node.name}</span><small>{node.tag.split('.').slice(-1)[0]}</small>
+      <span className={styles.treeNodeName}>{labels.primary}</span><small>{labels.type}</small>
     </button>
     {node.children.map((child) => <TreeNode key={child.key} node={child} depth={depth + 1} selectedKey={selectedKey} onSelect={onSelect} />)}
   </>
