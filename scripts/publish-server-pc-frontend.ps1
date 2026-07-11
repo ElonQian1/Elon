@@ -46,12 +46,28 @@ function Reset-PcFrontendBuildArtifacts {
 }
 
 function Resolve-PnpmCommand {
-    if (-not [string]::IsNullOrWhiteSpace($env:PNPM_CMD) -and (Test-Path $env:PNPM_CMD)) {
+    if (-not [string]::IsNullOrWhiteSpace($env:PNPM_CMD) -and (Test-Path $env:PNPM_CMD -PathType Leaf)) {
+        $configuredExtension = [System.IO.Path]::GetExtension($env:PNPM_CMD)
+        if ($configuredExtension -ieq ".ps1") {
+            $configuredShim = [System.IO.Path]::ChangeExtension($env:PNPM_CMD, ".cmd")
+            if (Test-Path $configuredShim -PathType Leaf) {
+                return $configuredShim
+            }
+            throw "PNPM_CMD points to a PowerShell script that cmd.exe cannot execute: $env:PNPM_CMD"
+        }
         return $env:PNPM_CMD
     }
 
+    # Invoke-LoggedCmd runs through cmd.exe. Resolve the Windows command shim
+    # explicitly so PowerShell does not hand pnpm.ps1 to the Windows file
+    # association (which opens it in Notepad instead of executing pnpm).
+    $pnpmCmd = Get-Command "pnpm.cmd" -ErrorAction SilentlyContinue
+    if ($pnpmCmd -and $pnpmCmd.Source -and (Test-Path $pnpmCmd.Source -PathType Leaf)) {
+        return $pnpmCmd.Source
+    }
+
     $pnpm = Get-Command "pnpm" -ErrorAction SilentlyContinue
-    if ($pnpm) {
+    if ($pnpm -and $pnpm.Source -and [System.IO.Path]::GetExtension($pnpm.Source) -ine ".ps1") {
         return $pnpm.Source
     }
 
