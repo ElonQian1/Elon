@@ -1095,6 +1095,7 @@
             android:layout_width="match_parent"
             android:layout_height="@dimen/main_bottom_menu_outer_height"
             android:layout_gravity="bottom"
+            android:layout_marginTop="-101dp"
             android:background="@android:color/transparent"
             android:clipChildren="false"
             android:clipToPadding="false"
