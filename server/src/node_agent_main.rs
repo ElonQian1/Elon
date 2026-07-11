@@ -38,6 +38,7 @@ mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
 mod node_agent_cli_probe;
+mod node_agent_source_preview;
 use node_agent_cli_probe::{
     cli_unavailable_after_refresh_error, probe_local_clis, LocalCliProbeSnapshot,
 };

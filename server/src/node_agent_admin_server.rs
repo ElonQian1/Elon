@@ -17,8 +17,9 @@ use super::{
     node_agent_client_maintenance, node_agent_cloud_net, node_agent_codex_vault,
     node_agent_download_router, node_agent_full_access, node_agent_install_env,
     node_agent_local_admin, node_agent_local_pc_frontend, node_agent_project_agent_runs,
-    node_agent_project_picker, node_agent_task_journal_api, pc_storage_git_http, pc_storage_repo,
-    project_landing, project_workspace_inspect, windows_doctor, NodeRuntime,
+    node_agent_project_picker, node_agent_source_preview, node_agent_task_journal_api,
+    pc_storage_git_http, pc_storage_repo, project_landing, project_workspace_inspect,
+    windows_doctor, NodeRuntime,
 };
 
 pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
@@ -69,6 +70,7 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .merge(node_agent_download_router::routes())
             .merge(node_agent_android_inspector::routes())
             .merge(node_agent_android_live::protected_routes())
+            .merge(node_agent_source_preview::routes())
             .route(
                 "/api/save-openai-key",
                 axum::routing::post(admin_save_openai_key),

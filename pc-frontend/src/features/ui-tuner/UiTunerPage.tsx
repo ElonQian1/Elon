@@ -50,6 +50,9 @@ import {
   type UiTunerVerificationReport,
 } from './runtime/verification'
 import styles from './UiTunerPage.module.css'
+import { EvidenceModeSwitch, SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
+import type { SourcePreviewMode } from './source-preview/types'
+import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
 
 type DragMode = 'move' | 'resize'
 
@@ -88,6 +91,7 @@ function normalizeViewScale(value: number) {
 }
 
 export default function UiTunerPage() {
+  const [workspaceMode, setWorkspaceMode] = useState<SourcePreviewMode>(() => (window.localStorage.getItem('elon.uiTuner.workspaceMode') as SourcePreviewMode | null) ?? 'source')
   const projects = useProjectStore((state) => state.projects)
   const activeProjectId = useProjectStore((state) => state.activeProjectId)
   const projectSpace = useProjectStore((state) => state.space)
@@ -147,6 +151,11 @@ export default function UiTunerPage() {
     window.localStorage.getItem('elon.uiTuner.liveProjectRoot') ?? ''
   ))
   const effectiveProjectRoot = projectRoot || clean(liveProjectRoot)
+
+  const changeWorkspaceMode = useCallback((mode: SourcePreviewMode) => {
+    setWorkspaceMode(mode)
+    window.localStorage.setItem('elon.uiTuner.workspaceMode', mode)
+  }, [])
 
   useEffect(() => {
     if (projectRoot) setLiveProjectRoot(projectRoot)
@@ -656,25 +665,13 @@ export default function UiTunerPage() {
   }
 
   const handleCanvasKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!selected) return
-    const step = event.shiftKey ? 8 : 1
-    if (event.key === 'ArrowLeft') {
-      event.preventDefault()
-      updateElement(selected.id, { x: clamp(selected.x - step, 0, tunerDoc.canvas.width - selected.width) })
-    } else if (event.key === 'ArrowRight') {
-      event.preventDefault()
-      updateElement(selected.id, { x: clamp(selected.x + step, 0, tunerDoc.canvas.width - selected.width) })
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      updateElement(selected.id, { y: clamp(selected.y - step, 0, tunerDoc.canvas.height - selected.height) })
-    } else if (event.key === 'ArrowDown') {
-      event.preventDefault()
-      updateElement(selected.id, { y: clamp(selected.y + step, 0, tunerDoc.canvas.height - selected.height) })
-    }
+    handleCanvasArrowKey(event, selected, tunerDoc.canvas, updateElement)
   }
 
   return (
-    <div className={styles.page}>
+    <>
+    <SourcePreviewWorkspace active={workspaceMode === 'source'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
+    <div className={styles.page} style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}>
       <UiTunerLayersPanel
         filter={layerFilter}
         filterResult={filterResult}
@@ -689,6 +686,7 @@ export default function UiTunerPage() {
       />
 
       <section className={styles.stage}>
+        <EvidenceModeSwitch initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
         <UiTunerToolbar
           canvasName={tunerDoc.canvas.name}
           screenshotInputRef={screenshotInputRef}
@@ -789,5 +787,6 @@ export default function UiTunerPage() {
         {notice}
       </div>
     </div>
+    </>
   )
 }
