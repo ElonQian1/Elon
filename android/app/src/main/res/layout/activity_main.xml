@@ -1117,7 +1117,8 @@
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="horizontal"
+                    android:visibility="gone">
 
                     <FrameLayout
                         android:id="@+id/bottomNewProjectButton"
@@ -1181,7 +1182,8 @@
 
                 <Space
                     android:layout_width="1dp"
-                    android:layout_height="5dp" />
+                    android:layout_height="5dp"
+                    android:visibility="gone" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
