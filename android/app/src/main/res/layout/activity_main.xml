@@ -1200,13 +1200,17 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1">
 
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="21dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_tab_chat_custom" />
+
                         <TextView
                             android:id="@+id/tabChat"
-                            style="@style/MainTabText"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:layout_weight="0"
-                            android:drawableTop="@drawable/ic_tab_chat_custom"
+                            style="@style/MainTabLabel"
                             android:text="好友" />
 
                         <TextView
@@ -1225,17 +1229,43 @@
 
                     </FrameLayout>
 
-                    <TextView
-                        android:id="@+id/tabProject"
-                        style="@style/MainTabText"
-                        android:drawableTop="@drawable/ic_tab_project_custom"
-                        android:text="项目" />
+                    <FrameLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1">
 
-                    <TextView
-                        android:id="@+id/tabProfile"
-                        style="@style/MainTabText"
-                        android:drawableTop="@drawable/ic_tab_profile_custom"
-                        android:text="我的" />
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="21dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_tab_project_custom" />
+
+                        <TextView
+                            android:id="@+id/tabProject"
+                            style="@style/MainTabLabel"
+                            android:text="项目" />
+                    </FrameLayout>
+
+                    <FrameLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1">
+
+                        <ImageView
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="top|center_horizontal"
+                            android:layout_marginTop="21dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_tab_profile_custom" />
+
+                        <TextView
+                            android:id="@+id/tabProfile"
+                            style="@style/MainTabLabel"
+                            android:text="我的" />
+                    </FrameLayout>
 
                     <TextView
                         android:id="@+id/tabMarket"
