@@ -13,6 +13,7 @@ interface UiTunerCanvasSurfaceProps {
   canvas: UiTunerDocument['canvas']
   filterResult: UiTunerFilterResult
   liveFrame: LiveUiFrame | null
+  realRenderer: boolean
   scrollerRef: RefObject<HTMLDivElement>
   selectedId: string | null
   viewScale: number
@@ -30,6 +31,7 @@ export function UiTunerCanvasSurface({
   canvas,
   filterResult,
   liveFrame,
+  realRenderer,
   scrollerRef,
   selectedId,
   viewScale,
@@ -58,7 +60,7 @@ export function UiTunerCanvasSurface({
             if (event.target === event.currentTarget) onClearSelection()
           }}
         >
-          <div className={styles.canvasGrid} aria-hidden="true" />
+          {!realRenderer && <div className={styles.canvasGrid} aria-hidden="true" />}
           {liveFrame ? (
             <img className={styles.referenceImage} src={liveFrame.dataUrl} alt="真机实时画面" />
           ) : canvas.referenceImage?.visible && (
@@ -78,7 +80,12 @@ export function UiTunerCanvasSurface({
             />
           )}
           {filterResult.visible.map(({ element, analysis }) => {
-            const elementStyle: CSSProperties = {
+            const elementStyle: CSSProperties = realRenderer ? {
+              left: element.x,
+              top: element.y,
+              width: element.width,
+              height: element.height,
+            } : {
               left: element.x,
               top: element.y,
               width: element.width,
@@ -109,9 +116,15 @@ export function UiTunerCanvasSurface({
                       : '',
                   analysis.isLocked ? styles.lockedElement : '',
                   styles[`kind_${element.kind}`],
+                  realRenderer ? styles.runtimeHitTarget : '',
                 ].join(' ')}
                 style={elementStyle}
                 onPointerDown={(event) => {
+                  if (realRenderer) {
+                    event.stopPropagation()
+                    onSelectElement(element.id)
+                    return
+                  }
                   if (analysis.isLocked) {
                     event.stopPropagation()
                     onSelectElement(element.id)
@@ -120,8 +133,11 @@ export function UiTunerCanvasSurface({
                   onElementPointerDown(event, element, 'move')
                 }}
               >
-                <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>
-                {element.id === selectedId && !analysis.isLocked && (
+                {!realRenderer && <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>}
+                {realRenderer && element.id === selectedId && (
+                  <span className={styles.runtimeSelectionLabel}>{element.name}</span>
+                )}
+                {!realRenderer && element.id === selectedId && !analysis.isLocked && (
                   <span
                     className={styles.resizeHandle}
                     aria-hidden="true"

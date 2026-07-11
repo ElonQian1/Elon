@@ -19,6 +19,7 @@ internal object UiRuntimeController {
     private var socket: UiRuntimeWebSocket? = null
     private var config: UiRuntimeSessionConfig? = null
     private var connected = false
+    private val activeViewPatches = linkedMapOf<LivePatchTarget, LinkedHashMap<String, LivePatchOperation>>()
 
     fun initialize(context: Context) {
         if (application != null) return
@@ -43,11 +44,16 @@ internal object UiRuntimeController {
         ).also { it.connect() }
     }
 
-    fun stop() {
+    fun stop(sessionId: String? = null) {
+        if (sessionId != null && config?.sessionId != sessionId) {
+            Log.i(TAG, "Ignore stale stop request for $sessionId")
+            return
+        }
         connected = false
         socket?.close()
         socket = null
         config = null
+        activeViewPatches.clear()
         mainHandler.removeCallbacksAndMessages(null)
     }
 
@@ -142,7 +148,36 @@ internal object UiRuntimeController {
                 },
             )
             send(gson.toJson(ack))
-            if (result.isSuccess) scheduleTreeSnapshot()
+            if (result.isSuccess) {
+                val operations = activeViewPatches.getOrPut(patch.target, ::linkedMapOf)
+                patch.operations.forEach { operation -> operations[operation.property] = operation }
+                schedulePatchReapply()
+                scheduleTreeSnapshot()
+            }
+        }
+    }
+
+    private fun schedulePatchReapply() {
+        mainHandler.removeCallbacks(reapplyPatchesRunnable)
+        if (connected && activeViewPatches.isNotEmpty()) {
+            mainHandler.postDelayed(reapplyPatchesRunnable, 120)
+        }
+    }
+
+    private val reapplyPatchesRunnable = object : Runnable {
+        override fun run() {
+            val currentRegistry = registry ?: return
+            var changed = false
+            activeViewPatches.forEach { (target, operations) ->
+                val views = currentRegistry.resolve(target).views
+                if (views.isNotEmpty()) {
+                    changed = UiRuntimeViewAdapter.reapply(views, operations.values.toList()) || changed
+                }
+            }
+            if (changed) scheduleTreeSnapshot()
+            if (connected && activeViewPatches.isNotEmpty()) {
+                mainHandler.postDelayed(this, 120)
+            }
         }
     }
 
@@ -178,9 +213,12 @@ internal object UiRuntimeController {
         mainHandler.postDelayed(sendTreeRunnable, 80)
     }
 
-    private val sendTreeRunnable = Runnable {
-        val currentRegistry = registry ?: return@Runnable
-        send(gson.toJson(currentRegistry.snapshot()))
+    private val sendTreeRunnable = object : Runnable {
+        override fun run() {
+            val currentRegistry = registry ?: return
+            send(gson.toJson(currentRegistry.snapshot()))
+            if (connected) mainHandler.postDelayed(this, 1_200)
+        }
     }
 
     private fun sendRuntimeError(error: String) {

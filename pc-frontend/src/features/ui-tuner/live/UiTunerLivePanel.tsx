@@ -271,14 +271,15 @@ export function UiTunerLivePanel({
           )}
           {buildVerifyResult && (
             <div className={styles.savedState}>
-              <strong>BUILD VERIFIED</strong>
+              <strong>{buildVerifyResult.sourceParityVerified === true ? 'BUILD VERIFIED' : 'BUILD MISMATCH'}</strong>
               <span>{buildVerifyResult.message}</span>
               <small>
                 {buildVerifyResult.screenshotWidth} × {buildVerifyResult.screenshotHeight}
                 {' · '}{buildVerifyResult.nodeCount} 节点
-                {buildVerifyResult.visualDiff
-                  ? ` · 视觉损失 ${buildVerifyResult.visualDiff.visualLoss.toFixed(4)}`
-                  : ''}
+                {buildVerifyResult.sourceParityDiff
+                  ? ` · 源码一致性损失 ${buildVerifyResult.sourceParityDiff.visualLoss.toFixed(4)}`
+                  : ' · 本机节点未返回源码一致性结果'}
+                {buildVerifyResult.visualDiff ? ` · 设计图损失 ${buildVerifyResult.visualDiff.visualLoss.toFixed(4)}` : ''}
               </small>
             </div>
           )}

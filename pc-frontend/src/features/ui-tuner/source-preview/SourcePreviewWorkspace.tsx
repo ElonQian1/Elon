@@ -1,4 +1,4 @@
-import { Code2, Image } from 'lucide-react'
+import { Code2, MonitorSmartphone } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import pageStyles from '../UiTunerPage.module.css'
 import { SourceDrivenPreviewSurface } from './SourceDrivenPreviewSurface'
@@ -40,5 +40,5 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
 }
 
 export function EvidenceModeSwitch({ onModeChange }: { initialProjectRoot: string; onModeChange: (mode: SourcePreviewMode) => void }) {
-  return <div className={styles.modeBar}><div className={styles.modeTabs}><button onClick={() => onModeChange('source')}><Code2 size={15} />动态设计</button><button className={styles.activeTab} onClick={() => onModeChange('evidence')}><Image size={15} />真机证据</button></div><span>截图 / XML 仅用于运行证据、源码定位和构建后验收</span></div>
+  return <div className={styles.modeBar}><div className={styles.modeTabs}><button className={styles.activeTab} onClick={() => onModeChange('evidence')}><MonitorSmartphone size={15} />Android 真实渲染</button><button onClick={() => onModeChange('source')}><Code2 size={15} />源码近似预览</button></div><span>画面来自真实 Android Renderer；选择框只负责点选，不会覆盖或模拟组件外观</span></div>
 }

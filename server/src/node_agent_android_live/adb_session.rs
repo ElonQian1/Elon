@@ -74,22 +74,16 @@ pub(crate) async fn stop_runtime(session: &LiveUiSession) -> Result<()> {
             STOP_ACTION.to_string(),
             "-n".to_string(),
             component,
+            "--es".to_string(),
+            "session_id".to_string(),
+            session.id.clone(),
         ],
         Duration::from_secs(8),
         64 * 1024,
     )
     .await;
-    let _ = run_adb_text(
-        &[
-            "-s".to_string(),
-            session.device_id.clone(),
-            "reverse".to_string(),
-            "--remove".to_string(),
-            format!("tcp:{}", session.device_port),
-        ],
-        Duration::from_secs(8),
-        64 * 1024,
-    )
-    .await;
+    // The reverse rule is shared by consecutive browser sessions on the same
+    // device port. Removing it while an older React effect is winding down can
+    // disconnect the newer Runtime. A later START idempotently replaces it.
     Ok(())
 }

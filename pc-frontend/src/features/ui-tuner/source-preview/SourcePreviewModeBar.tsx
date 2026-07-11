@@ -1,4 +1,4 @@
-import { Code2, Image, LoaderCircle, Redo2, Save, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { Code2, LoaderCircle, MonitorSmartphone, Redo2, Save, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
 import type { SourcePreviewDocument, SourcePreviewMode, SourcePreviewSaveState } from './types'
 import styles from './SourcePreview.module.css'
 
@@ -12,8 +12,8 @@ export function SourcePreviewModeBar(props: Props) {
   return (
     <div className={styles.modeBar}>
       <div className={styles.modeTabs}>
-        <button className={props.mode === 'source' ? styles.activeTab : ''} onClick={() => props.onModeChange('source')}><Code2 size={15} />动态设计</button>
-        <button className={props.mode === 'evidence' ? styles.activeTab : ''} onClick={() => props.onModeChange('evidence')}><Image size={15} />真机证据</button>
+        <button className={props.mode === 'evidence' ? styles.activeTab : ''} onClick={() => props.onModeChange('evidence')}><MonitorSmartphone size={15} />Android 真实渲染</button>
+        <button className={props.mode === 'source' ? styles.activeTab : ''} onClick={() => props.onModeChange('source')}><Code2 size={15} />源码近似预览</button>
       </div>
       {props.mode === 'source' && <>
         <input className={styles.projectInput} value={props.projectRoot} onChange={(event) => props.onProjectRootChange(event.target.value)} placeholder="本机 Android 项目目录" />

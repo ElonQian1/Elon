@@ -339,6 +339,44 @@
   box-shadow: 0 0 0 4px rgba(168, 199, 250, .16);
 }
 
+.runtimeHitTarget {
+  padding: 0 !important;
+  overflow: visible;
+  border: 0 !important;
+  border-radius: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+.runtimeHitTarget:hover {
+  outline: 1px solid rgba(114, 213, 255, .72);
+  background: rgba(74, 190, 255, .035) !important;
+}
+
+.runtimeHitTarget.selectedElement {
+  outline: 2px solid #59d7ff;
+  box-shadow: 0 0 0 3px rgba(89, 215, 255, .2);
+}
+
+.runtimeSelectionLabel {
+  position: absolute;
+  left: -2px;
+  bottom: calc(100% + 6px);
+  max-width: 240px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border-radius: 5px;
+  color: #03131b !important;
+  background: #59d7ff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .ghostElement {
   opacity: .34 !important;
   background: rgba(255, 255, 255, .04) !important;

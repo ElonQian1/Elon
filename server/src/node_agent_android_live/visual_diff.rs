@@ -63,6 +63,27 @@ pub(crate) fn compare_target_with_png(
     compare_dynamic_images(&target, &current, target_rect, current_rect)
 }
 
+pub(crate) fn compare_pngs(
+    target_png: &[u8],
+    current_png: &[u8],
+    target_rect: Option<PixelRect>,
+    current_rect: Option<PixelRect>,
+) -> Result<VisualDiffResult> {
+    let decode = |bytes: &[u8]| {
+        image::ImageReader::new(Cursor::new(bytes))
+            .with_guessed_format()
+            .context("无法识别真机截图格式")?
+            .decode()
+            .context("无法解码真机截图")
+    };
+    compare_dynamic_images(
+        &decode(target_png)?,
+        &decode(current_png)?,
+        target_rect,
+        current_rect,
+    )
+}
+
 pub(crate) fn compare_dynamic_images(
     target: &DynamicImage,
     current: &DynamicImage,

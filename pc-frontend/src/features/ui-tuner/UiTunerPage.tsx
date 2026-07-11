@@ -35,6 +35,7 @@ import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './type
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { useLiveUiSession } from './live/useLiveUiSession'
 import { prepareLiveDebugRuntime } from './live/liveUiApi'
+import { preferredRuntimeSelection, runtimeNodesToTunerDocument } from './live/runtimeNodeDocument'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerCanvasSurface } from './UiTunerCanvasSurface'
@@ -77,6 +78,7 @@ const VIEW_SCALE_MAX = 2
 const VIEW_SCALE_STEP = 0.1
 const LIVE_DEBUG_SUFFIX = '.uituner'
 const DEFAULT_ANDROID_PACKAGE = 'com.elon.app'
+const WORKSPACE_MODE_STORAGE_KEY = 'elon.uiTuner.workspaceMode.v2'
 function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
   if (preferredId && document.elements.some((element) => element.id === preferredId)) {
     return preferredId
@@ -91,7 +93,9 @@ function normalizeViewScale(value: number) {
 }
 
 export default function UiTunerPage() {
-  const [workspaceMode, setWorkspaceMode] = useState<SourcePreviewMode>(() => (window.localStorage.getItem('elon.uiTuner.workspaceMode') as SourcePreviewMode | null) ?? 'source')
+  const [workspaceMode, setWorkspaceMode] = useState<SourcePreviewMode>(() => (
+    window.localStorage.getItem(WORKSPACE_MODE_STORAGE_KEY) as SourcePreviewMode | null
+  ) ?? 'evidence')
   const projects = useProjectStore((state) => state.projects)
   const activeProjectId = useProjectStore((state) => state.activeProjectId)
   const projectSpace = useProjectStore((state) => state.space)
@@ -113,6 +117,7 @@ export default function UiTunerPage() {
   const dragMovedRef = useRef(false)
   const verificationCaptureRef = useRef(false)
   const verificationBaselineRef = useRef<UiTunerVerificationBaseline | null>(null)
+  const runtimeDocumentSignatureRef = useRef('')
   const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
   const [liveTargetPackage, setLiveTargetPackage] = useState(() => {
     const captured = tunerDoc.runtimeSnapshot?.packageName ?? ''
@@ -154,7 +159,7 @@ export default function UiTunerPage() {
 
   const changeWorkspaceMode = useCallback((mode: SourcePreviewMode) => {
     setWorkspaceMode(mode)
-    window.localStorage.setItem('elon.uiTuner.workspaceMode', mode)
+    window.localStorage.setItem(WORKSPACE_MODE_STORAGE_KEY, mode)
   }, [])
 
   useEffect(() => {
@@ -208,6 +213,9 @@ export default function UiTunerPage() {
 
   const handleDeviceCaptured = useCallback((snapshot: AndroidInspectorSnapshot) => {
     if (verificationCaptureRef.current) return
+    const foregroundPackage = snapshot.activityName
+      ?.match(/([A-Za-z0-9_.]+)\/[A-Za-z0-9_.$]+/)?.[1]
+    setLiveTargetPackage(foregroundPackage || snapshot.packageName || '')
     const next = snapshotToTunerDocument(snapshot)
     commitDocument(() => next, next.elements[0]?.id ?? null)
     setFitToStage(true)
@@ -291,11 +299,53 @@ export default function UiTunerPage() {
     deviceId: liveTargetPackage ? selectedDeviceId : tunerDoc.runtimeSnapshot?.deviceId,
     packageName: liveTargetPackage || tunerDoc.runtimeSnapshot?.packageName,
     projectRoot: effectiveProjectRoot,
-    debugApplicationIdSuffix: liveTargetPackage ? LIVE_DEBUG_SUFFIX : undefined,
+    debugApplicationIdSuffix: liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX)
+      ? LIVE_DEBUG_SUFFIX
+      : undefined,
     document: tunerDoc,
     selected,
     onNotice: setNotice,
   })
+
+  useEffect(() => {
+    if (
+      workspaceMode !== 'evidence'
+      || liveUi.state !== 'connected'
+      || !liveUi.session
+      || !liveUi.liveFrame
+      || liveUi.nodes.length === 0
+    ) {
+      if (liveUi.state !== 'connected') runtimeDocumentSignatureRef.current = ''
+      return
+    }
+    const signature = [
+      liveUi.session.id,
+      liveUi.session.treeRevision,
+      liveUi.liveFrame.capturedAt,
+      liveUi.nodes.length,
+    ].join(':')
+    if (runtimeDocumentSignatureRef.current === signature) return
+    runtimeDocumentSignatureRef.current = signature
+    const previousSelected = tunerDocRef.current.elements.find(
+      (element) => element.id === selectedIdRef.current,
+    ) ?? null
+    setTunerDoc((current) => {
+      const next = runtimeNodesToTunerDocument(
+        current,
+        liveUi.session as NonNullable<typeof liveUi.session>,
+        liveUi.nodes,
+        liveUi.liveFrame as NonNullable<typeof liveUi.liveFrame>,
+      )
+      setSelectedId(preferredRuntimeSelection(previousSelected, next.elements))
+      return next
+    })
+  }, [
+    liveUi.liveFrame,
+    liveUi.nodes,
+    liveUi.session,
+    liveUi.state,
+    workspaceMode,
+  ])
 
   const handleLiveOptimisticUpdate = useCallback((patch: Partial<UiTunerElement>) => {
     const currentId = selectedIdRef.current
@@ -673,6 +723,7 @@ export default function UiTunerPage() {
     <SourcePreviewWorkspace active={workspaceMode === 'source'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
     <div className={styles.page} style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}>
       <UiTunerLayersPanel
+        realRenderer={liveUi.state === 'connected' && Boolean(liveUi.liveFrame)}
         filter={layerFilter}
         filterResult={filterResult}
         selectedId={selectedId}
@@ -727,6 +778,7 @@ export default function UiTunerPage() {
           canvas={tunerDoc.canvas}
           filterResult={filterResult}
           liveFrame={liveUi.liveFrame}
+          realRenderer={liveUi.state === 'connected' && Boolean(liveUi.liveFrame)}
           scrollerRef={canvasScrollerRef}
           selectedId={selectedId}
           viewScale={viewScale}

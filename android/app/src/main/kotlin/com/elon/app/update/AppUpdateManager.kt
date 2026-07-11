@@ -93,6 +93,7 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
      * - 静默失败，不打扰用户
      */
     fun autoCheck() {
+        if (BuildConfig.DEBUG) return
         val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0)
         if (System.currentTimeMillis() - lastCheck < AUTO_CHECK_INTERVAL_MS) return
 
@@ -142,6 +143,7 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
      * 事件只作为提醒信号，真正弹窗前仍重新拉取 version.json，避免使用过期数据。
      */
     fun realtimeCheck(remoteVersionCode: Int = 0) {
+        if (BuildConfig.DEBUG) return
         if (remoteVersionCode > 0 && remoteVersionCode <= BuildConfig.VERSION_CODE) return
 
         Thread {

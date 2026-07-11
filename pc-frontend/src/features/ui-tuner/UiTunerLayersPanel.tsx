@@ -7,6 +7,7 @@ import panelStyles from './UiTunerPanels.module.css'
 import styles from './UiTunerPage.module.css'
 
 interface UiTunerLayersPanelProps {
+  realRenderer?: boolean
   filter: UiTunerFilterState
   filterResult: UiTunerFilterResult
   selectedId: string | null
@@ -20,6 +21,7 @@ interface UiTunerLayersPanelProps {
 }
 
 export function UiTunerLayersPanel({
+  realRenderer = false,
   filter,
   filterResult,
   selectedId,
@@ -34,18 +36,20 @@ export function UiTunerLayersPanel({
   return (
     <aside className={styles.layersPanel}>
       <div className={styles.panelHeader}>
-        <h1>微调画布</h1>
-        <p>导入 APP 截图作为真实底图，再拖动图层调位置、尺寸、字号和间距。</p>
+        <h1>{realRenderer ? 'Android 真实组件' : '微调画布'}</h1>
+        <p>{realRenderer
+          ? '这里列出 APK 当前画面的真实 Runtime 节点；点选后修改会直接作用于 Android 组件。'
+          : '导入 APP 截图作为真实底图，再拖动图层调位置、尺寸、字号和间距。'}</p>
       </div>
 
-      <div className={styles.templateGroup}>
+      {!realRenderer && <div className={styles.templateGroup}>
         <button type="button" onClick={onApplyAppSidebarTemplate}>
           <PanelLeft size={14} aria-hidden="true" />
           APP 侧边栏模板
         </button>
-      </div>
+      </div>}
 
-      <div className={styles.addGroup}>
+      {!realRenderer && <div className={styles.addGroup}>
         <button type="button" onClick={() => onAddElement('text')}>
           <Type size={14} aria-hidden="true" />
           文字
@@ -58,7 +62,7 @@ export function UiTunerLayersPanel({
           <Plus size={14} aria-hidden="true" />
           按钮
         </button>
-      </div>
+      </div>}
 
       <UiTunerViewControls
         filter={filter}

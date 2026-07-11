@@ -6,6 +6,8 @@ export function matchLiveNode(
   nodes: LiveUiNode[],
 ): LiveUiNode | null {
   if (!selected?.runtime) return null
+  const exactRuntime = nodes.find((node) => node.runtimeNodeId === selected.runtime?.nodeId)
+  if (exactRuntime) return exactRuntime
   const resourceId = comparableResourceId(selected.runtime.resourceId)
   if (resourceId) {
     const exact = nodes.find((node) => comparableResourceId(node.resourceId) === resourceId)

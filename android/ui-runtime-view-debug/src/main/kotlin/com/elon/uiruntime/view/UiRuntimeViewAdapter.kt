@@ -14,6 +14,7 @@ import com.google.gson.JsonPrimitive
 import java.lang.reflect.Method
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 internal object UiRuntimeViewAdapter {
     private val zeroArgMethodsByClass = ConcurrentHashMap<Class<*>, Map<String, Method>>()
@@ -120,6 +121,37 @@ internal object UiRuntimeViewAdapter {
                 "heightDp" to pxToDp(first, first.height.toFloat()),
             ),
         )
+    }
+
+    fun reapply(views: List<View>, operations: List<LivePatchOperation>): Boolean {
+        var changed = false
+        views.forEach { view ->
+            operations.forEach { operation ->
+                if (!matches(view, operation)) {
+                    applyOperation(view, operation)
+                    changed = true
+                }
+            }
+            if (changed) {
+                view.requestLayout()
+                view.invalidate()
+            }
+        }
+        return changed
+    }
+
+    private fun matches(view: View, operation: LivePatchOperation): Boolean {
+        val expected = operation.value
+        if (operation.property == "width" || operation.property == "height") {
+            val actual = if (operation.property == "width") view.layoutParams.width else view.layoutParams.height
+            return actual == dimension(view, expected)
+        }
+        val actual = read(view, operation.property)
+        return when (expected.valueType.lowercase(Locale.ROOT)) {
+            "dp", "sp", "float" -> abs(actual.value.asDouble - expected.value.asDouble) <= 0.02
+            "argb" -> actual.value.asString.equals(expected.value.asString, ignoreCase = true)
+            else -> actual.value == expected.value
+        }
     }
 
     private fun applyOperation(view: View, operation: LivePatchOperation) {

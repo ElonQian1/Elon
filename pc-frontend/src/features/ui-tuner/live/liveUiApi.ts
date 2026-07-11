@@ -110,7 +110,7 @@ export interface LivePreviewRequest {
 }
 
 export interface LiveBuildVerifyResult {
-  status: 'BUILD_VERIFIED'
+  status: 'BUILD_VERIFIED' | 'BUILD_MISMATCH'
   apkPath: string
   buildDurationMs: number
   installOutput: string
@@ -125,6 +125,13 @@ export interface LiveBuildVerifyResult {
     edgeError: number
     geometryError: number
   }
+  sourceParityDiff?: {
+    visualLoss: number
+    meanAbsoluteColorError: number
+    edgeError: number
+    geometryError: number
+  }
+  sourceParityVerified?: boolean
   message: string
 }
 

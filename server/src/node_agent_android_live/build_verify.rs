@@ -14,14 +14,16 @@ use crate::node_agent_android_inspector::{
 };
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
-use super::broker::{LiveUiBroker, LiveUiSession};
+use super::broker::{LiveCommitSnapshot, LiveUiBroker, LiveUiSession};
 use super::preview::{open_preview, PreviewOpenRequest};
+use super::protocol::{LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
-use super::visual_diff::{compare_target_with_png, VisualDiffResult};
+use super::visual_diff::{compare_pngs, compare_target_with_png, PixelRect, VisualDiffResult};
 
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_BUILD_OUTPUT: usize = 256 * 1024;
 const MAX_SCAN_FILES: usize = 40_000;
+const SOURCE_PARITY_MAX_LOSS: f64 = 0.035;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +45,8 @@ pub(crate) struct BuildVerifyResult {
     screenshot_width: u32,
     screenshot_height: u32,
     visual_diff: Option<VisualDiffResult>,
+    source_parity_diff: VisualDiffResult,
+    source_parity_verified: bool,
     message: String,
 }
 
@@ -123,6 +127,9 @@ pub(crate) async fn build_and_verify(
     let project_root = canonical_project_root(&session)?;
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
+    let live_snapshot = session.commit_snapshot().await;
+    let live_preview_png = capture_screen_png(&session.device_id).await?;
+    let live_preview_rect = patched_bounds(&live_snapshot, true);
 
     let build_started = Instant::now();
     let debug_application_id_suffix = request
@@ -179,16 +186,34 @@ pub(crate) async fn build_and_verify(
                 })?
         }
     };
-    tokio::time::sleep(Duration::from_millis(650)).await;
-    let screenshot = capture_screen_png(&session.device_id).await?;
+    // The Activity can expose its first View tree before async data binding and
+    // entrance rendering finish. Comparing that intermediate frame against a
+    // stable Live preview creates false BUILD_MISMATCH results. Give the debug
+    // renderer a deterministic settle window, then require consecutive frames.
+    tokio::time::sleep(Duration::from_millis(2_200)).await;
+    let screenshot = capture_stable_screen(&session.device_id).await?;
     let (screenshot_width, screenshot_height) = png_dimensions(&screenshot)?;
     let visual_diff = target_path
         .as_deref()
         .map(|path| compare_target_with_png(path, &screenshot, None, None))
         .transpose()?;
+    let (_, redeployed_nodes) = broker.tree(session_id).await?;
+    let source_rect = patched_bounds_for_nodes(&redeployed_nodes, &live_snapshot.patches, false);
+    let source_parity_diff = compare_pngs(
+        &live_preview_png,
+        &screenshot,
+        live_preview_rect,
+        source_rect,
+    )?;
+    let source_parity_verified = source_parity_diff.visual_loss <= SOURCE_PARITY_MAX_LOSS;
+    let status = if source_parity_verified {
+        "BUILD_VERIFIED"
+    } else {
+        "BUILD_MISMATCH"
+    };
 
     Ok(BuildVerifyResult {
-        status: "BUILD_VERIFIED",
+        status,
         apk_path: apk.display().to_string(),
         build_duration_ms,
         install_output: install_output.trim().to_string(),
@@ -198,9 +223,83 @@ pub(crate) async fn build_and_verify(
         screenshot_width,
         screenshot_height,
         visual_diff,
-        message: "已由源码重新构建并安装；临时 Patch 已清空，当前画面来自新 Debug APK。"
-            .to_string(),
+        source_parity_diff,
+        source_parity_verified,
+        message: if source_parity_verified {
+            "已由源码重新构建并安装；临时 Patch 已清空，纯源码画面与 Live 预览一致。".to_string()
+        } else {
+            "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。".to_string()
+        },
     })
+}
+
+async fn capture_stable_screen(device_id: &str) -> Result<Vec<u8>> {
+    let mut previous = capture_screen_png(device_id).await?;
+    let mut stable_frames = 0_u8;
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_millis(350)).await;
+        let current = capture_screen_png(device_id).await?;
+        let diff = compare_pngs(&previous, &current, None, None)?;
+        if diff.visual_loss <= 0.012 {
+            stable_frames += 1;
+            if stable_frames >= 2 {
+                return Ok(current);
+            }
+        } else {
+            stable_frames = 0;
+        }
+        previous = current;
+    }
+    Ok(previous)
+}
+
+fn patched_bounds(snapshot: &LiveCommitSnapshot, allow_runtime_id: bool) -> Option<PixelRect> {
+    patched_bounds_for_nodes(&snapshot.nodes, &snapshot.patches, allow_runtime_id)
+}
+
+fn patched_bounds_for_nodes(
+    nodes: &[LiveUiNode],
+    patches: &[LiveStylePatch],
+    allow_runtime_id: bool,
+) -> Option<PixelRect> {
+    let mut result: Option<PixelRect> = None;
+    for patch in patches {
+        let node = allow_runtime_id
+            .then(|| patch.target.runtime_node_id.as_deref())
+            .flatten()
+            .and_then(|id| nodes.iter().find(|node| node.runtime_node_id == id))
+            .or_else(|| {
+                patch
+                    .target
+                    .definition_id
+                    .as_deref()
+                    .and_then(|definition| {
+                        nodes.iter().find(|node| node.definition_id == definition)
+                    })
+            });
+        let Some(node) = node.filter(|node| node.geometry.visible) else {
+            continue;
+        };
+        let bounds = &node.geometry.bounds_in_display_px;
+        if bounds.right <= bounds.left || bounds.bottom <= bounds.top {
+            continue;
+        }
+        result = Some(match result {
+            Some(current) => PixelRect {
+                left: current.left.min(bounds.left),
+                top: current.top.min(bounds.top),
+                right: current.right.max(bounds.right),
+                bottom: current.bottom.max(bounds.bottom),
+            },
+            None => PixelRect {
+                left: bounds.left,
+                top: bounds.top,
+                right: bounds.right,
+                bottom: bounds.bottom,
+            },
+        });
+    }
+    result
 }
 
 fn canonical_project_root(session: &LiveUiSession) -> Result<PathBuf> {

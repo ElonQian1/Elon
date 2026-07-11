@@ -74,6 +74,7 @@ export function useLiveUiSession({
   const sessionRef = useRef<LiveUiSession | null>(null)
   const treeRevisionRef = useRef<number | null>(null)
   const stopPromiseRef = useRef<Promise<void>>(Promise.resolve())
+  const startPromiseRef = useRef<Promise<void>>(Promise.resolve())
   const generationRef = useRef(0)
   const targetDesignRef = useRef<LiveTargetDesign | null>(null)
   const targetSignatureRef = useRef('')
@@ -141,7 +142,9 @@ export function useLiveUiSession({
       return () => undefined
     }
 
-    void (async () => {
+    const startTransaction = startPromiseRef.current
+      .catch(() => undefined)
+      .then(async () => {
       // React effect cleanup cannot be awaited. Serialize STOP before the
       // next START so a stale session cannot remove the new adb reverse rule
       // or stop the newly connected Android Runtime.
@@ -171,12 +174,27 @@ export function useLiveUiSession({
         })
         const created = started.session
         if (disposed || generation !== generationRef.current) {
-          await stopLiveUiSession(created.id).catch(() => undefined)
+          await queueStop(created)
           return
         }
         sessionRef.current = created
         setSession(created)
         setMcp(started.mcp)
+        return created
+      } catch (startError) {
+        if (disposed || generation !== generationRef.current) return null
+        const message = messageOf(startError, '无法启动 Live Runtime')
+        setState('attach_only')
+        setError(`${message}；已保留截图/XML调试模式。`)
+        return null
+      }
+    })
+    startPromiseRef.current = startTransaction.then(() => undefined, () => undefined)
+
+    void (async () => {
+      const created = await startTransaction
+      if (!created || disposed || generation !== generationRef.current) return
+      try {
         const startedAt = Date.now()
         const poll = async () => {
           if (disposed || generation !== generationRef.current) return
@@ -229,17 +247,16 @@ export function useLiveUiSession({
     }
     let disposed = false
     let timer: number | undefined
-    const pollTree = async () => {
+    const pollRuntime = async () => {
       if (disposed) return
       try {
-        await refresh(session.id)
+        await Promise.all([refresh(session.id), refreshFrame(session.id)])
       } catch {
-        // A transient tree read must not tear down the current live session.
+        // A transient tree/frame read must not tear down the current live session.
       }
-      if (!disposed) timer = window.setTimeout(() => { void pollTree() }, 2_500)
+      if (!disposed) timer = window.setTimeout(() => { void pollRuntime() }, 1_500)
     }
-    void refreshFrame(session.id).catch(() => undefined)
-    void pollTree()
+    void pollRuntime()
     return () => {
       disposed = true
       if (timer !== undefined) window.clearTimeout(timer)
@@ -348,18 +365,26 @@ export function useLiveUiSession({
   const historyAction = useCallback(async (action: 'undo' | 'redo') => {
     const current = sessionRef.current
     if (!current?.connected) return
+    const target = matchLiveNode(selected, nodes)
     setBusy(true)
     try {
-      await liveUiHistoryAction(current.id, action)
+      const ack = await liveUiHistoryAction(current.id, action)
       await new Promise((resolve) => window.setTimeout(resolve, 120))
       await Promise.all([refresh(current.id), refreshFrame(current.id)])
+      if (target && ack.effectiveValues) {
+        setNodes((currentNodes) => currentNodes.map((node) => (
+          node.runtimeNodeId === target.runtimeNodeId
+            ? mergeEffectiveValues(node, ack.effectiveValues ?? {})
+            : node
+        )))
+      }
       setCommitPlan(null)
       setCommitResult(null)
       onNotice(action === 'undo' ? '已撤销一条真机实时修改' : '已重做一条真机实时修改')
     } finally {
       setBusy(false)
     }
-  }, [onNotice, refresh, refreshFrame])
+  }, [nodes, onNotice, refresh, refreshFrame, selected])
 
   const previewCommit = useCallback(async () => {
     const current = sessionRef.current
@@ -462,7 +487,11 @@ export function useLiveUiSession({
       const result = await buildAndVerifyLiveUi(current.id, preview, debugApplicationIdSuffix)
       setBuildVerifyResult(result)
       await Promise.all([refresh(current.id), refreshFrame(current.id)])
-      onNotice(`BUILD VERIFIED：${result.runtimeBuildId ?? '新 Debug APK'} 已安装，临时 Patch 已清空`)
+      onNotice(result.sourceParityVerified === true
+        ? `BUILD VERIFIED：${result.runtimeBuildId ?? '新 Debug APK'} 已安装，纯源码画面与 Live 预览一致`
+        : result.sourceParityDiff
+          ? `BUILD MISMATCH：已安装源码版本，但与 Live 预览仍有差异 ${result.sourceParityDiff.visualLoss.toFixed(4)}`
+          : 'BUILD MISMATCH：本机节点未返回源码一致性结果，请更新 Windows PC 节点后重试')
       return result
     } catch (verifyError) {
       const message = messageOf(verifyError, '构建安装验收失败')

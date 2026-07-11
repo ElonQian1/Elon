@@ -18,7 +18,9 @@ class UiRuntimeControlReceiver : BroadcastReceiver() {
                 }
                 UiRuntimeController.start(context, sessionId, token, port)
             }
-            ACTION_STOP -> UiRuntimeController.stop()
+            ACTION_STOP -> UiRuntimeController.stop(
+                intent.getStringExtra(EXTRA_SESSION_ID)?.takeIf { it.isNotBlank() },
+            )
         }
     }
 
