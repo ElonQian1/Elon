@@ -6,10 +6,14 @@ const repoRoot = path.resolve(__dirname, '..')
 const previewPath = path.join(repoRoot, 'pc-frontend', 'src', 'task-progress-preview.tsx')
 const viteConfigPath = path.join(repoRoot, 'pc-frontend', 'vite.config.ts')
 const routerPath = path.join(repoRoot, 'server', 'src', 'router.rs')
+const taskGroupPath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'dev', 'DevTaskGroup.tsx')
+const progressSurfacePath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'dev', 'TaskProgressSurface.tsx')
 
 const previewSource = fs.readFileSync(previewPath, 'utf8')
 const viteConfigSource = fs.readFileSync(viteConfigPath, 'utf8')
 const routerSource = fs.readFileSync(routerPath, 'utf8')
+const taskGroupSource = fs.readFileSync(taskGroupPath, 'utf8')
+const progressSurfaceSource = fs.readFileSync(progressSurfacePath, 'utf8')
 
 assert.match(
   viteConfigSource,
@@ -55,7 +59,29 @@ for (const scenario of lifecycleScenarios) {
 assert.match(
   previewSource,
   /const openProcessInPlace = expandAll/,
-  'expand=1 should expose the process in every lifecycle scenario',
+  'expand=1 should expose local tool details in every lifecycle scenario',
+)
+assert.match(previewSource, /收起工具详情/)
+assert.match(previewSource, /展开工具详情/)
+assert.match(
+  taskGroupSource,
+  /const directPublicProcess = !resultMsg/,
+  'running tasks should render their public flow directly instead of behind a process fold',
+)
+assert.match(
+  taskGroupSource,
+  /const publicSurfaceItems = !resultMsg\s*\? progressFlowSurfaceItems/,
+  'command and approval events should remain visible even when no assistant note precedes them',
+)
+assert.match(
+  progressSurfaceSource,
+  /open=\{expandAll \|\| tone === 'failed'\}/,
+  'debug expansion should only open local command details',
+)
+assert.match(
+  progressSurfaceSource,
+  /item\.kind === 'approval'.*taskContext/s,
+  'tool approval must remain actionable in the direct progress flow',
 )
 assert.match(
   previewSource,

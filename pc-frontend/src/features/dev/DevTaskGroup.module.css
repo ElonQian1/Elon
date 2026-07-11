@@ -420,6 +420,40 @@
   padding: 1px 0 1px;
 }
 
+.continueAction {
+  width: max-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  border: 1px solid rgba(114, 157, 255, .34);
+  border-radius: 6px;
+  background: rgba(82, 122, 214, .1);
+  padding: 4px 9px;
+  color: #b9ccff;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.continueAction:hover,
+.continueAction:focus-visible {
+  border-color: rgba(137, 174, 255, .58);
+  background: rgba(82, 122, 214, .18);
+  color: #d7e2ff;
+}
+
+.continueAction:focus-visible {
+  outline: 1px solid rgba(137, 174, 255, .58);
+  outline-offset: 2px;
+}
+
+.progressApproval {
+  min-width: 0;
+  max-width: min(760px, 100%);
+}
+
 .progressHighlight {
   color: #eef3ff;
   font-size: 13px;

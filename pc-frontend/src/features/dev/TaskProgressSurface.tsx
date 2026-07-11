@@ -1,11 +1,12 @@
 import { AlertTriangle, FileCode2, KeyRound, ListChecks, Terminal } from 'lucide-react'
 import { clean } from '../../lib/utils'
 import MarkdownContent from '../markdown/MarkdownContent'
+import { DevTaskMessage } from './DevTaskCard'
 import { buildTimelineDisplay, isAssistantTimelineItem } from './taskTimelineDisplayModel'
 import { isStatusEchoProgressText } from './taskTimelineRuntime'
 import type { TimelineItem, TimelineItemKind, TaskTimelineStage } from './taskTimelineModel'
 import type { buildTaskTimeline } from './taskTimelineModel'
-import type { TaskTone } from './types'
+import type { ChatMessage, TaskContext, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
 
 export interface ProgressSurfaceItem {
@@ -19,15 +20,40 @@ export interface ProgressSurfaceItem {
   tone?: TaskTone
 }
 
-export function TaskProgressHighlights({ items, hiddenCount }: { items: ProgressSurfaceItem[]; hiddenCount: number }) {
+interface TaskProgressHighlightsProps {
+  items: ProgressSurfaceItem[]
+  hiddenCount: number
+  expandAll?: boolean
+  taskContext?: TaskContext
+  onCancel?: (taskId: string) => void
+  onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
+}
+
+export function TaskProgressHighlights({
+  items,
+  hiddenCount,
+  expandAll = false,
+  taskContext,
+  onCancel,
+  onApprove,
+}: TaskProgressHighlightsProps) {
   return (
     <div className={styles.progressHighlights}>
       {items.map((item) => {
         if (item.surfaceType === 'commands') {
-          return <ProgressCommandGroup key={item.id} item={item} />
+          return <ProgressCommandGroup key={item.id} item={item} expandAll={expandAll} />
         }
         if (item.surfaceType === 'artifact') {
-          return <ProgressArtifactSummary key={item.id} item={item} />
+          return (
+            <ProgressArtifactSummary
+              key={item.id}
+              item={item}
+              expandAll={expandAll}
+              taskContext={taskContext}
+              onCancel={onCancel}
+              onApprove={onApprove}
+            />
+          )
         }
         const content = item.detail ?? ''
         const hasMarkdown = /[#*`\[\]>|]/.test(content)
@@ -117,14 +143,14 @@ export function progressSurfaceItems(stage: TaskTimelineStage, assistantItems: T
   return dedupeProgressSurfaceItems(items)
 }
 
-function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
+function ProgressCommandGroup({ item, expandAll = false }: { item: ProgressSurfaceItem; expandAll?: boolean }) {
   const commandItems = (item.items ?? []).filter((commandItem) => clean(commandTextForSurface(commandItem)))
   if (!commandItems.length) return null
   const tone = commandSurfaceTone(commandItems)
   const verb = commandSurfaceVerb(tone)
   if (commandItems.length === 1) {
     return (
-      <details className={styles.progressCommandSingleDetails} data-tone={tone}>
+      <details className={styles.progressCommandSingleDetails} data-tone={tone} open={expandAll || tone === 'failed'}>
         <summary className={styles.progressCommandSingle} data-tone={tone}>
           <Terminal size={13} aria-hidden="true" />
           <span>{verb}</span>
@@ -137,14 +163,14 @@ function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
   const visibleCommands = commandItems.slice(0, 6)
   const hiddenCount = commandItems.length - visibleCommands.length
   return (
-    <details className={styles.progressCommandGroup} data-tone={tone} open={commandItems.length <= 4}>
+    <details className={styles.progressCommandGroup} data-tone={tone} open={expandAll || tone === 'failed'}>
       <summary>
         <Terminal size={13} aria-hidden="true" />
         <span>{verb} {commandItems.length} 条命令</span>
       </summary>
       <div className={styles.progressCommandList}>
         {visibleCommands.map((commandItem, index) => (
-          <details key={`${commandItem.id}-${index}`} className={styles.progressCommandLine}>
+          <details key={`${commandItem.id}-${index}`} className={styles.progressCommandLine} open={expandAll || commandItem.tone === 'failed'}>
             <summary>
               <span>{commandLineState(commandItem)}</span>
               <code title={commandTextForSurface(commandItem)}>{commandSummaryForSurface(commandTextForSurface(commandItem))}</code>
@@ -152,7 +178,7 @@ function ProgressCommandGroup({ item }: { item: ProgressSurfaceItem }) {
             <ProgressCommandDetail item={commandItem} />
           </details>
         ))}
-        {hiddenCount > 0 && <div className={styles.progressCommandMore}>还有 {hiddenCount} 条命令在过程里</div>}
+        {hiddenCount > 0 && <div className={styles.progressCommandMore}>另有 {hiddenCount} 条命令</div>}
       </div>
     </details>
   )
@@ -178,13 +204,37 @@ function ProgressCommandDetail({ item }: { item: TimelineItem }) {
   )
 }
 
-function ProgressArtifactSummary({ item }: { item: ProgressSurfaceItem }) {
+function ProgressArtifactSummary({ item, expandAll = false, taskContext, onCancel, onApprove }: {
+  item: ProgressSurfaceItem
+  expandAll?: boolean
+  taskContext?: TaskContext
+  onCancel?: (taskId: string) => void
+  onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
+}) {
+  const timelineItem = item.items?.[0]
+  if (item.kind === 'approval' && timelineItem?.message && taskContext) {
+    return (
+      <div className={styles.progressApproval}>
+        <DevTaskMessage
+          message={timelineItem.message as ChatMessage}
+          context={taskContext}
+          onCancel={onCancel}
+          onApprove={onApprove}
+        />
+      </div>
+    )
+  }
   const Icon = progressArtifactIcon(item.kind, item.tone)
-  const body = clean(item.items?.[0]?.process?.body ?? '')
-  const process = item.items?.[0]?.process
+  const body = clean(timelineItem?.process?.body ?? '')
+  const process = timelineItem?.process
   if (body) {
     return (
-      <details className={styles.progressArtifactDetails} data-kind={item.kind || undefined} data-tone={item.tone || undefined}>
+      <details
+        className={styles.progressArtifactDetails}
+        data-kind={item.kind || undefined}
+        data-tone={item.tone || undefined}
+        open={expandAll || item.tone === 'failed'}
+      >
         <summary className={styles.progressArtifactSingle} data-kind={item.kind || undefined} data-tone={item.tone || undefined}>
           <Icon size={13} aria-hidden="true" />
           <span>{item.title}</span>

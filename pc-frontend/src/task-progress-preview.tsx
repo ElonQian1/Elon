@@ -317,7 +317,7 @@ function Preview() {
           data-active={expandAll ? 'true' : undefined}
           onClick={toggleExpand}
         >
-          {expandAll ? '过程展开中' : '按真实默认'}
+          {expandAll ? '收起工具详情' : '展开工具详情'}
         </button>
         <div className="scenarioTabs">
           <button type="button" data-active={activeId === 'all' ? 'true' : undefined} onClick={() => selectScenario('all')}>

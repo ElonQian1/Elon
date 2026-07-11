@@ -4,9 +4,9 @@
  * 将同一 task_id 的用户请求、过程消息和最终回复连成一个对话段：
  *  - 用户请求显示为右侧气泡
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
- *  - 中间回复片段和命令按发生顺序穿插在过程面板中，任务结束后再折叠
+ *  - 中间回复片段和工具按发生顺序直接展示，任务结束后仅折叠历史详情
  */
-import { StopCircle } from 'lucide-react'
+import { PlayCircle, StopCircle } from 'lucide-react'
 import { memo, useState, useEffect, useRef, type ReactNode } from 'react'
 import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
@@ -46,7 +46,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const explicitResultMsg = latestMessageOfKind(messages, 'ai_result') ?? terminalAssistantMsg ?? fallbackAssistantMsg
   const isDone  = taskIsTerminal(task) || !!explicitResultMsg || messages.some(isTerminalTaskMessage)
 
-  // 过程默认保持轻量；审批态和预览强制展开由后续逻辑处理。
+  // 仅终态历史保留总折叠；运行中的公开内容始终直接进入对话流。
   const [collapsed, setCollapsed] = useState(!(expandAll || debugOpenProcess))
   const prevDone = useRef(isDone)
   const prevCollapseKey = useRef('')
@@ -72,8 +72,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const publicAssistantItemsInConversation = !resultMsg && hasPublicAssistantItems
   const defaultProcessOpen = shouldDefaultOpenProcess(isDone, timeline)
   const displayCollapsed = forceProcessOpen ? false : collapsed
-  const showPublicSurfaceItems = publicAssistantItemsInConversation && (displayCollapsed || debugOpenProcess)
-  const hideTimelineAssistantReplies = publicAssistantItemsInConversation && (displayCollapsed || debugOpenProcess)
+  const hideTimelineAssistantReplies = false
   const hasProgressDetails = taskTimelineHasVisibleDetails(timeline, {
     completed: compactCompletedProcess,
     hideAssistantReplies: hideTimelineAssistantReplies,
@@ -87,14 +86,15 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const processedDuration = processDurationLabel(messages, isDone)
   const hideCompletedProcessPanel = false
   const previewAssistantItems = publicAssistantPreviewItems(publicAssistantItems, 3)
-  const publicSurfaceItems = publicAssistantItemsInConversation
+  const publicSurfaceItems = !resultMsg
     ? progressFlowSurfaceItems(timeline, compactCompletedProcess)
     : []
-  const surfaceItems = !resultMsg && displayCollapsed && !publicAssistantItemsInConversation
+  const showPublicSurfaceItems = publicSurfaceItems.length > 0
+  const surfaceItems = !resultMsg && !showPublicSurfaceItems
     ? progressSurfaceItems(timeline.stage, previewAssistantItems)
     : []
   const visiblePublicSurfaceItems = showPublicSurfaceItems ? publicSurfaceItems : []
-  const visibleSurfaceItems = displayCollapsed ? surfaceItems : []
+  const visibleSurfaceItems = surfaceItems
   const hasVisibleSurfaceItems = visiblePublicSurfaceItems.length > 0 || visibleSurfaceItems.length > 0
   const previewHiddenCount = Math.max(0, publicAssistantItems.length - previewAssistantItems.length)
   const suppressProgressNarrative = (
@@ -103,7 +103,9 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
     || (!displayCollapsed && hasPublicAssistantItems)
   )
     && timeline.stage.key !== 'approval'
-  const directPublicProcess = false
+  const directPublicProcess = !resultMsg
+  const canContinue = !!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)
+  const expandToolDetails = expandAll || debugOpenProcess
 
   useEffect(() => {
     const collapseKey = `${taskId}:${expandAll ? 'expanded' : 'default'}:${debugOpenProcess ? 'debug-open' : 'debug-default'}:${forceProcessOpen ? 'locked' : 'free'}:${defaultProcessOpen ? 'process-open' : 'process-closed'}`
@@ -169,7 +171,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
           lockedOpen={forceProcessOpen}
           processedDuration={processedDuration}
           suppressNarrative={suppressProgressNarrative}
-          canContinue={!!taskId && !!onContinue && taskStageAllowsContinue(timeline.stage.key, tone)}
+          canContinue={canContinue}
           onToggle={() => {
             if (forceProcessOpen) return
             setCollapsed((c) => !c)
@@ -233,7 +235,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
             <div className={styles.assistantBody}>
               <div className={styles.assistantMeta}>
                 <strong>一龙</strong>
-                {hasPublicAssistantItems && <span>正在处理</span>}
+                <span>正在处理</span>
                 {assistantProcessTime && <span>{assistantProcessTime}</span>}
                 {directPublicProcess && canCancel && (
                   <button
@@ -251,12 +253,36 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
                 )}
               </div>
               {visiblePublicSurfaceItems.length > 0 && (
-                <TaskProgressHighlights items={visiblePublicSurfaceItems} hiddenCount={0} />
+                <TaskProgressHighlights
+                  items={visiblePublicSurfaceItems}
+                  hiddenCount={0}
+                  expandAll={expandToolDetails}
+                  taskContext={taskContext}
+                  onCancel={onCancel}
+                  onApprove={onApprove}
+                />
               )}
               {visibleSurfaceItems.length > 0 && (
-                <TaskProgressHighlights items={visibleSurfaceItems} hiddenCount={previewHiddenCount} />
+                <TaskProgressHighlights
+                  items={visibleSurfaceItems}
+                  hiddenCount={previewHiddenCount}
+                  expandAll={expandToolDetails}
+                  taskContext={taskContext}
+                  onCancel={onCancel}
+                  onApprove={onApprove}
+                />
               )}
-              {renderProgressPanel(true, hasVisibleSurfaceItems ? 'afterNotes' : false)}
+              {canContinue && (
+                <button
+                  type="button"
+                  className={styles.continueAction}
+                  onClick={() => taskId && onContinue?.(taskId)}
+                >
+                  <PlayCircle size={14} aria-hidden="true" />
+                  <span>继续任务</span>
+                </button>
+              )}
+              {!directPublicProcess && renderProgressPanel(true, hasVisibleSurfaceItems ? 'afterNotes' : false)}
             </div>
           </div>
         ) : null
