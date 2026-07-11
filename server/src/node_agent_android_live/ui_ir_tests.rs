@@ -63,3 +63,38 @@ async fn persists_target_design_and_compact_ir() {
         .is_file());
     fs::remove_dir_all(root).unwrap();
 }
+
+#[tokio::test]
+async fn target_design_rejects_oversized_dimensions_before_full_decode() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-ui-ir-dimensions-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    fs::create_dir_all(&root).unwrap();
+    let broker = LiveUiBroker::new();
+    let session = broker
+        .create_session(
+            "device-1".to_string(),
+            "com.example.debug".to_string(),
+            Some(root.display().to_string()),
+            38917,
+        )
+        .await;
+    let mut png = Vec::new();
+    DynamicImage::ImageRgba8(RgbaImage::from_pixel(16_385, 1, Rgba([1, 2, 3, 255])))
+        .write_to(&mut Cursor::new(&mut png), ImageFormat::Png)
+        .unwrap();
+    let error = persist_target_design(
+        &broker,
+        &session.id,
+        TargetDesignUpload {
+            name: "oversized.png".to_string(),
+            data_url: format!("data:image/png;base64,{}", B64.encode(&png)),
+            figma_url: None,
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(format!("{error:#}").contains("尺寸超限"));
+    fs::remove_dir_all(root).unwrap();
+}

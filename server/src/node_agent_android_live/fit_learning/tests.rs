@@ -191,6 +191,23 @@ fn fixed_learning_backup_recovers_corrupt_primary() {
     let recovered = store.load_cases().unwrap();
     assert_eq!(recovered.cases.len(), 1);
     assert!(serde_json::from_str::<Value>(&fs::read_to_string(&cases_path).unwrap()).is_ok());
+
+    let promoted = promote_priors(
+        &recovered.cases,
+        &[],
+        &MockEvaluator { regress: false },
+        &FitPromotionPolicy::default(),
+    )
+    .unwrap()
+    .document;
+    store.save_priors(&promoted).unwrap();
+    store.save_priors(&promoted).unwrap();
+    let priors_path = store.priors_path();
+    assert!(priors_path
+        .with_file_name("fit-priors.v1.json.bak")
+        .is_file());
+    fs::write(&priors_path, b"corrupt-primary").unwrap();
+    assert!(!store.load_priors().unwrap().priors.is_empty());
     fs::remove_dir_all(root).unwrap();
 }
 

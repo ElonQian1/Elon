@@ -279,11 +279,11 @@ pub(crate) fn persisted_node_property_values(
         .iter()
         .filter_map(|(property, snapshot)| {
             snapshot.effective.as_ref().map(|value| {
-                serde_json::to_value(value)
-                    .map(|serialized| (property.clone(), serialized))
+                serde_json::to_value(value).map(|serialized| (property.clone(), serialized))
             })
         })
-        .collect()
+        .collect::<serde_json::Result<BTreeMap<_, _>>>()
+        .map_err(Into::into)
 }
 
 fn live_artifact_dir(project_root: Option<&str>, session_id: &str) -> Result<PathBuf> {
