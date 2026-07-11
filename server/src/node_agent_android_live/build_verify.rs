@@ -165,27 +165,32 @@ pub(crate) async fn build_and_verify(
     start_runtime(&session, host_port).await?;
     // A connected socket with an empty tree is not a verified UI. Always wait
     // for at least one runtime node, including normal Activity verification.
-    let require_preview_nodes = true;
-    if let Some(preview) = request.preview {
-        open_preview(&session, preview).await?;
+    let preview = request.preview.clone();
+    if let Some(preview) = preview.as_ref() {
+        open_preview(&session, preview.clone()).await?;
     }
-    let runtime_view = match wait_for_runtime(&session, require_preview_nodes).await {
-        Ok(view) => view,
-        Err(first_error) => {
-            // Some vendor systems finish `adb install -r` before the replaced
-            // process and its debug receiver are fully ready. Re-launch and
-            // bootstrap once more instead of leaving the PC page in a false
-            // disconnected state after a successful install.
-            launch_app(&session.device_id, &session.package_name).await?;
-            tokio::time::sleep(Duration::from_millis(650)).await;
-            start_runtime(&session, host_port).await?;
-            wait_for_runtime(&session, require_preview_nodes)
-                .await
-                .with_context(|| {
-                    format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}")
-                })?
-        }
-    };
+    let expected_screen_id = preview.as_ref().map(|preview| preview.screen_id.as_str());
+    let runtime_view =
+        match wait_for_runtime(broker, session_id, &session, expected_screen_id).await {
+            Ok(view) => view,
+            Err(first_error) => {
+                // Some vendor systems finish `adb install -r` before the replaced
+                // process and its debug receiver are fully ready. Re-launch and
+                // bootstrap once more instead of leaving the PC page in a false
+                // disconnected state after a successful install.
+                launch_app(&session.device_id, &session.package_name).await?;
+                tokio::time::sleep(Duration::from_millis(650)).await;
+                start_runtime(&session, host_port).await?;
+                if let Some(preview) = preview.as_ref() {
+                    open_preview(&session, preview.clone()).await?;
+                }
+                wait_for_runtime(broker, session_id, &session, expected_screen_id)
+                    .await
+                    .with_context(|| {
+                        format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}")
+                    })?
+            }
+        };
     // The Activity can expose its first View tree before async data binding and
     // entrance rendering finish. Comparing that intermediate frame against a
     // stable Live preview creates false BUILD_MISMATCH results. Give the debug
@@ -463,26 +468,47 @@ fn collect_debug_apks(
 }
 
 async fn wait_for_runtime(
+    broker: &LiveUiBroker,
+    session_id: &str,
     session: &LiveUiSession,
-    require_nodes: bool,
+    expected_screen_id: Option<&str>,
 ) -> Result<super::protocol::LiveSessionView> {
     let started = Instant::now();
     loop {
         let view = session.view().await;
-        if view.connected
-            && view.runtime_build_id.is_some()
-            && (!require_nodes || view.node_count > 0)
-        {
+        let nodes_ready = if view.node_count == 0 {
+            false
+        } else if let Some(expected_screen_id) = expected_screen_id {
+            let (_, nodes) = broker.tree(session_id).await?;
+            nodes_match_preview(&nodes, expected_screen_id)
+        } else {
+            true
+        };
+        if view.connected && view.runtime_build_id.is_some() && nodes_ready {
             return Ok(view);
         }
         if started.elapsed() > Duration::from_secs(15) {
-            if require_nodes && view.connected {
-                bail!("新 APK 已安装且 Runtime 已连接，但 Preview 节点树在 15 秒内没有上报");
+            if view.connected {
+                if let Some(expected_screen_id) = expected_screen_id {
+                    bail!(
+                        "新 APK 已安装且 Runtime 已连接，但 Preview 场景 {expected_screen_id} 的节点树在 15 秒内没有上报"
+                    );
+                }
+                bail!("新 APK 已安装且 Runtime 已连接，但节点树在 15 秒内没有上报");
             }
             bail!("新 APK 已安装，但 Debug Runtime 在 15 秒内没有重新连接");
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }
+}
+
+fn nodes_match_preview(nodes: &[LiveUiNode], expected_screen_id: &str) -> bool {
+    let preview_definition_prefix = format!("preview.{expected_screen_id}.");
+    nodes.iter().any(|node| {
+        node.screen_id == expected_screen_id
+            || node.definition_id == expected_screen_id
+            || node.definition_id.starts_with(&preview_definition_prefix)
+    })
 }
 
 fn tail_output(stdout: &[u8], stderr: &[u8]) -> String {
@@ -539,5 +565,29 @@ mod tests {
             root.join("android").canonicalize().unwrap()
         );
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn matches_compose_and_view_preview_nodes() {
+        let mut node = LiveUiNode {
+            runtime_node_id: "runtime-1".to_string(),
+            definition_id: "preview.compose.primary_card".to_string(),
+            instance_key: None,
+            parent_runtime_node_id: None,
+            screen_id: "elon.compose.gallery".to_string(),
+            kind: "compose".to_string(),
+            text: None,
+            resource_id: None,
+            class_name: "PrimaryCard".to_string(),
+            source: None,
+            geometry: Default::default(),
+            properties: Default::default(),
+            capabilities: Default::default(),
+        };
+        assert!(nodes_match_preview(&[node.clone()], "elon.compose.gallery"));
+
+        node.screen_id = "com.elon.uiruntime.view.UiRuntimePreviewHostActivity".to_string();
+        node.definition_id = "preview.elon.view.gallery.root".to_string();
+        assert!(nodes_match_preview(&[node], "elon.view.gallery"));
     }
 }

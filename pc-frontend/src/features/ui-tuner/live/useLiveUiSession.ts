@@ -82,6 +82,7 @@ export function useLiveUiSession({
   const gestureActiveRef = useRef(false)
   const reconnectPromiseRef = useRef<Promise<void> | null>(null)
   const reconnectAttemptRef = useRef(0)
+  const lastPreviewRef = useRef<LivePreviewRequest | null>(null)
 
   const refresh = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id
@@ -112,6 +113,7 @@ export function useLiveUiSession({
     const cleanDevice = deviceId?.trim()
     const cleanPackage = packageName?.trim()
     const generation = ++generationRef.current
+    lastPreviewRef.current = null
     let timer: number | undefined
     let disposed = false
 
@@ -535,6 +537,7 @@ export function useLiveUiSession({
     setBusy(true)
     try {
       await openLiveUiPreview(current.id, request)
+      lastPreviewRef.current = request
       onNotice(`Preview 已切换：${request.screenId} · ${request.scenario} · ${request.theme}`)
       window.setTimeout(() => {
         void Promise.all([refresh(current.id), refreshFrame(current.id)]).catch(() => undefined)
@@ -555,7 +558,11 @@ export function useLiveUiSession({
     setBusy(true)
     setBuildVerifyResult(null)
     try {
-      const result = await buildAndVerifyLiveUi(current.id, preview, debugApplicationIdSuffix)
+      const result = await buildAndVerifyLiveUi(
+        current.id,
+        preview ?? lastPreviewRef.current ?? undefined,
+        debugApplicationIdSuffix,
+      )
       setBuildVerifyResult(result)
       await Promise.all([refresh(current.id), refreshFrame(current.id)])
       onNotice(result.sourceParityVerified === true
