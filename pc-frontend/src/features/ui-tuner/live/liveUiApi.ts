@@ -212,6 +212,16 @@ export async function getLiveUiFrame(sessionId: string): Promise<LiveUiFrame> {
   return response.frame
 }
 
+export async function reconnectLiveUiSession(sessionId: string): Promise<LiveUiSession> {
+  const response = await nodeApi<{ session: LiveUiSession }>(
+    inspectorAdminUrl(),
+    `/api/android-live/sessions/${encodeURIComponent(sessionId)}/reconnect`,
+    { method: 'POST' },
+    15_000,
+  )
+  return response.session
+}
+
 export async function openLiveUiPreview(
   sessionId: string,
   request: LivePreviewRequest,
@@ -242,8 +252,12 @@ export async function applyLiveUiPatch(input: {
   sessionId: string
   target: LiveUiNode
   scope: LiveUiScope
-  operation: LivePatchOperation
+  operation?: LivePatchOperation
+  operations?: LivePatchOperation[]
+  gestureId?: string
 }): Promise<LivePatchAck> {
+  const operations = input.operations ?? (input.operation ? [input.operation] : [])
+  if (operations.length === 0) throw new Error('LiveStylePatch 至少需要一个操作')
   const response = await nodeApi<{ ack: LivePatchAck }>(
     inspectorAdminUrl(),
     `/api/android-live/sessions/${encodeURIComponent(input.sessionId)}/patch`,
@@ -254,6 +268,7 @@ export async function applyLiveUiPatch(input: {
         messageType: 'patch.apply',
         sessionId: input.sessionId,
         requestId: '',
+        gestureId: input.gestureId,
         sequence: Date.now(),
         target: {
           scope: input.scope,
@@ -263,7 +278,7 @@ export async function applyLiveUiPatch(input: {
         },
         atomic: true,
         ephemeral: true,
-        operations: [input.operation],
+        operations,
       }),
     },
     10_000,

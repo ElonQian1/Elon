@@ -29,6 +29,27 @@ pub(crate) async fn start_runtime(session: &LiveUiSession, host_port: u16) -> Re
         64 * 1024,
     )
     .await?;
+    // Some OEM systems (notably MIUI) defer explicit broadcasts to cached
+    // background processes. A LIVE session is user-initiated and needs the
+    // target screen visible anyway, so resume the package task before sending
+    // the runtime control broadcast. `monkey` resolves the launcher activity
+    // without requiring the PC editor to know the app's concrete Activity.
+    run_adb_text(
+        &[
+            "-s".to_string(),
+            session.device_id.clone(),
+            "shell".to_string(),
+            "monkey".to_string(),
+            "-p".to_string(),
+            session.package_name.clone(),
+            "-c".to_string(),
+            "android.intent.category.LAUNCHER".to_string(),
+            "1".to_string(),
+        ],
+        Duration::from_secs(10),
+        128 * 1024,
+    )
+    .await?;
     let component = format!("{}/{}", session.package_name, RUNTIME_RECEIVER);
     let output = run_adb_text(
         &[

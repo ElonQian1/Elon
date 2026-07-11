@@ -13,6 +13,11 @@ export function matchLiveNode(
     const exact = nodes.find((node) => comparableResourceId(node.resourceId) === resourceId)
     if (exact) return exact
   }
+  const definitionId = selected.runtime.xpath?.trim()
+  if (definitionId) {
+    const exactDefinition = nodes.find((node) => node.definitionId === definitionId)
+    if (exactDefinition) return exactDefinition
+  }
   const original = selected.runtime.originalBounds
   let best: { node: LiveUiNode; score: number } | null = null
   for (const node of nodes) {

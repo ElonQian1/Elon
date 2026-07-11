@@ -51,6 +51,10 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             get(frame_handler),
         )
         .route(
+            "/api/android-live/sessions/:session_id/reconnect",
+            post(reconnect_session_handler),
+        )
+        .route(
             "/api/android-live/sessions/:session_id/preview",
             post(preview_handler),
         )
@@ -156,6 +160,26 @@ async fn create_session_handler(
             runtime.live_ui.remove_session(&session.id).await;
             json_error(StatusCode::BAD_GATEWAY, format!("{error:#}"))
         }
+    }
+}
+
+async fn reconnect_session_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    let session = match runtime.live_ui.session(&session_id).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    let host_port = crate::node_agent_admin_open::admin_port_from_env();
+    match start_runtime(&session, host_port).await {
+        Ok(output) => Json(json!({
+            "ok": true,
+            "session": session.view().await,
+            "adbOutput": output,
+        }))
+        .into_response(),
+        Err(error) => json_error(StatusCode::BAD_GATEWAY, format!("{error:#}")),
     }
 }
 

@@ -8,6 +8,7 @@ import {
   getLiveUiTree,
   liveUiHistoryAction,
   openLiveUiPreview,
+  reconnectLiveUiSession,
   startLiveUiSession,
   stopLiveUiSession,
   type LivePatchOperation,
@@ -70,7 +71,7 @@ export function useLiveUiSession({
   const [solverResult, setSolverResult] = useState<VisualSolverResult | null>(null)
   const [liveFrame, setLiveFrame] = useState<LiveUiFrame | null>(null)
   const [buildVerifyResult, setBuildVerifyResult] = useState<LiveBuildVerifyResult | null>(null)
-  const [restartRevision, setRestartRevision] = useState(0)
+  const [gestureActive, setGestureActiveState] = useState(false)
   const sessionRef = useRef<LiveUiSession | null>(null)
   const treeRevisionRef = useRef<number | null>(null)
   const stopPromiseRef = useRef<Promise<void>>(Promise.resolve())
@@ -78,6 +79,9 @@ export function useLiveUiSession({
   const generationRef = useRef(0)
   const targetDesignRef = useRef<LiveTargetDesign | null>(null)
   const targetSignatureRef = useRef('')
+  const gestureActiveRef = useRef(false)
+  const reconnectPromiseRef = useRef<Promise<void> | null>(null)
+  const reconnectAttemptRef = useRef(0)
 
   const refresh = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id
@@ -231,7 +235,7 @@ export function useLiveUiSession({
       sessionRef.current = null
       if (current) void queueStop(current)
     }
-  }, [deviceId, packageName, projectRoot, refresh, restartRevision])
+  }, [deviceId, packageName, projectRoot, refresh])
 
   const refreshFrame = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id
@@ -240,9 +244,48 @@ export function useLiveUiSession({
     setLiveFrame(frame)
   }, [])
 
+  const reconnect = useCallback(async () => {
+    const current = sessionRef.current
+    if (!current) return
+    if (reconnectPromiseRef.current) return reconnectPromiseRef.current
+    const task = (async () => {
+      setState('connecting')
+      setError('真实画面已冻结，正在恢复 adb reverse 与 Android Runtime…')
+      try {
+        await reconnectLiveUiSession(current.id)
+        for (let attempt = 0; attempt < 16; attempt += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250))
+          await refresh(current.id)
+          if (sessionRef.current?.connected) {
+            reconnectAttemptRef.current = 0
+            await refreshFrame(current.id).catch(() => undefined)
+            return
+          }
+        }
+        throw new Error('Android Runtime 重连超时')
+      } catch (reconnectError) {
+        reconnectAttemptRef.current += 1
+        setState('attach_only')
+        setError(messageOf(reconnectError, 'Android Runtime 自动重连失败'))
+      }
+    })()
+    reconnectPromiseRef.current = task
+    try {
+      await task
+    } finally {
+      reconnectPromiseRef.current = null
+    }
+  }, [refresh, refreshFrame])
+
+  useEffect(() => {
+    if (state !== 'attach_only' || !session?.id) return
+    const delay = Math.min(8_000, 500 * (2 ** reconnectAttemptRef.current))
+    const timer = window.setTimeout(() => { void reconnect() }, delay)
+    return () => window.clearTimeout(timer)
+  }, [reconnect, session?.id, state])
+
   useEffect(() => {
     if (state !== 'connected' || !session?.id) {
-      setLiveFrame(null)
       return
     }
     let disposed = false
@@ -254,7 +297,10 @@ export function useLiveUiSession({
       } catch {
         // A transient tree/frame read must not tear down the current live session.
       }
-      if (!disposed) timer = window.setTimeout(() => { void pollRuntime() }, 1_500)
+      if (!disposed) timer = window.setTimeout(
+        () => { void pollRuntime() },
+        gestureActiveRef.current ? 160 : 1_500,
+      )
     }
     void pollRuntime()
     return () => {
@@ -322,22 +368,24 @@ export function useLiveUiSession({
     syncContext,
   ])
 
-  const apply = useCallback(async (
-    operation: LivePatchOperation,
+  const applyOperations = useCallback(async (
+    operations: LivePatchOperation[],
     scope: LiveUiScope,
+    gestureId?: string,
   ) => {
     const currentSession = sessionRef.current
     const target = matchLiveNode(selected, nodes)
     if (!currentSession?.connected || !target) {
       throw new Error('当前选中元素尚未绑定 Live Node')
     }
-    setBusy(true)
+    if (!gestureId) setBusy(true)
     try {
       const ack = await applyLiveUiPatch({
         sessionId: currentSession.id,
         target,
         scope,
-        operation,
+        operations,
+        gestureId,
       })
       if (ack.status !== 'APPLIED') throw new Error(ack.error || '真机拒绝了修改')
       setNodes((current) => current.map((node) => (
@@ -347,10 +395,12 @@ export function useLiveUiSession({
       )))
       setCommitPlan(null)
       setCommitResult(null)
-      onNotice(`LIVE PREVIEW：${operation.property} 已在真机生效，源码尚未写入`)
-      window.setTimeout(() => {
-        void Promise.all([refresh(), refreshFrame(currentSession.id)]).catch(() => undefined)
-      }, 180)
+      if (!gestureId) {
+        onNotice(`LIVE PREVIEW：${operations.map((item) => item.property).join('、')} 已在真机生效，源码尚未写入`)
+        window.setTimeout(() => {
+          void Promise.all([refresh(), refreshFrame(currentSession.id)]).catch(() => undefined)
+        }, 180)
+      }
       return ack
     } catch (applyError) {
       const message = messageOf(applyError, '真机实时修改失败')
@@ -358,9 +408,30 @@ export function useLiveUiSession({
       onNotice(message)
       throw applyError
     } finally {
-      setBusy(false)
+      if (!gestureId) setBusy(false)
     }
   }, [nodes, onNotice, refresh, refreshFrame, selected])
+
+  const apply = useCallback((operation: LivePatchOperation, scope: LiveUiScope) => (
+    applyOperations([operation], scope)
+  ), [applyOperations])
+
+  const applyGesture = useCallback((operations: LivePatchOperation[], gestureId: string) => (
+    applyOperations(operations, 'INSTANCE', gestureId)
+  ), [applyOperations])
+
+  const setGestureActive = useCallback((active: boolean) => {
+    gestureActiveRef.current = active
+    setGestureActiveState(active)
+    if (!active) {
+      const current = sessionRef.current
+      if (current?.connected) {
+        window.setTimeout(() => {
+          void Promise.all([refresh(current.id), refreshFrame(current.id)]).catch(() => undefined)
+        }, 80)
+      }
+    }
+  }, [refresh, refreshFrame])
 
   const historyAction = useCallback(async (action: 'undo' | 'redo') => {
     const current = sessionRef.current
@@ -518,10 +589,16 @@ export function useLiveUiSession({
     solverResult,
     liveFrame,
     buildVerifyResult,
+    gestureActive,
     apply,
+    applyGesture,
+    setGestureActive,
     undo: () => historyAction('undo'),
     redo: () => historyAction('redo'),
-    reconnect: () => setRestartRevision((value) => value + 1),
+    reconnect: () => {
+      reconnectAttemptRef.current = 0
+      void reconnect()
+    },
     refresh,
     previewCommit,
     commit,

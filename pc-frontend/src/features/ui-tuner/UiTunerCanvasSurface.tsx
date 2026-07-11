@@ -14,6 +14,10 @@ interface UiTunerCanvasSurfaceProps {
   filterResult: UiTunerFilterResult
   liveFrame: LiveUiFrame | null
   realRenderer: boolean
+  runtimeConnected: boolean
+  runtimeGestureActive: boolean
+  runtimeCanMove: boolean
+  runtimeCanResize: boolean
   scrollerRef: RefObject<HTMLDivElement>
   selectedId: string | null
   viewScale: number
@@ -32,6 +36,10 @@ export function UiTunerCanvasSurface({
   filterResult,
   liveFrame,
   realRenderer,
+  runtimeConnected,
+  runtimeGestureActive,
+  runtimeCanMove,
+  runtimeCanResize,
   scrollerRef,
   selectedId,
   viewScale,
@@ -42,6 +50,13 @@ export function UiTunerCanvasSurface({
 }: UiTunerCanvasSurfaceProps) {
   return (
     <div className={styles.canvasScroller} ref={scrollerRef}>
+      {realRenderer && (
+        <div className={runtimeConnected ? styles.runtimeSurfaceLive : styles.runtimeSurfaceFrozen}>
+          {runtimeConnected
+            ? runtimeGestureActive ? 'Android 正在实时重绘' : 'Android LIVE · 拖动真实组件'
+            : '真实画面已冻结 · Runtime 正在重连'}
+        </div>
+      )}
       <div
         className={styles.canvasViewport}
         style={{ width: canvas.width * viewScale, height: canvas.height * viewScale }}
@@ -53,7 +68,8 @@ export function UiTunerCanvasSurface({
             height: canvas.height,
             background: canvas.background,
             transform: `scale(${viewScale})`,
-          }}
+            '--canvas-scale': viewScale,
+          } as CSSProperties}
           tabIndex={0}
           onKeyDown={onCanvasKeyDown}
           onPointerDown={(event) => {
@@ -106,6 +122,8 @@ export function UiTunerCanvasSurface({
               <button
                 key={element.id}
                 type="button"
+                aria-label={realRenderer ? `真实组件 ${element.name}` : undefined}
+                data-runtime-node-id={realRenderer ? element.runtime?.nodeId : undefined}
                 className={[
                   styles.canvasElement,
                   element.id === selectedId ? styles.selectedElement : '',
@@ -122,7 +140,11 @@ export function UiTunerCanvasSurface({
                 onPointerDown={(event) => {
                   if (realRenderer) {
                     event.stopPropagation()
-                    onSelectElement(element.id)
+                    if (element.id === selectedId && runtimeCanMove) {
+                      onElementPointerDown(event, element, 'move')
+                    } else {
+                      onSelectElement(element.id)
+                    }
                     return
                   }
                   if (analysis.isLocked) {
@@ -134,8 +156,12 @@ export function UiTunerCanvasSurface({
                 }}
               >
                 {!realRenderer && <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>}
-                {realRenderer && element.id === selectedId && (
-                  <span className={styles.runtimeSelectionLabel}>{element.name}</span>
+                {realRenderer && element.id === selectedId && runtimeCanResize && (
+                  <span
+                    className={styles.runtimeResizeHandle}
+                    aria-label="拖动缩放真实 Android 组件"
+                    onPointerDown={(event) => onElementPointerDown(event, element, 'resize')}
+                  />
                 )}
                 {!realRenderer && element.id === selectedId && !analysis.isLocked && (
                   <span

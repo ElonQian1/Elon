@@ -359,6 +359,64 @@
   box-shadow: 0 0 0 3px rgba(89, 215, 255, .2);
 }
 
+.runtimeHitTarget.ghostElement,
+.runtimeHitTarget.outlineElement {
+  border: 0 !important;
+  color: transparent !important;
+  background: transparent !important;
+  opacity: 1 !important;
+}
+
+.runtimeHitTarget.selectedElement {
+  cursor: move;
+}
+
+.runtimeSurfaceLive,
+.runtimeSurfaceFrozen {
+  position: sticky;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+  width: max-content;
+  margin: 12px 0 -42px 12px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 999px;
+  background: rgba(8, 10, 13, .9);
+  color: #e9edf3;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.runtimeSurfaceLive::before,
+.runtimeSurfaceFrozen::before {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: #55c987;
+  content: '';
+}
+
+.runtimeSurfaceFrozen::before {
+  background: #efb34c;
+}
+
+.runtimeResizeHandle {
+  position: absolute;
+  right: calc(-10px / var(--canvas-scale, 1));
+  bottom: calc(-10px / var(--canvas-scale, 1));
+  width: calc(20px / var(--canvas-scale, 1));
+  height: calc(20px / var(--canvas-scale, 1));
+  border: calc(2px / var(--canvas-scale, 1)) solid #071016;
+  border-radius: 4px;
+  background: #59d7ff;
+  cursor: nwse-resize;
+}
+
 .runtimeSelectionLabel {
   position: absolute;
   left: -2px;

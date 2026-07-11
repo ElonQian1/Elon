@@ -71,10 +71,15 @@ internal class UiRuntimeRegistry(
     fun resolve(target: LivePatchTarget): ResolvedTargets {
         val requestedRuntimeId = target.runtimeNodeId
         if (!requestedRuntimeId.isNullOrBlank()) {
-            return ResolvedTargets(
-                views = listOfNotNull(viewsByRuntimeId[requestedRuntimeId]?.get()),
-                externalNodes = listOfNotNull(externalNodes[requestedRuntimeId]),
-            )
+            val requestedView = viewsByRuntimeId[requestedRuntimeId]?.get()
+                ?.takeIf(View::isAttachedToWindow)
+            val requestedExternal = externalNodes[requestedRuntimeId]
+            if (requestedView != null || requestedExternal != null) {
+                return ResolvedTargets(
+                    views = listOfNotNull(requestedView),
+                    externalNodes = listOfNotNull(requestedExternal),
+                )
+            }
         }
         val definitionId = target.definitionId ?: return ResolvedTargets(emptyList(), emptyList())
         val views = definitionByRuntimeId.entries
@@ -83,13 +88,32 @@ internal class UiRuntimeRegistry(
             .filter { (runtimeId, _) ->
                 target.instanceKey == null || instanceByRuntimeId[runtimeId] == target.instanceKey
             }
-            .mapNotNull { (runtimeId, _) -> viewsByRuntimeId[runtimeId]?.get() }
+            .mapNotNull { (runtimeId, _) ->
+                viewsByRuntimeId[runtimeId]?.get()?.takeIf(View::isAttachedToWindow)
+            }
             .toList()
         val external = externalNodes.values.filter { node ->
             node.definitionId == definitionId &&
                 (target.instanceKey == null || node.instanceKey == target.instanceKey)
         }
         return ResolvedTargets(views, external)
+    }
+
+    fun persistentTarget(target: LivePatchTarget): LivePatchTarget {
+        val definitionId = target.definitionId?.takeIf { it.isNotBlank() } ?: return target
+        val matchingViews = definitionByRuntimeId.entries.count { (runtimeId, definition) ->
+            definition == definitionId &&
+                viewsByRuntimeId[runtimeId]?.get()?.isAttachedToWindow == true &&
+                (target.instanceKey == null || instanceByRuntimeId[runtimeId] == target.instanceKey)
+        }
+        val matchingExternal = externalNodes.values.count { node ->
+            node.definitionId == definitionId &&
+                (target.instanceKey == null || node.instanceKey == target.instanceKey)
+        }
+        val canAddressStably = target.scope != "INSTANCE" ||
+            target.instanceKey != null ||
+            matchingViews + matchingExternal == 1
+        return if (canAddressStably) target.copy(runtimeNodeId = null) else target
     }
 
     fun upsertExternalNode(node: UiRuntimeExternalNode) {

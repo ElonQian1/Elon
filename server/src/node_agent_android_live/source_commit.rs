@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use super::broker::{LiveCommitSnapshot, LiveUiSession};
 use super::protocol::{LivePatchTarget, LivePropertyValue, LiveStylePatch, LiveUiNode};
+use super::source_json::{read_json, replace_json_pointer, resolve_json_binding, write_json};
 use super::source_xml::{
     canonical_project_root, element_attribute, find_layout_element, find_value_resource, read_xml,
     reference_impact_count, replace_element_attribute, replace_value_resource, source_revision,
@@ -71,6 +72,10 @@ enum WriteBinding {
         file: PathBuf,
         resource: ValueResource,
     },
+    Json {
+        file: PathBuf,
+        pointer: String,
+    },
 }
 
 pub(crate) async fn build_source_commit_plan(
@@ -112,6 +117,7 @@ pub(super) fn apply_source_commit_plan(
     }
 
     let mut contents = BTreeMap::<PathBuf, String>::new();
+    let mut json_paths = BTreeSet::<PathBuf>::new();
     for entry in &deterministic {
         let binding = entry
             .binding
@@ -119,7 +125,11 @@ pub(super) fn apply_source_commit_plan(
             .ok_or_else(|| anyhow!("Commit Plan 缺少内部写入绑定"))?;
         let path = binding.path().to_path_buf();
         if !contents.contains_key(&path) {
-            contents.insert(path.clone(), read_xml(&path)?);
+            let content = match binding {
+                WriteBinding::Json { .. } => read_json(&path)?,
+                _ => read_xml(&path)?,
+            };
+            contents.insert(path.clone(), content);
         }
         let content = contents.get(&path).cloned().unwrap_or_default();
         let source_value = source_value(&entry.value)?;
@@ -130,12 +140,20 @@ pub(super) fn apply_source_commit_plan(
             WriteBinding::Resource { resource, .. } => {
                 replace_value_resource(&content, resource, &source_value)?
             }
+            WriteBinding::Json { pointer, .. } => {
+                json_paths.insert(path.clone());
+                replace_json_pointer(&content, pointer, &entry.value.value)?
+            }
         };
         contents.insert(path, updated);
     }
 
     for (path, content) in &contents {
-        write_xml(&root, path, content)?;
+        if json_paths.contains(path) {
+            write_json(&root, path, content)?;
+        } else {
+            write_xml(&root, path, content)?;
+        }
     }
     let changed_files = contents
         .keys()
@@ -238,6 +256,62 @@ fn plan_entry(
         entry.reason =
             "重复组件的单实例修改无法直接写回共享 XML，请交给 Codex 生成业务状态覆盖".to_string();
         return Ok(entry);
+    }
+    if let Some(property_snapshot) = node.properties.get(&property) {
+        if let Some(binding) = property_snapshot.binding.as_ref() {
+            let binding_kind = binding
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default()
+                .trim()
+                .to_ascii_uppercase();
+            if matches!(binding_kind.as_str(), "STYLE_JSON" | "TOKEN") {
+                if !property_snapshot
+                    .commit_mode
+                    .eq_ignore_ascii_case("DETERMINISTIC")
+                {
+                    entry.commit_mode = property_snapshot.commit_mode.to_ascii_uppercase();
+                    entry.reason = format!(
+                        "属性声明为 {}，不允许确定性写回 {}",
+                        property_snapshot.commit_mode, binding_kind
+                    );
+                    return Ok(entry);
+                }
+                match resolve_json_binding(root, binding) {
+                    Ok(Some(json_binding)) => {
+                        entry.source_file = Some(json_binding.relative_file);
+                        entry.source_key = Some(json_binding.source_key);
+                        entry.old_value = Some(display_json_value(&json_binding.old_value));
+                        entry.commit_mode = "DETERMINISTIC".to_string();
+                        entry.impact_count = 1;
+                        entry.reason = if json_binding.kind == "TOKEN" {
+                            "精确写回绑定的设计 Token JSON".to_string()
+                        } else {
+                            "精确写回受控 Compose Style JSON".to_string()
+                        };
+                        entry.binding = Some(WriteBinding::Json {
+                            file: json_binding.file,
+                            pointer: json_binding.pointer,
+                        });
+                        return Ok(entry);
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        entry.reason = format!("样式 JSON 绑定无效: {error}");
+                        return Ok(entry);
+                    }
+                }
+            }
+            if binding_kind == "KOTLIN_SYMBOL" {
+                entry.reason = "属性绑定 Kotlin Symbol，需要 Codex/PSI 修改源码".to_string();
+                return Ok(entry);
+            }
+            if matches!(binding_kind.as_str(), "SESSION_ONLY" | "COMPUTED") {
+                entry.commit_mode = "SESSION_ONLY".to_string();
+                entry.reason = "属性只允许当前设计会话预览，不能直接写回源码".to_string();
+                return Ok(entry);
+            }
+        }
     }
     let Some(resource_id) = resource_id else {
         entry.commit_mode = "SESSION_ONLY".to_string();
@@ -434,6 +508,13 @@ fn trim_number(value: f64) -> String {
     }
 }
 
+fn display_json_value(value: &serde_json::Value) -> String {
+    value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string())
+}
+
 fn deferred_entry(
     definition_id: String,
     resource_id: Option<String>,
@@ -468,7 +549,9 @@ fn relative_path(root: &Path, path: &Path) -> String {
 impl WriteBinding {
     fn path(&self) -> &Path {
         match self {
-            Self::Attribute { file, .. } | Self::Resource { file, .. } => file,
+            Self::Attribute { file, .. }
+            | Self::Resource { file, .. }
+            | Self::Json { file, .. } => file,
         }
     }
 }

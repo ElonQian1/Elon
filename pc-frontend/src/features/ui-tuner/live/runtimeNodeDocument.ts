@@ -67,6 +67,11 @@ export function preferredRuntimeSelection(
       (element) => comparableResourceId(element.runtime?.resourceId) === resource,
     )
     if (sameResource) return sameResource.id
+    const definitionId = previous.runtime?.xpath?.trim()
+    const sameDefinition = definitionId && elements.find(
+      (element) => element.runtime?.xpath?.trim() === definitionId,
+    )
+    if (sameDefinition) return sameDefinition.id
   }
   return elements.find((element) => element.runtime?.resourceId)?.id ?? elements[0]?.id ?? null
 }

@@ -1,5 +1,6 @@
 use serde_json::json;
 
+use super::broker::patches_share_gesture;
 use super::protocol::{
     LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch, LiveUiNode,
     PROTOCOL_VERSION,
@@ -60,6 +61,18 @@ fn prepare_binds_patch_to_session_and_request() {
     assert_eq!(value.session_id, "live_demo");
     assert_eq!(value.message_type, "patch.apply");
     assert!(value.request_id.starts_with("req_"));
+}
+
+#[test]
+fn coalesces_continuous_canvas_patches_into_one_gesture() {
+    let mut first = patch("width", "dp", json!(100));
+    first.gesture_id = Some("gesture-1".to_string());
+    let mut next = patch("width", "dp", json!(160));
+    next.gesture_id = Some("gesture-1".to_string());
+    assert!(patches_share_gesture(&first, &next));
+
+    next.gesture_id = Some("gesture-2".to_string());
+    assert!(!patches_share_gesture(&first, &next));
 }
 
 #[test]

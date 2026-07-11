@@ -3,12 +3,16 @@ package com.elon.uiruntime.view
 import android.app.Application
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.Base64
+import android.view.PixelCopy
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import java.io.ByteArrayOutputStream
 
 internal object UiRuntimeController {
     private const val TAG = "YilongUiRuntime"
@@ -88,7 +92,80 @@ internal object UiRuntimeController {
                     }
                 applyPatch(patch)
             }
+            "frame.request" -> captureFrame(
+                requestId = root.get("requestId")?.asString.orEmpty(),
+                quality = root.get("quality")?.asInt ?: 72,
+            )
         }
+    }
+
+    private fun captureFrame(requestId: String, quality: Int) {
+        mainHandler.post {
+            val window = registry?.currentActivity()?.window
+            val root = window?.decorView
+            if (root == null || root.width <= 0 || root.height <= 0) {
+                sendFrameError(requestId, "当前 Android Window 尚未完成布局")
+                return@post
+            }
+            val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            PixelCopy.request(
+                window,
+                bitmap,
+                pixelCopy@{ result ->
+                    if (result != PixelCopy.SUCCESS) {
+                        bitmap.recycle()
+                        sendFrameError(requestId, "PixelCopy 取帧失败: $result")
+                        return@pixelCopy
+                    }
+                    sendCapturedFrame(requestId, quality, bitmap)
+                },
+                mainHandler,
+            )
+        }
+    }
+
+    private fun sendCapturedFrame(requestId: String, quality: Int, bitmap: Bitmap) {
+        runCatching {
+            val bytes = ByteArrayOutputStream().use { output ->
+                val format = if (Build.VERSION.SDK_INT >= 30) {
+                    Bitmap.CompressFormat.WEBP_LOSSY
+                } else {
+                    @Suppress("DEPRECATION")
+                    Bitmap.CompressFormat.WEBP
+                }
+                check(bitmap.compress(format, quality.coerceIn(35, 92), output)) {
+                    "Android Window 帧压缩失败"
+                }
+                output.toByteArray()
+            }
+            JsonObject().apply {
+                addProperty("protocolVersion", UI_RUNTIME_PROTOCOL_VERSION)
+                addProperty("messageType", "frame.snapshot")
+                addProperty("requestId", requestId)
+                addProperty("dataUrl", "data:image/webp;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
+                addProperty("width", bitmap.width)
+                addProperty("height", bitmap.height)
+                addProperty("bytes", bytes.size)
+                addProperty("capturedAt", System.currentTimeMillis().toString())
+            }
+        }.fold(
+            onSuccess = { send(gson.toJson(it)) },
+            onFailure = { sendFrameError(requestId, it.message ?: "Android Window 取帧失败") },
+        )
+        bitmap.recycle()
+    }
+
+    private fun sendFrameError(requestId: String, error: String) {
+        send(
+            gson.toJson(
+                JsonObject().apply {
+                    addProperty("protocolVersion", UI_RUNTIME_PROTOCOL_VERSION)
+                    addProperty("messageType", "frame.reject")
+                    addProperty("requestId", requestId)
+                    addProperty("error", error)
+                },
+            ),
+        )
     }
 
     private fun applyPatch(patch: LiveStylePatch) {
@@ -149,7 +226,8 @@ internal object UiRuntimeController {
             )
             send(gson.toJson(ack))
             if (result.isSuccess) {
-                val operations = activeViewPatches.getOrPut(patch.target, ::linkedMapOf)
+                val persistentTarget = currentRegistry.persistentTarget(patch.target)
+                val operations = activeViewPatches.getOrPut(persistentTarget, ::linkedMapOf)
                 patch.operations.forEach { operation -> operations[operation.property] = operation }
                 schedulePatchReapply()
                 scheduleTreeSnapshot()

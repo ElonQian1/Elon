@@ -33,6 +33,7 @@
 .eyebrow,
 .field span,
 .fieldFull span,
+.liveNumberField > span:first-child,
 .scopeField span {
   color: #94a3b8;
   font-size: 11px;
@@ -87,7 +88,8 @@
 
 .scopeField select,
 .field input,
-.fieldFull input {
+.fieldFull input,
+.liveNumberInputs input[type='number'] {
   min-width: 0;
   border: 1px solid rgba(100, 116, 139, 0.42);
   border-radius: 8px;
@@ -106,13 +108,49 @@
 }
 
 .field,
-.fieldFull {
+.fieldFull,
+.liveNumberField {
   display: grid;
   gap: 5px;
 }
 
+.liveNumberInputs {
+  display: grid;
+  grid-template-columns: 24px minmax(52px, 1fr) 24px 62px;
+  align-items: center;
+  gap: 6px;
+}
+
+.liveNumberInputs button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(96, 165, 250, 0.36);
+  border-radius: 7px;
+  padding: 0;
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.14);
+  cursor: pointer;
+}
+
+.liveNumberInputs button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.liveNumberInputs input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  accent-color: #60a5fa;
+  cursor: ew-resize;
+}
+
+.liveNumberInputs input[type='range']:disabled {
+  cursor: default;
+}
+
 .liveFieldRow {
   display: grid;
+  grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 6px;
@@ -134,7 +172,8 @@
 }
 
 .field input,
-.fieldFull input {
+.fieldFull input,
+.liveNumberInputs input[type='number'] {
   width: 100%;
   box-sizing: border-box;
   padding: 7px 8px;
@@ -205,6 +244,26 @@
 .projectField {
   display: grid;
   gap: 5px;
+}
+
+.connectedProjectField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
+}
+
+.connectedProjectField > button {
+  min-height: 33px;
+  border: 1px solid rgba(96, 165, 250, 0.36);
+  border-radius: 8px;
+  padding: 0 9px;
+  color: #dbeafe;
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.connectedProjectField > button:disabled {
+  opacity: 0.38;
 }
 
 .projectField input {

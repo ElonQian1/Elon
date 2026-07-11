@@ -13,6 +13,7 @@ mod preview;
 mod protocol;
 mod routes;
 mod source_commit;
+mod source_json;
 mod source_xml;
 mod ui_ir;
 mod visual_diff;

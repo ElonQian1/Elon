@@ -5,8 +5,8 @@ use serde_json::json;
 
 use super::broker::LiveCommitSnapshot;
 use super::protocol::{
-    LiveGeometry, LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch,
-    LiveUiNode, PROTOCOL_VERSION,
+    LiveGeometry, LivePatchOperation, LivePatchTarget, LivePropertySnapshot, LivePropertyValue,
+    LiveStylePatch, LiveUiNode, PROTOCOL_VERSION,
 };
 use super::source_commit::{apply_source_commit_plan, build_plan, SourceCommitRequest};
 
@@ -74,6 +74,95 @@ fn plans_and_writes_bound_android_resources() {
     assert!(fs::read_to_string(values_dir.join("colors.xml"))
         .expect("read colors")
         .contains(">#FF6750A4</color>"));
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn plans_and_writes_compose_style_and_token_json() {
+    let root =
+        std::env::temp_dir().join(format!("elon-live-json-{}", uuid::Uuid::new_v4().simple()));
+    let style_dir = root.join(".elon/ui-styles");
+    let token_dir = root.join(".elon/ui-standards");
+    fs::create_dir_all(&style_dir).expect("create style dir");
+    fs::create_dir_all(&token_dir).expect("create token dir");
+    let style_file = style_dir.join("checkout.json");
+    let token_file = token_dir.join("tokens.json");
+    fs::write(
+        &style_file,
+        r#"{"payButton":{"cornerRadius":16,"paddingStart":20}}"#,
+    )
+    .expect("write style json");
+    fs::write(
+        &token_file,
+        r##"{"colors":{"action":{"primary":"#FF5D3FD3"}}}"##,
+    )
+    .expect("write token json");
+
+    let mut node = live_node();
+    node.resource_id = None;
+    node.definition_id = "checkout.pay_button.compose".to_string();
+    node.properties.insert(
+        "cornerRadius.all".to_string(),
+        bound_property(json!({
+            "kind": "STYLE_JSON",
+            "relativeFile": ".elon/ui-styles/checkout.json",
+            "jsonPointer": "/payButton/cornerRadius"
+        })),
+    );
+    node.properties.insert(
+        "backgroundColor".to_string(),
+        bound_property(json!({
+            "kind": "TOKEN",
+            "path": "colors.action.primary"
+        })),
+    );
+    let mut style_patch = patch(vec![
+        operation("cornerRadius.all", "dp", json!(18)),
+        operation("backgroundColor", "argb", json!("#FF6750A4")),
+    ]);
+    style_patch.target.definition_id = Some(node.definition_id.clone());
+
+    let plan = build_plan(
+        "live_json",
+        LiveCommitSnapshot {
+            project_root: Some(root.display().to_string()),
+            nodes: vec![node],
+            patches: vec![style_patch],
+        },
+    )
+    .expect("build JSON source commit plan");
+    assert_eq!(plan.deterministic_count, 2);
+    assert_eq!(plan.codex_count, 0);
+    assert!(plan.entries.iter().any(|entry| {
+        entry.source_key.as_deref() == Some("json:/payButton/cornerRadius")
+            && entry.old_value.as_deref() == Some("16")
+    }));
+    assert!(plan.entries.iter().any(|entry| {
+        entry.source_key.as_deref() == Some("token:colors.action.primary")
+            && entry.old_value.as_deref() == Some("#FF5D3FD3")
+    }));
+
+    let revision = plan.source_revision.clone();
+    let result = apply_source_commit_plan(
+        plan,
+        SourceCommitRequest {
+            source_revision: revision,
+        },
+    )
+    .expect("commit JSON source plan");
+    assert_eq!(result.committed_count, 2);
+    let style: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(style_file).expect("read style json"))
+            .expect("parse style json");
+    let tokens: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(token_file).expect("read token json"))
+            .expect("parse token json");
+    assert_eq!(style.pointer("/payButton/cornerRadius"), Some(&json!(18)));
+    assert_eq!(
+        tokens.pointer("/colors/action/primary"),
+        Some(&json!("#FF6750A4"))
+    );
 
     let _ = fs::remove_dir_all(root);
 }
@@ -163,5 +252,16 @@ fn operation(property: &str, value_type: &str, value: serde_json::Value) -> Live
             value_type: value_type.to_string(),
             value,
         },
+    }
+}
+
+fn bound_property(binding: serde_json::Value) -> LivePropertySnapshot {
+    LivePropertySnapshot {
+        effective: None,
+        measured: None,
+        change_level: "LIVE".to_string(),
+        commit_mode: "DETERMINISTIC".to_string(),
+        binding: Some(binding),
+        constraints: None,
     }
 }

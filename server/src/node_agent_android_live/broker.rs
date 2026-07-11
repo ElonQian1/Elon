@@ -15,6 +15,7 @@ use super::protocol::{
 };
 
 const PATCH_ACK_TIMEOUT: Duration = Duration::from_secs(5);
+const FRAME_ACK_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_HISTORY: usize = 100;
 
 #[derive(Default)]
@@ -380,7 +381,7 @@ impl LiveUiSession {
                 state.nodes = nodes;
                 state.last_seen_at = Some(Utc::now().to_rfc3339());
             }
-            "patch.ack" | "patch.reject" => {
+            "patch.ack" | "patch.reject" | "frame.snapshot" | "frame.reject" => {
                 let request_id = value
                     .get("requestId")
                     .and_then(Value::as_str)
@@ -441,10 +442,18 @@ impl LiveUiSession {
         if matches!(journal, JournalMode::Record) {
             if let Some(inverse) = inverse_patch(&patch, &ack) {
                 let mut state = self.state.write().await;
-                state.history.push(PatchJournalEntry {
-                    forward: patch,
-                    inverse,
-                });
+                if let Some(last) = state
+                    .history
+                    .last_mut()
+                    .filter(|last| patches_share_gesture(&last.forward, &patch))
+                {
+                    last.forward = patch;
+                } else {
+                    state.history.push(PatchJournalEntry {
+                        forward: patch,
+                        inverse,
+                    });
+                }
                 if state.history.len() > MAX_HISTORY {
                     state.history.remove(0);
                 }
@@ -454,11 +463,76 @@ impl LiveUiSession {
         Ok(ack)
     }
 
+    pub(crate) async fn request_frame(&self) -> Result<Value> {
+        let tx = self
+            .runtime_tx
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| anyhow!("Android Live Runtime 尚未连接，无法获取进程内真实帧"))?;
+        let request_id = format!("frame_{}", uuid::Uuid::new_v4().simple());
+        let (waiter_tx, waiter_rx) = oneshot::channel();
+        self.pending
+            .lock()
+            .await
+            .insert(request_id.clone(), waiter_tx);
+        tx.send(Message::Text(serde_json::to_string(&json!({
+            "protocolVersion": PROTOCOL_VERSION,
+            "messageType": "frame.request",
+            "requestId": request_id,
+            "quality": 72,
+        }))?))
+        .map_err(|_| anyhow!("Android Live Runtime 连接已断开"))?;
+        let frame = match tokio::time::timeout(FRAME_ACK_TIMEOUT, waiter_rx).await {
+            Ok(Ok(frame)) => frame,
+            Ok(Err(_)) => {
+                self.pending.lock().await.remove(&request_id);
+                bail!("Android 真实帧通道已关闭");
+            }
+            Err(_) => {
+                self.pending.lock().await.remove(&request_id);
+                bail!("等待 Android 真实帧超时");
+            }
+        };
+        if frame.get("messageType").and_then(Value::as_str) == Some("frame.reject") {
+            bail!(
+                "Android 拒绝真实帧请求: {}",
+                frame
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .unwrap_or("未知错误")
+            );
+        }
+        Ok(frame)
+    }
+
     async fn set_error(&self, error: String) {
         let mut state = self.state.write().await;
         state.last_error = Some(error);
         state.last_seen_at = Some(Utc::now().to_rfc3339());
     }
+}
+
+pub(super) fn patches_share_gesture(left: &LiveStylePatch, right: &LiveStylePatch) -> bool {
+    let Some(left_gesture) = left.gesture_id.as_deref() else {
+        return false;
+    };
+    let Some(right_gesture) = right.gesture_id.as_deref() else {
+        return false;
+    };
+    left_gesture == right_gesture
+        && left.target.scope == right.target.scope
+        && left.target.runtime_node_id == right.target.runtime_node_id
+        && left.target.definition_id == right.target.definition_id
+        && left.target.instance_key == right.target.instance_key
+        && left
+            .operations
+            .iter()
+            .map(|operation| operation.property.as_str())
+            .eq(right
+                .operations
+                .iter()
+                .map(|operation| operation.property.as_str()))
 }
 
 fn inverse_patch(patch: &LiveStylePatch, ack: &Value) -> Option<LiveStylePatch> {

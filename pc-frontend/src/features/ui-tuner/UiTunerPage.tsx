@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
 import {
@@ -17,7 +16,7 @@ import {
   createAppSidebarTemplateElements,
   isAppSidebarTemplateElement,
 } from './appSidebarTemplate'
-import { clamp, getMetrics, touch } from './uiTunerGeometry'
+import { getMetrics, touch } from './uiTunerGeometry'
 import { type AndroidInspectorSnapshot } from './device/deviceInspectorApi'
 import { UiTunerDeviceDialog } from './device/UiTunerDeviceDialog'
 import { useAndroidInspectorDevices } from './device/useAndroidInspectorDevices'
@@ -33,6 +32,7 @@ import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './type
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { prepareLiveDebugRuntime } from './live/liveUiApi'
 import { useRuntimeDocumentSync } from './live/useRuntimeDocumentSync'
+import { useRuntimeCanvasGesture } from './live/useRuntimeCanvasGesture'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerCanvasSurface } from './UiTunerCanvasSurface'
@@ -51,17 +51,6 @@ import styles from './UiTunerPage.module.css'
 import { EvidenceModeSwitch, SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
 import type { SourcePreviewMode } from './source-preview/types'
 import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
-
-type DragMode = 'move' | 'resize'
-
-interface DragState {
-  id: string
-  mode: DragMode
-  startX: number
-  startY: number
-  scale: number
-  original: UiTunerElement
-}
 
 interface HistoryState {
   past: UiTunerDocument[]
@@ -100,7 +89,6 @@ export default function UiTunerPage() {
     loadUiTunerDocument(APK_STYLE_SOURCE_SIGNATURE) ?? createInitialTunerDocument()
   ))
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
-  const [dragState, setDragState] = useState<DragState | null>(null)
   const [history, setHistory] = useState<HistoryState>({ past: [], future: [] })
   const [viewScale, setViewScale] = useState(1)
   const [fitToStage, setFitToStage] = useState(true)
@@ -110,8 +98,6 @@ export default function UiTunerPage() {
   const screenshotInputRef = useRef<HTMLInputElement>(null)
   const tunerDocRef = useRef(tunerDoc)
   const selectedIdRef = useRef<string | null>(selectedId)
-  const dragSnapshotRef = useRef<UiTunerDocument | null>(null)
-  const dragMovedRef = useRef(false)
   const verificationCaptureRef = useRef(false)
   const verificationBaselineRef = useRef<UiTunerVerificationBaseline | null>(null)
   const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
@@ -151,7 +137,10 @@ export default function UiTunerPage() {
   const [liveProjectRoot, setLiveProjectRoot] = useState(() => (
     window.localStorage.getItem('elon.uiTuner.liveProjectRoot') ?? ''
   ))
-  const effectiveProjectRoot = projectRoot || clean(liveProjectRoot)
+  // A manually entered local root is an explicit source-write target and must
+  // override the project's last remembered worktree. This also prevents a
+  // stale project record from committing LIVE changes into the wrong checkout.
+  const effectiveProjectRoot = clean(liveProjectRoot) || projectRoot
 
   const changeWorkspaceMode = useCallback((mode: SourcePreviewMode) => {
     setWorkspaceMode(mode)
@@ -159,8 +148,8 @@ export default function UiTunerPage() {
   }, [])
 
   useEffect(() => {
-    if (projectRoot) setLiveProjectRoot(projectRoot)
-  }, [projectRoot])
+    if (projectRoot && !clean(liveProjectRoot)) setLiveProjectRoot(projectRoot)
+  }, [liveProjectRoot, projectRoot])
 
   const updateLiveProjectRoot = useCallback((value: string) => {
     setLiveProjectRoot(value)
@@ -299,6 +288,27 @@ export default function UiTunerPage() {
     document: tunerDoc, selected, workspaceMode, documentRef: tunerDocRef, selectedIdRef,
     setDocument: setTunerDoc, setSelectedId, onNotice: setNotice,
   })
+  const runtimeDocument = Boolean(
+    liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX)
+    || liveUi.session?.packageName.endsWith(LIVE_DEBUG_SUFFIX)
+    || tunerDoc.runtimeSnapshot?.packageName?.endsWith(LIVE_DEBUG_SUFFIX),
+  )
+  const realRenderer = workspaceMode === 'evidence'
+    && runtimeDocument
+    && Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible)
+  const canvasGesture = useRuntimeCanvasGesture({
+    documentRef: tunerDocRef,
+    setDocument: setTunerDoc,
+    setSelectedId,
+    pushHistorySnapshot,
+    selectedNode: liveUi.selectedNode,
+    realRenderer,
+    runtimeConnected: liveUi.state === 'connected',
+    viewScale,
+    applyRuntimeGesture: liveUi.applyGesture,
+    setRuntimeGestureActive: liveUi.setGestureActive,
+    onNotice: setNotice,
+  })
 
   const handleLiveOptimisticUpdate = useCallback((patch: Partial<UiTunerElement>) => {
     const currentId = selectedIdRef.current
@@ -424,51 +434,6 @@ export default function UiTunerPage() {
     const timer = window.setTimeout(() => setNotice(''), 2200)
     return () => window.clearTimeout(timer)
   }, [notice])
-
-  useEffect(() => {
-    if (!dragState) return undefined
-
-    const handlePointerMove = (event: PointerEvent) => {
-      event.preventDefault()
-      dragMovedRef.current = true
-      const dx = (event.clientX - dragState.startX) / dragState.scale
-      const dy = (event.clientY - dragState.startY) / dragState.scale
-
-      setTunerDoc((current) => {
-        const elements = current.elements.map((element) => {
-          if (element.id !== dragState.id) return element
-          if (dragState.mode === 'move') {
-            return {
-              ...element,
-              x: clamp(dragState.original.x + dx, 0, current.canvas.width - element.width),
-              y: clamp(dragState.original.y + dy, 0, current.canvas.height - element.height),
-            }
-          }
-          return {
-            ...element,
-            width: clamp(dragState.original.width + dx, MIN_SIZE, current.canvas.width - element.x),
-            height: clamp(dragState.original.height + dy, MIN_SIZE, current.canvas.height - element.y),
-          }
-        })
-        return touch({ ...current, elements })
-      })
-    }
-
-    const handlePointerUp = () => {
-      if (dragSnapshotRef.current && dragMovedRef.current) {
-        pushHistorySnapshot(dragSnapshotRef.current)
-      }
-      dragSnapshotRef.current = null
-      dragMovedRef.current = false
-      setDragState(null)
-    }
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', handlePointerUp)
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', handlePointerUp)
-    }
-  }, [dragState, pushHistorySnapshot])
 
   const updateCanvas = (patch: Partial<UiTunerDocument['canvas']>) => {
     commitDocument((current) => touch({ ...current, canvas: { ...current.canvas, ...patch } }))
@@ -646,27 +611,6 @@ export default function UiTunerPage() {
     reader.readAsDataURL(file)
   }
 
-  const startDrag = (
-    event: ReactPointerEvent<HTMLElement>,
-    element: UiTunerElement,
-    mode: DragMode,
-  ) => {
-    if (event.button !== 0) return
-    event.stopPropagation()
-    event.preventDefault()
-    setSelectedId(element.id)
-    dragSnapshotRef.current = tunerDocRef.current
-    dragMovedRef.current = false
-    setDragState({
-      id: element.id,
-      mode,
-      startX: event.clientX,
-      startY: event.clientY,
-      scale: viewScale,
-      original: element,
-    })
-  }
-
   const handleCanvasKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     handleCanvasArrowKey(event, selected, tunerDoc.canvas, updateElement)
   }
@@ -676,7 +620,7 @@ export default function UiTunerPage() {
     <SourcePreviewWorkspace active={workspaceMode === 'source'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
     <div className={styles.page} style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}>
       <UiTunerLayersPanel
-        realRenderer={liveUi.state === 'connected' && Boolean(liveUi.liveFrame)}
+        realRenderer={realRenderer}
         filter={layerFilter}
         filterResult={filterResult}
         selectedId={selectedId}
@@ -703,8 +647,8 @@ export default function UiTunerPage() {
           )) ?? false}
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
-          canUndo={history.past.length > 0}
-          canRedo={history.future.length > 0}
+          canUndo={realRenderer ? (liveUi.session?.historyCount ?? 0) > 0 : history.past.length > 0}
+          canRedo={realRenderer ? (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
           onImportScreenshot={importScreenshot}
           onSelectDevice={setSelectedDeviceId}
           onRefreshDevices={refreshDevices}
@@ -717,8 +661,8 @@ export default function UiTunerPage() {
             fitCanvasToStage()
           }}
           onActualSize={() => setManualViewScale(1)}
-          onUndo={undoHistory}
-          onRedo={redoHistory}
+          onUndo={() => { if (realRenderer) void liveUi.undo(); else undoHistory() }}
+          onRedo={() => { if (realRenderer) void liveUi.redo(); else redoHistory() }}
           onSave={saveNow}
           onCopyExport={copyExport}
           onCopyCliPatch={copyCliPatch}
@@ -731,13 +675,17 @@ export default function UiTunerPage() {
           canvas={tunerDoc.canvas}
           filterResult={filterResult}
           liveFrame={liveUi.liveFrame}
-          realRenderer={liveUi.state === 'connected' && Boolean(liveUi.liveFrame)}
+          realRenderer={realRenderer}
+          runtimeConnected={liveUi.state === 'connected'}
+          runtimeGestureActive={canvasGesture.runtimeGestureActive}
+          runtimeCanMove={canvasGesture.canMove}
+          runtimeCanResize={canvasGesture.canResize}
           scrollerRef={canvasScrollerRef}
           selectedId={selectedId}
           viewScale={viewScale}
           onCanvasKeyDown={handleCanvasKeyDown}
           onClearSelection={() => setSelectedId(null)}
-          onElementPointerDown={startDrag}
+          onElementPointerDown={canvasGesture.startGesture}
           onSelectElement={setSelectedId}
         />
       </section>

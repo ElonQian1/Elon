@@ -32,6 +32,8 @@ interface UiTunerLivePanelProps {
   targetDesign: LiveTargetDesign | null
   solverResult: VisualSolverResult | null
   onApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
+  onApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
+  onGestureActive: (active: boolean) => void
   onUndo: () => Promise<void>
   onRedo: () => Promise<void>
   onReconnect: () => void
@@ -54,16 +56,20 @@ interface UiTunerLivePanelProps {
 }
 
 const NUMBER_FIELDS = [
-  ['width', '宽度', 'dp'],
-  ['height', '高度', 'dp'],
-  ['padding.start', '左内距', 'dp'],
-  ['padding.top', '上内距', 'dp'],
-  ['padding.end', '右内距', 'dp'],
-  ['padding.bottom', '下内距', 'dp'],
-  ['cornerRadius.all', '圆角', 'dp'],
-  ['textSize', '字号', 'sp'],
-  ['borderWidth', '边框', 'dp'],
-  ['opacity', '透明度', 'float'],
+  ['width', '宽度', 'dp', 1, 720],
+  ['height', '高度', 'dp', 1, 1_200],
+  ['padding.start', '左内距', 'dp', 0, 128],
+  ['padding.top', '上内距', 'dp', 0, 128],
+  ['padding.end', '右内距', 'dp', 0, 128],
+  ['padding.bottom', '下内距', 'dp', 0, 128],
+  ['margin.start', '左外距', 'dp', -96, 192],
+  ['margin.top', '上外距', 'dp', -96, 192],
+  ['margin.end', '右外距', 'dp', -96, 192],
+  ['margin.bottom', '下外距', 'dp', -96, 192],
+  ['cornerRadius.all', '圆角', 'dp', 0, 96],
+  ['textSize', '字号', 'sp', 8, 96],
+  ['borderWidth', '边框', 'dp', 0, 32],
+  ['opacity', '透明度', 'float', 0, 1],
 ] as const
 
 const COLOR_FIELDS = [
@@ -84,6 +90,8 @@ export function UiTunerLivePanel({
   targetDesign,
   solverResult,
   onApply,
+  onApplyGesture,
+  onGestureActive,
   onUndo,
   onRedo,
   onReconnect,
@@ -105,7 +113,10 @@ export function UiTunerLivePanel({
   onPrepareRuntime,
 }: UiTunerLivePanelProps) {
   const [scope, setScope] = useState<LiveUiScope>('INSTANCE')
+  const [projectRootDraft, setProjectRootDraft] = useState(projectRoot)
   const connected = state === 'connected'
+
+  useEffect(() => setProjectRootDraft(projectRoot), [projectRoot])
 
   return (
     <section className={styles.panel} data-state={state}>
@@ -118,6 +129,28 @@ export function UiTunerLivePanel({
       </div>
 
       {error && <p className={styles.hint}>{error}</p>}
+      {connected && (
+        <div className={styles.connectedProjectField}>
+          <label className={styles.projectField}>
+            <span>源码写回项目目录</span>
+            <input
+              value={projectRootDraft}
+              placeholder="例如 D:\\projects\\my-android-app"
+              onChange={(event) => setProjectRootDraft(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && projectRootDraft.trim() !== projectRoot.trim()) {
+                  onProjectRootChange(projectRootDraft)
+                }
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={!projectRootDraft.trim() || projectRootDraft.trim() === projectRoot.trim()}
+            onClick={() => onProjectRootChange(projectRootDraft)}
+          >切换源码目录</button>
+        </div>
+      )}
       {!connected && (
         <div className={styles.prepareCard}>
           <strong>启用真正的 LIVE 修改</strong>
@@ -167,13 +200,23 @@ export function UiTunerLivePanel({
           </label>
 
           <div className={styles.grid}>
-            {NUMBER_FIELDS.map(([property, label, valueType]) => node.properties[property] && (
+            {NUMBER_FIELDS.map(([property, label, valueType, minimum, maximum]) => node.properties[property] && (
               <NumberLiveField
                 key={property}
                 label={label}
                 value={numberValue(node, property)}
                 disabled={busy}
                 step={property === 'opacity' ? 0.05 : 1}
+                minimum={node.properties[property]?.constraints?.minimum ?? minimum}
+                maximum={node.properties[property]?.constraints?.maximum ?? maximum}
+                onGestureActive={onGestureActive}
+                onPreview={async (value, gestureId) => {
+                  await onApplyGesture([{
+                    property,
+                    value: { type: valueType, value },
+                  }], gestureId)
+                  onOptimisticUpdate(optimisticPatch(property, value))
+                }}
                 onCommit={async (value) => {
                   await onApply({
                     property,
@@ -412,18 +455,30 @@ function NumberLiveField({
   label,
   value,
   step,
+  minimum,
+  maximum,
   disabled,
   onCommit,
+  onPreview,
+  onGestureActive,
 }: {
   label: string
   value: number
   step: number
+  minimum: number
+  maximum: number
   disabled: boolean
   onCommit: (value: number) => Promise<unknown>
+  onPreview: (value: number, gestureId: string) => Promise<unknown>
+  onGestureActive: (active: boolean) => void
 }) {
   const [draft, setDraft] = useState(String(value))
   const [committing, setCommitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const gestureIdRef = useRef('')
+  const pendingRef = useRef<number | null>(null)
+  const inFlightRef = useRef<Promise<void> | null>(null)
+  const idleEndTimerRef = useRef<number | null>(null)
   useEffect(() => setDraft(String(value)), [value])
   const isSameValue = (next: number) => Math.abs(next - value) < Math.max(0.0001, step / 2)
   const commit = async () => {
@@ -440,20 +495,108 @@ function NumberLiveField({
       setCommitting(false)
     }
   }
+  const flushPreview = () => {
+    if (inFlightRef.current || pendingRef.current == null || !gestureIdRef.current) return
+    const next = pendingRef.current
+    pendingRef.current = null
+    const task = onPreview(next, gestureIdRef.current)
+      .then(() => undefined)
+      .catch(() => { setDraft(String(value)) })
+      .finally(() => {
+        inFlightRef.current = null
+        flushPreview()
+      })
+    inFlightRef.current = task
+  }
+  const beginPreview = () => {
+    if (disabled || committing || gestureIdRef.current) return
+    gestureIdRef.current = `slider_${Date.now()}_${Math.random().toString(16).slice(2)}`
+    onGestureActive(true)
+  }
+  const updatePreview = (next: number) => {
+    if (!gestureIdRef.current) beginPreview()
+    setDraft(String(next))
+    pendingRef.current = next
+    flushPreview()
+    if (idleEndTimerRef.current != null) window.clearTimeout(idleEndTimerRef.current)
+    idleEndTimerRef.current = window.setTimeout(() => { void endPreview() }, 220)
+  }
+  const endPreview = async () => {
+    if (!gestureIdRef.current) return
+    if (idleEndTimerRef.current != null) {
+      window.clearTimeout(idleEndTimerRef.current)
+      idleEndTimerRef.current = null
+    }
+    flushPreview()
+    while (inFlightRef.current || pendingRef.current != null) {
+      if (!inFlightRef.current) flushPreview()
+      await (inFlightRef.current ?? Promise.resolve())
+    }
+    gestureIdRef.current = ''
+    onGestureActive(false)
+  }
+  const nudgePreview = async (direction: -1 | 1) => {
+    const current = Number(draft)
+    const next = Math.min(maximum, Math.max(minimum, (Number.isFinite(current) ? current : value) + (step * direction)))
+    if (isSameValue(next)) return
+    setDraft(String(next))
+    setCommitting(true)
+    try {
+      await onCommit(next)
+    } catch {
+      setDraft(String(value))
+    } finally {
+      setCommitting(false)
+    }
+  }
   return (
     <div className={styles.liveFieldRow}>
-      <label className={styles.field}>
+      <div className={styles.liveNumberField}>
         <span>{label}</span>
-        <input
-          ref={inputRef}
-          type="number"
-          value={draft}
-          step={step}
-          disabled={disabled || committing}
-          onChange={(event) => setDraft(event.currentTarget.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') void commit() }}
-        />
-      </label>
+        <span className={styles.liveNumberInputs}>
+          <button
+            type="button"
+            aria-label={`减小${label}`}
+            disabled={disabled || committing || Number(draft) <= minimum}
+            onClick={() => { void nudgePreview(-1) }}
+          >−</button>
+          <input
+            type="range"
+            aria-label={`实时调整${label}`}
+            value={Math.min(maximum, Math.max(minimum, Number(draft) || 0))}
+            min={minimum}
+            max={maximum}
+            step={step}
+            disabled={disabled || committing}
+            onPointerDown={beginPreview}
+            onPointerUp={() => { void endPreview() }}
+            onPointerCancel={() => { void endPreview() }}
+            onKeyDown={(event) => {
+              if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'].includes(event.key)) {
+                beginPreview()
+              }
+            }}
+            onKeyUp={() => { void endPreview() }}
+            onChange={(event) => updatePreview(Number(event.currentTarget.value))}
+          />
+          <button
+            type="button"
+            aria-label={`增大${label}`}
+            disabled={disabled || committing || Number(draft) >= maximum}
+            onClick={() => { void nudgePreview(1) }}
+          >+</button>
+          <input
+            ref={inputRef}
+            type="number"
+            aria-label={label}
+            value={draft}
+            step={step}
+            disabled={disabled || committing}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') void commit() }}
+          />
+        </span>
+      </div>
       <button
         type="button"
         disabled={disabled || committing || isSameValue(Number(draft))}

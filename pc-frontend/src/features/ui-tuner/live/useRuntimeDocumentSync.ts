@@ -45,8 +45,9 @@ export function useRuntimeDocumentSync(options: RuntimeDocumentSyncOptions) {
     const signature = [
       liveUi.session.id,
       liveUi.session.treeRevision,
-      liveUi.liveFrame.capturedAt,
       liveUi.nodes.length,
+      liveUi.liveFrame.width,
+      liveUi.liveFrame.height,
     ].join(':')
     if (signatureRef.current === signature) return
     signatureRef.current = signature

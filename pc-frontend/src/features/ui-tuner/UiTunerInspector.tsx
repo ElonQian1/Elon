@@ -106,6 +106,8 @@ export function UiTunerInspector({
             targetDesign={liveUi.targetDesign}
             solverResult={liveUi.solverResult}
             onApply={liveUi.apply}
+            onApplyGesture={liveUi.applyGesture}
+            onGestureActive={liveUi.setGestureActive}
             onUndo={liveUi.undo}
             onRedo={liveUi.redo}
             onReconnect={liveUi.reconnect}
