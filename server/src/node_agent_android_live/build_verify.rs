@@ -13,6 +13,7 @@ use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify_apk::select_fresh_debug_apk;
 use super::preview::{open_preview, PreviewOpenRequest};
+use super::protocol::LiveUiNode;
 use super::ui_ir::load_or_build_ui_ir;
 use super::verification_gate::{
     evaluate_verification_gates, VerificationGateInput, VerificationGateResult,
