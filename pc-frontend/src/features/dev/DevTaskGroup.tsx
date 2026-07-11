@@ -10,6 +10,7 @@ import { PlayCircle, StopCircle } from 'lucide-react'
 import { memo, useState, useEffect, useRef, type ReactNode } from 'react'
 import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
+import TaskCompletionMeta from './TaskCompletionMeta'
 import {
   TaskProgressHighlights,
   progressFlowSurfaceItems,
@@ -300,6 +301,7 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
             reason={terminalReason}
             time={assistantProcessTime}
             beforeBubble={showProgressPanel ? renderProgressPanel(true, 'beforeReply') : null}
+            afterBubble={<TaskCompletionMeta timeline={timeline} />}
           />
         </>
       )}
@@ -332,13 +334,14 @@ function progressStatusForStage(
   return status
 }
 
-function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime, beforeBubble }: {
+function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime, beforeBubble, afterBubble }: {
   message: ChatMessage
   tone: TaskTone
   label: string
   reason?: string
   time?: string
   beforeBubble?: ReactNode
+  afterBubble?: ReactNode
 }) {
   const content = taskResultDisplayText(message)
   if (!content) return null
@@ -361,6 +364,7 @@ function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime,
         <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
           {hasMarkdown ? <MarkdownContent content={displayContent} copy /> : displayContent}
         </div>
+        {afterBubble}
       </div>
     </div>
   )

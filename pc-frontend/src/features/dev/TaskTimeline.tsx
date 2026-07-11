@@ -86,18 +86,6 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
           {display.showCoverageInDiagnostics && <CoverageStrip model={model} />}
         </TimelineFold>
       )}
-      <TimelineFold title="运行摘要" count={display.grouped.summary.length} defaultOpen={expandAll}>
-        {display.grouped.summary.map((item) => (
-          <TimelineRow
-            key={item.id}
-            item={item}
-            taskContext={taskContext}
-            expandAll={expandAll}
-            onCancel={onCancel}
-            onApprove={onApprove}
-          />
-        ))}
-      </TimelineFold>
     </div>
   )
 }

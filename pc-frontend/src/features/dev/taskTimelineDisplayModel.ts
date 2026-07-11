@@ -43,7 +43,6 @@ export function buildTimelineDisplay(model: TaskTimelineModel, {
     || primaryBlocks.length > 0
     || diagnosticCount > 0
     || visibleGrouped.connection.length > 0
-    || visibleGrouped.summary.length > 0
   return {
     grouped: visibleGrouped,
     primaryBlocks,

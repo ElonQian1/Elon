@@ -38,6 +38,9 @@ try {
   const {
     taskStageActionModel,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskStageActionModel.ts'));
+  const {
+    taskCompletionMetaModel,
+  } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskCompletionMetaModel.ts'));
 
   const mixedTimeline = buildTaskTimeline([
     {
@@ -148,6 +151,34 @@ try {
     taskStageActionModel('latest', 'running', false),
     { canContinue: false, canOpenNode: false, continueLabel: '' },
     'an active command failure stays under AI control instead of asking the user to intervene',
+  );
+
+  assert.deepStrictEqual(
+    taskCompletionMetaModel({
+      items: [{
+        event: {
+          type: 'usage',
+          model: 'gpt-5.5',
+          input_tokens: 18000,
+          output_tokens: 2000,
+        },
+      }],
+    }),
+    { model: 'gpt-5.5', usage: '输入 18,000 · 输出 2,000' },
+    'structured usage should render as completion metadata',
+  );
+  assert.deepStrictEqual(
+    taskCompletionMetaModel({
+      items: [{
+        event: {
+          type: 'usage',
+          model: 'codex',
+          message: '输入 18k tokens，输出 2k tokens。',
+        },
+      }],
+    }),
+    { model: 'codex', usage: '输入 18k tokens，输出 2k tokens。' },
+    'legacy usage messages should remain readable below the final reply',
   );
 
   assert.deepStrictEqual(

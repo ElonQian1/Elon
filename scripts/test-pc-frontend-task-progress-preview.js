@@ -8,12 +8,14 @@ const viteConfigPath = path.join(repoRoot, 'pc-frontend', 'vite.config.ts')
 const routerPath = path.join(repoRoot, 'server', 'src', 'router.rs')
 const taskGroupPath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'dev', 'DevTaskGroup.tsx')
 const progressSurfacePath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'dev', 'TaskProgressSurface.tsx')
+const timelinePath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'dev', 'TaskTimeline.tsx')
 
 const previewSource = fs.readFileSync(previewPath, 'utf8')
 const viteConfigSource = fs.readFileSync(viteConfigPath, 'utf8')
 const routerSource = fs.readFileSync(routerPath, 'utf8')
 const taskGroupSource = fs.readFileSync(taskGroupPath, 'utf8')
 const progressSurfaceSource = fs.readFileSync(progressSurfacePath, 'utf8')
+const timelineSource = fs.readFileSync(timelinePath, 'utf8')
 
 assert.match(
   viteConfigSource,
@@ -77,6 +79,16 @@ assert.match(
   progressSurfaceSource,
   /open=\{expandAll \|\| tone === 'failed'\}/,
   'debug expansion should only open local command details',
+)
+assert.doesNotMatch(
+  timelineSource,
+  /title="运行摘要"/,
+  'the processed history should not contain a nested runtime summary fold',
+)
+assert.match(
+  taskGroupSource,
+  /afterBubble=\{<TaskCompletionMeta timeline=\{timeline\} \/>\}/,
+  'usage metadata should render after the final reply',
 )
 assert.match(
   progressSurfaceSource,
