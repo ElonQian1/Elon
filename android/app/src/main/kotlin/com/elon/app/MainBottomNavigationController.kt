@@ -38,7 +38,7 @@ internal class MainBottomNavigationController(
             binding.marketplacePage
         ).forEach { view ->
             view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, inset)
-            view.clipToPadding = false
+            view.clipToPadding = true
         }
     }
 }
