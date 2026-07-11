@@ -18,9 +18,7 @@ import {
   isAppSidebarTemplateElement,
 } from './appSidebarTemplate'
 import { clamp, getMetrics, touch } from './uiTunerGeometry'
-import {
-  type AndroidInspectorSnapshot,
-} from './device/deviceInspectorApi'
+import { type AndroidInspectorSnapshot } from './device/deviceInspectorApi'
 import { UiTunerDeviceDialog } from './device/UiTunerDeviceDialog'
 import { useAndroidInspectorDevices } from './device/useAndroidInspectorDevices'
 import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
@@ -33,9 +31,8 @@ import {
 import { buildStandardInsight, stringifyStandardPackage } from './standards'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
-import { useLiveUiSession } from './live/useLiveUiSession'
 import { prepareLiveDebugRuntime } from './live/liveUiApi'
-import { preferredRuntimeSelection, runtimeNodesToTunerDocument } from './live/runtimeNodeDocument'
+import { useRuntimeDocumentSync } from './live/useRuntimeDocumentSync'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerCanvasSurface } from './UiTunerCanvasSurface'
@@ -117,7 +114,6 @@ export default function UiTunerPage() {
   const dragMovedRef = useRef(false)
   const verificationCaptureRef = useRef(false)
   const verificationBaselineRef = useRef<UiTunerVerificationBaseline | null>(null)
-  const runtimeDocumentSignatureRef = useRef('')
   const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
   const [liveTargetPackage, setLiveTargetPackage] = useState(() => {
     const captured = tunerDoc.runtimeSnapshot?.packageName ?? ''
@@ -295,57 +291,14 @@ export default function UiTunerPage() {
     }
   }, [captureDeviceSnapshot, effectiveProjectRoot, selectedDeviceId, setDeviceDialogOpen])
 
-  const liveUi = useLiveUiSession({
+  const liveUi = useRuntimeDocumentSync({
     deviceId: liveTargetPackage ? selectedDeviceId : tunerDoc.runtimeSnapshot?.deviceId,
     packageName: liveTargetPackage || tunerDoc.runtimeSnapshot?.packageName,
     projectRoot: effectiveProjectRoot,
-    debugApplicationIdSuffix: liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX)
-      ? LIVE_DEBUG_SUFFIX
-      : undefined,
-    document: tunerDoc,
-    selected,
-    onNotice: setNotice,
+    debugApplicationIdSuffix: liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX) ? LIVE_DEBUG_SUFFIX : undefined,
+    document: tunerDoc, selected, workspaceMode, documentRef: tunerDocRef, selectedIdRef,
+    setDocument: setTunerDoc, setSelectedId, onNotice: setNotice,
   })
-
-  useEffect(() => {
-    if (
-      workspaceMode !== 'evidence'
-      || liveUi.state !== 'connected'
-      || !liveUi.session
-      || !liveUi.liveFrame
-      || liveUi.nodes.length === 0
-    ) {
-      if (liveUi.state !== 'connected') runtimeDocumentSignatureRef.current = ''
-      return
-    }
-    const signature = [
-      liveUi.session.id,
-      liveUi.session.treeRevision,
-      liveUi.liveFrame.capturedAt,
-      liveUi.nodes.length,
-    ].join(':')
-    if (runtimeDocumentSignatureRef.current === signature) return
-    runtimeDocumentSignatureRef.current = signature
-    const previousSelected = tunerDocRef.current.elements.find(
-      (element) => element.id === selectedIdRef.current,
-    ) ?? null
-    setTunerDoc((current) => {
-      const next = runtimeNodesToTunerDocument(
-        current,
-        liveUi.session as NonNullable<typeof liveUi.session>,
-        liveUi.nodes,
-        liveUi.liveFrame as NonNullable<typeof liveUi.liveFrame>,
-      )
-      setSelectedId(preferredRuntimeSelection(previousSelected, next.elements))
-      return next
-    })
-  }, [
-    liveUi.liveFrame,
-    liveUi.nodes,
-    liveUi.session,
-    liveUi.state,
-    workspaceMode,
-  ])
 
   const handleLiveOptimisticUpdate = useCallback((patch: Partial<UiTunerElement>) => {
     const currentId = selectedIdRef.current
