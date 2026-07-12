@@ -3,6 +3,7 @@ package com.elon.uiruntime.view
 import android.os.Build
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
@@ -15,6 +16,7 @@ import java.lang.reflect.Method
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 internal object UiRuntimeViewAdapter {
     private val zeroArgMethodsByClass = ConcurrentHashMap<Class<*>, Map<String, Method>>()
@@ -72,6 +74,9 @@ internal object UiRuntimeViewAdapter {
             "freeTranslate" to false,
             "text" to (view is TextView),
             "textSize" to (view is TextView),
+            "fontWeight" to (view is TextView),
+            "lineHeight" to (view is TextView),
+            "letterSpacing" to (view is TextView),
             "backgroundColor" to true,
             "contentColor" to (view is TextView),
             "cornerRadius" to supportsCornerRadius(view),
@@ -176,6 +181,17 @@ internal object UiRuntimeViewAdapter {
                 ?: error("目标 View 不支持文字")
             "textSize" -> (view as? TextView)?.setTextSize(TypedValue.COMPLEX_UNIT_SP, number(operation.value).toFloat())
                 ?: error("目标 View 不支持字号")
+            "fontWeight" -> applyFontWeight(
+                view as? TextView ?: error("目标 View 不支持字重"),
+                number(operation.value).roundToInt(),
+            )
+            "lineHeight" -> applyLineHeight(
+                view as? TextView ?: error("目标 View 不支持行高"),
+                number(operation.value),
+            )
+            "letterSpacing" -> (view as? TextView)?.let {
+                it.letterSpacing = number(operation.value).toFloat()
+            } ?: error("目标 View 不支持字距")
             "opacity" -> view.alpha = number(operation.value).toFloat().coerceIn(0f, 1f)
             "visibility" -> view.visibility = when (operation.value.value.asString.lowercase(Locale.ROOT)) {
                 "visible" -> View.VISIBLE
@@ -211,6 +227,9 @@ internal object UiRuntimeViewAdapter {
         "cornerRadius.all" -> dpValue(pxToDp(view, cornerRadius(view)))
         "text" -> textValue((view as? TextView)?.text?.toString().orEmpty())
         "textSize" -> spValue((view as? TextView)?.let(::textSizeSp) ?: 0f)
+        "fontWeight" -> floatValue((view as? TextView)?.let(::fontWeight)?.toFloat() ?: 400f)
+        "lineHeight" -> spValue((view as? TextView)?.let(::lineHeightSp) ?: 0f)
+        "letterSpacing" -> floatValue((view as? TextView)?.letterSpacing ?: 0f)
         "opacity" -> floatValue(view.alpha)
         "visibility" -> enumValue(visibilityName(view.visibility))
         "translationX" -> dpValue(pxToDp(view, view.translationX))
@@ -232,6 +251,9 @@ internal object UiRuntimeViewAdapter {
         if (view is TextView) {
             addProperty(properties, "text", textValue(view.text?.toString().orEmpty()), null, resourceId)
             addProperty(properties, "textSize", spValue(textSizeSp(view)), null, resourceId)
+            addProperty(properties, "fontWeight", floatValue(fontWeight(view).toFloat()), null, resourceId)
+            addProperty(properties, "lineHeight", spValue(lineHeightSp(view)), null, resourceId)
+            addProperty(properties, "letterSpacing", floatValue(view.letterSpacing), null, resourceId)
             addProperty(properties, "contentColor", colorValue(view.currentTextColor), null, resourceId)
         }
     }
@@ -358,6 +380,38 @@ internal object UiRuntimeViewAdapter {
         )
     } else {
         view.textSize / view.resources.displayMetrics.scaledDensity
+    }
+
+    private fun fontWeight(view: TextView): Int = if (Build.VERSION.SDK_INT >= 28) {
+        view.typeface?.weight ?: 400
+    } else if (view.typeface?.isBold == true) {
+        700
+    } else {
+        400
+    }
+
+    private fun applyFontWeight(view: TextView, weight: Int) {
+        val safeWeight = weight.coerceIn(1, 1000)
+        val italic = view.typeface?.isItalic == true
+        view.typeface = if (Build.VERSION.SDK_INT >= 28) {
+            Typeface.create(view.typeface ?: Typeface.DEFAULT, safeWeight, italic)
+        } else {
+            Typeface.create(view.typeface ?: Typeface.DEFAULT, if (safeWeight >= 600) Typeface.BOLD else Typeface.NORMAL)
+        }
+    }
+
+    private fun lineHeightSp(view: TextView): Float =
+        view.lineHeight / view.resources.displayMetrics.scaledDensity
+
+    private fun applyLineHeight(view: TextView, valueSp: Double) {
+        val pixels = (valueSp * view.resources.displayMetrics.scaledDensity).roundToInt().coerceAtLeast(1)
+        if (Build.VERSION.SDK_INT >= 28) {
+            view.lineHeight = pixels
+            return
+        }
+        val metrics = view.paint.fontMetricsInt
+        val fontHeight = metrics.descent - metrics.ascent
+        view.setLineSpacing((pixels - fontHeight).coerceAtLeast(0).toFloat(), 1f)
     }
     private fun dp(view: View, px: Int): LivePropertyValue = dpValue(pxToDp(view, px.toFloat()))
     private fun dpValue(value: Double): LivePropertyValue = LivePropertyValue("dp", JsonPrimitive(round(value)))
