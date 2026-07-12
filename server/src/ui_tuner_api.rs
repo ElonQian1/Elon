@@ -11,7 +11,9 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
-    store::CreateUiTunerContextArtifact,
+    store::{
+        CreateUiTunerContextArtifact, UiLearnedRoute, UiRouteLearningSource,
+    },
     types::AppState,
 };
 
@@ -39,6 +41,101 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/modules/ui-tuner/memories/:memory_id",
             patch(review_memory),
         )
+        .route(
+            "/api/projects/:project_id/modules/ui-tuner/route-learning",
+            get(list_route_learning).post(confirm_route_learning),
+        )
+        .route(
+            "/api/projects/:project_id/modules/ui-tuner/route-learning/:entry_id",
+            patch(revoke_route_learning),
+        )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ConfirmRouteLearningBody {
+    message: String,
+    route: String,
+    reason: Option<String>,
+}
+
+async fn list_route_learning(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    if let Err(response) = authorized_developer(&state, &headers, &project_id) {
+        return response;
+    }
+    match state.store.list_ui_route_learning(&project_id, 200) {
+        Ok(entries) => Json(serde_json::json!({ "entries": entries })).into_response(),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    }
+}
+
+async fn confirm_route_learning(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(body): Json<ConfirmRouteLearningBody>,
+) -> Response {
+    let user = match authorized_developer(&state, &headers, &project_id) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let route = match body.route.trim().to_ascii_lowercase().as_str() {
+        "ui" | "ui_design" => UiLearnedRoute::Ui,
+        "non_ui" | "code" | "normal" => UiLearnedRoute::NonUi,
+        _ => return json_error(StatusCode::BAD_REQUEST, "route 必须是 ui 或 non_ui"),
+    };
+    let reason = body
+        .reason
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("用户在 UI 调优模块明确纠正路由");
+    match state.store.confirm_ui_route_learning(
+        &project_id,
+        Some(&user.id),
+        &body.message,
+        route,
+        UiRouteLearningSource::UserOverride,
+        reason,
+    ) {
+        Ok(entry) => Json(entry).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RevokeRouteLearningBody {
+    reason: Option<String>,
+}
+
+async fn revoke_route_learning(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, entry_id)): Path<(String, String)>,
+    Json(body): Json<RevokeRouteLearningBody>,
+) -> Response {
+    let user = match authorized_developer(&state, &headers, &project_id) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let reason = body
+        .reason
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("用户撤销错误的 UI 路由经验");
+    match state
+        .store
+        .revoke_ui_route_learning(&project_id, &entry_id, &user.id, reason)
+    {
+        Ok(entry) => Json(entry).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
 }
 
 #[derive(Deserialize)]
