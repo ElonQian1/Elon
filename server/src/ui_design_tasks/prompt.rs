@@ -40,6 +40,9 @@ pub(crate) fn append_ui_design_task_context(
          Execution contract:\n\
          - {mode_contract}\n\
          - {image_contract}\n\
+         - TOOL-FIRST GATE: before any source edit, call ui_get_design_task, ui_get_project_profile and ui_get_runtime_status. Do not begin with repository-wide source reading.\n\
+         - For style-only requests, resolve the smallest matching Runtime node and try ui_propose_live_patch/ui_apply_live_patch first. Let the user-visible real renderer prove the change before committing it.\n\
+         - Source editing is allowed only for structural changes, unbound properties or an unavailable/unsupported Runtime. State that fallback reason explicitly and read only ui_get_source_bundle or the smallest necessary files.\n\
          - Prefer project UI profile, component catalog, design tokens and targeted source bundles over scanning the whole repository.\n\
          - Do not stop after writing a skeleton or source file. For CREATE_NEW/EXTEND_EXISTING, compile and call ui_prepare_debug_runtime so the real Android Renderer becomes the authority.\n\
          - Bind only a clean TARGET_DESIGN with ui_bind_target_design. Map annotated requests with ui_map_annotations_to_nodes instead of comparing annotation pixels.\n\
@@ -201,6 +204,8 @@ mod tests {
         assert!(prompt.contains(TASK_MARKER_BEGIN));
         assert!(prompt.contains("text-only UI request"));
         assert!(prompt.contains("MODIFY_EXISTING"));
+        assert!(prompt.contains("TOOL-FIRST GATE"));
+        assert!(prompt.contains("before any source edit"));
     }
 
     #[test]

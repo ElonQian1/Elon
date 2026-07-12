@@ -120,7 +120,7 @@ pub(crate) async fn handle_request(
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
-            "instructions": "全新页面先读 ui_get_project_profile 和 ui_get_design_task；已有 Runtime 再读 ui_get_screen_summary。仅在需要时读取节点、局部源码和裁剪。LIVE 数值优先使用 ui_propose_live_patch/ui_apply_live_patch，结构修改才编辑源码。"
+            "instructions": "强制 Tool-first：任何源码编辑前先调用 ui_get_design_task、ui_get_project_profile、ui_get_runtime_status。已有 Runtime 再读 ui_get_screen_summary，并只读取目标节点/子树。样式请求必须优先 ui_propose_live_patch/ui_apply_live_patch；只有结构变化、未绑定属性或 Runtime 不可用时才读取 ui_get_source_bundle 并做最小源码修改，同时说明降级原因。全新页面使用档案默认值创建骨架、首次构建，再回到真实 Renderer。"
         })),
         "notifications/initialized" => return Value::Null,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
