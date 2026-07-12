@@ -496,19 +496,31 @@ pub(super) async fn run_session(
                                             }));
                                             return;
                                         }
-                                    };
+                                };
                                 let original_prompt = prompt.clone();
-                                let prompt = match crate::node_agent_ui_design_workspace::prepare_ui_design_workspace(
+                                let ui_design_routed = crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);
+                                let (prompt, ui_design_workspace_ready) = match crate::node_agent_ui_design_workspace::prepare_ui_design_workspace(
                                     prompt,
                                     prepared_cwd.cwd.as_deref(),
                                     &resolved_args,
                                 ) {
-                                    Ok(prompt) => prompt,
+                                    Ok(prompt) => (prompt, true),
                                     Err(error) => {
                                         warn!(error = %error, "UI 设计任务本地工件准备失败，继续使用原始任务上下文");
-                                        format!("{original_prompt}\n\nUI design workspace preparation failed: {error:#}\n请先诊断附件与项目工作区，再继续任务。")
+                                        (format!("{original_prompt}\n\nUI design workspace preparation failed: {error:#}\n请先诊断附件与项目工作区，再继续任务。"), false)
                                     }
                                 };
+                                if ui_design_routed {
+                                    let status = if ui_design_workspace_ready { "READY" } else { "DEGRADED" };
+                                    let event = serde_json::json!({
+                                        "type": "elon.ui_design.route",
+                                        "status": status,
+                                    });
+                                    let _ = tx_c.send(ws_text(&AgentToServer::CliChunk {
+                                        req_id: req_id_for_cleanup.clone(),
+                                        text: format!("{event}\n"),
+                                    }));
+                                }
                                 let handle = node_agent_active_task::ActiveCliPromptHandle::new(
                                     req_id_for_cleanup.clone(),
                                     resolved_cli.name().to_string(),

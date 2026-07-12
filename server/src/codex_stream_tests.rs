@@ -26,6 +26,15 @@ fn explains_live_patch_as_real_component_redraw() {
 }
 
 #[test]
+fn shows_ui_route_before_codex_reads_source() {
+    let messages =
+        stream_event_to_ws_messages(r#"{"type":"elon.ui_design.route","status":"READY"}"#, None);
+    assert!(messages
+        .iter()
+        .any(|message| message.contains("先预览，后写回源码")));
+}
+
+#[test]
 fn stream_event_emits_tool_call_and_progress_for_command_started() {
     let line = r#"{"type":"item.started","item":{"id":"call_1","type":"command_execution","command":"cargo check"}}"#;
     let msgs = stream_event_to_ws_messages(line, None);

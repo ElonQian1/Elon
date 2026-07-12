@@ -11,6 +11,10 @@ const TASK_MARKER_END: &str = "</elon-ui-design-task>";
 const MAX_SCANNED_FILES: usize = 4_000;
 const MAX_CANDIDATES: usize = 80;
 
+pub(crate) fn is_ui_design_task_prompt(prompt: &str) -> bool {
+    prompt.contains(TASK_MARKER_BEGIN) && prompt.contains(TASK_MARKER_END)
+}
+
 pub(crate) fn prepare_ui_design_workspace(
     prompt: String,
     cwd: Option<&str>,

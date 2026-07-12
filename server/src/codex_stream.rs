@@ -35,6 +35,14 @@ pub(crate) fn stream_event_to_ws_messages(line: &str, model_used: Option<&str>) 
     };
 
     match event_type {
+        "elon.ui_design.route" => {
+            let message = if value.get("status").and_then(Value::as_str) == Some("READY") {
+                "已识别 UI 样式任务，正在使用实时调优工具链（先预览，后写回源码）"
+            } else {
+                "已识别 UI 样式任务，但本地 UI 工件准备失败，正在安全降级诊断"
+            };
+            push_progress(&mut out, message.to_string());
+        }
         "item.started" => handle_item_started(&value, &mut out, push_progress),
         "item.completed" => {
             handle_item_completed(&value, &mut out, push_progress, model_used_owned.as_deref())
