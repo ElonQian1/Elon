@@ -28,8 +28,8 @@ mod gradle;
 
 use geometry::{patched_bounds, patched_bounds_for_nodes, verification_bounds};
 use gradle::{
-    canonical_project_root, find_gradle_root, gradle_wrapper, run_debug_build,
-    validate_debug_application_id_suffix, validate_package_name,
+    canonical_project_root, find_gradle_root, gradle_wrapper, infer_debug_application_id_suffix,
+    run_debug_build, validate_debug_application_id_suffix, validate_package_name,
 };
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -154,12 +154,22 @@ pub(crate) async fn build_and_verify(
     let artifact_not_before = SystemTime::now()
         .checked_sub(Duration::from_secs(2))
         .unwrap_or(SystemTime::UNIX_EPOCH);
-    let debug_application_id_suffix = request
+    let explicit_debug_application_id_suffix = request
         .debug_application_id_suffix
         .as_deref()
         .map(validate_debug_application_id_suffix)
-        .transpose()?;
-    run_debug_build(&gradle_root, &wrapper, debug_application_id_suffix).await?;
+        .transpose()?
+        .map(str::to_string);
+    let debug_application_id_suffix = match explicit_debug_application_id_suffix {
+        Some(value) => Some(value),
+        None => infer_debug_application_id_suffix(&gradle_root, &session.package_name)?,
+    };
+    run_debug_build(
+        &gradle_root,
+        &wrapper,
+        debug_application_id_suffix.as_deref(),
+    )
+    .await?;
     let build_duration_ms = build_started.elapsed().as_millis();
     let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
 

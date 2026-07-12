@@ -117,6 +117,61 @@ pub(super) fn validate_package_name(value: &str) -> Result<&str> {
     Ok(value)
 }
 
+pub(super) fn infer_debug_application_id_suffix(
+    gradle_root: &Path,
+    package_name: &str,
+) -> Result<Option<String>> {
+    for relative in [
+        "app/build.gradle",
+        "app/build.gradle.kts",
+        "build.gradle",
+        "build.gradle.kts",
+    ] {
+        let path = gradle_root.join(relative);
+        if !path.is_file() {
+            continue;
+        }
+        let text = std::fs::read_to_string(&path)
+            .with_context(|| format!("无法读取 Gradle 配置: {}", path.display()))?;
+        let Some(base_application_id) = application_id_literal(&text) else {
+            continue;
+        };
+        if package_name == base_application_id {
+            return Ok(None);
+        }
+        let Some(suffix) = package_name.strip_prefix(&base_application_id) else {
+            bail!(
+                "当前会话包 {package_name} 不是项目 applicationId {base_application_id} 的 Debug 变体"
+            );
+        };
+        validate_debug_application_id_suffix(suffix)?;
+        return Ok(Some(suffix.to_string()));
+    }
+    Ok(None)
+}
+
+fn application_id_literal(text: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let line = line.trim();
+        let remainder = line.strip_prefix("applicationId")?;
+        if remainder
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        {
+            return None;
+        }
+        let value = remainder.trim().strip_prefix('=').unwrap_or(remainder.trim()).trim();
+        let quote = value.chars().next()?;
+        if !matches!(quote, '\'' | '"') {
+            return None;
+        }
+        let rest = &value[quote.len_utf8()..];
+        let end = rest.find(quote)?;
+        Some(rest[..end].to_string())
+    })
+}
+
 fn tail_output(stdout: &[u8], stderr: &[u8]) -> String {
     let combined = format!(
         "{}\n{}",
@@ -129,4 +184,40 @@ fn tail_output(stdout: &[u8], stderr: &[u8]) -> String {
         .unwrap_or(&combined)
         .trim()
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn infers_suffix_from_groovy_application_id() {
+        let root = std::env::temp_dir().join(format!(
+            "debug-suffix-test-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(root.join("app")).unwrap();
+        std::fs::write(
+            root.join("app/build.gradle"),
+            "android { defaultConfig {\n  applicationId \"com.example.app\"\n} }",
+        )
+        .unwrap();
+        assert_eq!(
+            infer_debug_application_id_suffix(&root, "com.example.app.uituner").unwrap(),
+            Some(".uituner".to_string())
+        );
+        assert_eq!(
+            infer_debug_application_id_suffix(&root, "com.example.app").unwrap(),
+            None
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn parses_kotlin_assignment_literal() {
+        assert_eq!(
+            application_id_literal("applicationId = \"com.example.kotlin\""),
+            Some("com.example.kotlin".to_string())
+        );
+    }
 }
