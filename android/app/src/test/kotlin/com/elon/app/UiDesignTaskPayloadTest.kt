@@ -57,6 +57,17 @@ class UiDesignTaskPayloadTest {
     }
 
     @Test
+    fun englishBuildRequestDoesNotMatchUiSubstring() {
+        val payload = buildUiDesignTaskPayload(
+            traceId = "build-1",
+            outgoingText = "build apk and publish release",
+            attachmentRefs = JsonArray()
+        )
+
+        assertNull(payload)
+    }
+
+    @Test
     fun explicitUiDesignSelectionWorksWithoutImage() {
         val payload = buildUiDesignTaskPayload(
             traceId = "explicit-1",

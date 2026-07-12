@@ -147,7 +147,7 @@ private fun looksLikeUiExtension(text: String): Boolean =
             !BEHAVIOR_MARKERS.any(text::contains))
 
 private val HIGH_CONFIDENCE_UI_MARKERS = listOf(
-    "设计稿", "设计图", "草稿图", "ui", "界面", "页面样式", "组件样式", "像素", "1:1", "拟合",
+    "设计稿", "设计图", "草稿图", "界面", "页面样式", "组件样式", "像素", "1:1", "拟合",
     "优化界面", "美化页面", "ui样式", "ui设计"
 )
 private val UI_SUBJECT_MARKERS = listOf(
