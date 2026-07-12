@@ -58,10 +58,10 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             "在已确认 Compose 的项目中创建不会覆盖现有文件的最小 Screen + Preview 骨架。创建后仍需按项目组件和主题补全并编译。",
             json!({
                 "type":"object",
-                "required":["relativeFile","packageName","screenName","screenId"],
+                "required":["screenName","screenId"],
                 "properties":{
-                    "relativeFile":{"type":"string","description":"模块 src/main 或 src/debug 下的 .kt 相对路径"},
-                    "packageName":{"type":"string"},
+                    "relativeFile":{"type":"string","description":"可选；默认根据 UI Profile 的 app 模块和 namespace 生成"},
+                    "packageName":{"type":"string","description":"可选；默认使用 UI Profile 的 Android namespace"},
                     "screenName":{"type":"string"},
                     "screenId":{"type":"string"}
                 }

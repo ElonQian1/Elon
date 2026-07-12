@@ -43,10 +43,24 @@ pub(crate) fn create_compose_screen_scaffold(
     if profile.pointer("/capabilities/jetpackCompose") != Some(&Value::Bool(true)) {
         bail!("项目 UI Profile 未确认 Jetpack Compose，拒绝生成 Compose 页面");
     }
-    let relative_file = required_string(arguments, "relativeFile")?;
-    let package_name = required_string(arguments, "packageName")?;
     let screen_name = required_string(arguments, "screenName")?;
     let screen_id = required_string(arguments, "screenId")?;
+    let package_name = optional_string(arguments, "packageName")
+        .or_else(|| {
+            profile
+                .pointer("/android/namespace")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned)
+        })
+        .or_else(|| {
+            profile
+                .pointer("/android/applicationId")
+                .and_then(Value::as_str)
+                .map(ToOwned::to_owned)
+        })
+        .ok_or_else(|| anyhow!("UI Profile 未识别 Android namespace；请显式提供 packageName"))?;
+    let relative_file = optional_string(arguments, "relativeFile")
+        .unwrap_or_else(|| default_compose_source_path(&profile, &package_name, &screen_name));
     validate_package(&package_name)?;
     validate_identifier(&screen_name, "screenName")?;
     validate_screen_id(&screen_id)?;
@@ -187,8 +201,8 @@ fn canonical_project_root(session: &LiveUiSession) -> Result<PathBuf> {
 }
 
 fn read_json_artifact(path: &Path) -> Result<Value> {
-    let metadata = fs::metadata(path)
-        .with_context(|| format!("UI 设计工件不存在: {}", path.display()))?;
+    let metadata =
+        fs::metadata(path).with_context(|| format!("UI 设计工件不存在: {}", path.display()))?;
     if metadata.len() > MAX_ARTIFACT_BYTES {
         bail!("UI 设计工件过大: {}", path.display());
     }
@@ -217,9 +231,12 @@ fn latest_task_dir(tasks_root: &Path) -> Result<PathBuf> {
 fn safe_new_kotlin_path(root: &Path, relative: &str) -> Result<PathBuf> {
     let relative = Path::new(relative.trim());
     if relative.is_absolute()
-        || relative
-            .components()
-            .any(|component| matches!(component, Component::ParentDir | Component::RootDir | Component::Prefix(_)))
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
         || relative.extension().and_then(|value| value.to_str()) != Some("kt")
     {
         bail!("relativeFile 必须是项目内的 .kt 相对路径");
@@ -232,23 +249,48 @@ fn safe_new_kotlin_path(root: &Path, relative: &str) -> Result<PathBuf> {
 }
 
 fn required_string(arguments: &Value, field: &str) -> Result<String> {
+    optional_string(arguments, field).ok_or_else(|| anyhow!("缺少 {field}"))
+}
+
+fn optional_string(arguments: &Value, field: &str) -> Option<String> {
     arguments
         .get(field)
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
-        .ok_or_else(|| anyhow!("缺少 {field}"))
+}
+
+fn default_compose_source_path(profile: &Value, package_name: &str, screen_name: &str) -> String {
+    let module = profile
+        .pointer("/candidates/buildFiles")
+        .and_then(Value::as_array)
+        .and_then(|files| {
+            files.iter().filter_map(Value::as_str).find(|path| {
+                path == &"app/build.gradle"
+                    || path == &"app/build.gradle.kts"
+                    || path.ends_with("/app/build.gradle")
+                    || path.ends_with("/app/build.gradle.kts")
+            })
+        })
+        .and_then(|path| Path::new(path).parent())
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .filter(|path| !path.is_empty())
+        .unwrap_or_else(|| "app".to_string());
+    format!(
+        "{module}/src/main/kotlin/{}/{}.kt",
+        package_name.replace('.', "/"),
+        screen_name
+    )
 }
 
 fn validate_package(value: &str) -> Result<()> {
     if value.len() > 240
         || value.split('.').any(|segment| {
             segment.is_empty()
-                || !segment
-                    .chars()
-                    .enumerate()
-                    .all(|(index, ch)| ch == '_' || ch.is_ascii_alphanumeric() && (index > 0 || !ch.is_ascii_digit()))
+                || !segment.chars().enumerate().all(|(index, ch)| {
+                    ch == '_' || ch.is_ascii_alphanumeric() && (index > 0 || !ch.is_ascii_digit())
+                })
         })
     {
         bail!("packageName 不是合法 Kotlin package");
@@ -258,10 +300,9 @@ fn validate_package(value: &str) -> Result<()> {
 
 fn validate_identifier(value: &str, field: &str) -> Result<()> {
     if value.len() > 120
-        || !value
-            .chars()
-            .enumerate()
-            .all(|(index, ch)| ch == '_' || ch.is_ascii_alphanumeric() && (index > 0 || !ch.is_ascii_digit()))
+        || !value.chars().enumerate().all(|(index, ch)| {
+            ch == '_' || ch.is_ascii_alphanumeric() && (index > 0 || !ch.is_ascii_digit())
+        })
     {
         bail!("{field} 不是合法 Kotlin 标识符");
     }
@@ -326,4 +367,20 @@ private fun {screen_name}Preview() {{
 }}
 "#
     )
+}
+
+#[cfg(test)]
+mod scaffold_tests {
+    use super::*;
+
+    #[test]
+    fn derives_compose_path_from_profile_without_source_scan() {
+        let profile = json!({
+            "candidates": { "buildFiles": ["android/app/build.gradle.kts"] }
+        });
+        assert_eq!(
+            default_compose_source_path(&profile, "com.example.checkout", "CheckoutScreen"),
+            "android/app/src/main/kotlin/com/example/checkout/CheckoutScreen.kt"
+        );
+    }
 }
