@@ -138,7 +138,8 @@ private fun looksLikeUiDesignRequest(text: String): Boolean {
 }
 
 private val HIGH_CONFIDENCE_UI_MARKERS = listOf(
-    "设计稿", "设计图", "草稿图", "ui", "界面", "页面样式", "组件样式", "像素", "1:1", "拟合"
+    "设计稿", "设计图", "草稿图", "ui", "界面", "页面样式", "组件样式", "像素", "1:1", "拟合",
+    "优化界面", "美化页面", "ui样式", "ui设计"
 )
 private val UI_SUBJECT_MARKERS = listOf(
     "页面", "按钮", "卡片", "文本", "文字", "标题", "图标", "图片", "导航", "弹窗", "列表", "组件"
@@ -154,13 +155,14 @@ private val UI_ACTION_MARKERS = listOf(
 )
 private val UI_SEMANTIC_MARKERS = listOf(
     "更紧凑", "更突出", "更明显", "更好看", "更协调", "更圆", "更小", "更大", "太松", "太挤", "太宽",
-    "太窄", "太高", "太矮", "样式", "视觉", "美化", "美观"
+    "太窄", "太高", "太矮", "太大", "太小", "改大", "改小", "样式", "视觉", "美化", "美观"
 )
 private val CREATE_MARKERS = listOf(
     "全新页面", "新建页面", "创建页面", "从零开始", "还没有源码", "没有相关源码", "create new screen"
 )
 private val EXTEND_MARKERS = listOf(
-    "扩展页面", "增加区域", "新增区域", "添加组件", "新增组件", "extend existing"
+    "扩展页面", "增加区域", "新增区域", "添加组件", "新增组件", "增加按钮", "添加按钮", "新增按钮",
+    "增加卡片", "添加卡片", "新增卡片", "extend existing"
 )
 private val MODIFY_MARKERS = listOf(
     "修改现有", "调整现有", "还原设计稿", "按图修改", "修改样式", "modify existing"

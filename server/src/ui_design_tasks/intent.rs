@@ -66,6 +66,7 @@ fn looks_like_ui_request(text: &str, has_image: bool) -> bool {
     let has_subject = contains_any(text, UI_SUBJECT_MARKERS);
     (has_property && has_action)
         || (has_subject && contains_any(text, UI_SEMANTIC_MARKERS))
+        || (contains_any(text, UI_SURFACE_MARKERS) && contains_any(text, UI_SURFACE_ACTION_MARKERS))
         || is_create_request(text)
         || contains_any(text, EXTEND_MARKERS)
         || contains_any(text, MODIFY_MARKERS)
@@ -125,10 +126,16 @@ const HIGH_CONFIDENCE_UI_MARKERS: &[&str] = &[
     "像素级",
     "1:1",
     "ui拟合",
+    "优化界面",
+    "美化页面",
+    "ui样式",
+    "ui设计",
 ];
 const UI_SUBJECT_MARKERS: &[&str] = &[
     "页面", "按钮", "卡片", "文本", "文字", "标题", "图标", "图片", "导航", "弹窗", "列表", "组件",
 ];
+const UI_SURFACE_MARKERS: &[&str] = &["页面", "界面", "screen", "page"];
+const UI_SURFACE_ACTION_MARKERS: &[&str] = &["优化", "美化", "调整样式", "polish", "restyle"];
 const UI_PROPERTY_MARKERS: &[&str] = &[
     "颜色",
     "圆角",
@@ -179,6 +186,10 @@ const UI_SEMANTIC_MARKERS: &[&str] = &[
     "太窄",
     "太高",
     "太矮",
+    "太大",
+    "太小",
+    "改大",
+    "改小",
     "样式",
     "视觉",
     "美化",
@@ -208,6 +219,12 @@ const EXTEND_MARKERS: &[&str] = &[
     "新增区域",
     "添加组件",
     "新增组件",
+    "增加按钮",
+    "添加按钮",
+    "新增按钮",
+    "增加卡片",
+    "添加卡片",
+    "新增卡片",
     "extend existing",
 ];
 const MODIFY_MARKERS: &[&str] = &[
@@ -256,5 +273,18 @@ mod tests {
         let task = infer_ui_design_task("创建一个新的结算页面", None)
             .expect("new screen should be inferred");
         assert_eq!(task.mode, UiDesignTaskMode::CreateNew);
+    }
+
+    #[test]
+    fn recognizes_natural_visual_phrases_and_structure_additions() {
+        assert!(infer_ui_design_task("这个按钮太大了，改小一点", None).is_some());
+        assert!(infer_ui_design_task("优化一下这个界面", None).is_some());
+        assert_eq!(
+            infer_ui_design_task("在列表里新增一张卡片", None)
+                .expect("extension should route")
+                .mode,
+            UiDesignTaskMode::ExtendExisting
+        );
+        assert!(infer_ui_design_task("调整按钮点击逻辑", None).is_none());
     }
 }
