@@ -15,6 +15,20 @@ pub(crate) fn is_ui_design_task_prompt(prompt: &str) -> bool {
     prompt.contains(TASK_MARKER_BEGIN) && prompt.contains(TASK_MARKER_END)
 }
 
+pub(crate) fn ui_design_route_status(prompt: &str) -> Option<&'static str> {
+    let envelope = task_envelope(prompt)?;
+    match envelope
+        .pointer("/task/route_learning_origin")
+        .or_else(|| envelope.pointer("/task/routeLearningOrigin"))
+        .and_then(Value::as_str)
+    {
+        Some("ambiguous_local") => Some("AMBIGUOUS"),
+        Some("active_library") => Some("LEARNED"),
+        Some("local_confirmed") => Some("LOCAL_CONFIRMED"),
+        _ => Some("READY"),
+    }
+}
+
 pub(crate) fn prepare_ui_design_workspace(
     prompt: String,
     cwd: Option<&str>,

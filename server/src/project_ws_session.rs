@@ -245,6 +245,7 @@ pub(crate) async fn handle_project_ws(
                 "client_request_id": &client_request_id,
                 "message_chars": message.chars().count(),
                 "display_message_chars": display_message.chars().count(),
+                "ui_route_source": resolved_ui_route.source,
                 "agent": request.agent.as_deref(),
                 "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
                 "direct_pc_cli": direct_pc_cli,

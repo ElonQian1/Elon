@@ -157,6 +157,7 @@ pub async fn chat_project(
             "user_id": &user.id,
             "conversation_id": &conversation_id,
             "message_chars": message.chars().count(),
+            "ui_route_source": resolved_ui_route.source,
             "agent": req.agent.as_deref(),
             "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
             "execution_mode": req.execution_mode.as_deref(),

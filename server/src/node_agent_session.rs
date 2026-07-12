@@ -499,6 +499,7 @@ pub(super) async fn run_session(
                                 };
                                 let original_prompt = prompt.clone();
                                 let ui_design_routed = crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);
+                                let ui_design_route_status = crate::node_agent_ui_design_workspace::ui_design_route_status(&original_prompt).unwrap_or("READY");
                                 let (prompt, ui_design_workspace_ready) = match crate::node_agent_ui_design_workspace::prepare_ui_design_workspace(
                                     prompt,
                                     prepared_cwd.cwd.as_deref(),
@@ -511,7 +512,7 @@ pub(super) async fn run_session(
                                     }
                                 };
                                 if ui_design_routed {
-                                    let status = if ui_design_workspace_ready { "READY" } else { "DEGRADED" };
+                                    let status = if ui_design_workspace_ready { ui_design_route_status } else { "DEGRADED" };
                                     let event = serde_json::json!({
                                         "type": "elon.ui_design.route",
                                         "status": status,
