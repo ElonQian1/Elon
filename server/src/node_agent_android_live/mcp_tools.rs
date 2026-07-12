@@ -18,6 +18,24 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             json!({"type":"object","properties":{}}),
         ),
         tool(
+            "ui_list_render_devices",
+            "列出远程 PC 节点当前可用于真实 Android Renderer 的设备和模拟器，并给出推荐设备。",
+            json!({"type":"object","properties":{}}),
+        ),
+        tool(
+            "ui_prepare_debug_runtime",
+            "首次页面骨架编译完成后，构建并安装带 Debug Runtime 的 APK，自动优先选择模拟器并把项目 MCP 升级到 LIVE。",
+            json!({
+                "type":"object",
+                "required":["basePackageName"],
+                "properties":{
+                    "basePackageName":{"type":"string"},
+                    "deviceId":{"type":"string","description":"可选；不填时优先选择在线模拟器"},
+                    "debugApplicationIdSuffix":{"type":"string","default":".uitest"}
+                }
+            }),
+        ),
+        tool(
             "ui_create_compose_screen_scaffold",
             "在已确认 Compose 的项目中创建不会覆盖现有文件的最小 Screen + Preview 骨架。创建后仍需按项目组件和主题补全并编译。",
             json!({

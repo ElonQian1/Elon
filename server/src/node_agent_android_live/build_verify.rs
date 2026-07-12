@@ -76,6 +76,7 @@ pub(crate) struct PrepareDebugRuntimeRequest {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PrepareDebugRuntimeResult {
     pub(crate) package_name: String,
+    pub(crate) session_id: Option<String>,
     pub(crate) build: BuildVerifyResult,
 }
 
@@ -87,6 +88,23 @@ pub(crate) async fn prepare_debug_runtime(
     broker: &LiveUiBroker,
     request: PrepareDebugRuntimeRequest,
     host_port: u16,
+) -> Result<PrepareDebugRuntimeResult> {
+    prepare_debug_runtime_inner(broker, request, host_port, false).await
+}
+
+pub(crate) async fn bootstrap_debug_runtime(
+    broker: &LiveUiBroker,
+    request: PrepareDebugRuntimeRequest,
+    host_port: u16,
+) -> Result<PrepareDebugRuntimeResult> {
+    prepare_debug_runtime_inner(broker, request, host_port, true).await
+}
+
+async fn prepare_debug_runtime_inner(
+    broker: &LiveUiBroker,
+    request: PrepareDebugRuntimeRequest,
+    host_port: u16,
+    keep_session: bool,
 ) -> Result<PrepareDebugRuntimeResult> {
     let device_id = request.device_id.trim();
     let base_package_name = validate_package_name(request.base_package_name.trim())?;
@@ -119,12 +137,27 @@ pub(crate) async fn prepare_debug_runtime(
         host_port,
     )
     .await;
-    let _ = stop_runtime(&session).await;
-    broker.remove_session(&session_id).await;
-    result.map(|build| PrepareDebugRuntimeResult {
-        package_name,
-        build,
-    })
+    match result {
+        Ok(build) if keep_session => Ok(PrepareDebugRuntimeResult {
+            package_name,
+            session_id: Some(session_id),
+            build,
+        }),
+        Ok(build) => {
+            let _ = stop_runtime(&session).await;
+            broker.remove_session(&session_id).await;
+            Ok(PrepareDebugRuntimeResult {
+                package_name,
+                session_id: None,
+                build,
+            })
+        }
+        Err(error) => {
+            let _ = stop_runtime(&session).await;
+            broker.remove_session(&session_id).await;
+            Err(error)
+        }
+    }
 }
 
 pub(crate) async fn build_and_verify(
