@@ -642,6 +642,7 @@ export default function UiTunerPage() {
           runtimeCanMove={canvasGesture.canMove}
           runtimeCanResize={canvasGesture.canResize}
           liveNode={liveUi.selectedNode}
+          liveNodes={liveUi.nodes}
           liveSession={liveUi.session}
           previewRequest={liveUi.previewRequest}
           uploadedTarget={liveUi.targetDesign}

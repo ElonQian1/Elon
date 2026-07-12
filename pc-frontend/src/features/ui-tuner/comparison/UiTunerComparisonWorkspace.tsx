@@ -31,6 +31,7 @@ interface UiTunerComparisonWorkspaceProps {
   filterResult: UiTunerFilterResult
   liveFrame: LiveUiFrame | null
   liveNode: LiveUiNode | null
+  liveNodes: LiveUiNode[]
   liveSession: LiveUiSession | null
   previewRequest: LivePreviewRequest | null
   uploadedTarget: LiveTargetDesign | null
@@ -62,6 +63,7 @@ export function UiTunerComparisonWorkspace({
   filterResult,
   liveFrame,
   liveNode,
+  liveNodes,
   liveSession,
   previewRequest,
   uploadedTarget,
@@ -123,6 +125,7 @@ export function UiTunerComparisonWorkspace({
         runtimeNodeId: liveNode.runtimeNodeId,
         definitionId: liveNode.definitionId,
         componentKind: liveNode.kind,
+        parentLayoutKind: parentLayoutKind(liveNode, liveNodes),
         instanceKey: liveNode.instanceKey,
         currentRect: pair.currentRect,
         projectedTargetRect: pair.projectedTargetRect,
@@ -143,7 +146,7 @@ export function UiTunerComparisonWorkspace({
       properties: editableSolverProperties(liveNode),
       autoStart: true,
     }
-  }, [comparison.pair, liveFrame, liveNode, previewRequest, target, uploadedTarget])
+  }, [comparison.pair, liveFrame, liveNode, liveNodes, previewRequest, target, uploadedTarget])
   const fitRun = useFitRun({ sessionId: liveSession?.id, input: fitInput, onNotice })
   const chooseAutoRegion = useCallback((region: DesignDiffRegion) => {
     const candidate = region.candidates.find((item) => (
@@ -272,6 +275,21 @@ const SOLVER_PROPERTIES = new Set([
   'cornerRadius.all', 'textSize', 'borderWidth', 'backgroundColor', 'contentColor',
   'borderColor',
 ])
+
+function parentLayoutKind(node: LiveUiNode, nodes: LiveUiNode[]) {
+  const parent = node.parentRuntimeNodeId
+    ? nodes.find((candidate) => candidate.runtimeNodeId === node.parentRuntimeNodeId)
+    : undefined
+  const value = `${parent?.kind ?? ''} ${parent?.className ?? ''}`.toLowerCase()
+  if (value.includes('column')) return 'column'
+  if (value.includes('row')) return 'row'
+  if (value.includes('constraint')) return 'constraint'
+  if (value.includes('grid')) return 'grid'
+  if (value.includes('lazy')) return 'lazy-list'
+  if (value.includes('linear')) return 'linear'
+  if (value.includes('frame') || value.includes('box')) return 'box'
+  return parent?.kind || undefined
+}
 
 function editableSolverProperties(node: LiveUiNode) {
   return Object.entries(node.properties)
