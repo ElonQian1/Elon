@@ -3,11 +3,13 @@
 //! 本模块只描述任务意图和确定性路由，不负责执行 Codex、构建或 Live Runtime。
 
 mod model;
+mod prompt;
 
 pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,
 };
+pub(crate) use prompt::append_ui_design_task_context;
 
 #[cfg(test)]
 mod tests;

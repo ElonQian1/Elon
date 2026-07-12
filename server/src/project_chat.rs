@@ -41,6 +41,7 @@ use crate::{
     store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AppState, WsMessage},
+    ui_design_tasks::append_ui_design_task_context,
 };
 
 pub async fn chat_project(
@@ -131,6 +132,10 @@ pub async fn chat_project(
         display_message.clone(),
         req.attachments.as_deref(),
     );
+    let message = match append_ui_design_task_context(message, req.ui_design_task.as_ref()) {
+        Ok(message) => message,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+    };
     let trace_id = clean_trace_id(req.trace_id.as_deref());
     state.server_traces.record(
         &trace_id,
@@ -391,6 +396,10 @@ pub async fn chat_project_stream(
         display_message.clone(),
         req.attachments.as_deref(),
     );
+    let message = match append_ui_design_task_context(message, req.ui_design_task.as_ref()) {
+        Ok(message) => message,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+    };
     let trace_id = clean_trace_id(req.trace_id.as_deref());
     let task_id = match state.store.create_task_with_display_message(
         &project.id,
