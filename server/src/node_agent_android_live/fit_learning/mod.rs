@@ -5,6 +5,7 @@
 
 mod case_builder;
 mod coordinator;
+mod diagnostics;
 mod eval;
 mod historical_evaluator;
 mod prior_index;
@@ -13,6 +14,7 @@ mod store;
 mod types;
 
 pub(crate) use coordinator::{record_and_promote, top_k_for_run};
+pub(crate) use diagnostics::learning_summary;
 pub(crate) use types::{FitPrior, FitUserDecision};
 
 #[cfg(test)]
