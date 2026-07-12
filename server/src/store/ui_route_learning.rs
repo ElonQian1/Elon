@@ -22,11 +22,11 @@ impl UiLearnedRoute {
         }
     }
 
-    fn parse(value: &str) -> Result<Self> {
+    fn parse(value: &str) -> Option<Self> {
         match value {
-            "ui" => Ok(Self::Ui),
-            "non_ui" => Ok(Self::NonUi),
-            _ => Err(anyhow!("未知 UI 路由经验值: {value}")),
+            "ui" => Some(Self::Ui),
+            "non_ui" => Some(Self::NonUi),
+            _ => None,
         }
     }
 }
@@ -296,9 +296,10 @@ impl Store {
              WHERE scope_type = 'project' AND scope_id = ?1
              ORDER BY updated_at DESC LIMIT ?2",
         )?;
-        Ok(statement
+        let entries = statement
             .query_map(params![project_id, limit.clamp(1, 200) as i64], map_entry)?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(entries)
     }
 }
 
@@ -326,13 +327,8 @@ fn map_entry(row: &Row<'_>) -> rusqlite::Result<UiRouteLearningEntry> {
         scope_id: row.get(2)?,
         phrase_key: row.get(3)?,
         sample_text: row.get(4)?,
-        learned_route: UiLearnedRoute::parse(&learned_route).map_err(|error| {
-            rusqlite::Error::FromSqlConversionFailure(
-                5,
-                rusqlite::types::Type::Text,
-                Box::new(error),
-            )
-        })?,
+        learned_route: UiLearnedRoute::parse(&learned_route)
+            .ok_or(rusqlite::Error::InvalidQuery)?,
         status: row.get(6)?,
         source: row.get(7)?,
         confidence: row.get(8)?,
