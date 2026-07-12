@@ -137,16 +137,38 @@ pub(super) fn constrained_value(node: &LiveUiNode, property: &str, value: f64) -
     let minimum = constraints
         .and_then(|value| value.get("minimum"))
         .and_then(|value| value.as_f64())
-        .unwrap_or(if property == "opacity" {
-            0.0
-        } else {
-            -10_000.0
+        .unwrap_or(match property {
+            "opacity" => 0.0,
+            "fontWeight" => 1.0,
+            "letterSpacing" => -1.0,
+            "textSize" | "lineHeight" | "width" | "height" | "borderWidth"
+            | "cornerRadius.all" => 0.0,
+            _ => -10_000.0,
         });
     let maximum = constraints
         .and_then(|value| value.get("maximum"))
         .and_then(|value| value.as_f64())
-        .unwrap_or(if property == "opacity" { 1.0 } else { 10_000.0 });
+        .unwrap_or(match property {
+            "opacity" => 1.0,
+            "fontWeight" => 1_000.0,
+            "letterSpacing" => 1.0,
+            _ => 10_000.0,
+        });
     value.clamp(minimum, maximum)
+}
+
+/// 将统一的“布局 dp 步长”换算成各属性自己的量纲。
+///
+/// 字重、字距和透明度若直接共用 4dp 的步长，会产生 404 这类没有设计
+/// 意义的字重，或让字距一次跳到边界。求解器仍使用同一个退火节奏，但
+/// 每个属性以符合 Android API 语义的尺度试探。
+pub(super) fn property_search_step(property: &str, base_step: f64) -> f64 {
+    match property {
+        "fontWeight" => base_step * 25.0,
+        "letterSpacing" => base_step / 80.0,
+        "opacity" => base_step / 20.0,
+        _ => base_step,
+    }
 }
 
 pub(super) fn operations_from_values(values: &BTreeMap<String, f64>) -> Vec<LivePatchOperation> {
@@ -291,5 +313,23 @@ mod tests {
             &BTreeMap::from([("padding.start".to_string(), 15.0)]),
         );
         assert_eq!(values["padding.start"], 20.0);
+    }
+
+    #[test]
+    fn typography_search_steps_use_property_units() {
+        assert_eq!(property_search_step("textSize", 4.0), 4.0);
+        assert_eq!(property_search_step("lineHeight", 4.0), 4.0);
+        assert_eq!(property_search_step("fontWeight", 4.0), 100.0);
+        assert_eq!(property_search_step("letterSpacing", 4.0), 0.05);
+        assert_eq!(property_search_step("opacity", 4.0), 0.2);
+    }
+
+    #[test]
+    fn unconstrained_typography_values_stay_in_android_ranges() {
+        let node = editable_node();
+        assert_eq!(constrained_value(&node, "fontWeight", 1_200.0), 1_000.0);
+        assert_eq!(constrained_value(&node, "fontWeight", -10.0), 1.0);
+        assert_eq!(constrained_value(&node, "letterSpacing", 4.0), 1.0);
+        assert_eq!(constrained_value(&node, "letterSpacing", -4.0), -1.0);
     }
 }

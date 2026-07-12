@@ -13,7 +13,7 @@ use super::visual_diff::{compare_target_with_png_projected, PixelRect, VisualDif
 use super::visual_solver_style_hints::target_color_operations;
 use super::visual_solver_values::{
     constrained_value, initial_values, operations_from_values, predicted_rect,
-    seed_geometry_target, seed_prior_deltas, solver_properties,
+    property_search_step, seed_geometry_target, seed_prior_deltas, solver_properties,
 };
 
 const DEFAULT_MAX_EVALUATIONS: usize = 16;
@@ -127,9 +127,10 @@ pub(crate) async fn solve_visual_style(
                 }
                 let mut candidate = best_values.clone();
                 let current = candidate.get(property).copied().unwrap_or_default();
+                let property_step = property_search_step(property, step);
                 candidate.insert(
                     property.clone(),
-                    constrained_value(&node, property, current + step * direction),
+                    constrained_value(&node, property, current + property_step * direction),
                 );
                 let scored = evaluate(
                     broker,
