@@ -165,6 +165,7 @@ export function UiTunerComparisonWorkspace({
     return true
   }, [comparison, document.elements, onNotice, onSelectElement])
   const autoQueue = useAutoFitQueue({
+    sessionId: liveSession?.id,
     fitRun,
     fitInput,
     activateRegion: chooseAutoRegion,

@@ -1,6 +1,6 @@
 import { nodeApi } from '../../node/localNodeApi'
 import { inspectorAdminUrl } from '../device/deviceInspectorApi'
-import type { CreateFitRunInput, FitRunCommand, FitRunDocument } from './types'
+import type { CreateFitRunInput, FitBatchAcceptResult, FitRunCommand, FitRunDocument } from './types'
 
 function fitRunsPath(sessionId: string) {
   return `/api/android-live/sessions/${encodeURIComponent(sessionId)}/fit-runs`
@@ -57,4 +57,22 @@ export async function sendFitRunCommand(
 export function fitRunCommandId(type: FitRunCommand['type']) {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)
   return `${type.toLowerCase()}-${Date.now()}-${random}`
+}
+
+export async function acceptFitRunBatch(
+  sessionId: string,
+  runIds: string[],
+  sourceRevision: string,
+  codexCompleted = false,
+) {
+  const response = await nodeApi<{ result: FitBatchAcceptResult }>(
+    inspectorAdminUrl(),
+    `${fitRunsPath(sessionId)}/batch-accept`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ runIds, sourceRevision, codexCompleted }),
+    },
+    20 * 60_000,
+  )
+  return response.result
 }

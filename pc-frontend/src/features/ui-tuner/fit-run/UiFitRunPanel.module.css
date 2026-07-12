@@ -69,6 +69,7 @@
 }
 
 .queueError { margin: 0; color: #ff9b9b; font-size: 10px; }
+.queueNotice { margin: 0; color: #b8d9ff; font-size: 10px; line-height: 1.45; }
 
 .panel {
   display: grid;

@@ -1,4 +1,4 @@
-import { ListRestart, PlayCircle } from 'lucide-react'
+import { ListRestart, PlayCircle, Save } from 'lucide-react'
 import type { DesignDiffRegionAnalysis } from '../comparison/autoPairApi'
 import type { useAutoFitQueue } from './useAutoFitQueue'
 import styles from './UiFitRunPanel.module.css'
@@ -22,6 +22,10 @@ export function AutoFitQueuePanel({ analysis, queue }: AutoFitQueuePanelProps) {
           <button type="button" disabled={runnable.length === 0} onClick={() => queue.start(runnable)}>
             <PlayCircle size={13} aria-hidden="true" />拟合全部 {runnable.length} 个节点
           </button>
+        ) : queue.phase === 'READY_TO_COMMIT' ? (
+          <button type="button" onClick={() => { void queue.commit() }}>
+            <Save size={13} aria-hidden="true" />统一写回并验收
+          </button>
         ) : (
           <button type="button" disabled={queue.active} onClick={queue.reset}>
             <ListRestart size={13} aria-hidden="true" />重置队列
@@ -44,6 +48,8 @@ export function AutoFitQueuePanel({ analysis, queue }: AutoFitQueuePanelProps) {
         </div>
       )}
       {queue.error && <p className={styles.queueError}>{queue.error}</p>}
+      {queue.phase === 'CODEX_RUNNING' && <p className={styles.queueNotice}>Codex 正在处理必要的结构源码，完成后自动验收。</p>}
+      {queue.phase === 'READY_TO_COMMIT' && <p className={styles.queueNotice}>Live 效果已就绪，源码尚未修改；确认后只构建和安装一次。</p>}
     </section>
   )
 }
@@ -51,6 +57,9 @@ export function AutoFitQueuePanel({ analysis, queue }: AutoFitQueuePanelProps) {
 function queueLabel(phase: string, index: number, total: number) {
   if (phase === 'IDLE') return '等待启动'
   if (phase === 'COMPLETED') return `已完成 ${total}/${total}`
+  if (phase === 'READY_TO_COMMIT') return `已拟合 ${total}/${total}，待统一写回`
+  if (phase === 'COMMITTING') return '正在统一写回和构建验收'
+  if (phase === 'CODEX_RUNNING') return 'Codex 正在一次性处理复杂源码'
   if (phase === 'FAILED') return `停在 ${Math.max(index + 1, 1)}/${total}`
   return `正在处理 ${index + 1}/${total}`
 }

@@ -1,4 +1,6 @@
 import type { LivePatchOperation } from '../live/liveUiApi'
+import type { LiveBuildVerifyResult } from '../live/liveUiApi'
+import type { LiveSourceCommitPlan, LiveSourceCommitResult } from '../live/liveUiCommitApi'
 import type { PixelRect } from '../live/liveUiIrApi'
 
 export type FitRunPhase =
@@ -150,6 +152,18 @@ export interface FitRunDocument {
   updatedAt: string
   lastSequence: number
   lastError?: string
+  sourceRevision?: string
+}
+
+export interface FitBatchAcceptResult {
+  status: 'BUILD_VERIFIED' | 'VERIFY_FAILED' | 'CODEX_REQUIRED'
+  runIds: string[]
+  plan: LiveSourceCommitPlan | { mode: 'CODEX_COMPLETED' }
+  commit?: LiveSourceCommitResult
+  build?: LiveBuildVerifyResult
+  codexBundle?: Record<string, unknown>
+  codexArtifactPath?: string
+  runs: FitRunDocument[]
 }
 
 export interface CreateFitRunInput {
