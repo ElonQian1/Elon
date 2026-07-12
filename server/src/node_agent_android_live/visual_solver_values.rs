@@ -38,6 +38,9 @@ pub(super) fn solver_properties(node: &LiveUiNode, requested: &[String]) -> Resu
                 | "margin.bottom"
                 | "cornerRadius.all"
                 | "textSize"
+                | "fontWeight"
+                | "lineHeight"
+                | "letterSpacing"
                 | "borderWidth"
         ) {
             bail!("视觉求解不支持属性: {property}");
@@ -153,7 +156,8 @@ pub(super) fn operations_from_values(values: &BTreeMap<String, f64>) -> Vec<Live
             property: property.clone(),
             value: LivePropertyValue {
                 value_type: match property.as_str() {
-                    "textSize" => "sp",
+                    "textSize" | "lineHeight" => "sp",
+                    "fontWeight" | "letterSpacing" => "float",
                     "opacity" => "float",
                     _ => "dp",
                 }

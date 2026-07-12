@@ -44,6 +44,18 @@ fn accepts_typed_live_style_properties() {
 }
 
 #[test]
+fn accepts_live_typography_properties() {
+    for (property, value_type, value) in [
+        ("fontWeight", "float", serde_json::json!(650)),
+        ("lineHeight", "sp", serde_json::json!(22)),
+        ("letterSpacing", "float", serde_json::json!(0.02)),
+    ] {
+        let value = patch(property, value_type, value);
+        assert!(value.validate().is_ok(), "{property} should be editable");
+    }
+}
+
+#[test]
 fn rejects_unknown_properties_and_invalid_values() {
     assert!(patch("onClick", "text", json!("rm -rf"))
         .validate()
