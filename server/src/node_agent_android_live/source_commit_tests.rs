@@ -206,6 +206,58 @@ fn defers_single_instance_commit_for_repeated_definition() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn mixed_plan_writes_deterministic_entries_and_preserves_codex_deferred_entries() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-live-mixed-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let layout_dir = root.join("app/src/main/res/layout");
+    fs::create_dir_all(&layout_dir).expect("create layout dir");
+    let layout_file = layout_dir.join("checkout.xml");
+    fs::write(
+        &layout_file,
+        r#"<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/pay_button"
+    android:layout_width="match_parent"
+    android:layout_height="48dp" />"#,
+    )
+    .expect("write layout");
+
+    let plan = build_plan(
+        "live_mixed",
+        LiveCommitSnapshot {
+            project_root: Some(root.display().to_string()),
+            nodes: vec![live_node()],
+            patches: vec![patch(vec![
+                operation("height", "dp", json!(56)),
+                operation("parentArrangement", "enum", json!("spaceBetween")),
+            ])],
+        },
+    )
+    .expect("build mixed plan");
+    assert_eq!(plan.deterministic_count, 1);
+    assert_eq!(plan.codex_count, 1);
+    let revision = plan.source_revision.clone();
+
+    let result = apply_source_commit_plan(
+        plan,
+        SourceCommitRequest {
+            source_revision: revision,
+        },
+    )
+    .expect("commit deterministic subset");
+
+    assert_eq!(result.committed_count, 1);
+    assert_eq!(result.deferred_count, 1);
+    assert_eq!(result.deferred[0].property, "parentArrangement");
+    assert!(fs::read_to_string(layout_file)
+        .expect("read layout")
+        .contains("android:layout_height=\"56dp\""));
+
+    let _ = fs::remove_dir_all(root);
+}
+
 fn live_node() -> LiveUiNode {
     LiveUiNode {
         runtime_node_id: "rn_1".to_string(),
