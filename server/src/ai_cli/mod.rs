@@ -1,5 +1,4 @@
 // server/src/ai_cli/mod.rs
-
 pub(crate) mod ai_cli_apk_build_script;
 mod ai_cli_apk_sync;
 mod ai_cli_chat;
@@ -19,6 +18,7 @@ mod ai_cli_streaming;
 mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
+mod ai_cli_ui_route_learning;
 mod pc_agent_dispatch;
 mod pc_artifact_completion;
 mod pc_billing;
@@ -27,7 +27,6 @@ mod pc_dispatch_capture;
 mod pc_passthrough_events;
 mod pc_passthrough_reply;
 pub(crate) mod pc_prompt_acceptance;
-
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
@@ -973,33 +972,7 @@ async fn run_via_pc_agent(
                 session_id,
                 ..
             } => {
-                if is_codex {
-                    if let Some(scope) = native_session_scope.as_ref() {
-                        match crate::ui_design_tasks::finalize_ui_route_learning(
-                            &state.store,
-                            &scope.project_id,
-                            &scope.user_id,
-                            user_message,
-                            &full_text,
-                            exit_ok,
-                        ) {
-                            Ok(Some(entry)) => {
-                                let _ = tx.send(
-                                    WsMessage::progress(format!(
-                                        "已记录 UI 路由经验：{}（{}）",
-                                        entry.sample_text.chars().take(40).collect::<String>(),
-                                        entry.status
-                                    ))
-                                    .to_json(),
-                                );
-                            }
-                            Ok(None) => {}
-                            Err(error) => {
-                                tracing::warn!(error = %error, "记录 UI 路由经验失败");
-                            }
-                        }
-                    }
-                }
+                ai_cli_ui_route_learning::finalize_ui_route_learning(is_codex, native_session_scope.as_ref(), user_message, &full_text, exit_ok, state.as_ref(), tx);
                 if is_codex {
                     let events = pc_cli_passthrough_events_flush(
                         &mut codex_passthrough_line_buffer,
