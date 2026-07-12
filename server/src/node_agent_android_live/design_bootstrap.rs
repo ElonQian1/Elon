@@ -2,9 +2,11 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde_json::{json, Value};
 
 use super::broker::LiveUiSession;
+use super::ui_ir::TargetDesignUpload;
 
 const MAX_ARTIFACT_BYTES: u64 = 512 * 1024;
 
@@ -90,6 +92,88 @@ pub(crate) fn create_compose_screen_scaffold(
         "screenName": composable_name,
         "nextPhase": "COMPILE_BOOTSTRAP"
     }))
+}
+
+pub(crate) fn target_design_upload(
+    session: &LiveUiSession,
+    arguments: &Value,
+) -> Result<TargetDesignUpload> {
+    let root = canonical_project_root(session)?;
+    let bundle = design_task(session, arguments)?;
+    let envelope = bundle
+        .get("task")
+        .ok_or_else(|| anyhow!("设计任务缺少 task.json"))?;
+    let intent = envelope
+        .pointer("/task/attachment_intent")
+        .or_else(|| envelope.pointer("/task/attachmentIntent"))
+        .and_then(Value::as_str)
+        .unwrap_or("AUTO");
+    if intent != "TARGET_DESIGN" {
+        bail!(
+            "只有 TARGET_DESIGN 可绑定为像素目标；当前是 {intent}，标注层和风格参考不得参与像素拟合"
+        );
+    }
+    let requested_id = arguments
+        .get("attachmentId")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            envelope
+                .pointer("/task/target_design_attachment_id")
+                .or_else(|| envelope.pointer("/task/targetDesignAttachmentId"))
+                .and_then(Value::as_str)
+        });
+    let entries = bundle
+        .pointer("/attachments/attachments")
+        .and_then(Value::as_array)
+        .ok_or_else(|| anyhow!("设计任务没有本地附件"))?;
+    let entry = requested_id
+        .and_then(|attachment_id| {
+            entries.iter().find(|entry| {
+                entry
+                    .pointer("/metadata/attachment_id")
+                    .or_else(|| entry.pointer("/metadata/attachmentId"))
+                    .and_then(Value::as_str)
+                    == Some(attachment_id)
+            })
+        })
+        .or_else(|| entries.first())
+        .ok_or_else(|| anyhow!("找不到目标设计附件"))?;
+    if entry.get("verified").and_then(Value::as_bool) != Some(true) {
+        bail!("目标设计附件 SHA 校验未通过");
+    }
+    let local_path = entry
+        .get("localPath")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("目标设计附件缺少 localPath"))?;
+    let local_path = PathBuf::from(local_path)
+        .canonicalize()
+        .context("目标设计附件不存在")?;
+    if !local_path.starts_with(&root) {
+        bail!("目标设计附件不在项目任务目录中");
+    }
+    let bytes = fs::read(&local_path)?;
+    if bytes.is_empty() || bytes.len() > 16 * 1024 * 1024 {
+        bail!("目标设计附件大小必须在 1..16MiB");
+    }
+    let mime_type = entry
+        .pointer("/metadata/mime_type")
+        .or_else(|| entry.pointer("/metadata/mimeType"))
+        .and_then(Value::as_str)
+        .unwrap_or("image/png");
+    if !matches!(mime_type, "image/png" | "image/jpeg") {
+        bail!("目标设计只支持 PNG/JPEG");
+    }
+    let name = entry
+        .pointer("/metadata/display_name")
+        .or_else(|| entry.pointer("/metadata/displayName"))
+        .and_then(Value::as_str)
+        .unwrap_or("target-design.png")
+        .to_string();
+    Ok(TargetDesignUpload {
+        name,
+        data_url: format!("data:{mime_type};base64,{}", B64.encode(bytes)),
+        figma_url: None,
+    })
 }
 
 fn canonical_project_root(session: &LiveUiSession) -> Result<PathBuf> {

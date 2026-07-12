@@ -36,6 +36,17 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_bind_target_design",
+            "把已校验的 TARGET_DESIGN 手机附件绑定为视觉 Diff/FitRun 目标。标注修改图和风格参考图会被拒绝。",
+            json!({
+                "type":"object",
+                "properties":{
+                    "taskId":{"type":"string"},
+                    "attachmentId":{"type":"string"}
+                }
+            }),
+        ),
+        tool(
             "ui_create_compose_screen_scaffold",
             "在已确认 Compose 的项目中创建不会覆盖现有文件的最小 Screen + Preview 骨架。创建后仍需按项目组件和主题补全并编译。",
             json!({

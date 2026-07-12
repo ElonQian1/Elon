@@ -13,7 +13,9 @@ use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_a
 use super::mcp_tools::tool_definitions;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
-use super::ui_ir::{load_or_build_ui_ir, UiIrDocument};
+use super::ui_ir::{
+    bind_ui_ir, load_or_build_ui_ir, persist_target_design, BindUiIrRequest, UiIrDocument,
+};
 use super::visual_diff::{compare_images, PixelRect, VisualDiffRequest};
 use super::visual_solver::{solve_visual_style, VisualSolverRequest};
 
@@ -213,6 +215,25 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             )
             .await?;
             json!({ "result": result, "nextPhase": "LIVE" })
+        }
+        "ui_bind_target_design" => {
+            let session = broker.session(&session_id).await?;
+            let upload = super::design_bootstrap::target_design_upload(&session, &arguments)?;
+            let target = persist_target_design(broker, &session_id, upload).await?;
+            let existing = load_or_build_ui_ir(broker, &session_id).await?;
+            let ir = bind_ui_ir(
+                broker,
+                &session_id,
+                BindUiIrRequest {
+                    snapshot: existing.snapshot,
+                    selected_runtime_node_id: existing.selected_runtime_node_id,
+                    source_candidates: existing.source_candidates,
+                    target_design: Some(target.clone()),
+                    clear_target_design: false,
+                },
+            )
+            .await?;
+            json!({ "targetDesign": target, "uiIrRevision": ir.revision })
         }
         "ui_create_compose_screen_scaffold" => {
             let session = broker.session(&session_id).await?;
