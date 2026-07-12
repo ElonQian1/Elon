@@ -31,6 +31,7 @@ pub(super) fn infer_ui_design_task(
         infer_attachment_intent(&normalized, has_annotations, !images.is_empty());
     let primary_id = images.iter().find_map(|item| item.attachment_id.clone());
     let mut task = UiDesignTaskInput {
+        task_id: Some(format!("design_auto_{}", uuid::Uuid::new_v4().simple())),
         mode,
         attachment_intent,
         ..UiDesignTaskInput::default()
@@ -239,6 +240,10 @@ mod tests {
             .expect("UI request should be inferred");
         assert_eq!(task.mode, UiDesignTaskMode::ModifyExisting);
         assert_eq!(task.attachment_intent, UiDesignAttachmentIntent::Auto);
+        assert!(task
+            .task_id
+            .as_deref()
+            .is_some_and(|id| id.starts_with("design_auto_")));
     }
 
     #[test]
