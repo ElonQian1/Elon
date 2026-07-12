@@ -9,6 +9,7 @@ import {
 } from './fitRunEvents'
 import type { useFitRun } from './useFitRun'
 import type { CreateFitRunInput, FitBatchAcceptResult } from './types'
+import { getFitLearningSummary, type FitLearningSummary } from './fitLearningApi'
 
 export type AutoFitQueuePhase =
   | 'IDLE' | 'ACTIVATING' | 'RUNNING' | 'READY_TO_COMMIT'
@@ -37,9 +38,26 @@ export function useAutoFitQueue({
   const [batchResult, setBatchResult] = useState<FitBatchAcceptResult | null>(null)
   const [codexTaskId, setCodexTaskId] = useState('')
   const [sourceRevision, setSourceRevision] = useState('')
+  const [learningSummary, setLearningSummary] = useState<FitLearningSummary | null>(null)
   const actionRef = useRef(false)
   const stagedRef = useRef<string[]>([])
   const current = currentIndex >= 0 ? regions[currentIndex] : undefined
+
+  const refreshLearning = useCallback(async () => {
+    if (!sessionId) {
+      setLearningSummary(null)
+      return null
+    }
+    try {
+      const summary = await getFitLearningSummary(sessionId)
+      setLearningSummary(summary)
+      return summary
+    } catch {
+      return null
+    }
+  }, [sessionId])
+
+  useEffect(() => { void refreshLearning() }, [refreshLearning])
 
   const start = useCallback((source: DesignDiffRegion[]) => {
     const runnable = source.filter((region) => region.recommendedRuntimeNodeId && region.candidates.length > 0)
@@ -103,6 +121,7 @@ export function useAutoFitQueue({
         throw new Error(result.build?.message || '批量源码结果未通过双门禁')
       }
       setPhase('COMPLETED')
+      void refreshLearning()
       onNotice?.(`全页面拟合完成：${stagedRef.current.length} 个节点只构建一次并通过双门禁`)
       return result
     } catch (cause) {
@@ -112,7 +131,7 @@ export function useAutoFitQueue({
     } finally {
       actionRef.current = false
     }
-  }, [onNotice, sessionId, sourceRevision])
+  }, [onNotice, refreshLearning, sessionId, sourceRevision])
 
   useEffect(() => listenForFitRunCodexSettled((settlement) => {
     if (!codexTaskId || settlement.taskId !== codexTaskId) return
@@ -175,6 +194,7 @@ export function useAutoFitQueue({
     current,
     stagedRunIds,
     batchResult,
+    learningSummary,
     start,
     reset,
     commit: () => executeBatch(false),
