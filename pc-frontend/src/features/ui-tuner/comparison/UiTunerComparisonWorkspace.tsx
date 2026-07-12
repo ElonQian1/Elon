@@ -16,6 +16,8 @@ import { UiTunerCanvasSurface } from '../UiTunerCanvasSurface'
 import { ComparisonModeControls } from './ComparisonModeControls'
 import { ComparisonOverlayLayer } from './ComparisonOverlayLayer'
 import { CalibrationPanel } from './CalibrationPanel'
+import { DesignDiffRegionsPanel } from './DesignDiffRegionsPanel'
+import type { DesignDiffRegion } from './autoPairApi'
 import { createCalibration } from './comparisonGeometry'
 import { TargetDesignPane } from './TargetDesignPane'
 import type { TargetCurrentPair } from './types'
@@ -140,6 +142,23 @@ export function UiTunerComparisonWorkspace({
     }
   }, [comparison.pair, liveFrame, liveNode, previewRequest, target, uploadedTarget])
   const fitRun = useFitRun({ sessionId: liveSession?.id, input: fitInput, onNotice })
+  const chooseAutoRegion = useCallback((region: DesignDiffRegion) => {
+    const candidate = region.candidates.find((item) => (
+      item.runtimeNodeId === region.recommendedRuntimeNodeId
+    )) ?? region.candidates[0]
+    if (!candidate) {
+      onNotice('这个差异区域尚未找到可编辑的真实 Android 节点')
+      return
+    }
+    const element = document.elements.find((item) => item.runtime?.nodeId === candidate.runtimeNodeId)
+    if (!element) {
+      onNotice(`已识别 ${candidate.definitionId}，但当前画布还没有对应元素，请刷新 Runtime 节点`)
+      return
+    }
+    comparison.setTargetRect(region.targetRect)
+    onSelectElement(element.id)
+    onNotice(`已自动配对 ${candidate.definitionId}，可以开始自动拟合`)
+  }, [comparison, document.elements, onNotice, onSelectElement])
   const overlay = target && comparison.mode !== 'split'
     ? (
         <ComparisonOverlayLayer
@@ -185,6 +204,11 @@ export function UiTunerComparisonWorkspace({
         onModeChange={comparison.setMode}
         onOpacityChange={comparison.setOverlayOpacity}
         onClearPair={comparison.clearPair}
+      />
+      <DesignDiffRegionsPanel
+        sessionId={liveSession?.id}
+        targetReady={Boolean(target)}
+        onChooseRegion={chooseAutoRegion}
       />
       <UiFitRunPanel fitRun={fitRun} pairReady={Boolean(fitInput)} />
       {target && (

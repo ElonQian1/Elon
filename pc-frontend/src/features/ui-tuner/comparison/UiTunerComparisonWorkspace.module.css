@@ -41,6 +41,124 @@
   font-weight: 800;
 }
 
+.autoPairPanel {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 7px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: #10141a;
+}
+
+.autoPairPanel header,
+.autoPairPanel header > div,
+.autoPairPanel header strong,
+.autoPairSummary {
+  display: flex;
+  align-items: center;
+}
+
+.autoPairPanel header {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.autoPairPanel header > div {
+  min-width: 0;
+  gap: 9px;
+}
+
+.autoPairPanel header strong {
+  flex: 0 0 auto;
+  gap: 5px;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.autoPairPanel header span,
+.autoPairSummary,
+.autoPairEmpty,
+.autoPairError {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.autoPairPanel header button {
+  height: 27px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(89, 215, 255, .45);
+  border-radius: 6px;
+  background: rgba(89, 215, 255, .1);
+  color: #dff8ff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.autoPairPanel header button:disabled {
+  cursor: not-allowed;
+  opacity: .4;
+}
+
+.autoPairSummary {
+  gap: 14px;
+}
+
+.autoPairRegions {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.autoPairRegions button {
+  position: relative;
+  min-width: 176px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 7px 30px 7px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #1a1e24;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.autoPairRegions button:hover:not(:disabled) {
+  border-color: rgba(89, 215, 255, .58);
+  background: rgba(89, 215, 255, .08);
+}
+
+.autoPairRegions strong {
+  grid-row: span 2;
+  color: var(--text-primary);
+  font-size: 10px;
+}
+
+.autoPairRegions span {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+}
+
+.autoPairRegions em {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  color: #75e7b1;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.autoPairError { color: #ff9b9b; }
+.autoPairEmpty { margin: 0; }
+
 .calibrationPanel {
   flex: 0 0 auto;
   padding: 6px 10px;
