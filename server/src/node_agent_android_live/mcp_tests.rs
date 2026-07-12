@@ -1,11 +1,12 @@
 use serde_json::json;
 
 use super::broker::LiveUiBroker;
+use super::fit_run::FitRunService;
 use super::mcp::{handle_request, McpRequest};
 
 #[tokio::test]
 async fn mcp_lists_compact_ui_tools() {
-    let broker = LiveUiBroker::new();
+    let broker = std::sync::Arc::new(LiveUiBroker::new());
     let session = broker
         .create_session(
             "device-1".to_string(),
@@ -21,7 +22,8 @@ async fn mcp_lists_compact_ui_tools() {
         "params": {}
     }))
     .unwrap();
-    let response = handle_request(&broker, &session.id, request).await;
+    let fit_runs = FitRunService::live(broker.clone());
+    let response = handle_request(&broker, &fit_runs, &session.id, request).await;
     let tools = response["result"]["tools"].as_array().unwrap();
     assert!(tools
         .iter()
@@ -32,4 +34,7 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_commit_bound_styles"));
+    assert!(tools
+        .iter()
+        .any(|tool| tool["name"] == "ui_start_fit_run"));
 }

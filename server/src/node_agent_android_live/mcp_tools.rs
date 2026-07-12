@@ -139,6 +139,49 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_start_fit_run",
+            "创建并立即启动可恢复的自动拟合任务。它会持久化每次试验、预算、最佳结果和学习案例；达到候选后再确认写回源码。",
+            json!({
+                "type":"object",
+                "required":["runtimeNodeId","targetRect","projectedTargetRect"],
+                "properties":{
+                    "runtimeNodeId":{"type":"string"},
+                    "targetRect":rect_value_schema(),
+                    "projectedTargetRect":rect_value_schema(),
+                    "properties":{"type":"array","items":{"type":"string"},"maxItems":64},
+                    "environment":{"type":"object"}
+                }
+            }),
+        ),
+        tool(
+            "ui_get_fit_run",
+            "读取一个持久化拟合任务；不传 runId 时列出当前项目最近任务。",
+            json!({
+                "type":"object",
+                "properties":{"runId":{"type":"string"}}
+            }),
+        ),
+        tool(
+            "ui_control_fit_run",
+            "控制持久化拟合任务。CANDIDATE_READY 使用 ACCEPT_BEST；AWAITING_CODEX 时按 handoff 完成小范围源码修改后报告 CODEX_COMPLETED。",
+            json!({
+                "type":"object",
+                "required":["runId","action"],
+                "properties":{
+                    "runId":{"type":"string"},
+                    "action":{"enum":["START","PAUSE","RESUME","CANCEL","ACCEPT_BEST","CODEX_STARTED","CODEX_COMPLETED","CODEX_FAILED"]},
+                    "handoffId":{"type":"string"},
+                    "taskId":{"type":"string"},
+                    "sourceRevisionBefore":{"type":"string"},
+                    "sourceRevisionAfter":{"type":"string"},
+                    "changedFiles":{"type":"array","items":{"type":"string"}},
+                    "commitId":{"type":"string"},
+                    "tokenUsage":{"type":"integer","minimum":0},
+                    "error":{"type":"string"}
+                }
+            }),
+        ),
+        tool(
             "ui_get_commit_plan",
             "分析当前 LIVE 修改的确定性写回与 Codex 回退项。",
             json!({"type":"object","properties":{}}),

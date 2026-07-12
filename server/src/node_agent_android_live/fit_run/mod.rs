@@ -15,9 +15,13 @@ mod service;
 mod store;
 mod workspace_revision;
 
-pub(crate) use model::{FitRunDocument, FitRunPhase, FitScore, FitTrial};
+pub(crate) use model::{
+    CreateFitRunRequest, FitCommand, FitEnvironment, FitRect, FitRunDocument, FitRunPhase,
+    FitScore, FitSessionContext, FitTargetPair, FitTrial,
+};
 pub(crate) use routes::protected_routes;
 pub(crate) use service::FitRunService;
+pub(crate) use workspace_revision::workspace_fingerprint;
 
 #[cfg(test)]
 mod tests;

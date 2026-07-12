@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
@@ -10,6 +11,10 @@ use super::build_verify::{
     bootstrap_debug_runtime, build_and_verify, BuildVerifyRequest, PrepareDebugRuntimeRequest,
 };
 use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_artifact};
+use super::fit_run::{
+    workspace_fingerprint, CreateFitRunRequest, FitCommand, FitEnvironment, FitRect, FitRunService,
+    FitSessionContext, FitTargetPair,
+};
 use super::mcp_tools::tool_definitions;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
@@ -105,6 +110,7 @@ pub(crate) fn cleanup_descriptor(session_id: &str) {
 
 pub(crate) async fn handle_request(
     broker: &LiveUiBroker,
+    fit_runs: &FitRunService,
     session_id: &str,
     request: McpRequest,
 ) -> Value {
@@ -118,7 +124,7 @@ pub(crate) async fn handle_request(
         })),
         "notifications/initialized" => return Value::Null,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
-        "tools/call" => call_tool(broker, session_id, request.params).await,
+        "tools/call" => call_tool(broker, fit_runs, session_id, request.params).await,
         "ping" => Ok(json!({})),
         _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
     };
@@ -132,7 +138,12 @@ pub(crate) async fn handle_request(
     }
 }
 
-async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Result<Value> {
+async fn call_tool(
+    broker: &LiveUiBroker,
+    fit_runs: &FitRunService,
+    session_id: &str,
+    params: Value,
+) -> Result<Value> {
     let session_id = broker.effective_session_id(session_id).await?;
     let name = params
         .get("name")
@@ -311,6 +322,81 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
                 serde_json::from_value(arguments).context("视觉求解参数无效")?;
             json!({ "result": solve_visual_style(broker, &session_id, request).await? })
         }
+        "ui_start_fit_run" => {
+            let ir = load_or_build_ui_ir(broker, &session_id).await?;
+            let target = ir
+                .target_design
+                .as_ref()
+                .ok_or_else(|| anyhow!("尚未绑定 TARGET_DESIGN，不能启动 FitRun"))?;
+            let node = find_node(&ir, &arguments)?;
+            let current = &node.geometry.bounds_in_display_px;
+            let environment: FitEnvironment = serde_json::from_value(
+                arguments
+                    .get("environment")
+                    .cloned()
+                    .unwrap_or_else(|| json!({ "screenId": node.screen_id })),
+            )
+            .context("environment 参数无效")?;
+            let request = CreateFitRunRequest {
+                pair: FitTargetPair {
+                    target_design_id: target.id.clone(),
+                    target_sha256: target.sha256.clone(),
+                    target_rect: fit_rect(arguments.get("targetRect"))?,
+                    runtime_node_id: node.runtime_node_id.clone(),
+                    definition_id: node.definition_id.clone(),
+                    component_kind: Some(node.kind.clone()),
+                    parent_layout_kind: None,
+                    instance_key: node.instance_key.clone(),
+                    current_rect: FitRect {
+                        left: current.left,
+                        top: current.top,
+                        right: current.right,
+                        bottom: current.bottom,
+                    },
+                    projected_target_rect: fit_rect(arguments.get("projectedTargetRect"))?,
+                    calibration_id: None,
+                    confidence: Some(1.0),
+                },
+                environment,
+                properties: arguments
+                    .get("properties")
+                    .and_then(Value::as_array)
+                    .map(|values| {
+                        values
+                            .iter()
+                            .filter_map(Value::as_str)
+                            .map(ToOwned::to_owned)
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                budget: Default::default(),
+                thresholds: Default::default(),
+                auto_start: true,
+            };
+            let context = fit_session_context(broker, &session_id).await?;
+            json!({ "run": fit_runs.create_run(context, request).await? })
+        }
+        "ui_get_fit_run" => {
+            let context = fit_session_context(broker, &session_id).await?;
+            if let Some(run_id) = arguments.get("runId").and_then(Value::as_str) {
+                json!({ "run": fit_runs.get_run(&context, run_id)? })
+            } else {
+                json!({ "runs": fit_runs.list_runs(&context)? })
+            }
+        }
+        "ui_control_fit_run" => {
+            let run_id = arguments
+                .get("runId")
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow!("缺少 runId"))?;
+            let action = arguments
+                .get("action")
+                .and_then(Value::as_str)
+                .ok_or_else(|| anyhow!("缺少 action"))?;
+            let command = fit_command(action, &arguments)?;
+            let context = fit_session_context(broker, &session_id).await?;
+            json!({ "result": fit_runs.command(context, run_id, command).await? })
+        }
         "ui_get_commit_plan" => {
             let session = broker.session(&session_id).await?;
             json!({ "plan": build_source_commit_plan(session).await? })
@@ -339,6 +425,72 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
         "structuredContent": value,
         "isError": false,
     }))
+}
+
+async fn fit_session_context(
+    broker: &LiveUiBroker,
+    session_id: &str,
+) -> Result<FitSessionContext> {
+    let session = broker.session(session_id).await?;
+    let view = session.view().await;
+    let project_root = session
+        .project_root
+        .clone()
+        .ok_or_else(|| anyhow!("FitRun 需要本机项目目录"))?;
+    let source_revision = workspace_fingerprint(&project_root)?;
+    Ok(FitSessionContext {
+        session_id: session.id.clone(),
+        project_root,
+        package_name: session.package_name.clone(),
+        device_id: session.device_id.clone(),
+        runtime_build_id: view.runtime_build_id,
+        tree_revision: view.tree_revision,
+        source_revision,
+    })
+}
+
+fn fit_rect(value: Option<&Value>) -> Result<FitRect> {
+    let rect: FitRect = serde_json::from_value(value.cloned().unwrap_or(Value::Null))
+        .context("FitRun 矩形参数无效")?;
+    rect.validate("FitRun rect")?;
+    Ok(rect)
+}
+
+fn fit_command(action: &str, arguments: &Value) -> Result<FitCommand> {
+    let command_id = format!("mcp_{}", uuid::Uuid::new_v4().simple());
+    let required = |key: &str| -> Result<String> {
+        arguments
+            .get(key)
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| anyhow!("{action} 缺少 {key}"))
+    };
+    let value = match action.trim().to_ascii_uppercase().as_str() {
+        "START" | "PAUSE" | "RESUME" | "CANCEL" | "ACCEPT_BEST" => json!({
+            "type": action.trim().to_ascii_uppercase(),
+            "commandId": command_id,
+        }),
+        "CODEX_STARTED" => json!({
+            "type":"CODEX_STARTED", "commandId":command_id,
+            "handoffId":required("handoffId")?, "taskId":required("taskId")?,
+        }),
+        "CODEX_COMPLETED" => json!({
+            "type":"CODEX_COMPLETED", "commandId":command_id,
+            "handoffId":required("handoffId")?,
+            "taskId":arguments.get("taskId").cloned(),
+            "sourceRevisionBefore":arguments.get("sourceRevisionBefore").cloned(),
+            "sourceRevisionAfter":required("sourceRevisionAfter")?,
+            "changedFiles":arguments.get("changedFiles").cloned().unwrap_or_else(|| json!([])),
+            "commitId":arguments.get("commitId").cloned(),
+            "tokenUsage":arguments.get("tokenUsage").cloned(),
+        }),
+        "CODEX_FAILED" => json!({
+            "type":"CODEX_FAILED", "commandId":command_id,
+            "handoffId":required("handoffId")?, "error":required("error")?,
+        }),
+        _ => bail!("不支持 FitRun action: {action}"),
+    };
+    serde_json::from_value(value).context("FitRun 控制命令无效")
 }
 
 fn find_node<'a>(

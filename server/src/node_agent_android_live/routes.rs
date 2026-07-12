@@ -287,7 +287,16 @@ async fn mcp_handler(
     {
         return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}"));
     }
-    Json(handle_mcp_request(&runtime.live_ui, &session_id, request).await).into_response()
+    Json(
+        handle_mcp_request(
+            &runtime.live_ui,
+            &runtime.ui_fit_runs,
+            &session_id,
+            request,
+        )
+        .await,
+    )
+    .into_response()
 }
 
 async fn session_handler(
