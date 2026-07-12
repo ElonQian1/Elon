@@ -18,6 +18,7 @@ internal class MainPreparedMessageActions(
     private val projectIconDataUrl: (String) -> String?,
     private val selectedAgentForRequest: () -> String?,
     private val selectedRuntimeRouteForRequest: () -> String?,
+    private val uiDesignRequestSelection: () -> UiDesignRequestSelection,
     private val appendMessage: (ChatMessage) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val looksLikeDevelopmentRequest: (String) -> Boolean,
@@ -140,7 +141,12 @@ internal class MainPreparedMessageActions(
             selectedAgentForRequest()?.let { addProperty("agent", it) }
             selectedRuntimeRouteForRequest()?.let { addProperty("runtimeRoute", it) }
             if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
-            buildUiDesignTaskPayload(traceId, outgoingText, attachmentRefs)?.let {
+            buildUiDesignTaskPayload(
+                traceId,
+                outgoingText,
+                attachmentRefs,
+                uiDesignRequestSelection()
+            )?.let {
                 add("uiDesignTask", it)
             }
         }

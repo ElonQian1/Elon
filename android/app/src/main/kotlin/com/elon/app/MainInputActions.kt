@@ -48,6 +48,10 @@ internal class MainInputActions(
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
     private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
     private var pendingImageEditIndex: Int = -1
+    private var uiDesignRequestSelection = UiDesignRequestSelection()
+    private val uiDesignRequestDialog by lazy {
+        UiDesignRequestOptionsDialog(activity, uiTools()::dp)
+    }
     private val imageEditLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -450,8 +454,20 @@ internal class MainInputActions(
             collapseEmojiPanel = { emojiActions.collapseEmojiPanel() },
             openCameraAttachment = { attachmentPickerActions.openCameraAttachment() },
             openPhotoAttachment = { attachmentPickerActions.openPhotoAttachment() },
-            openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() }
+            openDocumentAttachment = { attachmentPickerActions.openDocumentAttachment() },
+            openUiDesignOptions = {
+                uiDesignRequestDialog.show(uiDesignRequestSelection) { selection ->
+                    uiDesignRequestSelection = selection
+                    Toast.makeText(activity, "已应用 UI 设计任务方式", Toast.LENGTH_SHORT).show()
+                }
+            }
         )
+    }
+
+    fun currentUiDesignRequestSelection(): UiDesignRequestSelection = uiDesignRequestSelection
+
+    fun clearUiDesignRequestSelection() {
+        uiDesignRequestSelection = UiDesignRequestSelection()
     }
 
     val emojiActions: MainEmojiActions by lazy {

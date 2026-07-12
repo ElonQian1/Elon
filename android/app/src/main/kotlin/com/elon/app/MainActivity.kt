@@ -523,6 +523,7 @@ class MainActivity : AppCompatActivity() {
             },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             selectedRuntimeRouteForRequest = { modelActions.selectedRuntimeRouteForRequest() },
+            uiDesignRequestSelection = { inputActions.currentUiDesignRequestSelection() },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
@@ -564,6 +565,7 @@ class MainActivity : AppCompatActivity() {
             },
             clearPendingAttachments = {
                 inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
+                inputActions.clearUiDesignRequestSelection()
             }
         )
     }

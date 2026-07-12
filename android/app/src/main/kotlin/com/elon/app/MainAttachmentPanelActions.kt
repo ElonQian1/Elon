@@ -23,7 +23,8 @@ internal class MainAttachmentPanelActions(
     private val collapseEmojiPanel: () -> Unit,
     private val openCameraAttachment: () -> Unit,
     private val openPhotoAttachment: () -> Unit,
-    private val openDocumentAttachment: () -> Unit
+    private val openDocumentAttachment: () -> Unit,
+    private val openUiDesignOptions: () -> Unit
 ) {
     var isOpen = false
         private set
@@ -39,7 +40,7 @@ internal class MainAttachmentPanelActions(
             background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(42), dp(4), dp(14), dp(16))
+            setPadding(dp(18), dp(4), dp(10), dp(16))
             visibility = View.GONE
 
             addView(createAttachmentAction("拍照", R.drawable.ic_input_camera_new, addEndMargin = true) {
@@ -48,8 +49,11 @@ internal class MainAttachmentPanelActions(
             addView(createAttachmentAction("图片", R.drawable.ic_input_photo_new, addEndMargin = true) {
                 openPhotoAttachment()
             })
-            addView(createAttachmentAction("文件", R.drawable.ic_input_file_new, addEndMargin = false) {
+            addView(createAttachmentAction("文件", R.drawable.ic_input_file_new, addEndMargin = true) {
                 openDocumentAttachment()
+            })
+            addView(createAttachmentAction("UI设计", R.drawable.ic_input_photo_new, addEndMargin = false) {
+                openUiDesignOptions()
             })
         }
     }
@@ -91,7 +95,7 @@ internal class MainAttachmentPanelActions(
     ): View {
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(dp(66), dp(78)).apply {
-                if (addEndMargin) marginEnd = dp(12)
+                if (addEndMargin) marginEnd = dp(8)
             }
             background = GradientDrawable().apply {
                 cornerRadius = dp(10).toFloat()
