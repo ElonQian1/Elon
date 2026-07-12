@@ -115,7 +115,7 @@ mod ai_cli_pc_reply_helpers;
 
 use self::ai_cli_pc_config::{
     native_session_uuid, pc_agent_cli_recv_timeout_secs, pc_display_model_label,
-    pc_lightweight_chat_reasoning_effort, pc_project_reasoning_effort, pc_route_a_extra_args,
+    pc_lightweight_chat_reasoning_effort, pc_project_reasoning_effort, pc_route_a_ui_args,
     pc_runtime_full_access, should_skip_pc_chat_native_session,
 };
 use self::ai_cli_pc_reply_helpers::{
@@ -519,21 +519,12 @@ async fn run_via_pc_agent(
     };
 
     // extra_args：Copilot/Codex 用 --session-id 绑定会话；Codex model/effort 由节点翻译成 exec 参数。
-    let mut extra_args = pc_route_a_extra_args(
+    let extra_args = pc_route_a_ui_args(
         cli_name,
         native_cli_session_uuid.as_deref(),
-        copilot_model,
-        effective_codex_reasoning_effort.as_deref(),
+        copilot_model, effective_codex_reasoning_effort.as_deref(),
+        &prompt, &state.public_url,
     );
-    if matches!(cli_name, "codex" | "copilot" | "claude" | "gemini") {
-        for url in crate::ui_design_tasks::ui_design_image_attachment_urls(
-            &prompt,
-            &state.public_url,
-        ) {
-            extra_args.push("--attachment".to_string());
-            extra_args.push(url);
-        }
-    }
 
     // dispatch 时节点可能刚好掉线重连；dispatch 成功后仍要等本机 ACK，避免假在线连接吞请求。
     let accepted_dispatch = dispatch_pc_cli_prompt_until_accepted(PcCliPromptDispatchRequest {

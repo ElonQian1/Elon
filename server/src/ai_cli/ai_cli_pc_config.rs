@@ -240,3 +240,26 @@ pub(super) fn pc_route_a_extra_args(
     }
 }
 
+pub(super) fn pc_route_a_ui_args(
+    cli_name: &str,
+    native_session_id: Option<&str>,
+    model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
+    prompt: &str,
+    public_url: &str,
+) -> Vec<String> {
+    let mut args = pc_route_a_extra_args(
+        cli_name,
+        native_session_id,
+        model,
+        codex_reasoning_effort,
+    );
+    if matches!(cli_name, "codex" | "copilot" | "claude" | "gemini") {
+        for url in crate::ui_design_tasks::ui_design_image_attachment_urls(prompt, public_url) {
+            args.push("--attachment".to_string());
+            args.push(url);
+        }
+    }
+    args
+}
+
