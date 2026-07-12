@@ -339,7 +339,13 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
     }
     if cli_name == "codex" {
-        if let Some(args) = crate::node_agent_cli_mcp::codex_mcp_config_args(&prompt) {
+        if let Some(args) = crate::node_agent_cli_mcp::codex_mcp_config_args_for_runtime(
+            &prompt,
+            cwd.as_deref(),
+            runtime.as_ref(),
+        )
+        .await
+        {
             for arg in args {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, arg);
             }

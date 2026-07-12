@@ -45,4 +45,5 @@ mod visual_diff_tests;
 mod visual_solver_style_hints_tests;
 
 pub(crate) use broker::LiveUiBroker;
+pub(crate) use mcp::descriptor_for_project as mcp_descriptor_for_project;
 pub(crate) use routes::{protected_routes, runtime_routes};

@@ -71,6 +71,17 @@ pub(crate) fn descriptor(session: &LiveUiSession, host_port: u16) -> Result<Valu
     }))
 }
 
+pub(crate) async fn descriptor_for_project(
+    broker: &LiveUiBroker,
+    project_root: &str,
+    host_port: u16,
+) -> Result<Option<Value>> {
+    let Some(session) = broker.connected_session_for_project(project_root).await else {
+        return Ok(None);
+    };
+    descriptor(&session, host_port).map(Some)
+}
+
 pub(crate) fn cleanup_descriptor(session_id: &str) {
     let path = std::env::temp_dir()
         .join("elon-ui-tuner-live")

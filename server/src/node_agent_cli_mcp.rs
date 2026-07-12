@@ -27,6 +27,40 @@ pub(crate) fn codex_mcp_config_args(prompt: &str) -> Option<Vec<String>> {
     }
 }
 
+pub(crate) async fn codex_mcp_config_args_for_runtime(
+    prompt: &str,
+    cwd: Option<&str>,
+    runtime: &crate::node_agent_runtime::NodeRuntime,
+) -> Option<Vec<String>> {
+    if let Some(args) = codex_mcp_config_args(prompt) {
+        return Some(args);
+    }
+    if !crate::ui_design_tasks::is_ui_design_task_prompt(prompt) {
+        return None;
+    }
+    let cwd = cwd?.trim();
+    if cwd.is_empty() {
+        return None;
+    }
+    let descriptor = match crate::node_agent_android_live::mcp_descriptor_for_project(
+        runtime.live_ui.as_ref(),
+        cwd,
+        crate::node_agent_admin_open::admin_port_from_env(),
+    )
+    .await
+    {
+        Ok(Some(descriptor)) => descriptor,
+        Ok(None) => return None,
+        Err(error) => {
+            tracing::warn!(error = %error, "无法为 UI 设计任务自动准备 Live MCP");
+            return None;
+        }
+    };
+    let config_path = descriptor.get("configPath")?.as_str()?;
+    let synthetic = serde_json::json!({ "mcpConfigPath": config_path }).to_string();
+    codex_mcp_config_args(&synthetic)
+}
+
 fn read_ui_tuner_mcp_url(prompt: &str) -> Result<Option<String>> {
     let Some(marker) = prompt.find(CONFIG_MARKER) else {
         return Ok(None);

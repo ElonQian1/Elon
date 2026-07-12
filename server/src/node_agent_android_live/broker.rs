@@ -106,6 +106,32 @@ impl LiveUiBroker {
             .ok_or_else(|| anyhow!("Live UI 会话不存在或已结束"))
     }
 
+    pub(crate) async fn connected_session_for_project(
+        &self,
+        project_root: &str,
+    ) -> Option<Arc<LiveUiSession>> {
+        let expected = canonical_or_raw(project_root);
+        let sessions = self
+            .sessions
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut matched = Vec::new();
+        for session in sessions {
+            let Some(root) = session.project_root.as_deref() else {
+                continue;
+            };
+            if canonical_or_raw(root) != expected || !session.view().await.connected {
+                continue;
+            }
+            matched.push(session);
+        }
+        matched.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+        matched.into_iter().next()
+    }
+
     pub(crate) async fn session_view(&self, session_id: &str) -> Result<LiveSessionView> {
         Ok(self.session(session_id).await?.view().await)
     }
@@ -286,6 +312,15 @@ impl LiveUiBroker {
             }
         }
     }
+}
+
+fn canonical_or_raw(value: &str) -> String {
+    std::path::PathBuf::from(value)
+        .canonicalize()
+        .unwrap_or_else(|_| std::path::PathBuf::from(value))
+        .to_string_lossy()
+        .trim_end_matches(['/', '\\'])
+        .to_ascii_lowercase()
 }
 
 #[derive(Clone, Copy)]
