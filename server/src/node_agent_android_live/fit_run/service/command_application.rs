@@ -85,8 +85,13 @@ pub(super) async fn apply_command(
             Ok(false)
         }
         FitCommand::AcceptBest { .. } => {
+            if run.phase == FitRunPhase::SourceVerifying {
+                // 上一次确认请求可能在耗时源码门禁期间断开。允许使用新的
+                // commandId 重新驱动同一持久化阶段，不重复改变状态。
+                return Ok(true);
+            }
             if run.phase != FitRunPhase::CandidateReady {
-                bail!("只有 CANDIDATE_READY 可以确认写回");
+                bail!("只有 CANDIDATE_READY 或中断的 SOURCE_VERIFYING 可以确认写回");
             }
             run.transition(FitRunPhase::SourceVerifying)?;
             Ok(true)

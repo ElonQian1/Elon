@@ -96,6 +96,9 @@ impl FitRunService {
         let mut run = self.store.load(&context.project_root, run_id)?;
         validate_command_context(&run, &context, &command)?;
         if run.has_command(command.command_id()) {
+            if interrupted_command_should_resume(&command, run.phase) {
+                run = self.drive(run).await?;
+            }
             self.record_terminal_learning(&run);
             return Ok(FitCommandResult {
                 run,
@@ -196,6 +199,22 @@ impl FitRunService {
             );
         }
     }
+}
+
+fn interrupted_command_should_resume(command: &FitCommand, phase: FitRunPhase) -> bool {
+    matches!(
+        (command, phase),
+        (
+            FitCommand::Start { .. },
+            FitRunPhase::Baselining | FitRunPhase::LocalSolving
+        ) | (
+            FitCommand::AcceptBest { .. },
+            FitRunPhase::SourceVerifying
+        ) | (
+            FitCommand::CodexCompleted { .. },
+            FitRunPhase::Rebuilding | FitRunPhase::Evaluating
+        )
+    )
 }
 
 fn validate_command_context(

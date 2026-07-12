@@ -112,6 +112,59 @@ async fn accepted_requires_target_score_and_source_parity() {
 }
 
 #[tokio::test]
+async fn interrupted_accept_command_can_resume_source_verification() {
+    let (root, _) = run(false);
+    let context = context(root.to_str().unwrap());
+    let mut verified = candidate("source-verified-after-resume", 0.01);
+    verified.source_parity_loss = Some(0.01);
+    verified.source_parity_verified = true;
+    let backend = Arc::new(
+        FakeBackend::new(vec![result("baseline", 0.01)], Vec::new()).with_verify(
+            FitSourceVerifyResult {
+                candidate: verified,
+                duration_ms: 1,
+            },
+        ),
+    );
+    let store = FitRunStore::new();
+    let service = FitRunService::new(store.clone(), backend);
+    let created = service
+        .create_run(context.clone(), request(false))
+        .await
+        .unwrap();
+    let ready = service
+        .command(
+            context.clone(),
+            &created.run_id,
+            FitCommand::Start {
+                command_id: "start-interrupted-accept".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(ready.run.phase, FitRunPhase::CandidateReady);
+
+    let mut stranded = ready.run;
+    stranded.transition(FitRunPhase::SourceVerifying).unwrap();
+    stranded.record_command("accept-interrupted".to_string());
+    store.save(&stranded).unwrap();
+
+    let recovered = service
+        .command(
+            context,
+            &stranded.run_id,
+            FitCommand::AcceptBest {
+                command_id: "accept-interrupted".to_string(),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(recovered.idempotent);
+    assert_eq!(recovered.run.phase, FitRunPhase::Accepted);
+    cleanup(root);
+}
+
+#[tokio::test]
 async fn commands_require_original_session_until_explicit_rebind() {
     let (root, _) = run(false);
     let original = context(root.to_str().unwrap());
