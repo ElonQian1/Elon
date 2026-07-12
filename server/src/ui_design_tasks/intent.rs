@@ -1,6 +1,21 @@
 use super::{UiDesignAttachmentIntent, UiDesignTaskInput, UiDesignTaskMode};
 use crate::project_ws_protocol::ProjectAttachmentRef;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UiRouteClass {
+    ConfirmedUi,
+    ConfirmedNonUi,
+    Ambiguous,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct UiRouteDecision {
+    pub(crate) class: UiRouteClass,
+    pub(crate) score: f64,
+    pub(crate) mode: UiDesignTaskMode,
+    pub(crate) reasons: Vec<&'static str>,
+}
+
 /// 兼容没有 `uiDesignTask` 字段的旧 APK、PC 页面和普通文本入口。
 ///
 /// 这里只做高置信度、确定性的 UI 意图识别，避免调用模型做前置分类。
@@ -21,12 +36,12 @@ pub(super) fn infer_ui_design_task(
         })
         .collect();
     let has_annotations = images.iter().any(|item| !item.annotations.is_empty());
-
-    if !has_annotations && !looks_like_ui_request(&normalized, !images.is_empty()) {
+    let decision = classify_normalized_ui_route(&normalized, !images.is_empty(), has_annotations);
+    if decision.class != UiRouteClass::ConfirmedUi {
         return None;
     }
 
-    let mode = infer_mode(&normalized);
+    let mode = decision.mode;
     let attachment_intent =
         infer_attachment_intent(&normalized, has_annotations, !images.is_empty());
     let primary_id = images.iter().find_map(|item| item.attachment_id.clone());
@@ -54,22 +69,112 @@ pub(super) fn infer_ui_design_task(
     Some(task)
 }
 
-fn looks_like_ui_request(text: &str, has_image: bool) -> bool {
-    if contains_any(text, HIGH_CONFIDENCE_UI_MARKERS) {
-        return true;
+pub(crate) fn classify_ui_route(
+    message: &str,
+    attachments: Option<&[ProjectAttachmentRef]>,
+) -> UiRouteDecision {
+    let normalized = message.to_lowercase();
+    let images = attachments.unwrap_or_default().iter().filter(|item| {
+        item.kind.as_deref() == Some("image")
+            || item
+                .mime_type
+                .as_deref()
+                .is_some_and(|mime| mime.starts_with("image/"))
+    });
+    let mut has_image = false;
+    let mut has_annotations = false;
+    for image in images {
+        has_image = true;
+        has_annotations |= !image.annotations.is_empty();
     }
-    if has_image && contains_any(text, IMAGE_ACTION_MARKERS) {
-        return true;
-    }
+    classify_normalized_ui_route(&normalized, has_image, has_annotations)
+}
+
+fn classify_normalized_ui_route(
+    text: &str,
+    has_image: bool,
+    has_annotations: bool,
+) -> UiRouteDecision {
+    let mut score = 0.0_f64;
+    let mut reasons = Vec::new();
     let has_property = contains_any(text, UI_PROPERTY_MARKERS);
     let has_action = contains_any(text, UI_ACTION_MARKERS);
     let has_subject = contains_any(text, UI_SUBJECT_MARKERS);
-    (has_property && has_action)
-        || (has_subject && contains_any(text, UI_SEMANTIC_MARKERS))
-        || (contains_any(text, UI_SURFACE_MARKERS) && contains_any(text, UI_SURFACE_ACTION_MARKERS))
-        || is_create_request(text)
-        || is_extend_request(text)
-        || contains_any(text, MODIFY_MARKERS)
+    let has_semantic = contains_any(text, UI_SEMANTIC_MARKERS);
+    let has_behavior = contains_any(text, BEHAVIOR_MARKERS);
+    let mode = infer_mode(text);
+
+    if has_annotations {
+        score = score.max(0.98);
+        reasons.push("图片包含结构化标注");
+    }
+    if is_create_request(text) {
+        score = score.max(0.96);
+        reasons.push("明确创建新页面");
+    }
+    if is_extend_request(text) {
+        score = score.max(0.94);
+        reasons.push("明确扩展视觉结构");
+    }
+    if contains_any(text, MODIFY_MARKERS) {
+        score = score.max(0.92);
+        reasons.push("明确修改现有样式");
+    }
+    if contains_any(text, HIGH_CONFIDENCE_UI_MARKERS) {
+        score = score.max(0.9);
+        reasons.push("命中高置信度 UI 表达");
+    }
+    if has_image && contains_any(text, IMAGE_ACTION_MARKERS) {
+        score = score.max(0.88);
+        reasons.push("图片与还原动作同时出现");
+    }
+    if has_property && has_action {
+        score = score.max(0.86);
+        reasons.push("样式属性与修改动作同时出现");
+    }
+    if has_subject && has_semantic {
+        score = score.max(0.82);
+        reasons.push("视觉对象与审美描述同时出现");
+    }
+    if contains_any(text, UI_SURFACE_MARKERS)
+        && contains_any(text, UI_SURFACE_ACTION_MARKERS)
+    {
+        score = score.max(0.84);
+        reasons.push("页面对象与美化动作同时出现");
+    }
+    if contains_any(text, AMBIGUOUS_VISUAL_MARKERS) {
+        score = score.max(if has_subject || contains_any(text, AMBIGUOUS_REGION_MARKERS) {
+            0.62
+        } else {
+            0.45
+        });
+        reasons.push("出现模糊视觉描述");
+    }
+    if has_subject && has_action {
+        score = score.max(0.48);
+        reasons.push("视觉对象与通用调整动作同时出现");
+    } else if has_subject || has_property || has_semantic {
+        score = score.max(0.32);
+        reasons.push("仅出现部分 UI 线索");
+    }
+    if has_behavior && !has_property && !has_semantic && !has_annotations {
+        score = score.min(0.08);
+        reasons.push("功能或交互逻辑证据占主导");
+    }
+
+    let class = if score >= 0.75 {
+        UiRouteClass::ConfirmedUi
+    } else if score <= 0.2 {
+        UiRouteClass::ConfirmedNonUi
+    } else {
+        UiRouteClass::Ambiguous
+    };
+    UiRouteDecision {
+        class,
+        score,
+        mode,
+        reasons,
+    }
 }
 
 fn infer_mode(text: &str) -> UiDesignTaskMode {
@@ -204,6 +309,25 @@ const UI_SEMANTIC_MARKERS: &[&str] = &[
     "美化",
     "美观",
 ];
+const AMBIGUOUS_VISUAL_MARKERS: &[&str] = &[
+    "轻一点",
+    "重一点",
+    "高级一点",
+    "更高级",
+    "更舒服",
+    "有呼吸感",
+    "不够高级",
+    "不够舒服",
+    "抢眼一点",
+    "更抢眼",
+    "克制一点",
+    "更克制",
+    "更精致",
+    "不够精致",
+];
+const AMBIGUOUS_REGION_MARKERS: &[&str] = &[
+    "底部", "顶部", "主操作", "次操作", "这个区域", "这块", "这里",
+];
 const CREATE_MARKERS: &[&str] = &[
     "全新页面",
     "新建页面",
@@ -309,5 +433,20 @@ mod tests {
             UiDesignTaskMode::ExtendExisting
         );
         assert!(infer_ui_design_task("调整按钮点击逻辑", None).is_none());
+    }
+
+    #[test]
+    fn exposes_ambiguous_visual_requests_for_second_stage_routing() {
+        let decision = classify_ui_route("让底部轻一点，看起来更克制", None);
+        assert_eq!(decision.class, UiRouteClass::Ambiguous);
+        assert!(decision.score > 0.2 && decision.score < 0.75);
+        assert!(!decision.reasons.is_empty());
+    }
+
+    #[test]
+    fn exposes_confident_non_ui_requests_without_model_work() {
+        let decision = classify_ui_route("调整按钮点击逻辑，修复接口无响应", None);
+        assert_eq!(decision.class, UiRouteClass::ConfirmedNonUi);
+        assert!(decision.score <= 0.2);
     }
 }
