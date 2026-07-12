@@ -16,7 +16,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.elon.uiruntime.view.UiRuntimePreviewRequest
 import com.elon.uiruntime.view.UiRuntimePreviewScenario
@@ -53,6 +55,9 @@ private fun ComposeRuntimeGallery(request: UiRuntimePreviewRequest) {
                 styleEditable("cornerRadius.all", "/primaryCard/cornerRadius", 0.0, 48.0),
                 sessionEditable("text"),
                 styleEditable("textSize", "/primaryCard/textSize", 10.0, 36.0),
+                styleEditable("fontWeight", "/primaryCard/fontWeight", 100.0, 900.0, 100.0),
+                styleEditable("lineHeight", "/primaryCard/lineHeight", 12.0, 56.0),
+                styleEditable("letterSpacing", "/primaryCard/letterSpacing", -0.1, 0.3, 0.01),
                 styleEditable("opacity", "/primaryCard/opacity", 0.0, 1.0, 0.05),
             ),
         ),
@@ -72,6 +77,9 @@ private fun ComposeRuntimeGallery(request: UiRuntimePreviewRequest) {
                 else -> "Compose Runtime 已连接"
             },
             textSize = baseline.textSize.sp,
+            fontWeight = baseline.fontWeight,
+            lineHeight = baseline.lineHeight.sp,
+            letterSpacing = baseline.letterSpacing,
             opacity = baseline.opacity,
         ),
     )
@@ -105,6 +113,9 @@ private fun ComposeRuntimeGallery(request: UiRuntimePreviewRequest) {
                 style = TextStyle(
                     color = style.contentColor ?: Color.White,
                     fontSize = style.textSize ?: 18.sp,
+                    fontWeight = FontWeight(style.fontWeight ?: 600),
+                    lineHeight = style.lineHeight ?: 24.sp,
+                    letterSpacing = (style.letterSpacing ?: 0.01f).em,
                 ),
             )
         }
@@ -142,6 +153,9 @@ private data class ComposeGalleryStyle(
     val contentColor: String = "#FFFFFFFF",
     val cornerRadius: Float = 16f,
     val textSize: Float = 18f,
+    val fontWeight: Int = 600,
+    val lineHeight: Float = 24f,
+    val letterSpacing: Float = 0.01f,
     val opacity: Float = 1f,
 )
 
@@ -158,6 +172,9 @@ private fun loadGalleryStyle(context: Context): ComposeGalleryStyle = runCatchin
         contentColor = card.getString("contentColor"),
         cornerRadius = card.getDouble("cornerRadius").toFloat(),
         textSize = card.getDouble("textSize").toFloat(),
+        fontWeight = card.getInt("fontWeight"),
+        lineHeight = card.getDouble("lineHeight").toFloat(),
+        letterSpacing = card.getDouble("letterSpacing").toFloat(),
         opacity = card.getDouble("opacity").toFloat().coerceIn(0f, 1f),
     )
 }.getOrDefault(ComposeGalleryStyle())

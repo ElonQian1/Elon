@@ -167,6 +167,9 @@ class UiNodeHandle internal constructor(
                 "opacity" to propertyKeys.contains("opacity"),
                 "text" to propertyKeys.contains("text"),
                 "textSize" to propertyKeys.contains("textSize"),
+                "fontWeight" to propertyKeys.contains("fontWeight"),
+                "lineHeight" to propertyKeys.contains("lineHeight"),
+                "letterSpacing" to propertyKeys.contains("letterSpacing"),
                 "backgroundColor" to propertyKeys.contains("backgroundColor"),
                 "contentColor" to propertyKeys.contains("contentColor"),
                 "cornerRadius" to propertyKeys.contains("cornerRadius.all"),
@@ -212,6 +215,9 @@ private fun UiStyle.withValue(property: String, value: UiRuntimeValue): UiStyle 
     "cornerRadius.all" -> copy(cornerRadius = value.number().dp)
     "text" -> copy(text = value.value?.toString().orEmpty())
     "textSize" -> copy(textSize = value.number().sp)
+    "fontWeight" -> copy(fontWeight = value.number().toInt().coerceIn(1, 1000))
+    "lineHeight" -> copy(lineHeight = value.number().sp)
+    "letterSpacing" -> copy(letterSpacing = value.number().toFloat())
     "opacity" -> copy(opacity = value.number().toFloat().coerceIn(0f, 1f))
     "horizontalAlignment" -> copy(horizontalAlignment = value.value?.toString())
     "verticalAlignment" -> copy(verticalAlignment = value.value?.toString())
@@ -232,6 +238,9 @@ private fun valueFor(style: UiStyle, property: String): UiRuntimeValue? = when (
     "cornerRadius.all" -> style.cornerRadius?.let { UiRuntimeValue("dp", it.value) }
     "text" -> style.text?.let { UiRuntimeValue("text", it) }
     "textSize" -> style.textSize?.let { UiRuntimeValue("sp", it.value) }
+    "fontWeight" -> style.fontWeight?.let { UiRuntimeValue("float", it) }
+    "lineHeight" -> style.lineHeight?.let { UiRuntimeValue("sp", it.value) }
+    "letterSpacing" -> style.letterSpacing?.let { UiRuntimeValue("float", it) }
     "opacity" -> style.opacity?.let { UiRuntimeValue("float", it) }
     "horizontalAlignment" -> style.horizontalAlignment?.let { UiRuntimeValue("enum", it) }
     "verticalAlignment" -> style.verticalAlignment?.let { UiRuntimeValue("enum", it) }
