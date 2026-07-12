@@ -132,7 +132,11 @@ pub async fn chat_project(
         display_message.clone(),
         req.attachments.as_deref(),
     );
-    let message = match append_ui_design_task_context(message, req.ui_design_task.as_ref()) {
+    let message = match append_ui_design_task_context(
+        message,
+        req.ui_design_task.as_ref(),
+        req.attachments.as_deref(),
+    ) {
         Ok(message) => message,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };
@@ -396,7 +400,11 @@ pub async fn chat_project_stream(
         display_message.clone(),
         req.attachments.as_deref(),
     );
-    let message = match append_ui_design_task_context(message, req.ui_design_task.as_ref()) {
+    let message = match append_ui_design_task_context(
+        message,
+        req.ui_design_task.as_ref(),
+        req.attachments.as_deref(),
+    ) {
         Ok(message) => message,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };

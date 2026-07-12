@@ -1,4 +1,6 @@
 use super::{UiDesignAttachmentIntent, UiDesignTaskInput, UiDesignTaskMode};
+use crate::project_ws_protocol::ProjectAttachmentRef;
+use serde::{Deserialize, Serialize};
 
 const TASK_MARKER_BEGIN: &str = "<elon-ui-design-task version=\"1\">";
 const TASK_MARKER_END: &str = "</elon-ui-design-task>";
@@ -10,12 +12,17 @@ const TASK_MARKER_END: &str = "</elon-ui-design-task>";
 pub(crate) fn append_ui_design_task_context(
     message: String,
     task: Option<&UiDesignTaskInput>,
+    attachments: Option<&[ProjectAttachmentRef]>,
 ) -> Result<String, String> {
     let Some(task) = task else {
         return Ok(message);
     };
     task.validate()?;
-    let task_json = serde_json::to_string(task)
+    let envelope = UiDesignTaskEnvelope {
+        task: task.clone(),
+        attachments: design_attachments(attachments),
+    };
+    let task_json = serde_json::to_string(&envelope)
         .map_err(|error| format!("UI 设计任务序列化失败: {error}"))?;
     let mode_contract = mode_contract(task.mode);
     let image_contract = attachment_contract(task.attachment_intent);
@@ -29,6 +36,90 @@ pub(crate) fn append_ui_design_task_context(
          - Once a real Preview/Runtime node exists, use yilong-ui-live tools for numeric fitting and deterministic style commits.\n\
          - Runtime patches are previews only; completion requires source write-back and a patch-free build verification when requireBuildVerification is true."
     ))
+}
+
+/// 从服务器生成的任务契约中取出远程节点可下载的图片 URL。
+/// 仅允许当前一龙服务器自己的 `/api/` 附件地址，防止把节点变成任意 URL 下载器。
+pub(crate) fn ui_design_image_attachment_urls(
+    prompt: &str,
+    public_url: &str,
+) -> Vec<String> {
+    let Some(envelope) = parse_task_envelope(prompt) else {
+        return Vec::new();
+    };
+    let allowed_prefix = format!("{}/api/", public_url.trim_end_matches('/'));
+    envelope
+        .attachments
+        .into_iter()
+        .filter(|attachment| attachment.mime_type.starts_with("image/"))
+        .filter_map(|attachment| attachment.url)
+        .filter(|url| url.starts_with(&allowed_prefix))
+        .take(8)
+        .collect()
+}
+
+fn parse_task_envelope(prompt: &str) -> Option<UiDesignTaskEnvelope> {
+    let (_, rest) = prompt.rsplit_once(TASK_MARKER_BEGIN)?;
+    let (json, _) = rest.split_once(TASK_MARKER_END)?;
+    serde_json::from_str(json.trim()).ok()
+}
+
+fn design_attachments(attachments: Option<&[ProjectAttachmentRef]>) -> Vec<UiDesignAttachment> {
+    attachments
+        .unwrap_or_default()
+        .iter()
+        .take(16)
+        .map(|attachment| UiDesignAttachment {
+            attachment_id: attachment.attachment_id.clone(),
+            display_name: attachment.display_name.clone(),
+            mime_type: attachment.mime_type.clone().unwrap_or_default(),
+            url: attachment.url.clone(),
+            sha256: attachment.sha256.clone(),
+            image_width: attachment.image_width,
+            image_height: attachment.image_height,
+            annotations: attachment
+                .annotations
+                .iter()
+                .map(|annotation| UiDesignAnnotation {
+                    x: annotation.x,
+                    y: annotation.y,
+                    width: annotation.width,
+                    height: annotation.height,
+                    note: annotation.note.clone(),
+                })
+                .collect(),
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct UiDesignTaskEnvelope {
+    task: UiDesignTaskInput,
+    #[serde(default)]
+    attachments: Vec<UiDesignAttachment>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct UiDesignAttachment {
+    attachment_id: Option<String>,
+    display_name: Option<String>,
+    #[serde(default)]
+    mime_type: String,
+    url: Option<String>,
+    sha256: Option<String>,
+    image_width: Option<u32>,
+    image_height: Option<u32>,
+    #[serde(default)]
+    annotations: Vec<UiDesignAnnotation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct UiDesignAnnotation {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    note: String,
 }
 
 fn mode_contract(mode: UiDesignTaskMode) -> &'static str {
@@ -80,11 +171,44 @@ mod tests {
             ..UiDesignTaskInput::default()
         };
 
-        let prompt = append_ui_design_task_context("创建页面".into(), Some(&task))
+        let prompt = append_ui_design_task_context("创建页面".into(), Some(&task), None)
             .expect("context should append");
 
         assert!(prompt.contains(TASK_MARKER_BEGIN));
         assert!(prompt.contains("Preview-first screen skeleton"));
         assert!(prompt.contains("Exclude arrows, labels and drawing overlays"));
+    }
+
+    #[test]
+    fn only_returns_image_urls_from_current_server() {
+        let task = UiDesignTaskInput::default();
+        let attachments = vec![ProjectAttachmentRef {
+            attachment_id: Some("att_1".into()),
+            kind: Some("image".into()),
+            display_name: Some("target.png".into()),
+            file_name: Some("target.png".into()),
+            mime_type: Some("image/png".into()),
+            path: None,
+            url: Some("https://elon.test/api/user/u/projects/p/attachments/a.png".into()),
+            sha256: Some("abc".into()),
+            size_bytes: Some(3),
+            image_width: Some(100),
+            image_height: Some(200),
+            duration_seconds: None,
+            transcription: None,
+            annotations: Vec::new(),
+        }];
+        let prompt = append_ui_design_task_context(
+            "创建页面".into(),
+            Some(&task),
+            Some(&attachments),
+        )
+        .expect("context should append");
+
+        assert_eq!(
+            ui_design_image_attachment_urls(&prompt, "https://elon.test"),
+            vec!["https://elon.test/api/user/u/projects/p/attachments/a.png"]
+        );
+        assert!(ui_design_image_attachment_urls(&prompt, "https://other.test").is_empty());
     }
 }

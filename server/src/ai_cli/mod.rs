@@ -519,12 +519,21 @@ async fn run_via_pc_agent(
     };
 
     // extra_args：Copilot/Codex 用 --session-id 绑定会话；Codex model/effort 由节点翻译成 exec 参数。
-    let extra_args = pc_route_a_extra_args(
+    let mut extra_args = pc_route_a_extra_args(
         cli_name,
         native_cli_session_uuid.as_deref(),
         copilot_model,
         effective_codex_reasoning_effort.as_deref(),
     );
+    if matches!(cli_name, "codex" | "copilot" | "claude" | "gemini") {
+        for url in crate::ui_design_tasks::ui_design_image_attachment_urls(
+            &prompt,
+            &state.public_url,
+        ) {
+            extra_args.push("--attachment".to_string());
+            extra_args.push(url);
+        }
+    }
 
     // dispatch 时节点可能刚好掉线重连；dispatch 成功后仍要等本机 ACK，避免假在线连接吞请求。
     let accepted_dispatch = dispatch_pc_cli_prompt_until_accepted(PcCliPromptDispatchRequest {

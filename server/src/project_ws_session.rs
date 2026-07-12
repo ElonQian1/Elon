@@ -206,7 +206,11 @@ pub(crate) async fn handle_project_ws(
             display_message.clone(),
             request.attachments.as_deref(),
         );
-        let message = match append_ui_design_task_context(message, request.ui_design_task.as_ref()) {
+        let message = match append_ui_design_task_context(
+            message,
+            request.ui_design_task.as_ref(),
+            request.attachments.as_deref(),
+        ) {
             Ok(message) => message,
             Err(message) => {
                 if sender
