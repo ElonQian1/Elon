@@ -35,12 +35,20 @@ pub(crate) fn append_ui_design_task_context(
         .iter()
         .any(|attachment| attachment.mime_type.starts_with("image/"));
     let image_contract = attachment_contract(task.attachment_intent, has_images);
+    let route_confirmation_contract = if task.route_learning_origin.as_deref()
+        == Some("ambiguous_local")
+    {
+        "AMBIGUOUS ROUTE GATE: before reading source or calling any other tool, call ui_confirm_route with UI_DESIGN or NON_UI and a concise reason. If NON_UI is accepted, stop UI fitting and continue as normal development."
+    } else {
+        "ROUTE CONFIRMED: this task already has explicit, learned or high-confidence UI evidence; no additional route confirmation is required."
+    };
     Ok(format!(
         "{message}\n\n{TASK_MARKER_BEGIN}\n{task_json}\n{TASK_MARKER_END}\n\
          This is a structured UI design development task supplied by the trusted Elon task router.\n\
          Execution contract:\n\
          - {mode_contract}\n\
          - {image_contract}\n\
+         - {route_confirmation_contract}\n\
          - TOOL-FIRST GATE: before any source edit, call ui_get_design_task, ui_get_project_profile and ui_get_runtime_status. Do not begin with repository-wide source reading.\n\
          - For style-only requests, resolve the smallest matching Runtime node and try ui_propose_live_patch/ui_apply_live_patch first. Let the user-visible real renderer prove the change before committing it.\n\
          - Source editing is allowed only for structural changes, unbound properties or an unavailable/unsupported Runtime. State that fallback reason explicitly and read only ui_get_source_bundle or the smallest necessary files.\n\
@@ -227,6 +235,24 @@ mod tests {
             append_ui_design_task_context(message.clone(), None, None, true).unwrap(),
             message
         );
+    }
+
+    #[test]
+    fn ambiguous_route_requires_semantic_confirmation_before_source_reading() {
+        let task = UiDesignTaskInput {
+            route_learning_origin: Some("ambiguous_local".into()),
+            ..UiDesignTaskInput::default()
+        };
+        let prompt = append_ui_design_task_context(
+            "让底部轻一点".into(),
+            Some(&task),
+            None,
+            true,
+        )
+        .unwrap();
+        assert!(prompt.contains("AMBIGUOUS ROUTE GATE"));
+        assert!(prompt.contains("ui_confirm_route"));
+        assert!(prompt.find("ui_confirm_route") < prompt.find("TOOL-FIRST GATE"));
     }
 
     #[test]

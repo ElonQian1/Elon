@@ -3,6 +3,19 @@ use serde_json::{json, Value};
 pub(crate) fn tool_definitions() -> Vec<Value> {
     vec![
         tool(
+            "ui_confirm_route",
+            "模糊任务的第一步：确认本轮是 UI_DESIGN 还是 NON_UI。只提交判断和理由，不读取源码、不修改文件。",
+            json!({
+                "type":"object",
+                "required":["route","reason"],
+                "properties":{
+                    "route":{"enum":["UI_DESIGN","NON_UI"]},
+                    "reason":{"type":"string","maxLength":500},
+                    "confidence":{"type":"number","minimum":0,"maximum":1}
+                }
+            }),
+        ),
+        tool(
             "ui_get_project_profile",
             "读取节点预生成的项目 UI 技术栈、主题、组件、导航和 Preview 候选；全新页面任务首先调用。",
             json!({"type":"object","properties":{}}),

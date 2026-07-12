@@ -120,7 +120,7 @@ pub(crate) async fn handle_request(
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
-            "instructions": "强制 Tool-first：任何源码编辑前先调用 ui_get_design_task、ui_get_project_profile、ui_get_runtime_status。已有 Runtime 再读 ui_get_screen_summary，并只读取目标节点/子树。样式请求必须优先 ui_propose_live_patch/ui_apply_live_patch；只有结构变化、未绑定属性或 Runtime 不可用时才读取 ui_get_source_bundle 并做最小源码修改，同时说明降级原因。全新页面使用档案默认值创建骨架、首次构建，再回到真实 Renderer。"
+            "instructions": "模糊路由任务必须先调用 ui_confirm_route。确认 UI 后强制 Tool-first：任何源码编辑前先调用 ui_get_design_task、ui_get_project_profile、ui_get_runtime_status。已有 Runtime 再读 ui_get_screen_summary，并只读取目标节点/子树。样式请求必须优先 ui_propose_live_patch/ui_apply_live_patch；只有结构变化、未绑定属性或 Runtime 不可用时才读取 ui_get_source_bundle 并做最小源码修改，同时说明降级原因。全新页面使用档案默认值创建骨架、首次构建，再回到真实 Renderer。"
         })),
         "notifications/initialized" => return Value::Null,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
@@ -154,6 +154,33 @@ async fn call_tool(
         .cloned()
         .unwrap_or_else(|| json!({}));
     let value = match name {
+        "ui_confirm_route" => {
+            let route = arguments
+                .get("route")
+                .and_then(Value::as_str)
+                .unwrap_or_default();
+            let reason = arguments
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim();
+            if reason.is_empty() || reason.chars().count() > 500 {
+                bail!("ui_confirm_route.reason 必须是 1 到 500 字的简短理由");
+            }
+            match route {
+                "UI_DESIGN" => json!({
+                    "acceptedRoute": "UI_DESIGN",
+                    "next": ["ui_get_design_task", "ui_get_project_profile", "ui_get_runtime_status"],
+                    "instruction": "继续 UI Tool-first 工作流；样式修改先实时预览，再写回源码。"
+                }),
+                "NON_UI" => json!({
+                    "acceptedRoute": "NON_UI",
+                    "next": "NORMAL_DEVELOPMENT",
+                    "instruction": "停止 UI 拟合和 Live Patch；按普通功能开发处理，并保持最小源码读取。"
+                }),
+                _ => bail!("ui_confirm_route.route 必须是 UI_DESIGN 或 NON_UI"),
+            }
+        }
         "ui_get_project_profile" => {
             let session = broker.session(&session_id).await?;
             json!({ "profile": super::design_bootstrap::project_profile(&session)? })

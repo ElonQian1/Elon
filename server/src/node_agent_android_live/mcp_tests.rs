@@ -30,6 +30,9 @@ async fn mcp_lists_compact_ui_tools() {
         .any(|tool| tool["name"] == "ui_get_screen_summary"));
     assert!(tools
         .iter()
+        .any(|tool| tool["name"] == "ui_confirm_route"));
+    assert!(tools
+        .iter()
         .any(|tool| tool["name"] == "ui_run_visual_solver"));
     assert!(tools
         .iter()

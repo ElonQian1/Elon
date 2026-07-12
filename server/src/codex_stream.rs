@@ -261,6 +261,7 @@ fn codex_tool_name(item: &Value) -> String {
 
 fn ui_tool_progress(tool: &str, completed: bool) -> String {
     let phase = match tool {
+        "ui_confirm_route" => "正在确认本轮是否属于 UI 设计任务",
         "ui_get_project_profile" | "ui_get_design_task" => "正在读取项目 UI 档案和设计任务",
         "ui_get_runtime_status" => "正在检查真实 Android Renderer 是否已连接",
         "ui_get_screen_summary" => "正在读取当前页面的实时组件摘要",
