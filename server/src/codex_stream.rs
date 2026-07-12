@@ -254,13 +254,22 @@ fn codex_tool_name(item: &Value) -> String {
 fn ui_tool_progress(tool: &str, completed: bool) -> String {
     let phase = match tool {
         "ui_get_project_profile" | "ui_get_design_task" => "正在读取项目 UI 档案和设计任务",
+        "ui_get_runtime_status" => "正在检查真实 Android Renderer 是否已连接",
+        "ui_get_screen_summary" => "正在读取当前页面的实时组件摘要",
+        "ui_get_node" | "ui_get_subtree" => "正在精准定位需要修改的组件",
+        "ui_get_source_bundle" => "实时能力不足，正在按需读取最小源码片段",
         "ui_create_compose_screen_scaffold" => "正在创建全新页面骨架和 Preview",
         "ui_prepare_debug_runtime" => "正在首次构建并切换到真实 Android Renderer",
         "ui_bind_target_design" => "正在绑定目标设计图",
         "ui_map_annotations_to_nodes" => "正在把图片标注映射到真实组件",
+        "ui_propose_live_patch" => "正在生成类型安全的实时样式预览",
+        "ui_apply_live_patch" => "正在让真实 Android 组件立即重绘（尚未改源码）",
+        "ui_get_current_crop" | "ui_get_target_crop" => "正在读取目标区域的精确画面",
+        "ui_get_visual_diff" => "正在本地计算设计图与真实画面的差异",
         "ui_start_fit_run" => "正在启动可恢复的自动拟合任务",
         "ui_run_visual_solver" => "正在本地试算样式参数（不消耗模型 Token）",
         "ui_control_fit_run" => "正在推进拟合、源码写回与验收",
+        "ui_get_commit_plan" => "正在规划确定性写回，避免重复读取源码",
         "ui_commit_bound_styles" => "正在把确认样式确定性写回源码",
         "ui_build_and_verify" => "正在重新构建并进行无临时 Patch 验收",
         _ if tool.starts_with("ui_") => "正在使用 UI 设计工具",
@@ -327,7 +336,6 @@ fn handle_usage_event(value: &Value, out: &mut Vec<String>) {
         );
     }
 }
-
 
 #[cfg(test)]
 #[path = "codex_stream_tests.rs"]
