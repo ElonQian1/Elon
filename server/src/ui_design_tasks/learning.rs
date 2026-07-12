@@ -21,7 +21,7 @@ pub(crate) fn finalize_ui_route_learning(
     };
     if !matches!(
         origin.as_str(),
-        "ambiguous_local" | "local_confirmed" | "active_library"
+        "ambiguous_local" | "codex_rescue" | "local_confirmed" | "active_library"
     ) {
         return Ok(None);
     }
@@ -29,7 +29,9 @@ pub(crate) fn finalize_ui_route_learning(
     let Some(learned_route) = observation.learned_route else {
         return Ok(None);
     };
-    if origin != "ambiguous_local" && learned_route == UiLearnedRoute::Ui {
+    if !matches!(origin.as_str(), "ambiguous_local" | "codex_rescue")
+        && learned_route == UiLearnedRoute::Ui
+    {
         return Ok(None);
     }
     let candidate = store.record_ui_route_candidate(

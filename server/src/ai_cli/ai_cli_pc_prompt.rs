@@ -5,6 +5,13 @@ pub(crate) fn pc_project_execution_prompt(
     model_label: Option<&str>,
     prompt_bootstrapped: bool,
 ) -> String {
+    let ui_route_rescue = if cli_name == "codex"
+        && !user_message.contains("<elon-ui-design-task version=\"1\">")
+    {
+        "路由逃生：若证据表明本任务实质是视觉/布局/UI 样式工作，在读取源码或改文件前只输出 `ELON_REQUEST_UI_ROUTE: <简短理由>`，由平台按需重开 UI 工具链；否则忽略此句。\n"
+    } else {
+        ""
+    };
     let model_line = model_label
         .map(str::trim)
         .filter(|value| !value.is_empty())
@@ -21,6 +28,7 @@ pub(crate) fn pc_project_execution_prompt(
             "继续当前一龙项目执行会话。完整执行规则已经在此原生 CLI 会话前序注入；继续遵守项目入口文档、Git/验证/commit/push/发布脚本规则。\n\
 当前 CLI：{}\n\
 {model_line}\
+{ui_route_rescue}\
 本轮仍是具体执行任务，不是计划草稿。不要只回复“已准备好/请提供任务/后续会处理”；读规则或查看状态后必须继续完成用户请求里的第一条未完成 direct task。\n\
 如果用户请求包含 Hard rules、Required direct tasks、marker、commit、push、发布或线上验证契约，最终回复前必须确认对应可验证结果已经产生；真实阻塞时说明证据。\n\n\
 如果本轮影响一龙 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI，CodePushed 只代表代码同步，不代表用户页面已经更新；除非用户明确说只同步代码或暂不发布，否则最终回复前必须构建 PC 前端、运行 publish-server 上传 pc-next-dist，并用 scripts/check-task-complete.ps1 -Kind PcFrontend 校验线上 /pc 和 /api/server/version。截图/遮挡/错位类 UI 修复还必须先定位真实组件并做视觉验收或说明替代证据。\n\n\
@@ -40,6 +48,7 @@ USER_REQUEST\n\
 你是「一龙」平台调度到用户本机节点的项目执行助手，当前 CLI 是 {}。\n\
 {model_line}\
 当前请求已经被判定为项目开发、Git、构建或发布执行任务。请直接在当前工作区完成用户请求；不要只做计划，不要在读完 AGENTS、README 或规则文档后停下来要求用户再次说明任务。\n\
+{ui_route_rescue}\
 必须先读取并遵守工作区入口规则；读完规则后回到下面“用户请求”逐项执行。\n\
 如果用户请求包含 Hard rules、Required direct tasks、End your final reply with marker 或类似完成契约，必须把它们当作本轮任务契约。\n\
 用户已经给了具体任务。禁止把“可以继续给我具体任务”“请提供具体任务”“我已准备好”或同义内容作为最终回复；如果你准备这样回复，说明你还没执行任务，必须继续执行用户请求里的第一条未完成 direct task。\n\
@@ -146,6 +155,7 @@ mod tests {
         );
 
         assert!(prompt.contains("项目执行助手"));
+        assert!(prompt.contains("ELON_REQUEST_UI_ROUTE"));
         assert!(prompt.contains("不要只做计划"));
         assert!(prompt.contains("不要在读完 AGENTS"));
         assert!(prompt.contains("读完规则后回到下面"));
@@ -153,6 +163,7 @@ mod tests {
         assert!(prompt.contains("用户已经给了具体任务"));
         assert!(prompt.contains("可以继续给我具体任务"));
         assert!(prompt.contains("第一条未完成 direct task"));
+        assert!(prompt.contains("ELON_REQUEST_UI_ROUTE"));
         assert!(prompt.contains("显式要求发布"));
         assert!(prompt.contains("优先于 docs-only"));
         assert!(prompt.contains("pc-next-dist"));
@@ -192,5 +203,17 @@ mod tests {
         assert!(!prompt.contains("本轮用户请求如下。它已经是具体执行任务"));
         assert!(!prompt.contains("如果用户显式要求发布、运行 publish-server.ps1/publish-apk.ps1"));
         assert!(prompt.chars().count() < 780);
+    }
+
+    #[test]
+    fn ui_contract_does_not_repeat_the_route_escape_instruction() {
+        let prompt = pc_project_execution_prompt(
+            "调整按钮\n<elon-ui-design-task version=\"1\">{}\n</elon-ui-design-task>",
+            None,
+            "codex",
+            Some("Codex"),
+            false,
+        );
+        assert!(!prompt.contains("ELON_REQUEST_UI_ROUTE"));
     }
 }

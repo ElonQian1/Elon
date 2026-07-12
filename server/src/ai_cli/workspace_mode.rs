@@ -108,6 +108,10 @@ pub(super) async fn run_with_workspace_mode(
                     );
                     let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
                 }
+                Ok(PcAgentRunOutcome::UiRerouteRequested { .. }) => {
+                    tracing::warn!("[ai_cli] UI 路由救援未能完成二次执行，回退本地");
+                    let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
+                }
                 Err(e) => {
                     tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
                     let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());

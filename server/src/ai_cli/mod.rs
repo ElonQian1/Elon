@@ -8,6 +8,7 @@ mod ai_cli_intent_gate;
 mod ai_cli_native_session;
 mod ai_cli_output;
 mod ai_cli_pc_execution;
+mod ai_cli_pc_guards;
 mod ai_cli_pc_prompt;
 mod ai_cli_prewarm;
 mod ai_cli_process;
@@ -19,6 +20,7 @@ mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
 mod ai_cli_ui_route_learning;
+mod ai_cli_ui_route_rescue;
 mod pc_agent_dispatch;
 mod pc_artifact_completion;
 mod pc_billing;
@@ -94,6 +96,8 @@ use self::{
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
     pc_agent_dispatch::{dispatch_pc_cli_prompt_until_accepted, PcCliPromptDispatchRequest},
 };
+use self::ai_cli_ui_route_rescue::run_via_pc_agent;
+use self::ai_cli_pc_guards::{PcCliCancelOnDrop, PcExecutionFinishOnDrop};
 use crate::{
     agent_routing::quick_casual_reply,
     billing, intent_router,
@@ -194,84 +198,6 @@ pub async fn run_plan_with_workspace(
 mod workspace_mode;
 use self::workspace_mode::run_with_workspace_mode;
 
-// ── PC agent 委托辅助函数 ─────────────────────────────────────────────────────
-
-struct PcCliCancelOnDrop {
-    handle: Option<crate::homecli_agent::CliPromptCancelHandle>,
-}
-
-impl PcCliCancelOnDrop {
-    fn armed(handle: crate::homecli_agent::CliPromptCancelHandle) -> Self {
-        Self {
-            handle: Some(handle),
-        }
-    }
-
-    fn disarm(&mut self) {
-        self.handle = None;
-    }
-}
-
-impl Drop for PcCliCancelOnDrop {
-    fn drop(&mut self) {
-        if let Some(handle) = self.handle.take() {
-            let sent = handle.cancel();
-            tracing::info!(
-                req_id = handle.req_id(),
-                sent,
-                "PC CLI task dropped; sent cancel to agent"
-            );
-        }
-    }
-}
-
-struct PcExecutionFinishOnDrop {
-    state: Option<Arc<AppState>>,
-    scope: Option<NativeSessionScope>,
-    request_id: String,
-    model: Option<String>,
-}
-
-impl PcExecutionFinishOnDrop {
-    fn armed(
-        state: Arc<AppState>,
-        scope: Option<NativeSessionScope>,
-        request_id: String,
-        model: Option<String>,
-    ) -> Self {
-        Self {
-            state: scope.as_ref().map(|_| state),
-            scope,
-            request_id,
-            model,
-        }
-    }
-
-    fn disarm(&mut self) {
-        self.state = None;
-        self.scope = None;
-    }
-}
-
-impl Drop for PcExecutionFinishOnDrop {
-    fn drop(&mut self) {
-        let (Some(state), Some(scope)) = (self.state.as_ref(), self.scope.as_ref()) else {
-            return;
-        };
-        record_pc_execution_finished(
-            state.as_ref(),
-            Some(scope),
-            &self.request_id,
-            false,
-            Some("PC CLI 请求在收到终态前被取消或连接断开"),
-            self.model.as_deref(),
-            None,
-            None,
-            None,
-        );
-    }
-}
-
 pub async fn run_with_pc_agent_workspace(
     agent_id: &str,
     user_id: &str,
@@ -322,6 +248,7 @@ pub async fn run_with_pc_agent_workspace(
             "{}",
             diagnostic.unwrap_or_else(|| "PC agent CLI 未返回可读内容".to_string())
         )),
+        PcAgentRunOutcome::UiRerouteRequested { .. } => Err(anyhow!("UI 路由救援未能完成二次执行")),
     }
 }
 pub async fn run_with_pc_agent_passthrough_workspace(
@@ -372,6 +299,7 @@ pub async fn run_with_pc_agent_passthrough_workspace(
         PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => {
             PcAgentChatOutcome::NoReadableReply { diagnostic }
         }
+        PcAgentRunOutcome::UiRerouteRequested { .. } => PcAgentChatOutcome::NoReadableReply { diagnostic: Some("UI 路由救援未能完成二次执行".to_string()) },
     })
 }
 
@@ -436,6 +364,7 @@ pub async fn run_with_pc_agent_chat(
         PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => {
             PcAgentChatOutcome::NoReadableReply { diagnostic }
         }
+        PcAgentRunOutcome::UiRerouteRequested { .. } => PcAgentChatOutcome::NoReadableReply { diagnostic: Some("UI 路由救援未能完成二次执行".to_string()) },
     })
 }
 
@@ -443,11 +372,12 @@ pub async fn run_with_pc_agent_chat(
 enum PcAgentRunOutcome {
     Completed,
     NoReadableLightweightReply { diagnostic: Option<String> },
+    UiRerouteRequested { reason: String },
 }
 const PC_PROJECT_NO_CHANGES_ERROR: &str =
     "开发助手已经结束，但项目工作区没有产生新提交；本轮需求没有实际修改项目。请重新发送需求，或切换可用 PC 节点后再试。";
 
-async fn run_via_pc_agent(
+pub(super) async fn run_via_pc_agent_once(
     agent_id: &str,
     user_id: &str,
     cwd: Option<&str>,
@@ -1018,6 +948,67 @@ async fn run_via_pc_agent(
                         pc_billing_call.mark_settled();
                     }
                     cli_usage = Some(usage);
+                }
+                let ui_reroute_reason = (is_codex
+                    && exit_ok
+                    && pc_development_prompt
+                    && !user_message.contains("<elon-ui-design-task version=\"1\">")
+                )
+                .then(|| ai_cli_ui_route_rescue::requested_ui_route(&full_text))
+                .flatten();
+                if let Some(reason) = ui_reroute_reason {
+                    record_pc_codex_thread_id(
+                        state,
+                        native_session_scope.as_ref(),
+                        agent_id,
+                        cwd,
+                        workspace_status.as_ref(),
+                        session_id.as_deref(),
+                    );
+                    record_pc_execution_finished(
+                        state,
+                        native_session_scope.as_ref(),
+                        &pc_req_id,
+                        true,
+                        None,
+                        model.as_deref().or(Some(display_model.as_str())),
+                        workspace_status.as_ref(),
+                        cli_usage.as_ref(),
+                        accounting_result.as_ref(),
+                    );
+                    mark_pc_route_a_prompt_bootstrapped(
+                        state,
+                        native_session_scope.as_ref(),
+                        cli_name,
+                        agent_id,
+                        cwd,
+                        session_id.as_deref().or(native_cli_session_uuid.as_deref()),
+                        true,
+                    );
+                    pc_execution_guard.disarm();
+                    if cli_usage.is_none() {
+                        pc_billing_call.release_no_usage();
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "released_no_usage",
+                            None,
+                            None,
+                            None,
+                            Some("Codex requested UI route rescue before source editing"),
+                        );
+                    } else {
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "settled",
+                            cli_usage.as_ref(),
+                            accounting_result.as_ref(),
+                            node_transaction.as_ref(),
+                            Some("Codex requested UI route rescue before source editing"),
+                        );
+                    }
+                    return Ok(PcAgentRunOutcome::UiRerouteRequested { reason });
                 }
                 let no_project_changes = pc_project_execution_had_no_changes(
                     request_mode,

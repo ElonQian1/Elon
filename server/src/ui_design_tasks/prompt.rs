@@ -35,9 +35,10 @@ pub(crate) fn append_ui_design_task_context(
         .iter()
         .any(|attachment| attachment.mime_type.starts_with("image/"));
     let image_contract = attachment_contract(task.attachment_intent, has_images);
-    let route_confirmation_contract = if task.route_learning_origin.as_deref()
-        == Some("ambiguous_local")
-    {
+    let route_confirmation_contract = if matches!(
+        task.route_learning_origin.as_deref(),
+        Some("ambiguous_local" | "codex_rescue")
+    ) {
         "AMBIGUOUS ROUTE GATE: before reading source or calling any other tool, call ui_confirm_route with UI_DESIGN or NON_UI and a concise reason. If NON_UI is accepted, stop UI fitting and continue as normal development."
     } else {
         "ROUTE CONFIRMED: this task already has explicit, learned or high-confidence UI evidence; no additional route confirmation is required. If project/runtime evidence proves it is actually behavior or business logic, call ui_confirm_route with NON_UI before any source edit and continue as normal development."

@@ -76,6 +76,13 @@ pub(crate) fn resolve_ui_route_task(
     }
 }
 
+pub(crate) fn promote_codex_ui_route(message: &str) -> Result<String, String> {
+    let mut task = force_ui_design_task(message, None);
+    task.route_learning_origin = Some("codex_rescue".to_string());
+    task.route_learning_phrase = Some(message.chars().take(2_000).collect());
+    super::append_ui_design_task_context(message.to_string(), Some(&task), None, false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -131,5 +138,13 @@ mod tests {
         );
         assert!(resolved.suppress_inference);
         assert!(resolved.task.is_none());
+    }
+
+    #[test]
+    fn codex_rescue_adds_a_trusted_ui_contract_and_learning_phrase() {
+        let promoted = promote_codex_ui_route("让操作区更有呼吸感").unwrap();
+        assert!(promoted.contains("<elon-ui-design-task version=\"1\">"));
+        assert!(promoted.contains("\"route_learning_origin\":\"codex_rescue\""));
+        assert!(promoted.contains("ui_confirm_route"));
     }
 }

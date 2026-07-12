@@ -9,7 +9,7 @@ mod dispatch;
 mod learning;
 
 pub(crate) use intent::force_ui_design_task;
-pub(crate) use dispatch::resolve_ui_route_task;
+pub(crate) use dispatch::{promote_codex_ui_route, resolve_ui_route_task};
 pub(crate) use learning::finalize_ui_route_learning;
 pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
