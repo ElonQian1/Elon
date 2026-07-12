@@ -132,6 +132,46 @@ impl LiveUiBroker {
         matched.into_iter().next()
     }
 
+    pub(crate) async fn session_for_project(
+        &self,
+        project_root: &str,
+    ) -> Option<Arc<LiveUiSession>> {
+        if let Some(session) = self.connected_session_for_project(project_root).await {
+            return Some(session);
+        }
+        let expected = canonical_or_raw(project_root);
+        let mut matched = self
+            .sessions
+            .read()
+            .await
+            .values()
+            .filter(|session| {
+                session
+                    .project_root
+                    .as_deref()
+                    .is_some_and(|root| canonical_or_raw(root) == expected)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        matched.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+        matched.into_iter().next()
+    }
+
+    pub(crate) async fn effective_session_id(&self, session_id: &str) -> Result<String> {
+        let requested = self.session(session_id).await?;
+        if requested.view().await.connected {
+            return Ok(requested.id.clone());
+        }
+        let Some(root) = requested.project_root.as_deref() else {
+            return Ok(requested.id.clone());
+        };
+        Ok(self
+            .connected_session_for_project(root)
+            .await
+            .map(|session| session.id.clone())
+            .unwrap_or_else(|| requested.id.clone()))
+    }
+
     pub(crate) async fn session_view(&self, session_id: &str) -> Result<LiveSessionView> {
         Ok(self.session(session_id).await?.view().await)
     }

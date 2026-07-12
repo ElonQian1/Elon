@@ -8,6 +8,7 @@ mod broker;
 mod build_verify;
 mod build_verify_apk;
 mod design_diff_regions;
+mod design_bootstrap;
 mod fit_learning;
 pub(crate) mod fit_run;
 mod frame;

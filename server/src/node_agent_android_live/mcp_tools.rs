@@ -3,6 +3,35 @@ use serde_json::{json, Value};
 pub(crate) fn tool_definitions() -> Vec<Value> {
     vec![
         tool(
+            "ui_get_project_profile",
+            "读取节点预生成的项目 UI 技术栈、主题、组件、导航和 Preview 候选；全新页面任务首先调用。",
+            json!({"type":"object","properties":{}}),
+        ),
+        tool(
+            "ui_get_design_task",
+            "读取结构化设计任务、本地附件清单和标注；不需要重新解析用户长提示。",
+            json!({"type":"object","properties":{"taskId":{"type":"string"}}}),
+        ),
+        tool(
+            "ui_get_runtime_status",
+            "查看当前处于无 Runtime 的 BOOTSTRAP 阶段还是已连接真实 Android Renderer 的 LIVE 阶段。",
+            json!({"type":"object","properties":{}}),
+        ),
+        tool(
+            "ui_create_compose_screen_scaffold",
+            "在已确认 Compose 的项目中创建不会覆盖现有文件的最小 Screen + Preview 骨架。创建后仍需按项目组件和主题补全并编译。",
+            json!({
+                "type":"object",
+                "required":["relativeFile","packageName","screenName","screenId"],
+                "properties":{
+                    "relativeFile":{"type":"string","description":"模块 src/main 或 src/debug 下的 .kt 相对路径"},
+                    "packageName":{"type":"string"},
+                    "screenName":{"type":"string"},
+                    "screenId":{"type":"string"}
+                }
+            }),
+        ),
+        tool(
             "ui_get_screen_summary",
             "读取紧凑页面摘要；每个任务应先调用。",
             json!({"type":"object","properties":{}}),

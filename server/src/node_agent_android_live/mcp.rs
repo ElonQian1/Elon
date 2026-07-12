@@ -76,8 +76,18 @@ pub(crate) async fn descriptor_for_project(
     project_root: &str,
     host_port: u16,
 ) -> Result<Option<Value>> {
-    let Some(session) = broker.connected_session_for_project(project_root).await else {
-        return Ok(None);
+    let session = match broker.session_for_project(project_root).await {
+        Some(session) => session,
+        None => {
+            broker
+                .create_session(
+                    "ui-design-bootstrap".to_string(),
+                    "ui.design.bootstrap".to_string(),
+                    Some(project_root.to_string()),
+                    super::adb_session::DEFAULT_DEVICE_PORT,
+                )
+                .await
+        }
     };
     descriptor(&session, host_port).map(Some)
 }
@@ -100,7 +110,7 @@ pub(crate) async fn handle_request(
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
-            "instructions": "先读 ui_get_screen_summary；仅在需要时读取节点、局部源码和裁剪。LIVE 数值优先使用 ui_propose_live_patch/ui_apply_live_patch，结构修改才编辑源码。"
+            "instructions": "全新页面先读 ui_get_project_profile 和 ui_get_design_task；已有 Runtime 再读 ui_get_screen_summary。仅在需要时读取节点、局部源码和裁剪。LIVE 数值优先使用 ui_propose_live_patch/ui_apply_live_patch，结构修改才编辑源码。"
         })),
         "notifications/initialized" => return Value::Null,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
@@ -119,6 +129,7 @@ pub(crate) async fn handle_request(
 }
 
 async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Result<Value> {
+    let session_id = broker.effective_session_id(session_id).await?;
     let name = params
         .get("name")
         .and_then(Value::as_str)
@@ -128,8 +139,28 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
         .cloned()
         .unwrap_or_else(|| json!({}));
     let value = match name {
+        "ui_get_project_profile" => {
+            let session = broker.session(&session_id).await?;
+            json!({ "profile": super::design_bootstrap::project_profile(&session)? })
+        }
+        "ui_get_design_task" => {
+            let session = broker.session(&session_id).await?;
+            super::design_bootstrap::design_task(&session, &arguments)?
+        }
+        "ui_get_runtime_status" => {
+            let session = broker.session(&session_id).await?;
+            let view = session.view().await;
+            json!({
+                "phase": if view.connected { "LIVE" } else { "BOOTSTRAP" },
+                "session": view,
+            })
+        }
+        "ui_create_compose_screen_scaffold" => {
+            let session = broker.session(&session_id).await?;
+            super::design_bootstrap::create_compose_screen_scaffold(&session, &arguments)?
+        }
         "ui_get_screen_summary" => {
-            let ir = load_or_build_ui_ir(broker, session_id).await?;
+            let ir = load_or_build_ui_ir(broker, &session_id).await?;
             json!({
                 "sessionId": ir.session_id,
                 "revision": ir.revision,
@@ -141,12 +172,12 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             })
         }
         "ui_get_node" => {
-            let ir = load_or_build_ui_ir(broker, session_id).await?;
+            let ir = load_or_build_ui_ir(broker, &session_id).await?;
             let node = find_node(&ir, &arguments)?;
             json!({ "revision": ir.revision, "node": node })
         }
         "ui_get_subtree" => {
-            let ir = load_or_build_ui_ir(broker, session_id).await?;
+            let ir = load_or_build_ui_ir(broker, &session_id).await?;
             let node = find_node(&ir, &arguments)?;
             let mut ids = vec![node.runtime_node_id.clone()];
             collect_descendants(&ir, &mut ids);
@@ -158,15 +189,15 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             json!({ "revision": ir.revision, "nodes": nodes })
         }
         "ui_get_source_bundle" => {
-            let ir = load_or_build_ui_ir(broker, session_id).await?;
+            let ir = load_or_build_ui_ir(broker, &session_id).await?;
             source_bundle(&ir, &arguments)?
         }
         "ui_get_target_crop" => {
-            let ir = load_or_build_ui_ir(broker, session_id).await?;
+            let ir = load_or_build_ui_ir(broker, &session_id).await?;
             let target = ir
                 .target_design
                 .ok_or_else(|| anyhow!("尚未绑定目标设计图"))?;
-            let session = broker.session(session_id).await?;
+            let session = broker.session(&session_id).await?;
             let artifact = persist_target_crop_artifact(
                 &session,
                 &target.path,
@@ -175,27 +206,27 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             json!({ "artifact": artifact, "targetSha256": target.sha256 })
         }
         "ui_get_current_crop" => {
-            let session = broker.session(session_id).await?;
+            let session = broker.session(&session_id).await?;
             let artifact =
                 capture_latest_frame_artifact(&session, parse_rect(arguments.get("rect"))?).await?;
             json!({ "artifact": artifact, "treeRevision": session.view().await.tree_revision })
         }
-        "ui_get_visual_diff" => visual_diff_from_ir(broker, session_id, &arguments).await?,
-        "ui_propose_live_patch" => propose_live_patch(broker, session_id, &arguments).await?,
+        "ui_get_visual_diff" => visual_diff_from_ir(broker, &session_id, &arguments).await?,
+        "ui_propose_live_patch" => propose_live_patch(broker, &session_id, &arguments).await?,
         "ui_apply_live_patch" => {
             let patch: LiveStylePatch =
                 serde_json::from_value(arguments.get("patch").cloned().unwrap_or(arguments))
                     .context("patch 参数不符合 LiveStylePatch")?;
-            let ack = broker.apply_patch(session_id, patch).await?;
+            let ack = broker.apply_patch(&session_id, patch).await?;
             json!({ "ack": ack })
         }
         "ui_run_visual_solver" => {
             let request: VisualSolverRequest =
                 serde_json::from_value(arguments).context("视觉求解参数无效")?;
-            json!({ "result": solve_visual_style(broker, session_id, request).await? })
+            json!({ "result": solve_visual_style(broker, &session_id, request).await? })
         }
         "ui_get_commit_plan" => {
-            let session = broker.session(session_id).await?;
+            let session = broker.session(&session_id).await?;
             json!({ "plan": build_source_commit_plan(session).await? })
         }
         "ui_commit_bound_styles" => {
@@ -204,7 +235,7 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
                 .and_then(Value::as_str)
                 .ok_or_else(|| anyhow!("缺少 sourceRevision"))?
                 .to_string();
-            let session = broker.session(session_id).await?;
+            let session = broker.session(&session_id).await?;
             json!({
                 "result": commit_source(session, SourceCommitRequest { source_revision }).await?
             })
@@ -213,7 +244,7 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             let request: BuildVerifyRequest =
                 serde_json::from_value(arguments).context("构建验收参数无效")?;
             let host_port = crate::node_agent_admin_open::admin_port_from_env();
-            json!({ "result": build_and_verify(broker, session_id, request, host_port).await? })
+            json!({ "result": build_and_verify(broker, &session_id, request, host_port).await? })
         }
         _ => bail!("未知 UI MCP 工具: {name}"),
     };
