@@ -377,7 +377,7 @@ enum PcAgentRunOutcome {
 const PC_PROJECT_NO_CHANGES_ERROR: &str =
     "开发助手已经结束，但项目工作区没有产生新提交；本轮需求没有实际修改项目。请重新发送需求，或切换可用 PC 节点后再试。";
 
-pub(super) async fn run_via_pc_agent_once(
+async fn run_via_pc_agent_once(
     agent_id: &str,
     user_id: &str,
     cwd: Option<&str>,
