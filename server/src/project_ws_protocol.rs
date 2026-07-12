@@ -3,7 +3,8 @@ use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    pc_agent_runtime_choice::PcRuntimeRoutePreference, store::TaskSnapshot, types::WsMessage,
+    pc_agent_runtime_choice::PcRuntimeRoutePreference, store::TaskSnapshot,
+    types::WsMessage, ui_design_tasks::UiDesignTaskInput,
 };
 
 pub const PROJECT_WS_BACKLOG_LIMIT: usize = 512;
@@ -48,6 +49,8 @@ pub struct ProjectChatRequest {
     #[serde(default, alias = "projectIconDataUrl")]
     pub project_icon_data_url: Option<String>,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
+    #[serde(default, alias = "uiDesignTask")]
+    pub ui_design_task: Option<UiDesignTaskInput>,
     #[serde(default, alias = "directPcCli", alias = "pcDirectCli")]
     pub direct_pc_cli: Option<bool>,
     /// 方案8: 客户端声明的 WS 协议版本，旧客户端为 None（服务器按 v1 处理）
@@ -272,6 +275,7 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         local_workspace_path: None,
         project_icon_data_url: None,
         attachments: None,
+        ui_design_task: None,
         direct_pc_cli: None,
         protocol_version: None,
         chat_only: None,

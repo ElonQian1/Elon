@@ -82,6 +82,27 @@
     }
 
     #[test]
+    fn parses_structured_ui_design_task() {
+        let request = parse_project_message(
+            r#"{
+                "message":"按设计图创建新页面",
+                "uiDesignTask":{
+                    "taskId":"ui_create_1",
+                    "mode":"CREATE_NEW",
+                    "attachmentIntent":"TARGET_DESIGN",
+                    "screenId":"new_dashboard",
+                    "targetDesignAttachmentId":"att_1"
+                }
+            }"#,
+        );
+
+        let task = request.ui_design_task.expect("ui design task should parse");
+        assert_eq!(task.task_id.as_deref(), Some("ui_create_1"));
+        assert_eq!(task.screen_id.as_deref(), Some("new_dashboard"));
+        task.validate().expect("task should be valid");
+    }
+
+    #[test]
     fn rejects_unknown_project_chat_runtime_route() {
         let request = serde_json::from_str::<ProjectChatRequest>(
             r#"{"message":"run","runtimeRoute":"remote-neighbor"}"#,

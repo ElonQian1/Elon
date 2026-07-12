@@ -218,6 +218,7 @@ mod store_schema;
 mod token_usage_api;
 mod tools;
 mod tools_apk;
+mod ui_design_tasks;
 mod tools_exec;
 mod tools_git;
 mod tools_patch;
