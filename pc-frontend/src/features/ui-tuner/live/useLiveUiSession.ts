@@ -70,6 +70,7 @@ export function useLiveUiSession({
   const [buildVerifyResult, setBuildVerifyResult] = useState<LiveBuildVerifyResult | null>(null)
   const [gestureActive, setGestureActiveState] = useState(false)
   const [previewRequest, setPreviewRequest] = useState<LivePreviewRequest | null>(null)
+  const [recoveryNonce, setRecoveryNonce] = useState(0)
   const sessionRef = useRef<LiveUiSession | null>(null)
   const treeRevisionRef = useRef<number | null>(null)
   const stopPromiseRef = useRef<Promise<void>>(Promise.resolve())
@@ -83,6 +84,8 @@ export function useLiveUiSession({
   const lastPreviewRef = useRef<LivePreviewRequest | null>(null)
   const gestureFrameBusyRef = useRef(false)
   const gestureFramePendingRef = useRef<string | null>(null)
+  const livePollFailureRef = useRef(0)
+  const recoveryInFlightRef = useRef(false)
 
   useEffect(() => {
     // A Preview belongs to the selected APK/device, not to a particular
@@ -190,11 +193,14 @@ export function useLiveUiSession({
           return
         }
         sessionRef.current = created
+        recoveryInFlightRef.current = false
+        livePollFailureRef.current = 0
         setSession(created)
         setMcp(started.mcp)
         return created
       } catch (startError) {
         if (disposed || generation !== generationRef.current) return null
+        recoveryInFlightRef.current = false
         const message = messageOf(startError, '无法启动 Live Runtime')
         setState('attach_only')
         setError(`${message}；已保留截图/XML调试模式。`)
@@ -243,7 +249,7 @@ export function useLiveUiSession({
       sessionRef.current = null
       if (current) void queueStop(current)
     }
-  }, [deviceId, packageName, projectRoot, refresh])
+  }, [deviceId, packageName, projectRoot, recoveryNonce, refresh])
 
   const refreshFrame = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id
@@ -271,7 +277,10 @@ export function useLiveUiSession({
 
   const reconnect = useCallback(async () => {
     const current = sessionRef.current
-    if (!current) return
+    if (!current) {
+      setRecoveryNonce((value) => value + 1)
+      return
+    }
     if (reconnectPromiseRef.current) return reconnectPromiseRef.current
     const task = (async () => {
       setState('connecting')
@@ -318,9 +327,18 @@ export function useLiveUiSession({
     const pollRuntime = async () => {
       if (disposed) return
       try {
-        await Promise.all([refresh(session.id), refreshFrame(session.id)])
+        await refresh(session.id)
+        livePollFailureRef.current = 0
+        await refreshFrame(session.id).catch(() => undefined)
       } catch {
-        // A transient tree/frame read must not tear down the current live session.
+        livePollFailureRef.current += 1
+        if (livePollFailureRef.current >= 2 && !recoveryInFlightRef.current) {
+          recoveryInFlightRef.current = true
+          setState('connecting')
+          setError('PC 节点已重启或 Live Session 已失效，正在自动恢复真实 Android 连接…')
+          setRecoveryNonce((value) => value + 1)
+          return
+        }
       }
       if (!disposed) timer = window.setTimeout(
         () => { void pollRuntime() },
