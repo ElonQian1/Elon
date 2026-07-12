@@ -33,6 +33,7 @@ pub(crate) fn resolve_ui_route_task(
                 let mut task = force_ui_design_task(display_message, attachments);
                 task.route_learning_id = Some(entry.id);
                 task.route_learning_origin = Some("active_library".to_string());
+                task.route_learning_phrase = Some(display_message.chars().take(2_000).collect());
                 ResolvedUiRouteTask {
                     task: Some(task),
                     suppress_inference: false,
@@ -58,14 +59,20 @@ pub(crate) fn resolve_ui_route_task(
             source: "ambiguous_secondary_rescue",
         };
     }
+    if decision.class == UiRouteClass::ConfirmedUi {
+        let mut task = force_ui_design_task(display_message, attachments);
+        task.route_learning_origin = Some("local_confirmed".to_string());
+        task.route_learning_phrase = Some(display_message.chars().take(2_000).collect());
+        return ResolvedUiRouteTask {
+            task: Some(task),
+            suppress_inference: false,
+            source: "local_confirmed_ui",
+        };
+    }
     ResolvedUiRouteTask {
         task: None,
         suppress_inference: false,
-        source: match decision.class {
-            UiRouteClass::ConfirmedUi => "local_confirmed_ui",
-            UiRouteClass::ConfirmedNonUi => "local_confirmed_non_ui",
-            UiRouteClass::Ambiguous => unreachable!(),
-        },
+        source: "local_confirmed_non_ui",
     }
 }
 

@@ -40,7 +40,7 @@ pub(crate) fn append_ui_design_task_context(
     {
         "AMBIGUOUS ROUTE GATE: before reading source or calling any other tool, call ui_confirm_route with UI_DESIGN or NON_UI and a concise reason. If NON_UI is accepted, stop UI fitting and continue as normal development."
     } else {
-        "ROUTE CONFIRMED: this task already has explicit, learned or high-confidence UI evidence; no additional route confirmation is required."
+        "ROUTE CONFIRMED: this task already has explicit, learned or high-confidence UI evidence; no additional route confirmation is required. If project/runtime evidence proves it is actually behavior or business logic, call ui_confirm_route with NON_UI before any source edit and continue as normal development."
     };
     Ok(format!(
         "{message}\n\n{TASK_MARKER_BEGIN}\n{task_json}\n{TASK_MARKER_END}\n\

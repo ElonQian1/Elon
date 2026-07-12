@@ -19,13 +19,19 @@ pub(crate) fn finalize_ui_route_learning(
     let Some((origin, phrase)) = learning_metadata(prompt) else {
         return Ok(None);
     };
-    if origin != "ambiguous_local" {
+    if !matches!(
+        origin.as_str(),
+        "ambiguous_local" | "local_confirmed" | "active_library"
+    ) {
         return Ok(None);
     }
     let observation = observe_codex_route(codex_jsonl);
     let Some(learned_route) = observation.learned_route else {
         return Ok(None);
     };
+    if origin != "ambiguous_local" && learned_route == UiLearnedRoute::Ui {
+        return Ok(None);
+    }
     let candidate = store.record_ui_route_candidate(
         project_id,
         Some(user_id),
