@@ -2,6 +2,7 @@
 //!
 //! 本模块只描述任务意图和确定性路由，不负责执行 Codex、构建或 Live Runtime。
 
+mod intent;
 mod model;
 mod prompt;
 

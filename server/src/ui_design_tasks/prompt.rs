@@ -14,7 +14,11 @@ pub(crate) fn append_ui_design_task_context(
     task: Option<&UiDesignTaskInput>,
     attachments: Option<&[ProjectAttachmentRef]>,
 ) -> Result<String, String> {
-    let Some(task) = task else {
+    let inferred_task = task
+        .is_none()
+        .then(|| super::intent::infer_ui_design_task(&message, attachments))
+        .flatten();
+    let Some(task) = task.or(inferred_task.as_ref()) else {
         return Ok(message);
     };
     task.validate()?;
@@ -25,7 +29,11 @@ pub(crate) fn append_ui_design_task_context(
     let task_json = serde_json::to_string(&envelope)
         .map_err(|error| format!("UI 设计任务序列化失败: {error}"))?;
     let mode_contract = mode_contract(task.mode);
-    let image_contract = attachment_contract(task.attachment_intent);
+    let has_images = envelope
+        .attachments
+        .iter()
+        .any(|attachment| attachment.mime_type.starts_with("image/"));
+    let image_contract = attachment_contract(task.attachment_intent, has_images);
     Ok(format!(
         "{message}\n\n{TASK_MARKER_BEGIN}\n{task_json}\n{TASK_MARKER_END}\n\
          This is a structured UI design development task supplied by the trusted Elon task router.\n\
@@ -144,7 +152,10 @@ fn mode_contract(mode: UiDesignTaskMode) -> &'static str {
     }
 }
 
-fn attachment_contract(intent: UiDesignAttachmentIntent) -> &'static str {
+fn attachment_contract(intent: UiDesignAttachmentIntent, has_images: bool) -> &'static str {
+    if !has_images {
+        return "This is a text-only UI request. Inspect the current Runtime/project profile first; do not invent or wait for a target image.";
+    }
     match intent {
         UiDesignAttachmentIntent::Auto => {
             "Determine whether each image is a clean target, an annotated change request, a current screenshot or style reference; never assume annotation overlays are target pixels."
@@ -182,6 +193,29 @@ mod tests {
         assert!(prompt.contains(TASK_MARKER_BEGIN));
         assert!(prompt.contains("Preview-first screen skeleton"));
         assert!(prompt.contains("Exclude arrows, labels and drawing overlays"));
+    }
+
+    #[test]
+    fn text_only_ui_request_gets_structured_contract_automatically() {
+        let prompt = append_ui_design_task_context(
+            "把支付按钮的圆角改小，间距更紧凑".into(),
+            None,
+            None,
+        )
+        .expect("context should append");
+
+        assert!(prompt.contains(TASK_MARKER_BEGIN));
+        assert!(prompt.contains("text-only UI request"));
+        assert!(prompt.contains("MODIFY_EXISTING"));
+    }
+
+    #[test]
+    fn behavior_bug_remains_a_normal_development_request() {
+        let message = "修复按钮点击后没有反应的问题".to_string();
+        assert_eq!(
+            append_ui_design_task_context(message.clone(), None, None).unwrap(),
+            message
+        );
     }
 
     #[test]
