@@ -24,6 +24,8 @@ use crate::node_agent_android_live::ui_ir::load_or_build_ui_ir;
 pub(crate) struct BatchAcceptRequest {
     pub(crate) run_ids: Vec<String>,
     pub(crate) source_revision: String,
+    #[serde(default)]
+    pub(crate) codex_completed: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -35,6 +37,7 @@ pub(crate) struct BatchAcceptResult {
     pub(crate) commit: Option<SourceCommitResult>,
     pub(crate) build: Option<BuildVerifyResult>,
     pub(crate) codex_bundle: Option<Value>,
+    pub(crate) codex_artifact_path: Option<String>,
     pub(crate) runs: Vec<FitRunDocument>,
 }
 
@@ -65,9 +68,27 @@ impl FitRunService {
             if run.phase != FitRunPhase::CandidateReady {
                 bail!("FitRun {} 尚未达到 CANDIDATE_READY", run.run_id);
             }
-            if run.source_revision.as_deref() != Some(request.source_revision.as_str()) {
+            if !request.codex_completed
+                && run.source_revision.as_deref() != Some(request.source_revision.as_str())
+            {
                 bail!("FitRun {} 的源码基线已经变化", run.run_id);
             }
+        }
+        if request.codex_completed {
+            let current_revision = context
+                .source_revision
+                .as_deref()
+                .ok_or_else(|| anyhow!("无法读取 Codex 修改后的源码 Revision"))?;
+            return self
+                .build_and_finalize_batch(
+                    &context,
+                    runs,
+                    request.run_ids,
+                    json!({ "mode": "CODEX_COMPLETED" }),
+                    None,
+                    current_revision,
+                )
+                .await;
         }
         let patches = runs
             .iter()
@@ -79,10 +100,13 @@ impl FitRunService {
         }
         let plan_value = serde_json::to_value(&plan)?;
         if plan.codex_count > 0 {
+            let bundle = codex_bundle(&runs, &plan_value);
+            let codex_artifact_path = persist_codex_bundle(&context.project_root, &bundle)?;
             return Ok(BatchAcceptResult {
                 status: "CODEX_REQUIRED",
                 run_ids: request.run_ids,
-                codex_bundle: Some(codex_bundle(&runs, &plan_value)),
+                codex_bundle: Some(bundle),
+                codex_artifact_path: Some(codex_artifact_path),
                 plan: plan_value,
                 commit: None,
                 build: None,
@@ -95,6 +119,31 @@ impl FitRunService {
                 source_revision: request.source_revision,
             },
         )?;
+        let source_revision_after = commit.source_revision_after.clone();
+        self.build_and_finalize_batch(
+            &context,
+            runs,
+            request.run_ids,
+            plan_value,
+            Some(commit),
+            &source_revision_after,
+        )
+        .await
+    }
+
+    async fn build_and_finalize_batch(
+        &self,
+        context: &FitSessionContext,
+        mut runs: Vec<FitRunDocument>,
+        run_ids: Vec<String>,
+        plan: Value,
+        commit: Option<SourceCommitResult>,
+        source_revision_after: &str,
+    ) -> Result<BatchAcceptResult> {
+        let broker = self
+            .live_broker
+            .as_ref()
+            .ok_or_else(|| anyhow!("批量拟合验收只支持真实 Android Live Runtime"))?;
         let host_port = crate::node_agent_admin_open::admin_port_from_env();
         let build = build_and_verify(
             broker,
@@ -105,7 +154,7 @@ impl FitRunService {
         .await?;
         let verified = build.verification_gate.verified;
         for run in &mut runs {
-            apply_batch_verification(run, &commit, &build, verified)?;
+            apply_batch_verification(run, source_revision_after, &build, verified)?;
             self.store.save(run)?;
             self.record_terminal_learning(run);
         }
@@ -115,11 +164,12 @@ impl FitRunService {
             } else {
                 "VERIFY_FAILED"
             },
-            run_ids: request.run_ids,
-            plan: plan_value,
-            commit: Some(commit),
+            run_ids,
+            plan,
+            commit,
             build: Some(build),
             codex_bundle: None,
+            codex_artifact_path: None,
             runs,
         })
     }
@@ -179,7 +229,7 @@ fn patch_for_run(
 
 fn apply_batch_verification(
     run: &mut FitRunDocument,
-    commit: &SourceCommitResult,
+    source_revision_after: &str,
     build: &BuildVerifyResult,
     verified: bool,
 ) -> Result<()> {
@@ -188,13 +238,13 @@ fn apply_batch_verification(
         .best
         .clone()
         .ok_or_else(|| anyhow!("FitRun {} 没有最佳候选", run.run_id))?;
-    candidate.source_revision = Some(commit.source_revision_after.clone());
+    candidate.source_revision = Some(source_revision_after.to_string());
     candidate.runtime_build_id = build.runtime_build_id.clone();
     candidate.source_parity_loss = Some(build.source_parity_diff.visual_loss);
     candidate.source_parity_verified = verified;
     run.current = Some(candidate.clone());
     run.best = Some(candidate);
-    run.source_revision = Some(commit.source_revision_after.clone());
+    run.source_revision = Some(source_revision_after.to_string());
     run.runtime_build_id = build.runtime_build_id.clone();
     run.usage.build_rounds = run.usage.build_rounds.saturating_add(1);
     run.stop_reason = Some(if verified {
@@ -208,6 +258,15 @@ fn apply_batch_verification(
         FitRunPhase::Failed
     })?;
     Ok(())
+}
+
+fn persist_codex_bundle(project_root: &str, bundle: &Value) -> Result<String> {
+    let root = std::path::PathBuf::from(project_root).canonicalize()?;
+    let directory = root.join(".elon").join("ui-tuner").join("fit-batches");
+    std::fs::create_dir_all(&directory)?;
+    let path = directory.join(format!("batch-{}.json", uuid::Uuid::new_v4().simple()));
+    std::fs::write(&path, serde_json::to_vec_pretty(bundle)?)?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 fn codex_bundle(runs: &[FitRunDocument], plan: &Value) -> Value {
