@@ -107,6 +107,23 @@ where
             );
             push_progress(out, "AI 正在修改文件……".to_string());
         }
+        "mcp_tool_call" | "dynamic_tool_call" | "tool_call" => {
+            let tool = codex_tool_name(item);
+            let args = item
+                .get("arguments")
+                .or_else(|| item.get("args"))
+                .or_else(|| item.get("input"))
+                .cloned()
+                .unwrap_or_else(|| Value::Object(Default::default()));
+            out.push(
+                WsMessage::ToolCall {
+                    tool: tool.clone(),
+                    args,
+                }
+                .to_json(),
+            );
+            push_progress(out, ui_tool_progress(&tool, false));
+        }
         _ => {}
     }
 }
@@ -200,7 +217,59 @@ fn handle_item_completed<F>(
             );
             push_progress(out, "文件修改完毕".to_string());
         }
+        "mcp_tool_call" | "dynamic_tool_call" | "tool_call" => {
+            let tool = codex_tool_name(item);
+            let result = item
+                .get("result")
+                .or_else(|| item.get("output"))
+                .map(|value| truncate_chars(&value.to_string(), 500))
+                .unwrap_or_else(|| {
+                    item.get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("完成")
+                        .to_string()
+                });
+            out.push(
+                WsMessage::ToolResult {
+                    tool: tool.clone(),
+                    result,
+                }
+                .to_json(),
+            );
+            push_progress(out, ui_tool_progress(&tool, true));
+        }
         _ => {}
+    }
+}
+
+fn codex_tool_name(item: &Value) -> String {
+    item.get("tool")
+        .or_else(|| item.get("name"))
+        .or_else(|| item.get("tool_name"))
+        .and_then(Value::as_str)
+        .unwrap_or("mcp_tool")
+        .to_string()
+}
+
+fn ui_tool_progress(tool: &str, completed: bool) -> String {
+    let phase = match tool {
+        "ui_get_project_profile" | "ui_get_design_task" => "正在读取项目 UI 档案和设计任务",
+        "ui_create_compose_screen_scaffold" => "正在创建全新页面骨架和 Preview",
+        "ui_prepare_debug_runtime" => "正在首次构建并切换到真实 Android Renderer",
+        "ui_bind_target_design" => "正在绑定目标设计图",
+        "ui_map_annotations_to_nodes" => "正在把图片标注映射到真实组件",
+        "ui_start_fit_run" => "正在启动可恢复的自动拟合任务",
+        "ui_run_visual_solver" => "正在本地试算样式参数（不消耗模型 Token）",
+        "ui_control_fit_run" => "正在推进拟合、源码写回与验收",
+        "ui_commit_bound_styles" => "正在把确认样式确定性写回源码",
+        "ui_build_and_verify" => "正在重新构建并进行无临时 Patch 验收",
+        _ if tool.starts_with("ui_") => "正在使用 UI 设计工具",
+        _ => "AI 正在调用开发工具",
+    };
+    if completed {
+        format!("{phase}：本步骤已完成")
+    } else {
+        format!("{phase}…")
     }
 }
 

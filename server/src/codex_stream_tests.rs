@@ -2,6 +2,18 @@
     use serde_json::Value;
 
     #[test]
+    fn streams_ui_fit_tool_as_mobile_friendly_progress() {
+        let line = r#"{"type":"item.started","item":{"id":"mcp_1","type":"mcp_tool_call","name":"ui_start_fit_run","arguments":{"runtimeNodeId":"rn_1"}}}"#;
+        let messages = stream_event_to_ws_messages(line, None);
+        assert!(messages
+            .iter()
+            .any(|message| message.contains("ui_start_fit_run")));
+        assert!(messages
+            .iter()
+            .any(|message| message.contains("自动拟合任务")));
+    }
+
+    #[test]
     fn stream_event_emits_tool_call_and_progress_for_command_started() {
         let line = r#"{"type":"item.started","item":{"id":"call_1","type":"command_execution","command":"cargo check"}}"#;
         let msgs = stream_event_to_ws_messages(line, None);
