@@ -41,9 +41,43 @@ pub(super) fn infer_ui_design_task(
         return None;
     }
 
-    let mode = decision.mode;
+    Some(build_ui_design_task(
+        &normalized,
+        &images,
+        has_annotations,
+        decision.mode,
+    ))
+}
+
+pub(crate) fn force_ui_design_task(
+    message: &str,
+    attachments: Option<&[ProjectAttachmentRef]>,
+) -> UiDesignTaskInput {
+    let normalized = message.to_lowercase();
+    let images: Vec<&ProjectAttachmentRef> = attachments
+        .unwrap_or_default()
+        .iter()
+        .filter(|item| {
+            item.kind.as_deref() == Some("image")
+                || item
+                    .mime_type
+                    .as_deref()
+                    .is_some_and(|mime| mime.starts_with("image/"))
+        })
+        .collect();
+    let has_annotations = images.iter().any(|item| !item.annotations.is_empty());
+    let mode = infer_mode(&normalized);
+    build_ui_design_task(&normalized, &images, has_annotations, mode)
+}
+
+fn build_ui_design_task(
+    normalized: &str,
+    images: &[&ProjectAttachmentRef],
+    has_annotations: bool,
+    mode: UiDesignTaskMode,
+) -> UiDesignTaskInput {
     let attachment_intent =
-        infer_attachment_intent(&normalized, has_annotations, !images.is_empty());
+        infer_attachment_intent(normalized, has_annotations, !images.is_empty());
     let primary_id = images.iter().find_map(|item| item.attachment_id.clone());
     let mut task = UiDesignTaskInput {
         task_id: Some(format!("design_auto_{}", uuid::Uuid::new_v4().simple())),
@@ -66,7 +100,7 @@ pub(super) fn infer_ui_design_task(
         UiDesignAttachmentIntent::CurrentScreenshot => task.original_attachment_id = primary_id,
         UiDesignAttachmentIntent::Auto => {}
     }
-    Some(task)
+    task
 }
 
 pub(crate) fn classify_ui_route(

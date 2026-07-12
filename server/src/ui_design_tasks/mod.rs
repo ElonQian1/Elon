@@ -6,6 +6,7 @@ mod intent;
 mod model;
 mod prompt;
 
+pub(crate) use intent::force_ui_design_task;
 pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,

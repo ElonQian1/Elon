@@ -210,6 +210,7 @@ pub(crate) async fn handle_project_ws(
             message,
             request.ui_design_task.as_ref(),
             request.attachments.as_deref(),
+            true,
         ) {
             Ok(message) => message,
             Err(message) => {

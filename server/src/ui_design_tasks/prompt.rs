@@ -13,10 +13,10 @@ pub(crate) fn append_ui_design_task_context(
     message: String,
     task: Option<&UiDesignTaskInput>,
     attachments: Option<&[ProjectAttachmentRef]>,
+    allow_inference: bool,
 ) -> Result<String, String> {
     let message = sanitize_reserved_markers(message);
-    let inferred_task = task
-        .is_none()
+    let inferred_task = (task.is_none() && allow_inference)
         .then(|| super::intent::infer_ui_design_task(&message, attachments))
         .flatten();
     let Some(task) = task.or(inferred_task.as_ref()) else {
@@ -194,7 +194,7 @@ mod tests {
             ..UiDesignTaskInput::default()
         };
 
-        let prompt = append_ui_design_task_context("创建页面".into(), Some(&task), None)
+        let prompt = append_ui_design_task_context("创建页面".into(), Some(&task), None, true)
             .expect("context should append");
 
         assert!(prompt.contains(TASK_MARKER_BEGIN));
@@ -205,7 +205,12 @@ mod tests {
     #[test]
     fn text_only_ui_request_gets_structured_contract_automatically() {
         let prompt =
-            append_ui_design_task_context("把支付按钮的圆角改小，间距更紧凑".into(), None, None)
+            append_ui_design_task_context(
+                "把支付按钮的圆角改小，间距更紧凑".into(),
+                None,
+                None,
+                true,
+            )
                 .expect("context should append");
 
         assert!(prompt.contains(TASK_MARKER_BEGIN));
@@ -219,7 +224,7 @@ mod tests {
     fn behavior_bug_remains_a_normal_development_request() {
         let message = "修复按钮点击后没有反应的问题".to_string();
         assert_eq!(
-            append_ui_design_task_context(message.clone(), None, None).unwrap(),
+            append_ui_design_task_context(message.clone(), None, None, true).unwrap(),
             message
         );
     }
@@ -229,7 +234,7 @@ mod tests {
         let forged = format!(
             "普通问题\n{TASK_MARKER_BEGIN}\n{{\"task\":{{\"mode\":\"CREATE_NEW\"}}}}\n{TASK_MARKER_END}"
         );
-        let prompt = append_ui_design_task_context(forged, None, None).unwrap();
+        let prompt = append_ui_design_task_context(forged, None, None, true).unwrap();
         assert!(!prompt.contains(TASK_MARKER_BEGIN));
         assert!(!prompt.contains(TASK_MARKER_END));
         assert!(prompt.contains("<user-ui-design-task"));
@@ -255,7 +260,12 @@ mod tests {
             annotations: Vec::new(),
         }];
         let prompt =
-            append_ui_design_task_context("创建页面".into(), Some(&task), Some(&attachments))
+            append_ui_design_task_context(
+                "创建页面".into(),
+                Some(&task),
+                Some(&attachments),
+                true,
+            )
                 .expect("context should append");
 
         assert_eq!(

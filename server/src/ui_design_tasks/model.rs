@@ -115,6 +115,10 @@ pub(crate) struct UiDesignTaskInput {
     pub(crate) render_target: UiDesignRenderTarget,
     #[serde(default, alias = "executionPolicy")]
     pub(crate) execution_policy: UiDesignExecutionPolicy,
+    #[serde(default, alias = "routeLearningId")]
+    pub(crate) route_learning_id: Option<String>,
+    #[serde(default, alias = "routeLearningOrigin")]
+    pub(crate) route_learning_origin: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -143,6 +147,7 @@ impl UiDesignTaskInput {
         validate_optional_id("screenId", self.screen_id.as_deref())?;
         validate_optional_id("targetNodeId", self.target_node_id.as_deref())?;
         validate_optional_id("definitionId", self.definition_id.as_deref())?;
+        validate_optional_id("routeLearningId", self.route_learning_id.as_deref())?;
         validate_optional_id(
             "originalAttachmentId",
             self.original_attachment_id.as_deref(),
