@@ -81,6 +81,8 @@ export function useLiveUiSession({
   const reconnectPromiseRef = useRef<Promise<void> | null>(null)
   const reconnectAttemptRef = useRef(0)
   const lastPreviewRef = useRef<LivePreviewRequest | null>(null)
+  const gestureFrameBusyRef = useRef(false)
+  const gestureFramePendingRef = useRef<string | null>(null)
 
   useEffect(() => {
     // A Preview belongs to the selected APK/device, not to a particular
@@ -250,6 +252,23 @@ export function useLiveUiSession({
     setLiveFrame(frame)
   }, [])
 
+  const requestGestureFrame = useCallback((sessionId: string) => {
+    gestureFramePendingRef.current = sessionId
+    if (gestureFrameBusyRef.current) return
+    gestureFrameBusyRef.current = true
+    void (async () => {
+      try {
+        while (gestureFramePendingRef.current) {
+          const pendingSessionId = gestureFramePendingRef.current
+          gestureFramePendingRef.current = null
+          await refreshFrame(pendingSessionId).catch(() => undefined)
+        }
+      } finally {
+        gestureFrameBusyRef.current = false
+      }
+    })()
+  }, [refreshFrame])
+
   const reconnect = useCallback(async () => {
     const current = sessionRef.current
     if (!current) return
@@ -401,6 +420,9 @@ export function useLiveUiSession({
       )))
       setCommitPlan(null)
       setCommitResult(null)
+      if (gestureId) {
+        window.setTimeout(() => requestGestureFrame(currentSession.id), 16)
+      }
       if (!gestureId) {
         onNotice(`LIVE PREVIEW：${operations.map((item) => item.property).join('、')} 已在真机生效，源码尚未写入`)
         window.setTimeout(() => {
@@ -416,7 +438,7 @@ export function useLiveUiSession({
     } finally {
       if (!gestureId) setBusy(false)
     }
-  }, [nodes, onNotice, refresh, refreshFrame, selected])
+  }, [nodes, onNotice, refresh, refreshFrame, requestGestureFrame, selected])
 
   const apply = useCallback((operation: LivePatchOperation, scope: LiveUiScope) => (
     applyOperations([operation], scope)
