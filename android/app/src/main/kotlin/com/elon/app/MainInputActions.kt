@@ -470,6 +470,11 @@ internal class MainInputActions(
         uiDesignRequestSelection = UiDesignRequestSelection()
     }
 
+    fun clearPendingSendState() {
+        pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
+        clearUiDesignRequestSelection()
+    }
+
     val emojiActions: MainEmojiActions by lazy {
         MainEmojiActions(
             activity = activity,

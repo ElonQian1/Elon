@@ -38,7 +38,7 @@ internal class MainPreparedMessageActions(
     private val persistActiveWork: () -> Unit,
     private val updateStage: (String, String) -> Unit,
     private val scheduleFirstServerResponseWatchdog: (String, Int) -> Unit,
-    private val clearPendingAttachments: () -> Unit
+    private val clearPendingSendState: () -> Unit
 ) {
     fun startPreparedMessage(
         visibleText: String,
@@ -236,7 +236,7 @@ internal class MainPreparedMessageActions(
                 updateStage("连接恢复", "任务请求已保留，正在重新连接服务器。")
             }
         } else {
-            clearPendingAttachments()
+            clearPendingSendState()
         }
         scheduleFirstServerResponseWatchdog(traceId, responseToken)
     }

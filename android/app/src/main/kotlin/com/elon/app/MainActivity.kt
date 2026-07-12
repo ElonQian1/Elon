@@ -563,10 +563,7 @@ class MainActivity : AppCompatActivity() {
             scheduleFirstServerResponseWatchdog = { traceId, token ->
                 workflowActions.serverResponseWatchdogActions.scheduleFirstServerResponseWatchdog(traceId, token)
             },
-            clearPendingAttachments = {
-                inputActions.pendingAttachmentActions.clearPendingAttachments(deleteFiles = false)
-                inputActions.clearUiDesignRequestSelection()
-            }
+            clearPendingSendState = inputActions::clearPendingSendState
         )
     }
 
