@@ -15,6 +15,12 @@ pub(super) fn solver_properties(node: &LiveUiNode, requested: &[String]) -> Resu
     };
     let mut result = Vec::new();
     for property in source {
+        if matches!(
+            property.as_str(),
+            "backgroundColor" | "contentColor" | "borderColor"
+        ) {
+            continue;
+        }
         if !matches!(
             property.as_str(),
             "width"
@@ -26,6 +32,10 @@ pub(super) fn solver_properties(node: &LiveUiNode, requested: &[String]) -> Resu
                 | "padding.top"
                 | "padding.end"
                 | "padding.bottom"
+                | "margin.start"
+                | "margin.top"
+                | "margin.end"
+                | "margin.bottom"
                 | "cornerRadius.all"
                 | "textSize"
                 | "borderWidth"
@@ -41,16 +51,10 @@ pub(super) fn solver_properties(node: &LiveUiNode, requested: &[String]) -> Resu
             result.push(property);
         }
     }
-    if result.is_empty() {
-        bail!("目标节点没有可用于视觉求解的 LIVE 数值属性");
-    }
     Ok(result)
 }
 
-pub(super) fn initial_values(
-    node: &LiveUiNode,
-    properties: &[String],
-) -> BTreeMap<String, f64> {
+pub(super) fn initial_values(node: &LiveUiNode, properties: &[String]) -> BTreeMap<String, f64> {
     let density = node.geometry.density.max(0.01) as f64;
     properties
         .iter()
@@ -130,7 +134,11 @@ pub(super) fn constrained_value(node: &LiveUiNode, property: &str, value: f64) -
     let minimum = constraints
         .and_then(|value| value.get("minimum"))
         .and_then(|value| value.as_f64())
-        .unwrap_or(if property == "opacity" { 0.0 } else { -10_000.0 });
+        .unwrap_or(if property == "opacity" {
+            0.0
+        } else {
+            -10_000.0
+        });
     let maximum = constraints
         .and_then(|value| value.get("maximum"))
         .and_then(|value| value.as_f64())
@@ -138,9 +146,7 @@ pub(super) fn constrained_value(node: &LiveUiNode, property: &str, value: f64) -
     value.clamp(minimum, maximum)
 }
 
-pub(super) fn operations_from_values(
-    values: &BTreeMap<String, f64>,
-) -> Vec<LivePatchOperation> {
+pub(super) fn operations_from_values(values: &BTreeMap<String, f64>) -> Vec<LivePatchOperation> {
     values
         .iter()
         .map(|(property, value)| LivePatchOperation {
@@ -186,9 +192,7 @@ pub(super) fn predicted_rect(node: &LiveUiNode, values: &BTreeMap<String, f64>) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node_agent_android_live::protocol::{
-        LiveGeometry, LivePropertySnapshot, LiveRect,
-    };
+    use crate::node_agent_android_live::protocol::{LiveGeometry, LivePropertySnapshot, LiveRect};
 
     fn editable_node() -> LiveUiNode {
         let property = || LivePropertySnapshot {
@@ -234,7 +238,10 @@ mod tests {
 
     #[test]
     fn default_properties_exclude_session_translation() {
-        assert_eq!(solver_properties(&editable_node(), &[]).unwrap(), ["width", "height"]);
+        assert_eq!(
+            solver_properties(&editable_node(), &[]).unwrap(),
+            ["width", "height"]
+        );
     }
 
     #[test]
@@ -244,7 +251,12 @@ mod tests {
         seed_geometry_target(
             &mut values,
             &node,
-            PixelRect { left: 40, top: 80, right: 240, bottom: 180 },
+            PixelRect {
+                left: 40,
+                top: 80,
+                right: 240,
+                bottom: 180,
+            },
         );
         assert_eq!(values["width"], 100.0);
         assert_eq!(values["height"], 50.0);

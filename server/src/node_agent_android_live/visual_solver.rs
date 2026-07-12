@@ -10,6 +10,7 @@ use super::broker::LiveUiBroker;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
 use super::visual_diff::{compare_target_with_png_projected, PixelRect, VisualDiffResult};
+use super::visual_solver_style_hints::target_color_operations;
 use super::visual_solver_values::{
     constrained_value, initial_values, operations_from_values, predicted_rect,
     seed_geometry_target, seed_prior_deltas, solver_properties,
@@ -69,6 +70,15 @@ pub(crate) async fn solve_visual_style(
         bail!("目标 Live Node 当前不可见");
     }
     let properties = solver_properties(&node, &request.properties)?;
+    let fixed_operations = target_color_operations(
+        &target.path,
+        request.target_rect,
+        &node,
+        &request.properties,
+    )?;
+    if properties.is_empty() && fixed_operations.is_empty() {
+        bail!("目标节点没有可用于视觉求解的 LIVE 样式属性");
+    }
     let max_evaluations = request
         .max_evaluations
         .unwrap_or(DEFAULT_MAX_EVALUATIONS)
@@ -99,6 +109,7 @@ pub(crate) async fn solve_visual_style(
         request.target_rect,
         projected_current_rect,
         &best_values,
+        &fixed_operations,
     )
     .await?;
     let mut evaluations = 1;
@@ -129,6 +140,7 @@ pub(crate) async fn solve_visual_style(
                     request.target_rect,
                     projected_current_rect,
                     &candidate,
+                    &fixed_operations,
                 )
                 .await?;
                 evaluations += 1;
@@ -144,7 +156,7 @@ pub(crate) async fn solve_visual_style(
         }
     }
 
-    let operations = operations_from_values(&best_values);
+    let operations = combined_operations(&best_values, &fixed_operations);
     let improved = best.visual_loss + 0.000_001 < baseline.visual_loss;
     let final_diff = if improved {
         broker
@@ -190,8 +202,9 @@ async fn evaluate(
     target_rect: PixelRect,
     projected_current_rect: PixelRect,
     values: &BTreeMap<String, f64>,
+    fixed_operations: &[LivePatchOperation],
 ) -> Result<VisualDiffResult> {
-    let patch = patch_for_node(node, operations_from_values(values), true);
+    let patch = patch_for_node(node, combined_operations(values, fixed_operations), true);
     let (_, inverse) = broker.apply_probe_patch(session_id, patch).await?;
     tokio::time::sleep(Duration::from_millis(80)).await;
     let comparison = match capture_screen_png(device_id).await {
@@ -209,6 +222,15 @@ async fn evaluate(
         return Err(anyhow!("视觉求解试探后恢复失败: {error:#}"));
     }
     comparison
+}
+
+fn combined_operations(
+    values: &BTreeMap<String, f64>,
+    fixed_operations: &[LivePatchOperation],
+) -> Vec<LivePatchOperation> {
+    let mut operations = fixed_operations.to_vec();
+    operations.extend(operations_from_values(values));
+    operations
 }
 
 fn patch_for_node(

@@ -24,6 +24,7 @@ mod ui_ir;
 mod verification_gate;
 mod visual_diff;
 mod visual_solver;
+mod visual_solver_style_hints;
 mod visual_solver_values;
 
 #[cfg(test)]
@@ -40,6 +41,8 @@ mod ui_ir_tests;
 mod verification_gate_tests;
 #[cfg(test)]
 mod visual_diff_tests;
+#[cfg(test)]
+mod visual_solver_style_hints_tests;
 
 pub(crate) use broker::LiveUiBroker;
 pub(crate) use routes::{protected_routes, runtime_routes};
