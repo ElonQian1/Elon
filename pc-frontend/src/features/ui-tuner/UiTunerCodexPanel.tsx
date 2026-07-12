@@ -19,6 +19,7 @@ import contextStyles from './UiTunerContext.module.css'
 import type { UiTunerVerificationReport } from './runtime/verification'
 import type { useLiveUiSession } from './live/useLiveUiSession'
 import { useFitRunStore } from './fit-run/fitRunStore'
+import { UiRouteLearningPanel } from './route-learning/UiRouteLearningPanel'
 
 interface UiTunerCodexPanelProps {
   tunerDoc: UiTunerDocument
@@ -191,6 +192,8 @@ export function UiTunerCodexPanel({
         <span>给 Codex 的修改意图</span>
         <textarea value={intent} onChange={(event) => setIntent(event.currentTarget.value)} />
       </label>
+
+      <UiRouteLearningPanel currentIntent={intent} />
 
       <div className={panelStyles.codexActions}>
         <button

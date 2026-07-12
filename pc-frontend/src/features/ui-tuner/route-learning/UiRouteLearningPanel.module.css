@@ -1,0 +1,61 @@
+.panel {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #111317;
+}
+
+.heading {
+  width: 100%;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 0;
+  background: #1b1d21;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.heading span,
+.heading small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.heading span { font-size: 12px; font-weight: 800; }
+.heading small { color: var(--text-secondary); font-size: 10px; }
+
+.body { display: grid; gap: 9px; padding: 10px; }
+.body > p { margin: 0; color: var(--text-secondary); font-size: 11px; line-height: 16px; }
+.currentActions, .entryActions { display: flex; flex-wrap: wrap; gap: 6px; }
+.currentActions button, .entryActions button {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #24272c;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+.currentActions button:disabled, .entryActions button:disabled { opacity: .5; }
+.notice, .empty { padding: 7px 8px; border-radius: 6px; background: #1d2530; color: #b9d3ff; font-size: 11px; line-height: 15px; }
+.list { display: grid; gap: 7px; max-height: 320px; overflow: auto; }
+.list article { min-width: 0; display: grid; gap: 6px; padding: 8px; border: 1px solid var(--border); border-radius: 7px; background: #17191d; }
+.list article[data-status='candidate'] { border-color: rgba(255, 190, 92, .38); }
+.list article[data-status='active'] { border-color: rgba(99, 208, 151, .38); }
+.list article[data-status='revoked'] { opacity: .65; }
+.entryHead { min-width: 0; display: grid; grid-template-columns: auto auto minmax(0, 1fr); gap: 6px; align-items: center; }
+.entryHead strong, .entryHead span, .entryHead small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entryHead strong { color: var(--text-primary); font-size: 11px; }
+.entryHead span { color: #a8c7fa; font-size: 10px; }
+.entryHead small { color: var(--text-secondary); font-size: 10px; text-align: right; }
+.list article > p { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 11px; line-height: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.metrics { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--text-secondary); font-size: 10px; }
