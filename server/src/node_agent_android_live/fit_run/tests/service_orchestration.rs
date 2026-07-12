@@ -149,9 +149,12 @@ async fn interrupted_accept_command_can_resume_source_verification() {
     stranded.record_command("accept-interrupted".to_string());
     store.save(&stranded).unwrap();
 
+    let mut resumed_context = context;
+    resumed_context.source_revision = Some("source-written-by-interrupted-accept".to_string());
+
     let recovered = service
         .command(
-            context,
+            resumed_context,
             &stranded.run_id,
             FitCommand::AcceptBest {
                 command_id: "accept-interrupted".to_string(),

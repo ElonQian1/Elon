@@ -237,7 +237,15 @@ fn validate_command_context(
         command,
         FitCommand::CodexCompleted { .. } | FitCommand::CodexFailed { .. }
     );
-    if !lifecycle_only && !codex_result && run.source_revision != context.source_revision {
+    let resumes_interrupted_source_verification = matches!(
+        (command, &run.phase),
+        (FitCommand::AcceptBest { .. }, FitRunPhase::SourceVerifying)
+    );
+    if !lifecycle_only
+        && !codex_result
+        && !resumes_interrupted_source_verification
+        && run.source_revision != context.source_revision
+    {
         bail!("工作区 Source Revision 已变化；请先显式 REBIND_SESSION");
     }
     if !lifecycle_only
