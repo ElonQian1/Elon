@@ -90,11 +90,16 @@ pub(crate) async fn solve_visual_style(
         .projected_current_rect
         .unwrap_or(request.target_rect);
     let baseline_png = capture_screen_png(&session.device_id).await?;
+    let baseline_current_rect = comparison_current_rect(
+        properties.iter().map(String::as_str),
+        base_rect,
+        projected_current_rect,
+    );
     let baseline = compare_target_with_png_projected(
         &target.path,
         &baseline_png,
         Some(request.target_rect),
-        Some(base_rect),
+        Some(baseline_current_rect),
         Some(projected_current_rect),
     )?;
     let mut best_values = initial_values(&node, &properties);
@@ -165,11 +170,17 @@ pub(crate) async fn solve_visual_style(
             .await?;
         tokio::time::sleep(Duration::from_millis(120)).await;
         let png = capture_screen_png(&session.device_id).await?;
+        let predicted = predicted_rect(&node, &best_values);
+        let current_rect = comparison_current_rect(
+            best_values.keys().map(String::as_str),
+            predicted,
+            projected_current_rect,
+        );
         compare_target_with_png_projected(
             &target.path,
             &png,
             Some(request.target_rect),
-            Some(predicted_rect(&node, &best_values)),
+            Some(current_rect),
             Some(projected_current_rect),
         )?
     } else {
@@ -209,13 +220,21 @@ async fn evaluate(
     let (_, inverse) = broker.apply_probe_patch(session_id, patch).await?;
     tokio::time::sleep(Duration::from_millis(80)).await;
     let comparison = match capture_screen_png(device_id).await {
-        Ok(png) => compare_target_with_png_projected(
-            target_path,
-            &png,
-            Some(target_rect),
-            Some(predicted_rect(node, values)),
-            Some(projected_current_rect),
-        ),
+        Ok(png) => {
+            let predicted = predicted_rect(node, values);
+            let current_rect = comparison_current_rect(
+                values.keys().map(String::as_str),
+                predicted,
+                projected_current_rect,
+            );
+            compare_target_with_png_projected(
+                target_path,
+                &png,
+                Some(target_rect),
+                Some(current_rect),
+                Some(projected_current_rect),
+            )
+        }
         Err(error) => Err(error),
     };
     let restore = broker.restore_probe_patch(session_id, inverse).await;
@@ -223,6 +242,73 @@ async fn evaluate(
         return Err(anyhow!("视觉求解试探后恢复失败: {error:#}"));
     }
     comparison
+}
+
+fn comparison_current_rect<'a>(
+    properties: impl Iterator<Item = &'a str>,
+    predicted: PixelRect,
+    projected_target: PixelRect,
+) -> PixelRect {
+    if properties.into_iter().any(is_geometry_property) {
+        predicted
+    } else {
+        // 颜色、圆角、字体等视觉属性必须在同一屏幕坐标内比较像素。
+        // TextView 的字形像素可能超出节点语义边界；若按节点边界裁剪，
+        // 即便真实画面已与设计图完全一致，损失也不会归零。
+        projected_target
+    }
+}
+
+fn is_geometry_property(property: &str) -> bool {
+    matches!(
+        property,
+        "width"
+            | "height"
+            | "translationX"
+            | "translationY"
+            | "margin.start"
+            | "margin.top"
+            | "margin.end"
+            | "margin.bottom"
+    )
+}
+
+#[cfg(test)]
+mod comparison_rect_tests {
+    use super::*;
+
+    fn rect(left: i32, top: i32, right: i32, bottom: i32) -> PixelRect {
+        PixelRect {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    #[test]
+    fn typography_uses_same_coordinate_crop() {
+        let predicted = rect(498, 134, 582, 266);
+        let projected = rect(488, 134, 592, 266);
+        assert_eq!(
+            comparison_current_rect(
+                ["textSize", "fontWeight", "lineHeight", "letterSpacing"].into_iter(),
+                predicted,
+                projected,
+            ),
+            projected
+        );
+    }
+
+    #[test]
+    fn geometry_keeps_predicted_node_rect() {
+        let predicted = rect(498, 134, 582, 266);
+        let projected = rect(488, 134, 592, 266);
+        assert_eq!(
+            comparison_current_rect(["textSize", "width"].into_iter(), predicted, projected),
+            predicted
+        );
+    }
 }
 
 fn combined_operations(
