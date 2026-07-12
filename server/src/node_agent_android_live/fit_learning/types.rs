@@ -92,6 +92,29 @@ pub(crate) struct FitCaseEnvironment {
     pub(crate) viewport_height: Option<u32>,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FitTranslationFeatures {
+    #[serde(default)]
+    pub(crate) parent_layout_kind: Option<String>,
+    #[serde(default)]
+    pub(crate) target_width_ratio: Option<f64>,
+    #[serde(default)]
+    pub(crate) target_height_ratio: Option<f64>,
+    #[serde(default)]
+    pub(crate) current_width_ratio: Option<f64>,
+    #[serde(default)]
+    pub(crate) current_height_ratio: Option<f64>,
+    #[serde(default)]
+    pub(crate) width_scale: Option<f64>,
+    #[serde(default)]
+    pub(crate) height_scale: Option<f64>,
+    #[serde(default)]
+    pub(crate) target_aspect_ratio: Option<f64>,
+    #[serde(default)]
+    pub(crate) current_aspect_ratio: Option<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FitCase {
@@ -103,6 +126,8 @@ pub(crate) struct FitCase {
     pub(crate) component_kind: String,
     pub(crate) property_set: Vec<String>,
     pub(crate) environment: FitCaseEnvironment,
+    #[serde(default)]
+    pub(crate) translation_features: FitTranslationFeatures,
     pub(crate) run_phase: String,
     pub(crate) outcome: FitCaseOutcome,
     pub(crate) user_decision: FitUserDecision,
@@ -175,7 +200,11 @@ pub(crate) struct FitPrior {
     pub(crate) screen_count: u32,
     pub(crate) success_rate: f64,
     pub(crate) confidence: f64,
+    #[serde(default)]
+    pub(crate) translation_features: FitTranslationFeatures,
     pub(crate) median_deltas: BTreeMap<String, f64>,
+    #[serde(default)]
+    pub(crate) median_factors: BTreeMap<String, f64>,
     pub(crate) case_ids: Vec<String>,
     pub(crate) run_ids: Vec<String>,
     pub(crate) source_revisions: Vec<String>,
@@ -228,6 +257,7 @@ pub(crate) struct FitPriorQuery {
     pub(crate) density: Option<f32>,
     pub(crate) font_scale: Option<f32>,
     pub(crate) theme: Option<String>,
+    pub(crate) translation_features: FitTranslationFeatures,
     pub(crate) limit: usize,
 }
 

@@ -7,7 +7,8 @@ use anyhow::{anyhow, bail, Result};
 use super::candidate::{from_build_value, from_diff, new_trial_id};
 use super::live_artifacts::{build_verify_request, elapsed_ms, persist_frame, pixel_rect};
 use super::live_values::{
-    candidate_operation_value, inverse_operations, resolve_runtime_node, sha256_file,
+    candidate_operation_value, inverse_operations, numeric_baseline_property_value,
+    resolve_runtime_node, sha256_file,
 };
 use super::model::FitRunDocument;
 use super::orchestrator::{
@@ -108,7 +109,7 @@ impl LiveFitRunBackend {
         };
         let initial_property_deltas = learning_prior
             .as_ref()
-            .map(|matched| matched.prior.median_deltas.clone())
+            .map(|matched| prior_seed_deltas(&matched.prior, &baseline_node))
             .unwrap_or_default();
         let initial_step_dp = initial_property_deltas
             .values()
@@ -347,6 +348,23 @@ impl LiveFitRunBackend {
             operations,
         }))
     }
+}
+
+fn prior_seed_deltas(
+    prior: &crate::node_agent_android_live::fit_learning::FitPrior,
+    node: &LiveUiNode,
+) -> std::collections::BTreeMap<String, f64> {
+    let mut deltas = prior.median_deltas.clone();
+    for (property, factor) in &prior.median_factors {
+        let Some(current) = numeric_baseline_property_value(node, property) else {
+            continue;
+        };
+        let scaled_delta = current * (factor - 1.0);
+        if scaled_delta.is_finite() {
+            deltas.insert(property.clone(), scaled_delta);
+        }
+    }
+    deltas
 }
 
 impl FitRunBackend for LiveFitRunBackend {

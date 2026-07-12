@@ -7,8 +7,8 @@ use serde_json::Value;
 use super::super::fit_run::{FitRunDocument, FitRunPhase, FitScore, FitTrial};
 use super::types::{
     FitCase, FitCaseEnvironment, FitCaseOutcome, FitCaseProvenance, FitCaseReview,
-    FitPropertyAdjustment, FitScoreEvidence, FitTrialEvidence, FitUserDecision,
-    FIT_CASE_SCHEMA_VERSION,
+    FitPropertyAdjustment, FitScoreEvidence, FitTranslationFeatures, FitTrialEvidence,
+    FitUserDecision, FIT_CASE_SCHEMA_VERSION,
 };
 
 impl FitCase {
@@ -52,6 +52,7 @@ impl FitCase {
                 viewport_width: run.environment.viewport_width,
                 viewport_height: run.environment.viewport_height,
             },
+            translation_features: translation_features(run),
             run_phase: phase_name(run.phase),
             outcome,
             user_decision: review.decision,
@@ -90,6 +91,48 @@ impl FitCase {
             review_note: review.note,
         }
     }
+}
+
+pub(crate) fn translation_features(run: &FitRunDocument) -> FitTranslationFeatures {
+    let viewport_width = run.environment.viewport_width.map(f64::from);
+    let viewport_height = run.environment.viewport_height.map(f64::from);
+    let target_width = rect_width(run.pair.projected_target_rect);
+    let target_height = rect_height(run.pair.projected_target_rect);
+    let current_width = rect_width(run.pair.current_rect);
+    let current_height = rect_height(run.pair.current_rect);
+    FitTranslationFeatures {
+        parent_layout_kind: run
+            .pair
+            .parent_layout_kind
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(|value| value.to_ascii_lowercase()),
+        target_width_ratio: ratio(target_width, viewport_width),
+        target_height_ratio: ratio(target_height, viewport_height),
+        current_width_ratio: ratio(current_width, viewport_width),
+        current_height_ratio: ratio(current_height, viewport_height),
+        width_scale: ratio(target_width, current_width),
+        height_scale: ratio(target_height, current_height),
+        target_aspect_ratio: ratio(target_width, target_height),
+        current_aspect_ratio: ratio(current_width, current_height),
+    }
+}
+
+fn rect_width(rect: super::super::fit_run::FitRect) -> Option<f64> {
+    (rect.right > rect.left).then(|| f64::from(rect.right - rect.left))
+}
+
+fn rect_height(rect: super::super::fit_run::FitRect) -> Option<f64> {
+    (rect.bottom > rect.top).then(|| f64::from(rect.bottom - rect.top))
+}
+
+fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
+    numerator
+        .zip(denominator)
+        .filter(|(left, right)| left.is_finite() && right.is_finite() && right.abs() > 0.000_001)
+        .map(|(left, right)| left / right)
+        .filter(|value| value.is_finite())
 }
 
 pub(super) fn sanitize_case_for_storage(mut case: FitCase) -> FitCase {

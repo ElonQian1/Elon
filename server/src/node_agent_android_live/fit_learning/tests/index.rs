@@ -1,5 +1,5 @@
 use super::super::prior_index::FitPriorIndex;
-use super::super::types::{FitPriorQuery, FitPriorScope};
+use super::super::types::{FitPriorQuery, FitPriorScope, FitTranslationFeatures};
 use super::fit_case;
 
 #[test]
@@ -23,6 +23,7 @@ fn exact_prior_needs_one_case_but_cross_prior_needs_three_cases_and_two_screens(
     assert_eq!(cross.screen_count, 2);
     assert_eq!(cross.success_rate, 0.75);
     assert_eq!(cross.median_deltas.get("height"), Some(&6.0));
+    assert!((cross.median_factors["height"] - 1.125).abs() < 0.000_001);
 }
 
 #[test]
@@ -40,6 +41,17 @@ fn top_k_prefers_exact_definition_then_environment() {
         density: Some(3.0),
         font_scale: Some(1.0),
         theme: Some("dark".into()),
+        translation_features: FitTranslationFeatures {
+            parent_layout_kind: Some("column".into()),
+            target_width_ratio: Some(0.5),
+            target_height_ratio: Some(0.05),
+            current_width_ratio: Some(0.45),
+            current_height_ratio: Some(0.04),
+            width_scale: Some(1.1),
+            height_scale: Some(1.25),
+            target_aspect_ratio: Some(4.5),
+            current_aspect_ratio: Some(5.0),
+        },
         limit: 3,
     });
     assert!(!matches.is_empty());

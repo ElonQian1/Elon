@@ -119,6 +119,10 @@ fn baseline_property_value(node: &LiveUiNode, property: &str) -> Option<LiveProp
     })
 }
 
+pub(super) fn numeric_baseline_property_value(node: &LiveUiNode, property: &str) -> Option<f64> {
+    baseline_property_value(node, property).and_then(|value| value.value.as_f64())
+}
+
 pub(super) fn sha256_file(path: &str) -> Result<String> {
     let mut file = File::open(path).with_context(|| format!("目标设计图不存在: {path}"))?;
     let mut hasher = Sha256::new();

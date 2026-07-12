@@ -9,7 +9,8 @@ use super::super::fit_run::{FitRunDocument, FitTrial};
 use super::eval::FitHoldoutEvaluator;
 use super::types::{
     FitCase, FitCaseEnvironment, FitCaseOutcome, FitCaseProvenance, FitHoldoutResult, FitPrior,
-    FitPropertyAdjustment, FitScoreEvidence, FitUserDecision, FIT_CASE_SCHEMA_VERSION,
+    FitPropertyAdjustment, FitScoreEvidence, FitTranslationFeatures, FitUserDecision,
+    FIT_CASE_SCHEMA_VERSION,
 };
 
 pub(super) struct MockEvaluator {
@@ -51,6 +52,17 @@ pub(super) fn fit_case(
             font_scale: Some(1.0),
             viewport_width: Some(1080),
             viewport_height: Some(2400),
+        },
+        translation_features: FitTranslationFeatures {
+            parent_layout_kind: Some("column".into()),
+            target_width_ratio: Some(0.5),
+            target_height_ratio: Some(0.05),
+            current_width_ratio: Some(0.45),
+            current_height_ratio: Some(0.04),
+            width_scale: Some(1.1),
+            height_scale: Some(1.25),
+            target_aspect_ratio: Some(4.5),
+            current_aspect_ratio: Some(5.0),
         },
         run_phase: if promotable { "ACCEPTED" } else { "FAILED" }.into(),
         outcome: if promotable {

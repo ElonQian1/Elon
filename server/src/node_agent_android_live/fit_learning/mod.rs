@@ -13,7 +13,7 @@ mod store;
 mod types;
 
 pub(crate) use coordinator::{record_and_promote, top_k_for_run};
-pub(crate) use types::FitUserDecision;
+pub(crate) use types::{FitPrior, FitUserDecision};
 
 #[cfg(test)]
 mod tests;

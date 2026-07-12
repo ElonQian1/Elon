@@ -3,6 +3,7 @@ use chrono::Utc;
 use std::sync::{Mutex, OnceLock};
 
 use super::super::fit_run::{FitRunDocument, FitTrial};
+use super::case_builder::translation_features;
 use super::historical_evaluator::HistoricalAdjustmentEvaluator;
 use super::prior_index::FitPriorIndex;
 use super::promotion::{promote_priors, FitPromotionPolicy};
@@ -95,6 +96,7 @@ impl FitLearningCoordinator {
                 density: run.environment.density,
                 font_scale: run.environment.font_scale,
                 theme: run.environment.theme.clone(),
+                translation_features: translation_features(run),
                 limit,
             }),
         )

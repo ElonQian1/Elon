@@ -5,6 +5,7 @@ use chrono::Utc;
 
 use super::types::{
     FitCase, FitPrior, FitPriorEnvironment, FitPriorMatch, FitPriorQuery, FitPriorScope,
+    FitTranslationFeatures,
 };
 
 const MIN_CROSS_SUCCESSES: usize = 3;
@@ -19,6 +20,7 @@ struct PriorGroupKey {
     density_bucket: Option<i32>,
     font_scale_bucket: Option<i32>,
     theme: Option<String>,
+    parent_layout_kind: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +111,7 @@ fn group_key(case: &FitCase, scope: FitPriorScope) -> PriorGroupKey {
             .theme
             .clone()
             .map(|value| value.to_ascii_lowercase()),
+        parent_layout_kind: case.translation_features.parent_layout_kind.clone(),
     }
 }
 
@@ -171,7 +174,9 @@ fn build_prior(key: PriorGroupKey, evidence: Vec<&FitCase>) -> Option<FitPrior> 
         screen_count: screens.len() as u32,
         success_rate,
         confidence,
+        translation_features: aggregate_translation_features(&successes, key.parent_layout_kind),
         median_deltas: median_deltas(&successes),
+        median_factors: median_factors(&successes),
         case_ids: unique(successes.iter().map(|case| case.case_id.clone())),
         run_ids: unique(successes.iter().map(|case| case.provenance.run_id.clone())),
         source_revisions: unique(
@@ -189,6 +194,55 @@ fn build_prior(key: PriorGroupKey, evidence: Vec<&FitCase>) -> Option<FitPrior> 
     })
 }
 
+fn aggregate_translation_features(
+    cases: &[&FitCase],
+    parent_layout_kind: Option<String>,
+) -> FitTranslationFeatures {
+    FitTranslationFeatures {
+        parent_layout_kind,
+        target_width_ratio: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.target_width_ratio),
+        ),
+        target_height_ratio: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.target_height_ratio),
+        ),
+        current_width_ratio: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.current_width_ratio),
+        ),
+        current_height_ratio: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.current_height_ratio),
+        ),
+        width_scale: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.width_scale),
+        ),
+        height_scale: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.height_scale),
+        ),
+        target_aspect_ratio: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.target_aspect_ratio),
+        ),
+        current_aspect_ratio: median(
+            cases
+                .iter()
+                .filter_map(|case| case.translation_features.current_aspect_ratio),
+        ),
+    }
+}
+
 fn median_deltas(cases: &[&FitCase]) -> BTreeMap<String, f64> {
     let mut values = BTreeMap::<String, Vec<f64>>::new();
     for case in cases {
@@ -198,6 +252,32 @@ fn median_deltas(cases: &[&FitCase]) -> BTreeMap<String, f64> {
                     .entry(adjustment.property.clone())
                     .or_default()
                     .push(delta);
+            }
+        }
+    }
+    values
+        .into_iter()
+        .filter_map(|(property, values)| median(values.into_iter()).map(|value| (property, value)))
+        .collect()
+}
+
+fn median_factors(cases: &[&FitCase]) -> BTreeMap<String, f64> {
+    let mut values = BTreeMap::<String, Vec<f64>>::new();
+    for case in cases {
+        for adjustment in &case.adjustments {
+            let factor = adjustment
+                .first_value
+                .zip(adjustment.final_value)
+                .filter(|(first, final_value)| {
+                    first.is_finite() && final_value.is_finite() && first.abs() > 0.000_001
+                })
+                .map(|(first, final_value)| final_value / first)
+                .filter(|value| value.is_finite() && *value > 0.0 && *value <= 10.0);
+            if let Some(factor) = factor {
+                values
+                    .entry(adjustment.property.clone())
+                    .or_default()
+                    .push(factor);
             }
         }
     }
@@ -263,15 +343,38 @@ fn match_score(prior: &FitPrior, query: &FitPriorQuery) -> Option<f64> {
         (Some(_), Some(_)) => -8.0,
         _ => 0.0,
     };
+    let layout = match (
+        &prior.translation_features.parent_layout_kind,
+        &query.translation_features.parent_layout_kind,
+    ) {
+        (Some(left), Some(right)) if left.eq_ignore_ascii_case(right) => 12.0,
+        (Some(_), Some(_)) => -14.0,
+        _ => 2.0,
+    };
+    let geometry = translation_similarity(&prior.translation_features, &query.translation_features);
     Some(
         definition
             + property_similarity * 30.0
             + density
             + font
             + theme
+            + layout
+            + geometry
             + prior.confidence * 12.0
             + prior.success_rate * 8.0,
     )
+}
+
+fn translation_similarity(left: &FitTranslationFeatures, right: &FitTranslationFeatures) -> f64 {
+    proximity(left.target_width_ratio, right.target_width_ratio, 0.25, 6.0)
+        + proximity(
+            left.target_height_ratio,
+            right.target_height_ratio,
+            0.25,
+            6.0,
+        )
+        + proximity(left.width_scale, right.width_scale, 0.75, 4.0)
+        + proximity(left.height_scale, right.height_scale, 0.75, 4.0)
 }
 
 fn environment_matches(prior: &FitPrior, case: &FitCase) -> bool {

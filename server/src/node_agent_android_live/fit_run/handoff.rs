@@ -40,6 +40,8 @@ pub(crate) fn handoff_payload(
                 "successCount": matched.prior.success_count,
                 "failureCount": matched.prior.failure_count,
                 "medianDeltas": matched.prior.median_deltas,
+                "medianFactors": matched.prior.median_factors,
+                "translationFeatures": matched.prior.translation_features,
                 "runIds": matched.prior.run_ids,
             })
         })
