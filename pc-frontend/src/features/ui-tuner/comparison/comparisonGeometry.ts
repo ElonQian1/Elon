@@ -34,6 +34,15 @@ export function normalizeRect(rect: PixelRect, bounds: PixelSize): PixelRect {
   )
 }
 
+export function unionRects(left: PixelRect, right: PixelRect): PixelRect {
+  return {
+    left: Math.min(left.left, right.left),
+    top: Math.min(left.top, right.top),
+    right: Math.max(left.right, right.right),
+    bottom: Math.max(left.bottom, right.bottom),
+  }
+}
+
 export function hasUsableArea(rect: PixelRect | null, minimumSize = 2) {
   return Boolean(rect
     && rect.right - rect.left >= minimumSize

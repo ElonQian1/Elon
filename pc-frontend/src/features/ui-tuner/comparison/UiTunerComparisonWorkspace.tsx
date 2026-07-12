@@ -20,7 +20,7 @@ import { ComparisonOverlayLayer } from './ComparisonOverlayLayer'
 import { CalibrationPanel } from './CalibrationPanel'
 import { DesignDiffRegionsPanel } from './DesignDiffRegionsPanel'
 import type { DesignDiffRegion, DesignDiffRegionAnalysis } from './autoPairApi'
-import { createCalibration } from './comparisonGeometry'
+import { createCalibration, unionRects } from './comparisonGeometry'
 import { TargetDesignPane } from './TargetDesignPane'
 import type { TargetCurrentPair } from './types'
 import { useComparisonWorkspace } from './useComparisonWorkspace'
@@ -162,7 +162,9 @@ export function UiTunerComparisonWorkspace({
       onNotice(`已识别 ${candidate.definitionId}，但当前画布还没有对应元素，请刷新 Runtime 节点`)
       return false
     }
-    comparison.setTargetRect(region.targetRect)
+    // 差异框只包含发生变化的像素，而 FitRun 的 currentRect 是完整组件。
+    // 自动配对时合并候选组件范围，保证目标和当前画面比较的是同一语义区域。
+    comparison.setTargetRect(unionRects(region.targetRect, candidate.targetBounds))
     onSelectElement(element.id)
     onNotice(`已自动配对 ${candidate.definitionId}，可以开始自动拟合`)
     return true
