@@ -230,6 +230,10 @@ pub(crate) async fn build_and_verify(
     // 重新部署后节点几何可能已经改变。目标门禁必须裁剪纯源码版本的
     // 实际 Runtime bounds，而不是继续沿用设计会话开始时的旧 currentRect。
     let verified_current_rect = source_rect.or(request.current_rect);
+    let target_comparison_rect = target_comparison_current_rect(
+        request.projected_current_rect,
+        verified_current_rect,
+    );
     let visual_diff = target_path
         .as_deref()
         .map(|path| {
@@ -237,7 +241,7 @@ pub(crate) async fn build_and_verify(
                 path,
                 &screenshot,
                 request.target_rect,
-                verified_current_rect,
+                target_comparison_rect,
                 request.projected_current_rect,
             )
         })
@@ -281,6 +285,17 @@ pub(crate) async fn build_and_verify(
         verification_gate,
         message,
     })
+}
+
+fn target_comparison_current_rect(
+    projected_current_rect: Option<PixelRect>,
+    verified_current_rect: Option<PixelRect>,
+) -> Option<PixelRect> {
+    // 目标设计图的 targetRect 位于设计坐标系；projectedCurrentRect 是它
+    // 校准到 Android 显示坐标后的同一屏幕区域。目标门禁必须裁剪这个
+    // 区域，不能拿 TextView 等节点的语义 bounds 代替，否则字形溢出会
+    // 让完全相同的画面仍产生误差。节点边界仍用于独立 Source Parity。
+    projected_current_rect.or(verified_current_rect)
 }
 
 async fn capture_stable_screen(device_id: &str) -> Result<Vec<u8>> {
@@ -349,3 +364,36 @@ fn nodes_match_preview(nodes: &[LiveUiNode], expected_screen_id: &str) -> bool {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod target_comparison_rect_tests {
+    use super::*;
+
+    fn rect(left: i32, top: i32, right: i32, bottom: i32) -> PixelRect {
+        PixelRect {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    #[test]
+    fn projected_design_region_wins_over_node_semantic_bounds() {
+        let projected = rect(488, 134, 592, 266);
+        let node_bounds = rect(498, 134, 582, 266);
+        assert_eq!(
+            target_comparison_current_rect(Some(projected), Some(node_bounds)),
+            Some(projected)
+        );
+    }
+
+    #[test]
+    fn node_bounds_remain_fallback_without_calibration() {
+        let node_bounds = rect(498, 134, 582, 266);
+        assert_eq!(
+            target_comparison_current_rect(None, Some(node_bounds)),
+            Some(node_bounds)
+        );
+    }
+}
