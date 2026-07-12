@@ -404,6 +404,10 @@ impl FitRunBackend for LiveFitRunBackend {
 
 impl FitRunService {
     pub(crate) fn live(broker: Arc<LiveUiBroker>) -> Self {
-        Self::new(FitRunStore::new(), Arc::new(LiveFitRunBackend::new(broker)))
+        Self::new(
+            FitRunStore::new(),
+            Arc::new(LiveFitRunBackend::new(broker.clone())),
+        )
+        .with_live_broker(broker)
     }
 }

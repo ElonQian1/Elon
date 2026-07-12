@@ -12,6 +12,7 @@ use serde_json::json;
 use crate::NodeRuntime;
 
 use super::model::{CreateFitRunRequest, FitCommand, FitSessionContext};
+use super::service::BatchAcceptRequest;
 use super::workspace_revision::workspace_fingerprint;
 
 /// 薄路由层。根模块只需将它 merge 到现有受保护 Android Live Router。
@@ -24,6 +25,10 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             get(list_runs_handler).post(create_run_handler),
         )
         .route(
+            "/api/android-live/sessions/:session_id/fit-runs/batch-accept",
+            post(batch_accept_handler),
+        )
+        .route(
             "/api/android-live/sessions/:session_id/fit-runs/:run_id",
             get(get_run_handler),
         )
@@ -31,6 +36,21 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/sessions/:session_id/fit-runs/:run_id/commands",
             post(command_handler),
         )
+}
+
+async fn batch_accept_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<BatchAcceptRequest>,
+) -> Response {
+    let context = match session_context(&runtime, &session_id).await {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    match runtime.ui_fit_runs.accept_batch(context, request).await {
+        Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::CONFLICT, format!("{error:#}")),
+    }
 }
 
 async fn create_run_handler(

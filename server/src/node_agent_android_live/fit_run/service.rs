@@ -11,10 +11,13 @@ use super::model::{
 };
 use super::orchestrator::{advance_one, FitRunBackend};
 use super::store::FitRunStore;
+use crate::node_agent_android_live::broker::LiveUiBroker;
 use crate::node_agent_android_live::fit_learning::{record_and_promote, FitUserDecision};
 
+mod batch_accept;
 mod command_application;
 
+pub(crate) use batch_accept::{BatchAcceptRequest, BatchAcceptResult};
 use command_application::apply_command;
 
 const MAX_INTERNAL_STEPS: usize = 32;
@@ -23,6 +26,8 @@ pub(crate) struct FitRunService {
     store: FitRunStore,
     backend: Arc<dyn FitRunBackend>,
     run_locks: RwLock<HashMap<String, Arc<Mutex<()>>>>,
+    batch_lock: Mutex<()>,
+    live_broker: Option<Arc<LiveUiBroker>>,
 }
 
 impl FitRunService {
@@ -31,7 +36,14 @@ impl FitRunService {
             store,
             backend,
             run_locks: RwLock::new(HashMap::new()),
+            batch_lock: Mutex::new(()),
+            live_broker: None,
         }
+    }
+
+    pub(crate) fn with_live_broker(mut self, broker: Arc<LiveUiBroker>) -> Self {
+        self.live_broker = Some(broker);
+        self
     }
 
     pub(crate) async fn create_run(
