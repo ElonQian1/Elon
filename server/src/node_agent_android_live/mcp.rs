@@ -10,11 +10,11 @@ use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::{
     bootstrap_debug_runtime, build_and_verify, BuildVerifyRequest, PrepareDebugRuntimeRequest,
 };
-use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_artifact};
 use super::fit_run::{
     workspace_fingerprint, CreateFitRunRequest, FitCommand, FitEnvironment, FitRect, FitRunService,
     FitSessionContext, FitTargetPair,
 };
+use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_artifact};
 use super::mcp_tools::tool_definitions;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
@@ -171,8 +171,8 @@ async fn call_tool(
             })
         }
         "ui_list_render_devices" => {
-            let devices = crate::node_agent_android_inspector::adb_wireless::list_device_inventory()
-                .await?;
+            let devices =
+                crate::node_agent_android_inspector::adb_wireless::list_device_inventory().await?;
             json!({
                 "devices": devices,
                 "recommendedDeviceId": devices
@@ -188,8 +188,8 @@ async fn call_tool(
                 .project_root
                 .clone()
                 .ok_or_else(|| anyhow!("UI 设计会话未绑定项目目录"))?;
-            let devices = crate::node_agent_android_inspector::adb_wireless::list_device_inventory()
-                .await?;
+            let devices =
+                crate::node_agent_android_inspector::adb_wireless::list_device_inventory().await?;
             let device_id = arguments
                 .get("deviceId")
                 .and_then(Value::as_str)
@@ -199,15 +199,25 @@ async fn call_tool(
                 .or_else(|| {
                     devices
                         .iter()
-                        .find(|device| device.state == "device" && device.serial.starts_with("emulator-"))
+                        .find(|device| {
+                            device.state == "device" && device.serial.starts_with("emulator-")
+                        })
                         .or_else(|| devices.iter().find(|device| device.state == "device"))
                         .map(|device| device.serial.clone())
                 })
                 .ok_or_else(|| anyhow!("没有可用 Android 设备或模拟器"))?;
+            let profile = super::design_bootstrap::project_profile(&bootstrap_session)?;
             let base_package_name = arguments
                 .get("basePackageName")
                 .and_then(Value::as_str)
-                .ok_or_else(|| anyhow!("缺少 basePackageName"))?
+                .or_else(|| {
+                    profile
+                        .pointer("/android/applicationId")
+                        .and_then(Value::as_str)
+                })
+                .ok_or_else(|| {
+                    anyhow!("UI Profile 未识别 Android applicationId；请显式提供 basePackageName")
+                })?
                 .to_string();
             let debug_application_id_suffix = arguments
                 .get("debugApplicationIdSuffix")
@@ -427,10 +437,7 @@ async fn call_tool(
     }))
 }
 
-async fn fit_session_context(
-    broker: &LiveUiBroker,
-    session_id: &str,
-) -> Result<FitSessionContext> {
+async fn fit_session_context(broker: &LiveUiBroker, session_id: &str) -> Result<FitSessionContext> {
     let session = broker.session(session_id).await?;
     let view = session.view().await;
     let project_root = session

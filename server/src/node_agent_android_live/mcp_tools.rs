@@ -27,9 +27,8 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             "首次页面骨架编译完成后，构建并安装带 Debug Runtime 的 APK，自动优先选择模拟器并把项目 MCP 升级到 LIVE。",
             json!({
                 "type":"object",
-                "required":["basePackageName"],
                 "properties":{
-                    "basePackageName":{"type":"string"},
+                    "basePackageName":{"type":"string","description":"可选；默认使用项目 UI Profile 预提取的 applicationId"},
                     "deviceId":{"type":"string","description":"可选；不填时优先选择在线模拟器"},
                     "debugApplicationIdSuffix":{"type":"string","default":".uitest"}
                 }
@@ -244,4 +243,24 @@ fn rect_value_schema() -> Value {
             "right":{"type":"integer"},"bottom":{"type":"integer"}
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_runtime_uses_profile_application_id_by_default() {
+        let tool = tool_definitions()
+            .into_iter()
+            .find(|tool| tool["name"] == "ui_prepare_debug_runtime")
+            .expect("tool should exist");
+        assert!(tool["inputSchema"].get("required").is_none());
+        assert!(
+            tool["inputSchema"]["properties"]["basePackageName"]["description"]
+                .as_str()
+                .unwrap()
+                .contains("UI Profile")
+        );
+    }
 }
