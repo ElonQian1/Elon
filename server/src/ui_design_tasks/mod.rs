@@ -5,8 +5,10 @@
 mod intent;
 mod model;
 mod prompt;
+mod dispatch;
 
 pub(crate) use intent::force_ui_design_task;
+pub(crate) use dispatch::resolve_ui_route_task;
 pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,

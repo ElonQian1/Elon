@@ -38,40 +38,11 @@ use crate::{
     project_trace_events::record_server_message,
     project_workspace_recovery,
     project_ws_protocol::{ProjectAttachmentRef, ProjectChatRequest},
-    store::{ProjectAccess, UiLearnedRoute, MEMORY_SCOPE_PROJECT},
+    store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AppState, WsMessage},
-    ui_design_tasks::{
-        append_ui_design_task_context, force_ui_design_task, UiDesignTaskInput,
-    },
+    ui_design_tasks::{append_ui_design_task_context, resolve_ui_route_task},
 };
-
-fn learned_ui_route_context(
-    state: &AppState,
-    project_id: &str,
-    display_message: &str,
-    explicit_task: Option<&UiDesignTaskInput>,
-    attachments: Option<&[ProjectAttachmentRef]>,
-) -> (Option<UiDesignTaskInput>, bool) {
-    if explicit_task.is_some() {
-        return (None, false);
-    }
-    let learned = state
-        .store
-        .lookup_ui_route_learning(project_id, display_message)
-        .ok()
-        .flatten();
-    match learned {
-        Some(entry) if entry.learned_route == UiLearnedRoute::Ui => {
-            let mut task = force_ui_design_task(display_message, attachments);
-            task.route_learning_id = Some(entry.id);
-            task.route_learning_origin = Some("active_library".to_string());
-            (Some(task), false)
-        }
-        Some(entry) if entry.learned_route == UiLearnedRoute::NonUi => (None, true),
-        _ => (None, false),
-    }
-}
 
 pub async fn chat_project(
     State(state): State<Arc<AppState>>,
@@ -161,8 +132,8 @@ pub async fn chat_project(
         display_message.clone(),
         req.attachments.as_deref(),
     );
-    let (learned_task, suppress_ui_inference) = learned_ui_route_context(
-        &state,
+    let resolved_ui_route = resolve_ui_route_task(
+        &state.store,
         &project.id,
         &display_message,
         req.ui_design_task.as_ref(),
@@ -170,9 +141,9 @@ pub async fn chat_project(
     );
     let message = match append_ui_design_task_context(
         message,
-        req.ui_design_task.as_ref().or(learned_task.as_ref()),
+        resolved_ui_route.task.as_ref(),
         req.attachments.as_deref(),
-        !suppress_ui_inference,
+        !resolved_ui_route.suppress_inference,
     ) {
         Ok(message) => message,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
@@ -437,8 +408,8 @@ pub async fn chat_project_stream(
         display_message.clone(),
         req.attachments.as_deref(),
     );
-    let (learned_task, suppress_ui_inference) = learned_ui_route_context(
-        &state,
+    let resolved_ui_route = resolve_ui_route_task(
+        &state.store,
         &project.id,
         &display_message,
         req.ui_design_task.as_ref(),
@@ -446,9 +417,9 @@ pub async fn chat_project_stream(
     );
     let message = match append_ui_design_task_context(
         message,
-        req.ui_design_task.as_ref().or(learned_task.as_ref()),
+        resolved_ui_route.task.as_ref(),
         req.attachments.as_deref(),
-        !suppress_ui_inference,
+        !resolved_ui_route.suppress_inference,
     ) {
         Ok(message) => message,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),

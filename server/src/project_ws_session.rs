@@ -25,7 +25,7 @@ use crate::{
     },
     store::{ProjectAccess, PublicUser},
     types::{AppState, WsMessage},
-    ui_design_tasks::append_ui_design_task_context,
+    ui_design_tasks::{append_ui_design_task_context, resolve_ui_route_task},
 };
 
 /// 单个已升级的 WebSocket 连接的完整会话循环。
@@ -206,11 +206,18 @@ pub(crate) async fn handle_project_ws(
             display_message.clone(),
             request.attachments.as_deref(),
         );
-        let message = match append_ui_design_task_context(
-            message,
+        let resolved_ui_route = resolve_ui_route_task(
+            &state.store,
+            &project.id,
+            &display_message,
             request.ui_design_task.as_ref(),
             request.attachments.as_deref(),
-            true,
+        );
+        let message = match append_ui_design_task_context(
+            message,
+            resolved_ui_route.task.as_ref(),
+            request.attachments.as_deref(),
+            !resolved_ui_route.suppress_inference,
         ) {
             Ok(message) => message,
             Err(message) => {
