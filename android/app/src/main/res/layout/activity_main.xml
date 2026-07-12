@@ -54,10 +54,7 @@
                 android:includeFontPadding="false"
                 android:text="会话区"
                 android:textColor="@color/elon_text_primary"
-                android:textSize="20sp" 
-                android:textFontWeight="600"
-                android:letterSpacing="0.05"
-                android:lineHeight="19.43sp"/>
+                android:textSize="16sp" />
 
             <LinearLayout
                 android:id="@+id/projectTopTabs"
