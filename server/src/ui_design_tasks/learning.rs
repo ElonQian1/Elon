@@ -186,6 +186,14 @@ fn is_ui_execution_evidence(tool: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn store() -> Store {
+        let path = std::env::temp_dir().join(format!(
+            "elon-ui-route-learning-{}.db",
+            uuid::Uuid::new_v4().simple()
+        ));
+        Store::open(&path).unwrap()
+    }
+
     #[test]
     fn observes_ui_confirmation_and_runtime_evidence() {
         let output = concat!(
@@ -205,5 +213,54 @@ mod tests {
         let observed = observe_codex_route(output);
         assert_eq!(observed.learned_route, Some(UiLearnedRoute::NonUi));
         assert!(!observed.non_ui_source_change);
+    }
+
+    #[test]
+    fn codex_rescue_activates_only_after_successful_ui_execution_evidence() {
+        let store = store();
+        let prompt = super::super::dispatch::promote_codex_ui_route("让操作区更有呼吸感")
+            .unwrap();
+        let confirmation_only = r#"{"type":"item.started","item":{"type":"mcp_tool_call","name":"ui_confirm_route","arguments":{"route":"UI_DESIGN","reason":"视觉间距任务","confidence":0.9}}}"#;
+        let candidate = finalize_ui_route_learning(
+            &store,
+            "project-1",
+            "user-1",
+            &prompt,
+            confirmation_only,
+            true,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(candidate.status, "candidate");
+        assert!(store
+            .lookup_ui_route_learning("project-1", "让操作区更有呼吸感")
+            .unwrap()
+            .is_none());
+
+        let verified = concat!(
+            r#"{"type":"item.started","item":{"type":"mcp_tool_call","name":"ui_confirm_route","arguments":{"route":"UI_DESIGN","reason":"视觉间距任务","confidence":0.9}}}"#,
+            "\n",
+            r#"{"type":"item.completed","item":{"type":"mcp_tool_call","name":"ui_apply_live_patch","status":"completed"}}"#
+        );
+        let active = finalize_ui_route_learning(
+            &store,
+            "project-1",
+            "user-1",
+            &prompt,
+            verified,
+            true,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(active.status, "active");
+        assert_eq!(active.source, "execution_verified");
+        assert_eq!(
+            store
+                .lookup_ui_route_learning("project-1", "让操作区更有呼吸感")
+                .unwrap()
+                .unwrap()
+                .learned_route,
+            UiLearnedRoute::Ui
+        );
     }
 }
