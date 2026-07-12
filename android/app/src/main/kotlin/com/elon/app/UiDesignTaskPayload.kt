@@ -36,8 +36,8 @@ internal fun buildUiDesignTaskPayload(
     val imageRefs = attachmentRefs
         .mapNotNull { element -> element.takeIf { it.isJsonObject }?.asJsonObject }
         .filter { item ->
-            item.stringOrNull("kind") == "image" ||
-                item.stringOrNull("mime_type").orEmpty().startsWith("image/")
+            item.uiDesignStringOrNull("kind") == "image" ||
+                item.uiDesignStringOrNull("mime_type").orEmpty().startsWith("image/")
         }
     if (imageRefs.isEmpty()) return null
 
@@ -50,7 +50,9 @@ internal fun buildUiDesignTaskPayload(
         ?: inferUiDesignMode(outgoingText)
     val intent = selection.imageIntent.takeUnless { it == UiDesignImageIntent.AUTO }
         ?: inferImageIntent(outgoingText, hasAnnotations)
-    val primaryAttachmentId = imageRefs.firstNotNullOfOrNull { it.stringOrNull("attachment_id") }
+    val primaryAttachmentId = imageRefs.firstNotNullOfOrNull {
+        it.uiDesignStringOrNull("attachment_id")
+    }
 
     return JsonObject().apply {
         addProperty("taskId", "design_$traceId")
@@ -90,6 +92,14 @@ internal fun buildUiDesignTaskPayload(
         })
     }
 }
+
+private fun JsonObject.uiDesignStringOrNull(name: String): String? =
+    get(name)
+        ?.takeUnless { it.isJsonNull }
+        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+        ?.asString
+        ?.trim()
+        ?.takeIf(String::isNotEmpty)
 
 private fun inferUiDesignMode(text: String): UiDesignRequestMode {
     val normalized = text.lowercase(Locale.ROOT)
