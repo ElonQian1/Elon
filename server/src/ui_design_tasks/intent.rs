@@ -68,17 +68,18 @@ fn looks_like_ui_request(text: &str, has_image: bool) -> bool {
         || (has_subject && contains_any(text, UI_SEMANTIC_MARKERS))
         || (contains_any(text, UI_SURFACE_MARKERS) && contains_any(text, UI_SURFACE_ACTION_MARKERS))
         || is_create_request(text)
-        || contains_any(text, EXTEND_MARKERS)
+        || is_extend_request(text)
         || contains_any(text, MODIFY_MARKERS)
 }
 
 fn infer_mode(text: &str) -> UiDesignTaskMode {
     if is_create_request(text) {
         UiDesignTaskMode::CreateNew
-    } else if contains_any(text, EXTEND_MARKERS) {
+    } else if is_extend_request(text) {
         UiDesignTaskMode::ExtendExisting
     } else if contains_any(text, MODIFY_MARKERS)
-        || (contains_any(text, UI_PROPERTY_MARKERS) && contains_any(text, UI_ACTION_MARKERS))
+        || (contains_any(text, UI_PROPERTY_MARKERS)
+            && (contains_any(text, UI_ACTION_MARKERS) || contains_any(text, UI_SEMANTIC_MARKERS)))
     {
         UiDesignTaskMode::ModifyExisting
     } else {
@@ -111,6 +112,13 @@ fn infer_attachment_intent(
 fn is_create_request(text: &str) -> bool {
     contains_any(text, CREATE_MARKERS)
         || (contains_any(text, CREATE_ACTIONS) && contains_any(text, CREATE_SUBJECTS))
+}
+
+fn is_extend_request(text: &str) -> bool {
+    contains_any(text, EXTEND_MARKERS)
+        || (contains_any(text, EXTEND_ACTION_MARKERS)
+            && contains_any(text, EXTEND_SUBJECT_MARKERS)
+            && !contains_any(text, BEHAVIOR_MARKERS))
 }
 
 fn contains_any(text: &str, markers: &[&str]) -> bool {
@@ -169,7 +177,8 @@ const UI_PROPERTY_MARKERS: &[&str] = &[
 ];
 const UI_ACTION_MARKERS: &[&str] = &[
     "修改", "调整", "优化", "改成", "变成", "缩小", "放大", "增大", "减小", "加大", "减少", "增加",
-    "去掉", "换成", "统一", "对齐", "还原", "匹配", "change", "update", "make", "resize", "align",
+    "去掉", "换成", "统一", "对齐", "还原", "匹配", "改小", "改大", "change", "update", "make",
+    "resize", "align",
 ];
 const UI_SEMANTIC_MARKERS: &[&str] = &[
     "更紧凑",
@@ -226,6 +235,20 @@ const EXTEND_MARKERS: &[&str] = &[
     "添加卡片",
     "新增卡片",
     "extend existing",
+];
+const EXTEND_ACTION_MARKERS: &[&str] = &["增加", "添加", "新增", "插入", "add"];
+const EXTEND_SUBJECT_MARKERS: &[&str] = &[
+    "区域", "组件", "按钮", "卡片", "图标", "图片", "标题", "文本", "列表",
+];
+const BEHAVIOR_MARKERS: &[&str] = &[
+    "点击",
+    "逻辑",
+    "事件",
+    "接口",
+    "网络",
+    "功能",
+    "崩溃",
+    "无响应",
 ];
 const MODIFY_MARKERS: &[&str] = &[
     "修改现有",

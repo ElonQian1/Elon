@@ -192,7 +192,7 @@ mod tests {
 
         assert!(prompt.contains(TASK_MARKER_BEGIN));
         assert!(prompt.contains("Preview-first screen skeleton"));
-        assert!(prompt.contains("Exclude arrows, labels and drawing overlays"));
+        assert!(prompt.contains("text-only UI request"));
     }
 
     #[test]

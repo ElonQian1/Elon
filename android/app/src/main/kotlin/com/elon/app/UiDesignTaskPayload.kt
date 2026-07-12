@@ -107,8 +107,11 @@ private fun inferUiDesignMode(text: String): UiDesignRequestMode {
     val normalized = text.lowercase(Locale.ROOT)
     return when {
         CREATE_MARKERS.any(normalized::contains) -> UiDesignRequestMode.CREATE_NEW
-        EXTEND_MARKERS.any(normalized::contains) -> UiDesignRequestMode.EXTEND_EXISTING
-        MODIFY_MARKERS.any(normalized::contains) -> UiDesignRequestMode.MODIFY_EXISTING
+        looksLikeUiExtension(normalized) -> UiDesignRequestMode.EXTEND_EXISTING
+        MODIFY_MARKERS.any(normalized::contains) ||
+            (UI_PROPERTY_MARKERS.any(normalized::contains) &&
+                (UI_ACTION_MARKERS.any(normalized::contains) || UI_SEMANTIC_MARKERS.any(normalized::contains))) ->
+            UiDesignRequestMode.MODIFY_EXISTING
         else -> UiDesignRequestMode.AUTO
     }
 }
@@ -133,9 +136,15 @@ private fun looksLikeUiDesignRequest(text: String): Boolean {
     return (hasVisualProperty && hasVisualIntent) ||
         (hasVisualSubject && UI_SEMANTIC_MARKERS.any(normalized::contains)) ||
         CREATE_MARKERS.any(normalized::contains) ||
-        EXTEND_MARKERS.any(normalized::contains) ||
+        looksLikeUiExtension(normalized) ||
         MODIFY_MARKERS.any(normalized::contains)
 }
+
+private fun looksLikeUiExtension(text: String): Boolean =
+    EXTEND_MARKERS.any(text::contains) ||
+        (EXTEND_ACTION_MARKERS.any(text::contains) &&
+            EXTEND_SUBJECT_MARKERS.any(text::contains) &&
+            !BEHAVIOR_MARKERS.any(text::contains))
 
 private val HIGH_CONFIDENCE_UI_MARKERS = listOf(
     "设计稿", "设计图", "草稿图", "ui", "界面", "页面样式", "组件样式", "像素", "1:1", "拟合",
@@ -151,7 +160,7 @@ private val UI_PROPERTY_MARKERS = listOf(
 )
 private val UI_ACTION_MARKERS = listOf(
     "修改", "调整", "优化", "改成", "变成", "缩小", "放大", "增大", "减小", "加大", "减少", "增加",
-    "去掉", "换成", "统一", "对齐", "还原", "匹配", "change", "update", "make", "resize", "align"
+    "去掉", "换成", "统一", "对齐", "还原", "匹配", "改小", "改大", "change", "update", "make", "resize", "align"
 )
 private val UI_SEMANTIC_MARKERS = listOf(
     "更紧凑", "更突出", "更明显", "更好看", "更协调", "更圆", "更小", "更大", "太松", "太挤", "太宽",
@@ -164,6 +173,9 @@ private val EXTEND_MARKERS = listOf(
     "扩展页面", "增加区域", "新增区域", "添加组件", "新增组件", "增加按钮", "添加按钮", "新增按钮",
     "增加卡片", "添加卡片", "新增卡片", "extend existing"
 )
+private val EXTEND_ACTION_MARKERS = listOf("增加", "添加", "新增", "插入", "add")
+private val EXTEND_SUBJECT_MARKERS = listOf("区域", "组件", "按钮", "卡片", "图标", "图片", "标题", "文本", "列表")
+private val BEHAVIOR_MARKERS = listOf("点击", "逻辑", "事件", "接口", "网络", "功能", "崩溃", "无响应")
 private val MODIFY_MARKERS = listOf(
     "修改现有", "调整现有", "还原设计稿", "按图修改", "修改样式", "modify existing"
 )
