@@ -100,7 +100,17 @@ impl FitRunService {
         }
         let plan_value = serde_json::to_value(&plan)?;
         if plan.codex_count > 0 {
-            let bundle = codex_bundle(&runs, &plan_value);
+            let commit = if plan.deterministic_count > 0 {
+                Some(commit_source_plan(
+                    plan.clone(),
+                    SourceCommitRequest {
+                        source_revision: request.source_revision.clone(),
+                    },
+                )?)
+            } else {
+                None
+            };
+            let bundle = codex_bundle(&runs, &plan_value, commit.as_ref());
             let codex_artifact_path = persist_codex_bundle(&context.project_root, &bundle)?;
             return Ok(BatchAcceptResult {
                 status: "CODEX_REQUIRED",
@@ -108,7 +118,7 @@ impl FitRunService {
                 codex_bundle: Some(bundle),
                 codex_artifact_path: Some(codex_artifact_path),
                 plan: plan_value,
-                commit: None,
+                commit,
                 build: None,
                 runs,
             });
@@ -269,7 +279,11 @@ fn persist_codex_bundle(project_root: &str, bundle: &Value) -> Result<String> {
     Ok(path.to_string_lossy().to_string())
 }
 
-fn codex_bundle(runs: &[FitRunDocument], plan: &Value) -> Value {
+fn codex_bundle(
+    runs: &[FitRunDocument],
+    plan: &Value,
+    deterministic_commit: Option<&SourceCommitResult>,
+) -> Value {
     json!({
         "schemaVersion": 1,
         "kind": "yilong_ui_fit_batch_codex_handoff",
@@ -284,9 +298,12 @@ fn codex_bundle(runs: &[FitRunDocument], plan: &Value) -> Value {
             "operations": run.best.as_ref().map(|candidate| &candidate.operations),
         })).collect::<Vec<_>>(),
         "sourcePlan": plan,
+        "deterministicCommit": deterministic_commit,
+        "sourceRevisionAfterDeterministic": deterministic_commit
+            .map(|commit| commit.source_revision_after.as_str()),
         "instructions": [
             "只读取 sourcePlan 中 CODEX 条目的必要源码 Symbol 和直接父布局。",
-            "保持已确定的 LIVE 数值，不重新分析完整页面或完整仓库。",
+            "DETERMINISTIC 条目已经写回源码；保持这些数值，不重新分析完整页面或完整仓库。",
             "一次性完成所有 deferred 条目，再调用批量验收接口重新执行双门禁。"
         ]
     })
