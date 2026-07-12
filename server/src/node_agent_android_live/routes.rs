@@ -15,6 +15,7 @@ use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::build_verify::{
     build_and_verify, prepare_debug_runtime, BuildVerifyRequest, PrepareDebugRuntimeRequest,
 };
+use super::design_diff_regions::{analyze_session_design_diff, DesignDiffRegionRequest};
 use super::frame::capture_frame;
 use super::mcp::{
     cleanup_descriptor, descriptor as mcp_descriptor, handle_request as handle_mcp_request,
@@ -89,6 +90,10 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/android-live/sessions/:session_id/target-design",
             post(target_design_handler),
+        )
+        .route(
+            "/api/android-live/sessions/:session_id/design-diff-regions",
+            post(design_diff_regions_handler),
         )
         .route(
             "/api/android-live/sessions/:session_id/visual-diff",
@@ -212,6 +217,17 @@ async fn target_design_handler(
 ) -> Response {
     match persist_target_design(&runtime.live_ui, &session_id, upload).await {
         Ok(target) => Json(json!({ "ok": true, "targetDesign": target })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn design_diff_regions_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+    Json(request): Json<DesignDiffRegionRequest>,
+) -> Response {
+    match analyze_session_design_diff(&runtime.live_ui, &session_id, request).await {
+        Ok(analysis) => Json(json!({ "ok": true, "analysis": analysis })).into_response(),
         Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
     }
 }
