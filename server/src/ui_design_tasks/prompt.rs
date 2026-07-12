@@ -58,10 +58,6 @@ pub(crate) fn ui_design_image_attachment_urls(
         .collect()
 }
 
-pub(crate) fn is_ui_design_task_prompt(prompt: &str) -> bool {
-    parse_task_envelope(prompt).is_some()
-}
-
 fn parse_task_envelope(prompt: &str) -> Option<UiDesignTaskEnvelope> {
     let (_, rest) = prompt.rsplit_once(TASK_MARKER_BEGIN)?;
     let (json, _) = rest.split_once(TASK_MARKER_END)?;

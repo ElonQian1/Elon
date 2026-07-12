@@ -10,7 +10,7 @@ pub(crate) use model::{
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,
 };
 pub(crate) use prompt::{
-    append_ui_design_task_context, is_ui_design_task_prompt, ui_design_image_attachment_urls,
+    append_ui_design_task_context, ui_design_image_attachment_urls,
 };
 
 #[cfg(test)]

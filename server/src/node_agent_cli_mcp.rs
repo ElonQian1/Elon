@@ -35,7 +35,7 @@ pub(crate) async fn codex_mcp_config_args_for_runtime(
     if let Some(args) = codex_mcp_config_args(prompt) {
         return Some(args);
     }
-    if !crate::ui_design_tasks::is_ui_design_task_prompt(prompt) {
+    if !prompt.contains("<elon-ui-design-task version=\"1\">") {
         return None;
     }
     let cwd = cwd?.trim();

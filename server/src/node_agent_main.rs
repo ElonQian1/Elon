@@ -126,6 +126,7 @@ mod node_agent_tts;
 pub use node_agent_tts::run_tts_synthesis;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
+mod node_agent_ui_design_workspace;
 mod node_agent_workspace_match;
 mod node_agent_workspace_modules;
 mod node_agent_write_preview;

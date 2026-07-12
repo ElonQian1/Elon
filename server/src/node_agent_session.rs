@@ -497,6 +497,18 @@ pub(super) async fn run_session(
                                             return;
                                         }
                                     };
+                                let original_prompt = prompt.clone();
+                                let prompt = match crate::node_agent_ui_design_workspace::prepare_ui_design_workspace(
+                                    prompt,
+                                    prepared_cwd.cwd.as_deref(),
+                                    &resolved_args,
+                                ) {
+                                    Ok(prompt) => prompt,
+                                    Err(error) => {
+                                        warn!(error = %error, "UI 设计任务本地工件准备失败，继续使用原始任务上下文");
+                                        format!("{original_prompt}\n\nUI design workspace preparation failed: {error:#}\n请先诊断附件与项目工作区，再继续任务。")
+                                    }
+                                };
                                 let handle = node_agent_active_task::ActiveCliPromptHandle::new(
                                     req_id_for_cleanup.clone(),
                                     resolved_cli.name().to_string(),
