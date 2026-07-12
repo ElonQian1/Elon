@@ -10,9 +10,7 @@ pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,
 };
-pub(crate) use prompt::{
-    append_ui_design_task_context, ui_design_image_attachment_urls,
-};
+pub(crate) use prompt::{append_ui_design_task_context, ui_design_image_attachment_urls};
 
 #[cfg(test)]
 mod tests;

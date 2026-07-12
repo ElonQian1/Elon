@@ -27,10 +27,9 @@ pub(super) fn infer_ui_design_task(
     }
 
     let mode = infer_mode(&normalized);
-    let attachment_intent = infer_attachment_intent(&normalized, has_annotations, !images.is_empty());
-    let primary_id = images
-        .iter()
-        .find_map(|item| item.attachment_id.clone());
+    let attachment_intent =
+        infer_attachment_intent(&normalized, has_annotations, !images.is_empty());
+    let primary_id = images.iter().find_map(|item| item.attachment_id.clone());
     let mut task = UiDesignTaskInput {
         mode,
         attachment_intent,
@@ -117,33 +116,118 @@ fn contains_any(text: &str, markers: &[&str]) -> bool {
 }
 
 const HIGH_CONFIDENCE_UI_MARKERS: &[&str] = &[
-    "设计稿", "设计图", "草稿图", "页面样式", "组件样式", "像素级", "1:1", "ui拟合",
+    "设计稿",
+    "设计图",
+    "草稿图",
+    "页面样式",
+    "组件样式",
+    "像素级",
+    "1:1",
+    "ui拟合",
 ];
 const UI_SUBJECT_MARKERS: &[&str] = &[
     "页面", "按钮", "卡片", "文本", "文字", "标题", "图标", "图片", "导航", "弹窗", "列表", "组件",
 ];
 const UI_PROPERTY_MARKERS: &[&str] = &[
-    "颜色", "圆角", "间距", "边距", "内边距", "外边距", "宽度", "高度", "宽高", "字号", "字体", "字重",
-    "行高", "透明度", "对齐", "布局", "阴影", "边框", "背景", "padding", "margin", "radius", "width",
-    "height", "font", "color", "opacity", "alignment", "spacing",
+    "颜色",
+    "圆角",
+    "间距",
+    "边距",
+    "内边距",
+    "外边距",
+    "宽度",
+    "高度",
+    "宽高",
+    "字号",
+    "字体",
+    "字重",
+    "行高",
+    "透明度",
+    "对齐",
+    "布局",
+    "阴影",
+    "边框",
+    "背景",
+    "padding",
+    "margin",
+    "radius",
+    "width",
+    "height",
+    "font",
+    "color",
+    "opacity",
+    "alignment",
+    "spacing",
 ];
 const UI_ACTION_MARKERS: &[&str] = &[
-    "修改", "调整", "优化", "改成", "变成", "缩小", "放大", "增大", "减小", "加大", "减少", "增加", "去掉",
-    "换成", "统一", "对齐", "还原", "匹配", "change", "update", "make", "resize", "align",
+    "修改", "调整", "优化", "改成", "变成", "缩小", "放大", "增大", "减小", "加大", "减少", "增加",
+    "去掉", "换成", "统一", "对齐", "还原", "匹配", "change", "update", "make", "resize", "align",
 ];
 const UI_SEMANTIC_MARKERS: &[&str] = &[
-    "更紧凑", "更突出", "更明显", "更好看", "更协调", "更圆", "更小", "更大", "太松", "太挤", "太宽", "太窄",
-    "太高", "太矮", "样式", "视觉", "美化", "美观",
+    "更紧凑",
+    "更突出",
+    "更明显",
+    "更好看",
+    "更协调",
+    "更圆",
+    "更小",
+    "更大",
+    "太松",
+    "太挤",
+    "太宽",
+    "太窄",
+    "太高",
+    "太矮",
+    "样式",
+    "视觉",
+    "美化",
+    "美观",
 ];
-const CREATE_MARKERS: &[&str] = &["全新页面", "新建页面", "从零开始", "还没有源码", "没有相关源码", "create new screen"];
-const CREATE_ACTIONS: &[&str] = &["创建", "新建", "生成", "做一个", "实现一个", "build", "create"];
+const CREATE_MARKERS: &[&str] = &[
+    "全新页面",
+    "新建页面",
+    "从零开始",
+    "还没有源码",
+    "没有相关源码",
+    "create new screen",
+];
+const CREATE_ACTIONS: &[&str] = &[
+    "创建",
+    "新建",
+    "生成",
+    "做一个",
+    "实现一个",
+    "build",
+    "create",
+];
 const CREATE_SUBJECTS: &[&str] = &["页面", "界面", "屏幕", "screen", "page"];
-const EXTEND_MARKERS: &[&str] = &["扩展页面", "增加区域", "新增区域", "添加组件", "新增组件", "extend existing"];
-const MODIFY_MARKERS: &[&str] = &["修改现有", "调整现有", "还原设计稿", "按图修改", "修改样式", "modify existing"];
+const EXTEND_MARKERS: &[&str] = &[
+    "扩展页面",
+    "增加区域",
+    "新增区域",
+    "添加组件",
+    "新增组件",
+    "extend existing",
+];
+const MODIFY_MARKERS: &[&str] = &[
+    "修改现有",
+    "调整现有",
+    "还原设计稿",
+    "按图修改",
+    "修改样式",
+    "modify existing",
+];
 const TARGET_MARKERS: &[&str] = &["设计稿", "设计图", "目标图", "1:1", "像素级", "按图还原"];
 const REFERENCE_MARKERS: &[&str] = &["风格参考", "参考风格", "参考这张", "灵感图"];
 const CURRENT_MARKERS: &[&str] = &["当前截图", "现状截图", "真机截图", "现在的页面"];
-const IMAGE_ACTION_MARKERS: &[&str] = &["照着做", "按这个做", "按图做", "还原这张", "做成这样", "匹配这张"];
+const IMAGE_ACTION_MARKERS: &[&str] = &[
+    "照着做",
+    "按这个做",
+    "按图做",
+    "还原这张",
+    "做成这样",
+    "匹配这张",
+];
 
 #[cfg(test)]
 mod tests {

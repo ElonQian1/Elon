@@ -53,10 +53,7 @@ pub(crate) fn append_ui_design_task_context(
 
 /// 从服务器生成的任务契约中取出远程节点可下载的图片 URL。
 /// 仅允许当前一龙服务器自己的 `/api/` 附件地址，防止把节点变成任意 URL 下载器。
-pub(crate) fn ui_design_image_attachment_urls(
-    prompt: &str,
-    public_url: &str,
-) -> Vec<String> {
+pub(crate) fn ui_design_image_attachment_urls(prompt: &str, public_url: &str) -> Vec<String> {
     let Some(envelope) = parse_task_envelope(prompt) else {
         return Vec::new();
     };
@@ -197,12 +194,9 @@ mod tests {
 
     #[test]
     fn text_only_ui_request_gets_structured_contract_automatically() {
-        let prompt = append_ui_design_task_context(
-            "把支付按钮的圆角改小，间距更紧凑".into(),
-            None,
-            None,
-        )
-        .expect("context should append");
+        let prompt =
+            append_ui_design_task_context("把支付按钮的圆角改小，间距更紧凑".into(), None, None)
+                .expect("context should append");
 
         assert!(prompt.contains(TASK_MARKER_BEGIN));
         assert!(prompt.contains("text-only UI request"));
@@ -237,12 +231,9 @@ mod tests {
             transcription: None,
             annotations: Vec::new(),
         }];
-        let prompt = append_ui_design_task_context(
-            "创建页面".into(),
-            Some(&task),
-            Some(&attachments),
-        )
-        .expect("context should append");
+        let prompt =
+            append_ui_design_task_context("创建页面".into(), Some(&task), Some(&attachments))
+                .expect("context should append");
 
         assert_eq!(
             ui_design_image_attachment_urls(&prompt, "https://elon.test"),
