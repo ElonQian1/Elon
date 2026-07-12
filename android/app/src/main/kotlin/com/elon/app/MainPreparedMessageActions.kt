@@ -140,6 +140,9 @@ internal class MainPreparedMessageActions(
             selectedAgentForRequest()?.let { addProperty("agent", it) }
             selectedRuntimeRouteForRequest()?.let { addProperty("runtimeRoute", it) }
             if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
+            buildUiDesignTaskPayload(traceId, outgoingText, attachmentRefs)?.let {
+                add("uiDesignTask", it)
+            }
         }
     }
 
