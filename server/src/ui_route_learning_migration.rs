@@ -24,7 +24,7 @@ pub(crate) fn migration_v97(conn: &Connection) -> Result<()> {
           CHECK (scope_type IN ('project', 'global')),
           CHECK (learned_route IN ('ui', 'non_ui')),
           CHECK (status IN ('candidate', 'active', 'revoked')),
-          CHECK (source IN ('codex_proposal', 'user_override', 'runtime_verified', 'admin')),
+          CHECK (source IN ('codex_proposal', 'user_override', 'runtime_verified', 'execution_verified', 'admin')),
           UNIQUE(scope_type, scope_id, phrase_key)
         );
 

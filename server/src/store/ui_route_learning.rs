@@ -36,6 +36,7 @@ pub(crate) enum UiRouteLearningSource {
     CodexProposal,
     UserOverride,
     RuntimeVerified,
+    ExecutionVerified,
     Admin,
 }
 
@@ -45,6 +46,7 @@ impl UiRouteLearningSource {
             Self::CodexProposal => "codex_proposal",
             Self::UserOverride => "user_override",
             Self::RuntimeVerified => "runtime_verified",
+            Self::ExecutionVerified => "execution_verified",
             Self::Admin => "admin",
         }
     }

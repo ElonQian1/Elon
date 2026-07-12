@@ -974,6 +974,33 @@ async fn run_via_pc_agent(
                 ..
             } => {
                 if is_codex {
+                    if let Some(scope) = native_session_scope.as_ref() {
+                        match crate::ui_design_tasks::finalize_ui_route_learning(
+                            &state.store,
+                            &scope.project_id,
+                            &scope.user_id,
+                            user_message,
+                            &full_text,
+                            exit_ok,
+                        ) {
+                            Ok(Some(entry)) => {
+                                let _ = tx.send(
+                                    WsMessage::progress(format!(
+                                        "已记录 UI 路由经验：{}（{}）",
+                                        entry.sample_text.chars().take(40).collect::<String>(),
+                                        entry.status
+                                    ))
+                                    .to_json(),
+                                );
+                            }
+                            Ok(None) => {}
+                            Err(error) => {
+                                tracing::warn!(error = %error, "记录 UI 路由经验失败");
+                            }
+                        }
+                    }
+                }
+                if is_codex {
                     let events = pc_cli_passthrough_events_flush(
                         &mut codex_passthrough_line_buffer,
                         Some(display_model.as_str()),

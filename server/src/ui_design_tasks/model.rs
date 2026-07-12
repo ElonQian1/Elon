@@ -119,6 +119,8 @@ pub(crate) struct UiDesignTaskInput {
     pub(crate) route_learning_id: Option<String>,
     #[serde(default, alias = "routeLearningOrigin")]
     pub(crate) route_learning_origin: Option<String>,
+    #[serde(default, alias = "routeLearningPhrase")]
+    pub(crate) route_learning_phrase: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -148,6 +150,13 @@ impl UiDesignTaskInput {
         validate_optional_id("targetNodeId", self.target_node_id.as_deref())?;
         validate_optional_id("definitionId", self.definition_id.as_deref())?;
         validate_optional_id("routeLearningId", self.route_learning_id.as_deref())?;
+        if self
+            .route_learning_phrase
+            .as_deref()
+            .is_some_and(|value| value.chars().count() > 2_000)
+        {
+            return Err("routeLearningPhrase 不能超过 2000 个字符".into());
+        }
         validate_optional_id(
             "originalAttachmentId",
             self.original_attachment_id.as_deref(),

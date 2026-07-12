@@ -51,6 +51,7 @@ pub(crate) fn resolve_ui_route_task(
     if decision.class == UiRouteClass::Ambiguous {
         let mut task = force_ui_design_task(display_message, attachments);
         task.route_learning_origin = Some("ambiguous_local".to_string());
+        task.route_learning_phrase = Some(display_message.chars().take(2_000).collect());
         return ResolvedUiRouteTask {
             task: Some(task),
             suppress_inference: false,
