@@ -47,6 +47,14 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_map_annotations_to_nodes",
+            "把手机标注框的归一化坐标映射到当前 Runtime 节点，返回前三候选与置信度；不会把标注层当成目标像素。",
+            json!({
+                "type":"object",
+                "properties":{"taskId":{"type":"string"}}
+            }),
+        ),
+        tool(
             "ui_create_compose_screen_scaffold",
             "在已确认 Compose 的项目中创建不会覆盖现有文件的最小 Screen + Preview 骨架。创建后仍需按项目组件和主题补全并编译。",
             json!({

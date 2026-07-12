@@ -4,6 +4,7 @@
 //! 连接公开的 loopback WebSocket 路由。
 
 mod adb_session;
+mod annotation_mapping;
 mod broker;
 mod build_verify;
 mod build_verify_apk;

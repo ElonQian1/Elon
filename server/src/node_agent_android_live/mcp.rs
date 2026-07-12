@@ -235,6 +235,12 @@ async fn call_tool(broker: &LiveUiBroker, session_id: &str, params: Value) -> Re
             .await?;
             json!({ "targetDesign": target, "uiIrRevision": ir.revision })
         }
+        "ui_map_annotations_to_nodes" => {
+            let session = broker.session(&session_id).await?;
+            let bundle = super::design_bootstrap::design_task(&session, &arguments)?;
+            let (_, nodes) = broker.tree(&session_id).await?;
+            super::annotation_mapping::map_annotations(&bundle, &nodes)?
+        }
         "ui_create_compose_screen_scaffold" => {
             let session = broker.session(&session_id).await?;
             super::design_bootstrap::create_compose_screen_scaffold(&session, &arguments)?
