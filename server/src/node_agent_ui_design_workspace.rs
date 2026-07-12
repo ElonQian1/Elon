@@ -39,11 +39,8 @@ pub(crate) fn prepare_ui_design_workspace(
 
     let task_path = task_root.join("task.json");
     fs::write(&task_path, serde_json::to_vec_pretty(&envelope)?)?;
-    let attachment_manifest = materialize_attachment_manifest(
-        &task_root,
-        envelope.get("attachments"),
-        resolved_args,
-    )?;
+    let attachment_manifest =
+        materialize_attachment_manifest(&task_root, envelope.get("attachments"), resolved_args)?;
     let attachment_path = task_root.join("attachments.json");
     fs::write(
         &attachment_path,
@@ -89,9 +86,9 @@ fn materialize_attachment_manifest(
     fs::create_dir_all(&attachment_root)?;
     let mut entries = Vec::new();
     for (index, source) in source_paths.into_iter().enumerate() {
-        let source = source.canonicalize().with_context(|| {
-            format!("UI 设计附件临时文件不存在: {}", source.display())
-        })?;
+        let source = source
+            .canonicalize()
+            .with_context(|| format!("UI 设计附件临时文件不存在: {}", source.display()))?;
         let extension = source
             .extension()
             .and_then(|value| value.to_str())
@@ -153,6 +150,8 @@ fn build_project_ui_profile(root: &Path) -> Result<Value> {
     let mut navigation = Vec::new();
     let mut previews = Vec::new();
     let mut build_files = Vec::new();
+    let mut application_id = None;
+    let mut android_namespace = None;
 
     let walker = WalkBuilder::new(root)
         .hidden(false)
@@ -190,11 +189,20 @@ fn build_project_ui_profile(root: &Path) -> Result<Value> {
             android_views = true;
             push_unique(&mut components, &relative_text);
         }
-        if !matches!(extension.as_str(), "kt" | "java" | "xml" | "json" | "kts" | "gradle" | "ts" | "tsx") {
+        if !matches!(
+            extension.as_str(),
+            "kt" | "java" | "xml" | "json" | "kts" | "gradle" | "ts" | "tsx"
+        ) {
             continue;
         }
         scanned += 1;
         let content = read_prefix(path, 192 * 1024).unwrap_or_default();
+        if matches!(extension.as_str(), "gradle" | "kts") {
+            application_id =
+                application_id.or_else(|| gradle_string_literal(&content, "applicationId"));
+            android_namespace =
+                android_namespace.or_else(|| gradle_string_literal(&content, "namespace"));
+        }
         if content.contains("androidx.compose") || content.contains("@Composable") {
             compose = true;
         }
@@ -211,9 +219,17 @@ fn build_project_ui_profile(root: &Path) -> Result<Value> {
         {
             push_unique(&mut navigation, &relative_text);
         }
-        if ["theme", "color", "typography", "shape", "token", "style", "design"]
-            .iter()
-            .any(|marker| name.contains(marker))
+        if [
+            "theme",
+            "color",
+            "typography",
+            "shape",
+            "token",
+            "style",
+            "design",
+        ]
+        .iter()
+        .any(|marker| name.contains(marker))
         {
             push_unique(&mut themes, &relative_text);
         }
@@ -227,6 +243,10 @@ fn build_project_ui_profile(root: &Path) -> Result<Value> {
             "jetpackCompose": compose,
             "androidViews": android_views,
             "pwa": pwa,
+        },
+        "android": {
+            "applicationId": application_id,
+            "namespace": android_namespace,
         },
         "candidates": {
             "buildFiles": build_files,
@@ -243,6 +263,32 @@ fn build_project_ui_profile(root: &Path) -> Result<Value> {
     }))
 }
 
+fn gradle_string_literal(content: &str, key: &str) -> Option<String> {
+    content.lines().find_map(|line| {
+        let line = line.trim();
+        let remainder = line.strip_prefix(key)?;
+        if remainder
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        {
+            return None;
+        }
+        let value = remainder
+            .trim()
+            .strip_prefix('=')
+            .unwrap_or(remainder.trim())
+            .trim();
+        let quote = value.chars().next()?;
+        if !matches!(quote, '\'' | '"') {
+            return None;
+        }
+        let rest = &value[quote.len_utf8()..];
+        let end = rest.find(quote)?;
+        Some(rest[..end].to_string())
+    })
+}
+
 fn ignored_dir(path: &Path) -> bool {
     path.components().any(|component| {
         matches!(
@@ -255,14 +301,27 @@ fn ignored_dir(path: &Path) -> bool {
 fn is_build_file(name: &str) -> bool {
     matches!(
         name,
-        "settings.gradle" | "settings.gradle.kts" | "build.gradle" | "build.gradle.kts" | "package.json"
+        "settings.gradle"
+            | "settings.gradle.kts"
+            | "build.gradle"
+            | "build.gradle.kts"
+            | "package.json"
     )
 }
 
 fn looks_like_component_file(name: &str) -> bool {
-    ["screen", "view", "component", "card", "button", "dialog", "sheet", "item"]
-        .iter()
-        .any(|marker| name.contains(marker))
+    [
+        "screen",
+        "view",
+        "component",
+        "card",
+        "button",
+        "dialog",
+        "sheet",
+        "item",
+    ]
+    .iter()
+    .any(|marker| name.contains(marker))
 }
 
 fn read_prefix(path: &Path, max_bytes: usize) -> Result<String> {
@@ -296,15 +355,19 @@ mod tests {
 
     #[test]
     fn profile_indexes_compose_without_embedding_source() {
-        let root = std::env::temp_dir().join(format!(
-            "elon_ui_profile_{}",
-            uuid::Uuid::new_v4().simple()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("elon_ui_profile_{}", uuid::Uuid::new_v4().simple()));
         let source = root.join("app/src/main/kotlin/demo/CheckoutScreen.kt");
         fs::create_dir_all(source.parent().unwrap()).unwrap();
         fs::write(
             &source,
             "import androidx.compose.runtime.Composable\n@Composable fun CheckoutScreen() = Unit\n",
+        )
+        .unwrap();
+        fs::create_dir_all(root.join("app")).unwrap();
+        fs::write(
+            root.join("app/build.gradle.kts"),
+            "android {\n namespace = \"demo.checkout\"\n defaultConfig {\n  applicationId = \"demo.checkout.app\"\n }\n}\n",
         )
         .unwrap();
 
@@ -317,6 +380,20 @@ mod tests {
             .iter()
             .any(|value| value.as_str().unwrap().ends_with("CheckoutScreen.kt")));
         assert_eq!(profile["scan"]["contentIncludedInProfile"], false);
+        assert_eq!(profile["android"]["namespace"], "demo.checkout");
+        assert_eq!(profile["android"]["applicationId"], "demo.checkout.app");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn parses_groovy_and_kotlin_gradle_literals() {
+        assert_eq!(
+            gradle_string_literal("applicationId \"com.example.groovy\"", "applicationId"),
+            Some("com.example.groovy".into())
+        );
+        assert_eq!(
+            gradle_string_literal("namespace = \"com.example.kotlin\"", "namespace"),
+            Some("com.example.kotlin".into())
+        );
     }
 }
