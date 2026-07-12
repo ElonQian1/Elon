@@ -4,11 +4,13 @@ import type {
   RefObject,
   UIEventHandler,
 } from 'react'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { UiTunerFilterResult } from '../filtering'
+import { AutoFitQueuePanel } from '../fit-run/AutoFitQueuePanel'
 import type { LivePreviewRequest, LiveUiFrame, LiveUiNode, LiveUiSession } from '../live/liveUiApi'
 import type { LiveTargetDesign } from '../live/liveUiIrApi'
 import { UiFitRunPanel } from '../fit-run/UiFitRunPanel'
+import { useAutoFitQueue } from '../fit-run/useAutoFitQueue'
 import { useFitRun } from '../fit-run/useFitRun'
 import { useFitRunStore } from '../fit-run/fitRunStore'
 import type { UiTunerDocument, UiTunerElement } from '../types'
@@ -17,7 +19,7 @@ import { ComparisonModeControls } from './ComparisonModeControls'
 import { ComparisonOverlayLayer } from './ComparisonOverlayLayer'
 import { CalibrationPanel } from './CalibrationPanel'
 import { DesignDiffRegionsPanel } from './DesignDiffRegionsPanel'
-import type { DesignDiffRegion } from './autoPairApi'
+import type { DesignDiffRegion, DesignDiffRegionAnalysis } from './autoPairApi'
 import { createCalibration } from './comparisonGeometry'
 import { TargetDesignPane } from './TargetDesignPane'
 import type { TargetCurrentPair } from './types'
@@ -81,6 +83,7 @@ export function UiTunerComparisonWorkspace({
   onPairChange,
   onNotice,
 }: UiTunerComparisonWorkspaceProps) {
+  const [autoAnalysis, setAutoAnalysis] = useState<DesignDiffRegionAnalysis | null>(null)
   const selected = document.elements.find((element) => element.id === selectedId) ?? null
   const currentSize = useMemo(() => ({
     width: liveFrame?.width ?? document.canvas.width,
@@ -148,17 +151,25 @@ export function UiTunerComparisonWorkspace({
     )) ?? region.candidates[0]
     if (!candidate) {
       onNotice('这个差异区域尚未找到可编辑的真实 Android 节点')
-      return
+      return false
     }
     const element = document.elements.find((item) => item.runtime?.nodeId === candidate.runtimeNodeId)
+      ?? document.elements.find((item) => item.runtime?.xpath === candidate.definitionId)
     if (!element) {
       onNotice(`已识别 ${candidate.definitionId}，但当前画布还没有对应元素，请刷新 Runtime 节点`)
-      return
+      return false
     }
     comparison.setTargetRect(region.targetRect)
     onSelectElement(element.id)
     onNotice(`已自动配对 ${candidate.definitionId}，可以开始自动拟合`)
+    return true
   }, [comparison, document.elements, onNotice, onSelectElement])
+  const autoQueue = useAutoFitQueue({
+    fitRun,
+    fitInput,
+    activateRegion: chooseAutoRegion,
+    onNotice,
+  })
   const overlay = target && comparison.mode !== 'split'
     ? (
         <ComparisonOverlayLayer
@@ -209,7 +220,9 @@ export function UiTunerComparisonWorkspace({
         sessionId={liveSession?.id}
         targetReady={Boolean(target)}
         onChooseRegion={chooseAutoRegion}
+        onAnalysisChange={setAutoAnalysis}
       />
+      <AutoFitQueuePanel analysis={autoAnalysis} queue={autoQueue} />
       <UiFitRunPanel fitRun={fitRun} pairReady={Boolean(fitInput)} />
       {target && (
         <CalibrationPanel

@@ -8,12 +8,14 @@ interface DesignDiffRegionsPanelProps {
   sessionId?: string
   targetReady: boolean
   onChooseRegion: (region: DesignDiffRegion) => void
+  onAnalysisChange?: (analysis: DesignDiffRegionAnalysis | null) => void
 }
 
 export function DesignDiffRegionsPanel({
   sessionId,
   targetReady,
   onChooseRegion,
+  onAnalysisChange,
 }: DesignDiffRegionsPanelProps) {
   const [analysis, setAnalysis] = useState<DesignDiffRegionAnalysis | null>(null)
   const [loading, setLoading] = useState(false)
@@ -24,7 +26,9 @@ export function DesignDiffRegionsPanel({
     setLoading(true)
     setError('')
     try {
-      setAnalysis(await analyzeDesignDiffRegions(sessionId))
+      const next = await analyzeDesignDiffRegions(sessionId)
+      setAnalysis(next)
+      onAnalysisChange?.(next)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '设计稿差异识别失败')
     } finally {

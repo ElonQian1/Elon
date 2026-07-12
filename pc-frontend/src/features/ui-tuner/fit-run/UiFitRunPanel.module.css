@@ -1,3 +1,75 @@
+.queuePanel {
+  flex: 0 0 auto;
+  display: grid;
+  gap: 7px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: #11151b;
+}
+
+.queuePanel header,
+.queuePanel header > div,
+.queuePanel header button,
+.queueProgress {
+  display: flex;
+  align-items: center;
+}
+
+.queuePanel header {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.queuePanel header > div { gap: 9px; }
+.queuePanel header strong { color: var(--text-primary); font-size: 11px; }
+.queuePanel header span { color: var(--text-tertiary); font-size: 10px; }
+
+.queuePanel header button {
+  height: 27px;
+  gap: 5px;
+  padding: 0 10px;
+  border: 1px solid rgba(117, 231, 177, .44);
+  border-radius: 6px;
+  background: rgba(117, 231, 177, .1);
+  color: #cffff0;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.queuePanel header button:disabled { cursor: not-allowed; opacity: .4; }
+
+.queueProgress {
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.queueProgress span {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.queueProgress .queueCurrent {
+  border-color: #59d7ff;
+  background: rgba(89, 215, 255, .14);
+  color: #dff8ff;
+}
+
+.queueProgress .queueDone {
+  border-color: #75e7b1;
+  background: rgba(117, 231, 177, .14);
+  color: #cffff0;
+}
+
+.queueError { margin: 0; color: #ff9b9b; font-size: 10px; }
+
 .panel {
   display: grid;
   gap: 10px;
