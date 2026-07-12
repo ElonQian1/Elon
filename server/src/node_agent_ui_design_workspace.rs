@@ -61,7 +61,8 @@ pub(crate) fn prepare_ui_design_workspace(
          - structured task: {}\n\
          - local attachment manifest: {}\n\
          - cached project UI profile: {}\n\
-         For CREATE_NEW, use the profile's component/theme/navigation candidates to create a Preview-first screen. Do not scan the whole repository unless these indexes are insufficient.",
+         For CREATE_NEW, use the profile's component/theme/navigation candidates to create a Preview-first screen. Do not scan the whole repository unless these indexes are insufficient.\n\
+         Continue through first compile, ui_prepare_debug_runtime, real-renderer FitRun, source write-back and patch-free build verification; a source-only scaffold is not a completed UI task.",
         task_path.display(),
         attachment_path.display(),
         profile_path.display(),

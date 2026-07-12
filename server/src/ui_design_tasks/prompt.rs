@@ -33,8 +33,13 @@ pub(crate) fn append_ui_design_task_context(
          - {mode_contract}\n\
          - {image_contract}\n\
          - Prefer project UI profile, component catalog, design tokens and targeted source bundles over scanning the whole repository.\n\
-         - Once a real Preview/Runtime node exists, use yilong-ui-live tools for numeric fitting and deterministic style commits.\n\
-         - Runtime patches are previews only; completion requires source write-back and a patch-free build verification when requireBuildVerification is true."
+         - Do not stop after writing a skeleton or source file. For CREATE_NEW/EXTEND_EXISTING, compile and call ui_prepare_debug_runtime so the real Android Renderer becomes the authority.\n\
+         - Bind only a clean TARGET_DESIGN with ui_bind_target_design. Map annotated requests with ui_map_annotations_to_nodes instead of comparing annotation pixels.\n\
+         - Once a real Preview/Runtime node exists, start a persistent ui_start_fit_run for each target region. Let its local solver perform numeric trials without model tokens.\n\
+         - If a FitRun reaches AWAITING_CODEX, use its compact handoff to make the smallest structural/source change, report it with ui_control_fit_run, and let the run continue.\n\
+         - If a FitRun reaches CANDIDATE_READY, confirm it with ACCEPT_BEST so deterministic write-back, patch-free build verification and reusable learning can finish.\n\
+         - Runtime patches are previews only; never report completion until source write-back and patch-free build verification pass when requireBuildVerification is true.\n\
+         - Finish with a concise Chinese result containing created/changed files, FitRun outcomes, final visual loss, verification status, APK result and any remaining human decision."
     ))
 }
 
