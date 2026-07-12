@@ -96,10 +96,16 @@ impl FitCase {
 pub(crate) fn translation_features(run: &FitRunDocument) -> FitTranslationFeatures {
     let viewport_width = run.environment.viewport_width.map(f64::from);
     let viewport_height = run.environment.viewport_height.map(f64::from);
-    let target_width = rect_width(run.pair.projected_target_rect);
-    let target_height = rect_height(run.pair.projected_target_rect);
-    let current_width = rect_width(run.pair.current_rect);
-    let current_height = rect_height(run.pair.current_rect);
+    let target_width = extent(
+        run.pair.projected_target_rect.left,
+        run.pair.projected_target_rect.right,
+    );
+    let target_height = extent(
+        run.pair.projected_target_rect.top,
+        run.pair.projected_target_rect.bottom,
+    );
+    let current_width = extent(run.pair.current_rect.left, run.pair.current_rect.right);
+    let current_height = extent(run.pair.current_rect.top, run.pair.current_rect.bottom);
     FitTranslationFeatures {
         parent_layout_kind: run
             .pair
@@ -119,12 +125,8 @@ pub(crate) fn translation_features(run: &FitRunDocument) -> FitTranslationFeatur
     }
 }
 
-fn rect_width(rect: super::super::fit_run::FitRect) -> Option<f64> {
-    (rect.right > rect.left).then(|| f64::from(rect.right - rect.left))
-}
-
-fn rect_height(rect: super::super::fit_run::FitRect) -> Option<f64> {
-    (rect.bottom > rect.top).then(|| f64::from(rect.bottom - rect.top))
+fn extent(start: i32, end: i32) -> Option<f64> {
+    (end > start).then(|| f64::from(end - start))
 }
 
 fn ratio(numerator: Option<f64>, denominator: Option<f64>) -> Option<f64> {
