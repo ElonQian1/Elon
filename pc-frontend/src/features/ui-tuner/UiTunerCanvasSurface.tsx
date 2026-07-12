@@ -68,7 +68,10 @@ export function UiTunerCanvasSurface({
         style={{ width: canvas.width * viewScale, height: canvas.height * viewScale }}
       >
         <div
-          className={styles.canvas}
+          className={[
+            styles.canvas,
+            realRenderer && runtimeGestureActive ? styles.runtimeGestureCanvas : '',
+          ].join(' ')}
           style={{
             width: canvas.width,
             height: canvas.height,
@@ -125,7 +128,9 @@ export function UiTunerCanvasSurface({
                 data-runtime-node-id={realRenderer ? element.runtime?.nodeId : undefined}
                 className={[
                   styles.canvasElement,
-                  element.id === selectedId ? styles.selectedElement : '',
+                  element.id === selectedId && !(realRenderer && runtimeGestureActive)
+                    ? styles.selectedElement
+                    : '',
                   analysis.appearance === 'ghost'
                     ? styles.ghostElement
                     : analysis.appearance === 'outline'
@@ -155,7 +160,7 @@ export function UiTunerCanvasSurface({
                 }}
               >
                 {!realRenderer && <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>}
-                {realRenderer && element.id === selectedId && runtimeCanResize && (
+                {realRenderer && !runtimeGestureActive && element.id === selectedId && runtimeCanResize && (
                   <span
                     className={styles.runtimeResizeHandle}
                     aria-label="拖动缩放真实 Android 组件"

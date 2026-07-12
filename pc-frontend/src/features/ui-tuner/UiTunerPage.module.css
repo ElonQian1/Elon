@@ -371,6 +371,13 @@
   cursor: move;
 }
 
+.runtimeGestureCanvas .runtimeHitTarget,
+.runtimeGestureCanvas .runtimeHitTarget:hover {
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 .runtimeSurfaceLive,
 .runtimeSurfaceFrozen {
   position: sticky;
