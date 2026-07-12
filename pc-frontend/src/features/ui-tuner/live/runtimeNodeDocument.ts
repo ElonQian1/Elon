@@ -132,9 +132,13 @@ function runtimeStyle(node: LiveUiNode): UiTunerRuntimeStyle {
   const fontSize = numeric(node, 'textSize', 13)
   return {
     fontSize,
-    lineHeight: Math.max(fontSize + 4, Math.round(node.geometry.boundsInDisplayPx.height / node.geometry.density)),
-    fontWeight: 500,
-    letterSpacing: 0,
+    lineHeight: numeric(
+      node,
+      'lineHeight',
+      Math.max(fontSize + 4, Math.round(node.geometry.boundsInDisplayPx.height / node.geometry.density)),
+    ),
+    fontWeight: numeric(node, 'fontWeight', 500),
+    letterSpacing: numeric(node, 'letterSpacing'),
     paddingX: Math.round((start + end) / 2),
     paddingY: Math.round((top + bottom) / 2),
     borderRadius: numeric(node, 'cornerRadius.all'),

@@ -63,6 +63,9 @@ const NUMBER_FIELDS = [
   ['margin.bottom', '下外距', 'dp', -96, 192],
   ['cornerRadius.all', '圆角', 'dp', 0, 96],
   ['textSize', '字号', 'sp', 8, 96],
+  ['fontWeight', '字重', 'float', 100, 900],
+  ['lineHeight', '行高', 'sp', 8, 160],
+  ['letterSpacing', '字距', 'float', -0.1, 0.3],
   ['borderWidth', '边框', 'dp', 0, 32],
   ['opacity', '透明度', 'float', 0, 1],
 ] as const
@@ -198,7 +201,7 @@ export function UiTunerLivePanel({
                 label={label}
                 value={numberValue(node, property)}
                 disabled={busy}
-                step={property === 'opacity' ? 0.05 : 1}
+                step={numericStep(property)}
                 minimum={node.properties[property]?.constraints?.minimum ?? minimum}
                 maximum={node.properties[property]?.constraints?.maximum ?? maximum}
                 onGestureActive={onGestureActive}
@@ -590,6 +593,9 @@ function optimisticPatch(property: string, value: number | string): Partial<UiTu
     case 'padding.bottom': return { paddingY: Number(value) }
     case 'cornerRadius.all': return { borderRadius: Number(value) }
     case 'textSize': return { fontSize: Number(value) }
+    case 'fontWeight': return { fontWeight: Number(value) }
+    case 'lineHeight': return { lineHeight: Number(value) }
+    case 'letterSpacing': return { letterSpacing: Number(value) }
     case 'borderWidth': return { borderWidth: Number(value) }
     case 'opacity': return { opacity: Number(value) }
     case 'backgroundColor': return { background: normalizeCssColor(String(value)) }
@@ -597,6 +603,13 @@ function optimisticPatch(property: string, value: number | string): Partial<UiTu
     case 'borderColor': return { borderColor: normalizeCssColor(String(value)) }
     default: return {}
   }
+}
+
+function numericStep(property: string) {
+  if (property === 'opacity') return 0.05
+  if (property === 'letterSpacing') return 0.01
+  if (property === 'fontWeight') return 100
+  return 1
 }
 
 function normalizeCssColor(value: string) {

@@ -272,8 +272,8 @@ export function UiTunerComparisonWorkspace({
 const SOLVER_PROPERTIES = new Set([
   'width', 'height', 'opacity', 'padding.start', 'padding.top', 'padding.end',
   'padding.bottom', 'margin.start', 'margin.top', 'margin.end', 'margin.bottom',
-  'cornerRadius.all', 'textSize', 'borderWidth', 'backgroundColor', 'contentColor',
-  'borderColor',
+  'cornerRadius.all', 'textSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+  'borderWidth', 'backgroundColor', 'contentColor', 'borderColor',
 ])
 
 function parentLayoutKind(node: LiveUiNode, nodes: LiveUiNode[]) {
