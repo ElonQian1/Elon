@@ -175,7 +175,7 @@ impl FitRunService {
     }
 }
 
-fn validate_batch_request(request: &BatchAcceptRequest) -> Result<()> {
+pub(super) fn validate_batch_request(request: &BatchAcceptRequest) -> Result<()> {
     if request.run_ids.is_empty() || request.run_ids.len() > 64 {
         bail!("runIds 必须包含 1..64 个拟合任务");
     }

@@ -15,6 +15,8 @@ use crate::node_agent_android_live::broker::LiveUiBroker;
 use crate::node_agent_android_live::fit_learning::{record_and_promote, FitUserDecision};
 
 mod batch_accept;
+#[cfg(test)]
+mod batch_accept_tests;
 mod command_application;
 
 pub(crate) use batch_accept::{BatchAcceptRequest, BatchAcceptResult};
