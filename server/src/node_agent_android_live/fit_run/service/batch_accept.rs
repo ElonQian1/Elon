@@ -55,7 +55,12 @@ impl FitRunService {
             .ok_or_else(|| anyhow!("批量拟合验收只支持真实 Android Live Runtime"))?;
         let session = broker.session(&context.session_id).await?;
         let ir = load_or_build_ui_ir(broker, &context.session_id).await?;
-        let mut runs = request
+        if !request.codex_completed
+            && context.source_revision.as_deref() != Some(request.source_revision.as_str())
+        {
+            bail!("工作区源码已在批量拟合期间变化，请重新生成批量计划");
+        }
+        let runs = request
             .run_ids
             .iter()
             .map(|run_id| self.store.load(&context.project_root, run_id))
@@ -67,11 +72,6 @@ impl FitRunService {
             }
             if run.phase != FitRunPhase::CandidateReady {
                 bail!("FitRun {} 尚未达到 CANDIDATE_READY", run.run_id);
-            }
-            if !request.codex_completed
-                && run.source_revision.as_deref() != Some(request.source_revision.as_str())
-            {
-                bail!("FitRun {} 的源码基线已经变化", run.run_id);
             }
         }
         if request.codex_completed {
