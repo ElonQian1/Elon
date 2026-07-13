@@ -7,6 +7,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[cfg(windows)]
+use std::ffi::c_void;
+
 pub(crate) const ACTIVE_LEASE_TTL_SECS: u64 = 24 * 60 * 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,6 +19,8 @@ pub(crate) struct LeaseRecord {
     pub(crate) toolchain_key: String,
     pub(crate) temp_path: String,
     pub(crate) created_at_unix_secs: u64,
+    #[serde(default)]
+    pub(crate) process_id: u32,
 }
 
 #[derive(Debug)]
@@ -40,6 +45,7 @@ impl BuildRunLease {
             toolchain_key: paths.toolchain_key.clone(),
             temp_path: paths.task_temp.to_string_lossy().to_string(),
             created_at_unix_secs: unix_now(),
+            process_id: std::process::id(),
         };
         let mut file = OpenOptions::new()
             .write(true)
@@ -89,5 +95,54 @@ fn lease_is_stale(path: &Path) -> bool {
         .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|duration| duration.as_secs())
         .unwrap_or(0);
-    unix_now().saturating_sub(modified) > ACTIVE_LEASE_TTL_SECS
+    if unix_now().saturating_sub(modified) <= ACTIVE_LEASE_TTL_SECS {
+        return false;
+    }
+    let process_id = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|payload| serde_json::from_str::<LeaseRecord>(&payload).ok())
+        .map(|record| record.process_id)
+        .unwrap_or_default();
+    process_id == 0 || !process_is_running(process_id)
+}
+
+#[cfg(windows)]
+fn process_is_running(process_id: u32) -> bool {
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    const STILL_ACTIVE: u32 = 259;
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
+        if handle.is_null() {
+            return false;
+        }
+        let mut exit_code = 0_u32;
+        let running = GetExitCodeProcess(handle, &mut exit_code) != 0 && exit_code == STILL_ACTIVE;
+        CloseHandle(handle);
+        running
+    }
+}
+
+#[cfg(windows)]
+unsafe extern "system" {
+    fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32) -> *mut c_void;
+    fn GetExitCodeProcess(process: *mut c_void, exit_code: *mut u32) -> i32;
+    fn CloseHandle(object: *mut c_void) -> i32;
+}
+
+#[cfg(not(windows))]
+fn process_is_running(process_id: u32) -> bool {
+    unsafe { kill(process_id as i32, 0) == 0 }
+}
+
+#[cfg(not(windows))]
+unsafe extern "C" {
+    fn kill(process_id: i32, signal: i32) -> i32;
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn current_process_is_reported_running() {
+        assert!(super::process_is_running(std::process::id()));
+    }
 }
