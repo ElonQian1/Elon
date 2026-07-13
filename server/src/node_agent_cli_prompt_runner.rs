@@ -355,6 +355,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "-m");
                 push_tracked_arg(&mut cmd, &mut sidecar_args, model);
             } else if let Some(effort) = a.strip_prefix("--codex-effort=") {
+                let effort = crate::node_agent_codex_effort::normalize_codex_reasoning_effort(effort);
                 push_tracked_arg(&mut cmd, &mut sidecar_args, "-c");
                 push_tracked_arg(
                     &mut cmd,

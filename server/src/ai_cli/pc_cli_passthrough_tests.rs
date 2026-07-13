@@ -118,6 +118,14 @@ fn pc_project_codex_defaults_to_medium_effort() {
         Some("high")
     );
     assert_eq!(
+        pc_project_reasoning_effort("codex", Some("ultra"), AiCliRequestMode::Execute).as_deref(),
+        Some("xhigh")
+    );
+    assert_eq!(
+        pc_project_reasoning_effort("codex", Some("unexpected"), AiCliRequestMode::Execute).as_deref(),
+        Some("medium")
+    );
+    assert_eq!(
         pc_project_reasoning_effort("copilot", None, AiCliRequestMode::Execute),
         None
     );

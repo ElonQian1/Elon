@@ -9,6 +9,18 @@ pub(super) const PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT: &str = "medium";
 pub(super) const PC_AGENT_CLI_RECV_TIMEOUT_ENV: &str = "ELON_PC_AGENT_CLI_RECV_TIMEOUT_SECS";
 pub(super) const PC_AGENT_CLI_RECV_TIMEOUT_GRACE_SECS: u64 = 45;
 
+fn normalize_codex_reasoning_effort(value: &str, fallback: &str) -> String {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "none" => "none".to_string(),
+        "minimal" => "minimal".to_string(),
+        "low" => "low".to_string(),
+        "medium" => "medium".to_string(),
+        "high" => "high".to_string(),
+        "xhigh" | "max" | "ultra" | "extra_high" => "xhigh".to_string(),
+        _ => fallback.to_string(),
+    }
+}
+
 pub(super) fn pc_lightweight_chat_reasoning_effort(
     cli_name: &str,
     requested_effort: Option<&str>,
@@ -20,8 +32,8 @@ pub(super) fn pc_lightweight_chat_reasoning_effort(
     let clean = requested_effort
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .unwrap_or("low")
-        .to_ascii_lowercase();
+        .map(|value| normalize_codex_reasoning_effort(value, "low"))
+        .unwrap_or_else(|| "low".to_string());
 
     match clean.as_str() {
         "high" | "xhigh" => Some("low".to_string()),
@@ -41,7 +53,7 @@ pub(super) fn pc_project_reasoning_effort(
     let clean = requested_effort
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(str::to_ascii_lowercase);
+        .map(|value| normalize_codex_reasoning_effort(value, PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT));
 
     clean.or_else(|| {
         if request_mode.is_passthrough() {

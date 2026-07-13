@@ -152,6 +152,7 @@ pub(crate) use node_agent_runtime::NodeRuntime;
 mod node_agent_cli_mcp;
 mod node_agent_cli_prompt_direct;
 mod node_agent_cli_prompt_runner;
+mod node_agent_codex_effort;
 pub(crate) use node_agent_cli_prompt_runner::{
     cli_prompt_read_only,
     resolve_attachment_args,
