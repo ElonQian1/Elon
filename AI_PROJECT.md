@@ -46,6 +46,21 @@ elon 是一个通过持续讨论把模糊想法变成可交付应用的 AI 开�
 - 向量层：已有本地 `local-hash-v1` embedding provider 和 `embeddings` 表；schema 支持同一 chunk 存多个模型向量。
 - 验证闭环：patch plan、dry run、review、verification、repair context、目标测试建议。
 
+## 当前共享 Android 真机（项目记忆）
+
+`elon-self` 项目当前共享真机如下。PC 节点和 AI 排查无线 ADB 时，以硬件序列号作为稳定身份，不要把局域网 IP、无线 ADB 端口或 mDNS 冲突后缀当成永久身份。
+
+| 字段 | 当前值 |
+|---|---|
+| 显示名 | `HONOR AAK-AN00` |
+| 厂商 / 型号 | `HONOR` / `AAK-AN00` |
+| Android | Android 16（SDK 36） |
+| 硬件序列号（稳定身份） | `ASUJ6R6324002425` |
+| 最近可用无线端点（2026-07-13） | `192.168.31.83:36115` |
+| 最近发现的 TLS mDNS 选择器 | `adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp` |
+
+连接约定：每台已登录项目的 PC 节点都应同步该共享设备档案，先按硬件序列号通过 `_adb-tls-connect._tcp` 发现当前端点，再尝试最近端点；发现新端点后回写共享档案。`(3)`、IP 和端口都可能变化。新电脑第一次连接仍必须由手机端完成无线调试配对/ADB 授权；禁止在项目文档、云端档案或 Git 中共享 `adbkey` 等私钥。PC 本地节点管理端口也可能位于 `7799-7819`，网页应使用 `node_admin` 或自动探测结果，不能写死 `7799`。
+
 ## 还没完全做到的部分
 
 这些是后续最有价值的完善方向：
