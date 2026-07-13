@@ -228,6 +228,7 @@ mod ui_tuner_api;
 mod ui_tuner_context;
 mod ui_tuner_store_migration;
 mod ui_route_learning_migration;
+mod project_android_devices_migration;
 mod user_agent_probe;
 mod user_agent_readiness;
 mod user_agent_secrets;

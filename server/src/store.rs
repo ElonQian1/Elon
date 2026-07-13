@@ -88,6 +88,7 @@ mod user_presence;
 mod user_progression;
 mod users;
 mod ui_route_learning;
+mod project_android_devices;
 pub use admin_stats::{
     estimate_cost_cny, AdminAccountingAuditRow, AdminDayRow, AdminFeatureRow, AdminModelRow,
     AdminPlatformSummary, AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
@@ -153,6 +154,7 @@ pub use user_progression::UserProgressionLedger;
 pub(crate) use ui_route_learning::{
     UiLearnedRoute, UiRouteLearningEntry, UiRouteLearningSource,
 };
+pub(crate) use project_android_devices::ProjectAndroidDevice;
 pub struct Store {
     conn: Mutex<Connection>,
 }

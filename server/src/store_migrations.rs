@@ -132,6 +132,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (95, "消息 1 分钟内撤回状态", crate::message_recall_migration::migration_v95),
     (96, "项目模块长期会话、记忆、上下文工件与稳定检查点", crate::ui_tuner_store_migration::migration_v96),
     (97, "UI 任务路由经验库、晋升状态与审计事件", crate::ui_route_learning_migration::migration_v97),
+    (98, "项目级 Android 测试设备共享档案", crate::project_android_devices_migration::migration_v98),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

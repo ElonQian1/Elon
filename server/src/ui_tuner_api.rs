@@ -2,17 +2,18 @@ use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
     Json, Router,
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
+use std::{net::{IpAddr, SocketAddr}, str::FromStr, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     store::{
-        CreateUiTunerContextArtifact, UiLearnedRoute, UiRouteLearningSource,
+        CreateUiTunerContextArtifact, ProjectAndroidDevice, UiLearnedRoute,
+        UiRouteLearningSource,
     },
     types::AppState,
 };
@@ -49,6 +50,140 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/modules/ui-tuner/route-learning/:entry_id",
             patch(revoke_route_learning),
         )
+        .route(
+            "/api/projects/:project_id/modules/ui-tuner/shared-android-devices",
+            get(list_shared_android_devices).post(upsert_shared_android_device),
+        )
+        .route(
+            "/api/projects/:project_id/modules/ui-tuner/shared-android-devices/:hardware_serial",
+            delete(delete_shared_android_device),
+        )
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SharedAndroidDeviceBody {
+    hardware_serial: String,
+    display_name: String,
+    manufacturer: Option<String>,
+    model: Option<String>,
+    android_sdk: Option<u32>,
+    android_release: Option<String>,
+    last_endpoint: String,
+    wireless_mode: Option<String>,
+}
+
+async fn list_shared_android_devices(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    if let Err(response) = authorized_developer(&state, &headers, &project_id) {
+        return response;
+    }
+    match state.store.list_project_android_devices(&project_id) {
+        Ok(devices) => Json(serde_json::json!({ "devices": devices })).into_response(),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    }
+}
+
+async fn upsert_shared_android_device(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(body): Json<SharedAndroidDeviceBody>,
+) -> Response {
+    let user = match authorized_developer(&state, &headers, &project_id) {
+        Ok(user) => user,
+        Err(response) => return response,
+    };
+    let hardware_serial = body.hardware_serial.trim();
+    if hardware_serial.is_empty()
+        || hardware_serial.len() > 128
+        || !hardware_serial
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+    {
+        return json_error(StatusCode::BAD_REQUEST, "hardwareSerial 格式不合法");
+    }
+    let display_name = body.display_name.trim();
+    if display_name.is_empty() || display_name.chars().count() > 80 {
+        return json_error(StatusCode::BAD_REQUEST, "displayName 不能为空且不能超过 80 字");
+    }
+    let endpoint = match private_adb_endpoint(&body.last_endpoint) {
+        Ok(endpoint) => endpoint,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+    };
+    let wireless_mode = body
+        .wireless_mode
+        .as_deref()
+        .unwrap_or("unknown")
+        .trim()
+        .to_ascii_lowercase();
+    if !matches!(wireless_mode.as_str(), "unknown" | "legacy" | "tls" | "manual") {
+        return json_error(StatusCode::BAD_REQUEST, "wirelessMode 不受支持");
+    }
+    let device = ProjectAndroidDevice {
+        project_id: project_id.clone(),
+        hardware_serial: hardware_serial.to_string(),
+        display_name: display_name.to_string(),
+        manufacturer: clean_shared_text(body.manufacturer, 80),
+        model: clean_shared_text(body.model, 80),
+        android_sdk: body.android_sdk,
+        android_release: clean_shared_text(body.android_release, 40),
+        last_endpoint: endpoint,
+        wireless_mode,
+        updated_by_user_id: user.id.clone(),
+        created_at: String::new(),
+        updated_at: String::new(),
+    };
+    match state
+        .store
+        .upsert_project_android_device(&project_id, &user.id, &device)
+    {
+        Ok(device) => Json(device).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
+}
+
+async fn delete_shared_android_device(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, hardware_serial)): Path<(String, String)>,
+) -> Response {
+    if let Err(response) = authorized_developer(&state, &headers, &project_id) {
+        return response;
+    }
+    match state
+        .store
+        .delete_project_android_device(&project_id, &hardware_serial)
+    {
+        Ok(removed) => Json(serde_json::json!({ "removed": removed })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
+}
+
+fn private_adb_endpoint(value: &str) -> Result<String, &'static str> {
+    let endpoint = value.trim();
+    let address = SocketAddr::from_str(endpoint)
+        .map_err(|_| "lastEndpoint 必须是私网 IP:端口")?;
+    if address.port() == 0 {
+        return Err("lastEndpoint 端口无效");
+    }
+    let private = match address.ip() {
+        IpAddr::V4(ip) => ip.is_private(),
+        IpAddr::V6(ip) => ip.is_unique_local(),
+    };
+    if !private {
+        return Err("只允许共享局域网私有 IP，禁止公网或回环地址");
+    }
+    Ok(address.to_string())
+}
+
+fn clean_shared_text(value: Option<String>, limit: usize) -> Option<String> {
+    value
+        .map(|value| value.trim().chars().take(limit).collect::<String>())
+        .filter(|value| !value.is_empty())
 }
 
 #[derive(Deserialize)]
@@ -392,4 +527,20 @@ fn bounded_memory_values(values: Vec<String>) -> Vec<String> {
         .filter(|value| !value.is_empty())
         .take(24)
         .collect()
+}
+
+#[cfg(test)]
+mod shared_device_tests {
+    use super::private_adb_endpoint;
+
+    #[test]
+    fn accepts_only_private_lan_adb_endpoints() {
+        assert_eq!(
+            private_adb_endpoint("192.168.31.171:5555").unwrap(),
+            "192.168.31.171:5555"
+        );
+        assert!(private_adb_endpoint("8.8.8.8:5555").is_err());
+        assert!(private_adb_endpoint("127.0.0.1:5555").is_err());
+        assert!(private_adb_endpoint("example.com:5555").is_err());
+    }
 }
