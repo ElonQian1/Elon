@@ -14,8 +14,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
-    project_events,
-    project_landing,
+    project_events, project_landing,
     project_mobile::ensure_mobile_project,
     store::{
         ProjectAccess, PublicUser, CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND,
@@ -32,29 +31,29 @@ const DOCS_CHANNEL_KIND: &str = "docs";
 const CHANNEL_AI_CANCEL_MESSAGE: &str = "用户已停止 AI 开发任务。";
 
 mod channel_ai;
+mod channel_ai_resume;
 mod channel_ai_spawn;
 mod channel_messages;
 mod member_conversations;
 mod permissions;
 
 pub use channel_ai::{
-    cancel_channel_ai_task, cancel_user_project_channel_ai_task,
-    decide_channel_ai_tool_approval, decide_user_project_channel_ai_tool_approval,
-    start_channel_ai_task, start_user_project_channel_ai_task,
-    summarize_channel_selection, summarize_user_project_channel_selection,
+    cancel_channel_ai_task, cancel_user_project_channel_ai_task, decide_channel_ai_tool_approval,
+    decide_user_project_channel_ai_tool_approval, start_channel_ai_task,
+    start_user_project_channel_ai_task, summarize_channel_selection,
+    summarize_user_project_channel_selection,
 };
 pub use channel_messages::{
-    list_channel_messages, list_user_project_channel_messages,
-    recall_channel_message, recall_user_project_channel_message,
-    send_channel_message, send_user_project_channel_message,
+    list_channel_messages, list_user_project_channel_messages, recall_channel_message,
+    recall_user_project_channel_message, send_channel_message, send_user_project_channel_message,
 };
 pub use member_conversations::{
-    list_member_conversation_messages, list_member_conversations,
-    send_member_conversation_message, update_member_conversation_visibility,
+    list_member_conversation_messages, list_member_conversations, send_member_conversation_message,
+    update_member_conversation_visibility,
 };
 pub use permissions::{
-    get_channel_category_permissions, get_channel_permissions,
-    update_channel_category_permissions, update_channel_permissions,
+    get_channel_category_permissions, get_channel_permissions, update_channel_category_permissions,
+    update_channel_permissions,
 };
 
 #[derive(Deserialize)]
@@ -412,7 +411,6 @@ fn publish_channel_message_updated(
     );
 }
 
-
 // 鈹€鈹€鈹€ 瀛愭ā鍧楀叡浜伐鍏凤紙pub(super) 瀵规墍鏈?project_space 瀛愭ā鍧楀彲瑙侊級鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 fn ensure_project_member_can_speak(
@@ -590,4 +588,3 @@ fn ensure_user_project_for_space(
     ensure_mobile_project(state, &effective_user_id, project_id, project_title)
         .map_err(|e| json_error(StatusCode::BAD_REQUEST, e.to_string()))
 }
-

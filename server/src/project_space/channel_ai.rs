@@ -23,6 +23,7 @@ use super::{
     project_space_access, publish_channel_message_updated, DOCS_CHANNEL_KIND,
 };
 
+use super::channel_ai_resume::resolve_channel_ai_task_start;
 use super::channel_ai_spawn::{spawn_channel_ai_task, BlankFallback, ChannelAiTask};
 
 #[derive(Deserialize)]
@@ -57,6 +58,8 @@ pub struct StartChannelAiTaskRequest {
     pub module_key: Option<String>,
     #[serde(default, alias = "contextArtifactId")]
     pub context_artifact_id: Option<String>,
+    #[serde(default, alias = "resumeTaskId", alias = "sourceTaskId")]
+    pub resume_task_id: Option<String>,
     pub trace_id: Option<String>,
 }
 
@@ -423,8 +426,8 @@ async fn start_channel_ai_task_response(
             "只有 AI开发 频道可以发起项目 AI 开发任务",
         );
     }
-    let content = req.content.trim().to_string();
-    if content.is_empty() {
+    let requested_content = req.content.trim().to_string();
+    if requested_content.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "content 不能为空");
     }
     let runtime_route = match req.runtime_route.as_deref() {
@@ -478,9 +481,24 @@ async fn start_channel_ai_task_response(
         }
     }
 
+    let resolved_start = match resolve_channel_ai_task_start(
+        state.as_ref(),
+        &project_id,
+        &channel_id,
+        &user_id,
+        &requested_content,
+        req.conversation_id.as_deref(),
+        req.resume_task_id.as_deref(),
+    ) {
+        Ok(start) => start,
+        Err((status, message)) => return json_error(status, message),
+    };
+    let content = resolved_start.content;
+    let display_content = resolved_start.display_content;
+    let source_task_id = resolved_start.source_task_id;
     let fallback_conversation_id = format!("channel-{}", channel_id);
     let fallback_conversation_title = format!("项目频道 {}", channel_id);
-    let conversation_id_hint = req
+    let conversation_id_hint = resolved_start
         .conversation_id
         .as_deref()
         .map(str::trim)
@@ -569,7 +587,7 @@ async fn start_channel_ai_task_response(
         &channel_id,
         Some(&user_id),
         "ai_task",
-        &format!("发起 AI 开发任务：{}", content),
+        &format!("发起 AI 开发任务：{}", display_content),
         Some(&task_id),
         None,
     ) {
@@ -607,6 +625,7 @@ async fn start_channel_ai_task_response(
         "task_id": task_id,
         "trace_id": trace_id,
         "conversation_id": conversation_id,
+        "source_task_id": source_task_id,
         "message": task_message,
     }))
     .into_response()

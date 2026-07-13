@@ -74,7 +74,7 @@ interface ProjectState {
     channelIdOverride?: string | null,
     directPcCli?: boolean,
     attachments?: ProjectAttachmentRef[],
-    taskContext?: { moduleKey?: string; contextArtifactId?: string },
+    taskContext?: { moduleKey?: string; contextArtifactId?: string; resumeTaskId?: string },
   ) => Promise<SendMessageResponse | null>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
@@ -347,7 +347,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     channelIdOverride?: string | null,
     directPcCli?: boolean,
     attachments?: ProjectAttachmentRef[],
-    taskContext?: { moduleKey?: string; contextArtifactId?: string },
+    taskContext?: { moduleKey?: string; contextArtifactId?: string; resumeTaskId?: string },
   ) => {
     const { activeProjectId, activeChannelId } = get()
     const channelId = channelIdOverride || activeChannelId
@@ -368,6 +368,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           attachments: attachments?.length ? attachments : undefined,
           moduleKey: taskContext?.moduleKey,
           contextArtifactId: taskContext?.contextArtifactId,
+          resumeTaskId: taskContext?.resumeTaskId,
         },
       )
       // 立即刷新消息

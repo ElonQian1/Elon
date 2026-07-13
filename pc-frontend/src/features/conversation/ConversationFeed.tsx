@@ -16,6 +16,8 @@ interface ConversationFeedProps {
   isDevChannel: boolean
   user: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   sendingMessage: boolean
+  localNodeReady?: boolean
+  localNodeRequired?: boolean
   onScroll: UIEventHandler<HTMLDivElement>
   onCancelTask: (id: string) => Promise<void>
   onContinueTask: (id: string) => Promise<void>
@@ -35,6 +37,8 @@ export default function ConversationFeed({
   isDevChannel,
   user,
   sendingMessage,
+  localNodeReady = true,
+  localNodeRequired = false,
   onScroll,
   onCancelTask,
   onContinueTask,
@@ -68,6 +72,8 @@ export default function ConversationFeed({
               onCancel={onCancelTask}
               onContinue={onContinueTask}
               onApprove={onApproveTool}
+              localNodeReady={localNodeReady}
+              localNodeRequired={localNodeRequired}
               expandAll={debugExpandAll}
               debugOpenProcess={debugOpenProcess}
             />

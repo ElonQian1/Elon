@@ -7,7 +7,7 @@ import { selectedAgentForRuntimeRoute } from '../models/routeModelPolicy'
 import type { AgentOption } from '../models/types'
 import { ensureLocalFullAccessGrant } from './localPcRuntime'
 import type { RuntimeRoute } from './runtimeRoutes'
-import type { SendMessageResponse } from './types'
+import type { ProjectAttachmentRef, SendMessageResponse } from './types'
 
 type SessionView = string | 'new' | null
 
@@ -21,6 +21,8 @@ type SendMessageFn = (
   localWorkspacePath?: string | null,
   channelIdOverride?: string | null,
   directPcCli?: boolean,
+  attachments?: ProjectAttachmentRef[],
+  taskContext?: { moduleKey?: string; contextArtifactId?: string; resumeTaskId?: string },
 ) => Promise<SendMessageResponse | null>
 
 interface UseConversationTaskActionsOptions {
@@ -83,10 +85,19 @@ export function useConversationTaskActions({
   }, [activeProjectId, refreshTaskSurface, setSendError, taskActionChannelId])
 
   const handleContinueTask = useCallback(async (taskId: string) => {
-    if (!taskId || sendingMessage) return
+    if (!taskId) return
+    if (sendingMessage) {
+      throw new Error('当前已有任务正在发送，请稍候再继续。')
+    }
     if (!activeProjectId || !taskActionChannelId) {
-      setSendError('当前项目没有可操作的 AI 开发频道')
-      return
+      const message = '当前项目没有可操作的 AI 开发频道'
+      setSendError(message)
+      throw new Error(message)
+    }
+    if ((directPcCliActive || shouldPreferLocalNode) && !localNodeReady) {
+      const message = 'Win 端尚未恢复；原任务和会话上下文已保留，节点重连后会自动继续，无需重新发送提示词。'
+      setSendError(message)
+      throw new Error(message)
     }
     setSendError('')
     try {
@@ -106,7 +117,7 @@ export function useConversationTaskActions({
       const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
       const conversationId = isExistingConversation ? sessionView : (draftConversationId || uuidv4())
       const response = await sendMessage(
-        '继续处理这个任务。',
+        '继续上一轮任务',
         requestAgent || null,
         requestRuntimeRoute,
         conversationId,
@@ -115,12 +126,16 @@ export function useConversationTaskActions({
         useLocalNodeForRequest ? activeWorkspacePath : null,
         taskActionChannelId,
         directPcCliForRequest,
+        undefined,
+        { resumeTaskId: taskId },
       )
       setSessionView(response?.conversation_id ?? conversationId)
       waitingForNewSession.current = false
       await refreshTaskSurface()
     } catch (err) {
-      setSendError((err as { message?: string }).message ?? '继续任务失败')
+      const message = (err as { message?: string }).message ?? '继续任务失败'
+      setSendError(message)
+      throw err instanceof Error ? err : new Error(message)
     }
   }, [
     activeProjectId,

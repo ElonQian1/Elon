@@ -11,6 +11,7 @@ import { memo, useState, useEffect, useRef, type ReactNode } from 'react'
 import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
 import TaskCompletionMeta from './TaskCompletionMeta'
+import TaskTerminalActions from './TaskTerminalActions'
 import {
   TaskProgressHighlights,
   progressFlowSurfaceItems,
@@ -24,6 +25,7 @@ import { messageKind, messageText, statusForTask, taskIdOf, taskIsTerminal, task
 import { buildTaskTimeline } from './taskTimelineModel'
 import { isStatusEchoProgressText } from './taskTimelineRuntime'
 import { taskStageActionModel } from './taskStageActionModel'
+import { taskTerminalActionModel } from './taskTerminalActionModel'
 import type { TimelineItem } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
@@ -34,12 +36,25 @@ interface Props {
   user?: { nickname?: string; account?: string; avatar_data_url?: string | null } | null
   expandAll?: boolean
   debugOpenProcess?: boolean
+  localNodeReady?: boolean
+  localNodeRequired?: boolean
   onCancel?: (taskId: string) => void
-  onContinue?: (taskId: string) => void
+  onContinue?: (taskId: string) => void | Promise<void>
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
-function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpenProcess = false, onCancel, onContinue, onApprove }: Props) {
+function DevTaskGroup({
+  messages,
+  taskContext,
+  user,
+  expandAll = false,
+  debugOpenProcess = false,
+  localNodeReady = true,
+  localNodeRequired = false,
+  onCancel,
+  onContinue,
+  onApprove,
+}: Props) {
   const taskId  = taskIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
@@ -69,6 +84,11 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
   const compactCompletedProcess = isDone && !!resultMsg
   const publicAssistantItems = publicAssistantTimelineItems(timeline)
   const terminalReason = terminalReasonFromTimeline(timeline, tone)
+  const terminalAction = taskTerminalActionModel(
+    tone,
+    resultMsg ? taskResultDisplayText(resultMsg) : '',
+    terminalReason,
+  )
   const processSummary = taskThreadSummary(timeline)
   const hasPublicAssistantItems = publicAssistantItems.length > 0
   const publicAssistantItemsInConversation = !resultMsg && hasPublicAssistantItems
@@ -301,7 +321,18 @@ function DevTaskGroup({ messages, taskContext, user, expandAll = false, debugOpe
             reason={terminalReason}
             time={assistantProcessTime}
             beforeBubble={showProgressPanel ? renderProgressPanel(true, 'beforeReply') : null}
-            afterBubble={<TaskCompletionMeta timeline={timeline} />}
+            afterBubble={(
+              <>
+                <TaskTerminalActions
+                  action={terminalAction}
+                  taskId={taskId}
+                  localNodeReady={localNodeReady}
+                  localNodeRequired={localNodeRequired}
+                  onContinue={onContinue}
+                />
+                <TaskCompletionMeta timeline={timeline} />
+              </>
+            )}
           />
         </>
       )}
@@ -317,6 +348,8 @@ export default memo(DevTaskGroup, (prev, next) =>
   && prev.user?.avatar_data_url === next.user?.avatar_data_url
   && prev.expandAll === next.expandAll
   && prev.debugOpenProcess === next.debugOpenProcess
+  && prev.localNodeReady === next.localNodeReady
+  && prev.localNodeRequired === next.localNodeRequired
   && prev.onCancel === next.onCancel
   && prev.onContinue === next.onContinue
   && prev.onApprove === next.onApprove

@@ -1370,7 +1370,7 @@ export default function ConversationPage() {
             taskContext={taskContext}
             isDevChannel={isDevChannel}
             user={user}
-            sendingMessage={sendingMessage}
+            sendingMessage={sendingMessage} localNodeReady={localNodeReady} localNodeRequired={directPcCliActive || shouldPreferLocalNode}
             onScroll={handleFeedScroll} onCancelTask={handleCancelTask} onContinueTask={handleContinueTask} onApproveTool={handleApproveTool}
             onForkMessage={isOwnConversationTarget && typeof sessionView === 'string' && sessionView !== 'new' ? forkConversationMessage : undefined}
           />

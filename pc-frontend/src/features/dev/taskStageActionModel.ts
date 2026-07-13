@@ -17,10 +17,7 @@ export function taskStageActionModel(
   tone: TaskTone,
   stuck: boolean,
 ): TaskStageActionModel {
-  if (stageKey === 'approval' || tone === 'done' || tone === 'canceled') return NO_ACTION
-  if (stageKey === 'finished' && tone === 'failed') {
-    return { canContinue: true, canOpenNode: false, continueLabel: '重试任务' }
-  }
+  if (stageKey === 'approval' || stageKey === 'finished' || tone === 'done' || tone === 'canceled') return NO_ACTION
   if (stageKey === 'resume-required') {
     return { canContinue: true, canOpenNode: true, continueLabel: '继续任务' }
   }

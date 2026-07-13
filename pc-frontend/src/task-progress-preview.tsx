@@ -1,15 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { LivePreview, livePreviewConfigFromLocation } from './task-progress-live-preview'
-import ConversationFeed from './features/conversation/ConversationFeed'
-import { buildDisplayMessages, buildMessageGroups } from './features/conversation/messageFlow'
-import type { Message } from './features/conversation/types'
-import { buildContext } from './features/dev/devTaskUtils'
 import type { ChatMessage, ToolEvent } from './features/dev/types'
-
-const taskId = 'tsk_preview_20260708'
-const startedAt = '2026-07-08T10:17:00+08:00'
-const previewUser = { nickname: '钱一龙', account: 'elon', avatar_data_url: null }
+import { previewStartedAt as startedAt, previewTaskId as taskId, ScenarioPreview } from './task-progress-preview/ScenarioPreview'
 
 type ScenarioId =
   | 'queued'
@@ -31,6 +24,7 @@ type ScenarioId =
   | 'incomplete'
   | 'failed'
   | 'canceled'
+  | 'connection-interrupted'
 type ViewId = 'all' | ScenarioId
 
 interface Scenario {
@@ -38,6 +32,8 @@ interface Scenario {
   label: string
   width: number
   messages: ChatMessage[]
+  localNodeReady?: boolean
+  localNodeRequired?: boolean
 }
 
 const scenarios: Scenario[] = [
@@ -280,6 +276,26 @@ const scenarios: Scenario[] = [
       result('任务已停止。', 'canceled'),
     ],
   },
+  {
+    id: 'connection-interrupted',
+    label: '通信中断',
+    width: 960,
+    localNodeReady: false,
+    localNodeRequired: true,
+    messages: [
+      task('请做一次只读诊断，不要修改文件、不要提交、不要发布。', 'canceled'),
+      event({ type: 'pc_dispatch_started', status: 'running', message: '已获得 PC 会话执行权，开始交给 PC 节点执行。' }),
+      progress('我已经接到任务，正在读取最近提交和线上版本。'),
+      event({
+        type: 'runtime_status',
+        status: 'canceled',
+        phase: 'connection_interrupted',
+        runtime: 'codex',
+        message: 'PC 节点通信中断；服务器正在更新升级，或 Win 端正在更新升级/重启。',
+      }),
+      result('AI 开发任务通信中断。任务已停止以避免重复执行；Win 端恢复后可以直接继续原任务。', 'canceled'),
+    ],
+  },
 ]
 
 function Preview() {
@@ -360,87 +376,6 @@ function updatePreviewLocation(view: ViewId | undefined, expand: boolean | undef
   if (expand !== undefined) url.searchParams.set('expand', expand ? '1' : '0')
   window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
 }
-function ScenarioPreview({ scenario, expandAll }: { scenario: Scenario; expandAll: boolean }) {
-  const feedRef = useRef<HTMLDivElement>(null)
-  const conversationId = `preview-conversation-${scenario.id}`
-  const openProcessInPlace = expandAll
-  const taskMessages = useMemo(() => scenario.messages as Message[], [scenario])
-  const conversationMessages = useMemo<Message[]>(() => [requestMessage(scenario, conversationId)], [conversationId, scenario])
-  const taskMessagesById = useMemo(() => new Map([[taskId, taskMessages]]), [taskMessages])
-  const displayMessages = useMemo(() => buildDisplayMessages({
-    sessionView: conversationId,
-    channelMessages: [],
-    conversationMessages,
-    conversationLoading: false,
-    taskMessagesById,
-  }), [conversationId, conversationMessages, taskMessagesById])
-  const messageGroups = useMemo(() => buildMessageGroups(displayMessages, true), [displayMessages])
-  const taskContext = useMemo(() => buildContext(displayMessages), [displayMessages])
-
-  return (
-    <article className="scenarioFrame" style={{ maxWidth: scenario.width }}>
-      <header>
-        <strong>{scenario.label}</strong>
-        <span>{scenario.width}px</span>
-      </header>
-      <div className="conversationReplay">
-        <div className="replayTopbar">
-          <strong>AI 开发频道</strong>
-          <span>{scenario.label}</span>
-        </div>
-        <ConversationFeed
-          sessionView={conversationId}
-          feedRef={feedRef}
-          feedLoading={false}
-          displayMessages={displayMessages}
-          messageGroups={messageGroups}
-          taskContext={taskContext}
-          isDevChannel
-          user={previewUser}
-          sendingMessage={false}
-          onScroll={() => undefined}
-          onCancelTask={noopTaskAction}
-          onContinueTask={noopTaskAction}
-          onApproveTool={noopApprovalAction}
-          debugOpenProcess={openProcessInPlace}
-        />
-        <div className="replayComposer">
-          <button type="button" aria-label="添加附件">+</button>
-          <div className="replayInput">以钱一龙的账号在 AI 开发频道发送消息...</div>
-          <span>GPT-5.5</span>
-          <button type="button" aria-label="发送">›</button>
-        </div>
-      </div>
-    </article>
-  )
-}
-
-function requestMessage(scenario: Scenario, conversationId: string): Message {
-  const request = scenario.messages.find((message) => message.kind === 'ai_task')?.content
-    ?? scenario.messages[0]?.content
-    ?? scenario.label
-
-  return {
-    id: `preview-user-${scenario.id}`,
-    kind: 'user',
-    role: 'user',
-    task_id: taskId,
-    taskId,
-    conversation_id: conversationId,
-    conversationId,
-    sender_name: '钱一龙',
-    user_id: 'preview-user',
-    outgoing: true,
-    content: request,
-    text: request,
-    created_at: startedAt,
-  }
-}
-
-async function noopTaskAction() {}
-
-async function noopApprovalAction() {}
-
 function task(content: string, status: string): ChatMessage {
   return {
     id: `${taskId}-request-${status}`,
@@ -672,6 +607,33 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.replayStatus {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.replayStatus button {
+  min-height: 25px;
+  padding: 3px 8px;
+  border: 1px solid rgba(137, 174, 255, .28);
+  border-radius: 4px;
+  background: rgba(82, 122, 214, .08);
+  color: #9db3e7;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.replayStatus button[data-node-ready='true'] {
+  border-color: rgba(46, 168, 97, .3);
+  background: rgba(46, 168, 97, .08);
+  color: #85d5a4;
+  cursor: default;
 }
 
 .replayComposer {

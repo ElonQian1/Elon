@@ -41,6 +41,9 @@ try {
   const {
     taskCompletionMetaModel,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskCompletionMetaModel.ts'));
+  const {
+    taskTerminalActionModel,
+  } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskTerminalActionModel.ts'));
 
   const mixedTimeline = buildTaskTimeline([
     {
@@ -145,7 +148,8 @@ try {
   );
   assert.deepStrictEqual(
     taskStageActionModel('finished', 'failed', false),
-    { canContinue: true, canOpenNode: false, continueLabel: '重试任务' },
+    { canContinue: false, canOpenNode: false, continueLabel: '' },
+    'terminal recovery belongs below the failure reason, not inside the processed status row',
   );
   assert.deepStrictEqual(
     taskStageActionModel('latest', 'running', false),
@@ -166,6 +170,33 @@ try {
     }),
     { model: 'gpt-5.5', usage: '输入 18,000 · 输出 2,000' },
     'structured usage should render as completion metadata',
+  );
+
+  assert.deepStrictEqual(
+    taskTerminalActionModel(
+      'canceled',
+      'AI 开发任务通信中断。任务已停止以避免重复执行。',
+      'PC 节点通信中断。',
+    ),
+    { visible: true, label: '继续任务', requiresNode: true },
+    'a disconnected PC task should wait for the node and then resume',
+  );
+  assert.deepStrictEqual(
+    taskTerminalActionModel('canceled', '用户已停止本轮任务。'),
+    { visible: true, label: '继续任务', requiresNode: false },
+    'an accidentally canceled task should be resumable',
+  );
+  assert.deepStrictEqual(
+    taskTerminalActionModel('failed', 'PC CLI 没有返回收尾回复；本轮结果无法确认完成。'),
+    { visible: true, label: '继续生成回复', requiresNode: true },
+  );
+  assert.deepStrictEqual(
+    taskTerminalActionModel('failed', '平台 AI runtime 返回 502 Bad Gateway。'),
+    { visible: true, label: '重试任务', requiresNode: false },
+  );
+  assert.deepStrictEqual(
+    taskTerminalActionModel('done', '任务已完成。'),
+    { visible: false, label: '', requiresNode: false },
   );
   assert.deepStrictEqual(
     taskCompletionMetaModel({
