@@ -58,6 +58,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/modules/ui-tuner/shared-android-devices/:hardware_serial",
             delete(delete_shared_android_device),
         )
+        .route(
+            "/api/me/modules/ui-tuner/shared-android-devices",
+            get(list_my_shared_android_devices),
+        )
 }
 
 #[derive(Deserialize)]
@@ -85,6 +89,33 @@ async fn list_shared_android_devices(
         Ok(devices) => Json(serde_json::json!({ "devices": devices })).into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
+}
+
+async fn list_my_shared_android_devices(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+    };
+    let projects = match state.store.list_projects_for_user(&user.id) {
+        Ok(projects) => projects,
+        Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    };
+    let mut devices = Vec::new();
+    for project in projects
+        .into_iter()
+        .filter(|project| can_edit(&project.role))
+    {
+        match state.store.list_project_android_devices(&project.id) {
+            Ok(mut project_devices) => devices.append(&mut project_devices),
+            Err(error) => {
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+            }
+        }
+    }
+    Json(serde_json::json!({ "devices": devices })).into_response()
 }
 
 async fn upsert_shared_android_device(
