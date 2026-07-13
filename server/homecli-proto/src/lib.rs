@@ -6,6 +6,8 @@ pub use cli_durable_types::{
 };
 
 pub const PROTO_VERSION: u32 = 7;
+/// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
+pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
 
 mod project_workspace_status;
 pub use project_workspace_status::{
@@ -242,7 +244,8 @@ pub enum ServerToAgent {
         #[serde(default)]
         env: Vec<(String, String)>,
         /// Project ownership for node-local cache routing and quota admission.
-        /// Old nodes ignore this optional field and remain wire-compatible.
+        /// The server only dispatches project-scoped work to nodes advertising
+        /// [`CAP_PROJECT_BUILD_CACHE_V1`].
         #[serde(default)]
         project_context: Option<CliProjectContext>,
     },
@@ -302,7 +305,7 @@ pub enum ServerToAgent {
         #[serde(default)]
         cwd: Option<String>,
         /// 项目会话上下文。新版 PC 节点会用它把 CLI cwd 切到会话隔离 worktree；
-        /// 老版节点忽略未知字段后仍可直接在 cwd 执行。
+        /// 服务端只会向声明 [`CAP_PROJECT_BUILD_CACHE_V1`] 的节点派发项目任务。
         #[serde(default)]
         project_context: Option<CliProjectContext>,
         /// Frozen credential source authorized before dispatch. Protocol-v5
@@ -431,6 +434,10 @@ pub enum AgentToServer {
         agent_id: String,
         version: String,
         proto_version: u32,
+        /// Optional protocol features implemented by this concrete node binary.
+        /// Missing on legacy register frames and therefore defaults to empty.
+        #[serde(default)]
+        capabilities: Vec<String>,
         #[serde(default)]
         allowed_clis: Vec<String>,
         #[serde(default)]

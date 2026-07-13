@@ -6,7 +6,10 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, CliCompletionProducerIdentity, ServerToAgent, PROTO_VERSION};
+use homecli_proto::{
+    AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_PROJECT_BUILD_CACHE_V1,
+    PROTO_VERSION,
+};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
@@ -137,6 +140,7 @@ pub(super) async fn run_session(
         agent_id: creds.agent_id.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         proto_version: PROTO_VERSION,
+        capabilities: vec![CAP_PROJECT_BUILD_CACHE_V1.to_string()],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
         owner_user_id: Some(creds.owner_user_id.clone()),
@@ -560,11 +564,24 @@ pub(super) async fn run_session(
                             args,
                             cwd,
                             env,
+                            project_context,
                         } => {
                             info!("⚙️  Exec: {} {}", cli, args.join(" "));
                             let tx_c = out_tx_r.clone();
+                            let rt_c = runtime.clone();
                             tokio::spawn(async move {
-                                run_exec(task_id, cli, args, cwd, env, tx_c).await;
+                                let data_paths = rt_c.node_data_root.read().await.paths.clone();
+                                run_exec(
+                                    task_id,
+                                    cli,
+                                    args,
+                                    cwd,
+                                    env,
+                                    project_context,
+                                    data_paths,
+                                    tx_c,
+                                )
+                                .await;
                             });
                         }
                         ServerToAgent::TtsSynthesizeRequest {

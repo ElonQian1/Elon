@@ -7,6 +7,8 @@ use serde::Serialize;
 pub struct AgentSummary {
     pub agent_id: String,
     pub version: String,
+    pub proto_version: u32,
+    pub capabilities: Vec<String>,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,

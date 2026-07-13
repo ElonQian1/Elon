@@ -77,6 +77,7 @@ pub(super) async fn run_relay_session(
         agent_id: agent_id.to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         proto_version: LEGACY_RELAY_PROTO_VERSION,
+        capabilities: Vec::new(),
         allowed_clis: vec!["copilot".into(), "codex".into()],
         allowed_cwds: vec![],
         owner_user_id: None,

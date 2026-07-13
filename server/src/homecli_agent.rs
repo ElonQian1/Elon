@@ -92,6 +92,7 @@ pub struct AgentEntry {
     pub agent_id: String,
     pub version: String,
     pub proto_version: u32,
+    pub capabilities: Vec<String>,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
@@ -311,6 +312,7 @@ impl AgentManager {
                     CLOUD_CONTROL_DEADLINE_PROTO_VERSION
                 ));
             }
+            require_project_build_cache(agent, project_context.as_ref())?;
             (
                 agent.cmd_tx.clone(),
                 agent.pending.clone(),
@@ -479,6 +481,8 @@ impl AgentManager {
             .map(|a| AgentSummary {
                 agent_id: a.agent_id.clone(),
                 version: a.version.clone(),
+                proto_version: a.proto_version,
+                capabilities: a.capabilities.clone(),
                 device_name: a.device_name.clone(),
                 hardware: a.hardware.clone(),
                 storage: a.storage.clone(),
@@ -603,6 +607,7 @@ impl AgentManager {
         let agent = agents
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        require_project_build_cache(agent, project_context.as_ref())?;
         let task_id = Uuid::new_v4().to_string();
         let (tx, rx) = mpsc::unbounded_channel();
         agent.pending.lock().await.insert(task_id.clone(), tx);
@@ -657,6 +662,26 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         Ok((req_id, rx))
     }
+}
+
+fn require_project_build_cache(
+    agent: &AgentEntry,
+    project_context: Option<&homecli_proto::CliProjectContext>,
+) -> Result<()> {
+    if project_context.is_some()
+        && !agent
+            .capabilities
+            .iter()
+            .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
+    {
+        return Err(anyhow!(
+            "PC 节点版本过旧，尚不支持项目构建缓存磁盘治理；请等待节点自动更新后重试（节点版本 {}，协议 v{}，缺少能力 {}）",
+            agent.version,
+            agent.proto_version,
+            homecli_proto::CAP_PROJECT_BUILD_CACHE_V1,
+        ));
+    }
+    Ok(())
 }
 
 fn clean_optional(value: Option<String>) -> Option<String> {

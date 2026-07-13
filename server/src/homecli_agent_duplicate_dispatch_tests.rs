@@ -27,6 +27,7 @@ async fn reconnect_agent() -> ReconnectAgent {
             agent_id: "agent".to_string(),
             version: "test".to_string(),
             proto_version: homecli_proto::PROTO_VERSION,
+            capabilities: vec![homecli_proto::CAP_PROJECT_BUILD_CACHE_V1.to_string()],
             device_name: None,
             hardware: None,
             storage: None,

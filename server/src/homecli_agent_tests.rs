@@ -30,6 +30,7 @@ async fn registered_approval_agent() -> TestApprovalAgent {
             agent_id: "agent".to_string(),
             version: "test".to_string(),
             proto_version: homecli_proto::PROTO_VERSION,
+            capabilities: vec![homecli_proto::CAP_PROJECT_BUILD_CACHE_V1.to_string()],
             device_name: None,
             hardware: None,
             storage: None,
@@ -126,13 +127,21 @@ async fn manager_sends_best_effort_cancel_to_exact_online_agent() {
 }
 
 #[tokio::test]
-async fn cli_prompt_dispatch_probes_agent_before_sending_prompt() {
+async fn non_project_prompt_allows_legacy_agent_after_dispatch_probe() {
     let TestApprovalAgent {
         manager,
         mut cmd_rx,
         ping_acks,
         ..
     } = registered_approval_agent().await;
+    manager
+        .agents
+        .write()
+        .await
+        .get_mut("agent")
+        .expect("registered agent")
+        .capabilities
+        .clear();
 
     let expected_deadline = (chrono::Utc::now() + chrono::Duration::minutes(10)).to_rfc3339();
     let deadline_for_dispatch = expected_deadline.clone();
@@ -358,6 +367,186 @@ async fn controlled_dispatch_without_absolute_deadline_is_rejected_before_ping()
         .to_string()
         .contains("absolute authorization deadline"));
     assert!(cmd_rx.try_recv().is_err());
+}
+
+#[tokio::test]
+async fn project_prompt_rejects_agent_without_build_cache_capability() {
+    let TestApprovalAgent { manager, .. } = registered_approval_agent().await;
+    manager
+        .agents
+        .write()
+        .await
+        .get_mut("agent")
+        .expect("registered agent")
+        .capabilities
+        .clear();
+
+    let error = match manager
+        .dispatch_cli_prompt_with_context_control(
+            "agent",
+            "codex".to_string(),
+            Vec::new(),
+            Some("D:/project".to_string()),
+            Some(project_context()),
+            "build".to_string(),
+        )
+        .await
+    {
+        Ok(_) => panic!("legacy agent must be rejected"),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("版本过旧"));
+}
+
+#[tokio::test]
+async fn project_exec_rejects_agent_without_build_cache_capability() {
+    let TestApprovalAgent {
+        manager,
+        mut cmd_rx,
+        ..
+    } = registered_approval_agent().await;
+    manager
+        .agents
+        .write()
+        .await
+        .get_mut("agent")
+        .expect("registered agent")
+        .capabilities
+        .clear();
+
+    let error = match manager
+        .dispatch_with_project_context(
+            "agent",
+            "cargo".to_string(),
+            vec!["check".to_string()],
+            "D:/project".to_string(),
+            Vec::new(),
+            Some(project_context()),
+        )
+        .await
+    {
+        Ok(_) => panic!("legacy agent must be rejected"),
+        Err(error) => error,
+    };
+
+    let message = error.to_string();
+    assert!(message.contains("版本过旧"));
+    assert!(message.contains(homecli_proto::CAP_PROJECT_BUILD_CACHE_V1));
+    assert!(matches!(
+        cmd_rx.try_recv(),
+        Err(mpsc::error::TryRecvError::Empty)
+    ));
+}
+
+#[tokio::test]
+async fn project_exec_allows_agent_with_build_cache_capability() {
+    let TestApprovalAgent {
+        manager,
+        mut cmd_rx,
+        ..
+    } = registered_approval_agent().await;
+
+    let expected_context = project_context();
+    let (task_id, _rx) = manager
+        .dispatch_with_project_context(
+            "agent",
+            "cargo".to_string(),
+            vec!["check".to_string()],
+            "D:/project".to_string(),
+            Vec::new(),
+            Some(expected_context.clone()),
+        )
+        .await
+        .expect("capable agent must accept project exec");
+
+    match cmd_rx.try_recv() {
+        Ok(ServerToAgent::Exec {
+            task_id: sent_task_id,
+            project_context,
+            ..
+        }) => {
+            assert_eq!(sent_task_id, task_id);
+            let actual = project_context.expect("project context must be retained");
+            assert_eq!(actual.project_id, expected_context.project_id);
+            assert_eq!(actual.conversation_id, expected_context.conversation_id);
+            assert_eq!(actual.runtime_permission, expected_context.runtime_permission);
+        }
+        other => panic!("expected project exec, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn non_project_exec_allows_agent_without_build_cache_capability() {
+    let TestApprovalAgent {
+        manager,
+        mut cmd_rx,
+        ..
+    } = registered_approval_agent().await;
+    manager
+        .agents
+        .write()
+        .await
+        .get_mut("agent")
+        .expect("registered agent")
+        .capabilities
+        .clear();
+
+    let (task_id, _rx) = manager
+        .dispatch(
+            "agent",
+            "powershell".to_string(),
+            vec!["-NoProfile".to_string()],
+            "D:/scratch".to_string(),
+            Vec::new(),
+        )
+        .await
+        .expect("non-project task must remain compatible with a legacy agent");
+
+    match cmd_rx.try_recv() {
+        Ok(ServerToAgent::Exec {
+            task_id: sent_task_id,
+            project_context,
+            ..
+        }) => {
+            assert_eq!(sent_task_id, task_id);
+            assert!(project_context.is_none());
+        }
+        other => panic!("expected non-project exec, got {other:?}"),
+    }
+}
+
+#[test]
+fn legacy_register_without_capabilities_defaults_to_empty() {
+    let register: AgentToServer = serde_json::from_str(
+        r#"{
+            "type": "register",
+            "agent_id": "legacy-agent",
+            "version": "0.3.68",
+            "proto_version": 4
+        }"#,
+    )
+    .expect("legacy register frame must remain decodable");
+
+    match register {
+        AgentToServer::Register {
+            proto_version,
+            capabilities,
+            ..
+        } => {
+            assert_eq!(proto_version, 4);
+            assert!(capabilities.is_empty());
+        }
+        other => panic!("expected register frame, got {other:?}"),
+    }
+}
+
+fn project_context() -> homecli_proto::CliProjectContext {
+    homecli_proto::CliProjectContext {
+        project_id: "project-1".to_string(),
+        conversation_id: "conversation-1".to_string(),
+        runtime_permission: Some("project_write".to_string()),
+    }
 }
 
 #[test]
