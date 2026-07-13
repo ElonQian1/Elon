@@ -80,6 +80,9 @@ mod summary;
 use public_dev_handshake::record_node_public_dev_handshake;
 pub use summary::AgentSummary;
 #[cfg(test)]
+#[path = "homecli_agent_build_cache_tests.rs"]
+mod homecli_agent_build_cache_tests;
+#[cfg(test)]
 #[path = "homecli_agent_duplicate_dispatch_tests.rs"]
 mod homecli_agent_duplicate_dispatch_tests;
 #[cfg(test)]
