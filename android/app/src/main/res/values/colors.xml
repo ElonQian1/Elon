@@ -27,6 +27,7 @@
     <color name="elon_icon_add_top">#D3D3D3</color>
 
     <color name="elon_input_pill_bg">#272727</color>
+    <color name="elon_input_panel_bg_70">#B3000000</color>
     <color name="elon_project_space_info_bg">#1F2023</color>
 
     <color name="elon_button_secondary_bg">#1A1A1A</color>
