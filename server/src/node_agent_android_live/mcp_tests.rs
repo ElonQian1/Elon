@@ -23,7 +23,9 @@ async fn mcp_lists_compact_ui_tools() {
     }))
     .unwrap();
     let fit_runs = FitRunService::live(broker.clone());
-    let response = handle_request(&broker, &fit_runs, &session.id, request).await;
+    let response = handle_request(&broker, &fit_runs, &session.id, request)
+        .await
+        .expect("tools/list must return a JSON-RPC response");
     let tools = response["result"]["tools"].as_array().unwrap();
     assert!(tools
         .iter()
@@ -40,4 +42,29 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_start_fit_run"));
+}
+
+#[tokio::test]
+async fn initialized_notification_has_no_json_rpc_response() {
+    let broker = std::sync::Arc::new(LiveUiBroker::new());
+    let session = broker
+        .create_session(
+            "device-1".to_string(),
+            "com.example.debug".to_string(),
+            None,
+            38917,
+        )
+        .await;
+    let request: McpRequest = serde_json::from_value(json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized",
+        "params": {}
+    }))
+    .unwrap();
+    let fit_runs = FitRunService::live(broker.clone());
+    assert!(
+        handle_request(&broker, &fit_runs, &session.id, request)
+            .await
+            .is_none()
+    );
 }

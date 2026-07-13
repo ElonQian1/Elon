@@ -113,7 +113,7 @@ pub(crate) async fn handle_request(
     fit_runs: &FitRunService,
     session_id: &str,
     request: McpRequest,
-) -> Value {
+) -> Option<Value> {
     let id = request.id.clone().unwrap_or(Value::Null);
     let result = match request.method.as_str() {
         "initialize" => Ok(json!({
@@ -122,20 +122,20 @@ pub(crate) async fn handle_request(
             "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
             "instructions": "模糊路由任务必须先调用 ui_confirm_route。确认 UI 后强制 Tool-first：任何源码编辑前先调用 ui_get_design_task、ui_get_project_profile、ui_get_runtime_status。已有 Runtime 再读 ui_get_screen_summary，并只读取目标节点/子树。样式请求必须优先 ui_propose_live_patch/ui_apply_live_patch；只有结构变化、未绑定属性或 Runtime 不可用时才读取 ui_get_source_bundle 并做最小源码修改，同时说明降级原因。全新页面使用档案默认值创建骨架、首次构建，再回到真实 Renderer。"
         })),
-        "notifications/initialized" => return Value::Null,
+        "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
         "tools/call" => call_tool(broker, fit_runs, session_id, request.params).await,
         "ping" => Ok(json!({})),
         _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
     };
-    match result {
+    Some(match result {
         Ok(value) => json!({ "jsonrpc": "2.0", "id": id, "result": value }),
         Err(error) => json!({
             "jsonrpc": "2.0",
             "id": id,
             "error": { "code": -32000, "message": format!("{error:#}") }
         }),
-    }
+    })
 }
 
 async fn call_tool(
