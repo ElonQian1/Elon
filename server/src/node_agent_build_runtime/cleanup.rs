@@ -124,7 +124,8 @@ pub(crate) fn remove_managed_path(root: &Path, target: &Path) -> Result<u64> {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
         Err(error) => {
-            return Err(error).with_context(|| format!("无法检查构建缓存路径 {}", target.display()));
+            return Err(error)
+                .with_context(|| format!("无法检查构建缓存路径 {}", target.display()));
         }
     };
     ensure_removal_tree_safe(root, target)?;
@@ -222,15 +223,18 @@ fn cleanup_expired_rust_targets(
         }
     };
     for project in projects {
-        let project = project
-            .with_context(|| format!("无法读取 Rust 项目缓存项 {}", rust_root.display()))?;
+        let project =
+            project.with_context(|| format!("无法读取 Rust 项目缓存项 {}", rust_root.display()))?;
         ensure_existing_within_root(&paths.root, &project.path())?;
         let project_key = project.file_name().to_string_lossy().to_string();
         let toolchains = std::fs::read_dir(project.path())
             .with_context(|| format!("无法枚举 Rust 项目缓存 {}", project.path().display()))?;
         for toolchain in toolchains {
             let toolchain = toolchain.with_context(|| {
-                format!("无法读取 Rust toolchain 缓存项 {}", project.path().display())
+                format!(
+                    "无法读取 Rust toolchain 缓存项 {}",
+                    project.path().display()
+                )
             })?;
             ensure_existing_within_root(&paths.root, &toolchain.path())?;
             let toolchain_key = toolchain.file_name().to_string_lossy().to_string();
@@ -282,8 +286,8 @@ fn rust_target_candidates(
         }
     };
     for project in projects {
-        let project = project
-            .with_context(|| format!("无法读取 Rust 项目缓存项 {}", root.display()))?;
+        let project =
+            project.with_context(|| format!("无法读取 Rust 项目缓存项 {}", root.display()))?;
         ensure_existing_within_root(&paths.root, &project.path())?;
         let project_key = project.file_name().to_string_lossy().to_string();
         if project_filter.is_some_and(|filter| project_key.as_str() != filter) {
@@ -293,7 +297,10 @@ fn rust_target_candidates(
             .with_context(|| format!("无法枚举 Rust 项目缓存 {}", project.path().display()))?;
         for toolchain in toolchains {
             let toolchain = toolchain.with_context(|| {
-                format!("无法读取 Rust toolchain 缓存项 {}", project.path().display())
+                format!(
+                    "无法读取 Rust toolchain 缓存项 {}",
+                    project.path().display()
+                )
             })?;
             ensure_existing_within_root(&paths.root, &toolchain.path())?;
             let toolchain_key = toolchain.file_name().to_string_lossy().to_string();
@@ -357,8 +364,7 @@ fn temp_candidates(
         Ok(_) => ensure_existing_within_root(&paths.root, &root)?,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => {
-            return Err(error)
-                .with_context(|| format!("无法检查任务临时目录 {}", root.display()));
+            return Err(error).with_context(|| format!("无法检查任务临时目录 {}", root.display()));
         }
     }
     let mut candidates = Vec::new();
@@ -367,7 +373,10 @@ fn temp_candidates(
     {
         let path = entry?.path();
         ensure_existing_within_root(&paths.root, &path)?;
-        let key = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+        let key = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
         if !active_tasks.contains(key) {
             candidates.push(CleanupCandidate {
                 modified_at: latest_modified(&path),

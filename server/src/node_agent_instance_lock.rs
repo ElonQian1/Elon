@@ -78,10 +78,8 @@ mod tests {
 
     #[test]
     fn only_one_guard_can_own_a_state_directory() {
-        let root = std::env::temp_dir().join(format!(
-            "elon-node-instance-lock-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("elon-node-instance-lock-{}", uuid::Uuid::new_v4()));
         let state = root.join("node.json");
         let first = acquire(&state).expect("first instance owns lock");
         assert!(acquire(&state).is_err());

@@ -522,11 +522,8 @@ fn claim_or_verify_root_marker(paths: &NodeDataPaths, install_id: &str) -> Resul
             }
             Ok(None) => Err(claim_error)
                 .with_context(|| format!("无法独占提交节点数据根标记 {}", marker.display())),
-            Err(marker_error) => Err(marker_error).with_context(|| {
-                format!(
-                    "节点数据根标记并发提交失败，原始错误: {claim_error:#}"
-                )
-            }),
+            Err(marker_error) => Err(marker_error)
+                .with_context(|| format!("节点数据根标记并发提交失败，原始错误: {claim_error:#}")),
         },
     }
 }

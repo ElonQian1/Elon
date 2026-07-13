@@ -25,9 +25,6 @@ pub(crate) fn admission_required_free(
 
 /// A completed task restores enough capacity for existing tasks and one next
 /// build. This preserves the previous "ready for the next task" behavior.
-pub(crate) fn cleanup_required_free(
-    policy: &BuildCachePolicy,
-    active_reserved_bytes: u64,
-) -> u64 {
+pub(crate) fn cleanup_required_free(policy: &BuildCachePolicy, active_reserved_bytes: u64) -> u64 {
     admission_required_free(policy, active_reserved_bytes)
 }

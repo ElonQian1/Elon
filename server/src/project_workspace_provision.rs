@@ -275,7 +275,6 @@ fn runtime_owned_by_user(runtime: &NodeRuntime, user_id: &str) -> bool {
     !user_id.is_empty() && runtime.owner_user_id.trim() == user_id
 }
 
-
 #[cfg(test)]
 #[path = "project_workspace_provision_tests.rs"]
 mod tests;

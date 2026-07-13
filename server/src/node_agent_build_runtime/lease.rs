@@ -54,9 +54,8 @@ impl BuildRunLease {
         if path.exists() {
             ensure_existing_within_root(&paths.root, &path)?;
             if lease_is_stale(&path)? {
-                remove_file_if_present(&path).with_context(|| {
-                    format!("无法移除过期构建任务 lease: {}", path.display())
-                })?;
+                remove_file_if_present(&path)
+                    .with_context(|| format!("无法移除过期构建任务 lease: {}", path.display()))?;
             } else {
                 bail!("构建任务 lease 已存在且仍活动: {}", path.display());
             }
@@ -78,9 +77,8 @@ impl BuildRunLease {
         let publish_result = (|| -> Result<()> {
             let mut payload = serde_json::to_vec_pretty(&record)?;
             payload.push(b'\n');
-            crate::node_agent_atomic_file::write_new(&path, &payload).with_context(|| {
-                format!("无法原子发布构建任务 lease: {}", path.display())
-            })?;
+            crate::node_agent_atomic_file::write_new(&path, &payload)
+                .with_context(|| format!("无法原子发布构建任务 lease: {}", path.display()))?;
             ensure_existing_within_root(&paths.root, &path)?;
             Ok(())
         })();
@@ -128,15 +126,12 @@ pub(crate) fn active_reserved_bytes(lease_root: &Path) -> Result<u64> {
 }
 
 pub(crate) fn active_lease_records(lease_root: &Path) -> Result<Vec<LeaseRecord>> {
-    let root = lease_root
-        .parent()
-        .and_then(Path::parent)
-        .ok_or_else(|| {
-            anyhow!(
-                "构建任务 lease 目录不在节点 cache 根内: {}",
-                lease_root.display()
-            )
-        })?;
+    let root = lease_root.parent().and_then(Path::parent).ok_or_else(|| {
+        anyhow!(
+            "构建任务 lease 目录不在节点 cache 根内: {}",
+            lease_root.display()
+        )
+    })?;
     match std::fs::symlink_metadata(lease_root) {
         Ok(_) => ensure_existing_within_root(root, lease_root)?,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -166,7 +161,10 @@ pub(crate) fn active_lease_records(lease_root: &Path) -> Result<Vec<LeaseRecord>
             continue;
         }
         if !file_name.ends_with(".lease.json") {
-            bail!("构建任务 lease 目录包含未知文件，拒绝清理: {}", path.display());
+            bail!(
+                "构建任务 lease 目录包含未知文件，拒绝清理: {}",
+                path.display()
+            );
         }
         match ensure_existing_within_root(root, &path) {
             Ok(()) => {}
@@ -234,7 +232,8 @@ fn lease_is_stale(path: &Path) -> Result<bool> {
         Ok(payload) => payload,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(true),
         Err(error) => {
-            return Err(error).with_context(|| format!("无法读取构建任务 lease: {}", path.display()));
+            return Err(error)
+                .with_context(|| format!("无法读取构建任务 lease: {}", path.display()));
         }
     };
     let record = serde_json::from_str::<LeaseRecord>(&payload)

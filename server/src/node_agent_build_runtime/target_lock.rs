@@ -32,12 +32,7 @@ impl TargetLock {
             "ELON_NODE_TARGET_LOCK_TIMEOUT_SECS",
             DEFAULT_TARGET_WAIT_SECS,
         );
-        let mut file = acquire_file(
-            &paths.root,
-            &path,
-            timeout,
-            "同项目 Rust target",
-        )?;
+        let mut file = acquire_file(&paths.root, &path, timeout, "同项目 Rust target")?;
         write_diagnostic(
             &mut file,
             serde_json::json!({
@@ -109,12 +104,7 @@ fn prepare_lock_directory(paths: &BuildRunPaths) -> Result<()> {
     ensure_existing_within_root(&paths.root, &paths.target_lock_root)
 }
 
-fn acquire_file(
-    root: &Path,
-    path: &Path,
-    timeout: Duration,
-    purpose: &str,
-) -> Result<File> {
+fn acquire_file(root: &Path, path: &Path, timeout: Duration, purpose: &str) -> Result<File> {
     ensure_within_root(root, path)?;
     let started = Instant::now();
     loop {
@@ -229,7 +219,10 @@ fn validate_locked_file(path: &Path, file: &File) -> Result<()> {
         || path_metadata.dev() != handle_metadata.dev()
         || path_metadata.ino() != handle_metadata.ino()
     {
-        bail!("节点 runtime 锁路径在打开期间发生替换或指向符号链接: {}", path.display());
+        bail!(
+            "节点 runtime 锁路径在打开期间发生替换或指向符号链接: {}",
+            path.display()
+        );
     }
     Ok(())
 }
@@ -252,10 +245,8 @@ mod tests {
 
     #[test]
     fn os_lock_rejects_a_second_handle() {
-        let root = std::env::temp_dir().join(format!(
-            "elon-target-lock-test-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("elon-target-lock-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&root).unwrap();
         let path = root.join("target.lock");
 

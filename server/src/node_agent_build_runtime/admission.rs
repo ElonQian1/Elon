@@ -41,11 +41,7 @@ pub(crate) fn admit(
 ) -> Result<CleanupReport> {
     let mut report = cleanup_expired(paths, policy)?;
     if under_pressure(paths, policy, active_reserved_bytes) {
-        report.merge(cleanup_for_pressure(
-            paths,
-            policy,
-            active_reserved_bytes,
-        )?);
+        report.merge(cleanup_for_pressure(paths, policy, active_reserved_bytes)?);
     }
 
     let cache_bytes = directory_size(&paths.cache_root);
@@ -92,9 +88,7 @@ pub(crate) fn under_pressure(
     directory_size(&paths.cache_root) > policy.max_total_cache_bytes
         || directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
         || disk_free_bytes(&paths.root)
-            .map(|bytes| {
-                bytes < reservation::cleanup_required_free(policy, active_reserved_bytes)
-            })
+            .map(|bytes| bytes < reservation::cleanup_required_free(policy, active_reserved_bytes))
             .unwrap_or(false)
 }
 

@@ -64,10 +64,7 @@ pub fn provision_project_workspace_in(
 ) -> Result<ProjectWorkspaceResult> {
     let user_dir = safe_path_part(&req.user_id, "user", 80);
     let project_dir = safe_path_part(&req.project_id, "project", 80);
-    let repo = workspace_root
-        .join(user_dir)
-        .join(project_dir)
-        .join("repo");
+    let repo = workspace_root.join(user_dir).join(project_dir).join("repo");
     let created = !repo.exists();
 
     if let Some(remote) = clean_git_remote(req.repo_url.as_deref(), req.branch.as_deref()) {
@@ -127,12 +124,7 @@ pub fn cleanup_project_workspace_in(
         .join("conversation-worktrees")
         .join(&project_part);
     remove_conversation_worktrees(&repo, &worktree_root, workspace_root, &mut result)?;
-    remove_managed_path(
-        &project_dir,
-        workspace_root,
-        "PC 项目工作区",
-        &mut result,
-    )?;
+    remove_managed_path(&project_dir, workspace_root, "PC 项目工作区", &mut result)?;
     Ok(result)
 }
 
@@ -233,12 +225,7 @@ pub fn prepare_conversation_workspace(
     conversation_id: &str,
 ) -> Result<ConversationWorkspaceResult> {
     let root = workspace_root();
-    prepare_conversation_workspace_in(
-        &root,
-        base_workspace_path,
-        project_id,
-        conversation_id,
-    )
+    prepare_conversation_workspace_in(&root, base_workspace_path, project_id, conversation_id)
 }
 
 /// Prepare a conversation worktree below an already validated workspace root.

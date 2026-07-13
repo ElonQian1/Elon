@@ -1,9 +1,6 @@
 use super::{
-    admission, cleanup,
-    paths::BuildRunPaths,
-    reservation,
-    target_lock::AdmissionLock,
-    telemetry, usage, BuildCachePolicy,
+    admission, cleanup, paths::BuildRunPaths, reservation, target_lock::AdmissionLock, telemetry,
+    usage, BuildCachePolicy,
 };
 use std::sync::{mpsc, OnceLock};
 
@@ -35,9 +32,8 @@ fn sender() -> &'static mpsc::Sender<JanitorJob> {
             .name("elon-cache-janitor".into())
             .spawn(move || {
                 while let Ok(job) = rx.recv() {
-                    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        process(job)
-                    }));
+                    let outcome =
+                        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| process(job)));
                     if outcome.is_err() {
                         tracing::error!("构建缓存 janitor 任务 panic，工作线程继续服务后续任务");
                     }
@@ -102,11 +98,7 @@ fn process(job: JanitorJob) {
         }
     };
     if admission::under_pressure(&job.paths, &job.policy, active_reserved_bytes) {
-        match cleanup::cleanup_for_pressure(
-            &job.paths,
-            &job.policy,
-            active_reserved_bytes,
-        ) {
+        match cleanup::cleanup_for_pressure(&job.paths, &job.policy, active_reserved_bytes) {
             Ok(pressure_report) => report.merge(pressure_report),
             Err(error) => tracing::warn!(
                 error = %error,

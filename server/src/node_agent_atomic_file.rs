@@ -155,10 +155,8 @@ mod tests {
 
     #[test]
     fn write_new_never_replaces_an_existing_file() {
-        let root = std::env::temp_dir().join(format!(
-            "elon-atomic-write-new-{}",
-            uuid::Uuid::new_v4()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("elon-atomic-write-new-{}", uuid::Uuid::new_v4()));
         let path = root.join("owner.json");
 
         write_new(&path, b"first").expect("claim file");

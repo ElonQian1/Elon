@@ -181,16 +181,12 @@ impl AgentManager {
     }
 
     pub async fn agent_has_capability(&self, agent_id: &str, capability: &str) -> bool {
-        self.agents
-            .read()
-            .await
-            .get(agent_id)
-            .is_some_and(|agent| {
-                agent
-                    .capabilities
-                    .iter()
-                    .any(|candidate| candidate == capability)
-            })
+        self.agents.read().await.get(agent_id).is_some_and(|agent| {
+            agent
+                .capabilities
+                .iter()
+                .any(|candidate| candidate == capability)
+        })
     }
     /// 把 AI 提示发给 PC agent，让 PC 用指定 CLI（copilot/codex）执行，流式返回 CliChunk/CliDone。
     pub async fn dispatch_cli_prompt(
@@ -689,9 +685,9 @@ fn require_project_build_cache(
 
 fn require_project_build_cache_capability(agent: &AgentEntry) -> Result<()> {
     if !agent
-            .capabilities
-            .iter()
-            .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
+        .capabilities
+        .iter()
+        .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
     {
         return Err(anyhow!(
             "PC 节点版本过旧，尚不支持项目构建缓存磁盘治理；请等待节点自动更新后重试（节点版本 {}，协议 v{}，缺少能力 {}）",

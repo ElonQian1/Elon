@@ -470,7 +470,10 @@ async fn project_exec_allows_agent_with_build_cache_capability() {
             let actual = project_context.expect("project context must be retained");
             assert_eq!(actual.project_id, expected_context.project_id);
             assert_eq!(actual.conversation_id, expected_context.conversation_id);
-            assert_eq!(actual.runtime_permission, expected_context.runtime_permission);
+            assert_eq!(
+                actual.runtime_permission,
+                expected_context.runtime_permission
+            );
         }
         other => panic!("expected project exec, got {other:?}"),
     }

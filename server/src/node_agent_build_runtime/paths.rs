@@ -301,8 +301,7 @@ fn absolute_lexical(path: &Path) -> Result<PathBuf> {
 
 fn stable_project_key(project_id: &str) -> String {
     let readable_limit = MAX_PROJECT_KEY_LEN - SHORT_DIGEST_LEN - 1;
-    let readable =
-        elon_pc_dev_runtime::safe_path_part(project_id, "project", readable_limit);
+    let readable = elon_pc_dev_runtime::safe_path_part(project_id, "project", readable_limit);
     let digest = format!("{:x}", Sha256::digest(project_id.as_bytes()));
     format!("{readable}-{}", &digest[..SHORT_DIGEST_LEN])
 }

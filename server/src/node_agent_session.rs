@@ -19,10 +19,10 @@ use super::node_agent_local_llm::discover_models;
 use super::{
     node_agent_active_task, node_agent_full_access, node_agent_lifecycle,
     node_agent_route_c_status, node_agent_task_journal, node_agent_task_journal_inspect,
-    node_agent_ws_control_queue, pc_storage_repo, pc_workspace_provisioner,
-    project_docs_scan, project_git_worktree_audit, project_workspace_inspect,
-    resolve_attachment_args, run_cli_prompt, run_exec, run_llm_inference, run_tts_synthesis,
-    ws_text, CliPromptRun, Credentials, NodeConfig, NodeRuntime, CLOUD_WS_READ_TIMEOUT,
+    node_agent_ws_control_queue, pc_storage_repo, pc_workspace_provisioner, project_docs_scan,
+    project_git_worktree_audit, project_workspace_inspect, resolve_attachment_args, run_cli_prompt,
+    run_exec, run_llm_inference, run_tts_synthesis, ws_text, CliPromptRun, Credentials, NodeConfig,
+    NodeRuntime, CLOUD_WS_READ_TIMEOUT,
 };
 
 const COMPLETION_REPLAY_INTERVAL: Duration = Duration::from_secs(3);
@@ -101,8 +101,7 @@ pub(super) async fn run_session(
     .map_err(|error| anyhow!("PC 开发运行时能力探测异常结束: {error}"))?;
     dev_runtime.server_runtime_status = Some(server_runtime_status.status);
     if let Some(paths) = data_root.paths.as_ref() {
-        dev_runtime.workspace_root_path =
-            Some(paths.workspaces().to_string_lossy().to_string());
+        dev_runtime.workspace_root_path = Some(paths.workspaces().to_string_lossy().to_string());
     } else {
         dev_runtime.workspace_root_path = data_root
             .configured_root()

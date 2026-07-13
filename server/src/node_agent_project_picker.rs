@@ -3,7 +3,10 @@
 use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{path::{Path, PathBuf}, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use crate::{
     node_agent_project_manifest_identity::{
@@ -431,15 +434,14 @@ fn has_dev_profile(project: &LocalProjectInfo) -> bool {
         || !project.detected_files.is_empty()
 }
 
-
-mod identity;
 mod helpers;
+mod identity;
 
-use identity::{detect_project_identity, ProjectIdentity};
 use helpers::{
-    clean_project_text, default_project_description, inspect_agent_runtime_freshness,
-    json_error, pick_folder, project_name,
+    clean_project_text, default_project_description, inspect_agent_runtime_freshness, json_error,
+    pick_folder, project_name,
 };
+use identity::{detect_project_identity, ProjectIdentity};
 
 #[cfg(test)]
 #[path = "node_agent_project_picker/picker_tests.rs"]

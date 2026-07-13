@@ -67,11 +67,9 @@ pub(crate) async fn set(
         Ok(paths) => paths,
         Err(reason) => return error(StatusCode::BAD_REQUEST, reason),
     };
-    if let Err(reason) = super::validate_no_canonical_root_overlap(
-        paths.root(),
-        &current,
-        &runtime.install_id,
-    ) {
+    if let Err(reason) =
+        super::validate_no_canonical_root_overlap(paths.root(), &current, &runtime.install_id)
+    {
         return error(StatusCode::BAD_REQUEST, reason);
     }
     match runtime.set_node_data_root(paths).await {

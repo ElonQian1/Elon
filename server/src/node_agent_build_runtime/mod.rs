@@ -21,7 +21,6 @@ use anyhow::{anyhow, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 use lease::BuildRunLease;
 use paths::{prepare_run_directories, resolve_run_paths, BuildRunPaths};
-use target_lock::{AdmissionLock, TargetLock};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -31,6 +30,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
+use target_lock::{AdmissionLock, TargetLock};
 
 const RUN_OUTCOME_PENDING: u8 = 0;
 const RUN_OUTCOME_SUCCESS: u8 = 1;
@@ -254,8 +254,7 @@ pub(crate) fn cleanup_rebuildable(
             current_active_leases
         ));
     }
-    let result =
-        crate::node_agent_data_root::cleanup(data_paths, expected_install_id, apply)?;
+    let result = crate::node_agent_data_root::cleanup(data_paths, expected_install_id, apply)?;
     if apply {
         invalidate_status(data_paths.root());
     }

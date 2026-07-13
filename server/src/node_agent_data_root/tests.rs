@@ -120,11 +120,8 @@ fn marker_owned_by_another_installation_is_never_rebound() {
     let root = std::env::temp_dir().join(format!("elon-marker-foreign-{}", Uuid::new_v4()));
     std::fs::create_dir_all(&root).expect("create root");
     let marker = root.join(ROOT_MARKER_FILE);
-    std::fs::write(
-        &marker,
-        br#"{"schema_version":1,"install_id":"ins_other"}"#,
-    )
-    .expect("write foreign marker");
+    std::fs::write(&marker, br#"{"schema_version":1,"install_id":"ins_other"}"#)
+        .expect("write foreign marker");
     let original = std::fs::read(&marker).expect("read original marker");
 
     let error = validate_and_prepare(root.to_string_lossy().as_ref(), "ins_current")
@@ -181,8 +178,7 @@ fn cleanup_never_includes_workspace_or_storage() {
     std::fs::write(paths.cache().join("cache.bin"), [1u8; 16]).expect("seed cache");
     std::fs::write(paths.workspaces().join("keep.txt"), "keep").expect("seed workspace");
 
-    let result =
-        cleanup(&paths, "ins_current", true).expect("cleanup managed cache and temp");
+    let result = cleanup(&paths, "ins_current", true).expect("cleanup managed cache and temp");
 
     assert_eq!(result.entries.len(), 2);
     assert!(paths.workspaces().join("keep.txt").is_file());
@@ -197,18 +193,16 @@ fn cleanup_rejects_unmarked_or_foreign_root() {
         std::env::temp_dir().join(format!("elon-cleanup-unmarked-{}", Uuid::new_v4()));
     let unmarked_paths = NodeDataPaths::new(&unmarked_root);
     std::fs::create_dir_all(unmarked_paths.cache()).expect("create unmarked cache");
-    let error = cleanup(&unmarked_paths, "ins_current", true)
-        .expect_err("unmarked cleanup must fail");
+    let error =
+        cleanup(&unmarked_paths, "ins_current", true).expect_err("unmarked cleanup must fail");
     assert!(error.to_string().contains("缺少所有权标记"));
     assert!(unmarked_paths.cache().is_dir());
 
     let foreign_root =
         std::env::temp_dir().join(format!("elon-cleanup-foreign-{}", Uuid::new_v4()));
-    let foreign_paths = validate_and_prepare(
-        foreign_root.to_string_lossy().as_ref(),
-        "ins_foreign",
-    )
-    .expect("prepare foreign root");
+    let foreign_paths =
+        validate_and_prepare(foreign_root.to_string_lossy().as_ref(), "ins_foreign")
+            .expect("prepare foreign root");
     let sentinel = foreign_paths.cache().join("keep.bin");
     std::fs::write(&sentinel, b"foreign-owner-data").expect("seed foreign cache");
     let error = cleanup(&foreign_paths, "ins_current", true)
@@ -244,14 +238,13 @@ fn normalizes_parent_segments_before_overlap_checks() {
 
     let error =
         validate_no_root_overlap(candidate.to_string_lossy().as_ref(), &state, "ins_current")
-        .expect_err("normalized overlap must fail");
+            .expect_err("normalized overlap must fail");
     assert!(error.to_string().contains("互相嵌套"));
 }
 
 #[test]
 fn owned_previous_data_root_can_be_selected_again() {
-    let base =
-        std::env::temp_dir().join(format!("elon-data-root-rollback-{}", Uuid::new_v4()));
+    let base = std::env::temp_dir().join(format!("elon-data-root-rollback-{}", Uuid::new_v4()));
     let previous = validate_and_prepare(
         base.join("previous").to_string_lossy().as_ref(),
         "ins_current",
@@ -395,8 +388,8 @@ fn cleanup_rejects_junction_inside_managed_tree() {
         return;
     }
 
-    let error = cleanup(&paths, "ins_current", true)
-        .expect_err("cleanup must reject nested junction");
+    let error =
+        cleanup(&paths, "ins_current", true).expect_err("cleanup must reject nested junction");
 
     assert!(error.to_string().contains("重解析点"));
     assert!(outside.join("keep.txt").is_file());

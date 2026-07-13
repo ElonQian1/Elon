@@ -174,9 +174,7 @@ pub fn prepare_cli_prompt_cwd_in(
         });
     }
     let workspace_root = workspace_root.ok_or_else(|| {
-        anyhow::anyhow!(
-            "PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘"
-        )
+        anyhow::anyhow!("PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘")
     })?;
     let workspace = pc_workspace_provisioner::prepare_conversation_workspace_in(
         workspace_root,
