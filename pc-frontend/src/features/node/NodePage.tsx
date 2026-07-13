@@ -15,6 +15,7 @@ import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import ShareSettlementCard from './ShareSettlementCard'
+import NodeStorageManagementCard from './storage/NodeStorageManagementCard'
 import { createCodexVaultEmergencyActions } from './codexVaultEmergencyActions'
 import { autostartSummaryLabel } from './autostartStatusModel'
 import { useUserProgression } from '../billing/useUserProgression'
@@ -518,6 +519,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
           <NodeLifecycleStatusCard localStatus={status} />
           <LocalNodeHealthPanel status={status} onRefresh={() => refreshStatus()} />
           <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
+          <NodeStorageManagementCard adminUrl={adminUrl} />
           <CodexStatusCard
             status={codex}
             refreshing={!!status.cli_probe?.refreshing}

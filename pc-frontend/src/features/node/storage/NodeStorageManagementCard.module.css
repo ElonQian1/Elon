@@ -1,0 +1,209 @@
+.card {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border, #263348);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface, #101827) 94%, #2563eb 6%);
+}
+
+.header,
+.rootRow,
+.sectionTitle,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.header h4 {
+  margin: 4px 0 5px;
+  font-size: 17px;
+}
+
+.header p,
+.sectionTitle span,
+.rootEditor small,
+.migrationItem small,
+.migrationItem p {
+  margin: 0;
+  color: var(--text-muted, #91a0b5);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.eyebrow {
+  color: #60a5fa;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+}
+
+.state {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, .14);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.state[data-tone="ok"] { color: #86efac; background: rgba(34, 197, 94, .14); }
+.state[data-tone="warning"] { color: #fcd34d; background: rgba(245, 158, 11, .15); }
+.state[data-tone="danger"] { color: #fca5a5; background: rgba(239, 68, 68, .16); }
+
+.alert,
+.success,
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.alert[data-tone="warning"] { color: #fcd34d; background: rgba(245, 158, 11, .11); }
+.alert[data-tone="danger"],
+.error { color: #fca5a5; background: rgba(239, 68, 68, .11); }
+.success { color: #86efac; background: rgba(34, 197, 94, .11); }
+
+.rootEditor {
+  display: grid;
+  gap: 8px;
+}
+
+.rootEditor label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rootRow input {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #334155);
+  border-radius: 10px;
+  color: inherit;
+  background: var(--surface-2, #0b1220);
+  font: 13px ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.rootRow input:focus {
+  outline: 2px solid rgba(59, 130, 246, .35);
+  border-color: #3b82f6;
+}
+
+.actions button,
+.primaryButton,
+.dangerButton {
+  padding: 9px 12px;
+  border: 1px solid var(--border, #334155);
+  border-radius: 9px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.primaryButton {
+  border-color: #2563eb;
+  color: #fff;
+  background: #2563eb;
+}
+
+.dangerButton { color: #fca5a5 !important; border-color: rgba(239, 68, 68, .45) !important; }
+.actions button:disabled,
+.primaryButton:disabled,
+.dangerButton:disabled { cursor: not-allowed; opacity: .48; }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metrics div {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border-radius: 11px;
+  background: rgba(15, 23, 42, .54);
+}
+
+.metrics span,
+.pathList span,
+.migrationItem > span,
+.cleanupPreview span { color: var(--text-muted, #91a0b5); font-size: 11px; }
+.metrics strong { font-size: 14px; }
+
+.pathList,
+.migration,
+.cleanupPreview {
+  display: grid;
+  gap: 9px;
+}
+
+.pathList > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.pathList code,
+.migrationItem code,
+.cleanupPreview code {
+  overflow-wrap: anywhere;
+  color: #bfdbfe;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.migration,
+.cleanupPreview {
+  padding: 13px;
+  border: 1px solid rgba(245, 158, 11, .25);
+  border-radius: 12px;
+  background: rgba(245, 158, 11, .06);
+}
+
+.migrationItem {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 3px 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(148, 163, 184, .14);
+}
+
+.migrationItem small,
+.migrationItem p { grid-column: 2; }
+
+.cleanupPreview > div {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.cleanupPreview b { font-size: 11px; }
+
+.actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .header,
+  .rootRow,
+  .sectionTitle { align-items: stretch; flex-direction: column; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pathList > div,
+  .migrationItem,
+  .cleanupPreview > div { grid-template-columns: 1fr; }
+  .migrationItem small,
+  .migrationItem p { grid-column: 1; }
+  .rootRow input,
+  .rootRow button { width: 100%; box-sizing: border-box; }
+}
