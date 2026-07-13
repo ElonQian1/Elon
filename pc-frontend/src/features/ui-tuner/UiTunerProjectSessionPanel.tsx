@@ -485,8 +485,7 @@ export function UiTunerProjectSessionPanel({
 }
 
 function uiTunerNodeAdminUrl() {
-  const fromQuery = new URLSearchParams(location.search).get('node_admin')
-  return safeNodeAdminUrl(fromQuery)
+  return safeNodeAdminUrl()
 }
 
 function describeLocalNodeStatus(

@@ -184,8 +184,10 @@ async function probeLocalNodeBase(baseUrl: string, timeoutMs: number): Promise<{
     const status = await res.json() as LocalNodeProbeStatus
     const localAdminToken = status.local_admin_token ?? ''
     const tokenHeader = status.local_admin_token_header?.trim().toLowerCase()
+    const agentId = status.agent_id?.trim()
+    const hasValidAgentIdentity = agentId ? agentId.startsWith('node-') : status.logged_in === false
     const isElonNode = tokenHeader === 'x-elon-local-admin-token'
-      && status.agent_id?.startsWith('node-')
+      && hasValidAgentIdentity
       && !!status.version?.trim()
     return localAdminToken && isElonNode ? { baseUrl, localAdminToken, status } : null
   } catch {

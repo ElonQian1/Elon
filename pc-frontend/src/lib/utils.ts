@@ -38,7 +38,9 @@ function pad2(value: number): string {
 
 /** 验证 node_admin URL：只允许回环地址；未指定时使用已探测到的本机节点。 */
 export function safeNodeAdminUrl(rawParam?: string | null): string {
-  const raw = rawParam ?? new URLSearchParams(location.search).get('node_admin') ?? ''
+  // 无显式覆盖时必须经 runtime 解析：它会让本页刚验证成功的端口
+  // 优先于启动器 URL 中可能已经过期的 node_admin 查询参数。
+  const raw = rawParam === undefined ? localNodeBaseUrl() : rawParam ?? ''
   if (raw.trim()) {
     try {
       const url = new URL(raw)

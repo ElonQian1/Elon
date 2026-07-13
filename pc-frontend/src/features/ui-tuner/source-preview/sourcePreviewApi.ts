@@ -3,7 +3,7 @@ import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { SourcePreviewDocument } from './types'
 
 export function sourcePreviewAdminUrl(): string {
-  return safeNodeAdminUrl(new URLSearchParams(window.location.search).get('node_admin'))
+  return safeNodeAdminUrl()
 }
 export async function loadSourcePreview(projectRoot: string, layoutFile?: string): Promise<SourcePreviewDocument> {
   const baseUrl = sourcePreviewAdminUrl()
