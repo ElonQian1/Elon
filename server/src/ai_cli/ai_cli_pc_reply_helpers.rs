@@ -99,7 +99,7 @@ pub(super) fn sanitize_pc_development_reply(reply: &str, apk_url: Option<&str>) 
             continue;
         }
         lines.push(sanitize_user_reply_line(line));
-        if lines.len() >= 4 {
+        if lines.len() >= 16 {
             break;
         }
     }
@@ -111,7 +111,7 @@ pub(super) fn sanitize_pc_development_reply(reply: &str, apk_url: Option<&str>) 
         .join("\n")
         .trim()
         .to_string();
-    text = truncate_chars(text.as_str(), 220).trim().to_string();
+    text = truncate_chars(text.as_str(), 1600).trim().to_string();
 
     if text.is_empty() {
         text = if apk_url.is_some() {

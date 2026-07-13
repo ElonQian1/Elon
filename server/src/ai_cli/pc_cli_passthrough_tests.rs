@@ -319,6 +319,25 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
 }
 
 #[test]
+fn pc_development_reply_keeps_device_and_runtime_summary() {
+    let reply = "已确认当前项目可用的 Android 渲染设备。\n\
+物理设备：小米 23116PN5BC（shennong）。\n\
+USB：e0d909c3，状态 device。\n\
+无线：192.168.31.171:5555，状态 device。\n\
+两个连接对应同一台测试手机。\n\
+推荐优先使用 USB；需要脱线测试时切换无线连接。\n\
+Renderer：BOOTSTRAP。\n\
+Live Runtime：尚未连接，nodeCount=0。";
+
+    let sanitized = sanitize_pc_development_reply(reply, None);
+
+    assert!(sanitized.contains("192.168.31.171:5555"));
+    assert!(sanitized.contains("Renderer：BOOTSTRAP"));
+    assert!(sanitized.contains("nodeCount=0"));
+    assert!(sanitized.chars().count() <= 1600);
+}
+
+#[test]
 fn pc_development_empty_reply_does_not_claim_code_was_changed() {
     let sanitized = sanitize_pc_development_reply("", None);
 
