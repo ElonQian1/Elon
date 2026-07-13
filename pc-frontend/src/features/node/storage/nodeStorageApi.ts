@@ -9,7 +9,7 @@ const STATUS_PATH = '/api/node-data-root'
 const CLEANUP_PATH = '/api/node-data-root/cleanup'
 
 export function fetchNodeDataRoot(adminUrl: string): Promise<NodeDataRootStatus> {
-  return nodeApi<NodeDataRootStatus>(adminUrl, STATUS_PATH, {}, 15000)
+  return nodeApi<NodeDataRootStatus>(adminUrl, STATUS_PATH, {}, 120000)
 }
 
 export function saveNodeDataRoot(adminUrl: string, rootPath: string): Promise<NodeDataRootSetResponse> {
@@ -26,5 +26,5 @@ export function cleanupNodeDataRoot(
   return nodeApi<NodeDataRootCleanupResponse>(adminUrl, CLEANUP_PATH, {
     method: 'POST',
     body: JSON.stringify({ apply }),
-  }, apply ? 120000 : 30000)
+  }, apply ? 1800000 : 120000)
 }

@@ -22,6 +22,7 @@ export interface NodeBuildCacheStatus {
   disk_free_bytes?: number
   disk_total_bytes?: number
   min_free_bytes?: number
+  build_headroom_bytes?: number
   max_total_cache_bytes?: number
   max_project_rust_bytes?: number
   pressure?: boolean

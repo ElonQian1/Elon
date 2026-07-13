@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { cleanupNodeDataRoot, fetchNodeDataRoot, saveNodeDataRoot } from './nodeStorageApi'
 import type { NodeDataRootCleanupResult, NodeDataRootStatus } from './types'
 import styles from './NodeStorageManagementCard.module.css'
@@ -29,11 +29,15 @@ function errorMessage(error: unknown, fallback: string): string {
 
 function activeTaskCount(status: NodeDataRootStatus | null): number {
   if (!status) return 0
-  if (Number.isFinite(status.build_cache?.active_leases)) return Math.max(0, Number(status.build_cache?.active_leases))
-  if (Number.isFinite(status.active_task_count)) return Math.max(0, Number(status.active_task_count))
-  if (Array.isArray(status.active_tasks)) return status.active_tasks.length
-  if (Number.isFinite(status.active_tasks)) return Math.max(0, Number(status.active_tasks))
-  return 0
+  const reportedTasks = Array.isArray(status.active_tasks)
+    ? status.active_tasks.length
+    : Number.isFinite(status.active_tasks) ? Number(status.active_tasks) : 0
+  return Math.max(
+    0,
+    Number.isFinite(status.build_cache?.active_leases) ? Number(status.build_cache?.active_leases) : 0,
+    Number.isFinite(status.active_task_count) ? Number(status.active_task_count) : 0,
+    reportedTasks,
+  )
 }
 
 function diskNumbers(status: NodeDataRootStatus | null): { total?: number; free?: number } {
@@ -58,15 +62,18 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [cleanupPreview, setCleanupPreview] = useState<NodeDataRootCleanupResult | null>(null)
+  const rootDirty = useRef(false)
 
   const refresh = useCallback(async (quiet = false) => {
     if (!quiet) setBusy('refresh')
+    if (!quiet) setMessage('')
     setError('')
     try {
       const next = await fetchNodeDataRoot(adminUrl)
       setStatus(next)
-      setRootPath((current) => current.trim() ? current : String(next.root_path ?? ''))
+      if (!rootDirty.current) setRootPath(String(next.root_path ?? ''))
     } catch (caught) {
+      setStatus(null)
       setError(errorMessage(caught, '无法读取节点数据盘状态'))
     } finally {
       if (!quiet) setBusy('')
@@ -107,6 +114,7 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
       const response = await saveNodeDataRoot(adminUrl, value)
       if (response.data_root) setStatus(response.data_root)
       setRootPath(String(response.data_root?.root_path ?? value))
+      rootDirty.current = false
       setCleanupPreview(null)
       setMessage(response.restart_recommended
         ? '数据根已保存。建议重启一龙开发平台，让后续任务全部使用新目录。'
@@ -126,7 +134,7 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
     try {
       const response = await cleanupNodeDataRoot(adminUrl, false)
       setCleanupPreview(response.cleanup ?? null)
-      setMessage(`预计可清理 ${formatBytes(response.cleanup?.estimated_bytes)}，不会触碰项目源码和 Git 仓库。`)
+      setMessage(`预计可清理 ${formatBytes(response.cleanup?.estimated_bytes)}，不会触碰项目源码和 Git 仓库；失败任务的诊断 Temp 也会被删除。`)
     } catch (caught) {
       setError(errorMessage(caught, '无法估算可清理空间'))
     } finally {
@@ -135,7 +143,7 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
   }
 
   async function applyCleanup() {
-    if (!window.confirm('只删除节点数据根下可重建的 cache 和 temp。项目源码、工作区与 Git 仓库不会删除。继续吗？')) return
+    if (!window.confirm('只删除节点数据根下可重建的 cache 和 temp（包括失败任务诊断 Temp）。项目源码、工作区与 Git 仓库不会删除。继续吗？')) return
     setBusy('cleanup')
     setMessage('')
     setError('')
@@ -164,14 +172,14 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
         </span>
       </div>
 
-      {status?.invalid_reason && <div className={styles.alert} data-tone="danger">{status.invalid_reason}</div>}
+      {status?.invalid_reason && <div className={styles.alert} data-tone="danger" role="alert">{status.invalid_reason}</div>}
       {status?.build_cache?.pressure && (
-        <div className={styles.alert} data-tone="danger">
+        <div className={styles.alert} data-tone="danger" role="alert">
           构建盘已触发容量保护；新任务会先按 TTL/LRU 回收，仍不足时拒绝启动，避免写满系统盘。
         </div>
       )}
-      {warnings.map((warning, index) => <div className={styles.alert} data-tone="warning" key={`${warning}-${index}`}>{warning}</div>)}
-      {tasks > 0 && <div className={styles.alert} data-tone="warning">当前有 {tasks} 个任务运行，切换数据根和实际清理会被安全阻止。</div>}
+      {warnings.map((warning, index) => <div className={styles.alert} data-tone="warning" role="alert" key={`${warning}-${index}`}>{warning}</div>)}
+      {tasks > 0 && <div className={styles.alert} data-tone="warning" role="alert">当前有 {tasks} 个任务运行，切换数据根和实际清理会被安全阻止。</div>}
 
       <div className={styles.rootEditor}>
         <label htmlFor="elon-node-data-root">数据根绝对路径</label>
@@ -179,21 +187,27 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
           <input
             id="elon-node-data-root"
             value={rootPath}
-            onChange={(event) => setRootPath(event.target.value)}
+            onChange={(event) => {
+              rootDirty.current = true
+              setRootPath(event.target.value)
+            }}
             placeholder="D:\\ElonNodeData"
             spellCheck={false}
             autoComplete="off"
+            aria-describedby="elon-node-data-root-help"
           />
-          <button type="button" className={styles.primaryButton} onClick={saveRoot} disabled={!!busy || !rootPath.trim()}>
+          <button type="button" className={styles.primaryButton} onClick={saveRoot} disabled={!!busy || !rootPath.trim() || tasks > 0}>
             {busy === 'save' ? '保存中…' : '保存数据根'}
           </button>
         </div>
-        <small>不能直接使用磁盘根目录，也不能与旧工作区或硬盘仓库互相嵌套。</small>
+        <small id="elon-node-data-root-help">不能直接使用磁盘根目录，也不能与旧工作区或硬盘仓库互相嵌套。</small>
       </div>
 
       <div className={styles.metrics}>
         <div><span>磁盘剩余</span><strong>{formatBytes(disk.free)}</strong></div>
         <div><span>磁盘容量</span><strong>{formatBytes(disk.total)}</strong></div>
+        <div><span>构建硬保留</span><strong>{formatBytes(status?.build_cache?.min_free_bytes)}</strong></div>
+        <div><span>单次构建余量</span><strong>{formatBytes(status?.build_cache?.build_headroom_bytes)}</strong></div>
         <div><span>缓存占用</span><strong>{formatBytes(status?.build_cache?.cache_bytes ?? status?.cache_bytes)}</strong></div>
         <div><span>临时占用</span><strong>{formatBytes(status?.build_cache?.temp_bytes ?? status?.temp_bytes)}</strong></div>
       </div>
@@ -245,8 +259,8 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
         </button>
       </div>
 
-      {message && <p className={styles.success}>{message}</p>}
-      {error && <p className={styles.error}>{error}</p>}
+      {message && <p className={styles.success} role="status" aria-live="polite">{message}</p>}
+      {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
   )
 }
