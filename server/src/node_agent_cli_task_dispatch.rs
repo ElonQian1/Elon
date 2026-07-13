@@ -345,11 +345,7 @@ async fn run_cli_task(
     // Workspace preparation and build admission share the data-root transition
     // lock. A root switch can happen before this transaction or after the
     // lease is registered, never between selecting a workspace and its cache.
-    let transition = runtime
-        .node_data_root_transition
-        .clone()
-        .lock_owned()
-        .await;
+    let transition = runtime.node_data_root_transition.clone().lock_owned().await;
     let data_paths = runtime.node_data_root.read().await.paths.clone();
     let workspace_root = data_paths
         .as_ref()
