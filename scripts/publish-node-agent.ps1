@@ -28,6 +28,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
+. (Join-Path $PSScriptRoot "local-env.ps1")
 
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
@@ -41,6 +42,8 @@ $ServerDir = Join-Path $RepoRoot "server"
 $ServerManifest = Join-Path $ServerDir "Cargo.toml"
 $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir = Join-Path $PcFrontendDir "dist"
+
+Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
 
 Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan
 
