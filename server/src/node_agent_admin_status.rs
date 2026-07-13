@@ -22,6 +22,7 @@ pub(super) async fn admin_status(
     let hardware = rt.hardware_profile().await;
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = super::pc_storage_repo::storage_profile(&storage_settings);
+    let node_data_root = rt.node_data_root.read().await.status_payload();
     let full_access_grant_count =
         match super::node_agent_full_access::current_grant_identity(&rt).await {
             Ok(identity) => rt.full_access_grants.list(&identity).await.len(),
@@ -74,6 +75,7 @@ pub(super) async fn admin_status(
         "lifecycle": lifecycle,
         "hardware": hardware,
         "storage": storage,
+        "node_data_root": node_data_root,
         "full_access_grant_count": full_access_grant_count,
         "runtime_policy": super::node_agent_full_access::runtime_policy_summary(),
         "cli_session_bridge": super::node_agent_cli_session_bridge::status_payload_for(

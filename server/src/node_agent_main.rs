@@ -69,12 +69,13 @@ mod node_agent_codex_vault_active;
 mod node_agent_codex_vault_emergency;
 mod node_agent_config;
 use node_agent_config::{
-    ensure_install_id, initial_credentials, initial_storage_settings, load_persisted,
-    save_persisted, PersistedState,
+    ensure_install_id, initial_credentials, initial_node_data_root, initial_storage_settings,
+    load_persisted, save_persisted, PersistedState,
 };
 pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
 mod node_agent_cli_runner;
 mod node_agent_download_router;
+mod node_agent_data_root;
 mod node_agent_env;
 use node_agent_cli_runner::*;
 pub use node_agent_cli_runner::{prepare_cli_prompt_cwd, PreparedCliPromptCwd};
@@ -270,12 +271,14 @@ async fn run_agent_runtime() -> Result<()> {
     node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
     let mut persisted = load_persisted();
     let install_id = ensure_install_id(&mut persisted);
+    let node_data_root = initial_node_data_root(&persisted);
     let storage_settings = initial_storage_settings(&persisted);
     let mut creds = initial_credentials(&persisted);
     save_persisted(&PersistedState::from_parts(
         &install_id,
         creds.as_ref(),
         &storage_settings,
+        node_data_root.configured_root(),
     ));
 
     // 有登录 token 但还没有节点凭证 → 自动注册一次
@@ -293,6 +296,7 @@ async fn run_agent_runtime() -> Result<()> {
                         &install_id,
                         Some(&c),
                         &storage_settings,
+                        node_data_root.configured_root(),
                     ));
                     creds = Some(c);
                 }
@@ -325,7 +329,13 @@ async fn run_agent_runtime() -> Result<()> {
         );
     }
 
-    let runtime = Arc::new(NodeRuntime::new(cfg, creds, storage_settings, install_id));
+    let runtime = Arc::new(NodeRuntime::new(
+        cfg,
+        creds,
+        storage_settings,
+        node_data_root,
+        install_id,
+    ));
     runtime.reconcile_local_completion_outbox();
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();

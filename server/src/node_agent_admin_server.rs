@@ -15,6 +15,7 @@ use super::{
     node_agent_admin_status, node_agent_android_inspector, node_agent_android_live,
     node_agent_api_runtime_config, node_agent_cli_sidecar_admin, node_agent_client_diagnostics,
     node_agent_client_maintenance, node_agent_cloud_net, node_agent_codex_vault,
+    node_agent_data_root,
     node_agent_download_router, node_agent_full_access, node_agent_install_env,
     node_agent_local_admin, node_agent_local_pc_frontend, node_agent_local_tasks,
     node_agent_project_agent_runs, node_agent_project_picker, node_agent_source_preview,
@@ -138,6 +139,14 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route(
                 "/api/storage-config",
                 axum::routing::get(admin_storage_config_get).post(admin_storage_config_set),
+            )
+            .route(
+                "/api/node-data-root",
+                axum::routing::get(admin_node_data_root_get).post(admin_node_data_root_set),
+            )
+            .route(
+                "/api/node-data-root/cleanup",
+                axum::routing::post(admin_node_data_root_cleanup),
             )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .route(

@@ -2,6 +2,129 @@ use super::*;
 use std::sync::Arc;
 use serde::Deserialize;
 
+pub(super) async fn admin_node_data_root_get(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> axum::Json<serde_json::Value> {
+    let state = rt.node_data_root.read().await;
+    axum::Json(state.status_payload())
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct NodeDataRootSetReq {
+    root_path: String,
+}
+
+pub(super) async fn admin_node_data_root_set(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<NodeDataRootSetReq>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    use axum::http::StatusCode;
+
+    if !rt.active_cli_prompts.views_without_approvals().await.is_empty() {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": "当前仍有 CLI 任务运行，不能切换节点数据根",
+            })),
+        );
+    }
+    let current = rt.node_data_root.read().await.clone();
+    if let Err(error) = node_agent_data_root::validate_no_root_overlap(&req.root_path, &current) {
+        return (
+            StatusCode::BAD_REQUEST,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": error.to_string(),
+            })),
+        );
+    }
+    let paths = match node_agent_data_root::validate_and_prepare(&req.root_path, &rt.install_id) {
+        Ok(paths) => paths,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": error.to_string(),
+                })),
+            );
+        }
+    };
+    match rt.set_node_data_root(paths).await {
+        Ok(state) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({
+                "ok": true,
+                "data_root": state.status_payload(),
+                "restart_recommended": true,
+            })),
+        ),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": error.to_string(),
+            })),
+        ),
+    }
+}
+
+#[derive(serde::Deserialize)]
+pub(super) struct NodeDataRootCleanupReq {
+    #[serde(default)]
+    apply: bool,
+}
+
+pub(super) async fn admin_node_data_root_cleanup(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    axum::Json(req): axum::Json<NodeDataRootCleanupReq>,
+) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
+    use axum::http::StatusCode;
+
+    if req.apply && !rt.active_cli_prompts.views_without_approvals().await.is_empty() {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": "当前仍有 CLI 任务运行，不能清理节点构建缓存",
+            })),
+        );
+    }
+    let state = rt.node_data_root.read().await.clone();
+    let Some(paths) = state.paths.clone() else {
+        return (
+            StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": "尚未配置 ELON_NODE_DATA_ROOT，拒绝清理旧用户目录",
+                "data_root": state.status_payload(),
+            })),
+        );
+    };
+    let apply = req.apply;
+    match tokio::task::spawn_blocking(move || node_agent_data_root::cleanup(&paths, apply)).await {
+        Ok(Ok(result)) => (
+            StatusCode::OK,
+            axum::Json(serde_json::json!({ "ok": true, "cleanup": result })),
+        ),
+        Ok(Err(error)) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": error.to_string(),
+            })),
+        ),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": format!("节点缓存清理任务异常结束: {error}"),
+            })),
+        ),
+    }
+}
+
 pub(super) async fn admin_tts_relay_get(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> axum::Json<serde_json::Value> {
@@ -52,13 +175,18 @@ pub(super) async fn admin_storage_config_set(
     axum::Json(req): axum::Json<StorageConfigSetReq>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     let enabled = req.enabled.unwrap_or(false);
-    let root_path = clean_optional_admin_field(req.root_path.as_deref()).or_else(|| {
-        enabled.then(|| {
-            pc_storage_repo::default_storage_root()
-                .to_string_lossy()
-                .to_string()
-        })
-    });
+    let default_root = rt
+        .node_data_root
+        .read()
+        .await
+        .paths
+        .as_ref()
+        .map(|paths| paths.storage())
+        .unwrap_or_else(pc_storage_repo::default_storage_root)
+        .to_string_lossy()
+        .to_string();
+    let root_path = clean_optional_admin_field(req.root_path.as_deref())
+        .or_else(|| enabled.then(|| default_root));
     if enabled {
         if let Some(root) = root_path.as_deref() {
             if let Err(e) = std::fs::create_dir_all(root) {

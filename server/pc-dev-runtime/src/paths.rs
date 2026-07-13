@@ -1,19 +1,34 @@
 use std::path::PathBuf;
 
-pub fn workspace_root() -> PathBuf {
-    for key in [
+use crate::node_data_paths::{NodeDataPaths, NODE_DATA_ROOT_ENV};
+
+pub fn configured_node_data_root() -> Option<PathBuf> {
+    nonempty_env(NODE_DATA_ROOT_ENV).map(PathBuf::from)
+}
+
+pub fn legacy_workspace_root_override() -> Option<PathBuf> {
+    [
         "ELON_NODE_WORKSPACE_ROOT",
         "ELON_PC_WORKSPACE_ROOT",
         "NODE_WORKSPACE_ROOT",
-    ] {
-        if let Ok(value) = std::env::var(key) {
-            let value = value.trim();
-            if !value.is_empty() {
-                return PathBuf::from(value);
-            }
-        }
+    ]
+    .into_iter()
+    .find_map(nonempty_env)
+    .map(PathBuf::from)
+}
+
+pub fn workspace_root() -> PathBuf {
+    if let Some(root) = legacy_workspace_root_override() {
+        return root;
+    }
+    if let Some(root) = configured_node_data_root() {
+        return NodeDataPaths::new(root).workspaces();
     }
 
+    legacy_default_workspace_root()
+}
+
+pub fn legacy_default_workspace_root() -> PathBuf {
     #[cfg(windows)]
     {
         if let Ok(profile) = std::env::var("USERPROFILE") {
@@ -29,6 +44,13 @@ pub fn workspace_root() -> PathBuf {
     }
 
     std::env::temp_dir().join("elon").join("workspaces")
+}
+
+fn nonempty_env(key: &str) -> Option<String> {
+    std::env::var(key)
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 pub fn safe_path_part(value: &str, fallback: &str, max_len: usize) -> String {

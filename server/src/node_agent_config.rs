@@ -44,6 +44,9 @@ pub(super) struct PersistedState {
     pub(super) agent_secret: Option<String>,
     pub(super) owner_user_id: Option<String>,
     pub(super) user_token: Option<String>,
+    /// Canonical root for large, reproducible node data. Credentials remain in
+    /// this small APPDATA state file and are not moved with the data root.
+    pub(super) node_data_root: Option<String>,
     pub(super) storage_enabled: Option<bool>,
     pub(super) storage_root: Option<String>,
     pub(super) storage_git_base_url: Option<String>,
@@ -123,6 +126,7 @@ impl PersistedState {
         install_id: &str,
         c: Option<&Credentials>,
         storage: &super::pc_storage_repo::StorageSettings,
+        node_data_root: Option<&std::path::Path>,
     ) -> Self {
         Self {
             install_id: Some(install_id.to_string()),
@@ -130,11 +134,30 @@ impl PersistedState {
             agent_secret: c.map(|c| c.agent_secret.clone()),
             owner_user_id: c.map(|c| c.owner_user_id.clone()),
             user_token: c.and_then(|c| c.user_token.clone()),
+            node_data_root: node_data_root.map(|path| path.to_string_lossy().to_string()),
             storage_enabled: Some(storage.enabled),
             storage_root: storage.root_path.clone(),
             storage_git_base_url: storage.git_base_url.clone(),
         }
     }
+}
+
+pub(super) fn initial_node_data_root(
+    persisted: &PersistedState,
+) -> super::node_agent_data_root::NodeDataRootState {
+    let legacy_storage_root = ["NODE_STORAGE_ROOT", "ELON_STORAGE_ROOT"]
+        .into_iter()
+        .find_map(|key| std::env::var(key).ok().filter(|value| !value.trim().is_empty()))
+        .or_else(|| persisted.storage_root.clone())
+        .map(PathBuf::from)
+        .or_else(|| {
+            let default = super::pc_storage_repo::legacy_default_storage_root();
+            default.exists().then_some(default)
+        });
+    super::node_agent_data_root::resolve(
+        persisted.node_data_root.as_deref(),
+        legacy_storage_root,
+    )
 }
 
 /// 从环境变量 / 持久化文件解析已有凭证；都没有时返回 None（需登录）。
@@ -160,9 +183,16 @@ pub(super) fn initial_storage_settings(
     persisted: &PersistedState,
 ) -> super::pc_storage_repo::StorageSettings {
     let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
-    let root_path = env_nonempty("NODE_STORAGE_ROOT")
+    let explicit_or_legacy_root = env_nonempty("NODE_STORAGE_ROOT")
         .or_else(|| env_nonempty("ELON_STORAGE_ROOT"))
         .or_else(|| persisted.storage_root.clone());
+    let data_root = initial_node_data_root(persisted);
+    let root_path = explicit_or_legacy_root.or_else(|| {
+        data_root
+            .paths
+            .as_ref()
+            .map(|paths| paths.storage().to_string_lossy().to_string())
+    });
     let git_base_url = env_nonempty("NODE_STORAGE_GIT_BASE_URL")
         .or_else(|| env_nonempty("ELON_STORAGE_GIT_BASE_URL"))
         .or_else(|| persisted.storage_git_base_url.clone());

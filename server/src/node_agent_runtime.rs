@@ -22,6 +22,7 @@ use crate::node_agent_cli_sidecar;
 use crate::node_agent_completion_outbox;
 use crate::node_agent_config::{save_persisted, Credentials, NodeConfig, PersistedState};
 use crate::node_agent_full_access;
+use crate::node_agent_data_root::{self, NodeDataRootState};
 use crate::node_agent_lifecycle;
 use crate::node_agent_local_admin;
 use crate::node_agent_local_llm::discover_models;
@@ -50,6 +51,7 @@ pub(crate) struct NodeRuntime {
     model_scan_refreshing: AtomicBool,
     pub(crate) tts_worker_url: RwLock<Option<String>>,
     pub(crate) storage_settings: RwLock<pc_storage_repo::StorageSettings>,
+    pub(crate) node_data_root: RwLock<NodeDataRootState>,
     pub(crate) active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
     pub(crate) cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
     pub(crate) task_journal: node_agent_task_journal::TaskJournal,
@@ -69,6 +71,7 @@ impl NodeRuntime {
         cfg: NodeConfig,
         creds: Option<Credentials>,
         storage_settings: pc_storage_repo::StorageSettings,
+        node_data_root: NodeDataRootState,
         install_id: String,
     ) -> Self {
         let tts_url = std::env::var("NODE_TTS_WORKER_URL")
@@ -90,6 +93,7 @@ impl NodeRuntime {
             model_scan_refreshing: AtomicBool::new(false),
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
+            node_data_root: RwLock::new(node_data_root),
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
             cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry::default(),
             task_journal: node_agent_task_journal::TaskJournal::default(),
@@ -431,10 +435,12 @@ impl NodeRuntime {
 
     pub(crate) async fn set_creds(&self, c: Option<Credentials>) {
         let storage = self.storage_settings.read().await.clone();
+        let data_root = self.node_data_root.read().await;
         save_persisted(&PersistedState::from_parts(
             &self.install_id,
             c.as_ref(),
             &storage,
+            data_root.configured_root(),
         ));
         *self.creds.write().await = c;
         self.wake.notify_waiters();
@@ -442,13 +448,39 @@ impl NodeRuntime {
 
     pub(crate) async fn set_storage_settings(&self, settings: pc_storage_repo::StorageSettings) {
         let creds = self.creds.read().await.clone();
+        let data_root = self.node_data_root.read().await;
         save_persisted(&PersistedState::from_parts(
             &self.install_id,
             creds.as_ref(),
             &settings,
+            data_root.configured_root(),
         ));
         *self.storage_settings.write().await = settings;
         self.wake.notify_waiters();
+    }
+
+    pub(crate) async fn set_node_data_root(
+        &self,
+        paths: elon_pc_dev_runtime::NodeDataPaths,
+    ) -> anyhow::Result<NodeDataRootState> {
+        node_agent_data_root::persist_to_env_file(&paths)?;
+        node_agent_data_root::apply_to_process(&paths);
+
+        let storage = self.storage_settings.read().await.clone();
+        let creds = self.creds.read().await.clone();
+        let next = node_agent_data_root::resolve(
+            None,
+            storage.root_path.as_deref().map(std::path::PathBuf::from),
+        );
+        save_persisted(&PersistedState::from_parts(
+            &self.install_id,
+            creds.as_ref(),
+            &storage,
+            next.configured_root(),
+        ));
+        *self.node_data_root.write().await = next.clone();
+        self.wake.notify_waiters();
+        Ok(next)
     }
 
     pub(crate) async fn set_connected(&self, on: bool, evt: &str) {

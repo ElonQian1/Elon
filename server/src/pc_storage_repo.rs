@@ -30,6 +30,13 @@ pub struct StorageRepoResult {
 }
 
 pub fn default_storage_root() -> PathBuf {
+    if let Some(root) = elon_pc_dev_runtime::configured_node_data_root() {
+        return elon_pc_dev_runtime::NodeDataPaths::new(root).storage();
+    }
+    legacy_default_storage_root()
+}
+
+pub fn legacy_default_storage_root() -> PathBuf {
     let base = if cfg!(windows) {
         std::env::var("APPDATA").ok().map(PathBuf::from)
     } else {
