@@ -11,6 +11,19 @@ use super::types::{AndroidDeviceIdentity, AndroidDeviceProfile};
 const PROFILE_SCHEMA_VERSION: u32 = 1;
 static PROFILE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
+#[derive(Debug, Clone)]
+pub(crate) struct SharedDeviceProfileInput {
+    pub project_id: String,
+    pub hardware_serial: String,
+    pub display_name: String,
+    pub manufacturer: Option<String>,
+    pub model: Option<String>,
+    pub android_sdk: Option<u32>,
+    pub android_release: Option<String>,
+    pub last_endpoint: String,
+    pub wireless_mode: String,
+}
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ProfileFile {
@@ -103,6 +116,7 @@ pub(crate) fn upsert_profile(
             wireless_mode: "unknown".to_string(),
             paired: false,
             last_endpoint: endpoint.map(str::to_string),
+            shared_project_ids: Vec::new(),
             created_at: now.clone(),
             last_seen_at: now,
         };
@@ -111,6 +125,86 @@ pub(crate) fn upsert_profile(
     };
     write_file(&path, &file)?;
     Ok(profile)
+}
+
+pub(crate) fn merge_shared_profiles(
+    shared: &[SharedDeviceProfileInput],
+) -> Result<Vec<AndroidDeviceProfile>> {
+    let _guard = profile_lock()
+        .lock()
+        .map_err(|_| anyhow::anyhow!("Android 设备档案锁已损坏"))?;
+    let path = profiles_path();
+    let mut file = read_file(&path)?;
+    let now = Utc::now().to_rfc3339();
+    let mut merged_serials = Vec::new();
+
+    for incoming in shared {
+        let project_id = incoming.project_id.trim();
+        let hardware_serial = incoming.hardware_serial.trim();
+        if project_id.is_empty() || hardware_serial.is_empty() {
+            continue;
+        }
+        let profile = if let Some(existing) = file
+            .profiles
+            .iter_mut()
+            .find(|profile| profile.hardware_serial == hardware_serial)
+        {
+            existing.display_name = clean_display_name(Some(&incoming.display_name))
+                .unwrap_or_else(|| existing.display_name.clone());
+            existing.manufacturer = incoming.manufacturer.clone();
+            existing.model = incoming.model.clone();
+            existing.android_sdk = incoming.android_sdk;
+            existing.android_release = incoming.android_release.clone();
+            existing.last_endpoint = Some(incoming.last_endpoint.clone());
+            if !existing.paired {
+                existing.wireless_mode = incoming.wireless_mode.clone();
+            }
+            if !existing
+                .shared_project_ids
+                .iter()
+                .any(|id| id == project_id)
+            {
+                existing.shared_project_ids.push(project_id.to_string());
+                existing.shared_project_ids.sort();
+            }
+            existing.last_seen_at = now.clone();
+            existing.clone()
+        } else {
+            let profile = AndroidDeviceProfile {
+                id: format!("adp_{}", uuid::Uuid::new_v4().simple()),
+                display_name: clean_display_name(Some(&incoming.display_name))
+                    .unwrap_or_else(|| hardware_serial.to_string()),
+                hardware_serial: hardware_serial.to_string(),
+                manufacturer: incoming.manufacturer.clone(),
+                model: incoming.model.clone(),
+                android_sdk: incoming.android_sdk,
+                android_release: incoming.android_release.clone(),
+                wireless_mode: incoming.wireless_mode.clone(),
+                paired: false,
+                last_endpoint: Some(incoming.last_endpoint.clone()),
+                shared_project_ids: vec![project_id.to_string()],
+                created_at: now.clone(),
+                last_seen_at: now.clone(),
+            };
+            file.profiles.push(profile.clone());
+            profile
+        };
+        if !merged_serials
+            .iter()
+            .any(|serial: &String| serial == &profile.hardware_serial)
+        {
+            merged_serials.push(profile.hardware_serial);
+        }
+    }
+
+    if !shared.is_empty() {
+        write_file(&path, &file)?;
+    }
+    Ok(file
+        .profiles
+        .into_iter()
+        .filter(|profile| merged_serials.contains(&profile.hardware_serial))
+        .collect())
 }
 
 pub(crate) fn mark_paired(profile_id: Option<&str>) -> Result<()> {

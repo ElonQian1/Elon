@@ -77,6 +77,8 @@ pub(crate) struct AndroidDeviceProfile {
     pub wireless_mode: String,
     pub paired: bool,
     pub last_endpoint: Option<String>,
+    #[serde(default)]
+    pub shared_project_ids: Vec<String>,
     pub created_at: String,
     pub last_seen_at: String,
 }
