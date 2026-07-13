@@ -11,8 +11,8 @@ mod cleanup;
 mod marker;
 
 pub(crate) use cleanup::{cleanup, CleanupEntry, CleanupResult};
-use marker::{claim_or_verify_root_marker, root_marker_belongs_to};
 pub(crate) use marker::verify_root_marker;
+use marker::{claim_or_verify_root_marker, root_marker_belongs_to};
 #[cfg(test)]
 use marker::{read_existing_root_marker, ROOT_MARKER_FILE};
 

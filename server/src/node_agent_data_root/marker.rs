@@ -5,10 +5,7 @@ use std::path::Path;
 pub(super) const ROOT_MARKER_FILE: &str = ".elon-node-data-root.json";
 const ROOT_MARKER_SCHEMA_VERSION: u64 = 1;
 
-pub(super) fn claim_or_verify_root_marker(
-    paths: &NodeDataPaths,
-    install_id: &str,
-) -> Result<()> {
+pub(super) fn claim_or_verify_root_marker(paths: &NodeDataPaths, install_id: &str) -> Result<()> {
     let install_id = require_install_id(install_id)?;
     let marker = paths.root().join(ROOT_MARKER_FILE);
     if let Some(existing_install_id) = read_existing_root_marker(&marker)? {

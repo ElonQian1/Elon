@@ -51,11 +51,7 @@ pub(super) fn spawn_provision(
             branch,
         } = request;
         let project_id_for_error = project_id.clone();
-        let transition = runtime
-            .node_data_root_transition
-            .clone()
-            .lock_owned()
-            .await;
+        let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let workspace_root = runtime
             .node_data_root
             .read()
@@ -105,7 +101,8 @@ pub(super) fn spawn_provision(
             AgentToServer::ProjectWorkspaceProvisionError {
                 req_id,
                 project_id: project_id_for_error,
-                message: "PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘".to_string(),
+                message: "PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘"
+                    .to_string(),
             }
         };
         let _ = out_tx.send(ws_text(&response));
@@ -128,16 +125,11 @@ pub(super) fn spawn_prepare_storage(
             prepare_worktree,
         } = request;
         let project_id_for_error = project_id.clone();
-        let transition = runtime
-            .node_data_root_transition
-            .clone()
-            .lock_owned()
-            .await;
+        let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let data_paths = runtime.node_data_root.read().await.paths.clone();
         let response = if let Some(data_paths) = data_paths {
             let mut storage_settings = runtime.storage_settings.read().await.clone();
-            storage_settings.root_path =
-                Some(data_paths.storage().to_string_lossy().to_string());
+            storage_settings.root_path = Some(data_paths.storage().to_string_lossy().to_string());
             match tokio::task::spawn_blocking(move || {
                 let _transition = transition;
                 pc_storage_repo::prepare_project_storage_repo(
@@ -198,11 +190,7 @@ pub(super) fn spawn_cleanup(
             workspace_path,
         } = request;
         let project_id_for_error = project_id.clone();
-        let transition = runtime
-            .node_data_root_transition
-            .clone()
-            .lock_owned()
-            .await;
+        let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let workspace_root = runtime
             .node_data_root
             .read()
@@ -243,7 +231,8 @@ pub(super) fn spawn_cleanup(
             AgentToServer::ProjectWorkspaceCleanupError {
                 req_id,
                 project_id: project_id_for_error,
-                message: "PC 节点尚未配置有效的统一数据根，拒绝按旧用户目录清理项目工作区".to_string(),
+                message: "PC 节点尚未配置有效的统一数据根，拒绝按旧用户目录清理项目工作区"
+                    .to_string(),
             }
         };
         let _ = out_tx.send(ws_text(&response));
