@@ -26,11 +26,7 @@ internal class MainBottomNavigationController(
 
     fun setVisible(visible: Boolean) {
         binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
-        val inset = if (visible) {
-            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
-        } else {
-            0
-        }
+        val inset = 0
         listOfNotNull(
             binding.conversationPage.parent as? ScrollView,
             binding.projectScrollView,
