@@ -24,15 +24,18 @@ Rust 首次编译常产生数 GB 到数十 GB target；多个项目、toolchain 
 ELON_NODE_DATA_ROOT=D:\ElonNodeData
 ```
 
+该环境变量用于安装器、无人值守部署和首次启动引导；本地管理页保存后，`node.json` 中的持久化值优先，确保重启不会被安装包里遗留的旧环境值悄悄改回。管理员若要重新以环境变量接管，应先显式清除持久化数据根，而不是同时维护两个相互竞争的真源。
+
 要求：
 
 1. 必须是绝对路径，不能直接选择 `C:\`、`D:\` 等磁盘根。
 2. 不能与旧 workspace、storage 或另一个数据根互相嵌套。
 3. 目录必须可创建、可写，且不能是重解析点、junction 或符号链接。
-4. 根目录标记绑定当前节点 `install_id`，不能让两台节点误用同一目录。
-5. 节点凭证、登录 token 和小体积配置仍保留在 `%APPDATA%` 与安装目录的 `_internal\node-agent.env`；它们不是构建缓存，不能随着可移除数据盘迁移。
+4. 首次绑定时目录必须为空；节点先以不覆盖语义独占创建 marker，再创建派生目录。已有非空目录不能被“顺手认领”为数据根。
+5. 根目录标记绑定当前节点 `install_id`，不能让两台节点误用同一目录；每次清理前都会重新校验 marker。
+6. 节点凭证、登录 token 和小体积配置仍保留在 `%APPDATA%` 与安装目录的 `_internal\node-agent.env`；它们不是构建缓存，不能随着可移除数据盘迁移。
 
-`ELON_NODE_WORKSPACE_ROOT`、`ELON_PC_WORKSPACE_ROOT`、`NODE_WORKSPACE_ROOT`、`NODE_STORAGE_ROOT` 和 `ELON_STORAGE_ROOT` 只保留给旧节点识别与高级覆盖。新节点不应要求普通用户分别配置这些变量。
+`ELON_NODE_WORKSPACE_ROOT`、`ELON_PC_WORKSPACE_ROOT`、`NODE_WORKSPACE_ROOT`、`NODE_STORAGE_ROOT` 和 `ELON_STORAGE_ROOT` 只保留给尚未配置统一数据根的旧节点。统一数据根一旦生效，它们只用于迁移发现，不能继续覆盖真实 workspace/storage，否则状态页面会显示 D 盘而新任务仍悄悄写回 C 盘。
 
 ## 3. 目录合同
 
@@ -50,7 +53,8 @@ ELON_NODE_DATA_ROOT=D:\ElonNodeData
 │  ├─ rust-targets\<project-id>\<toolchain-key>\target\
 │  ├─ gradle-home\
 │  ├─ npm\
-│  └─ pnpm-store\
+│  ├─ pnpm-store\
+│  └─ yarn\
 └─ temp\<task-id>\
 ```
 
@@ -76,7 +80,8 @@ cache\rust-targets\<project-id>\<toolchain-key>\target
 - 同一项目的基础 repo 和所有会话 worktree 共享 target，避免每个会话重复下载和编译。
 - 不同项目使用不同 target，避免 feature、build script、环境变量和绝对 dep-info 互相污染。
 - 不同 Rust toolchain 使用不同 `toolchain-key`，例如 `stable-msvc`、`nightly-msvc`；Cargo 会继续在 target 内按 target triple 分目录。
-- 每个任务创建文件 lease，TTL/LRU 和人工清理都必须避开活跃 lease；同一 target 的写入一致性继续由 Cargo 原生 target lock 保证。
+- 每个任务创建原子 lease，TTL/LRU 和人工清理都必须避开活跃 lease；同一项目与 toolchain 还持有跨进程 target 独占锁，不能仅依赖某一种构建工具自己的锁实现。
+- 云端只把带项目上下文的 CLI/Exec 任务派给声明 `project_build_cache_v1` 能力的新节点；滚动升级期间，旧节点不会静默绕过治理并继续使用用户目录默认缓存。
 - 跨项目复用依赖编译结果应使用受控的编译缓存层，不能把所有项目硬塞进一个 `D:\rust\shared\target`。
 - 服务端 musl 发布、Windows 节点发布和用户项目开发 profile 不能混用同一个 target。
 
@@ -105,6 +110,7 @@ RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
 | Gradle | `GRADLE_USER_HOME=<root>\cache\gradle-home` |
 | npm | `npm_config_cache=<root>\cache\npm` |
 | pnpm | store 指向 `<root>\cache\pnpm-store` |
+| Yarn | `YARN_CACHE_FOLDER=<root>\cache\yarn`；项目内 `.yarn/cache` 随 workspace 一起位于数据盘 |
 | Cargo | `CARGO_HOME` 和项目级 `CARGO_TARGET_DIR` |
 | Windows 临时目录 | `TEMP=<root>\temp\<task-id>`、`TMP=...` |
 | 跨平台临时目录 | `TMPDIR=<root>\temp\<task-id>` |
@@ -127,6 +133,8 @@ Gradle 项目自己的 `.gradle`、`build` 和 Android 输出仍位于项目 wor
 
 缓存不需要复制：新根创建空 cache 即可。旧 C 盘 target 可在确认没有 Cargo/Rustc 进程后删除；旧 Temp 只按白名单类型和年龄处理。
 
+升级后若尚未配置有效统一根，节点仍可登录、查看状态和选择已有外部项目，但平台托管 workspace、会话 worktree、项目 storage 以及带项目上下文的构建全部 fail closed；不会为了兼容而继续在 `%USERPROFILE%` 或 `%APPDATA%` 创建新数据。
+
 ## 7. 容量、TTL 与 LRU 默认
 
 产品默认建议如下；管理员可以收紧，不能扩大到 workspace/storage：
@@ -134,6 +142,7 @@ Gradle 项目自己的 `.gradle`、`build` 和 Android 输出仍位于项目 wor
 | 项目 | 默认 |
 |---|---|
 | 构建前硬保留 | 10 GiB，可用 `ELON_NODE_BUILD_MIN_FREE_BYTES` 覆盖 |
+| 单次构建增长余量 | 24 GiB，可用 `ELON_NODE_BUILD_HEADROOM_BYTES` 覆盖；准入时与硬保留、其他活动任务预留相加 |
 | 节点 cache 配额 | 80 GiB，可用 `ELON_NODE_BUILD_MAX_CACHE_BYTES` 覆盖 |
 | 单项目 Rust cache 配额 | 24 GiB，可用 `ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES` 覆盖 |
 | 成功任务 temp | 子进程结束后立即清理 |
@@ -142,7 +151,7 @@ Gradle 项目自己的 `.gradle`、`build` 和 Android 输出仍位于项目 wor
 | LRU 顺序 | 最久未使用且没有活跃 lease 的项目缓存优先；活动项目绝不删除 |
 | 旧根回滚观察期 | 至少 7 天，并由用户显式确认清理 |
 
-构建前容量预测应叠加项目类型预算。仅保留 4 GiB 不足以承载 Android 或 Rust 首次全量构建。
+默认情况下，第一个项目任务启动前至少需要 34 GiB 可用空间：其中 10 GiB 是任务结束后仍应保留的安全线，24 GiB 是当前构建可增长的保守余量；并发任务会各自再预留 24 GiB，不能重复承诺同一份空闲空间。任务结束后若仍低于“硬保留 + 活动任务预留 + 下一任务预留”的准入线，节点立即对无活跃 lease 的可重建缓存执行压力清理。该预留来自本机两份 Rust target 合计约 23.6 GiB 的实测量级；它是保守准入而非运行中硬配额，管理员应优先选择空间充足的 D/E 盘，不应降低硬保留来勉强放行。
 
 ## 8. 设置、状态与清理 API
 
@@ -163,7 +172,7 @@ Content-Type: application/json
 {"root_path":"D:\\ElonNodeData"}
 ```
 
-设置会写入 `node.json` 和安装目录 `_internal\node-agent.env`。当前进程更新路径状态，但建议重启节点，让所有后台组件继承一致环境。
+通过本地 API 设置时，`node.json` 是唯一持久化真源；写入采用同目录原子替换，失败时不会发布新的内存状态。当前进程会立即更新 `ELON_NODE_DATA_ROOT` 及所有派生路径，但仍建议重启节点，让以后启动的所有后台组件继承一致环境。安装目录 `_internal\node-agent.env` 只用于安装器或管理员手工配置，不和 API 进行非事务双写。
 
 清理前预览：
 
@@ -180,13 +189,13 @@ Content-Type: application/json
 {"apply":true}
 ```
 
-清理接口检测到活动 CLI 任务时必须拒绝执行；未配置数据根时也必须拒绝，不能退回清理任意 `%USERPROFILE%` 或 `%TEMP%`。
+清理接口检测到活动 CLI 或 Exec lease 时必须拒绝执行；未配置数据根时也必须拒绝，不能退回清理任意 `%USERPROFILE%` 或 `%TEMP%`。切换、任务准入和清理共用同一门闩，避免“检查时无任务、删除时任务已启动”的竞态。
 
 ## 9. 回滚
 
 1. 停止创建任务并等待活动 CLI/Cargo/Gradle 进程退出。
 2. 保留新旧根，不要先删除任一侧。
-3. 将 `ELON_NODE_DATA_ROOT` 恢复为上一个带相同 `install_id` marker 的根。
+3. 在本地管理页将数据根恢复为上一个带相同 `install_id` marker 的根；无人值守节点应先清除持久化值，再修改 `ELON_NODE_DATA_ROOT`。
 4. 重启节点并确认状态、项目 Git 远端和 workspace 可用。
 5. 对 storage 执行完整性检查，对项目检查 `git status` 和远端分支。
 6. 回滚完成后，新根的 cache/temp 可清；workspace/storage 仍需用户确认。
