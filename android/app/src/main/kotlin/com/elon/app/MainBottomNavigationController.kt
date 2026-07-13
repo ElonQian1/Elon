@@ -26,7 +26,11 @@ internal class MainBottomNavigationController(
 
     fun setVisible(visible: Boolean) {
         binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
-        val inset = 0
+        val inset = if (visible) {
+            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
+        } else {
+            0
+        }
         listOfNotNull(
             binding.conversationPage.parent as? ScrollView,
             binding.projectScrollView,
@@ -34,7 +38,7 @@ internal class MainBottomNavigationController(
             binding.marketplacePage
         ).forEach { view ->
             view.setPadding(view.paddingLeft, view.paddingTop, view.paddingRight, inset)
-            view.clipToPadding = true
+            view.clipToPadding = false
         }
     }
 }

@@ -105,16 +105,15 @@
     .app {
       display: grid;
       min-height: 100vh;
-      grid-template-rows: 50px 1fr auto auto;
+      grid-template-rows: 50px 1fr auto;
       grid-template-columns: 1fr;
       grid-template-areas:
         "toolbar"
         "content"
-        "input"
-        "tabs";
+        "input";
     }
     .app.project-tabs-visible {
-      grid-template-rows: 62px 1fr auto auto;
+      grid-template-rows: 62px 1fr auto;
     }
     /* 平板 / 桌面：限定宽度居中，Tab 始终在底部（与 APK 一致） */
     @media (min-width: 720px) {
@@ -3074,8 +3073,11 @@
 
     /* ===== Tab 栏 ===== */
     .tabs-bar {
-      grid-area: tabs;
-      position: relative;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 20;
       background: transparent;
       display: flex;
       flex-direction: column;
