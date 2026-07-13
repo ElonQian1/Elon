@@ -1,6 +1,6 @@
 use super::*;
-use std::sync::Arc;
 use serde::Deserialize;
+use std::sync::Arc;
 
 pub(super) async fn admin_node_data_root_get(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
@@ -8,10 +8,9 @@ pub(super) async fn admin_node_data_root_get(
     let state = rt.node_data_root.read().await.clone();
     let mut payload = state.status_payload();
     if let Some(paths) = state.paths {
-        if let Ok(build_cache) = tokio::task::spawn_blocking(move || {
-            crate::node_agent_build_runtime::status(&paths)
-        })
-        .await
+        if let Ok(build_cache) =
+            tokio::task::spawn_blocking(move || crate::node_agent_build_runtime::status(&paths))
+                .await
         {
             payload["build_cache"] = serde_json::json!(build_cache);
         }
@@ -30,7 +29,12 @@ pub(super) async fn admin_node_data_root_set(
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     use axum::http::StatusCode;
 
-    if !rt.active_cli_prompts.views_without_approvals().await.is_empty() {
+    if !rt
+        .active_cli_prompts
+        .views_without_approvals()
+        .await
+        .is_empty()
+    {
         return (
             StatusCode::CONFLICT,
             axum::Json(serde_json::json!({
@@ -92,7 +96,13 @@ pub(super) async fn admin_node_data_root_cleanup(
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     use axum::http::StatusCode;
 
-    if req.apply && !rt.active_cli_prompts.views_without_approvals().await.is_empty() {
+    if req.apply
+        && !rt
+            .active_cli_prompts
+            .views_without_approvals()
+            .await
+            .is_empty()
+    {
         return (
             StatusCode::CONFLICT,
             axum::Json(serde_json::json!({

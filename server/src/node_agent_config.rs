@@ -159,7 +159,11 @@ pub(super) fn initial_node_data_root(
 ) -> super::node_agent_data_root::NodeDataRootState {
     let legacy_storage_root = ["NODE_STORAGE_ROOT", "ELON_STORAGE_ROOT"]
         .into_iter()
-        .find_map(|key| std::env::var(key).ok().filter(|value| !value.trim().is_empty()))
+        .find_map(|key| {
+            std::env::var(key)
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+        })
         .or_else(|| persisted.node_data_legacy_storage_root.clone())
         .or_else(|| persisted.storage_root.clone())
         .map(PathBuf::from)
@@ -200,15 +204,17 @@ pub(super) fn initial_storage_settings(
     persisted: &PersistedState,
 ) -> super::pc_storage_repo::StorageSettings {
     let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
-    let explicit_root = env_nonempty("NODE_STORAGE_ROOT")
-        .or_else(|| env_nonempty("ELON_STORAGE_ROOT"));
+    let explicit_root =
+        env_nonempty("NODE_STORAGE_ROOT").or_else(|| env_nonempty("ELON_STORAGE_ROOT"));
     let data_root = initial_node_data_root(persisted);
-    let root_path = explicit_root.or_else(|| {
-        data_root
-            .paths
-            .as_ref()
-            .map(|paths| paths.storage().to_string_lossy().to_string())
-    }).or_else(|| persisted.storage_root.clone());
+    let root_path = explicit_root
+        .or_else(|| {
+            data_root
+                .paths
+                .as_ref()
+                .map(|paths| paths.storage().to_string_lossy().to_string())
+        })
+        .or_else(|| persisted.storage_root.clone());
     let git_base_url = env_nonempty("NODE_STORAGE_GIT_BASE_URL")
         .or_else(|| env_nonempty("ELON_STORAGE_GIT_BASE_URL"))
         .or_else(|| persisted.storage_git_base_url.clone());

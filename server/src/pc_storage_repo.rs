@@ -526,7 +526,6 @@ fn hide_command_window(_command: &mut Command) {
     }
 }
 
-
 #[cfg(test)]
 #[path = "pc_storage_repo_tests.rs"]
 mod tests;

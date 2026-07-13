@@ -75,8 +75,8 @@ use node_agent_config::{
 };
 pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
 mod node_agent_cli_runner;
-mod node_agent_download_router;
 mod node_agent_data_root;
+mod node_agent_download_router;
 mod node_agent_env;
 use node_agent_cli_runner::*;
 pub use node_agent_cli_runner::{prepare_cli_prompt_cwd, PreparedCliPromptCwd};

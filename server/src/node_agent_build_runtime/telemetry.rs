@@ -71,9 +71,10 @@ pub(crate) fn capture(
 }
 
 pub(crate) fn persist(paths: &BuildRunPaths, telemetry: &BuildCacheTelemetry) {
-    let target = paths
-        .telemetry_root
-        .join(format!("{}-{}.json", paths.project_key, paths.toolchain_key));
+    let target = paths.telemetry_root.join(format!(
+        "{}-{}.json",
+        paths.project_key, paths.toolchain_key
+    ));
     if let Ok(payload) = serde_json::to_vec_pretty(telemetry) {
         let temporary = target.with_extension(format!("json.tmp-{}", uuid::Uuid::new_v4()));
         if std::fs::write(&temporary, payload).is_ok() {
@@ -122,9 +123,7 @@ pub(crate) fn capture_root_status(
             || largest_project_rust_bytes > policy.max_project_rust_bytes
             || disk_free.is_some_and(|bytes| bytes < policy.min_free_bytes),
         active_leases: active_lease_count(&cache.join(".leases")),
-        last_cleanup_at_unix_secs: cleanup
-            .as_ref()
-            .map(|status| status.cleaned_at_unix_secs),
+        last_cleanup_at_unix_secs: cleanup.as_ref().map(|status| status.cleaned_at_unix_secs),
         last_cleanup_reclaimed_bytes: cleanup
             .as_ref()
             .map(|status| status.reclaimed_bytes)

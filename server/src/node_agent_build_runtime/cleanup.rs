@@ -5,7 +5,10 @@ use super::{
     telemetry::{directory_size, unix_now},
 };
 use anyhow::{Context, Result};
-use std::{collections::HashSet, path::{Path, PathBuf}};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct CleanupReport {
@@ -40,7 +43,11 @@ pub(crate) fn cleanup_expired(
         &paths.root,
         &paths.root.join("temp"),
         policy.temp_ttl_secs,
-        |path| path.file_name().and_then(|name| name.to_str()).is_some_and(|name| active_tasks.contains(name)),
+        |path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| active_tasks.contains(name))
+        },
         &mut report,
     )?;
     cleanup_expired_rust_targets(paths, policy.cache_ttl_secs, &active_rust, &mut report)?;

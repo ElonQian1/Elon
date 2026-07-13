@@ -5,12 +5,7 @@ use uuid::Uuid;
 fn environment_root_wins_over_persisted_root() {
     let env_root = std::env::temp_dir().join("elon-env-root");
     let persisted_root = std::env::temp_dir().join("elon-persisted-root");
-    let state = resolve_from_values(
-        Some(env_root.clone()),
-        Some(persisted_root),
-        None,
-        None,
-    );
+    let state = resolve_from_values(Some(env_root.clone()), Some(persisted_root), None, None);
 
     assert_eq!(state.source, NodeDataRootSource::Environment);
     assert_eq!(state.configured_root(), Some(env_root.as_path()));

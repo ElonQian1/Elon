@@ -1,12 +1,11 @@
 //! PC 节点 Exec 命令执行（流式 stdout/stderr/exit）。
 //! 从 node_agent_main.rs 拆分，保持行为不变。
 
+use homecli_proto::AgentToServer;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::warn;
-use homecli_proto::AgentToServer;
 
 use super::ws_text;
-
 
 /// 执行 Exec：运行任意命令，流式返回 TaskStdout/TaskStderr/TaskExit。
 pub async fn run_exec(
@@ -142,4 +141,3 @@ pub fn hide_tokio_command_window(_command: &mut tokio::process::Command) {
         _command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
     }
 }
-

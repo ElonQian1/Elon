@@ -84,10 +84,19 @@ mod tests {
     fn derives_stable_layout_from_single_root() {
         let paths = NodeDataPaths::new(PathBuf::from("D:/ElonNodeData"));
 
-        assert_eq!(paths.workspaces(), PathBuf::from("D:/ElonNodeData/workspaces"));
+        assert_eq!(
+            paths.workspaces(),
+            PathBuf::from("D:/ElonNodeData/workspaces")
+        );
         assert_eq!(paths.storage(), PathBuf::from("D:/ElonNodeData/storage"));
-        assert_eq!(paths.gradle_home(), PathBuf::from("D:/ElonNodeData/cache/gradle-home"));
-        assert_eq!(paths.task_temp("task/one"), PathBuf::from("D:/ElonNodeData/temp/taskone"));
+        assert_eq!(
+            paths.gradle_home(),
+            PathBuf::from("D:/ElonNodeData/cache/gradle-home")
+        );
+        assert_eq!(
+            paths.task_temp("task/one"),
+            PathBuf::from("D:/ElonNodeData/temp/taskone")
+        );
     }
 
     #[test]

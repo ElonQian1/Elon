@@ -13,7 +13,10 @@ impl BuildEnvironment {
                 ("ELON_NODE_DATA_ROOT".into(), path(&paths.root)),
                 ("ELON_PROJECT_ID".into(), project_id.to_string()),
                 ("ELON_BUILD_TASK_ID".into(), task_id.to_string()),
-                ("ELON_RUST_TOOLCHAIN_KEY".into(), paths.toolchain_key.clone()),
+                (
+                    "ELON_RUST_TOOLCHAIN_KEY".into(),
+                    paths.toolchain_key.clone(),
+                ),
                 ("CARGO_TARGET_DIR".into(), path(&paths.cargo_target)),
                 ("CARGO_HOME".into(), path(&paths.cargo_home)),
                 ("GRADLE_USER_HOME".into(), path(&paths.gradle_home)),

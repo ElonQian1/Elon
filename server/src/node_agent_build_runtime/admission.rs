@@ -21,13 +21,11 @@ impl Default for BuildCachePolicy {
     fn default() -> Self {
         Self {
             min_free_bytes: env_u64("ELON_NODE_BUILD_MIN_FREE_BYTES").unwrap_or(10 * GIB),
-            max_total_cache_bytes: env_u64("ELON_NODE_BUILD_MAX_CACHE_BYTES")
-                .unwrap_or(80 * GIB),
+            max_total_cache_bytes: env_u64("ELON_NODE_BUILD_MAX_CACHE_BYTES").unwrap_or(80 * GIB),
             max_project_rust_bytes: env_u64("ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES")
                 .unwrap_or(24 * GIB),
             temp_ttl_secs: env_u64("ELON_NODE_BUILD_TEMP_TTL_SECS").unwrap_or(24 * 60 * 60),
-            cache_ttl_secs: env_u64("ELON_NODE_BUILD_CACHE_TTL_SECS")
-                .unwrap_or(30 * 24 * 60 * 60),
+            cache_ttl_secs: env_u64("ELON_NODE_BUILD_CACHE_TTL_SECS").unwrap_or(30 * 24 * 60 * 60),
         }
     }
 }
@@ -168,7 +166,6 @@ fn disk_free_bytes_platform(path: &Path) -> Option<u64> {
         .ok()?
         .checked_mul(1024)
 }
-
 
 #[cfg(not(windows))]
 fn disk_total_bytes_platform(path: &Path) -> Option<u64> {

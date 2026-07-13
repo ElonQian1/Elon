@@ -276,7 +276,10 @@ fn reject_reparse_point(path: &Path) -> Result<()> {
         rejected |= metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
     }
     if rejected {
-        bail!("节点数据目录不能是符号链接、junction 或重解析点: {}", path.display());
+        bail!(
+            "节点数据目录不能是符号链接、junction 或重解析点: {}",
+            path.display()
+        );
     }
     Ok(())
 }

@@ -4,7 +4,11 @@ use super::{
     prepare_run, status, BuildCachePolicy, BuildEnvironment, BuildRunRequest,
 };
 use elon_pc_dev_runtime::NodeDataPaths;
-use std::{fs, path::PathBuf, time::{Duration, SystemTime, UNIX_EPOCH}};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 #[test]
 fn environment_routes_large_outputs_under_node_data_root() {

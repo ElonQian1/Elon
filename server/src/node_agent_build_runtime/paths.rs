@@ -118,7 +118,8 @@ fn rust_toolchain_key(cwd: Option<&Path>) -> String {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
     let detected = explicit.or_else(|| rustup_active_toolchain(cwd));
-    let identity = detected.unwrap_or_else(|| rustc_identity(cwd).unwrap_or_else(|| "default".into()));
+    let identity =
+        detected.unwrap_or_else(|| rustc_identity(cwd).unwrap_or_else(|| "default".into()));
     let readable = elon_pc_dev_runtime::safe_path_part(&identity, "default", 36);
     let digest = Sha256::digest(identity.as_bytes());
     format!("{}-{:x}", readable, digest)[..readable.len() + 13].to_string()
