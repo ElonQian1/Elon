@@ -57,11 +57,15 @@ pub(crate) async fn connect_and_remember(
     let output = connect_device(address).await?;
     tokio::time::sleep(Duration::from_millis(250)).await;
     if let Ok(identity) = probe_identity(address).await {
-        let mode = if profile_id.is_some() {
-            "tls"
-        } else {
-            "manual"
-        };
+        let paired = profile_id
+            .and_then(|id| {
+                list_profiles()
+                    .ok()?
+                    .into_iter()
+                    .find(|profile| profile.id == id)
+            })
+            .is_some_and(|profile| profile.paired);
+        let mode = connection_mode(address, paired);
         remember_connection(&identity.hardware_serial, address, mode)?;
     }
     Ok(output)
@@ -142,7 +146,9 @@ pub(crate) async fn wireless_status() -> Result<AndroidWirelessStatus> {
         if let Some(hardware_serial) = device.hardware_serial.as_ref() {
             let replace = connections
                 .get(hardware_serial)
-                .is_none_or(|current: &String| current.contains(':'));
+                .is_none_or(|current: &String| {
+                    !current.contains(':') && device.serial.contains(':')
+                });
             if replace {
                 connections.insert(hardware_serial.clone(), device.serial.clone());
             }
@@ -297,6 +303,16 @@ fn optional_text(value: String) -> Option<String> {
     (!value.is_empty()).then_some(value)
 }
 
+fn connection_mode(address: &str, paired: bool) -> &'static str {
+    if paired {
+        "tls"
+    } else if address.trim().ends_with(":5555") {
+        "legacy"
+    } else {
+        "manual"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,5 +331,12 @@ adb-ABC _adb-tls-pairing._tcp 192.168.1.9:40123\n";
     fn parses_wifi_source_address() {
         let address = "24: wlan0: <UP> mtu 1500\n    inet 192.168.1.88/24 brd 192.168.1.255 scope global wlan0\n";
         assert_eq!(parse_wifi_ip(address).as_deref(), Some("192.168.1.88"));
+    }
+
+    #[test]
+    fn classifies_legacy_and_tls_connections_without_profile_id_guessing() {
+        assert_eq!(connection_mode("192.168.31.171:5555", false), "legacy");
+        assert_eq!(connection_mode("192.168.31.171:37123", false), "manual");
+        assert_eq!(connection_mode("192.168.31.171:37123", true), "tls");
     }
 }
