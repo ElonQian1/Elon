@@ -552,7 +552,6 @@ pub(super) async fn run_session(
                             let tx_c = out_tx_r.clone();
                             let rt_c = runtime.clone();
                             tokio::spawn(async move {
-                                let data_paths = rt_c.node_data_root.read().await.paths.clone();
                                 run_exec(
                                     task_id,
                                     cli,
@@ -560,7 +559,7 @@ pub(super) async fn run_session(
                                     cwd,
                                     env,
                                     project_context,
-                                    data_paths,
+                                    rt_c,
                                     tx_c,
                                 )
                                 .await;
