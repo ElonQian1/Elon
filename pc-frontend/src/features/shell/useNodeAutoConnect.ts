@@ -1,14 +1,14 @@
 /**
  * useNodeAutoConnect — 登录后自动探测并绑定本机节点
  *
- * 逻辑：只要用户已登录，就尝试探测 localhost:7799，
+ * 逻辑：只要用户已登录，就尝试探测启动器允许的本机端口范围，
  * 探测到节点后自动发送 token 完成绑定。
  * 每 30s 持续确认一次，避免顶部"已绑定"状态在 Win 端退出后变成过期绿条。
  * 不依赖任何 URL 参数。
  */
 import { useEffect, useRef, useState } from 'react'
 import { useAuthStore } from '../../store/auth'
-import { localNodeBaseUrl } from '../../api/runtime'
+import { localNodeProbeBaseUrls, rememberLocalNodeBaseUrl } from '../../api/runtime'
 
 export type NodeConnectStatus =
   | 'idle'        // 未登录或节点探测未开始
@@ -23,12 +23,9 @@ interface NodeConnectState {
   detailMessage: string
 }
 
-const LOCAL_NODE_PORT = 7799
-const FALLBACK_LOCAL_NODE_BASES = [
-  `http://127.0.0.1:${LOCAL_NODE_PORT}`,
-  `http://localhost:${LOCAL_NODE_PORT}`,
-]
 const PROBE_INTERVAL_MS = 30_000
+const PRIMARY_PROBE_TIMEOUT_MS = 1200
+const FALLBACK_PROBE_TIMEOUT_MS = 900
 
 export function useNodeAutoConnect(): NodeConnectState {
   const token = useAuthStore((s: { token: string | null }) => s.token)
@@ -78,6 +75,7 @@ export function useNodeAutoConnect(): NodeConnectState {
       }
       seenLocalNodeRef.current = true
       const { baseUrl, localAdminToken, status } = found
+      rememberLocalNodeBaseUrl(baseUrl)
       const ownerOk = !currentUserId || !status.owner_user_id || status.owner_user_id === currentUserId
       const alreadyBound = !!status.logged_in && ownerOk
 
@@ -153,6 +151,9 @@ interface LocalNodeProbeStatus {
   owner_user_id?: string
   connected?: boolean
   local_admin_token?: string
+  local_admin_token_header?: string
+  agent_id?: string
+  version?: string
 }
 
 async function probeLocalNode(): Promise<{
@@ -160,27 +161,35 @@ async function probeLocalNode(): Promise<{
   localAdminToken: string
   status: LocalNodeProbeStatus
 } | null> {
-  for (const baseUrl of localNodeProbeBases()) {
-    try {
-      const res = await fetch(`${baseUrl}/api/status`, {
-        credentials: 'omit',
-        signal: AbortSignal.timeout(2000),
-      })
-      if (!res.ok) continue
-      const data = await res.json() as LocalNodeProbeStatus
-      const localAdminToken: string = data.local_admin_token ?? ''
-      if (localAdminToken) return { baseUrl, localAdminToken, status: data }
-    } catch {
-      // Try the next loopback hostname.
-    }
-  }
-  return null
+  const [primary, ...fallbacks] = localNodeProbeBaseUrls()
+  const preferred = primary ? await probeLocalNodeBase(primary, PRIMARY_PROBE_TIMEOUT_MS) : null
+  if (preferred) return preferred
+  const matches = await Promise.all(
+    fallbacks.map((baseUrl) => probeLocalNodeBase(baseUrl, FALLBACK_PROBE_TIMEOUT_MS)),
+  )
+  return matches.find((match) => match !== null) ?? null
 }
 
-function localNodeProbeBases(): string[] {
-  const bases = [localNodeBaseUrl(), ...FALLBACK_LOCAL_NODE_BASES]
-    .map((value) => value.replace(/\/+$/, ''))
-    .filter(Boolean)
-  return Array.from(new Set(bases))
+async function probeLocalNodeBase(baseUrl: string, timeoutMs: number): Promise<{
+  baseUrl: string
+  localAdminToken: string
+  status: LocalNodeProbeStatus
+} | null> {
+  try {
+    const res = await fetch(`${baseUrl}/api/status`, {
+      credentials: 'omit',
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    if (!res.ok) return null
+    const status = await res.json() as LocalNodeProbeStatus
+    const localAdminToken = status.local_admin_token ?? ''
+    const tokenHeader = status.local_admin_token_header?.trim().toLowerCase()
+    const isElonNode = tokenHeader === 'x-elon-local-admin-token'
+      && status.agent_id?.startsWith('node-')
+      && !!status.version?.trim()
+    return localAdminToken && isElonNode ? { baseUrl, localAdminToken, status } : null
+  } catch {
+    return null
+  }
 }
 

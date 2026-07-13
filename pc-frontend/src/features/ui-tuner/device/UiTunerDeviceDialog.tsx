@@ -93,7 +93,7 @@ export function UiTunerDeviceDialog({
   }, [activeProfileId, selectedDevice?.serial, status?.profiles])
   const unauthorizedDevice = devices.find((device) => device.state === 'unauthorized')
   const readyUsbDevice = devices.find((device) => (
-    device.state === 'device' && !device.serial.includes(':')
+    device.state === 'device' && device.connectionType === 'usb'
   ))
   const selectedReadyDevice = selectedDevice?.state === 'device' ? selectedDevice : readyUsbDevice
 

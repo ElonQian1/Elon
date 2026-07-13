@@ -36,7 +36,7 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0')
 }
 
-/** 验证 node_admin URL：只允许 127.0.0.1 / localhost，默认 http://127.0.0.1:7799/ */
+/** 验证 node_admin URL：只允许回环地址；未指定时使用已探测到的本机节点。 */
 export function safeNodeAdminUrl(rawParam?: string | null): string {
   const raw = rawParam ?? new URLSearchParams(location.search).get('node_admin') ?? ''
   if (raw.trim()) {

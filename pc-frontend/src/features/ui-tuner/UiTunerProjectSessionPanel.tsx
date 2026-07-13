@@ -9,6 +9,7 @@ import { useModelStore } from '../models/useModelStore'
 import { selectedAgentForRuntimeRoute } from '../models/routeModelPolicy'
 import { localJson } from '../doctor/localApi'
 import { useAuthStore } from '../../store/auth'
+import { LOCAL_NODE_BASE_CHANGED_EVENT } from '../../api/runtime'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
 import type { UiTunerCodexContextPack } from './contextPack'
 import {
@@ -60,7 +61,7 @@ export function UiTunerProjectSessionPanel({
   onMutationTaskStarted,
   onTaskSettled,
 }: UiTunerProjectSessionPanelProps) {
-  const nodeAdminUrl = uiTunerNodeAdminUrl()
+  const [nodeAdminUrl, setNodeAdminUrl] = useState(uiTunerNodeAdminUrl)
   const user = useAuthStore((state) => state.user)
   const selectedAgent = useModelStore((state) => state.selectedAgent)
   const modelOptions = useModelStore((state) => state.options)
@@ -85,6 +86,12 @@ export function UiTunerProjectSessionPanel({
     overrideIntent?: string,
     options?: SessionStartOptions,
   ) => Promise<UiTunerProjectSessionRecord | null>>(async () => null)
+
+  useEffect(() => {
+    const syncNodeAdminUrl = () => setNodeAdminUrl(uiTunerNodeAdminUrl())
+    window.addEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, syncNodeAdminUrl)
+    return () => window.removeEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, syncNodeAdminUrl)
+  }, [])
 
   useEffect(() => {
     if (!projectsLoaded) loadProjects().catch(() => {})
@@ -479,7 +486,7 @@ export function UiTunerProjectSessionPanel({
 
 function uiTunerNodeAdminUrl() {
   const fromQuery = new URLSearchParams(location.search).get('node_admin')
-  return safeNodeAdminUrl(fromQuery || 'http://127.0.0.1:7799')
+  return safeNodeAdminUrl(fromQuery)
 }
 
 function describeLocalNodeStatus(

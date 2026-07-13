@@ -16,7 +16,7 @@ export default function LocalNodeOfflineCard({ onLaunch, onRetry }: Props) {
             <p className={styles.eyebrow}>本机程序未响应</p>
             <h3 className={styles.title}>Win 端未启动，或本机管理接口卡住</h3>
             <p className={styles.detail}>
-              网页现在无法访问 127.0.0.1:7799。请先拉起 Win 端；已安装但仍不可用时，直接修复入口或导出诊断。
+              网页现在无法访问本机节点端口。请先拉起 Win 端；已安装但仍不可用时，直接修复入口或导出诊断。
             </p>
           </div>
           <span className={[styles.badge, styles.toneDanger].join(' ')}>未连接</span>

@@ -12,6 +12,12 @@ declare global {
 
 const DEFAULT_CLOUD_BASE_URL = 'http://43.139.149.158:8080'
 const DEFAULT_LOCAL_NODE_BASE_URL = 'http://127.0.0.1:7799'
+const LOCAL_NODE_BASE_STORAGE_KEY = 'elon_local_node_base_url'
+const LOCAL_NODE_FIRST_PORT = 7799
+const LOCAL_NODE_FALLBACK_LIMIT = 20
+export const LOCAL_NODE_BASE_CHANGED_EVENT = 'elon:local-node-base-changed'
+
+let validatedLocalNodeBaseUrl = ''
 
 function bootstrap(): PcWorkbenchBootstrap {
   return window.__ELON_PC_BOOTSTRAP__ ?? {}
@@ -38,6 +44,30 @@ function safeLoopbackUrl(raw: string | null | undefined): string {
   return ''
 }
 
+function rememberedLocalNodeBaseUrl(): string {
+  try {
+    return safeLoopbackUrl(localStorage.getItem(LOCAL_NODE_BASE_STORAGE_KEY))
+  } catch {
+    return ''
+  }
+}
+
+export function rememberLocalNodeBaseUrl(raw: string): string {
+  const safe = safeLoopbackUrl(raw)
+  if (!safe) return ''
+  const changed = validatedLocalNodeBaseUrl !== safe
+  validatedLocalNodeBaseUrl = safe
+  try {
+    localStorage.setItem(LOCAL_NODE_BASE_STORAGE_KEY, safe)
+  } catch {
+    // Storage can be disabled; the current page can still use the discovered URL.
+  }
+  if (changed) window.dispatchEvent(new CustomEvent(LOCAL_NODE_BASE_CHANGED_EVENT, {
+    detail: { baseUrl: safe },
+  }))
+  return safe
+}
+
 export function isLocalWorkbench(): boolean {
   const boot = bootstrap()
   if (boot.mode === 'local') return true
@@ -50,12 +80,26 @@ export function cloudBaseUrl(): string {
 }
 
 export function localNodeBaseUrl(): string {
+  if (validatedLocalNodeBaseUrl) return validatedLocalNodeBaseUrl
   const boot = safeLoopbackUrl(bootstrap().localNodeBaseUrl)
   if (boot) return boot
   const fromQuery = safeLoopbackUrl(new URLSearchParams(location.search).get('node_admin'))
   if (fromQuery) return fromQuery
   const base = isLoopbackHost(location.hostname) ? location.origin : DEFAULT_LOCAL_NODE_BASE_URL
-  return trimTrailingSlash(base)
+  if (isLoopbackHost(location.hostname)) return trimTrailingSlash(base)
+  return rememberedLocalNodeBaseUrl() || trimTrailingSlash(base)
+}
+
+export function localNodeProbeBaseUrls(): string[] {
+  const fallbackBases = Array.from(
+    { length: LOCAL_NODE_FALLBACK_LIMIT + 1 },
+    (_, offset) => `http://127.0.0.1:${LOCAL_NODE_FIRST_PORT + offset}`,
+  )
+  return Array.from(new Set(
+    [localNodeBaseUrl(), 'http://localhost:7799', ...fallbackBases]
+      .map(trimTrailingSlash)
+      .filter(Boolean),
+  ))
 }
 
 export function resolveApiUrl(path: string): string {

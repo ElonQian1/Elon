@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { LOCAL_NODE_BASE_CHANGED_EVENT } from '../../../api/runtime'
 import {
   captureAndroidSnapshot,
   connectAndroidDevice,
@@ -207,6 +208,13 @@ export function useAndroidInspectorDevices({
 
   useEffect(() => {
     void reconnectWirelessDevices(undefined, false)
+    const reconnectAfterNodeDiscovery = () => {
+      void reconnectWirelessDevices(undefined, false)
+    }
+    window.addEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, reconnectAfterNodeDiscovery)
+    return () => {
+      window.removeEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, reconnectAfterNodeDiscovery)
+    }
   }, [reconnectWirelessDevices])
 
   const registerWiredDevice = useCallback(async (deviceId: string, displayName?: string) => {
