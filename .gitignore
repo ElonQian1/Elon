@@ -34,6 +34,7 @@ Thumbs.db
 scripts/_wsl_deploy.sh
 scripts/_deploy_temp*.sh
 .runtime/
+/.elon/ui-design/
 .elon/ui-tuner/live/
 .elon/ui-tuner/fit-runs/
 
