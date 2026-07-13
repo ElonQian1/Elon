@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,7 +13,6 @@ import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.mcp.McpNativeControlBridge
 import com.elon.app.mcp.rememberPendingMcpConversationSeed
@@ -409,24 +407,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applySystemBarColors() {
-        window.statusBarColor = ContextCompat.getColor(this, R.color.elon_bg_app)
-        val navigationColor = if (::binding.isInitialized && binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
-            R.color.elon_store_detail_bg
-        } else {
-            R.color.elon_bg_app
-        }
-        window.navigationBarColor = ContextCompat.getColor(this, navigationColor)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            window.isNavigationBarContrastEnforced = false
-        }
-        var flags = window.decorView.systemUiVisibility
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags = flags and View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR.inv()
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
-        }
-        window.decorView.systemUiVisibility = flags
+        applyMainSystemBarChrome(this, if (::binding.isInitialized) binding else null)
     }
 
     private val resumeActions: MainResumeActions by lazy {

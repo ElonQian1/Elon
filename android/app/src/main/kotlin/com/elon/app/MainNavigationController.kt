@@ -120,14 +120,14 @@ internal class MainNavigationController(
     }
 
     private fun showMainTabs() {
-        setNavigationBarColor(R.color.elon_bg_app)
+        binding.scheduleNavigationBarChrome(activity, R.color.elon_bg_app, false)
         bottomNavigation.setVisible(true)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
     }
 
     private fun hideBottomMenus() {
-        setNavigationBarColor(R.color.elon_bg_app)
+        binding.scheduleNavigationBarChrome(activity, R.color.elon_bg_app, true)
         bottomNavigation.setVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
@@ -179,14 +179,14 @@ internal class MainNavigationController(
     }
 
     private fun showProjectSpaceBottomMenu() {
-        setNavigationBarColor(R.color.elon_store_detail_bg)
+        binding.scheduleNavigationBarChrome(activity, R.color.elon_store_detail_bg, false)
         bottomNavigation.setVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
     }
 
     private fun setNavigationBarColor(colorRes: Int) {
-        activity.window.navigationBarColor = activity.getColor(colorRes)
+        binding.scheduleNavigationBarChrome(activity, colorRes)
     }
 
     private fun selectBottomTab(tab: TextView, animate: Boolean) {

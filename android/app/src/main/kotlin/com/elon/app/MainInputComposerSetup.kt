@@ -91,7 +91,7 @@ internal class MainInputComposerSetup(
         root.clipChildren = false
         root.clipToPadding = false
         root.setPadding(0, dp(12), 0, dp(6))
-        root.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        root.setBackgroundColor(Color.argb(77, 0, 0, 0))
 
         val modeButtonRow = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(

@@ -23,6 +23,9 @@ internal class MainKeyboardInsetsAnimationActions(
     private var chatLiftAnimator: ValueAnimator? = null
     private var runningImeAnimation = false
     private var baseChatListPaddingBottom = 0
+    private val baseInputLayoutPadding = Rect()
+    private val baseSelectionBarPadding = Rect()
+    private var bottomBarOverlayHeight = 0
     private var baselineHiddenHeight = -1
     private var lastKeyboardHeight = -1
     private var lastKnownKeyboardHeight = -1
@@ -42,11 +45,24 @@ internal class MainKeyboardInsetsAnimationActions(
 
     fun install() {
         baseChatListPaddingBottom = binding.chatList.paddingBottom
+        baseInputLayoutPadding.set(
+            binding.inputLayout.paddingLeft,
+            binding.inputLayout.paddingTop,
+            binding.inputLayout.paddingRight,
+            binding.inputLayout.paddingBottom
+        )
+        baseSelectionBarPadding.set(
+            binding.chatSelectionBar.paddingLeft,
+            binding.chatSelectionBar.paddingTop,
+            binding.chatSelectionBar.paddingRight,
+            binding.chatSelectionBar.paddingBottom
+        )
         installVisibleFrameFallback()
         installFocusFallback()
         installBottomBarLayoutSync()
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            applyNavigationBarInset(insets)
             if (!runningImeAnimation) {
                 val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
                 val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
@@ -270,22 +286,50 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     private fun installBottomBarLayoutSync() {
-        binding.bottomBarContainer.addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
-            if (binding.chatPage.visibility != View.VISIBLE) return@addOnLayoutChangeListener
-            if (SystemClock.uptimeMillis() < suppressBottomBarLayoutSyncUntil) return@addOnLayoutChangeListener
-            val oldHeight = oldBottom - oldTop
-            val newHeight = bottom - top
-            val heightDelta = newHeight - oldHeight
-            if (oldHeight <= 0 || heightDelta == 0) return@addOnLayoutChangeListener
-            if (!followChatBottomDuringLift && !shouldFollowLatestMessage()) return@addOnLayoutChangeListener
-            followChatBottomDuringLift = binding.inputEdit.hasFocus() || followChatBottomDuringLift
-            binding.chatList.post {
-                if (heightDelta != 0) {
-                    binding.chatList.scrollBy(0, heightDelta)
-                }
-                keepLatestMessageAboveInput(binding.chatList.layoutManager as? LinearLayoutManager)
-            }
+        val syncOverlayHeight = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            syncBottomBarOverlayHeight()
         }
+        binding.bottomBarContainer.addOnLayoutChangeListener(syncOverlayHeight)
+        binding.inputLayout.addOnLayoutChangeListener(syncOverlayHeight)
+        binding.chatSelectionBar.addOnLayoutChangeListener(syncOverlayHeight)
+    }
+
+    private fun syncBottomBarOverlayHeight() {
+        if (binding.chatPage.visibility != View.VISIBLE) return
+        val visibleBottomBar = when {
+            binding.inputLayout.visibility == View.VISIBLE -> binding.inputLayout
+            binding.chatSelectionBar.visibility == View.VISIBLE -> binding.chatSelectionBar
+            else -> return
+        }
+        val newHeight = visibleBottomBar.height
+        if (newHeight <= 0 || bottomBarOverlayHeight == newHeight) return
+        bottomBarOverlayHeight = newHeight
+        if (SystemClock.uptimeMillis() < suppressBottomBarLayoutSyncUntil) {
+            applyChatBottomPaddingWithoutScroll(0)
+            return
+        }
+        if (!followChatBottomDuringLift && !shouldFollowLatestMessage()) {
+            applyChatBottomPaddingWithoutScroll(lastKeyboardHeight.coerceAtLeast(0))
+            return
+        }
+        followChatBottomDuringLift = binding.inputEdit.hasFocus() || followChatBottomDuringLift
+        binding.chatList.post {
+            applyChatBottomPadding(lastKeyboardHeight.coerceAtLeast(0))
+        }
+    }
+
+    private fun applyNavigationBarInset(insets: WindowInsetsCompat) {
+        val navigationBar = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
+        setNavigationBarPadding(binding.inputLayout, baseInputLayoutPadding, navigationBar.left, navigationBar.right, navigationBar.bottom)
+        setNavigationBarPadding(binding.chatSelectionBar, baseSelectionBarPadding, navigationBar.left, navigationBar.right, navigationBar.bottom)
+    }
+
+    private fun setNavigationBarPadding(view: View, base: Rect, left: Int, right: Int, bottom: Int) {
+        val targetLeft = base.left + left
+        val targetRight = base.right + right
+        val targetBottom = base.bottom + bottom
+        if (view.paddingLeft == targetLeft && view.paddingRight == targetRight && view.paddingBottom == targetBottom) return
+        view.setPadding(targetLeft, base.top, targetRight, targetBottom)
     }
 
     private fun scheduleEstimatedKeyboardLift() {
@@ -443,7 +487,9 @@ internal class MainKeyboardInsetsAnimationActions(
 
     private fun animateChatBottomPadding(keyboardHeight: Int) {
         val target = keyboardHeight.coerceAtLeast(0)
-        val start = (binding.chatList.paddingBottom - baseChatListPaddingBottom).coerceAtLeast(0)
+        val start = (
+            binding.chatList.paddingBottom - baseChatListPaddingBottom - bottomBarOverlayHeight
+        ).coerceAtLeast(0)
         if (start == target) {
             applyChatBottomPadding(target)
             return
@@ -475,7 +521,7 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     private fun applyChatBottomPadding(keyboardHeight: Int) {
-        val targetBottom = baseChatListPaddingBottom + keyboardHeight
+        val targetBottom = baseChatListPaddingBottom + bottomBarOverlayHeight + keyboardHeight
         val currentBottom = binding.chatList.paddingBottom
         if (currentBottom == targetBottom) {
             if (keyboardHeight == 0) {
@@ -484,7 +530,7 @@ internal class MainKeyboardInsetsAnimationActions(
             return
         }
         val layoutManager = binding.chatList.layoutManager as? LinearLayoutManager
-        val shouldFollowLatest = followChatBottomDuringLift || shouldFollowLatestMessage(layoutManager)
+        val shouldFollowLatest = followChatBottomDuringLift || shouldFollowLatestMessage()
         val anchor = if (shouldFollowLatest) null else chatListAnchor(layoutManager)
         binding.chatList.setPadding(
             binding.chatList.paddingLeft,
@@ -508,7 +554,7 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     private fun applyChatBottomPaddingWithoutScroll(keyboardHeight: Int) {
-        val targetBottom = baseChatListPaddingBottom + keyboardHeight
+        val targetBottom = baseChatListPaddingBottom + bottomBarOverlayHeight + keyboardHeight
         if (binding.chatList.paddingBottom == targetBottom) {
             if (keyboardHeight == 0) {
                 followChatBottomDuringLift = false
@@ -533,7 +579,7 @@ internal class MainKeyboardInsetsAnimationActions(
         val itemCount = binding.chatList.adapter?.itemCount ?: return false
         if (itemCount <= 0) return false
         val lastVisible = layoutManager?.findLastVisibleItemPosition() ?: RecyclerView.NO_POSITION
-        return lastVisible >= itemCount - 1
+        return lastVisible >= itemCount - 1 && !binding.chatList.canScrollVertically(1)
     }
 
     private fun keepLatestMessageAboveInput(layoutManager: LinearLayoutManager?) {
@@ -567,7 +613,10 @@ internal class MainKeyboardInsetsAnimationActions(
         val rootHeight = binding.root.rootView.height
         if (rootHeight <= 0 || visibleFrame.bottom <= 0) return 0
 
-        val hiddenHeight = (rootHeight - visibleFrame.bottom).coerceAtLeast(0)
+        val navigationInset = ViewCompat.getRootWindowInsets(binding.root)
+            ?.getInsets(WindowInsetsCompat.Type.navigationBars())
+            ?.bottom ?: 0
+        val hiddenHeight = (rootHeight - visibleFrame.bottom - navigationInset).coerceAtLeast(0)
         if (shouldUseFreshVisibleFrameKeyboardHeight(hiddenHeight, rootHeight)) {
             return visibleFrameKeyboardHeightWithoutBaseline(hiddenHeight)
         }
@@ -600,10 +649,7 @@ internal class MainKeyboardInsetsAnimationActions(
     }
 
     private fun visibleFrameKeyboardHeightWithoutBaseline(hiddenHeight: Int): Int {
-        val systemBottom = ViewCompat.getRootWindowInsets(binding.root)
-            ?.getInsets(WindowInsetsCompat.Type.systemBars())
-            ?.bottom ?: 0
-        return (hiddenHeight - systemBottom).coerceAtLeast(0)
+        return hiddenHeight.coerceAtLeast(0)
     }
 
     private fun keyboardHeightFromInsetsOrFrame(insets: WindowInsetsCompat): Int {
