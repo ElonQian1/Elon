@@ -1,7 +1,10 @@
 use super::{
-    admission::{disk_free_bytes, BuildCachePolicy},
+    admission::{disk_free_bytes, required_free_bytes, BuildCachePolicy},
     lease::active_lease_records,
-    paths::{ensure_within_root, BuildRunPaths},
+    paths::{
+        ensure_existing_within_root, ensure_removal_tree_safe, ensure_within_root,
+        is_link_or_reparse, BuildRunPaths,
+    },
     telemetry::{directory_size, unix_now},
 };
 use anyhow::{Context, Result};
@@ -29,7 +32,7 @@ pub(crate) fn cleanup_expired(
     paths: &BuildRunPaths,
     policy: &BuildCachePolicy,
 ) -> Result<CleanupReport> {
-    let active = active_lease_records(&paths.lease_root);
+    let active = active_lease_records(&paths.lease_root)?;
     let active_tasks = active
         .iter()
         .map(|record| elon_pc_dev_runtime::safe_path_part(&record.task_id, "task", 96))
@@ -52,7 +55,7 @@ pub(crate) fn cleanup_expired(
     )?;
     cleanup_expired_rust_targets(paths, policy.cache_ttl_secs, &active_rust, &mut report)?;
     if active.is_empty() {
-        for candidate in shared_cache_candidates(paths) {
+        for candidate in shared_cache_candidates(paths)? {
             if unix_now().saturating_sub(candidate.modified_at) > policy.cache_ttl_secs {
                 remove_candidate(&paths.root, &candidate.path, &mut report)?;
             }
@@ -65,14 +68,14 @@ pub(crate) fn cleanup_for_pressure(
     paths: &BuildRunPaths,
     policy: &BuildCachePolicy,
 ) -> Result<CleanupReport> {
-    let active = active_lease_records(&paths.lease_root);
+    let active = active_lease_records(&paths.lease_root)?;
     let active_rust = active
         .iter()
         .map(|record| (record.project_key.clone(), record.toolchain_key.clone()))
         .collect::<HashSet<_>>();
     let mut candidates = rust_target_candidates(paths, &active_rust)?;
     if active.is_empty() {
-        candidates.extend(shared_cache_candidates(paths));
+        candidates.extend(shared_cache_candidates(paths)?);
     }
     candidates.sort_by_key(|candidate| candidate.modified_at);
 
@@ -88,14 +91,19 @@ pub(crate) fn cleanup_for_pressure(
 
 pub(crate) fn remove_managed_path(root: &Path, target: &Path) -> Result<u64> {
     ensure_within_root(root, target)?;
-    if target == root {
+    let metadata = match std::fs::symlink_metadata(target) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+        Err(error) => {
+            return Err(error).with_context(|| format!("无法检查构建缓存路径 {}", target.display()));
+        }
+    };
+    ensure_removal_tree_safe(root, target)?;
+    if std::fs::canonicalize(root)? == std::fs::canonicalize(target)? {
         anyhow::bail!("拒绝删除统一节点数据根本身");
     }
     let size = directory_size(target);
-    let Ok(metadata) = std::fs::symlink_metadata(target) else {
-        return Ok(0);
-    };
-    if metadata.file_type().is_symlink() || metadata.is_file() {
+    if metadata.is_file() {
         std::fs::remove_file(target)
             .with_context(|| format!("无法删除构建缓存文件 {}", target.display()))?;
     } else {
@@ -118,11 +126,25 @@ fn cleanup_expired_children(
     is_active: impl Fn(&Path) -> bool,
     report: &mut CleanupReport,
 ) -> Result<()> {
-    let Ok(entries) = std::fs::read_dir(parent) else {
-        return Ok(());
+    match std::fs::symlink_metadata(parent) {
+        Ok(_) => ensure_existing_within_root(root, parent)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error).with_context(|| format!("无法检查待清理目录 {}", parent.display()));
+        }
+    }
+    let entries = match std::fs::read_dir(parent) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error).with_context(|| format!("无法枚举待清理目录 {}", parent.display()));
+        }
     };
-    for entry in entries.filter_map(|entry| entry.ok()) {
-        let path = entry.path();
+    for entry in entries {
+        let path = entry
+            .with_context(|| format!("无法读取待清理目录项 {}", parent.display()))?
+            .path();
+        ensure_existing_within_root(root, &path)?;
         if is_active(&path) {
             report.skipped_active_paths += 1;
         } else if is_expired(&path, ttl_secs) {
@@ -138,15 +160,35 @@ fn cleanup_expired_rust_targets(
     active: &HashSet<(String, String)>,
     report: &mut CleanupReport,
 ) -> Result<()> {
-    let Ok(projects) = std::fs::read_dir(paths.root.join("cache").join("rust-targets")) else {
-        return Ok(());
+    let rust_root = paths.root.join("cache").join("rust-targets");
+    match std::fs::symlink_metadata(&rust_root) {
+        Ok(_) => ensure_existing_within_root(&paths.root, &rust_root)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("无法检查 Rust 构建缓存 {}", rust_root.display()));
+        }
+    }
+    let projects = match std::fs::read_dir(&rust_root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("无法枚举 Rust 构建缓存 {}", rust_root.display()));
+        }
     };
-    for project in projects.filter_map(|entry| entry.ok()) {
+    for project in projects {
+        let project = project
+            .with_context(|| format!("无法读取 Rust 项目缓存项 {}", rust_root.display()))?;
+        ensure_existing_within_root(&paths.root, &project.path())?;
         let project_key = project.file_name().to_string_lossy().to_string();
-        let Ok(toolchains) = std::fs::read_dir(project.path()) else {
-            continue;
-        };
-        for toolchain in toolchains.filter_map(|entry| entry.ok()) {
+        let toolchains = std::fs::read_dir(project.path())
+            .with_context(|| format!("无法枚举 Rust 项目缓存 {}", project.path().display()))?;
+        for toolchain in toolchains {
+            let toolchain = toolchain.with_context(|| {
+                format!("无法读取 Rust toolchain 缓存项 {}", project.path().display())
+            })?;
+            ensure_existing_within_root(&paths.root, &toolchain.path())?;
             let toolchain_key = toolchain.file_name().to_string_lossy().to_string();
             if active.contains(&(project_key.clone(), toolchain_key)) {
                 report.skipped_active_paths += 1;
@@ -164,15 +206,34 @@ fn rust_target_candidates(
 ) -> Result<Vec<CleanupCandidate>> {
     let mut candidates = Vec::new();
     let root = paths.root.join("cache").join("rust-targets");
-    let Ok(projects) = std::fs::read_dir(root) else {
-        return Ok(candidates);
+    match std::fs::symlink_metadata(&root) {
+        Ok(_) => ensure_existing_within_root(&paths.root, &root)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(candidates),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("无法检查 Rust 构建缓存 {}", root.display()));
+        }
+    }
+    let projects = match std::fs::read_dir(&root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(candidates),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("无法枚举 Rust 构建缓存 {}", root.display()));
+        }
     };
-    for project in projects.filter_map(|entry| entry.ok()) {
+    for project in projects {
+        let project = project
+            .with_context(|| format!("无法读取 Rust 项目缓存项 {}", root.display()))?;
+        ensure_existing_within_root(&paths.root, &project.path())?;
         let project_key = project.file_name().to_string_lossy().to_string();
-        let Ok(toolchains) = std::fs::read_dir(project.path()) else {
-            continue;
-        };
-        for toolchain in toolchains.filter_map(|entry| entry.ok()) {
+        let toolchains = std::fs::read_dir(project.path())
+            .with_context(|| format!("无法枚举 Rust 项目缓存 {}", project.path().display()))?;
+        for toolchain in toolchains {
+            let toolchain = toolchain.with_context(|| {
+                format!("无法读取 Rust toolchain 缓存项 {}", project.path().display())
+            })?;
+            ensure_existing_within_root(&paths.root, &toolchain.path())?;
             let toolchain_key = toolchain.file_name().to_string_lossy().to_string();
             if !active.contains(&(project_key.clone(), toolchain_key)) {
                 candidates.push(CleanupCandidate {
@@ -185,9 +246,9 @@ fn rust_target_candidates(
     Ok(candidates)
 }
 
-fn shared_cache_candidates(paths: &BuildRunPaths) -> Vec<CleanupCandidate> {
+fn shared_cache_candidates(paths: &BuildRunPaths) -> Result<Vec<CleanupCandidate>> {
     let cargo_home = &paths.cargo_home;
-    [
+    let candidates = [
         cargo_home.join("registry").join("cache"),
         cargo_home.join("registry").join("src"),
         cargo_home.join("git").join("checkouts"),
@@ -199,17 +260,24 @@ fn shared_cache_candidates(paths: &BuildRunPaths) -> Vec<CleanupCandidate> {
     ]
     .into_iter()
     .filter(|path| path.exists())
-    .map(|path| CleanupCandidate {
-        modified_at: latest_modified(&path),
-        path,
-    })
-    .collect()
+    .collect::<Vec<_>>();
+    for path in &candidates {
+        ensure_existing_within_root(&paths.root, path)?;
+    }
+    Ok(candidates
+        .into_iter()
+        .map(|path| CleanupCandidate {
+            modified_at: latest_modified(&path),
+            path,
+        })
+        .collect())
 }
 
 fn pressure_remains(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> bool {
     directory_size(&paths.cache_root) > policy.max_total_cache_bytes
         || directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
-        || disk_free_bytes(&paths.root).is_some_and(|bytes| bytes < policy.min_free_bytes)
+        || disk_free_bytes(&paths.root)
+            .is_some_and(|bytes| bytes < required_free_bytes(policy))
 }
 
 fn remove_candidate(root: &Path, path: &Path, report: &mut CleanupReport) -> Result<()> {
@@ -233,7 +301,7 @@ fn latest_modified(path: &Path) -> u64 {
         .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
         .map(|duration| duration.as_secs())
         .unwrap_or(0);
-    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+    if !metadata.is_dir() || is_link_or_reparse(&metadata) {
         return own;
     }
     std::fs::read_dir(path)

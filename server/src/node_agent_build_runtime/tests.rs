@@ -1,7 +1,8 @@
 use super::{
+    admission::required_free_bytes,
     cleanup::{cleanup_expired, remove_managed_path},
     paths::{ensure_within_root, resolve_run_paths},
-    prepare_run, status, BuildCachePolicy, BuildEnvironment, BuildRunRequest,
+    active_leases, prepare_run, status, BuildCachePolicy, BuildEnvironment, BuildRunRequest,
 };
 use elon_pc_dev_runtime::NodeDataPaths;
 use std::{
@@ -54,6 +55,19 @@ fn rust_targets_share_project_and_split_toolchain_identity() {
 }
 
 #[test]
+fn sanitized_project_ids_never_share_a_rust_target() {
+    let root = unique_root("project-key-digest");
+    let data_paths = NodeDataPaths::new(&root);
+    let with_separator = resolve_run_paths(&data_paths, "task-a", "a/b", None).unwrap();
+    let without_separator = resolve_run_paths(&data_paths, "task-b", "ab", None).unwrap();
+
+    assert_ne!(with_separator.project_key, without_separator.project_key);
+    assert_ne!(with_separator.cargo_target, without_separator.cargo_target);
+    assert!(with_separator.project_key.len() <= 96);
+    assert!(without_separator.project_key.len() <= 96);
+}
+
+#[test]
 fn cleanup_refuses_paths_outside_managed_root() {
     let root = unique_root("cleanup-root");
     let outside = unique_root("cleanup-outside");
@@ -64,6 +78,72 @@ fn cleanup_refuses_paths_outside_managed_root() {
     assert!(remove_managed_path(&root, &outside).is_err());
     let _ = fs::remove_dir_all(root);
     let _ = fs::remove_dir_all(outside);
+}
+
+#[test]
+fn cleanup_refuses_nested_symlink_or_junction() {
+    let root = unique_root("cleanup-reparse-root");
+    let outside = unique_root("cleanup-reparse-outside");
+    let target = root.join("cache").join("victim");
+    let link = target.join("escape");
+    fs::create_dir_all(&target).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+    fs::write(outside.join("sentinel.txt"), b"keep").unwrap();
+
+    if !create_directory_link(&outside, &link) {
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(outside);
+        return;
+    }
+
+    assert!(remove_managed_path(&root, &target).is_err());
+    assert!(outside.join("sentinel.txt").is_file());
+    remove_directory_link(&link);
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(outside);
+}
+
+#[test]
+fn directory_preparation_refuses_symlink_or_junction_ancestor() {
+    let base = unique_root("prepare-reparse-base");
+    let outside = unique_root("prepare-reparse-outside");
+    let link = base.join("redirect");
+    fs::create_dir_all(&base).unwrap();
+    fs::create_dir_all(&outside).unwrap();
+
+    if !create_directory_link(&outside, &link) {
+        let _ = fs::remove_dir_all(base);
+        let _ = fs::remove_dir_all(outside);
+        return;
+    }
+
+    let data_paths = NodeDataPaths::new(link.join("node-data"));
+    let result = prepare_run(
+        &data_paths,
+        BuildRunRequest {
+            task_id: "task-reparse",
+            project_id: "project-reparse",
+            cwd: None,
+        },
+    );
+    assert!(result.is_err());
+    assert!(!outside.join("node-data").exists());
+    remove_directory_link(&link);
+    let _ = fs::remove_dir_all(base);
+    let _ = fs::remove_dir_all(outside);
+}
+
+#[test]
+fn admission_reserves_build_headroom_above_disk_floor() {
+    let policy = BuildCachePolicy {
+        min_free_bytes: 10,
+        build_headroom_bytes: 8,
+        max_total_cache_bytes: u64::MAX,
+        max_project_rust_bytes: u64::MAX,
+        temp_ttl_secs: 1,
+        cache_ttl_secs: 1,
+    };
+    assert_eq!(required_free_bytes(&policy), 18);
 }
 
 #[test]
@@ -87,9 +167,13 @@ fn prepared_run_creates_lease_and_removes_task_temp_on_drop() {
             .unwrap(),
     );
     assert!(temp.is_dir());
+    assert_eq!(status(&data_paths).active_leases, 1);
+    assert_eq!(active_leases(&data_paths), 1);
     run.finish(true);
     drop(run);
     assert!(!temp.exists());
+    assert_eq!(status(&data_paths).active_leases, 0);
+    assert_eq!(active_leases(&data_paths), 0);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -154,6 +238,7 @@ fn expired_cleanup_keeps_current_run_lease() {
             temp_ttl_secs: 1,
             cache_ttl_secs: 1,
             min_free_bytes: 1,
+            build_headroom_bytes: 0,
             max_total_cache_bytes: u64::MAX,
             max_project_rust_bytes: u64::MAX,
         },
@@ -198,4 +283,32 @@ fn unique_root(label: &str) -> PathBuf {
         .unwrap_or(Duration::ZERO)
         .as_nanos();
     std::env::temp_dir().join(format!("elon-build-runtime-{label}-{nanos}"))
+}
+
+#[cfg(windows)]
+fn create_directory_link(target: &std::path::Path, link: &std::path::Path) -> bool {
+    if std::os::windows::fs::symlink_dir(target, link).is_ok() {
+        return true;
+    }
+    std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(link)
+        .arg(target)
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
+#[cfg(not(windows))]
+fn create_directory_link(target: &std::path::Path, link: &std::path::Path) -> bool {
+    std::os::unix::fs::symlink(target, link).is_ok()
+}
+
+#[cfg(windows)]
+fn remove_directory_link(link: &std::path::Path) {
+    let _ = fs::remove_dir(link);
+}
+
+#[cfg(not(windows))]
+fn remove_directory_link(link: &std::path::Path) {
+    let _ = fs::remove_file(link);
 }

@@ -19,11 +19,12 @@ use lease::BuildRunLease;
 use paths::{prepare_run_directories, resolve_run_paths, BuildRunPaths};
 use std::{
     collections::HashMap,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc, Mutex, OnceLock,
     },
+    time::{Duration, Instant},
 };
 
 const RUN_OUTCOME_PENDING: u8 = 0;
@@ -61,11 +62,37 @@ impl Drop for PreparedBuildRun {
             let _ = cleanup::remove_managed_path(&self.paths.root, &self.paths.task_temp);
         }
         self.lease.take();
-        let final_snapshot = telemetry::capture(
-            &self.paths,
-            self.telemetry.reclaimed_bytes,
-            self.policy.min_free_bytes,
-        );
+        let mut reclaimed_bytes = self.telemetry.reclaimed_bytes;
+        if admission::under_pressure(&self.paths, &self.policy) {
+            match prepare_lock().lock() {
+                Ok(_prepare_guard) => {
+                    if admission::under_pressure(&self.paths, &self.policy) {
+                        match cleanup::cleanup_for_pressure(&self.paths, &self.policy) {
+                            Ok(report) => {
+                                reclaimed_bytes =
+                                    reclaimed_bytes.saturating_add(report.reclaimed_bytes);
+                                telemetry::record_cleanup(&self.paths, &report);
+                                tracing::info!(
+                                    project = %self.paths.project_key,
+                                    reclaimed_bytes = report.reclaimed_bytes,
+                                    removed_paths = report.removed_paths,
+                                    skipped_active_paths = report.skipped_active_paths,
+                                    "PC 节点任务结束后已执行构建盘压力清理"
+                                );
+                            }
+                            Err(error) => tracing::warn!(
+                                error = %error,
+                                project = %self.paths.project_key,
+                                "PC 节点任务结束后的构建盘压力清理失败"
+                            ),
+                        }
+                    }
+                }
+                Err(_) => tracing::warn!("构建缓存准备锁已损坏，跳过任务结束后的压力清理"),
+            }
+        }
+        invalidate_status(&self.paths.root);
+        let final_snapshot = telemetry::capture(&self.paths, reclaimed_bytes, &self.policy);
         telemetry::persist(&self.paths, &final_snapshot);
     }
 }
@@ -89,8 +116,9 @@ pub(crate) fn prepare_run(
     telemetry::record_cleanup(&paths, &cleanup);
     prepare_run_directories(&paths)?;
     let lease = BuildRunLease::acquire(&paths, task_id)?;
+    invalidate_status(&paths.root);
     let environment = BuildEnvironment::for_run(&paths, project_id, task_id);
-    let telemetry = telemetry::capture(&paths, cleanup.reclaimed_bytes, policy.min_free_bytes);
+    let telemetry = telemetry::capture(&paths, cleanup.reclaimed_bytes, &policy);
     telemetry::persist(&paths, &telemetry);
     tracing::info!(
         project = %paths.project_key,
@@ -179,7 +207,39 @@ pub(crate) fn mark_cli_run_outcome(task_id: &str, succeeded: bool) {
 }
 
 pub(crate) fn status(data_paths: &NodeDataPaths) -> NodeBuildCacheStatus {
-    telemetry::capture_root_status(data_paths, &BuildCachePolicy::default())
+    let key = data_paths.root().to_path_buf();
+    if let Some(status) = cached_status(&key) {
+        return status;
+    }
+    let _capture_guard = status_capture_lock().lock().ok();
+    if let Some(status) = cached_status(&key) {
+        return status;
+    }
+    let status = telemetry::capture_root_status(data_paths, &BuildCachePolicy::default());
+    if let Ok(mut cache) = status_cache().lock() {
+        cache.insert(
+            key,
+            CachedRootStatus {
+                captured: Instant::now(),
+                status: status.clone(),
+            },
+        );
+    }
+    status
+}
+
+/// 不读取 30 秒状态缓存，供数据根切换等并发门禁获取实时 lease 数。
+pub(crate) fn active_leases(data_paths: &NodeDataPaths) -> usize {
+    lease::active_lease_count(&data_paths.cache().join(".leases"))
+}
+
+fn cached_status(root: &Path) -> Option<NodeBuildCacheStatus> {
+    status_cache()
+        .lock()
+        .ok()
+        .and_then(|cache| cache.get(root).cloned())
+        .filter(|cached| cached.captured.elapsed() < Duration::from_secs(30))
+        .map(|cached| cached.status)
 }
 
 pub(crate) fn cleanup_rebuildable(
@@ -189,14 +249,40 @@ pub(crate) fn cleanup_rebuildable(
     let _prepare_guard = prepare_lock()
         .lock()
         .map_err(|_| anyhow!("构建缓存准备锁已损坏"))?;
-    let current = status(data_paths);
-    if apply && current.active_leases > 0 {
+    let current_active_leases = active_leases(data_paths);
+    if apply && current_active_leases > 0 {
         return Err(anyhow!(
             "当前仍有 {} 个构建任务使用缓存，拒绝清理",
-            current.active_leases
+            current_active_leases
         ));
     }
-    crate::node_agent_data_root::cleanup(data_paths, apply)
+    let result = crate::node_agent_data_root::cleanup(data_paths, apply)?;
+    if apply {
+        invalidate_status(data_paths.root());
+    }
+    Ok(result)
+}
+
+#[derive(Clone)]
+struct CachedRootStatus {
+    captured: Instant,
+    status: NodeBuildCacheStatus,
+}
+
+fn status_cache() -> &'static Mutex<HashMap<PathBuf, CachedRootStatus>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, CachedRootStatus>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn status_capture_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+fn invalidate_status(root: &Path) {
+    if let Ok(mut cache) = status_cache().lock() {
+        cache.remove(root);
+    }
 }
 
 #[derive(Clone)]

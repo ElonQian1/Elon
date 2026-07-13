@@ -1,8 +1,8 @@
 use super::{
-    admission::{disk_free_bytes, disk_total_bytes, BuildCachePolicy},
+    admission::{disk_free_bytes, disk_total_bytes, required_free_bytes, BuildCachePolicy},
     cleanup::CleanupReport,
     lease::active_lease_count,
-    paths::BuildRunPaths,
+    paths::{is_link_or_reparse, BuildRunPaths},
 };
 use elon_pc_dev_runtime::NodeDataPaths;
 use serde::{Deserialize, Serialize};
@@ -32,6 +32,7 @@ pub(crate) struct NodeBuildCacheStatus {
     pub(crate) disk_free_bytes: Option<u64>,
     pub(crate) disk_total_bytes: Option<u64>,
     pub(crate) min_free_bytes: u64,
+    pub(crate) build_headroom_bytes: u64,
     pub(crate) max_total_cache_bytes: u64,
     pub(crate) max_project_rust_bytes: u64,
     pub(crate) pressure: bool,
@@ -52,20 +53,24 @@ struct CleanupTelemetry {
 pub(crate) fn capture(
     paths: &BuildRunPaths,
     reclaimed_bytes: u64,
-    min_free_bytes: u64,
+    policy: &BuildCachePolicy,
 ) -> BuildCacheTelemetry {
     let disk_free = disk_free_bytes(&paths.root);
+    let cache_bytes = directory_size(&paths.cache_root);
+    let project_rust_bytes = directory_size(&paths.project_rust_root);
     BuildCacheTelemetry {
         root: paths.root.to_string_lossy().to_string(),
         project_key: paths.project_key.clone(),
         toolchain_key: paths.toolchain_key.clone(),
-        cache_bytes: directory_size(&paths.cache_root),
-        project_rust_bytes: directory_size(&paths.project_rust_root),
+        cache_bytes,
+        project_rust_bytes,
         temp_bytes: directory_size(&paths.root.join("temp")),
         disk_free_bytes: disk_free,
         active_leases: active_lease_count(&paths.lease_root),
         reclaimed_bytes,
-        pressure: disk_free.is_some_and(|bytes| bytes < min_free_bytes),
+        pressure: cache_bytes > policy.max_total_cache_bytes
+            || project_rust_bytes > policy.max_project_rust_bytes
+            || disk_free.is_some_and(|bytes| bytes < required_free_bytes(policy)),
         captured_at_unix_secs: unix_now(),
     }
 }
@@ -117,11 +122,12 @@ pub(crate) fn capture_root_status(
         disk_free_bytes: disk_free,
         disk_total_bytes: disk_total_bytes(data_paths.root()),
         min_free_bytes: policy.min_free_bytes,
+        build_headroom_bytes: policy.build_headroom_bytes,
         max_total_cache_bytes: policy.max_total_cache_bytes,
         max_project_rust_bytes: policy.max_project_rust_bytes,
         pressure: cache_bytes > policy.max_total_cache_bytes
             || largest_project_rust_bytes > policy.max_project_rust_bytes
-            || disk_free.is_some_and(|bytes| bytes < policy.min_free_bytes),
+            || disk_free.is_some_and(|bytes| bytes < required_free_bytes(policy)),
         active_leases: active_lease_count(&cache.join(".leases")),
         last_cleanup_at_unix_secs: cleanup.as_ref().map(|status| status.cleaned_at_unix_secs),
         last_cleanup_reclaimed_bytes: cleanup
@@ -133,6 +139,12 @@ pub(crate) fn capture_root_status(
 }
 
 fn largest_project_cache(rust_targets: &Path) -> u64 {
+    let Ok(metadata) = std::fs::symlink_metadata(rust_targets) else {
+        return 0;
+    };
+    if !metadata.is_dir() || is_link_or_reparse(&metadata) {
+        return 0;
+    }
     std::fs::read_dir(rust_targets)
         .ok()
         .into_iter()
@@ -147,7 +159,7 @@ pub(crate) fn directory_size(path: &Path) -> u64 {
     let Ok(metadata) = std::fs::symlink_metadata(path) else {
         return 0;
     };
-    if metadata.file_type().is_symlink() {
+    if is_link_or_reparse(&metadata) {
         return 0;
     }
     if metadata.is_file() {

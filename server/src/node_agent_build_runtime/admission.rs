@@ -11,6 +11,7 @@ const GIB: u64 = 1024 * 1024 * 1024;
 #[derive(Debug, Clone)]
 pub(crate) struct BuildCachePolicy {
     pub(crate) min_free_bytes: u64,
+    pub(crate) build_headroom_bytes: u64,
     pub(crate) max_total_cache_bytes: u64,
     pub(crate) max_project_rust_bytes: u64,
     pub(crate) temp_ttl_secs: u64,
@@ -21,6 +22,8 @@ impl Default for BuildCachePolicy {
     fn default() -> Self {
         Self {
             min_free_bytes: env_u64("ELON_NODE_BUILD_MIN_FREE_BYTES").unwrap_or(10 * GIB),
+            build_headroom_bytes: env_u64_allow_zero("ELON_NODE_BUILD_HEADROOM_BYTES")
+                .unwrap_or(8 * GIB),
             max_total_cache_bytes: env_u64("ELON_NODE_BUILD_MAX_CACHE_BYTES").unwrap_or(80 * GIB),
             max_project_rust_bytes: env_u64("ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES")
                 .unwrap_or(24 * GIB),
@@ -39,10 +42,13 @@ pub(crate) fn admit(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> Result<
     let cache_bytes = directory_size(&paths.cache_root);
     let project_bytes = directory_size(&paths.project_rust_root);
     let free_bytes = disk_free_bytes(&paths.root);
-    if free_bytes.is_some_and(|bytes| bytes < policy.min_free_bytes) {
+    let required_free = required_free_bytes(policy);
+    if free_bytes.is_some_and(|bytes| bytes < required_free) {
         return Err(anyhow!(
-            "PC 节点构建盘空间不足：需要至少 {} GiB 空闲，当前约 {} GiB",
+            "PC 节点构建盘空间不足：安全底线 {} GiB + 本次构建预留 {} GiB，启动前需至少 {} GiB 空闲，当前约 {} GiB",
             policy.min_free_bytes / GIB,
+            policy.build_headroom_bytes / GIB,
+            required_free / GIB,
             free_bytes.unwrap_or_default() / GIB
         ));
     }
@@ -66,7 +72,14 @@ pub(crate) fn admit(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> Result<
 pub(crate) fn under_pressure(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> bool {
     directory_size(&paths.cache_root) > policy.max_total_cache_bytes
         || directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
-        || disk_free_bytes(&paths.root).is_some_and(|bytes| bytes < policy.min_free_bytes)
+        || disk_free_bytes(&paths.root)
+            .is_some_and(|bytes| bytes < required_free_bytes(policy))
+}
+
+pub(crate) fn required_free_bytes(policy: &BuildCachePolicy) -> u64 {
+    policy
+        .min_free_bytes
+        .saturating_add(policy.build_headroom_bytes)
 }
 
 fn env_u64(name: &str) -> Option<u64> {
@@ -74,6 +87,12 @@ fn env_u64(name: &str) -> Option<u64> {
         .ok()
         .and_then(|value| value.trim().parse::<u64>().ok())
         .filter(|value| *value > 0)
+}
+
+fn env_u64_allow_zero(name: &str) -> Option<u64> {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
 }
 
 pub(crate) fn disk_free_bytes(path: &Path) -> Option<u64> {
