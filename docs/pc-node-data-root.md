@@ -1,0 +1,211 @@
+# PC 节点数据根、构建缓存与磁盘治理
+
+最后更新：2026-07-13
+
+本文是一龙 Windows PC 节点大体积数据的产品合同。目标是：源码在哪个盘，工作区、构建缓存和任务临时文件就由用户选择的数据盘统一承载，不再因为 Windows 用户目录的默认行为悄悄写满 C 盘。
+
+## 1. 为什么源码在 D 盘，C 盘仍会爆满
+
+PC 节点过去只有分散的目录设置，没有统一的数据根：
+
+- 项目工作区默认落在 `%USERPROFILE%\Elon\workspaces`。
+- 硬盘节点仓库默认落在 `%APPDATA%\elon-node-agent\storage`。
+- Rust 开发和节点发布 target 默认落在 `%LOCALAPPDATA%\Elon\build-target`。
+- Cargo registry、Gradle、npm/pnpm 和应用临时文件继续使用各工具的用户目录或 `%TEMP%`。
+- 会话 worktree 在 D 盘并不代表编译 target、Gradle 用户缓存和临时文件也在 D 盘。
+
+Rust 首次编译常产生数 GB 到数十 GB target；多个项目、toolchain 或发布 profile 再各建一份，很容易成为 C 盘耗尽的直接触发因素。会话文本通常不是主要占用。
+
+## 2. 唯一设置：`ELON_NODE_DATA_ROOT`
+
+用户注册 PC 节点时应选择一个空间充足的数据目录，例如：
+
+```dotenv
+ELON_NODE_DATA_ROOT=D:\ElonNodeData
+```
+
+要求：
+
+1. 必须是绝对路径，不能直接选择 `C:\`、`D:\` 等磁盘根。
+2. 不能与旧 workspace、storage 或另一个数据根互相嵌套。
+3. 目录必须可创建、可写，且不能是重解析点、junction 或符号链接。
+4. 根目录标记绑定当前节点 `install_id`，不能让两台节点误用同一目录。
+5. 节点凭证、登录 token 和小体积配置仍保留在 `%APPDATA%` 与安装目录的 `_internal\node-agent.env`；它们不是构建缓存，不能随着可移除数据盘迁移。
+
+`ELON_NODE_WORKSPACE_ROOT`、`ELON_PC_WORKSPACE_ROOT`、`NODE_WORKSPACE_ROOT`、`NODE_STORAGE_ROOT` 和 `ELON_STORAGE_ROOT` 只保留给旧节点识别与高级覆盖。新节点不应要求普通用户分别配置这些变量。
+
+## 3. 目录合同
+
+```text
+<ELON_NODE_DATA_ROOT>\
+├─ .elon-node-data-root.json
+├─ workspaces\
+│  ├─ <user-id>\<project-id>\repo\
+│  └─ conversation-worktrees\<project-id>\<conversation-id>\
+├─ storage\
+│  ├─ git\projects\<user-id>\<project-id>.git\
+│  └─ worktrees\users\<user-id>\<project-id>\repo\
+├─ cache\
+│  ├─ cargo-home\
+│  ├─ rust-targets\<project-id>\<toolchain-key>\target\
+│  ├─ gradle-home\
+│  ├─ npm\
+│  └─ pnpm-store\
+└─ temp\<task-id>\
+```
+
+职责边界：
+
+- `workspaces`：用户代码和会话 Git worktree，属于重要数据。
+- `storage`：硬盘节点裸仓库和 owner checkout，属于重要数据。
+- `cache`：依赖、编译 target 和包管理器缓存，可重建。
+- `temp`：任务级下载、解包、附件和中间产物，可重建。
+
+自动清理只能处理 `cache`、`temp`。任何 TTL、LRU 或“立即清理缓存”都不得删除 `workspaces`、`storage`、`.git`、未提交文件或用户 artifact。
+
+## 4. Rust target 的共享边界
+
+Rust target 采用：
+
+```text
+cache\rust-targets\<project-id>\<toolchain-key>\target
+```
+
+规则：
+
+- 同一项目的基础 repo 和所有会话 worktree 共享 target，避免每个会话重复下载和编译。
+- 不同项目使用不同 target，避免 feature、build script、环境变量和绝对 dep-info 互相污染。
+- 不同 Rust toolchain 使用不同 `toolchain-key`，例如 `stable-msvc`、`nightly-msvc`；Cargo 会继续在 target 内按 target triple 分目录。
+- 每个任务创建文件 lease，TTL/LRU 和人工清理都必须避开活跃 lease；同一 target 的写入一致性继续由 Cargo 原生 target lock 保证。
+- 跨项目复用依赖编译结果应使用受控的编译缓存层，不能把所有项目硬塞进一个 `D:\rust\shared\target`。
+- 服务端 musl 发布、Windows 节点发布和用户项目开发 profile 不能混用同一个 target。
+
+节点启动项目任务时应注入绝对 `CARGO_TARGET_DIR`。如需迁移 Cargo registry，可同时注入：
+
+```text
+CARGO_HOME=<root>\cache\cargo-home
+```
+
+平台仓库自身的开发与发布缓存不属于用户项目缓存，应在本机未提交的 `.env.local` 分开设置：
+
+```dotenv
+ELON_DEV_CARGO_TARGET_DIR=D:\rust\shared\elon-dev-cargo-target
+ELON_NODE_AGENT_TARGET_DIR=D:\rust\shared\elon-node-agent-target
+RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
+```
+
+三者的 target triple、profile 和 features 不同，不能为了“共享”而指向同一个目录。`cargo-dev.ps1` 和 `publish-node-agent.ps1` 会读取 `.env.local`；共享仓库脚本不会把某台机器的 `D:` 盘写死为所有用户默认值。
+
+## 5. Gradle、Node 与任务 Temp 路由
+
+节点启动 AI CLI、生成项目命令或构建子进程时，环境变量至少应包含：
+
+| 工具 | 路由 |
+|---|---|
+| Gradle | `GRADLE_USER_HOME=<root>\cache\gradle-home` |
+| npm | `npm_config_cache=<root>\cache\npm` |
+| pnpm | store 指向 `<root>\cache\pnpm-store` |
+| Cargo | `CARGO_HOME` 和项目级 `CARGO_TARGET_DIR` |
+| Windows 临时目录 | `TEMP=<root>\temp\<task-id>`、`TMP=...` |
+| 跨平台临时目录 | `TMPDIR=<root>\temp\<task-id>` |
+
+Gradle 项目自己的 `.gradle`、`build` 和 Android 输出仍位于项目 workspace；workspace 已在数据根，因此不会回流 C 盘。Android SDK、JDK、Rust toolchain 和 Codex 安装目录属于工具安装，不应被缓存清理接口删除。
+
+任务结束后可回收任务 temp；异常终止时由 TTL 扫描补清。子进程仍在运行时不得删除对应 task temp。
+
+## 6. 旧节点迁移策略
+
+升级后先生成迁移计划，不自动移动 Git 数据：
+
+1. 枚举旧 `ELON_NODE_WORKSPACE_ROOT`、旧 storage root 和历史默认目录。
+2. 仅报告路径、是否存在、是否有数据、建议目标和迁移策略。
+3. 旧 workspace/storage 在迁移期只作为兼容来源；新任务不得继续向旧根创建新项目。
+4. 旧会话 worktree 不能递归复制。先确认工作区干净、提交已合并或已 push，再删除并从基础 Git repo 在新根重建。
+5. 旧 storage 裸仓库必须复制到暂存目录，执行 Git 完整性校验后再原子切换；owner checkout 应从裸仓库重建。
+6. 发现脏 worktree、未 push 提交、活动任务、空间不足、跨节点 marker 或校验失败时停止，旧目录保持不变。
+7. 切换成功后先保留旧目录作为回滚源；经过观察期和用户确认后再单独清理。
+
+缓存不需要复制：新根创建空 cache 即可。旧 C 盘 target 可在确认没有 Cargo/Rustc 进程后删除；旧 Temp 只按白名单类型和年龄处理。
+
+## 7. 容量、TTL 与 LRU 默认
+
+产品默认建议如下；管理员可以收紧，不能扩大到 workspace/storage：
+
+| 项目 | 默认 |
+|---|---|
+| 构建前硬保留 | 10 GiB，可用 `ELON_NODE_BUILD_MIN_FREE_BYTES` 覆盖 |
+| 节点 cache 配额 | 80 GiB，可用 `ELON_NODE_BUILD_MAX_CACHE_BYTES` 覆盖 |
+| 单项目 Rust cache 配额 | 24 GiB，可用 `ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES` 覆盖 |
+| 成功任务 temp | 子进程结束后立即清理 |
+| 失败、取消或异常任务 temp TTL | 24 小时 |
+| Rust/Gradle/Node cache TTL | 30 天未使用后进入 LRU 候选 |
+| LRU 顺序 | 最久未使用且没有活跃 lease 的项目缓存优先；活动项目绝不删除 |
+| 旧根回滚观察期 | 至少 7 天，并由用户显式确认清理 |
+
+构建前容量预测应叠加项目类型预算。仅保留 4 GiB 不足以承载 Android 或 Rust 首次全量构建。
+
+## 8. 设置、状态与清理 API
+
+本地管理 API 受本地管理员 token 保护。
+
+查看状态和迁移计划：
+
+```http
+GET /api/node-data-root
+```
+
+设置新根：
+
+```http
+POST /api/node-data-root
+Content-Type: application/json
+
+{"root_path":"D:\\ElonNodeData"}
+```
+
+设置会写入 `node.json` 和安装目录 `_internal\node-agent.env`。当前进程更新路径状态，但建议重启节点，让所有后台组件继承一致环境。
+
+清理前预览：
+
+```http
+POST /api/node-data-root/cleanup
+Content-Type: application/json
+
+{"apply":false}
+```
+
+明确执行：
+
+```json
+{"apply":true}
+```
+
+清理接口检测到活动 CLI 任务时必须拒绝执行；未配置数据根时也必须拒绝，不能退回清理任意 `%USERPROFILE%` 或 `%TEMP%`。
+
+## 9. 回滚
+
+1. 停止创建任务并等待活动 CLI/Cargo/Gradle 进程退出。
+2. 保留新旧根，不要先删除任一侧。
+3. 将 `ELON_NODE_DATA_ROOT` 恢复为上一个带相同 `install_id` marker 的根。
+4. 重启节点并确认状态、项目 Git 远端和 workspace 可用。
+5. 对 storage 执行完整性检查，对项目检查 `git status` 和远端分支。
+6. 回滚完成后，新根的 cache/temp 可清；workspace/storage 仍需用户确认。
+
+不能用修改环境变量的方式“回滚”尚未迁移或未 push 的工作区内容。长期恢复来源始终是已验证的 Git repo、remote 和 branch。
+
+## 10. 旧 C 盘只读盘点
+
+仓库提供 `scripts/inspect-node-disk-usage.ps1`：
+
+```powershell
+# 默认只预览
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-node-disk-usage.ps1
+
+# 显式清理两个已知可重建 Rust target
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-node-disk-usage.ps1 -Apply
+
+# 再包含 30 天前的严格 Temp 候选
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-node-disk-usage.ps1 -Apply -IncludeExpiredTemp -MinAgeDays 30
+```
+
+脚本拒绝系统根、候选根越界、重解析点和 Cargo/Rustc 活跃进程；默认不删除任何内容。它不是通用磁盘清理器，不处理 VS Code、Gradle、Codex 会话、浏览器或未知应用目录。

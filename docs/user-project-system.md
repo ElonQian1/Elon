@@ -252,17 +252,19 @@ Authorization: Bearer <token>
 
 PC 节点创建项目的门槛是 `workspace_provision_ready`（一龙 PC 开发运行时可用），不是 `cli_project_ready`。`cli_project_ready` 只表示 Codex/Copilot 等 AI CLI 可用，影响后续 AI 开发任务，不应阻止“创建目录 + 初始化 Git”的基础项目创建。
 
-PC 节点默认目录结构：
+PC 节点的大体积目录统一由 `ELON_NODE_DATA_ROOT` 派生。完整目录合同、构建缓存隔离、旧 C 盘迁移和清理边界见 [`pc-node-data-root.md`](pc-node-data-root.md)。
 
 ```text
-ELON_NODE_WORKSPACE_ROOT/
-  usr_xxx/
-    prj_xxx/
-      repo/
-      worktrees/
-      artifacts/
-      logs/
+ELON_NODE_DATA_ROOT/
+  workspaces/
+    usr_xxx/prj_xxx/repo/
+    conversation-worktrees/prj_xxx/conversation_xxx/
+  storage/
+  cache/
+  temp/
 ```
+
+`ELON_NODE_WORKSPACE_ROOT` 只保留给旧节点和高级覆盖。新节点必须选择空间充足的数据根；workspace/storage 属于重要数据，不能进入缓存 TTL/LRU 清理。
 
 如果 PC 节点创建失败，服务端应清理本次新建的项目档案，不给客户端返回一个不能执行的假项目。
 
