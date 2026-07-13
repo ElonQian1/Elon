@@ -47,6 +47,8 @@ pub(super) struct PersistedState {
     /// Canonical root for large, reproducible node data. Credentials remain in
     /// this small APPDATA state file and are not moved with the data root.
     pub(super) node_data_root: Option<String>,
+    pub(super) node_data_legacy_workspace_root: Option<String>,
+    pub(super) node_data_legacy_storage_root: Option<String>,
     pub(super) storage_enabled: Option<bool>,
     pub(super) storage_root: Option<String>,
     pub(super) storage_git_base_url: Option<String>,
@@ -126,7 +128,7 @@ impl PersistedState {
         install_id: &str,
         c: Option<&Credentials>,
         storage: &super::pc_storage_repo::StorageSettings,
-        node_data_root: Option<&std::path::Path>,
+        node_data_root: &super::node_agent_data_root::NodeDataRootState,
     ) -> Self {
         Self {
             install_id: Some(install_id.to_string()),
@@ -134,7 +136,17 @@ impl PersistedState {
             agent_secret: c.map(|c| c.agent_secret.clone()),
             owner_user_id: c.map(|c| c.owner_user_id.clone()),
             user_token: c.and_then(|c| c.user_token.clone()),
-            node_data_root: node_data_root.map(|path| path.to_string_lossy().to_string()),
+            node_data_root: node_data_root
+                .configured_root()
+                .map(|path| path.to_string_lossy().to_string()),
+            node_data_legacy_workspace_root: node_data_root
+                .legacy_workspace_root
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string()),
+            node_data_legacy_storage_root: node_data_root
+                .legacy_storage_root
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string()),
             storage_enabled: Some(storage.enabled),
             storage_root: storage.root_path.clone(),
             storage_git_base_url: storage.git_base_url.clone(),
@@ -148,6 +160,7 @@ pub(super) fn initial_node_data_root(
     let legacy_storage_root = ["NODE_STORAGE_ROOT", "ELON_STORAGE_ROOT"]
         .into_iter()
         .find_map(|key| std::env::var(key).ok().filter(|value| !value.trim().is_empty()))
+        .or_else(|| persisted.node_data_legacy_storage_root.clone())
         .or_else(|| persisted.storage_root.clone())
         .map(PathBuf::from)
         .or_else(|| {
@@ -156,6 +169,10 @@ pub(super) fn initial_node_data_root(
         });
     super::node_agent_data_root::resolve(
         persisted.node_data_root.as_deref(),
+        persisted
+            .node_data_legacy_workspace_root
+            .as_deref()
+            .map(PathBuf::from),
         legacy_storage_root,
     )
 }
@@ -183,16 +200,15 @@ pub(super) fn initial_storage_settings(
     persisted: &PersistedState,
 ) -> super::pc_storage_repo::StorageSettings {
     let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
-    let explicit_or_legacy_root = env_nonempty("NODE_STORAGE_ROOT")
-        .or_else(|| env_nonempty("ELON_STORAGE_ROOT"))
-        .or_else(|| persisted.storage_root.clone());
+    let explicit_root = env_nonempty("NODE_STORAGE_ROOT")
+        .or_else(|| env_nonempty("ELON_STORAGE_ROOT"));
     let data_root = initial_node_data_root(persisted);
-    let root_path = explicit_or_legacy_root.or_else(|| {
+    let root_path = explicit_root.or_else(|| {
         data_root
             .paths
             .as_ref()
             .map(|paths| paths.storage().to_string_lossy().to_string())
-    });
+    }).or_else(|| persisted.storage_root.clone());
     let git_base_url = env_nonempty("NODE_STORAGE_GIT_BASE_URL")
         .or_else(|| env_nonempty("ELON_STORAGE_GIT_BASE_URL"))
         .or_else(|| persisted.storage_git_base_url.clone());

@@ -279,7 +279,7 @@ async fn run_agent_runtime() -> Result<()> {
         &install_id,
         creds.as_ref(),
         &storage_settings,
-        node_data_root.configured_root(),
+        &node_data_root,
     ));
 
     // 有登录 token 但还没有节点凭证 → 自动注册一次
@@ -297,7 +297,7 @@ async fn run_agent_runtime() -> Result<()> {
                         &install_id,
                         Some(&c),
                         &storage_settings,
-                        node_data_root.configured_root(),
+                        &node_data_root,
                     ));
                     creds = Some(c);
                 }

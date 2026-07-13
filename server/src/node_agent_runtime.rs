@@ -440,7 +440,7 @@ impl NodeRuntime {
             &self.install_id,
             c.as_ref(),
             &storage,
-            data_root.configured_root(),
+            &data_root,
         ));
         *self.creds.write().await = c;
         self.wake.notify_waiters();
@@ -453,7 +453,7 @@ impl NodeRuntime {
             &self.install_id,
             creds.as_ref(),
             &settings,
-            data_root.configured_root(),
+            &data_root,
         ));
         *self.storage_settings.write().await = settings;
         self.wake.notify_waiters();
@@ -466,18 +466,38 @@ impl NodeRuntime {
         node_agent_data_root::persist_to_env_file(&paths)?;
         node_agent_data_root::apply_to_process(&paths);
 
-        let storage = self.storage_settings.read().await.clone();
+        let previous = self.node_data_root.read().await.clone();
+        let mut storage = self.storage_settings.read().await.clone();
+        let legacy_storage_root = storage
+            .root_path
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .or(previous.legacy_storage_root.clone());
+        if std::env::var("NODE_STORAGE_ROOT")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .or_else(|| {
+                std::env::var("ELON_STORAGE_ROOT")
+                    .ok()
+                    .filter(|value| !value.trim().is_empty())
+            })
+            .is_none()
+        {
+            storage.root_path = Some(paths.storage().to_string_lossy().to_string());
+        }
         let creds = self.creds.read().await.clone();
         let next = node_agent_data_root::resolve(
             None,
-            storage.root_path.as_deref().map(std::path::PathBuf::from),
+            previous.legacy_workspace_root.clone(),
+            legacy_storage_root,
         );
         save_persisted(&PersistedState::from_parts(
             &self.install_id,
             creds.as_ref(),
             &storage,
-            next.configured_root(),
+            &next,
         ));
+        *self.storage_settings.write().await = storage;
         *self.node_data_root.write().await = next.clone();
         self.wake.notify_waiters();
         Ok(next)

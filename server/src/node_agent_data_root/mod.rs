@@ -54,12 +54,15 @@ pub(crate) struct CleanupResult {
 
 pub(crate) fn resolve(
     persisted_root: Option<&str>,
+    legacy_workspace_root: Option<PathBuf>,
     legacy_storage_root: Option<PathBuf>,
 ) -> NodeDataRootState {
     resolve_from_values(
         configured_node_data_root(),
         persisted_root.map(PathBuf::from),
-        legacy_workspace_root_override().or_else(|| Some(legacy_default_workspace_root())),
+        legacy_workspace_root_override()
+            .or(legacy_workspace_root)
+            .or_else(|| Some(legacy_default_workspace_root())),
         legacy_storage_root,
     )
 }
@@ -160,11 +163,13 @@ pub(crate) fn validate_and_prepare(root: &str, install_id: &str) -> Result<NodeD
     }
     std::fs::create_dir_all(&root)
         .with_context(|| format!("无法创建节点数据根 {}", root.display()))?;
+    reject_reparse_point(&root)?;
 
     let paths = NodeDataPaths::new(root);
     for managed in paths.managed_roots() {
         std::fs::create_dir_all(&managed)
             .with_context(|| format!("无法创建节点数据目录 {}", managed.display()))?;
+        reject_reparse_point(&managed)?;
     }
     write_root_marker(&paths, install_id)?;
     Ok(paths)
@@ -258,6 +263,22 @@ fn clean_root(value: &str) -> Result<PathBuf> {
         bail!("节点数据根必须是绝对路径: {}", path.display());
     }
     Ok(path)
+}
+
+fn reject_reparse_point(path: &Path) -> Result<()> {
+    let metadata = std::fs::symlink_metadata(path)
+        .with_context(|| format!("无法检查节点数据目录 {}", path.display()))?;
+    let mut rejected = metadata.file_type().is_symlink();
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
+        rejected |= metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0;
+    }
+    if rejected {
+        bail!("节点数据目录不能是符号链接、junction 或重解析点: {}", path.display());
+    }
+    Ok(())
 }
 
 fn write_root_marker(paths: &NodeDataPaths, install_id: &str) -> Result<()> {
