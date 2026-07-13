@@ -266,7 +266,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 }
 
 #[cfg(test)]
-mod tests {
+mod annotation_tests {
     use super::tool_definitions;
 
     #[test]
