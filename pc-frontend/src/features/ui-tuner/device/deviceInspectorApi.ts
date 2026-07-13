@@ -120,7 +120,7 @@ export interface AndroidDeviceProfile {
   wirelessMode: 'unknown' | 'tls' | 'legacy' | 'manual'
   paired: boolean
   lastEndpoint?: string
-  sharedProjectIds: string[]
+  sharedProjectIds?: string[]
   createdAt: string
   lastSeenAt: string
   connectionState: 'connected_usb' | 'connected_wireless' | 'paired_offline' | 'offline'

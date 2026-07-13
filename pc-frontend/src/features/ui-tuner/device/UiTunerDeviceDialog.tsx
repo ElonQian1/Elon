@@ -3,6 +3,7 @@ import {
   Cable,
   Link2,
   RefreshCw,
+  Share2,
   ShieldCheck,
   Smartphone,
   Trash2,
@@ -35,6 +36,9 @@ interface UiTunerDeviceDialogProps {
   onEnableLegacy: (deviceId: string, profileId?: string) => Promise<boolean>
   onConnectAddress: (address: string, profileId?: string) => Promise<boolean>
   onForget: (profileId: string) => void
+  projectName?: string
+  sharedHardwareSerials: string[]
+  onToggleProjectShare: (profile: AndroidDeviceProfile, shared: boolean) => void
 }
 
 const STATE_LABELS: Record<AndroidDeviceProfile['connectionState'], string> = {
@@ -69,6 +73,9 @@ export function UiTunerDeviceDialog({
   onEnableLegacy,
   onConnectAddress,
   onForget,
+  projectName,
+  sharedHardwareSerials,
+  onToggleProjectShare,
 }: UiTunerDeviceDialogProps) {
   const [displayName, setDisplayName] = useState('')
   const [pairingAddress, setPairingAddress] = useState('')
@@ -238,7 +245,9 @@ export function UiTunerDeviceDialog({
             </div>
             <div className={styles.profileList}>
               {!status?.profiles.length && <div className={styles.empty}>尚未登记手机，请先完成第一步。</div>}
-              {status?.profiles.map((profile) => (
+              {status?.profiles.map((profile) => {
+                const shared = sharedHardwareSerials.includes(profile.hardwareSerial)
+                return (
                 <article
                   key={profile.id}
                   className={profile.id === activeProfile?.id ? styles.activeProfile : styles.profileCard}
@@ -251,6 +260,23 @@ export function UiTunerDeviceDialog({
                   </div>
                   <div className={styles.profileActions}>
                     <span data-state={profile.connectionState}>{STATE_LABELS[profile.connectionState]}</span>
+                    <button
+                      type="button"
+                      disabled={busy || !projectName || !profile.lastEndpoint}
+                      title={!projectName
+                        ? '请先选择项目'
+                        : !profile.lastEndpoint
+                          ? '请先完成无线连接'
+                          : shared
+                            ? `停止向“${projectName}”的 PC 节点共享连接档案`
+                            : `让“${projectName}”的获授权 PC 节点记住这台手机`}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        onToggleProjectShare(profile, shared)
+                      }}
+                    >
+                      <Share2 size={13} /> {shared ? '项目已共享' : '共享到项目'}
+                    </button>
                     <button type="button" disabled={busy} onClick={(event) => {
                       event.stopPropagation()
                       onReconnect(profile.id)
@@ -265,7 +291,8 @@ export function UiTunerDeviceDialog({
                     </button>
                   </div>
                 </article>
-              ))}
+                )
+              })}
             </div>
           </section>
         </div>
