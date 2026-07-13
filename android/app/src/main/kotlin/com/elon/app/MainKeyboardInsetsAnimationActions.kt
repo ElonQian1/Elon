@@ -304,6 +304,7 @@ internal class MainKeyboardInsetsAnimationActions(
         val newHeight = visibleBottomBar.height
         if (newHeight <= 0 || bottomBarOverlayHeight == newHeight) return
         bottomBarOverlayHeight = newHeight
+        syncChatSideMenuHandleBottomMargin(binding, newHeight)
         if (SystemClock.uptimeMillis() < suppressBottomBarLayoutSyncUntil) {
             applyChatBottomPaddingWithoutScroll(0)
             return
