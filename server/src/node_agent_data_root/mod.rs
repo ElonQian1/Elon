@@ -7,9 +7,14 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 pub(crate) mod admin;
+mod cleanup;
+mod marker;
 
-const ROOT_MARKER_FILE: &str = ".elon-node-data-root.json";
-const ROOT_MARKER_SCHEMA_VERSION: u64 = 1;
+pub(crate) use cleanup::{cleanup, CleanupEntry, CleanupResult};
+use marker::{claim_or_verify_root_marker, root_marker_belongs_to};
+pub(crate) use marker::verify_root_marker;
+#[cfg(test)]
+use marker::{read_existing_root_marker, ROOT_MARKER_FILE};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -38,22 +43,6 @@ pub(crate) struct MigrationPlanItem {
     pub(crate) has_data: bool,
     pub(crate) read_only_compatibility: bool,
     pub(crate) strategy: &'static str,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct CleanupEntry {
-    pub(crate) kind: &'static str,
-    pub(crate) path: String,
-    pub(crate) existed: bool,
-    pub(crate) estimated_bytes: u64,
-    pub(crate) removed: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct CleanupResult {
-    pub(crate) apply: bool,
-    pub(crate) estimated_bytes: u64,
-    pub(crate) entries: Vec<CleanupEntry>,
 }
 
 pub(crate) fn resolve(
@@ -286,63 +275,6 @@ pub(crate) fn apply_to_process(paths: &NodeDataPaths) {
     std::env::set_var(NODE_DATA_ROOT_ENV, paths.root());
 }
 
-pub(crate) fn cleanup(
-    paths: &NodeDataPaths,
-    expected_install_id: &str,
-    apply: bool,
-) -> Result<CleanupResult> {
-    // Carry the live runtime owner through the complete deletion transaction.
-    // Accepting an arbitrary well-formed marker here would leave a window in
-    // which a replaced root could authorize deletion with another node's ID.
-    verify_root_marker(paths, expected_install_id)?;
-    let canonical_root = validate_created_root(paths.root())?;
-    let targets = [("cache", paths.cache()), ("temp", paths.temp())];
-    let mut entries = Vec::with_capacity(targets.len());
-    for (kind, target) in targets {
-        validate_canonical_managed_path(paths.root(), &canonical_root, &target)?;
-        let existed = target.exists();
-        let estimated_bytes = directory_size_without_following_links(&target)?;
-        if apply && existed {
-            verify_root_marker(paths, expected_install_id)?;
-            // Re-scan immediately before deletion. This rejects a junction or
-            // symlink anywhere in the managed tree instead of allowing
-            // remove_dir_all to cross an out-of-root reparse boundary.
-            validate_tree_no_reparse(&target)?;
-            validate_canonical_managed_path(paths.root(), &canonical_root, &target)?;
-            std::fs::remove_dir_all(&target)
-                .with_context(|| format!("无法清理节点 {kind} 目录 {}", target.display()))?;
-            std::fs::create_dir_all(&target)
-                .with_context(|| format!("无法重建节点 {kind} 目录 {}", target.display()))?;
-            verify_root_marker(paths, expected_install_id)?;
-            validate_canonical_managed_path(paths.root(), &canonical_root, &target)?;
-        }
-        entries.push(CleanupEntry {
-            kind,
-            path: path_text(&target),
-            existed,
-            estimated_bytes,
-            removed: apply && existed,
-        });
-    }
-    Ok(CleanupResult {
-        apply,
-        estimated_bytes: entries.iter().map(|entry| entry.estimated_bytes).sum(),
-        entries,
-    })
-}
-
-pub(crate) fn verify_root_marker(paths: &NodeDataPaths, install_id: &str) -> Result<()> {
-    let install_id = require_install_id(install_id)?;
-    let marker = paths.root().join(ROOT_MARKER_FILE);
-    let Some(existing_install_id) = read_existing_root_marker(&marker)? else {
-        bail!("节点数据根缺少所有权标记: {}", marker.display());
-    };
-    if existing_install_id != install_id {
-        bail!("该目录已属于另一台一龙节点: {}", marker.display());
-    }
-    Ok(())
-}
-
 fn clean_root(value: &str) -> Result<PathBuf> {
     let value = value.trim();
     if value.is_empty() {
@@ -490,109 +422,6 @@ fn metadata_is_reparse_point(metadata: &std::fs::Metadata) -> bool {
     rejected
 }
 
-fn claim_or_verify_root_marker(paths: &NodeDataPaths, install_id: &str) -> Result<()> {
-    let install_id = require_install_id(install_id)?;
-    let marker = paths.root().join(ROOT_MARKER_FILE);
-    if let Some(existing_install_id) = read_existing_root_marker(&marker)? {
-        return ensure_marker_owner(&marker, &existing_install_id, install_id);
-    }
-
-    if !directory_is_empty(paths.root())? {
-        // A concurrent claimant may have installed the marker after our first
-        // lookup and may already be creating managed roots. Re-read once before
-        // treating the directory as an unsafe pre-existing directory.
-        if let Some(existing_install_id) = read_existing_root_marker(&marker)? {
-            return ensure_marker_owner(&marker, &existing_install_id, install_id);
-        }
-        bail!(
-            "未标记的节点数据根必须是空目录，请选择专用空目录: {}",
-            paths.root().display()
-        );
-    }
-
-    let content = serde_json::to_vec_pretty(&serde_json::json!({
-        "schema_version": ROOT_MARKER_SCHEMA_VERSION,
-        "install_id": install_id,
-    }))?;
-    match crate::node_agent_atomic_file::write_new(&marker, &content) {
-        Ok(()) => Ok(()),
-        Err(claim_error) => match read_existing_root_marker(&marker) {
-            Ok(Some(existing_install_id)) => {
-                ensure_marker_owner(&marker, &existing_install_id, install_id)
-            }
-            Ok(None) => Err(claim_error)
-                .with_context(|| format!("无法独占提交节点数据根标记 {}", marker.display())),
-            Err(marker_error) => Err(marker_error)
-                .with_context(|| format!("节点数据根标记并发提交失败，原始错误: {claim_error:#}")),
-        },
-    }
-}
-
-fn require_install_id(install_id: &str) -> Result<&str> {
-    let install_id = install_id.trim();
-    if install_id.is_empty() {
-        bail!("节点安装 ID 不能为空，拒绝绑定数据根");
-    }
-    Ok(install_id)
-}
-
-fn ensure_marker_owner(marker: &Path, existing: &str, expected: &str) -> Result<()> {
-    if existing != expected {
-        bail!("该目录已属于另一台一龙节点: {}", marker.display());
-    }
-    Ok(())
-}
-
-fn read_existing_root_marker(marker: &Path) -> Result<Option<String>> {
-    let metadata = match std::fs::symlink_metadata(marker) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => {
-            return Err(error)
-                .with_context(|| format!("无法检查节点数据根标记 {}", marker.display()));
-        }
-    };
-    if metadata_is_reparse_point(&metadata) {
-        bail!(
-            "节点数据根标记不能是符号链接、junction 或重解析点: {}",
-            marker.display()
-        );
-    }
-    if !metadata.is_file() {
-        bail!("节点数据根标记不是普通文件: {}", marker.display());
-    }
-    let existing = std::fs::read_to_string(marker)
-        .with_context(|| format!("无法读取节点数据根标记 {}", marker.display()))?;
-    let value: serde_json::Value = serde_json::from_str(&existing)
-        .with_context(|| format!("节点数据根标记损坏: {}", marker.display()))?;
-    let schema_version = value
-        .get("schema_version")
-        .and_then(serde_json::Value::as_u64)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "节点数据根标记缺少有效 schema_version: {}",
-                marker.display()
-            )
-        })?;
-    if schema_version != ROOT_MARKER_SCHEMA_VERSION {
-        bail!(
-            "节点数据根标记 schema_version 不受支持: {} (expected {}, actual {})",
-            marker.display(),
-            ROOT_MARKER_SCHEMA_VERSION,
-            schema_version
-        );
-    }
-    let install_id = value
-        .get("install_id")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            anyhow::anyhow!("节点数据根标记缺少有效 install_id: {}", marker.display())
-        })?;
-    Ok(Some(install_id.to_string()))
-}
-
 fn is_owned_previous_managed_child(candidate: &Path, existing: &Path, install_id: &str) -> bool {
     is_exact_managed_child(candidate, existing) && root_marker_belongs_to(candidate, install_id)
 }
@@ -600,17 +429,6 @@ fn is_owned_previous_managed_child(candidate: &Path, existing: &Path, install_id
 fn is_exact_managed_child(root: &Path, candidate: &Path) -> bool {
     paths_equal(candidate, &root.join("workspaces"))
         || paths_equal(candidate, &root.join("storage"))
-}
-
-fn root_marker_belongs_to(root: &Path, install_id: &str) -> bool {
-    verify_root_marker(&NodeDataPaths::new(root), install_id).is_ok()
-}
-
-fn directory_is_empty(path: &Path) -> Result<bool> {
-    Ok(std::fs::read_dir(path)
-        .with_context(|| format!("无法检查节点数据根是否为空 {}", path.display()))?
-        .next()
-        .is_none())
 }
 
 fn push_migration_item(
@@ -652,52 +470,6 @@ fn ensure_managed_child(root: &Path, target: &Path) -> Result<()> {
             target.display(),
             root.display()
         );
-    }
-    Ok(())
-}
-
-fn directory_size_without_following_links(path: &Path) -> Result<u64> {
-    if !path.exists() {
-        return Ok(0);
-    }
-    let metadata = std::fs::symlink_metadata(path)?;
-    if metadata_is_reparse_point(&metadata) {
-        bail!(
-            "拒绝读取包含符号链接、junction 或重解析点的清理目录: {}",
-            path.display()
-        );
-    }
-    if metadata.is_file() {
-        return Ok(metadata.len());
-    }
-    let mut total = 0u64;
-    for entry in std::fs::read_dir(path)? {
-        let entry = entry?;
-        total = total.saturating_add(directory_size_without_following_links(&entry.path())?);
-    }
-    Ok(total)
-}
-
-fn validate_tree_no_reparse(path: &Path) -> Result<()> {
-    let metadata = match std::fs::symlink_metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => {
-            return Err(error).with_context(|| format!("无法检查待清理目录 {}", path.display()));
-        }
-    };
-    if metadata_is_reparse_point(&metadata) {
-        bail!(
-            "拒绝清理包含符号链接、junction 或重解析点的目录: {}",
-            path.display()
-        );
-    }
-    if metadata.is_dir() {
-        for entry in std::fs::read_dir(path)
-            .with_context(|| format!("无法枚举待清理目录 {}", path.display()))?
-        {
-            validate_tree_no_reparse(&entry?.path())?;
-        }
     }
     Ok(())
 }
