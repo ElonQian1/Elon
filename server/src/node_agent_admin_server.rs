@@ -142,11 +142,12 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             )
             .route(
                 "/api/node-data-root",
-                axum::routing::get(admin_node_data_root_get).post(admin_node_data_root_set),
+                axum::routing::get(node_agent_data_root::admin::get)
+                    .post(node_agent_data_root::admin::set),
             )
             .route(
                 "/api/node-data-root/cleanup",
-                axum::routing::post(admin_node_data_root_cleanup),
+                axum::routing::post(node_agent_data_root::admin::cleanup),
             )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .route(

@@ -6,6 +6,8 @@ use elon_pc_dev_runtime::{
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
+pub(crate) mod admin;
+
 const ROOT_MARKER_FILE: &str = ".elon-node-data-root.json";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
