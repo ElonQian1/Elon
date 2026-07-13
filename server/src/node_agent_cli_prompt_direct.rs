@@ -224,6 +224,42 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             stdout_text.push_str(&text);
         }
     }
+    if !exit_ok && cli_name == "codex" {
+        if let Some(fallback_args) =
+            crate::node_agent_codex_model_compat::compatibility_fallback_args(
+                &extra_args,
+                &stdout_text,
+                &stderr_text,
+            )
+        {
+            send_cli_chunk(
+                &out_tx,
+                &task_journal,
+                &req_id,
+                "stdout",
+                "codex\n当前模型需要更高版本 Codex，已自动切换到兼容模型 gpt-5.4 并继续本轮任务。\n",
+            );
+            Box::pin(crate::run_cli_prompt(crate::CliPromptRun {
+                req_id,
+                bin: bin_owned,
+                cli_name: cli_name_owned,
+                extra_args: fallback_args,
+                runtime_permission,
+                cwd,
+                conversation_workspace,
+                prompt,
+                server_runtime_config,
+                approval_state,
+                task_journal,
+                runtime,
+                cancel_rx,
+                out_tx,
+                codex_vault_switch_attempted,
+            }))
+            .await;
+            return;
+        }
+    }
     if !exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
         if let Some(message) =
             node_agent_codex_auth_switch::try_after_failure(&runtime, &stdout_text, &stderr_text)
