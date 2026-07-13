@@ -8,6 +8,7 @@ import type {
   UserPresenceSettings,
 } from './types'
 import { presenceLabel } from './memberUtils'
+import { recoverySnapshotPhase } from './taskRecoverySnapshotModel'
 
 export function titleFromMessage(message: string): string {
   const title = message.replace(/\s+/g, ' ').trim()
@@ -194,10 +195,14 @@ function recoverySnapshotMessage(snapshot: TaskSnapshotResponse): Message | null
   const resume = snapshot.resume ?? null
   const attach = snapshot.attach ?? snapshot.cloud_attach ?? snapshot.cloudAttach ?? null
   const approvalState = snapshot.approval_state ?? snapshot.approvalState ?? null
-  const nextAction = clean(resume?.next_action ?? resume?.nextAction ?? '')
-  const phase = journalStatus === 'available' && nextAction !== 'continue_from_snapshot'
-    ? 'connection_recovering'
-    : 'resume_required'
+  const phase = recoverySnapshotPhase({
+    taskStatus,
+    taskError: snapshot.task?.error,
+    journalStatus,
+    resume,
+    attach,
+  })
+  if (!phase) return null
   const pcReqId = clean(snapshot.pc_req_id ?? snapshot.pcReqId ?? localJournal.pc_req_id ?? localJournal.pcReqId ?? '')
   const agentId = clean(snapshot.agent_id ?? snapshot.agentId ?? localJournal.agent_id ?? localJournal.agentId ?? '')
   const lastEventSeq = Number(snapshot.last_event_seq ?? snapshot.lastEventSeq ?? 0)
