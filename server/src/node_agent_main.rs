@@ -104,6 +104,7 @@ mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
+mod node_agent_shared_android_devices;
 mod node_agent_session;
 use node_agent_session::run_session;
 #[cfg(test)]
@@ -320,6 +321,7 @@ async fn run_agent_runtime() -> Result<()> {
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
+    node_agent_shared_android_devices::spawn(runtime.clone());
     node_agent_admin_open::maybe_open_admin_page(admin_port);
     runtime.ensure_cli_probe_background(true).await;
     runtime.refresh_models_background();
