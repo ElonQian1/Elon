@@ -22,7 +22,11 @@ pub(super) async fn admin_status(
     let hardware = rt.hardware_profile().await;
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = super::pc_storage_repo::storage_profile(&storage_settings);
-    let full_access_grant_count = rt.full_access_grants.list().await.len();
+    let full_access_grant_count =
+        match super::node_agent_full_access::current_grant_identity(&rt).await {
+            Ok(identity) => rt.full_access_grants.list(&identity).await.len(),
+            Err(_) => 0,
+        };
     let active_cli_prompts = rt.active_cli_prompts.views_without_approvals().await;
     let active_cli_prompt_count = active_cli_prompts.len();
     let recent_task_records = rt.task_journal.latest_records(20).unwrap_or_else(|error| {

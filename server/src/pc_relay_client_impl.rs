@@ -76,7 +76,7 @@ pub(super) async fn run_relay_session(
     let register = AgentToServer::Register {
         agent_id: agent_id.to_string(),
         version: env!("CARGO_PKG_VERSION").to_string(),
-        proto_version: PROTO_VERSION,
+        proto_version: LEGACY_RELAY_PROTO_VERSION,
         allowed_clis: vec!["copilot".into(), "codex".into()],
         allowed_cwds: vec![],
         owner_user_id: None,
@@ -142,6 +142,9 @@ pub(super) async fn run_relay_session(
         };
 
         match msg {
+            ServerToAgent::CliCompletionAck { .. } => {
+                // The legacy relay has no durable completion outbox.
+            }
             ServerToAgent::HttpRequest {
                 req_id,
                 method,
@@ -166,6 +169,11 @@ pub(super) async fn run_relay_session(
                 extra_args,
                 cwd,
                 project_context,
+                codex_credential_binding: _,
+                requires_cloud_control: _,
+                cloud_control_deadline: _,
+                cloud_control_issued_at: _,
+                cloud_control_ttl_ms: _,
                 prompt,
             } => {
                 let tx = out_tx.clone();

@@ -393,7 +393,7 @@ fn mark_suggestion_updated_response(
     }
 }
 
-fn publish_channel_message_updated(
+pub(crate) fn publish_channel_message_updated(
     state: &AppState,
     project_id: &str,
     channel_id: &str,

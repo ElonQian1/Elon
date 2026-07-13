@@ -14,6 +14,8 @@ pub(crate) struct TrustedBillingCall<'a> {
     user_id: String,
     compute_call_id: String,
     active: bool,
+    dispatch_held: bool,
+    deferred_to_replay: bool,
 }
 
 impl<'a> TrustedBillingCall<'a> {
@@ -41,6 +43,8 @@ impl<'a> TrustedBillingCall<'a> {
             user_id: user_id.to_string(),
             compute_call_id,
             active: true,
+            dispatch_held: false,
+            deferred_to_replay: false,
         })
     }
 
@@ -54,6 +58,8 @@ impl<'a> TrustedBillingCall<'a> {
             user_id: user_id.to_string(),
             compute_call_id: compute_call_id.into(),
             active: false,
+            dispatch_held: false,
+            deferred_to_replay: false,
         }
     }
 
@@ -63,6 +69,50 @@ impl<'a> TrustedBillingCall<'a> {
 
     pub(crate) fn mark_settled(&mut self) {
         self.active = false;
+        self.dispatch_held = false;
+        self.deferred_to_replay = false;
+    }
+
+    /// Persist the crash-safety boundary before a prompt can reach a node.
+    /// Returns false for non-billable calls that have no balance reservation.
+    pub(crate) fn hold_for_dispatch(&mut self) -> Result<bool, String> {
+        let held = self
+            .store
+            .hold_billing_reservation_for_dispatch(&self.user_id, &self.compute_call_id)
+            .map_err(|error| format!("持久化派发计费预留失败: {error}"))?
+            .is_some();
+        self.dispatch_held = held;
+        Ok(held)
+    }
+
+    /// Dedicated refund path for a dispatch failure that proves the prompt was
+    /// never enqueued to the node writer.
+    pub(crate) fn release_dispatch_not_sent(&mut self) {
+        if !self.dispatch_held {
+            self.release_error();
+            return;
+        }
+        if let Err(error) = self
+            .store
+            .release_dispatch_billing_hold_before_send(&self.user_id, &self.compute_call_id)
+        {
+            tracing::warn!(
+                user_id = %self.user_id,
+                compute_call_id = %self.compute_call_id,
+                %error,
+                "verified pre-send billing hold release failed"
+            );
+        }
+        self.active = false;
+        self.dispatch_held = false;
+        self.deferred_to_replay = false;
+    }
+
+    /// Transfer responsibility for an already-dispatched PC completion to its
+    /// durable replay outbox without releasing its dispatch hold.
+    pub(crate) fn handoff_to_durable_replay(&mut self) {
+        self.active = false;
+        self.deferred_to_replay = true;
     }
 
     pub(crate) fn release_no_usage(&mut self) {
@@ -74,7 +124,20 @@ impl<'a> TrustedBillingCall<'a> {
     }
 
     fn release(&mut self, status: &str) {
-        if !self.active {
+        if self.dispatch_held || self.deferred_to_replay {
+            return;
+        }
+        // The PC node may have started as own-Codex (no hold) and then asked
+        // the cloud to atomically upgrade this same compute_call_id to a
+        // shared-Codex lease. Always attempt the idempotent release so an
+        // externally-created mid-run hold cannot remain stranded on timeout.
+        if !self.active
+            && !matches!(
+                self.store
+                    .get_active_billing_reservation(&self.user_id, &self.compute_call_id),
+                Ok(Some(_))
+            )
+        {
             return;
         }
         crate::billing::release_trusted_call(
@@ -127,4 +190,52 @@ pub(crate) fn spawn_reservation_janitor(state: Arc<AppState>) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TrustedBillingCall;
+    use crate::store::Store;
+
+    #[test]
+    fn durable_replay_handoff_keeps_dispatch_hold_open() {
+        let path = std::env::temp_dir().join(format!(
+            "elon-billing-handoff-{}.sqlite",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let store = Store::open(&path).unwrap();
+        let user = store
+            .create_user(
+                &format!("handoff-{}@example.com", uuid::Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        store
+            .billing_recharge(&user.id, 1_000, "test", "test", None)
+            .unwrap();
+        let key = "pc_agent_cli:test-unknown-usage-handoff";
+
+        let mut call = TrustedBillingCall::reserve(
+            &store,
+            &user.id,
+            key,
+            "pc_agent_cli_chat",
+            "pc_agent_cli",
+            Some("codex"),
+            100,
+        )
+        .unwrap();
+        assert!(call.hold_for_dispatch().unwrap());
+        call.handoff_to_durable_replay();
+        drop(call);
+
+        assert!(store
+            .billing_reservation_is_still_reserved(&user.id, key)
+            .unwrap());
+        assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(900));
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
 }

@@ -10,6 +10,7 @@ import AuthDialog from '../auth/AuthDialog'
 import AppUpdateWatcher from '../updates/AppUpdateWatcher'
 import LocalModeBanner from './LocalModeBanner'
 import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
+import { isLocalWorkbench } from '../../api/runtime'
 import styles from './Shell.module.css'
 
 function NodeConnectBanner() {
@@ -89,21 +90,22 @@ function DuplicateWorkbenchNotice() {
 
 export default function Shell() {
   const duplicateTab = useWorkbenchTabCoordinator()
-  useNotifications()
+  const localMode = isLocalWorkbench()
+  useNotifications(!localMode)
   const token = useAuthStore((s) => s.token)
   const fetchMe = useAuthStore((s) => s.fetchMe)
 
   // token 存在时始终刷新用户信息（确保 user.id 格式正确）
   // 不再依赖 !user 判断，因为旧版 localStorage 可能存了格式错误的 user 对象
   useEffect(() => {
-    if (!token) return
+    if (localMode || !token) return
     fetchMe().catch((err: { status?: number }) => {
       if (err?.status === 401) {
         useAuthStore.getState().logout()
       }
     })
-  }, [token])
-  useProjectOpenPrewarm(!duplicateTab)
+  }, [fetchMe, localMode, token])
+  useProjectOpenPrewarm(!duplicateTab && !localMode)
 
   if (duplicateTab) return <DuplicateWorkbenchNotice />
 
@@ -111,14 +113,14 @@ export default function Shell() {
     <div className={styles.shell}>
       <ServerRail />
       <div className={styles.content}>
-        <AccountClaimBanner />
+        {!localMode && <AccountClaimBanner />}
         <LocalModeBanner />
-        <NodeConnectBanner />
+        {!localMode && <NodeConnectBanner />}
         <main className={styles.routeFrame}>
           <Outlet />
         </main>
       </div>
-      <AppUpdateWatcher />
+      {!localMode && <AppUpdateWatcher />}
     </div>
   )
 }

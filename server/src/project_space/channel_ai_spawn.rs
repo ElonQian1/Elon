@@ -160,6 +160,26 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
                         pending_tools.note_event(event_type, &value);
                         match event_type {
                             "pc_dispatch_started" => {
+                                if let Some(request_id) = value
+                                    .get("pc_req_id")
+                                    .or_else(|| value.get("req_id"))
+                                    .and_then(|value| value.as_str())
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty())
+                                {
+                                    if let Err(error) = task
+                                        .state
+                                        .store
+                                        .bind_project_execution_task_id(request_id, &task.task_id)
+                                    {
+                                        tracing::warn!(
+                                            task_id = %task.task_id,
+                                            request_id,
+                                            %error,
+                                            "failed to bind PC completion replay to cloud task"
+                                        );
+                                    }
+                                }
                                 if let Some(content) = pc_dispatch_started_progress(&value) {
                                     insert_channel_ai_progress(&task, &content);
                                 }

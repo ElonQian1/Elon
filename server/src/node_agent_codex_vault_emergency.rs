@@ -27,6 +27,10 @@ pub(crate) struct EmergencyRestoreRequest {
     pub(crate) provider_account: Option<String>,
     pub(crate) purpose: Option<String>,
     pub(crate) failure_reason: Option<String>,
+    /// Present only when an already-running PC CLI request switches from the
+    /// owner's Codex account to a shared account. The cloud must bind the lease
+    /// and a live billing reservation before returning the shared credential.
+    pub(crate) compute_call_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,6 +44,12 @@ pub(crate) struct EmergencyLeaseResponse {
     pub(crate) provider_account: Option<String>,
     pub(crate) billing_source: Option<String>,
     pub(crate) lease_expires_at: Option<String>,
+    #[serde(default)]
+    pub(crate) cloud_control_deadline: Option<String>,
+    #[serde(default)]
+    pub(crate) cloud_control_issued_at: Option<String>,
+    #[serde(default)]
+    pub(crate) cloud_control_ttl_ms: Option<u64>,
     pub(crate) message: Option<String>,
 }
 
@@ -92,6 +102,9 @@ async fn emergency_restore_handler(
                 "provider_nickname": lease.provider_nickname,
                 "billing_source": lease.billing_source,
                 "lease_expires_at": lease.lease_expires_at,
+                "cloud_control_deadline": lease.cloud_control_deadline,
+                "cloud_control_issued_at": lease.cloud_control_issued_at,
+                "cloud_control_ttl_ms": lease.cloud_control_ttl_ms,
                 "local": local_status_payload(),
             })),
         ),
@@ -187,6 +200,7 @@ pub(crate) async fn restore_emergency_from_cloud(
         "device_name": crate::machine_label(),
         "purpose": req.purpose.unwrap_or_else(|| "pc_web_robot_shared_codex_cli".to_string()),
         "failure_reason": req.failure_reason,
+        "compute_call_id": req.compute_call_id,
     });
     let lease = cloud_post_typed::<EmergencyLeaseResponse>(&url, &token, &body).await?;
     let auth_value: Value =

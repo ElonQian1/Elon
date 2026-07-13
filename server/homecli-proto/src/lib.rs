@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-pub const PROTO_VERSION: u32 = 4;
+mod cli_durable_types;
+pub use cli_durable_types::{
+    CliCodexCredentialBinding, CliCompletionEnvelope, CliCompletionProducerIdentity,
+};
+
+pub const PROTO_VERSION: u32 = 7;
 
 mod project_workspace_status;
 pub use project_workspace_status::{
@@ -248,6 +253,23 @@ pub enum ServerToAgent {
         dispatch_id: String,
         decision: String,
     },
+    /// The server has durably stored a replayable CLI completion.
+    ///
+    /// Nodes may remove or mark their local outbox row only when `accepted` is
+    /// true. `deduplicated=true` means the same `event_id` had already reached
+    /// durable server storage, so it is equally safe to acknowledge locally.
+    CliCompletionAck {
+        event_id: String,
+        req_id: String,
+        accepted: bool,
+        #[serde(default)]
+        deduplicated: bool,
+        /// A rejected completion should remain pending only when this is true.
+        #[serde(default)]
+        retryable: bool,
+        #[serde(default)]
+        error: Option<String>,
+    },
     Ping {
         nonce: Option<String>,
     },
@@ -279,6 +301,24 @@ pub enum ServerToAgent {
         /// 老版节点忽略未知字段后仍可直接在 cwd 执行。
         #[serde(default)]
         project_context: Option<CliProjectContext>,
+        /// Frozen credential source authorized before dispatch. Protocol-v5
+        /// nodes reject cloud Codex work when this binding is missing/mismatched.
+        #[serde(default)]
+        codex_credential_binding: Option<CliCodexCredentialBinding>,
+        /// True when execution depends on a shared/platform resource whose
+        /// authorization must be continuously controlled by the cloud session.
+        #[serde(default)]
+        requires_cloud_control: bool,
+        /// Frozen absolute RFC3339 authorization deadline.
+        #[serde(default)]
+        cloud_control_deadline: Option<String>,
+        /// Server wall-clock time at which `cloud_control_ttl_ms` was frozen.
+        #[serde(default)]
+        cloud_control_issued_at: Option<String>,
+        /// Remaining authorization TTL frozen immediately before dispatch.
+        /// Protocol-v7 nodes convert this to a monotonic deadline on receipt.
+        #[serde(default)]
+        cloud_control_ttl_ms: Option<u64>,
         /// 完整的提示内容
         prompt: String,
     },
@@ -493,6 +533,14 @@ pub enum AgentToServer {
         #[serde(default)]
         workspace_status: Option<CliWorkspaceStatus>,
     },
+    /// Replay a completion that was persisted locally before the original
+    /// WebSocket could deliver/confirm it. This message is intentionally not
+    /// routed through the transient request `pending` map; the server handles it
+    /// through its durable completion inbox and responds with
+    /// `ServerToAgent::CliCompletionAck`.
+    CliCompletionReplay {
+        completion: CliCompletionEnvelope,
+    },
     /// PC 节点返回某个本机 CLI 任务的 journal / sidecar 恢复快照。
     CliTaskJournalSnapshot {
         req_id: String,
@@ -662,6 +710,7 @@ impl AgentToServer {
             | Self::CliPromptAccepted { .. }
             | Self::CliChunk { .. }
             | Self::CliDone { .. }
+            | Self::CliCompletionReplay { .. }
             | Self::CliTaskJournalSnapshot { .. }
             | Self::ToolApprovalDecisionAck { .. }
             | Self::RegisterCapabilities { .. }

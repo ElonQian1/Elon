@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { MonitorCheck, RefreshCw, WifiOff } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { cloudBaseUrl, cloudWorkbenchUrl, isLocalWorkbench, localNodeUrl } from '../../api/runtime'
+import { listLocalTasks } from '../local-tasks/localTaskApi'
+import { pendingSyncCountFromList } from '../local-tasks/localTaskModel'
 import styles from './Shell.module.css'
 
 type CloudState = 'checking' | 'online' | 'offline'
@@ -14,6 +17,7 @@ interface LocalStatus {
 export default function LocalModeBanner() {
   const [cloudState, setCloudState] = useState<CloudState>('checking')
   const [localStatus, setLocalStatus] = useState<LocalStatus | null>(null)
+  const [pendingSyncCount, setPendingSyncCount] = useState(0)
   const localMode = isLocalWorkbench()
 
   useEffect(() => {
@@ -26,13 +30,15 @@ export default function LocalModeBanner() {
         setLocalStatus(null)
         return
       }
-      const [cloudOk, status] = await Promise.all([
+      const [cloudOk, status, localTasks] = await Promise.all([
         probeCloudHealth(),
         probeLocalStatus(),
+        listLocalTasks(50).catch(() => null),
       ])
       if (cancelled) return
       setCloudState(cloudOk ? 'online' : 'offline')
       setLocalStatus(status)
+      setPendingSyncCount(localTasks ? pendingSyncCountFromList(localTasks) : 0)
     }
     refresh()
     const timer = setInterval(refresh, 12_000)
@@ -42,20 +48,13 @@ export default function LocalModeBanner() {
     }
   }, [localMode])
 
-  useEffect(() => {
-    if (!localMode || cloudState !== 'online') return
-    const target = cloudWorkbenchUrl()
-    if (new URL(target).origin === location.origin) return
-    window.location.replace(target)
-  }, [cloudState, localMode])
-
   if (!localMode) {
     if (cloudState !== 'offline') return null
     return (
       <div className={[styles.nodeBanner, styles.localModeOffline].join(' ')}>
         <WifiOff className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
         <span>云端连接异常 · 当前显示的是一龙 PC 工作台缓存壳，本机 Win 端可用于诊断网络或防火墙问题。</span>
-        <a href={localNodeUrl('/pc')}>打开本机工作台</a>
+        <a href={localNodeUrl('/pc/local-tasks')}>打开本机任务</a>
       </div>
     )
   }
@@ -68,17 +67,21 @@ export default function LocalModeBanner() {
   const Icon = cloudState === 'offline' ? WifiOff : cloudState === 'checking' ? RefreshCw : MonitorCheck
   const cloudHost = hostLabel(localStatus?.cloud_http_url || cloudBaseUrl())
   const copy = cloudState === 'offline'
-    ? `本地模式 · 工作台由这台电脑提供，云端 ${cloudHost} 暂时不可达。`
+    ? `本地模式 · 工作台由这台电脑提供，云端 ${cloudHost} 暂时不可达；任务不会因此中断。`
     : cloudState === 'checking'
       ? '本地模式 · 正在确认云端连接…'
       : nodeConnected
-        ? `本地模式 · 本机节点正常，云端 ${cloudHost} 已连接。`
+        ? `本地模式 · 本机节点正常，云端 ${cloudHost} 已恢复；由你决定何时返回云端。`
         : `本地模式 · 本机工作台正常，正在等待云端 ${cloudHost} 恢复连接。`
 
   return (
     <div className={bannerClass}>
       <Icon className={styles.nodeBannerIcon} aria-hidden="true" size={14} />
       <span title={localStatus?.last_event || copy}>{copy}</span>
+      <Link to="/local-tasks">
+        本机任务{pendingSyncCount > 0 ? ` · 待同步 ${pendingSyncCount}` : ''}
+      </Link>
+      {cloudState === 'online' && <a href={cloudWorkbenchUrl()}>返回云端工作台</a>}
     </div>
   )
 }

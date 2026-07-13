@@ -1,5 +1,8 @@
 use super::*;
-use crate::store::BillingPriceRuleUpsert;
+use crate::store::{
+    token_usage::{BillingReservationConstraint, BillingReservationConstraintViolation},
+    BillingPriceRuleUpsert,
+};
 use uuid::Uuid;
 
 fn temp_store() -> (Store, std::path::PathBuf) {
@@ -222,5 +225,183 @@ fn estimate_cost_uses_configured_price_rule() {
     assert_eq!(event.cached_usd_per_m, Some(0.5));
     assert_eq!(event.output_usd_per_m, Some(1000.0));
     assert_eq!(event.price_source.as_str(), "rule");
+    let _ = std::fs::remove_file(path);
+}
+
+fn configure_frozen_allowance_price(store: &Store) {
+    store
+        .billing_set_config("usd_to_rmb_rate_x10000", "10000")
+        .unwrap();
+    store.billing_set_config("markup_x1000", "1000").unwrap();
+    store
+        .billing_upsert_price_rule(&BillingPriceRuleUpsert {
+            pattern: "frozen-allowance-model".to_string(),
+            input_usd_per_m: 0.0,
+            cached_usd_per_m: 0.0,
+            output_usd_per_m: 10.0,
+            priority: 1_000,
+            enabled: true,
+            note: Some("frozen allowance tests".to_string()),
+        })
+        .unwrap();
+}
+
+fn funded_constraint_user(store: &Store) -> crate::store::PublicUser {
+    let user = store
+        .create_user(
+            &format!("frozen-allowance-{}@example.com", Uuid::new_v4().simple()),
+            "secret1",
+            None,
+            None,
+        )
+        .unwrap();
+    store
+        .billing_recharge(&user.id, 10_000, "test", "test", None)
+        .unwrap();
+    user
+}
+
+fn frozen_allowance_record<'a>(user_id: &'a str, key: &'a str) -> TokenUsageRecord<'a> {
+    TokenUsageRecord {
+        user_id,
+        feature: "pc_agent_cli_chat",
+        usage_mode: "pc_agent_cli",
+        model: Some("frozen-allowance-model-v1"),
+        input_tokens: 0,
+        cached_input_tokens: 0,
+        output_tokens: 1_000_000,
+        reasoning_tokens: 0,
+        total_tokens: 1_000_000,
+        billing_source: Some(crate::store::token_usage::BILLING_SOURCE_PLATFORM),
+        resource_owner_user_id: None,
+        idempotency_key: Some(key),
+    }
+}
+
+fn reserve_frozen_allowance(
+    store: &Store,
+    user_id: &str,
+    key: &str,
+    reserve_fen: i64,
+) -> BillingReservationOutcome {
+    store
+        .reserve_billing_call(&BillingReservationRequest {
+            user_id,
+            compute_call_id: key,
+            feature: "pc_agent_cli_chat",
+            usage_mode: "pc_agent_cli",
+            model: Some("frozen-allowance-model-v1"),
+            reserve_fen,
+            bill_missing_balance: true,
+        })
+        .unwrap()
+}
+
+#[test]
+fn server_priced_cost_above_frozen_max_is_rejected_atomically() {
+    let (store, path) = temp_store();
+    configure_frozen_allowance_price(&store);
+    let user = funded_constraint_user(&store);
+    let key = "pc_agent_cli:frozen-over-limit";
+    let server_cost =
+        estimate_cost_for_tokens(&store, "frozen-allowance-model-v1", 0, 0, 1_000_000);
+    assert_eq!(server_cost, 1_000);
+    let reservation = reserve_frozen_allowance(&store, &user.id, key, server_cost - 1);
+    let record = frozen_allowance_record(&user.id, key);
+
+    let error = account_trusted_usage_with_charge_policy_and_constraint(
+        &store,
+        &record,
+        true,
+        Some(BillingReservationConstraint {
+            expected_reservation_id: &reservation.reservation_id,
+            max_cost_rmb_fen: reservation.reserved_fen,
+        }),
+    )
+    .expect_err("server-priced overage must not be billed");
+    assert!(matches!(
+        error.downcast_ref::<BillingReservationConstraintViolation>(),
+        Some(BillingReservationConstraintViolation::CostExceedsFrozenMaximum)
+    ));
+    assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(9_001));
+    assert!(store
+        .get_active_billing_reservation(&user.id, key)
+        .unwrap()
+        .is_some());
+    assert!(store
+        .get_token_usage_accounting_by_idempotency_key(&user.id, key)
+        .unwrap()
+        .is_none());
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn frozen_allowance_id_must_match_active_reservation_atomically() {
+    let (store, path) = temp_store();
+    configure_frozen_allowance_price(&store);
+    let user = funded_constraint_user(&store);
+    let key = "pc_agent_cli:frozen-id-mismatch";
+    let reservation = reserve_frozen_allowance(&store, &user.id, key, 1_000);
+    let record = frozen_allowance_record(&user.id, key);
+
+    let error = account_trusted_usage_with_charge_policy_and_constraint(
+        &store,
+        &record,
+        true,
+        Some(BillingReservationConstraint {
+            expected_reservation_id: "brv-forged",
+            max_cost_rmb_fen: reservation.reserved_fen,
+        }),
+    )
+    .expect_err("a different allowance must not settle the active reservation");
+    assert!(matches!(
+        error.downcast_ref::<BillingReservationConstraintViolation>(),
+        Some(BillingReservationConstraintViolation::AllowanceMismatch)
+    ));
+    let active = store
+        .get_active_billing_reservation(&user.id, key)
+        .unwrap()
+        .expect("original reservation must remain active");
+    assert_eq!(active.reservation_id, reservation.reservation_id);
+    assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(9_000));
+    assert!(store
+        .get_token_usage_accounting_by_idempotency_key(&user.id, key)
+        .unwrap()
+        .is_none());
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn server_priced_cost_equal_to_frozen_max_settles_successfully() {
+    let (store, path) = temp_store();
+    configure_frozen_allowance_price(&store);
+    let user = funded_constraint_user(&store);
+    let key = "pc_agent_cli:frozen-boundary";
+    let reservation = reserve_frozen_allowance(&store, &user.id, key, 1_000);
+    let record = frozen_allowance_record(&user.id, key);
+
+    let result = account_trusted_usage_with_charge_policy_and_constraint(
+        &store,
+        &record,
+        true,
+        Some(BillingReservationConstraint {
+            expected_reservation_id: &reservation.reservation_id,
+            max_cost_rmb_fen: reservation.reserved_fen,
+        }),
+    )
+    .expect("cost exactly at the frozen maximum should settle");
+    assert_eq!(result.cost_rmb_fen, 1_000);
+    assert_eq!(result.accounting_status, "billed");
+    assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(9_000));
+    assert!(store
+        .get_active_billing_reservation(&user.id, key)
+        .unwrap()
+        .is_none());
+
+    drop(store);
     let _ = std::fs::remove_file(path);
 }

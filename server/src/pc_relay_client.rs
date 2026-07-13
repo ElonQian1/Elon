@@ -12,7 +12,7 @@
 use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, ServerToAgent, PROTO_VERSION};
+use homecli_proto::{AgentToServer, ServerToAgent};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc, Mutex},
@@ -23,6 +23,9 @@ use tracing::{info, warn};
 
 /// WS ping 间隔：每 30s 向云端发一次 WS-level Ping，检测 zombie 连接
 const WS_PING_INTERVAL: Duration = Duration::from_secs(30);
+/// The in-process legacy relay never persists terminal CLI events to an outbox.
+/// Advertising protocol v5 would falsely authorize durable-replay handoff.
+const LEGACY_RELAY_PROTO_VERSION: u32 = 4;
 /// 读超时：90s 内如果未收到任何 WS frame（包括 Pong），视为 zombie，强制断开重连
 const WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
 
@@ -59,7 +62,6 @@ pub fn spawn_if_configured() {
         local_port,
     ));
 }
-
 
 #[path = "pc_relay_client_impl.rs"]
 mod relay_impl;

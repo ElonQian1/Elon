@@ -17,6 +17,13 @@ pub struct NodeComputeRun {
     pub model_id: Option<String>,
     pub feature: String,
     pub usage_mode: String,
+    pub billing_source: String,
+    pub resource_owner_user_id: Option<String>,
+    pub lease_id: Option<String>,
+    pub offline_policy: String,
+    pub replay_deadline: Option<String>,
+    pub max_cost_rmb_fen: i64,
+    pub allowance_id: Option<String>,
     pub status: String,
     pub started_at: String,
     pub finished_at: Option<String>,
@@ -283,7 +290,7 @@ impl Store {
     }
 }
 
-fn select_run_by_compute_call_id(
+pub(super) fn select_run_by_compute_call_id(
     conn: &rusqlite::Connection,
     compute_call_id: &str,
 ) -> Result<Option<NodeComputeRun>> {
@@ -298,11 +305,12 @@ fn select_run_by_compute_call_id(
 
 fn run_select_sql() -> &'static str {
     "SELECT id, compute_call_id, consumer_user_id, provider_user_id,
-            node_id, model_id, feature, usage_mode, status,
-            started_at, finished_at, duration_ms,
-            prompt_tokens, completion_tokens, billed_cost_rmb_fen,
-            provider_earned_fen, settlement_status, route_reason,
-            error_message, created_at, updated_at
+            node_id, model_id, feature, usage_mode,
+            billing_source, resource_owner_user_id, lease_id, offline_policy,
+            replay_deadline, max_cost_rmb_fen, allowance_id, status,
+            started_at, finished_at, duration_ms, prompt_tokens,
+            completion_tokens, billed_cost_rmb_fen, provider_earned_fen,
+            settlement_status, route_reason, error_message, created_at, updated_at
        FROM node_compute_runs"
 }
 
@@ -316,19 +324,26 @@ fn read_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<NodeComputeRun> {
         model_id: row.get(5)?,
         feature: row.get(6)?,
         usage_mode: row.get(7)?,
-        status: row.get(8)?,
-        started_at: row.get(9)?,
-        finished_at: row.get(10)?,
-        duration_ms: row.get(11)?,
-        prompt_tokens: row.get(12)?,
-        completion_tokens: row.get(13)?,
-        billed_cost_rmb_fen: row.get(14)?,
-        provider_earned_fen: row.get(15)?,
-        settlement_status: row.get(16)?,
-        route_reason: row.get(17)?,
-        error_message: row.get(18)?,
-        created_at: row.get(19)?,
-        updated_at: row.get(20)?,
+        billing_source: row.get(8)?,
+        resource_owner_user_id: row.get(9)?,
+        lease_id: row.get(10)?,
+        offline_policy: row.get(11)?,
+        replay_deadline: row.get(12)?,
+        max_cost_rmb_fen: row.get(13)?,
+        allowance_id: row.get(14)?,
+        status: row.get(15)?,
+        started_at: row.get(16)?,
+        finished_at: row.get(17)?,
+        duration_ms: row.get(18)?,
+        prompt_tokens: row.get(19)?,
+        completion_tokens: row.get(20)?,
+        billed_cost_rmb_fen: row.get(21)?,
+        provider_earned_fen: row.get(22)?,
+        settlement_status: row.get(23)?,
+        route_reason: row.get(24)?,
+        error_message: row.get(25)?,
+        created_at: row.get(26)?,
+        updated_at: row.get(27)?,
     })
 }
 
@@ -339,6 +354,7 @@ fn normalize_status(status: &str) -> &str {
         "settled_no_provider" => "settled_no_provider",
         "settlement_skipped" => "settlement_skipped",
         "settlement_failed" => "settlement_failed",
+        "verification_pending" => "verification_pending",
         "deduplicated" => "deduplicated",
         "released_no_usage" => "released_no_usage",
         "released_error" => "released_error",

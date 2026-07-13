@@ -4,14 +4,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, ServerToAgent, PROTO_VERSION};
+use homecli_proto::{AgentToServer, CliCompletionProducerIdentity, ServerToAgent, PROTO_VERSION};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
-use super::node_agent_cli_done::{cli_prompt_accepted, duplicate_cli_prompt_done};
 use super::node_agent_config::machine_label;
 use super::node_agent_local_llm::discover_models;
 use super::{
@@ -22,6 +21,13 @@ use super::{
     resolve_attachment_args, run_cli_prompt, run_exec, run_llm_inference, run_tts_synthesis,
     ws_text, CliPromptRun, Credentials, NodeConfig, NodeRuntime, CLOUD_WS_READ_TIMEOUT,
 };
+
+const COMPLETION_REPLAY_INTERVAL: Duration = Duration::from_secs(3);
+const COMPLETION_REPLAY_SCAN_LIMIT: usize = 100;
+const COMPLETION_REPLAY_BATCH_LIMIT: usize = 16;
+const COMPLETION_REPLAY_BASE_BACKOFF_MS: u64 = 3_000;
+const COMPLETION_REPLAY_MAX_BACKOFF_MS: u64 = 5 * 60 * 1_000;
+const SESSION_TASK_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
 
@@ -105,10 +111,16 @@ pub(super) async fn run_session(
     let (ws_write, mut ws_read) = ws_stream.split();
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
-    let writer = tokio::spawn(async move {
+    let (session_stop_tx, session_stop_rx) = watch::channel(false);
+    let mut writer_stop_rx = session_stop_rx.clone();
+    let mut writer = tokio::spawn(async move {
         let mut sink = ws_write;
-        while let Some(msg) = node_agent_ws_control_queue::recv(&mut control_rx, &mut out_rx).await
-        {
+        loop {
+            let msg = tokio::select! {
+                _ = writer_stop_rx.changed() => break,
+                msg = node_agent_ws_control_queue::recv(&mut control_rx, &mut out_rx) => msg,
+            };
+            let Some(msg) = msg else { break };
             if sink.send(msg).await.is_err() {
                 break;
             }
@@ -147,12 +159,73 @@ pub(super) async fn run_session(
         lifecycle: Some(lifecycle),
     }))?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
+    let session_producer_identity = CliCompletionProducerIdentity {
+        owner_user_id: creds.owner_user_id.clone(),
+        agent_id: creds.agent_id.clone(),
+        install_id: runtime.install_id.clone(),
+    };
+
+    // Durable completion replay runs for the entire connected session. It covers
+    // both rows left by a previous process/session and new rows produced while this
+    // WebSocket is already online.
+    let mut replay_task = {
+        let replay_runtime = runtime.clone();
+        let replay_tx = out_tx.clone();
+        let replay_identity = session_producer_identity.clone();
+        let mut stop_rx = session_stop_rx.clone();
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(COMPLETION_REPLAY_INTERVAL);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            loop {
+                tokio::select! {
+                    _ = stop_rx.changed() => return,
+                    _ = ticker.tick() => {}
+                }
+                let pending = match replay_runtime
+                    .completion_outbox
+                    .list_pending_for_producer(&replay_identity, COMPLETION_REPLAY_SCAN_LIMIT)
+                {
+                    Ok(pending) => pending,
+                    Err(error) => {
+                        warn!(%error, "读取 CLI completion outbox 失败");
+                        continue;
+                    }
+                };
+                let now_ms = unix_now_ms();
+                for pending in pending
+                    .into_iter()
+                    .filter(|pending| completion_replay_is_due(pending, now_ms))
+                    .take(COMPLETION_REPLAY_BATCH_LIMIT)
+                {
+                    let completion = pending.completion;
+                    let event_id = completion.event_id.clone();
+                    if replay_tx
+                        .send(ws_text(&AgentToServer::CliCompletionReplay { completion }))
+                        .is_err()
+                    {
+                        return;
+                    }
+                    if let Err(error) = replay_runtime
+                        .completion_outbox
+                        .record_attempt(&event_id, None)
+                    {
+                        warn!(%event_id, %error, "记录 CLI completion 补传尝试失败");
+                    }
+                }
+            }
+        })
+    };
 
     let ping_tx = control_tx.clone();
-    tokio::spawn(async move {
+    let mut ping_stop_rx = session_stop_rx.clone();
+    let mut ping_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(10));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = ping_stop_rx.changed() => break,
+                _ = interval.tick() => {}
+            }
             if ping_tx.send(Message::Ping(vec![])).is_err() {
                 break;
             }
@@ -188,6 +261,27 @@ pub(super) async fn run_session(
                         }
                     };
                     match msg {
+                        ServerToAgent::CliCompletionAck {
+                            event_id,
+                            req_id,
+                            accepted,
+                            deduplicated: _,
+                            retryable,
+                            error,
+                        } => {
+                            if let Err(ack_error) = apply_cli_completion_ack(
+                                &runtime.completion_outbox,
+                                &runtime.local_tasks,
+                                &session_producer_identity,
+                                &event_id,
+                                &req_id,
+                                accepted,
+                                retryable,
+                                error.as_deref(),
+                            ) {
+                                warn!(%event_id, %req_id, error = %ack_error, "应用 CLI completion ACK 失败，保留本机持久记录供重试或诊断");
+                            }
+                        }
                         ServerToAgent::LlmStreamRequest {
                             req_id,
                             model,
@@ -393,202 +487,43 @@ pub(super) async fn run_session(
                             extra_args,
                             cwd,
                             project_context,
+                            codex_credential_binding,
+                            requires_cloud_control,
+                            cloud_control_deadline,
+                            cloud_control_issued_at,
+                            cloud_control_ttl_ms,
                             prompt,
                         } => {
-                            info!("📝 CliPrompt: {} cli={}", req_id, cli);
-                            let tx_c = out_tx_r.clone();
-                            let rt_c = runtime.clone();
-                            tokio::spawn(async move {
-                                let req_id_for_cleanup = req_id.clone();
-                                let (cancel_tx, cancel_rx) = watch::channel(false);
-                                if rt_c.cli_prompt_active(&req_id_for_cleanup).await {
-                                    warn!(
-                                        "拒绝重复启动 PC CLI prompt: {} 已经在运行",
-                                        req_id_for_cleanup
-                                    );
-                                    let _ = tx_c.send(ws_text(&duplicate_cli_prompt_done(req_id)));
-                                    return;
-                                }
-                                let requested_runtime_permission = project_context
-                                    .as_ref()
-                                    .and_then(|ctx| ctx.runtime_permission.clone());
-                                let _ = tx_c.send(ws_text(&cli_prompt_accepted(
-                                    req_id_for_cleanup.clone(),
-                                    Some(cli.clone()),
-                                    cwd.clone(),
-                                    requested_runtime_permission.clone(),
-                                )));
-                                let resolved_cli = match rt_c.resolve_cli(&cli).await {
-                                    Ok(resolved) => resolved,
-                                    Err(e) => {
-                                        let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
-                                            req_id,
-                                            exit_ok: false,
-                                            error: Some(e.to_string()),
-                                            session_id: None,
-                                            prompt_tokens: None,
-                                            cached_input_tokens: None,
-                                            completion_tokens: None,
-                                            reasoning_tokens: None,
-                                            total_tokens: None,
-                                            model: None,
-                                            workspace_status: None,
-                                        }));
-                                        return;
-                                    }
-                                };
-                                // 处理 --attachment URL：下载图片到本地临时文件
-                                // Copilot: --attachment <url> → 下载后 --attachment <local_path>
-                                // Codex:   --attachment <url> → 下载后 -i <local_path>
-                                let resolved_args = resolve_attachment_args(
-                                    extra_args,
-                                    resolved_cli.name(),
-                                    rt_c.creds
-                                        .read()
-                                        .await
-                                        .as_ref()
-                                        .and_then(|c| c.user_token.clone())
-                                        .as_deref(),
-                                )
-                                .await;
-                                let runtime_permission = requested_runtime_permission;
-                                if let Err(e) =
-                                    node_agent_full_access::require_route_a_full_access_grant(
-                                        &rt_c.full_access_grants,
-                                        resolved_cli.name(),
-                                        runtime_permission.as_deref(),
-                                        project_context.as_ref(),
-                                        cwd.as_deref(),
-                                    )
-                                    .await
-                                {
-                                    let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
-                                        req_id,
-                                        exit_ok: false,
-                                        error: Some(e.to_string()),
-                                        session_id: None,
-                                        prompt_tokens: None,
-                                        cached_input_tokens: None,
-                                        completion_tokens: None,
-                                        reasoning_tokens: None,
-                                        total_tokens: None,
-                                        model: None,
-                                        workspace_status: None,
-                                    }));
-                                    return;
-                                }
-                                let prepared_cwd =
-                                    match prepare_cli_prompt_cwd(cwd, project_context) {
-                                        Ok(cwd) => cwd,
-                                        Err(e) => {
-                                            let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
-                                                req_id,
-                                                exit_ok: false,
-                                                error: Some(e.to_string()),
-                                                session_id: None,
-                                                prompt_tokens: None,
-                                                cached_input_tokens: None,
-                                                completion_tokens: None,
-                                                reasoning_tokens: None,
-                                                total_tokens: None,
-                                                model: None,
-                                                workspace_status: None,
-                                            }));
-                                            return;
-                                        }
-                                };
-                                let original_prompt = prompt.clone();
-                                let ui_design_routed = crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);
-                                let ui_design_route_status = crate::node_agent_ui_design_workspace::ui_design_route_status(&original_prompt).unwrap_or("READY");
-                                let (prompt, ui_design_workspace_ready) = match crate::node_agent_ui_design_workspace::prepare_ui_design_workspace(
-                                    prompt,
-                                    prepared_cwd.cwd.as_deref(),
-                                    &resolved_args,
-                                ) {
-                                    Ok(prompt) => (prompt, true),
-                                    Err(error) => {
-                                        warn!(error = %error, "UI 设计任务本地工件准备失败，继续使用原始任务上下文");
-                                        (format!("{original_prompt}\n\nUI design workspace preparation failed: {error:#}\n请先诊断附件与项目工作区，再继续任务。"), false)
-                                    }
-                                };
-                                if ui_design_routed {
-                                    let status = if ui_design_workspace_ready { ui_design_route_status } else { "DEGRADED" };
-                                    let event = serde_json::json!({
-                                        "type": "elon.ui_design.route",
-                                        "status": status,
-                                    });
-                                    let _ = tx_c.send(ws_text(&AgentToServer::CliChunk {
-                                        req_id: req_id_for_cleanup.clone(),
-                                        text: format!("{event}\n"),
-                                    }));
-                                }
-                                let handle = node_agent_active_task::ActiveCliPromptHandle::new(
-                                    req_id_for_cleanup.clone(),
-                                    resolved_cli.name().to_string(),
-                                    node_agent_active_task::route_for_cli(resolved_cli.name()),
-                                    prepared_cwd.cwd.clone(),
-                                    runtime_permission.clone(),
-                                    cancel_tx,
+                            let completion_context =
+                                crate::node_agent_cli_done::CliCompletionContext::cloud(
+                                    session_producer_identity.clone(),
+                                    project_context.clone(),
                                 );
-                                if !rt_c.try_register_cli_prompt(handle).await {
-                                    warn!(
-                                        "拒绝重复启动 PC CLI prompt: {} 注册竞争失败",
-                                        req_id_for_cleanup
-                                    );
-                                    let _ = tx_c.send(ws_text(&duplicate_cli_prompt_done(req_id)));
-                                    return;
-                                }
-                                if let Err(error) = rt_c.task_journal.record_started(
-                                    node_agent_task_journal::TaskJournalStart {
-                                        req_id: &req_id_for_cleanup,
-                                        cli_name: resolved_cli.name(),
-                                        route: Some(node_agent_active_task::route_for_cli(
-                                            resolved_cli.name(),
-                                        )),
-                                        run_handle_id: Some(&req_id_for_cleanup),
-                                        cwd: prepared_cwd.cwd.as_deref(),
-                                        runtime_permission: runtime_permission.as_deref(),
-                                    },
-                                ) {
-                                    warn!("PC 任务 journal 写入开始事件失败: {error}");
-                                }
-                                run_cli_prompt(CliPromptRun {
+                            crate::node_agent_cli_task_dispatch::spawn_cli_task(
+                                runtime.clone(),
+                                out_tx_r.clone(),
+                                crate::node_agent_cli_task_dispatch::CliTaskDispatchRequest {
                                     req_id,
-                                    bin: resolved_cli.bin().to_string(),
-                                    cli_name: resolved_cli.name().to_string(),
-                                    extra_args: resolved_args,
-                                    runtime_permission,
-                                    cwd: prepared_cwd.cwd,
-                                    conversation_workspace: prepared_cwd.conversation_workspace,
+                                    cli,
+                                    extra_args,
+                                    cwd,
+                                    project_context,
+                                    codex_credential_binding,
+                                    requires_cloud_control,
+                                    cloud_control_deadline,
+                                    cloud_control_issued_at,
+                                    cloud_control_ttl_ms,
                                     prompt,
-                                    server_runtime_config: Some(
-                                        crate::node_agent_server_runtime::ServerRuntimeConfig {
-                                            server_url: rt_c.cloud_http_url(),
-                                            user_token: rt_c.user_token().await,
-                                        },
-                                    ),
-                                    approval_state: rt_c.tool_approvals.clone(),
-                                    task_journal: rt_c.task_journal.clone(),
-                                    runtime: rt_c.clone(),
-                                    cancel_rx,
-                                    out_tx: tx_c,
-                                    codex_vault_switch_attempted: false,
-                                })
-                                .await;
-                                if let Err(error) =
-                                    rt_c.task_journal.record_finished(&req_id_for_cleanup)
-                                {
-                                    warn!("PC 任务 journal 写入结束事件失败: {error}");
-                                }
-                                rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
-                            });
+                                    completion_context,
+                                    allow_codex_auth_switch: true,
+                                    frozen_codex_home: None,
+                                },
+                            );
                         }
                         ServerToAgent::Cancel { task_id } => {
-                            let canceled = runtime.cancel_cli_prompt(&task_id).await;
-                            if canceled {
-                                info!("🛑 已请求取消 CLI prompt: {}", task_id);
-                            } else {
-                                warn!("🛑 未找到可取消的 CLI prompt: {}", task_id);
+                            match crate::node_agent_session_cancel::apply(runtime, &task_id).await? {
+                                true => info!("🛑 已请求取消 CLI prompt: {}", task_id),
+                                false => warn!("🛑 已保存启动前取消墓碑: {}", task_id),
                             }
                         }
                         ServerToAgent::ToolApprovalDecision {
@@ -698,7 +633,164 @@ pub(super) async fn run_session(
     }
     .await;
 
+    runtime
+        .set_connected(false, "云端连接已断开，正在等待重连")
+        .await;
+    // Cancellation follows the immutable per-task credential boundary. Local
+    // owner tasks keep running; only tasks that adopted managed/shared homes
+    // depend on this cloud control session.
+    let canceled = runtime.cancel_cloud_controlled_cli_prompts().await;
+    if canceled > 0 {
+        warn!(
+            canceled,
+            "cloud-controlled Codex tasks canceled after cloud disconnect"
+        );
+    }
+
+    let _ = session_stop_tx.send(true);
     drop(out_tx);
-    let _ = writer.await;
+    drop(control_tx);
+    shutdown_session_task(
+        "completion replay",
+        &mut replay_task,
+        SESSION_TASK_SHUTDOWN_TIMEOUT,
+    )
+    .await;
+    shutdown_session_task(
+        "protocol ping",
+        &mut ping_task,
+        SESSION_TASK_SHUTDOWN_TIMEOUT,
+    )
+    .await;
+    shutdown_session_task(
+        "websocket writer",
+        &mut writer,
+        SESSION_TASK_SHUTDOWN_TIMEOUT,
+    )
+    .await;
     read_result
 }
+
+fn completion_replay_is_due(
+    pending: &crate::node_agent_completion_outbox::PendingCliCompletion,
+    now_ms: u64,
+) -> bool {
+    pending
+        .last_attempt_at_ms
+        .map_or(true, |last_attempt_at_ms| {
+            now_ms.saturating_sub(last_attempt_at_ms)
+                >= completion_replay_backoff_ms(pending.attempt_count)
+        })
+}
+
+fn completion_replay_backoff_ms(attempt_count: u32) -> u64 {
+    let shift = attempt_count.saturating_sub(1).min(7);
+    COMPLETION_REPLAY_BASE_BACKOFF_MS
+        .saturating_mul(1_u64 << shift)
+        .min(COMPLETION_REPLAY_MAX_BACKOFF_MS)
+}
+
+fn unix_now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
+        .unwrap_or_default()
+}
+
+async fn shutdown_session_task(
+    label: &str,
+    task: &mut tokio::task::JoinHandle<()>,
+    timeout_duration: Duration,
+) {
+    match tokio::time::timeout(timeout_duration, &mut *task).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) if !error.is_cancelled() => {
+            warn!(%error, task = label, "PC node session task exited unexpectedly");
+        }
+        Ok(Err(_)) => {}
+        Err(_) => {
+            warn!(
+                task = label,
+                "PC node session task shutdown timed out; aborting"
+            );
+            task.abort();
+            let _ = (&mut *task).await;
+        }
+    }
+}
+
+fn apply_cli_completion_ack(
+    outbox: &crate::node_agent_completion_outbox::CliCompletionOutbox,
+    local_tasks: &crate::node_agent_local_task_store::LocalTaskStore,
+    authenticated_producer: &CliCompletionProducerIdentity,
+    event_id: &str,
+    req_id: &str,
+    accepted: bool,
+    retryable: bool,
+    error: Option<&str>,
+) -> Result<()> {
+    let completion = outbox
+        .completion_for_binding(event_id, req_id)
+        .context("读取 CLI completion ACK 绑定")?
+        .ok_or_else(|| anyhow!("未知或不匹配的 CLI completion ACK binding"))?;
+    if completion.producer_identity.as_ref() != Some(authenticated_producer) {
+        return Err(anyhow!("CLI completion ACK 不属于当前登录/节点/安装身份"));
+    }
+    let is_local_offline =
+        completion.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN;
+
+    // Local display state moves first. If this fails, the outbox remains pending
+    // and the server's idempotent ACK can drive the same transition after retry.
+    if is_local_offline {
+        let reconciled = local_tasks
+            .reconcile_completion(&completion)
+            .context("从 durable completion 修复本机任务终态")?;
+        if !reconciled {
+            return Err(anyhow!(
+                "durable completion 没有匹配的本机任务，保留 outbox 等待修复"
+            ));
+        }
+        let display_updated = if accepted {
+            local_tasks
+                .mark_synced(event_id)
+                .context("更新本机任务同步状态")?
+        } else {
+            local_tasks
+                .mark_sync_error(event_id, retryable)
+                .context("更新本机任务补传错误状态")?
+        };
+        if !display_updated {
+            return Err(anyhow!(
+                "本机任务尚未绑定 completion event，保留 outbox 等待重试"
+            ));
+        }
+    }
+
+    if accepted {
+        if !outbox
+            .acknowledge(event_id, req_id)
+            .context("持久化 CLI completion ACK")?
+        {
+            return Err(anyhow!("CLI completion ACK binding 在迁移前消失"));
+        }
+        if !outbox
+            .delete_acked(event_id)
+            .context("清理已确认 CLI completion")?
+        {
+            return Err(anyhow!("已确认 CLI completion 未能安全清理"));
+        }
+    } else {
+        let message = error.unwrap_or("服务器拒绝 CLI completion 补传");
+        if !outbox
+            .reject(event_id, req_id, retryable, message)
+            .context("持久化 CLI completion 拒绝状态")?
+        {
+            return Err(anyhow!("CLI completion rejection binding 在迁移前消失"));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "node_agent_session_completion_ack_tests.rs"]
+mod completion_ack_tests;

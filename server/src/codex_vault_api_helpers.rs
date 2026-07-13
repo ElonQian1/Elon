@@ -1,5 +1,27 @@
 use super::*;
 
+pub(super) const OWNER_VAULT_LEASE_CLEANUP_SECONDS: i64 = 900;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct OwnerVaultCloudControlWindow {
+    pub(super) deadline: String,
+    pub(super) issued_at: String,
+    pub(super) ttl_ms: u64,
+}
+
+pub(super) fn freeze_owner_vault_cloud_control_window(
+) -> anyhow::Result<OwnerVaultCloudControlWindow> {
+    let deadline = (chrono::Utc::now()
+        + chrono::Duration::seconds(OWNER_VAULT_LEASE_CLEANUP_SECONDS))
+    .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true);
+    let frozen = crate::homecli_agent::freeze_cloud_control_dispatch_window(&deadline)?;
+    Ok(OwnerVaultCloudControlWindow {
+        deadline,
+        issued_at: frozen.issued_at,
+        ttl_ms: frozen.ttl_ms,
+    })
+}
+
 pub(super) fn status_from_record(
     record: Option<&CodexVaultRecord>,
     slots: &[CodexVaultSlotRecord],
@@ -227,8 +249,26 @@ pub(super) fn hash_hint(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_auth_cache;
+    use super::{
+        freeze_owner_vault_cloud_control_window, validate_auth_cache,
+        OWNER_VAULT_LEASE_CLEANUP_SECONDS,
+    };
     use serde_json::json;
+
+    #[test]
+    fn owner_vault_lease_window_is_finite_and_signed_at_response_time() {
+        let frozen = freeze_owner_vault_cloud_control_window().unwrap();
+        let deadline = chrono::DateTime::parse_from_rfc3339(&frozen.deadline).unwrap();
+        let issued_at = chrono::DateTime::parse_from_rfc3339(&frozen.issued_at).unwrap();
+        let signed_ttl = deadline.signed_duration_since(issued_at).num_milliseconds();
+
+        assert_eq!(frozen.ttl_ms, signed_ttl as u64);
+        assert!(frozen.ttl_ms > 0);
+        assert!(
+            frozen.ttl_ms <= (OWNER_VAULT_LEASE_CLEANUP_SECONDS as u64) * 1_000,
+            "window must never exceed the advertised cleanup lifetime"
+        );
+    }
 
     #[test]
     fn validate_auth_cache_requires_chatgpt_refresh_token() {

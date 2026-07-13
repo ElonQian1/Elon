@@ -555,6 +555,18 @@ async fn start_channel_ai_task_response(
             Ok(id) => id,
             Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
+    if let Some(source_task_id) = source_task_id.as_deref() {
+        let _ = state.store.record_task_event(
+            &task_id,
+            &serde_json::json!({
+                "type": "task_resumed",
+                "task_id": task_id,
+                "source_task_id": source_task_id,
+                "conversation_id": conversation_id,
+            })
+            .to_string(),
+        );
+    }
     if let Some((artifact_id, _)) = module_preflight_note.as_ref() {
         if let Err(error) = state.store.bind_ui_tuner_task(
             &project.id,

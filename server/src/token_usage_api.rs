@@ -22,7 +22,8 @@ use crate::{
     project_auth::{auth_from_headers, json_error},
     store::{
         token_usage::{
-            BILLING_SOURCE_CLIENT_REPORTED, BILLING_SOURCE_PLATFORM, BILLING_SOURCE_USER_API_KEY,
+            BillingReservationConstraint, BILLING_SOURCE_CLIENT_REPORTED, BILLING_SOURCE_PLATFORM,
+            BILLING_SOURCE_USER_API_KEY,
         },
         ComputeMeterEvent, Store, TokenUsageAccountingResult, TokenUsageRecord,
     },
@@ -221,11 +222,51 @@ pub(crate) fn record_trusted_usage_with_key_and_resource(
     resource_owner_user_id: Option<&str>,
     charge_platform_balance: bool,
 ) -> Option<crate::store::TokenUsageAccountingResult> {
+    match try_record_trusted_usage_with_key_and_resource(
+        store,
+        user_id,
+        feature,
+        usage_mode,
+        model,
+        usage,
+        idempotency_key,
+        billing_source,
+        resource_owner_user_id,
+        charge_platform_balance,
+        None,
+    ) {
+        Ok(result) => result,
+        Err(e) => {
+            tracing::error!(
+                user_id,
+                feature,
+                usage_mode,
+                "record_trusted_usage 记账失败: {}",
+                e
+            );
+            None
+        }
+    }
+}
+
+pub(crate) fn try_record_trusted_usage_with_key_and_resource(
+    store: &Store,
+    user_id: &str,
+    feature: &str,
+    usage_mode: &str,
+    model: Option<&str>,
+    usage: &CliTokenUsage,
+    idempotency_key: Option<&str>,
+    billing_source: Option<&str>,
+    resource_owner_user_id: Option<&str>,
+    charge_platform_balance: bool,
+    reservation_constraint: Option<BillingReservationConstraint<'_>>,
+) -> anyhow::Result<Option<crate::store::TokenUsageAccountingResult>> {
     let Some(usage) = usage.clone().normalized() else {
         if let Some(key) = idempotency_key {
             crate::billing::release_trusted_call(store, user_id, key, "released_no_usage");
         }
-        return None;
+        return Ok(None);
     };
     let model = model.or(usage.model.as_deref());
     let record = TokenUsageRecord {
@@ -242,48 +283,36 @@ pub(crate) fn record_trusted_usage_with_key_and_resource(
         resource_owner_user_id,
         idempotency_key,
     };
-    match crate::billing::account_trusted_usage_with_charge_policy(
+    let result = crate::billing::account_trusted_usage_with_charge_policy_and_constraint(
         store,
         &record,
         charge_platform_balance,
-    ) {
-        Ok(result) => {
-            tracing::debug!(
-                user_id,
-                feature,
-                usage_mode,
-                token_event_id = %result.token_usage_event_id,
-                billing_event_id = ?result.billing_event_id,
-                cost_rmb_fen = result.cost_rmb_fen,
-                balance_after_fen = ?result.balance_after_fen,
-                accounting_status = %result.accounting_status,
-                idempotency_key = ?result.idempotency_key,
-                deduplicated = result.deduplicated,
-                "record_trusted_usage accounted"
-            );
-            record_token_meter_event(
-                store,
-                user_id,
-                feature,
-                usage_mode,
-                model,
-                &usage,
-                idempotency_key,
-                &result,
-            );
-            Some(result)
-        }
-        Err(e) => {
-            tracing::error!(
-                user_id,
-                feature,
-                usage_mode,
-                "record_trusted_usage 记账失败: {}",
-                e
-            );
-            None
-        }
-    }
+        reservation_constraint,
+    )?;
+    tracing::debug!(
+        user_id,
+        feature,
+        usage_mode,
+        token_event_id = %result.token_usage_event_id,
+        billing_event_id = ?result.billing_event_id,
+        cost_rmb_fen = result.cost_rmb_fen,
+        balance_after_fen = ?result.balance_after_fen,
+        accounting_status = %result.accounting_status,
+        idempotency_key = ?result.idempotency_key,
+        deduplicated = result.deduplicated,
+        "record_trusted_usage accounted"
+    );
+    record_token_meter_event(
+        store,
+        user_id,
+        feature,
+        usage_mode,
+        model,
+        &usage,
+        idempotency_key,
+        &result,
+    );
+    Ok(Some(result))
 }
 
 fn record_token_meter_event(

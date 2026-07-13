@@ -1,5 +1,5 @@
-use super::*;
 use super::super::state_path;
+use super::*;
 
 pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     let registry = CliSidecarRegistry::new(config.registry_dir.clone());
@@ -142,7 +142,9 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
         if let Some(success) = child_exit {
             let drained_after_exit = child_exit_observed_at
                 .is_some_and(|instant| instant.elapsed() >= Duration::from_millis(500));
-            if reader_closed || canceled || drained_after_exit {
+            // Cancellation/timeout must not skip the final PTY drain: Codex may
+            // have emitted its token-count event immediately before termination.
+            if reader_closed || drained_after_exit {
                 break success;
             }
         }
@@ -366,4 +368,3 @@ pub(super) fn safe_id_fragment(value: &str) -> String {
         })
         .collect()
 }
-

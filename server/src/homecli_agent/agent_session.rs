@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -7,7 +7,9 @@ use std::{
 use anyhow::{anyhow, Result};
 use axum::extract::ws::{Message, WebSocket};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{AgentToServer, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile, ServerToAgent};
+use homecli_proto::{
+    AgentToServer, NodeDevRuntimeProfile, NodeHardwareProfile, NodeStorageProfile, ServerToAgent,
+};
 use tokio::sync::{mpsc, oneshot, watch, Mutex};
 use uuid::Uuid;
 
@@ -15,14 +17,13 @@ use sha2::Digest as _;
 
 use crate::types::AppState;
 
-use super::{
-    heartbeat, journal,
-    AgentEntry, AgentManager, AGENT_WS_READ_TIMEOUT, TOOL_APPROVAL_ACK_TIMEOUT,
-    PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV, PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV,
-    PROJECT_STORAGE_PREPARE_TIMEOUT_ENV,
-    clean_optional,
-};
 use super::public_dev_handshake::record_node_public_dev_handshake;
+use super::{
+    clean_optional, heartbeat, journal, AgentEntry, AgentManager, AGENT_WS_READ_TIMEOUT,
+    DURABLE_CLI_COMPLETION_PROTO_VERSION, PROJECT_STORAGE_PREPARE_TIMEOUT_ENV,
+    PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV, PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV,
+    TOOL_APPROVAL_ACK_TIMEOUT,
+};
 
 pub(super) async fn run_agent_session(
     socket: WebSocket,
@@ -48,7 +49,7 @@ pub(super) async fn run_agent_session(
         version,
         allowed_clis,
         allowed_cwds,
-        _proto_ver,
+        proto_version,
         owner_user_id,
         device_name,
         install_id,
@@ -101,18 +102,53 @@ pub(super) async fn run_agent_session(
     if !auth_ok {
         return Err(anyhow!("auth failed for agent_id={agent_id}"));
     }
-    // If agent registered via DB credentials, resolve owner from DB
-    let resolved_owner_user_id = if owner_user_id.is_some() {
-        owner_user_id.clone()
-    } else if !secrets.contains_key(&agent_id) {
-        state
-            .store
-            .get_node_credential_owner(&agent_id)
-            .ok()
-            .flatten()
-    } else {
-        None
-    };
+    // DB-bound node credentials are authoritative. Never let a node select a
+    // different owner in its Register payload; local offline replay relies on
+    // this identity boundary.
+    let stored_credential = state
+        .store
+        .get_node_credential(&agent_id)
+        .map_err(|error| anyhow!("resolve node credential for {agent_id}: {error}"))?;
+    let stored_owner_user_id = stored_credential
+        .as_ref()
+        .map(|credential| credential.owner_user_id.clone());
+    if let (Some(claimed), Some(stored)) =
+        (owner_user_id.as_deref(), stored_owner_user_id.as_deref())
+    {
+        if claimed != stored {
+            return Err(anyhow!(
+                "registered owner does not match credential owner for agent_id={agent_id}"
+            ));
+        }
+    }
+    if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION {
+        let claimed_install_id = install_id.as_deref().ok_or_else(|| {
+            anyhow!("durable completion protocol requires install_id for agent_id={agent_id}")
+        })?;
+        if let Some(stored_install_id) = stored_credential
+            .as_ref()
+            .and_then(|credential| credential.install_id.as_deref())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            if claimed_install_id != stored_install_id {
+                return Err(anyhow!(
+                    "registered install_id does not match credential installation for agent_id={agent_id}"
+                ));
+            }
+        }
+    }
+    let resolved_owner_user_id = stored_owner_user_id.or(owner_user_id.clone());
+    if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION
+        && resolved_owner_user_id
+            .as_deref()
+            .map(str::trim)
+            .is_none_or(str::is_empty)
+    {
+        return Err(anyhow!(
+            "durable completion protocol requires an authoritative owner for agent_id={agent_id}"
+        ));
+    }
     if let Some(owner) = &resolved_owner_user_id {
         if let Err(e) = state.store.update_node_credential_registration_info(
             &agent_id,
@@ -120,7 +156,27 @@ pub(super) async fn run_agent_session(
             install_id.as_deref(),
             device_name.as_deref(),
         ) {
+            if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION && stored_credential.is_some()
+            {
+                return Err(anyhow!(
+                    "failed to bind durable node installation for agent_id={agent_id}: {e}"
+                ));
+            }
             tracing::warn!(%agent_id, error = %e, "failed to update node registration info");
+        }
+    }
+    if proto_version >= DURABLE_CLI_COMPLETION_PROTO_VERSION && stored_credential.is_some() {
+        let verified = state
+            .store
+            .get_node_credential(&agent_id)
+            .map_err(|error| anyhow!("verify node installation for {agent_id}: {error}"))?
+            .ok_or_else(|| anyhow!("node credential disappeared for agent_id={agent_id}"))?;
+        if Some(verified.owner_user_id.as_str()) != resolved_owner_user_id.as_deref()
+            || verified.install_id.as_deref() != install_id.as_deref()
+        {
+            return Err(anyhow!(
+                "durable node owner/install binding was not persisted for agent_id={agent_id}"
+            ));
         }
     }
     if let (Some(owner), Some(hardware)) = (&resolved_owner_user_id, hardware.as_ref()) {
@@ -145,13 +201,15 @@ pub(super) async fn run_agent_session(
         )
         .await;
     }
-    tracing::info!(%agent_id, %version, device_name = ?device_name, "agent registered");
+    tracing::info!(%agent_id, %version, proto_version, device_name = ?device_name, "agent registered");
+    state.agent_manager.ensure_cli_recovery_worker();
     let session_id = Uuid::new_v4().to_string();
     let session_version = version.clone();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
     let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let cli_pending_ids = Arc::new(Mutex::new(HashSet::new()));
     let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let ping_acks: Arc<Mutex<HashMap<String, oneshot::Sender<()>>>> =
@@ -161,6 +219,7 @@ pub(super) async fn run_agent_session(
         session_id: session_id.clone(),
         agent_id: agent_id.clone(),
         version,
+        proto_version,
         device_name: device_name.clone(),
         hardware: hardware.clone(),
         storage: storage.clone(),
@@ -174,6 +233,7 @@ pub(super) async fn run_agent_session(
             .unwrap_or(0),
         cmd_tx: cmd_tx.clone(),
         pending: pending.clone(),
+        cli_pending_ids: cli_pending_ids.clone(),
         approval_acks: approval_acks.clone(),
         ping_acks: ping_acks.clone(),
         session_shutdown: session_shutdown.clone(),
@@ -190,8 +250,15 @@ pub(super) async fn run_agent_session(
                 new_session_id = %session_id,
                 "evicting previous agent session (same agent_id re-registered)"
             );
-            // 通知旧连接的所有挂起请求立即失败
-            fail_pending_requests(&old_entry.pending, "PC 节点通信临时中断：Win 端正在更新升级/重启或节点重新注册，旧连接已关闭。").await;
+            state
+                .agent_manager
+                .recover_session_pending(
+                    &agent_id,
+                    &old_entry.pending,
+                    &old_entry.cli_pending_ids,
+                    "PC 节点通信临时中断：Win 端正在更新升级/重启或节点重新注册，旧连接已关闭。",
+                )
+                .await;
             fail_pending_approvals(&old_entry.approval_acks).await;
             fail_pending_pings(&old_entry.ping_acks).await;
             let _ = old_entry.session_shutdown.send(true);
@@ -265,6 +332,7 @@ pub(super) async fn run_agent_session(
 
     // Reader: route AgentToServer events to the right pending task.
     let pending_r = pending.clone();
+    let cli_pending_ids_r = cli_pending_ids.clone();
     let approval_acks_r = approval_acks.clone();
     let ping_acks_r = ping_acks.clone();
     let mut reader_shutdown_rx = session_shutdown_rx.clone();
@@ -287,6 +355,34 @@ pub(super) async fn run_agent_session(
                 Message::Text(t) => match serde_json::from_str::<AgentToServer>(&t) {
                     Ok(msg) => {
                         state.node_registry.touch(&agent_id).await;
+                        if let AgentToServer::CliCompletionReplay { completion } = &msg {
+                            let ack = crate::ai_cli::pc_completion_replay::handle_pc_cli_completion_replay(
+                                state.as_ref(),
+                                &agent_id,
+                                resolved_owner_user_id.as_deref(),
+                                install_id.as_deref(),
+                                completion.clone(),
+                            );
+                            if matches!(
+                                &ack,
+                                ServerToAgent::CliCompletionAck { accepted: true, .. }
+                            ) {
+                                let delivered = state
+                                    .agent_manager
+                                    .deliver_accepted_cli_replay(&agent_id, completion)
+                                    .await;
+                                tracing::debug!(
+                                    %agent_id,
+                                    req_id = %completion.req_id,
+                                    delivered,
+                                    "accepted PC CLI replay routed to in-memory receiver"
+                                );
+                            }
+                            if cmd_tx.send(ack).is_err() {
+                                return Err(anyhow!("agent writer closed before completion ACK"));
+                            }
+                            continue;
+                        }
                         if let AgentToServer::ToolApprovalDecisionAck {
                             req_id,
                             approval_id,
@@ -320,18 +416,13 @@ pub(super) async fn run_agent_session(
                             if drop_after {
                                 p.remove(&task_id);
                             }
-                        } else if let Some(req_id) = msg.req_id() {
-                            // HTTP relay / CLI streaming — CliChunk 保留，其余删除
-                            let req_id = req_id.to_string();
-                            let is_final = msg.is_final_req_msg();
-                            let mut p = pending_r.lock().await;
-                            if is_final {
-                                if let Some(tx) = p.remove(&req_id) {
-                                    let _ = tx.send(msg);
-                                }
-                            } else if let Some(tx) = p.get(&req_id) {
-                                let _ = tx.send(msg);
-                            }
+                        } else if msg.req_id().is_some() {
+                            route_req_message_to_pending(
+                                &pending_r,
+                                &cli_pending_ids_r,
+                                msg,
+                            )
+                            .await;
                         } else {
                             // Register/Pong without task_id — 处理节点专属消息
                             match &msg {
@@ -462,12 +553,14 @@ pub(super) async fn run_agent_session(
         );
     }
 
-    // 节点断线时，向所有还在等待响应的 CLI 请求发送 CliDone(exit_ok=false)，
-    // 让 run_via_pc_agent 的 while rx.recv() 立即收到错误并返回，
-    // 而不是永远阻塞到 HTTP 请求超时。
-    {
-        fail_pending_requests(&pending, "PC 节点通信临时中断：服务器正在更新升级或 Win 端正在更新升级/重启时会临时断开；系统会等待节点重新连接并尝试恢复。").await;
-    }
+    // CLI receiver stays alive through a bounded reconnect window; all other
+    // request types retain the historical fail-fast behavior.
+    state.agent_manager.recover_session_pending(
+        &agent_id,
+        &pending,
+        &cli_pending_ids,
+        "PC 节点通信临时中断：服务器正在更新升级或 Win 端正在更新升级/重启时会临时断开；系统会等待节点重新连接并尝试恢复。",
+    ).await;
     {
         fail_pending_approvals(&approval_acks).await;
     }
@@ -479,6 +572,30 @@ pub(super) async fn run_agent_session(
     let _ = writer.await;
     tracing::info!(%agent_id, "agent disconnected");
     read_result
+}
+
+/// Route one req_id-scoped message through the session's transient waiter map.
+/// Final messages remove the waiter before delivery so deadline tasks cannot
+/// emit a stale Cancel after the CLI process has already completed.
+pub(super) async fn route_req_message_to_pending(
+    pending: &Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
+    cli_pending_ids: &Arc<Mutex<HashSet<String>>>,
+    msg: AgentToServer,
+) -> bool {
+    let Some(req_id) = msg.req_id().map(str::to_owned) else {
+        return false;
+    };
+    let is_final = msg.is_final_req_msg();
+    let mut pending = pending.lock().await;
+    if is_final {
+        cli_pending_ids.lock().await.remove(&req_id);
+        if let Some(tx) = pending.remove(&req_id) {
+            let _ = tx.send(msg);
+        }
+    } else if let Some(tx) = pending.get(&req_id) {
+        let _ = tx.send(msg);
+    }
+    true
 }
 
 pub(super) fn tool_approval_ack_key(req_id: &str, approval_id: &str, dispatch_id: &str) -> String {
@@ -516,30 +633,6 @@ pub(super) async fn send_protocol_ping(
     }
 }
 
-pub(super) async fn fail_pending_requests(
-    pending: &Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
-    message: &str,
-) {
-    let mut pending = pending.lock().await;
-    let stale: Vec<(String, mpsc::UnboundedSender<AgentToServer>)> = pending.drain().collect();
-    drop(pending);
-    for (req_id, sender) in stale {
-        let _ = sender.send(AgentToServer::CliDone {
-            req_id,
-            exit_ok: false,
-            error: Some(message.to_string()),
-            session_id: None,
-            prompt_tokens: None,
-            cached_input_tokens: None,
-            completion_tokens: None,
-            reasoning_tokens: None,
-            total_tokens: None,
-            model: None,
-            workspace_status: None,
-        });
-    }
-}
-
 pub(super) async fn fail_pending_approvals(
     approval_acks: &Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
 ) {
@@ -551,7 +644,9 @@ pub(super) async fn fail_pending_approvals(
     }
 }
 
-pub(super) async fn fail_pending_pings(ping_acks: &Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>) {
+pub(super) async fn fail_pending_pings(
+    ping_acks: &Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>,
+) {
     let mut ping_acks = ping_acks.lock().await;
     ping_acks.clear();
 }
@@ -588,4 +683,3 @@ pub(super) fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 // ── /api/_test_dispatch handler (Phase 1 smoke test) ─────────────────────────
-

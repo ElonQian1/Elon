@@ -14,11 +14,18 @@ use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::{
+    billing,
     codex_vault_api::{decrypt_auth_json, verify_node_proof},
     project_auth::{auth_from_headers, json_error},
     store::codex_vault_emergency::CodexVaultEmergencyLeaseCreate,
+    store::{
+        ActiveBillingReservation, CodexVaultEmergencyCredentialDeliveryClaim, NodeComputeRun, Store,
+    },
     types::AppState,
 };
+
+#[path = "codex_vault_emergency_api_cleanup.rs"]
+mod cleanup;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateEmergencyGrantRequest {
@@ -39,6 +46,10 @@ pub struct LeaseEmergencyAuthCacheRequest {
     pub device_name: Option<String>,
     pub purpose: Option<String>,
     pub failure_reason: Option<String>,
+    /// The immutable accounting key of an already-running PC CLI request. A
+    /// shared credential is not returned for this path until that run has a
+    /// live balance hold and is rebound to the provider lease.
+    pub compute_call_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -132,12 +143,33 @@ pub async fn revoke_grant(
         .store
         .revoke_codex_vault_emergency_grant(&grant_id, &provider.id)
     {
-        Ok(true) => Json(serde_json::json!({
-            "ok": true,
-            "message": "已撤销 Codex 账号授权共享。",
-        }))
-        .into_response(),
-        Ok(false) => json_error(StatusCode::NOT_FOUND, "没有可撤销的授权共享"),
+        Ok(Some(cancel_targets)) => {
+            let mut cancel_sent = 0usize;
+            for (node_id, req_id) in &cancel_targets {
+                if state
+                    .agent_manager
+                    .cancel_cli_prompt_on_agent(node_id, req_id)
+                    .await
+                {
+                    cancel_sent += 1;
+                } else {
+                    tracing::warn!(
+                        %node_id,
+                        %req_id,
+                        %grant_id,
+                        "共享 Codex 授权已撤销，但在线任务取消消息未送达"
+                    );
+                }
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "cancel_targets": cancel_targets.len(),
+                "cancel_sent": cancel_sent,
+                "message": "已撤销 Codex 账号授权共享。",
+            }))
+            .into_response()
+        }
+        Ok(None) => json_error(StatusCode::NOT_FOUND, "没有可撤销的授权共享"),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
@@ -200,6 +232,17 @@ pub async fn lease_auth_cache(
         }
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
+    let midrun = match validate_midrun_switch(
+        &state.store,
+        &consumer.id,
+        &req.agent_id,
+        req.compute_call_id.as_deref(),
+    )
+    .await
+    {
+        Ok(run) => run,
+        Err(error) => return json_error(StatusCode::CONFLICT, error),
+    };
     let auth_json = match decrypt_auth_json(&slot.ciphertext_b64, &slot.nonce_b64) {
         Ok(text) => text,
         Err(error) => {
@@ -213,33 +256,112 @@ pub async fn lease_auth_cache(
             return json_error(StatusCode::SERVICE_UNAVAILABLE, error.to_string());
         }
     };
+    let reservation = match midrun.as_ref() {
+        Some(run) => match reserve_midrun_shared_call(&state.store, run) {
+            Ok(reservation) => Some(reservation),
+            Err(error) => return json_error(StatusCode::PAYMENT_REQUIRED, error),
+        },
+        None => None,
+    };
+    let lease_input = || CodexVaultEmergencyLeaseCreate {
+        grant_id: &grant.id,
+        provider_user_id: &provider.id,
+        consumer_user_id: &consumer.id,
+        consumer_node_id: &req.agent_id,
+        provider_slot_id: &slot.slot_id,
+        account_hint_hash: slot.account_hint_hash.as_deref(),
+        purpose: req.purpose.as_deref(),
+        failure_reason: req.failure_reason.as_deref(),
+        max_lease_seconds: grant.max_lease_seconds,
+    };
+    let lease_result = match (midrun.as_ref(), reservation.as_ref()) {
+        (Some(run), Some(reservation)) => state
+            .store
+            .create_codex_vault_emergency_lease_for_run(
+                lease_input(),
+                run,
+                &reservation.reservation_id,
+            )
+            .map(|issue| {
+                issue.map(|issue| {
+                    let deadline = issue
+                        .run
+                        .replay_deadline
+                        .unwrap_or_else(|| issue.lease.expires_at.clone());
+                    (issue.lease, deadline, issue.superseded_cancel_targets)
+                })
+            }),
+        (None, None) => state
+            .store
+            .create_codex_vault_emergency_lease_with_superseded_runs(lease_input())
+            .map(|issue| {
+                let deadline = issue.lease.expires_at.clone();
+                Some((issue.lease, deadline, issue.superseded_cancel_targets))
+            }),
+        _ => unreachable!("midrun shared lease and its reservation are created together"),
+    };
+    let lease = match lease_result {
+        Ok(Some(issue)) => issue,
+        Ok(None) => {
+            release_midrun_reservation_if_unbound(&state.store, midrun.as_ref());
+            let _ = state.store.record_codex_vault_event(
+                &consumer.id,
+                "emergency_lease_billing_bind_failed",
+                Some(&req.agent_id),
+                false,
+                Some("运行中 PC 任务已被并发请求绑定"),
+            );
+            return json_error(
+                StatusCode::CONFLICT,
+                "运行中 PC 任务已经绑定了其他共享 Codex 租约，本次不会下发凭据",
+            );
+        }
+        Err(error) => {
+            release_midrun_reservation_if_unbound(&state.store, midrun.as_ref());
+            let message = format!("创建并绑定共享 Codex 租约失败: {error}");
+            let _ = state.store.record_codex_vault_event(
+                &consumer.id,
+                "emergency_lease_billing_bind_failed",
+                Some(&req.agent_id),
+                false,
+                Some(&message),
+            );
+            return json_error(StatusCode::CONFLICT, message);
+        }
+    };
+    let (lease, cloud_control_deadline, superseded_cancel_targets) = lease;
+    for (node_id, req_id) in &superseded_cancel_targets {
+        if !state
+            .agent_manager
+            .cancel_cli_prompt_on_agent(node_id, req_id)
+            .await
+        {
+            tracing::warn!(
+                %node_id,
+                %req_id,
+                lease_id = %lease.id,
+                "共享 Codex 旧租约已被替换，但旧运行取消消息未送达"
+            );
+        }
+    }
+    // The lease/run transaction is the authorization boundary. These legacy
+    // slot timestamps are advisory bookkeeping and must not turn a committed
+    // credential dispatch into a client-visible failure.
     if let Err(error) = state.store.mark_user_codex_credential_slot_leased(
         &provider.id,
         &slot.slot_id,
         Some(&req.agent_id),
     ) {
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        tracing::warn!(
+            lease_id = %lease.id,
+            slot_id = %slot.slot_id,
+            error = %error,
+            "共享 Codex 租约已提交，但槽位最近租用时间更新失败"
+        );
     }
     let _ = state
         .store
         .mark_user_codex_credential_leased(&provider.id, Some(&req.agent_id));
-    let lease =
-        match state
-            .store
-            .create_codex_vault_emergency_lease(CodexVaultEmergencyLeaseCreate {
-                grant_id: &grant.id,
-                provider_user_id: &provider.id,
-                consumer_user_id: &consumer.id,
-                consumer_node_id: &req.agent_id,
-                provider_slot_id: &slot.slot_id,
-                account_hint_hash: slot.account_hint_hash.as_deref(),
-                purpose: req.purpose.as_deref(),
-                failure_reason: req.failure_reason.as_deref(),
-                max_lease_seconds: grant.max_lease_seconds,
-            }) {
-            Ok(lease) => lease,
-            Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
-        };
     let _ = state.store.record_codex_vault_event(
         &provider.id,
         "emergency_lease_provider",
@@ -254,6 +376,113 @@ pub async fn lease_auth_cache(
         true,
         None,
     );
+    let cloud_control_window =
+        match crate::homecli_agent::freeze_cloud_control_dispatch_window(&cloud_control_deadline) {
+            Ok(window) => window,
+            Err(error) => {
+                tracing::warn!(
+                    lease_id = %lease.id,
+                    %error,
+                    "共享 Codex 租约已提交，但授权窗口在凭据响应前已失效"
+                );
+                let reason = error.to_string();
+                cleanup::cleanup_failed_credential_delivery(
+                    &state,
+                    &lease.id,
+                    &consumer.id,
+                    &req.agent_id,
+                    midrun.as_ref(),
+                    &reason,
+                )
+                .await;
+                return json_error(StatusCode::CONFLICT, reason);
+            }
+        };
+    let delivery_claim = CodexVaultEmergencyCredentialDeliveryClaim {
+        lease_id: &lease.id,
+        expected_lease_updated_at: &lease.updated_at,
+        grant_id: &grant.id,
+        provider_user_id: &provider.id,
+        consumer_user_id: &consumer.id,
+        consumer_node_id: &req.agent_id,
+        provider_slot_id: &slot.slot_id,
+        credential_version: slot.credential_version,
+        compute_call_id: midrun.as_ref().map(|run| run.compute_call_id.as_str()),
+        cloud_control_deadline: &cloud_control_deadline,
+    };
+    match state
+        .store
+        .claim_codex_vault_emergency_credential_delivery(delivery_claim)
+    {
+        Ok(true) => {}
+        Ok(false) => {
+            let reason = "共享 Codex 租约在凭据返回前已撤销、清除、过期或被替换";
+            cleanup::cleanup_failed_credential_delivery(
+                &state,
+                &lease.id,
+                &consumer.id,
+                &req.agent_id,
+                midrun.as_ref(),
+                reason,
+            )
+            .await;
+            return json_error(StatusCode::CONFLICT, reason);
+        }
+        Err(error) => {
+            let reason = format!("共享 Codex 凭据返回前严格核验失败: {error}");
+            cleanup::cleanup_failed_credential_delivery(
+                &state,
+                &lease.id,
+                &consumer.id,
+                &req.agent_id,
+                midrun.as_ref(),
+                &reason,
+            )
+            .await;
+            return json_error(StatusCode::CONFLICT, reason);
+        }
+    }
+    if let Some(run) = midrun.as_ref() {
+        if let Some(req_id) = run
+            .compute_call_id
+            .strip_prefix("pc_agent_cli:")
+            .filter(|req_id| !req_id.is_empty())
+        {
+            let Some(cancel_at) = tokio::time::Instant::now().checked_add(
+                std::time::Duration::from_millis(cloud_control_window.ttl_ms),
+            ) else {
+                let reason = "共享 Codex 授权 TTL 超出服务器计时范围";
+                cleanup::cleanup_failed_credential_delivery(
+                    &state,
+                    &lease.id,
+                    &consumer.id,
+                    &req.agent_id,
+                    midrun.as_ref(),
+                    reason,
+                )
+                .await;
+                return json_error(StatusCode::CONFLICT, reason);
+            };
+            let agent_manager = Arc::clone(&state.agent_manager);
+            let node_id = req.agent_id.clone();
+            let req_id = req_id.to_string();
+            let lease_id = lease.id.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep_until(cancel_at).await;
+                if !agent_manager
+                    .cancel_cli_prompt_on_agent(&node_id, &req_id)
+                    .await
+                {
+                    tracing::warn!(
+                        %node_id,
+                        %req_id,
+                        %lease_id,
+                        "共享 Codex 授权到期，但服务器取消消息未送达"
+                    );
+                }
+            });
+        }
+    }
     Json(serde_json::json!({
         "ok": true,
         "lease_id": lease.id,
@@ -276,10 +505,106 @@ pub async fn lease_auth_cache(
         "purpose": req.purpose,
         "billing_source": "shared_codex",
         "lease_expires_at": lease.expires_at,
+        "cloud_control_deadline": cloud_control_deadline,
+        "cloud_control_issued_at": cloud_control_window.issued_at,
+        "cloud_control_ttl_ms": cloud_control_window.ttl_ms,
         "cleanup_recommended_seconds": grant.max_lease_seconds,
         "message": "已切换到授权机器人的共享 Codex 账号。",
     }))
     .into_response()
+}
+
+async fn validate_midrun_switch(
+    store: &Store,
+    consumer_user_id: &str,
+    node_id: &str,
+    compute_call_id: Option<&str>,
+) -> Result<Option<NodeComputeRun>, String> {
+    let Some(compute_call_id) = compute_call_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Ok(None);
+    };
+    // The node ACKs the prompt just before the cloud dispatch path persists its
+    // compute run. A very fast auth failure can therefore reach this endpoint a
+    // few milliseconds early; wait briefly instead of dropping a valid switch.
+    let mut run = None;
+    for attempt in 0..=20 {
+        run = store
+            .get_node_compute_run_by_compute_call_id(compute_call_id)
+            .map_err(|error| format!("查询运行中 PC 任务失败: {error}"))?;
+        if run.is_some() || attempt == 20 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    let run = run.ok_or_else(|| "没有找到可绑定共享租约的运行中 PC 任务".to_string())?;
+    if run.consumer_user_id != consumer_user_id
+        || run.node_id != node_id
+        || run.usage_mode != "pc_agent_cli"
+        || run.status != "started"
+    {
+        return Err("共享 Codex 切换与当前用户、节点或运行中任务不匹配".to_string());
+    }
+    if run.billing_source != "own_codex" || run.offline_policy != "allow_offline" {
+        return Err("只有从本机自有 Codex 发起的运行中任务可以切换共享账号".to_string());
+    }
+    Ok(Some(run))
+}
+
+fn reserve_midrun_shared_call(
+    store: &Store,
+    run: &NodeComputeRun,
+) -> Result<ActiveBillingReservation, String> {
+    let reservation_key = if run.feature.contains("dev") {
+        "billing_cli_dev_reservation_fen"
+    } else {
+        "billing_cli_chat_reservation_fen"
+    };
+    let fallback = if run.feature.contains("dev") { 100 } else { 10 };
+    let reserve_fen = billing::configured_reservation_fen(store, reservation_key, fallback);
+    billing::reserve_trusted_call(
+        store,
+        &run.consumer_user_id,
+        &run.compute_call_id,
+        &run.feature,
+        &run.usage_mode,
+        run.model_id.as_deref(),
+        reserve_fen,
+    )?;
+    store
+        .get_active_billing_reservation(&run.consumer_user_id, &run.compute_call_id)
+        .map_err(|error| format!("确认共享 Codex 计费预留失败: {error}"))?
+        .ok_or_else(|| "共享 Codex 必须先完成在线计费预留，本次不会下发共享凭据".to_string())
+}
+
+fn release_midrun_reservation_if_unbound(store: &Store, run: Option<&NodeComputeRun>) {
+    let Some(run) = run else {
+        return;
+    };
+    // An idempotent reservation can be shared by racing requests. Never let a
+    // losing request release the hold after the winner committed its lease.
+    let still_unbound = store
+        .get_node_compute_run_by_compute_call_id(&run.compute_call_id)
+        .ok()
+        .flatten()
+        .is_some_and(|current| {
+            current.status == "started"
+                && current.consumer_user_id == run.consumer_user_id
+                && current.node_id == run.node_id
+                && current.billing_source == "own_codex"
+                && current.offline_policy == "allow_offline"
+                && current.lease_id.is_none()
+        });
+    if still_unbound {
+        billing::release_trusted_call(
+            store,
+            &run.consumer_user_id,
+            &run.compute_call_id,
+            "released_error",
+        );
+    }
 }
 
 pub async fn clear_active_lease(
@@ -294,18 +619,41 @@ pub async fn clear_active_lease(
     if let Err(error) = verify_node_proof(&state, &consumer.id, &req.agent_id, &req.agent_secret) {
         return json_error(StatusCode::FORBIDDEN, error.to_string());
     }
-    match state.store.clear_codex_vault_emergency_lease_for_node(
-        &consumer.id,
-        &req.agent_id,
-        req.lease_id.as_deref(),
-    ) {
-        Ok(Some(lease)) => Json(serde_json::json!({
-            "ok": true,
-            "cleared": true,
-            "lease": lease,
-            "message": "已清除当前节点 Codex 账号共享租约。",
-        }))
-        .into_response(),
+    match state
+        .store
+        .clear_codex_vault_emergency_lease_for_node_with_cancel_targets(
+            &consumer.id,
+            &req.agent_id,
+            req.lease_id.as_deref(),
+        ) {
+        Ok(Some(issue)) => {
+            let mut cancel_sent = 0usize;
+            for (node_id, req_id) in &issue.cancel_targets {
+                if state
+                    .agent_manager
+                    .cancel_cli_prompt_on_agent(node_id, req_id)
+                    .await
+                {
+                    cancel_sent += 1;
+                } else {
+                    tracing::warn!(
+                        %node_id,
+                        %req_id,
+                        lease_id = %issue.lease.id,
+                        "共享 Codex 租约已清除，但关联运行取消消息未送达"
+                    );
+                }
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "cleared": true,
+                "lease": issue.lease,
+                "cancel_targets": issue.cancel_targets.len(),
+                "cancel_sent": cancel_sent,
+                "message": "已清除当前节点 Codex 账号共享租约。",
+            }))
+            .into_response()
+        }
         Ok(None) => Json(serde_json::json!({
             "ok": true,
             "cleared": false,
@@ -315,3 +663,7 @@ pub async fn clear_active_lease(
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
 }
+
+#[cfg(test)]
+#[path = "codex_vault_emergency_api_tests.rs"]
+mod midrun_switch_tests;

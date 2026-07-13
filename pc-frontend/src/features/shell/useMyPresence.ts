@@ -12,13 +12,13 @@ export interface UserPresenceSettings {
 
 export type PresenceStatus = 'online' | 'idle' | 'dnd' | 'invisible' | 'offline'
 
-export function useMyPresence() {
+export function useMyPresence(enabled = true) {
   const user = useAuthStore((s) => s.user)
   const [presence, setPresence] = useState<UserPresenceSettings | null>(null)
 
   useEffect(() => {
     let canceled = false
-    if (!user?.id) {
+    if (!enabled || !user?.id) {
       setPresence(null)
       return () => { canceled = true }
     }
@@ -30,10 +30,10 @@ export function useMyPresence() {
         if (!canceled) setPresence(null)
       })
     return () => { canceled = true }
-  }, [user?.id])
+  }, [enabled, user?.id])
 
   useEffect(() => {
-    if (!user?.id) return
+    if (!enabled || !user?.id) return
     const userId = user.id
 
     function onPresence(event: Event) {
@@ -63,7 +63,7 @@ export function useMyPresence() {
 
     window.addEventListener('elon:presence', onPresence)
     return () => window.removeEventListener('elon:presence', onPresence)
-  }, [user?.id])
+  }, [enabled, user?.id])
 
   return presence
 }

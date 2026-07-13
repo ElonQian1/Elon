@@ -16,6 +16,7 @@ pub(crate) struct ActiveCliPromptHandle {
     route: String,
     cwd: Option<String>,
     runtime_permission: Option<String>,
+    requires_cloud_control: bool,
     started_at_ms: u128,
     last_heartbeat_ms: u128,
     os_pid: Option<u32>,
@@ -29,6 +30,7 @@ pub(crate) struct ActiveCliPromptView {
     pub route: String,
     pub cwd: Option<String>,
     pub runtime_permission: Option<String>,
+    pub requires_cloud_control: bool,
     pub started_at_ms: u128,
     pub last_heartbeat_ms: u128,
     pub control_lease_expires_at_ms: u128,
@@ -54,6 +56,7 @@ impl ActiveCliPromptHandle {
             route: route.into(),
             cwd,
             runtime_permission,
+            requires_cloud_control: false,
             started_at_ms: now,
             last_heartbeat_ms: now,
             os_pid: None,
@@ -62,6 +65,23 @@ impl ActiveCliPromptHandle {
 
     pub(crate) fn cancel_tx(&self) -> watch::Sender<bool> {
         self.cancel_tx.clone()
+    }
+
+    pub(crate) fn with_requires_cloud_control(mut self, required: bool) -> Self {
+        self.requires_cloud_control = required;
+        self
+    }
+
+    pub(crate) fn requires_cloud_control(&self) -> bool {
+        self.requires_cloud_control
+    }
+
+    pub(crate) fn set_requires_cloud_control(&mut self, required: bool) {
+        // Once a task has adopted cloud-managed credentials it remains cloud
+        // controlled for the rest of that task, even if a later retry changes
+        // credential homes again.
+        self.requires_cloud_control |= required;
+        self.touch();
     }
 
     pub(crate) fn req_id(&self) -> &str {
@@ -89,6 +109,7 @@ impl ActiveCliPromptHandle {
             route: self.route.clone(),
             cwd: self.cwd.clone(),
             runtime_permission: self.runtime_permission.clone(),
+            requires_cloud_control: self.requires_cloud_control,
             started_at_ms: self.started_at_ms,
             last_heartbeat_ms: self.last_heartbeat_ms,
             control_lease_expires_at_ms: now_ms() + CONTROL_LEASE_MS,

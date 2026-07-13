@@ -13,9 +13,20 @@ mod billing_price_rules;
 mod billing_reservation_tests;
 mod billing_reservations;
 mod build_quota;
-mod codex_vault; pub(crate) mod codex_vault_emergency; mod codex_vault_sharing_health; #[cfg(test)] mod codex_vault_sharing_regression_tests; pub(crate) mod codex_vault_usage_estimation;
+mod codex_vault;
+mod codex_vault_dispatch_authorization;
+pub(crate) mod codex_vault_emergency;
+mod codex_vault_emergency_delivery_guard;
+mod codex_vault_emergency_lease_guard;
+mod codex_vault_emergency_usage_attach;
+mod codex_vault_sharing_health;
+#[cfg(test)]
+mod codex_vault_sharing_regression_tests;
+pub(crate) mod codex_vault_usage_estimation;
 mod common;
-mod compute_metering; mod conversation_forks; mod conversations;
+mod compute_metering;
+mod conversation_forks;
+mod conversations;
 pub(crate) mod default_joint_projects;
 mod external_app_tool_executions;
 mod external_apps;
@@ -33,6 +44,8 @@ mod groups;
 mod join_requests;
 mod message_recall;
 mod native_sessions;
+mod node_cli_completion_receipts;
+mod node_compute_replay;
 mod node_compute_runs;
 mod node_credentials;
 mod node_hardware;
@@ -42,6 +55,7 @@ mod node_payout_tests;
 mod node_payouts;
 mod node_public_dev;
 mod pc_project_binding;
+mod project_android_devices;
 mod project_branding;
 mod project_dev_profiles;
 mod project_execution_sessions;
@@ -58,6 +72,8 @@ mod project_module_queries;
 mod project_module_tests;
 mod project_module_types;
 mod project_module_workspaces;
+mod project_ops;
+mod project_query;
 pub(crate) mod project_releases;
 mod project_roles;
 mod project_runtime_permissions;
@@ -72,23 +88,21 @@ mod social_ai_pending;
 mod social_ai_selected;
 mod store_types;
 mod store_types_project;
-mod workspace_tasks;
-mod project_ops;
-mod project_query;
 mod system_projects;
+mod task_completion_replay;
 mod task_recovery;
 mod tasks;
 pub(crate) mod token_usage;
 mod token_usage_stats;
 #[cfg(test)]
 mod token_usage_tests;
+mod ui_route_learning;
 mod user_archive;
 mod user_memories;
 mod user_presence;
 mod user_progression;
 mod users;
-mod ui_route_learning;
-mod project_android_devices;
+mod workspace_tasks;
 pub use admin_stats::{
     estimate_cost_cny, AdminAccountingAuditRow, AdminDayRow, AdminFeatureRow, AdminModelRow,
     AdminPlatformSummary, AdminTrendRow, AdminUserDetail, AdminUserUsageRow, UserQuota,
@@ -96,8 +110,11 @@ pub use admin_stats::{
 pub use billing::{AdminBalanceRow, AdminBillingEventRow, BillingEvent, RechargeRecord};
 pub use billing_alerts::BillingAlertRow;
 pub use billing_price_rules::{BillingPriceRule, BillingPriceRuleUpsert, BillingPriceSnapshot};
-pub use billing_reservations::{BillingReservationOutcome, BillingReservationRequest};
+pub use billing_reservations::{
+    ActiveBillingReservation, BillingReservationOutcome, BillingReservationRequest,
+};
 pub use codex_vault::{CodexVaultRecord, CodexVaultSlotRecord};
+pub(crate) use codex_vault_emergency_delivery_guard::CodexVaultEmergencyCredentialDeliveryClaim;
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
@@ -106,11 +123,19 @@ pub use compute_metering::ComputeMeterEvent;
 pub(crate) use external_app_tool_executions::{
     AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,
 };
+pub use node_cli_completion_receipts::{
+    NodeCliCompletionIngestOutcome, NodeCliCompletionReceipt, NodeCliCompletionReceiptInput,
+};
+pub use node_compute_replay::{
+    LocalOfflineNodeComputeRunClaim, LocalOfflineNodeComputeRunClaimOutcome,
+    NodeComputeReplayBinding, NodeComputeReplayExpectation,
+};
 pub use node_compute_runs::{
     NodeComputeRun, NodeComputeRunFinish, NodeComputeRunStart, NodeQualityScore,
 };
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use node_payouts::CreateNodePayout;
+pub(crate) use project_android_devices::ProjectAndroidDevice;
 pub use project_dev_profiles::ProjectDevProfile;
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
@@ -135,26 +160,25 @@ pub(crate) use social_ai_messages::{
     SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
 };
 pub(crate) use social_ai_pending::SocialAiPendingMention;
-pub use store_types_project::JoinRequestRecord;
 pub use store_types::*;
+pub use store_types_project::JoinRequestRecord;
 pub use store_types_project::*;
 pub(crate) use system_projects::{
     is_system_project_name, is_system_project_source_type, system_project_key_for_source_type,
     CHAT_MEMORY_PROJECT_NAME, PHONE_CONTROL_PROJECT_NAME,
 };
+pub(crate) use task_completion_replay::is_automatic_communication_failure;
+pub use task_completion_replay::{PcCliTaskCompletionApply, PcCliTaskCompletionOutcome};
 pub use token_usage::{
     TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord, UsageDayRow,
     UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats, UsageTotals,
 };
+pub(crate) use ui_route_learning::{UiLearnedRoute, UiRouteLearningEntry, UiRouteLearningSource};
 pub use user_memories::{
     UserMemory, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_GLOBAL, MEMORY_SCOPE_PHONE_CONTROL,
     MEMORY_SCOPE_PROJECT,
 };
 pub use user_progression::UserProgressionLedger;
-pub(crate) use ui_route_learning::{
-    UiLearnedRoute, UiRouteLearningEntry, UiRouteLearningSource,
-};
-pub(crate) use project_android_devices::ProjectAndroidDevice;
 pub struct Store {
     conn: Mutex<Connection>,
 }
@@ -215,12 +239,14 @@ impl Store {
         Ok(user)
     }
 
-
     pub(crate) fn conn(&self) -> Result<MutexGuard<'_, Connection>> {
         self.conn.lock().map_err(|_| anyhow!("数据库连接锁已损坏"))
     }
 }
 
-
 mod project_helpers;
-use self::project_helpers::{project_summary_from_row, update_external_project_binding, find_owner_project_by_name, find_owner_project_by_workspace_path, find_project_by_id_for_user, apply_effective_project_summary_role};
+use self::project_helpers::{
+    apply_effective_project_summary_role, find_owner_project_by_name,
+    find_owner_project_by_workspace_path, find_project_by_id_for_user, project_summary_from_row,
+    update_external_project_binding,
+};

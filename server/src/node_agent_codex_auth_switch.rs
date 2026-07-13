@@ -7,6 +7,18 @@ use tracing::warn;
 
 use super::{node_agent_codex_vault, node_agent_codex_vault_emergency, NodeRuntime};
 
+pub(crate) struct CodexAuthSwitchOutcome {
+    pub(crate) message: String,
+    pub(crate) frozen_codex_home: crate::node_agent_codex_child_env::FrozenCodexHome,
+}
+
+struct CodexAuthSwitchCandidate {
+    message: String,
+    cloud_control_deadline: Option<String>,
+    cloud_control_issued_at: Option<String>,
+    cloud_control_ttl_ms: Option<u64>,
+}
+
 #[derive(Debug, Deserialize, Default)]
 struct SharingStatusResponse {
     #[serde(default)]
@@ -46,9 +58,10 @@ struct AutoSharedProvider {
 
 pub(crate) async fn try_after_failure(
     runtime: &Arc<NodeRuntime>,
+    req_id: &str,
     stdout_text: &str,
     stderr_text: &str,
-) -> Option<String> {
+) -> Option<CodexAuthSwitchOutcome> {
     match node_agent_codex_vault::try_auto_switch_after_codex_failure(
         runtime,
         stdout_text,
@@ -56,12 +69,33 @@ pub(crate) async fn try_after_failure(
     )
     .await
     {
-        Ok(Some(message)) => return Some(message),
+        Ok(Some(candidate)) => {
+            return finalize_auth_switch(
+                runtime,
+                req_id,
+                candidate.message,
+                candidate.cloud_control_deadline,
+                candidate.cloud_control_issued_at,
+                candidate.cloud_control_ttl_ms,
+            )
+            .await
+        }
         Ok(None) => {}
         Err(error) => warn!("Codex 保险箱自动切换检查失败: {error:#}"),
     }
-    match try_shared_provider_after_failure(runtime, stdout_text, stderr_text).await {
-        Ok(message) => message,
+    match try_shared_provider_after_failure(runtime, req_id, stdout_text, stderr_text).await {
+        Ok(Some(candidate)) => {
+            finalize_auth_switch(
+                runtime,
+                req_id,
+                candidate.message,
+                candidate.cloud_control_deadline,
+                candidate.cloud_control_issued_at,
+                candidate.cloud_control_ttl_ms,
+            )
+            .await
+        }
+        Ok(None) => None,
         Err(error) => {
             warn!("Codex 共享授权自动切换检查失败: {error:#}");
             None
@@ -69,11 +103,92 @@ pub(crate) async fn try_after_failure(
     }
 }
 
+async fn finalize_auth_switch(
+    runtime: &Arc<NodeRuntime>,
+    req_id: &str,
+    message: String,
+    server_deadline: Option<String>,
+    server_issued_at: Option<String>,
+    server_ttl_ms: Option<u64>,
+) -> Option<CodexAuthSwitchOutcome> {
+    let frozen_codex_home =
+        match crate::node_agent_codex_child_env::FrozenCodexHome::capture_for_task() {
+            Ok(home) => home,
+            Err(error) => {
+                warn!(%error, "Codex 账号切换后无法冻结新的 CODEX_HOME，拒绝重试");
+                return None;
+            }
+        };
+    if !frozen_codex_home.requires_cloud_control() {
+        warn!(
+            path = frozen_codex_home.path(),
+            "Codex 云端账号切换没有落到节点托管 CODEX_HOME，拒绝重试"
+        );
+        return None;
+    }
+    let deadline = match freeze_auth_switch_cloud_control(
+        server_deadline.as_deref(),
+        server_issued_at.as_deref(),
+        server_ttl_ms,
+        frozen_codex_home.managed_lease_expires_at(),
+    ) {
+        Ok(deadline) => deadline,
+        Err(error) => {
+            warn!(%req_id, %error, "Codex 账号切换缺少有效云控截止时间，拒绝重试");
+            return None;
+        }
+    };
+    let Some(cancel_tx) = runtime.adopt_cli_prompt_cloud_control(req_id).await else {
+        warn!(%req_id, "Codex 账号切换后任务控制句柄已消失，拒绝重试");
+        return None;
+    };
+    let cancel_rx = cancel_tx.subscribe();
+    if *cancel_rx.borrow() {
+        warn!(%req_id, "Codex 账号切换期间任务已经被取消，拒绝重试");
+        return None;
+    }
+    if let Err(error) = crate::node_agent_cloud_control::validate_registered_cloud_control(
+        true,
+        runtime.is_cloud_connected().await,
+        Some(&deadline),
+    ) {
+        let _ = cancel_tx.send(true);
+        warn!(%req_id, %error, "Codex 账号切换未通过注册后云控复查，已取消任务");
+        return None;
+    }
+    crate::node_agent_cloud_control::spawn_absolute_deadline_cancel(
+        Some(deadline),
+        cancel_tx,
+        req_id.to_string(),
+    );
+    Some(CodexAuthSwitchOutcome {
+        message,
+        frozen_codex_home,
+    })
+}
+
+fn freeze_auth_switch_cloud_control(
+    server_deadline: Option<&str>,
+    server_issued_at: Option<&str>,
+    server_ttl_ms: Option<u64>,
+    managed_lease_deadline: Option<&str>,
+) -> Result<crate::node_agent_cloud_control::CloudControlDeadline> {
+    crate::node_agent_cloud_control::freeze_cloud_control_deadline(
+        true,
+        server_deadline,
+        server_issued_at,
+        server_ttl_ms,
+        managed_lease_deadline,
+    )?
+    .ok_or_else(|| anyhow::anyhow!("云控账号切换没有冻结授权窗口"))
+}
+
 async fn try_shared_provider_after_failure(
     rt: &Arc<NodeRuntime>,
+    req_id: &str,
     stdout_text: &str,
     stderr_text: &str,
-) -> Result<Option<String>> {
+) -> Result<Option<CodexAuthSwitchCandidate>> {
     let combined = format!("{stdout_text}\n{stderr_text}");
     let classified = crate::errors::classify_ai_error(&combined);
     if !matches!(
@@ -102,6 +217,7 @@ async fn try_shared_provider_after_failure(
             provider_account: provider.provider_account.clone(),
             purpose: Some("auto_switch_to_shared_codex_after_failure".to_string()),
             failure_reason: Some(reason),
+            compute_call_id: Some(format!("pc_agent_cli:{req_id}")),
         },
     )
     .await
@@ -112,15 +228,20 @@ async fn try_shared_provider_after_failure(
             return Ok(None);
         }
     };
-    Ok(Some(format!(
-        "Codex 当前账号额度或认证不可用，已自动切换到 {} 的共享账号{}，正在重试本轮任务。",
-        provider.label,
-        lease
-            .account_hint_hash
-            .as_deref()
-            .map(|hint| format!(" ({hint})"))
-            .unwrap_or_default()
-    )))
+    Ok(Some(CodexAuthSwitchCandidate {
+        message: format!(
+            "Codex 当前账号额度或认证不可用，已自动切换到 {} 的共享账号{}，正在重试本轮任务。",
+            provider.label,
+            lease
+                .account_hint_hash
+                .as_deref()
+                .map(|hint| format!(" ({hint})"))
+                .unwrap_or_default()
+        ),
+        cloud_control_deadline: lease.cloud_control_deadline,
+        cloud_control_issued_at: lease.cloud_control_issued_at,
+        cloud_control_ttl_ms: lease.cloud_control_ttl_ms,
+    }))
 }
 
 async fn auto_shared_provider(rt: &Arc<NodeRuntime>) -> Result<Option<AutoSharedProvider>> {
@@ -262,12 +383,36 @@ async fn cloud_get(url: &str, token: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::{
-        configured_auto_shared_provider, select_auto_shared_provider, AutoSharedProvider,
-        SharingGrantSummary,
+        configured_auto_shared_provider, freeze_auth_switch_cloud_control,
+        select_auto_shared_provider, AutoSharedProvider, SharingGrantSummary,
     };
     use std::sync::Mutex;
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn auth_switch_accepts_complete_owner_vault_cloud_window() {
+        let issued_at = chrono::Utc::now();
+        let deadline = issued_at + chrono::Duration::seconds(60);
+        let frozen = freeze_auth_switch_cloud_control(
+            Some(&deadline.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)),
+            Some(&issued_at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)),
+            Some(60_000),
+            None,
+        );
+
+        assert!(frozen.is_ok());
+    }
+
+    #[test]
+    fn auth_switch_rejects_owner_vault_window_with_missing_signed_fields() {
+        let deadline = chrono::Utc::now() + chrono::Duration::seconds(60);
+        let error =
+            freeze_auth_switch_cloud_control(Some(&deadline.to_rfc3339()), None, None, None)
+                .unwrap_err();
+
+        assert!(error.to_string().contains("缺少服务器签发时间"));
+    }
 
     #[test]
     fn auto_shared_provider_selects_incoming_active_available_grant() {

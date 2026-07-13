@@ -7,7 +7,7 @@ import { cloudWebSocketUrl } from '../../api/runtime'
 const MAX_RECONNECT_MS = 30_000
 
 /** 对应旧 pc_app_notifications.js：WebSocket 任务完成通知 + 声音 + 标题角标 */
-export function useNotifications() {
+export function useNotifications(enabled = true) {
   const token = useAuthStore((s) => s.token)
   // 用 ref 保存所有可变状态，避免 effect 闭包陈旧引用
   const stateRef = useRef({
@@ -25,6 +25,20 @@ export function useNotifications() {
 
   useEffect(() => {
     const s = stateRef.current
+    if (!enabled) {
+      if (s.reconnectTimer) clearTimeout(s.reconnectTimer)
+      s.reconnectTimer = 0
+      if (s.socket) {
+        s.socket.onopen = null
+        s.socket.onmessage = null
+        s.socket.onclose = null
+        s.socket.onerror = null
+        s.socket.close()
+        s.socket = null
+      }
+      s.connectedToken = ''
+      return
+    }
 
     function makeWsUrl(tok: string) {
       const url = new URL(cloudWebSocketUrl('/ws/app'))
@@ -215,5 +229,5 @@ export function useNotifications() {
       window.removeEventListener('keydown', prepareOnGesture)
     }
   // token 变化时重启整个 effect
-  }, [token])
+  }, [enabled, token])
 }

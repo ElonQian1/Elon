@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use chrono::Datelike;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
 use super::billing_reservations::{load_reservation_for_settlement, mark_reservation_settled};
@@ -66,6 +66,27 @@ pub struct TokenUsageBillingCharge<'a> {
     pub price_snapshot: super::BillingPriceSnapshot,
     pub bill_missing_balance: bool,
     pub charge_platform_balance: bool,
+    pub(crate) reservation_constraint: Option<BillingReservationConstraint<'a>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BillingReservationConstraint<'a> {
+    pub expected_reservation_id: &'a str,
+    pub max_cost_rmb_fen: i64,
+}
+
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub(crate) enum BillingReservationConstraintViolation {
+    #[error("冻结计费缺少有效 allowance_id")]
+    MissingFrozenAllowance,
+    #[error("冻结计费对应的 active reservation 不存在或已过期")]
+    ActiveReservationMissing,
+    #[error("冻结 allowance_id 与当前 active reservation 不一致")]
+    AllowanceMismatch,
+    #[error("冻结 max_cost_rmb_fen 与 active reservation 金额不一致")]
+    FrozenMaximumMismatch,
+    #[error("服务端定价后的实际费用超过冻结 max_cost_rmb_fen")]
+    CostExceedsFrozenMaximum,
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +180,40 @@ pub struct UsageStats {
 // ── Store 方法 ────────────────────────────────────────────────────────────────
 
 impl Store {
+    pub fn get_token_usage_accounting_by_idempotency_key(
+        &self,
+        user_id: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<TokenUsageAccountingResult>> {
+        let user_id = user_id.trim();
+        let idempotency_key = idempotency_key.trim();
+        if user_id.is_empty() || idempotency_key.is_empty() {
+            return Ok(None);
+        }
+        self.conn()?
+            .query_row(
+                "SELECT id, billing_event_id, cost_rmb_fen, balance_after_fen,
+                        accounting_status
+                   FROM token_usage_events
+                  WHERE user_id = ?1 AND idempotency_key = ?2
+                  LIMIT 1",
+                params![user_id, idempotency_key],
+                |row| {
+                    Ok(TokenUsageAccountingResult {
+                        token_usage_event_id: row.get(0)?,
+                        billing_event_id: row.get(1)?,
+                        cost_rmb_fen: row.get(2)?,
+                        balance_after_fen: row.get(3)?,
+                        accounting_status: row.get(4)?,
+                        idempotency_key: Some(idempotency_key.to_string()),
+                        deduplicated: true,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
     /// 写入一条 token 用量记录。调用方无需处理返回错误，失败只记日志。
     pub fn record_token_usage(&self, r: &TokenUsageRecord<'_>) -> Result<()> {
         let id = new_id("tok");
@@ -207,8 +262,8 @@ impl Store {
         r: &TokenUsageRecord<'_>,
         charge: &TokenUsageBillingCharge<'_>,
     ) -> Result<TokenUsageAccountingResult> {
-        let conn = self.conn.lock().unwrap();
-        let tx = conn.unchecked_transaction()?;
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let token_event_id = new_id("tok");
         let created = now();
         let idempotency_key = normalized_idempotency_key(r.idempotency_key);
@@ -333,10 +388,17 @@ impl Store {
         }
 
         let reservation = if let Some(key) = idempotency_key.as_deref() {
-            load_reservation_for_settlement(&tx, r.user_id, key)?
+            if charge.reservation_constraint.is_some() {
+                super::billing_reservations::load_active_reservation_for_settlement(
+                    &tx, r.user_id, key, &created,
+                )?
+            } else {
+                load_reservation_for_settlement(&tx, r.user_id, key)?
+            }
         } else {
             None
         };
+        validate_reservation_constraint(charge, reservation.as_ref())?;
 
         if let Some(reservation) = reservation {
             let balance_after_reserve = tx
@@ -503,6 +565,27 @@ impl Store {
             deduplicated: false,
         })
     }
+}
+
+fn validate_reservation_constraint(
+    charge: &TokenUsageBillingCharge<'_>,
+    reservation: Option<&super::billing_reservations::BillingReservationForSettlement>,
+) -> Result<()> {
+    let Some(constraint) = charge.reservation_constraint else {
+        return Ok(());
+    };
+    let reservation =
+        reservation.ok_or(BillingReservationConstraintViolation::ActiveReservationMissing)?;
+    if reservation.id != constraint.expected_reservation_id {
+        return Err(BillingReservationConstraintViolation::AllowanceMismatch.into());
+    }
+    if constraint.max_cost_rmb_fen < 0 || reservation.reserved_fen != constraint.max_cost_rmb_fen {
+        return Err(BillingReservationConstraintViolation::FrozenMaximumMismatch.into());
+    }
+    if charge.cost_rmb_fen.max(0) > constraint.max_cost_rmb_fen {
+        return Err(BillingReservationConstraintViolation::CostExceedsFrozenMaximum.into());
+    }
+    Ok(())
 }
 
 fn normalized_idempotency_key(value: Option<&str>) -> Option<String> {

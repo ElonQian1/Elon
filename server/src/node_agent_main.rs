@@ -38,6 +38,7 @@ mod node_agent_api_runtime_tools;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
 mod node_agent_cli_probe;
+mod node_agent_completion_outbox;
 mod node_agent_source_preview;
 use node_agent_cli_probe::{
     cli_unavailable_after_refresh_error, probe_local_clis, LocalCliProbeSnapshot,
@@ -87,6 +88,8 @@ mod node_agent_install_env;
 mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
+mod node_agent_local_task_store;
+mod node_agent_local_tasks;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
@@ -104,8 +107,9 @@ mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
-mod node_agent_shared_android_devices;
 mod node_agent_session;
+mod node_agent_session_cancel;
+mod node_agent_shared_android_devices;
 use node_agent_session::run_session;
 #[cfg(test)]
 mod node_agent_task_approval_cleanup_tests;
@@ -153,6 +157,9 @@ pub(crate) use node_agent_runtime::NodeRuntime;
 mod node_agent_cli_mcp;
 mod node_agent_cli_prompt_direct;
 mod node_agent_cli_prompt_runner;
+mod node_agent_cli_prompt_sidecar;
+mod node_agent_cli_task_dispatch;
+mod node_agent_cloud_control;
 mod node_agent_codex_effort;
 mod node_agent_codex_model_compat;
 pub(crate) use node_agent_cli_prompt_runner::{
@@ -319,6 +326,7 @@ async fn run_agent_runtime() -> Result<()> {
     }
 
     let runtime = Arc::new(NodeRuntime::new(cfg, creds, storage_settings, install_id));
+    runtime.reconcile_local_completion_outbox();
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);

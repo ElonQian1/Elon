@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test:message-flow": "node ../scripts/test-pc-frontend-message-flow.js && node ../scripts/test-pc-frontend-task-result-tone.js && node ../scripts/test-pc-frontend-task-timeline-display.js && node ../scripts/test-pc-frontend-task-progress-preview.js && node ../scripts/test-pc-frontend-task-recovery-snapshot.js",
     "test:workspace-access": "node ../scripts/test-pc-frontend-workspace-access.js",
+    "test:local-tasks": "node scripts/test-local-tasks.cjs",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {

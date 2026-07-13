@@ -13,8 +13,9 @@ use serde_json::Value;
 use tracing::warn;
 
 use crate::store::{
-    BillingPriceSnapshot, BillingReservationOutcome, BillingReservationRequest, Store,
-    TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord,
+    token_usage::BillingReservationConstraint, BillingPriceSnapshot, BillingReservationOutcome,
+    BillingReservationRequest, Store, TokenUsageAccountingResult, TokenUsageBillingCharge,
+    TokenUsageRecord,
 };
 
 const NEW_USER_TRIAL_CREDIT_CONFIG_KEY: &str = "new_user_trial_credit_fen";
@@ -365,6 +366,20 @@ pub fn account_trusted_usage_with_charge_policy(
     record: &TokenUsageRecord<'_>,
     charge_platform_balance: bool,
 ) -> anyhow::Result<TokenUsageAccountingResult> {
+    account_trusted_usage_with_charge_policy_and_constraint(
+        store,
+        record,
+        charge_platform_balance,
+        None,
+    )
+}
+
+pub(crate) fn account_trusted_usage_with_charge_policy_and_constraint(
+    store: &Store,
+    record: &TokenUsageRecord<'_>,
+    charge_platform_balance: bool,
+    reservation_constraint: Option<BillingReservationConstraint<'_>>,
+) -> anyhow::Result<TokenUsageAccountingResult> {
     let (rate, markup) = store.billing_get_rate_and_markup();
     let model = record.model.unwrap_or("unknown");
     let price = price_snapshot_for_store(store, model);
@@ -387,6 +402,7 @@ pub fn account_trusted_usage_with_charge_policy(
         price_snapshot: price,
         bill_missing_balance: billing_required_for_all_users(store),
         charge_platform_balance,
+        reservation_constraint,
     };
     let result = store.record_token_usage_with_billing(record, &charge)?;
     if let Some(balance) = result.balance_after_fen {

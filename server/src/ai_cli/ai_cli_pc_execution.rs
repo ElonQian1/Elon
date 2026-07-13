@@ -1,3 +1,4 @@
+use anyhow::bail;
 use homecli_proto::CliWorkspaceStatus;
 
 use super::{pc_cli_model_id, pc_cli_usage_tokens, NativeSessionScope};
@@ -10,16 +11,10 @@ pub(crate) fn start_pc_node_compute_run(
     compute_call_id: &str,
     feature: &str,
     model: Option<&str>,
-) {
-    let provider_user_id = match state.store.get_node_credential_owner(node_id) {
-        Ok(owner) => owner,
-        Err(e) => {
-            tracing::warn!(node_id, error = %e, "查询 PC 节点 owner 失败，执行证明仅记录消费者侧");
-            None
-        }
-    };
+) -> anyhow::Result<crate::store::NodeComputeRun> {
+    let provider_user_id = state.store.get_node_credential_owner(node_id)?;
     let model_id = pc_cli_model_id(model);
-    if let Err(e) = state
+    let run = state
         .store
         .start_node_compute_run(crate::store::NodeComputeRunStart {
             compute_call_id,
@@ -31,14 +26,19 @@ pub(crate) fn start_pc_node_compute_run(
             usage_mode: "pc_agent_cli",
             route_reason: Some("pc_agent_selected"),
         })
+        .map_err(anyhow::Error::from)?;
+    if run.consumer_user_id != consumer_user_id
+        || run.provider_user_id != provider_user_id
+        || run.node_id != node_id
+        || run.model_id.as_deref() != Some(model_id.as_str())
+        || run.feature != feature
+        || run.usage_mode != "pc_agent_cli"
+        || run.route_reason.as_deref() != Some("pc_agent_selected")
+        || run.status != "started"
     {
-        tracing::warn!(
-            consumer_user_id,
-            node_id,
-            compute_call_id,
-            "PC CLI 执行证明 start 记录失败: {e:#}"
-        );
+        bail!("compute_call_id 已绑定其他 PC CLI 计算身份或终态");
     }
+    Ok(run)
 }
 
 pub(crate) fn finish_pc_node_compute_run(
@@ -101,25 +101,25 @@ pub(crate) fn record_pc_execution_started(
     request_id: &str,
     requested_workspace_path: Option<&str>,
     model: Option<&str>,
-) {
+) -> anyhow::Result<()> {
     let Some(scope) = scope else {
-        return;
+        return Ok(());
     };
-    if let Err(e) =
-        state
-            .store
-            .record_project_execution_started(crate::store::ProjectExecutionSessionStart {
-                project_id: &scope.project_id,
-                conversation_id: &scope.conversation_id,
-                user_id: &scope.user_id,
-                node_id,
-                request_id,
-                requested_workspace_path,
-                model,
-            })
-    {
-        tracing::warn!("record project execution start failed: {e:#}");
+    let recorded = state.store.record_project_execution_started(
+        crate::store::ProjectExecutionSessionStart {
+            project_id: &scope.project_id,
+            conversation_id: &scope.conversation_id,
+            user_id: &scope.user_id,
+            node_id,
+            request_id,
+            requested_workspace_path,
+            model,
+        },
+    )?;
+    if !recorded {
+        bail!("PC CLI req_id 已绑定其他项目执行身份");
     }
+    Ok(())
 }
 
 pub(crate) fn pc_route_a_prompt_bootstrapped(
@@ -249,6 +249,7 @@ pub(crate) fn record_pc_codex_thread_id(
 pub(crate) fn record_pc_execution_finished(
     state: &AppState,
     scope: Option<&NativeSessionScope>,
+    node_id: &str,
     request_id: &str,
     exit_ok: bool,
     error: Option<&str>,
@@ -257,9 +258,9 @@ pub(crate) fn record_pc_execution_finished(
     usage: Option<&crate::cli_usage::CliTokenUsage>,
     accounting_result: Option<&crate::store::TokenUsageAccountingResult>,
 ) {
-    if scope.is_none() {
+    let Some(scope) = scope else {
         return;
-    }
+    };
     let status = if exit_ok { "done" } else { "failed" };
     let merge_status = workspace_status
         .and_then(|status| status.merge_status.as_deref())
@@ -267,47 +268,56 @@ pub(crate) fn record_pc_execution_finished(
     let workspace_message = workspace_status.and_then(|status| status.merge_message.as_deref());
     let last_error = error.or_else(|| (!exit_ok).then_some(workspace_message).flatten());
 
-    if let Err(e) =
-        state
-            .store
-            .record_project_execution_finished(crate::store::ProjectExecutionSessionFinish {
-                request_id,
-                base_workspace_path: workspace_status
-                    .and_then(|status| status.base_workspace_path.as_deref()),
-                active_workspace_path: workspace_status
-                    .map(|status| status.active_workspace_path.as_str()),
-                branch: workspace_status.and_then(|status| status.branch.as_deref()),
-                isolated: workspace_status
-                    .map(|status| status.isolated)
-                    .unwrap_or(false),
-                status,
-                merge_status,
-                last_error,
-                model,
-                prompt_tokens: usage.map(|usage| usage.input_tokens.max(0)),
-                cached_input_tokens: usage.map(|usage| usage.cached_input_tokens.max(0)),
-                completion_tokens: usage.map(|usage| usage.output_tokens.max(0)),
-                reasoning_tokens: usage.map(|usage| usage.reasoning_tokens.max(0)),
-                total_tokens: usage.map(|usage| usage.total_tokens.max(0)),
-                token_usage_event_id: accounting_result
-                    .map(|result| result.token_usage_event_id.as_str()),
-                billing_event_id: accounting_result
-                    .and_then(|result| result.billing_event_id.as_deref()),
-            })
-    {
-        tracing::warn!("record project execution finish failed: {e:#}");
+    match state.store.record_project_execution_finished(
+        crate::store::ProjectExecutionSessionFinish {
+            request_id,
+            project_id: &scope.project_id,
+            conversation_id: &scope.conversation_id,
+            user_id: &scope.user_id,
+            node_id,
+            base_workspace_path: workspace_status
+                .and_then(|status| status.base_workspace_path.as_deref()),
+            active_workspace_path: workspace_status
+                .map(|status| status.active_workspace_path.as_str()),
+            branch: workspace_status.and_then(|status| status.branch.as_deref()),
+            isolated: workspace_status
+                .map(|status| status.isolated)
+                .unwrap_or(false),
+            status,
+            merge_status,
+            last_error,
+            model,
+            prompt_tokens: usage.map(|usage| usage.input_tokens.max(0)),
+            cached_input_tokens: usage.map(|usage| usage.cached_input_tokens.max(0)),
+            completion_tokens: usage.map(|usage| usage.output_tokens.max(0)),
+            reasoning_tokens: usage.map(|usage| usage.reasoning_tokens.max(0)),
+            total_tokens: usage.map(|usage| usage.total_tokens.max(0)),
+            token_usage_event_id: accounting_result
+                .map(|result| result.token_usage_event_id.as_str()),
+            billing_event_id: accounting_result
+                .and_then(|result| result.billing_event_id.as_deref()),
+        },
+    ) {
+        Ok(true) => {}
+        Ok(false) => tracing::warn!(
+            request_id,
+            node_id,
+            "record project execution finish rejected an identity mismatch"
+        ),
+        Err(e) => tracing::warn!("record project execution finish failed: {e:#}"),
     }
 }
 
 pub(crate) fn record_pc_execution_without_cli_done(
     state: &AppState,
     scope: Option<&NativeSessionScope>,
+    node_id: &str,
     request_id: &str,
     exit_ok: bool,
     error: Option<&str>,
     model: Option<&str>,
 ) {
     record_pc_execution_finished(
-        state, scope, request_id, exit_ok, error, model, None, None, None,
+        state, scope, node_id, request_id, exit_ok, error, model, None, None, None,
     );
 }

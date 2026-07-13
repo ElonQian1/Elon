@@ -19,11 +19,13 @@ use crate::node_agent_cli_probe::{
 };
 use crate::node_agent_cli_security;
 use crate::node_agent_cli_sidecar;
+use crate::node_agent_completion_outbox;
 use crate::node_agent_config::{save_persisted, Credentials, NodeConfig, PersistedState};
 use crate::node_agent_full_access;
 use crate::node_agent_lifecycle;
 use crate::node_agent_local_admin;
 use crate::node_agent_local_llm::discover_models;
+use crate::node_agent_local_task_store;
 use crate::node_agent_task_journal;
 use crate::node_agent_tool_approval;
 use crate::node_agent_workspace_match;
@@ -51,6 +53,8 @@ pub(crate) struct NodeRuntime {
     pub(crate) active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
     pub(crate) cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
     pub(crate) task_journal: node_agent_task_journal::TaskJournal,
+    pub(crate) completion_outbox: node_agent_completion_outbox::CliCompletionOutbox,
+    pub(crate) local_tasks: node_agent_local_task_store::LocalTaskStore,
     pub(crate) lifecycle: node_agent_lifecycle::NodeLifecycleTracker,
     pub(crate) tool_approvals: node_agent_tool_approval::ToolApprovalState,
     pub(crate) full_access_grants: node_agent_full_access::FullAccessGrantState,
@@ -89,6 +93,8 @@ impl NodeRuntime {
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
             cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry::default(),
             task_journal: node_agent_task_journal::TaskJournal::default(),
+            completion_outbox: node_agent_completion_outbox::CliCompletionOutbox::default(),
+            local_tasks: node_agent_local_task_store::LocalTaskStore::default(),
             lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
@@ -101,6 +107,64 @@ impl NodeRuntime {
 
     pub(crate) async fn creds(&self) -> Option<Credentials> {
         self.creds.read().await.clone()
+    }
+
+    /// Rebuild local UI terminal bindings from the durable outbox after an
+    /// agent crash between the two SQLite commits. The outbox remains the
+    /// source of truth and is never deleted here.
+    pub(crate) fn reconcile_local_completion_outbox(&self) {
+        let completions = match self.completion_outbox.list_pending(1_000) {
+            Ok(completions) => completions,
+            Err(error) => {
+                warn!(%error, "failed to read durable completion outbox during startup repair");
+                return;
+            }
+        };
+        for completion in completions {
+            if completion.origin != node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
+                continue;
+            }
+            match self.local_tasks.reconcile_completion(&completion) {
+                Ok(true) => info!(
+                    req_id = %completion.req_id,
+                    event_id = %completion.event_id,
+                    "repaired local task terminal state from durable outbox"
+                ),
+                Ok(false) => warn!(
+                    req_id = %completion.req_id,
+                    event_id = %completion.event_id,
+                    "durable local completion has no matching local task row"
+                ),
+                Err(error) => warn!(
+                    req_id = %completion.req_id,
+                    event_id = %completion.event_id,
+                    %error,
+                    "failed to repair local task terminal state from durable outbox"
+                ),
+            }
+        }
+
+        // Any remaining `running` row has lost its in-memory child handle. Keep
+        // rows that still have a durable outbox envelope recoverable, and make all
+        // other interrupted work explicit instead of displaying it as live forever.
+        let durable_req_ids = match self.completion_outbox.pending_req_ids() {
+            Ok(req_ids) => req_ids,
+            Err(error) => {
+                warn!(%error, "failed to read durable completion bindings during startup repair");
+                return;
+            }
+        };
+        match self
+            .local_tasks
+            .interrupt_lingering_running(&durable_req_ids)
+        {
+            Ok(0) => {}
+            Ok(interrupted) => warn!(
+                interrupted,
+                "marked local tasks interrupted after node-agent restart"
+            ),
+            Err(error) => warn!(%error, "failed to mark lingering local tasks interrupted"),
+        }
     }
 
     pub(crate) fn cloud_http_url(&self) -> String {
@@ -220,6 +284,22 @@ impl NodeRuntime {
                 false
             }
         }
+    }
+
+    pub(crate) async fn adopt_cli_prompt_cloud_control(
+        &self,
+        req_id: &str,
+    ) -> Option<tokio::sync::watch::Sender<bool>> {
+        self.active_cli_prompts.adopt_cloud_control(req_id).await
+    }
+
+    pub(crate) async fn cancel_cloud_controlled_cli_prompts(&self) -> usize {
+        let req_ids = self.active_cli_prompts.cloud_controlled_req_ids().await;
+        let mut canceled = 0;
+        for req_id in req_ids {
+            canceled += usize::from(self.cancel_cli_prompt(&req_id).await);
+        }
+        canceled
     }
 
     pub(crate) async fn active_cli_prompt_view(
@@ -375,6 +455,10 @@ impl NodeRuntime {
         let mut s = self.status.write().await;
         s.connected = on;
         s.last_event = evt.to_string();
+    }
+
+    pub(crate) async fn is_cloud_connected(&self) -> bool {
+        self.status.read().await.connected
     }
 
     pub(crate) async fn set_models(&self, models: Vec<ModelCapability>) {

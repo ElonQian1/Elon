@@ -16,8 +16,15 @@ impl CliTokenUsage {
     }
 
     pub fn normalized(mut self) -> Option<Self> {
+        self.input_tokens = self.input_tokens.max(0);
+        self.cached_input_tokens = self.cached_input_tokens.clamp(0, self.input_tokens);
+        self.output_tokens = self.output_tokens.max(0);
+        self.reasoning_tokens = self.reasoning_tokens.clamp(0, self.output_tokens);
+        let observed_total = self.input_tokens.saturating_add(self.output_tokens);
         if self.total_tokens <= 0 {
-            self.total_tokens = self.input_tokens + self.output_tokens;
+            self.total_tokens = observed_total;
+        } else {
+            self.total_tokens = self.total_tokens.max(observed_total);
         }
         if self.input_tokens <= 0 && self.output_tokens <= 0 && self.total_tokens > 0 {
             self.input_tokens = self.total_tokens;
@@ -51,14 +58,18 @@ pub fn usage_from_optional_parts(
     model: Option<String>,
 ) -> Option<CliTokenUsage> {
     CliTokenUsage {
-        input_tokens: input_tokens.unwrap_or(0) as i64,
-        cached_input_tokens: cached_input_tokens.unwrap_or(0) as i64,
-        output_tokens: output_tokens.unwrap_or(0) as i64,
-        reasoning_tokens: reasoning_tokens.unwrap_or(0) as i64,
-        total_tokens: total_tokens.unwrap_or(0) as i64,
+        input_tokens: saturating_u64_to_i64(input_tokens.unwrap_or(0)),
+        cached_input_tokens: saturating_u64_to_i64(cached_input_tokens.unwrap_or(0)),
+        output_tokens: saturating_u64_to_i64(output_tokens.unwrap_or(0)),
+        reasoning_tokens: saturating_u64_to_i64(reasoning_tokens.unwrap_or(0)),
+        total_tokens: saturating_u64_to_i64(total_tokens.unwrap_or(0)),
         model,
     }
     .normalized()
+}
+
+fn saturating_u64_to_i64(value: u64) -> i64 {
+    value.min(i64::MAX as u64) as i64
 }
 
 pub fn parse_cli_usage(text: &str) -> Option<CliTokenUsage> {

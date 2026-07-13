@@ -69,6 +69,34 @@ impl ActiveCliPromptRegistry {
         }
     }
 
+    pub(crate) async fn set_requires_cloud_control(&self, req_id: &str, required: bool) -> bool {
+        let mut prompts = self.prompts.write().await;
+        let Some(handle) = prompts.get_mut(req_id) else {
+            return false;
+        };
+        handle.set_requires_cloud_control(required);
+        true
+    }
+
+    /// Atomically makes the task visible to disconnect cleanup and returns its
+    /// cancellation sender for the adopter's post-lock connection/deadline check.
+    pub(crate) async fn adopt_cloud_control(&self, req_id: &str) -> Option<watch::Sender<bool>> {
+        let mut prompts = self.prompts.write().await;
+        let handle = prompts.get_mut(req_id)?;
+        handle.set_requires_cloud_control(true);
+        Some(handle.cancel_tx())
+    }
+
+    pub(crate) async fn cloud_controlled_req_ids(&self) -> Vec<String> {
+        self.prompts
+            .read()
+            .await
+            .values()
+            .filter(|handle| handle.requires_cloud_control())
+            .map(|handle| handle.req_id().to_string())
+            .collect()
+    }
+
     pub(crate) async fn remove(&self, req_id: &str) -> bool {
         self.prompts.write().await.remove(req_id).is_some()
     }

@@ -79,6 +79,7 @@ pub(crate) struct CliSidecarRunResult {
     pub stdout_text: String,
     pub stderr_text: String,
     pub canceled: bool,
+    pub terminal_error: Option<String>,
 }
 
 pub(crate) fn sidecar_enabled() -> bool {
@@ -217,6 +218,8 @@ pub(crate) async fn follow_sidecar_output(
     let mut stderr_text = String::new();
     let mut exit_ok = None;
     let mut canceled = false;
+    let mut child_started = false;
+    let mut terminal_error = None;
 
     loop {
         for record in read_new_output_records(output_path, &mut offset)? {
@@ -237,12 +240,23 @@ pub(crate) async fn follow_sidecar_output(
                 }
                 "child_started" => {
                     if let Some(pid) = record.child_pid {
+                        child_started = true;
                         on_event(CliSidecarOutputEvent::ChildStarted(pid));
                     }
                 }
                 "exit" => {
-                    exit_ok = Some(record.success.unwrap_or(false));
-                    canceled = record.canceled.unwrap_or(false);
+                    if let Some(error) = record.error {
+                        terminal_error = Some(error);
+                        // A spawn failure has no later child exit record. A timeout
+                        // after `child_started` does, so keep following to drain any
+                        // token event already buffered ahead of the real exit.
+                        if !child_started {
+                            exit_ok = Some(false);
+                        }
+                    } else {
+                        exit_ok = Some(record.success.unwrap_or(false));
+                        canceled = record.canceled.unwrap_or(false);
+                    }
                 }
                 _ => {}
             }
@@ -253,6 +267,7 @@ pub(crate) async fn follow_sidecar_output(
                 stdout_text,
                 stderr_text,
                 canceled,
+                terminal_error,
             });
         }
 
@@ -273,7 +288,6 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     }
     run_pty_sidecar(config).await
 }
-
 
 #[path = "node_agent_cli_sidecar_runner_impl.rs"]
 mod sidecar_impl;

@@ -34,6 +34,7 @@ impl Drop for PcCliCancelOnDrop {
 pub(super) struct PcExecutionFinishOnDrop {
     state: Option<Arc<AppState>>,
     scope: Option<NativeSessionScope>,
+    node_id: String,
     request_id: String,
     model: Option<String>,
 }
@@ -42,12 +43,14 @@ impl PcExecutionFinishOnDrop {
     pub(super) fn armed(
         state: Arc<AppState>,
         scope: Option<NativeSessionScope>,
+        node_id: String,
         request_id: String,
         model: Option<String>,
     ) -> Self {
         Self {
             state: scope.as_ref().map(|_| state),
             scope,
+            node_id,
             request_id,
             model,
         }
@@ -67,6 +70,7 @@ impl Drop for PcExecutionFinishOnDrop {
         record_pc_execution_finished(
             state.as_ref(),
             Some(scope),
+            &self.node_id,
             &self.request_id,
             false,
             Some("PC CLI 请求在收到终态前被取消或连接断开"),

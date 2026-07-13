@@ -18,6 +18,7 @@ use crate::{
         pc_lightweight_no_node_event_diagnostic, wait_for_pc_cli_prompt_acceptance,
     },
     project_auth::{auth_from_headers, json_error},
+    store::{NodeComputeReplayBinding, NodeComputeRunFinish, NodeComputeRunStart, Store},
     types::AppState,
 };
 
@@ -82,14 +83,27 @@ pub async fn node_exec_handler(
         let found = agents.iter().find(|a| a.agent_id == *node_id);
         match found {
             Some(a) => {
+                if state
+                    .store
+                    .get_node_credential_owner(&a.agent_id)
+                    .ok()
+                    .flatten()
+                    .as_deref()
+                    != Some(user.id.as_str())
+                {
+                    return json_error(
+                        StatusCode::FORBIDDEN,
+                        "此直连入口只允许执行本人绑定的 PC 节点；共享节点请使用带预授权和计费的 AI 路由。",
+                    );
+                }
                 if a.allowed_clis.is_empty() {
                     return json_error(
                         StatusCode::FORBIDDEN,
                         "指定的节点没有可用的 Codex/Claude CLI",
                     );
                 }
-                // 远程 Codex 模式允许用户指定节点大厅里的在线公共 CLI 节点。
-                // 不指定 node_id 时下面已有公共节点兜底；这里保持同一语义，避免选中远程节点后反而被拦截。
+                // 该轻量直连入口只承载 owner 自有资源；朋友共享节点必须走
+                // 会冻结租约、额度和云控期限的正式 AI 路由。
                 PickedAgent {
                     agent_id: a.agent_id.clone(),
                     device_name: a.device_name.clone(),
@@ -116,16 +130,6 @@ pub async fn node_exec_handler(
                 }
             }
         }
-        // 退而选第一个有 CLI 的公共 agent（向后兼容）
-        if picked.is_none() {
-            if let Some(a) = agents.iter().find(|a| !a.allowed_clis.is_empty()) {
-                picked = Some(PickedAgent {
-                    agent_id: a.agent_id.clone(),
-                    device_name: a.device_name.clone(),
-                    allowed_clis: a.allowed_clis.clone(),
-                });
-            }
-        }
         match picked {
             Some(a) => a,
             None => {
@@ -148,18 +152,31 @@ pub async fn node_exec_handler(
 
     // ── 4. 分发给 PC 节点执行，并对节点重连导致的旧连接关闭自动重派一次 ───────
     let node_prompt = build_node_exec_prompt(&req.prompt, &display_name, &agent_id);
-    let mut run =
-        match dispatch_and_collect_node_exec(&state, &agent_id, &display_name, &cli, &node_prompt)
-            .await
-        {
-            Ok(run) => run,
-            Err(e) => return json_error(StatusCode::BAD_GATEWAY, e),
-        };
+    let mut run = match dispatch_and_collect_node_exec(
+        &state,
+        &user.id,
+        &agent_id,
+        &display_name,
+        &cli,
+        &node_prompt,
+    )
+    .await
+    {
+        Ok(run) => run,
+        Err(e) => return json_error(StatusCode::BAD_GATEWAY, e),
+    };
     let mut display_output = clean_node_exec_output(&run.output);
     if should_retry_node_exec_after_reconnect(run.error.as_deref(), &display_output) {
         sleep(Duration::from_millis(700)).await;
-        match dispatch_and_collect_node_exec(&state, &agent_id, &display_name, &cli, &node_prompt)
-            .await
+        match dispatch_and_collect_node_exec(
+            &state,
+            &user.id,
+            &agent_id,
+            &display_name,
+            &cli,
+            &node_prompt,
+        )
+        .await
         {
             Ok(retry_run) => {
                 run = retry_run;
@@ -206,23 +223,46 @@ fn build_node_exec_prompt(user_prompt: &str, node_display_name: &str, node_id: &
 
 async fn dispatch_and_collect_node_exec(
     state: &Arc<AppState>,
+    owner_user_id: &str,
     agent_id: &str,
     node_label: &str,
     cli: &str,
     prompt: &str,
 ) -> Result<NodeExecRun, String> {
-    let dispatch = state
+    let req_id = uuid::Uuid::new_v4().to_string();
+    prepare_owner_node_exec_run(&state.store, &req_id, owner_user_id, agent_id, cli)?;
+    let codex_credential_binding = cli.to_ascii_lowercase().contains("codex").then_some(
+        homecli_proto::CliCodexCredentialBinding {
+            managed: false,
+            lease_id: None,
+        },
+    );
+    let dispatch = match state
         .agent_manager
-        .dispatch_cli_prompt_with_context_control(
+        .dispatch_cli_prompt_with_context_control_id_and_credential_binding(
+            req_id.clone(),
             agent_id,
             cli.to_string(),
             vec![],
             None,
             None,
+            codex_credential_binding,
+            false,
+            None,
             prompt.to_string(),
         )
         .await
-        .map_err(|e| format!("分发到 PC 节点失败：{e}"))?;
+    {
+        Ok(dispatch) => dispatch,
+        Err(error) => {
+            finish_owner_node_exec_before_dispatch_failure(
+                &state.store,
+                &req_id,
+                &error.to_string(),
+            );
+            return Err(format!("分发到 PC 节点失败：{error}"));
+        }
+    };
     let (req_id, mut rx, cancel_handle) = dispatch.into_parts();
     let mut first_cli_event =
         match wait_for_pc_cli_prompt_acceptance(state, agent_id, node_label, &req_id, cli, &mut rx)
@@ -307,6 +347,84 @@ async fn dispatch_and_collect_node_exec(
         error,
         model,
     })
+}
+
+fn prepare_owner_node_exec_run(
+    store: &Store,
+    req_id: &str,
+    owner_user_id: &str,
+    node_id: &str,
+    cli: &str,
+) -> Result<(), String> {
+    let compute_call_id = format!("pc_agent_cli:{req_id}");
+    let run = store
+        .start_node_compute_run(NodeComputeRunStart {
+            compute_call_id: &compute_call_id,
+            consumer_user_id: owner_user_id,
+            provider_user_id: Some(owner_user_id),
+            node_id,
+            model_id: Some(cli),
+            feature: "pc_node_exec",
+            usage_mode: "pc_agent_cli",
+            route_reason: Some("owner_direct_node_exec"),
+        })
+        .map_err(|error| format!("建立本机直连执行账本失败：{error}"))?;
+    if run.status != "started"
+        || run.consumer_user_id != owner_user_id
+        || run.provider_user_id.as_deref() != Some(owner_user_id)
+        || run.node_id != node_id
+        || run.model_id.as_deref() != Some(cli)
+        || run.feature != "pc_node_exec"
+        || run.usage_mode != "pc_agent_cli"
+        || run.route_reason.as_deref() != Some("owner_direct_node_exec")
+    {
+        return Err("本机直连执行请求标识已被其他计算运行占用".to_string());
+    }
+
+    let run = store
+        .bind_node_compute_run_replay_policy(
+            &compute_call_id,
+            NodeComputeReplayBinding {
+                billing_source: "own_codex",
+                resource_owner_user_id: Some(owner_user_id),
+                lease_id: None,
+                offline_policy: "allow_offline",
+                replay_deadline: None,
+                max_cost_rmb_fen: 0,
+                allowance_id: None,
+            },
+        )
+        .map_err(|error| format!("冻结本机直连补传授权失败：{error}"))?
+        .ok_or_else(|| "本机直连执行账本在分发前消失".to_string())?;
+    if run.status != "started"
+        || run.billing_source != "own_codex"
+        || run.resource_owner_user_id.as_deref() != Some(owner_user_id)
+        || run.lease_id.is_some()
+        || run.offline_policy != "allow_offline"
+        || run.replay_deadline.is_some()
+        || run.max_cost_rmb_fen != 0
+        || run.allowance_id.is_some()
+    {
+        return Err("本机直连执行的离线补传授权冻结不完整".to_string());
+    }
+    Ok(())
+}
+
+fn finish_owner_node_exec_before_dispatch_failure(store: &Store, req_id: &str, error: &str) {
+    let compute_call_id = format!("pc_agent_cli:{req_id}");
+    let _ = store.finish_node_compute_run(
+        &compute_call_id,
+        NodeComputeRunFinish {
+            provider_user_id: None,
+            status: "released_error",
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            billed_cost_rmb_fen: 0,
+            provider_earned_fen: 0,
+            settlement_status: Some("not_dispatched"),
+            error_message: Some(error),
+        },
+    );
 }
 
 /// 从允许的 CLI 列表中选最优的
@@ -409,8 +527,10 @@ fn is_codex_protocol_event_line(line: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_node_exec_prompt, clean_node_exec_output, should_retry_node_exec_after_reconnect,
+        build_node_exec_prompt, clean_node_exec_output, prepare_owner_node_exec_run,
+        should_retry_node_exec_after_reconnect,
     };
+    use crate::store::Store;
 
     #[test]
     fn node_exec_output_extracts_codex_agent_message() {
@@ -464,5 +584,37 @@ codex
         assert!(prompt.contains("node.exe"));
         assert!(prompt.contains("不确定时先说不确定并追问"));
         assert!(prompt.contains("看看节点连接了没有"));
+    }
+
+    #[test]
+    fn node_exec_prepares_ackable_owner_durable_run_before_dispatch() {
+        let path = std::env::temp_dir().join(format!(
+            "elon-node-exec-durable-test-{}.sqlite",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let store = Store::open(&path).expect("store should open");
+        let owner = store
+            .create_user("node-exec-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+
+        prepare_owner_node_exec_run(&store, "req-owner-direct", &owner.id, "node-owner", "codex")
+            .expect("owner direct run should be frozen before dispatch");
+
+        let run = store
+            .get_node_compute_run_by_compute_call_id("pc_agent_cli:req-owner-direct")
+            .expect("run lookup should succeed")
+            .expect("run should exist");
+        assert_eq!(run.consumer_user_id, owner.id);
+        assert_eq!(run.provider_user_id.as_deref(), Some(owner.id.as_str()));
+        assert_eq!(run.node_id, "node-owner");
+        assert_eq!(run.billing_source, "own_codex");
+        assert_eq!(run.offline_policy, "allow_offline");
+        assert!(store
+            .can_replay_node_compute_run_offline("pc_agent_cli:req-owner-direct")
+            .expect("replay policy lookup should succeed"));
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 }

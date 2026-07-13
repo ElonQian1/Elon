@@ -100,7 +100,9 @@ impl Store {
              WHERE c.project_id = ?1
                AND c.user_id = ?2
                AND (?3 = c.user_id OR COALESCE(c.is_public, 1) = 1)
-             ORDER BY c.updated_at DESC, COALESCE(last_message_at, c.created_at) DESC, c.id DESC
+             ORDER BY COALESCE(last_message_at, c.created_at) DESC,
+                      c.created_at DESC,
+                      c.id DESC
              LIMIT ?4",
         )?;
         let rows = stmt

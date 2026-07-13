@@ -168,3 +168,299 @@ pub(crate) fn migration_v93(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+pub(crate) fn migration_v100(conn: &Connection) -> Result<()> {
+    // Older builds could leave more than one active row for a consumer/node.
+    // Collapse those rows deterministically before installing the invariant:
+    // latest leased_at wins, and id is the stable tie breaker.
+    conn.execute_batch(
+        r#"
+        UPDATE node_compute_runs
+           SET replay_deadline = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE lease_id IN (
+               SELECT id
+                 FROM codex_vault_emergency_leases
+                WHERE status = 'active'
+                  AND cleared_at IS NULL
+                  AND (
+                      julianday(expires_at) IS NULL
+                      OR julianday(expires_at) <= julianday('now')
+                  )
+           )
+           AND (
+               replay_deadline IS NULL
+               OR julianday(replay_deadline) IS NULL
+               OR julianday(replay_deadline) > julianday('now')
+           );
+
+        UPDATE codex_vault_emergency_leases
+           SET status = 'expired',
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE status = 'active'
+           AND cleared_at IS NULL
+           AND (
+               julianday(expires_at) IS NULL
+               OR julianday(expires_at) <= julianday('now')
+           );
+
+        UPDATE node_compute_runs
+           SET replay_deadline = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE lease_id IN (
+               SELECT lease.id
+                 FROM codex_vault_emergency_leases AS lease
+                WHERE lease.status = 'active'
+                  AND lease.cleared_at IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                        FROM codex_vault_emergency_grants AS grant_row
+                       WHERE grant_row.id = lease.grant_id
+                         AND grant_row.status = 'active'
+                         AND (
+                             grant_row.expires_at IS NULL
+                             OR (
+                                 julianday(grant_row.expires_at) IS NOT NULL
+                                 AND julianday(grant_row.expires_at) > julianday('now')
+                             )
+                         )
+                  )
+           )
+           AND (
+               replay_deadline IS NULL
+               OR julianday(replay_deadline) IS NULL
+               OR julianday(replay_deadline) > julianday('now')
+           );
+
+        UPDATE codex_vault_emergency_leases
+           SET status = 'cleared',
+               cleared_at = COALESCE(
+                   cleared_at,
+                   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+               ),
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE status = 'active'
+           AND cleared_at IS NULL
+           AND NOT EXISTS (
+               SELECT 1
+                 FROM codex_vault_emergency_grants AS grant_row
+                WHERE grant_row.id = codex_vault_emergency_leases.grant_id
+                  AND grant_row.status = 'active'
+                  AND (
+                      grant_row.expires_at IS NULL
+                      OR (
+                          julianday(grant_row.expires_at) IS NOT NULL
+                          AND julianday(grant_row.expires_at) > julianday('now')
+                      )
+                  )
+           );
+
+        UPDATE node_compute_runs
+           SET replay_deadline = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE lease_id IN (
+               SELECT lease.id
+                 FROM codex_vault_emergency_leases AS lease
+                WHERE lease.status = 'active'
+                  AND lease.cleared_at IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                        FROM codex_vault_emergency_leases AS newer
+                       WHERE newer.consumer_user_id = lease.consumer_user_id
+                         AND newer.consumer_node_id = lease.consumer_node_id
+                         AND newer.status = 'active'
+                         AND newer.cleared_at IS NULL
+                         AND (
+                             (
+                                 julianday(newer.leased_at) IS NOT NULL
+                                 AND julianday(lease.leased_at) IS NULL
+                             )
+                             OR (
+                                 julianday(newer.leased_at) > julianday(lease.leased_at)
+                             )
+                             OR (
+                                 (
+                                     julianday(newer.leased_at) = julianday(lease.leased_at)
+                                     OR (
+                                         julianday(newer.leased_at) IS NULL
+                                         AND julianday(lease.leased_at) IS NULL
+                                     )
+                                 )
+                                 AND newer.id > lease.id
+                             )
+                         )
+                  )
+           )
+           AND (
+               replay_deadline IS NULL
+               OR julianday(replay_deadline) IS NULL
+               OR julianday(replay_deadline) > julianday('now')
+           );
+
+        UPDATE codex_vault_emergency_leases
+           SET status = 'cleared',
+               cleared_at = COALESCE(
+                   cleared_at,
+                   strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+               ),
+               updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         WHERE status = 'active'
+           AND cleared_at IS NULL
+           AND EXISTS (
+               SELECT 1
+                 FROM codex_vault_emergency_leases AS newer
+                WHERE newer.consumer_user_id = codex_vault_emergency_leases.consumer_user_id
+                  AND newer.consumer_node_id = codex_vault_emergency_leases.consumer_node_id
+                  AND newer.status = 'active'
+                  AND newer.cleared_at IS NULL
+                  AND (
+                      (
+                          julianday(newer.leased_at) IS NOT NULL
+                          AND julianday(codex_vault_emergency_leases.leased_at) IS NULL
+                      )
+                      OR (
+                          julianday(newer.leased_at)
+                              > julianday(codex_vault_emergency_leases.leased_at)
+                      )
+                      OR (
+                          (
+                              julianday(newer.leased_at)
+                                  = julianday(codex_vault_emergency_leases.leased_at)
+                              OR (
+                                  julianday(newer.leased_at) IS NULL
+                                  AND julianday(codex_vault_emergency_leases.leased_at) IS NULL
+                              )
+                          )
+                          AND newer.id > codex_vault_emergency_leases.id
+                      )
+                  )
+           );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_codex_vault_emergency_leases_one_active_node
+          ON codex_vault_emergency_leases(consumer_user_id, consumer_node_id)
+          WHERE status = 'active' AND cleared_at IS NULL;
+        "#,
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{migration_v100, migration_v91};
+    use rusqlite::{params, Connection};
+
+    #[test]
+    fn v100_collapses_legacy_active_leases_before_unique_index() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (id TEXT PRIMARY KEY);
+            CREATE TABLE node_compute_runs (
+              id              TEXT PRIMARY KEY,
+              lease_id        TEXT,
+              replay_deadline TEXT,
+              updated_at      TEXT NOT NULL
+            );
+            "#,
+        )
+        .unwrap();
+        migration_v91(&conn).unwrap();
+        conn.execute_batch(
+            r#"
+            INSERT INTO users (id)
+            VALUES ('provider-a'), ('provider-b'), ('consumer-a');
+
+            INSERT INTO codex_vault_emergency_grants
+              (id, provider_user_id, consumer_user_id, status, max_lease_seconds,
+               created_by_user_id, created_at, updated_at)
+            VALUES
+              ('grant-active', 'provider-a', 'consumer-a', 'active', 900,
+               'provider-a', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+              ('grant-revoked', 'provider-b', 'consumer-a', 'revoked', 900,
+               'provider-b', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
+
+            INSERT INTO codex_vault_emergency_leases
+              (id, grant_id, provider_user_id, consumer_user_id, consumer_node_id,
+               provider_slot_id, status, leased_at, expires_at, created_at, updated_at)
+            VALUES
+              ('lease-a', 'grant-active', 'provider-a', 'consumer-a', 'node-dup',
+               'slot-a', 'active', '2026-02-01T00:00:00Z', '2099-01-01T00:00:00Z',
+               '2026-02-01T00:00:00Z', '2026-02-01T00:00:00Z'),
+              ('lease-b', 'grant-active', 'provider-a', 'consumer-a', 'node-dup',
+               'slot-b', 'active', '2026-02-01T00:00:00Z', '2099-01-01T00:00:00Z',
+               '2026-02-01T00:00:00Z', '2026-02-01T00:00:00Z'),
+              ('lease-revoked', 'grant-revoked', 'provider-b', 'consumer-a', 'node-revoked',
+               'slot-r', 'active', '2026-02-01T00:00:00Z', '2099-01-01T00:00:00Z',
+               '2026-02-01T00:00:00Z', '2026-02-01T00:00:00Z'),
+              ('lease-expired', 'grant-active', 'provider-a', 'consumer-a', 'node-expired',
+               'slot-e', 'active', '1999-01-01T00:00:00Z', '2000-01-01T00:00:00Z',
+               '1999-01-01T00:00:00Z', '1999-01-01T00:00:00Z');
+
+            INSERT INTO node_compute_runs (id, lease_id, replay_deadline, updated_at)
+            VALUES
+              ('run-duplicate', 'lease-a', '2099-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+              ('run-winner', 'lease-b', '2099-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+              ('run-revoked', 'lease-revoked', NULL, '2026-01-01T00:00:00Z'),
+              ('run-expired', 'lease-expired', 'invalid-deadline', '2026-01-01T00:00:00Z');
+            "#,
+        )
+        .unwrap();
+
+        migration_v100(&conn).unwrap();
+        migration_v100(&conn).unwrap();
+
+        let status = |lease_id: &str| -> (String, Option<String>) {
+            conn.query_row(
+                "SELECT status, cleared_at FROM codex_vault_emergency_leases WHERE id = ?1",
+                [lease_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap()
+        };
+        assert_eq!(status("lease-a").0, "cleared");
+        assert!(status("lease-a").1.is_some());
+        assert_eq!(status("lease-b"), ("active".to_string(), None));
+        assert_eq!(status("lease-revoked").0, "cleared");
+        assert_eq!(status("lease-expired").0, "expired");
+
+        let deadline = |run_id: &str| -> Option<String> {
+            conn.query_row(
+                "SELECT replay_deadline FROM node_compute_runs WHERE id = ?1",
+                [run_id],
+                |row| row.get(0),
+            )
+            .unwrap()
+        };
+        for run_id in ["run-duplicate", "run-revoked", "run-expired"] {
+            let fenced = deadline(run_id).expect("retired lease run must be fenced");
+            assert_ne!(fenced, "2099-01-01T00:00:00Z");
+            assert_ne!(fenced, "invalid-deadline");
+            assert!(
+                conn.query_row(
+                    "SELECT julianday(?1) <= julianday('now')",
+                    [&fenced],
+                    |row| { row.get::<_, bool>(0) }
+                )
+                .unwrap(),
+                "{run_id} should be fenced no later than migration time"
+            );
+        }
+        assert_eq!(
+            deadline("run-winner").as_deref(),
+            Some("2099-01-01T00:00:00Z")
+        );
+
+        let duplicate = conn.execute(
+            "INSERT INTO codex_vault_emergency_leases
+             (id, grant_id, provider_user_id, consumer_user_id, consumer_node_id,
+              provider_slot_id, status, leased_at, expires_at, created_at, updated_at)
+             VALUES ('lease-c', 'grant-active', 'provider-a', 'consumer-a', 'node-dup',
+                     'slot-c', 'active', ?1, ?2, ?1, ?1)",
+            params!["2026-03-01T00:00:00Z", "2099-01-01T00:00:00Z"],
+        );
+        assert!(
+            duplicate.is_err(),
+            "partial unique index must reject a second active lease"
+        );
+    }
+}

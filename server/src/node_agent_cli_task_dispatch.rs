@@ -1,0 +1,643 @@
+//! Shared CLI task admission/launch path for cloud WebSocket dispatch and localhost workbench.
+
+use std::sync::Arc;
+
+use homecli_proto::{AgentToServer, CliCodexCredentialBinding, CliProjectContext};
+use tokio::sync::{mpsc, watch};
+use tokio_tungstenite::tungstenite::Message;
+use tracing::{info, warn};
+
+use crate::node_agent_cli_done::CliCompletionContext;
+use crate::node_agent_codex_child_env::FrozenCodexHome;
+use crate::{
+    node_agent_active_task, node_agent_full_access, node_agent_task_journal,
+    prepare_cli_prompt_cwd, resolve_attachment_args, run_cli_prompt, ws_text, CliPromptRun,
+    NodeRuntime,
+};
+
+#[derive(Debug)]
+pub(crate) struct CliTaskDispatchRequest {
+    pub req_id: String,
+    pub cli: String,
+    pub extra_args: Vec<String>,
+    pub cwd: Option<String>,
+    pub project_context: Option<CliProjectContext>,
+    pub codex_credential_binding: Option<CliCodexCredentialBinding>,
+    pub requires_cloud_control: bool,
+    pub cloud_control_deadline: Option<String>,
+    pub cloud_control_issued_at: Option<String>,
+    pub cloud_control_ttl_ms: Option<u64>,
+    pub prompt: String,
+    pub completion_context: CliCompletionContext,
+    /// Offline-local work must never auto-switch into a borrowed/shared Codex slot.
+    pub allow_codex_auth_switch: bool,
+    /// Local work supplies this at creation time. Cloud work captures it once
+    /// during admission. The runner must never consult process-global CODEX_HOME.
+    pub frozen_codex_home: Option<FrozenCodexHome>,
+}
+
+pub(crate) fn spawn_cli_task(
+    runtime: Arc<NodeRuntime>,
+    out_tx: mpsc::UnboundedSender<Message>,
+    request: CliTaskDispatchRequest,
+) {
+    tokio::spawn(async move {
+        run_cli_task(runtime, out_tx, request).await;
+    });
+}
+
+fn send_cli_prompt_reattached(
+    out_tx: &mpsc::UnboundedSender<Message>,
+    req_id: String,
+    cli: String,
+    cwd: Option<String>,
+    runtime_permission: Option<String>,
+) {
+    let _ = out_tx.send(ws_text(&crate::node_agent_cli_done::cli_prompt_accepted(
+        req_id,
+        Some(cli),
+        cwd,
+        runtime_permission,
+    )));
+}
+
+async fn run_cli_task(
+    runtime: Arc<NodeRuntime>,
+    out_tx: mpsc::UnboundedSender<Message>,
+    request: CliTaskDispatchRequest,
+) {
+    let CliTaskDispatchRequest {
+        req_id,
+        cli,
+        extra_args,
+        cwd,
+        project_context,
+        codex_credential_binding,
+        requires_cloud_control,
+        cloud_control_deadline,
+        cloud_control_issued_at,
+        cloud_control_ttl_ms,
+        prompt,
+        completion_context,
+        allow_codex_auth_switch,
+        frozen_codex_home,
+    } = request;
+    info!(%req_id, %cli, "starting admitted PC CLI task");
+    let req_id_for_cleanup = req_id.clone();
+    if let Err(error) = validate_completion_producer_identity(&runtime, &completion_context).await {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            &cli,
+            &out_tx,
+            req_id,
+            error.to_string(),
+        );
+        return;
+    }
+    if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
+    {
+        send_preflight_failure(&runtime, &completion_context, &cli, &out_tx, req_id, error);
+        return;
+    }
+    let (cancel_tx, cancel_rx) = watch::channel(false);
+    let requested_runtime_permission = project_context
+        .as_ref()
+        .and_then(|context| context.runtime_permission.clone());
+    if runtime.cli_prompt_active(&req_id_for_cleanup).await {
+        info!(%req_id_for_cleanup, "re-attaching duplicate dispatch to active PC CLI task");
+        send_cli_prompt_reattached(&out_tx, req_id, cli, cwd, requested_runtime_permission);
+        return;
+    }
+    match runtime
+        .completion_outbox
+        .latest_for_req_id_for_producer(&req_id_for_cleanup, &completion_context.producer_identity)
+    {
+        Ok(Some(_)) => {
+            info!(%req_id_for_cleanup, "re-attaching duplicate dispatch to durable PC CLI completion");
+            send_cli_prompt_reattached(&out_tx, req_id, cli, cwd, requested_runtime_permission);
+            return;
+        }
+        Ok(None) => {}
+        Err(error) => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                &cli,
+                &out_tx,
+                req_id,
+                format!("读取 durable completion 状态失败，已拒绝重复执行：{error}"),
+            );
+            return;
+        }
+    }
+    let resolved_cli = match runtime.resolve_cli(&cli).await {
+        Ok(resolved) => resolved,
+        Err(error) => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                &cli,
+                &out_tx,
+                req_id,
+                error.to_string(),
+            );
+            return;
+        }
+    };
+    let resolved_args = resolve_attachment_args(
+        extra_args,
+        resolved_cli.name(),
+        runtime
+            .creds
+            .read()
+            .await
+            .as_ref()
+            .and_then(|creds| creds.user_token.clone())
+            .as_deref(),
+    )
+    .await;
+    let runtime_permission = requested_runtime_permission.clone();
+    let local_offline =
+        completion_context.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN;
+    let frozen_codex_home = if resolved_cli.name() == "codex" {
+        let frozen = match frozen_codex_home {
+            Some(frozen) => frozen,
+            None if local_offline => {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    "本机离线任务没有在创建时冻结 CODEX_HOME，已拒绝启动。".to_string(),
+                );
+                return;
+            }
+            None => match FrozenCodexHome::capture_for_task() {
+                Ok(frozen) => frozen,
+                Err(error) => {
+                    send_preflight_failure(
+                        &runtime,
+                        &completion_context,
+                        resolved_cli.name(),
+                        &out_tx,
+                        req_id,
+                        error.to_string(),
+                    );
+                    return;
+                }
+            },
+        };
+        if let Err(error) =
+            frozen.validate_for_task(local_offline, runtime.is_cloud_connected().await)
+        {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                error.to_string(),
+            );
+            return;
+        }
+        if local_offline {
+            if codex_credential_binding.is_some() {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    "本机离线 Codex 任务不能携带云端凭据绑定。".to_string(),
+                );
+                return;
+            }
+        } else {
+            let Some(binding) = codex_credential_binding.as_ref() else {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    "云端 Codex 任务缺少凭据绑定，已拒绝启动。".to_string(),
+                );
+                return;
+            };
+            if let Err(error) = frozen.validate_cloud_binding(binding) {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    error.to_string(),
+                );
+                return;
+            }
+        }
+        Some(frozen)
+    } else {
+        if codex_credential_binding.is_some() {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                "非 Codex 任务不能携带 Codex 凭据绑定。".to_string(),
+            );
+            return;
+        }
+        if local_offline {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                "本机离线任务只允许使用已冻结本地凭据的 Codex CLI。".to_string(),
+            );
+            return;
+        }
+        None
+    };
+    let credential_home_requires_cloud_control = frozen_codex_home
+        .as_ref()
+        .is_some_and(FrozenCodexHome::requires_cloud_control);
+    if credential_home_requires_cloud_control && !requires_cloud_control {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            "托管 Codex 凭据必须由云端持续控制，已拒绝启动。".to_string(),
+        );
+        return;
+    }
+    let effective_requires_cloud_control =
+        requires_cloud_control || credential_home_requires_cloud_control;
+    let cloud_control_deadline =
+        match crate::node_agent_cloud_control::freeze_cloud_control_deadline(
+            effective_requires_cloud_control,
+            cloud_control_deadline.as_deref(),
+            cloud_control_issued_at.as_deref(),
+            cloud_control_ttl_ms,
+            frozen_codex_home
+                .as_ref()
+                .and_then(FrozenCodexHome::managed_lease_expires_at),
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    error.to_string(),
+                );
+                return;
+            }
+        };
+    let full_access_identity = match node_agent_full_access::FullAccessGrantIdentity::new(
+        &completion_context.producer_identity.owner_user_id,
+        &completion_context.producer_identity.agent_id,
+        &runtime.install_id,
+    ) {
+        Ok(identity) => identity,
+        Err(error) => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                error.to_string(),
+            );
+            return;
+        }
+    };
+    if let Err(error) = node_agent_full_access::require_route_a_full_access_grant(
+        &runtime.full_access_grants,
+        &full_access_identity,
+        resolved_cli.name(),
+        runtime_permission.as_deref(),
+        project_context.as_ref(),
+        cwd.as_deref(),
+        !local_offline,
+    )
+    .await
+    {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            error.to_string(),
+        );
+        return;
+    }
+
+    let prepared_cwd = match prepare_cli_prompt_cwd(cwd, project_context) {
+        Ok(cwd) => cwd,
+        Err(error) => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                error.to_string(),
+            );
+            return;
+        }
+    };
+    let original_prompt = prompt.clone();
+    let ui_design_routed =
+        crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);
+    let ui_design_route_status =
+        crate::node_agent_ui_design_workspace::ui_design_route_status(&original_prompt)
+            .unwrap_or("READY");
+    let (prompt, ui_design_workspace_ready) =
+        match crate::node_agent_ui_design_workspace::prepare_ui_design_workspace(
+            prompt,
+            prepared_cwd.cwd.as_deref(),
+            &resolved_args,
+        ) {
+            Ok(prompt) => (prompt, true),
+            Err(error) => {
+                warn!(%error, "UI design local artifacts unavailable; continuing degraded");
+                (
+                    format!(
+                        "{original_prompt}\n\nUI design workspace preparation failed: {error:#}\n请先诊断附件与项目工作区，再继续任务。"
+                    ),
+                    false,
+                )
+            }
+        };
+    if ui_design_routed {
+        let status = if ui_design_workspace_ready {
+            ui_design_route_status
+        } else {
+            "DEGRADED"
+        };
+        let event = serde_json::json!({
+            "type": "elon.ui_design.route",
+            "status": status,
+        });
+        let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
+            req_id: req_id_for_cleanup.clone(),
+            text: format!("{event}\n"),
+        }));
+    }
+
+    let deadline_cancel_tx = cancel_tx.clone();
+    let handle = node_agent_active_task::ActiveCliPromptHandle::new(
+        req_id_for_cleanup.clone(),
+        resolved_cli.name().to_string(),
+        node_agent_active_task::route_for_cli(resolved_cli.name()),
+        prepared_cwd.cwd.clone(),
+        runtime_permission.clone(),
+        cancel_tx,
+    )
+    .with_requires_cloud_control(effective_requires_cloud_control);
+    if !runtime.try_register_cli_prompt(handle).await {
+        warn!(%req_id_for_cleanup, "PC CLI task registration race lost");
+        send_cli_prompt_reattached(
+            &out_tx,
+            req_id,
+            cli,
+            prepared_cwd.cwd,
+            requested_runtime_permission,
+        );
+        return;
+    }
+    if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
+    {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            error,
+        );
+        runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+        return;
+    }
+    if let Err(error) = validate_completion_producer_identity(&runtime, &completion_context).await {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            error.to_string(),
+        );
+        runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+        return;
+    }
+    // Close the disconnect window between preflight and handle registration.
+    // The post-insert check applies to every controlled task, including an
+    // unmanaged Codex home billed through a cloud reservation.
+    let cloud_connected = runtime.is_cloud_connected().await;
+    if let Err(error) = crate::node_agent_cloud_control::validate_registered_cloud_control(
+        effective_requires_cloud_control,
+        cloud_connected,
+        cloud_control_deadline.as_ref(),
+    ) {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            error.to_string(),
+        );
+        runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+        return;
+    }
+    if let Some(home) = frozen_codex_home.as_ref() {
+        if let Err(error) = home.validate_for_task(local_offline, cloud_connected) {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                error.to_string(),
+            );
+            runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+            return;
+        }
+    }
+    crate::node_agent_cloud_control::spawn_absolute_deadline_cancel(
+        cloud_control_deadline,
+        deadline_cancel_tx,
+        req_id_for_cleanup.clone(),
+    );
+    if out_tx
+        .send(ws_text(&crate::node_agent_cli_done::cli_prompt_accepted(
+            req_id_for_cleanup.clone(),
+            Some(cli.clone()),
+            prepared_cwd.cwd.clone(),
+            requested_runtime_permission.clone(),
+        )))
+        .is_err()
+    {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            "任务控制通道已断开，已拒绝在确认前启动 CLI。".to_string(),
+        );
+        runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+        return;
+    }
+    if let Err(error) =
+        runtime
+            .task_journal
+            .record_started(node_agent_task_journal::TaskJournalStart {
+                req_id: &req_id_for_cleanup,
+                cli_name: resolved_cli.name(),
+                route: Some(node_agent_active_task::route_for_cli(resolved_cli.name())),
+                run_handle_id: Some(&req_id_for_cleanup),
+                cwd: prepared_cwd.cwd.as_deref(),
+                runtime_permission: runtime_permission.as_deref(),
+            })
+    {
+        warn!(%error, "failed to persist PC task start journal event");
+    }
+
+    run_cli_prompt(CliPromptRun {
+        req_id,
+        bin: resolved_cli.bin().to_string(),
+        cli_name: resolved_cli.name().to_string(),
+        extra_args: resolved_args,
+        runtime_permission,
+        cwd: prepared_cwd.cwd,
+        conversation_workspace: prepared_cwd.conversation_workspace,
+        prompt,
+        server_runtime_config: Some(crate::node_agent_server_runtime::ServerRuntimeConfig {
+            server_url: runtime.cloud_http_url(),
+            user_token: runtime.user_token().await,
+        }),
+        approval_state: runtime.tool_approvals.clone(),
+        task_journal: runtime.task_journal.clone(),
+        runtime: runtime.clone(),
+        cancel_rx,
+        out_tx,
+        codex_vault_switch_attempted: !allow_codex_auth_switch,
+        completion_context,
+        frozen_codex_home,
+    })
+    .await;
+    if let Err(error) = runtime.task_journal.record_finished(&req_id_for_cleanup) {
+        warn!(%error, "failed to persist PC task final journal event");
+    }
+    runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+}
+
+fn prestart_cancel_admission_error(
+    journal: &node_agent_task_journal::TaskJournal,
+    req_id: &str,
+) -> Option<String> {
+    match journal.prestart_cancel_tombstone_active(req_id) {
+        Ok(false) => None,
+        Ok(true) => Some("服务器已在任务启动前撤销该请求，已拒绝启动。".to_string()),
+        Err(error) => Some(format!("读取持久取消状态失败，已拒绝启动：{error}")),
+    }
+}
+
+async fn validate_completion_producer_identity(
+    runtime: &NodeRuntime,
+    context: &CliCompletionContext,
+) -> anyhow::Result<()> {
+    let current = runtime
+        .creds()
+        .await
+        .ok_or_else(|| anyhow::anyhow!("本机节点当前未绑定账号，拒绝启动任务。"))?;
+    let producer = &context.producer_identity;
+    if producer.owner_user_id != current.owner_user_id
+        || producer.agent_id != current.agent_id
+        || producer.install_id != runtime.install_id
+    {
+        anyhow::bail!("任务冻结的 owner/节点/安装身份与当前绑定不一致，拒绝启动。")
+    }
+    Ok(())
+}
+
+fn send_preflight_failure(
+    runtime: &NodeRuntime,
+    completion_context: &CliCompletionContext,
+    cli_name: &str,
+    out_tx: &mpsc::UnboundedSender<Message>,
+    req_id: String,
+    error: String,
+) {
+    let message = AgentToServer::CliDone {
+        req_id,
+        exit_ok: false,
+        error: Some(error),
+        session_id: None,
+        prompt_tokens: None,
+        cached_input_tokens: None,
+        completion_tokens: None,
+        reasoning_tokens: None,
+        total_tokens: None,
+        model: None,
+        workspace_status: None,
+    };
+    if let Err(error) = crate::node_agent_cli_done::persist_and_send_cli_done(
+        runtime,
+        completion_context,
+        cli_name,
+        None,
+        message,
+        out_tx,
+    ) {
+        warn!(%error, "failed to persist preflight CLI completion");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn duplicate_dispatch_returns_idempotent_acceptance_not_terminal() {
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        send_cli_prompt_reattached(
+            &tx,
+            "req-duplicate".to_string(),
+            "codex".to_string(),
+            Some("D:/workspace".to_string()),
+            Some("full_access".to_string()),
+        );
+
+        let Message::Text(payload) = rx.try_recv().expect("duplicate response") else {
+            panic!("duplicate response must be websocket text");
+        };
+        let event: AgentToServer =
+            serde_json::from_str(payload.as_ref()).expect("valid duplicate response");
+        assert!(matches!(
+            event,
+            AgentToServer::CliPromptAccepted {
+                req_id,
+                cli: Some(cli),
+                cwd: Some(cwd),
+                runtime_permission: Some(runtime_permission),
+            } if req_id == "req-duplicate"
+                && cli == "codex"
+                && cwd == "D:/workspace"
+                && runtime_permission == "full_access"
+        ));
+    }
+}

@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
-use homecli_proto::{AgentToServer, CliProjectContext};
+use anyhow::{anyhow, Context, Result};
+use homecli_proto::{AgentToServer, CliCodexCredentialBinding, CliProjectContext};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use super::{
+    pc_billing_policy::PcCliBillingDispatchReady,
     pc_prompt_acceptance::{pc_cli_accept_timeout, wait_for_pc_cli_prompt_acceptance},
     AiCliRequestMode, NativeSessionScope,
 };
@@ -18,9 +19,11 @@ const PC_AGENT_CLI_ACCEPT_RETRY_LIMIT: usize = 1;
 const PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS: u64 = 45;
 
 pub(crate) struct PcCliPromptDispatchRequest<'a> {
+    pub(crate) billing_ready: &'a PcCliBillingDispatchReady,
     pub(crate) state: &'a Arc<AppState>,
     pub(crate) tx: &'a UnboundedSender<String>,
     pub(crate) agent_id: &'a str,
+    pub(crate) pc_req_id: &'a str,
     pub(crate) cli_name: &'a str,
     pub(crate) extra_args: &'a [String],
     pub(crate) cwd: Option<&'a str>,
@@ -28,25 +31,85 @@ pub(crate) struct PcCliPromptDispatchRequest<'a> {
     pub(crate) request_mode: AiCliRequestMode,
     pub(crate) native_session_scope: Option<&'a NativeSessionScope>,
     pub(crate) lightweight_pc_chat: bool,
+    pub(crate) codex_credential_binding: Option<CliCodexCredentialBinding>,
+    pub(crate) requires_cloud_control: bool,
+    pub(crate) cloud_control_deadline: Option<String>,
 }
 
 pub(crate) struct PcAcceptedCliPrompt {
-    pub(crate) pc_req_id: String,
     pub(crate) rx: UnboundedReceiver<AgentToServer>,
     pub(crate) cancel_handle: CliPromptCancelHandle,
     pub(crate) first_cli_event: Option<AgentToServer>,
 }
 
+#[derive(Debug)]
+pub(crate) struct PcCliPromptDispatchFailure {
+    error: anyhow::Error,
+    prompt_may_have_been_sent: bool,
+}
+
+impl PcCliPromptDispatchFailure {
+    fn new(error: anyhow::Error, prompt_may_have_been_sent: bool) -> Self {
+        Self {
+            error,
+            prompt_may_have_been_sent,
+        }
+    }
+
+    pub(crate) fn prompt_may_have_been_sent(&self) -> bool {
+        self.prompt_may_have_been_sent
+    }
+
+    pub(crate) fn into_error(self) -> anyhow::Error {
+        self.error
+    }
+}
+
+#[derive(Default)]
+struct PcCliPromptSendState {
+    prompt_may_have_been_sent: bool,
+}
+
+impl PcCliPromptSendState {
+    fn mark_sent(&mut self) {
+        self.prompt_may_have_been_sent = true;
+    }
+
+    fn failure(&self, error: anyhow::Error) -> PcCliPromptDispatchFailure {
+        PcCliPromptDispatchFailure::new(error, self.prompt_may_have_been_sent)
+    }
+}
+
 pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
     request: PcCliPromptDispatchRequest<'_>,
-) -> Result<PcAcceptedCliPrompt> {
+) -> std::result::Result<PcAcceptedCliPrompt, PcCliPromptDispatchFailure> {
     let mut accept_retry_count = 0usize;
+    let mut send_state = PcCliPromptSendState::default();
+    // The exact-call type-state token proves that the durable billing
+    // transition committed before this function can reach its first send.
+    if !request.billing_ready.matches_pc_req_id(request.pc_req_id) {
+        return Err(send_state.failure(anyhow!("PC CLI 派发计费预授权与 req_id 不匹配")));
+    }
     let node_progress_name = pc_node_progress_name(request.state.as_ref(), request.agent_id).await;
     loop {
         let previous_connected_at = agent_connected_at(request.state, request.agent_id).await;
-        let dispatch = dispatch_pc_cli_prompt_once(&request).await?;
+        let dispatch = match dispatch_pc_cli_prompt_once(&request).await {
+            Ok(dispatch) => {
+                send_state.mark_sent();
+                dispatch
+            }
+            Err(error) => return Err(send_state.failure(error)),
+        };
         let (pc_req_id, mut rx, cancel_handle) = dispatch.into_parts();
-        match wait_for_pc_cli_prompt_acceptance(
+        if pc_req_id != request.pc_req_id {
+            let _ = cancel_handle.cancel();
+            return Err(send_state.failure(anyhow!(
+                "PC CLI 派发返回了不同于预授权运行的 req_id：期望 {}，实际 {}",
+                request.pc_req_id,
+                pc_req_id
+            )));
+        }
+        let acceptance = wait_for_pc_cli_prompt_acceptance(
             request.state,
             request.agent_id,
             &node_progress_name,
@@ -54,20 +117,27 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
             request.cli_name,
             &mut rx,
         )
-        .await
-        {
+        .await;
+        match acceptance {
             Ok(first_cli_event) => {
                 return Ok(PcAcceptedCliPrompt {
-                    pc_req_id,
                     rx,
                     cancel_handle,
                     first_cli_event,
                 });
             }
-            Err(error)
-                if pc_cli_accept_timeout(&error).is_some()
-                    && accept_retry_count < PC_AGENT_CLI_ACCEPT_RETRY_LIMIT =>
-            {
+            Err(error) => {
+                let cancel_sent = cancel_handle.cancel();
+                if pc_cli_accept_timeout(&error).is_none()
+                    || accept_retry_count >= PC_AGENT_CLI_ACCEPT_RETRY_LIMIT
+                {
+                    tracing::warn!(
+                        req_id = %pc_req_id,
+                        cancel_sent,
+                        "PC CLI acceptance failed after pre-authorization"
+                    );
+                    return Err(send_state.failure(error));
+                }
                 let timeout_secs = pc_cli_accept_timeout(&error)
                     .map(|timeout| timeout.timeout_secs())
                     .unwrap_or(0);
@@ -84,11 +154,11 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
                     );
                 }
                 if !wait_for_agent_reconnect(&request, previous_connected_at).await {
-                    return Err(anyhow!(
-                        "PC 节点 {} 在 {} 秒内没有重新连接；本轮已停止。请重启一龙 PC 节点客户端后重发。",
-                        node_progress_name,
-                        PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS
-                    ));
+                    return Err(send_state.failure(anyhow!(
+                            "PC 节点 {} 在 {} 秒内没有重新连接；本轮已停止。请重启一龙 PC 节点客户端后重发。",
+                            node_progress_name,
+                            PC_AGENT_CLI_ACCEPT_RECONNECT_WAIT_SECS
+                        )));
                 }
                 if !request.lightweight_pc_chat {
                     let _ = request.tx.send(
@@ -96,8 +166,28 @@ pub(crate) async fn dispatch_pc_cli_prompt_until_accepted(
                     );
                 }
             }
-            Err(error) => return Err(error),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PcCliPromptSendState;
+
+    #[test]
+    fn send_state_distinguishes_proven_pre_send_failure_from_unknown_outcome() {
+        let mut state = PcCliPromptSendState::default();
+        assert!(!state
+            .failure(anyhow::anyhow!("pre-send"))
+            .prompt_may_have_been_sent());
+
+        state.mark_sent();
+        assert!(state
+            .failure(anyhow::anyhow!("unacked"))
+            .prompt_may_have_been_sent());
+        assert!(state
+            .failure(anyhow::anyhow!("retry failed before second send"))
+            .prompt_may_have_been_sent());
     }
 }
 
@@ -117,15 +207,20 @@ async fn dispatch_pc_cli_prompt_once(
                 scope.runtime_permission.clone()
             }),
         });
+        require_dispatch_authorization(request)?;
         match request
             .state
             .agent_manager
-            .dispatch_cli_prompt_with_context_control(
+            .dispatch_cli_prompt_with_context_control_id_and_credential_binding(
+                request.pc_req_id.to_string(),
                 request.agent_id,
                 request.cli_name.to_string(),
                 request.extra_args.to_vec(),
                 request.cwd.map(ToOwned::to_owned),
                 project_context,
+                request.codex_credential_binding.clone(),
+                request.requires_cloud_control,
+                request.cloud_control_deadline.clone(),
                 request.prompt.to_string(),
             )
             .await
@@ -156,6 +251,39 @@ async fn dispatch_pc_cli_prompt_once(
         }
     }
     result
+}
+
+fn require_dispatch_authorization(request: &PcCliPromptDispatchRequest<'_>) -> Result<()> {
+    let expected_lease_id = request
+        .codex_credential_binding
+        .as_ref()
+        .and_then(|binding| binding.lease_id.as_deref());
+    if request
+        .codex_credential_binding
+        .as_ref()
+        .is_some_and(|binding| {
+            binding.managed
+                != binding
+                    .lease_id
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty())
+        })
+    {
+        return Err(anyhow!("PC CLI Codex 凭证管理标记与租约身份不一致"));
+    }
+    let compute_call_id = format!("pc_agent_cli:{}", request.pc_req_id);
+    request
+        .state
+        .store
+        .require_node_compute_run_dispatch_authorization(
+            &compute_call_id,
+            request.agent_id,
+            request.requires_cloud_control,
+            request.cloud_control_deadline.as_deref(),
+            expected_lease_id,
+        )
+        .with_context(|| format!("PC CLI 派发授权已失效: {compute_call_id}"))?;
+    Ok(())
 }
 
 async fn agent_connected_at(state: &Arc<AppState>, agent_id: &str) -> Option<u64> {

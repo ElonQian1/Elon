@@ -3,7 +3,7 @@
 use crate::{
     node_agent_cli_pty::{default_cols, default_rows},
     node_agent_cli_sidecar::{now_ms, CliSidecarRegistry},
-    node_agent_cli_sidecar_io::read_new_output_records,
+    node_agent_cli_sidecar_io::{append_output, read_new_output_records, CliSidecarOutputRecord},
     node_agent_cli_sidecar_runner::{
         follow_sidecar_output, run_sidecar, CliSidecarLaunchConfig, CliSidecarOutputEvent,
     },
@@ -162,6 +162,63 @@ async fn pipe_json_sidecar_registers_child_and_keeps_streams_clean() {
         .iter()
         .any(|record| record.stream.as_deref() == Some("pty")));
 
+    let _ = fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn timeout_follower_waits_for_buffered_usage_and_real_exit() {
+    let root = temp_dir("timeout-follower-drains-usage");
+    let registry = CliSidecarRegistry::new(root.join("sidecars"));
+    let task_id = "task-timeout-usage";
+    let output_path = root.join("timeout-output.jsonl");
+    append_output(&output_path, CliSidecarOutputRecord::child_started(12_345)).unwrap();
+    append_output(
+        &output_path,
+        CliSidecarOutputRecord::error("codex pipe sidecar 执行超时（超过 10 秒）".to_string()),
+    )
+    .unwrap();
+
+    let delayed_output_path = output_path.clone();
+    let writer = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        append_output(
+            &delayed_output_path,
+            CliSidecarOutputRecord::chunk(
+                "stdout",
+                concat!(
+                    r#"{"type":"token_count","usage":{"input_tokens":40,"output_tokens":2,"total_tokens":42}}"#,
+                    "\n",
+                ),
+            ),
+        )
+        .unwrap();
+        append_output(
+            &delayed_output_path,
+            CliSidecarOutputRecord::exit(false, true),
+        )
+        .unwrap();
+    });
+
+    let (_cancel_tx, mut cancel_rx) = watch::channel(false);
+    let result = tokio::time::timeout(
+        Duration::from_secs(2),
+        follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {}),
+    )
+    .await
+    .expect("follower should wait for the real exit")
+    .expect("sidecar output should parse");
+    writer.await.unwrap();
+
+    assert!(!result.exit_ok);
+    assert!(result.canceled);
+    assert!(result
+        .terminal_error
+        .as_deref()
+        .is_some_and(|error| error.contains("执行超时")));
+    let usage = crate::cli_usage::parse_cli_usage(&result.stdout_text).unwrap();
+    assert_eq!(usage.input_tokens, 40);
+    assert_eq!(usage.output_tokens, 2);
+    assert_eq!(usage.total_tokens, 42);
     let _ = fs::remove_dir_all(root);
 }
 

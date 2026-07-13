@@ -24,11 +24,14 @@ mod ai_cli_ui_route_rescue;
 mod pc_agent_dispatch;
 mod pc_artifact_completion;
 mod pc_billing;
+mod pc_billing_policy;
 mod pc_cli_failure;
+pub(crate) mod pc_completion_replay;
 mod pc_dispatch_capture;
 mod pc_passthrough_events;
 mod pc_passthrough_reply;
 pub(crate) mod pc_prompt_acceptance;
+mod pc_run_lifecycle;
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
 use anyhow::{anyhow, Result};
@@ -54,7 +57,12 @@ pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
 use self::pc_artifact_completion::pc_project_execution_had_no_changes;
 pub(crate) use self::pc_billing::{pc_cli_request_is_own_codex, requested_pc_cli_looks_like_codex};
 use self::pc_billing::{
-    record_pc_cli_trusted_usage, reserve_pc_cli_billing_call, settle_pc_cli_node_usage,
+    record_pc_cli_trusted_usage_result, refresh_pc_cli_billing_context_from_run,
+    settle_pc_cli_node_usage,
+};
+use self::pc_billing_policy::{
+    bind_pc_cli_usage_to_frozen_model, hold_pc_cli_usage_for_verification,
+    pc_cli_unknown_usage_requires_verification,
 };
 use self::pc_cli_failure::{
     pc_cli_readable_output, pc_cli_terminal_error_message, pc_codex_error_output_can_complete,
@@ -73,7 +81,10 @@ use self::pc_passthrough_reply::{
     strip_terminal_control_sequences,
 };
 use self::pc_prompt_acceptance::pc_lightweight_no_node_event_diagnostic;
+use self::pc_run_lifecycle::{admit_pc_run, PcRunAdmission, PcRunAdmissionRequest};
 
+use self::ai_cli_pc_guards::PcCliCancelOnDrop;
+use self::ai_cli_ui_route_rescue::run_via_pc_agent;
 use self::{
     ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},
     ai_cli_environment::{ensure_git, environment_notes},
@@ -85,23 +96,16 @@ use self::{
     ai_cli_pc_execution::{
         finish_pc_node_compute_run, mark_pc_route_a_prompt_bootstrapped,
         pc_route_a_prompt_bootstrapped, record_pc_codex_thread_id, record_pc_execution_finished,
-        record_pc_execution_started, record_pc_execution_without_cli_done,
-        start_pc_node_compute_run,
+        record_pc_execution_without_cli_done,
     },
-    ai_cli_pc_prompt::{
-        contextual_passthrough_message, pc_cli_progress_label, pc_lightweight_chat_prompt,
-        pc_project_execution_prompt, pc_project_passthrough_prompt,
-    },
+    ai_cli_pc_prompt::pc_cli_progress_label,
     ai_cli_prompts::build_cli_prompt,
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
-    pc_agent_dispatch::{dispatch_pc_cli_prompt_until_accepted, PcCliPromptDispatchRequest},
 };
-use self::ai_cli_ui_route_rescue::run_via_pc_agent;
-use self::ai_cli_pc_guards::{PcCliCancelOnDrop, PcExecutionFinishOnDrop};
 use crate::{
     agent_routing::quick_casual_reply,
     billing, intent_router,
-    pc_node_display::{pc_cli_heartbeat_subject, pc_node_progress_name},
+    pc_node_display::pc_cli_heartbeat_subject,
     tools,
     types::{AppState, WsMessage},
 };
@@ -116,18 +120,23 @@ pub use self::ai_cli_intent_gate::confirm_project_intent;
 mod ai_cli_pc_config;
 mod ai_cli_pc_reply_helpers;
 
+#[cfg(test)]
 use self::ai_cli_pc_config::{
-    native_session_uuid, pc_agent_cli_recv_timeout_secs, pc_display_model_label,
-    pc_lightweight_chat_reasoning_effort, pc_project_reasoning_effort, pc_route_a_ui_args,
-    pc_runtime_full_access, should_skip_pc_chat_native_session,
+    native_session_uuid, pc_display_model_label, pc_project_reasoning_effort,
 };
+use self::ai_cli_pc_config::{
+    pc_agent_cli_recv_timeout_secs, pc_lightweight_chat_reasoning_effort, pc_runtime_full_access,
+    should_skip_pc_chat_native_session,
+};
+#[cfg(test)]
+use self::ai_cli_pc_reply_helpers::pc_dispatch_started_event;
 use self::ai_cli_pc_reply_helpers::{
     abort_pc_progress, extract_codex_reconnect_attempt, extract_lightweight_pc_chat_reply,
     extract_lightweight_pc_chat_timeout_reply, extract_retry_fraction,
     is_pc_development_reply_boundary, is_pc_development_reply_noise_line,
     lightweight_pc_reply_delta, lightweight_reply_text_delta, no_readable_lightweight_reply,
     pc_cli_model_id, pc_cli_price_per_1k_credits, pc_cli_usage_tokens, pc_codex_progress_hint,
-    pc_dispatch_started_event, sanitize_pc_development_reply, sanitize_user_reply_line,
+    sanitize_pc_development_reply, sanitize_user_reply_line,
 };
 
 pub async fn run_with_workspace(
@@ -299,7 +308,9 @@ pub async fn run_with_pc_agent_passthrough_workspace(
         PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => {
             PcAgentChatOutcome::NoReadableReply { diagnostic }
         }
-        PcAgentRunOutcome::UiRerouteRequested { .. } => PcAgentChatOutcome::NoReadableReply { diagnostic: Some("UI 路由救援未能完成二次执行".to_string()) },
+        PcAgentRunOutcome::UiRerouteRequested { .. } => PcAgentChatOutcome::NoReadableReply {
+            diagnostic: Some("UI 路由救援未能完成二次执行".to_string()),
+        },
     })
 }
 
@@ -364,7 +375,9 @@ pub async fn run_with_pc_agent_chat(
         PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => {
             PcAgentChatOutcome::NoReadableReply { diagnostic }
         }
-        PcAgentRunOutcome::UiRerouteRequested { .. } => PcAgentChatOutcome::NoReadableReply { diagnostic: Some("UI 路由救援未能完成二次执行".to_string()) },
+        PcAgentRunOutcome::UiRerouteRequested { .. } => PcAgentChatOutcome::NoReadableReply {
+            diagnostic: Some("UI 路由救援未能完成二次执行".to_string()),
+        },
     })
 }
 
@@ -395,158 +408,44 @@ async fn run_via_pc_agent_once(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<PcAgentRunOutcome> {
-    let raw_pc_passthrough = request_mode.is_passthrough();
-    let lightweight_pc_chat = !request_mode.is_plan() && cwd.is_none();
-    let apk_sync_probe_since = pc_apk_probe_since(request_mode, cwd);
-    let effective_codex_reasoning_effort = if lightweight_pc_chat {
-        pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort)
-    } else {
-        pc_project_reasoning_effort(cli_name, codex_reasoning_effort, request_mode)
-    };
-    // Route A CLI 会话锚点：服务器只下发稳定 scope，本机节点再按权限 + cwd 分桶。
-    let native_cli_session_uuid = native_session_scope
-        .as_ref()
-        .map(|scope| native_session_uuid(cli_name, scope));
-    let pc_development_prompt =
-        !lightweight_pc_chat && !request_mode.is_plan() && !raw_pc_passthrough;
-    let pc_prompt_bootstrapped = if pc_development_prompt {
-        pc_route_a_prompt_bootstrapped(
-            state,
-            native_session_scope.as_ref(),
-            cli_name,
-            agent_id,
-            cwd,
-            native_cli_session_uuid.as_deref(),
-            true,
-        )
-    } else {
-        false
-    };
-    let prompt = if raw_pc_passthrough {
-        pc_project_passthrough_prompt(&contextual_passthrough_message(user_message, preflight_note))
-    } else if lightweight_pc_chat {
-        pc_lightweight_chat_prompt(user_message, cli_name, model_label.or(copilot_model))
-    } else if request_mode.is_plan() {
-        match preflight_note {
-            Some(note) => format!(
-                "当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n注意：{}\n\n{}",
-                note, user_message
-            ),
-            None => format!(
-                "当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n{}",
-                user_message
-            ),
-        }
-    } else {
-        pc_project_execution_prompt(
-            user_message,
-            preflight_note,
-            cli_name,
-            model_label.or(copilot_model),
-            pc_prompt_bootstrapped,
-        )
-    };
-
-    // extra_args：Copilot/Codex 用 --session-id 绑定会话；Codex model/effort 由节点翻译成 exec 参数。
-    let extra_args = pc_route_a_ui_args(
-        cli_name,
-        native_cli_session_uuid.as_deref(),
-        copilot_model, effective_codex_reasoning_effort.as_deref(),
-        &prompt, &state.public_url,
-    );
-
-    // dispatch 时节点可能刚好掉线重连；dispatch 成功后仍要等本机 ACK，避免假在线连接吞请求。
-    let accepted_dispatch = dispatch_pc_cli_prompt_until_accepted(PcCliPromptDispatchRequest {
-        state,
-        tx,
+    // Admission freezes prompt, billing, execution identity and the accepted
+    // node task handle before this orchestration starts streaming output.
+    let PcRunAdmission {
+        raw_pc_passthrough,
+        lightweight_pc_chat,
+        apk_sync_probe_since,
+        native_cli_session_uuid,
+        pc_development_prompt,
+        pc_req_id,
+        pc_cli_feature,
+        pc_accounting_key,
+        mut pc_billing_call,
+        mut pc_billing_context,
+        frozen_model_id,
+        display_model,
+        mut pc_execution_guard,
+        mut rx,
+        cancel_handle,
+        mut first_cli_event,
+        node_progress_name,
+    } = admit_pc_run(PcRunAdmissionRequest {
         agent_id,
-        cli_name,
-        extra_args: &extra_args,
+        user_id,
         cwd,
-        prompt: &prompt,
+        user_message,
+        preflight_note,
         request_mode,
         native_session_scope: native_session_scope.as_ref(),
-        lightweight_pc_chat,
+        cli_name,
+        copilot_model,
+        codex_reasoning_effort,
+        model_label,
+        state,
+        tx,
     })
     .await?;
-    let pc_req_id = accepted_dispatch.pc_req_id;
-    let mut rx = accepted_dispatch.rx;
-    let cancel_handle = accepted_dispatch.cancel_handle;
-    let mut first_cli_event = accepted_dispatch.first_cli_event;
+
     let mut pc_cancel_guard = PcCliCancelOnDrop::armed(cancel_handle);
-    let pc_cli_feature = if request_mode.is_plan() {
-        "pc_agent_cli_plan"
-    } else if raw_pc_passthrough {
-        "pc_agent_cli_direct"
-    } else if cwd.is_some() {
-        "pc_agent_cli_dev"
-    } else {
-        "pc_agent_cli_chat"
-    };
-    let pc_accounting_key = format!("pc_agent_cli:{pc_req_id}");
-    let pc_reserve_fen = billing::configured_reservation_fen(
-        &state.store,
-        if cwd.is_some() && !raw_pc_passthrough {
-            "billing_cli_dev_reservation_fen"
-        } else {
-            "billing_cli_chat_reservation_fen"
-        },
-        if cwd.is_some() && !raw_pc_passthrough {
-            100
-        } else {
-            10
-        },
-    );
-    let (mut pc_billing_call, mut pc_billing_context) = reserve_pc_cli_billing_call(
-        state.as_ref(),
-        user_id,
-        agent_id,
-        &pc_accounting_key,
-        pc_cli_feature,
-        model_label.or(copilot_model).or(Some(cli_name)),
-        pc_reserve_fen,
-        cli_name,
-    )
-    .map_err(|msg| anyhow!(msg))?;
-    let display_model = pc_display_model_label(
-        cli_name,
-        model_label.or(copilot_model),
-        effective_codex_reasoning_effort.as_deref(),
-        lightweight_pc_chat,
-        cli_name,
-    );
-    start_pc_node_compute_run(
-        state,
-        user_id,
-        agent_id,
-        &pc_accounting_key,
-        pc_cli_feature,
-        Some(&display_model),
-    );
-    record_pc_execution_started(
-        state,
-        native_session_scope.as_ref(),
-        agent_id,
-        &pc_req_id,
-        cwd,
-        model_label.or(copilot_model),
-    );
-    let mut pc_execution_guard = PcExecutionFinishOnDrop::armed(
-        state.clone(),
-        native_session_scope.clone(),
-        pc_req_id.clone(),
-        Some(display_model.clone()),
-    );
-    let node_progress_name = pc_node_progress_name(state.as_ref(), agent_id).await;
-    let _ = tx.send(pc_dispatch_started_event(
-        &pc_req_id,
-        agent_id,
-        &node_progress_name,
-        cli_name,
-        cwd,
-        native_session_scope.as_ref(),
-        request_mode,
-    ));
 
     let mut full_text = String::new();
     let stream_id = Uuid::new_v4().to_string();
@@ -625,6 +524,7 @@ async fn run_via_pc_agent_once(
                         record_pc_execution_without_cli_done(
                             state,
                             native_session_scope.as_ref(),
+                            agent_id,
                             &pc_req_id,
                             false,
                             Some(&message),
@@ -662,6 +562,7 @@ async fn run_via_pc_agent_once(
                         record_pc_execution_without_cli_done(
                             state,
                             native_session_scope.as_ref(),
+                            agent_id,
                             &pc_req_id,
                             true,
                             None,
@@ -707,6 +608,7 @@ async fn run_via_pc_agent_once(
                         record_pc_execution_without_cli_done(
                             state,
                             native_session_scope.as_ref(),
+                            agent_id,
                             &pc_req_id,
                             true,
                             None,
@@ -730,6 +632,7 @@ async fn run_via_pc_agent_once(
                     record_pc_execution_without_cli_done(
                         state,
                         native_session_scope.as_ref(),
+                        agent_id,
                         &pc_req_id,
                         false,
                         Some(
@@ -775,6 +678,7 @@ async fn run_via_pc_agent_once(
                     record_pc_execution_without_cli_done(
                         state,
                         native_session_scope.as_ref(),
+                        agent_id,
                         &pc_req_id,
                         false,
                         Some(&message),
@@ -902,7 +806,15 @@ async fn run_via_pc_agent_once(
                 session_id,
                 ..
             } => {
-                ai_cli_ui_route_learning::finalize_ui_route_learning(is_codex, native_session_scope.as_ref(), user_message, &full_text, exit_ok, state.as_ref(), tx);
+                ai_cli_ui_route_learning::finalize_ui_route_learning(
+                    is_codex,
+                    native_session_scope.as_ref(),
+                    user_message,
+                    &full_text,
+                    exit_ok,
+                    state.as_ref(),
+                    tx,
+                );
                 if is_codex {
                     let events = pc_cli_passthrough_events_flush(
                         &mut codex_passthrough_line_buffer,
@@ -914,46 +826,111 @@ async fn run_via_pc_agent_once(
                 }
                 abort_pc_progress(&mut progress_handle); // 停止心跳
                 pc_cancel_guard.disarm();
-                let mut cli_usage = None;
+                let cli_usage = bind_pc_cli_usage_to_frozen_model(
+                    crate::cli_usage::usage_from_optional_parts(
+                        prompt_tokens,
+                        cached_input_tokens,
+                        completion_tokens,
+                        reasoning_tokens,
+                        total_tokens,
+                        model,
+                    ),
+                    &frozen_model_id,
+                );
+                let billing_context_ready = match refresh_pc_cli_billing_context_from_run(
+                    state.as_ref(),
+                    user_id,
+                    agent_id,
+                    &pc_accounting_key,
+                    &pc_billing_context,
+                ) {
+                    Ok(context) => {
+                        pc_billing_context = context;
+                        true
+                    }
+                    Err(error) => {
+                        tracing::error!(
+                            %pc_accounting_key,
+                            %error,
+                            "读取 PC CLI 冻结计费上下文失败，交由 durable completion 重放"
+                        );
+                        false
+                    }
+                };
+                let usage_verification_pending = pc_cli_unknown_usage_requires_verification(
+                    billing_context_ready.then_some(&pc_billing_context),
+                    cli_usage.as_ref(),
+                );
+                if usage_verification_pending {
+                    pc_billing_call.handoff_to_durable_replay();
+                    hold_pc_cli_usage_for_verification(&state.store, user_id, &pc_accounting_key)?;
+                }
                 let mut accounting_result = None;
                 let mut node_transaction = None;
-                if let Some(usage) = crate::cli_usage::usage_from_optional_parts(
-                    prompt_tokens,
-                    cached_input_tokens,
-                    completion_tokens,
-                    reasoning_tokens,
-                    total_tokens,
-                    model.clone().or_else(|| Some(display_model.clone())),
-                ) {
-                    pc_billing_context.refresh(state.as_ref(), user_id, agent_id, cli_name);
-                    accounting_result = record_pc_cli_trusted_usage(
-                        &state.store,
-                        user_id,
-                        pc_cli_feature,
-                        model.as_deref().or(Some(display_model.as_str())),
-                        &usage,
-                        &pc_accounting_key,
-                        &pc_billing_context,
-                    );
-                    node_transaction = settle_pc_cli_node_usage(
-                        state,
-                        user_id,
-                        agent_id,
-                        pc_cli_feature,
-                        model.as_deref().or(Some(display_model.as_str())),
-                        &usage,
-                        accounting_result.as_ref(),
-                    );
-                    if accounting_result.is_some() {
-                        pc_billing_call.mark_settled();
+                if let Some(usage) = cli_usage.as_ref() {
+                    let mut replay_required = !billing_context_ready;
+                    if !replay_required {
+                        match record_pc_cli_trusted_usage_result(
+                            &state.store,
+                            user_id,
+                            pc_cli_feature,
+                            &frozen_model_id,
+                            usage,
+                            &pc_accounting_key,
+                            &pc_billing_context,
+                        ) {
+                            Ok(Some(result)) => {
+                                accounting_result = Some(result);
+                                pc_billing_call.mark_settled();
+                            }
+                            Ok(None) => {
+                                tracing::error!(
+                                    %pc_accounting_key,
+                                    "PC CLI completion 含 token 但未产生用量记录，交由 durable completion 重放"
+                                );
+                                replay_required = true;
+                            }
+                            Err(error) => {
+                                tracing::error!(
+                                    %pc_accounting_key,
+                                    %error,
+                                    "PC CLI token 入账失败，交由 durable completion 重放"
+                                );
+                                replay_required = true;
+                            }
+                        }
                     }
-                    cli_usage = Some(usage);
+                    if !replay_required {
+                        node_transaction = match settle_pc_cli_node_usage(
+                            state,
+                            user_id,
+                            agent_id,
+                            pc_cli_feature,
+                            &frozen_model_id,
+                            usage,
+                            accounting_result.as_ref(),
+                            &pc_billing_context,
+                        ) {
+                            Ok(transaction) => transaction,
+                            Err(error) => {
+                                tracing::error!(
+                                    %pc_accounting_key,
+                                    %error,
+                                    "PC CLI 节点收益结算失败，交由 durable completion 重放"
+                                );
+                                replay_required = true;
+                                None
+                            }
+                        };
+                    }
+                    if replay_required {
+                        pc_billing_call.handoff_to_durable_replay();
+                    }
                 }
                 let ui_reroute_reason = (is_codex
                     && exit_ok
                     && pc_development_prompt
-                    && !user_message.contains("<elon-ui-design-task version=\"1\">")
-                )
+                    && !user_message.contains("<elon-ui-design-task version=\"1\">"))
                 .then(|| ai_cli_ui_route_rescue::requested_ui_route(&full_text))
                 .flatten();
                 if let Some(reason) = ui_reroute_reason {
@@ -968,10 +945,11 @@ async fn run_via_pc_agent_once(
                     record_pc_execution_finished(
                         state,
                         native_session_scope.as_ref(),
+                        agent_id,
                         &pc_req_id,
                         true,
                         None,
-                        model.as_deref().or(Some(display_model.as_str())),
+                        Some(frozen_model_id.as_str()),
                         workspace_status.as_ref(),
                         cli_usage.as_ref(),
                         accounting_result.as_ref(),
@@ -986,7 +964,7 @@ async fn run_via_pc_agent_once(
                         true,
                     );
                     pc_execution_guard.disarm();
-                    if cli_usage.is_none() {
+                    if cli_usage.is_none() && !usage_verification_pending {
                         pc_billing_call.release_no_usage();
                         finish_pc_node_compute_run(
                             state,
@@ -997,7 +975,7 @@ async fn run_via_pc_agent_once(
                             None,
                             Some("Codex requested UI route rescue before source editing"),
                         );
-                    } else {
+                    } else if cli_usage.is_some() {
                         finish_pc_node_compute_run(
                             state,
                             &pc_accounting_key,
@@ -1042,10 +1020,11 @@ async fn run_via_pc_agent_once(
                 record_pc_execution_finished(
                     state,
                     native_session_scope.as_ref(),
+                    agent_id,
                     &pc_req_id,
                     effective_exit_ok,
                     effective_error.as_deref(),
-                    model.as_deref().or(Some(display_model.as_str())),
+                    Some(frozen_model_id.as_str()),
                     workspace_status.as_ref(),
                     cli_usage.as_ref(),
                     accounting_result.as_ref(),
@@ -1093,7 +1072,7 @@ async fn run_via_pc_agent_once(
                         }
                     }
                     if lightweight_pc_chat && reply.is_empty() {
-                        if cli_usage.is_none() {
+                        if cli_usage.is_none() && !usage_verification_pending {
                             pc_billing_call.release_no_usage();
                             finish_pc_node_compute_run(
                                 state,
@@ -1106,7 +1085,7 @@ async fn run_via_pc_agent_once(
                                     "Lightweight PC chat completed without readable reply; fallback to normal chat",
                                 ),
                             );
-                        } else {
+                        } else if cli_usage.is_some() {
                             finish_pc_node_compute_run(
                                 state,
                                 &pc_accounting_key,
@@ -1165,7 +1144,7 @@ async fn run_via_pc_agent_once(
                             .to_json(),
                         );
                     }
-                    if cli_usage.is_none() {
+                    if cli_usage.is_none() && !usage_verification_pending {
                         pc_billing_call.release_no_usage();
                         finish_pc_node_compute_run(
                             state,
@@ -1176,7 +1155,7 @@ async fn run_via_pc_agent_once(
                             None,
                             Some("CLI completed without token usage"),
                         );
-                    } else {
+                    } else if cli_usage.is_some() {
                         finish_pc_node_compute_run(
                             state,
                             &pc_accounting_key,
@@ -1205,16 +1184,18 @@ async fn run_via_pc_agent_once(
                         effective_error.as_deref(),
                         &full_text,
                     );
-                    finish_pc_node_compute_run(
-                        state,
-                        &pc_accounting_key,
-                        "failed",
-                        cli_usage.as_ref(),
-                        accounting_result.as_ref(),
-                        node_transaction.as_ref(),
-                        Some(&error_message),
-                    );
-                    pc_billing_call.release_error();
+                    if !usage_verification_pending {
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "failed",
+                            cli_usage.as_ref(),
+                            accounting_result.as_ref(),
+                            node_transaction.as_ref(),
+                            Some(&error_message),
+                        );
+                        pc_billing_call.release_error();
+                    }
                     return Err(anyhow!(error_message));
                 }
             }
@@ -1265,6 +1246,7 @@ async fn run_via_pc_agent_once(
             record_pc_execution_without_cli_done(
                 state,
                 native_session_scope.as_ref(),
+                agent_id,
                 &pc_req_id,
                 true,
                 None,
@@ -1286,6 +1268,7 @@ async fn run_via_pc_agent_once(
         record_pc_execution_without_cli_done(
             state,
             native_session_scope.as_ref(),
+            agent_id,
             &pc_req_id,
             false,
             Some("Lightweight PC chat channel closed before CliDone; fallback to normal chat"),
@@ -1307,6 +1290,7 @@ async fn run_via_pc_agent_once(
     record_pc_execution_without_cli_done(
         state,
         native_session_scope.as_ref(),
+        agent_id,
         &pc_req_id,
         false,
         Some("PC agent CLI 连接中断（未收到 CliDone）"),

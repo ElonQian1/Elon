@@ -1,8 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, GitBranch, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Bot, Boxes, GitBranch, HardDrive, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
+import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
 import UserAvatar, { userDisplayName } from './UserAvatar'
 import { presenceLabel, useMyPresence } from './useMyPresence'
@@ -26,11 +27,16 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
 ]
 
+const LOCAL_TASK_ITEM: RailItem = {
+  path: '/local-tasks', Icon: HardDrive, label: '本机任务', color: '#26342d', hoverColor: '#30463a',
+}
+
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const user = useAuthStore((s) => s.user)
-  const presence = useMyPresence()
+  const localMode = isLocalWorkbench()
+  const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
 
   // 项目列表（从 store 读取，实时响应）
@@ -58,7 +64,7 @@ export default function ServerRail() {
 
   return (
     <nav className={styles.rail}>
-      {RAIL_ITEMS.map((item) => {
+      {(localMode ? [LOCAL_TASK_ITEM] : RAIL_ITEMS).map((item) => {
         const active = isActive(item.path)
         const Icon = item.Icon
         return (
@@ -78,9 +84,9 @@ export default function ServerRail() {
       })}
 
       {/* ── 项目列表分隔线 ── */}
-      {projects.length > 0 && <div className={styles.divider} />}
+      {!localMode && projects.length > 0 && <div className={styles.divider} />}
 
-      <div className={styles.projectStack} aria-label="项目快捷入口">
+      {!localMode && <div className={styles.projectStack} aria-label="项目快捷入口">
         {projects.map((p) => {
           const isActiveProject = pathname === '/workspace' && p.id === activeProjectId
           const iconSrc = p.icon_data_url || p.icon || ''
@@ -101,12 +107,12 @@ export default function ServerRail() {
             </button>
           )
         })}
-      </div>
+      </div>}
 
-      <div className={styles.divider} />
+      {!localMode && <div className={styles.divider} />}
 
       {/* 账号头像 → 点击进账号页 */}
-      {user && (
+      {!localMode && user && (
         <button
           className={[styles.avatar, styles.userAvatar].join(' ')}
           title={`${userDisplayName(user)} — ${presenceLabel(presence?.status)}`}

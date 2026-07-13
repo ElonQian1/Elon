@@ -42,6 +42,7 @@ fn active_handle() -> ActiveCliPromptView {
         route: "route_c_server_runtime".to_string(),
         cwd: Some("D:/demo".to_string()),
         runtime_permission: Some("project_write".to_string()),
+        requires_cloud_control: false,
         started_at_ms: 1,
         last_heartbeat_ms: 2,
         control_lease_expires_at_ms: 47_000,

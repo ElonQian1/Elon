@@ -16,14 +16,17 @@ import PublicDevSmokePage from './features/node/PublicDevSmokePage'
 import DevTasksPage from './features/dev/DevTasksPage'
 import GitWorktreesPage from './features/git-worktrees/GitWorktreesPage'
 import UiTunerPage from './features/ui-tuner/UiTunerPage'
+import LocalTasksPage from './features/local-tasks/LocalTasksPage'
+import { isLocalWorkbench } from './api/runtime'
 
 export default function App() {
+  const defaultPath = isLocalWorkbench() ? '/local-tasks' : '/ai'
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/*" element={<Shell />}>
         {/* 首页：一龙 AI 工作台 */}
-        <Route index element={<Navigate to="/ai" replace />} />
+        <Route index element={<Navigate to={defaultPath} replace />} />
         <Route path="ai" element={<AiChatPage />} />
         <Route path="workspace" element={<ConversationPage />} />
         <Route path="friends" element={<FriendsPage />} />
@@ -36,6 +39,7 @@ export default function App() {
         <Route path="dev-tasks" element={<DevTasksPage />} />
         <Route path="git-worktrees" element={<GitWorktreesPage />} />
         <Route path="ui-tuner" element={<UiTunerPage />} />
+        <Route path="local-tasks" element={<LocalTasksPage />} />
         <Route path="voice" element={<VoicePage />} />
         <Route path="doctor" element={<DoctorPage />} />
         <Route path="node/public-dev-smoke" element={<PublicDevSmokePage />} />

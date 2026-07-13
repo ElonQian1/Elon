@@ -97,12 +97,29 @@ pub(super) fn pc_codex_error_output_can_complete(
         && !pc_codex_failure_requires_error(error, output)
         && error
             .map(|e| {
-                !e.contains("断线")
+                !pc_cli_terminal_may_have_unreported_usage(Some(e))
+                    && !e.contains("断线")
                     && !e.contains("超时")
                     && !e.contains("worktree")
                     && !e.contains("合并")
             })
             .unwrap_or(true)
+}
+
+/// These terminal errors are only emitted after the node has started a real
+/// child process. Missing usage therefore means "unknown after execution", not
+/// an authoritative zero. A shared/managed reservation must stay with durable
+/// replay instead of being released immediately.
+pub(super) fn pc_cli_terminal_may_have_unreported_usage(error: Option<&str>) -> bool {
+    let error = error.unwrap_or_default().trim();
+    if error.is_empty() {
+        return false;
+    }
+    let lower = error.to_ascii_lowercase();
+    error.contains("用户已停止 PC CLI 任务")
+        || error.contains("执行超时")
+        || lower.contains("cli task canceled after start")
+        || lower.contains("cli task timed out after start")
 }
 
 fn pc_codex_failure_requires_error(error: Option<&str>, output: &str) -> bool {
@@ -152,7 +169,9 @@ pub(super) fn pc_cli_terminal_error_message(
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_readable_output, pc_cli_terminal_error_message, pc_codex_failure_requires_error,
+        pc_cli_readable_output, pc_cli_terminal_error_message,
+        pc_cli_terminal_may_have_unreported_usage, pc_codex_error_output_can_complete,
+        pc_codex_failure_requires_error,
     };
     use crate::ai_cli::pc_passthrough_reply::pc_lightweight_no_readable_diagnostic;
 
@@ -271,5 +290,26 @@ mod tests {
             readable.completion_status(false, false, true, false, Some("502 Bad Gateway"));
         assert!(!exit_ok);
         assert_eq!(error.as_deref(), Some("502 Bad Gateway"));
+    }
+
+    #[test]
+    fn canceled_or_timed_out_child_with_unknown_usage_is_not_zero_usage() {
+        for error in [
+            "用户已停止 PC CLI 任务",
+            "codex 执行超时（超过300秒），已强制终止",
+            "codex pipe sidecar 执行超时（超过 300 秒）",
+        ] {
+            assert!(pc_cli_terminal_may_have_unreported_usage(Some(error)));
+            assert!(!pc_codex_error_output_can_complete(
+                true,
+                true,
+                false,
+                Some(error),
+                "codex\n已有部分公开输出\n",
+            ));
+        }
+        assert!(!pc_cli_terminal_may_have_unreported_usage(Some(
+            "无法启动 codex: executable not found",
+        )));
     }
 }

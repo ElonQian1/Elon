@@ -22,9 +22,41 @@ const ROUTE_BC_HIGH_RISK_GIT_PUSH_DENIED: &[&str] = &[
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct FullAccessGrant {
+    /// Identity fields deliberately default to empty only for backwards
+    /// compatible deserialization. Empty legacy grants never match a live
+    /// runtime identity and therefore fail closed.
+    #[serde(default)]
+    pub owner_user_id: String,
+    #[serde(default)]
+    pub agent_id: String,
+    #[serde(default)]
+    pub install_id: String,
     pub project_id: String,
     pub workspace_path: String,
     pub granted_at_ms: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FullAccessGrantIdentity {
+    owner_user_id: String,
+    agent_id: String,
+    install_id: String,
+}
+
+impl FullAccessGrantIdentity {
+    pub(crate) fn new(owner_user_id: &str, agent_id: &str, install_id: &str) -> Result<Self> {
+        Ok(Self {
+            owner_user_id: clean_required("owner_user_id", owner_user_id)?.to_string(),
+            agent_id: clean_required("agent_id", agent_id)?.to_string(),
+            install_id: clean_required("install_id", install_id)?.to_string(),
+        })
+    }
+
+    fn matches(&self, grant: &FullAccessGrant) -> bool {
+        grant.owner_user_id == self.owner_user_id
+            && grant.agent_id == self.agent_id
+            && grant.install_id == self.install_id
+    }
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -68,20 +100,26 @@ impl FullAccessGrantState {
 
     pub(crate) async fn grant_project(
         &self,
+        identity: &FullAccessGrantIdentity,
         project_id: &str,
         workspace_path: &str,
     ) -> Result<FullAccessGrant> {
         let project_id = clean_required("project_id", project_id)?;
         let workspace_path = canonical_workspace_path(workspace_path)?;
         let grant = FullAccessGrant {
+            owner_user_id: identity.owner_user_id.clone(),
+            agent_id: identity.agent_id.clone(),
+            install_id: identity.install_id.clone(),
             project_id: project_id.to_string(),
             workspace_path,
             granted_at_ms: now_ms(),
         };
         let snapshot = {
             let mut grants = self.grants.write().await;
-            // 一个云端项目在一台 PC 上只保留一个完全访问目录，避免旧目录继续扩大权限。
-            grants.retain(|item| item.project_id != grant.project_id);
+            // Each bound identity keeps only one directory per project. Grants
+            // belonging to another owner, node credential, or installation are
+            // retained but can never authorize the current runtime.
+            grants.retain(|item| !(identity.matches(item) && item.project_id == grant.project_id));
             grants.push(grant.clone());
             grants.clone()
         };
@@ -89,15 +127,28 @@ impl FullAccessGrantState {
         Ok(grant)
     }
 
-    pub(crate) async fn list(&self) -> Vec<FullAccessGrant> {
-        self.grants.read().await.clone()
+    pub(crate) async fn list(&self, identity: &FullAccessGrantIdentity) -> Vec<FullAccessGrant> {
+        self.grants
+            .read()
+            .await
+            .iter()
+            .filter(|grant| identity.matches(grant))
+            .cloned()
+            .collect()
     }
 
-    async fn require_project(&self, project_id: &str, workspace_path: &str) -> Result<()> {
+    async fn require_project(
+        &self,
+        identity: &FullAccessGrantIdentity,
+        project_id: &str,
+        workspace_path: &str,
+    ) -> Result<()> {
         let project_id = clean_required("project_id", project_id)?;
         let workspace_path = canonical_workspace_path(workspace_path)?;
         let granted = self.grants.read().await.iter().any(|grant| {
-            grant.project_id == project_id && same_workspace(&grant.workspace_path, &workspace_path)
+            identity.matches(grant)
+                && grant.project_id == project_id
+                && same_workspace(&grant.workspace_path, &workspace_path)
         });
         if granted {
             return Ok(());
@@ -120,10 +171,12 @@ impl FullAccessGrantState {
 
 pub(crate) async fn require_route_a_full_access_grant(
     grants: &FullAccessGrantState,
+    identity: &FullAccessGrantIdentity,
     cli_name: &str,
     runtime_permission: Option<&str>,
     project_context: Option<&CliProjectContext>,
     cwd: Option<&str>,
+    allow_personal_chat_bypass: bool,
 ) -> Result<()> {
     if !is_route_a_cli(cli_name) || !is_full_access(runtime_permission) {
         return Ok(());
@@ -131,7 +184,7 @@ pub(crate) async fn require_route_a_full_access_grant(
     let context = project_context
         .ok_or_else(|| anyhow!("Route A 完全访问必须携带项目上下文，已拒绝执行。"))?;
     // AI 聊天模式（project_id = "chat"）不需要本机 grant，直接放行。
-    if context.project_id == "chat" {
+    if allow_personal_chat_bypass && context.project_id == "chat" {
         return Ok(());
     }
     let cwd = cwd
@@ -141,7 +194,23 @@ pub(crate) async fn require_route_a_full_access_grant(
     if platform_managed_workspace_matches(&context.project_id, cwd) {
         return Ok(());
     }
-    grants.require_project(&context.project_id, cwd).await
+    grants
+        .require_project(identity, &context.project_id, cwd)
+        .await
+}
+
+pub(crate) async fn current_grant_identity(
+    runtime: &crate::NodeRuntime,
+) -> Result<FullAccessGrantIdentity> {
+    let credentials = runtime
+        .creds()
+        .await
+        .ok_or_else(|| anyhow!("本机节点未绑定当前账号，不能使用完全访问授权。"))?;
+    FullAccessGrantIdentity::new(
+        &credentials.owner_user_id,
+        &credentials.agent_id,
+        &runtime.install_id,
+    )
 }
 
 pub(crate) async fn grant_handler(
@@ -151,9 +220,13 @@ pub(crate) async fn grant_handler(
     if !req.confirm_full_access {
         return json_error(StatusCode::BAD_REQUEST, "缺少完全访问本机确认。");
     }
+    let identity = match current_grant_identity(&runtime).await {
+        Ok(identity) => identity,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+    };
     match runtime
         .full_access_grants
-        .grant_project(&req.project_id, &req.workspace_path)
+        .grant_project(&identity, &req.project_id, &req.workspace_path)
         .await
     {
         Ok(grant) => (
@@ -170,11 +243,15 @@ pub(crate) async fn grant_handler(
 pub(crate) async fn list_handler(
     State(runtime): State<Arc<crate::NodeRuntime>>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    let identity = match current_grant_identity(&runtime).await {
+        Ok(identity) => identity,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
+    };
     (
         StatusCode::OK,
         Json(json!({
             "ok": true,
-            "grants": runtime.full_access_grants.list().await,
+            "grants": runtime.full_access_grants.list(&identity).await,
         })),
     )
 }
@@ -319,7 +396,6 @@ fn json_error(
         })),
     )
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_full_access_tests.rs"]

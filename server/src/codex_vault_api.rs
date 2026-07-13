@@ -427,6 +427,15 @@ pub async fn lease_auth_cache(
     let _ = state
         .store
         .mark_user_codex_credential_leased(&user.id, Some(&req.agent_id));
+    let cloud_control_window = match freeze_owner_vault_cloud_control_window() {
+        Ok(window) => window,
+        Err(error) => {
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("无法签发 Codex 保险箱云控窗口: {error}"),
+            )
+        }
+    };
     Json(serde_json::json!({
         "ok": true,
         "lease_id": format!("cvl_{}", uuid::Uuid::new_v4().simple()),
@@ -437,14 +446,16 @@ pub async fn lease_auth_cache(
         "account_hint_hash": slot.account_hint_hash,
         "device_name": req.device_name,
         "purpose": req.purpose,
-        "cleanup_recommended_seconds": 900,
+        "cloud_control_deadline": cloud_control_window.deadline,
+        "cloud_control_issued_at": cloud_control_window.issued_at,
+        "cloud_control_ttl_ms": cloud_control_window.ttl_ms,
+        "cleanup_recommended_seconds": OWNER_VAULT_LEASE_CLEANUP_SECONDS,
         "message": "租用凭据只应写入本机节点管理的临时 CODEX_HOME，退出后必须清理。",
     }))
     .into_response()
 }
 
-
 #[path = "codex_vault_api_helpers.rs"]
 mod helpers;
-pub(crate) use self::helpers::{decrypt_auth_json, verify_node_proof};
 use self::helpers::*;
+pub(crate) use self::helpers::{decrypt_auth_json, verify_node_proof};

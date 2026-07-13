@@ -62,11 +62,29 @@ struct CloudLeaseResponse {
     lease_id: Option<String>,
     slot_id: Option<String>,
     account_hint_hash: Option<String>,
+    #[serde(default)]
+    cloud_control_deadline: Option<String>,
+    #[serde(default)]
+    cloud_control_issued_at: Option<String>,
+    #[serde(default)]
+    cloud_control_ttl_ms: Option<u64>,
     message: Option<String>,
 }
 
+pub(crate) struct CodexVaultAutoSwitchCandidate {
+    pub(crate) message: String,
+    pub(crate) cloud_control_deadline: Option<String>,
+    pub(crate) cloud_control_issued_at: Option<String>,
+    pub(crate) cloud_control_ttl_ms: Option<u64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct ManagedSlotMeta { pub(crate) slot_id: String, pub(crate) account_hint_hash: Option<String>, pub(crate) lease_id: Option<String>, pub(crate) lease_expires_at: Option<String> }
+pub(crate) struct ManagedSlotMeta {
+    pub(crate) slot_id: String,
+    pub(crate) account_hint_hash: Option<String>,
+    pub(crate) lease_id: Option<String>,
+    pub(crate) lease_expires_at: Option<String>,
+}
 
 pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
     Router::new()
@@ -192,7 +210,7 @@ pub(crate) async fn try_auto_switch_after_codex_failure(
     rt: &Arc<crate::NodeRuntime>,
     stdout_text: &str,
     stderr_text: &str,
-) -> Result<Option<String>> {
+) -> Result<Option<CodexVaultAutoSwitchCandidate>> {
     let combined = format!("{stdout_text}\n{stderr_text}");
     let classified = crate::errors::classify_ai_error(&combined);
     if !matches!(
@@ -223,17 +241,29 @@ pub(crate) async fn try_auto_switch_after_codex_failure(
             return Ok(None);
         }
     };
+    Ok(owner_vault_auto_switch_candidate(previous_hint, lease))
+}
+
+fn owner_vault_auto_switch_candidate(
+    previous_hint: &str,
+    lease: CloudLeaseResponse,
+) -> Option<CodexVaultAutoSwitchCandidate> {
     if lease.account_hint_hash.as_deref() == Some(previous_hint) {
-        return Ok(None);
+        return None;
     }
-    Ok(Some(format!(
-        "Codex 当前账号额度或认证不可用，已自动切换到保险箱备用账号{}，正在重试本轮任务。",
-        lease
-            .account_hint_hash
-            .as_deref()
-            .map(|hint| format!(" ({hint})"))
-            .unwrap_or_default()
-    )))
+    Some(CodexVaultAutoSwitchCandidate {
+        message: format!(
+            "Codex 当前账号额度或认证不可用，已自动切换到保险箱备用账号{}，正在重试本轮任务。",
+            lease
+                .account_hint_hash
+                .as_deref()
+                .map(|hint| format!(" ({hint})"))
+                .unwrap_or_default()
+        ),
+        cloud_control_deadline: lease.cloud_control_deadline,
+        cloud_control_issued_at: lease.cloud_control_issued_at,
+        cloud_control_ttl_ms: lease.cloud_control_ttl_ms,
+    })
 }
 
 async fn restore_from_cloud(
@@ -287,7 +317,10 @@ async fn restore_from_cloud(
         &ManagedSlotMeta {
             slot_id: slot_id.to_string(),
             account_hint_hash: lease.account_hint_hash.clone(),
-            lease_id: lease.lease_id.clone(),
+            // The owner's legacy vault endpoint issues an opaque request id,
+            // not a revocable/expiring shared lease. Only emergency sharing
+            // metadata may carry lease_id + lease_expires_at.
+            lease_id: None,
             lease_expires_at: None,
         },
     )?;
@@ -302,9 +335,11 @@ async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoRe
         .as_ref()
         .filter(|path| path_in_managed_vault(path))
         .and_then(|path| read_slot_meta(path).ok().flatten());
-    let cloud_clear =
-        crate::node_agent_codex_vault_emergency::clear_cloud_emergency_lease(&rt, active_meta.as_ref())
-            .await;
+    let cloud_clear = crate::node_agent_codex_vault_emergency::clear_cloud_emergency_lease(
+        &rt,
+        active_meta.as_ref(),
+    )
+    .await;
     if let Err(error) = safe_remove_all_managed_homes() {
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
@@ -362,10 +397,54 @@ async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl
     }
 }
 
-
 mod local_helpers;
 use self::local_helpers::*;
 pub(crate) use self::local_helpers::{
     cloud_post_typed, managed_slot_codex_home, validate_chatgpt_auth_cache,
     write_managed_auth_home, write_slot_meta,
 };
+
+#[cfg(test)]
+mod tests {
+    use super::{owner_vault_auto_switch_candidate, CloudLeaseResponse};
+
+    #[test]
+    fn owner_vault_auto_switch_carries_signed_cloud_window() {
+        let candidate = owner_vault_auto_switch_candidate(
+            "old-account",
+            CloudLeaseResponse {
+                auth_json: "{}".to_string(),
+                lease_id: Some("opaque-request".to_string()),
+                slot_id: Some("slot-new".to_string()),
+                account_hint_hash: Some("new-account".to_string()),
+                cloud_control_deadline: Some("2030-01-01T00:15:00Z".to_string()),
+                cloud_control_issued_at: Some("2030-01-01T00:00:00Z".to_string()),
+                cloud_control_ttl_ms: Some(900_000),
+                message: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            candidate.cloud_control_deadline.as_deref(),
+            Some("2030-01-01T00:15:00Z")
+        );
+        assert_eq!(
+            candidate.cloud_control_issued_at.as_deref(),
+            Some("2030-01-01T00:00:00Z")
+        );
+        assert_eq!(candidate.cloud_control_ttl_ms, Some(900_000));
+    }
+
+    #[test]
+    fn legacy_owner_vault_response_defaults_cloud_window_to_missing() {
+        let lease: CloudLeaseResponse = serde_json::from_str(
+            r#"{"auth_json":"{}","slot_id":"slot-new","account_hint_hash":"new-account"}"#,
+        )
+        .unwrap();
+
+        assert!(lease.cloud_control_deadline.is_none());
+        assert!(lease.cloud_control_issued_at.is_none());
+        assert!(lease.cloud_control_ttl_ms.is_none());
+    }
+}

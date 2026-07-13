@@ -1,22 +1,22 @@
 // server/src/node_agent_cli_prompt_direct.rs
 //! 直接子进程 CLI 路径
 
+use crate::node_agent_cli_done::{
+    cli_done_message_from_output, latest_codex_session_id, persist_and_send_cli_done,
+    CliCompletionContext,
+};
+use crate::node_agent_cli_prompt_runner::{cli_done_error, cli_prompt_timeout_secs, ws_text};
+use crate::node_agent_cli_runner::*;
+use crate::node_agent_codex_session::CodexSessionPlan;
+use crate::node_agent_runtime::NodeRuntime;
+use crate::pc_workspace_provisioner;
+use crate::{node_agent_codex_auth_switch, node_agent_codex_session};
+use homecli_proto::AgentToServer;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::watch;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
-use homecli_proto::AgentToServer;
-use crate::cli_usage;
-use crate::node_agent_cli_done::{cli_done_message, latest_codex_session_id};
-use crate::node_agent_cli_runner::*;
-use crate::node_agent_cli_prompt_runner::{ws_text, cli_prompt_timeout_secs, cli_done_error};
-use crate::node_agent_codex_session::CodexSessionPlan;
-use crate::node_agent_runtime::NodeRuntime;
-use crate::node_agent_task_journal;
-use crate::node_agent_tool_approval;
-use crate::pc_workspace_provisioner;
-use crate::{node_agent_codex_auth_switch, node_agent_codex_session};
 
 pub(crate) struct CliDirectRunContext {
     pub cmd: tokio::process::Command,
@@ -39,11 +39,36 @@ pub(crate) struct CliDirectRunContext {
     pub prompt: String,
     pub server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     pub approval_state: crate::node_agent_tool_approval::ToolApprovalState,
+    pub completion_context: CliCompletionContext,
+    pub frozen_codex_home: Option<crate::node_agent_codex_child_env::FrozenCodexHome>,
 }
 
 pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
     use tokio::io::AsyncBufReadExt;
-    let CliDirectRunContext { mut cmd, cli_name_owned, bin_owned, req_id, codex_sessions_file, codex_plan, codex_last_message_path, codex_key, extra_args, runtime_permission, conversation_workspace, codex_vault_switch_attempted, runtime, out_tx, mut cancel_rx, task_journal, cwd, prompt, server_runtime_config, approval_state } = ctx;
+    let CliDirectRunContext {
+        mut cmd,
+        cli_name_owned,
+        bin_owned,
+        req_id,
+        codex_sessions_file,
+        codex_plan,
+        codex_last_message_path,
+        codex_key,
+        extra_args,
+        runtime_permission,
+        conversation_workspace,
+        codex_vault_switch_attempted,
+        runtime,
+        out_tx,
+        mut cancel_rx,
+        task_journal,
+        cwd,
+        prompt,
+        server_runtime_config,
+        approval_state,
+        completion_context,
+        frozen_codex_home,
+    } = ctx;
     let cli_name = cli_name_owned.as_str();
     let bin = bin_owned.as_str();
 
@@ -51,8 +76,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         Ok(c) => c,
         Err(e) => {
             let message = format!("无法启动 {} : {}", bin, e);
-            record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
-            let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+            let done = AgentToServer::CliDone {
                 req_id,
                 exit_ok: false,
                 error: Some(message),
@@ -64,7 +88,17 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 total_tokens: None,
                 model: None,
                 workspace_status: None,
-            }));
+            };
+            if let Err(error) = persist_and_send_cli_done(
+                &runtime,
+                &completion_context,
+                cli_name,
+                None,
+                done,
+                &out_tx,
+            ) {
+                warn!(%error, "failed to persist CLI spawn completion");
+            }
             return;
         }
     };
@@ -173,20 +207,37 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 if changed.is_ok() && *cancel_rx.borrow() {
                     warn!("[{}] CLI 收到取消请求，强杀进程", cli_name);
                     let _ = child.kill().await;
+                    drain_killed_child_output(
+                        &mut stdout_lines,
+                        &mut stderr_rx,
+                        &mut stdout_done,
+                        &mut stderr_done,
+                        &mut stdout_text,
+                        &mut stderr_text,
+                    ).await;
                     let message = "用户已停止 PC CLI 任务".to_string();
                     let (exit_ok, error, workspace_status) =
                         finalize_cli_prompt_workspace(false, Some(message), conversation_workspace);
-                    let model = cli_model_from_args(cli_name, &extra_args);
-                    record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
-                    let _ = out_tx.send(ws_text(&cli_done_message(
+                    let (done, combined_output) = cli_done_message_from_output(
                         req_id,
                         exit_ok,
                         error,
-                        None,
-                        model,
+                        &stdout_text,
+                        &stderr_text,
+                        cli_model_from_args(cli_name, &extra_args),
                         workspace_status,
                         latest_codex_session_id(cli_name, &codex_plan, &task_journal),
-                    )));
+                    );
+                    if let Err(error) = persist_and_send_cli_done(
+                        &runtime,
+                        &completion_context,
+                        cli_name,
+                        Some(&combined_output),
+                        done,
+                        &out_tx,
+                    ) {
+                        warn!(%error, "failed to persist canceled CLI completion");
+                    }
                     return;
                 }
             },
@@ -195,23 +246,37 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             )) => {
                 warn!("[{}] CLI 执行超时，强杀进程", cli_name);
                 let _ = child.kill().await;
+                drain_killed_child_output(
+                    &mut stdout_lines,
+                    &mut stderr_rx,
+                    &mut stdout_done,
+                    &mut stderr_done,
+                    &mut stdout_text,
+                    &mut stderr_text,
+                ).await;
                 let timeout_secs = cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref());
                 let message = format!("{} 执行超时（超过{}秒），已强制终止",
                     cli_name, timeout_secs);
-                record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
-                let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+                let (done, combined_output) = cli_done_message_from_output(
                     req_id,
-                    exit_ok: false,
-                    error: Some(message),
-                    session_id: latest_codex_session_id(cli_name, &codex_plan, &task_journal),
-                    prompt_tokens: None,
-                    cached_input_tokens: None,
-                    completion_tokens: None,
-                    reasoning_tokens: None,
-                    total_tokens: None,
-                    model: None,
-                    workspace_status: None,
-                }));
+                    false,
+                    Some(message),
+                    &stdout_text,
+                    &stderr_text,
+                    cli_model_from_args(cli_name, &extra_args),
+                    None,
+                    latest_codex_session_id(cli_name, &codex_plan, &task_journal),
+                );
+                if let Err(error) = persist_and_send_cli_done(
+                    &runtime,
+                    &completion_context,
+                    cli_name,
+                    Some(&combined_output),
+                    done,
+                    &out_tx,
+                ) {
+                    warn!(%error, "failed to persist timeout CLI completion");
+                }
                 return;
             },
         }
@@ -255,22 +320,28 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 cancel_rx,
                 out_tx,
                 codex_vault_switch_attempted,
+                completion_context,
+                frozen_codex_home,
             }))
             .await;
             return;
         }
     }
     if !exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
-        if let Some(message) =
-            node_agent_codex_auth_switch::try_after_failure(&runtime, &stdout_text, &stderr_text)
-                .await
+        if let Some(auth_switch) = node_agent_codex_auth_switch::try_after_failure(
+            &runtime,
+            &req_id,
+            &stdout_text,
+            &stderr_text,
+        )
+        .await
         {
             send_cli_chunk(
                 &out_tx,
                 &task_journal,
                 &req_id,
                 "stdout",
-                &format!("codex\n{message}\n"),
+                &format!("codex\n{}\n", auth_switch.message),
             );
             Box::pin(crate::run_cli_prompt(crate::CliPromptRun {
                 req_id,
@@ -288,6 +359,8 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 cancel_rx,
                 out_tx,
                 codex_vault_switch_attempted: true,
+                completion_context,
+                frozen_codex_home: Some(auth_switch.frozen_codex_home),
             }))
             .await;
             return;
@@ -330,6 +403,8 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             cancel_rx,
             out_tx,
             codex_vault_switch_attempted,
+            completion_context,
+            frozen_codex_home,
         }))
         .await;
         return;
@@ -353,20 +428,59 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
     };
     let (exit_ok, error, workspace_status) =
         finalize_cli_prompt_workspace(exit_ok, error, conversation_workspace);
-    record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
-    let combined_usage_text = format!("{}\n{}", stdout_text, stderr_text);
-    let usage = cli_usage::parse_cli_usage(&combined_usage_text);
-    let model = usage
-        .as_ref()
-        .and_then(|u| u.model.clone())
-        .or_else(|| cli_model_from_args(cli_name, &extra_args));
-    let _ = out_tx.send(ws_text(&cli_done_message(
+    let (done, combined_output) = cli_done_message_from_output(
         req_id,
         exit_ok,
         error,
-        usage,
-        model,
+        &stdout_text,
+        &stderr_text,
+        cli_model_from_args(cli_name, &extra_args),
         workspace_status,
         latest_codex_session_id(cli_name, &codex_plan, &task_journal),
-    )));
+    );
+    if let Err(error) = persist_and_send_cli_done(
+        &runtime,
+        &completion_context,
+        cli_name,
+        Some(&combined_output),
+        done,
+        &out_tx,
+    ) {
+        warn!(%error, "failed to persist direct CLI completion");
+    }
+}
+
+/// After `kill().await` the process has exited, but pipe-reader tasks may still
+/// hold buffered terminal records. Give both streams a short bounded drain so a
+/// token-count event emitted before cancellation/timeout reaches the durable
+/// completion instead of being mistaken for unknown/zero usage.
+async fn drain_killed_child_output(
+    stdout_lines: &mut tokio::io::Lines<tokio::io::BufReader<tokio::process::ChildStdout>>,
+    stderr_rx: &mut tokio::sync::mpsc::UnboundedReceiver<Option<String>>,
+    stdout_done: &mut bool,
+    stderr_done: &mut bool,
+    stdout_text: &mut String,
+    stderr_text: &mut String,
+) {
+    let drain = async {
+        while !*stdout_done || !*stderr_done {
+            tokio::select! {
+                line = stdout_lines.next_line(), if !*stdout_done => match line {
+                    Ok(Some(line)) => {
+                        stdout_text.push_str(&line);
+                        stdout_text.push('\n');
+                    }
+                    Ok(None) | Err(_) => *stdout_done = true,
+                },
+                line = stderr_rx.recv(), if !*stderr_done => match line {
+                    Some(Some(line)) => {
+                        stderr_text.push_str(&line);
+                        stderr_text.push('\n');
+                    }
+                    Some(None) | None => *stderr_done = true,
+                },
+            }
+        }
+    };
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(1), drain).await;
 }

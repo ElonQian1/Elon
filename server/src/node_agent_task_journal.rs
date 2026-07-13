@@ -1,5 +1,8 @@
 // server/src/node_agent_task_journal.rs
 
+#[path = "node_agent_cancel_tombstones.rs"]
+mod cancel_tombstones;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -304,6 +307,43 @@ impl TaskJournal {
         with_task_journal_io_lock(|| match cli_chunk_event(req_id, stream, text, now_ms()) {
             Some(event) => self.append_event(event),
             None => Ok(()),
+        })
+    }
+
+    /// Reconstruct a bounded public transcript for the durable completion envelope.
+    /// This reads only the current task's already-redacted journal events and never
+    /// persists the prompt or environment secrets.
+    pub(crate) fn completion_output(&self, req_id: &str, max_chars: usize) -> Result<String> {
+        with_task_journal_io_lock(|| {
+            let path = self.events_path();
+            if !path.exists() || max_chars == 0 {
+                return Ok(String::new());
+            }
+            let file = File::open(&path).with_context(|| format!("读取 {:?}", path))?;
+            let mut output = String::new();
+            let mut remaining = max_chars;
+            for line in BufReader::new(file).lines() {
+                let line = line.with_context(|| format!("读取 {:?}", path))?;
+                let Ok(event) = serde_json::from_str::<Value>(&line) else {
+                    continue;
+                };
+                if event.get("req_id").and_then(Value::as_str) != Some(req_id) {
+                    continue;
+                }
+                let Some(text) = event.get("text").and_then(Value::as_str) else {
+                    continue;
+                };
+                if remaining == 0 {
+                    break;
+                }
+                let chunk: String = text.chars().take(remaining).collect();
+                remaining = remaining.saturating_sub(chunk.chars().count());
+                output.push_str(&chunk);
+                if !output.ends_with('\n') {
+                    output.push('\n');
+                }
+            }
+            Ok(output)
         })
     }
 
@@ -623,7 +663,6 @@ fn now_ms() -> u128 {
         .map(|duration| duration.as_millis())
         .unwrap_or_default()
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_task_journal_tests.rs"]

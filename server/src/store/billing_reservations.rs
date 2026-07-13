@@ -1,8 +1,10 @@
 //! Billing call reservations and reconciliation helpers.
 //!
-//! A reservation is a short-lived balance hold keyed by the same compute call id
-//! used as trusted token-usage idempotency key. Final token accounting settles
-//! the hold by refunding the unused amount or deducting the delta.
+//! A reservation starts as a short-lived pre-dispatch balance hold keyed by the
+//! same compute call id used as trusted token-usage idempotency key. Before work
+//! can reach a node it becomes a durable, amount-bounded dispatch hold. Final
+//! token accounting settles the hold by refunding the unused amount or deducting
+//! the delta.
 
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension, Transaction};
@@ -29,6 +31,15 @@ pub struct BillingReservationOutcome {
     pub balance_after_fen: Option<i64>,
     pub status: String,
     pub deduplicated: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ActiveBillingReservation {
+    pub reservation_id: String,
+    pub user_id: String,
+    pub compute_call_id: String,
+    pub reserved_fen: i64,
+    pub expires_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -73,6 +84,158 @@ pub(super) struct BillingReservationForSettlement {
 }
 
 impl Store {
+    pub fn get_active_billing_reservation(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+    ) -> Result<Option<ActiveBillingReservation>> {
+        let user_id = normalize_required_id("user_id", user_id)?;
+        let compute_call_id = normalize_compute_call_id(compute_call_id)?;
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT id, user_id, compute_call_id, reserved_fen, expires_at
+               FROM billing_reservations
+              WHERE user_id = ?1
+                AND compute_call_id = ?2
+                AND (
+                  status IN ('dispatch_hold', 'verification_hold')
+                  OR (status = 'reserved' AND (expires_at IS NULL OR expires_at >= ?3))
+                )",
+            params![user_id, compute_call_id, ts],
+            |row| {
+                Ok(ActiveBillingReservation {
+                    reservation_id: row.get(0)?,
+                    user_id: row.get(1)?,
+                    compute_call_id: row.get(2)?,
+                    reserved_fen: row.get(3)?,
+                    expires_at: row.get(4)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
+    /// Commits the crash-safety boundary before a prompt can be sent to a node.
+    /// The originally reserved amount and authorization deadline remain frozen,
+    /// while the expiry janitor can no longer refund work whose execution
+    /// outcome is not yet known. Keeping `expires_at` is important: it is also
+    /// the absolute execution deadline sent to cloud-controlled nodes.
+    pub fn hold_billing_reservation_for_dispatch(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+    ) -> Result<Option<ActiveBillingReservation>> {
+        let user_id = normalize_required_id("user_id", user_id)?;
+        let compute_call_id = normalize_compute_call_id(compute_call_id)?;
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE billing_reservations
+                SET status = 'dispatch_hold',
+                    updated_at = ?3
+              WHERE user_id = ?1
+                AND compute_call_id = ?2
+                AND (
+                  status = 'dispatch_hold'
+                  OR (status = 'reserved' AND (expires_at IS NULL OR expires_at >= ?3))
+                )",
+            params![user_id, compute_call_id, ts],
+        )?;
+        let held = active_hold_with_status(&tx, &user_id, &compute_call_id, "dispatch_hold")?;
+        tx.commit()?;
+        Ok(held)
+    }
+
+    /// Converts a bounded reservation into a non-expiring manual verification
+    /// hold without refunding or increasing the originally reserved amount.
+    /// The transaction serializes against the expiry janitor.
+    pub fn hold_billing_reservation_for_verification(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+    ) -> Result<Option<ActiveBillingReservation>> {
+        let user_id = normalize_required_id("user_id", user_id)?;
+        let compute_call_id = normalize_compute_call_id(compute_call_id)?;
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE billing_reservations
+                SET status = 'verification_hold',
+                    expires_at = NULL,
+                    updated_at = ?3
+              WHERE user_id = ?1
+                AND compute_call_id = ?2
+                AND status IN ('reserved', 'dispatch_hold', 'verification_hold')",
+            params![user_id, compute_call_id, ts],
+        )?;
+        let held = tx
+            .query_row(
+                "SELECT id, user_id, compute_call_id, reserved_fen, expires_at
+                   FROM billing_reservations
+                  WHERE user_id = ?1
+                    AND compute_call_id = ?2
+                    AND status = 'verification_hold'",
+                params![user_id, compute_call_id],
+                |row| {
+                    Ok(ActiveBillingReservation {
+                        reservation_id: row.get(0)?,
+                        user_id: row.get(1)?,
+                        compute_call_id: row.get(2)?,
+                        reserved_fen: row.get(3)?,
+                        expires_at: row.get(4)?,
+                    })
+                },
+            )
+            .optional()?;
+        tx.commit()?;
+        Ok(held)
+    }
+
+    /// Refunds a durable dispatch hold only when the caller has positive proof
+    /// that no prompt was ever enqueued to the node writer.
+    pub fn release_dispatch_billing_hold_before_send(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+    ) -> Result<Option<BillingReservationOutcome>> {
+        self.release_held_billing_call(
+            user_id,
+            compute_call_id,
+            &["dispatch_hold"],
+            "released_dispatch_not_sent",
+        )
+    }
+
+    /// Explicit operator/verified-failure escape hatch for a hold that cannot
+    /// be settled from a trusted completion. It is intentionally separate from
+    /// ordinary error/no-usage release and the automatic expiry janitor.
+    pub fn release_billing_hold_after_manual_verification(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+    ) -> Result<Option<BillingReservationOutcome>> {
+        self.release_held_billing_call(
+            user_id,
+            compute_call_id,
+            &["dispatch_hold", "verification_hold"],
+            "released_manual_verified",
+        )
+    }
+
+    pub fn billing_reservation_is_still_reserved(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+    ) -> Result<bool> {
+        Ok(self
+            .get_active_billing_reservation(user_id, compute_call_id)?
+            .is_some())
+    }
+
     pub fn release_expired_billing_reservations(&self) -> Result<usize> {
         let ts = now();
         let conn = self.conn.lock().unwrap();
@@ -258,6 +421,72 @@ impl Store {
         }))
     }
 
+    fn release_held_billing_call(
+        &self,
+        user_id: &str,
+        compute_call_id: &str,
+        allowed_statuses: &[&str],
+        release_status: &str,
+    ) -> Result<Option<BillingReservationOutcome>> {
+        let user_id = normalize_required_id("user_id", user_id)?;
+        let compute_call_id = normalize_compute_call_id(compute_call_id)?;
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        let existing = tx
+            .query_row(
+                "SELECT id, reserved_fen, status
+                   FROM billing_reservations
+                  WHERE user_id = ?1 AND compute_call_id = ?2",
+                params![user_id, compute_call_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((reservation_id, reserved_fen, current_status)) = existing else {
+            tx.commit()?;
+            return Ok(None);
+        };
+        if !allowed_statuses.contains(&current_status.as_str()) {
+            tx.commit()?;
+            return Ok(None);
+        }
+
+        let balance_after = refund_reserved_fen(&tx, &user_id, reserved_fen, &ts)?;
+        let changed = tx.execute(
+            "UPDATE billing_reservations
+                SET status = ?2,
+                    refunded_fen = reserved_fen,
+                    balance_after_fen = ?3,
+                    updated_at = ?4
+              WHERE id = ?1 AND status = ?5",
+            params![
+                reservation_id,
+                release_status,
+                balance_after,
+                ts,
+                current_status
+            ],
+        )?;
+        if changed != 1 {
+            return Err(anyhow!("billing hold changed during verified release"));
+        }
+        tx.commit()?;
+        Ok(Some(BillingReservationOutcome {
+            reservation_id,
+            compute_call_id,
+            reserved_fen,
+            balance_after_fen: Some(balance_after),
+            status: release_status.to_string(),
+            deduplicated: false,
+        }))
+    }
+
     pub fn admin_billing_reconciliation_summary(
         &self,
         days: i64,
@@ -293,10 +522,12 @@ impl Store {
                   HAVING COUNT(*) > 1
                 )),
                (SELECT COUNT(*) FROM user_balance WHERE balance_fen < 0),
-               (SELECT COUNT(*) FROM billing_reservations WHERE status = 'reserved'),
+               (SELECT COUNT(*) FROM billing_reservations
+                 WHERE status IN ('reserved', 'dispatch_hold', 'verification_hold')),
                (SELECT COUNT(*) FROM billing_reservations
                 WHERE status = 'reserved' AND expires_at IS NOT NULL AND expires_at < ?2),
-               (SELECT COALESCE(SUM(reserved_fen),0) FROM billing_reservations WHERE status = 'reserved'),
+               (SELECT COALESCE(SUM(reserved_fen),0) FROM billing_reservations
+                WHERE status IN ('reserved', 'dispatch_hold', 'verification_hold')),
                (SELECT COALESCE(SUM(cost_rmb_fen),0) FROM token_usage_events
                 WHERE usage_mode != 'client_reported'
                   AND created_at >= datetime('now', ?1))",
@@ -393,12 +624,67 @@ pub(super) fn load_reservation_for_settlement(
     tx.query_row(
         "SELECT id, reserved_fen
          FROM billing_reservations
-         WHERE user_id = ?1 AND compute_call_id = ?2 AND status = 'reserved'",
+         WHERE user_id = ?1
+           AND compute_call_id = ?2
+           AND status IN ('reserved', 'dispatch_hold', 'verification_hold')",
         params![user_id, compute_call_id],
         |row| {
             Ok(BillingReservationForSettlement {
                 id: row.get(0)?,
                 reserved_fen: row.get(1)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+pub(super) fn load_active_reservation_for_settlement(
+    tx: &Transaction<'_>,
+    user_id: &str,
+    compute_call_id: &str,
+    active_at: &str,
+) -> Result<Option<BillingReservationForSettlement>> {
+    let compute_call_id = normalize_compute_call_id(compute_call_id)?;
+    tx.query_row(
+        "SELECT id, reserved_fen
+         FROM billing_reservations
+         WHERE user_id = ?1
+           AND compute_call_id = ?2
+           AND (
+             status IN ('dispatch_hold', 'verification_hold')
+             OR (status = 'reserved' AND (expires_at IS NULL OR expires_at >= ?3))
+           )",
+        params![user_id, compute_call_id, active_at],
+        |row| {
+            Ok(BillingReservationForSettlement {
+                id: row.get(0)?,
+                reserved_fen: row.get(1)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+fn active_hold_with_status(
+    tx: &Transaction<'_>,
+    user_id: &str,
+    compute_call_id: &str,
+    status: &str,
+) -> Result<Option<ActiveBillingReservation>> {
+    tx.query_row(
+        "SELECT id, user_id, compute_call_id, reserved_fen, expires_at
+           FROM billing_reservations
+          WHERE user_id = ?1 AND compute_call_id = ?2 AND status = ?3",
+        params![user_id, compute_call_id, status],
+        |row| {
+            Ok(ActiveBillingReservation {
+                reservation_id: row.get(0)?,
+                user_id: row.get(1)?,
+                compute_call_id: row.get(2)?,
+                reserved_fen: row.get(3)?,
+                expires_at: row.get(4)?,
             })
         },
     )
@@ -442,6 +728,14 @@ fn normalize_compute_call_id(value: &str) -> Result<String> {
         return Err(anyhow!("compute_call_id 不能为空"));
     }
     Ok(value.chars().take(200).collect())
+}
+
+fn normalize_required_id(field: &str, value: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() || value.len() > 200 || value.chars().any(char::is_control) {
+        return Err(anyhow!("{field} 无效"));
+    }
+    Ok(value.to_string())
 }
 
 fn reservation_expires_at() -> String {

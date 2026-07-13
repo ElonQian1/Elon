@@ -397,6 +397,27 @@ async fn run_project_ws_job(
                     break;
                 };
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&progress) {
+            if value.get("type").and_then(|t| t.as_str()) == Some("pc_dispatch_started") {
+                if let Some(request_id) = value
+                    .get("pc_req_id")
+                    .or_else(|| value.get("req_id"))
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
+                    if let Err(error) = state
+                        .store
+                        .bind_project_execution_task_id(request_id, &task_id)
+                    {
+                        tracing::warn!(
+                            %task_id,
+                            request_id,
+                            %error,
+                            "failed to bind WebSocket PC completion replay to cloud task"
+                        );
+                    }
+                }
+            }
             match value.get("type").and_then(|t| t.as_str()) {
                 Some("done") => {
                     reply = value["message"].as_str().unwrap_or("完成").to_string();

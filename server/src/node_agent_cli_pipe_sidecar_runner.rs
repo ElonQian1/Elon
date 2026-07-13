@@ -172,7 +172,9 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
         if let Some(status) = child_exit {
             let drained_after_exit = child_exit_observed_at
                 .is_some_and(|instant| instant.elapsed() >= Duration::from_millis(500));
-            if (stdout_closed && stderr_closed) || canceled || drained_after_exit {
+            // Cancellation/timeout must still drain both pipes (or the bounded
+            // post-exit grace) so an already-emitted usage event is preserved.
+            if (stdout_closed && stderr_closed) || drained_after_exit {
                 break status.success();
             }
         }

@@ -8,8 +8,9 @@ const SERVER_UPDATE_RECOVERY_ERROR: &str = "server update recovery pending";
 const SERVER_UPDATE_RECOVERY_TIMEOUT_ERROR: &str = "server update recovery timed out";
 const CHANNEL_TASK_SERVER_UPDATE_RECOVERY_RESULT: &str =
     "恢复失败：服务器或 Win 端更新升级后，通信没有在预期时间内自动恢复。请点击“继续”让 AI 检查当前工作区、origin/main、线上版本和发布状态后接着处理；若刚才正在发布 PC 前端，还需要核对 /pc、/api/server/version 与 pc-next-dist 是否已经生效。";
+const CHANNEL_TASK_RECOVERY_TIMEOUT_ERROR: &str = "PC节点通信自动恢复超时";
 const CHANNEL_TASK_STALE_RESULT: &str =
-    "任务失败：PC 节点断线、任务超时或通信长期没有结果。请点击“继续”让 AI 检查当前工作区后接着处理。";
+    "PC 节点通信自动恢复超时：服务器已停止等待，但不表示本机任务已终止；节点重连后会自动补传真实终态。请确认本机任务状态后再点击“继续”。";
 
 #[derive(Debug, Clone)]
 struct ChannelTaskTarget {
@@ -82,12 +83,17 @@ impl Store {
                  SET status = 'failed',
                      error = CASE
                          WHEN status = 'recovering' THEN ?3
-                         ELSE COALESCE(error, 'PC节点断线或任务超时自动终止')
+                         ELSE COALESCE(error, ?4)
                      END,
                      updated_at = ?1
                  WHERE (status = 'running' AND created_at < ?2)
                     OR (status = 'recovering' AND updated_at < ?2)",
-                params![now(), cutoff, SERVER_UPDATE_RECOVERY_TIMEOUT_ERROR],
+                params![
+                    now(),
+                    cutoff,
+                    SERVER_UPDATE_RECOVERY_TIMEOUT_ERROR,
+                    CHANNEL_TASK_RECOVERY_TIMEOUT_ERROR
+                ],
             )?
         } else {
             let placeholders = std::iter::repeat("?")
@@ -99,7 +105,7 @@ impl Store {
                  SET status = 'failed',
                      error = CASE
                          WHEN status = 'recovering' THEN ?
-                         ELSE COALESCE(error, 'PC节点断线或任务超时自动终止')
+                         ELSE COALESCE(error, ?)
                      END,
                      updated_at = ?
                  WHERE ((status = 'running' AND created_at < ?)
@@ -109,6 +115,7 @@ impl Store {
             let now_value = now();
             let mut values = vec![
                 SERVER_UPDATE_RECOVERY_TIMEOUT_ERROR.to_string(),
+                CHANNEL_TASK_RECOVERY_TIMEOUT_ERROR.to_string(),
                 now_value,
                 cutoff.clone(),
                 cutoff.clone(),

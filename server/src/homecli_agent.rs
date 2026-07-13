@@ -27,8 +27,8 @@ use homecli_proto::{
 use serde::{Deserialize, Serialize};
 use sha2::Digest as _;
 use std::{
-    collections::HashMap,
-    sync::Arc,
+    collections::{HashMap, HashSet},
+    sync::{atomic::AtomicBool, Arc},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
@@ -41,11 +41,47 @@ const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSPECT_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
-mod heartbeat; mod journal;
+const DURABLE_CLI_COMPLETION_PROTO_VERSION: u32 = 5;
+const CLOUD_CONTROL_DEADLINE_PROTO_VERSION: u32 = 7;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CloudControlDispatchWindow {
+    pub(crate) issued_at: String,
+    pub(crate) ttl_ms: u64,
+}
+
+pub(crate) fn freeze_cloud_control_dispatch_window(
+    deadline: &str,
+) -> Result<CloudControlDispatchWindow> {
+    freeze_cloud_control_dispatch_window_at(deadline, chrono::Utc::now())
+}
+
+fn freeze_cloud_control_dispatch_window_at(
+    deadline: &str,
+    issued_at: chrono::DateTime<chrono::Utc>,
+) -> Result<CloudControlDispatchWindow> {
+    let deadline = chrono::DateTime::parse_from_rfc3339(deadline)
+        .map_err(|_| anyhow!("cloud authorization deadline is not valid RFC3339"))?
+        .with_timezone(&chrono::Utc);
+    let ttl_ms = deadline.signed_duration_since(issued_at).num_milliseconds();
+    if ttl_ms <= 0 {
+        return Err(anyhow!("cloud authorization deadline has expired"));
+    }
+    Ok(CloudControlDispatchWindow {
+        issued_at: issued_at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+        ttl_ms: ttl_ms as u64,
+    })
+}
+mod heartbeat;
+mod journal;
+mod pending_recovery;
 mod public_dev_handshake;
 mod summary;
 use public_dev_handshake::record_node_public_dev_handshake;
 pub use summary::AgentSummary;
+#[cfg(test)]
+#[path = "homecli_agent_duplicate_dispatch_tests.rs"]
+mod homecli_agent_duplicate_dispatch_tests;
 #[cfg(test)]
 #[path = "homecli_agent_tests.rs"]
 mod homecli_agent_tests;
@@ -55,6 +91,7 @@ pub struct AgentEntry {
     session_id: String,
     pub agent_id: String,
     pub version: String,
+    pub proto_version: u32,
     pub device_name: Option<String>,
     pub hardware: Option<NodeHardwareProfile>,
     pub storage: Option<NodeStorageProfile>,
@@ -67,6 +104,8 @@ pub struct AgentEntry {
     pub(crate) cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
     /// For each in-flight task: where to forward AgentToServer events.
     pub(crate) pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
+    /// Request IDs that are durable CLI work and may survive a short WS disconnect.
+    cli_pending_ids: Arc<Mutex<HashSet<String>>>,
     /// One-shot ACK waiters keyed by req_id + approval_id + dispatch_id.
     approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
     /// One-shot protocol ping waiters keyed by nonce.
@@ -110,6 +149,8 @@ impl CliPromptCancelHandle {
 #[derive(Default)]
 pub struct AgentManager {
     pub(crate) agents: RwLock<HashMap<String, AgentEntry>>,
+    recovering_cli: pending_recovery::RecoveringCliRequests,
+    recovery_worker_started: AtomicBool,
 }
 impl AgentManager {
     pub fn new() -> Self {
@@ -118,6 +159,24 @@ impl AgentManager {
     /// 返回第一个当前在线的 PC agent ID（优先用于 CLI 委托）
     pub async fn any_connected_agent_id(&self) -> Option<String> {
         self.agents.read().await.keys().next().cloned()
+    }
+    /// Best-effort cancel for a known CLI request on a specific online node.
+    /// Authorization state is committed before callers invoke this method, so
+    /// a disconnected writer must never roll back the server-side revocation.
+    pub async fn cancel_cli_prompt_on_agent(&self, agent_id: &str, req_id: &str) -> bool {
+        let cmd_tx = self
+            .agents
+            .read()
+            .await
+            .get(agent_id)
+            .map(|agent| agent.cmd_tx.clone());
+        cmd_tx.is_some_and(|cmd_tx| {
+            cmd_tx
+                .send(ServerToAgent::Cancel {
+                    task_id: req_id.to_string(),
+                })
+                .is_ok()
+        })
     }
     /// 把 AI 提示发给 PC agent，让 PC 用指定 CLI（copilot/codex）执行，流式返回 CliChunk/CliDone。
     pub async fn dispatch_cli_prompt(
@@ -174,17 +233,101 @@ impl AgentManager {
         prompt: String,
     ) -> Result<CliPromptDispatch> {
         let req_id = Uuid::new_v4().to_string();
-        let (cmd_tx, pending, ping_acks) = {
+        self.dispatch_cli_prompt_with_context_control_id(
+            req_id,
+            agent_id,
+            cli,
+            extra_args,
+            cwd,
+            project_context,
+            prompt,
+        )
+        .await
+    }
+
+    /// Dispatch a pre-authorized CLI request using the exact compute identity
+    /// already persisted by the server. Retries reuse the same id so a node can
+    /// re-attach to active/durable work without starting a second process.
+    pub async fn dispatch_cli_prompt_with_context_control_id(
+        &self,
+        req_id: String,
+        agent_id: &str,
+        cli: String,
+        extra_args: Vec<String>,
+        cwd: Option<String>,
+        project_context: Option<homecli_proto::CliProjectContext>,
+        prompt: String,
+    ) -> Result<CliPromptDispatch> {
+        self.dispatch_cli_prompt_with_context_control_id_and_credential_binding(
+            req_id,
+            agent_id,
+            cli,
+            extra_args,
+            cwd,
+            project_context,
+            None,
+            true,
+            None,
+            prompt,
+        )
+        .await
+    }
+
+    pub async fn dispatch_cli_prompt_with_context_control_id_and_credential_binding(
+        &self,
+        req_id: String,
+        agent_id: &str,
+        cli: String,
+        extra_args: Vec<String>,
+        cwd: Option<String>,
+        project_context: Option<homecli_proto::CliProjectContext>,
+        codex_credential_binding: Option<homecli_proto::CliCodexCredentialBinding>,
+        requires_cloud_control: bool,
+        cloud_control_deadline: Option<String>,
+        prompt: String,
+    ) -> Result<CliPromptDispatch> {
+        let req_id = req_id.trim().to_string();
+        if req_id.is_empty() || req_id.len() > 200 || req_id.chars().any(char::is_control) {
+            return Err(anyhow!("invalid pre-authorized CLI req_id"));
+        }
+        let (cmd_tx, pending, cli_pending_ids, ping_acks) = {
             let agents = self.agents.read().await;
             let agent = agents
                 .get(agent_id)
                 .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+            if agent.proto_version < DURABLE_CLI_COMPLETION_PROTO_VERSION {
+                return Err(anyhow!(
+                    "agent protocol v{} cannot safely run CLI work: durable completion protocol v{}+ is required",
+                    agent.proto_version,
+                    DURABLE_CLI_COMPLETION_PROTO_VERSION
+                ));
+            }
+            if cloud_control_deadline.is_some()
+                && agent.proto_version < CLOUD_CONTROL_DEADLINE_PROTO_VERSION
+            {
+                return Err(anyhow!(
+                    "agent protocol v{} cannot enforce cloud authorization deadlines: protocol v{}+ is required",
+                    agent.proto_version,
+                    CLOUD_CONTROL_DEADLINE_PROTO_VERSION
+                ));
+            }
             (
                 agent.cmd_tx.clone(),
                 agent.pending.clone(),
+                agent.cli_pending_ids.clone(),
                 agent.ping_acks.clone(),
             )
         };
+        if requires_cloud_control && cloud_control_deadline.is_none() {
+            return Err(anyhow!(
+                "cloud-controlled CLI dispatch requires an absolute authorization deadline"
+            ));
+        }
+        if !requires_cloud_control && cloud_control_deadline.is_some() {
+            return Err(anyhow!(
+                "uncontrolled CLI dispatch cannot carry a cloud authorization deadline"
+            ));
+        }
         if let Err(error) =
             send_protocol_ping(agent_id, &cmd_tx, &ping_acks, AGENT_DISPATCH_PROBE_TIMEOUT).await
         {
@@ -193,8 +336,38 @@ impl AgentManager {
                 .await;
             return Err(anyhow!("agent not connected: {agent_id} ({error})"));
         }
+        // A reconnect retry reuses the pre-authorized req_id. Its previous
+        // receiver was dropped by the retry loop, so it must not steal the
+        // durable replay from the fresh active receiver installed below.
+        let _ = self.take_recovering_cli(agent_id, &req_id).await;
+        let cloud_control_window = if requires_cloud_control {
+            Some(freeze_cloud_control_dispatch_window(
+                cloud_control_deadline
+                    .as_deref()
+                    .expect("cloud-controlled dispatch validated a deadline"),
+            )?)
+        } else {
+            None
+        };
+        let cloud_control_issued_at = cloud_control_window
+            .as_ref()
+            .map(|window| window.issued_at.clone());
+        let cloud_control_ttl_ms = cloud_control_window.as_ref().map(|window| window.ttl_ms);
+        let server_cancel_at = cloud_control_window
+            .as_ref()
+            .map(|window| {
+                tokio::time::Instant::now()
+                    .checked_add(Duration::from_millis(window.ttl_ms))
+                    .ok_or_else(|| anyhow!("cloud authorization TTL exceeds server timer range"))
+            })
+            .transpose()?;
         let (tx, rx) = mpsc::unbounded_channel();
-        pending.lock().await.insert(req_id.clone(), tx);
+        {
+            let mut pending = pending.lock().await;
+            let mut cli_pending_ids = cli_pending_ids.lock().await;
+            pending.insert(req_id.clone(), tx);
+            cli_pending_ids.insert(req_id.clone());
+        }
         let cancel_handle = CliPromptCancelHandle {
             req_id: req_id.clone(),
             cmd_tx: cmd_tx.clone(),
@@ -206,12 +379,38 @@ impl AgentManager {
                 extra_args,
                 cwd,
                 project_context,
+                codex_credential_binding,
+                requires_cloud_control,
+                cloud_control_deadline,
+                cloud_control_issued_at,
+                cloud_control_ttl_ms,
                 prompt,
             })
             .map_err(|_| anyhow!("agent writer closed"))
         {
-            pending.lock().await.remove(&req_id);
+            let mut pending = pending.lock().await;
+            let mut cli_pending_ids = cli_pending_ids.lock().await;
+            pending.remove(&req_id);
+            cli_pending_ids.remove(&req_id);
             return Err(error);
+        }
+        if let Some(cancel_at) = server_cancel_at {
+            let deadline_cmd_tx = cmd_tx.clone();
+            let deadline_req_id = req_id.clone();
+            let deadline_pending = pending.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep_until(cancel_at).await;
+                // A final frame removes the request from `pending` before it is
+                // delivered to the caller. Do not turn every successfully
+                // completed cloud request into a durable pre-start tombstone at
+                // its former deadline; only an actually in-flight request still
+                // needs the server-side deadline fence.
+                if deadline_pending.lock().await.contains_key(&deadline_req_id) {
+                    let _ = deadline_cmd_tx.send(ServerToAgent::Cancel {
+                        task_id: deadline_req_id,
+                    });
+                }
+            });
         }
         Ok(CliPromptDispatch {
             req_id,
@@ -300,16 +499,20 @@ impl AgentManager {
                     entry.session_id.clone(),
                     entry.session_shutdown.clone(),
                     entry.pending.clone(),
+                    entry.cli_pending_ids.clone(),
                     entry.approval_acks.clone(),
                     entry.ping_acks.clone(),
                 )
             })
         };
-        let Some((session_id, shutdown, pending, approval_acks, ping_acks)) = shutdown else {
+        let Some((session_id, shutdown, pending, cli_pending_ids, approval_acks, ping_acks)) =
+            shutdown
+        else {
             return false;
         };
         tracing::warn!(%agent_id, %session_id, %reason, "closing PC agent session");
-        fail_pending_requests(&pending, reason).await;
+        self.recover_session_pending(agent_id, &pending, &cli_pending_ids, reason)
+            .await;
         fail_pending_approvals(&approval_acks).await;
         fail_pending_pings(&ping_acks).await;
         let _ = shutdown.send(true);
@@ -503,13 +706,17 @@ async fn handle_agent_socket(
 }
 
 mod agent_session;
+#[cfg(test)]
+use agent_session::route_req_message_to_pending;
 use agent_session::{
-    fail_pending_approvals, fail_pending_pings, fail_pending_requests,
-    project_storage_prepare_timeout, project_workspace_inspect_timeout,
-    project_workspace_provision_timeout, run_agent_session, send_protocol_ping,
-    tool_approval_ack_key,
+    fail_pending_approvals, fail_pending_pings, project_storage_prepare_timeout,
+    project_workspace_inspect_timeout, project_workspace_provision_timeout, run_agent_session,
+    send_protocol_ping, tool_approval_ack_key,
 };
 
-mod workspace_dispatch;
 mod test_dispatch;
-pub use test_dispatch::{TestDispatchReq, TestDispatchResp, TestCliPromptReq, TestCliPromptResp, test_dispatch, test_cli_prompt};
+mod workspace_dispatch;
+pub use test_dispatch::{
+    test_cli_prompt, test_dispatch, TestCliPromptReq, TestCliPromptResp, TestDispatchReq,
+    TestDispatchResp,
+};

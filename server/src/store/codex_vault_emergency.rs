@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use chrono::{Duration, Utc};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
@@ -242,58 +241,6 @@ impl Store {
             .map_err(Into::into)
     }
 
-    pub fn revoke_codex_vault_emergency_grant(
-        &self,
-        grant_id: &str,
-        provider_user_id: &str,
-    ) -> Result<bool> {
-        let ts = now();
-        let changed = self.conn()?.execute(
-            "UPDATE codex_vault_emergency_grants
-                SET status = 'revoked',
-                    revoked_at = ?3,
-                    updated_at = ?3
-              WHERE id = ?1
-                AND provider_user_id = ?2
-                AND status = 'active'",
-            params![grant_id, provider_user_id, ts],
-        )?;
-        Ok(changed > 0)
-    }
-
-    pub fn create_codex_vault_emergency_lease(
-        &self,
-        p: CodexVaultEmergencyLeaseCreate<'_>,
-    ) -> Result<CodexVaultEmergencyLeaseRecord> {
-        let id = new_id("cvel");
-        let leased_at = now();
-        let lease_seconds = p.max_lease_seconds.clamp(60, 7200);
-        let expires_at = (Utc::now() + Duration::seconds(lease_seconds)).to_rfc3339();
-        self.conn()?.execute(
-            "INSERT INTO codex_vault_emergency_leases
-             (id, grant_id, provider_user_id, consumer_user_id, consumer_node_id,
-              provider_slot_id, account_hint_hash, purpose, failure_reason, billing_source,
-              status, leased_at, expires_at, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'shared_codex',
-                     'active', ?10, ?11, ?10, ?10)",
-            params![
-                id,
-                p.grant_id,
-                p.provider_user_id,
-                p.consumer_user_id,
-                p.consumer_node_id,
-                p.provider_slot_id,
-                clean_optional(p.account_hint_hash),
-                clean_optional(p.purpose),
-                clean_optional(p.failure_reason),
-                leased_at,
-                expires_at
-            ],
-        )?;
-        self.get_codex_vault_emergency_lease(&id)?
-            .ok_or_else(|| anyhow!("共享租约保存后无法读取"))
-    }
-
     pub fn get_codex_vault_emergency_lease(
         &self,
         lease_id: &str,
@@ -333,66 +280,6 @@ impl Store {
             .map_err(Into::into)
     }
 
-    pub fn clear_codex_vault_emergency_lease_for_node(
-        &self,
-        consumer_user_id: &str,
-        consumer_node_id: &str,
-        lease_id: Option<&str>,
-    ) -> Result<Option<CodexVaultEmergencyLeaseRecord>> {
-        let ts = now();
-        let clean_lease_id = clean_optional(lease_id);
-        let conn = self.conn()?;
-        let target: Option<String> = if let Some(lease_id) = clean_lease_id {
-            conn.query_row(
-                "SELECT id
-                   FROM codex_vault_emergency_leases
-                  WHERE id = ?1
-                    AND consumer_user_id = ?2
-                    AND consumer_node_id = ?3
-                    AND status = 'active'
-                    AND cleared_at IS NULL
-                  LIMIT 1",
-                params![lease_id, consumer_user_id, consumer_node_id],
-                |row| row.get(0),
-            )
-            .optional()?
-        } else {
-            conn.query_row(
-                "SELECT id
-                   FROM codex_vault_emergency_leases
-                  WHERE consumer_user_id = ?1
-                    AND consumer_node_id = ?2
-                    AND status = 'active'
-                    AND cleared_at IS NULL
-                  ORDER BY leased_at DESC
-                  LIMIT 1",
-                params![consumer_user_id, consumer_node_id],
-                |row| row.get(0),
-            )
-            .optional()?
-        };
-        let Some(target) = target else {
-            return Ok(None);
-        };
-        let changed = conn.execute(
-            "UPDATE codex_vault_emergency_leases
-                SET status = 'cleared',
-                    cleared_at = ?2,
-                    updated_at = ?2
-              WHERE id = ?1
-                AND consumer_user_id = ?3
-                AND consumer_node_id = ?4
-                AND status = 'active'
-                AND cleared_at IS NULL",
-            params![target, ts, consumer_user_id, consumer_node_id],
-        )?;
-        drop(conn);
-        if changed == 0 {
-            return Ok(None);
-        }
-        self.get_codex_vault_emergency_lease(&target)
-    }
-
     pub fn list_codex_vault_emergency_leases(
         &self,
         user_id: &str,
@@ -413,6 +300,9 @@ impl Store {
             .map_err(Into::into)
     }
 
+    /// Legacy fixture helper. Production attachment must use the exact-run
+    /// proof in `attach_codex_vault_emergency_usage_strict`.
+    #[cfg(test)]
     pub fn attach_codex_vault_emergency_usage(
         &self,
         lease_id: &str,
@@ -622,3 +512,7 @@ fn read_lease_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexVaultEmer
 #[cfg(test)]
 #[path = "codex_vault_emergency_tests.rs"]
 mod codex_vault_emergency_tests;
+
+#[cfg(test)]
+#[path = "codex_vault_emergency_lease_guard_tests.rs"]
+mod codex_vault_emergency_lease_guard_tests;
