@@ -234,7 +234,63 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
 }
 
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {
-    json!({ "name": name, "description": description, "inputSchema": input_schema })
+    let read_only = matches!(
+        name,
+        "ui_confirm_route"
+            | "ui_get_project_profile"
+            | "ui_get_design_task"
+            | "ui_get_runtime_status"
+            | "ui_list_render_devices"
+            | "ui_get_screen_summary"
+            | "ui_get_node"
+            | "ui_get_subtree"
+            | "ui_get_source_bundle"
+            | "ui_get_target_crop"
+            | "ui_get_current_crop"
+            | "ui_get_visual_diff"
+            | "ui_propose_live_patch"
+            | "ui_get_fit_run"
+            | "ui_get_commit_plan"
+    );
+    json!({
+        "name": name,
+        "description": description,
+        "inputSchema": input_schema,
+        "annotations": {
+            "readOnlyHint": read_only,
+            "destructiveHint": false,
+            "idempotentHint": read_only,
+            "openWorldHint": false
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tool_definitions;
+
+    #[test]
+    fn status_and_route_tools_are_declared_read_only() {
+        let tools = tool_definitions();
+        for name in [
+            "ui_confirm_route",
+            "ui_get_design_task",
+            "ui_get_project_profile",
+            "ui_get_runtime_status",
+            "ui_list_render_devices",
+        ] {
+            let tool = tools
+                .iter()
+                .find(|tool| tool["name"] == name)
+                .expect("read-only UI tool");
+            assert_eq!(tool["annotations"]["readOnlyHint"], true);
+        }
+        let apply = tools
+            .iter()
+            .find(|tool| tool["name"] == "ui_apply_live_patch")
+            .expect("live patch tool");
+        assert_eq!(apply["annotations"]["readOnlyHint"], false);
+    }
 }
 
 fn node_selector_schema() -> Value {
