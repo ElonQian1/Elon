@@ -24,6 +24,7 @@ impl BuildEnvironment {
                 ("npm_config_cache".into(), path(&paths.npm_cache)),
                 ("PNPM_STORE_DIR".into(), path(&paths.pnpm_store)),
                 ("npm_config_store_dir".into(), path(&paths.pnpm_store)),
+                ("YARN_CACHE_FOLDER".into(), path(&paths.yarn_cache)),
                 ("COREPACK_HOME".into(), path(&paths.corepack_home)),
                 ("TEMP".into(), path(&paths.task_temp)),
                 ("TMP".into(), path(&paths.task_temp)),

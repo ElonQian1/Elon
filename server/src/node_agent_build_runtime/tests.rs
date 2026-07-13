@@ -24,6 +24,7 @@ fn environment_routes_large_outputs_under_node_data_root() {
         "GRADLE_USER_HOME",
         "NPM_CONFIG_CACHE",
         "PNPM_STORE_DIR",
+        "YARN_CACHE_FOLDER",
         "COREPACK_HOME",
         "TEMP",
         "TMP",

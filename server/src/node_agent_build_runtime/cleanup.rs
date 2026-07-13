@@ -256,6 +256,7 @@ fn shared_cache_candidates(paths: &BuildRunPaths) -> Result<Vec<CleanupCandidate
         paths.gradle_home.join("wrapper").join("dists"),
         paths.npm_cache.clone(),
         paths.pnpm_store.clone(),
+        paths.yarn_cache.clone(),
         paths.corepack_home.clone(),
     ]
     .into_iter()

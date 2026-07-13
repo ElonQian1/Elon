@@ -57,6 +57,10 @@ impl NodeDataPaths {
         self.cache().join("pnpm-store")
     }
 
+    pub fn yarn_cache(&self) -> PathBuf {
+        self.cache().join("yarn")
+    }
+
     /// Worktrees of the same project share this target, while unrelated
     /// projects and explicitly different Rust toolchains never write together.
     pub fn project_rust_target(&self, project_id: &str, toolchain_key: &str) -> PathBuf {
@@ -92,6 +96,10 @@ mod tests {
         assert_eq!(
             paths.gradle_home(),
             PathBuf::from("D:/ElonNodeData/cache/gradle-home")
+        );
+        assert_eq!(
+            paths.yarn_cache(),
+            PathBuf::from("D:/ElonNodeData/cache/yarn")
         );
         assert_eq!(
             paths.task_temp("task/one"),
