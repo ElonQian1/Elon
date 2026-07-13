@@ -34,6 +34,23 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.elon.app.databinding.ActivityMainBinding
 
+internal data class EmojiPanelExtent(
+    val topGap: Int,
+    val contentHeight: Int
+) {
+    val totalHeight: Int
+        get() = topGap + contentHeight
+}
+
+internal fun resolveEmojiPanelExtent(totalHeight: Int, preferredTopGap: Int): EmojiPanelExtent {
+    val safeTotalHeight = totalHeight.coerceAtLeast(0)
+    val topGap = preferredTopGap.coerceIn(0, safeTotalHeight)
+    return EmojiPanelExtent(
+        topGap = topGap,
+        contentHeight = safeTotalHeight - topGap
+    )
+}
+
 internal class MainEmojiActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
@@ -140,7 +157,7 @@ internal class MainEmojiActions(
         keyboardVisibleOverEmojiPanel = false
         keyboardOverlayRequestedAt = 0L
         panel.visibility = View.VISIBLE
-        setPanelHeight(panel, 0)
+        setPanelExtent(panel, 0)
         panel.alpha = 0f
         panel.translationY = dp(10).toFloat()
         hideKeyboard()
@@ -153,7 +170,7 @@ internal class MainEmojiActions(
         keyboardVisibleOverEmojiPanel = false
         keyboardOverlayRequestedAt = 0L
         panel.visibility = View.VISIBLE
-        setPanelHeight(panel, targetEmojiPanelHeight())
+        setPanelExtent(panel, targetEmojiPanelHeight())
         panel.alpha = 1f
         panel.translationY = 0f
         setKeyboardOverlayModeForPanelReplacement()
@@ -191,11 +208,9 @@ internal class MainEmojiActions(
         matchKeyboardTransition: Boolean = false
     ) {
         val targetHeight = if (expand) targetEmojiPanelHeight() else 0
-        val startHeight = maxOf(
-            (panel.layoutParams?.height ?: 0).coerceAtLeast(0),
-            panel.height.coerceAtLeast(0)
-        )
+        val startHeight = currentPanelExtent(panel)
         if (startHeight == targetHeight) {
+            setPanelExtent(panel, targetHeight)
             if (!expand) panel.visibility = View.GONE
             panel.alpha = 1f
             panel.translationY = 0f
@@ -209,7 +224,7 @@ internal class MainEmojiActions(
             interpolator = panelInterpolator
             addUpdateListener { animator ->
                 val fraction = animator.animatedFraction
-                setPanelHeight(panel, animator.animatedValue as Int)
+                setPanelExtent(panel, animator.animatedValue as Int)
                 panel.alpha = if (expand) fraction else 1f - fraction
                 panel.translationY = if (expand) {
                     dp(10) * (1f - fraction)
@@ -225,7 +240,7 @@ internal class MainEmojiActions(
                 override fun onAnimationEnd(animation: Animator) {
                     panel.setLayerType(View.LAYER_TYPE_NONE, null)
                     if (cancelled) return
-                    setPanelHeight(panel, targetHeight)
+                    setPanelExtent(panel, targetHeight)
                     panel.alpha = 1f
                     panel.translationY = 0f
                     if (!expand) panel.visibility = View.GONE
@@ -243,11 +258,34 @@ internal class MainEmojiActions(
             ?: fallbackHeight
     }
 
-    private fun setPanelHeight(panel: View, height: Int) {
+    private fun setPanelExtent(panel: View, height: Int) {
         val params = panel.layoutParams ?: return
-        if (params.height == height) return
-        params.height = height
+        val marginParams = params as? ViewGroup.MarginLayoutParams
+        // The IME leaves inputLayout's bottom padding as a visible gap below the composer.
+        // Keep the same total replacement extent while moving that gap above the emoji surface.
+        val preferredTopGap = if (marginParams != null) binding.inputLayout.paddingBottom else 0
+        val extent = resolveEmojiPanelExtent(height, preferredTopGap)
+        var changed = false
+        if (params.height != extent.contentHeight) {
+            params.height = extent.contentHeight
+            changed = true
+        }
+        if (marginParams != null && marginParams.topMargin != extent.topGap) {
+            marginParams.topMargin = extent.topGap
+            changed = true
+        }
+        if (!changed) return
         panel.layoutParams = params
+    }
+
+    private fun currentPanelExtent(panel: View): Int {
+        val params = panel.layoutParams
+        val topGap = (params as? ViewGroup.MarginLayoutParams)?.topMargin?.coerceAtLeast(0) ?: 0
+        val contentHeight = maxOf(
+            (params?.height ?: 0).coerceAtLeast(0),
+            panel.height.coerceAtLeast(0)
+        )
+        return topGap + contentHeight
     }
 
     private fun createTabRow(): LinearLayout {
@@ -618,7 +656,7 @@ internal class MainEmojiActions(
         isOpen = true
         setKeyboardOverlayMode(true)
         panel.visibility = View.VISIBLE
-        setPanelHeight(panel, targetEmojiPanelHeight())
+        setPanelExtent(panel, targetEmojiPanelHeight())
         panel.alpha = 1f
         panel.translationY = 0f
         binding.inputEdit.requestFocus()
