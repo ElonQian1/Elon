@@ -115,6 +115,7 @@ pub fn record_cli_done_outcome(
     exit_ok: bool,
     error: Option<&str>,
 ) {
+    crate::node_agent_build_runtime::mark_cli_run_outcome(req_id, exit_ok);
     let status = if exit_ok {
         "done"
     } else if cli_done_error_is_canceled(error) {
@@ -144,17 +145,20 @@ fn cli_done_error_is_canceled(error: Option<&str>) -> bool {
 pub struct PreparedCliPromptCwd {
     pub cwd: Option<String>,
     pub conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
+    pub project_context: Option<homecli_proto::CliProjectContext>,
 }
 
 pub fn prepare_cli_prompt_cwd(
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> anyhow::Result<PreparedCliPromptCwd> {
+    let managed_project = project_context.is_some();
     let (base_cwd, context) = node_agent_cli_security::prepare_cli_base_cwd(cwd, project_context)?;
     if cli_prompt_read_only(context.runtime_permission.as_deref()) {
         return Ok(PreparedCliPromptCwd {
             cwd: Some(base_cwd.to_string_lossy().to_string()),
             conversation_workspace: None,
+            project_context: managed_project.then_some(context),
         });
     }
     let workspace = pc_workspace_provisioner::prepare_conversation_workspace(
@@ -171,6 +175,7 @@ pub fn prepare_cli_prompt_cwd(
     Ok(PreparedCliPromptCwd {
         cwd: Some(workspace.workspace_path.clone()),
         conversation_workspace: Some(workspace),
+        project_context: managed_project.then_some(context),
     })
 }
 

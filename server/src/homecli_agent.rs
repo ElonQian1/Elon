@@ -586,6 +586,19 @@ impl AgentManager {
         cwd: String,
         env: Vec<(String, String)>,
     ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
+        self.dispatch_with_project_context(agent_id, cli, args, cwd, env, None)
+            .await
+    }
+
+    pub async fn dispatch_with_project_context(
+        &self,
+        agent_id: &str,
+        cli: String,
+        args: Vec<String>,
+        cwd: String,
+        env: Vec<(String, String)>,
+        project_context: Option<homecli_proto::CliProjectContext>,
+    ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
         let agents = self.agents.read().await;
         let agent = agents
             .get(agent_id)
@@ -601,6 +614,7 @@ impl AgentManager {
                 args,
                 cwd,
                 env,
+                project_context,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
         Ok((task_id, rx))

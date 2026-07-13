@@ -5,8 +5,18 @@ use serde::Deserialize;
 pub(super) async fn admin_node_data_root_get(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> axum::Json<serde_json::Value> {
-    let state = rt.node_data_root.read().await;
-    axum::Json(state.status_payload())
+    let state = rt.node_data_root.read().await.clone();
+    let mut payload = state.status_payload();
+    if let Some(paths) = state.paths {
+        if let Ok(build_cache) = tokio::task::spawn_blocking(move || {
+            crate::node_agent_build_runtime::status(&paths)
+        })
+        .await
+        {
+            payload["build_cache"] = serde_json::json!(build_cache);
+        }
+    }
+    axum::Json(payload)
 }
 
 #[derive(serde::Deserialize)]
@@ -103,7 +113,11 @@ pub(super) async fn admin_node_data_root_cleanup(
         );
     };
     let apply = req.apply;
-    match tokio::task::spawn_blocking(move || node_agent_data_root::cleanup(&paths, apply)).await {
+    match tokio::task::spawn_blocking(move || {
+        crate::node_agent_build_runtime::cleanup_rebuildable(&paths, apply)
+    })
+    .await
+    {
         Ok(Ok(result)) => (
             StatusCode::OK,
             axum::Json(serde_json::json!({ "ok": true, "cleanup": result })),

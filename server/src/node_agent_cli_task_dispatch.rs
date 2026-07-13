@@ -357,6 +357,43 @@ async fn run_cli_task(
             return;
         }
     };
+    let build_run_guard = if let Some(project_context) = prepared_cwd.project_context.as_ref() {
+        let data_paths = runtime.node_data_root.read().await.paths.clone();
+        let Some(data_paths) = data_paths else {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                "PC 节点尚未配置统一数据根，已阻止项目构建回落到系统盘".to_string(),
+            );
+            return;
+        };
+        match crate::node_agent_build_runtime::register_cli_run(
+            &data_paths,
+            crate::node_agent_build_runtime::BuildRunRequest {
+                task_id: &req_id_for_cleanup,
+                project_id: &project_context.project_id,
+                cwd: prepared_cwd.cwd.as_deref().map(std::path::Path::new),
+            },
+        ) {
+            Ok(run) => Some(run),
+            Err(error) => {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    format!("PC 节点构建环境门禁失败: {error:#}"),
+                );
+                return;
+            }
+        }
+    } else {
+        None
+    };
     let original_prompt = prompt.clone();
     let ui_design_routed =
         crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);
@@ -539,6 +576,7 @@ async fn run_cli_task(
         frozen_codex_home,
     })
     .await;
+    drop(build_run_guard);
     if let Err(error) = runtime.task_journal.record_finished(&req_id_for_cleanup) {
         warn!(%error, "failed to persist PC task final journal event");
     }

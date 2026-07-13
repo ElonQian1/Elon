@@ -16,6 +16,7 @@ pub async fn exec_via_agent(
     cli: &str,
     args: Vec<String>,
     cwd: &str,
+    project_context: Option<homecli_proto::CliProjectContext>,
     progress_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
 ) -> Result<String> {
     use crate::types::WsMessage;
@@ -31,7 +32,14 @@ pub async fn exec_via_agent(
 
     let (_task_id, mut rx) = state
         .agent_manager
-        .dispatch(&agent_id, cli.to_string(), args, cwd.to_string(), vec![])
+        .dispatch_with_project_context(
+            &agent_id,
+            cli.to_string(),
+            args,
+            cwd.to_string(),
+            vec![],
+            project_context,
+        )
         .await?;
 
     info!(%agent_id, %cli, %cwd, "exec_via_agent: dispatched");
@@ -130,7 +138,19 @@ pub async fn build_project_via_agent(
             ))
         }
     };
-    let output = exec_via_agent(state, cli, args, &pc_cwd, progress_tx).await?;
+    let output = exec_via_agent(
+        state,
+        cli,
+        args,
+        &pc_cwd,
+        Some(homecli_proto::CliProjectContext {
+            project_id: "elon-platform".to_string(),
+            conversation_id: format!("platform-build-{target}"),
+            runtime_permission: Some("project_write".to_string()),
+        }),
+        progress_tx,
+    )
+    .await?;
     if target == "android" {
         return Ok(format!(
             "android 构建成功（PC agent）\n##APK_FILE:ElonSpeed-latest.apk\n\n{}",

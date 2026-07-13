@@ -92,6 +92,7 @@ pub(crate) async fn sync_pc_agent_apk_after_success(
         agent_id,
         pc_workspace,
         artifact_workspace,
+        project_id_from_download_base(download_base),
         fresh_after_unix_secs,
         explicit_apk_sync,
     )
@@ -196,14 +197,20 @@ async fn sync_pc_agent_apk_artifact(
     agent_id: &str,
     pc_workspace: &str,
     artifact_workspace: &Path,
+    project_id: Option<&str>,
     fresh_after_unix_secs: Option<u64>,
     build_if_missing: bool,
 ) -> Result<Option<SyncedPcApk>> {
     let command =
         pc_apk_sync_loader_command(&state.public_url, fresh_after_unix_secs, build_if_missing);
+    let project_context = project_id.map(|project_id| homecli_proto::CliProjectContext {
+        project_id: project_id.to_string(),
+        conversation_id: "apk-sync".to_string(),
+        runtime_permission: Some("project_write".to_string()),
+    });
     let (_task_id, mut rx) = state
         .agent_manager
-        .dispatch(
+        .dispatch_with_project_context(
             agent_id,
             "powershell".to_string(),
             vec![
@@ -215,6 +222,7 @@ async fn sync_pc_agent_apk_artifact(
             ],
             pc_workspace.to_string(),
             vec![],
+            project_context,
         )
         .await?;
 

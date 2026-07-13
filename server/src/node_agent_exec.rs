@@ -15,14 +15,47 @@ pub async fn run_exec(
     args: Vec<String>,
     cwd: String,
     env_vars: Vec<(String, String)>,
+    project_context: Option<homecli_proto::CliProjectContext>,
+    data_paths: Option<elon_pc_dev_runtime::NodeDataPaths>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
     use tokio::io::AsyncBufReadExt;
 
+    let mut build_run = if let Some(project_context) = project_context.as_ref() {
+        let Some(data_paths) = data_paths.as_ref() else {
+            let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
+                task_id,
+                message: "PC 节点尚未配置统一数据根，已阻止项目 Exec 回落到系统盘".into(),
+            }));
+            return;
+        };
+        match crate::node_agent_build_runtime::prepare_run(
+            data_paths,
+            crate::node_agent_build_runtime::BuildRunRequest {
+                task_id: &task_id,
+                project_id: &project_context.project_id,
+                cwd: Some(std::path::Path::new(&cwd)),
+            },
+        ) {
+            Ok(run) => Some(run),
+            Err(error) => {
+                let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
+                    task_id,
+                    message: format!("PC 节点构建环境门禁失败: {error:#}"),
+                }));
+                return;
+            }
+        }
+    } else {
+        None
+    };
     let mut cmd = tokio::process::Command::new(&cli);
     cmd.args(&args).current_dir(&cwd);
     for (k, v) in &env_vars {
         cmd.env(k, v);
+    }
+    if let Some(run) = build_run.as_ref() {
+        run.environment().apply_tokio(&mut cmd);
     }
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -94,6 +127,10 @@ pub async fn run_exec(
     }
 
     let code = child.wait().await.ok().and_then(|s| s.code());
+    if let Some(run) = build_run.as_mut() {
+        run.finish(code == Some(0));
+    }
+    drop(build_run);
     let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
 }
 

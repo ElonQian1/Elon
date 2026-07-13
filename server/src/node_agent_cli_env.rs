@@ -24,6 +24,7 @@ pub(crate) fn cli_child_env_overrides(
 pub(crate) fn apply_env(
     cmd: &mut tokio::process::Command,
     sidecar_env: &mut Vec<(String, String)>,
+    task_id: &str,
     cli_name: &str,
     cli_program: &str,
     cwd: Option<&str>,
@@ -31,6 +32,10 @@ pub(crate) fn apply_env(
     for (key, value) in cli_child_env_overrides(cli_name, cli_program, cwd) {
         cmd.env(&key, &value);
         sidecar_env.push((key, value));
+    }
+    if let Some(build_environment) = crate::node_agent_build_runtime::cli_run_environment(task_id) {
+        build_environment.apply_tokio(cmd);
+        build_environment.merge_into(sidecar_env);
     }
 }
 

@@ -460,6 +460,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
     apply_env(
         &mut cmd,
         &mut sidecar_env,
+        &req_id,
         cli_name,
         actual_bin,
         cwd.as_deref(),

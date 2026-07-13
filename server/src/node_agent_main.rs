@@ -35,6 +35,7 @@ mod node_agent_android_inspector;
 mod node_agent_android_live;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
+mod node_agent_build_runtime;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
 mod node_agent_cli_probe;

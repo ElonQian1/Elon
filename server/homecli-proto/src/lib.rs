@@ -241,6 +241,10 @@ pub enum ServerToAgent {
         cwd: String,
         #[serde(default)]
         env: Vec<(String, String)>,
+        /// Project ownership for node-local cache routing and quota admission.
+        /// Old nodes ignore this optional field and remain wire-compatible.
+        #[serde(default)]
+        project_context: Option<CliProjectContext>,
     },
     Cancel {
         task_id: String,
