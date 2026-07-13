@@ -1,4 +1,4 @@
-#!/usr/bin/env powershell
+﻿#!/usr/bin/env powershell
 
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -92,12 +92,37 @@ function Get-CandidateBytes {
     return $total
 }
 
+function Get-LatestWriteTimeUtc {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $latest = [DateTime]::MinValue
+    $pending = New-Object 'System.Collections.Generic.Stack[string]'
+    $pending.Push((Get-NormalizedFullPath $Path))
+    while ($pending.Count -gt 0) {
+        $current = $pending.Pop()
+        $item = Get-Item -LiteralPath $current -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw "时间检查期间发现重解析点，拒绝继续：$current"
+        }
+        if ($item.LastWriteTimeUtc -gt $latest) { $latest = $item.LastWriteTimeUtc }
+        if (-not $item.PSIsContainer) { continue }
+        foreach ($child in Get-ChildItem -LiteralPath $current -Force -ErrorAction Stop) {
+            if (($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "时间检查期间发现重解析点，拒绝继续：$($child.FullName)"
+            }
+            if ($child.LastWriteTimeUtc -gt $latest) { $latest = $child.LastWriteTimeUtc }
+            if ($child.PSIsContainer) { $pending.Push($child.FullName) }
+        }
+    }
+    return $latest
+}
+
 function New-Candidate {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$AllowedRoot,
         [Parameter(Mandatory = $true)][string]$Kind,
-        [Parameter(Mandatory = $true)][string]$Reason
+        [Parameter(Mandatory = $true)][string]$Reason,
+        [bool]$RequiresRustIdle = $false
     )
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     [pscustomobject]@{
@@ -105,6 +130,7 @@ function New-Candidate {
         AllowedRoot = Get-NormalizedFullPath $AllowedRoot
         Kind = $Kind
         Reason = $Reason
+        RequiresRustIdle = $RequiresRustIdle
     }
 }
 
@@ -136,19 +162,19 @@ foreach ($name in @('elon-dev-cargo', 'elon-node-agent')) {
         -Path (Join-Path $buildTargetRoot $name) `
         -AllowedRoot $buildTargetRoot `
         -Kind 'known_rust_target' `
-        -Reason '一龙历史默认路径下的可重建 Rust target'
+        -Reason '一龙历史默认路径下的可重建 Rust target' `
+        -RequiresRustIdle $true
     if ($candidate) { $candidates += $candidate }
 }
 
 if ($IncludeExpiredTemp) {
     $cutoff = [DateTime]::UtcNow.AddDays(-$MinAgeDays)
-    $knownTempPrefix = '^(rustc|cargo-|elon-(aapt-inspect|remote-apk|ripgrep|codex-sharing-proof|api-runtime-env|data-root-test|data-cleanup-test))'
+    $knownTempPrefix = '^(rustc|cargo-|elon-|ElonSpeed$|elonspeed-|cofficethinking[-_]|bb64a-|codex-.*-chrome|fb2-.*-chrome|HeadlessChrome|chromiumoxide-runner$|gradle-extract$|node-compile-cache$|vscode-safe$|vscode-stable-user-|WinGet$|Roslyn$|Diagnostics$|DiagOutputDir$)'
     foreach ($item in Get-ChildItem -LiteralPath $tempRoot -Force -ErrorAction SilentlyContinue) {
         if ($item.LastWriteTimeUtc -ge $cutoff) { continue }
         $isKnownDirectory = $item.PSIsContainer -and $item.Name -match $knownTempPrefix
         $isKnownFile = -not $item.PSIsContainer -and
-            $item.Name -match $knownTempPrefix -and
-            $item.Extension -in @('.tmp', '.dmp', '.dll', '.pdb')
+            $item.Extension -in @('.tmp', '.dmp', '.log', '.etl', '.pdb')
         $isMarkedTarget = $item.PSIsContainer -and $item.Name -eq 'target' -and
             ((Test-Path -LiteralPath (Join-Path $item.FullName '.rustc_info.json')) -or
              (Test-Path -LiteralPath (Join-Path $item.FullName 'debug\.fingerprint')) -or
@@ -158,12 +184,24 @@ if ($IncludeExpiredTemp) {
             -Path $item.FullName `
             -AllowedRoot $tempRoot `
             -Kind 'expired_temp' `
-            -Reason "严格名称/标记匹配且超过 $MinAgeDays 天"
+            -Reason "严格名称、文件类型或 Rust target 标记匹配且整棵目录超过 $MinAgeDays 天" `
+            -RequiresRustIdle ($item.Name -match '^(rustc|cargo-|elon-cargo)')
         if ($candidate) { $candidates += $candidate }
     }
 }
 
 $candidates = @($candidates | Sort-Object Path -Unique)
+$verifiedCandidates = @()
+foreach ($candidate in $candidates) {
+    Assert-SafeCandidate $candidate
+    $latestWriteUtc = Get-LatestWriteTimeUtc $candidate.Path
+    if ($candidate.Kind -eq 'expired_temp' -and $latestWriteUtc -ge $cutoff) {
+        continue
+    }
+    $candidate | Add-Member -NotePropertyName LatestWriteUtc -NotePropertyValue $latestWriteUtc
+    $verifiedCandidates += $candidate
+}
+$candidates = @($verifiedCandidates)
 if ($candidates.Count -eq 0) {
     Write-Host '没有发现符合严格规则的候选。'
     exit 0
@@ -171,12 +209,12 @@ if ($candidates.Count -eq 0) {
 
 $report = @()
 foreach ($candidate in $candidates) {
-    Assert-SafeCandidate $candidate
-    $item = Get-Item -LiteralPath $candidate.Path -Force
+    $estimatedBytes = Get-CandidateBytes $candidate.Path
+    $candidate | Add-Member -NotePropertyName EstimatedBytes -NotePropertyValue $estimatedBytes
     $report += [pscustomobject]@{
         Kind = $candidate.Kind
-        GiB = [Math]::Round((Get-CandidateBytes $candidate.Path) / 1GB, 2)
-        LastWriteUtc = $item.LastWriteTimeUtc.ToString('u')
+        GiB = [Math]::Round($estimatedBytes / 1GB, 2)
+        LastWriteUtc = $candidate.LatestWriteUtc.ToString('u')
         Path = $candidate.Path
         Reason = $candidate.Reason
     }
@@ -190,11 +228,15 @@ if (-not $Apply) {
 }
 
 $activeRust = @(Get-Process -Name cargo, rustc -ErrorAction SilentlyContinue)
-if ($activeRust.Count -gt 0) {
-    throw "检测到 cargo/rustc 进程，拒绝清理。PID: $($activeRust.Id -join ', ')"
-}
+$skippedRust = @()
+$removedBytes = [uint64]0
+$removedCount = 0
 
 foreach ($candidate in $candidates) {
+    if ($candidate.RequiresRustIdle -and $activeRust.Count -gt 0) {
+        $skippedRust += $candidate.Path
+        continue
+    }
     Assert-SafeCandidate $candidate
     if (-not $PSCmdlet.ShouldProcess($candidate.Path, '删除已知可重建缓存/过期严格 Temp 候选')) {
         continue
@@ -205,7 +247,14 @@ foreach ($candidate in $candidates) {
     } else {
         Remove-Item -LiteralPath $candidate.Path -Force
     }
+    $removedBytes += [uint64]$candidate.EstimatedBytes
+    $removedCount += 1
     Write-Host "REMOVED=$($candidate.Path)"
 }
 
+if ($skippedRust.Count -gt 0) {
+    Write-Warning "检测到 cargo/rustc，已跳过 $($skippedRust.Count) 个 Rust 候选。PID: $($activeRust.Id -join ', ')"
+}
+Write-Host "REMOVED_COUNT=$removedCount"
+Write-Host "RECLAIMED_GIB=$([Math]::Round($removedBytes / 1GB, 2))"
 Write-Host 'APPLY_COMPLETE=true'
