@@ -162,13 +162,7 @@ pub(crate) async fn wireless_status() -> Result<AndroidWirelessStatus> {
                 .as_deref()
                 .filter(|device_id| device_id.contains(':'))
             {
-                let mode = if profile.paired {
-                    "tls"
-                } else if endpoint.ends_with(":5555") {
-                    "legacy"
-                } else {
-                    "manual"
-                };
+                let mode = connection_mode(endpoint, profile.paired);
                 if profile.last_endpoint.as_deref() != Some(endpoint)
                     || profile.wireless_mode != mode
                 {
@@ -304,10 +298,10 @@ fn optional_text(value: String) -> Option<String> {
 }
 
 fn connection_mode(address: &str, paired: bool) -> &'static str {
-    if paired {
-        "tls"
-    } else if address.trim().ends_with(":5555") {
+    if address.trim().ends_with(":5555") {
         "legacy"
+    } else if paired {
+        "tls"
     } else {
         "manual"
     }
@@ -336,6 +330,7 @@ adb-ABC _adb-tls-pairing._tcp 192.168.1.9:40123\n";
     #[test]
     fn classifies_legacy_and_tls_connections_without_profile_id_guessing() {
         assert_eq!(connection_mode("192.168.31.171:5555", false), "legacy");
+        assert_eq!(connection_mode("192.168.31.171:5555", true), "legacy");
         assert_eq!(connection_mode("192.168.31.171:37123", false), "manual");
         assert_eq!(connection_mode("192.168.31.171:37123", true), "tls");
     }
