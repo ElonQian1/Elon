@@ -280,6 +280,7 @@ const HIGH_CONFIDENCE_UI_MARKERS: &[&str] = &[
 ];
 const UI_SUBJECT_MARKERS: &[&str] = &[
     "页面", "按钮", "卡片", "文本", "文字", "标题", "图标", "图片", "导航", "弹窗", "列表", "组件",
+    "控件",
 ];
 const UI_SURFACE_MARKERS: &[&str] = &["页面", "界面", "screen", "page"];
 const UI_SURFACE_ACTION_MARKERS: &[&str] = &["优化", "美化", "调整样式", "polish", "restyle"];
@@ -358,6 +359,11 @@ const AMBIGUOUS_VISUAL_MARKERS: &[&str] = &[
     "更克制",
     "更精致",
     "不够精致",
+    "像块砖",
+    "块砖",
+    "减减肥",
+    "瘦一点",
+    "太臃肿",
 ];
 const AMBIGUOUS_REGION_MARKERS: &[&str] = &[
     "底部", "顶部", "主操作", "次操作", "这个区域", "这块", "这里",
@@ -475,6 +481,13 @@ mod tests {
         assert_eq!(decision.class, UiRouteClass::Ambiguous);
         assert!(decision.score > 0.2 && decision.score < 0.75);
         assert!(!decision.reasons.is_empty());
+    }
+
+    #[test]
+    fn recognizes_colloquial_control_weight_requests_as_ambiguous_ui() {
+        let decision = classify_ui_route("当前选中的控件像块砖，给它减减肥", None);
+        assert_eq!(decision.class, UiRouteClass::Ambiguous);
+        assert!(decision.score > 0.2 && decision.score < 0.75);
     }
 
     #[test]
