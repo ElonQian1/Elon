@@ -18,11 +18,11 @@ pub fn legacy_workspace_root_override() -> Option<PathBuf> {
 }
 
 pub fn workspace_root() -> PathBuf {
-    if let Some(root) = legacy_workspace_root_override() {
-        return root;
-    }
     if let Some(root) = configured_node_data_root() {
         return NodeDataPaths::new(root).workspaces();
+    }
+    if let Some(root) = legacy_workspace_root_override() {
+        return root;
     }
 
     legacy_default_workspace_root()
