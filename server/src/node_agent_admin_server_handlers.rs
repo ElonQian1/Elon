@@ -52,17 +52,28 @@ pub(super) async fn admin_storage_config_set(
     axum::Json(req): axum::Json<StorageConfigSetReq>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     let enabled = req.enabled.unwrap_or(false);
-    let default_root = rt
-        .node_data_root
-        .read()
-        .await
+    let data_root = rt.node_data_root.read().await.clone();
+    if enabled && data_root.paths.is_none() {
+        return (
+            axum::http::StatusCode::CONFLICT,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": data_root.invalid_reason.unwrap_or_else(|| "尚未配置统一节点数据根，不能启用硬盘服务".to_string()),
+            })),
+        );
+    }
+    let managed_storage_root = data_root
         .paths
         .as_ref()
         .map(|paths| paths.storage())
-        .unwrap_or_else(pc_storage_repo::default_storage_root)
-        .to_string_lossy()
-        .to_string();
-    let root_path = clean_optional_admin_field(req.root_path.as_deref())
+        .map(|path| path.to_string_lossy().to_string());
+    let default_root = managed_storage_root.clone().unwrap_or_else(|| {
+        pc_storage_repo::default_storage_root()
+            .to_string_lossy()
+            .to_string()
+    });
+    let root_path = managed_storage_root
+        .or_else(|| clean_optional_admin_field(req.root_path.as_deref()))
         .or_else(|| enabled.then(|| default_root));
     if enabled {
         if let Some(root) = root_path.as_deref() {
@@ -82,7 +93,15 @@ pub(super) async fn admin_storage_config_set(
         root_path,
         git_base_url: clean_optional_admin_field(req.git_base_url.as_deref()),
     };
-    rt.set_storage_settings(settings.clone()).await;
+    if let Err(error) = rt.set_storage_settings(settings.clone()).await {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": format!("保存硬盘服务配置失败: {error:#}"),
+            })),
+        );
+    }
     (
         axum::http::StatusCode::OK,
         axum::Json(serde_json::json!({
@@ -208,7 +227,15 @@ pub(super) async fn admin_login(
     match provision_node(&rt.cfg, &token, existing.as_ref(), &rt.install_id).await {
         Ok(c) => {
             let agent_id = c.agent_id.clone();
-            rt.set_creds(Some(c)).await;
+            if let Err(error) = rt.set_creds(Some(c)).await {
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(serde_json::json!({
+                        "ok": false,
+                        "error": format!("节点凭证已签发，但本机持久化失败: {error:#}"),
+                    })),
+                );
+            }
             (
                 StatusCode::OK,
                 axum::Json(serde_json::json!({ "ok": true, "agent_id": agent_id })),
@@ -225,7 +252,15 @@ pub(super) async fn admin_login(
 pub(super) async fn admin_logout(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
-    rt.set_creds(None).await;
+    if let Err(error) = rt.set_creds(None).await {
+        return (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            axum::Json(serde_json::json!({
+                "ok": false,
+                "error": format!("清除本机节点凭证失败: {error:#}"),
+            })),
+        );
+    }
     (
         axum::http::StatusCode::OK,
         axum::Json(serde_json::json!({ "ok": true })),

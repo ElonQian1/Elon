@@ -8,6 +8,11 @@ use crate::NodeRuntime;
 pub(crate) async fn get(State(runtime): State<Arc<NodeRuntime>>) -> Json<serde_json::Value> {
     let state = runtime.node_data_root.read().await.clone();
     let mut payload = state.status_payload();
+    payload["active_task_count"] = serde_json::json!(runtime
+        .active_cli_prompts
+        .views_without_approvals()
+        .await
+        .len());
     if let Some(paths) = state.paths {
         if let Ok(build_cache) =
             tokio::task::spawn_blocking(move || crate::node_agent_build_runtime::status(&paths))
@@ -28,6 +33,10 @@ pub(crate) async fn set(
     State(runtime): State<Arc<NodeRuntime>>,
     Json(request): Json<SetRequest>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    // Root changes, project-task admission, and manual cleanup share one gate.
+    // Holding it through persistence closes the check-then-switch race: either
+    // a task has already created its lease, or it observes the new root.
+    let _transition = runtime.node_data_root_transition.lock().await;
     if !runtime
         .active_cli_prompts
         .views_without_approvals()
@@ -40,13 +49,31 @@ pub(crate) async fn set(
         );
     }
     let current = runtime.node_data_root.read().await.clone();
-    if let Err(reason) = super::validate_no_root_overlap(&request.root_path, &current) {
+    if let Some(paths) = current.paths.as_ref() {
+        let active_leases = crate::node_agent_build_runtime::active_leases(paths);
+        if active_leases > 0 {
+            return error(
+                StatusCode::CONFLICT,
+                format!("当前仍有 {active_leases} 个项目任务运行，不能切换节点数据根"),
+            );
+        }
+    }
+    if let Err(reason) =
+        super::validate_no_root_overlap(&request.root_path, &current, &runtime.install_id)
+    {
         return error(StatusCode::BAD_REQUEST, reason);
     }
     let paths = match super::validate_and_prepare(&request.root_path, &runtime.install_id) {
         Ok(paths) => paths,
         Err(reason) => return error(StatusCode::BAD_REQUEST, reason),
     };
+    if let Err(reason) = super::validate_no_canonical_root_overlap(
+        paths.root(),
+        &current,
+        &runtime.install_id,
+    ) {
+        return error(StatusCode::BAD_REQUEST, reason);
+    }
     match runtime.set_node_data_root(paths).await {
         Ok(state) => (
             StatusCode::OK,
@@ -70,6 +97,13 @@ pub(crate) async fn cleanup(
     State(runtime): State<Arc<NodeRuntime>>,
     Json(request): Json<CleanupRequest>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    // Preview is read-only and may be slightly stale; only an applying cleanup
+    // blocks new project-task admission for the full deletion window.
+    let _transition = if request.apply {
+        Some(runtime.node_data_root_transition.clone().lock_owned().await)
+    } else {
+        None
+    };
     if request.apply
         && !runtime
             .active_cli_prompts
@@ -93,9 +127,23 @@ pub(crate) async fn cleanup(
             })),
         );
     };
+    if request.apply {
+        let active_leases = crate::node_agent_build_runtime::active_leases(&paths);
+        if active_leases > 0 {
+            return error(
+                StatusCode::CONFLICT,
+                format!("当前仍有 {active_leases} 个项目任务运行，不能清理节点构建缓存"),
+            );
+        }
+    }
     let apply = request.apply;
+    let install_id = runtime.install_id.clone();
     match tokio::task::spawn_blocking(move || {
-        crate::node_agent_build_runtime::cleanup_rebuildable(&paths, apply)
+        // Keep the owned transition guard inside the blocking job. If the HTTP
+        // client disconnects, Tokio may drop the JoinHandle while deletion
+        // continues; the guard must survive until that deletion really ends.
+        let _transition = _transition;
+        crate::node_agent_build_runtime::cleanup_rebuildable(&paths, &install_id, apply)
     })
     .await
     {

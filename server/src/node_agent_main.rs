@@ -35,6 +35,7 @@ mod node_agent_android_inspector;
 mod node_agent_android_live;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
+mod node_agent_atomic_file;
 mod node_agent_build_runtime;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
@@ -71,7 +72,7 @@ mod node_agent_codex_vault_emergency;
 mod node_agent_config;
 use node_agent_config::{
     ensure_install_id, initial_credentials, initial_node_data_root, initial_storage_settings,
-    load_persisted, save_persisted, PersistedState,
+    load_persisted, save_persisted,
 };
 pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
 mod node_agent_cli_runner;
@@ -87,6 +88,7 @@ mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_install_env;
+mod node_agent_instance_lock;
 mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
@@ -270,17 +272,31 @@ async fn run_agent_runtime() -> Result<()> {
     let cfg = NodeConfig::from_env()?;
     node_agent_proxy::ensure_localhost_no_proxy();
     node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
-    let mut persisted = load_persisted();
+    let _instance_lock = node_agent_instance_lock::acquire(&node_agent_config::state_path())?;
+    info!(
+        path = %_instance_lock.path().display(),
+        "已独占 PC 节点状态目录"
+    );
+    let mut persisted = load_persisted()?;
     let install_id = ensure_install_id(&mut persisted);
-    let node_data_root = initial_node_data_root(&persisted);
-    let storage_settings = initial_storage_settings(&persisted);
+    // Persist the installation identity before binding a data-root marker. If
+    // a later write fails, the next start must reuse the same identity instead
+    // of making a valid marker look foreign.
+    save_persisted(&persisted)?;
+    let node_data_root = initial_node_data_root(&persisted, &install_id);
+    let storage_settings = initial_storage_settings(&persisted, &node_data_root);
+    if let Some(paths) = node_data_root.paths.as_ref() {
+        node_agent_data_root::apply_to_process(paths);
+    } else if let Some(reason) = node_data_root.invalid_reason.as_deref() {
+        warn!("节点数据根校验失败，项目构建与硬盘服务保持阻断状态: {reason}");
+    }
+    if node_data_root.source == node_agent_data_root::NodeDataRootSource::Environment
+        && persisted.set_validated_node_data_root(&node_data_root)
+    {
+        persisted.set_storage_settings(&storage_settings);
+        save_persisted(&persisted)?;
+    }
     let mut creds = initial_credentials(&persisted);
-    save_persisted(&PersistedState::from_parts(
-        &install_id,
-        creds.as_ref(),
-        &storage_settings,
-        &node_data_root,
-    ));
 
     // 有登录 token 但还没有节点凭证 → 自动注册一次
     if creds.is_none() {
@@ -293,12 +309,10 @@ async fn run_agent_runtime() -> Result<()> {
             match provision_node(&cfg, &tok, None, &install_id).await {
                 Ok(c) => {
                     info!("✅ 节点已自动注册: {}", c.agent_id);
-                    save_persisted(&PersistedState::from_parts(
-                        &install_id,
-                        Some(&c),
-                        &storage_settings,
-                        &node_data_root,
-                    ));
+                    let mut next_persisted = load_persisted()?;
+                    next_persisted.set_install_id(&install_id);
+                    next_persisted.set_credentials(Some(&c));
+                    save_persisted(&next_persisted)?;
                     creds = Some(c);
                 }
                 Err(e) => warn!("自动注册失败（可在管理页重新登录）: {e:#}"),

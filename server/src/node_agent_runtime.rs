@@ -7,7 +7,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::{Mutex, Notify, RwLock};
 use tracing::{info, warn};
 
 use homecli_proto::{ModelCapability, NodeHardwareProfile};
@@ -20,7 +20,9 @@ use crate::node_agent_cli_probe::{
 use crate::node_agent_cli_security;
 use crate::node_agent_cli_sidecar;
 use crate::node_agent_completion_outbox;
-use crate::node_agent_config::{save_persisted, Credentials, NodeConfig, PersistedState};
+use crate::node_agent_config::{
+    load_persisted, save_persisted, Credentials, NodeConfig, PersistedState,
+};
 use crate::node_agent_data_root::{self, NodeDataRootState};
 use crate::node_agent_full_access;
 use crate::node_agent_lifecycle;
@@ -52,6 +54,8 @@ pub(crate) struct NodeRuntime {
     pub(crate) tts_worker_url: RwLock<Option<String>>,
     pub(crate) storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     pub(crate) node_data_root: RwLock<NodeDataRootState>,
+    pub(crate) node_data_root_transition: Arc<Mutex<()>>,
+    persisted_state_transition: Mutex<()>,
     pub(crate) active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
     pub(crate) cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
     pub(crate) task_journal: node_agent_task_journal::TaskJournal,
@@ -94,6 +98,8 @@ impl NodeRuntime {
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
             node_data_root: RwLock::new(node_data_root),
+            node_data_root_transition: Arc::new(Mutex::new(())),
+            persisted_state_transition: Mutex::new(()),
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
             cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry::default(),
             task_journal: node_agent_task_journal::TaskJournal::default(),
@@ -433,72 +439,87 @@ impl NodeRuntime {
         }
     }
 
-    pub(crate) async fn set_creds(&self, c: Option<Credentials>) {
-        let storage = self.storage_settings.read().await.clone();
-        let data_root = self.node_data_root.read().await;
-        save_persisted(&PersistedState::from_parts(
-            &self.install_id,
-            c.as_ref(),
-            &storage,
-            &data_root,
-        ));
+    pub(crate) async fn set_creds(&self, c: Option<Credentials>) -> anyhow::Result<()> {
+        let _transition = self.persisted_state_transition.lock().await;
+        let mut persisted = load_persisted()?;
+        persisted.set_install_id(&self.install_id);
+        persisted.set_credentials(c.as_ref());
+        save_persisted(&persisted)?;
         *self.creds.write().await = c;
         self.wake.notify_waiters();
+        Ok(())
     }
 
-    pub(crate) async fn set_storage_settings(&self, settings: pc_storage_repo::StorageSettings) {
-        let creds = self.creds.read().await.clone();
-        let data_root = self.node_data_root.read().await;
-        save_persisted(&PersistedState::from_parts(
-            &self.install_id,
-            creds.as_ref(),
-            &settings,
-            &data_root,
-        ));
+    pub(crate) async fn set_storage_settings(
+        &self,
+        mut settings: pc_storage_repo::StorageSettings,
+    ) -> anyhow::Result<()> {
+        let _transition = self.persisted_state_transition.lock().await;
+        let data_root = self.node_data_root.read().await.clone();
+        if let Some(paths) = data_root.paths.as_ref() {
+            settings.root_path = Some(paths.storage().to_string_lossy().to_string());
+        } else if settings.enabled {
+            anyhow::bail!(
+                "尚未配置有效的节点数据根，硬盘服务保持阻断: {}",
+                data_root
+                    .invalid_reason
+                    .as_deref()
+                    .unwrap_or("统一数据根未配置")
+            );
+        }
+        let mut persisted = load_persisted()?;
+        persisted.set_install_id(&self.install_id);
+        persisted.set_storage_settings(&settings);
+        save_persisted(&persisted)?;
         *self.storage_settings.write().await = settings;
         self.wake.notify_waiters();
+        Ok(())
     }
 
     pub(crate) async fn set_node_data_root(
         &self,
         paths: elon_pc_dev_runtime::NodeDataPaths,
     ) -> anyhow::Result<NodeDataRootState> {
-        node_agent_data_root::persist_to_env_file(&paths)?;
-        node_agent_data_root::apply_to_process(&paths);
-
-        let previous = self.node_data_root.read().await.clone();
-        let mut storage = self.storage_settings.read().await.clone();
-        let legacy_storage_root = storage
-            .root_path
-            .as_deref()
-            .map(std::path::PathBuf::from)
+        let _persistence = self.persisted_state_transition.lock().await;
+        // Acquire every in-memory write guard before the durable commit. Once
+        // save_persisted succeeds there are no more await points, so dropping
+        // an HTTP handler cannot expose a new node.json/process env alongside
+        // stale in-memory roots.
+        let mut data_root_guard = self.node_data_root.write().await;
+        let mut storage_guard = self.storage_settings.write().await;
+        let previous = data_root_guard.clone();
+        let mut storage = storage_guard.clone();
+        let legacy_workspace_root = previous
+            .paths
+            .as_ref()
+            .map(elon_pc_dev_runtime::NodeDataPaths::workspaces)
+            .or(previous.legacy_workspace_root.clone());
+        let legacy_storage_root = previous
+            .paths
+            .as_ref()
+            .map(elon_pc_dev_runtime::NodeDataPaths::storage)
+            .or_else(|| storage.root_path.as_deref().map(std::path::PathBuf::from))
             .or(previous.legacy_storage_root.clone());
-        if std::env::var("NODE_STORAGE_ROOT")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .or_else(|| {
-                std::env::var("ELON_STORAGE_ROOT")
-                    .ok()
-                    .filter(|value| !value.trim().is_empty())
-            })
-            .is_none()
-        {
-            storage.root_path = Some(paths.storage().to_string_lossy().to_string());
-        }
-        let creds = self.creds.read().await.clone();
-        let next = node_agent_data_root::resolve(
-            None,
-            previous.legacy_workspace_root.clone(),
+        storage.root_path = Some(paths.storage().to_string_lossy().to_string());
+        let next = NodeDataRootState::from_prepared_paths(
+            paths.clone(),
+            node_agent_data_root::NodeDataRootSource::Persisted,
+            legacy_workspace_root,
             legacy_storage_root,
         );
-        save_persisted(&PersistedState::from_parts(
-            &self.install_id,
-            creds.as_ref(),
-            &storage,
-            &next,
-        ));
-        *self.storage_settings.write().await = storage;
-        *self.node_data_root.write().await = next.clone();
+        let mut persisted = load_persisted()?;
+        persisted.set_install_id(&self.install_id);
+        if !persisted.set_validated_node_data_root(&next) {
+            anyhow::bail!("拒绝持久化未经验证的节点数据根");
+        }
+        persisted.set_storage_settings(&storage);
+        save_persisted(&persisted)?;
+        // node.json is the durable single source. Publish the new process and
+        // in-memory state only after its atomic replacement succeeds. There
+        // must be no await between these publications.
+        node_agent_data_root::apply_to_process(&paths);
+        *storage_guard = storage;
+        *data_root_guard = next.clone();
         self.wake.notify_waiters();
         Ok(next)
     }

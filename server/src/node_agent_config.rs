@@ -1,10 +1,10 @@
-//! 节点配置与凭证持久化。
-//! 从 node_agent_main.rs 拆分，保持行为不变。
+//! 节点配置与凭证持久化，以及启动阶段的数据根 fail-closed 校验。
 
-use std::path::PathBuf;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
@@ -92,20 +92,170 @@ pub fn state_path() -> PathBuf {
         .join("node.json")
 }
 
-pub(super) fn load_persisted() -> PersistedState {
-    std::fs::read_to_string(state_path())
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
+pub(super) fn load_persisted() -> Result<PersistedState> {
+    load_persisted_from(&state_path())
 }
 
-pub(super) fn save_persisted(s: &PersistedState) {
-    let p = state_path();
-    if let Some(dir) = p.parent() {
-        let _ = std::fs::create_dir_all(dir);
+fn load_persisted_from(path: &Path) -> Result<PersistedState> {
+    let contents = match std::fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(PersistedState::default()),
+        Err(error) => {
+            return Err(error).with_context(|| format!("无法读取节点状态文件 {}", path.display()));
+        }
+    };
+    serde_json::from_str(&contents)
+        .with_context(|| format!("节点状态文件损坏，拒绝用默认值覆盖: {}", path.display()))
+}
+
+pub(super) fn save_persisted(state: &PersistedState) -> Result<()> {
+    save_persisted_to(&state_path(), state)
+}
+
+fn save_persisted_to(path: &Path, state: &PersistedState) -> Result<()> {
+    let json = serde_json::to_vec_pretty(state).context("无法序列化节点状态")?;
+    crate::node_agent_atomic_file::write(path, &json)
+        .with_context(|| format!("无法持久化节点状态 {}", path.display()))
+}
+
+#[cfg(test)]
+mod persistence_tests {
+    use super::*;
+
+    #[test]
+    fn missing_state_file_is_the_only_default_case() {
+        let root =
+            std::env::temp_dir().join(format!("elon-node-state-missing-{}", uuid::Uuid::new_v4()));
+        let state = load_persisted_from(&root.join("node.json")).expect("missing means default");
+        assert!(state.install_id.is_none());
     }
-    if let Ok(json) = serde_json::to_string_pretty(s) {
-        let _ = std::fs::write(&p, json);
+
+    #[test]
+    fn corrupted_state_file_fails_closed() {
+        let root =
+            std::env::temp_dir().join(format!("elon-node-state-corrupt-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).expect("create temp state root");
+        let path = root.join("node.json");
+        std::fs::write(&path, b"{not-json").expect("write corrupt state");
+
+        let error = match load_persisted_from(&path) {
+            Ok(_) => panic!("corrupt state must fail"),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("状态文件损坏"));
+        assert_eq!(
+            std::fs::read(&path).expect("state remains untouched"),
+            b"{not-json"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn non_not_found_read_error_is_not_treated_as_default() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-node-state-read-error-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let path = root.join("node.json");
+        std::fs::create_dir_all(&path).expect("make state path a directory");
+
+        let result = load_persisted_from(&path);
+
+        assert!(result.is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn state_save_replaces_file_atomically() {
+        let root =
+            std::env::temp_dir().join(format!("elon-node-state-save-{}", uuid::Uuid::new_v4()));
+        let path = root.join("node.json");
+        let mut state = PersistedState::default();
+        state.install_id = Some("ins_test".to_string());
+
+        save_persisted_to(&path, &state).expect("save state");
+        let loaded = load_persisted_from(&path).expect("reload state");
+
+        assert_eq!(loaded.install_id.as_deref(), Some("ins_test"));
+        assert_eq!(
+            std::fs::read_dir(&root)
+                .expect("read state root")
+                .filter_map(|entry| entry.ok())
+                .count(),
+            1
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn valid_unified_root_owns_storage_path() {
+        let root =
+            std::env::temp_dir().join(format!("elon-node-storage-root-{}", uuid::Uuid::new_v4()));
+        let data_root = super::super::node_agent_data_root::NodeDataRootState::from_prepared_paths(
+            elon_pc_dev_runtime::NodeDataPaths::new(&root),
+            super::super::node_agent_data_root::NodeDataRootSource::Persisted,
+            None,
+            Some(PathBuf::from(r"C:\legacy-storage")),
+        );
+        let persisted = PersistedState {
+            storage_enabled: Some(true),
+            storage_root: Some(r"C:\legacy-storage".to_string()),
+            ..PersistedState::default()
+        };
+
+        let settings = initial_storage_settings(&persisted, &data_root);
+        let expected = root.join("storage").to_string_lossy().to_string();
+
+        assert_eq!(settings.root_path.as_deref(), Some(expected.as_str()));
+    }
+
+    #[test]
+    fn invalid_explicit_data_root_blocks_legacy_storage_fallback() {
+        let root =
+            std::env::temp_dir().join(format!("elon-node-invalid-root-{}", uuid::Uuid::new_v4()));
+        let data_root = super::super::node_agent_data_root::NodeDataRootState::from_prepared_paths(
+            elon_pc_dev_runtime::NodeDataPaths::new(root),
+            super::super::node_agent_data_root::NodeDataRootSource::Persisted,
+            None,
+            Some(PathBuf::from(r"C:\legacy-storage")),
+        )
+        .block_invalid_root("marker mismatch");
+        let persisted = PersistedState {
+            storage_enabled: Some(true),
+            storage_root: Some(r"C:\legacy-storage".to_string()),
+            ..PersistedState::default()
+        };
+
+        let settings = initial_storage_settings(&persisted, &data_root);
+
+        assert!(!settings.enabled);
+        assert!(settings.root_path.is_none());
+    }
+
+    #[test]
+    fn invalid_explicit_root_survives_unrelated_state_persistence() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-node-invalid-persisted-root-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let expected = root.to_string_lossy().to_string();
+        let mut persisted = PersistedState {
+            node_data_root: Some(expected.clone()),
+            storage_enabled: Some(true),
+            storage_root: Some(r"C:\legacy-storage".to_string()),
+            ..PersistedState::default()
+        };
+
+        persisted.set_install_id("ins_test");
+        persisted.set_credentials(None);
+
+        assert_eq!(persisted.node_data_root.as_deref(), Some(expected.as_str()));
+        assert_eq!(persisted.storage_enabled, Some(true));
+        assert_eq!(
+            persisted.storage_root.as_deref(),
+            Some(r"C:\legacy-storage")
+        );
     }
 }
 
@@ -124,38 +274,52 @@ pub(super) fn ensure_install_id(persisted: &mut PersistedState) -> String {
 }
 
 impl PersistedState {
-    pub(super) fn from_parts(
-        install_id: &str,
-        c: Option<&Credentials>,
+    pub(super) fn set_install_id(&mut self, install_id: &str) {
+        self.install_id = Some(install_id.to_string());
+    }
+
+    pub(super) fn set_credentials(&mut self, credentials: Option<&Credentials>) {
+        self.agent_id = credentials.map(|credentials| credentials.agent_id.clone());
+        self.agent_secret = credentials.map(|credentials| credentials.agent_secret.clone());
+        self.owner_user_id = credentials.map(|credentials| credentials.owner_user_id.clone());
+        self.user_token = credentials.and_then(|credentials| credentials.user_token.clone());
+    }
+
+    pub(super) fn set_storage_settings(
+        &mut self,
         storage: &super::pc_storage_repo::StorageSettings,
+    ) {
+        self.storage_enabled = Some(storage.enabled);
+        self.storage_root = storage.root_path.clone();
+        self.storage_git_base_url = storage.git_base_url.clone();
+    }
+
+    /// Persist a data root only after marker/path validation has succeeded.
+    /// Returning false lets startup keep an invalid environment bootstrap out
+    /// of node.json so a corrected environment can recover on the next start.
+    pub(super) fn set_validated_node_data_root(
+        &mut self,
         node_data_root: &super::node_agent_data_root::NodeDataRootState,
-    ) -> Self {
-        Self {
-            install_id: Some(install_id.to_string()),
-            agent_id: c.map(|c| c.agent_id.clone()),
-            agent_secret: c.map(|c| c.agent_secret.clone()),
-            owner_user_id: c.map(|c| c.owner_user_id.clone()),
-            user_token: c.and_then(|c| c.user_token.clone()),
-            node_data_root: node_data_root
-                .configured_root()
-                .map(|path| path.to_string_lossy().to_string()),
-            node_data_legacy_workspace_root: node_data_root
-                .legacy_workspace_root
-                .as_ref()
-                .map(|path| path.to_string_lossy().to_string()),
-            node_data_legacy_storage_root: node_data_root
-                .legacy_storage_root
-                .as_ref()
-                .map(|path| path.to_string_lossy().to_string()),
-            storage_enabled: Some(storage.enabled),
-            storage_root: storage.root_path.clone(),
-            storage_git_base_url: storage.git_base_url.clone(),
-        }
+    ) -> bool {
+        let Some(paths) = node_data_root.paths.as_ref() else {
+            return false;
+        };
+        self.node_data_root = Some(paths.root().to_string_lossy().to_string());
+        self.node_data_legacy_workspace_root = node_data_root
+            .legacy_workspace_root
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string());
+        self.node_data_legacy_storage_root = node_data_root
+            .legacy_storage_root
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string());
+        true
     }
 }
 
 pub(super) fn initial_node_data_root(
     persisted: &PersistedState,
+    install_id: &str,
 ) -> super::node_agent_data_root::NodeDataRootState {
     let legacy_storage_root = ["NODE_STORAGE_ROOT", "ELON_STORAGE_ROOT"]
         .into_iter()
@@ -171,14 +335,27 @@ pub(super) fn initial_node_data_root(
             let default = super::pc_storage_repo::legacy_default_storage_root();
             default.exists().then_some(default)
         });
-    super::node_agent_data_root::resolve(
+    let mut state = super::node_agent_data_root::resolve(
         persisted.node_data_root.as_deref(),
         persisted
             .node_data_legacy_workspace_root
             .as_deref()
             .map(PathBuf::from),
         legacy_storage_root,
-    )
+    );
+    let Some(configured) = state.paths.as_ref().map(|paths| paths.root().to_path_buf()) else {
+        return state;
+    };
+    match super::node_agent_data_root::validate_and_prepare(
+        configured.to_string_lossy().as_ref(),
+        install_id,
+    ) {
+        Ok(paths) => {
+            state.paths = Some(paths);
+            state
+        }
+        Err(error) => state.block_invalid_root(error),
+    }
 }
 
 /// 从环境变量 / 持久化文件解析已有凭证；都没有时返回 None（需登录）。
@@ -202,26 +379,39 @@ pub(super) fn initial_credentials(persisted: &PersistedState) -> Option<Credenti
 
 pub(super) fn initial_storage_settings(
     persisted: &PersistedState,
+    data_root: &super::node_agent_data_root::NodeDataRootState,
 ) -> super::pc_storage_repo::StorageSettings {
     let env_nonempty = |k: &str| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
     let explicit_root =
         env_nonempty("NODE_STORAGE_ROOT").or_else(|| env_nonempty("ELON_STORAGE_ROOT"));
-    let data_root = initial_node_data_root(persisted);
-    let root_path = explicit_root
-        .or_else(|| {
-            data_root
-                .paths
-                .as_ref()
-                .map(|paths| paths.storage().to_string_lossy().to_string())
-        })
-        .or_else(|| persisted.storage_root.clone());
     let git_base_url = env_nonempty("NODE_STORAGE_GIT_BASE_URL")
         .or_else(|| env_nonempty("ELON_STORAGE_GIT_BASE_URL"))
         .or_else(|| persisted.storage_git_base_url.clone());
-    let enabled = super::node_agent_env::env_flag("NODE_STORAGE_ENABLED")
+    let requested_enabled = super::node_agent_env::env_flag("NODE_STORAGE_ENABLED")
         .or_else(|| super::node_agent_env::env_flag("ELON_STORAGE_ENABLED"))
         .or(persisted.storage_enabled)
         .unwrap_or(false);
+    let root_is_configured =
+        data_root.source != super::node_agent_data_root::NodeDataRootSource::Unconfigured;
+    let (enabled, root_path) = if let Some(paths) = data_root.paths.as_ref() {
+        // A valid unified root owns storage as well. Legacy overrides are
+        // migration inputs only and must not keep writing new data to C:.
+        (
+            requested_enabled,
+            Some(paths.storage().to_string_lossy().to_string()),
+        )
+    } else if root_is_configured {
+        // Explicit root configured but failed validation: block storage rather
+        // than silently falling back to the legacy user-profile directory.
+        (false, None)
+    } else {
+        (
+            // A legacy storage path may be retained for migration metadata,
+            // but it is never effective until a unified data root validates.
+            false,
+            explicit_root.or_else(|| persisted.storage_root.clone()),
+        )
+    };
     super::pc_storage_repo::StorageSettings {
         enabled,
         root_path: root_path.or_else(|| {
