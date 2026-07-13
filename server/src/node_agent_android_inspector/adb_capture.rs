@@ -5,7 +5,8 @@ use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use chrono::Utc;
 
 use super::adb_command::{
-    run_adb, run_adb_text, validate_connect_address, validate_device_id, validate_package_name,
+    is_wireless_device_id, run_adb, run_adb_text, validate_connect_address, validate_device_id,
+    validate_package_name,
 };
 use super::adb_path::adb_path;
 use super::png_probe::png_dimensions;
@@ -212,14 +213,26 @@ fn parse_device_line(line: &str) -> Option<AndroidDevice> {
     if line.is_empty() {
         return None;
     }
-    let mut parts = line.split_whitespace();
-    let serial = parts.next()?.to_string();
-    let state = parts.next().unwrap_or("unknown").to_string();
+    let parts: Vec<_> = line.split_whitespace().collect();
+    let (state_index, metadata_index, state) = (1..parts.len())
+        .find_map(|index| match parts[index] {
+            "no" if parts.get(index + 1).copied() == Some("permissions") => {
+                Some((index, index + 2, "no permissions"))
+            }
+            value @ ("device" | "offline" | "unauthorized" | "authorizing" | "connecting"
+            | "bootloader" | "recovery" | "sideload" | "rescue" | "host" | "detached") => {
+                Some((index, index + 1, value))
+            }
+            _ => None,
+        })
+        .or_else(|| parts.get(1).map(|state| (1, 2, *state)))?;
+    let serial = parts[..state_index].join(" ");
+    let state = state.to_string();
     let mut product = None;
     let mut model = None;
     let mut device = None;
     let mut transport_id = None;
-    for part in parts {
+    for part in parts.into_iter().skip(metadata_index) {
         if let Some(value) = part.strip_prefix("product:") {
             product = Some(value.to_string());
         } else if let Some(value) = part.strip_prefix("model:") {
@@ -232,7 +245,7 @@ fn parse_device_line(line: &str) -> Option<AndroidDevice> {
     }
     let connection_type = if serial.starts_with("emulator-") {
         "emulator"
-    } else if serial.contains(':') {
+    } else if is_wireless_device_id(&serial) {
         "wireless"
     } else {
         "usb"
@@ -262,5 +275,20 @@ e0d909c3               device product:shennong model:23116PN5BC device:shennong 
         assert_eq!(devices.len(), 1);
         assert_eq!(devices[0].serial, "e0d909c3");
         assert_eq!(devices[0].model.as_deref(), Some("23116PN5BC"));
+    }
+
+    #[test]
+    fn preserves_mdns_selector_with_collision_suffix() {
+        let output = "List of devices attached\n\
+adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp device product:AAK-AN00 model:AAK_AN00 device:HNAAK transport_id:94\n";
+        let devices = parse_devices(output);
+        assert_eq!(devices.len(), 1);
+        assert_eq!(
+            devices[0].serial,
+            "adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp"
+        );
+        assert_eq!(devices[0].state, "device");
+        assert_eq!(devices[0].connection_type, "wireless");
+        assert_eq!(devices[0].transport_id.as_deref(), Some("94"));
     }
 }

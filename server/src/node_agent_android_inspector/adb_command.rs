@@ -7,6 +7,9 @@ use tokio::process::Command;
 
 use super::adb_path::adb_path;
 
+const MDNS_TLS_DEVICE_PREFIX: &str = "adb-";
+const MDNS_TLS_DEVICE_SUFFIX: &str = "._adb-tls-connect._tcp";
+
 #[derive(Debug, Clone)]
 pub(crate) struct AdbOutput {
     pub stdout: Vec<u8>,
@@ -113,7 +116,40 @@ pub(crate) async fn run_adb_text_with_stdin(
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+pub(crate) fn is_mdns_tls_device_id(device_id: &str) -> bool {
+    let value = device_id.trim();
+    let Some(instance) = value
+        .strip_prefix(MDNS_TLS_DEVICE_PREFIX)
+        .and_then(|value| value.strip_suffix(MDNS_TLS_DEVICE_SUFFIX))
+    else {
+        return false;
+    };
+    let instance = if let Some((base, collision_suffix)) = instance.rsplit_once(" (") {
+        let Some(number) = collision_suffix.strip_suffix(')') else {
+            return false;
+        };
+        if number.is_empty() || !number.chars().all(|ch| ch.is_ascii_digit()) {
+            return false;
+        }
+        base
+    } else {
+        instance
+    };
+    !instance.is_empty()
+        && instance
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.'))
+}
+
+pub(crate) fn is_wireless_device_id(device_id: &str) -> bool {
+    let value = device_id.trim();
+    value.contains(':') || is_mdns_tls_device_id(value)
+}
+
 pub(crate) fn validate_device_id(device_id: &str) -> Result<()> {
+    if device_id.chars().any(char::is_control) {
+        bail!("deviceId 包含非法字符");
+    }
     let value = device_id.trim();
     if value.is_empty() {
         bail!("deviceId 不能为空");
@@ -121,9 +157,10 @@ pub(crate) fn validate_device_id(device_id: &str) -> Result<()> {
     if value.len() > 128 {
         bail!("deviceId 过长");
     }
-    if value
-        .chars()
-        .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | ':')))
+    if !is_mdns_tls_device_id(value)
+        && value
+            .chars()
+            .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | ':')))
     {
         bail!("deviceId 包含非法字符");
     }
@@ -186,7 +223,13 @@ mod tests {
     fn validates_device_ids() {
         assert!(validate_device_id("e0d909c3").is_ok());
         assert!(validate_device_id("192.168.1.8:5555").is_ok());
+        let mdns_selector = "adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp";
+        assert!(validate_device_id(mdns_selector).is_ok());
+        assert!(is_mdns_tls_device_id(mdns_selector));
+        assert!(is_wireless_device_id(mdns_selector));
         assert!(validate_device_id("bad id").is_err());
+        assert!(validate_device_id("e0d909c3\n").is_err());
+        assert!(validate_device_id("adb-phone (x)._adb-tls-connect._tcp").is_err());
     }
 
     #[test]

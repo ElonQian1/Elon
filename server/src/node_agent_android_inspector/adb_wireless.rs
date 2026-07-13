@@ -5,16 +5,16 @@ use anyhow::{bail, Context, Result};
 
 use super::adb_capture::{adb_status, connect_device, list_devices};
 use super::adb_command::{
-    run_adb_text, run_adb_text_with_stdin, validate_connect_address, validate_device_id,
-    validate_pairing_code,
+    is_mdns_tls_device_id, run_adb_text, run_adb_text_with_stdin, validate_connect_address,
+    validate_device_id, validate_pairing_code,
 };
 use super::device_profiles::{
     forget_profile, list_profiles, mark_paired, remember_connection, upsert_profile,
 };
 use super::types::{
-    AdbMdnsService, AndroidDeviceIdentity, AndroidDeviceProfile, AndroidDeviceProfileView,
-    AndroidWirelessStatus, EnableTcpIpRequest, PairDeviceRequest, ReconnectRequest,
-    RegisterDeviceRequest,
+    AdbMdnsService, AndroidDevice, AndroidDeviceIdentity, AndroidDeviceProfile,
+    AndroidDeviceProfileView, AndroidWirelessStatus, EnableTcpIpRequest, PairDeviceRequest,
+    ReconnectRequest, RegisterDeviceRequest,
 };
 
 const TEXT_LIMIT: usize = 256 * 1024;
@@ -123,7 +123,7 @@ pub(crate) async fn reconnect_devices(req: ReconnectRequest) -> Result<AndroidWi
             "_adb-tls-connect._tcp" | "_adb._tcp"
         ) && allowed_serials
             .iter()
-            .any(|serial| service.name.contains(serial))
+            .any(|serial| mdns_service_matches_hardware_serial(&service.name, serial))
         {
             endpoints.push(service.address);
         }
@@ -141,50 +141,59 @@ pub(crate) async fn wireless_status() -> Result<AndroidWirelessStatus> {
     let devices = list_device_inventory().await?;
     let profiles = list_profiles()?;
     let mdns_services = discover_mdns_services().await.unwrap_or_default();
-    let mut connections = HashMap::new();
+    let mut connections: HashMap<String, &AndroidDevice> = HashMap::new();
     for device in devices.iter().filter(|device| device.state == "device") {
         if let Some(hardware_serial) = device.hardware_serial.as_ref() {
             let replace = connections
                 .get(hardware_serial)
-                .is_none_or(|current: &String| {
-                    !current.contains(':') && device.serial.contains(':')
-                });
+                .is_none_or(|current| connection_priority(device) > connection_priority(current));
             if replace {
-                connections.insert(hardware_serial.clone(), device.serial.clone());
+                connections.insert(hardware_serial.clone(), device);
             }
         }
     }
     let profile_views = profiles
         .into_iter()
-        .map(|mut profile| {
-            let connected_device_id = connections.get(&profile.hardware_serial).cloned();
-            if let Some(endpoint) = connected_device_id
-                .as_deref()
-                .filter(|device_id| device_id.contains(':'))
+        .map(|mut profile| -> Result<AndroidDeviceProfileView> {
+            let connected_device = connections.get(&profile.hardware_serial).copied();
+            let connected_device_id = connected_device.map(|device| device.serial.clone());
+            if let Some(endpoint) = connected_device
+                .and_then(|device| wireless_endpoint_for_device(device, &mdns_services))
             {
-                let mode = connection_mode(endpoint, profile.paired);
-                if profile.last_endpoint.as_deref() != Some(endpoint)
-                    || profile.wireless_mode != mode
+                let mode = if connected_device
+                    .is_some_and(|device| is_mdns_tls_device_id(&device.serial))
                 {
-                    let _ = remember_connection(&profile.hardware_serial, endpoint, mode);
-                    profile.last_endpoint = Some(endpoint.to_string());
+                    "tls"
+                } else {
+                    connection_mode(&endpoint, profile.paired)
+                };
+                if profile.last_endpoint.as_deref() != Some(&endpoint)
+                    || profile.wireless_mode != mode
+                    || (mode == "tls" && !profile.paired)
+                {
+                    remember_connection(&profile.hardware_serial, &endpoint, mode)
+                        .context("保存 Android 无线设备档案失败")?;
+                    profile.last_endpoint = Some(endpoint);
                     profile.wireless_mode = mode.to_string();
                 }
+                if mode == "tls" {
+                    profile.paired = true;
+                }
             }
-            let connection_state = match connected_device_id.as_deref() {
-                Some(device_id) if device_id.contains(':') => "connected_wireless",
+            let connection_state = match connected_device {
+                Some(device) if device.connection_type == "wireless" => "connected_wireless",
                 Some(_) => "connected_usb",
                 None if profile.paired => "paired_offline",
                 None => "offline",
             }
             .to_string();
-            AndroidDeviceProfileView {
+            Ok(AndroidDeviceProfileView {
                 profile,
                 connection_state,
                 connected_device_id,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
     Ok(AndroidWirelessStatus {
         ok: true,
         adb: adb_status().await,
@@ -194,7 +203,7 @@ pub(crate) async fn wireless_status() -> Result<AndroidWirelessStatus> {
     })
 }
 
-pub(crate) async fn list_device_inventory() -> Result<Vec<super::types::AndroidDevice>> {
+pub(crate) async fn list_device_inventory() -> Result<Vec<AndroidDevice>> {
     let mut devices = list_devices().await?;
     for device in devices.iter_mut().filter(|device| device.state == "device") {
         device.hardware_serial = getprop(&device.serial, "ro.serialno")
@@ -268,17 +277,70 @@ fn parse_mdns_services(output: &str) -> Vec<AdbMdnsService> {
     output
         .lines()
         .filter_map(|line| {
-            let parts: Vec<_> = line.split_whitespace().collect();
-            if parts.len() < 3 || !parts[1].starts_with("_adb") || !parts[2].contains(':') {
+            let line = line.trim();
+            let address = line.split_whitespace().last()?;
+            let address_index = line.rfind(address)?;
+            let before_address = line[..address_index].trim_end();
+            let service_type = before_address.split_whitespace().last()?;
+            let service_index = before_address.rfind(service_type)?;
+            let name = before_address[..service_index].trim_end();
+            if name.is_empty() || !service_type.starts_with("_adb") || !address.contains(':') {
                 return None;
             }
             Some(AdbMdnsService {
-                name: parts[0].to_string(),
-                service_type: parts[1].to_string(),
-                address: parts[2].to_string(),
+                name: name.to_string(),
+                service_type: service_type.to_string(),
+                address: address.to_string(),
             })
         })
         .collect()
+}
+
+fn wireless_endpoint_for_device(
+    device: &AndroidDevice,
+    mdns_services: &[AdbMdnsService],
+) -> Option<String> {
+    if device.connection_type != "wireless" {
+        return None;
+    }
+    if device.serial.contains(':') {
+        return Some(device.serial.clone());
+    }
+    mdns_services
+        .iter()
+        .find(|service| {
+            service.service_type == "_adb-tls-connect._tcp"
+                && device
+                    .serial
+                    .strip_suffix(&service.service_type)
+                    .and_then(|name| name.strip_suffix('.'))
+                    == Some(service.name.as_str())
+        })
+        .map(|service| service.address.clone())
+}
+
+fn connection_priority(device: &AndroidDevice) -> u8 {
+    if is_mdns_tls_device_id(&device.serial) {
+        2
+    } else if device.connection_type == "wireless" {
+        1
+    } else {
+        0
+    }
+}
+
+fn mdns_service_matches_hardware_serial(service_name: &str, hardware_serial: &str) -> bool {
+    let base_name = service_name
+        .rsplit_once(" (")
+        .and_then(|(base, suffix)| {
+            suffix
+                .strip_suffix(')')
+                .filter(|number| !number.is_empty() && number.chars().all(|ch| ch.is_ascii_digit()))
+                .map(|_| base)
+        })
+        .unwrap_or(service_name);
+    let exact = format!("adb-{hardware_serial}");
+    base_name == exact || base_name.starts_with(&format!("{exact}-"))
 }
 
 fn parse_wifi_ip(output: &str) -> Option<String> {
@@ -314,11 +376,41 @@ mod tests {
     #[test]
     fn parses_mdns_connect_services() {
         let output = "List of discovered mdns services\n\
-adb-ABC-x _adb-tls-connect._tcp 192.168.1.9:37895\n\
-adb-ABC _adb-tls-pairing._tcp 192.168.1.9:40123\n";
+adb-ASUJ6R6324002425-ZDy0od (3)\t_adb-tls-connect._tcp\t192.168.31.83:36115\n\
+adb-ASUJ6R6324002425-ZDy0od (2)\t_adb-tls-connect._tcp\t192.168.31.83:39593\n\
+adb-ASUJ6R6324002425-ZDy0od\t_adb-tls-connect._tcp\t192.168.31.83:43079\n";
         let services = parse_mdns_services(output);
-        assert_eq!(services.len(), 2);
-        assert_eq!(services[0].address, "192.168.1.9:37895");
+        assert_eq!(services.len(), 3);
+        assert_eq!(services[0].name, "adb-ASUJ6R6324002425-ZDy0od (3)");
+        assert_eq!(services[0].address, "192.168.31.83:36115");
+        assert_eq!(services[1].name, "adb-ASUJ6R6324002425-ZDy0od (2)");
+
+        let device = AndroidDevice {
+            serial: "adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp".to_string(),
+            state: "device".to_string(),
+            hardware_serial: Some("ASUJ6R6324002425".to_string()),
+            connection_type: "wireless".to_string(),
+            product: None,
+            model: None,
+            device: None,
+            transport_id: Some("94".to_string()),
+        };
+        assert_eq!(
+            wireless_endpoint_for_device(&device, &services).as_deref(),
+            Some("192.168.31.83:36115")
+        );
+
+        let mut endpoint_device = device.clone();
+        endpoint_device.serial = "192.168.31.83:36115".to_string();
+        assert!(connection_priority(&device) > connection_priority(&endpoint_device));
+        assert!(mdns_service_matches_hardware_serial(
+            "adb-ASUJ6R6324002425-ZDy0od (3)",
+            "ASUJ6R6324002425"
+        ));
+        assert!(!mdns_service_matches_hardware_serial(
+            "adb-ASUJ6R6324002425-ZDy0od (3)",
+            "ASUJ6R6"
+        ));
     }
 
     #[test]

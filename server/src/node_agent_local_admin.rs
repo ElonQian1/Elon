@@ -119,10 +119,17 @@ fn verify_origin(headers: &HeaderMap, cloud_http_url: &str) -> Result<(), String
 }
 
 fn trusted_origins(cloud_http_url: &str) -> Vec<String> {
+    trusted_origins_for_port(
+        cloud_http_url,
+        crate::node_agent_admin_open::admin_port_from_env(),
+    )
+}
+
+fn trusted_origins_for_port(cloud_http_url: &str, admin_port: u16) -> Vec<String> {
     let mut origins = vec![
         "http://43.139.149.158:8080".to_string(),
-        "http://127.0.0.1:7799".to_string(),
-        "http://localhost:7799".to_string(),
+        format!("http://127.0.0.1:{admin_port}"),
+        format!("http://localhost:{admin_port}"),
         // Local PC frontend development/preview servers. Keep this explicit
         // instead of trusting arbitrary localhost ports.
         "http://127.0.0.1:4179".to_string(),
@@ -165,7 +172,8 @@ fn header_str<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::{
-        can_expose_local_admin_token, verify_local_admin_request, LOCAL_ADMIN_TOKEN_HEADER,
+        can_expose_local_admin_token, trusted_origins_for_port, verify_local_admin_request,
+        LOCAL_ADMIN_TOKEN_HEADER,
     };
     use axum::http::{HeaderMap, HeaderName, HeaderValue};
 
@@ -195,6 +203,14 @@ mod tests {
     fn accepts_explicit_pc_frontend_development_origin() {
         let headers = headers(Some("secret"), Some("http://127.0.0.1:4179"));
         assert!(verify_local_admin_request(&headers, "secret", "http://example.com").is_ok());
+    }
+
+    #[test]
+    fn trusts_the_actual_local_admin_port() {
+        let origins = trusted_origins_for_port("http://example.com", 7800);
+        assert!(origins.contains(&"http://127.0.0.1:7800".to_string()));
+        assert!(origins.contains(&"http://localhost:7800".to_string()));
+        assert!(!origins.contains(&"http://127.0.0.1:7799".to_string()));
     }
 
     #[test]
