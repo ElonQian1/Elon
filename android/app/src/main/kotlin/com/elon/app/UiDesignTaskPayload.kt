@@ -129,12 +129,18 @@ private fun inferImageIntent(text: String, hasAnnotations: Boolean): UiDesignIma
 
 private fun looksLikeUiDesignRequest(text: String): Boolean {
     val normalized = text.lowercase(Locale.ROOT)
+    val hasVisualProperty = UI_PROPERTY_MARKERS.any(normalized::contains)
+    val hasVisualSemantic = UI_SEMANTIC_MARKERS.any(normalized::contains)
+    if (BEHAVIOR_MARKERS.any(normalized::contains) && !hasVisualProperty && !hasVisualSemantic) {
+        return false
+    }
     if (HIGH_CONFIDENCE_UI_MARKERS.any(normalized::contains)) return true
     val hasVisualSubject = UI_SUBJECT_MARKERS.any(normalized::contains)
-    val hasVisualProperty = UI_PROPERTY_MARKERS.any(normalized::contains)
     val hasVisualIntent = UI_ACTION_MARKERS.any(normalized::contains)
     return (hasVisualProperty && hasVisualIntent) ||
-        (hasVisualSubject && UI_SEMANTIC_MARKERS.any(normalized::contains)) ||
+        (hasVisualSubject && hasVisualSemantic) ||
+        (UI_SURFACE_MARKERS.any(normalized::contains) &&
+            UI_SURFACE_ACTION_MARKERS.any(normalized::contains)) ||
         CREATE_MARKERS.any(normalized::contains) ||
         looksLikeUiExtension(normalized) ||
         MODIFY_MARKERS.any(normalized::contains)
@@ -147,12 +153,14 @@ private fun looksLikeUiExtension(text: String): Boolean =
             !BEHAVIOR_MARKERS.any(text::contains))
 
 private val HIGH_CONFIDENCE_UI_MARKERS = listOf(
-    "设计稿", "设计图", "草稿图", "界面", "页面样式", "组件样式", "像素", "1:1", "拟合",
+    "设计稿", "设计图", "草稿图", "页面样式", "组件样式", "像素", "1:1", "拟合",
     "优化界面", "美化页面", "ui样式", "ui设计"
 )
 private val UI_SUBJECT_MARKERS = listOf(
     "页面", "按钮", "卡片", "文本", "文字", "标题", "图标", "图片", "导航", "弹窗", "列表", "组件"
 )
+private val UI_SURFACE_MARKERS = listOf("页面", "界面", "screen", "page")
+private val UI_SURFACE_ACTION_MARKERS = listOf("优化", "美化", "调整样式", "polish", "restyle")
 private val UI_PROPERTY_MARKERS = listOf(
     "颜色", "圆角", "间距", "边距", "内边距", "外边距", "宽度", "高度", "宽高", "字号", "字体",
     "字重", "行高", "透明度", "对齐", "布局", "阴影", "边框", "背景", "padding", "margin", "radius",

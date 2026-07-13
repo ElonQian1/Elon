@@ -464,7 +464,7 @@ mod tests {
 
     #[test]
     fn recognizes_natural_visual_phrases_and_structure_additions() {
-        assert!(infer_ui_design_task("这个按钮太大了，改小一点", None).is_some());
+        assert!(infer_ui_design_task("按钮太大", None).is_some());
         assert!(infer_ui_design_task("优化一下这个界面", None).is_some());
         assert_eq!(
             infer_ui_design_task("在列表里新增一张卡片", None)
@@ -473,6 +473,7 @@ mod tests {
             UiDesignTaskMode::ExtendExisting
         );
         assert!(infer_ui_design_task("调整按钮点击逻辑", None).is_none());
+        assert!(infer_ui_design_task("调整这个界面的按钮点击逻辑", None).is_none());
     }
 
     #[test]

@@ -22,6 +22,19 @@ class UiDesignTaskPayloadTest {
     }
 
     @Test
+    fun naturalUiPhrasesEnterStyleWorkflow() {
+        listOf("按钮太大", "优化一下这个界面").forEachIndexed { index, message ->
+            val payload = buildUiDesignTaskPayload(
+                traceId = "natural-$index",
+                outgoingText = message,
+                attachmentRefs = JsonArray()
+            )
+
+            assertNotNull("Expected UI payload for: $message", payload)
+        }
+    }
+
+    @Test
     fun newScreenWithoutSourceEntersCreateWorkflow() {
         val payload = buildUiDesignTaskPayload(
             traceId = "create-1",
@@ -47,13 +60,19 @@ class UiDesignTaskPayloadTest {
 
     @Test
     fun buttonBehaviorBugDoesNotMasqueradeAsStyleRequest() {
-        val payload = buildUiDesignTaskPayload(
-            traceId = "behavior-1",
-            outgoingText = "按钮点击后没有反应，请修复接口逻辑",
-            attachmentRefs = JsonArray()
-        )
+        listOf(
+            "按钮点击后没有反应，请修复接口逻辑",
+            "调整按钮点击逻辑",
+            "调整这个界面的按钮点击逻辑"
+        ).forEachIndexed { index, message ->
+            val payload = buildUiDesignTaskPayload(
+                traceId = "behavior-$index",
+                outgoingText = message,
+                attachmentRefs = JsonArray()
+            )
 
-        assertNull(payload)
+            assertNull("Expected no UI payload for: $message", payload)
+        }
     }
 
     @Test
