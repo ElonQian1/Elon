@@ -61,6 +61,18 @@ impl NodeDataPaths {
         self.cache().join("yarn")
     }
 
+    pub fn yarn_global(&self) -> PathBuf {
+        self.cache().join("yarn-global")
+    }
+
+    pub fn node_gyp_cache(&self) -> PathBuf {
+        self.cache().join("node-gyp")
+    }
+
+    pub fn sccache(&self) -> PathBuf {
+        self.cache().join("sccache")
+    }
+
     /// Worktrees of the same project share this target, while unrelated
     /// projects and explicitly different Rust toolchains never write together.
     pub fn project_rust_target(&self, project_id: &str, toolchain_key: &str) -> PathBuf {
@@ -72,6 +84,13 @@ impl NodeDataPaths {
 
     pub fn task_temp(&self, task_id: &str) -> PathBuf {
         self.temp().join(safe_path_part(task_id, "task", 96))
+    }
+
+    /// Resolves a task temp directory from a caller-provided collision-resistant
+    /// key. The node build runtime owns the SHA-based key format; this shared
+    /// path model only guarantees that the final component stays path-safe.
+    pub fn task_temp_for_key(&self, task_key: &str) -> PathBuf {
+        self.temp().join(safe_path_part(task_key, "task", 96))
     }
 
     pub fn managed_roots(&self) -> [PathBuf; 4] {
@@ -100,6 +119,18 @@ mod tests {
         assert_eq!(
             paths.yarn_cache(),
             PathBuf::from("D:/ElonNodeData/cache/yarn")
+        );
+        assert_eq!(
+            paths.yarn_global(),
+            PathBuf::from("D:/ElonNodeData/cache/yarn-global")
+        );
+        assert_eq!(
+            paths.node_gyp_cache(),
+            PathBuf::from("D:/ElonNodeData/cache/node-gyp")
+        );
+        assert_eq!(
+            paths.sccache(),
+            PathBuf::from("D:/ElonNodeData/cache/sccache")
         );
         assert_eq!(
             paths.task_temp("task/one"),

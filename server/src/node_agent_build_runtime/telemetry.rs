@@ -1,8 +1,9 @@
 use super::{
-    admission::{disk_free_bytes, disk_total_bytes, required_free_bytes, BuildCachePolicy},
+    admission::{disk_free_bytes, disk_total_bytes, BuildCachePolicy},
     cleanup::CleanupReport,
-    lease::active_lease_count,
+    lease::{active_lease_count, active_reserved_bytes},
     paths::{is_link_or_reparse, BuildRunPaths},
+    reservation,
 };
 use elon_pc_dev_runtime::NodeDataPaths;
 use serde::{Deserialize, Serialize};
@@ -18,6 +19,7 @@ pub(crate) struct BuildCacheTelemetry {
     pub(crate) temp_bytes: u64,
     pub(crate) disk_free_bytes: Option<u64>,
     pub(crate) active_leases: usize,
+    pub(crate) active_reserved_bytes: u64,
     pub(crate) reclaimed_bytes: u64,
     pub(crate) pressure: bool,
     pub(crate) captured_at_unix_secs: u64,
@@ -37,6 +39,8 @@ pub(crate) struct NodeBuildCacheStatus {
     pub(crate) max_project_rust_bytes: u64,
     pub(crate) pressure: bool,
     pub(crate) active_leases: usize,
+    pub(crate) active_reserved_bytes: u64,
+    pub(crate) required_free_bytes: u64,
     pub(crate) last_cleanup_at_unix_secs: Option<u64>,
     pub(crate) last_cleanup_reclaimed_bytes: u64,
     pub(crate) captured_at_unix_secs: u64,
@@ -58,6 +62,7 @@ pub(crate) fn capture(
     let disk_free = disk_free_bytes(&paths.root);
     let cache_bytes = directory_size(&paths.cache_root);
     let project_rust_bytes = directory_size(&paths.project_rust_root);
+    let reserved_bytes = active_reserved_bytes(&paths.lease_root).unwrap_or_default();
     BuildCacheTelemetry {
         root: paths.root.to_string_lossy().to_string(),
         project_key: paths.project_key.clone(),
@@ -67,10 +72,13 @@ pub(crate) fn capture(
         temp_bytes: directory_size(&paths.root.join("temp")),
         disk_free_bytes: disk_free,
         active_leases: active_lease_count(&paths.lease_root),
+        active_reserved_bytes: reserved_bytes,
         reclaimed_bytes,
         pressure: cache_bytes > policy.max_total_cache_bytes
             || project_rust_bytes > policy.max_project_rust_bytes
-            || disk_free.is_some_and(|bytes| bytes < required_free_bytes(policy)),
+            || disk_free.is_some_and(|bytes| {
+                bytes < reservation::cleanup_required_free(policy, reserved_bytes)
+            }),
         captured_at_unix_secs: unix_now(),
     }
 }
@@ -111,6 +119,9 @@ pub(crate) fn capture_root_status(
     let cache_bytes = directory_size(&cache);
     let largest_project_rust_bytes = largest_project_cache(&data_paths.rust_targets());
     let disk_free = disk_free_bytes(data_paths.root());
+    let lease_root = cache.join(".leases");
+    let reserved_bytes = active_reserved_bytes(&lease_root).unwrap_or_default();
+    let required_free = reservation::cleanup_required_free(policy, reserved_bytes);
     let cleanup = std::fs::read_to_string(cache.join(".telemetry").join("cleanup.json"))
         .ok()
         .and_then(|payload| serde_json::from_str::<CleanupTelemetry>(&payload).ok());
@@ -127,8 +138,10 @@ pub(crate) fn capture_root_status(
         max_project_rust_bytes: policy.max_project_rust_bytes,
         pressure: cache_bytes > policy.max_total_cache_bytes
             || largest_project_rust_bytes > policy.max_project_rust_bytes
-            || disk_free.is_some_and(|bytes| bytes < required_free_bytes(policy)),
-        active_leases: active_lease_count(&cache.join(".leases")),
+            || disk_free.is_some_and(|bytes| bytes < required_free),
+        active_leases: active_lease_count(&lease_root),
+        active_reserved_bytes: reserved_bytes,
+        required_free_bytes: required_free,
         last_cleanup_at_unix_secs: cleanup.as_ref().map(|status| status.cleaned_at_unix_secs),
         last_cleanup_reclaimed_bytes: cleanup
             .as_ref()

@@ -1,9 +1,13 @@
 mod admission;
 mod cleanup;
 mod environment;
+mod janitor;
 mod lease;
 mod paths;
+mod reservation;
+mod target_lock;
 mod telemetry;
+mod usage;
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +21,7 @@ use anyhow::{anyhow, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 use lease::BuildRunLease;
 use paths::{prepare_run_directories, resolve_run_paths, BuildRunPaths};
+use target_lock::{AdmissionLock, TargetLock};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -42,6 +47,7 @@ pub(crate) struct PreparedBuildRun {
     paths: BuildRunPaths,
     policy: BuildCachePolicy,
     lease: Option<BuildRunLease>,
+    target_lock: Option<TargetLock>,
     telemetry: BuildCacheTelemetry,
     succeeded: bool,
 }
@@ -58,42 +64,17 @@ impl PreparedBuildRun {
 
 impl Drop for PreparedBuildRun {
     fn drop(&mut self) {
-        if self.succeeded {
-            let _ = cleanup::remove_managed_path(&self.paths.root, &self.paths.task_temp);
-        }
+        // Release active ownership first, then enqueue all recursive work. Drop
+        // may run on a Tokio worker and must never scan/delete a multi-GB tree.
         self.lease.take();
-        let mut reclaimed_bytes = self.telemetry.reclaimed_bytes;
-        if admission::under_pressure(&self.paths, &self.policy) {
-            match prepare_lock().lock() {
-                Ok(_prepare_guard) => {
-                    if admission::under_pressure(&self.paths, &self.policy) {
-                        match cleanup::cleanup_for_pressure(&self.paths, &self.policy) {
-                            Ok(report) => {
-                                reclaimed_bytes =
-                                    reclaimed_bytes.saturating_add(report.reclaimed_bytes);
-                                telemetry::record_cleanup(&self.paths, &report);
-                                tracing::info!(
-                                    project = %self.paths.project_key,
-                                    reclaimed_bytes = report.reclaimed_bytes,
-                                    removed_paths = report.removed_paths,
-                                    skipped_active_paths = report.skipped_active_paths,
-                                    "PC 节点任务结束后已执行构建盘压力清理"
-                                );
-                            }
-                            Err(error) => tracing::warn!(
-                                error = %error,
-                                project = %self.paths.project_key,
-                                "PC 节点任务结束后的构建盘压力清理失败"
-                            ),
-                        }
-                    }
-                }
-                Err(_) => tracing::warn!("构建缓存准备锁已损坏，跳过任务结束后的压力清理"),
-            }
-        }
+        self.target_lock.take();
         invalidate_status(&self.paths.root);
-        let final_snapshot = telemetry::capture(&self.paths, reclaimed_bytes, &self.policy);
-        telemetry::persist(&self.paths, &final_snapshot);
+        janitor::enqueue(janitor::JanitorJob {
+            paths: self.paths.clone(),
+            policy: self.policy.clone(),
+            succeeded: self.succeeded,
+            initial_reclaimed_bytes: self.telemetry.reclaimed_bytes,
+        });
     }
 }
 
@@ -101,21 +82,35 @@ pub(crate) fn prepare_run(
     data_paths: &NodeDataPaths,
     request: BuildRunRequest<'_>,
 ) -> Result<PreparedBuildRun> {
-    let _prepare_guard = prepare_lock()
-        .lock()
-        .map_err(|_| anyhow!("构建缓存准备锁已损坏"))?;
     let task_id = request.task_id.trim();
     let project_id = request.project_id.trim();
     if task_id.is_empty() || project_id.is_empty() {
         return Err(anyhow!("构建任务必须包含 task_id 和 project_id"));
     }
     let paths = resolve_run_paths(data_paths, task_id, project_id, request.cwd)?;
+    {
+        let _prepare_guard = prepare_lock()
+            .lock()
+            .map_err(|_| anyhow!("构建缓存准备锁已损坏"))?;
+        prepare_run_directories(&paths)?;
+    }
+    let target_lock = TargetLock::acquire(&paths, task_id)?;
+    let _admission_lock = AdmissionLock::acquire(&paths, "prepare_run")?;
+    let _prepare_guard = prepare_lock()
+        .lock()
+        .map_err(|_| anyhow!("构建缓存准备锁已损坏"))?;
     prepare_run_directories(&paths)?;
     let policy = BuildCachePolicy::default();
-    let cleanup = admit(&paths, &policy)?;
+    usage::touch(&paths)?;
+    let active_reserved_bytes = reservation::active_reserved_bytes(&paths)?;
+    let cleanup = admit(&paths, &policy, active_reserved_bytes)?;
     telemetry::record_cleanup(&paths, &cleanup);
     prepare_run_directories(&paths)?;
-    let lease = BuildRunLease::acquire(&paths, task_id)?;
+    let lease = BuildRunLease::acquire(
+        &paths,
+        task_id,
+        reservation::reservation_for_new_run(&policy),
+    )?;
     invalidate_status(&paths.root);
     let environment = BuildEnvironment::for_run(&paths, project_id, task_id);
     let telemetry = telemetry::capture(&paths, cleanup.reclaimed_bytes, &policy);
@@ -133,6 +128,7 @@ pub(crate) fn prepare_run(
         paths,
         policy,
         lease: Some(lease),
+        target_lock: Some(target_lock),
         telemetry,
         succeeded: false,
     })
@@ -244,8 +240,10 @@ fn cached_status(root: &Path) -> Option<NodeBuildCacheStatus> {
 
 pub(crate) fn cleanup_rebuildable(
     data_paths: &NodeDataPaths,
+    expected_install_id: &str,
     apply: bool,
 ) -> Result<crate::node_agent_data_root::CleanupResult> {
+    let _admission_lock = AdmissionLock::acquire_root(data_paths.root(), "manual_cleanup")?;
     let _prepare_guard = prepare_lock()
         .lock()
         .map_err(|_| anyhow!("构建缓存准备锁已损坏"))?;
@@ -256,7 +254,8 @@ pub(crate) fn cleanup_rebuildable(
             current_active_leases
         ));
     }
-    let result = crate::node_agent_data_root::cleanup(data_paths, apply)?;
+    let result =
+        crate::node_agent_data_root::cleanup(data_paths, expected_install_id, apply)?;
     if apply {
         invalidate_status(data_paths.root());
     }
@@ -279,7 +278,7 @@ fn status_capture_lock() -> &'static Mutex<()> {
     LOCK.get_or_init(|| Mutex::new(()))
 }
 
-fn invalidate_status(root: &Path) {
+pub(super) fn invalidate_status(root: &Path) {
     if let Ok(mut cache) = status_cache().lock() {
         cache.remove(root);
     }
@@ -296,7 +295,7 @@ fn cli_environment_registry() -> &'static Mutex<HashMap<String, CliRunEntry>> {
     REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn prepare_lock() -> &'static Mutex<()> {
+pub(super) fn prepare_lock() -> &'static Mutex<()> {
     static PREPARE_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     PREPARE_LOCK.get_or_init(|| Mutex::new(()))
 }

@@ -1,6 +1,8 @@
 //! PC 节点 Exec 命令执行（流式 stdout/stderr/exit）。
 //! 从 node_agent_main.rs 拆分，保持行为不变。
 
+use std::sync::Arc;
+
 use homecli_proto::AgentToServer;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::warn;
@@ -15,27 +17,32 @@ pub async fn run_exec(
     cwd: String,
     env_vars: Vec<(String, String)>,
     project_context: Option<homecli_proto::CliProjectContext>,
-    data_paths: Option<elon_pc_dev_runtime::NodeDataPaths>,
+    runtime: Arc<crate::NodeRuntime>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
     use tokio::io::AsyncBufReadExt;
 
     let mut build_run = if let Some(project_context) = project_context.as_ref() {
-        let Some(data_paths) = data_paths.as_ref() else {
-            let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
-                task_id,
-                message: "PC 节点尚未配置统一数据根，已阻止项目 Exec 回落到系统盘".into(),
-            }));
-            return;
+        let prepared = {
+            let _transition = runtime.node_data_root_transition.lock().await;
+            let data_paths = runtime.node_data_root.read().await.paths.clone();
+            let Some(data_paths) = data_paths else {
+                let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
+                    task_id,
+                    message: "PC 节点尚未配置统一数据根，已阻止项目 Exec 回落到系统盘".into(),
+                }));
+                return;
+            };
+            crate::node_agent_build_runtime::prepare_run(
+                &data_paths,
+                crate::node_agent_build_runtime::BuildRunRequest {
+                    task_id: &task_id,
+                    project_id: &project_context.project_id,
+                    cwd: Some(std::path::Path::new(&cwd)),
+                },
+            )
         };
-        match crate::node_agent_build_runtime::prepare_run(
-            data_paths,
-            crate::node_agent_build_runtime::BuildRunRequest {
-                task_id: &task_id,
-                project_id: &project_context.project_id,
-                cwd: Some(std::path::Path::new(&cwd)),
-            },
-        ) {
+        match prepared {
             Ok(run) => Some(run),
             Err(error) => {
                 let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
@@ -129,8 +136,13 @@ pub async fn run_exec(
     if let Some(run) = build_run.as_mut() {
         run.finish(code == Some(0));
     }
+    // Report process completion before potentially expensive post-run cache
+    // accounting/pressure cleanup in PreparedBuildRun::drop().
+    let _ = out_tx.send(ws_text(&AgentToServer::TaskExit {
+        task_id: task_id.clone(),
+        code,
+    }));
     drop(build_run);
-    let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
 }
 
 pub fn hide_tokio_command_window(_command: &mut tokio::process::Command) {

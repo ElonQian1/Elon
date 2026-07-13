@@ -1,6 +1,7 @@
 use super::{
     cleanup::{cleanup_expired, cleanup_for_pressure, CleanupReport},
     paths::BuildRunPaths,
+    reservation,
     telemetry::directory_size,
 };
 use anyhow::{anyhow, Result};
@@ -23,7 +24,7 @@ impl Default for BuildCachePolicy {
         Self {
             min_free_bytes: env_u64("ELON_NODE_BUILD_MIN_FREE_BYTES").unwrap_or(10 * GIB),
             build_headroom_bytes: env_u64_allow_zero("ELON_NODE_BUILD_HEADROOM_BYTES")
-                .unwrap_or(8 * GIB),
+                .unwrap_or(24 * GIB),
             max_total_cache_bytes: env_u64("ELON_NODE_BUILD_MAX_CACHE_BYTES").unwrap_or(80 * GIB),
             max_project_rust_bytes: env_u64("ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES")
                 .unwrap_or(24 * GIB),
@@ -33,23 +34,37 @@ impl Default for BuildCachePolicy {
     }
 }
 
-pub(crate) fn admit(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> Result<CleanupReport> {
+pub(crate) fn admit(
+    paths: &BuildRunPaths,
+    policy: &BuildCachePolicy,
+    active_reserved_bytes: u64,
+) -> Result<CleanupReport> {
     let mut report = cleanup_expired(paths, policy)?;
-    if under_pressure(paths, policy) {
-        report.merge(cleanup_for_pressure(paths, policy)?);
+    if under_pressure(paths, policy, active_reserved_bytes) {
+        report.merge(cleanup_for_pressure(
+            paths,
+            policy,
+            active_reserved_bytes,
+        )?);
     }
 
     let cache_bytes = directory_size(&paths.cache_root);
     let project_bytes = directory_size(&paths.project_rust_root);
-    let free_bytes = disk_free_bytes(&paths.root);
-    let required_free = required_free_bytes(policy);
-    if free_bytes.is_some_and(|bytes| bytes < required_free) {
+    let free_bytes = disk_free_bytes(&paths.root).ok_or_else(|| {
+        anyhow!(
+            "无法读取 PC 节点构建盘可用容量，已按 fail-closed 拒绝启动任务: {}",
+            paths.root.display()
+        )
+    })?;
+    let required_free = reservation::admission_required_free(policy, active_reserved_bytes);
+    if free_bytes < required_free {
         return Err(anyhow!(
-            "PC 节点构建盘空间不足：安全底线 {} GiB + 本次构建预留 {} GiB，启动前需至少 {} GiB 空闲，当前约 {} GiB",
+            "PC 节点构建盘空间不足：安全底线 {} GiB + 活动任务预留 {} GiB + 本次构建预留 {} GiB，启动前需至少 {} GiB 空闲，当前约 {} GiB",
             policy.min_free_bytes / GIB,
+            active_reserved_bytes / GIB,
             policy.build_headroom_bytes / GIB,
             required_free / GIB,
-            free_bytes.unwrap_or_default() / GIB
+            free_bytes / GIB
         ));
     }
     if cache_bytes > policy.max_total_cache_bytes {
@@ -69,17 +84,22 @@ pub(crate) fn admit(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> Result<
     Ok(report)
 }
 
-pub(crate) fn under_pressure(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> bool {
+pub(crate) fn under_pressure(
+    paths: &BuildRunPaths,
+    policy: &BuildCachePolicy,
+    active_reserved_bytes: u64,
+) -> bool {
     directory_size(&paths.cache_root) > policy.max_total_cache_bytes
         || directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
         || disk_free_bytes(&paths.root)
-            .is_some_and(|bytes| bytes < required_free_bytes(policy))
+            .map(|bytes| {
+                bytes < reservation::cleanup_required_free(policy, active_reserved_bytes)
+            })
+            .unwrap_or(false)
 }
 
 pub(crate) fn required_free_bytes(policy: &BuildCachePolicy) -> u64 {
-    policy
-        .min_free_bytes
-        .saturating_add(policy.build_headroom_bytes)
+    reservation::admission_required_free(policy, 0)
 }
 
 fn env_u64(name: &str) -> Option<u64> {

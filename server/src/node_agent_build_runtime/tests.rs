@@ -2,6 +2,7 @@ use super::{
     admission::required_free_bytes,
     cleanup::{cleanup_expired, remove_managed_path},
     paths::{ensure_within_root, resolve_run_paths},
+    reservation::admission_required_free,
     active_leases, prepare_run, status, BuildCachePolicy, BuildEnvironment, BuildRunRequest,
 };
 use elon_pc_dev_runtime::NodeDataPaths;
@@ -25,6 +26,9 @@ fn environment_routes_large_outputs_under_node_data_root() {
         "NPM_CONFIG_CACHE",
         "PNPM_STORE_DIR",
         "YARN_CACHE_FOLDER",
+        "YARN_GLOBAL_FOLDER",
+        "NPM_CONFIG_DEVDIR",
+        "SCCACHE_DIR",
         "COREPACK_HOME",
         "TEMP",
         "TMP",
@@ -66,6 +70,19 @@ fn sanitized_project_ids_never_share_a_rust_target() {
     assert_ne!(with_separator.cargo_target, without_separator.cargo_target);
     assert!(with_separator.project_key.len() <= 96);
     assert!(without_separator.project_key.len() <= 96);
+}
+
+#[test]
+fn sanitized_task_ids_never_share_temp_or_lease_identity() {
+    let root = unique_root("task-key-digest");
+    let data_paths = NodeDataPaths::new(&root);
+    let with_separator = resolve_run_paths(&data_paths, "a/b", "project", None).unwrap();
+    let without_separator = resolve_run_paths(&data_paths, "ab", "project", None).unwrap();
+
+    assert_ne!(with_separator.task_key, without_separator.task_key);
+    assert_ne!(with_separator.task_temp, without_separator.task_temp);
+    assert!(with_separator.task_key.len() <= 96);
+    assert!(without_separator.task_key.len() <= 96);
 }
 
 #[test]
@@ -138,13 +155,14 @@ fn directory_preparation_refuses_symlink_or_junction_ancestor() {
 fn admission_reserves_build_headroom_above_disk_floor() {
     let policy = BuildCachePolicy {
         min_free_bytes: 10,
-        build_headroom_bytes: 8,
+        build_headroom_bytes: 24,
         max_total_cache_bytes: u64::MAX,
         max_project_rust_bytes: u64::MAX,
         temp_ttl_secs: 1,
         cache_ttl_secs: 1,
     };
-    assert_eq!(required_free_bytes(&policy), 18);
+    assert_eq!(required_free_bytes(&policy), 34);
+    assert_eq!(admission_required_free(&policy, 7), 41);
 }
 
 #[test]
@@ -172,6 +190,10 @@ fn prepared_run_creates_lease_and_removes_task_temp_on_drop() {
     assert_eq!(active_leases(&data_paths), 1);
     run.finish(true);
     drop(run);
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while temp.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
     assert!(!temp.exists());
     assert_eq!(status(&data_paths).active_leases, 0);
     assert_eq!(active_leases(&data_paths), 0);

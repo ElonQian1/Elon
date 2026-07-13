@@ -8,6 +8,7 @@ use std::{
 
 const SHORT_DIGEST_LEN: usize = 12;
 const MAX_PROJECT_KEY_LEN: usize = 96;
+const MAX_TASK_KEY_LEN: usize = 96;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct BuildRunPaths {
@@ -20,10 +21,16 @@ pub(crate) struct BuildRunPaths {
     pub(crate) npm_cache: PathBuf,
     pub(crate) pnpm_store: PathBuf,
     pub(crate) yarn_cache: PathBuf,
+    pub(crate) yarn_global: PathBuf,
+    pub(crate) node_gyp_cache: PathBuf,
+    pub(crate) sccache: PathBuf,
     pub(crate) corepack_home: PathBuf,
     pub(crate) task_temp: PathBuf,
+    pub(crate) target_lock_root: PathBuf,
     pub(crate) lease_root: PathBuf,
+    pub(crate) usage_root: PathBuf,
     pub(crate) telemetry_root: PathBuf,
+    pub(crate) task_key: String,
     pub(crate) project_key: String,
     pub(crate) toolchain_key: String,
 }
@@ -35,6 +42,7 @@ pub(crate) fn resolve_run_paths(
     cwd: Option<&Path>,
 ) -> Result<BuildRunPaths> {
     require_absolute_root(paths.root())?;
+    let task_key = stable_task_key(task_id);
     let project_key = stable_project_key(project_id);
     let toolchain_key = rust_toolchain_key(cwd);
     let cache_root = paths.cache();
@@ -48,10 +56,16 @@ pub(crate) fn resolve_run_paths(
         npm_cache: paths.npm_cache(),
         pnpm_store: paths.pnpm_store(),
         yarn_cache: paths.yarn_cache(),
+        yarn_global: paths.yarn_global(),
+        node_gyp_cache: paths.node_gyp_cache(),
+        sccache: paths.sccache(),
         corepack_home: cache_root.join("corepack"),
-        task_temp: paths.task_temp(task_id),
+        task_temp: paths.task_temp_for_key(&task_key),
+        target_lock_root: paths.root().join(".runtime").join("target-locks"),
         lease_root: cache_root.join(".leases"),
+        usage_root: cache_root.join(".usage"),
         telemetry_root: cache_root.join(".telemetry"),
+        task_key,
         project_key,
         toolchain_key,
     })
@@ -68,9 +82,14 @@ pub(crate) fn prepare_run_directories(paths: &BuildRunPaths) -> Result<()> {
         &paths.npm_cache,
         &paths.pnpm_store,
         &paths.yarn_cache,
+        &paths.yarn_global,
+        &paths.node_gyp_cache,
+        &paths.sccache,
         &paths.corepack_home,
         &paths.task_temp,
+        &paths.target_lock_root,
         &paths.lease_root,
+        &paths.usage_root,
         &paths.telemetry_root,
     ] {
         prepare_managed_directory(&paths.root, directory)?;
@@ -285,6 +304,13 @@ fn stable_project_key(project_id: &str) -> String {
     let readable =
         elon_pc_dev_runtime::safe_path_part(project_id, "project", readable_limit);
     let digest = format!("{:x}", Sha256::digest(project_id.as_bytes()));
+    format!("{readable}-{}", &digest[..SHORT_DIGEST_LEN])
+}
+
+pub(crate) fn stable_task_key(task_id: &str) -> String {
+    let readable_limit = MAX_TASK_KEY_LEN - SHORT_DIGEST_LEN - 1;
+    let readable = elon_pc_dev_runtime::safe_path_part(task_id, "task", readable_limit);
+    let digest = format!("{:x}", Sha256::digest(task_id.as_bytes()));
     format!("{readable}-{}", &digest[..SHORT_DIGEST_LEN])
 }
 

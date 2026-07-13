@@ -1,11 +1,13 @@
 use super::{
-    admission::{disk_free_bytes, required_free_bytes, BuildCachePolicy},
-    lease::active_lease_records,
+    admission::{disk_free_bytes, BuildCachePolicy},
+    lease::{active_lease_records, record_task_key},
     paths::{
         ensure_existing_within_root, ensure_removal_tree_safe, ensure_within_root,
         is_link_or_reparse, BuildRunPaths,
     },
+    reservation,
     telemetry::{directory_size, unix_now},
+    usage,
 };
 use anyhow::{Context, Result};
 use std::{
@@ -33,10 +35,7 @@ pub(crate) fn cleanup_expired(
     policy: &BuildCachePolicy,
 ) -> Result<CleanupReport> {
     let active = active_lease_records(&paths.lease_root)?;
-    let active_tasks = active
-        .iter()
-        .map(|record| elon_pc_dev_runtime::safe_path_part(&record.task_id, "task", 96))
-        .collect::<HashSet<_>>();
+    let active_tasks = active.iter().map(record_task_key).collect::<HashSet<_>>();
     let active_rust = active
         .iter()
         .map(|record| (record.project_key.clone(), record.toolchain_key.clone()))
@@ -57,7 +56,7 @@ pub(crate) fn cleanup_expired(
     if active.is_empty() {
         for candidate in shared_cache_candidates(paths)? {
             if unix_now().saturating_sub(candidate.modified_at) > policy.cache_ttl_secs {
-                remove_candidate(&paths.root, &candidate.path, &mut report)?;
+                remove_candidate(&paths.root, &candidate, &mut report)?;
             }
         }
     }
@@ -67,24 +66,54 @@ pub(crate) fn cleanup_expired(
 pub(crate) fn cleanup_for_pressure(
     paths: &BuildRunPaths,
     policy: &BuildCachePolicy,
+    active_reserved_bytes: u64,
 ) -> Result<CleanupReport> {
     let active = active_lease_records(&paths.lease_root)?;
+    let active_tasks = active.iter().map(record_task_key).collect::<HashSet<_>>();
     let active_rust = active
         .iter()
         .map(|record| (record.project_key.clone(), record.toolchain_key.clone()))
         .collect::<HashSet<_>>();
-    let mut candidates = rust_target_candidates(paths, &active_rust)?;
+    let mut report = CleanupReport::default();
+
+    // Repair a project quota using only that project's rebuildable targets.
+    if project_pressure_remains(paths, policy) {
+        let mut project_candidates =
+            rust_target_candidates(paths, &active_rust, Some(&paths.project_key))?;
+        project_candidates.sort_by_key(|candidate| candidate.modified_at);
+        for candidate in project_candidates {
+            if !project_pressure_remains(paths, policy) {
+                break;
+            }
+            remove_candidate(&paths.root, &candidate, &mut report)?;
+        }
+    }
+
+    if !global_or_disk_pressure_remains(paths, policy, active_reserved_bytes) {
+        return Ok(report);
+    }
+
+    let mut candidates = rust_target_candidates(paths, &active_rust, None)?;
     if active.is_empty() {
         candidates.extend(shared_cache_candidates(paths)?);
     }
+    if disk_pressure_remains(paths, policy, active_reserved_bytes) {
+        candidates.extend(temp_candidates(paths, &active_tasks)?);
+    }
     candidates.sort_by_key(|candidate| candidate.modified_at);
 
-    let mut report = CleanupReport::default();
     for candidate in candidates {
-        if !pressure_remains(paths, policy) {
+        if !global_or_disk_pressure_remains(paths, policy, active_reserved_bytes) {
             break;
         }
-        remove_candidate(&paths.root, &candidate.path, &mut report)?;
+        // Temp does not count toward cache quota. It is only an emergency disk
+        // candidate and must be retained when the hard disk pressure is gone.
+        if candidate.kind == CandidateKind::Temp
+            && !disk_pressure_remains(paths, policy, active_reserved_bytes)
+        {
+            continue;
+        }
+        remove_candidate(&paths.root, &candidate, &mut report)?;
     }
     Ok(report)
 }
@@ -113,10 +142,19 @@ pub(crate) fn remove_managed_path(root: &Path, target: &Path) -> Result<u64> {
     Ok(size)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CandidateKind {
+    Rust,
+    Shared,
+    Temp,
+}
+
 #[derive(Debug)]
 struct CleanupCandidate {
     path: PathBuf,
     modified_at: u64,
+    usage_path: Option<PathBuf>,
+    kind: CandidateKind,
 }
 
 fn cleanup_expired_children(
@@ -148,7 +186,13 @@ fn cleanup_expired_children(
         if is_active(&path) {
             report.skipped_active_paths += 1;
         } else if is_expired(&path, ttl_secs) {
-            remove_candidate(root, &path, report)?;
+            let candidate = CleanupCandidate {
+                path,
+                modified_at: 0,
+                usage_path: None,
+                kind: CandidateKind::Temp,
+            };
+            remove_candidate(root, &candidate, report)?;
         }
     }
     Ok(())
@@ -190,10 +234,24 @@ fn cleanup_expired_rust_targets(
             })?;
             ensure_existing_within_root(&paths.root, &toolchain.path())?;
             let toolchain_key = toolchain.file_name().to_string_lossy().to_string();
-            if active.contains(&(project_key.clone(), toolchain_key)) {
+            if active.contains(&(project_key.clone(), toolchain_key.clone())) {
                 report.skipped_active_paths += 1;
-            } else if is_expired(&toolchain.path(), ttl_secs) {
-                remove_candidate(&paths.root, &toolchain.path(), report)?;
+                continue;
+            }
+            let modified_at = usage::last_used(paths, &project_key, &toolchain_key)
+                .unwrap_or_else(|| latest_modified(&toolchain.path()));
+            if unix_now().saturating_sub(modified_at) > ttl_secs {
+                let candidate = CleanupCandidate {
+                    path: toolchain.path(),
+                    modified_at,
+                    usage_path: Some(usage::target_usage_path(
+                        paths,
+                        &project_key,
+                        &toolchain_key,
+                    )),
+                    kind: CandidateKind::Rust,
+                };
+                remove_candidate(&paths.root, &candidate, report)?;
             }
         }
     }
@@ -203,6 +261,7 @@ fn cleanup_expired_rust_targets(
 fn rust_target_candidates(
     paths: &BuildRunPaths,
     active: &HashSet<(String, String)>,
+    project_filter: Option<&str>,
 ) -> Result<Vec<CleanupCandidate>> {
     let mut candidates = Vec::new();
     let root = paths.root.join("cache").join("rust-targets");
@@ -227,6 +286,9 @@ fn rust_target_candidates(
             .with_context(|| format!("无法读取 Rust 项目缓存项 {}", root.display()))?;
         ensure_existing_within_root(&paths.root, &project.path())?;
         let project_key = project.file_name().to_string_lossy().to_string();
+        if project_filter.is_some_and(|filter| project_key.as_str() != filter) {
+            continue;
+        }
         let toolchains = std::fs::read_dir(project.path())
             .with_context(|| format!("无法枚举 Rust 项目缓存 {}", project.path().display()))?;
         for toolchain in toolchains {
@@ -235,10 +297,17 @@ fn rust_target_candidates(
             })?;
             ensure_existing_within_root(&paths.root, &toolchain.path())?;
             let toolchain_key = toolchain.file_name().to_string_lossy().to_string();
-            if !active.contains(&(project_key.clone(), toolchain_key)) {
+            if !active.contains(&(project_key.clone(), toolchain_key.clone())) {
                 candidates.push(CleanupCandidate {
-                    modified_at: latest_modified(&toolchain.path()),
+                    modified_at: usage::last_used(paths, &project_key, &toolchain_key)
+                        .unwrap_or_else(|| latest_modified(&toolchain.path())),
                     path: toolchain.path(),
+                    usage_path: Some(usage::target_usage_path(
+                        paths,
+                        &project_key,
+                        &toolchain_key,
+                    )),
+                    kind: CandidateKind::Rust,
                 });
             }
         }
@@ -257,6 +326,9 @@ fn shared_cache_candidates(paths: &BuildRunPaths) -> Result<Vec<CleanupCandidate
         paths.npm_cache.clone(),
         paths.pnpm_store.clone(),
         paths.yarn_cache.clone(),
+        paths.yarn_global.clone(),
+        paths.node_gyp_cache.clone(),
+        paths.sccache.clone(),
         paths.corepack_home.clone(),
     ]
     .into_iter()
@@ -270,19 +342,74 @@ fn shared_cache_candidates(paths: &BuildRunPaths) -> Result<Vec<CleanupCandidate
         .map(|path| CleanupCandidate {
             modified_at: latest_modified(&path),
             path,
+            usage_path: None,
+            kind: CandidateKind::Shared,
         })
         .collect())
 }
 
-fn pressure_remains(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> bool {
-    directory_size(&paths.cache_root) > policy.max_total_cache_bytes
-        || directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
-        || disk_free_bytes(&paths.root)
-            .is_some_and(|bytes| bytes < required_free_bytes(policy))
+fn temp_candidates(
+    paths: &BuildRunPaths,
+    active_tasks: &HashSet<String>,
+) -> Result<Vec<CleanupCandidate>> {
+    let root = paths.root.join("temp");
+    match std::fs::symlink_metadata(&root) {
+        Ok(_) => ensure_existing_within_root(&paths.root, &root)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(error)
+                .with_context(|| format!("无法检查任务临时目录 {}", root.display()));
+        }
+    }
+    let mut candidates = Vec::new();
+    for entry in std::fs::read_dir(&root)
+        .with_context(|| format!("无法枚举任务临时目录 {}", root.display()))?
+    {
+        let path = entry?.path();
+        ensure_existing_within_root(&paths.root, &path)?;
+        let key = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+        if !active_tasks.contains(key) {
+            candidates.push(CleanupCandidate {
+                modified_at: latest_modified(&path),
+                path,
+                usage_path: None,
+                kind: CandidateKind::Temp,
+            });
+        }
+    }
+    Ok(candidates)
 }
 
-fn remove_candidate(root: &Path, path: &Path, report: &mut CleanupReport) -> Result<()> {
-    let reclaimed = remove_managed_path(root, path)?;
+fn project_pressure_remains(paths: &BuildRunPaths, policy: &BuildCachePolicy) -> bool {
+    directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
+}
+
+fn disk_pressure_remains(
+    paths: &BuildRunPaths,
+    policy: &BuildCachePolicy,
+    active_reserved_bytes: u64,
+) -> bool {
+    disk_free_bytes(&paths.root).is_some_and(|bytes| {
+        bytes < reservation::cleanup_required_free(policy, active_reserved_bytes)
+    })
+}
+
+fn global_or_disk_pressure_remains(
+    paths: &BuildRunPaths,
+    policy: &BuildCachePolicy,
+    active_reserved_bytes: u64,
+) -> bool {
+    directory_size(&paths.cache_root) > policy.max_total_cache_bytes
+        || disk_pressure_remains(paths, policy, active_reserved_bytes)
+}
+
+fn remove_candidate(
+    root: &Path,
+    candidate: &CleanupCandidate,
+    report: &mut CleanupReport,
+) -> Result<()> {
+    let reclaimed = remove_managed_path(root, &candidate.path)?;
+    usage::remove(candidate.usage_path.as_deref());
     report.reclaimed_bytes = report.reclaimed_bytes.saturating_add(reclaimed);
     report.removed_paths += 1;
     Ok(())
