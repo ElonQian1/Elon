@@ -21,6 +21,9 @@ pub use paths::{
     configured_node_data_root, legacy_default_workspace_root, legacy_workspace_root_override,
     safe_path_part, workspace_root,
 };
-pub use profile::{collect_dev_runtime_profile, collect_dev_runtime_profile_with_server_runtime};
+pub use profile::{
+    collect_dev_runtime_profile, collect_dev_runtime_profile_with_server_runtime,
+    collect_dev_runtime_profile_with_workspace_root,
+};
 pub use project_git::{ensure_project_git_baseline, ProjectGitBaselineRequest};
 pub use project_scaffold::{ensure_project_scaffold, ProjectScaffoldRequest};

@@ -5,7 +5,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 use crate::types::AppState;
-use super::{AgentManager, AgentEntry};
+use super::{require_project_build_cache_capability, AgentEntry, AgentManager};
 use super::agent_session::{
     project_storage_prepare_timeout, project_workspace_inspect_timeout,
     project_workspace_provision_timeout,
@@ -27,6 +27,7 @@ impl AgentManager {
         let agent = agents
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        require_project_build_cache_capability(agent)?;
         let (tx, mut rx) = mpsc::unbounded_channel();
         let pending = agent.pending.clone();
         pending.lock().await.insert(req_id.clone(), tx);
@@ -76,6 +77,7 @@ impl AgentManager {
         let agent = agents
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        require_project_build_cache_capability(agent)?;
         let (tx, mut rx) = mpsc::unbounded_channel();
         let pending = agent.pending.clone();
         pending.lock().await.insert(req_id.clone(), tx);
@@ -199,6 +201,7 @@ impl AgentManager {
         let agent = agents
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        require_project_build_cache_capability(agent)?;
         let (tx, mut rx) = mpsc::unbounded_channel();
         let pending = agent.pending.clone();
         pending.lock().await.insert(req_id.clone(), tx);

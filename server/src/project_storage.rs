@@ -1,6 +1,7 @@
 use anyhow::Result;
 use axum::http::StatusCode;
 use homecli_proto::AgentToServer;
+use std::collections::HashSet;
 
 use crate::{
     node_runtime::{node_runtime_by_id, user_node_runtimes, NodeRuntime},
@@ -148,6 +149,7 @@ async fn resolve_storage_node(
         .map(str::trim)
         .filter(|value| !value.is_empty());
     if let Some(node_id) = requested {
+        ensure_storage_agent_capability(state, node_id).await?;
         let node = node_runtime_by_id(state, node_id)
             .await
             .map_err(internal_error)?
@@ -162,12 +164,29 @@ async fn resolve_storage_node(
         return Ok(Some(node));
     }
 
+    let supported_agents = state
+        .agent_manager
+        .list()
+        .await
+        .into_iter()
+        .filter(|agent| {
+            agent
+                .capabilities
+                .iter()
+                .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
+        })
+        .map(|agent| agent.agent_id)
+        .collect::<HashSet<_>>();
     let nodes = user_node_runtimes(state, user_id)
         .await
         .map_err(internal_error)?;
     let mut candidates = nodes
         .into_iter()
-        .filter(|node| node.owner_user_id == user_id && node.storage_ready())
+        .filter(|node| {
+            supported_agents.contains(&node.node_id)
+                && node.owner_user_id == user_id
+                && node.storage_ready()
+        })
         .collect::<Vec<_>>();
     if let Some(preferred) = preferred_node_id {
         if let Some(index) = candidates.iter().position(|node| node.node_id == preferred) {
@@ -187,6 +206,26 @@ async fn resolve_storage_node(
             )
     });
     Ok(candidates.into_iter().next())
+}
+
+async fn ensure_storage_agent_capability(
+    state: &AppState,
+    node_id: &str,
+) -> Result<(), (StatusCode, String)> {
+    if state
+        .agent_manager
+        .agent_has_capability(node_id, homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
+        .await
+    {
+        Ok(())
+    } else {
+        Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "硬盘节点版本过旧，尚不支持受治理的项目存储，请等待节点自动更新后重试: {node_id}"
+            ),
+        ))
+    }
 }
 
 fn ensure_storage_node_owner(

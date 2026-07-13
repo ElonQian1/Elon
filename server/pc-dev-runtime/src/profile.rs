@@ -1,7 +1,7 @@
 use crate::{command_probe, workspace_root};
 use homecli_proto::{DevToolchainStatus, NodeDevRuntimeProfile, NodeDevRuntimeToolContract};
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Output, Stdio},
     thread,
     time::{Duration, Instant},
@@ -19,8 +19,31 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
     authenticated_server_runtime: bool,
 ) -> NodeDevRuntimeProfile {
     let root = workspace_root();
-    let workspace_root_path = Some(root.to_string_lossy().to_string());
-    let (workspace_root_writable, root_issue) = check_workspace_root(&root);
+    collect_dev_runtime_profile_with_workspace_root(
+        allowed_clis,
+        authenticated_server_runtime,
+        Some(&root),
+    )
+}
+
+/// Collect the runtime profile without resolving a legacy workspace root.
+/// `None` is a deliberate fail-closed state and performs no directory probe or
+/// write, which is required before a node has validated its unified data root.
+pub fn collect_dev_runtime_profile_with_workspace_root(
+    allowed_clis: &[String],
+    authenticated_server_runtime: bool,
+    workspace_root: Option<&Path>,
+) -> NodeDevRuntimeProfile {
+    let workspace_root_path = workspace_root.map(|root| root.to_string_lossy().to_string());
+    let (workspace_root_writable, root_issue) = workspace_root.map_or_else(
+        || {
+            (
+                false,
+                Some("尚未配置有效的统一节点数据根，未探测旧用户工作区".to_string()),
+            )
+        },
+        check_workspace_root,
+    );
 
     let git = command_status("git", &["--version"]);
     let codex = command_status("codex", &["--version"]);
@@ -266,7 +289,7 @@ mod tests {
     }
 }
 
-fn check_workspace_root(root: &PathBuf) -> (bool, Option<String>) {
+fn check_workspace_root(root: &Path) -> (bool, Option<String>) {
     if let Err(e) = std::fs::create_dir_all(root) {
         return (
             false,

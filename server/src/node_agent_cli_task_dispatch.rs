@@ -11,8 +11,7 @@ use crate::node_agent_cli_done::CliCompletionContext;
 use crate::node_agent_codex_child_env::FrozenCodexHome;
 use crate::{
     node_agent_active_task, node_agent_full_access, node_agent_task_journal,
-    prepare_cli_prompt_cwd, resolve_attachment_args, run_cli_prompt, ws_text, CliPromptRun,
-    NodeRuntime,
+    resolve_attachment_args, run_cli_prompt, ws_text, CliPromptRun, NodeRuntime,
 };
 
 #[derive(Debug)]
@@ -343,9 +342,30 @@ async fn run_cli_task(
         return;
     }
 
-    let prepared_cwd = match prepare_cli_prompt_cwd(cwd, project_context) {
-        Ok(cwd) => cwd,
-        Err(error) => {
+    // Workspace preparation and build admission share the data-root transition
+    // lock. A root switch can happen before this transaction or after the
+    // lease is registered, never between selecting a workspace and its cache.
+    let transition = runtime
+        .node_data_root_transition
+        .clone()
+        .lock_owned()
+        .await;
+    let data_paths = runtime.node_data_root.read().await.paths.clone();
+    let workspace_root = data_paths
+        .as_ref()
+        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces);
+    let prepared = tokio::task::spawn_blocking(move || {
+        let result = crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in(
+            workspace_root.as_deref(),
+            cwd,
+            project_context,
+        );
+        (transition, result)
+    })
+    .await;
+    let (transition, prepared_cwd) = match prepared {
+        Ok((transition, Ok(cwd))) => (transition, cwd),
+        Ok((_transition, Err(error))) => {
             send_preflight_failure(
                 &runtime,
                 &completion_context,
@@ -356,10 +376,20 @@ async fn run_cli_task(
             );
             return;
         }
+        Err(error) => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                format!("PC 项目工作区准备任务异常结束: {error}"),
+            );
+            return;
+        }
     };
     let build_run_guard = if let Some(project_context) = prepared_cwd.project_context.as_ref() {
-        let data_paths = runtime.node_data_root.read().await.paths.clone();
-        let Some(data_paths) = data_paths else {
+        let Some(data_paths) = data_paths.as_ref() else {
             send_preflight_failure(
                 &runtime,
                 &completion_context,
@@ -371,7 +401,7 @@ async fn run_cli_task(
             return;
         };
         match crate::node_agent_build_runtime::register_cli_run(
-            &data_paths,
+            data_paths,
             crate::node_agent_build_runtime::BuildRunRequest {
                 task_id: &req_id_for_cleanup,
                 project_id: &project_context.project_id,
@@ -394,6 +424,7 @@ async fn run_cli_task(
     } else {
         None
     };
+    drop(transition);
     let original_prompt = prompt.clone();
     let ui_design_routed =
         crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);

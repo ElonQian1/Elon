@@ -1,7 +1,7 @@
 //! CLI 提示执行辅助函数（从 node_agent_main.rs 拆分）。
 //! 保持行为不变。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use homecli_proto::{AgentToServer, CliWorkspaceStatus};
 use tokio_tungstenite::tungstenite::Message;
@@ -152,6 +152,18 @@ pub fn prepare_cli_prompt_cwd(
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> anyhow::Result<PreparedCliPromptCwd> {
+    let workspace_root = elon_pc_dev_runtime::workspace_root();
+    prepare_cli_prompt_cwd_in(Some(&workspace_root), cwd, project_context)
+}
+
+/// Prepare a CLI cwd using a workspace root that was read from validated node
+/// runtime state. A missing root is allowed only for genuinely read-only work
+/// against an explicitly supplied external project.
+pub fn prepare_cli_prompt_cwd_in(
+    workspace_root: Option<&Path>,
+    cwd: Option<String>,
+    project_context: Option<homecli_proto::CliProjectContext>,
+) -> anyhow::Result<PreparedCliPromptCwd> {
     let managed_project = project_context.is_some();
     let (base_cwd, context) = node_agent_cli_security::prepare_cli_base_cwd(cwd, project_context)?;
     if cli_prompt_read_only(context.runtime_permission.as_deref()) {
@@ -161,7 +173,13 @@ pub fn prepare_cli_prompt_cwd(
             project_context: managed_project.then_some(context),
         });
     }
-    let workspace = pc_workspace_provisioner::prepare_conversation_workspace(
+    let workspace_root = workspace_root.ok_or_else(|| {
+        anyhow::anyhow!(
+            "PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘"
+        )
+    })?;
+    let workspace = pc_workspace_provisioner::prepare_conversation_workspace_in(
+        workspace_root,
         base_cwd.to_string_lossy().as_ref(),
         &context.project_id,
         &context.conversation_id,

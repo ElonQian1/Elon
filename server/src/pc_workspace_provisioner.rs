@@ -52,9 +52,22 @@ pub struct ConversationWorkspaceResult {
 
 pub fn provision_project_workspace(req: ProjectWorkspaceRequest) -> Result<ProjectWorkspaceResult> {
     let root = workspace_root();
+    provision_project_workspace_in(&root, req)
+}
+
+/// Provision a platform-managed project under an already validated workspace
+/// root. The full node agent must use this entry point so a missing unified
+/// data root can never fall back to the user profile.
+pub fn provision_project_workspace_in(
+    workspace_root: &Path,
+    req: ProjectWorkspaceRequest,
+) -> Result<ProjectWorkspaceResult> {
     let user_dir = safe_path_part(&req.user_id, "user", 80);
     let project_dir = safe_path_part(&req.project_id, "project", 80);
-    let repo = root.join(user_dir).join(project_dir).join("repo");
+    let repo = workspace_root
+        .join(user_dir)
+        .join(project_dir)
+        .join("repo");
     let created = !repo.exists();
 
     if let Some(remote) = clean_git_remote(req.repo_url.as_deref(), req.branch.as_deref()) {
@@ -86,6 +99,17 @@ pub fn cleanup_project_workspace(
     workspace_path: &str,
 ) -> Result<ProjectWorkspaceCleanupResult> {
     let root = workspace_root();
+    cleanup_project_workspace_in(&root, project_id, workspace_path)
+}
+
+/// Cleanup a platform-managed project only inside an already validated
+/// workspace root. Callers that own node runtime state should never use the
+/// legacy environment-resolving wrapper above.
+pub fn cleanup_project_workspace_in(
+    workspace_root: &Path,
+    project_id: &str,
+    workspace_path: &str,
+) -> Result<ProjectWorkspaceCleanupResult> {
     let project_part = safe_path_part(project_id, "project", 80);
     let repo = PathBuf::from(workspace_path);
     let mut result = ProjectWorkspaceCleanupResult {
@@ -93,15 +117,22 @@ pub fn cleanup_project_workspace(
         skipped_paths: Vec::new(),
     };
 
-    let Some(project_dir) = managed_project_dir(&root, &repo, &project_part)? else {
+    let Some(project_dir) = managed_project_dir(workspace_root, &repo, &project_part)? else {
         result
             .skipped_paths
             .push(format!("跳过非平台托管 PC 工作区：{}", repo.display()));
         return Ok(result);
     };
-    let worktree_root = root.join("conversation-worktrees").join(&project_part);
-    remove_conversation_worktrees(&repo, &worktree_root, &root, &mut result)?;
-    remove_managed_path(&project_dir, &root, "PC 项目工作区", &mut result)?;
+    let worktree_root = workspace_root
+        .join("conversation-worktrees")
+        .join(&project_part);
+    remove_conversation_worktrees(&repo, &worktree_root, workspace_root, &mut result)?;
+    remove_managed_path(
+        &project_dir,
+        workspace_root,
+        "PC 项目工作区",
+        &mut result,
+    )?;
     Ok(result)
 }
 
@@ -201,6 +232,24 @@ pub fn prepare_conversation_workspace(
     project_id: &str,
     conversation_id: &str,
 ) -> Result<ConversationWorkspaceResult> {
+    let root = workspace_root();
+    prepare_conversation_workspace_in(
+        &root,
+        base_workspace_path,
+        project_id,
+        conversation_id,
+    )
+}
+
+/// Prepare a conversation worktree below an already validated workspace root.
+/// Keeping the root explicit is what lets the node runtime hold its transition
+/// gate across worktree creation and build-lease admission.
+pub fn prepare_conversation_workspace_in(
+    workspace_root: &Path,
+    base_workspace_path: &str,
+    project_id: &str,
+    conversation_id: &str,
+) -> Result<ConversationWorkspaceResult> {
     let base_workspace = git_path_buf(&PathBuf::from(base_workspace_path));
     if !is_git_work_tree(&base_workspace) {
         return Ok(ConversationWorkspaceResult {
@@ -213,7 +262,7 @@ pub fn prepare_conversation_workspace(
 
     let project_part = safe_path_part(project_id, "project", 80);
     let conversation_part = safe_path_part(conversation_id, "conversation", 80);
-    let worktree_root = workspace_root()
+    let worktree_root = workspace_root
         .join("conversation-worktrees")
         .join(&project_part);
     let worktree_path = worktree_root.join(&conversation_part);

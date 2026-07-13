@@ -1,16 +1,14 @@
     use super::{
         conversation_workspace_head_landed, ensure_conversation_workspace_committed, git_output,
         git_path_arg, is_git_work_tree, is_retryable_push_rejection,
-        merge_conversation_workspace, prepare_conversation_workspace,
+        merge_conversation_workspace, prepare_conversation_workspace_in,
         recover_stale_conversation_worktree_path, worktree_clean,
     };
     use elon_pc_dev_runtime::safe_path_part;
     use std::path::Path;
     use std::process::Command;
-    use std::{env, ffi::OsString, fs, sync::Mutex};
+    use std::fs;
     use uuid::Uuid;
-
-    static WORKSPACE_ROOT_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn safe_path_part_removes_path_separators() {
@@ -65,9 +63,13 @@
         ));
         fs::create_dir_all(&base).expect("base should create");
 
-        let workspace =
-            prepare_conversation_workspace(&base.to_string_lossy(), "project-a", "conversation-a")
-                .expect("non-git workspace should resolve");
+        let workspace = prepare_conversation_workspace_in(
+            &base.join("managed-workspaces"),
+            &base.to_string_lossy(),
+            "project-a",
+            "conversation-a",
+        )
+        .expect("non-git workspace should resolve");
 
         assert!(!workspace.isolated);
         assert_eq!(workspace.branch, None);
@@ -108,9 +110,6 @@
 
     #[test]
     fn prepare_conversation_workspace_recovers_stale_path() {
-        let _guard = WORKSPACE_ROOT_ENV_LOCK
-            .lock()
-            .expect("env lock should work");
         let root = std::env::temp_dir().join(format!(
             "elon_prepare_stale_conversation_root_{}",
             Uuid::new_v4().simple()
@@ -119,8 +118,6 @@
             "elon_prepare_stale_conversation_repo_{}",
             Uuid::new_v4().simple()
         ));
-        let _env_guard = EnvVarGuard::set("ELON_NODE_WORKSPACE_ROOT", &root);
-
         fs::create_dir_all(&base).expect("base repo should create");
         run_git(&base, &["init"]);
         run_git(&base, &["config", "user.email", "ai@example.test"]);
@@ -135,9 +132,13 @@
         fs::write(stale_path.join("leftover.txt"), "partial output\n")
             .expect("leftover file should write");
 
-        let workspace =
-            prepare_conversation_workspace(&base.to_string_lossy(), "project-a", "conversation-a")
-                .expect("stale path should be recovered");
+        let workspace = prepare_conversation_workspace_in(
+            &root,
+            &base.to_string_lossy(),
+            "project-a",
+            "conversation-a",
+        )
+        .expect("stale path should be recovered");
 
         assert!(workspace.isolated);
         let active = std::path::PathBuf::from(&workspace.workspace_path);
@@ -310,26 +311,4 @@
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
-    }
-
-    struct EnvVarGuard {
-        key: &'static str,
-        old: Option<OsString>,
-    }
-
-    impl EnvVarGuard {
-        fn set(key: &'static str, value: &Path) -> Self {
-            let old = env::var_os(key);
-            env::set_var(key, value);
-            Self { key, old }
-        }
-    }
-
-    impl Drop for EnvVarGuard {
-        fn drop(&mut self) {
-            match self.old.as_ref() {
-                Some(value) => env::set_var(self.key, value),
-                None => env::remove_var(self.key),
-            }
-        }
     }

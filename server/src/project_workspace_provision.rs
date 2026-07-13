@@ -30,6 +30,18 @@ pub async fn resolve_pc_project_node(
         .filter(|value| !value.is_empty());
 
     if let Some(node_id) = requested_node_id {
+        if !state
+            .agent_manager
+            .agent_has_capability(node_id, homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
+            .await
+        {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "PC 节点版本过旧，尚不支持受治理的项目工作区，请等待节点自动更新后重试: {node_id}"
+                ),
+            ));
+        }
         let runtime = match node_runtime_by_id(state, node_id).await {
             Ok(Some(runtime)) => runtime,
             Ok(None) => {
@@ -232,6 +244,13 @@ fn requested_pc_node_runtime_ready_wait() -> Duration {
 async fn connected_project_workspace_nodes(state: &AppState, user_id: &str) -> Vec<NodeRuntime> {
     let mut nodes = Vec::new();
     for agent in state.agent_manager.list().await {
+        if !agent
+            .capabilities
+            .iter()
+            .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
+        {
+            continue;
+        }
         match node_runtime_by_id(state, &agent.agent_id).await {
             Ok(Some(runtime))
                 if runtime_owned_by_user(&runtime, user_id)

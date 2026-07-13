@@ -1,16 +1,16 @@
 // server/src/node_agent_project_picker.rs
 
-use axum::{http::StatusCode, Json};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::path::{Path, PathBuf};
+use std::{path::{Path, PathBuf}, sync::Arc};
 
 use crate::{
     node_agent_project_manifest_identity::{
         detect_manifest_project_identity, detect_shallow_manifest_project_identity,
     },
     node_agent_project_profile::detect_project_profile,
-    pc_workspace_provisioner, project_landing, project_workspace_inspect,
+    pc_workspace_provisioner, project_landing, project_workspace_inspect, NodeRuntime,
 };
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +123,7 @@ pub(crate) async fn inspect_local_project_folder(
 }
 
 pub(crate) async fn prepare_default_project_folder(
+    State(runtime): State<Arc<NodeRuntime>>,
     Json(req): Json<DefaultLocalProjectReq>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     let project_id = clean_project_text(req.project_id.as_deref().unwrap_or(""), 80)
@@ -134,17 +135,45 @@ pub(crate) async fn prepare_default_project_folder(
     let template = clean_project_text(req.template.as_deref().unwrap_or(""), 80)
         .unwrap_or_else(|| "blank".to_string());
 
-    match pc_workspace_provisioner::provision_project_workspace(
-        pc_workspace_provisioner::ProjectWorkspaceRequest {
-            project_id,
-            user_id,
-            name,
-            template,
-            repo_url: clean_project_text(req.repo_url.as_deref().unwrap_or(""), 500),
-            branch: clean_project_text(req.branch.as_deref().unwrap_or(""), 160),
-        },
-    ) {
+    let request = pc_workspace_provisioner::ProjectWorkspaceRequest {
+        project_id,
+        user_id,
+        name,
+        template,
+        repo_url: clean_project_text(req.repo_url.as_deref().unwrap_or(""), 500),
+        branch: clean_project_text(req.branch.as_deref().unwrap_or(""), 160),
+    };
+    let transition = runtime.node_data_root_transition.clone().lock_owned().await;
+    let workspace_root = runtime
+        .node_data_root
+        .read()
+        .await
+        .paths
+        .as_ref()
+        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces);
+    let Some(workspace_root) = workspace_root else {
+        drop(transition);
+        return json_error(
+            StatusCode::CONFLICT,
+            "尚未配置有效的统一节点数据根，不能创建默认项目目录",
+        );
+    };
+    let provisioned = tokio::task::spawn_blocking(move || {
+        let _transition = transition;
+        pc_workspace_provisioner::provision_project_workspace_in(&workspace_root, request)
+    })
+    .await;
+    match provisioned {
         Ok(result) => {
+            let result = match result {
+                Ok(result) => result,
+                Err(error) => {
+                    return json_error(
+                        StatusCode::BAD_REQUEST,
+                        format!("准备默认项目目录失败: {error}"),
+                    );
+                }
+            };
             let (status, Json(mut value)) = project_info_response(&result.workspace_path);
             if status.is_success() {
                 if let Some(object) = value.as_object_mut() {
@@ -163,8 +192,8 @@ pub(crate) async fn prepare_default_project_folder(
             (status, Json(value))
         }
         Err(error) => json_error(
-            StatusCode::BAD_REQUEST,
-            format!("准备默认项目目录失败: {error}"),
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("准备默认项目目录任务异常结束: {error}"),
         ),
     }
 }

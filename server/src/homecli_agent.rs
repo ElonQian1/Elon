@@ -179,6 +179,19 @@ impl AgentManager {
                 .is_ok()
         })
     }
+
+    pub async fn agent_has_capability(&self, agent_id: &str, capability: &str) -> bool {
+        self.agents
+            .read()
+            .await
+            .get(agent_id)
+            .is_some_and(|agent| {
+                agent
+                    .capabilities
+                    .iter()
+                    .any(|candidate| candidate == capability)
+            })
+    }
     /// 把 AI 提示发给 PC agent，让 PC 用指定 CLI（copilot/codex）执行，流式返回 CliChunk/CliDone。
     pub async fn dispatch_cli_prompt(
         &self,
@@ -668,8 +681,14 @@ fn require_project_build_cache(
     agent: &AgentEntry,
     project_context: Option<&homecli_proto::CliProjectContext>,
 ) -> Result<()> {
-    if project_context.is_some()
-        && !agent
+    if project_context.is_some() {
+        require_project_build_cache_capability(agent)?;
+    }
+    Ok(())
+}
+
+fn require_project_build_cache_capability(agent: &AgentEntry) -> Result<()> {
+    if !agent
             .capabilities
             .iter()
             .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)

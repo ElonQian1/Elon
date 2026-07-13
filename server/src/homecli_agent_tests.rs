@@ -516,6 +516,56 @@ async fn non_project_exec_allows_agent_without_build_cache_capability() {
     }
 }
 
+#[tokio::test]
+async fn project_workspace_mutations_reject_agent_without_build_cache_capability() {
+    let TestApprovalAgent { manager, .. } = registered_approval_agent().await;
+    manager
+        .agents
+        .write()
+        .await
+        .get_mut("agent")
+        .expect("registered agent")
+        .capabilities
+        .clear();
+
+    let provision_error = manager
+        .dispatch_project_workspace_provision(
+            "agent",
+            "project".into(),
+            "user".into(),
+            "Project".into(),
+            "blank".into(),
+            None,
+            None,
+        )
+        .await
+        .expect_err("legacy agent must not provision a workspace");
+    let storage_error = manager
+        .dispatch_project_storage_repo_prepare(
+            "agent",
+            "project".into(),
+            "user".into(),
+            "Project".into(),
+            None,
+            None,
+            false,
+        )
+        .await
+        .expect_err("legacy agent must not prepare project storage");
+    let cleanup_error = manager
+        .dispatch_project_workspace_cleanup(
+            "agent",
+            "project".into(),
+            "D:/managed/project/repo".into(),
+        )
+        .await
+        .expect_err("legacy agent must not cleanup a workspace");
+
+    for error in [provision_error, storage_error, cleanup_error] {
+        assert!(error.to_string().contains("版本过旧"));
+    }
+}
+
 #[test]
 fn legacy_register_without_capabilities_defaults_to_empty() {
     let register: AgentToServer = serde_json::from_str(
