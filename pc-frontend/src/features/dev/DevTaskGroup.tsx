@@ -26,6 +26,7 @@ import { buildTaskTimeline } from './taskTimelineModel'
 import { isStatusEchoProgressText } from './taskTimelineRuntime'
 import { taskStageActionModel } from './taskStageActionModel'
 import { taskTerminalActionModel } from './taskTerminalActionModel'
+import { withRunningProgressFallback } from './taskProgressSurfaceModel'
 import type { TimelineItem } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskState, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
@@ -116,7 +117,9 @@ function DevTaskGroup({
     ? progressSurfaceItems(timeline.stage, previewAssistantItems)
     : []
   const visiblePublicSurfaceItems = showPublicSurfaceItems ? publicSurfaceItems : []
-  const visibleSurfaceItems = surfaceItems
+  const visibleSurfaceItems = !resultMsg && !showPublicSurfaceItems
+    ? withRunningProgressFallback(surfaceItems)
+    : surfaceItems
   const hasVisibleSurfaceItems = visiblePublicSurfaceItems.length > 0 || visibleSurfaceItems.length > 0
   const previewHiddenCount = Math.max(0, publicAssistantItems.length - previewAssistantItems.length)
   const suppressProgressNarrative = (

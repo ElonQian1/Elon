@@ -7,18 +7,10 @@ import { isStatusEchoProgressText } from './taskTimelineRuntime'
 import type { TimelineItem, TimelineItemKind, TaskTimelineStage } from './taskTimelineModel'
 import type { buildTaskTimeline } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
+import type { ProgressSurfaceItem } from './taskProgressSurfaceModel'
 import styles from './DevTaskGroup.module.css'
 
-export interface ProgressSurfaceItem {
-  surfaceType?: 'text' | 'commands' | 'artifact'
-  id: string
-  title?: string
-  detail?: string
-  meta?: string
-  kind?: TimelineItemKind
-  items?: TimelineItem[]
-  tone?: TaskTone
-}
+export type { ProgressSurfaceItem } from './taskProgressSurfaceModel'
 
 interface TaskProgressHighlightsProps {
   items: ProgressSurfaceItem[]

@@ -6,6 +6,7 @@ import { previewStartedAt as startedAt, previewTaskId as taskId, ScenarioPreview
 
 type ScenarioId =
   | 'queued'
+  | 'first-progress'
   | 'dispatch'
   | 'heartbeat'
   | 'recovery'
@@ -43,6 +44,15 @@ const scenarios: Scenario[] = [
     width: 599,
     messages: [
       task('请做一次只读诊断，不要修改文件、不要提交、不要发布。', 'queued'),
+    ],
+  },
+  {
+    id: 'first-progress',
+    label: '等待首条进展',
+    width: 720,
+    messages: [
+      task('请做一次只读诊断，不要修改文件、不要提交、不要发布。', 'running'),
+      event({ type: 'runtime_status', status: 'running', phase: 'thinking', runtime: 'codex', message: '任务已经开始处理。' }),
     ],
   },
   {

@@ -38,6 +38,7 @@ assert.strictEqual(
 
 const lifecycleScenarios = [
   'queued',
+  'first-progress',
   'dispatch',
   'heartbeat',
   'recovery',

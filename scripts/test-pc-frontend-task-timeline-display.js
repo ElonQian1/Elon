@@ -44,6 +44,28 @@ try {
   const {
     taskTerminalActionModel,
   } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskTerminalActionModel.ts'));
+  const {
+    withRunningProgressFallback,
+  } = require(path.join(pcRoot, 'src', 'features', 'dev', 'taskProgressSurfaceModel.ts'));
+
+  const pendingProgress = withRunningProgressFallback([]);
+  assert.deepStrictEqual(
+    pendingProgress,
+    [{
+      surfaceType: 'text',
+      id: 'running-progress-pending',
+      title: '任务已发送',
+      detail: '正在连接执行环境并等待第一条进展。收到节点或 AI 输出后会自动更新。',
+      tone: 'queued',
+    }],
+    'a running task must never leave the assistant turn visually empty',
+  );
+  const realProgress = [{ surfaceType: 'text', id: 'assistant-note', detail: '正在读取项目规则。', tone: 'running' }];
+  assert.strictEqual(
+    withRunningProgressFallback(realProgress),
+    realProgress,
+    'real public progress must replace the pending fallback without duplication',
+  );
 
   const mixedTimeline = buildTaskTimeline([
     {
