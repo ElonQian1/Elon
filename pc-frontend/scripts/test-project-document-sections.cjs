@@ -110,4 +110,10 @@ assert(prompt.includes('.elon/document-organization-suggestions.json'))
 assert(prompt.includes('classification_model_tokens=0'))
 assert(!prompt.includes('# Reviewer'))
 
+const workspaceSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsWorkspace.tsx',
+), 'utf8')
+assert(!workspaceSource.includes('markSuggestionsRequested'), '启动 AI 前不得在主工作区预写建议占位文件')
+assert(workspaceSource.includes('onStartAiOrganize(buildOrganizationPrompt'))
+
 console.log('project document section model tests passed')

@@ -207,20 +207,6 @@ export function buildOrganizationPrompt(
     `紧凑目录（path | role | lifecycle | authority | section | confidence）：\n${compactCatalog}`
 }
 
-export function requestedSuggestions(): DocumentOrganizationSuggestions {
-  return {
-    version: 1,
-    status: 'requested',
-    summary: 'AI 整理任务已发起，等待结构化建议。',
-    proposed_sections: [],
-    assignments: [],
-    conflicts: [],
-    move_suggestions: [],
-    documents_read: 0,
-    estimated_tokens_used: 0,
-  }
-}
-
 export function serializeProjectDocumentJson(value: unknown) {
   return `${JSON.stringify(value, null, 2)}\n`
 }

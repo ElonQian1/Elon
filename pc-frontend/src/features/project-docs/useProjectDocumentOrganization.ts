@@ -10,7 +10,6 @@ import {
   ORGANIZATION_SUGGESTIONS_PATH,
   parseOrganizationSuggestions,
   parseSectionManifest,
-  requestedSuggestions,
   SECTION_CONFIG_PATH,
   serializeProjectDocumentJson,
   SYSTEM_DOCUMENT_SECTIONS,
@@ -109,10 +108,6 @@ export function useProjectDocumentOrganization(projectId: string) {
     return nextManifest
   }, [manifestFile.value, saveManifest])
 
-  const markSuggestionsRequested = useCallback(async () => {
-    await saveSuggestions(requestedSuggestions())
-  }, [saveSuggestions])
-
   const applySuggestions = useCallback(async (documents: ProjectDocumentEntry[]) => {
     const suggestions = suggestionsFile.value
     if (!suggestions || suggestions.status !== 'ready') return manifestFile.value
@@ -146,7 +141,6 @@ export function useProjectDocumentOrganization(projectId: string) {
     addSection,
     removeSection,
     assignDocument,
-    markSuggestionsRequested,
     applySuggestions,
   }
 }

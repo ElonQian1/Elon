@@ -42,5 +42,6 @@ applyTo: "**/*.md"
 
 - `.elon/document-sections.json` 是项目共享的虚拟分区和文档归类配置；它不改变文件实际路径。
 - `.elon/document-organization-suggestions.json` 是 AI 整理建议的结构化产物；AI 整理任务只可写这一份建议文件。
+- 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - AI 可建议新分区和虚拟归类，但必须经用户审核后才更新分区配置。
 - 应用虚拟分区建议不等于移动 Markdown；实体迁移必须作为独立 Git 变更再审核。

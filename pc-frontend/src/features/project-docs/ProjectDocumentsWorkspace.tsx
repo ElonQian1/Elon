@@ -220,7 +220,6 @@ export default function ProjectDocumentsWorkspace({
     setOrganizing(true)
     setMessage('')
     try {
-      await organization.markSuggestionsRequested()
       await onStartAiOrganize(buildOrganizationPrompt(projectName, catalog, organization.manifest))
     } catch (error) {
       setMessage(errorMessage(error, '无法发起 AI 整理任务'))
