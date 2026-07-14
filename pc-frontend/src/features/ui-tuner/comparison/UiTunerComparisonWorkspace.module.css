@@ -258,7 +258,7 @@
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: 35% 7px minmax(0, 1fr);
+  grid-template-columns: var(--design-pane-ratio, 35%) 7px minmax(0, 1fr);
 }
 
 .designToolsDock {

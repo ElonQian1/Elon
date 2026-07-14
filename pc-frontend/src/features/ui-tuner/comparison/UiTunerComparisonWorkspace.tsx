@@ -1,4 +1,5 @@
 import type {
+  CSSProperties,
   KeyboardEventHandler,
   PointerEvent as ReactPointerEvent,
   RefObject,
@@ -258,7 +259,7 @@ export function UiTunerComparisonWorkspace({
               onClick={() => setDesignToolsOpen((open) => !open)}
             >
               <strong>设计识别与自动拟合</strong>
-              <span>{fitRun.run ? `正在运行 · ${fitRun.run.phase}` : fitInput ? '配对就绪' : '按需展开'}</span>
+              <span>{fitRun.run ? '拟合进行中' : fitInput ? '配对就绪' : '按需展开'}</span>
               <em>{designToolsOpen ? '收起' : '展开'}</em>
             </button>
             {designToolsOpen && (
@@ -285,7 +286,7 @@ export function UiTunerComparisonWorkspace({
       {comparison.mode === 'split' && target && designPaneOpen ? (
         <div
           className={styles.splitGrid}
-          style={{ gridTemplateColumns: `${splitRatio}% 7px minmax(0, 1fr)` }}
+          style={{ '--design-pane-ratio': `${splitRatio}%` } as CSSProperties}
         >
           <section className={styles.pane} aria-label="目标设计稿">
             <header className={styles.paneHeader}>
