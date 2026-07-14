@@ -64,12 +64,14 @@ const BOTTOM_NAV_CHAT_ACTIVE_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_chat_active.png");
 const BOTTOM_NAV_PROJECT_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_project.png");
-const BOTTOM_NAV_PROJECT_ACTIVE_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_project_active.png");
+const BOTTOM_NAV_PROJECT_ACTIVE_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_project_active.png"
+);
 const BOTTOM_NAV_PROFILE_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_profile.png");
-const BOTTOM_NAV_PROFILE_ACTIVE_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_profile_active.png");
+const BOTTOM_NAV_PROFILE_ACTIVE_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_profile_active.png"
+);
 const BOTTOM_NAV_MENU_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_menu.png");
 const BOTTOM_NAV_MENU_ACTIVE_PNG: &[u8] =
