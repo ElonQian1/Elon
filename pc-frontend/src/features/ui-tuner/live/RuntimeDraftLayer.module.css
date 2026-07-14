@@ -1,0 +1,43 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.baseMask,
+.preview {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+}
+
+.baseMask {
+  z-index: 0;
+}
+
+.preview {
+  z-index: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-style: solid;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-rendering: geometricPrecision;
+  box-shadow: 0 0 0 1px rgba(89, 215, 255, .24);
+}
+
+.bitmapPreview {
+  image-rendering: auto;
+}
+
+.stylePreview {
+  background-clip: padding-box;
+}
+
+.rejected {
+  box-shadow: 0 0 0 2px #ff6b6b, 0 0 0 5px rgba(255, 107, 107, .22);
+}
