@@ -40,6 +40,17 @@ git push origin HEAD:main
 
 兼容时保留双方逻辑。不要因为编码、验证或发布期间 `origin/main` 前进就主动 rebase、merge 或重跑。
 
+## push 输出管理
+
+`pre-push` 里的 `cargo check --workspace` 常整段输出几十 KB 警告；直接读回对话会撑爆 token（历史事故）。push 时重定向到 `.ai-tmp/push.log`，只在失败时读尾部：
+
+```powershell
+git push origin HEAD:main *> .ai-tmp/push.log
+if ($LASTEXITCODE -ne 0) { Get-Content .ai-tmp/push.log -Tail 40 }
+```
+
+Bash: `git push origin HEAD:main > .ai-tmp/push.log 2>&1 || tail -n 40 .ai-tmp/push.log`
+
 ## 验证入口
 
 ### Rust/Cargo
