@@ -108,6 +108,10 @@ const catalog = {
 const prompt = buildOrganizationPrompt('测试项目', catalog, manifest)
 assert(prompt.includes('.elon/document-organization-suggestions.json'))
 assert(prompt.includes('classification_model_tokens=0'))
+assert(prompt.includes('project_docs_analyze'))
+assert(prompt.includes('project_docs_get_status'))
+assert(prompt.includes('绝不能自行调用 project_docs_apply_suggestions'))
+assert(prompt.length < 3000, '整理任务 Prompt 不应内嵌完整文档目录')
 assert(!prompt.includes('# Reviewer'))
 
 const workspaceSource = fs.readFileSync(path.join(
@@ -115,5 +119,34 @@ const workspaceSource = fs.readFileSync(path.join(
 ), 'utf8')
 assert(!workspaceSource.includes('markSuggestionsRequested'), '启动 AI 前不得在主工作区预写建议占位文件')
 assert(workspaceSource.includes('onStartAiOrganize(buildOrganizationPrompt'))
+
+const statusSourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentOrganizationStatus.ts')
+const statusOutput = ts.transpileModule(fs.readFileSync(statusSourcePath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const statusLoaded = { exports: {} }
+new Function('module', 'exports', 'require', statusOutput)(statusLoaded, statusLoaded.exports, require)
+const trace = statusLoaded.exports.parseDocumentOrganizationTrace({
+  version: 1,
+  operation_id: 'docs_test',
+  status: 'running',
+  current_stage: 'catalog_analyzed',
+  created_at: 1,
+  updated_at: 2,
+  documents_cataloged: 119,
+  ambiguous_documents: 57,
+  documents_read: 3,
+  estimated_tokens_used: 240,
+  events: [{ stage: 'catalog_analyzed', status: 'running', label: '目录分析完成', detail: 'metadata only', at: 2 }],
+})
+assert.equal(trace.documents_cataloged, 119)
+assert.equal(statusLoaded.exports.shouldPollDocumentOrganization(trace), true)
+assert.equal(statusLoaded.exports.shouldPollDocumentOrganization({ ...trace, status: 'failed' }), false)
+
+const channelSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsChannel.tsx',
+), 'utf8')
+assert(channelSource.includes('/organization/start') === false, '状态 API 应封装在 organization hook 中')
+assert(!channelSource.includes('await projectStore.selectChannel(aiChannel.id)'), '发起整理后应停留在文档工作台观察进度')
 
 console.log('project document section model tests passed')

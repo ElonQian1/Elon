@@ -2,10 +2,14 @@ import { CheckCircle2, FileWarning, Lightbulb, RefreshCw, Sparkles } from 'lucid
 
 import { formatNumber } from './projectDocumentModel'
 import type { DocumentOrganizationSuggestions } from './projectDocumentSections'
+import type { DocumentOrganizationTrace } from './projectDocumentOrganizationStatus'
 import styles from './ProjectDocumentsWorkspace.module.css'
 
 interface Props {
   suggestions: DocumentOrganizationSuggestions | null
+  trace: DocumentOrganizationTrace | null
+  trackingAvailable: boolean
+  trackingError: string
   loading: boolean
   error: string
   canEdit: boolean
@@ -16,6 +20,9 @@ interface Props {
 
 export default function ProjectDocumentSuggestions({
   suggestions,
+  trace,
+  trackingAvailable,
+  trackingError,
   loading,
   error,
   canEdit,
@@ -43,6 +50,50 @@ export default function ProjectDocumentSuggestions({
 
       <div className={styles.suggestionsBody}>
         {error && <div className={styles.errorBox}>{error}</div>}
+        {trackingError && <div className={styles.errorBox}>{trackingError}</div>}
+        {trace && (
+          <section className={styles.organizationTrace} data-status={trace.status}>
+            <header>
+              <div>
+                <strong>整理运行观测</strong>
+                <span>{trace.events[trace.events.length - 1]?.label ?? trace.current_stage}</span>
+              </div>
+              <code>{trace.operation_id}</code>
+            </header>
+            <div className={styles.traceMetrics}>
+              <span>目录 <strong>{formatNumber(trace.documents_cataloged)}</strong></span>
+              <span>歧义 <strong>{formatNumber(trace.ambiguous_documents)}</strong></span>
+              <span>正文读取 <strong>{formatNumber(trace.documents_read)}</strong></span>
+              <span>估算 token <strong>{formatNumber(trace.estimated_tokens_used)}</strong></span>
+            </div>
+            <ol className={styles.traceTimeline}>
+              {trace.events.map((event, index) => (
+                <li key={`${event.stage}:${event.at}:${index}`} data-status={event.status}>
+                  <i>{event.status === 'failed' ? '!' : index + 1}</i>
+                  <div><strong>{event.label}</strong><span>{event.detail}</span></div>
+                  <time>{formatTraceTime(event.at)}</time>
+                </li>
+              ))}
+            </ol>
+            {trace.error && (
+              <div className={styles.traceFailure}>
+                <strong>{trace.error.code}</strong>
+                <span>{trace.error.message}</span>
+                <p>修复建议：{trace.error.recovery}</p>
+              </div>
+            )}
+            {(trace.catalog_revision || trace.suggestions_revision || trace.manifest_revision) && (
+              <footer className={styles.traceRevisions}>
+                {trace.catalog_revision && <span>catalog <code>{shortRevision(trace.catalog_revision)}</code></span>}
+                {trace.suggestions_revision && <span>suggestions <code>{shortRevision(trace.suggestions_revision)}</code></span>}
+                {trace.manifest_revision && <span>manifest <code>{shortRevision(trace.manifest_revision)}</code></span>}
+              </footer>
+            )}
+          </section>
+        )}
+        {!trackingAvailable && !trace && (
+          <div className={styles.trackingUnavailable}>当前运行路线不经过本机节点；建议文件仍可审核，但不会显示本机 MCP 分阶段日志。</div>
+        )}
         {!suggestions && !loading && (
           <div className={styles.suggestionEmpty}>
             <Lightbulb size={34} aria-hidden="true" />
@@ -125,4 +176,13 @@ export default function ProjectDocumentSuggestions({
       </footer>
     </main>
   )
+}
+
+function formatTraceTime(value: number) {
+  if (!value) return ''
+  return new Date(value * 1_000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function shortRevision(value: string) {
+  return value.length > 12 ? `${value.slice(0, 12)}…` : value
 }

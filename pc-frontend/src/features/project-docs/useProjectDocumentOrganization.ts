@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api, type ApiError } from '../../api/client'
+import { nodeApi } from '../node/localNodeApi'
 import type { DocumentFile } from './projectDocumentModel'
+import {
+  newDocumentOrganizationOperationId,
+  organizationTraceStorageKey,
+  parseDocumentOrganizationTrace,
+  shouldPollDocumentOrganization,
+  type DocumentOrganizationTrace,
+  type DocumentOrganizationTraceResponse,
+  type DocumentOrganizationTrackingRuntime,
+} from './projectDocumentOrganizationStatus'
 import {
   createCustomSection,
   customSectionKey,
@@ -27,7 +37,10 @@ interface AppliedOrganizationResponse {
   suggestions_revision?: string
 }
 
-export function useProjectDocumentOrganization(projectId: string) {
+export function useProjectDocumentOrganization(
+  projectId: string,
+  trackingRuntime: DocumentOrganizationTrackingRuntime,
+) {
   const [manifestFile, setManifestFile] = useState<PersistedJson<DocumentSectionManifest>>({
     value: EMPTY_SECTION_MANIFEST,
   })
@@ -36,6 +49,8 @@ export function useProjectDocumentOrganization(projectId: string) {
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [trace, setTrace] = useState<DocumentOrganizationTrace | null>(null)
+  const [trackingError, setTrackingError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,6 +76,87 @@ export function useProjectDocumentOrganization(projectId: string) {
       setLoading(false)
     })
   }, [load])
+
+  const trackingAvailable = trackingRuntime.enabled && !!trackingRuntime.projectRoot.trim()
+  const trackingRequest = useCallback(async (
+    path: string,
+    body: Record<string, unknown>,
+  ) => {
+    const response = await nodeApi<DocumentOrganizationTraceResponse>(
+      trackingRuntime.adminUrl,
+      path,
+      { method: 'POST', body: JSON.stringify({ project_root: trackingRuntime.projectRoot, ...body }) },
+    )
+    const parsed = parseDocumentOrganizationTrace(response.trace)
+    if (!parsed) throw new Error('本机节点返回了无效的文档整理状态')
+    setTrace(parsed)
+    setTrackingError('')
+    return parsed
+  }, [trackingRuntime.adminUrl, trackingRuntime.projectRoot])
+
+  const loadStatus = useCallback(async () => {
+    if (!trackingAvailable) return null
+    const operationId = readStoredOperation(projectId)
+    if (!operationId) return null
+    try {
+      return await trackingRequest('/api/project-docs/organization/status', { operation_id: operationId })
+    } catch (reason) {
+      setTrackingError(errorMessage(reason, '读取 MCP 整理进度失败'))
+      return null
+    }
+  }, [projectId, trackingAvailable, trackingRequest])
+
+  useEffect(() => {
+    loadStatus()
+  }, [loadStatus])
+
+  useEffect(() => {
+    if (!shouldPollDocumentOrganization(trace)) return
+    const timer = window.setInterval(loadStatus, 1_500)
+    return () => window.clearInterval(timer)
+  }, [loadStatus, trace])
+
+  useEffect(() => {
+    if (trace?.current_stage === 'awaiting_review' || trace?.current_stage === 'applied') {
+      load().catch((reason) => setError(errorMessage(reason, '刷新 AI 整理建议失败')))
+    }
+  }, [load, trace?.current_stage])
+
+  const startRun = useCallback(async () => {
+    if (!trackingAvailable) return undefined
+    const operationId = newDocumentOrganizationOperationId()
+    const started = await trackingRequest('/api/project-docs/organization/start', {
+      operation_id: operationId,
+    })
+    storeOperation(projectId, started.operation_id)
+    return started.operation_id
+  }, [projectId, trackingAvailable, trackingRequest])
+
+  const markDispatched = useCallback(async (operationId?: string, taskId?: string) => {
+    if (!trackingAvailable || !operationId) return
+    try {
+      await trackingRequest('/api/project-docs/organization/dispatched', {
+        operation_id: operationId,
+        task_id: taskId,
+      })
+    } catch (reason) {
+      setTrackingError(errorMessage(reason, '记录 AI 任务发送状态失败'))
+    }
+  }, [trackingAvailable, trackingRequest])
+
+  const markFailed = useCallback(async (operationId: string | undefined, message: string) => {
+    if (!trackingAvailable || !operationId) return
+    try {
+      await trackingRequest('/api/project-docs/organization/fail', {
+        operation_id: operationId,
+        error_code: 'dispatch_failed',
+        message,
+        recovery: '确认本机节点、项目目录和 AI 开发频道可用后重试。',
+      })
+    } catch (reason) {
+      setTrackingError(errorMessage(reason, '记录 AI 整理失败状态失败'))
+    }
+  }, [trackingAvailable, trackingRequest])
 
   const saveManifest = useCallback(async (value: DocumentSectionManifest) => {
     const saved = await writeJsonFile(projectId, SECTION_CONFIG_PATH, value, manifestFile.revision)
@@ -116,19 +212,57 @@ export function useProjectDocumentOrganization(projectId: string) {
     )
     setManifestFile({ value: result.manifest, revision: result.manifest_revision })
     setSuggestionsFile({ value: result.suggestions, revision: result.suggestions_revision })
+    const operationId = trace?.operation_id
+    if (trackingAvailable && operationId) {
+      try {
+        await trackingRequest('/api/project-docs/organization/applied', {
+          operation_id: operationId,
+          manifest_revision: result.manifest_revision,
+          suggestions_revision: result.suggestions_revision,
+        })
+      } catch (reason) {
+        setTrackingError(errorMessage(reason, '分区已应用，但记录观测状态失败'))
+      }
+    }
     return result.manifest
-  }, [manifestFile.revision, manifestFile.value, projectId, suggestionsFile.revision, suggestionsFile.value])
+  }, [manifestFile.revision, manifestFile.value, projectId, suggestionsFile.revision, suggestionsFile.value, trace?.operation_id, trackingAvailable, trackingRequest])
+
+  const reload = useCallback(async () => {
+    await Promise.all([load(), loadStatus()])
+  }, [load, loadStatus])
 
   return {
     manifest: manifestFile.value,
     suggestions: suggestionsFile.value,
     loading,
     error,
-    reload: load,
+    trace,
+    trackingAvailable,
+    trackingError,
+    reload,
+    startRun,
+    markDispatched,
+    markFailed,
     addSection,
     removeSection,
     assignDocument,
     applySuggestions,
+  }
+}
+
+function readStoredOperation(projectId: string) {
+  try {
+    return window.localStorage.getItem(organizationTraceStorageKey(projectId)) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function storeOperation(projectId: string, operationId: string) {
+  try {
+    window.localStorage.setItem(organizationTraceStorageKey(projectId), operationId)
+  } catch {
+    // The current page still keeps the trace even when storage is blocked.
   }
 }
 

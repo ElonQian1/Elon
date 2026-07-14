@@ -178,33 +178,24 @@ export function buildOrganizationPrompt(
   projectName: string,
   catalog: DocumentCatalog,
   manifest: DocumentSectionManifest,
+  operationId?: string,
 ) {
-  const lines = catalog.documents.map((document) => [
-    document.path,
-    document.metadata.role,
-    document.metadata.lifecycle,
-    document.metadata.authority,
-    sectionForDocument(document, manifest),
-    document.metadata.ambiguous ? 'ambiguous' : document.metadata.confidence,
-  ].join(' | '))
-  let compactCatalog = lines.join('\n')
-  const maxChars = 12_000
-  if (compactCatalog.length > maxChars) {
-    compactCatalog = `${compactCatalog.slice(0, maxChars)}\n…目录因预算截断，请在结果中明确标记未覆盖范围。`
-  }
   const customSections = manifest.sections.length
     ? manifest.sections.map((section) => `${customSectionKey(section.id)}=${section.label}`).join(', ')
     : '无'
+  const ambiguous = catalog.documents.filter((document) => document.metadata.ambiguous).length
   return `<elon-project-docs-task version="1">\n请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
-    '程序已仅用路径、标题、元数据和哈希预分类，classification_model_tokens=0；不要全文扫描 Markdown。' +
-    '优先检查 ambiguous；需要内容时先读标题和目录，仍无法判断才读单篇正文。' +
-    `现有自定义分区：${customSections}。` +
-    `你只能新建或覆盖 ${ORGANIZATION_SUGGESTIONS_PATH}，不得修改其他文件，不得移动或删除文档。` +
-    '该文件必须是纯 JSON（不要 Markdown 代码栏），结构为：' +
-    '{"version":1,"status":"ready","summary":"...","proposed_sections":[{"id":"slug","label":"名称","detail":"用途","color":"#RRGGBB"}],"assignments":[{"path":"docs/x.md","section_id":"current 或 custom:slug","reason":"..."}],"conflicts":["..."],"move_suggestions":["..."],"documents_read":0,"estimated_tokens_used":0}。' +
-    '只为确有改进价值的文档生成 assignments；新分区最多 8 个。保持 AGENTS.md + .github/copilot-instructions.md + .github/instructions/ 的跨供应商结构。' +
-    '如实填写实际读取文档数和估算 token。\n\n' +
-    `紧凑目录（path | role | lifecycle | authority | section | confidence）：\n${compactCatalog}`
+    `运行 ID：${operationId || '由 MCP 会话生成'}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；现有自定义分区：${customSections}。\n` +
+    '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
+    '① project_docs_analyze 获取 classification_model_tokens=0 的完整紧凑目录；' +
+    '② 仅对仍无法根据路径、标题和 headings 判断的少量文档调用 project_docs_read；' +
+    '③ project_docs_save_suggestions 保存 ready 建议；' +
+    '④ project_docs_get_status 确认阶段、revision、读取数与 token；' +
+    '⑤ 停在等待审核，绝不能自行调用 project_docs_apply_suggestions。' +
+    `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得移动、删除或改写 Markdown，也不得直接改分区配置。` +
+    '虚拟分区不改变真实路径的 role、lifecycle、authority 或 default_retrieval；不能借虚拟 current 提升权威性。' +
+    '只为确有改进价值的文档生成 assignments，新分区最多 8 个，并如实记录实际正文读取数和 token。' +
+    '如果当前供应商确实没有 MCP，才使用同一顺序做本地元数据扫描并写建议 JSON；不要全文扫描 docs。'
 }
 
 export function serializeProjectDocumentJson(value: unknown) {

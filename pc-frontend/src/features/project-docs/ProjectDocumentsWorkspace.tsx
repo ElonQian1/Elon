@@ -5,6 +5,7 @@ import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import ProjectDocumentNotebookRail from './ProjectDocumentNotebookRail'
 import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
+import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import {
   formatNumber,
   lifecycleLabel,
@@ -25,7 +26,8 @@ interface Props {
   projectId: string
   projectName: string
   onBack: () => void
-  onStartAiOrganize: (prompt: string) => Promise<void>
+  organizationTracking: DocumentOrganizationTrackingRuntime
+  onStartAiOrganize: (prompt: string) => Promise<{ task_id?: string } | null>
   canStartAi: boolean
 }
 
@@ -38,6 +40,7 @@ export default function ProjectDocumentsWorkspace({
   onBack,
   onStartAiOrganize,
   canStartAi,
+  organizationTracking,
 }: Props) {
   const [catalog, setCatalog] = useState<DocumentCatalog | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
@@ -53,7 +56,7 @@ export default function ProjectDocumentsWorkspace({
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [organizing, setOrganizing] = useState(false)
   const [applyingSuggestions, setApplyingSuggestions] = useState(false)
-  const organization = useProjectDocumentOrganization(projectId)
+  const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const sections = useMemo(() => buildDocumentSections(organization.manifest), [organization.manifest])
 
   const loadCatalog = useCallback(async () => {
@@ -219,10 +222,23 @@ export default function ProjectDocumentsWorkspace({
     if (!catalog || !canStartAi) return
     setOrganizing(true)
     setMessage('')
+    let operationId: string | undefined
     try {
-      await onStartAiOrganize(buildOrganizationPrompt(projectName, catalog, organization.manifest))
+      operationId = await organization.startRun()
+      const response = await onStartAiOrganize(buildOrganizationPrompt(
+        projectName,
+        catalog,
+        organization.manifest,
+        operationId,
+      ))
+      await organization.markDispatched(operationId, response?.task_id)
+      setMessage(operationId
+        ? 'AI 整理任务已发起；可在“AI 整理建议”分区观察 MCP 每一步。'
+        : 'AI 整理任务已发起；当前运行路线不提供本机 MCP 分阶段观测。')
     } catch (error) {
+      await organization.markFailed(operationId, errorMessage(error, '无法发起 AI 整理任务'))
       setMessage(errorMessage(error, '无法发起 AI 整理任务'))
+    } finally {
       setOrganizing(false)
     }
   }
@@ -269,6 +285,9 @@ export default function ProjectDocumentsWorkspace({
       {activeSection === 'suggestions' ? (
         <ProjectDocumentSuggestions
           suggestions={organization.suggestions}
+          trace={organization.trace}
+          trackingAvailable={organization.trackingAvailable}
+          trackingError={organization.trackingError}
           loading={organization.loading}
           error={organization.error}
           canEdit={!!catalog?.can_edit}

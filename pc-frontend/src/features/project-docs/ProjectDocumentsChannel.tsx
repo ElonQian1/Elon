@@ -9,6 +9,7 @@ import { useProjectStore } from '../conversation/useProjectStore'
 import { selectedAgentForRuntimeRoute } from '../models/routeModelPolicy'
 import type { AgentOption } from '../models/types'
 import ProjectDocumentsWorkspace from './ProjectDocumentsWorkspace'
+import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 
 export interface ProjectDocumentsRuntime {
   projectId: string
@@ -50,7 +51,7 @@ export default function ProjectDocumentsChannel({ runtime, onOpenProjectHome }: 
       useLocalRouteA: useLocalNode && requestRoute === 'route_a',
     })
     const projectStore = useProjectStore.getState()
-    await projectStore.sendMessage(
+    const response = await projectStore.sendMessage(
       prompt,
       requestAgent || null,
       requestRoute,
@@ -61,7 +62,15 @@ export default function ProjectDocumentsChannel({ runtime, onOpenProjectHome }: 
       aiChannel.id,
       runtime.directPcCliActive,
     )
-    await projectStore.selectChannel(aiChannel.id)
+    return response
+  }
+
+  const trackingRuntime: DocumentOrganizationTrackingRuntime = {
+    enabled: (runtime.directPcCliActive || runtime.shouldPreferLocalNode)
+      && runtime.localNodeReady
+      && !!runtime.activeWorkspacePath.trim(),
+    adminUrl: safeNodeAdminUrl(),
+    projectRoot: runtime.activeWorkspacePath,
   }
 
   return (
@@ -69,6 +78,7 @@ export default function ProjectDocumentsChannel({ runtime, onOpenProjectHome }: 
       projectId={runtime.projectId}
       projectName={runtime.projectName}
       canStartAi={canStartAi}
+      organizationTracking={trackingRuntime}
       onBack={() => {
         if (returnChannel) useProjectStore.getState().selectChannel(returnChannel.id)
         else onOpenProjectHome()

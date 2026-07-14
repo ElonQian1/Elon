@@ -41,6 +41,7 @@ applyTo: "**/*.md"
 ## 分区和 AI 建议的可移植约定
 
 - `.elon/document-sections.json` 是项目共享的虚拟分区和文档归类配置；它不改变文件实际路径。
+- 虚拟分区是 OneNote 式浏览维度，不是第二套权威性。把扁平文档审核归入 `current` 或自定义主题后，其 `role`、`lifecycle`、`authority` 和 `default_retrieval` 仍由真实路径决定；要提高路径权威上限必须另行审核 Git 迁移。
 - `.elon/document-organization-suggestions.json` 是 AI 整理建议的结构化产物；AI 整理任务只可写这一份建议文件。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - AI 可建议新分区和虚拟归类，但必须经用户审核后才更新分区配置。
@@ -49,6 +50,7 @@ applyTo: "**/*.md"
 ## 供应商无关 MCP 顺序
 
 - 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据，`classification_model_tokens=0`。
+- 诊断或观察整理运行时调用 `project_docs_get_status`；它返回阶段、revision、读取数、token 估算、错误代码和修复建议，不读取 Markdown。
 - 只对 `ambiguous` 或当前任务命中的路径调用 `project_docs_read`，不得借 MCP 全量读取 Markdown。
 - 模型完成判断后调用 `project_docs_save_suggestions`；该工具只写建议 JSON，并校验目录 revision、真实路径和结构上限。
 - 没有用户或审核流程明确确认，不得调用 `project_docs_apply_suggestions`；确认后也只应用虚拟分区，不移动 Markdown。
