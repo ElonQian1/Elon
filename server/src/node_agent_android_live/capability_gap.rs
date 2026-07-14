@@ -236,7 +236,8 @@ fn start_upgrade(gap: &mut CapabilityGapDocument, arguments: &Value) -> Result<(
     require_status(gap, CapabilityGapStatus::Approved)?;
     if gap.upgrade_rounds >= gap.policy.max_upgrade_rounds {
         gap.status = CapabilityGapStatus::HumanRequired;
-        bail!("平台升级轮次已耗尽");
+        gap.last_error = Some("平台升级轮次已耗尽".to_string());
+        return Ok(());
     }
     let source_revision_before = required_text(arguments, "sourceRevisionBefore", 256)?;
     gap.upgrade_rounds += 1;
@@ -260,20 +261,32 @@ fn publish_completed(gap: &mut CapabilityGapDocument, arguments: &Value) -> Resu
     let version = required_text(arguments, "version", 256)?;
     let source_revision_after = required_text(arguments, "sourceRevisionAfter", 256)?;
     let changed_files = string_array(arguments, "changedFiles", 1, 128)?;
-    if gap
+    let duplicate_release = gap
         .attempts
         .iter()
-        .any(|item| item.commit_id.as_deref() == Some(commit_id.as_str()))
-    {
-        bail!("同一提交不能重复作为平台升级发布");
+        .any(|item| {
+            item.commit_id.as_deref() == Some(commit_id.as_str())
+                || item.version.as_deref() == Some(version.as_str())
+        });
+    let source_revision_before = gap
+        .attempts
+        .last()
+        .ok_or_else(|| anyhow!("缺少升级尝试"))?
+        .source_revision_before
+        .clone();
+    if duplicate_release || source_revision_after == source_revision_before {
+        gap.status = CapabilityGapStatus::HumanRequired;
+        gap.last_error = Some(if duplicate_release {
+            "同一提交或版本不能重复作为平台升级发布".to_string()
+        } else {
+            "源码 Revision 没有变化，拒绝空发布".to_string()
+        });
+        return Ok(());
     }
     let attempt = gap
         .attempts
         .last_mut()
         .ok_or_else(|| anyhow!("缺少升级尝试"))?;
-    if source_revision_after == attempt.source_revision_before {
-        bail!("源码 Revision 没有变化，拒绝空发布");
-    }
     attempt.source_revision_after = Some(source_revision_after);
     attempt.commit_id = Some(commit_id);
     attempt.version = Some(version);
@@ -483,7 +496,11 @@ pub(crate) struct CapabilityGapDocument {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_capabilities, SUPPORTED_CAPABILITIES};
+    use super::{
+        normalize_capabilities, publish_completed, CapabilityGapDocument, CapabilityGapStatus,
+        CapabilityUpgradeAttempt, CapabilityUpgradePolicy, SUPPORTED_CAPABILITIES,
+    };
+    use serde_json::json;
 
     #[test]
     fn capability_names_are_deduplicated_and_normalized() {
@@ -492,5 +509,57 @@ mod tests {
             vec!["LIVE_STYLE_PATCH"]
         );
         assert!(SUPPORTED_CAPABILITIES.contains(&"PERSISTENT_FIT_RUN"));
+    }
+
+    #[test]
+    fn empty_platform_release_becomes_persistable_human_required_state() {
+        let mut gap = test_gap();
+        publish_completed(
+            &mut gap,
+            &json!({
+                "commitId": "abc123",
+                "version": "v1",
+                "sourceRevisionAfter": "before",
+                "changedFiles": ["server/src/example.rs"]
+            }),
+        )
+        .unwrap();
+        assert_eq!(gap.status, CapabilityGapStatus::HumanRequired);
+        assert!(gap.last_error.unwrap().contains("空发布"));
+    }
+
+    fn test_gap() -> CapabilityGapDocument {
+        CapabilityGapDocument {
+            schema_version: 1,
+            gap_id: "gap_test".into(),
+            task_id: "task_test".into(),
+            fit_run_id: None,
+            project_root: ".".into(),
+            status: CapabilityGapStatus::Upgrading,
+            missing_capabilities: vec!["PLATFORM_TOOL_DEFECT".into()],
+            evidence: vec!["test".into()],
+            proposed_changes: vec!["test".into()],
+            resume_target: "resume".into(),
+            policy: CapabilityUpgradePolicy {
+                trusted_boundary: "LOCAL_GIT_WORKSPACE".into(),
+                automatic_source_upgrade: true,
+                automatic_publish: true,
+                max_upgrade_rounds: 8,
+            },
+            upgrade_rounds: 1,
+            attempts: vec![CapabilityUpgradeAttempt {
+                round: 1,
+                started_at: "now".into(),
+                source_revision_before: "before".into(),
+                source_revision_after: None,
+                commit_id: None,
+                version: None,
+                changed_files: vec![],
+            }],
+            failure_signatures: vec![],
+            created_at: "now".into(),
+            updated_at: "now".into(),
+            last_error: None,
+        }
     }
 }
