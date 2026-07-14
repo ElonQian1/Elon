@@ -26,6 +26,7 @@ pub(crate) const UNINSTALL_EXE_NAME: &str = "卸载一龙开发平台.exe";
 pub(crate) const INTERNAL_DIR_NAME: &str = "_internal";
 pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
 pub(crate) const BACKGROUND_START_ARG: &str = "--background";
+pub(crate) const BACKGROUND_REPAIR_ARG: &str = "--repair-background";
 pub(crate) const WATCHDOG_ARG: &str = "--watchdog";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
@@ -42,6 +43,7 @@ enum ClientCommand {
     BackgroundStart,
     Watchdog,
     Install,
+    InstallBackground,
     Uninstall,
     Update,
     ExportDiagnostics,
@@ -163,6 +165,21 @@ fn run_command(command: ClientCommand) -> Result<()> {
             launch_result?;
             watchdog_result?;
         }
+        ClientCommand::InstallBackground => {
+            let install_dir = installer::install_or_repair()?;
+            // This entrypoint is launched from an already downloaded and verified
+            // package. Rechecking updates here can recursively schedule a second
+            // replacement before the first runtime has recovered.
+            let port = process::start_background(&install_dir)?;
+            watchdog::ensure_running(&install_dir)?;
+            process::verify_background_ready(port)?;
+            log_file::record_event(
+                &install_dir,
+                "silent_repair_restart_healthy",
+                true,
+                "installed client runtime and watchdog recovered without opening a browser tab",
+            );
+        }
         ClientCommand::Uninstall => installer::uninstall()?,
         ClientCommand::Update => {
             let install_dir = paths::install_dir()?;
@@ -192,6 +209,9 @@ impl ClientCommand {
         }
         if args.iter().any(|arg| arg == WATCHDOG_ARG) {
             return Self::Watchdog;
+        }
+        if args.iter().any(|arg| arg == BACKGROUND_REPAIR_ARG) {
+            return Self::InstallBackground;
         }
         if args
             .iter()
@@ -230,6 +250,7 @@ impl ClientCommand {
             Self::BackgroundStart => "background_start",
             Self::Watchdog => "watchdog",
             Self::Install => "install",
+            Self::InstallBackground => "install_background",
             Self::Uninstall => "uninstall",
             Self::Update => "update",
             Self::ExportDiagnostics => "export_diagnostics",
@@ -276,7 +297,6 @@ fn exe_stem_contains(needle: &str) -> bool {
         .map(|stem| stem.contains(needle))
         .unwrap_or(false)
 }
-
 
 #[cfg(test)]
 #[path = "launcher_tests.rs"]

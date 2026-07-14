@@ -142,7 +142,9 @@ pub(super) fn try_update_from_client_package(
     }
 }
 
-pub(super) fn update_http_client(env_values: &HashMap<String, String>) -> Result<reqwest::blocking::Client> {
+pub(super) fn update_http_client(
+    env_values: &HashMap<String, String>,
+) -> Result<reqwest::blocking::Client> {
     let mut builder = reqwest::blocking::Client::builder()
         .connect_timeout(Duration::from_secs(env_u64(
             "NODE_AGENT_UPDATE_CONNECT_TIMEOUT_SECS",
@@ -324,12 +326,16 @@ try {{
   if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
   $installedClient = Join-Path $installDir '一龙开发平台.exe'
   Stop-ElonNodeClientProcesses -Client $installedClient -TimeoutSeconds 30
-  $repair = Start-Process -FilePath $packageClient -ArgumentList '--repair' -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
+  $repair = Start-Process -FilePath $packageClient -ArgumentList '--repair-background' -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
   if ($null -eq $repair) {{ throw 'Start-Process did not return a repair process handle' }}
   Wait-Process -Id $repair.Id -Timeout 120 -ErrorAction Stop
   $repair.Refresh()
   if (($null -ne $repair.ExitCode) -and ($repair.ExitCode -ne 0)) {{ throw "repair process failed with exit code $($repair.ExitCode)" }}
-  Write-ElonNodeUpdateLog "package repair update finished"
+  $port = Get-ElonNodeAdminPort -InstallDir $installDir
+  if (-not (Wait-ElonNodeAdminHealth -Port $port -TimeoutSeconds 15)) {{
+    throw "package repair exited but node health did not recover: http://127.0.0.1:$port/api/status"
+  }}
+  Write-ElonNodeUpdateLog "package repair update finished; runtime healthy on port $port; browser untouched"
 }} catch {{
   Write-ElonNodeUpdateLog ("package repair update failed: " + ($_ | Out-String))
   throw
@@ -344,7 +350,7 @@ try {{
         tmp_zip = launcher_command::ps_single_quote(&tmp_zip.to_string_lossy()),
         install_dir = launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
         tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
-        replace_helpers = UPDATE_REPLACE_HELPERS
+        replace_helpers = format!("{UPDATE_REPLACE_HELPERS}\n{UPDATE_RESTART_HELPERS}")
     )
 }
 
@@ -628,7 +634,10 @@ function Start-ElonNodeRuntimeAndWait {
 "#;
 
 #[cfg(windows)]
-pub(super) fn restart_agent_runtime_after_update_script(client_expr: &str, install_dir_expr: &str) -> String {
+pub(super) fn restart_agent_runtime_after_update_script(
+    client_expr: &str,
+    install_dir_expr: &str,
+) -> String {
     let mut script = String::from(UPDATE_RESTART_HELPERS);
     script.push_str("Start-ElonNodeRuntimeAndWait -Client ");
     script.push_str(client_expr);
@@ -644,7 +653,6 @@ pub(super) fn update_base_url(env_values: &std::collections::HashMap<String, Str
         .cloned()
         .unwrap_or_else(|| DEFAULT_BASE_URL.to_string())
 }
-
 
 #[cfg(test)]
 #[path = "updater_tests.rs"]

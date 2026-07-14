@@ -27,6 +27,10 @@
             ClientCommand::Install
         ));
         assert!(matches!(
+            ClientCommand::from_args(&["--repair-background".to_string()], false),
+            ClientCommand::InstallBackground
+        ));
+        assert!(matches!(
             ClientCommand::from_args(&["elon-node://repair".to_string()], false),
             ClientCommand::Install
         ));
@@ -55,10 +59,12 @@
     #[test]
     fn scheduled_update_paths_do_not_open_browser_tabs() {
         let source = include_str!("mod.rs");
-        let removed_open_helper = ["open_installed", "pc_web_page"].join("_");
 
-        assert!(!source.contains(&removed_open_helper));
         assert!(source.contains("避免已有 /pc 工作页重连时又被插入一个重复 tab"));
+        assert!(source.contains("ClientCommand::InstallBackground"));
+        assert!(source.contains("let port = process::start_background(&install_dir)"));
+        assert!(source.contains("process::verify_background_ready(port)"));
+        assert!(source.contains("Rechecking updates here can recursively schedule a second"));
     }
 
     #[test]

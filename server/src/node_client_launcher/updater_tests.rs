@@ -80,13 +80,19 @@
         assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
         assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
         assert!(script.contains("Stop-ElonNodeClientProcesses -Client $installedClient"));
-        assert!(script.contains("Start-Process -FilePath $packageClient -ArgumentList '--repair'"));
+        assert!(script.contains(
+            "Start-Process -FilePath $packageClient -ArgumentList '--repair-background'"
+        ));
         assert!(script.contains("Wait-Process -Id $repair.Id -Timeout 120"));
+        assert!(script.contains("Wait-ElonNodeAdminHealth -Port $port -TimeoutSeconds 15"));
+        assert!(script.contains("browser untouched"));
         assert!(script.contains("client-update.log"));
         assert!(script.contains("Remove-Item -LiteralPath $archivePath"));
         assert!(script.contains("Remove-Item -LiteralPath $tmpVersion"));
         assert!(!script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
-        assert!(!script.contains("Start-ElonNodeRuntimeAndWait"));
+        assert!(!script.contains(
+            "Start-ElonNodeRuntimeAndWait -Client $installedClient -InstallDir $installDir"
+        ));
     }
 
     #[test]

@@ -18,6 +18,7 @@ const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_secs(4);
 const ADMIN_PC_WEB_READY_WAIT: Duration = Duration::from_secs(5);
 const ADMIN_LOCAL_READY_WAIT: Duration = Duration::from_secs(15);
 const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
+const BACKGROUND_REPAIR_READY_WAIT: Duration = Duration::from_secs(25);
 const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
 const ADMIN_HEALTH_READ_LIMIT: usize = 16 * 1024;
 const CLOUD_WORKBENCH_PROBE_TIMEOUT: Duration = Duration::from_millis(2200);
@@ -86,7 +87,7 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     open_pc_web_page(port, &env_values)
 }
 
-pub(crate) fn start_background(install_dir: &Path) -> Result<()> {
+pub(crate) fn start_background(install_dir: &Path) -> Result<u16> {
     let client = paths::client_exe(install_dir);
     if !client.exists() {
         bail!("缺少客户端主程序：{}", client.display());
@@ -112,7 +113,14 @@ pub(crate) fn start_background(install_dir: &Path) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(port)
+}
+
+pub(crate) fn verify_background_ready(port: u16) -> Result<()> {
+    if wait_for_admin_ready(port, BACKGROUND_REPAIR_READY_WAIT) {
+        return Ok(());
+    }
+    bail!("静默更新后本机节点健康检查超时：http://127.0.0.1:{port}/api/status")
 }
 
 pub(crate) fn admin_port_from_env_values(env_values: &HashMap<String, String>) -> u16 {
@@ -587,7 +595,6 @@ fn admin_status_response_healthy(response: &str) -> bool {
     // 只把本节点的 /api/status 当作健康，避免随机占用 7799 的网页服务误判为已就绪。
     status_ok && response.contains("\"local_admin_token_header\"")
 }
-
 
 #[cfg(test)]
 #[path = "process_tests.rs"]
