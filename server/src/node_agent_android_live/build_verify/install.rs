@@ -6,7 +6,10 @@ use anyhow::{anyhow, bail, Error, Result};
 use crate::node_agent_android_inspector::adb_capture::wake_device_for_user_interaction;
 use crate::node_agent_android_inspector::adb_command::run_adb_text;
 
-const INSTALL_TIMEOUT: Duration = Duration::from_secs(180);
+// Honor and other vendor package installers can spend nearly three minutes in
+// their security scan before rendering the on-device confirmation. Keep the
+// same adb transaction alive long enough for that prompt to be accepted.
+const INSTALL_TIMEOUT: Duration = Duration::from_secs(360);
 const UNINSTALL_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_OUTPUT: usize = 256 * 1024;
 const SIGNATURE_MISMATCH: &str = "INSTALL_FAILED_UPDATE_INCOMPATIBLE";
@@ -64,7 +67,7 @@ fn actionable_install_error(error: Error) -> Error {
     let detail = error.to_string();
     if detail.contains("adb 命令超时") && detail.contains(" install ") {
         return anyhow!(
-            "手机安装器等待确认超过 3 分钟。首次安装节点专属 Debug 包时，荣耀、小米等系统可能要求在手机上勾选风险提示并点“继续安装”；请保持手机解锁、完成一次确认后在 PC 网页重试。后续同签名 Debug 包更新通常会自动完成。原始错误：{detail}"
+            "手机安装器等待确认超过 6 分钟。首次安装或更新节点专属 Debug 包时，荣耀、小米等系统可能先执行较长的安全扫描，再要求在手机上勾选风险提示并点“继续安装”；请保持手机解锁、完成确认后在 PC 网页重试。后续同签名 Debug 包更新通常会自动完成。原始错误：{detail}"
         );
     }
     if detail.contains("INSTALL_FAILED_USER_RESTRICTED") {
@@ -130,7 +133,9 @@ mod tests {
             "adb 命令超时: -s phone install -r -t app-debug.apk"
         ));
         let message = error.to_string();
-        assert!(message.contains("首次安装节点专属 Debug 包"));
+        assert!(message.contains("超过 6 分钟"));
+        assert!(message.contains("安全扫描"));
+        assert!(message.contains("首次安装或更新节点专属 Debug 包"));
         assert!(message.contains("继续安装"));
         assert!(message.contains("后续同签名 Debug 包更新通常会自动完成"));
     }
