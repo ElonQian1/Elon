@@ -352,10 +352,7 @@ export default function UiTunerPage() {
     applyGestureRemote: liveUi.applyGesture,
     onNotice: setNotice,
   })
-  const undoLive = useCallback(async () => {
-    if (runtimeDraft.status === 'rejected') runtimeDraft.reset()
-    else await liveUi.undo()
-  }, [liveUi, runtimeDraft])
+  const undoLive = useCallback(async () => { if (runtimeDraft.status === 'rejected') runtimeDraft.reset(); else await liveUi.undo() }, [liveUi, runtimeDraft])
   const redoLive = useCallback(() => liveUi.redo(), [liveUi])
   const canvasGesture = useRuntimeCanvasGesture({
     documentRef: tunerDocRef,
