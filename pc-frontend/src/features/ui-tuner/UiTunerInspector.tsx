@@ -13,6 +13,7 @@ import type { UiTunerVerificationReport } from './runtime/verification'
 import { UiTunerLivePanel } from './live/UiTunerLivePanel'
 import type { useLiveUiSession } from './live/useLiveUiSession'
 import type { LivePatchOperation, LiveUiScope } from './live/liveUiApi'
+import type { RuntimeDraftStatus } from './live/runtimeDraftModel'
 import styles from './UiTunerPage.module.css'
 
 const MIN_SIZE = 24
@@ -39,6 +40,9 @@ interface UiTunerInspectorProps {
   liveUi: ReturnType<typeof useLiveUiSession>
   onLiveApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
   onLiveApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
+  onLiveUndo: () => Promise<void>
+  onLiveRedo: () => Promise<void>
+  liveUiDraftStatus: RuntimeDraftStatus
   livePrepareBusy: boolean
   livePrepareError: string
   livePrepareReady: boolean
@@ -69,6 +73,9 @@ export function UiTunerInspector({
   liveUi,
   onLiveApply,
   onLiveApplyGesture,
+  onLiveUndo,
+  onLiveRedo,
+  liveUiDraftStatus,
   livePrepareBusy,
   livePrepareError,
   livePrepareReady,
@@ -106,11 +113,12 @@ export function UiTunerInspector({
             mcp={liveUi.mcp}
             uiIr={liveUi.uiIr}
             targetDesign={liveUi.targetDesign}
+            draftStatus={liveUiDraftStatus}
             onApply={onLiveApply}
             onApplyGesture={onLiveApplyGesture}
             onGestureActive={liveUi.setGestureActive}
-            onUndo={liveUi.undo}
-            onRedo={liveUi.redo}
+            onUndo={onLiveUndo}
+            onRedo={onLiveRedo}
             onReconnect={liveUi.reconnect}
             commitPlan={liveUi.commitPlan}
             commitResult={liveUi.commitResult}

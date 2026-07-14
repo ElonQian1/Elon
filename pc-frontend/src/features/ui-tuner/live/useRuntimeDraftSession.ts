@@ -26,6 +26,7 @@ interface QueuedRuntimeDraft {
 }
 
 interface UseRuntimeDraftSessionOptions {
+  resetKey: string
   frame: LiveUiFrame | null
   nodes: LiveUiNode[]
   selectedNode: LiveUiNode | null
@@ -35,6 +36,7 @@ interface UseRuntimeDraftSessionOptions {
 }
 
 export function useRuntimeDraftSession({
+  resetKey,
   frame,
   nodes,
   selectedNode,
@@ -46,6 +48,7 @@ export function useRuntimeDraftSession({
   const stateRef = useRef(state)
   const pendingRef = useRef(new Map<string, QueuedRuntimeDraft>())
   const flushingRef = useRef(false)
+  const resetKeyRef = useRef(resetKey)
 
   const replaceState = useCallback((update: (current: RuntimeDraftState) => RuntimeDraftState) => {
     const next = update(stateRef.current)
@@ -53,6 +56,18 @@ export function useRuntimeDraftSession({
     setState(next)
     return next
   }, [])
+
+  const reset = useCallback(() => {
+    pendingRef.current.clear()
+    stateRef.current = EMPTY_RUNTIME_DRAFT_STATE
+    setState(EMPTY_RUNTIME_DRAFT_STATE)
+  }, [])
+
+  useEffect(() => {
+    if (resetKeyRef.current === resetKey) return
+    resetKeyRef.current = resetKey
+    reset()
+  }, [reset, resetKey])
 
   useEffect(() => {
     replaceState((current) => confirmRuntimeDraftFrame(current, frame))
@@ -139,12 +154,6 @@ export function useRuntimeDraftSession({
     })
     return Promise.resolve({ queued: true, revision: local.revision })
   }, [applyGestureRemote, preview, queue, selectedNode])
-
-  const reset = useCallback(() => {
-    pendingRef.current.clear()
-    stateRef.current = EMPTY_RUNTIME_DRAFT_STATE
-    setState(EMPTY_RUNTIME_DRAFT_STATE)
-  }, [])
 
   return useMemo(() => ({
     state,

@@ -16,6 +16,7 @@ import type {
 import type { LiveMcpDescriptor } from './liveUiApi'
 import styles from './UiTunerLivePanel.module.css'
 import { UiTunerPreviewPanel } from './UiTunerPreviewPanel'
+import type { RuntimeDraftStatus } from './runtimeDraftModel'
 
 interface UiTunerLivePanelProps {
   state: LiveUiConnectionState
@@ -26,6 +27,7 @@ interface UiTunerLivePanelProps {
   mcp: LiveMcpDescriptor | null
   uiIr: LiveUiIrDocument | null
   targetDesign: LiveTargetDesign | null
+  draftStatus: RuntimeDraftStatus
   onApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
   onApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
   onGestureActive: (active: boolean) => void
@@ -83,6 +85,7 @@ export function UiTunerLivePanel({
   mcp,
   uiIr,
   targetDesign,
+  draftStatus,
   onApply,
   onApplyGesture,
   onGestureActive,
@@ -182,6 +185,7 @@ export function UiTunerLivePanel({
             <span>{uiIr ? 'UI IR ' + uiIr.revision.slice(0, 16) : '正在生成 UI IR'}</span>
             <span>{mcp ? 'Codex 按需工具已就绪' : 'Codex 工具待连接'}</span>
             <span>{targetDesign ? '目标图 ' + targetDesign.sha256.slice(0, 12) : '尚未导入目标设计图'}</span>
+            <span>{draftStatusLabel(draftStatus)}</span>
           </div>
           <label className={styles.scopeField}>
             <span>作用范围</span>
@@ -252,7 +256,7 @@ export function UiTunerLivePanel({
           <button
             className={styles.commitButton}
             type="button"
-            disabled={busy || !session?.historyCount}
+            disabled={busy || !session?.historyCount || draftStatus !== 'confirmed'}
             onClick={() => { void onPreviewCommit() }}
           >
             生成源码写回计划
@@ -280,7 +284,7 @@ export function UiTunerLivePanel({
             </div>
           ) : (
             <>
-              <p className={styles.previewWarning}>LIVE PREVIEW · 真机已变化，源码尚未写入或尚未完成构建验收</p>
+              <p className={styles.previewWarning}>{draftStatusLabel(draftStatus)} · 源码尚未写入或尚未完成构建验收</p>
               <button
                 className={styles.commitButton}
                 type="button"
@@ -591,4 +595,12 @@ function statusLabel(state: LiveUiConnectionState) {
     case 'error': return '连接异常'
     default: return '等待真机捕获'
   }
+}
+
+function draftStatusLabel(status: RuntimeDraftStatus) {
+  if (status === 'local') return 'PC 即时预览 · 尚未同步真机'
+  if (status === 'syncing') return 'PC 已更新 · 真机后台同步中'
+  if (status === 'calibrating') return '真机已接收 · 正在校准画面'
+  if (status === 'rejected') return 'PC 草稿已保留 · 真机同步失败'
+  return '真机画面已校准'
 }

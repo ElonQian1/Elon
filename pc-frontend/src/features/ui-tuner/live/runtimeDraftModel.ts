@@ -7,6 +7,7 @@ import type {
 } from './liveUiApi'
 
 export type RuntimeDraftPhase = 'local' | 'syncing' | 'acked' | 'rejected'
+export type RuntimeDraftStatus = 'confirmed' | 'local' | 'syncing' | 'calibrating' | 'rejected'
 
 export interface RuntimeDraftRect {
   left: number
@@ -148,7 +149,7 @@ export function confirmRuntimeDraftFrame(
   return Object.keys(nodes).length === Object.keys(state.nodes).length ? state : { ...state, nodes }
 }
 
-export function runtimeDraftStatus(state: RuntimeDraftState) {
+export function runtimeDraftStatus(state: RuntimeDraftState): RuntimeDraftStatus {
   const drafts = Object.values(state.nodes)
   if (drafts.some((draft) => draft.phase === 'rejected')) return 'rejected' as const
   if (drafts.some((draft) => draft.phase === 'local')) return 'local' as const

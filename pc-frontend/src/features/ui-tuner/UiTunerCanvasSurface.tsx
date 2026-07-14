@@ -10,7 +10,7 @@ import type { UiTunerFilterResult } from './filtering'
 import type { LiveUiFrame } from './live/liveUiApi'
 import type { LiveUiNode } from './live/liveUiApi'
 import { RuntimeDraftLayer } from './live/RuntimeDraftLayer'
-import type { RuntimeDraftState } from './live/runtimeDraftModel'
+import type { RuntimeDraftState, RuntimeDraftStatus } from './live/runtimeDraftModel'
 import type { UiTunerDocument, UiTunerElement } from './types'
 import styles from './UiTunerPage.module.css'
 
@@ -20,7 +20,7 @@ interface UiTunerCanvasSurfaceProps {
   liveFrame: LiveUiFrame | null
   liveNodes: LiveUiNode[]
   runtimeDraftState: RuntimeDraftState
-  runtimeDraftStatus: 'confirmed' | 'local' | 'syncing' | 'calibrating' | 'rejected'
+  runtimeDraftStatus: RuntimeDraftStatus
   realRenderer: boolean
   runtimeConnected: boolean
   runtimeGestureActive: boolean

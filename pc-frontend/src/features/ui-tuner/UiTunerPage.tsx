@@ -344,6 +344,7 @@ export default function UiTunerPage() {
     && runtimeDocument
     && Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible)
   const runtimeDraft = useRuntimeDraftSession({
+    resetKey: `${liveUi.session?.id ?? ''}:${liveUi.previewRequest ? JSON.stringify(liveUi.previewRequest) : ''}:${liveUi.buildVerifyResult?.apkPath ?? ''}`,
     frame: liveUi.liveFrame,
     nodes: liveUi.nodes,
     selectedNode: liveUi.selectedNode,
@@ -351,6 +352,8 @@ export default function UiTunerPage() {
     applyGestureRemote: liveUi.applyGesture,
     onNotice: setNotice,
   })
+  const undoLive = useCallback(async () => { runtimeDraft.reset(); await liveUi.undo() }, [liveUi, runtimeDraft])
+  const redoLive = useCallback(async () => { runtimeDraft.reset(); await liveUi.redo() }, [liveUi, runtimeDraft])
   const canvasGesture = useRuntimeCanvasGesture({
     documentRef: tunerDocRef,
     setDocument: setTunerDoc,
@@ -694,8 +697,8 @@ export default function UiTunerPage() {
           onZoomIn={comparisonViewport.zoomIn}
           onFitToStage={comparisonViewport.fitCanvasToStage}
           onActualSize={comparisonViewport.actualSize}
-          onUndo={() => { if (realRenderer) void liveUi.undo(); else undoHistory() }}
-          onRedo={() => { if (realRenderer) void liveUi.redo(); else redoHistory() }}
+          onUndo={() => { if (realRenderer) void undoLive(); else undoHistory() }}
+          onRedo={() => { if (realRenderer) void redoLive(); else redoHistory() }}
           onSave={saveNow}
           onCopyExport={copyExport}
           onCopyCliPatch={copyCliPatch}
@@ -755,6 +758,9 @@ export default function UiTunerPage() {
         liveUi={liveUi}
         onLiveApply={runtimeDraft.apply}
         onLiveApplyGesture={runtimeDraft.applyGesture}
+        onLiveUndo={undoLive}
+        onLiveRedo={redoLive}
+        liveUiDraftStatus={runtimeDraft.status}
         livePrepareBusy={livePrepareBusy}
         livePrepareError={livePrepareError}
         livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}
