@@ -64,6 +64,36 @@ fn path_defaults(path: &str, file_name: &str) -> ProjectDocumentMetadata {
                 "high",
                 "按任务加载的领域规则",
             )
+        } else if path.starts_with(".github/agents/") {
+            (
+                "agent_definition",
+                "active",
+                "customization",
+                false,
+                false,
+                "high",
+                "Agent 定义仅在对应任务中按需加载",
+            )
+        } else if path.starts_with(".github/prompts/") {
+            (
+                "prompt_template",
+                "active",
+                "customization",
+                false,
+                false,
+                "high",
+                "Prompt 模板不属于项目事实或当前规范",
+            )
+        } else if path.starts_with(".github/skills/") {
+            (
+                "skill",
+                "active",
+                "customization",
+                false,
+                false,
+                "high",
+                "Skill 只在能力命中时按需加载",
+            )
         } else if matches!(path, "codex.md" | "claude.md" | "gemini.md") {
             (
                 "provider_adapter",
@@ -76,7 +106,11 @@ fn path_defaults(path: &str, file_name: &str) -> ProjectDocumentMetadata {
             )
         } else if matches!(
             path,
-            "ai_project.md" | "ai_architecture.md" | "ai_index.md" | "ai_task_template.md"
+            "ai_project.md"
+                | "ai_architecture.md"
+                | "ai_index.md"
+                | "ai_rules.md"
+                | "ai_task_template.md"
         ) {
             (
                 "project_guide",
@@ -186,6 +220,16 @@ fn path_defaults(path: &str, file_name: &str) -> ProjectDocumentMetadata {
                 false,
                 "high",
                 "讨论和草稿默认不参与实现检索",
+            )
+        } else if path.starts_with("docs/inbox/") {
+            (
+                "note",
+                "unclassified",
+                "unknown",
+                false,
+                true,
+                "high",
+                "Inbox 笔记尚未确认权威性和长期分区",
             )
         } else if looks_like_discussion(file_name) {
             (

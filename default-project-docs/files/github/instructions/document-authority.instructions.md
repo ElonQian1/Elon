@@ -32,3 +32,9 @@ applyTo: "**/*.md"
 6. 同级冲突报告 `DOC_CONFLICT`，不要静默任选一份。
 
 AI 首轮只提出分类、冲突和迁移建议，不自动提升权威性，不移动、删除或改写文档。无法确认的内容留在 `unclassified`。报告实际读取的文档数、估算 token 和默认排除范围。
+
+## 分区和 AI 建议
+
+- `.elon/document-sections.json` 保存项目共享的虚拟分区和文档归类，不改变文件实际路径。
+- `.elon/document-organization-suggestions.json` 保存 AI 的结构化整理建议；AI 整理任务只可写这一份建议文件。
+- AI 可建议新分区和虚拟归类，但用户审核后才能应用；实体文件迁移必须另行审核 Git 变更。

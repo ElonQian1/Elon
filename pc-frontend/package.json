@@ -13,6 +13,7 @@
     "test:local-tasks": "node scripts/test-local-tasks.cjs",
     "test:runtime-draft": "node scripts/test-runtime-draft-model.cjs",
     "test:ui-tuner-workspace": "node scripts/test-ui-tuner-workspace.cjs",
+    "test:project-docs": "node scripts/test-project-document-sections.cjs",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {

@@ -5,6 +5,10 @@ use sha2::{Digest, Sha256};
 use std::path::{Component, Path, PathBuf};
 
 const MAX_DOCUMENT_BYTES: usize = 2 * 1024 * 1024;
+const PROJECT_DOCUMENT_CONFIG_PATHS: &[&str] = &[
+    ".elon/document-sections.json",
+    ".elon/document-organization-suggestions.json",
+];
 
 #[derive(Debug)]
 pub(crate) struct ProjectDocumentFile {
@@ -53,7 +57,7 @@ pub(crate) fn write_project_document_file(
     if content.len() > MAX_DOCUMENT_BYTES {
         return Err(write_error("项目文档超过 2 MiB 编辑上限", false));
     }
-    let (target, relative) = resolve_markdown_target(workspace, document_path)
+    let (target, relative) = resolve_markdown_target(workspace, document_path, true)
         .map_err(|error| write_error(error.to_string(), false))?;
 
     let current_revision = if target.is_file() {
@@ -80,7 +84,7 @@ pub(crate) fn write_project_document_file(
 }
 
 fn resolve_existing_markdown(workspace: &Path, document_path: &str) -> Result<(PathBuf, String)> {
-    let (target, relative) = resolve_markdown_target(workspace, document_path)?;
+    let (target, relative) = resolve_markdown_target(workspace, document_path, false)?;
     if !target.is_file() {
         bail!("项目文档不存在：{}", relative);
     }
@@ -94,7 +98,11 @@ fn resolve_existing_markdown(workspace: &Path, document_path: &str) -> Result<(P
     Ok((canonical_target, relative))
 }
 
-fn resolve_markdown_target(workspace: &Path, document_path: &str) -> Result<(PathBuf, String)> {
+fn resolve_markdown_target(
+    workspace: &Path,
+    document_path: &str,
+    create_parent: bool,
+) -> Result<(PathBuf, String)> {
     if !workspace.is_dir() {
         bail!("项目工作区不存在：{}", workspace.display());
     }
@@ -113,8 +121,11 @@ fn resolve_markdown_target(workspace: &Path, document_path: &str) -> Result<(Pat
         .and_then(|value| value.to_str())
         .unwrap_or_default()
         .to_ascii_lowercase();
-    if !matches!(extension.as_str(), "md" | "markdown" | "mdown") {
-        bail!("项目文档只允许 Markdown 文件");
+    let normalized_lower = normalized.to_ascii_lowercase();
+    if !matches!(extension.as_str(), "md" | "markdown" | "mdown")
+        && !PROJECT_DOCUMENT_CONFIG_PATHS.contains(&normalized_lower.as_str())
+    {
+        bail!("项目文档只允许 Markdown，或受控的 .elon 文档分区配置");
     }
     let canonical_root = std::fs::canonicalize(workspace)
         .with_context(|| format!("无法解析项目工作区 {}", workspace.display()))?;
@@ -139,12 +150,14 @@ fn resolve_markdown_target(workspace: &Path, document_path: &str) -> Result<(Pat
     if !canonical_ancestor.starts_with(&canonical_root) {
         bail!("项目文档路径越过工作区边界");
     }
-    std::fs::create_dir_all(parent)
-        .with_context(|| format!("无法创建项目文档目录 {}", parent.display()))?;
-    let canonical_parent = std::fs::canonicalize(parent)
-        .with_context(|| format!("无法解析项目文档目录 {}", parent.display()))?;
-    if !canonical_parent.starts_with(&canonical_root) {
-        bail!("项目文档路径越过工作区边界");
+    if create_parent {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("无法创建项目文档目录 {}", parent.display()))?;
+        let canonical_parent = std::fs::canonicalize(parent)
+            .with_context(|| format!("无法解析项目文档目录 {}", parent.display()))?;
+        if !canonical_parent.starts_with(&canonical_root) {
+            bail!("项目文档路径越过工作区边界");
+        }
     }
     Ok((target, normalized))
 }
@@ -203,6 +216,46 @@ mod tests {
         ));
         std::fs::create_dir_all(&root).unwrap();
         assert!(write_project_document_file(&root, "../outside.md", "bad", None).is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn allows_only_controlled_document_json_files() {
+        let root =
+            std::env::temp_dir().join(format!("elon-project-doc-config-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let config = write_project_document_file(
+            &root,
+            ".elon/document-sections.json",
+            "{\"version\":1}\n",
+            None,
+        )
+        .unwrap();
+        assert_eq!(config.path, ".elon/document-sections.json");
+        let suggestions = write_project_document_file(
+            &root,
+            ".elon/document-organization-suggestions.json",
+            "{\"status\":\"requested\"}\n",
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            suggestions.path,
+            ".elon/document-organization-suggestions.json"
+        );
+        assert!(write_project_document_file(&root, ".elon/untrusted.json", "{}", None,).is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn missing_config_read_does_not_create_elon_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-project-doc-read-only-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(read_project_document_file(&root, ".elon/document-sections.json").is_err());
+        assert!(!root.join(".elon").exists());
         let _ = std::fs::remove_dir_all(root);
     }
 }

@@ -55,3 +55,27 @@ fn frontmatter_can_only_narrow_lifecycle() {
     assert_eq!(metadata.scope, "api");
     assert!(!metadata.default_retrieval);
 }
+
+#[test]
+fn customization_assets_and_ai_rules_are_not_unknown_notes() {
+    let agent =
+        classify_project_document(".github/agents/elon-reviewer.agent.md", "# Reviewer\n", 10);
+    assert_eq!(agent.role, "agent_definition");
+    assert_eq!(agent.authority, "customization");
+    assert!(!agent.ambiguous);
+
+    let prompt =
+        classify_project_document(".github/prompts/elon-dev-task.prompt.md", "# Prompt\n", 9);
+    assert_eq!(prompt.role, "prompt_template");
+
+    let skill = classify_project_document(
+        ".github/skills/modular-long-term-dev/SKILL.md",
+        "# Skill\n",
+        8,
+    );
+    assert_eq!(skill.role, "skill");
+
+    let bridge = classify_project_document("AI_RULES.md", "# Bridge\n", 9);
+    assert_eq!(bridge.role, "project_guide");
+    assert!(!bridge.ambiguous);
+}

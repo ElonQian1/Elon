@@ -112,7 +112,13 @@ pub(crate) fn collect_project_documents_with_options(
         }
     }
 
-    append_default_documents(&mut documents, &mut warnings);
+    // Existing projects must reflect their real workspace. Mixing absent platform
+    // templates into a non-empty catalog creates phantom pages that cannot be
+    // opened or edited. Empty workspaces still receive a read-only starter view;
+    // editable user projects seed the same defaults before scanning.
+    if documents.is_empty() {
+        append_default_documents(&mut documents, &mut warnings);
+    }
     if options.catalog_only {
         for document in &mut documents {
             document.content.clear();

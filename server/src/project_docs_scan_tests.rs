@@ -33,9 +33,9 @@ fn project_docs_collects_agent_and_instruction_docs_first() {
     assert_eq!(paths[1], "CODEX.md");
     assert!(paths.contains(&".github/instructions/git.instructions.md"));
     assert!(paths.contains(&"docs/guide.md"));
-    assert!(paths.contains(&".github/copilot-instructions.md"));
+    assert!(!paths.contains(&".github/copilot-instructions.md"));
     assert!(!snapshot.revision.is_empty());
-    assert_eq!(snapshot.source, "workspace_with_defaults");
+    assert_eq!(snapshot.source, "workspace");
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn project_docs_can_seed_missing_default_docs() {
         .warnings
         .iter()
         .any(|warning| warning.contains("补齐")));
-    assert_eq!(snapshot.source, "workspace_with_defaults");
+    assert_eq!(snapshot.source, "workspace");
 }
 
 #[test]
