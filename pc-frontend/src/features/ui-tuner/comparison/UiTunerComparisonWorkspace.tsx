@@ -4,7 +4,7 @@ import type {
   RefObject,
   UIEventHandler,
 } from 'react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { UiTunerFilterResult } from '../filtering'
 import { AutoFitQueuePanel } from '../fit-run/AutoFitQueuePanel'
 import type { LivePreviewRequest, LiveUiFrame, LiveUiNode, LiveUiSession } from '../live/liveUiApi'
@@ -102,6 +102,7 @@ export function UiTunerComparisonWorkspace({
   onNotice,
 }: UiTunerComparisonWorkspaceProps) {
   const [autoAnalysis, setAutoAnalysis] = useState<DesignDiffRegionAnalysis | null>(null)
+  const [designToolsOpen, setDesignToolsOpen] = useState(false)
   const selected = document.elements.find((element) => element.id === selectedId) ?? null
   const currentSize = useMemo(() => ({
     width: liveFrame?.width ?? document.canvas.width,
@@ -192,6 +193,9 @@ export function UiTunerComparisonWorkspace({
     activateRegion: chooseAutoRegion,
     onNotice,
   })
+  useEffect(() => {
+    if (fitRun.run) setDesignToolsOpen(true)
+  }, [fitRun.run])
   const overlay = target && comparison.mode !== 'split'
     ? (
         <ComparisonOverlayLayer
@@ -246,23 +250,37 @@ export function UiTunerComparisonWorkspace({
             onOpacityChange={comparison.setOverlayOpacity}
             onClearPair={comparison.clearPair}
           />
-          <DesignDiffRegionsPanel
-            sessionId={liveSession?.id}
-            targetReady
-            onChooseRegion={chooseAutoRegion}
-            onAnalysisChange={setAutoAnalysis}
-          />
-          <AutoFitQueuePanel analysis={autoAnalysis} queue={autoQueue} />
-          <UiFitRunPanel fitRun={fitRun} pairReady={Boolean(fitInput)} />
+          <section className={styles.designToolsDock}>
+            <button
+              type="button"
+              className={styles.designToolsToggle}
+              aria-expanded={designToolsOpen}
+              onClick={() => setDesignToolsOpen((open) => !open)}
+            >
+              <strong>设计识别与自动拟合</strong>
+              <span>{fitRun.run ? `正在运行 · ${fitRun.run.phase}` : fitInput ? '配对就绪' : '按需展开'}</span>
+              <em>{designToolsOpen ? '收起' : '展开'}</em>
+            </button>
+            {designToolsOpen && (
+              <div className={styles.designToolsContent}>
+                <DesignDiffRegionsPanel
+                  sessionId={liveSession?.id}
+                  targetReady
+                  onChooseRegion={chooseAutoRegion}
+                  onAnalysisChange={setAutoAnalysis}
+                />
+                <AutoFitQueuePanel analysis={autoAnalysis} queue={autoQueue} />
+                <UiFitRunPanel fitRun={fitRun} pairReady={Boolean(fitInput)} />
+                <CalibrationPanel
+                  calibration={calibration}
+                  targetSize={targetSize}
+                  currentSize={currentSize}
+                  onChange={comparison.setCalibration}
+                />
+              </div>
+            )}
+          </section>
         </>
-      )}
-      {target && (
-        <CalibrationPanel
-          calibration={calibration}
-          targetSize={targetSize}
-          currentSize={currentSize}
-          onChange={comparison.setCalibration}
-        />
       )}
       {comparison.mode === 'split' && target && designPaneOpen ? (
         <div
