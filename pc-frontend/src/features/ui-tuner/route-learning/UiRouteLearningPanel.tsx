@@ -87,7 +87,7 @@ export function UiRouteLearningPanel({ currentIntent }: Props) {
       </button>
       {open && (
         <div className={styles.body}>
-          <p>Codex 建议先作为候选；用户确认或真实执行成功后才会生效。</p>
+          <p>Codex 建议只进入候选；受控近义词由本地规则归簇，只有用户确认或真实执行成功的经验才能被复用。</p>
           <div className={styles.currentActions}>
             <button disabled={busy || !projectId || !currentIntent.trim()} onClick={() => void confirm(currentIntent, 'ui')}>
               当前意图是 UI
@@ -108,8 +108,26 @@ export function UiRouteLearningPanel({ currentIntent }: Props) {
                   <small>{sourceLabel(entry.source)}</small>
                 </div>
                 <p title={entry.sampleText}>{entry.sampleText}</p>
+                {entry.conceptLabel && (
+                  <div className={styles.cluster} title={entry.conceptKey}>
+                    <strong>受控近义簇</strong>
+                    <span>{entry.conceptLabel}</span>
+                    <small>规则 v{entry.conceptVersion}</small>
+                  </div>
+                )}
+                {entry.aliases.length > 0 && (
+                  <div className={styles.aliases}>
+                    {entry.aliases.map((alias) => (
+                      <span key={alias.id} title={`本地受控词表命中 ${alias.hitCount} 次`}>
+                        {alias.sampleText} · {alias.hitCount}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className={styles.metrics}>
                   <span>命中 {entry.hitCount}</span>
+                  <span>近义命中 {entry.clusterHitCount}</span>
+                  <span>别名 {entry.aliasCount}</span>
                   <span>证据 {entry.evidenceCount}</span>
                   <span>冲突 {entry.conflictCount}</span>
                   <span>置信 {Math.round(entry.confidence * 100)}%</span>

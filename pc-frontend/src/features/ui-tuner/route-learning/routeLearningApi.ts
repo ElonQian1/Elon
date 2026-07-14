@@ -3,6 +3,16 @@ import { api } from '../../../api/client'
 export type UiLearnedRoute = 'ui' | 'non_ui'
 export type UiRouteLearningStatus = 'candidate' | 'active' | 'revoked'
 
+export interface UiRouteLearningAlias {
+  id: string
+  sampleText: string
+  source: 'controlled_vocabulary' | 'user_override' | 'execution_verified' | 'codex_candidate'
+  status: UiRouteLearningStatus
+  hitCount: number
+  conflictCount: number
+  updatedAt: string
+}
+
 export interface UiRouteLearningEntry {
   id: string
   sampleText: string
@@ -13,6 +23,12 @@ export interface UiRouteLearningEntry {
   evidenceCount: number
   conflictCount: number
   hitCount: number
+  conceptKey?: string
+  conceptLabel?: string
+  conceptVersion?: number
+  clusterHitCount: number
+  aliasCount: number
+  aliases: UiRouteLearningAlias[]
   updatedAt: string
 }
 

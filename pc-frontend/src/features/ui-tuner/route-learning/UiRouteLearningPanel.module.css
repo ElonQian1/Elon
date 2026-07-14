@@ -58,4 +58,10 @@
 .entryHead span { color: #a8c7fa; font-size: 10px; }
 .entryHead small { color: var(--text-secondary); font-size: 10px; text-align: right; }
 .list article > p { margin: 0; overflow: hidden; color: var(--text-primary); font-size: 11px; line-height: 16px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cluster { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 6px 7px; border-radius: 6px; background: rgba(92, 150, 255, .1); color: #c8dcff; font-size: 10px; }
+.cluster strong, .cluster span, .cluster small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cluster strong { color: #8db8ff; }
+.cluster small { color: var(--text-secondary); }
+.aliases { display: flex; min-width: 0; flex-wrap: wrap; gap: 5px; }
+.aliases span { max-width: 100%; overflow: hidden; padding: 3px 6px; border: 1px solid rgba(99, 208, 151, .25); border-radius: 999px; color: #a9dfc2; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .metrics { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--text-secondary); font-size: 10px; }
