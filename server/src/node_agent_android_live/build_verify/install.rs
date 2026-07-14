@@ -72,6 +72,15 @@ fn actionable_install_error(error: Error) -> Error {
             "手机系统拒绝安装调试 APK。已尝试自动点亮手机，请解锁后在开发者选项中开启“通过 USB 安装”；若手机弹出安装确认，请点允许，然后在 PC 网页点击重试。原始错误：{detail}"
         );
     }
+    if detail.contains("INSTALL_FAILED_ABORTED")
+        && detail
+            .to_ascii_lowercase()
+            .contains("user rejected permissions")
+    {
+        return anyhow!(
+            "手机安装器等待用户确认时拒绝了本次 Debug APK 更新。荣耀等系统可能在 adb 已返回失败后仍保留“未经安全审核”提示；请保持手机解锁，点“继续”，再在 PC 网页点击重试。完成一次确认后，后续同签名更新可继续自动安装。原始错误：{detail}"
+        );
+    }
     error
 }
 
@@ -124,5 +133,16 @@ mod tests {
         assert!(message.contains("首次安装节点专属 Debug 包"));
         assert!(message.contains("继续安装"));
         assert!(message.contains("后续同签名 Debug 包更新通常会自动完成"));
+    }
+
+    #[test]
+    fn aborted_honor_install_explains_late_confirmation_and_retry() {
+        let error = actionable_install_error(anyhow::anyhow!(
+            "Failure [INSTALL_FAILED_ABORTED: User rejected permissions]"
+        ));
+        let message = error.to_string();
+        assert!(message.contains("adb 已返回失败后仍保留"));
+        assert!(message.contains("点“继续”"));
+        assert!(message.contains("在 PC 网页点击重试"));
     }
 }
