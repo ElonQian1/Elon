@@ -2,21 +2,29 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
-const { buildSync } = require('esbuild')
+const ts = require('typescript')
 
 const projectRoot = path.resolve(__dirname, '..')
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'elon-runtime-draft-'))
 const outputFile = path.join(temporaryDirectory, 'runtimeDraftModel.cjs')
 
 try {
-  buildSync({
-    entryPoints: [path.join(projectRoot, 'src/features/ui-tuner/live/runtimeDraftModel.ts')],
-    outfile: outputFile,
-    bundle: true,
-    format: 'cjs',
-    platform: 'node',
-    logLevel: 'silent',
+  const sourceFile = path.join(projectRoot, 'src/features/ui-tuner/live/runtimeDraftModel.ts')
+  const source = fs.readFileSync(sourceFile, 'utf8')
+  const compiled = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+    fileName: sourceFile,
+    reportDiagnostics: true,
   })
+  const errors = compiled.diagnostics.filter((diagnostic) => (
+    diagnostic.category === ts.DiagnosticCategory.Error
+  ))
+  assert.equal(errors.length, 0, errors.map((diagnostic) => diagnostic.messageText).join('\n'))
+  fs.writeFileSync(outputFile, compiled.outputText)
 
   const {
     EMPTY_RUNTIME_DRAFT_STATE,
