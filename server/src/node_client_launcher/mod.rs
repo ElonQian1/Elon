@@ -97,12 +97,52 @@ pub(crate) fn set_autostart_enabled(_install_dir: &std::path::Path, _enabled: bo
 }
 
 /// 已安装的一龙桌面壳 exe 路径（不存在时返回 None）。
-/// `node_agent_admin_open` 用它决定是打开原生窗口还是回退到系统浏览器。
+/// `open_workbench_url` 用它决定是打开原生窗口还是回退到系统浏览器。
 #[cfg(windows)]
 pub(crate) fn desktop_shell_exe_path() -> Option<PathBuf> {
     let install_dir = paths::install_dir().ok()?;
     let path = paths::desktop_shell_exe(&install_dir);
     path.exists().then_some(path)
+}
+
+/// 打开工作台页面的唯一入口：优先用一龙桌面壳（elon-desktop.exe，原生窗口），
+/// 找不到该 exe 或启动失败（旧客户端尚未升级到带桌面壳的安装包）就回退到
+/// 系统默认浏览器。双击客户端的启动器路径（`process::start_or_open`）和后台
+/// runtime 自打开路径（`node_agent_admin_open::maybe_open_admin_page`）都
+/// 必须走这一个函数，不要各自实现一份，避免只改了一处导致体验不一致。
+#[cfg(windows)]
+pub(crate) fn open_workbench_url(url: &str) -> Result<()> {
+    if let Some(desktop_exe) = desktop_shell_exe_path() {
+        match std::process::Command::new(&desktop_exe)
+            .env("ELON_DESKTOP_URL", url)
+            .spawn()
+        {
+            Ok(_) => return Ok(()),
+            Err(error) => {
+                if let Ok(install_dir) = paths::install_dir() {
+                    log_file::record_event(
+                        &install_dir,
+                        "desktop_shell_launch_failed",
+                        false,
+                        &format!(
+                            "path={}; error={error:#}; falling back to system browser",
+                            desktop_exe.display()
+                        ),
+                    );
+                }
+            }
+        }
+    }
+    command::open_url(url).map_err(|error| anyhow::anyhow!("无法打开管理页 {url}: {error}"))
+}
+
+#[cfg(not(windows))]
+pub(crate) fn open_workbench_url(url: &str) -> Result<()> {
+    let mut cmd = command::silent_command("xdg-open");
+    cmd.arg(url);
+    command::spawn_hidden(&mut cmd)
+        .map(|_| ())
+        .map_err(|error| anyhow::anyhow!("无法打开管理页 {url}: {error}"))
 }
 
 #[cfg(windows)]

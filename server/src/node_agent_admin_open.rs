@@ -119,34 +119,10 @@ pub fn maybe_open_admin_page(port: u16) {
     std::thread::spawn(move || {
         wait_for_admin_port(port);
         let url = admin_url(port);
-        if let Err(err) = open_with_desktop_shell_or_browser(&url) {
+        if let Err(err) = crate::node_client_launcher::open_workbench_url(&url) {
             tracing::warn!(%url, error = %err, "无法打开一龙工作台窗口");
         }
     });
-}
-
-/// 优先用一龙桌面壳（elon-desktop.exe，原生窗口）打开工作台；找不到该 exe 或
-/// 启动失败（比如旧客户端还没升级到带桌面壳的版本）就回退到系统默认浏览器，
-/// 保持和升级前完全一致的兜底行为。
-#[cfg(windows)]
-fn open_with_desktop_shell_or_browser(url: &str) -> std::io::Result<()> {
-    if let Some(desktop_exe) = crate::node_client_launcher::desktop_shell_exe_path() {
-        match std::process::Command::new(&desktop_exe)
-            .env("ELON_DESKTOP_URL", url)
-            .spawn()
-        {
-            Ok(_) => return Ok(()),
-            Err(error) => {
-                tracing::warn!(
-                    %url,
-                    path = %desktop_exe.display(),
-                    error = %error,
-                    "启动一龙桌面壳失败，回退到系统浏览器"
-                );
-            }
-        }
-    }
-    crate::node_client_launcher::command::open_url(url)
 }
 
 #[cfg(not(windows))]

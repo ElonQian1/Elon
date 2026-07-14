@@ -384,18 +384,8 @@ fn cloud_pc_url(port: u16, env_values: &HashMap<String, String>) -> String {
 }
 
 fn open_url(url: &str) -> Result<()> {
-    #[cfg(windows)]
-    {
-        launcher_command::open_url(url).with_context(|| format!("无法打开管理页 {url}"))?;
-    }
-    #[cfg(not(windows))]
-    {
-        let mut cmd = launcher_command::silent_command("xdg-open");
-        cmd.arg(url);
-        launcher_command::spawn_hidden(&mut cmd)
-            .with_context(|| format!("无法打开管理页 {url}"))?;
-    }
-    Ok(())
+    // 统一走 super::open_workbench_url：优先原生桌面壳窗口，找不到才回退浏览器。
+    super::open_workbench_url(url)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
