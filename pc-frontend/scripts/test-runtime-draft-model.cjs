@@ -106,6 +106,28 @@ try {
   assert.equal(runtimeDraftStatus(rejected), 'rejected')
   assert.ok(rejected.nodes[node.runtimeNodeId], 'Android 拒绝时 PC 草稿必须保留供用户修正')
 
+  const shortcutFile = path.join(projectRoot, 'src/features/ui-tuner/comparison/canvasZoomShortcuts.ts')
+  const shortcutOutput = path.join(temporaryDirectory, 'canvasZoomShortcuts.js')
+  const shortcutCompiled = ts.transpileModule(fs.readFileSync(shortcutFile, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    fileName: shortcutFile,
+  })
+  fs.writeFileSync(shortcutOutput, shortcutCompiled.outputText)
+  const { canvasZoomCommand } = require(shortcutOutput)
+  const shortcut = (key, overrides = {}) => canvasZoomCommand({
+    key,
+    ctrlKey: true,
+    metaKey: false,
+    altKey: false,
+    ...overrides,
+  })
+  assert.equal(shortcut('+'), 'zoom-in')
+  assert.equal(shortcut('='), 'zoom-in')
+  assert.equal(shortcut('-'), 'zoom-out')
+  assert.equal(shortcut('0'), 'actual-size')
+  assert.equal(shortcut('+', { ctrlKey: false }), null, '普通文字输入不能误触画布缩放')
+  assert.equal(shortcut('+', { ctrlKey: false, metaKey: true }), 'zoom-in', 'macOS Command 快捷键必须可用')
+
   const layerFile = path.join(projectRoot, 'src/features/ui-tuner/live/RuntimeDraftLayer.tsx')
   const layerOutput = path.join(temporaryDirectory, 'RuntimeDraftLayer.js')
   const layerCompiled = ts.transpileModule(fs.readFileSync(layerFile, 'utf8'), {
