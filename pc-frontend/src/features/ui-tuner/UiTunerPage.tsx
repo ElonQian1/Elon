@@ -629,8 +629,16 @@ export default function UiTunerPage() {
   return (
     <>
     <SourcePreviewWorkspace active={workspaceMode === 'source'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
-    <div className={styles.page} style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}>
-      <UiTunerLayersPanel
+    <div
+      className={[
+        styles.page,
+        !workspaceLayout.leftPanelOpen ? styles.leftPanelCollapsed : '',
+        !workspaceLayout.rightPanelOpen ? styles.rightPanelCollapsed : '',
+        workspaceLayout.focusMode ? styles.focusCanvas : '',
+      ].join(' ')}
+      style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}
+    >
+      {workspaceLayout.leftPanelOpen && <UiTunerLayersPanel
         realRenderer={realRenderer}
         filter={layerFilter}
         filterResult={filterResult}
@@ -642,7 +650,7 @@ export default function UiTunerPage() {
         onSelectElement={setSelectedId}
         onToggleElementVisibility={toggleElementVisibility}
         onToggleElementLock={toggleElementLock}
-      />
+      />}
 
       <section className={styles.stage}>
         <EvidenceModeSwitch initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
@@ -670,6 +678,9 @@ export default function UiTunerPage() {
           fitToStage={fitToStage}
           canUndo={realRenderer ? runtimeDraft.status === 'rejected' || (runtimeDraft.status === 'confirmed' && (liveUi.session?.historyCount ?? 0) > 0) : history.past.length > 0}
           canRedo={realRenderer ? runtimeDraft.status === 'confirmed' && (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
+          leftPanelOpen={workspaceLayout.leftPanelOpen}
+          rightPanelOpen={workspaceLayout.rightPanelOpen}
+          focusMode={workspaceLayout.focusMode}
           onImportScreenshot={importScreenshot}
           onSelectDevice={selectDevice}
           onRefreshDevices={refreshDevices}
@@ -687,6 +698,9 @@ export default function UiTunerPage() {
           onCopyStandardPackage={copyStandardPackage}
           onDownloadExport={downloadExport}
           onReset={resetDocument}
+          onToggleLeftPanel={workspaceLayout.toggleLeftPanel}
+          onToggleRightPanel={workspaceLayout.toggleRightPanel}
+          onToggleFocusMode={workspaceLayout.toggleFocusMode}
         />
 
         <UiTunerComparisonWorkspace
@@ -724,7 +738,7 @@ export default function UiTunerPage() {
         />
       </section>
 
-      <UiTunerInspector
+      {workspaceLayout.rightPanelOpen && <UiTunerInspector
         tunerDoc={tunerDoc}
         selected={selected}
         metrics={metrics}
@@ -754,7 +768,7 @@ export default function UiTunerPage() {
         liveProjectRoot={liveProjectRoot}
         onLiveProjectRootChange={updateLiveProjectRoot}
         onPrepareLiveRuntime={() => { void prepareLiveRuntime() }}
-      />
+      />}
 
       <UiTunerDeviceDialog
         open={deviceDialogOpen}

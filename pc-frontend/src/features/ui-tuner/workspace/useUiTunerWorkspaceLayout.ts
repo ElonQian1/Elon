@@ -6,6 +6,9 @@ const DEFAULT_SPLIT_RATIO = 35
 interface CanvasLayoutState {
   designPaneOpen: boolean
   splitRatio: number
+  leftPanelOpen: boolean
+  rightPanelOpen: boolean
+  focusMode: boolean
 }
 
 function clampSplitRatio(value: number) {
@@ -18,9 +21,18 @@ function loadState(storageKey: string): CanvasLayoutState {
     return {
       designPaneOpen: parsed.designPaneOpen !== false,
       splitRatio: clampSplitRatio(Number(parsed.splitRatio) || DEFAULT_SPLIT_RATIO),
+      leftPanelOpen: parsed.leftPanelOpen !== false,
+      rightPanelOpen: parsed.rightPanelOpen !== false,
+      focusMode: parsed.focusMode === true,
     }
   } catch {
-    return { designPaneOpen: true, splitRatio: DEFAULT_SPLIT_RATIO }
+    return {
+      designPaneOpen: true,
+      splitRatio: DEFAULT_SPLIT_RATIO,
+      leftPanelOpen: true,
+      rightPanelOpen: true,
+      focusMode: false,
+    }
   }
 }
 
@@ -56,10 +68,28 @@ export function useUiTunerWorkspaceLayout(storageScope: string, hasTarget: boole
     setState((current) => ({ ...current, designPaneOpen: !current.designPaneOpen }))
   }, [hasTarget])
 
+  const toggleLeftPanel = useCallback(() => {
+    setState((current) => ({ ...current, leftPanelOpen: !current.leftPanelOpen, focusMode: false }))
+  }, [])
+
+  const toggleRightPanel = useCallback(() => {
+    setState((current) => ({ ...current, rightPanelOpen: !current.rightPanelOpen, focusMode: false }))
+  }, [])
+
+  const toggleFocusMode = useCallback(() => {
+    setState((current) => ({ ...current, focusMode: !current.focusMode }))
+  }, [])
+
   return {
     designPaneOpen: hasTarget && state.designPaneOpen,
     splitRatio: state.splitRatio,
+    leftPanelOpen: !state.focusMode && state.leftPanelOpen,
+    rightPanelOpen: !state.focusMode && state.rightPanelOpen,
+    focusMode: state.focusMode,
     setSplitRatio,
     toggleDesignPane,
+    toggleLeftPanel,
+    toggleRightPanel,
+    toggleFocusMode,
   }
 }

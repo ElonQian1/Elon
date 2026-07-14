@@ -8,6 +8,11 @@ import {
   Maximize2,
   Minus,
   MousePointer2,
+  PanelsTopLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   RefreshCw,
   Redo2,
@@ -45,6 +50,9 @@ interface UiTunerToolbarProps {
   fitToStage: boolean
   canUndo: boolean
   canRedo: boolean
+  leftPanelOpen: boolean
+  rightPanelOpen: boolean
+  focusMode: boolean
   onImportScreenshot: (file: File) => void
   onSelectDevice: (deviceId: string) => void
   onRefreshDevices: () => void
@@ -62,6 +70,9 @@ interface UiTunerToolbarProps {
   onCopyStandardPackage: () => void
   onDownloadExport: () => void
   onReset: () => void
+  onToggleLeftPanel: () => void
+  onToggleRightPanel: () => void
+  onToggleFocusMode: () => void
 }
 
 export function UiTunerToolbar({
@@ -82,6 +93,9 @@ export function UiTunerToolbar({
   fitToStage,
   canUndo,
   canRedo,
+  leftPanelOpen,
+  rightPanelOpen,
+  focusMode,
   onImportScreenshot,
   onSelectDevice,
   onRefreshDevices,
@@ -99,6 +113,9 @@ export function UiTunerToolbar({
   onCopyStandardPackage,
   onDownloadExport,
   onReset,
+  onToggleLeftPanel,
+  onToggleRightPanel,
+  onToggleFocusMode,
 }: UiTunerToolbarProps) {
   const selectedDevice = devices.find((device) => device.serial === selectedDeviceId)
   const selectedName = selectedDevice?.model ?? selectedDevice?.serial
@@ -200,6 +217,39 @@ export function UiTunerToolbar({
           <ImagePlus size={14} aria-hidden="true" />
           导入设计图/截图
         </button>
+        <div className={styles.workspaceControls} aria-label="工作区布局">
+          <button
+            type="button"
+            className={leftPanelOpen ? styles.activeWorkspaceControl : ''}
+            onClick={onToggleLeftPanel}
+            aria-label={leftPanelOpen ? '隐藏组件树' : '显示组件树'}
+            title={leftPanelOpen ? '隐藏组件树' : '显示组件树'}
+          >
+            {leftPanelOpen
+              ? <PanelLeftClose size={14} aria-hidden="true" />
+              : <PanelLeftOpen size={14} aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            className={rightPanelOpen ? styles.activeWorkspaceControl : ''}
+            onClick={onToggleRightPanel}
+            aria-label={rightPanelOpen ? '隐藏属性栏' : '显示属性栏'}
+            title={rightPanelOpen ? '隐藏属性栏' : '显示属性栏'}
+          >
+            {rightPanelOpen
+              ? <PanelRightClose size={14} aria-hidden="true" />
+              : <PanelRightOpen size={14} aria-hidden="true" />}
+          </button>
+          <button
+            type="button"
+            className={focusMode ? styles.activeWorkspaceControl : ''}
+            onClick={onToggleFocusMode}
+            aria-label={focusMode ? '退出专注画布' : '专注画布'}
+            title={focusMode ? '退出专注画布' : '隐藏两侧面板，专注画布'}
+          >
+            <PanelsTopLeft size={14} aria-hidden="true" />
+          </button>
+        </div>
         <div className={styles.historyControls} aria-label="历史记录">
           <button type="button" onClick={onUndo} disabled={!canUndo} aria-label="撤回一步" title="撤回一步">
             <Undo2 size={14} aria-hidden="true" />

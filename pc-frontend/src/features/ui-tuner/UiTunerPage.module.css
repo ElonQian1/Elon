@@ -1,11 +1,26 @@
 .page {
+  --layers-panel-width: 252px;
+  --inspector-panel-width: 330px;
   height: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: 252px minmax(0, 1fr) 330px;
+  grid-template-columns: var(--layers-panel-width) minmax(0, 1fr) var(--inspector-panel-width);
   background: var(--bg-base);
   color: var(--text-primary);
   overflow: hidden;
+}
+
+.leftPanelCollapsed {
+  --layers-panel-width: 0px;
+}
+
+.rightPanelCollapsed {
+  --inspector-panel-width: 0px;
+}
+
+.focusCanvas {
+  --layers-panel-width: 0px;
+  --inspector-panel-width: 0px;
 }
 
 .layersPanel,
@@ -266,6 +281,26 @@
   padding-right: 7px;
   margin-right: 2px;
   border-right: 1px solid var(--border);
+}
+
+.workspaceControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 7px;
+  margin-right: 2px;
+  border-right: 1px solid var(--border);
+}
+
+.workspaceControls button {
+  width: 30px;
+  padding: 0;
+}
+
+.workspaceControls .activeWorkspaceControl {
+  border-color: rgba(89, 215, 255, .5);
+  background: rgba(89, 215, 255, .12);
+  color: #dff8ff;
 }
 
 .historyControls button {
@@ -820,7 +855,18 @@
 
 @media (max-width: 1180px) {
   .page {
-    grid-template-columns: 220px minmax(0, 1fr) 300px;
+    --layers-panel-width: 220px;
+    --inspector-panel-width: 300px;
+  }
+
+  .page.leftPanelCollapsed,
+  .page.focusCanvas {
+    --layers-panel-width: 0px;
+  }
+
+  .page.rightPanelCollapsed,
+  .page.focusCanvas {
+    --inspector-panel-width: 0px;
   }
 
   .canvasScroller {
