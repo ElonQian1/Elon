@@ -163,6 +163,12 @@ export function UiTunerLivePanel({
             />
           </label>
           {prepareError && <span>{prepareError}</span>}
+          {prepareBusy && (
+            <div className={styles.installAttention} role="status">
+              <strong>请留意手机上的安装确认</strong>
+              <small>首次安装节点专属 Debug 包时，部分荣耀、小米等系统会要求勾选风险提示并点“继续安装”；这是独立调试包的一次性安全确认，后续同签名更新通常会自动完成。</small>
+            </div>
+          )}
           <button
             className={styles.prepareButton}
             type="button"

@@ -272,7 +272,7 @@ export default function UiTunerPage() {
     const basePackageName = liveDebugBasePackage(capturedPackage)
     setLivePrepareBusy(true)
     setLivePrepareError('')
-    setNotice('正在构建并安装实时调试包；首次构建可能需要几分钟…')
+    setNotice('正在构建并安装实时调试包；首次安装可能需要在手机上确认“继续安装”，请保持手机解锁…')
     try {
       const lease = await deviceLease.ensureLease(selectedHardwareSerial)
       const prepared = await prepareLiveDebugRuntime({

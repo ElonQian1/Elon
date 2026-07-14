@@ -62,6 +62,11 @@ pub(super) async fn install_debug_apk(
 
 fn actionable_install_error(error: Error) -> Error {
     let detail = error.to_string();
+    if detail.contains("adb 命令超时") && detail.contains(" install ") {
+        return anyhow!(
+            "手机安装器等待确认超过 3 分钟。首次安装节点专属 Debug 包时，荣耀、小米等系统可能要求在手机上勾选风险提示并点“继续安装”；请保持手机解锁、完成一次确认后在 PC 网页重试。后续同签名 Debug 包更新通常会自动完成。原始错误：{detail}"
+        );
+    }
     if detail.contains("INSTALL_FAILED_USER_RESTRICTED") {
         return anyhow!(
             "手机系统拒绝安装调试 APK。已尝试自动点亮手机，请解锁后在开发者选项中开启“通过 USB 安装”；若手机弹出安装确认，请点允许，然后在 PC 网页点击重试。原始错误：{detail}"
@@ -108,5 +113,16 @@ mod tests {
         let message = error.to_string();
         assert!(message.contains("已尝试自动点亮手机"));
         assert!(message.contains("在 PC 网页点击重试"));
+    }
+
+    #[test]
+    fn install_timeout_explains_vendor_confirmation_and_first_install() {
+        let error = actionable_install_error(anyhow::anyhow!(
+            "adb 命令超时: -s phone install -r -t app-debug.apk"
+        ));
+        let message = error.to_string();
+        assert!(message.contains("首次安装节点专属 Debug 包"));
+        assert!(message.contains("继续安装"));
+        assert!(message.contains("后续同签名 Debug 包更新通常会自动完成"));
     }
 }
