@@ -72,7 +72,6 @@ interface HistoryState {
   past: UiTunerDocument[]
   future: UiTunerDocument[]
 }
-
 const MIN_SIZE = 24
 const HISTORY_LIMIT = 80
 const DEFAULT_ANDROID_PACKAGE = 'com.elon.app'
@@ -316,10 +315,8 @@ export default function UiTunerPage() {
     || isLiveDebugPackage(liveUi.session?.packageName)
     || isLiveDebugPackage(tunerDoc.runtimeSnapshot?.packageName),
   )
-  const renderMode = deriveUiTunerRenderMode({
-    workspaceMode, runtimeDocument,
-    hasAndroidPixels: Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible),
-  })
+  const renderMode = deriveUiTunerRenderMode({ workspaceMode, runtimeDocument,
+    hasAndroidPixels: Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible) })
   const runtimeDraft = useRuntimeDraftSession({
     resetKey: `${liveUi.session?.id ?? ''}:${liveUi.previewRequest ? JSON.stringify(liveUi.previewRequest) : ''}:${liveUi.buildVerifyResult?.apkPath ?? ''}`,
     frame: liveUi.liveFrame,
