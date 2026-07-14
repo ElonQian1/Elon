@@ -39,7 +39,6 @@ interface UiTunerInspectorProps {
   liveUi: ReturnType<typeof useLiveUiSession>
   onLiveApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
   onLiveApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
-  onLiveOptimisticUpdate: (patch: Partial<UiTunerElement>) => void
   livePrepareBusy: boolean
   livePrepareError: string
   livePrepareReady: boolean
@@ -70,7 +69,6 @@ export function UiTunerInspector({
   liveUi,
   onLiveApply,
   onLiveApplyGesture,
-  onLiveOptimisticUpdate,
   livePrepareBusy,
   livePrepareError,
   livePrepareReady,
@@ -114,7 +112,6 @@ export function UiTunerInspector({
             onUndo={liveUi.undo}
             onRedo={liveUi.redo}
             onReconnect={liveUi.reconnect}
-            onOptimisticUpdate={onLiveOptimisticUpdate}
             commitPlan={liveUi.commitPlan}
             commitResult={liveUi.commitResult}
             onPreviewCommit={liveUi.previewCommit}

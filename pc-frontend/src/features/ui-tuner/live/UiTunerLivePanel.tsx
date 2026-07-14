@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import type { UiTunerElement } from '../types'
 import type {
   LivePatchOperation,
   LivePreviewRequest,
@@ -33,7 +32,6 @@ interface UiTunerLivePanelProps {
   onUndo: () => Promise<void>
   onRedo: () => Promise<void>
   onReconnect: () => void
-  onOptimisticUpdate: (patch: Partial<UiTunerElement>) => void
   commitPlan: LiveSourceCommitPlan | null
   commitResult: LiveSourceCommitResult | null
   onPreviewCommit: () => Promise<LiveSourceCommitPlan>
@@ -91,7 +89,6 @@ export function UiTunerLivePanel({
   onUndo,
   onRedo,
   onReconnect,
-  onOptimisticUpdate,
   commitPlan,
   commitResult,
   onPreviewCommit,
@@ -210,14 +207,12 @@ export function UiTunerLivePanel({
                     property,
                     value: { type: valueType, value },
                   }], gestureId)
-                  onOptimisticUpdate(optimisticPatch(property, value))
                 }}
                 onCommit={async (value) => {
                   await onApply({
                     property,
                     value: { type: valueType, value },
                   }, scope)
-                  onOptimisticUpdate(optimisticPatch(property, value))
                 }}
               />
             ))}
@@ -231,7 +226,6 @@ export function UiTunerLivePanel({
               disabled={busy}
               onCommit={async (value) => {
                 await onApply({ property, value: { type: 'argb', value } }, scope)
-                onOptimisticUpdate(optimisticPatch(property, value))
               }}
             />
           ))}
@@ -242,7 +236,6 @@ export function UiTunerLivePanel({
               disabled={busy}
               onCommit={async (value) => {
                 await onApply({ property: 'text', value: { type: 'text', value } }, scope)
-                onOptimisticUpdate({ text: value })
               }}
             />
           )}
@@ -583,37 +576,11 @@ function stringValue(node: LiveUiNode, property: string) {
   return String(node.properties[property]?.effective?.value ?? '')
 }
 
-function optimisticPatch(property: string, value: number | string): Partial<UiTunerElement> {
-  switch (property) {
-    case 'width': return { width: Number(value) }
-    case 'height': return { height: Number(value) }
-    case 'padding.start':
-    case 'padding.end': return { paddingX: Number(value) }
-    case 'padding.top':
-    case 'padding.bottom': return { paddingY: Number(value) }
-    case 'cornerRadius.all': return { borderRadius: Number(value) }
-    case 'textSize': return { fontSize: Number(value) }
-    case 'fontWeight': return { fontWeight: Number(value) }
-    case 'lineHeight': return { lineHeight: Number(value) }
-    case 'letterSpacing': return { letterSpacing: Number(value) }
-    case 'borderWidth': return { borderWidth: Number(value) }
-    case 'opacity': return { opacity: Number(value) }
-    case 'backgroundColor': return { background: normalizeCssColor(String(value)) }
-    case 'contentColor': return { color: normalizeCssColor(String(value)) }
-    case 'borderColor': return { borderColor: normalizeCssColor(String(value)) }
-    default: return {}
-  }
-}
-
 function numericStep(property: string) {
   if (property === 'opacity') return 0.05
   if (property === 'letterSpacing') return 0.01
   if (property === 'fontWeight') return 100
   return 1
-}
-
-function normalizeCssColor(value: string) {
-  return /^#[0-9a-f]{8}$/i.test(value) ? `#${value.slice(3)}${value.slice(1, 3)}` : value
 }
 
 function statusLabel(state: LiveUiConnectionState) {

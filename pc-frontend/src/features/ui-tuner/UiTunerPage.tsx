@@ -365,17 +365,6 @@ export default function UiTunerPage() {
     onNotice: setNotice,
   })
 
-  const handleLiveOptimisticUpdate = useCallback((patch: Partial<UiTunerElement>) => {
-    const currentId = selectedIdRef.current
-    if (!currentId) return
-    setTunerDoc((current) => touch({
-      ...current,
-      elements: current.elements.map((element) => (
-        element.id === currentId ? { ...element, ...patch } : element
-      )),
-    }))
-  }, [])
-
   const handleMutationTaskStarted = useCallback(async (pack: UiTunerCodexContextPack) => {
     const currentSelected = tunerDocRef.current.elements.find((element) => element.id === selectedIdRef.current)
     if (!currentSelected) return
@@ -766,7 +755,6 @@ export default function UiTunerPage() {
         liveUi={liveUi}
         onLiveApply={runtimeDraft.apply}
         onLiveApplyGesture={runtimeDraft.applyGesture}
-        onLiveOptimisticUpdate={handleLiveOptimisticUpdate}
         livePrepareBusy={livePrepareBusy}
         livePrepareError={livePrepareError}
         livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}
