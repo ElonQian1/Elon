@@ -15,7 +15,7 @@ mod windows_integration;
 
 use anyhow::Result;
 #[cfg(windows)]
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub(crate) const APP_NAME: &str = "一龙开发平台";
 /// Canonical user-facing Windows entry. It contains both the launcher and the
@@ -94,6 +94,15 @@ pub(crate) fn set_autostart_enabled(install_dir: &Path, enabled: bool) -> Result
 #[cfg(not(windows))]
 pub(crate) fn set_autostart_enabled(_install_dir: &std::path::Path, _enabled: bool) -> Result<()> {
     anyhow::bail!("当前平台不支持 Windows 开机自启动设置")
+}
+
+/// 已安装的一龙桌面壳 exe 路径（不存在时返回 None）。
+/// `node_agent_admin_open` 用它决定是打开原生窗口还是回退到系统浏览器。
+#[cfg(windows)]
+pub(crate) fn desktop_shell_exe_path() -> Option<PathBuf> {
+    let install_dir = paths::install_dir().ok()?;
+    let path = paths::desktop_shell_exe(&install_dir);
+    path.exists().then_some(path)
 }
 
 #[cfg(windows)]

@@ -15,6 +15,9 @@ const INTERNAL_FILES: &[&str] = &[
     "node-agent-version.json",
     "node-agent.env.example",
     "README.txt",
+    // 一龙桌面壳（desktop-shell/ 独立 crate 构建产物），随主客户端一起分发。
+    // 找不到时 node_agent_admin_open 会自动回退到系统浏览器，不影响旧客户端。
+    "elon-desktop.exe",
 ];
 
 const INTERNAL_DIRS: &[&str] = &["pc-next-dist"];

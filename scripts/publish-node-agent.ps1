@@ -42,6 +42,7 @@ $ServerDir = Join-Path $RepoRoot "server"
 $ServerManifest = Join-Path $ServerDir "Cargo.toml"
 $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir = Join-Path $PcFrontendDir "dist"
+$DesktopShellManifest = Join-Path $RepoRoot "desktop-shell\src-tauri\Cargo.toml"
 
 Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
 
@@ -464,7 +465,8 @@ foreach ($requiredPath in @(
     (Join-Path $PcFrontendDir "package.json"),
     (Join-Path $RepoRoot "default-project-docs\files"),
     (Join-Path $RepoRoot "scripts\setup-node-env.ps1"),
-    (Join-Path $ServerDir "src\node_agent_admin.html")
+    (Join-Path $ServerDir "src\node_agent_admin.html"),
+    $DesktopShellManifest
 )) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "发布目录不完整，缺少必要文件：$requiredPath。请在完整仓库 worktree 中运行。"
@@ -538,6 +540,19 @@ $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 $WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerInvariant()
 
+# ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
+Write-Host "[2.2/5] 编译一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
+try {
+    $unitSeparator = [char]0x1f
+    $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
+    cargo build --manifest-path $DesktopShellManifest --release --bin elon-desktop
+    if ($LASTEXITCODE -ne 0) { throw "elon-desktop 编译失败" }
+} finally {
+    Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+}
+$DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
+if (-not (Test-Path $DesktopShellBin)) { throw "elon-desktop 二进制不存在：$DesktopShellBin" }
+
 Invoke-NodeAgentPcFrontendBuild
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
@@ -575,6 +590,7 @@ New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-N
 try {
     Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "一龙开发平台.exe") -Force
     Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "卸载一龙开发平台.exe") -Force
+    Copy-Item -LiteralPath $DesktopShellBin -Destination (Join-Path $PackageInternal "elon-desktop.exe") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force
     $PackagePcDist = Join-Path $PackageInternal "pc-next-dist"

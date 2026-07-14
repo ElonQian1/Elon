@@ -21,6 +21,13 @@ pub(crate) fn uninstall_exe(install_dir: &std::path::Path) -> PathBuf {
     install_dir.join(UNINSTALL_EXE_NAME)
 }
 
+/// 一龙桌面壳（Tauri 原生窗口，desktop-shell/ 独立 crate 构建产物）。
+/// 随主客户端一起打包进 `_internal/`，`node_agent_admin_open` 优先用它打开
+/// 工作台窗口，找不到就回退到系统默认浏览器。
+pub(crate) fn desktop_shell_exe(install_dir: &std::path::Path) -> PathBuf {
+    internal_dir(install_dir).join("elon-desktop.exe")
+}
+
 pub(crate) fn version_file(install_dir: &std::path::Path) -> PathBuf {
     internal_dir(install_dir).join("node-agent-version.json")
 }
