@@ -107,6 +107,14 @@ const DEFAULT_PROJECT_FILES: &[DefaultProjectFile] = &[
         )),
     },
     DefaultProjectFile {
+        path: ".github/instructions/document-authority.instructions.md",
+        title: Some("文档权威性与低 Token 检索"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/github/instructions/document-authority.instructions.md"
+        )),
+    },
+    DefaultProjectFile {
         path: ".github/instructions/git-workflow.instructions.md",
         title: Some("Git 与发布流程"),
         content: include_str!(concat!(
@@ -167,6 +175,11 @@ pub(crate) fn default_project_documents() -> Vec<ProjectDocumentEntry> {
             truncated: false,
             byte_len: doc.content.trim().len() as u64,
             source: "platform_default".to_string(),
+            metadata: crate::project_document_policy::classify_project_document(
+                doc.path,
+                doc.content,
+                doc.content.chars().count(),
+            ),
         })
         .collect()
 }
@@ -187,7 +200,6 @@ pub(crate) fn ensure_default_docs_in_workspace(workspace: &Path) -> Result<usize
     }
     Ok(created)
 }
-
 
 #[cfg(test)]
 #[path = "project_default_docs_tests.rs"]

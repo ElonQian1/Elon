@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+mod project_workspace;
+pub use project_workspace::*;
+
 mod cli_durable_types;
 pub use cli_durable_types::{
     CliCodexCredentialBinding, CliCompletionEnvelope, CliCompletionProducerIdentity,
@@ -184,56 +187,6 @@ pub struct DevToolchainStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CliProjectContext {
-    pub project_id: String,
-    pub conversation_id: String,
-    /// "project_write" | "full_access". Old nodes ignore this field.
-    #[serde(default)]
-    pub runtime_permission: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CliWorkspaceStatus {
-    #[serde(default)]
-    pub base_workspace_path: Option<String>,
-    pub active_workspace_path: String,
-    pub isolated: bool,
-    #[serde(default)]
-    pub branch: Option<String>,
-    pub prepare_status: String,
-    #[serde(default)]
-    pub merge_status: Option<String>,
-    #[serde(default)]
-    pub merge_message: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectDocumentEntry {
-    pub path: String,
-    pub title: String,
-    pub content: String,
-    pub truncated: bool,
-    pub byte_len: u64,
-    #[serde(default)]
-    pub source: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectDocumentsSnapshot {
-    pub workspace_path: String,
-    #[serde(default)]
-    pub revision: String,
-    #[serde(default)]
-    pub source: String,
-    #[serde(default)]
-    pub generated_at_ms: u64,
-    #[serde(default)]
-    pub documents: Vec<ProjectDocumentEntry>,
-    #[serde(default)]
-    pub warnings: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
     Exec {
@@ -395,6 +348,23 @@ pub enum ServerToAgent {
         workspace_path: String,
         #[serde(default)]
         seed_defaults: bool,
+        #[serde(default)]
+        catalog_only: bool,
+    },
+    /// Read one Markdown document on the PC that owns the project workspace.
+    ReadProjectDocumentFile {
+        req_id: String,
+        workspace_path: String,
+        document_path: String,
+    },
+    /// Create or replace one Markdown document with optimistic concurrency.
+    WriteProjectDocumentFile {
+        req_id: String,
+        workspace_path: String,
+        document_path: String,
+        content: String,
+        #[serde(default)]
+        expected_revision: Option<String>,
     },
     /// 云端要求 PC 节点清理一个由平台创建的项目工作区。
     CleanupProjectWorkspace {
@@ -676,6 +646,33 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC 节点返回单篇项目文档。
+    ProjectDocumentFileRead {
+        req_id: String,
+        path: String,
+        content: String,
+        revision: String,
+        byte_len: u64,
+    },
+    /// PC 节点读取单篇项目文档失败。
+    ProjectDocumentFileReadError {
+        req_id: String,
+        message: String,
+    },
+    /// PC 节点完成单篇项目文档写入。
+    ProjectDocumentFileWritten {
+        req_id: String,
+        path: String,
+        revision: String,
+        byte_len: u64,
+    },
+    /// PC 节点写入单篇项目文档失败。
+    ProjectDocumentFileWriteError {
+        req_id: String,
+        message: String,
+        #[serde(default)]
+        conflict: bool,
+    },
     /// PC 节点已清理项目工作区。
     ProjectWorkspaceCleaned {
         req_id: String,
@@ -738,6 +735,10 @@ impl AgentToServer {
             | Self::ProjectGitWorktreeAuditError { .. }
             | Self::ProjectDocumentsRead { .. }
             | Self::ProjectDocumentsReadError { .. }
+            | Self::ProjectDocumentFileRead { .. }
+            | Self::ProjectDocumentFileReadError { .. }
+            | Self::ProjectDocumentFileWritten { .. }
+            | Self::ProjectDocumentFileWriteError { .. }
             | Self::ProjectWorkspaceCleaned { .. }
             | Self::ProjectWorkspaceCleanupError { .. }
             | Self::TtsSynthesizeResponse { .. }
@@ -766,6 +767,10 @@ impl AgentToServer {
             | Self::ProjectGitWorktreeAuditError { req_id, .. }
             | Self::ProjectDocumentsRead { req_id, .. }
             | Self::ProjectDocumentsReadError { req_id, .. }
+            | Self::ProjectDocumentFileRead { req_id, .. }
+            | Self::ProjectDocumentFileReadError { req_id, .. }
+            | Self::ProjectDocumentFileWritten { req_id, .. }
+            | Self::ProjectDocumentFileWriteError { req_id, .. }
             | Self::ProjectWorkspaceCleaned { req_id, .. }
             | Self::ProjectWorkspaceCleanupError { req_id, .. }
             | Self::TtsSynthesizeResponse { req_id, .. }

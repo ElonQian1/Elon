@@ -4,6 +4,33 @@ use super::{
 };
 
 #[test]
+fn old_project_document_snapshot_without_metadata_still_decodes() {
+    let json = r##"{
+        "type": "project_documents_read",
+        "req_id": "req-docs",
+        "snapshot": {
+            "workspace_path": "C:/repo",
+            "documents": [{
+                "path": "AGENTS.md",
+                "title": "Rules",
+                "content": "# Rules",
+                "truncated": false,
+                "byte_len": 7
+            }]
+        }
+    }"##;
+
+    let decoded: AgentToServer = serde_json::from_str(json).expect("decode old document snapshot");
+    match decoded {
+        AgentToServer::ProjectDocumentsRead { snapshot, .. } => {
+            assert_eq!(snapshot.documents.len(), 1);
+            assert!(snapshot.documents[0].metadata.role.is_empty());
+        }
+        other => panic!("expected project document snapshot, got {other:?}"),
+    }
+}
+
+#[test]
 fn old_tool_approval_decision_without_dispatch_id_still_decodes() {
     let json = r#"{
         "type": "tool_approval_decision",

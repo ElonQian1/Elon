@@ -304,6 +304,7 @@ pub(super) async fn run_relay_session(
                 req_id,
                 workspace_path,
                 seed_defaults,
+                catalog_only,
             } => {
                 let tx = out_tx.clone();
                 tokio::spawn(async move {
@@ -313,6 +314,7 @@ pub(super) async fn run_relay_session(
                             &path,
                             crate::project_docs_scan::ProjectDocumentScanOptions {
                                 seed_missing_defaults: seed_defaults,
+                                catalog_only,
                             },
                         ) {
                             Ok(snapshot) => {
@@ -323,6 +325,62 @@ pub(super) async fn run_relay_session(
                                 message: e.to_string(),
                             },
                         };
+                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                });
+            }
+            ServerToAgent::ReadProjectDocumentFile {
+                req_id,
+                workspace_path,
+                document_path,
+            } => {
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let response = match crate::project_document_files::read_project_document_file(
+                        std::path::Path::new(&workspace_path),
+                        &document_path,
+                    ) {
+                        Ok(document) => AgentToServer::ProjectDocumentFileRead {
+                            req_id,
+                            path: document.path,
+                            content: document.content,
+                            revision: document.revision,
+                            byte_len: document.byte_len,
+                        },
+                        Err(error) => AgentToServer::ProjectDocumentFileReadError {
+                            req_id,
+                            message: error.to_string(),
+                        },
+                    };
+                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                });
+            }
+            ServerToAgent::WriteProjectDocumentFile {
+                req_id,
+                workspace_path,
+                document_path,
+                content,
+                expected_revision,
+            } => {
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let response = match crate::project_document_files::write_project_document_file(
+                        std::path::Path::new(&workspace_path),
+                        &document_path,
+                        &content,
+                        expected_revision.as_deref(),
+                    ) {
+                        Ok(document) => AgentToServer::ProjectDocumentFileWritten {
+                            req_id,
+                            path: document.path,
+                            revision: document.revision,
+                            byte_len: document.byte_len,
+                        },
+                        Err(error) => AgentToServer::ProjectDocumentFileWriteError {
+                            req_id,
+                            message: error.message,
+                            conflict: error.conflict,
+                        },
+                    };
                     let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
                 });
             }

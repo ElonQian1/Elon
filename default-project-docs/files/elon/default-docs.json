@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "template_version": "2026-06-16.2",
+  "template_version": "2026-07-14.1",
   "authority": ".github/copilot-instructions.md",
   "strategy": "copilot-primary-bridged-agents",
   "update_policy": {
@@ -60,6 +60,10 @@
     },
     {
       "path": ".github/instructions/project-workflow.instructions.md",
+      "role": "on-demand"
+    },
+    {
+      "path": ".github/instructions/document-authority.instructions.md",
       "role": "on-demand"
     },
     {

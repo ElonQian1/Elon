@@ -115,6 +115,7 @@ import { MemberDirectoryDrawer } from './MemberDirectoryDrawer'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import { DEFAULT_POPOVER_ANCHOR, type PopoverAnchor } from '../../lib/popoverPosition'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
+import ProjectDocumentsChannel from '../project-docs/ProjectDocumentsChannel'
 import styles from './ConversationPage.module.css'
 
 interface ConversationMessageCacheEntry {
@@ -384,9 +385,7 @@ export default function ConversationPage() {
   useEffect(() => {
     requestFeedAutoFollow()
     conversationLoadSeqRef.current += 1
-    setSessionView(null)
-    setConvMessages([])
-    setSessionTaskMessages([])
+    setSessionView(null); setConvMessages([]); setSessionTaskMessages([])
     waitingForNewSession.current = false
   }, [activeConversationTargetId, requestFeedAutoFollow])
 
@@ -1099,10 +1098,7 @@ export default function ConversationPage() {
     return data.member
   }
 
-  function resetMemberConversationTarget() {
-    setMemberConversationTarget(null)
-    setSendError('')
-  }
+  function resetMemberConversationTarget() { setMemberConversationTarget(null); setSendError('') }
 
   async function openProjectHome() {
     if (!activeProjectId) return
@@ -1113,6 +1109,10 @@ export default function ConversationPage() {
     setMemberConversationTarget(null)
     waitingForNewSession.current = false
     await selectProject(activeProjectId)
+  }
+
+  if (activeProjectId && activeChannel?.kind === 'docs') {
+    return <ProjectDocumentsChannel runtime={{ projectId: activeProjectId, projectName: activeProject?.name ?? '当前项目', activeWorkspacePath, runtimePermission: activeProject?.runtime_permission, channels, aiDevelopmentChannel, directPcCliActive, runtimeRoute, shouldPreferLocalNode, localNodeReady, localNodeId, selectedAgent, modelOptions }} onOpenProjectHome={openProjectHome} />
   }
 
   return (

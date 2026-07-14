@@ -30,6 +30,10 @@
         let codex = std::fs::read_to_string(root.join("CODEX.md")).unwrap();
         let copilot =
             std::fs::read_to_string(root.join(".github/copilot-instructions.md")).unwrap();
+        let document_authority = std::fs::read_to_string(
+            root.join(".github/instructions/document-authority.instructions.md"),
+        )
+        .unwrap();
         let metadata = std::fs::read_to_string(root.join(".elon/default-docs.json")).unwrap();
         let _ = std::fs::remove_dir_all(&root);
 
@@ -37,6 +41,7 @@
         assert_eq!(agents, "# User Rules\nkeep me");
         assert!(codex.contains(".github/copilot-instructions.md"));
         assert!(copilot.contains("共享规则权威来源"));
+        assert!(document_authority.contains("路径权威上限"));
         assert!(metadata.contains("copilot-primary-bridged-agents"));
     }
 

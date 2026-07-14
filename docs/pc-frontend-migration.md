@@ -2,7 +2,7 @@
 
 > 本文记录 `/pc` PC 工作台从原生静态 HTML/CSS/JS 迁移到 `Vite + React + TypeScript` 的路线、边界和模块状态。硬规则见 `.github/instructions/pc-frontend-migration.instructions.md`。
 >
-> 最后状态校准：2026-07-06
+> 最后状态校准：2026-07-14
 
 ## 当前判断
 
@@ -43,6 +43,7 @@ server/src/
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
 | Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
+| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 分类目录） | 🔴 高 | `src/features/project-docs/` | ✅ 第一条完整纵切完成：文档频道直接进入三栏知识库；程序零模型 token 预分类，AI 只接收紧凑目录并提出整理建议 |
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |

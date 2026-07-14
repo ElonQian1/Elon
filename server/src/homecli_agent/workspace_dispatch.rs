@@ -159,6 +159,7 @@ impl AgentManager {
         agent_id: &str,
         workspace_path: String,
         seed_defaults: bool,
+        catalog_only: bool,
     ) -> Result<AgentToServer> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
@@ -174,6 +175,7 @@ impl AgentManager {
                 req_id: req_id.clone(),
                 workspace_path,
                 seed_defaults,
+                catalog_only,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
         drop(agents);
@@ -187,6 +189,62 @@ impl AgentManager {
             pending.lock().await.remove(&req_id);
         }
         outcome
+    }
+
+    pub async fn dispatch_project_document_file_read(
+        &self,
+        agent_id: &str,
+        workspace_path: String,
+        document_path: String,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(ServerToAgent::ReadProjectDocumentFile {
+                req_id: req_id.clone(),
+                workspace_path,
+                document_path,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+        wait_for_project_document_response(pending, req_id, &mut rx).await
+    }
+
+    pub async fn dispatch_project_document_file_write(
+        &self,
+        agent_id: &str,
+        workspace_path: String,
+        document_path: String,
+        content: String,
+        expected_revision: Option<String>,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(ServerToAgent::WriteProjectDocumentFile {
+                req_id: req_id.clone(),
+                workspace_path,
+                document_path,
+                content,
+                expected_revision,
+            })
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+        wait_for_project_document_response(pending, req_id, &mut rx).await
     }
 
     /// Ask a PC node to cleanup a managed project workspace and return a single status frame.
@@ -264,4 +322,24 @@ impl AgentManager {
             Err(_) => Err(anyhow!("TTS synthesis timeout (180s)")),
         }
     }
+}
+
+async fn wait_for_project_document_response(
+    pending: Arc<
+        tokio::sync::Mutex<std::collections::HashMap<String, mpsc::UnboundedSender<AgentToServer>>>,
+    >,
+    req_id: String,
+    rx: &mut mpsc::UnboundedReceiver<AgentToServer>,
+) -> Result<AgentToServer> {
+    let outcome = match tokio::time::timeout(Duration::from_secs(8), rx.recv()).await {
+        Ok(Some(message)) => Ok(message),
+        Ok(None) => Err(anyhow!(
+            "agent disconnected before project document response"
+        )),
+        Err(_) => Err(anyhow!("project document request timeout (8s)")),
+    };
+    if outcome.is_err() {
+        pending.lock().await.remove(&req_id);
+    }
+    outcome
 }

@@ -19,7 +19,7 @@ use super::node_agent_local_llm::discover_models;
 use super::{
     node_agent_active_task, node_agent_full_access, node_agent_lifecycle,
     node_agent_route_c_status, node_agent_task_journal, node_agent_task_journal_inspect,
-    node_agent_ws_control_queue, pc_storage_repo, project_docs_scan, project_git_worktree_audit,
+    node_agent_ws_control_queue, pc_storage_repo, project_git_worktree_audit,
     project_workspace_inspect, resolve_attachment_args, run_cli_prompt, run_exec,
     run_llm_inference, run_tts_synthesis, ws_text, CliPromptRun, Credentials, NodeConfig,
     NodeRuntime, CLOUD_WS_READ_TIMEOUT,
@@ -415,29 +415,23 @@ pub(super) async fn run_session(
                             req_id,
                             workspace_path,
                             seed_defaults,
+                            catalog_only,
                         } => {
                             info!("📚 ReadProjectDocuments: {}", req_id);
-                            let tx_c = out_tx_r.clone();
-                            tokio::spawn(async move {
-                                let path = std::path::PathBuf::from(workspace_path);
-                                let response =
-                                    match project_docs_scan::collect_project_documents_with_options(
-                                        &path,
-                                        project_docs_scan::ProjectDocumentScanOptions {
-                                            seed_missing_defaults: seed_defaults,
-                                        },
-                                    ) {
-                                        Ok(snapshot) => {
-                                            AgentToServer::ProjectDocumentsRead { req_id, snapshot }
-                                        }
-                                        Err(e) => AgentToServer::ProjectDocumentsReadError {
-                                            req_id,
-                                            message: e.to_string(),
-                                        },
-                                    };
-                                let _ = tx_c.send(ws_text(&response));
-                            });
+                            crate::node_agent_project_documents::spawn_catalog_response(req_id, workspace_path, seed_defaults, catalog_only, out_tx_r.clone());
                         }
+                        ServerToAgent::ReadProjectDocumentFile {
+                            req_id,
+                            workspace_path,
+                            document_path,
+                        } => crate::node_agent_project_documents::spawn_file_read_response(req_id, workspace_path, document_path, out_tx_r.clone()),
+                        ServerToAgent::WriteProjectDocumentFile {
+                            req_id,
+                            workspace_path,
+                            document_path,
+                            content,
+                            expected_revision,
+                        } => crate::node_agent_project_documents::spawn_file_write_response(req_id, workspace_path, document_path, content, expected_revision, out_tx_r.clone()),
                         ServerToAgent::CleanupProjectWorkspace {
                             req_id,
                             project_id,

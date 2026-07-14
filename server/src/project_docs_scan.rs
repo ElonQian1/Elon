@@ -12,8 +12,10 @@ use std::{
 };
 
 use crate::project_default_docs::{default_project_documents, ensure_default_docs_in_workspace};
+use crate::project_document_policy::classify_project_document;
 
 const MAX_DOCUMENTS: usize = 48;
+const MAX_CATALOG_DOCUMENTS: usize = 500;
 const MAX_DOC_CHARS: usize = 24_000;
 const MAX_TOTAL_CHARS: usize = 220_000;
 
@@ -28,6 +30,11 @@ const ROOT_DOCS: &[&str] = &[
     "AI.md",
     "AI_AGENT.md",
     "AI_AGENTS.md",
+    "AI_PROJECT.md",
+    "AI_ARCHITECTURE.md",
+    "AI_INDEX.md",
+    "AI_RULES.md",
+    "AI_TASK_TEMPLATE.md",
 ];
 
 const DOC_DIRS: &[(&str, usize, usize)] = &[
@@ -36,11 +43,22 @@ const DOC_DIRS: &[(&str, usize, usize)] = &[
     (".github/agents", 130, 4),
     (".github/skills", 140, 5),
     ("docs", 300, 3),
+    ("documentation", 310, 3),
 ];
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ProjectDocumentScanOptions {
     pub seed_missing_defaults: bool,
+    pub catalog_only: bool,
+}
+
+impl Default for ProjectDocumentScanOptions {
+    fn default() -> Self {
+        Self {
+            seed_missing_defaults: false,
+            catalog_only: false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -67,17 +85,22 @@ pub(crate) fn collect_project_documents_with_options(
 
     let mut warnings = Vec::new();
     seed_default_documents_if_requested(workspace, options, &mut warnings);
-    let candidates = discover_document_candidates(workspace, &mut warnings);
+    let candidates = discover_document_candidates(workspace, options.catalog_only, &mut warnings);
     let mut documents = Vec::new();
     let mut total_chars = 0usize;
 
-    for path in candidates.into_iter().take(MAX_DOCUMENTS) {
+    let document_limit = if options.catalog_only {
+        MAX_CATALOG_DOCUMENTS
+    } else {
+        MAX_DOCUMENTS
+    };
+    for path in candidates.into_iter().take(document_limit) {
         let relative = relative_path(workspace, &path);
-        match read_document_snapshot(workspace, &path, total_chars) {
+        match read_document_snapshot(workspace, &path, total_chars, options.catalog_only) {
             Ok((document, used_chars)) => {
                 total_chars += used_chars;
                 documents.push(document);
-                if total_chars >= MAX_TOTAL_CHARS {
+                if !options.catalog_only && total_chars >= MAX_TOTAL_CHARS {
                     warnings.push(format!(
                         "文档频道已达到本次加载上限，{} 之后的文档会按需由 AI 再读取。",
                         relative
@@ -90,6 +113,12 @@ pub(crate) fn collect_project_documents_with_options(
     }
 
     append_default_documents(&mut documents, &mut warnings);
+    if options.catalog_only {
+        for document in &mut documents {
+            document.content.clear();
+            document.truncated = false;
+        }
+    }
     let source = snapshot_source(&documents);
 
     Ok(build_snapshot(workspace_path, source, documents, warnings))
@@ -114,7 +143,11 @@ fn seed_default_documents_if_requested(
     }
 }
 
-fn discover_document_candidates(workspace: &FsPath, warnings: &mut Vec<String>) -> Vec<PathBuf> {
+fn discover_document_candidates(
+    workspace: &FsPath,
+    catalog_only: bool,
+    warnings: &mut Vec<String>,
+) -> Vec<PathBuf> {
     let mut candidates = Vec::new();
     for relative in ROOT_DOCS {
         push_if_markdown(workspace, relative, &mut candidates);
@@ -137,11 +170,16 @@ fn discover_document_candidates(workspace: &FsPath, warnings: &mut Vec<String>) 
             unique.push(path);
         }
     }
-    if unique.len() > MAX_DOCUMENTS {
+    let limit = if catalog_only {
+        MAX_CATALOG_DOCUMENTS
+    } else {
+        MAX_DOCUMENTS
+    };
+    if unique.len() > limit {
         warnings.push(format!(
             "发现 {} 份项目文档，本次优先展示前 {} 份。",
             unique.len(),
-            MAX_DOCUMENTS
+            limit
         ));
     }
     unique
@@ -216,18 +254,29 @@ fn read_document_snapshot(
     workspace: &FsPath,
     path: &FsPath,
     total_chars: usize,
+    catalog_only: bool,
 ) -> Result<(ProjectDocumentEntry, usize)> {
     let raw = fs::read_to_string(path)?;
-    let remaining = MAX_TOTAL_CHARS.saturating_sub(total_chars);
-    if remaining == 0 {
+    let remaining = if catalog_only {
+        usize::MAX
+    } else {
+        MAX_TOTAL_CHARS.saturating_sub(total_chars)
+    };
+    if !catalog_only && remaining == 0 {
         return Err(anyhow!("已达到文档频道总加载上限"));
     }
     let limit = MAX_DOC_CHARS.min(remaining);
-    let truncated = raw.chars().count() > limit;
-    let content: String = raw.chars().take(limit).collect();
+    let raw_char_count = raw.chars().count();
+    let truncated = !catalog_only && raw_char_count > limit;
+    let content: String = if catalog_only {
+        String::new()
+    } else {
+        raw.chars().take(limit).collect()
+    };
     let used_chars = content.chars().count();
     let path_label = relative_path(workspace, path);
-    let title = markdown_title(&content).unwrap_or_else(|| {
+    let metadata = classify_project_document(&path_label, &raw, raw_char_count);
+    let title = markdown_title(&raw).unwrap_or_else(|| {
         path.file_stem()
             .and_then(|name| name.to_str())
             .unwrap_or("项目文档")
@@ -241,6 +290,7 @@ fn read_document_snapshot(
             truncated,
             byte_len: raw.len() as u64,
             source: "workspace".to_string(),
+            metadata,
         },
         used_chars,
     ))
@@ -295,6 +345,11 @@ fn compute_revision(
         hasher.update(doc.byte_len.to_le_bytes());
         hasher.update([doc.truncated as u8]);
         hasher.update(doc.content.as_bytes());
+        hasher.update(doc.metadata.content_hash.as_bytes());
+        hasher.update(doc.metadata.role.as_bytes());
+        hasher.update(doc.metadata.lifecycle.as_bytes());
+        hasher.update(doc.metadata.authority.as_bytes());
+        hasher.update([doc.metadata.default_retrieval as u8]);
         hasher.update([0]);
     }
     for warning in warnings {
@@ -329,6 +384,11 @@ fn root_priority(relative: &str) -> usize {
         "CODEX.md" => 5,
         "CLAUDE.md" => 6,
         "GEMINI.md" => 7,
+        "AI_PROJECT.md" => 20,
+        "AI_ARCHITECTURE.md" => 21,
+        "AI_INDEX.md" => 22,
+        "AI_RULES.md" => 23,
+        "AI_TASK_TEMPLATE.md" => 24,
         "README.md" => 10,
         "README.zh-CN.md" | "README_CN.md" => 11,
         path if path.starts_with(".github/instructions/") => 100,
@@ -370,7 +430,6 @@ fn relative_path(workspace: &FsPath, path: &FsPath) -> String {
         .to_string_lossy()
         .replace('\\', "/")
 }
-
 
 #[cfg(test)]
 #[path = "project_docs_scan_tests.rs"]

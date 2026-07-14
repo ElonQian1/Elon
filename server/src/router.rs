@@ -288,6 +288,15 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_docs::get_project_document),
         )
         .route(
+            "/api/projects/:project_id/docs/catalog",
+            get(project_docs::get_project_document_catalog),
+        )
+        .route(
+            "/api/projects/:project_id/docs/file",
+            get(project_docs::get_project_document_file)
+                .put(project_docs::put_project_document_file),
+        )
+        .route(
             "/api/projects/:project_id/members/:member_user_id/conversations",
             get(project_space::list_member_conversations),
         )

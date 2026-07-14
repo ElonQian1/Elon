@@ -18,6 +18,7 @@
 | 任务类型 | 继续读取或执行 |
 |---|---|
 | 项目定位、架构、模块入口、任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
+| 项目文档、笔记、权威性、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
 | Rust 验证、Cargo、格式化 | `.github/instructions/git-deploy-workflow.instructions.md` 对应章节 |
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |

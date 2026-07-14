@@ -263,9 +263,19 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   },
 
   selectChannel: async (id: string) => {
-    const { activeProjectId } = get()
+    const { activeProjectId, channels } = get()
     if (!activeProjectId) return
     get().stopPolling()
+    const channel = channels.find((candidate) => candidate.id === id)
+    if (channel?.kind === 'docs') {
+      writeProjectSelection(activeProjectId, id)
+      set({
+        activeChannelId: id,
+        messages: [],
+        messagesLoading: false,
+      })
+      return
+    }
     const cached = get().messageCache[channelMessageCacheKey(activeProjectId, id)]
     writeProjectSelection(activeProjectId, id)
     set({
@@ -292,6 +302,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
   loadMessages: async (projectId: string, channelId: string) => {
     const startState = get()
+    if (startState.channels.some((channel) => channel.id === channelId && channel.kind === 'docs')) {
+      if (startState.activeProjectId === projectId && startState.activeChannelId === channelId) {
+        set({ messages: [], messagesLoading: false })
+      }
+      return
+    }
     const isActiveRequest = startState.activeProjectId === projectId && startState.activeChannelId === channelId
     const requestSeq = isActiveRequest ? startState.messageRequestSeq + 1 : startState.messageRequestSeq
     const key = channelMessageCacheKey(projectId, channelId)

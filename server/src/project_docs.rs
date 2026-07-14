@@ -9,15 +9,21 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use homecli_proto::ProjectDocumentEntry;
-use serde::Serialize;
+use homecli_proto::{AgentToServer, ProjectDocumentEntry, ProjectDocumentMetadata};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
-    project_auth::{auth_from_headers, json_error, project_access},
-    project_docs_snapshot::load_project_documents_snapshot,
+    project_auth::{auth_from_headers, can_edit, json_error, project_access},
+    project_docs_snapshot::{
+        load_project_documents_catalog_snapshot, load_project_documents_snapshot,
+    },
+    project_document_files::{
+        read_project_document_file, write_project_document_file, ProjectDocumentFile,
+        ProjectDocumentWriteError,
+    },
     project_mobile::ensure_mobile_project,
-    store::ProjectAccess,
+    store::{ProjectAccess, PublicUser},
     types::AppState,
 };
 
@@ -29,6 +35,7 @@ struct ProjectDocument {
     size_bytes: u64,
     truncated: bool,
     source: String,
+    metadata: ProjectDocumentMetadata,
 }
 
 impl From<ProjectDocumentEntry> for ProjectDocument {
@@ -40,8 +47,22 @@ impl From<ProjectDocumentEntry> for ProjectDocument {
             size_bytes: entry.byte_len,
             truncated: entry.truncated,
             source: entry.source,
+            metadata: entry.metadata,
         }
     }
+}
+
+#[derive(Deserialize)]
+pub struct ProjectDocumentPathQuery {
+    path: String,
+}
+
+#[derive(Deserialize)]
+pub struct SaveProjectDocumentRequest {
+    path: String,
+    content: String,
+    #[serde(default)]
+    expected_revision: Option<String>,
 }
 
 pub async fn get_project_document(
@@ -58,6 +79,117 @@ pub async fn get_project_document(
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
     project_document_response(state, headers, access).await
+}
+
+pub async fn get_project_document_catalog(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    let (user, access) = match authorized_project(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let snapshot = load_project_documents_catalog_snapshot(&state, &access).await;
+    let estimated_tokens = snapshot
+        .documents
+        .iter()
+        .map(|document| document.metadata.token_estimate)
+        .sum::<u64>();
+    let default_tokens = snapshot
+        .documents
+        .iter()
+        .filter(|document| document.metadata.default_retrieval)
+        .map(|document| document.metadata.token_estimate)
+        .sum::<u64>();
+    let ambiguous_count = snapshot
+        .documents
+        .iter()
+        .filter(|document| document.metadata.ambiguous)
+        .count();
+    let excluded_count = snapshot
+        .documents
+        .iter()
+        .filter(|document| !document.metadata.default_retrieval)
+        .count();
+    Json(serde_json::json!({
+        "project_id": access.id,
+        "workspace": snapshot.workspace_path,
+        "revision": snapshot.revision,
+        "source": snapshot.source,
+        "generated_at_ms": snapshot.generated_at_ms,
+        "documents": snapshot.documents.into_iter().map(ProjectDocument::from).collect::<Vec<_>>(),
+        "warnings": snapshot.warnings,
+        "can_edit": can_edit(&access.role),
+        "requested_by": user.id,
+        "budget": {
+            "classification_model_tokens": 0,
+            "estimated_full_read_tokens": estimated_tokens,
+            "estimated_default_retrieval_tokens": default_tokens,
+            "estimated_tokens_avoided": estimated_tokens.saturating_sub(default_tokens),
+            "ambiguous_documents": ambiguous_count,
+            "excluded_by_default": excluded_count,
+        }
+    }))
+    .into_response()
+}
+
+pub async fn get_project_document_file(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectDocumentPathQuery>,
+) -> Response {
+    let (_, access) = match authorized_project(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    match read_project_file(&state, &access, &query.path).await {
+        Ok(document) => Json(serde_json::json!({
+            "project_id": access.id,
+            "path": document.path,
+            "content": document.content,
+            "revision": document.revision,
+            "byte_len": document.byte_len,
+            "can_edit": can_edit(&access.role),
+        }))
+        .into_response(),
+        Err((status, message)) => json_error(status, message),
+    }
+}
+
+pub async fn put_project_document_file(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(request): Json<SaveProjectDocumentRequest>,
+) -> Response {
+    let (_, access) = match authorized_project(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    if !can_edit(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前项目角色不能编辑文档");
+    }
+    match write_project_file(
+        &state,
+        &access,
+        &request.path,
+        &request.content,
+        request.expected_revision.as_deref(),
+    )
+    .await
+    {
+        Ok(document) => Json(serde_json::json!({
+            "ok": true,
+            "project_id": access.id,
+            "path": document.path,
+            "revision": document.revision,
+            "byte_len": document.byte_len,
+        }))
+        .into_response(),
+        Err((status, message)) => json_error(status, message),
+    }
 }
 
 pub async fn get_user_project_document(
@@ -136,6 +268,143 @@ fn ensure_user_project_for_document(
     ensure_mobile_project(state, &effective_user_id, project_id, project_title)
         .map(|(_, project)| project)
         .map_err(|e| json_error(StatusCode::BAD_REQUEST, e.to_string()))
+}
+
+fn authorized_project(
+    state: &AppState,
+    headers: &HeaderMap,
+    project_id: &str,
+) -> Result<(PublicUser, ProjectAccess), Response> {
+    let user = auth_from_headers(state, headers)
+        .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error.to_string()))?;
+    let access = project_access(state, &user.id, project_id)
+        .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
+    Ok((user, access))
+}
+
+async fn read_project_file(
+    state: &AppState,
+    access: &ProjectAccess,
+    document_path: &str,
+) -> Result<ProjectDocumentFile, (StatusCode, String)> {
+    if let (Some(node_id), Some(workspace_path)) = (
+        access
+            .node_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+        access
+            .workspace_path
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+    ) {
+        return match state
+            .agent_manager
+            .dispatch_project_document_file_read(
+                node_id,
+                workspace_path.to_string(),
+                document_path.to_string(),
+            )
+            .await
+        {
+            Ok(AgentToServer::ProjectDocumentFileRead {
+                path,
+                content,
+                revision,
+                byte_len,
+                ..
+            }) => Ok(ProjectDocumentFile {
+                path,
+                content,
+                revision,
+                byte_len,
+            }),
+            Ok(AgentToServer::ProjectDocumentFileReadError { message, .. }) => {
+                Err((StatusCode::BAD_REQUEST, message))
+            }
+            Ok(other) => Err((
+                StatusCode::BAD_GATEWAY,
+                format!("PC 节点返回了非文档响应：{other:?}"),
+            )),
+            Err(error) => Err((StatusCode::BAD_GATEWAY, error.to_string())),
+        };
+    }
+    let workspace =
+        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
+    read_project_document_file(&workspace, document_path)
+        .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))
+}
+
+async fn write_project_file(
+    state: &AppState,
+    access: &ProjectAccess,
+    document_path: &str,
+    content: &str,
+    expected_revision: Option<&str>,
+) -> Result<ProjectDocumentFile, (StatusCode, String)> {
+    if let (Some(node_id), Some(workspace_path)) = (
+        access
+            .node_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+        access
+            .workspace_path
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+    ) {
+        return match state
+            .agent_manager
+            .dispatch_project_document_file_write(
+                node_id,
+                workspace_path.to_string(),
+                document_path.to_string(),
+                content.to_string(),
+                expected_revision.map(str::to_string),
+            )
+            .await
+        {
+            Ok(AgentToServer::ProjectDocumentFileWritten {
+                path,
+                revision,
+                byte_len,
+                ..
+            }) => Ok(ProjectDocumentFile {
+                path,
+                content: content.to_string(),
+                revision,
+                byte_len,
+            }),
+            Ok(AgentToServer::ProjectDocumentFileWriteError {
+                message, conflict, ..
+            }) => Err((
+                if conflict {
+                    StatusCode::CONFLICT
+                } else {
+                    StatusCode::BAD_REQUEST
+                },
+                message,
+            )),
+            Ok(other) => Err((
+                StatusCode::BAD_GATEWAY,
+                format!("PC 节点返回了非文档响应：{other:?}"),
+            )),
+            Err(error) => Err((StatusCode::BAD_GATEWAY, error.to_string())),
+        };
+    }
+    let workspace =
+        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
+    write_project_document_file(&workspace, document_path, content, expected_revision)
+        .map_err(write_service_error)
+}
+
+fn write_service_error(error: ProjectDocumentWriteError) -> (StatusCode, String) {
+    (
+        if error.conflict {
+            StatusCode::CONFLICT
+        } else {
+            StatusCode::BAD_REQUEST
+        },
+        error.message,
+    )
 }
 
 async fn load_project_documents(

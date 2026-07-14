@@ -90,6 +90,7 @@
             &root,
             ProjectDocumentScanOptions {
                 seed_missing_defaults: true,
+                catalog_only: false,
             },
         )
         .unwrap();
@@ -123,4 +124,55 @@
         let _ = fs::remove_dir_all(&root);
 
         assert_ne!(first.revision, second.revision);
+    }
+
+    #[test]
+    fn project_docs_catalog_classifies_without_returning_bodies() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-project-docs-catalog-{}",
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(root.join("docs/archive")).unwrap();
+        fs::write(root.join("AGENTS.md"), "# Agent Rules\nrequired").unwrap();
+        fs::write(root.join("AI_PROJECT.md"), "# Local Project\ncurrent").unwrap();
+        fs::write(root.join("docs/archive/old.md"), "# Old\nlegacy").unwrap();
+
+        let snapshot = collect_project_documents_with_options(
+            &root,
+            ProjectDocumentScanOptions {
+                seed_missing_defaults: false,
+                catalog_only: true,
+            },
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(snapshot
+            .documents
+            .iter()
+            .all(|document| document.content.is_empty()));
+        let agents = snapshot
+            .documents
+            .iter()
+            .find(|document| document.path == "AGENTS.md")
+            .unwrap();
+        assert_eq!(agents.metadata.role, "router");
+        assert!(agents.metadata.default_retrieval);
+        let project_guide = snapshot
+            .documents
+            .iter()
+            .find(|document| document.path == "AI_PROJECT.md")
+            .unwrap();
+        assert_eq!(project_guide.source, "workspace");
+        assert!(!project_guide.metadata.default_retrieval);
+        let archived = snapshot
+            .documents
+            .iter()
+            .find(|document| document.path == "docs/archive/old.md")
+            .unwrap();
+        assert_eq!(archived.metadata.lifecycle, "archived");
+        assert!(!archived.metadata.default_retrieval);
     }
