@@ -1,0 +1,482 @@
+//! Durable, project-scoped diagnostics for the document organization MCP workflow.
+
+use anyhow::{bail, Context, Result};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+const TRACE_VERSION: u8 = 1;
+const MAX_EVENTS: usize = 40;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentOrganizationTrace {
+    pub version: u8,
+    pub operation_id: String,
+    pub status: String,
+    pub current_stage: String,
+    pub created_at: u64,
+    pub updated_at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub catalog_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggestions_revision: Option<String>,
+    #[serde(default)]
+    pub documents_cataloged: u64,
+    #[serde(default)]
+    pub ambiguous_documents: u64,
+    #[serde(default)]
+    pub documents_read: u64,
+    #[serde(default)]
+    pub estimated_tokens_used: u64,
+    #[serde(default)]
+    pub events: Vec<DocumentOrganizationEvent>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<DocumentOrganizationError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentOrganizationEvent {
+    pub stage: String,
+    pub status: String,
+    pub label: String,
+    pub detail: String,
+    pub at: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentOrganizationError {
+    pub code: String,
+    pub message: String,
+    pub recovery: String,
+    pub at: u64,
+}
+
+pub(crate) fn start_operation(workspace: &Path, operation_id: Option<&str>) -> Result<Value> {
+    let workspace = validate_workspace(workspace)?;
+    let operation_id = normalize_operation_id(operation_id.unwrap_or(""))?;
+    with_trace_lock(|| {
+        if let Some(existing) = read_trace_unlocked(&workspace)? {
+            if existing.operation_id == operation_id {
+                return serde_json::to_value(existing).context("序列化文档整理状态失败");
+            }
+        }
+        let now = unix_seconds();
+        let mut trace = DocumentOrganizationTrace {
+            version: TRACE_VERSION,
+            operation_id,
+            status: "pending".to_string(),
+            current_stage: "requested".to_string(),
+            created_at: now,
+            updated_at: now,
+            task_id: None,
+            session_id: None,
+            catalog_revision: None,
+            manifest_revision: None,
+            suggestions_revision: None,
+            documents_cataloged: 0,
+            ambiguous_documents: 0,
+            documents_read: 0,
+            estimated_tokens_used: 0,
+            events: Vec::new(),
+            error: None,
+        };
+        push_event(
+            &mut trace,
+            "requested",
+            "pending",
+            "整理请求已创建",
+            "等待 AI 任务连接项目文档 MCP。",
+        );
+        write_trace_unlocked(&workspace, &trace)?;
+        serde_json::to_value(trace).context("序列化文档整理状态失败")
+    })
+}
+
+pub(crate) fn mark_session_ready(workspace: &Path, session_id: &str) -> Result<String> {
+    let workspace = validate_workspace(workspace)?;
+    with_trace_lock(|| {
+        let mut trace = read_trace_unlocked(&workspace)?.unwrap_or_else(new_direct_trace);
+        trace.session_id = Some(session_id.to_string());
+        advance(
+            &mut trace,
+            "session_ready",
+            "running",
+            "MCP 会话已就绪",
+            "AI 可直接调用供应商无关的项目文档工具。",
+        );
+        let operation_id = trace.operation_id.clone();
+        write_trace_unlocked(&workspace, &trace)?;
+        Ok(operation_id)
+    })
+}
+
+pub(crate) fn get_status(workspace: &Path, operation_id: Option<&str>) -> Result<Value> {
+    let workspace = validate_workspace(workspace)?;
+    with_trace_lock(|| {
+        let trace = read_trace_unlocked(&workspace)?
+            .ok_or_else(|| anyhow::anyhow!("当前项目还没有文档整理运行记录"))?;
+        verify_operation(&trace, operation_id)?;
+        serde_json::to_value(trace).context("序列化文档整理状态失败")
+    })
+}
+
+pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
+    let Ok(workspace) = validate_workspace(workspace) else {
+        return;
+    };
+    let _ = with_trace_lock(|| {
+        let mut trace = read_trace_unlocked(&workspace)?.unwrap_or_else(new_direct_trace);
+        match tool {
+            "project_docs_analyze" => {
+                trace.catalog_revision = string_field(value, "catalog_revision");
+                trace.documents_cataloged = value["pagination"]["matching_documents"]
+                    .as_u64()
+                    .unwrap_or_default();
+                trace.ambiguous_documents = value["budget"]["ambiguous_documents"]
+                    .as_u64()
+                    .unwrap_or_default();
+                if can_advance_work(&trace) {
+                    advance(
+                        &mut trace,
+                        "catalog_analyzed",
+                        "running",
+                        "目录分析完成",
+                        "只读取了路径、标题、标题层级、哈希和生命周期元数据。",
+                    );
+                }
+            }
+            "project_docs_read" => {
+                trace.documents_read = trace
+                    .documents_read
+                    .saturating_add(value["documents_read"].as_u64().unwrap_or_default());
+                trace.estimated_tokens_used = trace.estimated_tokens_used.saturating_add(
+                    value["estimated_tokens_returned"]
+                        .as_u64()
+                        .unwrap_or_default(),
+                );
+                if can_advance_work(&trace) {
+                    advance(
+                        &mut trace,
+                        "documents_read",
+                        "running",
+                        "按需正文读取完成",
+                        "只读取了 AI 明确选择的歧义或任务相关文档。",
+                    );
+                }
+            }
+            "project_docs_get_suggestions" if can_advance_work(&trace) => advance(
+                &mut trace,
+                "suggestions_checked",
+                "running",
+                "现有建议已检查",
+                "已读取建议 revision，没有读取 Markdown 正文。",
+            ),
+            "project_docs_get_suggestions" => {}
+            "project_docs_save_suggestions" => {
+                trace.catalog_revision = string_field(value, "catalog_revision");
+                trace.suggestions_revision = string_field(value, "suggestions_revision");
+                if let Some(suggestions) = value.get("suggestions") {
+                    trace.documents_read = suggestions["documents_read"]
+                        .as_u64()
+                        .unwrap_or(trace.documents_read);
+                    trace.estimated_tokens_used = suggestions["estimated_tokens_used"]
+                        .as_u64()
+                        .unwrap_or(trace.estimated_tokens_used);
+                }
+                advance(
+                    &mut trace,
+                    "awaiting_review",
+                    "awaiting_review",
+                    "整理建议已生成",
+                    "建议已通过真实路径和 revision 校验，等待用户审核应用。",
+                );
+            }
+            "project_docs_apply_suggestions" => {
+                trace.manifest_revision = string_field(value, "manifest_revision");
+                trace.suggestions_revision = string_field(value, "suggestions_revision");
+                advance(
+                    &mut trace,
+                    "applied",
+                    "succeeded",
+                    "分区建议已应用",
+                    "虚拟分区已更新；Markdown 未移动、删除或改写。",
+                );
+            }
+            _ => return Ok(()),
+        }
+        write_trace_unlocked(&workspace, &trace)
+    });
+}
+
+pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::Error) {
+    let recovery = match tool {
+        "project_docs_analyze" => "确认项目目录存在且是 Git 工作区，然后重新分析。",
+        "project_docs_read" => "重新 analyze 获取最新目录 revision，只读取目录中存在的路径。",
+        "project_docs_save_suggestions" => {
+            "重新 analyze，合并最新建议 revision，并移除不存在的路径或未知分区。"
+        }
+        "project_docs_apply_suggestions" => {
+            "先刷新建议并明确审核；若 revision 已变化，重新 analyze 后再应用。"
+        }
+        _ => "查看错误详情并重试当前步骤。",
+    };
+    let code = format!("{}_failed", tool.trim_start_matches("project_docs_"));
+    let _ = mark_failure(workspace, None, &code, &format!("{error:#}"), recovery);
+}
+
+pub(crate) fn mark_dispatched(
+    workspace: &Path,
+    operation_id: Option<&str>,
+    task_id: Option<&str>,
+) -> Result<Value> {
+    update_trace(workspace, operation_id, |trace| {
+        trace.task_id = task_id
+            .filter(|value| !value.trim().is_empty())
+            .map(str::to_string);
+        advance(
+            trace,
+            "task_dispatched",
+            "running",
+            "AI 整理任务已发送",
+            "等待所选 AI 供应商连接项目文档 MCP。",
+        );
+    })
+}
+
+pub(crate) fn mark_applied(
+    workspace: &Path,
+    operation_id: Option<&str>,
+    manifest_revision: Option<&str>,
+    suggestions_revision: Option<&str>,
+) -> Result<Value> {
+    update_trace(workspace, operation_id, |trace| {
+        trace.manifest_revision = manifest_revision.map(str::to_string);
+        trace.suggestions_revision = suggestions_revision.map(str::to_string);
+        advance(
+            trace,
+            "applied",
+            "succeeded",
+            "分区建议已应用",
+            "PC 审核接口已更新虚拟分区；Markdown 未移动、删除或改写。",
+        );
+    })
+}
+
+pub(crate) fn mark_failure(
+    workspace: &Path,
+    operation_id: Option<&str>,
+    code: &str,
+    message: &str,
+    recovery: &str,
+) -> Result<Value> {
+    update_trace(workspace, operation_id, |trace| {
+        let now = unix_seconds();
+        trace.status = "failed".to_string();
+        trace.current_stage = "failed".to_string();
+        trace.updated_at = now;
+        trace.error = Some(DocumentOrganizationError {
+            code: clean_bounded(code, 80),
+            message: clean_bounded(message, 2_000),
+            recovery: clean_bounded(recovery, 1_000),
+            at: now,
+        });
+        push_event(trace, "failed", "failed", "整理流程在当前步骤失败", message);
+    })
+}
+
+fn update_trace(
+    workspace: &Path,
+    operation_id: Option<&str>,
+    update: impl FnOnce(&mut DocumentOrganizationTrace),
+) -> Result<Value> {
+    let workspace = validate_workspace(workspace)?;
+    with_trace_lock(|| {
+        let mut trace = read_trace_unlocked(&workspace)?
+            .ok_or_else(|| anyhow::anyhow!("当前项目还没有文档整理运行记录"))?;
+        verify_operation(&trace, operation_id)?;
+        update(&mut trace);
+        write_trace_unlocked(&workspace, &trace)?;
+        serde_json::to_value(trace).context("序列化文档整理状态失败")
+    })
+}
+
+fn advance(
+    trace: &mut DocumentOrganizationTrace,
+    stage: &str,
+    status: &str,
+    label: &str,
+    detail: &str,
+) {
+    trace.current_stage = stage.to_string();
+    trace.status = status.to_string();
+    trace.updated_at = unix_seconds();
+    trace.error = None;
+    push_event(trace, stage, status, label, detail);
+}
+
+fn can_advance_work(trace: &DocumentOrganizationTrace) -> bool {
+    !matches!(trace.status.as_str(), "awaiting_review" | "succeeded")
+}
+
+fn push_event(
+    trace: &mut DocumentOrganizationTrace,
+    stage: &str,
+    status: &str,
+    label: &str,
+    detail: &str,
+) {
+    let event = DocumentOrganizationEvent {
+        stage: stage.to_string(),
+        status: status.to_string(),
+        label: clean_bounded(label, 120),
+        detail: clean_bounded(detail, 1_000),
+        at: unix_seconds(),
+    };
+    if trace
+        .events
+        .last()
+        .is_some_and(|last| last.stage == event.stage && last.status == event.status)
+    {
+        trace.events.pop();
+    }
+    trace.events.push(event);
+    if trace.events.len() > MAX_EVENTS {
+        trace.events.drain(..trace.events.len() - MAX_EVENTS);
+    }
+}
+
+fn new_direct_trace() -> DocumentOrganizationTrace {
+    let now = unix_seconds();
+    DocumentOrganizationTrace {
+        version: TRACE_VERSION,
+        operation_id: format!("mcp_{}", uuid::Uuid::new_v4().simple()),
+        status: "pending".to_string(),
+        current_stage: "requested".to_string(),
+        created_at: now,
+        updated_at: now,
+        task_id: None,
+        session_id: None,
+        catalog_revision: None,
+        manifest_revision: None,
+        suggestions_revision: None,
+        documents_cataloged: 0,
+        ambiguous_documents: 0,
+        documents_read: 0,
+        estimated_tokens_used: 0,
+        events: Vec::new(),
+        error: None,
+    }
+}
+
+fn validate_workspace(workspace: &Path) -> Result<PathBuf> {
+    let root = workspace
+        .canonicalize()
+        .context("projectRoot 不存在或不可访问")?;
+    if !root.is_dir() || !root.join(".git").exists() {
+        bail!("projectRoot 必须是现存 Git 工作区");
+    }
+    Ok(root)
+}
+
+fn normalize_operation_id(value: &str) -> Result<String> {
+    let value = if value.trim().is_empty() {
+        format!("docs_{}", uuid::Uuid::new_v4().simple())
+    } else {
+        value.trim().to_string()
+    };
+    if value.len() > 96
+        || !value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        bail!("operation_id 格式无效");
+    }
+    Ok(value)
+}
+
+fn verify_operation(trace: &DocumentOrganizationTrace, expected: Option<&str>) -> Result<()> {
+    if expected
+        .filter(|value| !value.trim().is_empty())
+        .is_some_and(|value| value != trace.operation_id)
+    {
+        bail!("该文档整理运行已被更新的操作替代");
+    }
+    Ok(())
+}
+
+fn trace_path(workspace: &Path) -> PathBuf {
+    let mut key = workspace.to_string_lossy().replace('\\', "/");
+    if cfg!(windows) {
+        key = key.to_ascii_lowercase();
+    }
+    let hash = format!("{:x}", Sha256::digest(key.as_bytes()));
+    std::env::temp_dir()
+        .join("elon-project-docs-organization")
+        .join(format!("{hash}.json"))
+}
+
+fn read_trace_unlocked(workspace: &Path) -> Result<Option<DocumentOrganizationTrace>> {
+    let path = trace_path(workspace);
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let bytes =
+        fs::read(&path).with_context(|| format!("读取文档整理状态失败：{}", path.display()))?;
+    serde_json::from_slice(&bytes)
+        .map(Some)
+        .with_context(|| format!("文档整理状态损坏：{}", path.display()))
+}
+
+fn write_trace_unlocked(workspace: &Path, trace: &DocumentOrganizationTrace) -> Result<()> {
+    let path = trace_path(workspace);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let bytes = serde_json::to_vec_pretty(trace)?;
+    crate::node_agent_atomic_file::write(&path, &bytes)
+        .with_context(|| format!("写入文档整理状态失败：{}", path.display()))
+}
+
+fn with_trace_lock<T>(operation: impl FnOnce() -> Result<T>) -> Result<T> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    let _guard = LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    operation()
+}
+
+fn string_field(value: &Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(str::to_string)
+}
+
+fn clean_bounded(value: &str, limit: usize) -> String {
+    value.trim().chars().take(limit).collect()
+}
+
+fn unix_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default()
+}
+
+#[cfg(test)]
+#[path = "project_document_observability_tests.rs"]
+mod tests;

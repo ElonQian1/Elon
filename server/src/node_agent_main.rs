@@ -161,6 +161,8 @@ mod project_document_governance;
 mod project_document_governance_service;
 #[cfg(test)]
 mod project_document_governance_tests;
+mod project_document_observability;
+mod project_document_observability_api;
 mod project_document_policy;
 mod project_git_worktree_audit;
 mod project_landing;

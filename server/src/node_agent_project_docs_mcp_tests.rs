@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use std::sync::Arc;
 use std::{fs, path::PathBuf};
 
 use crate::node_agent_project_docs_mcp::{
@@ -70,6 +71,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         names,
         vec![
             "project_docs_analyze",
+            "project_docs_get_status",
             "project_docs_read",
             "project_docs_get_suggestions",
             "project_docs_save_suggestions",
@@ -138,6 +140,40 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         false
     );
     fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn descriptor_creation_is_safe_under_parallel_cleanup() {
+    let roots = (0..32).map(|_| workspace()).collect::<Vec<_>>();
+    let roots = Arc::new(roots);
+    let workers = (0..32)
+        .map(|index| {
+            let roots = Arc::clone(&roots);
+            std::thread::spawn(move || {
+                let root = &roots[index];
+                let descriptor = descriptor_for_project(root.to_str().unwrap(), 7799).unwrap();
+                let url = reqwest::Url::parse(descriptor["url"].as_str().unwrap()).unwrap();
+                let session_id = url
+                    .path_segments()
+                    .unwrap()
+                    .next_back()
+                    .unwrap()
+                    .to_string();
+                let token = url
+                    .query_pairs()
+                    .find(|(key, _)| key == "token")
+                    .map(|(_, value)| value.into_owned())
+                    .unwrap();
+                authorize_session(&session_id, &token).unwrap()
+            })
+        })
+        .collect::<Vec<_>>();
+    for (index, worker) in workers.into_iter().enumerate() {
+        assert_eq!(worker.join().unwrap(), roots[index].canonicalize().unwrap());
+    }
+    for root in roots.iter() {
+        fs::remove_dir_all(root).unwrap();
+    }
 }
 
 #[tokio::test]

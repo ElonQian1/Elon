@@ -9,6 +9,7 @@ use crate::{
         analyze_workspace, apply_saved_suggestions, default_page_size, default_read_chars,
         get_suggestions, read_documents, save_suggestions,
     },
+    project_document_observability::{get_status, record_tool_failure, record_tool_success},
 };
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +62,11 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "ambiguous_only":{"type":"boolean","default":false}
                 }
             }),
+        ),
+        tool(
+            "project_docs_get_status",
+            "读取当前项目最近一次文档整理的逐阶段状态、revision、低 token 用量、失败代码和恢复建议；不读取 Markdown，不修改项目文件。",
+            json!({"type":"object","properties":{}}),
         ),
         tool(
             "project_docs_read",
@@ -119,44 +125,60 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    let value = match name {
-        "project_docs_analyze" => {
-            let input: AnalyzeArguments = decode(arguments, name)?;
-            analyze_workspace(workspace, input.offset, input.limit, input.ambiguous_only)?
+    let result = (|| -> Result<Value> {
+        match name {
+            "project_docs_get_status" => {
+                ensure_empty_object(&arguments, name)?;
+                get_status(workspace, None)
+            }
+            "project_docs_analyze" => {
+                let input: AnalyzeArguments = decode(arguments, name)?;
+                analyze_workspace(workspace, input.offset, input.limit, input.ambiguous_only)
+            }
+            "project_docs_read" => {
+                let input: ReadArguments = decode(arguments, name)?;
+                read_documents(
+                    workspace,
+                    &input.paths,
+                    input.max_chars_per_document,
+                    input.expected_catalog_revision.as_deref(),
+                )
+            }
+            "project_docs_get_suggestions" => {
+                ensure_empty_object(&arguments, name)?;
+                get_suggestions(workspace)
+            }
+            "project_docs_save_suggestions" => {
+                let input: SaveSuggestionsArguments = decode(arguments, name)?;
+                save_suggestions(
+                    workspace,
+                    input.suggestions,
+                    &input.expected_catalog_revision,
+                    input.expected_suggestions_revision.as_deref(),
+                )
+            }
+            "project_docs_apply_suggestions" => {
+                let input: ApplySuggestionsArguments = decode(arguments, name)?;
+                apply_saved_suggestions(
+                    workspace,
+                    input.reviewed,
+                    &input.expected_catalog_revision,
+                    input.expected_manifest_revision.as_deref(),
+                    input.expected_suggestions_revision.as_deref(),
+                )
+            }
+            _ => Err(anyhow::anyhow!("未知项目文档 MCP 工具：{name}")),
         }
-        "project_docs_read" => {
-            let input: ReadArguments = decode(arguments, name)?;
-            read_documents(
-                workspace,
-                &input.paths,
-                input.max_chars_per_document,
-                input.expected_catalog_revision.as_deref(),
-            )?
+    })();
+    let value = match result {
+        Ok(value) => {
+            record_tool_success(workspace, name, &value);
+            value
         }
-        "project_docs_get_suggestions" => {
-            ensure_empty_object(&arguments, name)?;
-            get_suggestions(workspace)?
+        Err(error) => {
+            record_tool_failure(workspace, name, &error);
+            return Err(error);
         }
-        "project_docs_save_suggestions" => {
-            let input: SaveSuggestionsArguments = decode(arguments, name)?;
-            save_suggestions(
-                workspace,
-                input.suggestions,
-                &input.expected_catalog_revision,
-                input.expected_suggestions_revision.as_deref(),
-            )?
-        }
-        "project_docs_apply_suggestions" => {
-            let input: ApplySuggestionsArguments = decode(arguments, name)?;
-            apply_saved_suggestions(
-                workspace,
-                input.reviewed,
-                &input.expected_catalog_revision,
-                input.expected_manifest_revision.as_deref(),
-                input.expected_suggestions_revision.as_deref(),
-            )?
-        }
-        _ => bail!("未知项目文档 MCP 工具：{name}"),
     };
     Ok(json!({
         "content": [{ "type": "text", "text": serde_json::to_string_pretty(&value)? }],

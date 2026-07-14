@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -23,6 +23,7 @@ use crate::NodeRuntime;
 const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
 const SESSION_TTL_SECONDS: u64 = 2 * 60 * 60;
 const MAX_SESSION_FILE_BYTES: u64 = 32 * 1024;
+const INVALID_SESSION_GRACE_SECONDS: u64 = 5 * 60;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,6 +60,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
         .route("/api/project-docs/mcp/bootstrap", post(bootstrap_handler))
         .route("/api/project-docs/mcp/:session_id", post(mcp_handler))
+        .merge(crate::project_document_observability_api::routes())
 }
 
 #[cfg(test)]
@@ -67,8 +69,9 @@ pub(crate) fn test_transport_routes() -> Router {
 }
 
 pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Result<Value> {
-    cleanup_expired_sessions();
     let root = validate_project_root(project_root)?;
+    let _guard = session_create_lock();
+    cleanup_expired_sessions();
     let now = unix_seconds();
     let session = ProjectDocsMcpSession {
         id: format!("docs_{}", uuid::Uuid::new_v4().simple()),
@@ -81,67 +84,38 @@ pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Resu
         created_at: now,
         expires_at: now.saturating_add(SESSION_TTL_SECONDS),
     };
-    let session_dir = session_dir(&session.id);
-    fs::create_dir_all(&session_dir)
-        .with_context(|| format!("创建项目文档 MCP 会话目录失败：{}", session_dir.display()))?;
-    write_private_json(&session_dir.join("session.json"), &session)?;
+    let final_session_dir = session_dir(&session.id);
+    let staging_dir = session_root().join(format!(".creating_{}", uuid::Uuid::new_v4().simple()));
+    fs::create_dir_all(&staging_dir)
+        .with_context(|| format!("创建项目文档 MCP 会话目录失败：{}", staging_dir.display()))?;
+    let create_result = write_session_files(&staging_dir, &session, host_port).and_then(|_| {
+        fs::rename(&staging_dir, &final_session_dir).with_context(|| {
+            format!(
+                "发布项目文档 MCP 会话目录失败：{}",
+                final_session_dir.display()
+            )
+        })
+    });
+    if let Err(error) = create_result {
+        let _ = fs::remove_dir_all(&staging_dir);
+        return Err(error);
+    }
+    let operation_id =
+        match crate::project_document_observability::mark_session_ready(&root, &session.id) {
+            Ok(operation_id) => operation_id,
+            Err(error) => {
+                let _ = fs::remove_dir_all(&final_session_dir);
+                return Err(error);
+            }
+        };
     let url = format!(
         "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
         session.id, session.token
     );
-    let config_path = session_dir.join("mcp.json");
-    write_private_json(
-        &config_path,
-        &json!({
-            "mcpServers": {
-                "yilong_project_docs": {
-                    "url": url,
-                    "required": false,
-                    "toolTimeoutSec": 60
-                }
-            }
-        }),
-    )?;
-    let copilot_config_path = session_dir.join("copilot-mcp.json");
-    write_private_json(
-        &copilot_config_path,
-        &json!({
-            "mcpServers": {
-                "yilong_project_docs": {
-                    "type": "http",
-                    "url": url,
-                    "tools": ["*"],
-                    "timeout": 60000
-                }
-            }
-        }),
-    )?;
-    let claude_config_path = session_dir.join("claude-mcp.json");
-    write_private_json(
-        &claude_config_path,
-        &json!({
-            "mcpServers": {
-                "yilong_project_docs": {
-                    "type": "http",
-                    "url": url,
-                    "timeout": 60000
-                }
-            }
-        }),
-    )?;
-    let gemini_config_path = session_dir.join("gemini-settings.json");
-    write_private_json(
-        &gemini_config_path,
-        &json!({
-            "mcpServers": {
-                "yilong_project_docs": {
-                    "httpUrl": url,
-                    "timeout": 60000,
-                    "trust": false
-                }
-            }
-        }),
-    )?;
+    let config_path = final_session_dir.join("mcp.json");
+    let copilot_config_path = final_session_dir.join("copilot-mcp.json");
+    let claude_config_path = final_session_dir.join("claude-mcp.json");
+    let gemini_config_path = final_session_dir.join("gemini-settings.json");
     Ok(json!({
         "name": "yilong-project-docs",
         "transport": "streamable-http",
@@ -154,11 +128,48 @@ pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Resu
             "gemini": gemini_config_path.display().to_string()
         },
         "sessionId": session.id,
+        "operationId": operation_id,
         "projectRoot": session.project_root,
         "expiresAt": session.expires_at,
         "protocolVersion": MCP_PROTOCOL_VERSION,
         "purpose": "低 token 分析项目文档权威性，按需读取，并把 AI 建议与用户审核应用分离。",
     }))
+}
+
+fn write_session_files(
+    directory: &Path,
+    session: &ProjectDocsMcpSession,
+    host_port: u16,
+) -> Result<()> {
+    write_private_json(&directory.join("session.json"), session)?;
+    let url = format!(
+        "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
+        session.id, session.token
+    );
+    write_private_json(
+        &directory.join("mcp.json"),
+        &json!({"mcpServers":{"yilong_project_docs":{
+            "url":url,"required":false,"toolTimeoutSec":60
+        }}}),
+    )?;
+    write_private_json(
+        &directory.join("copilot-mcp.json"),
+        &json!({"mcpServers":{"yilong_project_docs":{
+            "type":"http","url":url,"tools":["*"],"timeout":60000
+        }}}),
+    )?;
+    write_private_json(
+        &directory.join("claude-mcp.json"),
+        &json!({"mcpServers":{"yilong_project_docs":{
+            "type":"http","url":url,"timeout":60000
+        }}}),
+    )?;
+    write_private_json(
+        &directory.join("gemini-settings.json"),
+        &json!({"mcpServers":{"yilong_project_docs":{
+            "httpUrl":url,"timeout":60000,"trust":false
+        }}}),
+    )
 }
 
 pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Option<Value> {
@@ -258,15 +269,45 @@ fn cleanup_expired_sessions() {
     let now = unix_seconds();
     for entry in entries.flatten().take(128) {
         let path = entry.path();
-        let expired = fs::read(path.join("session.json"))
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !path.is_dir() {
+            continue;
+        }
+        if name.starts_with(".creating_") {
+            if directory_age_seconds(&path) > INVALID_SESSION_GRACE_SECONDS {
+                let _ = fs::remove_dir_all(path);
+            }
+            continue;
+        }
+        if !valid_session_id(&name) {
+            continue;
+        }
+        let session = fs::read(path.join("session.json"))
             .ok()
-            .and_then(|bytes| serde_json::from_slice::<ProjectDocsMcpSession>(&bytes).ok())
+            .and_then(|bytes| serde_json::from_slice::<ProjectDocsMcpSession>(&bytes).ok());
+        let expired = session
             .map(|session| session.expires_at < now)
-            .unwrap_or(true);
+            .unwrap_or_else(|| directory_age_seconds(&path) > INVALID_SESSION_GRACE_SECONDS);
         if expired {
             let _ = fs::remove_dir_all(path);
         }
     }
+}
+
+fn directory_age_seconds(path: &Path) -> u64 {
+    fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| SystemTime::now().duration_since(modified).ok())
+        .map(|age| age.as_secs())
+        .unwrap_or_default()
+}
+
+fn session_create_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 fn write_private_json(path: &Path, value: &impl Serialize) -> Result<()> {
