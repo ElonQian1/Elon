@@ -69,6 +69,16 @@ try {
     const confirmed = confirmRuntimeDraftFrame(acked, frameAt(1_700_000_000_200))
     assert.equal(runtimeDraftStatus(confirmed), 'confirmed', 'Android 新帧到达后才清除本地草稿层')
     assert.equal(Object.keys(confirmed.nodes).length, 0)
+    const numericFrame = {
+      ...frameAt(1_700_000_000_200),
+      capturedAt: '1700000000200',
+    }
+    const confirmedByNumericTimestamp = confirmRuntimeDraftFrame(acked, numericFrame)
+    assert.equal(
+      runtimeDraftStatus(confirmedByNumericTimestamp),
+      'confirmed',
+      '节点端返回毫秒时间戳字符串时也必须完成真机帧校准',
+    )
   } finally {
     Date.now = originalNow
   }

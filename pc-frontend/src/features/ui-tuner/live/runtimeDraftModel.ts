@@ -138,7 +138,7 @@ export function confirmRuntimeDraftFrame(
   frame: LiveUiFrame | null,
 ): RuntimeDraftState {
   if (!frame) return state
-  const capturedAtMs = Date.parse(frame.capturedAt)
+  const capturedAtMs = parseCapturedAtMs(frame.capturedAt)
   const nodes = Object.fromEntries(Object.entries(state.nodes).filter(([, draft]) => !(
     draft.phase === 'acked'
     && draft.confirmedRevision === draft.localRevision
@@ -147,6 +147,12 @@ export function confirmRuntimeDraftFrame(
     && draft.baseFrameCapturedAt !== frame.capturedAt
   )))
   return Object.keys(nodes).length === Object.keys(state.nodes).length ? state : { ...state, nodes }
+}
+
+function parseCapturedAtMs(capturedAt: string) {
+  const numeric = Number(capturedAt)
+  if (Number.isFinite(numeric) && numeric > 0) return numeric
+  return Date.parse(capturedAt)
 }
 
 export function runtimeDraftStatus(state: RuntimeDraftState): RuntimeDraftStatus {
