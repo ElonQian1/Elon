@@ -17,7 +17,9 @@ import styles from './UiTunerPage.module.css'
 export interface UiTunerCanvasViewportControls {
   actualSize: () => void
   fitCanvasToStage: () => void
+  fitCanvasToWidth: () => void
   fitToStage: boolean
+  fitToWidth: boolean
   viewScaleLabel: string
   zoomIn: () => void
   zoomOut: () => void
@@ -75,7 +77,7 @@ export function UiTunerCanvasSurface({
   onSelectElement,
 }: UiTunerCanvasSurfaceProps) {
   return (
-    <div className={styles.canvasScroller} ref={scrollerRef} onScroll={onScroll}>
+    <div className={styles.canvasSurface}>
       <div className={styles.canvasUtilityBar}>
         {realRenderer && (
           <div className={
@@ -96,12 +98,21 @@ export function UiTunerCanvasSurface({
             type="button"
             className={viewportControls.fitToStage ? styles.activeCanvasZoom : ''}
             onClick={viewportControls.fitCanvasToStage}
-            title="让完整画面适应当前区域"
+            title="完整显示整张手机画面"
           >
-            适屏
+            适高
+          </button>
+          <button
+            type="button"
+            className={viewportControls.fitToWidth ? styles.activeCanvasZoom : ''}
+            onClick={viewportControls.fitCanvasToWidth}
+            title="按可用宽度放大，允许上下滚动"
+          >
+            适宽
           </button>
         </div>
       </div>
+      <div className={styles.canvasScroller} ref={scrollerRef} onScroll={onScroll}>
       <div
         className={styles.canvasViewport}
         style={{ width: canvas.width * viewScale, height: canvas.height * viewScale }}
@@ -228,6 +239,7 @@ export function UiTunerCanvasSurface({
             )
           })}
         </div>
+      </div>
       </div>
     </div>
   )

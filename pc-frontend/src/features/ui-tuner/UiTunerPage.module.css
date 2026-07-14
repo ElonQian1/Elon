@@ -140,6 +140,7 @@
 }
 
 .toolbar {
+  height: 48px;
   min-height: 48px;
   flex: 0 0 auto;
   display: flex;
@@ -152,6 +153,8 @@
 }
 
 .toolbarTitle {
+  max-width: 240px;
+  flex: 0 1 240px;
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -195,12 +198,19 @@
 }
 
 .toolbarActions {
+  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.toolbarActions::-webkit-scrollbar {
+  display: none;
 }
 
 .hiddenFileInput {
@@ -309,6 +319,14 @@
   gap: 5px;
 }
 
+.canvasSurface {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .canvasScroller {
   min-height: 0;
   flex: 1;
@@ -319,13 +337,17 @@
 }
 
 .canvasUtilityBar {
+  min-height: 42px;
+  flex: 0 0 auto;
   max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  margin-bottom: 12px;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  background: #0f1114;
 }
 
 .canvasZoomControls {

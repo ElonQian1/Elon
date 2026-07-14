@@ -48,6 +48,7 @@ interface UiTunerToolbarProps {
   deviceLeases: AndroidDeviceLease[]
   viewScaleLabel: string
   fitToStage: boolean
+  fitToWidth: boolean
   canUndo: boolean
   canRedo: boolean
   leftPanelOpen: boolean
@@ -61,6 +62,7 @@ interface UiTunerToolbarProps {
   onZoomOut: () => void
   onZoomIn: () => void
   onFitToStage: () => void
+  onFitToWidth: () => void
   onActualSize: () => void
   onUndo: () => void
   onRedo: () => void
@@ -91,6 +93,7 @@ export function UiTunerToolbar({
   deviceLeases,
   viewScaleLabel,
   fitToStage,
+  fitToWidth,
   canUndo,
   canRedo,
   leftPanelOpen,
@@ -104,6 +107,7 @@ export function UiTunerToolbar({
   onZoomOut,
   onZoomIn,
   onFitToStage,
+  onFitToWidth,
   onActualSize,
   onUndo,
   onRedo,
@@ -207,7 +211,14 @@ export function UiTunerToolbar({
             onClick={onFitToStage}
           >
             <Maximize2 size={14} aria-hidden="true" />
-            适屏
+            适高
+          </button>
+          <button
+            type="button"
+            className={fitToWidth ? styles.activeViewControl : ''}
+            onClick={onFitToWidth}
+          >
+            适宽
           </button>
           <button type="button" onClick={onActualSize}>
             100%

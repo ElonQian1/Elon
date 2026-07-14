@@ -114,7 +114,7 @@ export default function UiTunerPage() {
     tunerDoc.runtimeSnapshot?.packageName ?? tunerDoc.source?.signature ?? 'default',
     Boolean(tunerDoc.canvas.targetDesign),
   )
-  const { viewScale, viewScaleLabel, fitToStage, requestFit } = comparisonViewport
+  const { viewScale, viewScaleLabel, fitToStage, fitToWidth, requestFit } = comparisonViewport
 
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
@@ -676,6 +676,7 @@ export default function UiTunerPage() {
           deviceLeases={deviceLease.leases}
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
+          fitToWidth={fitToWidth}
           canUndo={realRenderer ? runtimeDraft.status === 'rejected' || (runtimeDraft.status === 'confirmed' && (liveUi.session?.historyCount ?? 0) > 0) : history.past.length > 0}
           canRedo={realRenderer ? runtimeDraft.status === 'confirmed' && (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
           leftPanelOpen={workspaceLayout.leftPanelOpen}
@@ -689,6 +690,7 @@ export default function UiTunerPage() {
           onZoomOut={comparisonViewport.zoomOut}
           onZoomIn={comparisonViewport.zoomIn}
           onFitToStage={comparisonViewport.fitCanvasToStage}
+          onFitToWidth={comparisonViewport.fitCanvasToWidth}
           onActualSize={comparisonViewport.actualSize}
           onUndo={() => { if (realRenderer) void undoLive(); else undoHistory() }}
           onRedo={() => { if (realRenderer) void redoLive(); else redoHistory() }}
