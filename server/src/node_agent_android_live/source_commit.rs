@@ -13,6 +13,7 @@ use super::source_xml::{
     reference_impact_count, replace_element_attribute, replace_value_resource, source_revision,
     write_xml, LayoutElement, ValueResource,
 };
+use super::style_codegen::generate_style_targets;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -174,11 +175,25 @@ pub(super) fn apply_source_commit_plan(
             write_xml(&root, path, content)?;
         }
     }
-    let changed_files = contents
+    let mut changed_files = contents
         .keys()
         .map(|path| relative_path(&root, path))
         .collect::<Vec<_>>();
-    let source_revision_after = source_revision(&root, contents.keys().cloned())?;
+    let generated = generate_style_targets(
+        &root,
+        changed_files
+            .iter()
+            .any(|path| path == ".elon/ui-standards/tokens.json"),
+    )?;
+    changed_files.extend(generated.iter().map(|path| relative_path(&root, path)));
+    changed_files.sort();
+    changed_files.dedup();
+    let revision_paths = contents
+        .keys()
+        .cloned()
+        .chain(generated)
+        .collect::<Vec<_>>();
+    let source_revision_after = source_revision(&root, revision_paths)?;
     let committed_count = deterministic.len();
     drop(deterministic);
     let deferred = plan

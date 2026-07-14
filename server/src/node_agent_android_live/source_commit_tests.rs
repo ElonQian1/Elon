@@ -98,6 +98,15 @@ fn plans_and_writes_compose_style_and_token_json() {
         r##"{"colors":{"action":{"primary":"#FF5D3FD3"}}}"##,
     )
     .expect("write token json");
+    fs::write(
+        root.join(".elon/ui-style-targets.json"),
+        r#"{
+  "version": 1,
+  "androidValuesFile": "app/src/main/res/values/elon_ui_tokens.xml",
+  "webCssFile": "web/src/styles/elon-ui-tokens.css"
+}"#,
+    )
+    .expect("write style targets config");
 
     let mut node = live_node();
     node.resource_id = None;
@@ -162,6 +171,24 @@ fn plans_and_writes_compose_style_and_token_json() {
     assert_eq!(
         tokens.pointer("/colors/action/primary"),
         Some(&json!("#FF6750A4"))
+    );
+    assert!(result
+        .changed_files
+        .iter()
+        .any(|path| path.ends_with("app/src/main/res/values/elon_ui_tokens.xml")));
+    assert!(result
+        .changed_files
+        .iter()
+        .any(|path| path.ends_with("web/src/styles/elon-ui-tokens.css")));
+    assert!(
+        fs::read_to_string(root.join("app/src/main/res/values/elon_ui_tokens.xml"))
+            .expect("read generated Android tokens")
+            .contains("<color name=\"elon_ui_colors_action_primary\">#FF6750A4</color>")
+    );
+    assert!(
+        fs::read_to_string(root.join("web/src/styles/elon-ui-tokens.css"))
+            .expect("read generated web tokens")
+            .contains("--elon-ui-colors-action-primary: #6750A4FF;")
     );
 
     let _ = fs::remove_dir_all(root);

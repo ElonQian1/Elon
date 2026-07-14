@@ -26,6 +26,7 @@ mod routes;
 mod source_commit;
 mod source_json;
 mod source_xml;
+mod style_codegen;
 mod ui_ir;
 mod verification_gate;
 mod visual_diff;
