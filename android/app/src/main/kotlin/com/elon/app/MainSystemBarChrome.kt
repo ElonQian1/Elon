@@ -64,15 +64,28 @@ internal fun applyMainNavigationBarChrome(
         window.isNavigationBarContrastEnforced = false
     }
 
-    var flags = window.decorView.systemUiVisibility
+    window.decorView.systemUiVisibility = resolveMainSystemUiVisibility(
+        currentFlags = window.decorView.systemUiVisibility,
+        drawChatBehindNavigationBar = drawChatBehindNavigationBar,
+        sdkInt = Build.VERSION.SDK_INT
+    )
+    root?.let(ViewCompat::requestApplyInsets)
+}
+
+internal fun resolveMainSystemUiVisibility(
+    currentFlags: Int,
+    drawChatBehindNavigationBar: Boolean,
+    sdkInt: Int
+): Int {
+    var flags = currentFlags and View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN.inv()
+    flags = flags and View.SYSTEM_UI_FLAG_FULLSCREEN.inv()
     flags = if (drawChatBehindNavigationBar) {
         flags or View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
     } else {
         flags and View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION.inv()
     }
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    if (sdkInt >= Build.VERSION_CODES.O) {
         flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
     }
-    window.decorView.systemUiVisibility = flags
-    root?.let(ViewCompat::requestApplyInsets)
+    return flags
 }
