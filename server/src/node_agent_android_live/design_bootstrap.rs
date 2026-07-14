@@ -44,6 +44,10 @@ pub(crate) fn create_compose_screen_scaffold(
     session: &LiveUiSession,
     arguments: &Value,
 ) -> Result<Value> {
+    let profile = project_profile(session)?;
+    if profile.pointer("/capabilities/jetpackCompose") != Some(&Value::Bool(true)) {
+        bail!("兼容工具只允许已确认的 Compose 项目；空白或混合项目请使用统一 Android 页面脚手架");
+    }
     let mut arguments = arguments.clone();
     arguments["uiToolkit"] = Value::String("COMPOSE".to_string());
     create_android_screen_scaffold(session, &arguments)
@@ -99,6 +103,8 @@ fn create_compose_scaffold(root: &Path, profile: &Value, arguments: &Value) -> R
     }
     fs::write(&target, source)?;
     let stable_node_ids = stable_node_ids(&screen_id);
+    let toolkit_confirmed =
+        profile.pointer("/capabilities/jetpackCompose") == Some(&Value::Bool(true));
     let contract_path = write_scaffold_contract(
         root,
         &screen_id,
@@ -111,6 +117,8 @@ fn create_compose_scaffold(root: &Path, profile: &Value, arguments: &Value) -> R
             "workflowStatus": "SCAFFOLDED",
             "rendererStatus": "NEEDS_BUILD_AND_NAVIGATION",
             "sourceBindingStatus": "NEEDS_COMPOSE_RUNTIME_ADAPTER",
+            "projectToolkitConfirmed": toolkit_confirmed,
+            "toolkitSetupRequired": !toolkit_confirmed,
             "stableNodeIds": stable_node_ids,
             "requiredNextActions": [
                 "Use Codex to replace the placeholder with the target business structure",
@@ -401,7 +409,9 @@ fn default_android_module(profile: &Value) -> String {
 }
 
 fn resolve_android_ui_toolkit(profile: &Value, arguments: &Value) -> Result<AndroidUiToolkit> {
-    let requested = optional_string(arguments, "uiToolkit")
+    let explicit = optional_string(arguments, "uiToolkit");
+    let requested = explicit
+        .clone()
         .unwrap_or_else(|| {
             profile
                 .pointer("/capabilities/preferredAndroidUiToolkit")
@@ -412,11 +422,17 @@ fn resolve_android_ui_toolkit(profile: &Value, arguments: &Value) -> Result<Andr
         .to_ascii_uppercase();
     let compose = profile.pointer("/capabilities/jetpackCompose") == Some(&Value::Bool(true));
     let views = profile.pointer("/capabilities/androidViews") == Some(&Value::Bool(true));
+    let android_project = is_android_project_profile(profile);
     match requested.as_str() {
-        "COMPOSE" if compose => Ok(AndroidUiToolkit::Compose),
-        "VIEWS" | "VIEW" | "XML" if views => Ok(AndroidUiToolkit::Views),
-        "COMPOSE" => bail!("项目 UI Profile 未确认业务代码使用 Jetpack Compose"),
-        "VIEWS" | "VIEW" | "XML" => bail!("项目 UI Profile 未确认业务代码使用 Android View/XML"),
+        "COMPOSE" if compose || explicit.is_some() && android_project => {
+            Ok(AndroidUiToolkit::Compose)
+        }
+        "VIEWS" | "VIEW" | "XML" if views || explicit.is_some() && android_project => {
+            Ok(AndroidUiToolkit::Views)
+        }
+        "COMPOSE" | "VIEWS" | "VIEW" | "XML" => {
+            bail!("UI Profile 没有识别到 Android 工程，不能安全生成页面")
+        }
         "HYBRID" => bail!("混合项目必须显式传 uiToolkit=COMPOSE 或 VIEWS，禁止静默猜测"),
         _ if compose && !views => Ok(AndroidUiToolkit::Compose),
         _ if views && !compose => Ok(AndroidUiToolkit::Views),
@@ -425,6 +441,19 @@ fn resolve_android_ui_toolkit(profile: &Value, arguments: &Value) -> Result<Andr
         }
         _ => bail!("UI Profile 没有识别到 Compose 或 View/XML，不能安全生成 Android 页面"),
     }
+}
+
+pub(crate) fn is_android_project_profile(profile: &Value) -> bool {
+    profile
+        .pointer("/android/namespace")
+        .and_then(Value::as_str)
+        .is_some_and(|value| !value.trim().is_empty())
+        || profile
+            .pointer("/android/applicationId")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.trim().is_empty())
+        || profile.pointer("/capabilities/jetpackCompose") == Some(&Value::Bool(true))
+        || profile.pointer("/capabilities/androidViews") == Some(&Value::Bool(true))
 }
 
 fn write_scaffold_contract(root: &Path, screen_id: &str, contract: Value) -> Result<PathBuf> {
@@ -698,6 +727,23 @@ mod scaffold_tests {
             resolve_android_ui_toolkit(&profile, &json!({"uiToolkit":"VIEWS"})).unwrap(),
             AndroidUiToolkit::Views
         );
+    }
+
+    #[test]
+    fn blank_android_project_accepts_explicit_first_toolkit() {
+        let profile = json!({
+            "android": {"namespace":"com.example.blank"},
+            "capabilities": {
+                "jetpackCompose": false,
+                "androidViews": false,
+                "preferredAndroidUiToolkit": "UNKNOWN"
+            }
+        });
+        assert_eq!(
+            resolve_android_ui_toolkit(&profile, &json!({"uiToolkit":"COMPOSE"})).unwrap(),
+            AndroidUiToolkit::Compose
+        );
+        assert!(resolve_android_ui_toolkit(&profile, &json!({})).is_err());
     }
 
     #[test]

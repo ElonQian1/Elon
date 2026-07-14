@@ -42,27 +42,56 @@ pub(crate) async fn check_capabilities(
 ) -> Result<Value> {
     let requested = requested_capabilities(session, arguments)?;
     let view = session.view().await;
+    let profile = super::design_bootstrap::project_profile(session).ok();
     let mut ready = Vec::new();
     let mut preparation = Vec::new();
+    let mut preparation_details = Vec::new();
     let mut missing = Vec::new();
+    let mut missing_details = Vec::new();
     for capability in requested {
-        if SUPPORTED_CAPABILITIES.contains(&capability.as_str()) {
-            if !view.connected
-                && matches!(
-                    capability.as_str(),
-                    "REAL_ANDROID_RENDERER"
-                        | "LIVE_STYLE_PATCH"
-                        | "LOCAL_VISUAL_SOLVER"
-                        | "PERSISTENT_FIT_RUN"
-                        | "PATCH_FREE_BUILD_VERIFY"
-                )
-            {
-                preparation.push(capability);
-            } else {
-                ready.push(capability);
-            }
-        } else {
+        if !SUPPORTED_CAPABILITIES.contains(&capability.as_str()) {
             missing.push(capability);
+            continue;
+        }
+        if capability == "NEW_SCREEN_BOOTSTRAP" {
+            match new_screen_bootstrap_readiness(profile.as_ref()) {
+                NewScreenBootstrapReadiness::Ready => ready.push(capability),
+                NewScreenBootstrapReadiness::ProfileRequired => {
+                    preparation.push(capability.clone());
+                    preparation_details.push(json!({
+                        "capability": capability,
+                        "reason": "PROJECT_UI_PROFILE_REQUIRED",
+                        "next": "ui_import_desktop_task"
+                    }));
+                }
+                NewScreenBootstrapReadiness::ToolkitSelectionRequired => {
+                    preparation.push(capability.clone());
+                    preparation_details.push(json!({
+                        "capability": capability,
+                        "reason": "ANDROID_UI_TOOLKIT_SELECTION_REQUIRED",
+                        "next": "ui_create_android_screen_scaffold",
+                        "requiredArgument": "uiToolkit=COMPOSE|VIEWS"
+                    }));
+                }
+                NewScreenBootstrapReadiness::NotAndroid => {
+                    missing.push(capability.clone());
+                    missing_details.push(json!({
+                        "capability": capability,
+                        "reason": "ANDROID_PROJECT_NOT_DETECTED"
+                    }));
+                }
+            }
+            continue;
+        }
+        if !view.connected && runtime_required(&capability) {
+            preparation.push(capability.clone());
+            preparation_details.push(json!({
+                "capability": capability,
+                "reason": "DEBUG_RUNTIME_NOT_CONNECTED",
+                "next": "ui_prepare_debug_runtime"
+            }));
+        } else {
+            ready.push(capability);
         }
     }
     let status = if !missing.is_empty() {
@@ -72,11 +101,29 @@ pub(crate) async fn check_capabilities(
     } else {
         "READY"
     };
+    let next = if !missing.is_empty() {
+        "ui_report_capability_gap"
+    } else if preparation_details.iter().any(|detail| {
+        detail.get("reason").and_then(Value::as_str) == Some("PROJECT_UI_PROFILE_REQUIRED")
+    }) {
+        "ui_import_desktop_task"
+    } else if preparation_details.iter().any(|detail| {
+        detail.get("reason").and_then(Value::as_str)
+            == Some("ANDROID_UI_TOOLKIT_SELECTION_REQUIRED")
+    }) {
+        "ui_create_android_screen_scaffold"
+    } else if !preparation.is_empty() {
+        "ui_prepare_debug_runtime"
+    } else {
+        "CONTINUE_UI_WORKFLOW"
+    };
     Ok(json!({
         "status": status,
         "ready": ready,
         "preparationRequired": preparation,
+        "preparationDetails": preparation_details,
         "missing": missing,
+        "missingDetails": missing_details,
         "supportedCapabilities": SUPPORTED_CAPABILITIES,
         "knownPlatformGaps": KNOWN_PLATFORM_GAPS,
         "automaticPlatformUpgrade": {
@@ -91,12 +138,43 @@ pub(crate) async fn check_capabilities(
                 "ROUND_BUDGET_EXHAUSTED"
             ]
         },
-        "next": match status {
-            "PLATFORM_GAP" => "ui_report_capability_gap",
-            "PREPARATION_REQUIRED" => "ui_prepare_debug_runtime",
-            _ => "CONTINUE_UI_WORKFLOW",
-        }
+        "next": next
     }))
+}
+
+fn runtime_required(capability: &str) -> bool {
+    matches!(
+        capability,
+        "REAL_ANDROID_RENDERER"
+            | "LIVE_STYLE_PATCH"
+            | "LOCAL_VISUAL_SOLVER"
+            | "PERSISTENT_FIT_RUN"
+            | "PATCH_FREE_BUILD_VERIFY"
+    )
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NewScreenBootstrapReadiness {
+    Ready,
+    ProfileRequired,
+    ToolkitSelectionRequired,
+    NotAndroid,
+}
+
+fn new_screen_bootstrap_readiness(profile: Option<&Value>) -> NewScreenBootstrapReadiness {
+    let Some(profile) = profile else {
+        return NewScreenBootstrapReadiness::ProfileRequired;
+    };
+    if !super::design_bootstrap::is_android_project_profile(profile) {
+        return NewScreenBootstrapReadiness::NotAndroid;
+    }
+    let compose = profile.pointer("/capabilities/jetpackCompose") == Some(&Value::Bool(true));
+    let views = profile.pointer("/capabilities/androidViews") == Some(&Value::Bool(true));
+    if compose || views {
+        NewScreenBootstrapReadiness::Ready
+    } else {
+        NewScreenBootstrapReadiness::ToolkitSelectionRequired
+    }
 }
 
 pub(crate) fn report_gap(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
@@ -494,8 +572,9 @@ pub(crate) struct CapabilityGapDocument {
 #[cfg(test)]
 mod tests {
     use super::{
-        normalize_capabilities, publish_completed, CapabilityGapDocument, CapabilityGapStatus,
-        CapabilityUpgradeAttempt, CapabilityUpgradePolicy, SUPPORTED_CAPABILITIES,
+        new_screen_bootstrap_readiness, normalize_capabilities, publish_completed,
+        CapabilityGapDocument, CapabilityGapStatus, CapabilityUpgradeAttempt,
+        CapabilityUpgradePolicy, NewScreenBootstrapReadiness, SUPPORTED_CAPABILITIES,
     };
     use serde_json::json;
 
@@ -523,6 +602,34 @@ mod tests {
         .unwrap();
         assert_eq!(gap.status, CapabilityGapStatus::HumanRequired);
         assert!(gap.last_error.unwrap().contains("空发布"));
+    }
+
+    #[test]
+    fn blank_android_project_requests_toolkit_instead_of_platform_upgrade() {
+        let profile = json!({
+            "android": {"namespace":"com.example.blank"},
+            "capabilities": {"jetpackCompose":false, "androidViews":false}
+        });
+        assert_eq!(
+            new_screen_bootstrap_readiness(Some(&profile)),
+            NewScreenBootstrapReadiness::ToolkitSelectionRequired
+        );
+        assert_eq!(
+            new_screen_bootstrap_readiness(None),
+            NewScreenBootstrapReadiness::ProfileRequired
+        );
+    }
+
+    #[test]
+    fn non_android_project_is_a_real_new_screen_capability_gap() {
+        let profile = json!({
+            "android": {"namespace":null, "applicationId":null},
+            "capabilities": {"jetpackCompose":false, "androidViews":false}
+        });
+        assert_eq!(
+            new_screen_bootstrap_readiness(Some(&profile)),
+            NewScreenBootstrapReadiness::NotAndroid
+        );
     }
 
     fn test_gap() -> CapabilityGapDocument {
