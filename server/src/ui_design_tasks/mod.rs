@@ -12,6 +12,10 @@ mod semantic_cluster;
 pub(crate) use intent::force_ui_design_task;
 pub(crate) use dispatch::{promote_codex_ui_route, resolve_ui_route_task};
 pub(crate) use learning::finalize_ui_route_learning;
+pub(crate) use semantic_cluster::{
+    controlled_ui_concept_label, controlled_ui_route_concept,
+    CONTROLLED_UI_CONCEPT_VERSION,
+};
 pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,

@@ -4,6 +4,8 @@ use serde::Serialize;
 
 use super::{common::new_id, common::now, Store};
 
+mod lookup;
+
 const GLOBAL_SCOPE_ID: &str = "*";
 const MAX_SAMPLE_CHARS: usize = 2_000;
 
@@ -38,6 +40,7 @@ pub(crate) enum UiRouteLearningSource {
     RuntimeVerified,
     ExecutionVerified,
     Admin,
+    ControlledVocabulary,
 }
 
 impl UiRouteLearningSource {
@@ -48,6 +51,7 @@ impl UiRouteLearningSource {
             Self::RuntimeVerified => "runtime_verified",
             Self::ExecutionVerified => "execution_verified",
             Self::Admin => "admin",
+            Self::ControlledVocabulary => "controlled_vocabulary",
         }
     }
 }
@@ -70,46 +74,16 @@ pub(crate) struct UiRouteLearningEntry {
     pub(crate) created_by_user_id: Option<String>,
     pub(crate) created_at: String,
     pub(crate) updated_at: String,
+    pub(crate) concept_key: Option<String>,
+    pub(crate) concept_label: Option<String>,
+    pub(crate) concept_version: Option<i64>,
+    pub(crate) cluster_hit_count: i64,
+    pub(crate) alias_count: i64,
+    pub(crate) match_kind: Option<String>,
+    pub(crate) matched_alias: Option<String>,
 }
 
 impl Store {
-    pub(crate) fn lookup_ui_route_learning(
-        &self,
-        project_id: &str,
-        message: &str,
-    ) -> Result<Option<UiRouteLearningEntry>> {
-        let phrase_key = normalize_ui_route_phrase(message);
-        if phrase_key.is_empty() {
-            return Ok(None);
-        }
-        let conn = self.conn()?;
-        let entry = conn
-            .query_row(
-                "SELECT id, scope_type, scope_id, phrase_key, sample_text, learned_route,
-                        status, source, confidence, evidence_count, conflict_count, hit_count,
-                        created_by_user_id, created_at, updated_at
-                 FROM ui_route_learning_entries
-                 WHERE phrase_key = ?1 AND status = 'active'
-                   AND ((scope_type = 'project' AND scope_id = ?2)
-                        OR (scope_type = 'global' AND scope_id = ?3))
-                 ORDER BY CASE scope_type WHEN 'project' THEN 0 ELSE 1 END
-                 LIMIT 1",
-                params![phrase_key, project_id, GLOBAL_SCOPE_ID],
-                map_entry,
-            )
-            .optional()?;
-        if let Some(entry) = entry.as_ref() {
-            let timestamp = now();
-            conn.execute(
-                "UPDATE ui_route_learning_entries
-                 SET hit_count = hit_count + 1, last_hit_at = ?2, updated_at = ?2
-                 WHERE id = ?1",
-                params![entry.id, timestamp],
-            )?;
-        }
-        Ok(entry)
-    }
-
     pub(crate) fn record_ui_route_candidate(
         &self,
         project_id: &str,
@@ -172,6 +146,9 @@ impl Store {
             return Err(anyhow!("UI 路由经验文本过短"));
         }
         let sample_text = message.trim().chars().take(MAX_SAMPLE_CHARS).collect::<String>();
+        let concept = crate::ui_design_tasks::controlled_ui_route_concept(message);
+        let concept_key = concept.as_ref().map(|value| value.key);
+        let concept_version = concept.as_ref().map(|value| value.version as i64);
         let timestamp = now();
         let conn = self.conn()?;
         let existing = conn
@@ -207,7 +184,9 @@ impl Store {
                      evidence_count = evidence_count + CASE WHEN ?7 = 0 THEN 1 ELSE 0 END,
                      conflict_count = conflict_count + ?7,
                      created_by_user_id = COALESCE(?8, created_by_user_id),
-                     updated_at = ?9
+                     updated_at = ?9,
+                     concept_key = ?10,
+                     concept_version = ?11
                  WHERE id = ?1",
                 params![
                     entry_id,
@@ -219,6 +198,8 @@ impl Store {
                     conflict as i64,
                     user_id,
                     timestamp,
+                    concept_key,
+                    concept_version,
                 ],
             )?;
         } else {
@@ -226,8 +207,8 @@ impl Store {
                 "INSERT INTO ui_route_learning_entries (
                    id, scope_type, scope_id, phrase_key, sample_text, learned_route, status,
                    source, confidence, evidence_count, conflict_count, hit_count,
-                   created_by_user_id, created_at, updated_at
-                 ) VALUES (?1, 'project', ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, 0, 0, ?9, ?10, ?10)",
+                   created_by_user_id, created_at, updated_at, concept_key, concept_version
+                 ) VALUES (?1, 'project', ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, 0, 0, ?9, ?10, ?10, ?11, ?12)",
                 params![
                     entry_id,
                     project_id,
@@ -239,6 +220,8 @@ impl Store {
                     confidence.clamp(0.0, 1.0),
                     user_id,
                     timestamp,
+                    concept_key,
+                    concept_version,
                 ],
             )?;
         }
@@ -271,6 +254,11 @@ impl Store {
         if changed == 0 {
             return Err(anyhow!("UI 路由经验不存在"));
         }
+        conn.execute(
+            "UPDATE ui_route_learning_aliases SET status = 'revoked', updated_at = ?2
+             WHERE entry_id = ?1 AND status != 'revoked'",
+            params![entry_id, timestamp],
+        )?;
         let entry = load_entry(&conn, entry_id)?;
         record_event(
             &conn,
@@ -293,7 +281,10 @@ impl Store {
         let mut statement = conn.prepare(
             "SELECT id, scope_type, scope_id, phrase_key, sample_text, learned_route,
                     status, source, confidence, evidence_count, conflict_count, hit_count,
-                    created_by_user_id, created_at, updated_at
+                    created_by_user_id, created_at, updated_at,
+                    concept_key, concept_version, cluster_hit_count,
+                    (SELECT COUNT(*) FROM ui_route_learning_aliases alias
+                     WHERE alias.entry_id = ui_route_learning_entries.id AND alias.status = 'active')
              FROM ui_route_learning_entries
              WHERE scope_type = 'project' AND scope_id = ?1
              ORDER BY updated_at DESC LIMIT ?2",
@@ -321,8 +312,9 @@ fn is_cjk(value: char) -> bool {
     matches!(value as u32, 0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF)
 }
 
-fn map_entry(row: &Row<'_>) -> rusqlite::Result<UiRouteLearningEntry> {
+pub(super) fn map_entry(row: &Row<'_>) -> rusqlite::Result<UiRouteLearningEntry> {
     let learned_route = row.get::<_, String>(5)?;
+    let concept_key = row.get::<_, Option<String>>(15)?;
     Ok(UiRouteLearningEntry {
         id: row.get(0)?,
         scope_type: row.get(1)?,
@@ -340,21 +332,37 @@ fn map_entry(row: &Row<'_>) -> rusqlite::Result<UiRouteLearningEntry> {
         created_by_user_id: row.get(12)?,
         created_at: row.get(13)?,
         updated_at: row.get(14)?,
+        concept_label: concept_key
+            .as_deref()
+            .and_then(crate::ui_design_tasks::controlled_ui_concept_label)
+            .map(str::to_string),
+        concept_key,
+        concept_version: row.get(16)?,
+        cluster_hit_count: row.get(17)?,
+        alias_count: row.get(18)?,
+        match_kind: None,
+        matched_alias: None,
     })
 }
 
-fn load_entry(conn: &rusqlite::Connection, entry_id: &str) -> Result<UiRouteLearningEntry> {
+pub(super) fn load_entry(
+    conn: &rusqlite::Connection,
+    entry_id: &str,
+) -> Result<UiRouteLearningEntry> {
     Ok(conn.query_row(
         "SELECT id, scope_type, scope_id, phrase_key, sample_text, learned_route,
                 status, source, confidence, evidence_count, conflict_count, hit_count,
-                created_by_user_id, created_at, updated_at
+                created_by_user_id, created_at, updated_at,
+                concept_key, concept_version, cluster_hit_count,
+                (SELECT COUNT(*) FROM ui_route_learning_aliases alias
+                 WHERE alias.entry_id = ui_route_learning_entries.id AND alias.status = 'active')
          FROM ui_route_learning_entries WHERE id = ?1",
         params![entry_id],
         map_entry,
     )?)
 }
 
-fn record_event(
+pub(super) fn record_event(
     conn: &rusqlite::Connection,
     entry_id: &str,
     action: &str,
@@ -384,11 +392,12 @@ fn record_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ui_route_learning_migration::migration_v97;
+    use crate::ui_route_learning_migration::{migration_v101, migration_v97};
 
     fn store() -> Store {
         let connection = rusqlite::Connection::open_in_memory().unwrap();
         migration_v97(&connection).unwrap();
+        migration_v101(&connection).unwrap();
         Store {
             conn: std::sync::Mutex::new(connection),
         }

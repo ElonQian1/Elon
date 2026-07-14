@@ -34,6 +34,13 @@ pub(crate) fn controlled_ui_route_concept(message: &str) -> Option<ControlledUiC
     None
 }
 
+pub(crate) fn controlled_ui_concept_label(key: &str) -> Option<&'static str> {
+    match key {
+        "ui.action_control.visual_weight.reduce" => Some("操作控件显得厚重，需要轻量化"),
+        _ => None,
+    }
+}
+
 fn contains_any(text: &str, markers: &[&str]) -> bool {
     markers.iter().any(|marker| text.contains(marker))
 }
