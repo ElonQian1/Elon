@@ -1,6 +1,8 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+use crate::store_migrations::add_column_if_missing;
+
 pub(crate) fn migration_v97(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
@@ -52,6 +54,64 @@ pub(crate) fn migration_v97(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn migration_v101(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "ui_route_learning_entries",
+        "concept_key",
+        "concept_key TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "ui_route_learning_entries",
+        "concept_version",
+        "concept_version INTEGER",
+    )?;
+    add_column_if_missing(
+        conn,
+        "ui_route_learning_entries",
+        "cluster_hit_count",
+        "cluster_hit_count INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(
+        conn,
+        "ui_route_learning_entries",
+        "last_cluster_hit_at",
+        "last_cluster_hit_at TEXT",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_ui_route_learning_concept
+          ON ui_route_learning_entries(scope_type, scope_id, concept_key, concept_version, status);
+
+        CREATE TABLE IF NOT EXISTS ui_route_learning_aliases (
+          id             TEXT PRIMARY KEY,
+          entry_id       TEXT NOT NULL,
+          phrase_key     TEXT NOT NULL,
+          sample_text    TEXT NOT NULL,
+          source         TEXT NOT NULL DEFAULT 'controlled_vocabulary',
+          status         TEXT NOT NULL DEFAULT 'active',
+          evidence_count INTEGER NOT NULL DEFAULT 1,
+          conflict_count INTEGER NOT NULL DEFAULT 0,
+          hit_count      INTEGER NOT NULL DEFAULT 0,
+          last_hit_at    TEXT,
+          created_at     TEXT NOT NULL,
+          updated_at     TEXT NOT NULL,
+          CHECK (source IN ('controlled_vocabulary', 'user_override', 'execution_verified', 'codex_candidate')),
+          CHECK (status IN ('candidate', 'active', 'revoked')),
+          UNIQUE(entry_id, phrase_key),
+          FOREIGN KEY (entry_id) REFERENCES ui_route_learning_entries(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_ui_route_learning_alias_lookup
+          ON ui_route_learning_aliases(phrase_key, status);
+        CREATE INDEX IF NOT EXISTS idx_ui_route_learning_alias_entry
+          ON ui_route_learning_aliases(entry_id, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -60,6 +120,8 @@ mod tests {
     fn migration_is_idempotent() {
         let conn = Connection::open_in_memory().unwrap();
         migration_v97(&conn).unwrap();
+        migration_v101(&conn).unwrap();
+        migration_v101(&conn).unwrap();
         migration_v97(&conn).unwrap();
         let count: i64 = conn
             .query_row(
@@ -68,6 +130,6 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(count, 2);
+        assert_eq!(count, 3);
     }
 }
