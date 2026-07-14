@@ -1149,7 +1149,8 @@
                             android:id="@+id/tabChatSelection"
                             android:layout_width="58dp"
                             android:layout_height="48dp"
-                            android:layout_gravity="center"
+                            android:layout_gravity="start|center_vertical"
+                            android:layout_marginStart="@dimen/main_bottom_menu_selection_inset"
                             android:contentDescription="@null"
                             android:scaleType="fitXY"
                             android:src="@drawable/bg_bottom_nav_item_selector" />
@@ -1270,7 +1271,8 @@
                             android:id="@+id/bottomMenuSelection"
                             android:layout_width="58dp"
                             android:layout_height="48dp"
-                            android:layout_gravity="center"
+                            android:layout_gravity="end|center_vertical"
+                            android:layout_marginEnd="@dimen/main_bottom_menu_selection_inset"
                             android:contentDescription="@null"
                             android:scaleType="fitXY"
                             android:src="@drawable/bg_bottom_nav_item_selector" />

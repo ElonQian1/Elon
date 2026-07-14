@@ -3,4 +3,5 @@
     <dimen name="main_bottom_menu_height">56dp</dimen>
     <dimen name="main_bottom_menu_edge_gap">8dp</dimen>
     <dimen name="main_bottom_menu_outer_height">72dp</dimen>
+    <dimen name="main_bottom_menu_selection_inset">4dp</dimen>
 </resources>
