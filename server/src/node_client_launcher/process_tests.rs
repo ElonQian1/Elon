@@ -190,10 +190,15 @@ fn runtime_spawn_script_uses_start_process_and_overrides_runtime_env() {
 #[cfg(windows)]
 #[test]
 fn stop_installed_client_processes_excludes_current_pid() {
-    let script =
-        stop_installed_client_processes_script(Path::new(r"C:\ElonNode\一龙开发平台.exe"), 1234);
+    let script = stop_installed_client_processes_script(
+        Path::new(r"C:\ElonNode\一龙开发平台.exe"),
+        Path::new(r"C:\ElonNode\_internal\elon-desktop.exe"),
+        1234,
+    );
 
     assert!(script.contains(r"C:\ElonNode\一龙开发平台.exe"));
+    assert!(script.contains(r"C:\ElonNode\_internal\elon-desktop.exe"));
+    assert!(script.contains("$matchesDesktopShell"));
     assert!(script.contains("$currentPid = 1234"));
     assert!(script.contains("ProcessId -ne"));
     assert!(script.contains("elon-node-agent.exe"));

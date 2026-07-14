@@ -14,6 +14,8 @@ fn self_replace_script_stops_on_failure_before_restart() {
     assert!(script.contains("$ErrorActionPreference = 'Stop'"));
     assert!(script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir"));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
+    assert!(script.contains("_internal\\elon-desktop.exe"));
+    assert!(script.contains("$matchesDesktopShell"));
     assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpExe"));
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $client"));
     assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));

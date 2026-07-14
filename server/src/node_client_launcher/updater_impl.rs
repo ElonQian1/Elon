@@ -509,14 +509,18 @@ const UPDATE_REPLACE_HELPERS: &str = r#"
 function Get-ElonNodeClientProcesses {
   param([Parameter(Mandatory = $true)][string]$Client)
   $fullClient = [System.IO.Path]::GetFullPath($Client)
+  $desktopShell = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $fullClient) '_internal\elon-desktop.exe'))
   Get-CimInstance Win32_Process | Where-Object {
     $matchesClient = $false
+    $matchesDesktopShell = $false
     if ($_.ExecutablePath) {
       try {
-        $matchesClient = ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $fullClient)
+        $fullExecutable = [System.IO.Path]::GetFullPath($_.ExecutablePath)
+        $matchesClient = ($fullExecutable -ieq $fullClient)
+        $matchesDesktopShell = ($fullExecutable -ieq $desktopShell)
       } catch {}
     }
-    $matchesClient -or ($_.Name -eq 'elon-node-agent.exe')
+    $matchesClient -or $matchesDesktopShell -or ($_.Name -eq 'elon-node-agent.exe')
   }
 }
 

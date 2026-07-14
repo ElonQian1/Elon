@@ -297,7 +297,9 @@ pub(crate) fn stop_installed_client_processes(install_dir: &Path) {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
-        let script = stop_installed_client_processes_script(&client, std::process::id());
+        let desktop_shell = paths::desktop_shell_exe(install_dir);
+        let script =
+            stop_installed_client_processes_script(&client, &desktop_shell, std::process::id());
         let mut ps = launcher_command::powershell_hidden_command(&script);
         let _ = launcher_command::status_hidden(&mut ps);
     }
@@ -308,24 +310,32 @@ pub(crate) fn stop_installed_client_processes(install_dir: &Path) {
 }
 
 #[cfg(any(windows, test))]
-fn stop_installed_client_processes_script(client: &Path, current_pid: u32) -> String {
+fn stop_installed_client_processes_script(
+    client: &Path,
+    desktop_shell: &Path,
+    current_pid: u32,
+) -> String {
     format!(
         r#"
 $target = [System.IO.Path]::GetFullPath('{client}')
+$desktopShell = [System.IO.Path]::GetFullPath('{desktop_shell}')
 $currentPid = {current_pid}
 $deadline = (Get-Date).AddSeconds(20)
 do {{
   $targets = @(Get-CimInstance Win32_Process | Where-Object {{
     $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
     $matchesClient = $false
+    $matchesDesktopShell = $false
     if ($exe) {{
       try {{
         $matchesClient = [System.IO.Path]::GetFullPath($exe).Equals($target, [StringComparison]::OrdinalIgnoreCase)
+        $matchesDesktopShell = [System.IO.Path]::GetFullPath($exe).Equals($desktopShell, [StringComparison]::OrdinalIgnoreCase)
       }} catch {{
         $matchesClient = $false
+        $matchesDesktopShell = $false
       }}
     }}
-    ([uint32]$_.ProcessId -ne [uint32]$currentPid) -and ($matchesClient -or ($_.Name -eq 'elon-node-agent.exe'))
+    ([uint32]$_.ProcessId -ne [uint32]$currentPid) -and ($matchesClient -or $matchesDesktopShell -or ($_.Name -eq 'elon-node-agent.exe'))
   }})
   foreach ($targetProcess in $targets) {{
     try {{ Invoke-CimMethod -InputObject $targetProcess -MethodName Terminate | Out-Null }} catch {{}}
@@ -335,6 +345,7 @@ do {{
 }} while ((Get-Date) -lt $deadline)
 "#,
         client = launcher_command::ps_single_quote(&client.to_string_lossy()),
+        desktop_shell = launcher_command::ps_single_quote(&desktop_shell.to_string_lossy()),
         current_pid = current_pid
     )
 }
