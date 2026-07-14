@@ -187,3 +187,22 @@ fn decode_png(bytes: &[u8]) -> Result<DynamicImage> {
 fn round6(value: f64) -> f64 {
     (value * 1_000_000.0).round() / 1_000_000.0
 }
+
+#[cfg(test)]
+mod runtime_image_format_tests {
+    use super::*;
+    use image::{DynamicImage, ImageFormat};
+
+    #[test]
+    fn compares_process_runtime_webp_frames() {
+        let mut encoded = Cursor::new(Vec::new());
+        DynamicImage::new_rgba8(2, 2)
+            .write_to(&mut encoded, ImageFormat::WebP)
+            .expect("encode WebP fixture");
+        let result = compare_pngs(encoded.get_ref(), encoded.get_ref(), None, None)
+            .expect("decode and compare WebP runtime frame");
+        assert_eq!((result.target_width, result.target_height), (2, 2));
+        assert_eq!((result.current_width, result.current_height), (2, 2));
+        assert_eq!(result.mean_absolute_color_error, 0.0);
+    }
+}
