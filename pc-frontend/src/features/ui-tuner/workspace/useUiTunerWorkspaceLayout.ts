@@ -46,6 +46,10 @@ export function deriveCanvasLayout(state: CanvasLayoutState, hasTarget: boolean)
   }
 }
 
+export function setCanvasFocusMode(state: CanvasLayoutState, focusMode: boolean) {
+  return { ...state, focusMode }
+}
+
 function loadState(storageKey: string) {
   return parseCanvasLayoutState(window.localStorage.getItem(storageKey))
 }
@@ -91,8 +95,23 @@ export function useUiTunerWorkspaceLayout(storageScope: string, hasTarget: boole
   }, [])
 
   const toggleFocusMode = useCallback(() => {
-    setState((current) => ({ ...current, focusMode: !current.focusMode }))
+    setState((current) => setCanvasFocusMode(current, !current.focusMode))
   }, [])
+
+  const exitFocusMode = useCallback(() => {
+    setState((current) => setCanvasFocusMode(current, false))
+  }, [])
+
+  useEffect(() => {
+    if (!state.focusMode) return undefined
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      exitFocusMode()
+    }
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [exitFocusMode, state.focusMode])
 
   return {
     ...deriveCanvasLayout(state, hasTarget),
@@ -101,5 +120,6 @@ export function useUiTunerWorkspaceLayout(storageScope: string, hasTarget: boole
     toggleLeftPanel,
     toggleRightPanel,
     toggleFocusMode,
+    exitFocusMode,
   }
 }

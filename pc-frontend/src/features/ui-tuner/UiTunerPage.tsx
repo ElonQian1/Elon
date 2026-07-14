@@ -636,6 +636,18 @@ export default function UiTunerPage() {
       ].join(' ')}
       style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}
     >
+      {workspaceLayout.focusMode && (
+        <button
+          type="button"
+          className={styles.focusModeExit}
+          onClick={workspaceLayout.exitFocusMode}
+          aria-label="退出专注画布"
+          title="退出专注画布（Esc）"
+        >
+          退出专注
+          <kbd>Esc</kbd>
+        </button>
+      )}
       {workspaceLayout.leftPanelOpen && <UiTunerLayersPanel
         realRenderer={realRenderer}
         filter={layerFilter}

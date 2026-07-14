@@ -98,6 +98,7 @@ try {
     clampSplitRatio,
     deriveCanvasLayout,
     parseCanvasLayoutState,
+    setCanvasFocusMode,
   } = require(layoutOutput)
 
   assert.deepEqual(parseCanvasLayoutState(null), {
@@ -139,6 +140,25 @@ try {
       focusMode: true,
     },
     '专注画布必须收起左右侧栏',
+  )
+  const focused = setCanvasFocusMode({
+    designPaneOpen: true,
+    splitRatio: 62,
+    leftPanelOpen: false,
+    rightPanelOpen: true,
+    focusMode: false,
+  }, true)
+  assert.equal(focused.focusMode, true)
+  assert.deepEqual(
+    setCanvasFocusMode(focused, false),
+    {
+      designPaneOpen: true,
+      splitRatio: 62,
+      leftPanelOpen: false,
+      rightPanelOpen: true,
+      focusMode: false,
+    },
+    '退出专注必须恢复进入前的面板偏好，而不是重置用户选择',
   )
 
   const previousCssLoader = require.extensions['.css']
@@ -198,6 +218,42 @@ try {
   )
   assert.match(pageCss, /--layers-panel-width/)
   assert.match(pageCss, /\.focusCanvas/)
+  assert.match(
+    pageCss,
+    /\.layersPanel\s*\{[^}]*grid-column:\s*1\s*;/s,
+    '隐藏面板后组件树位置不能依赖 DOM 自动排布',
+  )
+  assert.match(
+    pageCss,
+    /\.stage\s*\{[^}]*grid-column:\s*2\s*;/s,
+    '隐藏面板后画布必须始终留在可伸展的中间列',
+  )
+  assert.match(
+    pageCss,
+    /\.inspector\s*\{[^}]*grid-column:\s*3\s*;/s,
+    '隐藏面板后属性栏位置不能依赖 DOM 自动排布',
+  )
+  assert.match(
+    pageCss,
+    /\.focusModeExit\s*\{[^}]*position:\s*fixed\s*;/s,
+    '专注模式必须保留不依赖工具栏布局的固定退出入口',
+  )
+  const pageSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/UiTunerPage.tsx'),
+    'utf8',
+  )
+  assert.match(pageSource, /workspaceLayout\.focusMode\s*&&/)
+  assert.match(pageSource, /className=\{styles\.focusModeExit\}/)
+  assert.match(pageSource, /onClick=\{workspaceLayout\.exitFocusMode\}/)
+  const layoutSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/workspace/useUiTunerWorkspaceLayout.ts'),
+    'utf8',
+  )
+  assert.match(
+    layoutSource,
+    /event\.key\s*!==\s*'Escape'/,
+    '持久化专注模式必须支持 Esc 紧急退出',
+  )
   assert.match(
     pageCss,
     /\.toolbarActions button\s*\{[^}]*flex:\s*0 0 auto\s*;[^}]*white-space:\s*nowrap\s*;/s,

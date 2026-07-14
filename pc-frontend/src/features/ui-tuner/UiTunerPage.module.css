@@ -32,12 +32,14 @@
 }
 
 .layersPanel {
+  grid-column: 1;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
 }
 
 .inspector {
+  grid-column: 3;
   border-left: 1px solid var(--border);
   padding: 12px;
 }
@@ -132,11 +134,47 @@
 }
 
 .stage {
+  grid-column: 2;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   background: #0b0c0e;
+}
+
+.focusModeExit {
+  position: fixed;
+  top: 42px;
+  right: 18px;
+  z-index: 120;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid rgba(89, 215, 255, .55);
+  border-radius: 999px;
+  background: rgba(12, 20, 26, .96);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .38);
+  color: #dff8ff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.focusModeExit:hover,
+.focusModeExit:focus-visible {
+  border-color: #59d7ff;
+  background: #172b34;
+}
+
+.focusModeExit kbd {
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, .24);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font: inherit;
 }
 
 .toolbar {
@@ -869,6 +907,7 @@
   }
 
   .layersPanel {
+    grid-column: 1;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
@@ -878,8 +917,13 @@
   }
 
   .inspector {
+    grid-column: 1;
     border-left: 0;
     border-top: 1px solid var(--border);
+  }
+
+  .stage {
+    grid-column: 1;
   }
 
   .notice {
