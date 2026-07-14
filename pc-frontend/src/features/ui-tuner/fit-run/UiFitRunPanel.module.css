@@ -84,12 +84,17 @@
 }
 
 .panel {
+  flex: 0 0 auto;
   display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent, #7c8cff) 35%, transparent);
-  border-radius: 12px;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent, #7c8cff) 35%, transparent);
   background: color-mix(in srgb, var(--surface-2, #151a24) 92%, transparent);
+}
+
+.idlePanel {
+  min-height: 38px;
+  padding-block: 5px;
 }
 
 .panel header,
@@ -104,6 +109,12 @@
 .panel header { justify-content: space-between; }
 .panel header > div,
 .handoff { align-items: flex-start; flex-direction: column; }
+.idlePanel header > div {
+  min-width: 0;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+}
 .panel header span,
 .metrics span,
 .handoff span,
@@ -140,4 +151,15 @@
 .handoff { padding: 10px; border-radius: 9px; background: rgba(124, 140, 255, .09); }
 .actions { flex-wrap: wrap; }
 .panel button { cursor: pointer; }
-.primary { min-height: 36px; font-weight: 700; }
+.primary {
+  width: auto;
+  min-width: 88px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid rgba(124, 140, 255, .45);
+  border-radius: 6px;
+  background: rgba(124, 140, 255, .14);
+  color: var(--text-primary, #f4f7fb);
+  font-size: 11px;
+  font-weight: 700;
+}

@@ -14,13 +14,18 @@ export function UiFitRunPanel({ fitRun, pairReady }: UiFitRunPanelProps) {
   const interactionBusy = fitRun.busy || codexHandoff.launching
   const terminal = Boolean(run && ['ACCEPTED', 'PLATEAU', 'FAILED', 'CANCELLED'].includes(run.phase))
   return (
-    <section className={styles.panel} aria-label="设计稿自动拟合">
+    <section className={[styles.panel, run ? '' : styles.idlePanel].join(' ')} aria-label="设计稿自动拟合">
       <header>
         <div>
           <strong>自动拟合</strong>
           <span>{run ? phaseLabel(run.phase) : pairReady ? '配对就绪' : '等待左右区域配对'}</span>
         </div>
         {run?.best && <Score value={run.best.score.overallLoss} />}
+        {!run && (
+          <button type="button" className={styles.primary} disabled={!fitRun.canStart || fitRun.busy} onClick={() => { void fitRun.start() }}>
+            {fitRun.busy ? '建立基线…' : '开始拟合'}
+          </button>
+        )}
       </header>
 
       {run ? (
@@ -76,11 +81,7 @@ export function UiFitRunPanel({ fitRun, pairReady }: UiFitRunPanelProps) {
             )}
           </div>
         </>
-      ) : (
-        <button type="button" className={styles.primary} disabled={!fitRun.canStart || fitRun.busy} onClick={() => { void fitRun.start() }}>
-          {fitRun.busy ? '正在建立基线…' : '开始自动拟合'}
-        </button>
-      )}
+      ) : null}
       {fitRun.error && <p className={styles.error}>{fitRun.error}</p>}
     </section>
   )

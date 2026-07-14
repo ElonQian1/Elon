@@ -224,23 +224,27 @@ export function UiTunerComparisonWorkspace({
 
   return (
     <div className={styles.workspace}>
-      <ComparisonModeControls
-        mode={comparison.mode}
-        opacity={comparison.overlayOpacity}
-        pair={comparison.pair}
-        targetReady={Boolean(target)}
-        onModeChange={comparison.setMode}
-        onOpacityChange={comparison.setOverlayOpacity}
-        onClearPair={comparison.clearPair}
-      />
-      <DesignDiffRegionsPanel
-        sessionId={liveSession?.id}
-        targetReady={Boolean(target)}
-        onChooseRegion={chooseAutoRegion}
-        onAnalysisChange={setAutoAnalysis}
-      />
-      <AutoFitQueuePanel analysis={autoAnalysis} queue={autoQueue} />
-      <UiFitRunPanel fitRun={fitRun} pairReady={Boolean(fitInput)} />
+      {target && (
+        <>
+          <ComparisonModeControls
+            mode={comparison.mode}
+            opacity={comparison.overlayOpacity}
+            pair={comparison.pair}
+            targetReady
+            onModeChange={comparison.setMode}
+            onOpacityChange={comparison.setOverlayOpacity}
+            onClearPair={comparison.clearPair}
+          />
+          <DesignDiffRegionsPanel
+            sessionId={liveSession?.id}
+            targetReady
+            onChooseRegion={chooseAutoRegion}
+            onAnalysisChange={setAutoAnalysis}
+          />
+          <AutoFitQueuePanel analysis={autoAnalysis} queue={autoQueue} />
+          <UiFitRunPanel fitRun={fitRun} pairReady={Boolean(fitInput)} />
+        </>
+      )}
       {target && (
         <CalibrationPanel
           calibration={calibration}
@@ -249,7 +253,7 @@ export function UiTunerComparisonWorkspace({
           onChange={comparison.setCalibration}
         />
       )}
-      {comparison.mode === 'split' ? (
+      {comparison.mode === 'split' && target ? (
         <div className={styles.splitGrid}>
           <section className={styles.pane} aria-label="目标设计稿">
             <header className={styles.paneHeader}>
