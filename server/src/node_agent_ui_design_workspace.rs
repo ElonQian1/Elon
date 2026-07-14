@@ -164,6 +164,8 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
     let mut scanned = 0usize;
     let mut compose = false;
     let mut android_views = false;
+    let mut compose_source_count = 0usize;
+    let mut view_layout_count = 0usize;
     let mut pwa = false;
     let mut themes = Vec::new();
     let mut components = Vec::new();
@@ -205,8 +207,10 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
         if name == "package.json" || name.ends_with(".webmanifest") {
             pwa = true;
         }
-        if extension == "xml" && relative_text.contains("/res/layout/") {
+        let tooling_runtime = is_ui_runtime_tooling_path(relative);
+        if !tooling_runtime && extension == "xml" && relative_text.contains("/res/layout/") {
             android_views = true;
+            view_layout_count += 1;
             push_unique(&mut components, &relative_text);
         }
         if !matches!(
@@ -223,13 +227,19 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
             android_namespace =
                 android_namespace.or_else(|| gradle_string_literal(&content, "namespace"));
         }
-        if content.contains("androidx.compose") || content.contains("@Composable") {
+        if !tooling_runtime
+            && (content.contains("androidx.compose") || content.contains("@Composable"))
+        {
             compose = true;
+            compose_source_count += 1;
         }
-        if content.contains("@Composable") && looks_like_component_file(&name) {
+        if !tooling_runtime
+            && content.contains("@Composable")
+            && looks_like_component_file(&name)
+        {
             push_unique(&mut components, &relative_text);
         }
-        if content.contains("@Preview") || name.contains("preview") {
+        if !tooling_runtime && (content.contains("@Preview") || name.contains("preview")) {
             push_unique(&mut previews, &relative_text);
         }
         if content.contains("NavHost")
@@ -256,13 +266,19 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
     }
 
     Ok(json!({
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "projectRoot": root,
         "generatedAt": chrono::Utc::now().to_rfc3339(),
         "capabilities": {
             "jetpackCompose": compose,
             "androidViews": android_views,
             "pwa": pwa,
+            "preferredAndroidUiToolkit": preferred_android_ui_toolkit(compose, android_views),
+            "evidence": {
+                "composeSourceFiles": compose_source_count,
+                "viewLayoutFiles": view_layout_count,
+                "toolingRuntimeExcluded": true,
+            }
         },
         "android": {
             "applicationId": application_id,
@@ -281,6 +297,26 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
             "contentIncludedInProfile": false,
         }
     }))
+}
+
+fn preferred_android_ui_toolkit(compose: bool, android_views: bool) -> &'static str {
+    match (compose, android_views) {
+        (true, false) => "COMPOSE",
+        (false, true) => "VIEWS",
+        (true, true) => "HYBRID",
+        (false, false) => "UNKNOWN",
+    }
+}
+
+/// The Live UI SDK is development infrastructure, not evidence that the host
+/// application itself is implemented with that UI toolkit.
+fn is_ui_runtime_tooling_path(path: &Path) -> bool {
+    path.components().any(|component| {
+        matches!(
+            component.as_os_str().to_string_lossy().as_ref(),
+            "ui-runtime-view-debug" | "ui-runtime-compose-debug"
+        )
+    })
 }
 
 fn gradle_string_literal(content: &str, key: &str) -> Option<String> {
@@ -415,5 +451,39 @@ mod tests {
             gradle_string_literal("namespace = \"com.example.kotlin\"", "namespace"),
             Some("com.example.kotlin".into())
         );
+    }
+
+    #[test]
+    fn profile_excludes_bundled_runtime_from_business_toolkit_detection() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_ui_profile_runtime_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let runtime = root.join(
+            "android/ui-runtime-compose-debug/src/main/kotlin/com/elon/RuntimeGallery.kt",
+        );
+        let layout = root.join("android/app/src/main/res/layout/activity_main.xml");
+        fs::create_dir_all(runtime.parent().unwrap()).unwrap();
+        fs::create_dir_all(layout.parent().unwrap()).unwrap();
+        fs::write(
+            runtime,
+            "import androidx.compose.runtime.Composable\n@Composable fun Gallery() = Unit\n",
+        )
+        .unwrap();
+        fs::write(layout, "<LinearLayout />\n").unwrap();
+
+        let profile = build_project_ui_profile(&root).unwrap();
+
+        assert_eq!(profile["capabilities"]["jetpackCompose"], false);
+        assert_eq!(profile["capabilities"]["androidViews"], true);
+        assert_eq!(
+            profile["capabilities"]["preferredAndroidUiToolkit"],
+            "VIEWS"
+        );
+        assert_eq!(
+            profile["capabilities"]["evidence"]["composeSourceFiles"],
+            0
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }
