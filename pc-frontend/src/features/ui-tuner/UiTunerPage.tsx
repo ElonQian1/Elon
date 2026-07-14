@@ -352,8 +352,8 @@ export default function UiTunerPage() {
     applyGestureRemote: liveUi.applyGesture,
     onNotice: setNotice,
   })
-  const undoLive = useCallback(async () => { runtimeDraft.reset(); await liveUi.undo() }, [liveUi, runtimeDraft])
-  const redoLive = useCallback(async () => { runtimeDraft.reset(); await liveUi.redo() }, [liveUi, runtimeDraft])
+  const undoLive = useCallback(async () => { runtimeDraft.undoLocal(); await liveUi.undo() }, [liveUi, runtimeDraft])
+  const redoLive = useCallback(async () => { runtimeDraft.redoLocal(); await liveUi.redo() }, [liveUi, runtimeDraft])
   const canvasGesture = useRuntimeCanvasGesture({
     documentRef: tunerDocRef,
     setDocument: setTunerDoc,
@@ -686,8 +686,8 @@ export default function UiTunerPage() {
           )) ?? false}
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
-          canUndo={realRenderer ? (liveUi.session?.historyCount ?? 0) > 0 : history.past.length > 0}
-          canRedo={realRenderer ? (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
+          canUndo={realRenderer ? runtimeDraft.canUndo || (liveUi.session?.historyCount ?? 0) > 0 : history.past.length > 0}
+          canRedo={realRenderer ? runtimeDraft.canRedo || (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
           onImportScreenshot={importScreenshot}
           onSelectDevice={selectDevice}
           onRefreshDevices={refreshDevices}
@@ -758,9 +758,9 @@ export default function UiTunerPage() {
         liveUi={liveUi}
         onLiveApply={runtimeDraft.apply}
         onLiveApplyGesture={runtimeDraft.applyGesture}
-        onLiveUndo={undoLive}
-        onLiveRedo={redoLive}
+        onLiveUndo={undoLive} onLiveRedo={redoLive}
         liveUiDraftStatus={runtimeDraft.status}
+        liveDraftCanUndo={runtimeDraft.canUndo} liveDraftCanRedo={runtimeDraft.canRedo}
         livePrepareBusy={livePrepareBusy}
         livePrepareError={livePrepareError}
         livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}

@@ -28,6 +28,8 @@ interface UiTunerLivePanelProps {
   uiIr: LiveUiIrDocument | null
   targetDesign: LiveTargetDesign | null
   draftStatus: RuntimeDraftStatus
+  localCanUndo: boolean
+  localCanRedo: boolean
   onApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
   onApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
   onGestureActive: (active: boolean) => void
@@ -86,6 +88,8 @@ export function UiTunerLivePanel({
   uiIr,
   targetDesign,
   draftStatus,
+  localCanUndo,
+  localCanRedo,
   onApply,
   onApplyGesture,
   onGestureActive,
@@ -245,10 +249,10 @@ export function UiTunerLivePanel({
           )}
 
           <div className={styles.actions}>
-            <button type="button" disabled={busy || !session?.historyCount} onClick={() => { void onUndo() }}>
+            <button type="button" disabled={busy || (!localCanUndo && !session?.historyCount)} onClick={() => { void onUndo() }}>
               撤销 LIVE
             </button>
-            <button type="button" disabled={busy || !session?.redoCount} onClick={() => { void onRedo() }}>
+            <button type="button" disabled={busy || (!localCanRedo && !session?.redoCount)} onClick={() => { void onRedo() }}>
               重做
             </button>
           </div>
