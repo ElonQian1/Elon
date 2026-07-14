@@ -3,10 +3,12 @@ package com.elon.app
 import android.graphics.Color
 import android.os.Build
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.elon.app.databinding.ActivityMainBinding
 
 internal fun shouldDrawChatBehindNavigationBar(binding: ActivityMainBinding): Boolean {
@@ -88,4 +90,43 @@ internal fun resolveMainSystemUiVisibility(
         flags = flags and View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR.inv()
     }
     return flags
+}
+
+internal fun ActivityMainBinding.restoreChatToolbar(backgroundColor: Int) {
+    toolbar.visibility = View.VISIBLE
+    toolbar.alpha = 1f
+    toolbar.translationY = 0f
+    toolbar.setBackgroundColor(backgroundColor)
+    topTitleText.visibility = View.VISIBLE
+    ViewCompat.requestApplyInsets(root)
+}
+
+internal fun applyMainToolbarStatusBarInset(
+    binding: ActivityMainBinding,
+    insets: WindowInsetsCompat
+) {
+    val params = binding.toolbar.layoutParams as? ViewGroup.MarginLayoutParams ?: return
+    val statusBarResourceId = binding.root.resources.getIdentifier(
+        "status_bar_height",
+        "dimen",
+        "android"
+    )
+    val statusBarResourceHeight = if (statusBarResourceId != 0) {
+        binding.root.resources.getDimensionPixelSize(statusBarResourceId)
+    } else {
+        0
+    }
+    val statusBarTop = maxOf(
+        insets.getInsets(WindowInsetsCompat.Type.statusBars()).top,
+        statusBarResourceHeight
+    )
+    val location = IntArray(2)
+    binding.toolbar.getLocationInWindow(location)
+    val toolbarTopWithoutAppliedMargin = location[1] - params.topMargin
+    val targetTopMargin = (statusBarTop - toolbarTopWithoutAppliedMargin).coerceAtLeast(0)
+    if (params.topMargin == targetTopMargin) return
+
+    params.topMargin = targetTopMargin
+    binding.toolbar.layoutParams = params
+    binding.toolbar.post { ViewCompat.requestApplyInsets(binding.root) }
 }

@@ -814,7 +814,7 @@ internal class MainNavigationController(
     }
 
     private fun applyChatChrome() {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
@@ -867,7 +867,7 @@ internal class MainNavigationController(
     }
 
     private fun applyFriendChatChrome(title: String) {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabChat)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
@@ -981,7 +981,7 @@ internal class MainNavigationController(
     }
 
     private fun applyProjectChannelChrome(title: String) {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.restoreChatToolbar(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE

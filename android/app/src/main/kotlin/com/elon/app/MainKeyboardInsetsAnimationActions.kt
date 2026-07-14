@@ -62,6 +62,7 @@ internal class MainKeyboardInsetsAnimationActions(
         installBottomBarLayoutSync()
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            applyMainToolbarStatusBarInset(binding, insets)
             applyNavigationBarInset(insets)
             if (!runningImeAnimation) {
                 val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)
