@@ -298,6 +298,10 @@ async fn call_tool(
             let session = broker.session(&session_id).await?;
             super::design_bootstrap::create_compose_screen_scaffold(&session, &arguments)?
         }
+        "ui_create_android_screen_scaffold" => {
+            let session = broker.session(&session_id).await?;
+            super::design_bootstrap::create_android_screen_scaffold(&session, &arguments)?
+        }
         "ui_get_screen_summary" => {
             let ir = load_or_build_ui_ir(broker, &session_id).await?;
             json!({

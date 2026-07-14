@@ -38,6 +38,9 @@ async fn mcp_lists_compact_ui_tools() {
         .iter()
         .any(|tool| tool["name"] == "ui_commit_bound_styles"));
     assert!(tools.iter().any(|tool| tool["name"] == "ui_start_fit_run"));
+    assert!(tools
+        .iter()
+        .any(|tool| tool["name"] == "ui_create_android_screen_scaffold"));
 }
 
 #[tokio::test]

@@ -92,8 +92,24 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_create_android_screen_scaffold",
+            "为全新 Android 页面按项目 UI Profile 生成不覆盖现有文件的真实工程骨架。纯 View/XML 或纯 Compose 自动选择；混合项目必须显式选择，创建后交给 Codex 补业务结构，再构建进入真实 Renderer。",
+            json!({
+                "type":"object",
+                "required":["screenName","screenId"],
+                "properties":{
+                    "uiToolkit":{"enum":["COMPOSE","VIEWS"],"description":"混合项目必填；纯技术栈项目可省略"},
+                    "relativeFile":{"type":"string","description":"可选；默认根据 UI Profile 的 app 模块生成"},
+                    "packageName":{"type":"string","description":"Compose 可选；默认使用 Android namespace"},
+                    "layoutName":{"type":"string","description":"View/XML 可选；必须是小写 Android resource name"},
+                    "screenName":{"type":"string"},
+                    "screenId":{"type":"string"}
+                }
+            }),
+        ),
+        tool(
             "ui_create_compose_screen_scaffold",
-            "在已确认 Compose 的项目中创建不会覆盖现有文件的最小 Screen + Preview 骨架。创建后仍需按项目组件和主题补全并编译。",
+            "兼容旧客户端的 Compose 专用页面骨架工具；新任务优先使用 ui_create_android_screen_scaffold。",
             json!({
                 "type":"object",
                 "required":["screenName","screenId"],

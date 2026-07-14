@@ -10,6 +10,12 @@ use super::ui_ir::TargetDesignUpload;
 
 const MAX_ARTIFACT_BYTES: u64 = 512 * 1024;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AndroidUiToolkit {
+    Compose,
+    Views,
+}
+
 pub(crate) fn project_profile(session: &LiveUiSession) -> Result<Value> {
     let root = canonical_project_root(session)?;
     read_json_artifact(&root.join(".elon/ui-design/project-ui-profile.json"))
@@ -38,11 +44,24 @@ pub(crate) fn create_compose_screen_scaffold(
     session: &LiveUiSession,
     arguments: &Value,
 ) -> Result<Value> {
+    let mut arguments = arguments.clone();
+    arguments["uiToolkit"] = Value::String("COMPOSE".to_string());
+    create_android_screen_scaffold(session, &arguments)
+}
+
+pub(crate) fn create_android_screen_scaffold(
+    session: &LiveUiSession,
+    arguments: &Value,
+) -> Result<Value> {
     let root = canonical_project_root(session)?;
     let profile = project_profile(session)?;
-    if profile.pointer("/capabilities/jetpackCompose") != Some(&Value::Bool(true)) {
-        bail!("项目 UI Profile 未确认 Jetpack Compose，拒绝生成 Compose 页面");
+    match resolve_android_ui_toolkit(&profile, arguments)? {
+        AndroidUiToolkit::Compose => create_compose_scaffold(&root, &profile, arguments),
+        AndroidUiToolkit::Views => create_view_scaffold(&root, &profile, arguments),
     }
+}
+
+fn create_compose_scaffold(root: &Path, profile: &Value, arguments: &Value) -> Result<Value> {
     let screen_name = required_string(arguments, "screenName")?;
     let screen_id = required_string(arguments, "screenId")?;
     let package_name = optional_string(arguments, "packageName")
@@ -64,7 +83,8 @@ pub(crate) fn create_compose_screen_scaffold(
     validate_package(&package_name)?;
     validate_identifier(&screen_name, "screenName")?;
     validate_screen_id(&screen_id)?;
-    let target = safe_new_kotlin_path(&root, &relative_file)?;
+    ensure_scaffold_contract_absent(root, &screen_id)?;
+    let target = safe_new_kotlin_path(root, &relative_file)?;
     if target.exists() {
         bail!("目标页面已存在，脚手架禁止覆盖: {}", target.display());
     }
@@ -78,25 +98,28 @@ pub(crate) fn create_compose_screen_scaffold(
         fs::create_dir_all(parent)?;
     }
     fs::write(&target, source)?;
-    let contract_dir = root.join(".elon/ui-design/generated");
-    fs::create_dir_all(&contract_dir)?;
-    let contract_path = contract_dir.join(format!("{}.scaffold.json", safe_id(&screen_id)));
-    fs::write(
-        &contract_path,
-        serde_json::to_vec_pretty(&json!({
-            "schemaVersion": 1,
+    let stable_node_ids = stable_node_ids(&screen_id);
+    let contract_path = write_scaffold_contract(
+        root,
+        &screen_id,
+        json!({
+            "schemaVersion": 2,
             "screenId": screen_id,
             "screenName": composable_name,
-            "sourceFile": target.strip_prefix(&root).unwrap_or(&target),
-            "status": "SCAFFOLDED",
-            "bindingStatus": "NEEDS_PROJECT_ADAPTER",
+            "uiToolkit": "COMPOSE",
+            "sourceFiles": [target.strip_prefix(root).unwrap_or(&target)],
+            "workflowStatus": "SCAFFOLDED",
+            "rendererStatus": "NEEDS_BUILD_AND_NAVIGATION",
+            "sourceBindingStatus": "NEEDS_COMPOSE_RUNTIME_ADAPTER",
+            "stableNodeIds": stable_node_ids,
             "requiredNextActions": [
+                "Use Codex to replace the placeholder with the target business structure",
                 "Apply the project theme and reusable components from project-ui-profile.json",
-                "Register navigation and Preview/Preview Host scenario",
-                "Replace placeholder state with the target design structure",
-                "Build before starting Runtime visual fitting"
+                "Register navigation and a deterministic Preview Host scenario",
+                "Add Compose Runtime style bindings for the editable nodes",
+                "Build and reconnect the real Android renderer before visual fitting"
             ]
-        }))?,
+        }),
     )?;
     Ok(json!({
         "created": true,
@@ -104,7 +127,69 @@ pub(crate) fn create_compose_screen_scaffold(
         "contractFile": contract_path,
         "screenId": screen_id,
         "screenName": composable_name,
-        "nextPhase": "COMPILE_BOOTSTRAP"
+        "uiToolkit": "COMPOSE",
+        "workflowStatus": "SCAFFOLDED",
+        "runtimeReady": false,
+        "nextPhase": "CODEX_STRUCTURE"
+    }))
+}
+
+fn create_view_scaffold(root: &Path, profile: &Value, arguments: &Value) -> Result<Value> {
+    let screen_name = required_string(arguments, "screenName")?;
+    let screen_id = required_string(arguments, "screenId")?;
+    if screen_name.chars().count() > 160 {
+        bail!("screenName 最多 160 个字符");
+    }
+    validate_screen_id(&screen_id)?;
+    ensure_scaffold_contract_absent(root, &screen_id)?;
+    let layout_name = optional_string(arguments, "layoutName")
+        .unwrap_or_else(|| format!("screen_{}", resource_name(&screen_id)));
+    validate_resource_name(&layout_name, "layoutName")?;
+    let relative_file = optional_string(arguments, "relativeFile")
+        .unwrap_or_else(|| default_view_layout_path(profile, &layout_name));
+    let target = safe_new_layout_path(root, &relative_file)?;
+    if target.exists() {
+        bail!("目标页面已存在，脚手架禁止覆盖: {}", target.display());
+    }
+    let node_ids = stable_node_ids(&screen_id);
+    let source = view_layout_source(&screen_name, &resource_name(&screen_id));
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&target, source)?;
+    let contract_path = write_scaffold_contract(
+        root,
+        &screen_id,
+        json!({
+            "schemaVersion": 2,
+            "screenId": screen_id,
+            "screenName": screen_name,
+            "uiToolkit": "VIEWS",
+            "layoutName": layout_name,
+            "sourceFiles": [target.strip_prefix(root).unwrap_or(&target)],
+            "workflowStatus": "SCAFFOLDED",
+            "rendererStatus": "NEEDS_BUILD_AND_NAVIGATION",
+            "sourceBindingStatus": "XML_RESOURCE_IDS_READY",
+            "stableNodeIds": node_ids,
+            "requiredNextActions": [
+                "Use Codex to replace the placeholder with the target business structure",
+                "Inflate this layout from the target Activity or Fragment and register navigation",
+                "Add deterministic Preview Host data for normal/loading/empty/error as needed",
+                "Build and reconnect the real Android renderer before visual fitting"
+            ]
+        }),
+    )?;
+    Ok(json!({
+        "created": true,
+        "sourceFile": target,
+        "contractFile": contract_path,
+        "screenId": screen_id,
+        "screenName": screen_name,
+        "layoutName": layout_name,
+        "uiToolkit": "VIEWS",
+        "workflowStatus": "SCAFFOLDED",
+        "runtimeReady": false,
+        "nextPhase": "CODEX_STRUCTURE"
     }))
 }
 
@@ -248,6 +333,26 @@ fn safe_new_kotlin_path(root: &Path, relative: &str) -> Result<PathBuf> {
     Ok(root.join(relative))
 }
 
+fn safe_new_layout_path(root: &Path, relative: &str) -> Result<PathBuf> {
+    let relative = Path::new(relative.trim());
+    if relative.is_absolute()
+        || relative.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+        || relative.extension().and_then(|value| value.to_str()) != Some("xml")
+    {
+        bail!("relativeFile 必须是项目内的 .xml 相对路径");
+    }
+    let normalized = relative.to_string_lossy().replace('\\', "/");
+    if !normalized.contains("/src/main/res/layout/") {
+        bail!("View relativeFile 必须位于模块 src/main/res/layout 下");
+    }
+    Ok(root.join(relative))
+}
+
 fn required_string(arguments: &Value, field: &str) -> Result<String> {
     optional_string(arguments, field).ok_or_else(|| anyhow!("缺少 {field}"))
 }
@@ -262,7 +367,23 @@ fn optional_string(arguments: &Value, field: &str) -> Option<String> {
 }
 
 fn default_compose_source_path(profile: &Value, package_name: &str, screen_name: &str) -> String {
-    let module = profile
+    let module = default_android_module(profile);
+    format!(
+        "{module}/src/main/kotlin/{}/{}.kt",
+        package_name.replace('.', "/"),
+        screen_name
+    )
+}
+
+fn default_view_layout_path(profile: &Value, layout_name: &str) -> String {
+    format!(
+        "{}/src/main/res/layout/{layout_name}.xml",
+        default_android_module(profile)
+    )
+}
+
+fn default_android_module(profile: &Value) -> String {
+    profile
         .pointer("/candidates/buildFiles")
         .and_then(Value::as_array)
         .and_then(|files| {
@@ -276,12 +397,101 @@ fn default_compose_source_path(profile: &Value, package_name: &str, screen_name:
         .and_then(|path| Path::new(path).parent())
         .map(|path| path.to_string_lossy().replace('\\', "/"))
         .filter(|path| !path.is_empty())
-        .unwrap_or_else(|| "app".to_string());
-    format!(
-        "{module}/src/main/kotlin/{}/{}.kt",
-        package_name.replace('.', "/"),
-        screen_name
-    )
+        .unwrap_or_else(|| "app".to_string())
+}
+
+fn resolve_android_ui_toolkit(profile: &Value, arguments: &Value) -> Result<AndroidUiToolkit> {
+    let requested = optional_string(arguments, "uiToolkit")
+        .unwrap_or_else(|| {
+            profile
+                .pointer("/capabilities/preferredAndroidUiToolkit")
+                .and_then(Value::as_str)
+                .unwrap_or("UNKNOWN")
+                .to_string()
+        })
+        .to_ascii_uppercase();
+    let compose = profile.pointer("/capabilities/jetpackCompose") == Some(&Value::Bool(true));
+    let views = profile.pointer("/capabilities/androidViews") == Some(&Value::Bool(true));
+    match requested.as_str() {
+        "COMPOSE" if compose => Ok(AndroidUiToolkit::Compose),
+        "VIEWS" | "VIEW" | "XML" if views => Ok(AndroidUiToolkit::Views),
+        "COMPOSE" => bail!("项目 UI Profile 未确认业务代码使用 Jetpack Compose"),
+        "VIEWS" | "VIEW" | "XML" => bail!("项目 UI Profile 未确认业务代码使用 Android View/XML"),
+        "HYBRID" => bail!("混合项目必须显式传 uiToolkit=COMPOSE 或 VIEWS，禁止静默猜测"),
+        _ if compose && !views => Ok(AndroidUiToolkit::Compose),
+        _ if views && !compose => Ok(AndroidUiToolkit::Views),
+        _ if compose && views => {
+            bail!("混合项目必须显式传 uiToolkit=COMPOSE 或 VIEWS，禁止静默猜测")
+        }
+        _ => bail!("UI Profile 没有识别到 Compose 或 View/XML，不能安全生成 Android 页面"),
+    }
+}
+
+fn write_scaffold_contract(root: &Path, screen_id: &str, contract: Value) -> Result<PathBuf> {
+    let contract_dir = root.join(".elon/ui-design/generated");
+    fs::create_dir_all(&contract_dir)?;
+    let contract_path = contract_dir.join(format!("{}.scaffold.json", safe_id(screen_id)));
+    fs::write(&contract_path, serde_json::to_vec_pretty(&contract)?)?;
+    Ok(contract_path)
+}
+
+fn ensure_scaffold_contract_absent(root: &Path, screen_id: &str) -> Result<()> {
+    let contract_path = root
+        .join(".elon/ui-design/generated")
+        .join(format!("{}.scaffold.json", safe_id(screen_id)));
+    if contract_path.exists() {
+        bail!(
+            "页面脚手架契约已存在，禁止覆盖: {}",
+            contract_path.display()
+        );
+    }
+    Ok(())
+}
+
+fn stable_node_ids(screen_id: &str) -> Value {
+    json!({
+        "root": format!("{screen_id}.root"),
+        "title": format!("{screen_id}.title"),
+        "primaryAction": format!("{screen_id}.primary_action"),
+    })
+}
+
+fn resource_name(value: &str) -> String {
+    let mut result = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    while result.contains("__") {
+        result = result.replace("__", "_");
+    }
+    result = result.trim_matches('_').to_string();
+    if result.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+        result.insert_str(0, "ui_");
+    }
+    if result.is_empty() {
+        "ui_screen".to_string()
+    } else {
+        result
+    }
+}
+
+fn validate_resource_name(value: &str, field: &str) -> Result<()> {
+    if value.len() > 120
+        || value.is_empty()
+        || value.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+        || !value
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
+    {
+        bail!("{field} 必须是小写 Android resource name");
+    }
+    Ok(())
 }
 
 fn validate_package(value: &str) -> Result<()> {
@@ -332,31 +542,66 @@ fn compose_source(package_name: &str, screen_name: &str, screen_id: &str) -> Str
     format!(
         r#"package {package_name}
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 data class {screen_name}UiState(
     val title: String = "{screen_name}",
+    val primaryActionText: String = "继续",
+)
+
+data class {screen_name}Style(
+    val contentPadding: Dp = 24.dp,
+    val itemSpacing: Dp = 16.dp,
+    val titleSize: TextUnit = 24.sp,
+    val primaryActionHeight: Dp = 52.dp,
+    val primaryActionRadius: Dp = 14.dp,
 )
 
 @Composable
 fun {screen_name}(
     state: {screen_name}UiState = {screen_name}UiState(),
+    style: {screen_name}Style = {screen_name}Style(),
+    onPrimaryAction: () -> Unit = {{}},
     modifier: Modifier = Modifier,
 ) {{
-    Box(
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .testTag("{screen_id}.root"),
-        contentAlignment = Alignment.Center,
+            .testTag("{screen_id}.root")
+            .padding(style.contentPadding),
+        verticalArrangement = Arrangement.spacedBy(style.itemSpacing),
     ) {{
-        Text(text = state.title)
+        Text(
+            text = state.title,
+            modifier = Modifier.testTag("{screen_id}.title"),
+            fontSize = style.titleSize,
+        )
+        Button(
+            onClick = onPrimaryAction,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(style.primaryActionHeight)
+                .testTag("{screen_id}.primary_action"),
+            shape = RoundedCornerShape(style.primaryActionRadius),
+        ) {{
+            Text(state.primaryActionText)
+        }}
     }}
 }}
 
@@ -367,6 +612,48 @@ private fun {screen_name}Preview() {{
 }}
 "#
     )
+}
+
+fn view_layout_source(screen_name: &str, resource_prefix: &str) -> String {
+    let title = xml_escape(screen_name);
+    format!(
+        r#"<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/{resource_prefix}_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <TextView
+        android:id="@+id/{resource_prefix}_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="{title}"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/{resource_prefix}_primary_action"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="16dp"
+        android:text="继续" />
+
+</LinearLayout>
+"#
+    )
+}
+
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }
 
 #[cfg(test)]
@@ -382,5 +669,69 @@ mod scaffold_tests {
             default_compose_source_path(&profile, "com.example.checkout", "CheckoutScreen"),
             "android/app/src/main/kotlin/com/example/checkout/CheckoutScreen.kt"
         );
+    }
+
+    #[test]
+    fn derives_view_layout_path_and_stable_resource_prefix() {
+        let profile = json!({
+            "candidates": { "buildFiles": ["android/app/build.gradle"] }
+        });
+        assert_eq!(
+            default_view_layout_path(&profile, "screen_checkout"),
+            "android/app/src/main/res/layout/screen_checkout.xml"
+        );
+        assert_eq!(resource_name("checkout.pay-button"), "checkout_pay_button");
+    }
+
+    #[test]
+    fn hybrid_project_requires_explicit_toolkit() {
+        let profile = json!({
+            "capabilities": {
+                "jetpackCompose": true,
+                "androidViews": true,
+                "preferredAndroidUiToolkit": "HYBRID"
+            }
+        });
+        let error = resolve_android_ui_toolkit(&profile, &json!({})).unwrap_err();
+        assert!(error.to_string().contains("必须显式"));
+        assert_eq!(
+            resolve_android_ui_toolkit(&profile, &json!({"uiToolkit":"VIEWS"})).unwrap(),
+            AndroidUiToolkit::Views
+        );
+    }
+
+    #[test]
+    fn creates_view_scaffold_with_runtime_addressable_resource_ids() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_view_scaffold_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let profile = json!({
+            "capabilities": {
+                "jetpackCompose": false,
+                "androidViews": true,
+                "preferredAndroidUiToolkit": "VIEWS"
+            },
+            "candidates": { "buildFiles": ["android/app/build.gradle"] }
+        });
+
+        let result = create_view_scaffold(
+            &root,
+            &profile,
+            &json!({"screenName":"结算页", "screenId":"checkout.pay"}),
+        )
+        .unwrap();
+
+        assert_eq!(result["uiToolkit"], "VIEWS");
+        let layout = root.join("android/app/src/main/res/layout/screen_checkout_pay.xml");
+        let source = fs::read_to_string(layout).unwrap();
+        assert!(source.contains("@+id/checkout_pay_root"));
+        assert!(source.contains("@+id/checkout_pay_primary_action"));
+        let contract =
+            fs::read_to_string(root.join(".elon/ui-design/generated/checkoutpay.scaffold.json"))
+                .unwrap();
+        assert!(contract.contains("XML_RESOURCE_IDS_READY"));
+        fs::remove_dir_all(root).unwrap();
     }
 }
