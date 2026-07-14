@@ -50,6 +50,8 @@ interface UiTunerInspectorProps {
   liveProjectRoot: string
   onLiveProjectRootChange: (value: string) => void
   onPrepareLiveRuntime: () => void
+  captureBusy: boolean
+  onRecaptureDevice: () => void
 }
 
 export function UiTunerInspector({
@@ -83,6 +85,8 @@ export function UiTunerInspector({
   liveProjectRoot,
   onLiveProjectRootChange,
   onPrepareLiveRuntime,
+  captureBusy,
+  onRecaptureDevice,
 }: UiTunerInspectorProps) {
   const [showExportJson, setShowExportJson] = useState(false)
   return (
@@ -93,6 +97,8 @@ export function UiTunerInspector({
         onUpdateCanvas={onUpdateCanvas}
         onSetProductMode={onSetProductMode}
         onSetDebugMode={onSetDebugMode}
+        captureBusy={captureBusy}
+        onRecaptureDevice={onRecaptureDevice}
       />
 
       {selected ? (
@@ -185,6 +191,8 @@ interface CanvasSectionProps {
   onUpdateCanvas: (patch: Partial<UiTunerDocument['canvas']>) => void
   onSetProductMode: () => void
   onSetDebugMode: () => void
+  captureBusy: boolean
+  onRecaptureDevice: () => void
 }
 
 function CanvasSection({
@@ -193,6 +201,8 @@ function CanvasSection({
   onUpdateCanvas,
   onSetProductMode,
   onSetDebugMode,
+  captureBusy,
+  onRecaptureDevice,
 }: CanvasSectionProps) {
   return (
     <section className={styles.section}>
@@ -208,6 +218,12 @@ function CanvasSection({
       <ColorField label="背景" value={tunerDoc.canvas.background} onChange={(background) => onUpdateCanvas({ background })} />
       {tunerDoc.canvas.referenceImage && (
         <ReferenceImagePanel tunerDoc={tunerDoc} onUpdateCanvas={onUpdateCanvas} />
+      )}
+      {!tunerDoc.canvas.referenceImage && tunerDoc.runtimeSnapshot && (
+        <MissingReferenceImagePanel
+          captureBusy={captureBusy}
+          onRecaptureDevice={onRecaptureDevice}
+        />
       )}
       {tunerDoc.canvas.targetDesign && (
         <TargetDesignPanel tunerDoc={tunerDoc} onUpdateCanvas={onUpdateCanvas} />
@@ -277,8 +293,38 @@ function ReferenceImagePanel({ tunerDoc, onUpdateCanvas }: ReferenceImagePanelPr
         >
           {referenceImage.visible ? '隐藏截图' : '显示截图'}
         </button>
-        <button type="button" onClick={() => onUpdateCanvas({ referenceImage: undefined })}>
+        <button
+          type="button"
+          onClick={() => {
+            if (window.confirm('移除后将暂时看不到真机底图，但组件树会保留。可通过“重新读取真机画面”恢复，确定移除吗？')) {
+              onUpdateCanvas({ referenceImage: undefined })
+            }
+          }}
+        >
           移除截图
+        </button>
+      </div>
+    </>
+  )
+}
+
+function MissingReferenceImagePanel({
+  captureBusy,
+  onRecaptureDevice,
+}: {
+  captureBusy: boolean
+  onRecaptureDevice: () => void
+}) {
+  return (
+    <>
+      <div className={styles.sourcePanel}>
+        <span>真机画面底图已移除</span>
+        <strong>组件树和源码绑定仍然保留</strong>
+        <small>重新读取后会恢复真实画面，不需要重新选择项目或组件。</small>
+      </div>
+      <div className={styles.inlineActions}>
+        <button type="button" disabled={captureBusy} onClick={onRecaptureDevice}>
+          {captureBusy ? '正在读取真机…' : '重新读取真机画面'}
         </button>
       </div>
     </>

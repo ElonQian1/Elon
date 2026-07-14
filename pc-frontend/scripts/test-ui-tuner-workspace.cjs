@@ -260,6 +260,14 @@ try {
   assert.match(pageSource, /<FocusModeExitButton/)
   assert.match(pageSource, /active=\{workspaceLayout\.focusMode\}/)
   assert.match(pageSource, /onExit=\{workspaceLayout\.exitFocusMode\}/)
+  assert.match(pageSource, /onRecaptureDevice=\{\(\) => \{ void captureDeviceSnapshot\(\) \}\}/)
+  const inspectorSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/UiTunerInspector.tsx'),
+    'utf8',
+  )
+  assert.match(inspectorSource, /window\.confirm\('移除后将暂时看不到真机底图/)
+  assert.match(inspectorSource, /真机画面底图已移除/)
+  assert.match(inspectorSource, /重新读取真机画面/)
   const focusExitSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/workspace/FocusModeExitButton.tsx'),
     'utf8',

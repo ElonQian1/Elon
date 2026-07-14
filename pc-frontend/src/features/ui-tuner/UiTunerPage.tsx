@@ -765,6 +765,8 @@ export default function UiTunerPage() {
         liveProjectRoot={liveProjectRoot}
         onLiveProjectRootChange={updateLiveProjectRoot}
         onPrepareLiveRuntime={() => { void prepareLiveRuntime() }}
+        captureBusy={captureBusy}
+        onRecaptureDevice={() => { void captureDeviceSnapshot() }}
       />}
 
       <UiTunerDeviceDialog
