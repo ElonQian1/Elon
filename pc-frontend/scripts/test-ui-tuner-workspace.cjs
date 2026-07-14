@@ -267,6 +267,16 @@ try {
   )
   assert.match(
     pageCss,
+    /\.toolbar\s*\{[^}]*height:\s*auto\s*;[^}]*min-height:\s*48px\s*;/s,
+    '顶部工具栏空间不足时必须允许内容撑高，不能裁掉换行后的按钮',
+  )
+  assert.match(
+    pageCss,
+    /\.toolbarActions\s*\{[^}]*flex-wrap:\s*wrap\s*;[^}]*overflow:\s*visible\s*;/s,
+    '左右侧栏同时打开时，顶部操作必须自动换行并保持全部可见',
+  )
+  assert.match(
+    pageCss,
     /\.viewControls\s*\{[^}]*flex:\s*0 0 auto\s*;/s,
     '缩放控件组必须保持完整宽度并由工具栏统一横向滚动',
   )
