@@ -110,12 +110,8 @@ export default function UiTunerPage() {
       ? { width: tunerDoc.canvas.targetDesign.width, height: tunerDoc.canvas.targetDesign.height }
       : null,
   )
-  const workspaceLayout = useUiTunerWorkspaceLayout(
-    tunerDoc.runtimeSnapshot?.packageName ?? tunerDoc.source?.signature ?? 'default',
-    Boolean(tunerDoc.canvas.targetDesign),
-  )
+  const workspaceLayout = useUiTunerWorkspaceLayout(tunerDoc.runtimeSnapshot?.packageName ?? tunerDoc.source?.signature ?? 'default', Boolean(tunerDoc.canvas.targetDesign))
   const { viewScale, viewScaleLabel, fitToStage, fitToWidth, requestFit } = comparisonViewport
-
   const selected = useMemo(
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
     [selectedId, tunerDoc.elements],
