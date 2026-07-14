@@ -162,6 +162,12 @@ PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --js
 
 ---
 
+### 2.5 项目文档治理与 MCP
+
+项目真实目录和 Markdown 始终是内容真源；PC 网页端的 OneNote 式分区是 `.elon/document-sections.json` 上的虚拟视图，不等于实际移动文件。AI 建议单独保存在 `.elon/document-organization-suggestions.json`，必须审核后才进入虚拟分区。
+
+Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP MCP。`project_docs_analyze` 复用路径权威性分类器并保持零模型 token，`project_docs_read` 受单次文档数和字符预算限制，保存建议与审核应用使用 revision 防并发覆盖。云端网页 API 通过 PC 节点文件网关调用同一 Rust 治理内核，因此网页端和任何支持 MCP 的 AI 供应商不会各自维护一套建议应用规则。详细契约按需读取 `docs/project-document-governance-mcp.md`。
+
 ## 3. 代码仓库结构（目标结构）
 
 ```

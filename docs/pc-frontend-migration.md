@@ -43,7 +43,7 @@ server/src/
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
 | Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
-| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 分类目录） | 🔴 高 | `src/features/project-docs/` | ✅ 已补齐互斥系统分区、项目内可移植自定义分区、手动归类和 AI 整理建议审核区；程序零模型 token 预分类，AI 只接收紧凑目录并写结构化建议 |
+| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 分类目录） | 🔴 高 | `src/features/project-docs/` | ✅ 已补齐互斥系统分区、项目内可移植自定义分区、手动归类和 AI 整理建议审核区；程序零模型 token 预分类；网页审核应用与供应商无关 MCP 共用 Rust 治理内核，AI 无需点击页面即可生成建议 |
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |

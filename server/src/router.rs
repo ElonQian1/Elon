@@ -21,13 +21,13 @@ use crate::{
     external_app_route_c_sdk, external_app_tool_report_api, friend_api, global_ws, group_ai,
     group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, peer_relay, project_api,
     project_attachments, project_channels, project_chat, project_conversation_identity,
-    project_deletion, project_docs, project_git, project_join_requests, project_landing_api,
-    project_membership, project_releases, project_runtime_permission_api, project_space,
-    project_space_task_snapshot, project_storage_git, project_store, project_workspace_health,
-    project_workspace_recovery, release_claim, server_agent_runtime, speech_translate,
-    token_usage_api, user_api, user_archive_api, user_memory_api, user_progression,
-    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
-    voice_ws_virtual_mic, web,
+    project_deletion, project_docs, project_document_organization_api, project_git,
+    project_join_requests, project_landing_api, project_membership, project_releases,
+    project_runtime_permission_api, project_space, project_space_task_snapshot,
+    project_storage_git, project_store, project_workspace_health, project_workspace_recovery,
+    release_claim, server_agent_runtime, speech_translate, token_usage_api, user_api,
+    user_archive_api, user_memory_api, user_progression, voice_asr_upload, voice_tts_api,
+    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
 
 mod admin_routes;
@@ -295,6 +295,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/projects/:project_id/docs/file",
             get(project_docs::get_project_document_file)
                 .put(project_docs::put_project_document_file),
+        )
+        .route(
+            "/api/projects/:project_id/docs/organization/apply",
+            post(project_document_organization_api::apply_organization_suggestions),
         )
         .route(
             "/api/projects/:project_id/members/:member_user_id/conversations",

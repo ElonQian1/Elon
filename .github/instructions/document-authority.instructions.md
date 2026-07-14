@@ -45,3 +45,12 @@ applyTo: "**/*.md"
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - AI 可建议新分区和虚拟归类，但必须经用户审核后才更新分区配置。
 - 应用虚拟分区建议不等于移动 Markdown；实体迁移必须作为独立 Git 变更再审核。
+
+## 供应商无关 MCP 顺序
+
+- 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据，`classification_model_tokens=0`。
+- 只对 `ambiguous` 或当前任务命中的路径调用 `project_docs_read`，不得借 MCP 全量读取 Markdown。
+- 模型完成判断后调用 `project_docs_save_suggestions`；该工具只写建议 JSON，并校验目录 revision、真实路径和结构上限。
+- 没有用户或审核流程明确确认，不得调用 `project_docs_apply_suggestions`；确认后也只应用虚拟分区，不移动 Markdown。
+- MCP 不可用时遵循同一顺序和两份 `.elon` JSON 契约，不得改用供应商私有文档作为第二真源。
+- 传输、短期会话和工具契约见 `docs/project-document-governance-mcp.md`；只有接入或诊断 MCP 时才读取。

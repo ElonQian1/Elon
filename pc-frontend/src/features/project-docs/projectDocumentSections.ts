@@ -195,7 +195,7 @@ export function buildOrganizationPrompt(
   const customSections = manifest.sections.length
     ? manifest.sections.map((section) => `${customSectionKey(section.id)}=${section.label}`).join(', ')
     : '无'
-  return `请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
+  return `<elon-project-docs-task version="1">\n请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
     '程序已仅用路径、标题、元数据和哈希预分类，classification_model_tokens=0；不要全文扫描 Markdown。' +
     '优先检查 ambiguous；需要内容时先读标题和目录，仍无法判断才读单篇正文。' +
     `现有自定义分区：${customSections}。` +

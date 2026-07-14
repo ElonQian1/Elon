@@ -1,0 +1,291 @@
+//! Project-scoped, vendor-neutral Streamable HTTP MCP for document governance.
+
+use anyhow::{anyhow, bail, Context, Result};
+use axum::{
+    extract::{Path as AxumPath, Query},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::post,
+    Json, Router,
+};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use crate::node_agent_project_docs_mcp_tools::{call_tool, tool_definitions};
+use crate::NodeRuntime;
+
+const MCP_PROTOCOL_VERSION: &str = "2025-03-26";
+const SESSION_TTL_SECONDS: u64 = 2 * 60 * 60;
+const MAX_SESSION_FILE_BYTES: u64 = 32 * 1024;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BootstrapRequest {
+    project_root: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct McpQuery {
+    token: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct McpRequest {
+    #[allow(dead_code)]
+    jsonrpc: Option<String>,
+    id: Option<Value>,
+    method: String,
+    #[serde(default)]
+    params: Value,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectDocsMcpSession {
+    id: String,
+    token: String,
+    project_root: String,
+    created_at: u64,
+    expires_at: u64,
+}
+
+pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
+    Router::new()
+        .route("/api/project-docs/mcp/bootstrap", post(bootstrap_handler))
+        .route("/api/project-docs/mcp/:session_id", post(mcp_handler))
+}
+
+#[cfg(test)]
+pub(crate) fn test_transport_routes() -> Router {
+    Router::new().route("/api/project-docs/mcp/:session_id", post(mcp_handler))
+}
+
+pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Result<Value> {
+    cleanup_expired_sessions();
+    let root = validate_project_root(project_root)?;
+    let now = unix_seconds();
+    let session = ProjectDocsMcpSession {
+        id: format!("docs_{}", uuid::Uuid::new_v4().simple()),
+        token: format!(
+            "pd_{}{}",
+            uuid::Uuid::new_v4().simple(),
+            uuid::Uuid::new_v4().simple()
+        ),
+        project_root: root.to_string_lossy().to_string(),
+        created_at: now,
+        expires_at: now.saturating_add(SESSION_TTL_SECONDS),
+    };
+    let session_dir = session_dir(&session.id);
+    fs::create_dir_all(&session_dir)
+        .with_context(|| format!("创建项目文档 MCP 会话目录失败：{}", session_dir.display()))?;
+    write_private_json(&session_dir.join("session.json"), &session)?;
+    let url = format!(
+        "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
+        session.id, session.token
+    );
+    let config_path = session_dir.join("mcp.json");
+    write_private_json(
+        &config_path,
+        &json!({
+            "mcpServers": {
+                "yilong_project_docs": {
+                    "url": url,
+                    "required": false,
+                    "toolTimeoutSec": 60
+                }
+            }
+        }),
+    )?;
+    let copilot_config_path = session_dir.join("copilot-mcp.json");
+    write_private_json(
+        &copilot_config_path,
+        &json!({
+            "mcpServers": {
+                "yilong_project_docs": {
+                    "type": "http",
+                    "url": url,
+                    "tools": ["*"],
+                    "timeout": 60000
+                }
+            }
+        }),
+    )?;
+    let claude_config_path = session_dir.join("claude-mcp.json");
+    write_private_json(
+        &claude_config_path,
+        &json!({
+            "mcpServers": {
+                "yilong_project_docs": {
+                    "type": "http",
+                    "url": url,
+                    "timeout": 60000
+                }
+            }
+        }),
+    )?;
+    let gemini_config_path = session_dir.join("gemini-settings.json");
+    write_private_json(
+        &gemini_config_path,
+        &json!({
+            "mcpServers": {
+                "yilong_project_docs": {
+                    "httpUrl": url,
+                    "timeout": 60000,
+                    "trust": false
+                }
+            }
+        }),
+    )?;
+    Ok(json!({
+        "name": "yilong-project-docs",
+        "transport": "streamable-http",
+        "url": url,
+        "configPath": config_path.display().to_string(),
+        "configPaths": {
+            "codex": config_path.display().to_string(),
+            "copilot": copilot_config_path.display().to_string(),
+            "claude": claude_config_path.display().to_string(),
+            "gemini": gemini_config_path.display().to_string()
+        },
+        "sessionId": session.id,
+        "projectRoot": session.project_root,
+        "expiresAt": session.expires_at,
+        "protocolVersion": MCP_PROTOCOL_VERSION,
+        "purpose": "低 token 分析项目文档权威性，按需读取，并把 AI 建议与用户审核应用分离。",
+    }))
+}
+
+pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Option<Value> {
+    let id = request.id.clone().unwrap_or(Value::Null);
+    let result = match request.method.as_str() {
+        "initialize" => Ok(json!({
+            "protocolVersion": MCP_PROTOCOL_VERSION,
+            "capabilities": { "tools": { "listChanged": false } },
+            "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
+            "instructions": "先调用 project_docs_analyze。目录预分类不读取正文且 classification_model_tokens=0；仅用 project_docs_read 按需读 ambiguous 或任务相关文档。AI 先用 project_docs_save_suggestions 写结构化建议；没有用户明确审核不得调用 project_docs_apply_suggestions。任何工具都不会移动或删除 Markdown。"
+        })),
+        "notifications/initialized" => return None,
+        "tools/list" => Ok(json!({ "tools": tool_definitions() })),
+        "tools/call" => call_tool(workspace, request.params),
+        "ping" => Ok(json!({})),
+        _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
+    };
+    Some(match result {
+        Ok(value) => json!({ "jsonrpc": "2.0", "id": id, "result": value }),
+        Err(error) => json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "error": { "code": -32000, "message": format!("{error:#}") }
+        }),
+    })
+}
+
+async fn bootstrap_handler(Json(request): Json<BootstrapRequest>) -> Response {
+    let host_port = crate::node_agent_admin_open::admin_port_from_env();
+    match descriptor_for_project(&request.project_root, host_port) {
+        Ok(mcp) => Json(json!({ "ok": true, "mcp": mcp })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+async fn mcp_handler(
+    AxumPath(session_id): AxumPath<String>,
+    Query(query): Query<McpQuery>,
+    Json(request): Json<McpRequest>,
+) -> Response {
+    let workspace = match authorize_session(&session_id, &query.token) {
+        Ok(workspace) => workspace,
+        Err(error) => return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}")),
+    };
+    match handle_request(&workspace, request).await {
+        Some(response) => Json(response).into_response(),
+        None => StatusCode::ACCEPTED.into_response(),
+    }
+}
+
+pub(crate) fn authorize_session(session_id: &str, token: &str) -> Result<PathBuf> {
+    if !valid_session_id(session_id) || token.trim().is_empty() {
+        bail!("项目文档 MCP 会话凭证无效");
+    }
+    let path = session_dir(session_id).join("session.json");
+    let metadata = fs::metadata(&path).context("项目文档 MCP 会话不存在")?;
+    if metadata.len() > MAX_SESSION_FILE_BYTES {
+        bail!("项目文档 MCP 会话文件异常");
+    }
+    let session: ProjectDocsMcpSession = serde_json::from_slice(&fs::read(&path)?)?;
+    if session.id != session_id || session.token != token || session.expires_at < unix_seconds() {
+        bail!("项目文档 MCP 会话已过期或令牌无效");
+    }
+    validate_project_root(&session.project_root)
+}
+
+fn validate_project_root(project_root: &str) -> Result<PathBuf> {
+    let root = PathBuf::from(project_root.trim())
+        .canonicalize()
+        .context("projectRoot 不存在或不可访问")?;
+    if !root.is_dir() || !root.join(".git").exists() {
+        bail!("projectRoot 必须是现存 Git 工作区");
+    }
+    Ok(root)
+}
+
+fn session_root() -> PathBuf {
+    std::env::temp_dir().join("elon-project-docs-mcp")
+}
+
+fn session_dir(session_id: &str) -> PathBuf {
+    session_root().join(session_id)
+}
+
+fn valid_session_id(value: &str) -> bool {
+    value.starts_with("docs_")
+        && value.len() <= 64
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn cleanup_expired_sessions() {
+    let Ok(entries) = fs::read_dir(session_root()) else {
+        return;
+    };
+    let now = unix_seconds();
+    for entry in entries.flatten().take(128) {
+        let path = entry.path();
+        let expired = fs::read(path.join("session.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<ProjectDocsMcpSession>(&bytes).ok())
+            .map(|session| session.expires_at < now)
+            .unwrap_or(true);
+        if expired {
+            let _ = fs::remove_dir_all(path);
+        }
+    }
+}
+
+fn write_private_json(path: &Path, value: &impl Serialize) -> Result<()> {
+    let bytes = serde_json::to_vec_pretty(value)?;
+    crate::node_agent_atomic_file::write(path, &bytes)
+        .with_context(|| format!("写入项目文档 MCP 文件失败：{}", path.display()))
+}
+
+fn unix_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default()
+}
+
+fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
+    (
+        status,
+        Json(json!({ "ok": false, "error": message.into() })),
+    )
+        .into_response()
+}

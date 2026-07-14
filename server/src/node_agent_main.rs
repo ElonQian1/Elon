@@ -101,6 +101,8 @@ mod node_agent_local_pc_frontend;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
+mod node_agent_project_docs_mcp;
+mod node_agent_project_docs_mcp_tools;
 mod node_agent_project_documents;
 mod node_agent_project_manifest_identity;
 mod node_agent_project_picker;
@@ -135,6 +137,8 @@ mod node_agent_task_resume_sidecar;
 mod node_agent_task_resume_sidecar_tests;
 mod node_agent_tts;
 pub use node_agent_tts::run_tts_synthesis;
+#[cfg(test)]
+mod node_agent_project_docs_mcp_tests;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_ui_design_workspace;
@@ -152,6 +156,10 @@ mod pc_workspace_provisioner;
 mod project_default_docs;
 mod project_docs_scan;
 mod project_document_files;
+mod project_document_governance;
+mod project_document_governance_service;
+#[cfg(test)]
+mod project_document_governance_tests;
 mod project_document_policy;
 mod project_git_worktree_audit;
 mod project_landing;

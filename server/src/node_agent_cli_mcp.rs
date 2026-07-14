@@ -5,6 +5,12 @@ use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
 const CONFIG_MARKER: &str = "\"mcpConfigPath\"";
+const PROJECT_DOCS_TASK_MARKER: &str = "<elon-project-docs-task version=\"1\">";
+
+pub(crate) struct ProjectDocsMcpLaunchConfig {
+    pub(crate) args: Vec<String>,
+    pub(crate) env: Vec<(String, String)>,
+}
 
 pub(crate) fn codex_mcp_config_args(prompt: &str) -> Option<Vec<String>> {
     match read_ui_tuner_mcp_url(prompt) {
@@ -32,33 +38,109 @@ pub(crate) async fn codex_mcp_config_args_for_runtime(
     cwd: Option<&str>,
     runtime: &crate::node_agent_runtime::NodeRuntime,
 ) -> Option<Vec<String>> {
-    if let Some(args) = codex_mcp_config_args(prompt) {
-        return Some(args);
+    let mut args = codex_mcp_config_args(prompt).unwrap_or_default();
+    let cwd = cwd.map(str::trim).filter(|value| !value.is_empty());
+    if prompt.contains("<elon-ui-design-task version=\"1\">")
+        && !args
+            .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_ui_live.url"))
+    {
+        if let Some(cwd) = cwd {
+            match crate::node_agent_android_live::mcp_descriptor_for_project(
+                runtime.live_ui.as_ref(),
+                cwd,
+                crate::node_agent_admin_open::admin_port_from_env(),
+            )
+            .await
+            {
+                Ok(Some(descriptor)) => {
+                    if let Some(config_path) = descriptor
+                        .get("configPath")
+                        .and_then(serde_json::Value::as_str)
+                    {
+                        let synthetic =
+                            serde_json::json!({ "mcpConfigPath": config_path }).to_string();
+                        if let Some(ui_args) = codex_mcp_config_args(&synthetic) {
+                            args.extend(ui_args);
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!(error = %error, "无法为 UI 设计任务自动准备 Live MCP");
+                }
+            }
+        }
     }
-    if !prompt.contains("<elon-ui-design-task version=\"1\">") {
+    (!args.is_empty()).then_some(args)
+}
+
+pub(crate) fn project_docs_mcp_launch_config(
+    prompt: &str,
+    cwd: Option<&str>,
+    cli_name: &str,
+    host_port: u16,
+) -> Option<ProjectDocsMcpLaunchConfig> {
+    if !prompt.contains(PROJECT_DOCS_TASK_MARKER) {
         return None;
     }
     let cwd = cwd?.trim();
     if cwd.is_empty() {
         return None;
     }
-    let descriptor = match crate::node_agent_android_live::mcp_descriptor_for_project(
-        runtime.live_ui.as_ref(),
-        cwd,
-        crate::node_agent_admin_open::admin_port_from_env(),
-    )
-    .await
-    {
-        Ok(Some(descriptor)) => descriptor,
-        Ok(None) => return None,
-        Err(error) => {
-            tracing::warn!(error = %error, "无法为 UI 设计任务自动准备 Live MCP");
-            return None;
+    match crate::node_agent_project_docs_mcp::descriptor_for_project(cwd, host_port) {
+        Ok(descriptor) => {
+            let config_path = |provider: &str| {
+                descriptor
+                    .pointer(&format!("/configPaths/{provider}"))
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+            };
+            let mut config = ProjectDocsMcpLaunchConfig {
+                args: Vec::new(),
+                env: Vec::new(),
+            };
+            match cli_name.trim().to_ascii_lowercase().as_str() {
+                "codex" => append_http_mcp_args(
+                    &mut config.args,
+                    "yilong_project_docs",
+                    descriptor.get("url")?.as_str()?,
+                ),
+                "copilot" => config.args.push(format!(
+                    "--additional-mcp-config=@{}",
+                    config_path("copilot")?
+                )),
+                "claude" => {
+                    config.args.push("--mcp-config".to_string());
+                    config.args.push(config_path("claude")?);
+                }
+                "gemini" => config.env.push((
+                    "GEMINI_CLI_SYSTEM_SETTINGS_PATH".to_string(),
+                    config_path("gemini")?,
+                )),
+                _ => return None,
+            }
+            Some(config)
         }
+        Err(error) => {
+            tracing::warn!(error = %error, "无法为项目文档整理任务自动准备 MCP");
+            None
+        }
+    }
+}
+
+fn append_http_mcp_args(args: &mut Vec<String>, name: &str, url: &str) {
+    let Ok(quoted_url) = serde_json::to_string(url) else {
+        return;
     };
-    let config_path = descriptor.get("configPath")?.as_str()?;
-    let synthetic = serde_json::json!({ "mcpConfigPath": config_path }).to_string();
-    codex_mcp_config_args(&synthetic)
+    args.extend([
+        "-c".to_string(),
+        format!("mcp_servers.{name}.url={quoted_url}"),
+        "-c".to_string(),
+        format!("mcp_servers.{name}.required=false"),
+        "-c".to_string(),
+        format!("mcp_servers.{name}.tool_timeout_sec=60"),
+    ]);
 }
 
 fn read_ui_tuner_mcp_url(prompt: &str) -> Result<Option<String>> {
@@ -129,7 +211,7 @@ fn validate_loopback_url(value: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::codex_mcp_config_args;
+    use super::{codex_mcp_config_args, project_docs_mcp_launch_config};
     use std::fs;
 
     #[test]
@@ -164,5 +246,52 @@ mod tests {
     fn ignores_uncontrolled_path() {
         let prompt = r#"{"mcpConfigPath":"C:\\Windows\\win.ini"}"#;
         assert!(codex_mcp_config_args(prompt).is_none());
+    }
+
+    #[test]
+    fn injects_project_docs_mcp_only_for_explicit_task_marker() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_project_docs_cli_mcp_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(root.join(".git")).unwrap();
+        let plain = project_docs_mcp_launch_config("普通代码任务", root.to_str(), "codex", 7799);
+        assert!(plain.is_none());
+        let config = project_docs_mcp_launch_config(
+            "<elon-project-docs-task version=\"1\">",
+            root.to_str(),
+            "codex",
+            7799,
+        )
+        .unwrap();
+        assert!(config
+            .args
+            .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_project_docs.url")));
+        let copilot = project_docs_mcp_launch_config(
+            "<elon-project-docs-task version=\"1\">",
+            root.to_str(),
+            "copilot",
+            7799,
+        )
+        .unwrap();
+        assert!(copilot.args[0].starts_with("--additional-mcp-config=@"));
+        let claude = project_docs_mcp_launch_config(
+            "<elon-project-docs-task version=\"1\">",
+            root.to_str(),
+            "claude",
+            7799,
+        )
+        .unwrap();
+        assert_eq!(claude.args[0], "--mcp-config");
+        let gemini = project_docs_mcp_launch_config(
+            "<elon-project-docs-task version=\"1\">",
+            root.to_str(),
+            "gemini",
+            7799,
+        )
+        .unwrap();
+        assert_eq!(gemini.env[0].0, "GEMINI_CLI_SYSTEM_SETTINGS_PATH");
+        fs::remove_dir_all(root).unwrap();
     }
 }

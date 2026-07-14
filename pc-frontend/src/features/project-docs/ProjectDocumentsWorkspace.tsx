@@ -231,7 +231,7 @@ export default function ProjectDocumentsWorkspace({
     if (!catalog) return
     setApplyingSuggestions(true)
     try {
-      await organization.applySuggestions(catalog.documents)
+      await organization.applySuggestions(catalog.revision)
       setMessage('AI 分区建议已应用；Markdown 文件未被移动或改写。')
     } catch (error) {
       setMessage(errorMessage(error, '应用 AI 建议失败'))

@@ -158,6 +158,8 @@ mod project_docs_scan;
 mod project_docs_snapshot;
 mod project_document_files;
 mod project_document_gateway;
+mod project_document_governance;
+mod project_document_organization_api;
 mod project_document_policy;
 mod project_downloads;
 mod project_events;

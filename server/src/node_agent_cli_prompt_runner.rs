@@ -350,6 +350,20 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         cmd.args(args);
         sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
     }
+    if let Some(config) = crate::node_agent_cli_mcp::project_docs_mcp_launch_config(
+        &prompt,
+        cwd.as_deref(),
+        cli_name,
+        crate::node_agent_admin_open::admin_port_from_env(),
+    ) {
+        for arg in config.args {
+            push_tracked_arg(&mut cmd, &mut sidecar_args, arg);
+        }
+        for (name, value) in config.env {
+            cmd.env(&name, &value);
+            sidecar_env.push((name, value));
+        }
+    }
     if cli_name == "codex" {
         if let Some(args) = crate::node_agent_cli_mcp::codex_mcp_config_args_for_runtime(
             &prompt,

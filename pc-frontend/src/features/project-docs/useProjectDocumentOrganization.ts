@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { api, type ApiError } from '../../api/client'
-import type { DocumentFile, ProjectDocumentEntry } from './projectDocumentModel'
+import type { DocumentFile } from './projectDocumentModel'
 import {
-  buildDocumentSections,
   createCustomSection,
   customSectionKey,
   EMPTY_SECTION_MANIFEST,
@@ -12,7 +11,6 @@ import {
   parseSectionManifest,
   SECTION_CONFIG_PATH,
   serializeProjectDocumentJson,
-  SYSTEM_DOCUMENT_SECTIONS,
   type DocumentOrganizationSuggestions,
   type DocumentSectionManifest,
 } from './projectDocumentSections'
@@ -20,6 +18,13 @@ import {
 interface PersistedJson<T> {
   value: T
   revision?: string
+}
+
+interface AppliedOrganizationResponse {
+  manifest: DocumentSectionManifest
+  suggestions: DocumentOrganizationSuggestions
+  manifest_revision?: string
+  suggestions_revision?: string
 }
 
 export function useProjectDocumentOrganization(projectId: string) {
@@ -63,17 +68,6 @@ export function useProjectDocumentOrganization(projectId: string) {
     return value
   }, [manifestFile.revision, projectId])
 
-  const saveSuggestions = useCallback(async (value: DocumentOrganizationSuggestions) => {
-    const saved = await writeJsonFile(
-      projectId,
-      ORGANIZATION_SUGGESTIONS_PATH,
-      value,
-      suggestionsFile.revision,
-    )
-    setSuggestionsFile({ value, revision: saved.revision })
-    return value
-  }, [projectId, suggestionsFile.revision])
-
   const addSection = useCallback(async (label: string) => {
     const section = createCustomSection(label, manifestFile.value.sections)
     await saveManifest({
@@ -108,29 +102,22 @@ export function useProjectDocumentOrganization(projectId: string) {
     return nextManifest
   }, [manifestFile.value, saveManifest])
 
-  const applySuggestions = useCallback(async (documents: ProjectDocumentEntry[]) => {
+  const applySuggestions = useCallback(async (catalogRevision: string) => {
     const suggestions = suggestionsFile.value
     if (!suggestions || suggestions.status !== 'ready') return manifestFile.value
-    const knownPaths = new Set(documents.map((document) => normalizePath(document.path)))
-    const sectionsById = new Map(manifestFile.value.sections.map((section) => [section.id, section]))
-    for (const section of suggestions.proposed_sections) sectionsById.set(section.id, section)
-    const nextSections = [...sectionsById.values()]
-    const validKeys = new Set(buildDocumentSections({
-      version: 1,
-      sections: nextSections,
-      assignments: {},
-    }).filter((section) => !section.virtual).map((section) => section.key))
-    const assignments = { ...manifestFile.value.assignments }
-    for (const suggestion of suggestions.assignments) {
-      const path = normalizePath(suggestion.path)
-      const sectionKey = normalizeSuggestedSectionKey(suggestion.section_id, nextSections.map((section) => section.id))
-      if (knownPaths.has(path) && validKeys.has(sectionKey)) assignments[path] = sectionKey
-    }
-    const nextManifest: DocumentSectionManifest = { version: 1, sections: nextSections, assignments }
-    await saveManifest(nextManifest)
-    await saveSuggestions({ ...suggestions, status: 'applied' })
-    return nextManifest
-  }, [manifestFile.value, saveManifest, saveSuggestions, suggestionsFile.value])
+    const result = await api.post<AppliedOrganizationResponse>(
+      `/api/projects/${encodeURIComponent(projectId)}/docs/organization/apply`,
+      {
+        reviewed: true,
+        expected_catalog_revision: catalogRevision,
+        expected_manifest_revision: manifestFile.revision,
+        expected_suggestions_revision: suggestionsFile.revision,
+      },
+    )
+    setManifestFile({ value: result.manifest, revision: result.manifest_revision })
+    setSuggestionsFile({ value: result.suggestions, revision: result.suggestions_revision })
+    return result.manifest
+  }, [manifestFile.revision, manifestFile.value, projectId, suggestionsFile.revision, suggestionsFile.value])
 
   return {
     manifest: manifestFile.value,
@@ -176,14 +163,6 @@ function documentFileUrl(projectId: string, path: string) {
 
 function normalizePath(path: string) {
   return path.trim().replace(/\\/g, '/')
-}
-
-function normalizeSuggestedSectionKey(sectionId: string, customIds: string[]) {
-  const value = sectionId.trim()
-  if (SYSTEM_DOCUMENT_SECTIONS.some((section) => section.key === value)) return value
-  if (value.startsWith('custom:')) return value
-  if (customIds.includes(value)) return customSectionKey(value)
-  return value
 }
 
 function errorMessage(error: unknown, fallback: string) {
