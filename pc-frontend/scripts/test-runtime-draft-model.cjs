@@ -172,6 +172,61 @@ try {
     assert.match(markup, /font-size:52\.5px/)
     assert.match(markup, /background:#112233CC/i)
     assert.match(markup, />立即支付<\/span>/)
+
+    const surfaceFile = path.join(projectRoot, 'src/features/ui-tuner/UiTunerCanvasSurface.tsx')
+    const surfaceOutput = path.join(temporaryDirectory, 'UiTunerCanvasSurface.js')
+    const surfaceCompiled = ts.transpileModule(fs.readFileSync(surfaceFile, 'utf8'), {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+        jsx: ts.JsxEmit.ReactJSX,
+        esModuleInterop: true,
+      },
+      fileName: surfaceFile,
+    })
+    fs.mkdirSync(path.join(temporaryDirectory, 'live'), { recursive: true })
+    fs.writeFileSync(
+      path.join(temporaryDirectory, 'live/RuntimeDraftLayer.js'),
+      'exports.RuntimeDraftLayer = function RuntimeDraftLayer() { return null }',
+    )
+    fs.writeFileSync(path.join(temporaryDirectory, 'UiTunerPage.module.css'), '')
+    fs.writeFileSync(surfaceOutput, surfaceCompiled.outputText)
+    const { UiTunerCanvasSurface } = require(surfaceOutput)
+    const surfaceMarkup = renderToStaticMarkup(React.createElement(UiTunerCanvasSurface, {
+      canvas: { name: '测试画布', width: 1080, height: 2400, background: '#000000' },
+      filterResult: { visible: [] },
+      liveFrame: null,
+      liveNodes: [],
+      runtimeDraftState: EMPTY_RUNTIME_DRAFT_STATE,
+      runtimeDraftStatus: 'confirmed',
+      realRenderer: true,
+      runtimeConnected: true,
+      runtimeGestureActive: false,
+      runtimeCanMove: false,
+      runtimeCanResize: false,
+      scrollerRef: { current: null },
+      selectedId: null,
+      viewScale: 0.5,
+      viewportControls: {
+        actualSize() {}, fitCanvasToStage() {}, fitToStage: false,
+        viewScaleLabel: '50%', zoomIn() {}, zoomOut() {},
+      },
+      onCanvasKeyDown() {}, onClearSelection() {}, onElementPointerDown() {}, onSelectElement() {},
+    }))
+    const statusIndex = surfaceMarkup.indexOf('Android LIVE · PC 本地即时渲染')
+    const zoomIndex = surfaceMarkup.indexOf('aria-label="画布快捷缩放"')
+    const canvasIndex = surfaceMarkup.indexOf('tabindex="0"')
+    assert.ok(statusIndex >= 0 && zoomIndex >= 0 && canvasIndex >= 0)
+    assert.ok(statusIndex < canvasIndex && zoomIndex < canvasIndex, '状态和缩放控件必须位于设备画布外')
+    assert.match(surfaceMarkup, /恢复画布到 100%[^>]*>50%<\/button>/)
+
+    const pageCss = fs.readFileSync(
+      path.join(projectRoot, 'src/features/ui-tuner/UiTunerPage.module.css'),
+      'utf8',
+    )
+    const runtimeSurfaceCss = pageCss.match(/\.runtimeSurfaceLive,[\s\S]*?\n}/)?.[0] ?? ''
+    assert.doesNotMatch(runtimeSurfaceCss, /position:\s*sticky/)
+    assert.doesNotMatch(runtimeSurfaceCss, /margin:[^;]*-/)
   } finally {
     if (previousCssLoader) require.extensions['.css'] = previousCssLoader
     else delete require.extensions['.css']
