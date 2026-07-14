@@ -185,6 +185,10 @@ async fn call_tool(
             let session = broker.session(&session_id).await?;
             json!({ "profile": super::design_bootstrap::project_profile(&session)? })
         }
+        "ui_import_desktop_task" => {
+            let session = broker.session(&session_id).await?;
+            json!({ "result": super::desktop_task::import_desktop_task(&session, &arguments)? })
+        }
         "ui_get_design_task" => {
             let session = broker.session(&session_id).await?;
             super::design_bootstrap::design_task(&session, &arguments)?

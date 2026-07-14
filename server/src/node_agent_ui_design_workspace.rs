@@ -160,7 +160,7 @@ fn cli_attachment_paths(args: &[String]) -> Vec<PathBuf> {
     paths
 }
 
-fn build_project_ui_profile(root: &Path) -> Result<Value> {
+pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
     let mut scanned = 0usize;
     let mut compose = false;
     let mut android_views = false;

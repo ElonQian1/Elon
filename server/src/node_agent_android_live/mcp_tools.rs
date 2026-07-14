@@ -21,6 +21,31 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             json!({"type":"object","properties":{}}),
         ),
         tool(
+            "ui_import_desktop_task",
+            "Codex 桌面端 UI 任务的第一步：把本轮草图/标注图复制进项目 UI 工作区，生成共享任务、附件哈希和项目 UI Profile，使 PC 网页端和节点读取同一工件。",
+            json!({
+                "type":"object",
+                "required":["request"],
+                "properties":{
+                    "request":{"type":"string","minLength":1,"maxLength":20000},
+                    "taskId":{"type":"string","maxLength":96},
+                    "mode":{"enum":["AUTO","MODIFY_EXISTING","EXTEND_EXISTING","CREATE_NEW"]},
+                    "attachmentIntent":{"enum":["AUTO","TARGET_DESIGN","ANNOTATED_CHANGE_REQUEST","REFERENCE_STYLE","CURRENT_SCREENSHOT"]},
+                    "attachments":{
+                        "type":"array","maxItems":8,
+                        "items":{
+                            "type":"object","required":["path"],
+                            "properties":{
+                                "path":{"type":"string"},
+                                "displayName":{"type":"string","maxLength":240},
+                                "intent":{"enum":["AUTO","TARGET_DESIGN","ANNOTATED_CHANGE_REQUEST","REFERENCE_STYLE","CURRENT_SCREENSHOT"]}
+                            }
+                        }
+                    }
+                }
+            }),
+        ),
+        tool(
             "ui_get_design_task",
             "读取结构化设计任务、本地附件清单和标注；不需要重新解析用户长提示。",
             json!({"type":"object","properties":{"taskId":{"type":"string"}}}),
@@ -236,7 +261,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {
     let read_only = matches!(
         name,
-        "ui_confirm_route"
+            "ui_confirm_route"
             | "ui_get_project_profile"
             | "ui_get_design_task"
             | "ui_get_runtime_status"

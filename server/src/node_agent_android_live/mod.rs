@@ -10,6 +10,7 @@ mod build_verify;
 mod build_verify_apk;
 mod debug_package;
 mod design_bootstrap;
+mod desktop_task;
 mod design_diff_regions;
 mod fit_learning;
 pub(crate) mod fit_run;
