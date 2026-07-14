@@ -39,7 +39,7 @@ internal class HomeChromeController(
 
     fun showHome() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setBottomMenuVisible(true)
+        setBottomMenuVisible(false)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.VISIBLE
         projectCreateFab.hide()
@@ -47,15 +47,15 @@ internal class HomeChromeController(
 
     fun showProjectPlazaEntry() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setBottomMenuVisible(true)
+        setBottomMenuVisible(false)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
-        binding.homeMenuButton.visibility = android.view.View.GONE
+        binding.homeMenuButton.visibility = android.view.View.VISIBLE
         projectCreateFab.hide()
     }
 
     fun showMenuOnly() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setBottomMenuVisible(true)
+        setBottomMenuVisible(false)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
         binding.homeMenuButton.visibility = android.view.View.VISIBLE
         projectCreateFab.hide()

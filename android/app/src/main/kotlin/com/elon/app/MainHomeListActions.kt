@@ -576,8 +576,7 @@ internal class MainHomeListActions(
     }
 
     private fun isProjectHomeVisible(): Boolean {
-        return binding.projectPage.visibility == View.VISIBLE &&
-            binding.pageTabs.visibility == View.VISIBLE
+        return binding.isProjectHomeSurfaceVisible()
     }
 
     fun refreshPlazaBannerProjects() {

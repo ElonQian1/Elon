@@ -121,9 +121,8 @@ internal class MainNavigationController(
 
     private fun showMainTabs() {
         binding.scheduleNavigationBarChrome(activity, R.color.elon_bg_app, false)
-        bottomNavigation.setVisible(true)
         binding.projectSpaceAiMenu.visibility = View.GONE
-        homeChrome.hide()
+        homeChrome.showMenuOnly()
     }
 
     private fun hideBottomMenus() {
@@ -195,8 +194,7 @@ internal class MainNavigationController(
         val incoming = pageForBottomTab(tab) ?: return
         if (!animate ||
             outgoing == null ||
-            outgoing === incoming ||
-            binding.pageTabs.visibility != View.VISIBLE
+            outgoing === incoming
         ) {
             WechatPageTransition.cancelActive()
             pageTransitionRunning = false
@@ -398,7 +396,7 @@ internal class MainNavigationController(
             }
             return
         }
-        if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
+        if (binding.isProjectSpaceSurfaceVisible()) {
             if (handleProjectSpaceInternalBack()) return
             when (projectPageReturnTarget) {
                 ChatReturnTarget.FRIENDS -> showConversationHome(animate = true)
@@ -706,7 +704,7 @@ internal class MainNavigationController(
 
     private fun projectPersonalChatReturnTarget(): ChatReturnTarget {
         if (binding.chatPage.visibility == View.VISIBLE) return chatReturnTarget
-        if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
+        if (binding.isProjectSpaceSurfaceVisible()) {
             return when (projectPageReturnTarget) {
                 ChatReturnTarget.FRIENDS,
                 ChatReturnTarget.SOCIAL_CHAT -> projectPageReturnTarget
@@ -720,7 +718,7 @@ internal class MainNavigationController(
 
     private fun currentProjectEntryReturnTarget(): ChatReturnTarget {
         if (binding.chatPage.visibility == View.VISIBLE) return chatReturnTarget
-        if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
+        if (binding.isProjectSpaceSurfaceVisible()) {
             return projectPageReturnTarget
         }
         if (binding.conversationPage.visibility == View.VISIBLE) return ChatReturnTarget.FRIENDS
@@ -749,8 +747,7 @@ internal class MainNavigationController(
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
         val enteringFromProjectHome = animate &&
-            binding.projectPage.visibility == View.VISIBLE &&
-            binding.pageTabs.visibility == View.VISIBLE
+            binding.isProjectHomeSurfaceVisible()
         if (enteringFromProjectHome) {
             pageTransitionRunning = true
             WechatPageTransition.replaceContentFromRight(

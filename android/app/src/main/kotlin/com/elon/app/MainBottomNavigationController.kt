@@ -24,13 +24,11 @@ internal class MainBottomNavigationController(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     fun setVisible(visible: Boolean) {
-        binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
-        val inset = if (visible) {
-            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
-        } else {
-            0
-        }
+        // 主页导航已收束到左上角菜单，底部悬浮菜单暂时不渲染，也不再预留空白。
+        binding.pageTabs.visibility = View.GONE
+        val inset = 0
         listOfNotNull(
             binding.conversationPage.parent as? ScrollView,
             binding.projectScrollView,

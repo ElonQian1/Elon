@@ -141,8 +141,7 @@ internal class MainCreateActions(
     }
 
     private fun isProjectSpacePageActive(): Boolean {
-        return binding.projectPage.visibility == View.VISIBLE &&
-            binding.pageTabs.visibility != View.VISIBLE
+        return binding.isProjectSpaceSurfaceVisible()
     }
 
     private fun SwipeRefreshLayout.tryDisableArrowhead() {

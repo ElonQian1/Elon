@@ -308,8 +308,7 @@ internal class MainMcpNativeControlActions(
     private fun activePage(): String {
         return when {
             binding.chatPage.visibility == android.view.View.VISIBLE -> "chat"
-            binding.projectPage.visibility == android.view.View.VISIBLE &&
-                binding.pageTabs.visibility == android.view.View.VISIBLE -> "project_home"
+            binding.isProjectHomeSurfaceVisible() -> "project_home"
             binding.projectPage.visibility == android.view.View.VISIBLE -> "project_space"
             binding.marketplacePage.visibility == android.view.View.VISIBLE -> "project_plaza"
             binding.conversationPage.visibility == android.view.View.VISIBLE -> "conversation_home"

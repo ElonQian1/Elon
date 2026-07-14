@@ -300,7 +300,7 @@ internal class MainAccountActions(
 
     private fun canRenderProjectListWithoutDisruptingSpace(): Boolean {
         return binding.projectPage.visibility != View.VISIBLE ||
-            binding.pageTabs.visibility == View.VISIBLE
+            binding.isProjectHomeSurfaceVisible()
     }
 
     private fun confirmLogoutStep2() {

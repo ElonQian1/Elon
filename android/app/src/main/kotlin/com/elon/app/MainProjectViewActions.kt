@@ -60,8 +60,7 @@ internal class MainProjectViewActions(
     }
 
     private fun isProjectHomeVisible(): Boolean {
-        return binding.projectPage.visibility == View.VISIBLE &&
-            binding.pageTabs.visibility == View.VISIBLE
+        return binding.isProjectHomeSurfaceVisible()
     }
 
     private fun updateStageLines(stage: String) {
