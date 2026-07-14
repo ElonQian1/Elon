@@ -258,7 +258,32 @@
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 35% 7px minmax(0, 1fr);
+}
+
+.splitHandle {
+  position: relative;
+  z-index: 6;
+  width: 7px;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: #111419;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.splitHandle span {
+  width: 2px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .18);
+}
+
+.splitHandle:hover span,
+.splitHandle:focus-visible span {
+  background: #59d7ff;
 }
 
 .pane,
@@ -268,10 +293,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.pane + .pane {
-  border-left: 1px solid var(--border);
 }
 
 .paneHeader {
@@ -418,12 +439,18 @@
 @media (max-width: 820px) {
   .splitGrid {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: repeat(2, minmax(280px, 1fr));
+    grid-template-rows: minmax(280px, 1fr) 7px minmax(280px, 1fr);
   }
 
-  .pane + .pane {
-    border-top: 1px solid var(--border);
-    border-left: 0;
+  .splitHandle {
+    width: auto;
+    height: 7px;
+    cursor: row-resize;
+  }
+
+  .splitHandle span {
+    width: 42px;
+    height: 2px;
   }
 
   .comparisonBar {

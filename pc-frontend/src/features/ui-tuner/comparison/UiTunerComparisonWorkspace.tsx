@@ -17,6 +17,7 @@ import { useFitRunStore } from '../fit-run/fitRunStore'
 import type { UiTunerDocument, UiTunerElement } from '../types'
 import { UiTunerCanvasSurface, type UiTunerCanvasViewportControls } from '../UiTunerCanvasSurface'
 import { ComparisonModeControls } from './ComparisonModeControls'
+import { ComparisonSplitHandle } from './ComparisonSplitHandle'
 import { ComparisonOverlayLayer } from './ComparisonOverlayLayer'
 import { CalibrationPanel } from './CalibrationPanel'
 import { DesignDiffRegionsPanel } from './DesignDiffRegionsPanel'
@@ -45,6 +46,8 @@ interface UiTunerComparisonWorkspaceProps {
   runtimeCanResize: boolean
   selectedId: string | null
   viewScale: number
+  designPaneOpen: boolean
+  splitRatio: number
   viewportControls: UiTunerCanvasViewportControls
   targetScrollerRef: RefObject<HTMLDivElement>
   currentScrollerRef: RefObject<HTMLDivElement>
@@ -52,6 +55,8 @@ interface UiTunerComparisonWorkspaceProps {
   onCurrentScroll: UIEventHandler<HTMLDivElement>
   onCanvasKeyDown: KeyboardEventHandler<HTMLDivElement>
   onClearSelection: () => void
+  onSplitRatioChange: (ratio: number) => void
+  onToggleDesignPane: () => void
   onElementPointerDown: (
     event: ReactPointerEvent<HTMLElement>,
     element: UiTunerElement,
@@ -80,6 +85,8 @@ export function UiTunerComparisonWorkspace({
   runtimeCanResize,
   selectedId,
   viewScale,
+  designPaneOpen,
+  splitRatio,
   viewportControls,
   targetScrollerRef,
   currentScrollerRef,
@@ -87,6 +94,8 @@ export function UiTunerComparisonWorkspace({
   onCurrentScroll,
   onCanvasKeyDown,
   onClearSelection,
+  onSplitRatioChange,
+  onToggleDesignPane,
   onElementPointerDown,
   onSelectElement,
   onPairChange,
@@ -231,7 +240,9 @@ export function UiTunerComparisonWorkspace({
             opacity={comparison.overlayOpacity}
             pair={comparison.pair}
             targetReady
+            designPaneOpen={designPaneOpen}
             onModeChange={comparison.setMode}
+            onToggleDesignPane={onToggleDesignPane}
             onOpacityChange={comparison.setOverlayOpacity}
             onClearPair={comparison.clearPair}
           />
@@ -253,8 +264,11 @@ export function UiTunerComparisonWorkspace({
           onChange={comparison.setCalibration}
         />
       )}
-      {comparison.mode === 'split' && target ? (
-        <div className={styles.splitGrid}>
+      {comparison.mode === 'split' && target && designPaneOpen ? (
+        <div
+          className={styles.splitGrid}
+          style={{ gridTemplateColumns: `${splitRatio}% 7px minmax(0, 1fr)` }}
+        >
           <section className={styles.pane} aria-label="目标设计稿">
             <header className={styles.paneHeader}>
               <strong>设计稿</strong>
@@ -269,6 +283,7 @@ export function UiTunerComparisonWorkspace({
               onSelectRect={comparison.setTargetRect}
             />
           </section>
+          <ComparisonSplitHandle ratio={splitRatio} onChange={onSplitRatioChange} />
           <section className={styles.pane} aria-label="真实 Android 现状">
             <header className={styles.paneHeader}>
               <strong>{runtimeDraftStatus === 'confirmed' ? '真实 Android' : 'PC 即时预览'}</strong>

@@ -1,4 +1,4 @@
-import { Columns2, Eye, ScanSearch, Sparkles, Trash2 } from 'lucide-react'
+import { Columns2, Eye, PanelLeftClose, PanelLeftOpen, ScanSearch, Sparkles, Trash2 } from 'lucide-react'
 import type { ComparisonMode, TargetCurrentPair } from './types'
 import styles from './UiTunerComparisonWorkspace.module.css'
 
@@ -14,7 +14,9 @@ interface ComparisonModeControlsProps {
   opacity: number
   pair: TargetCurrentPair | null
   targetReady: boolean
+  designPaneOpen: boolean
   onModeChange: (mode: ComparisonMode) => void
+  onToggleDesignPane: () => void
   onOpacityChange: (opacity: number) => void
   onClearPair: () => void
 }
@@ -24,7 +26,9 @@ export function ComparisonModeControls({
   opacity,
   pair,
   targetReady,
+  designPaneOpen,
   onModeChange,
+  onToggleDesignPane,
   onOpacityChange,
   onClearPair,
 }: ComparisonModeControlsProps) {
@@ -43,6 +47,14 @@ export function ComparisonModeControls({
             {label}
           </button>
         ))}
+        {targetReady && mode === 'split' && (
+          <button type="button" onClick={onToggleDesignPane}>
+            {designPaneOpen
+              ? <PanelLeftClose size={13} aria-hidden="true" />
+              : <PanelLeftOpen size={13} aria-hidden="true" />}
+            {designPaneOpen ? '隐藏设计稿' : '显示设计稿'}
+          </button>
+        )}
       </div>
       {mode === 'overlay' && (
         <label className={styles.opacityControl}>

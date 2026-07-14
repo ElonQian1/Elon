@@ -43,6 +43,7 @@ import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerComparisonWorkspace } from './comparison/UiTunerComparisonWorkspace'
 import { useComparisonViewport } from './comparison/useComparisonViewport'
+import { useUiTunerWorkspaceLayout } from './workspace/useUiTunerWorkspaceLayout'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { mergeProjectRecords } from '../conversation/conversationPageHelpers'
 import { clean } from '../../lib/utils'
@@ -108,6 +109,10 @@ export default function UiTunerPage() {
     tunerDoc.canvas.targetDesign
       ? { width: tunerDoc.canvas.targetDesign.width, height: tunerDoc.canvas.targetDesign.height }
       : null,
+  )
+  const workspaceLayout = useUiTunerWorkspaceLayout(
+    tunerDoc.runtimeSnapshot?.packageName ?? tunerDoc.source?.signature ?? 'default',
+    Boolean(tunerDoc.canvas.targetDesign),
   )
   const { viewScale, viewScaleLabel, fitToStage, requestFit } = comparisonViewport
 
@@ -702,6 +707,8 @@ export default function UiTunerPage() {
           uploadedTarget={liveUi.targetDesign}
           selectedId={selectedId}
           viewScale={viewScale}
+          designPaneOpen={workspaceLayout.designPaneOpen}
+          splitRatio={workspaceLayout.splitRatio}
           viewportControls={comparisonViewport}
           targetScrollerRef={comparisonViewport.targetScrollerRef}
           currentScrollerRef={comparisonViewport.currentScrollerRef}
@@ -709,6 +716,8 @@ export default function UiTunerPage() {
           onCurrentScroll={comparisonViewport.onCurrentScroll}
           onCanvasKeyDown={handleCanvasKeyDown}
           onClearSelection={() => setSelectedId(null)}
+          onSplitRatioChange={workspaceLayout.setSplitRatio}
+          onToggleDesignPane={workspaceLayout.toggleDesignPane}
           onElementPointerDown={canvasGesture.startGesture}
           onSelectElement={setSelectedId}
           onNotice={setNotice}
