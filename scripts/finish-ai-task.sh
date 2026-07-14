@@ -175,15 +175,27 @@ elif [[ "$skip_worktree_cleanup" -eq 1 ]]; then
   task_worktree_status="skipped_by_option"
 elif [[ "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
   cd "$main_path"
-  bash "$main_path/scripts/cleanup-task-worktrees.sh" --apply || {
-    task_worktree_status="cleanup_failed"
-    finish_error "Task worktree cleanup command failed."
-  }
+  remove_output="$(git -C "$main_path" worktree remove "$task_root" 2>&1)" || true
   if git -C "$main_path" worktree list --porcelain | grep -Fq "worktree $task_root"; then
     task_worktree_status="cleanup_failed"
-    finish_error "Task worktree is still registered after cleanup: $task_root"
+    finish_error "Task worktree is still registered after targeted cleanup: $task_root. $remove_output"
   fi
-  task_worktree_status="cleaned"
+  if [[ -e "$task_root" ]]; then
+    if find "$task_root" \( -type f -o -type l \) -print -quit | grep -q .; then
+      task_worktree_status="cleanup_failed_residual_files"
+      echo "TASK_WORKTREE_RESIDUAL_PATH=$task_root"
+      echo "TASK_WORKTREE_REMOVE_OUTPUT=$remove_output"
+      finish_error "Targeted worktree cleanup left files or links behind; refusing to delete unknown residual content."
+    fi
+    if rm -rf -- "$task_root"; then
+      task_worktree_status="cleaned"
+    else
+      task_worktree_status="cleaned_registration_residual_empty_directory"
+      echo "TASK_WORKTREE_RESIDUAL_PATH=$task_root"
+    fi
+  else
+    task_worktree_status="cleaned"
+  fi
 else
   task_worktree_status="user_managed"
 fi

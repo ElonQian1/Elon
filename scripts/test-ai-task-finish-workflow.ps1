@@ -82,6 +82,7 @@ try {
     $originPath = Join-Path $testRoot "origin.git"
     $mainRepo = Join-Path $testRoot "main"
     $taskWorktree = Join-Path $testRoot "task-worktree"
+    $peerWorktree = Join-Path $testRoot "peer-worktree"
 
     & git init --bare $originPath *> $null
     if ($LASTEXITCODE -ne 0) { throw "git init --bare failed" }
@@ -104,6 +105,7 @@ try {
     Invoke-Git $mainRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $mainRepo @("push", "-u", "origin", "main") | Out-Null
     Invoke-Git $mainRepo @("worktree", "add", "-b", "codex/finish-fixture", $taskWorktree, "origin/main") | Out-Null
+    Invoke-Git $mainRepo @("worktree", "add", "-b", "codex/peer-fixture", $peerWorktree, "origin/main") | Out-Null
     Invoke-Git $taskWorktree @("config", "user.email", "finish-test@example.invalid") | Out-Null
     Invoke-Git $taskWorktree @("config", "user.name", "finish-test") | Out-Null
 
@@ -178,6 +180,7 @@ try {
     Assert-Contains $cleanupOutput "FINALIZABLE=true" "Cleaned task worktree must be finalizable."
     $registered = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if ($registered.Contains($taskWorktree)) { throw "Task worktree is still registered after unified finish cleanup." }
+    if (-not $registered.Contains("branch refs/heads/codex/peer-fixture")) { throw "Unified finish removed another agent's merged worktree." }
 
     Write-Host "PASS ai-task-finish workflow guard"
 } finally {

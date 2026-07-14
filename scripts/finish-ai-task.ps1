@@ -353,25 +353,38 @@ try {
         $taskWorktreeStatus = "skipped_by_option"
     } elseif ($isManagedTaskWorktree) {
         Set-Location -LiteralPath $mainPath
-        $cleanupScript = Join-Path $mainPath "scripts\cleanup-task-worktrees.ps1"
-        $enginePath = [System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName
-        $cleanup = Invoke-NativeCapture -FilePath $enginePath -Arguments @(
-            "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $cleanupScript, "-Apply"
-        )
-        $cleanup.Output | ForEach-Object { Write-Host ([string]$_) }
-        if ($cleanup.ExitCode -ne 0) {
-            $taskWorktreeStatus = "cleanup_failed"
-            throw "Task worktree cleanup command failed."
-        }
+        $remove = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "remove", $taskRoot)
 
         $remaining = @(Get-GitWorktreeEntries -RepoPath $mainPath | Where-Object {
             $_.Path -and (Normalize-PathText ([string]$_.Path)) -eq $taskNormalized
         })
         if ($remaining.Count -gt 0) {
             $taskWorktreeStatus = "cleanup_failed"
-            throw "Task worktree is still registered after cleanup: $taskRoot"
+            throw "Task worktree is still registered after targeted cleanup: $taskRoot. $($remove.Text)"
         }
-        $taskWorktreeStatus = "cleaned"
+
+        if (Test-Path -LiteralPath $taskRoot) {
+            $residualFiles = @(Get-ChildItem -LiteralPath $taskRoot -Force -Recurse -File -ErrorAction Stop)
+            $reparseEntries = @(Get-ChildItem -LiteralPath $taskRoot -Force -Recurse -ErrorAction Stop | Where-Object {
+                ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
+            })
+            if ($residualFiles.Count -gt 0 -or $reparseEntries.Count -gt 0) {
+                $taskWorktreeStatus = "cleanup_failed_residual_files"
+                Write-Host "TASK_WORKTREE_RESIDUAL_PATH=$taskRoot"
+                Write-Host "TASK_WORKTREE_REMOVE_OUTPUT=$($remove.Text)"
+                throw "Targeted worktree cleanup left files or links behind; refusing to delete unknown residual content."
+            }
+
+            try {
+                Remove-Item -LiteralPath $taskRoot -Recurse -Force -ErrorAction Stop
+                $taskWorktreeStatus = "cleaned"
+            } catch {
+                $taskWorktreeStatus = "cleaned_registration_residual_empty_directory"
+                Write-Host "TASK_WORKTREE_RESIDUAL_PATH=$taskRoot"
+            }
+        } else {
+            $taskWorktreeStatus = "cleaned"
+        }
     } else {
         $taskWorktreeStatus = "user_managed"
     }
