@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -10,6 +11,7 @@ use super::types::{RuntimeUiNode, SourceMapEntry};
 const MAX_SOURCE_FILES: usize = 2_500;
 const MAX_SOURCE_BYTES: u64 = 1024 * 1024;
 const MAX_CANDIDATES: usize = 6;
+const MAX_SOURCE_MAP_DURATION: Duration = Duration::from_secs(2);
 
 pub(crate) struct SourceMapAttachment {
     pub root: Option<String>,
@@ -39,15 +41,16 @@ pub(crate) fn attach_source_map(
     nodes: &mut [RuntimeUiNode],
     explicit_root: Option<&str>,
 ) -> SourceMapAttachment {
-    let Some(root) = resolve_source_root(explicit_root) else {
+    let deadline = Instant::now() + MAX_SOURCE_MAP_DURATION;
+    let Some(root) = resolve_source_root(explicit_root, deadline) else {
         return SourceMapAttachment {
             root: None,
             fingerprint: None,
             bindings_path: None,
         };
     };
-    let files = collect_project_source_files(&root);
-    let index = build_source_index(&root, &files, nodes);
+    let files = collect_project_source_files(&root, deadline);
+    let index = build_source_index(&root, &files, nodes, Some(deadline));
     for node in nodes.iter_mut() {
         let candidates = index.candidates_for(node);
         node.source = candidates.first().cloned();
@@ -102,6 +105,7 @@ fn build_source_index(
     root: &Path,
     files: &[PathBuf],
     nodes: &[RuntimeUiNode],
+    deadline: Option<Instant>,
 ) -> SourceCandidateIndex {
     let resource_ids = nodes
         .iter()
@@ -116,6 +120,9 @@ fn build_source_index(
         .collect::<HashSet<_>>();
     let mut index = SourceCandidateIndex::default();
     for file in files {
+        if deadline.is_some_and(|value| Instant::now() >= value) {
+            break;
+        }
         let Some(content) = read_small_source(file) else {
             continue;
         };
@@ -124,6 +131,9 @@ fn build_source_index(
             .and_then(|value| value.to_str())
             .unwrap_or("");
         for (line_index, line) in content.lines().enumerate() {
+            if line_index % 256 == 0 && deadline.is_some_and(|value| Instant::now() >= value) {
+                break;
+            }
             let line_number = line_index + 1;
             if extension == "xml" {
                 for marker in ["@+id/", "@id/"] {
@@ -289,13 +299,14 @@ fn is_useful_literal(value: &str) -> bool {
     (3..=80).contains(&size)
 }
 
-fn resolve_source_root(explicit_root: Option<&str>) -> Option<PathBuf> {
-    if let Some(root) = canonical_android_project(explicit_root.map(PathBuf::from)) {
+fn resolve_source_root(explicit_root: Option<&str>, deadline: Instant) -> Option<PathBuf> {
+    if let Some(root) = canonical_android_project(explicit_root.map(PathBuf::from), deadline) {
         return Some(root);
     }
-    if let Some(root) =
-        canonical_android_project(std::env::var_os("ELON_ANDROID_SOURCE_ROOT").map(PathBuf::from))
-    {
+    if let Some(root) = canonical_android_project(
+        std::env::var_os("ELON_ANDROID_SOURCE_ROOT").map(PathBuf::from),
+        deadline,
+    ) {
         return Some(root);
     }
     let mut candidates = Vec::new();
@@ -309,7 +320,10 @@ fn resolve_source_root(explicit_root: Option<&str>) -> Option<PathBuf> {
     }
     for candidate in candidates {
         for ancestor in candidate.ancestors() {
-            if has_android_sources(ancestor) {
+            if Instant::now() >= deadline {
+                return None;
+            }
+            if has_android_sources(ancestor, deadline) {
                 return ancestor.canonicalize().ok();
             }
         }
@@ -317,24 +331,27 @@ fn resolve_source_root(explicit_root: Option<&str>) -> Option<PathBuf> {
     None
 }
 
-fn canonical_android_project(candidate: Option<PathBuf>) -> Option<PathBuf> {
+fn canonical_android_project(candidate: Option<PathBuf>, deadline: Instant) -> Option<PathBuf> {
     candidate
         .and_then(|path| path.canonicalize().ok())
-        .filter(|path| has_android_sources(path))
+        .filter(|path| has_android_sources(path, deadline))
 }
 
-fn has_android_sources(path: &Path) -> bool {
-    find_android_manifest(path, 0)
+fn has_android_sources(path: &Path, deadline: Instant) -> bool {
+    find_android_manifest(path, 0, deadline)
 }
 
-fn find_android_manifest(root: &Path, depth: usize) -> bool {
-    if depth > 12 {
+fn find_android_manifest(root: &Path, depth: usize, deadline: Instant) -> bool {
+    if depth > 12 || Instant::now() >= deadline {
         return false;
     }
     let Ok(entries) = fs::read_dir(root) else {
         return false;
     };
     for entry in entries.flatten() {
+        if Instant::now() >= deadline {
+            return false;
+        }
         let path = entry.path();
         if path.is_dir() {
             let name = path
@@ -347,7 +364,7 @@ fn find_android_manifest(root: &Path, depth: usize) -> bool {
             ) {
                 continue;
             }
-            if find_android_manifest(&path, depth + 1) {
+            if find_android_manifest(&path, depth + 1, deadline) {
                 return true;
             }
         } else if path.file_name().and_then(|name| name.to_str()) == Some("AndroidManifest.xml")
@@ -362,11 +379,11 @@ fn find_android_manifest(root: &Path, depth: usize) -> bool {
     false
 }
 
-fn collect_project_source_files(root: &Path) -> Vec<PathBuf> {
+fn collect_project_source_files(root: &Path, deadline: Instant) -> Vec<PathBuf> {
     let mut files = Vec::new();
-    visit_dirs(root, 0, &mut |path| {
+    visit_dirs(root, 0, deadline, &mut |path| {
         if files.len() >= MAX_SOURCE_FILES {
-            return;
+            return false;
         }
         let extension = path.extension().and_then(|value| value.to_str());
         if matches!(extension, Some("xml") | Some("kt") | Some("java"))
@@ -377,18 +394,30 @@ fn collect_project_source_files(root: &Path) -> Vec<PathBuf> {
         {
             files.push(path.to_path_buf());
         }
+        files.len() < MAX_SOURCE_FILES
     });
     files
 }
 
-fn visit_dirs(root: &Path, depth: usize, visit: &mut impl FnMut(&Path)) {
+fn visit_dirs(
+    root: &Path,
+    depth: usize,
+    deadline: Instant,
+    visit: &mut impl FnMut(&Path) -> bool,
+) -> bool {
+    if Instant::now() >= deadline {
+        return false;
+    }
     if depth > 12 {
-        return;
+        return true;
     }
     let Ok(entries) = fs::read_dir(root) else {
-        return;
+        return true;
     };
     for entry in entries.flatten() {
+        if Instant::now() >= deadline {
+            return false;
+        }
         let path = entry.path();
         if path.is_dir() {
             let name = path
@@ -401,11 +430,14 @@ fn visit_dirs(root: &Path, depth: usize, visit: &mut impl FnMut(&Path)) {
             ) {
                 continue;
             }
-            visit_dirs(&path, depth + 1, visit);
-        } else {
-            visit(&path);
+            if !visit_dirs(&path, depth + 1, deadline, visit) {
+                return false;
+            }
+        } else if !visit(&path) {
+            return false;
         }
     }
+    true
 }
 
 fn project_fingerprint(root: &str) -> String {
@@ -516,7 +548,7 @@ mod tests {
             source: None,
             source_candidates: Vec::new(),
         };
-        let index = build_source_index(&root, &[layout, code], std::slice::from_ref(&node));
+        let index = build_source_index(&root, &[layout, code], std::slice::from_ref(&node), None);
         let candidates = index.candidates_for(&node);
         assert_eq!(candidates.len(), 2);
         assert_eq!(candidates[0].match_kind, "resource_id_xml");
@@ -566,7 +598,7 @@ mod tests {
             source: None,
             source_candidates: Vec::new(),
         };
-        let index = build_source_index(&root, &[code], std::slice::from_ref(&node));
+        let index = build_source_index(&root, &[code], std::slice::from_ref(&node), None);
         let candidates = index.candidates_for(&node);
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].match_kind, "compose_semantics");
