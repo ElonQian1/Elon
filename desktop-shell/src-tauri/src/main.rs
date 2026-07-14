@@ -7,17 +7,27 @@
 // （elon-pc-node，见 server/src/node_agent_admin_open.rs）时静默启动
 // 后台服务，再打开系统默认浏览器标签页。
 //
-// 原型阶段只验证核心可行性：原生窗口能否正常加载 /pc 并完成登录、
-// 会话、实时刷新等既有能力。后续阶段再接入：
+// 已完成：首屏加载遮罩（见 LOADING_OVERLAY_SCRIPT）、系统托盘（替代
+// tray-launcher.ps1）、关闭按钮最小化到托盘而不是直接退出。
+//
+// 后续阶段再接入：
 //   - 复用 node_agent_admin_open::admin_url() 的云端可达探测 + 本地回退
-//   - 系统托盘（替代 tray-launcher.ps1）
-//   - 无边框自定义标题栏 + Mica/Acrylic 背景
+//   - 无边框自定义标题栏 + Mica/Acrylic 背景（两者耦合：Mica 只有在窗口有
+//     透明/半透明区域时才可见，当前整窗被远程页面不透明内容铺满，暂不做，
+//     避免加了个看不见效果的依赖）
 //   - 全局快捷键、原生通知
 //   - 安装器/快捷方式接入（desktop-shell 作为新增 elon-desktop.exe）
 
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+};
+
+/// 主窗口 label，托盘菜单/左键点击需要用它找回窗口。
+const MAIN_WINDOW_LABEL: &str = "main";
 
 /// 目标工作台地址。
 ///
@@ -81,7 +91,7 @@ fn main() {
 
             println!("[elon-desktop] 目标地址: {url}");
 
-            let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+            let window = WebviewWindowBuilder::new(app, MAIN_WINDOW_LABEL, WebviewUrl::External(url))
                 .title("一龙工作台")
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(960.0, 600.0)
@@ -110,6 +120,55 @@ fn main() {
             // 原型排障阶段自动打开 DevTools，方便直接看控制台报错和网络请求。
             #[cfg(debug_assertions)]
             window.open_devtools();
+
+            // 关闭按钮只隐藏窗口，真正退出走托盘菜单——这样它才像一个“一直在”
+            // 的 agent 客户端，而不是一个关掉就没了的网页标签。
+            let hide_on_close_window = window.clone();
+            window.on_window_event(move |event| {
+                if let WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    let _ = hide_on_close_window.hide();
+                }
+            });
+
+            // 系统托盘：替代旧的 tray-launcher.ps1。左键点开/聚焦主窗口，
+            // 右键菜单可以重新打开窗口或彻底退出进程。
+            let handle = app.handle();
+            let show_item =
+                MenuItem::with_id(handle, "show", "打开一龙工作台", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(handle, "quit", "退出", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(handle, &[&show_item, &quit_item])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().expect("缺少默认窗口图标").clone())
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .tooltip("一龙工作台")
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
 
             Ok(())
         })
