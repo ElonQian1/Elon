@@ -96,6 +96,6 @@ Assert-Contains $toolchain 'channel = "stable"' "Rust toolchain must declare the
 Assert-Contains $toolchain 'components = ["rustfmt"]' "Pinned toolchain must install rustfmt."
 
 $versionLock = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".rustfmt-version") -Encoding UTF8
-Assert-Contains $versionLock 'rustfmt 1.9.0-stable (31fca3adb2 2026-06-26)' "Rustfmt build must stay locked to the committed baseline."
+Assert-Contains $versionLock 'rustfmt 1.9.0-stable (2d8144b788 2026-07-07)' "Rustfmt build must stay locked to the committed baseline."
 
 Write-Host "PASS Rust format workflow guard"
