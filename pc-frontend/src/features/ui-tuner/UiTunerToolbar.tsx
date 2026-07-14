@@ -26,6 +26,7 @@ import type { AndroidDeviceLease } from './device/deviceLeaseApi'
 import styles from './UiTunerPage.module.css'
 
 function deviceConnectionLabel(device: AndroidInspectorDevice) {
+  if (device.hostMode === 'shared') return device.hostDisplayName ? `共享 · ${device.hostDisplayName}` : '共享主机'
   if (device.connectionType === 'usb') return 'USB'
   if (device.connectionType === 'wireless') return '无线'
   if (device.connectionType === 'emulator') return '模拟器'

@@ -8,6 +8,8 @@ pub use cli_durable_types::{
     CliCodexCredentialBinding, CliCompletionEnvelope, CliCompletionProducerIdentity,
 };
 
+mod android_device_host;
+pub use android_device_host::{AndroidDeviceHostRequest, CAP_ANDROID_DEVICE_HOST_V1};
 pub const PROTO_VERSION: u32 = 7;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
@@ -244,6 +246,12 @@ pub enum ServerToAgent {
         headers: Vec<(String, String)>,
         /// base64 编码的 body（GET 等无 body 时为 None）
         body_b64: Option<String>,
+    },
+    /// Project-authorized shared Android device-host request. This is distinct
+    /// from the legacy generic relay so a node can keep the local-admin token
+    /// private and reject arbitrary `/api/pc-relay` traffic.
+    AndroidDeviceHostRequest {
+        request: AndroidDeviceHostRequest,
     },
     /// 云端把 AI 提示发给 PC，让 PC 用本地 CLI（copilot/codex）执行，流式返回结果
     CliPrompt {

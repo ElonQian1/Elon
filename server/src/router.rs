@@ -13,6 +13,7 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::types::AppState;
 use crate::ui_tuner_api;
+use crate::ui_tuner_device_host_api;
 use crate::ui_tuner_device_lease_api;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
@@ -206,6 +207,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/me", get(auth_api::me))
         .merge(codex_vault_api::routes())
         .merge(ui_tuner_api::routes())
+        .merge(ui_tuner_device_host_api::routes())
         .merge(ui_tuner_device_lease_api::routes())
         .route("/api/me/progression", get(user_progression::get_my_progression))
         .route(

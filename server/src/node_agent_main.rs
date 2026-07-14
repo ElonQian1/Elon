@@ -34,6 +34,7 @@ mod node_agent_admin_status;
 mod node_agent_android_device_lease;
 mod node_agent_android_inspector;
 mod node_agent_android_live;
+mod node_agent_android_relay;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_atomic_file;

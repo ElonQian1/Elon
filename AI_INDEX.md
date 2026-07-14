@@ -33,7 +33,7 @@
 | 应用更新 | `android/app/src/main/kotlin/com/elon/app/update/` |
 | 网络/API/WebSocket | `android/app/src/main/kotlin/com/elon/app/net/` |
 | 项目相关 UI | `android/app/src/main/kotlin/com/elon/app/project/` |
-| `elon-self` 共享真机身份、无线 ADB 最近端点和连接约定 | `AI_PROJECT.md` 的“当前共享 Android 真机（项目记忆）”、`server/src/node_agent_android_inspector/` |
+| `elon-self` 共享真机身份、无线 ADB 最近端点和连接约定 | `AI_PROJECT.md` 的“当前共享 Android 真机（项目记忆）”、`docs/shared-android-device-host.md`、`server/src/node_agent_android_inspector/` |
 
 ## Web/静态资源入口
 

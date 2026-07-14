@@ -236,6 +236,7 @@ mod ui_design_tasks;
 mod ui_route_learning_migration;
 mod ui_tuner_api;
 mod ui_tuner_context;
+mod ui_tuner_device_host_api;
 mod ui_tuner_device_lease_api;
 mod ui_tuner_store_migration;
 mod user_agent_probe;

@@ -7,8 +7,8 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
-    AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_PROJECT_BUILD_CACHE_V1,
-    PROTO_VERSION,
+    AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_ANDROID_DEVICE_HOST_V1,
+    CAP_PROJECT_BUILD_CACHE_V1, PROTO_VERSION,
 };
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -172,7 +172,10 @@ pub(super) async fn run_session(
         agent_id: creds.agent_id.clone(),
         version: env!("CARGO_PKG_VERSION").to_string(),
         proto_version: PROTO_VERSION,
-        capabilities: vec![CAP_PROJECT_BUILD_CACHE_V1.to_string()],
+        capabilities: vec![
+            CAP_PROJECT_BUILD_CACHE_V1.to_string(),
+            CAP_ANDROID_DEVICE_HOST_V1.to_string(),
+        ],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
         owner_user_id: Some(creds.owner_user_id.clone()),
@@ -337,6 +340,11 @@ pub(super) async fn run_session(
                         ServerToAgent::Ping { nonce } => {
                             let _ = control_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));
                         }
+                        ServerToAgent::AndroidDeviceHostRequest { request } => crate::node_agent_android_relay::spawn(
+                            runtime.clone(),
+                            out_tx_r.clone(),
+                            request,
+                        ),
                         ServerToAgent::ProvisionProjectWorkspace {
                             req_id,
                             project_id,

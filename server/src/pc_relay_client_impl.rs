@@ -163,6 +163,13 @@ pub(super) async fn run_relay_session(
                     let _ = tx.send(Message::Text(serde_json::to_string(&resp).unwrap()));
                 });
             }
+            ServerToAgent::AndroidDeviceHostRequest { request } => {
+                let response = AgentToServer::HttpError {
+                    req_id: request.req_id,
+                    message: "旧版 relay 客户端不支持共享 Android 设备主机".to_string(),
+                };
+                let _ = out_tx.send(Message::Text(serde_json::to_string(&response)?));
+            }
 
             ServerToAgent::CliPrompt {
                 req_id,

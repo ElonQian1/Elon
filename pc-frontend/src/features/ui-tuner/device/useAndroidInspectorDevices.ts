@@ -15,12 +15,15 @@ import {
   type AndroidWirelessStatus,
 } from './deviceInspectorApi'
 import type { AndroidDeviceLeaseProof } from './deviceLeaseApi'
+import { listProjectAndroidDeviceHosts } from './deviceHostApi'
+import { setAndroidNodeTransportHost } from './androidNodeTransport'
 
 interface UseAndroidInspectorDevicesOptions {
   onCaptured: (snapshot: AndroidInspectorSnapshot) => void
   onNotice: (message: string) => void
   projectRoot?: string
   packageName?: string
+  projectId?: string
   ensureLease?: (hardwareSerial: string) => Promise<AndroidDeviceLeaseProof>
 }
 
@@ -52,11 +55,15 @@ function selectCaptureDevice(devices: AndroidInspectorDevice[], preferredId: str
 }
 
 function deviceDisplayName(device: AndroidInspectorDevice) {
-  return device.model ?? device.serial
+  const name = device.model ?? device.serial
+  return device.hostMode === 'shared' && device.hostDisplayName
+    ? `${name}（由 ${device.hostDisplayName} 托管）`
+    : name
 }
 
 function devicePriority(device: AndroidInspectorDevice) {
   const stateScore = device.state === 'device' ? 100 : 0
+  const hostScore = device.hostMode === 'local' ? 40 : 0
   // 真机调试优先使用同一硬件的无线 transport。USB 插拔或 adb tcpip
   // 切换时，有线 serial 可能在刷新后瞬间消失，无线 endpoint 更稳定。
   const connectionScore = device.connectionType === 'wireless'
@@ -64,7 +71,20 @@ function devicePriority(device: AndroidInspectorDevice) {
     : device.connectionType === 'usb'
       ? 10
       : 0
-  return stateScore + connectionScore
+  return stateScore + hostScore + connectionScore
+}
+
+function activateDeviceHost(device: AndroidInspectorDevice | undefined, projectId?: string) {
+  if (device?.hostMode === 'shared' && device.hostAgentId && projectId) {
+    setAndroidNodeTransportHost({
+      mode: 'shared',
+      projectId,
+      agentId: device.hostAgentId,
+      displayName: device.hostDisplayName || device.hostAgentId,
+    })
+    return
+  }
+  setAndroidNodeTransportHost()
 }
 
 function normalizeDeviceInventory(devices: AndroidInspectorDevice[]) {
@@ -109,6 +129,7 @@ export function useAndroidInspectorDevices({
   onNotice,
   projectRoot,
   packageName,
+  projectId,
   ensureLease,
 }: UseAndroidInspectorDevicesOptions) {
   const [devices, setDevices] = useState<AndroidInspectorDevice[]>([])
@@ -130,7 +151,31 @@ export function useAndroidInspectorDevices({
   const refreshDevices = useCallback(async (announce = true): Promise<AndroidInspectorDevice[]> => {
     setDeviceBusy(true)
     try {
-      const nextDevices = normalizeDeviceInventory(await listAndroidDevices())
+      const [localResult, sharedResult] = await Promise.allSettled([
+        listAndroidDevices(),
+        projectId ? listProjectAndroidDeviceHosts(projectId) : Promise.resolve([]),
+      ])
+      const localDevices = localResult.status === 'fulfilled'
+        ? localResult.value.map((device) => ({
+            ...device,
+            hostMode: 'local' as const,
+            hostDisplayName: '本机 PC 节点',
+          }))
+        : []
+      const sharedDevices = sharedResult.status === 'fulfilled'
+        ? sharedResult.value
+            .sort((left, right) => left.displayName.localeCompare(right.displayName))
+            .flatMap((host) => host.devices.map((device) => ({
+              ...device,
+              hostMode: 'shared' as const,
+              hostAgentId: host.agentId,
+              hostDisplayName: host.displayName,
+            })))
+        : []
+      if (localResult.status === 'rejected' && sharedResult.status === 'rejected') {
+        throw localResult.reason
+      }
+      const nextDevices = normalizeDeviceInventory([...localDevices, ...sharedDevices])
       const readyDevices = nextDevices.filter((device) => device.state === 'device')
       setDevices(nextDevices)
       setSelectedDeviceId((current) => chooseDeviceId(nextDevices, current))
@@ -153,7 +198,7 @@ export function useAndroidInspectorDevices({
     } finally {
       setDeviceBusy(false)
     }
-  }, [onNotice])
+  }, [onNotice, projectId])
 
   const captureDeviceSnapshot = useCallback(async (override?: {
     deviceId?: string
@@ -179,6 +224,7 @@ export function useAndroidInspectorDevices({
         return null
       }
       const identity = deviceIdentity(targetDevice)
+      activateDeviceHost(targetDevice, projectId)
       const lease = override?.launchApp === false ? undefined : await ensureLease?.(identity)
       window.localStorage.setItem(SELECTED_DEVICE_STORAGE_KEY, identity)
       setSelectedDeviceId(targetDevice.serial)
@@ -228,14 +274,15 @@ export function useAndroidInspectorDevices({
     } finally {
       setCaptureBusy(false)
     }
-  }, [ensureLease, onCaptured, onNotice, packageName, projectRoot, refreshDevices, selectedDeviceId])
+  }, [ensureLease, onCaptured, onNotice, packageName, projectId, projectRoot, refreshDevices, selectedDeviceId])
 
   const selectDevice = useCallback((deviceId: string) => {
     const selected = devices.find((device) => device.serial === deviceId)
     if (selected) window.localStorage.setItem(SELECTED_DEVICE_STORAGE_KEY, deviceIdentity(selected))
     else if (!deviceId) window.localStorage.removeItem(SELECTED_DEVICE_STORAGE_KEY)
+    activateDeviceHost(selected, projectId)
     setSelectedDeviceId(deviceId)
-  }, [devices])
+  }, [devices, projectId])
 
   const refreshWirelessStatus = useCallback(async () => {
     setWirelessBusy(true)
@@ -253,8 +300,20 @@ export function useAndroidInspectorDevices({
 
   const openDeviceManager = useCallback(() => {
     setDeviceDialogOpen(true)
+    const selected = devices.find((device) => device.serial === selectedDeviceId)
+    if (selected?.hostMode === 'shared') {
+      onNotice(`${deviceDisplayName(selected)} 已可用；无线授权由托管电脑维护，本机无需重复配对`)
+      return
+    }
     void refreshWirelessStatus()
-  }, [refreshWirelessStatus])
+  }, [devices, onNotice, refreshWirelessStatus, selectedDeviceId])
+
+  useEffect(() => {
+    activateDeviceHost(
+      devices.find((device) => device.serial === selectedDeviceId),
+      projectId,
+    )
+  }, [devices, projectId, selectedDeviceId])
 
   const reconnectWirelessDevices = useCallback(async (profileId?: string, announce = true) => {
     setWirelessBusy(true)
@@ -279,6 +338,8 @@ export function useAndroidInspectorDevices({
 
   useEffect(() => {
     const discoverDevices = async () => {
+      const discovered = await refreshDevices(false)
+      if (discovered.some((device) => device.state === 'device')) return
       const status = await refreshWirelessStatus()
       if (status && !status.devices.some((device) => device.state === 'device')) {
         await reconnectWirelessDevices(undefined, false)
@@ -292,7 +353,7 @@ export function useAndroidInspectorDevices({
     return () => {
       window.removeEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, reconnectAfterNodeDiscovery)
     }
-  }, [reconnectWirelessDevices, refreshWirelessStatus])
+  }, [reconnectWirelessDevices, refreshDevices, refreshWirelessStatus])
 
   const registerWiredDevice = useCallback(async (deviceId: string, displayName?: string) => {
     setWirelessBusy(true)

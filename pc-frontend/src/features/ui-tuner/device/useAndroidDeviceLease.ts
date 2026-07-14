@@ -10,6 +10,7 @@ import {
   type AndroidDeviceLeaseProof,
 } from './deviceLeaseApi'
 import { createDeviceLeaseClientId } from './deviceLeaseClientId'
+import { setAndroidNodeLeaseProof } from './androidNodeTransport'
 
 const CLIENT_ID_KEY = 'elon.pc.uiTuner.deviceLeaseClient.v1'
 
@@ -43,6 +44,7 @@ export function useAndroidDeviceLease(
       const current = ownedRef.current
       if (current && !next.some((lease) => lease.leaseId === current.leaseId)) {
         setOwnedLease(null)
+        setAndroidNodeLeaseProof()
         onNotice('公共测试手机使用权已释放；实时修改已暂停，请重新取得使用权')
       }
       return next
@@ -61,6 +63,7 @@ export function useAndroidDeviceLease(
     const current = ownedRef.current
     if (current && (current.projectId !== projectId || current.hardwareSerial !== hardwareSerial)) {
       setOwnedLease(null)
+      setAndroidNodeLeaseProof()
       void releaseAndroidDeviceLease(current).catch(() => undefined)
     }
   }, [hardwareSerial, projectId])
@@ -71,9 +74,11 @@ export function useAndroidDeviceLease(
       try {
         const renewed = await heartbeatAndroidDeviceLease(ownedLease)
         setOwnedLease(renewed)
+        setAndroidNodeLeaseProof(leaseProof(renewed))
         setLeases((current) => current.map((lease) => lease.leaseId === renewed.leaseId ? renewed : lease))
       } catch (error) {
         setOwnedLease(null)
+        setAndroidNodeLeaseProof()
         onNotice(deviceLeaseError(error))
       }
     }
@@ -84,6 +89,7 @@ export function useAndroidDeviceLease(
   useEffect(() => () => {
     const current = ownedRef.current
     if (current) void releaseAndroidDeviceLease(current).catch(() => undefined)
+    setAndroidNodeLeaseProof()
   }, [])
 
   const ensureLease = useCallback(async (serial?: string): Promise<AndroidDeviceLeaseProof> => {
@@ -92,7 +98,9 @@ export function useAndroidDeviceLease(
     if (!target) throw new Error('无法识别手机硬件序列号，请刷新设备或重新登记')
     const current = ownedRef.current
     if (current && current.projectId === projectId && current.hardwareSerial === target) {
-      return leaseProof(current)
+      const proof = leaseProof(current)
+      setAndroidNodeLeaseProof(proof)
+      return proof
     }
     setBusy(true)
     try {
@@ -100,7 +108,9 @@ export function useAndroidDeviceLease(
       setOwnedLease(acquired)
       setLeases((items) => [...items.filter((item) => item.hardwareSerial !== target), acquired])
       onNotice(`已取得 ${acquired.hardwareSerial} 的使用权；离开或断线后会自动释放`)
-      return leaseProof(acquired)
+      const proof = leaseProof(acquired)
+      setAndroidNodeLeaseProof(proof)
+      return proof
     } catch (error) {
       void refresh()
       throw new Error(deviceLeaseError(error))
@@ -113,6 +123,7 @@ export function useAndroidDeviceLease(
     const current = ownedRef.current
     if (!current) return
     setOwnedLease(null)
+    setAndroidNodeLeaseProof()
     await releaseAndroidDeviceLease(current).catch(() => undefined)
     await refresh()
   }, [refresh])

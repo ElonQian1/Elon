@@ -1,6 +1,7 @@
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import { safeNodeAdminUrl } from '../../../lib/utils'
 import type { AndroidDeviceLeaseProof } from './deviceLeaseApi'
+import { androidNodeApi } from './androidNodeTransport'
 
 export interface AndroidInspectorDevice {
   serial: string
@@ -11,6 +12,9 @@ export interface AndroidInspectorDevice {
   model?: string
   device?: string
   transportId?: string
+  hostMode?: 'local' | 'shared'
+  hostAgentId?: string
+  hostDisplayName?: string
 }
 
 export interface AndroidInspectorBounds {
@@ -333,7 +337,7 @@ export async function captureAndroidSnapshot(input: {
   lease?: AndroidDeviceLeaseProof
 }): Promise<AndroidInspectorSnapshot> {
   try {
-    return await nodeApi<AndroidInspectorSnapshot>(
+    return await androidNodeApi<AndroidInspectorSnapshot>(
       inspectorAdminUrl(),
       '/api/android-inspector/capture',
       {
@@ -364,7 +368,7 @@ export async function persistAndroidSelectionArtifact(input: {
   componentKey?: string
 }): Promise<AndroidSelectionArtifact> {
   try {
-    const response = await nodeApi<{ artifact: AndroidSelectionArtifact }>(
+    const response = await androidNodeApi<{ artifact: AndroidSelectionArtifact }>(
       inspectorAdminUrl(),
       '/api/android-inspector/selection-artifact',
       {

@@ -231,6 +231,7 @@ export default function UiTunerPage() {
     onNotice: setNotice,
     projectRoot: effectiveProjectRoot,
     packageName: liveTargetPackage || undefined,
+    projectId: activeProjectId,
     ensureLease: (hardwareSerial) => {
       const acquire = ensureDeviceLeaseRef.current
       return acquire

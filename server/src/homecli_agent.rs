@@ -72,6 +72,7 @@ fn freeze_cloud_control_dispatch_window_at(
         ttl_ms: ttl_ms as u64,
     })
 }
+mod android_device_host;
 mod heartbeat;
 mod journal;
 mod pending_recovery;
@@ -592,6 +593,7 @@ impl AgentManager {
             Err(_) => Err(anyhow!("http relay timeout (60s)")),
         }
     }
+
     /// Dispatch a new exec task to the given agent. Returns a receiver that
     /// streams the agent's events for this task until `TaskExit` or `TaskError`.
     pub async fn dispatch(

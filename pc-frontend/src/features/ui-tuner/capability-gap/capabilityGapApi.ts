@@ -1,4 +1,4 @@
-import { nodeApi } from '../../node/localNodeApi'
+import { androidNodeApi as nodeApi } from '../device/androidNodeTransport'
 import { inspectorAdminUrl } from '../device/deviceInspectorApi'
 import type { CapabilityGapDocument, CapabilityReadiness } from './types'
 

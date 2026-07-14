@@ -51,6 +51,7 @@ const STATE_LABELS: Record<AndroidDeviceProfile['connectionState'], string> = {
 }
 
 function deviceConnectionLabel(device: AndroidInspectorDevice) {
+  if (device.hostMode === 'shared') return device.hostDisplayName ? `共享 · ${device.hostDisplayName}` : '共享主机'
   return device.connectionType === 'usb'
     ? 'USB'
     : device.connectionType === 'wireless'
@@ -99,6 +100,7 @@ export function UiTunerDeviceDialog({
     device.state === 'device' && device.connectionType === 'usb'
   ))
   const selectedReadyDevice = selectedDevice?.state === 'device' ? selectedDevice : readyUsbDevice
+  const localReadyDevice = selectedReadyDevice?.hostMode === 'shared' ? readyUsbDevice : selectedReadyDevice
 
   if (!open) return null
 
@@ -160,9 +162,9 @@ export function UiTunerDeviceDialog({
               />
               <button
                 type="button"
-                disabled={busy || !selectedReadyDevice}
+                disabled={busy || !localReadyDevice}
                 onClick={async () => {
-                  const profile = await onRegister(selectedReadyDevice?.serial ?? '', displayName)
+                  const profile = await onRegister(localReadyDevice?.serial ?? '', displayName)
                   if (profile) setActiveProfileId(profile.id)
                 }}
               >
@@ -221,8 +223,8 @@ export function UiTunerDeviceDialog({
             <div className={styles.compatActions}>
               <button
                 type="button"
-                disabled={busy || !selectedReadyDevice}
-                onClick={() => onEnableLegacy(selectedReadyDevice?.serial ?? '', activeProfile?.id)}
+                disabled={busy || !localReadyDevice}
+                onClick={() => onEnableLegacy(localReadyDevice?.serial ?? '', activeProfile?.id)}
               >
                 USB 一键转无线 5555
               </button>
