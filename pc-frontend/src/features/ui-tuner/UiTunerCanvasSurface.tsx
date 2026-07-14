@@ -214,8 +214,8 @@ function runtimeSurfaceLabel(
   status: UiTunerCanvasSurfaceProps['runtimeDraftStatus'],
 ) {
   if (!connected) return 'PC 草稿可继续编辑 · Android 正在重连'
-  if (status === 'local') return 'PC 即时重绘 · 等待同步 Android'
-  if (status === 'syncing') return 'PC 即时重绘 · Android 后台同步中'
+  if (status === 'local') return 'Android 实时重绘 · PC 草稿正在发送'
+  if (status === 'syncing') return 'Android 实时重绘 · 正在同步真机帧'
   if (status === 'calibrating') return 'Android 已应用 · 正在校准真机画面'
   if (status === 'rejected') return 'PC 草稿已保留 · Android 同步失败'
   return 'Android LIVE · PC 本地即时渲染'

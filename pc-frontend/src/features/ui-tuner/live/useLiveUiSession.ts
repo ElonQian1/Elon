@@ -338,6 +338,28 @@ export function useLiveUiSession({
     }
   }, [refresh, refreshFrame, session?.id, state])
 
+  useEffect(() => {
+    if (state !== 'connected' || !session?.id || !gestureActive) return
+    let disposed = false
+    let timer: number | undefined
+    const streamRealRenderer = async () => {
+      if (disposed) return
+      // Keep the Android Window as the visual source of truth while dragging.
+      // RuntimeDraftLayer only bridges the short gap before PixelCopy returns;
+      // each request is serialized so a slow USB/Wi-Fi device cannot build an
+      // unbounded frame backlog.
+      await refreshFrame(session.id).catch(() => undefined)
+      if (!disposed) {
+        timer = window.setTimeout(() => { void streamRealRenderer() }, 120)
+      }
+    }
+    void streamRealRenderer()
+    return () => {
+      disposed = true
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [gestureActive, refreshFrame, session?.id, state])
+
   const selectedNode = useMemo(
     () => matchLiveNode(selected, nodes),
     [nodes, selected],
