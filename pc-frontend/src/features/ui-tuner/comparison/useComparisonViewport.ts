@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react'
 import type { PixelSize } from './types'
+import { canvasZoomCommand } from './canvasZoomShortcuts'
 
 const MIN_SCALE = 0.08
 const MAX_SCALE = 2
@@ -98,6 +99,19 @@ export function useComparisonViewport(currentSize: PixelSize, targetSize: PixelS
     fitCanvasToStage()
   }, [fitCanvasToStage])
   const requestFit = useCallback(() => setFitToStage(true), [])
+
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const command = canvasZoomCommand(event)
+      if (!command) return
+      event.preventDefault()
+      if (command === 'zoom-in') zoomIn()
+      else if (command === 'zoom-out') zoomOut()
+      else actualSize()
+    }
+    window.addEventListener('keydown', handleShortcut)
+    return () => window.removeEventListener('keydown', handleShortcut)
+  }, [actualSize, zoomIn, zoomOut])
 
   return {
     viewScale,
