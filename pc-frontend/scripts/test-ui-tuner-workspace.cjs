@@ -242,9 +242,15 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/UiTunerPage.tsx'),
     'utf8',
   )
-  assert.match(pageSource, /workspaceLayout\.focusMode\s*&&/)
-  assert.match(pageSource, /className=\{styles\.focusModeExit\}/)
-  assert.match(pageSource, /onClick=\{workspaceLayout\.exitFocusMode\}/)
+  assert.match(pageSource, /<FocusModeExitButton/)
+  assert.match(pageSource, /active=\{workspaceLayout\.focusMode\}/)
+  assert.match(pageSource, /onExit=\{workspaceLayout\.exitFocusMode\}/)
+  const focusExitSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/workspace/FocusModeExitButton.tsx'),
+    'utf8',
+  )
+  assert.match(focusExitSource, /className=\{styles\.focusModeExit\}/)
+  assert.match(focusExitSource, /onClick=\{onExit\}/)
   const layoutSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/workspace/useUiTunerWorkspaceLayout.ts'),
     'utf8',

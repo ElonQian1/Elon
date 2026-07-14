@@ -49,6 +49,7 @@ import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerComparisonWorkspace } from './comparison/UiTunerComparisonWorkspace'
 import { useComparisonViewport } from './comparison/useComparisonViewport'
+import { FocusModeExitButton } from './workspace/FocusModeExitButton'
 import { useUiTunerWorkspaceLayout } from './workspace/useUiTunerWorkspaceLayout'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { mergeProjectRecords } from '../conversation/conversationPageHelpers'
@@ -620,10 +621,6 @@ export default function UiTunerPage() {
     reader.readAsDataURL(file)
   }
 
-  const handleCanvasKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    handleCanvasArrowKey(event, selected, tunerDoc.canvas, updateElement)
-  }
-
   return (
     <>
     <SourcePreviewWorkspace active={workspaceMode === 'source'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
@@ -636,18 +633,7 @@ export default function UiTunerPage() {
       ].join(' ')}
       style={{ display: workspaceMode === 'evidence' ? 'grid' : 'none' }}
     >
-      {workspaceLayout.focusMode && (
-        <button
-          type="button"
-          className={styles.focusModeExit}
-          onClick={workspaceLayout.exitFocusMode}
-          aria-label="退出专注画布"
-          title="退出专注画布（Esc）"
-        >
-          退出专注
-          <kbd>Esc</kbd>
-        </button>
-      )}
+      <FocusModeExitButton active={workspaceLayout.focusMode} onExit={workspaceLayout.exitFocusMode} />
       {workspaceLayout.leftPanelOpen && <UiTunerLayersPanel
         realRenderer={realRenderer}
         filter={layerFilter}
@@ -739,7 +725,7 @@ export default function UiTunerPage() {
           currentScrollerRef={comparisonViewport.currentScrollerRef}
           onTargetScroll={comparisonViewport.onTargetScroll}
           onCurrentScroll={comparisonViewport.onCurrentScroll}
-          onCanvasKeyDown={handleCanvasKeyDown}
+          onCanvasKeyDown={(event) => handleCanvasArrowKey(event, selected, tunerDoc.canvas, updateElement)}
           onClearSelection={() => setSelectedId(null)}
           onSplitRatioChange={workspaceLayout.setSplitRatio}
           onToggleDesignPane={workspaceLayout.toggleDesignPane}
