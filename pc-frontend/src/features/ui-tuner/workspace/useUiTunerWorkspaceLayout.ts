@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 const STORAGE_PREFIX = 'elon.uiTuner.canvasLayout.v1'
 const DEFAULT_SPLIT_RATIO = 35
 
-interface CanvasLayoutState {
+export interface CanvasLayoutState {
   designPaneOpen: boolean
   splitRatio: number
   leftPanelOpen: boolean
@@ -11,13 +11,13 @@ interface CanvasLayoutState {
   focusMode: boolean
 }
 
-function clampSplitRatio(value: number) {
+export function clampSplitRatio(value: number) {
   return Math.round(Math.min(Math.max(value, 20), 80))
 }
 
-function loadState(storageKey: string): CanvasLayoutState {
+export function parseCanvasLayoutState(serialized: string | null): CanvasLayoutState {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? '') as Partial<CanvasLayoutState>
+    const parsed = JSON.parse(serialized ?? '') as Partial<CanvasLayoutState>
     return {
       designPaneOpen: parsed.designPaneOpen !== false,
       splitRatio: clampSplitRatio(Number(parsed.splitRatio) || DEFAULT_SPLIT_RATIO),
@@ -34,6 +34,20 @@ function loadState(storageKey: string): CanvasLayoutState {
       focusMode: false,
     }
   }
+}
+
+export function deriveCanvasLayout(state: CanvasLayoutState, hasTarget: boolean) {
+  return {
+    designPaneOpen: hasTarget && state.designPaneOpen,
+    splitRatio: state.splitRatio,
+    leftPanelOpen: !state.focusMode && state.leftPanelOpen,
+    rightPanelOpen: !state.focusMode && state.rightPanelOpen,
+    focusMode: state.focusMode,
+  }
+}
+
+function loadState(storageKey: string) {
+  return parseCanvasLayoutState(window.localStorage.getItem(storageKey))
 }
 
 export function useUiTunerWorkspaceLayout(storageScope: string, hasTarget: boolean) {
@@ -81,11 +95,7 @@ export function useUiTunerWorkspaceLayout(storageScope: string, hasTarget: boole
   }, [])
 
   return {
-    designPaneOpen: hasTarget && state.designPaneOpen,
-    splitRatio: state.splitRatio,
-    leftPanelOpen: !state.focusMode && state.leftPanelOpen,
-    rightPanelOpen: !state.focusMode && state.rightPanelOpen,
-    focusMode: state.focusMode,
+    ...deriveCanvasLayout(state, hasTarget),
     setSplitRatio,
     toggleDesignPane,
     toggleLeftPanel,

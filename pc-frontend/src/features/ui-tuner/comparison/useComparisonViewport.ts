@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react'
 import type { PixelSize } from './types'
 import { canvasZoomCommand } from './canvasZoomShortcuts'
+import {
+  calculateCanvasFitScale,
+  normalizeCanvasScale,
+  type CanvasFitMode,
+} from './canvasViewportScale'
 
-const MIN_SCALE = 0.08
-const MAX_SCALE = 2
 const SCALE_STEP = 0.1
 
-type FitMode = 'stage' | 'width' | 'manual'
-
-function normalizeScale(value: number) {
-  if (!Number.isFinite(value)) return 1
-  return Math.round(Math.min(Math.max(value, MIN_SCALE), MAX_SCALE) * 100) / 100
-}
+type FitMode = CanvasFitMode | 'manual'
 
 function availableViewport(scroller: HTMLDivElement) {
   const style = window.getComputedStyle(scroller)
@@ -27,13 +25,9 @@ function availableViewport(scroller: HTMLDivElement) {
   }
 }
 
-function fitScale(scroller: HTMLDivElement | null, size: PixelSize | null, mode: Exclude<FitMode, 'manual'>) {
+function fitScale(scroller: HTMLDivElement | null, size: PixelSize | null, mode: CanvasFitMode) {
   if (!scroller || !size || size.width <= 0 || size.height <= 0) return null
-  const viewport = availableViewport(scroller)
-  const widthScale = viewport.width / size.width
-  return mode === 'width'
-    ? Math.min(widthScale, 1)
-    : Math.min(widthScale, viewport.height / size.height, 1)
+  return calculateCanvasFitScale(availableViewport(scroller), size, mode)
 }
 
 function copyNormalizedScroll(source: HTMLDivElement, target: HTMLDivElement) {
@@ -56,12 +50,12 @@ export function useComparisonViewport(currentSize: PixelSize, targetSize: PixelS
   const currentScrollerRef = useRef<HTMLDivElement | null>(null)
   const syncingRef = useRef(false)
 
-  const applyFit = useCallback((mode: Exclude<FitMode, 'manual'>) => {
+  const applyFit = useCallback((mode: CanvasFitMode) => {
     const candidates = [
       fitScale(currentScrollerRef.current, currentSize, mode),
       fitScale(targetScrollerRef.current, targetSize, mode),
     ].filter((value): value is number => value !== null)
-    if (candidates.length > 0) setViewScale(normalizeScale(Math.min(...candidates)))
+    if (candidates.length > 0) setViewScale(normalizeCanvasScale(Math.min(...candidates)))
   }, [currentSize.height, currentSize.width, targetSize?.height, targetSize?.width])
 
   useEffect(() => {
@@ -82,7 +76,7 @@ export function useComparisonViewport(currentSize: PixelSize, targetSize: PixelS
 
   const setManualScale = useCallback((value: number) => {
     setFitMode('manual')
-    setViewScale(normalizeScale(value))
+    setViewScale(normalizeCanvasScale(value))
   }, [])
 
   const synchronize = useCallback((source: HTMLDivElement, target: HTMLDivElement | null) => {
