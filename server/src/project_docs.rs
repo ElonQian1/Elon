@@ -9,7 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use homecli_proto::{AgentToServer, ProjectDocumentEntry, ProjectDocumentMetadata};
+use homecli_proto::{ProjectDocumentEntry, ProjectDocumentMetadata};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 
@@ -18,10 +18,7 @@ use crate::{
     project_docs_snapshot::{
         load_project_documents_catalog_snapshot, load_project_documents_snapshot,
     },
-    project_document_files::{
-        read_project_document_file, write_project_document_file, ProjectDocumentFile,
-        ProjectDocumentWriteError,
-    },
+    project_document_gateway::{read_project_file, write_project_file},
     project_mobile::ensure_mobile_project,
     store::{ProjectAccess, PublicUser},
     types::AppState,
@@ -280,131 +277,6 @@ fn authorized_project(
     let access = project_access(state, &user.id, project_id)
         .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
     Ok((user, access))
-}
-
-async fn read_project_file(
-    state: &AppState,
-    access: &ProjectAccess,
-    document_path: &str,
-) -> Result<ProjectDocumentFile, (StatusCode, String)> {
-    if let (Some(node_id), Some(workspace_path)) = (
-        access
-            .node_id
-            .as_deref()
-            .filter(|value| !value.trim().is_empty()),
-        access
-            .workspace_path
-            .as_deref()
-            .filter(|value| !value.trim().is_empty()),
-    ) {
-        return match state
-            .agent_manager
-            .dispatch_project_document_file_read(
-                node_id,
-                workspace_path.to_string(),
-                document_path.to_string(),
-            )
-            .await
-        {
-            Ok(AgentToServer::ProjectDocumentFileRead {
-                path,
-                content,
-                revision,
-                byte_len,
-                ..
-            }) => Ok(ProjectDocumentFile {
-                path,
-                content,
-                revision,
-                byte_len,
-            }),
-            Ok(AgentToServer::ProjectDocumentFileReadError { message, .. }) => {
-                Err((StatusCode::BAD_REQUEST, message))
-            }
-            Ok(other) => Err((
-                StatusCode::BAD_GATEWAY,
-                format!("PC 节点返回了非文档响应：{other:?}"),
-            )),
-            Err(error) => Err((StatusCode::BAD_GATEWAY, error.to_string())),
-        };
-    }
-    let workspace =
-        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
-    read_project_document_file(&workspace, document_path)
-        .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))
-}
-
-async fn write_project_file(
-    state: &AppState,
-    access: &ProjectAccess,
-    document_path: &str,
-    content: &str,
-    expected_revision: Option<&str>,
-) -> Result<ProjectDocumentFile, (StatusCode, String)> {
-    if let (Some(node_id), Some(workspace_path)) = (
-        access
-            .node_id
-            .as_deref()
-            .filter(|value| !value.trim().is_empty()),
-        access
-            .workspace_path
-            .as_deref()
-            .filter(|value| !value.trim().is_empty()),
-    ) {
-        return match state
-            .agent_manager
-            .dispatch_project_document_file_write(
-                node_id,
-                workspace_path.to_string(),
-                document_path.to_string(),
-                content.to_string(),
-                expected_revision.map(str::to_string),
-            )
-            .await
-        {
-            Ok(AgentToServer::ProjectDocumentFileWritten {
-                path,
-                revision,
-                byte_len,
-                ..
-            }) => Ok(ProjectDocumentFile {
-                path,
-                content: content.to_string(),
-                revision,
-                byte_len,
-            }),
-            Ok(AgentToServer::ProjectDocumentFileWriteError {
-                message, conflict, ..
-            }) => Err((
-                if conflict {
-                    StatusCode::CONFLICT
-                } else {
-                    StatusCode::BAD_REQUEST
-                },
-                message,
-            )),
-            Ok(other) => Err((
-                StatusCode::BAD_GATEWAY,
-                format!("PC 节点返回了非文档响应：{other:?}"),
-            )),
-            Err(error) => Err((StatusCode::BAD_GATEWAY, error.to_string())),
-        };
-    }
-    let workspace =
-        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
-    write_project_document_file(&workspace, document_path, content, expected_revision)
-        .map_err(write_service_error)
-}
-
-fn write_service_error(error: ProjectDocumentWriteError) -> (StatusCode, String) {
-    (
-        if error.conflict {
-            StatusCode::CONFLICT
-        } else {
-            StatusCode::BAD_REQUEST
-        },
-        error.message,
-    )
 }
 
 async fn load_project_documents(
