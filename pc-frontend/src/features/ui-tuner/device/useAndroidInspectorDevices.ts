@@ -56,9 +56,11 @@ function deviceDisplayName(device: AndroidInspectorDevice) {
 
 function devicePriority(device: AndroidInspectorDevice) {
   const stateScore = device.state === 'device' ? 100 : 0
-  const connectionScore = device.connectionType === 'usb'
+  // 真机调试优先使用同一硬件的无线 transport。USB 插拔或 adb tcpip
+  // 切换时，有线 serial 可能在刷新后瞬间消失，无线 endpoint 更稳定。
+  const connectionScore = device.connectionType === 'wireless'
     ? 20
-    : device.connectionType === 'wireless'
+    : device.connectionType === 'usb'
       ? 10
       : 0
   return stateScore + connectionScore
