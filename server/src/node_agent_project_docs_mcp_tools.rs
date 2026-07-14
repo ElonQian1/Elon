@@ -4,6 +4,9 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 use crate::{
+    project_document_file_operations::{
+        apply_reviewed_file_operations, ApplyFileOperationsRequest,
+    },
     project_document_governance::DocumentOrganizationSuggestions,
     project_document_governance_service::{
         analyze_workspace, apply_saved_suggestions, default_page_size, default_read_chars,
@@ -42,6 +45,21 @@ struct SaveSuggestionsArguments {
 #[derive(Debug, Deserialize)]
 struct ApplySuggestionsArguments {
     reviewed: bool,
+    expected_catalog_revision: String,
+    #[serde(default)]
+    expected_manifest_revision: Option<String>,
+    #[serde(default)]
+    expected_suggestions_revision: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApplyFileOperationsArguments {
+    reviewed: bool,
+    operation_ids: Vec<String>,
+    #[serde(default)]
+    allow_rename: bool,
+    #[serde(default)]
+    allow_move: bool,
     expected_catalog_revision: String,
     #[serde(default)]
     expected_manifest_revision: Option<String>,
@@ -113,6 +131,23 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 }
             }),
         ),
+        tool(
+            "project_docs_apply_file_operations",
+            "仅在用户逐项审核后，对选中的 Markdown 执行重命名或移动。必须 reviewed=true，并分别授予 rename/move 权限；校验目录、建议和源文件 revision；禁止覆盖、删除、越界、改写正文或自动提交 Git。",
+            json!({
+                "type":"object",
+                "required":["reviewed","operation_ids","expected_catalog_revision"],
+                "properties":{
+                    "reviewed":{"type":"boolean","const":true},
+                    "operation_ids":{"type":"array","minItems":1,"maxItems":100,"items":{"type":"string"}},
+                    "allow_rename":{"type":"boolean","default":false},
+                    "allow_move":{"type":"boolean","default":false},
+                    "expected_catalog_revision":{"type":"string","minLength":1},
+                    "expected_manifest_revision":{"type":"string"},
+                    "expected_suggestions_revision":{"type":"string"}
+                }
+            }),
+        ),
     ]
 }
 
@@ -165,6 +200,23 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                     &input.expected_catalog_revision,
                     input.expected_manifest_revision.as_deref(),
                     input.expected_suggestions_revision.as_deref(),
+                )
+            }
+            "project_docs_apply_file_operations" => {
+                let input: ApplyFileOperationsArguments = decode(arguments, name)?;
+                apply_reviewed_file_operations(
+                    workspace,
+                    ApplyFileOperationsRequest {
+                        reviewed: input.reviewed,
+                        operation_ids: &input.operation_ids,
+                        allow_rename: input.allow_rename,
+                        allow_move: input.allow_move,
+                        expected_catalog_revision: &input.expected_catalog_revision,
+                        expected_manifest_revision: input.expected_manifest_revision.as_deref(),
+                        expected_suggestions_revision: input
+                            .expected_suggestions_revision
+                            .as_deref(),
+                    },
                 )
             }
             _ => Err(anyhow::anyhow!("未知项目文档 MCP 工具：{name}")),
@@ -240,6 +292,22 @@ fn suggestions_schema() -> Value {
             },
             "conflicts":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
             "move_suggestions":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
+            "file_operations":{
+                "type":"array","maxItems":100,
+                "items":{
+                    "type":"object",
+                    "required":["id","kind","source_path","target_path","source_revision","reason"],
+                    "properties":{
+                        "id":{"type":"string","pattern":"^[A-Za-z0-9._-]+$","maxLength":80},
+                        "kind":{"type":"string","enum":["rename","move"]},
+                        "source_path":{"type":"string"},
+                        "target_path":{"type":"string"},
+                        "source_revision":{"type":"string","description":"必须等于 analyze 返回的 content_hash"},
+                        "reason":{"type":"string","maxLength":500},
+                        "status":{"type":"string","const":"proposed","default":"proposed"}
+                    }
+                }
+            },
             "documents_read":{"type":"integer","minimum":0},
             "estimated_tokens_used":{"type":"integer","minimum":0}
         }

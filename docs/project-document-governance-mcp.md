@@ -1,6 +1,6 @@
 # 项目文档治理 MCP
 
-最后更新：2026-07-14
+最后更新：2026-07-15
 
 本文是接入或诊断项目文档治理 MCP 时才读取的按需手册。日常文档任务先遵循 `.github/instructions/document-authority.instructions.md`，不要把本文复制到 Codex、Claude、Gemini 或 Copilot 的私有桥接文件。
 
@@ -102,6 +102,18 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 - 第二步状态写入失败时可安全重试；
 - 永远不移动、删除或改写 Markdown。
 
+### `project_docs_apply_file_operations`
+
+只有用户在审核界面逐项确认后才能调用。它执行建议中的结构化 `file_operations`：
+
+- 请求必须带选中的 operation id、`reviewed=true`，并分别声明本次是否允许 `rename`、`move`；
+- 每项使用 analyze 目录里的 `content_hash` 作为 `source_revision`，防止文档变化后仍按旧建议操作；
+- 只允许 Git 工作区内的 Markdown，禁止覆盖现有目标、删除文件、越过工作区或改写正文；
+- 执行后同步 `.elon/document-sections.json` 中受影响的路径，并把操作标记为 `applied`；
+- 不修改正文引用，也不自动 commit/push；页面必须提示用户继续审核 Git 变更。
+
+这项授权是一次性、逐项的。修改正文、批量修复引用、归档、删除和 Git 发布必须分别设计更高权限，不能由 `rename`/`move` 隐含获得。
+
 ## 4. 网页端共享逻辑
 
 PC 网页端通过以下云端 API 审核应用：
@@ -112,7 +124,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 请求携带 `reviewed` 和三类 expected revision。云端通过项目绑定的 PC 节点读写两份 `.elon` JSON，并复用 MCP 相同的 Rust schema、清洗、真实路径校验、合并和幂等规则。网页端只负责展示与用户交互，不再自行实现建议合并算法。
 
-本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台，不强制跳转到开发频道。运行状态保存在系统临时目录，不写入 Git 工作区；建议和审核后的虚拟分区仍只使用两份 `.elon` JSON。
+本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台，不强制跳转到开发频道。运行状态保存在系统临时目录，不写入 Git 工作区；建议和审核后的虚拟分区仍只使用两份 `.elon` JSON。逐项审核实体操作后，页面调用 `/api/project-docs/organization/apply-files`，由本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
 手工新建分区、删除自定义分区和单篇虚拟归类仍写 `.elon/document-sections.json`；它们不会自动创建实际目录。AI 可以提出新分区，是否采用由审核者决定。
 
@@ -122,13 +134,13 @@ POST /api/projects/:project_id/docs/organization/apply
 - 配置和会话文件位于系统临时目录；启动器只接受 loopback URL。
 - 会话先在 staging 目录完整写入，再原子发布；并发清理跳过创建中目录，损坏会话也有宽限期，不会删除另一代理刚创建的会话。
 - Markdown 读取继续经过工作区边界、符号链接、UTF-8 和 2 MiB 上限检查。
-- 建议与分区写入采用原子替换和 optimistic revision。
+- 建议与分区写入采用原子替换和 optimistic revision；实体操作还校验 catalog、建议、分区和源文件四类 revision。
 - 无效 JSON、未知路径、未知分区、过期 revision 或未审核应用都必须显式失败。
 - MCP 不可用时，AI 可以使用相同两份 JSON 契约完成建议，但仍要遵守先目录、再按需正文、最后审核应用的顺序。
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、审核门禁、revision 冲突、幂等应用、阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
+Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、审核门禁、revision 冲突、幂等应用、安全重命名/移动、禁止覆盖、逐项权限、阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
 
 发布前至少运行：
 

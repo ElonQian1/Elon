@@ -117,7 +117,16 @@ pub(crate) fn analyze_workspace(
         "manifest_revision": manifest.revision,
         "suggestions": suggestions.value,
         "suggestions_revision": suggestions.revision,
-        "next": "Only read ambiguous or task-relevant paths with project_docs_read; save a structured ready suggestion before asking for review.",
+        "permissions": {
+            "virtual_organization": {"requires_review": true, "changes_markdown": false},
+            "file_operations": {
+                "requires_item_review": true,
+                "one_shot_permissions": ["rename", "move"],
+                "allowed_scope": "workspace_markdown_only",
+                "forbidden": ["overwrite", "delete", "edit_content", "outside_workspace", "git_commit", "git_push"]
+            }
+        },
+        "next": "Only read ambiguous or task-relevant paths. Save virtual assignments and optional structured rename/move file_operations, then stop for item-by-item user review.",
     }))
 }
 

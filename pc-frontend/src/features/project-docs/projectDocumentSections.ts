@@ -31,6 +31,16 @@ export interface SuggestedAssignment {
   reason: string
 }
 
+export interface SuggestedFileOperation {
+  id: string
+  kind: 'rename' | 'move'
+  source_path: string
+  target_path: string
+  source_revision: string
+  reason: string
+  status: 'proposed' | 'applied'
+}
+
 export interface DocumentOrganizationSuggestions {
   version: 1
   status: 'requested' | 'ready' | 'applied'
@@ -39,6 +49,7 @@ export interface DocumentOrganizationSuggestions {
   assignments: SuggestedAssignment[]
   conflicts: string[]
   move_suggestions: string[]
+  file_operations: SuggestedFileOperation[]
   documents_read: number
   estimated_tokens_used: number
 }
@@ -146,6 +157,26 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
         return [{ path, section_id: sectionId, reason: String(candidate.reason ?? '').slice(0, 500) }]
       })
       : []
+    const fileOperations = Array.isArray(value.file_operations)
+      ? value.file_operations.slice(0, 100).flatMap((operation) => {
+        if (!operation || typeof operation !== 'object') return []
+        const candidate = operation as Partial<SuggestedFileOperation>
+        const id = String(candidate.id ?? '').trim().slice(0, 80)
+        const kind = candidate.kind === 'rename' || candidate.kind === 'move' ? candidate.kind : null
+        const sourcePath = normalizedPath(candidate.source_path ?? '')
+        const targetPath = normalizedPath(candidate.target_path ?? '')
+        if (!id || !kind || !sourcePath || !targetPath || sourcePath.toLowerCase() === targetPath.toLowerCase()) return []
+        return [{
+          id,
+          kind,
+          source_path: sourcePath,
+          target_path: targetPath,
+          source_revision: String(candidate.source_revision ?? '').trim().slice(0, 128),
+          reason: String(candidate.reason ?? '').trim().slice(0, 500),
+          status: candidate.status === 'applied' ? 'applied' as const : 'proposed' as const,
+        }]
+      })
+      : []
     return {
       version: 1,
       status,
@@ -154,6 +185,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       assignments,
       conflicts: stringArray(value.conflicts, 100),
       move_suggestions: stringArray(value.move_suggestions, 100),
+      file_operations: fileOperations,
       documents_read: safeNonNegativeNumber(value.documents_read),
       estimated_tokens_used: safeNonNegativeNumber(value.estimated_tokens_used),
     }
@@ -192,7 +224,9 @@ export function buildOrganizationPrompt(
     '③ project_docs_save_suggestions 保存 ready 建议；' +
     '④ project_docs_get_status 确认阶段、revision、读取数与 token；' +
     '⑤ 停在等待审核，绝不能自行调用 project_docs_apply_suggestions。' +
-    `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得移动、删除或改写 Markdown，也不得直接改分区配置。` +
+    '如发现命名含糊或路径放错，可在 file_operations 中提出结构化 rename/move；source_revision 必须使用 analyze 返回的 content_hash。' +
+    `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
+    '没有用户在审核界面逐项确认 rename/move 权限，绝不能调用 project_docs_apply_file_operations。' +
     '虚拟分区不改变真实路径的 role、lifecycle、authority 或 default_retrieval；不能借虚拟 current 提升权威性。' +
     '只为确有改进价值的文档生成 assignments，新分区最多 8 个，并如实记录实际正文读取数和 token。' +
     '如果当前供应商确实没有 MCP，才使用同一顺序做本地元数据扫描并写建议 JSON；不要全文扫描 docs。'

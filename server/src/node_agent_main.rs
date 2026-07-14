@@ -156,6 +156,8 @@ mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
 mod project_docs_scan;
+mod project_document_file_operation_model;
+mod project_document_file_operations;
 mod project_document_files;
 mod project_document_governance;
 mod project_document_governance_service;

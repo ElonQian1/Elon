@@ -156,6 +156,7 @@ mod project_docs;
 mod project_docs_channel;
 mod project_docs_scan;
 mod project_docs_snapshot;
+mod project_document_file_operation_model;
 mod project_document_files;
 mod project_document_gateway;
 mod project_document_governance;

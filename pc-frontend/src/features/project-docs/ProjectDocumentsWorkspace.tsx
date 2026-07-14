@@ -3,6 +3,8 @@ import { Bot, FilePlus2, FileText, FolderTree, RefreshCw, Save, Search, Sparkles
 
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
+import ProjectDocumentAccessNotice from './ProjectDocumentAccessNotice'
+import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
 import ProjectDocumentNotebookRail from './ProjectDocumentNotebookRail'
 import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
@@ -51,11 +53,13 @@ export default function ProjectDocumentsWorkspace({
   const [document, setDocument] = useState<DocumentFile | null>(null)
   const [draft, setDraft] = useState('')
   const [documentLoading, setDocumentLoading] = useState(false)
+  const [documentError, setDocumentError] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [organizing, setOrganizing] = useState(false)
   const [applyingSuggestions, setApplyingSuggestions] = useState(false)
+  const [applyingFileOperations, setApplyingFileOperations] = useState(false)
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const sections = useMemo(() => buildDocumentSections(organization.manifest), [organization.manifest])
 
@@ -94,6 +98,7 @@ export default function ProjectDocumentsWorkspace({
     if (!path) return
     setDocumentLoading(true)
     setMessage('')
+    setDocumentError('')
     try {
       const response = await api.get<DocumentFile>(
         `/api/projects/${encodeURIComponent(projectId)}/docs/file?path=${encodeURIComponent(path)}`,
@@ -104,7 +109,7 @@ export default function ProjectDocumentsWorkspace({
     } catch (error) {
       setDocument(null)
       setDraft('')
-      setMessage(errorMessage(error, '读取文档失败'))
+      setDocumentError(errorMessage(error, '读取文档失败'))
     } finally {
       setDocumentLoading(false)
     }
@@ -121,7 +126,9 @@ export default function ProjectDocumentsWorkspace({
       counts[section] = (counts[section] ?? 0) + 1
     }
     counts.suggestions = organization.suggestions
-      ? organization.suggestions.proposed_sections.length + organization.suggestions.assignments.length || 1
+      ? organization.suggestions.proposed_sections.length
+        + organization.suggestions.assignments.length
+        + organization.suggestions.file_operations.filter((operation) => operation.status === 'proposed').length || 1
       : 0
     return counts
   }, [catalog, organization.manifest, organization.suggestions, sections])
@@ -256,6 +263,28 @@ export default function ProjectDocumentsWorkspace({
     }
   }
 
+  async function applyFileOperations(input: { operationIds: string[]; allowRename: boolean; allowMove: boolean }) {
+    if (!catalog) return
+    const localCatalogRevision = organization.trace?.catalog_revision
+    if (!localCatalogRevision) throw new Error('缺少本机 MCP 目录 revision，请刷新整理建议后再执行实体操作')
+    setApplyingFileOperations(true)
+    try {
+      const result = await organization.applyFileOperations({
+        catalogRevision: localCatalogRevision,
+        ...input,
+      })
+      const selectedMove = result.operations.find((operation) => operation.source_path === selectedPath)
+      if (selectedMove) {
+        setDocument(null)
+        setDraft('')
+        setSelectedPath(selectedMove.target_path)
+      }
+      await loadCatalog()
+    } finally {
+      setApplyingFileOperations(false)
+    }
+  }
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -292,8 +321,11 @@ export default function ProjectDocumentsWorkspace({
           error={organization.error}
           canEdit={!!catalog?.can_edit}
           applying={applyingSuggestions}
+          applyingFiles={applyingFileOperations}
+          canApplyFiles={!!catalog?.can_edit && organization.trackingAvailable && !!organization.trace?.catalog_revision}
           onRefresh={organization.reload}
           onApply={applySuggestions}
+          onApplyFiles={applyFileOperations}
         />
       ) : (
         <>
@@ -311,6 +343,12 @@ export default function ProjectDocumentsWorkspace({
               <Search size={14} aria-hidden="true" />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题或路径" />
             </label>
+            <ProjectDocumentHealthSummary
+              catalog={catalog}
+              unclassified={sectionCounts.unclassified ?? 0}
+              suggestions={organization.suggestions}
+              onOpenSuggestions={() => setActiveSection('suggestions')}
+            />
             <div className={styles.pageList}>
               {catalogError && <div className={styles.errorBox}>{catalogError}</div>}
               {!catalogLoading && !catalogError && visibleDocuments.length === 0 && <div className={styles.emptyList}>这个分区还没有文档</div>}
@@ -351,11 +389,17 @@ export default function ProjectDocumentsWorkspace({
                   </button>
                 ))}
               </div>
-              <button className={styles.saveButton} type="button" onClick={saveDocument} disabled={!dirty || !catalog?.can_edit || saveState === 'saving'}>
+              <button className={styles.saveButton} type="button" onClick={saveDocument} disabled={!dirty || !document?.can_edit || saveState === 'saving'}>
                 <Save size={15} aria-hidden="true" />
                 {saveState === 'saving' ? '保存中' : saveState === 'saved' ? '已保存' : '保存'}
               </button>
             </header>
+
+            <ProjectDocumentAccessNotice
+              access={catalog?.access}
+              warnings={[...(catalog?.warnings ?? []), ...(document?.warnings ?? [])]}
+              onRetry={loadCatalog}
+            />
 
             {selectedEntry && (
               <div className={styles.authorityStrip}>
@@ -383,9 +427,11 @@ export default function ProjectDocumentsWorkspace({
             <div className={[styles.editorBody, styles[`view_${viewMode}`]].join(' ')}>
               {documentLoading ? <div className={styles.documentEmpty}>正在按需读取这一篇文档…</div> : document ? (
                 <>
-                  {viewMode !== 'preview' && <textarea className={styles.editor} value={draft} onChange={(event) => { setDraft(event.target.value); setSaveState('idle') }} readOnly={!catalog?.can_edit} spellCheck={false} aria-label="Markdown 编辑器" />}
+                  {viewMode !== 'preview' && <textarea className={styles.editor} value={draft} onChange={(event) => { setDraft(event.target.value); setSaveState('idle') }} readOnly={!document.can_edit} spellCheck={false} aria-label="Markdown 编辑器" />}
                   {viewMode !== 'edit' && <article className={styles.preview}><MarkdownContent content={draft || '（文档为空）'} /></article>}
                 </>
+              ) : documentError ? (
+                <ProjectDocumentAccessNotice error={documentError} path={selectedPath} onRetry={() => openDocument(selectedPath)} />
               ) : (
                 <div className={styles.documentEmpty}>
                   <Bot size={30} aria-hidden="true" /><strong>从左侧选择一篇文档</strong>

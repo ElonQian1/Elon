@@ -37,6 +37,23 @@ interface AppliedOrganizationResponse {
   suggestions_revision?: string
 }
 
+export interface AppliedFileOperationResult {
+  id: string
+  kind: 'rename' | 'move'
+  source_path: string
+  target_path: string
+  already_applied: boolean
+}
+
+interface AppliedFileOperationsResponse {
+  operations: AppliedFileOperationResult[]
+  manifest: DocumentSectionManifest
+  suggestions: DocumentOrganizationSuggestions
+  manifest_revision?: string
+  suggestions_revision?: string
+  catalog_revision: string
+}
+
 export function useProjectDocumentOrganization(
   projectId: string,
   trackingRuntime: DocumentOrganizationTrackingRuntime,
@@ -227,6 +244,41 @@ export function useProjectDocumentOrganization(
     return result.manifest
   }, [manifestFile.revision, manifestFile.value, projectId, suggestionsFile.revision, suggestionsFile.value, trace?.operation_id, trackingAvailable, trackingRequest])
 
+  const applyFileOperations = useCallback(async (input: {
+    catalogRevision: string
+    operationIds: string[]
+    allowRename: boolean
+    allowMove: boolean
+  }) => {
+    if (!trackingAvailable) throw new Error('实体文档整理必须连接项目本机节点')
+    setError('')
+    try {
+      const result = await nodeApi<AppliedFileOperationsResponse>(
+        trackingRuntime.adminUrl,
+        '/api/project-docs/organization/apply-files',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            project_root: trackingRuntime.projectRoot,
+            reviewed: true,
+            operation_ids: input.operationIds,
+            allow_rename: input.allowRename,
+            allow_move: input.allowMove,
+            expected_catalog_revision: input.catalogRevision,
+            expected_manifest_revision: manifestFile.revision,
+            expected_suggestions_revision: suggestionsFile.revision,
+          }),
+        },
+      )
+      setManifestFile({ value: result.manifest, revision: result.manifest_revision })
+      setSuggestionsFile({ value: result.suggestions, revision: result.suggestions_revision })
+      return result
+    } catch (reason) {
+      setError(errorMessage(reason, '实体文档整理失败'))
+      throw reason
+    }
+  }, [manifestFile.revision, suggestionsFile.revision, trackingAvailable, trackingRuntime.adminUrl, trackingRuntime.projectRoot])
+
   const reload = useCallback(async () => {
     await Promise.all([load(), loadStatus()])
   }, [load, loadStatus])
@@ -247,6 +299,7 @@ export function useProjectDocumentOrganization(
     removeSection,
     assignDocument,
     applySuggestions,
+    applyFileOperations,
   }
 }
 

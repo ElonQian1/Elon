@@ -40,8 +40,8 @@
 | 领域 | 入口 |
 |---|---|
 | Web 项目页 | `server/src/assets/web_page.html` |
-| PC 工作台旧静态入口 | `server/src/assets/pc_app.html`、`server/src/assets/pc_app.js`、`server/src/assets/pc_app.css`、`server/src/assets/pc_*.js`、`server/src/assets/pc_*.css` |
-| PC 工作台新前端迁移目标 | `pc-frontend/`（建立后承接 `/pc-next` 和后续 `/pc`） |
+| PC 工作台当前入口 | `pc-frontend/`（React/Vite，承接 `/pc`；`/pc-next` 为同源兼容入口） |
+| PC 工作台旧版对照 | `/pc-legacy` 由发布脚本从历史提交导出只读快照；仓库不再保留 `server/src/assets/pc_*` 源码 |
 | PC 静态资源服务端托管 | `server/src/web.rs`、`server/src/router.rs` |
 | PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |

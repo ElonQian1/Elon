@@ -37,6 +37,12 @@ export interface DocumentCatalog {
   documents: ProjectDocumentEntry[]
   warnings: string[]
   can_edit: boolean
+  access?: {
+    mode: 'pc_node' | 'server_workspace' | 'server_fallback_read_only'
+    degraded: boolean
+    body_readable: boolean
+    writable: boolean
+  }
   budget: DocumentBudget
 }
 
@@ -46,6 +52,8 @@ export interface DocumentFile {
   revision: string
   byte_len: number
   can_edit: boolean
+  source?: 'pc_node' | 'server_workspace' | 'server_fallback'
+  warnings?: string[]
 }
 
 export function roleLabel(role: string) {

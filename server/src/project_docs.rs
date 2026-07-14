@@ -109,6 +109,16 @@ pub async fn get_project_document_catalog(
         .iter()
         .filter(|document| !document.metadata.default_retrieval)
         .count();
+    let degraded = snapshot.source.starts_with("server_fallback:");
+    let writable = can_edit(&access.role) && !degraded;
+    let body_readable = !snapshot.documents.is_empty();
+    let access_mode = if degraded {
+        "server_fallback_read_only"
+    } else if snapshot.source.starts_with("pc_node") {
+        "pc_node"
+    } else {
+        "server_workspace"
+    };
     Json(serde_json::json!({
         "project_id": access.id,
         "workspace": snapshot.workspace_path,
@@ -117,7 +127,13 @@ pub async fn get_project_document_catalog(
         "generated_at_ms": snapshot.generated_at_ms,
         "documents": snapshot.documents.into_iter().map(ProjectDocument::from).collect::<Vec<_>>(),
         "warnings": snapshot.warnings,
-        "can_edit": can_edit(&access.role),
+        "can_edit": writable,
+        "access": {
+            "mode": access_mode,
+            "degraded": degraded,
+            "body_readable": body_readable,
+            "writable": writable,
+        },
         "requested_by": user.id,
         "budget": {
             "classification_model_tokens": 0,
@@ -144,11 +160,13 @@ pub async fn get_project_document_file(
     match read_project_file(&state, &access, &query.path).await {
         Ok(document) => Json(serde_json::json!({
             "project_id": access.id,
-            "path": document.path,
-            "content": document.content,
-            "revision": document.revision,
-            "byte_len": document.byte_len,
-            "can_edit": can_edit(&access.role),
+            "path": document.file.path,
+            "content": document.file.content,
+            "revision": document.file.revision,
+            "byte_len": document.file.byte_len,
+            "source": document.source,
+            "warnings": document.warnings,
+            "can_edit": can_edit(&access.role) && document.source != "server_fallback",
         }))
         .into_response(),
         Err((status, message)) => json_error(status, message),

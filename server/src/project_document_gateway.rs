@@ -14,46 +14,74 @@ use crate::{
 
 pub(crate) type ProjectDocumentGatewayError = (StatusCode, String);
 
+#[derive(Debug)]
+pub(crate) struct ProjectDocumentRead {
+    pub(crate) file: ProjectDocumentFile,
+    pub(crate) source: &'static str,
+    pub(crate) warnings: Vec<String>,
+}
+
 pub(crate) async fn read_project_file(
     state: &AppState,
     access: &ProjectAccess,
     document_path: &str,
-) -> Result<ProjectDocumentFile, ProjectDocumentGatewayError> {
+) -> Result<ProjectDocumentRead, ProjectDocumentGatewayError> {
     if let Some((node_id, workspace_path)) = bound_pc_workspace(access) {
-        return match state
+        let remote = state
             .agent_manager
             .dispatch_project_document_file_read(
                 node_id,
                 workspace_path.to_string(),
                 document_path.to_string(),
             )
-            .await
-        {
+            .await;
+        return match remote {
             Ok(AgentToServer::ProjectDocumentFileRead {
                 path,
                 content,
                 revision,
                 byte_len,
                 ..
-            }) => Ok(ProjectDocumentFile {
-                path,
-                content,
-                revision,
-                byte_len,
+            }) => Ok(ProjectDocumentRead {
+                file: ProjectDocumentFile {
+                    path,
+                    content,
+                    revision,
+                    byte_len,
+                },
+                source: "pc_node",
+                warnings: Vec::new(),
             }),
             Ok(AgentToServer::ProjectDocumentFileReadError { message, .. }) => {
-                Err((StatusCode::BAD_REQUEST, message))
+                read_server_fallback(
+                    state,
+                    access,
+                    document_path,
+                    format!("PC 节点读取正文失败：{message}"),
+                )
             }
-            Ok(other) => Err((
-                StatusCode::BAD_GATEWAY,
+            Ok(other) => read_server_fallback(
+                state,
+                access,
+                document_path,
                 format!("PC 节点返回了非文档响应：{other:?}"),
-            )),
-            Err(error) => Err((StatusCode::BAD_GATEWAY, error.to_string())),
+            ),
+            Err(error) => read_server_fallback(
+                state,
+                access,
+                document_path,
+                format!("PC 节点暂不可读取正文：{error}"),
+            ),
         };
     }
     let workspace =
         state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
     read_project_document_file(&workspace, document_path)
+        .map(|file| ProjectDocumentRead {
+            file,
+            source: "server_workspace",
+            warnings: Vec::new(),
+        })
         .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))
 }
 
@@ -63,13 +91,34 @@ pub(crate) async fn read_optional_project_file(
     document_path: &str,
 ) -> Result<Option<ProjectDocumentFile>, ProjectDocumentGatewayError> {
     match read_project_file(state, access, document_path).await {
-        Ok(file) => Ok(Some(file)),
-        Err((StatusCode::BAD_REQUEST, message))
-            if message.contains("不存在") || message.contains("not found") =>
-        {
+        Ok(document) => Ok(Some(document.file)),
+        Err((_, message)) if message.contains("不存在") || message.contains("not found") => {
             Ok(None)
         }
         Err(error) => Err(error),
+    }
+}
+
+fn read_server_fallback(
+    state: &AppState,
+    access: &ProjectAccess,
+    document_path: &str,
+    node_warning: String,
+) -> Result<ProjectDocumentRead, ProjectDocumentGatewayError> {
+    let workspace =
+        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
+    match read_project_document_file(&workspace, document_path) {
+        Ok(file) => Ok(ProjectDocumentRead {
+            file,
+            source: "server_fallback",
+            warnings: vec![node_warning],
+        }),
+        Err(local_error) => Err((
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!(
+                "{node_warning}；服务器回退副本也无法读取该文档：{local_error}。请恢复项目绑定的 PC 节点后重试"
+            ),
+        )),
     }
 }
 

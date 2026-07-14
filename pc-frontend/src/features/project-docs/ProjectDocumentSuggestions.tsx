@@ -1,6 +1,7 @@
 import { CheckCircle2, FileWarning, Lightbulb, RefreshCw, Sparkles } from 'lucide-react'
 
 import { formatNumber } from './projectDocumentModel'
+import ProjectDocumentFileOperations from './ProjectDocumentFileOperations'
 import type { DocumentOrganizationSuggestions } from './projectDocumentSections'
 import type { DocumentOrganizationTrace } from './projectDocumentOrganizationStatus'
 import styles from './ProjectDocumentsWorkspace.module.css'
@@ -14,8 +15,11 @@ interface Props {
   error: string
   canEdit: boolean
   applying: boolean
+  applyingFiles: boolean
+  canApplyFiles: boolean
   onRefresh: () => void
   onApply: () => void
+  onApplyFiles: (input: { operationIds: string[]; allowRename: boolean; allowMove: boolean }) => Promise<void>
 }
 
 export default function ProjectDocumentSuggestions({
@@ -27,8 +31,11 @@ export default function ProjectDocumentSuggestions({
   error,
   canEdit,
   applying,
+  applyingFiles,
+  canApplyFiles,
   onRefresh,
   onApply,
+  onApplyFiles,
 }: Props) {
   const ready = suggestions?.status === 'ready'
   const suggestionCount = (suggestions?.proposed_sections.length ?? 0) + (suggestions?.assignments.length ?? 0)
@@ -164,6 +171,13 @@ export default function ProjectDocumentSuggestions({
                 <p className={styles.safetyNote}>这些移动不会自动执行，必须另行审核 Git 变更。</p>
               </section>
             )}
+
+            <ProjectDocumentFileOperations
+              operations={suggestions.file_operations}
+              canApply={canApplyFiles}
+              applying={applyingFiles}
+              onApply={onApplyFiles}
+            />
           </>
         )}
       </div>

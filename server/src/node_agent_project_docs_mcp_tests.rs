@@ -75,7 +75,8 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_read",
             "project_docs_get_suggestions",
             "project_docs_save_suggestions",
-            "project_docs_apply_suggestions"
+            "project_docs_apply_suggestions",
+            "project_docs_apply_file_operations"
         ]
     );
     let analyzed = handle_request(
@@ -95,6 +96,14 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     let catalog_revision = analyzed["result"]["structuredContent"]["catalog_revision"]
         .as_str()
         .unwrap();
+    let source_revision = analyzed["result"]["structuredContent"]["documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|document| document["path"] == "AGENTS.md")
+        .unwrap()["content_hash"]
+        .as_str()
+        .unwrap();
     let saved = handle_request(
         &root,
         request(json!({
@@ -107,7 +116,13 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
                         "version":1,"status":"ready","summary":"共享入口保持必须文档。",
                         "proposed_sections":[],
                         "assignments":[{"path":"AGENTS.md","section_id":"required","reason":"共享路由入口"}],
-                        "conflicts":[],"move_suggestions":[],"documents_read":0,"estimated_tokens_used":0
+                        "conflicts":[],"move_suggestions":[],
+                        "file_operations":[{
+                            "id":"rename-agent-entry","kind":"rename","source_path":"AGENTS.md",
+                            "target_path":"AI_AGENT.md","source_revision":source_revision,
+                            "reason":"使用可识别的共享入口名称","status":"proposed"
+                        }],
+                        "documents_read":0,"estimated_tokens_used":0
                     }
                 }
             }
@@ -139,6 +154,36 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         applied["result"]["structuredContent"]["markdown_changed"],
         false
     );
+    let applied_suggestions_revision = applied["result"]["structuredContent"]
+        ["suggestions_revision"]
+        .as_str()
+        .unwrap();
+    let files_applied = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":5,"method":"tools/call",
+            "params":{
+                "name":"project_docs_apply_file_operations",
+                "arguments":{
+                    "reviewed":true,
+                    "operation_ids":["rename-agent-entry"],
+                    "allow_rename":true,
+                    "allow_move":false,
+                    "expected_catalog_revision":catalog_revision,
+                    "expected_manifest_revision":applied["result"]["structuredContent"]["manifest_revision"],
+                    "expected_suggestions_revision":applied_suggestions_revision
+                }
+            }
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        files_applied["result"]["structuredContent"]["status"],
+        "file_operations_applied"
+    );
+    assert!(root.join("AI_AGENT.md").is_file());
+    assert!(!root.join("AGENTS.md").exists());
     fs::remove_dir_all(root).unwrap();
 }
 

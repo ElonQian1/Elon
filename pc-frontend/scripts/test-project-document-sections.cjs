@@ -75,11 +75,17 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
   assignments: [{ path: 'docs/unknown.md', section_id: 'custom:api', reason: '归类' }],
   conflicts: [],
   move_suggestions: [],
+  file_operations: [{
+    id: 'rename-unknown', kind: 'rename', source_path: 'docs/unknown.md',
+    target_path: 'docs/unknown-topic.md', source_revision: 'abc', reason: '名称更可检索',
+  }],
   documents_read: 1,
   estimated_tokens_used: 20,
 }))
 assert.equal(suggestions.status, 'ready')
 assert.equal(suggestions.assignments.length, 1)
+assert.equal(suggestions.file_operations.length, 1)
+assert.equal(suggestions.file_operations[0].status, 'proposed')
 
 const boundedSuggestions = parseOrganizationSuggestions(JSON.stringify({
   status: 'ready',
@@ -111,6 +117,8 @@ assert(prompt.includes('classification_model_tokens=0'))
 assert(prompt.includes('project_docs_analyze'))
 assert(prompt.includes('project_docs_get_status'))
 assert(prompt.includes('绝不能自行调用 project_docs_apply_suggestions'))
+assert(prompt.includes('project_docs_apply_file_operations'))
+assert(prompt.includes('source_revision'))
 assert(prompt.length < 3000, '整理任务 Prompt 不应内嵌完整文档目录')
 assert(!prompt.includes('# Reviewer'))
 
@@ -119,6 +127,15 @@ const workspaceSource = fs.readFileSync(path.join(
 ), 'utf8')
 assert(!workspaceSource.includes('markSuggestionsRequested'), '启动 AI 前不得在主工作区预写建议占位文件')
 assert(workspaceSource.includes('onStartAiOrganize(buildOrganizationPrompt'))
+assert(workspaceSource.includes('ProjectDocumentAccessNotice'))
+assert(workspaceSource.includes('applyFileOperations'))
+assert(workspaceSource.includes('organization.trace?.catalog_revision'))
+
+const fileOperationsSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFileOperations.tsx',
+), 'utf8')
+assert(fileOperationsSource.includes('逐项授权'))
+assert(fileOperationsSource.includes('不覆盖、不删除、不改正文'))
 
 const statusSourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentOrganizationStatus.ts')
 const statusOutput = ts.transpileModule(fs.readFileSync(statusSourcePath, 'utf8'), {

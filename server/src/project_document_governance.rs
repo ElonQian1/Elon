@@ -5,10 +5,18 @@ use homecli_proto::ProjectDocumentEntry;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+use crate::project_document_file_operation_model::{
+    normalize_document_path, normalize_file_operations, validate_file_operations,
+};
+pub(crate) use crate::project_document_file_operation_model::{
+    SuggestedFileOperation, SuggestedFileOperationKind, SuggestedFileOperationStatus,
+};
+
 pub(crate) const SECTION_CONFIG_PATH: &str = ".elon/document-sections.json";
 pub(crate) const SUGGESTIONS_CONFIG_PATH: &str = ".elon/document-organization-suggestions.json";
 pub(crate) const MAX_PROPOSED_SECTIONS: usize = 8;
 pub(crate) const MAX_SUGGESTED_ASSIGNMENTS: usize = 500;
+pub(crate) const MAX_SUGGESTED_FILE_OPERATIONS: usize = 100;
 
 const SYSTEM_SECTION_KEYS: &[&str] = &[
     "required",
@@ -91,6 +99,8 @@ pub(crate) struct DocumentOrganizationSuggestions {
     #[serde(default)]
     pub move_suggestions: Vec<String>,
     #[serde(default)]
+    pub file_operations: Vec<SuggestedFileOperation>,
+    #[serde(default)]
     pub documents_read: u64,
     #[serde(default)]
     pub estimated_tokens_used: u64,
@@ -155,6 +165,7 @@ pub(crate) fn normalize_suggestions(
         || suggestions.assignments.len() > MAX_SUGGESTED_ASSIGNMENTS
         || suggestions.conflicts.len() > 100
         || suggestions.move_suggestions.len() > 100
+        || suggestions.file_operations.len() > MAX_SUGGESTED_FILE_OPERATIONS
     {
         bail!("AI 文档整理建议超过安全上限");
     }
@@ -174,6 +185,7 @@ pub(crate) fn normalize_suggestions(
         .collect::<Result<Vec<_>>>()?;
     suggestions.conflicts = bounded_strings(suggestions.conflicts, 100, 1_000);
     suggestions.move_suggestions = bounded_strings(suggestions.move_suggestions, 100, 1_000);
+    suggestions.file_operations = normalize_file_operations(suggestions.file_operations)?;
     Ok(suggestions)
 }
 
@@ -196,6 +208,7 @@ pub(crate) fn validate_ready_suggestions(
             bail!("AI 建议引用了未知分区：{}", assignment.section_id);
         }
     }
+    validate_file_operations(&suggestions.file_operations, documents, &known_paths)?;
     Ok(suggestions)
 }
 
@@ -368,20 +381,6 @@ fn document_paths(documents: &[ProjectDocumentEntry]) -> HashSet<String> {
         .iter()
         .map(|document| document.path.replace('\\', "/").to_ascii_lowercase())
         .collect()
-}
-
-fn normalize_document_path(value: &str) -> Result<String> {
-    let path = value.trim().replace('\\', "/");
-    if path.is_empty()
-        || path.starts_with('/')
-        || path.contains(':')
-        || path
-            .split('/')
-            .any(|part| part.is_empty() || matches!(part, "." | ".."))
-    {
-        bail!("文档归类必须使用工作区内的规范相对路径");
-    }
-    Ok(path)
 }
 
 fn sanitize_section_id(value: &str) -> String {

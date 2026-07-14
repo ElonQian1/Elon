@@ -83,6 +83,53 @@ pub(crate) fn write_project_document_file(
     })
 }
 
+pub(crate) fn move_project_document_file(
+    workspace: &Path,
+    source_path: &str,
+    target_path: &str,
+    expected_source_revision: &str,
+) -> std::result::Result<ProjectDocumentFile, ProjectDocumentWriteError> {
+    if !is_markdown_document_path(source_path) || !is_markdown_document_path(target_path) {
+        return Err(write_error(
+            "实体整理只允许移动或重命名 Markdown 文件",
+            false,
+        ));
+    }
+    let current = read_project_document_file(workspace, source_path)
+        .map_err(|error| write_error(error.to_string(), false))?;
+    if current.revision != expected_source_revision {
+        return Err(write_error(
+            "源文档已被其他会话修改，请重新分析后再执行实体整理",
+            true,
+        ));
+    }
+    let (source, source_relative) = resolve_existing_markdown(workspace, source_path)
+        .map_err(|error| write_error(error.to_string(), false))?;
+    let (target, target_relative) = resolve_markdown_target(workspace, target_path, true)
+        .map_err(|error| write_error(error.to_string(), false))?;
+    if source_relative.eq_ignore_ascii_case(&target_relative) {
+        return Err(write_error("源路径和目标路径不能相同或仅大小写不同", false));
+    }
+    if target.exists() {
+        return Err(write_error(
+            format!("目标文档已存在，禁止覆盖：{target_relative}"),
+            true,
+        ));
+    }
+    std::fs::rename(&source, &target).map_err(|error| {
+        write_error(
+            format!("无法把 {source_relative} 移动到 {target_relative}：{error}"),
+            false,
+        )
+    })?;
+    Ok(ProjectDocumentFile {
+        path: target_relative,
+        content: current.content,
+        revision: current.revision,
+        byte_len: current.byte_len,
+    })
+}
+
 fn resolve_existing_markdown(workspace: &Path, document_path: &str) -> Result<(PathBuf, String)> {
     let (target, relative) = resolve_markdown_target(workspace, document_path, false)?;
     if !target.is_file() {
@@ -164,6 +211,19 @@ fn resolve_markdown_target(
 
 fn revision(content: &str) -> String {
     format!("{:x}", Sha256::digest(content.as_bytes()))
+}
+
+fn is_markdown_document_path(value: &str) -> bool {
+    Path::new(value.trim())
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "md" | "markdown" | "mdown"
+            )
+        })
+        .unwrap_or(false)
 }
 
 fn write_error(message: impl Into<String>, conflict: bool) -> ProjectDocumentWriteError {
@@ -256,6 +316,36 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         assert!(read_project_document_file(&root, ".elon/document-sections.json").is_err());
         assert!(!root.join(".elon").exists());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn moves_markdown_without_overwriting_or_accepting_stale_content() {
+        let root =
+            std::env::temp_dir().join(format!("elon-project-doc-move-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(root.join("docs/inbox")).unwrap();
+        let source =
+            write_project_document_file(&root, "docs/inbox/1.md", "# Useful note\n", None).unwrap();
+        let moved = move_project_document_file(
+            &root,
+            "docs/inbox/1.md",
+            "docs/current/useful-note.md",
+            &source.revision,
+        )
+        .unwrap();
+        assert_eq!(moved.path, "docs/current/useful-note.md");
+        assert!(!root.join("docs/inbox/1.md").exists());
+        assert!(root.join("docs/current/useful-note.md").is_file());
+        assert!(
+            move_project_document_file(
+                &root,
+                "docs/current/useful-note.md",
+                "docs/current/other.md",
+                "stale",
+            )
+            .unwrap_err()
+            .conflict
+        );
         let _ = std::fs::remove_dir_all(root);
     }
 }

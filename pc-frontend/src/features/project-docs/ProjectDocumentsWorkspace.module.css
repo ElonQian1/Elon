@@ -130,7 +130,7 @@
 
 .pageRail {
   display: grid;
-  grid-template-rows: 50px 44px minmax(0, 1fr) 52px;
+  grid-template-rows: 50px 44px auto minmax(0, 1fr) 52px;
   background: #1d1e23;
 }
 .pageHeader {
@@ -167,6 +167,16 @@
 }
 .searchBox:focus-within { border-color: rgba(167, 127, 234, .52); }
 .searchBox input { min-width: 0; width: 100%; height: 28px; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 11px; }
+.healthSummary { margin: 0 10px 8px; border: 1px solid rgba(110, 174, 139, .17); border-radius: 7px; background: rgba(61, 119, 88, .08); }
+.healthSummary summary { display: flex; align-items: center; gap: 6px; padding: 8px; color: #a7d7bb; cursor: pointer; list-style: none; font-size: 10px; }
+.healthSummary summary::-webkit-details-marker { display: none; }
+.healthSummary summary strong { flex: 1; color: #d4e9dc; }
+.healthSummary summary span { color: var(--text-muted); font-size: 9px; }
+.healthMetrics { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 0 8px; }
+.healthMetrics span { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 8px; }
+.healthMetrics b { color: #dce5e0; font-size: 10px; }
+.healthSummary p { margin: 8px; color: #aab6af; font-size: 9px; line-height: 1.45; }
+.healthSummary button { display: flex; align-items: center; justify-content: space-between; width: calc(100% - 16px); height: 25px; margin: 0 8px 8px; padding: 0 7px; border-radius: 5px; color: #a9dcbc; background: rgba(92, 165, 126, .1); font-size: 9px; }
 .pageList { min-height: 0; overflow-y: auto; padding: 2px 8px 10px; }
 .pageButton {
   display: block;
@@ -225,6 +235,12 @@
 .authorityStrip select { max-width: 150px; height: 24px; border: 1px solid rgba(167, 127, 234, .32); border-radius: 5px; color: #d9cced; background: #29252f; font-size: 9px; }
 .authorityStrip small { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .messageBar { padding: 8px 18px; color: #ffc1c1; background: rgba(182, 69, 69, .12); font-size: 11px; }
+.accessNotice { display: flex; align-items: center; gap: 10px; padding: 8px 18px; border-bottom: 1px solid rgba(245, 185, 74, .18); color: #efc36d; background: rgba(151, 103, 24, .12); }
+.accessNotice > div { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.accessNotice strong { color: #ffe1a5; font-size: 11px; }
+.accessNotice span { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.accessNotice button, .documentFailure button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: 1px solid rgba(240, 198, 117, .3); border-radius: 6px; color: #ffe0a3; background: rgba(255, 255, 255, .04); }
+.accessNotice button { height: 27px; padding: 0 9px; }
 .editorBody { display: grid; min-width: 0; min-height: 0; }
 .view_split { grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr); }
 .view_edit,
@@ -235,6 +251,11 @@
 .documentEmpty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; height: 100%; padding: 30px; color: var(--text-muted); text-align: center; }
 .documentEmpty strong { color: var(--text); font-size: 14px; }
 .documentEmpty span { max-width: 440px; font-size: 11px; line-height: 1.6; }
+.documentFailure { display: flex; align-items: center; justify-content: center; gap: 9px; height: 100%; padding: 32px; color: #d6af69; text-align: center; flex-direction: column; }
+.documentFailure strong { color: #ffe0a3; font-size: 14px; }
+.documentFailure code { max-width: 90%; overflow: hidden; color: #c8b789; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.documentFailure span, .documentFailure p { max-width: 520px; margin: 0; color: var(--text-muted); font-size: 11px; line-height: 1.6; }
+.documentFailure button { min-height: 31px; padding: 0 12px; margin-top: 4px; }
 
 .suggestionsPane { display: grid; grid-column: 2 / 4; grid-template-rows: 62px minmax(0, 1fr) 62px; min-width: 0; min-height: 0; background: #202126; }
 .suggestionsHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 22px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
@@ -300,6 +321,27 @@
 .assignmentList strong { color: #88d5aa; font-size: 10px; }
 .assignmentList span { color: var(--text-muted); font-size: 10px; line-height: 1.45; }
 .safetyNote { color: #e9b96b; font-size: 10px; }
+.fileOperations > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.fileOperations > header > div { display: flex; align-items: center; gap: 7px; }
+.fileOperations > header h3 { margin: 0; }
+.fileOperations > header span { color: var(--text-muted); font-size: 9px; }
+.fileOperationList { display: grid; gap: 7px; }
+.fileOperationList > label { display: grid; grid-template-columns: auto 22px minmax(0, 1fr) auto; align-items: start; gap: 7px; padding: 10px; border: 1px solid rgba(255, 255, 255, .06); border-radius: 7px; background: rgba(255, 255, 255, .025); }
+.fileOperationList > label[data-applied="true"] { opacity: .68; border-color: rgba(98, 200, 145, .18); }
+.fileOperationList input { margin-top: 3px; accent-color: #7e55c7; }
+.fileOperationList i { color: #c8acef; }
+.fileOperationList strong, .fileOperationList code, .fileOperationList span { display: block; }
+.fileOperationList strong { color: #e1e3e9; font-size: 10px; }
+.fileOperationList code { margin-top: 5px; color: #b7a5d4; font-size: 9px; }
+.fileOperationList span { margin-top: 3px; color: #8fc6a8; font-size: 9px; }
+.fileOperationList b { color: var(--text-muted); font-size: 9px; }
+.fileOperations > footer { display: grid; justify-items: start; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .06); }
+.reviewPermission { display: flex; align-items: flex-start; gap: 7px; color: #d5d8df; font-size: 10px; }
+.reviewPermission input { accent-color: #7e55c7; }
+.fileOperations > footer p { margin: 0; color: var(--text-muted); font-size: 9px; line-height: 1.5; }
+.fileOperations > footer .permissionWarning { color: #e5b66b; }
+.fileOperations > footer button { min-height: 31px; padding: 0 12px; border-radius: 6px; color: #fff; background: #7245bd; font-size: 10px; font-weight: 700; }
+.fileOperations > footer button:disabled { color: var(--text-muted); background: rgba(255, 255, 255, .05); }
 .suggestionsFooter { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 22px; border-top: 1px solid rgba(255, 255, 255, .07); background: rgba(0, 0, 0, .12); }
 .suggestionsFooter span { color: var(--text-muted); font-size: 10px; }
 .suggestionsFooter button { height: 34px; padding: 0 15px; border-radius: 7px; color: #fff; background: #7245bd; font-size: 10px; font-weight: 800; }

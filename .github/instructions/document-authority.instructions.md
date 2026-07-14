@@ -45,7 +45,9 @@ applyTo: "**/*.md"
 - `.elon/document-organization-suggestions.json` 是 AI 整理建议的结构化产物；AI 整理任务只可写这一份建议文件。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - AI 可建议新分区和虚拟归类，但必须经用户审核后才更新分区配置。
-- 应用虚拟分区建议不等于移动 Markdown；实体迁移必须作为独立 Git 变更再审核。
+- AI 可在建议中提供结构化 `file_operations`，用于改善含糊文件名或错误目录；每项必须带 analyze 返回的源文件哈希。
+- 应用虚拟分区建议不等于移动 Markdown。实体重命名/移动必须逐项勾选并按本次操作分别授予 `rename`/`move` 权限；只允许项目内 Markdown，禁止覆盖、删除、越界、改写正文或自动提交 Git。
+- 修改正文、批量修复引用、归档、删除、commit 和 push 都是更高权限，不能由实体整理授权隐含获得。
 
 ## 供应商无关 MCP 顺序
 
@@ -54,5 +56,6 @@ applyTo: "**/*.md"
 - 只对 `ambiguous` 或当前任务命中的路径调用 `project_docs_read`，不得借 MCP 全量读取 Markdown。
 - 模型完成判断后调用 `project_docs_save_suggestions`；该工具只写建议 JSON，并校验目录 revision、真实路径和结构上限。
 - 没有用户或审核流程明确确认，不得调用 `project_docs_apply_suggestions`；确认后也只应用虚拟分区，不移动 Markdown。
+- 只有用户逐项确认实体操作后才能调用 `project_docs_apply_file_operations`；必须传所选 operation id、`reviewed=true` 和本次允许的 `rename`/`move` 权限。
 - MCP 不可用时遵循同一顺序和两份 `.elon` JSON 契约，不得改用供应商私有文档作为第二真源。
 - 传输、短期会话和工具契约见 `docs/project-document-governance-mcp.md`；只有接入或诊断 MCP 时才读取。

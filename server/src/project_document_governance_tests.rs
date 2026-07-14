@@ -1,10 +1,14 @@
 use std::{fs, path::PathBuf};
 
 use crate::{
+    project_document_file_operations::{
+        apply_reviewed_file_operations, ApplyFileOperationsRequest,
+    },
     project_document_files::write_project_document_file,
     project_document_governance::{
         to_pretty_json, CustomDocumentSection, DocumentOrganizationSuggestions, OrganizationStatus,
-        SuggestedAssignment, SUGGESTIONS_CONFIG_PATH,
+        SuggestedAssignment, SuggestedFileOperation, SuggestedFileOperationKind,
+        SuggestedFileOperationStatus, SUGGESTIONS_CONFIG_PATH,
     },
     project_document_governance_service::{
         analyze_workspace, apply_saved_suggestions, read_documents, save_suggestions,
@@ -45,9 +49,82 @@ fn ready_suggestions() -> DocumentOrganizationSuggestions {
         }],
         conflicts: Vec::new(),
         move_suggestions: Vec::new(),
+        file_operations: Vec::new(),
         documents_read: 0,
         estimated_tokens_used: 0,
     }
+}
+
+#[test]
+fn file_operations_require_per_action_permission_and_preserve_content() {
+    let root = workspace("file-operations");
+    let original = fs::read_to_string(root.join("docs/archive/old.md")).unwrap();
+    let analysis = analyze_workspace(&root, 0, 80, false).unwrap();
+    let catalog_revision = analysis["catalog_revision"].as_str().unwrap();
+    let source_revision = analysis["documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|document| document["path"] == "docs/archive/old.md")
+        .unwrap()["content_hash"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let mut suggestions = ready_suggestions();
+    suggestions.assignments.clear();
+    suggestions.proposed_sections.clear();
+    suggestions.file_operations = vec![SuggestedFileOperation {
+        id: "rename-old-note".to_string(),
+        kind: SuggestedFileOperationKind::Rename,
+        source_path: "docs/archive/old.md".to_string(),
+        target_path: "docs/archive/legacy-discussion.md".to_string(),
+        source_revision,
+        reason: "名称应表达文档用途".to_string(),
+        status: SuggestedFileOperationStatus::Proposed,
+    }];
+    let saved = save_suggestions(&root, suggestions, catalog_revision, None).unwrap();
+    let suggestions_revision = saved["suggestions_revision"].as_str().unwrap();
+    let operation_ids = vec!["rename-old-note".to_string()];
+    let denied = apply_reviewed_file_operations(
+        &root,
+        ApplyFileOperationsRequest {
+            reviewed: true,
+            operation_ids: &operation_ids,
+            allow_rename: false,
+            allow_move: false,
+            expected_catalog_revision: catalog_revision,
+            expected_manifest_revision: None,
+            expected_suggestions_revision: Some(suggestions_revision),
+        },
+    )
+    .unwrap_err();
+    assert!(denied.to_string().contains("rename 权限"));
+    let applied = apply_reviewed_file_operations(
+        &root,
+        ApplyFileOperationsRequest {
+            reviewed: true,
+            operation_ids: &operation_ids,
+            allow_rename: true,
+            allow_move: false,
+            expected_catalog_revision: catalog_revision,
+            expected_manifest_revision: None,
+            expected_suggestions_revision: Some(suggestions_revision),
+        },
+    )
+    .unwrap();
+    assert_eq!(applied["applied_count"], 1);
+    assert_eq!(applied["content_changed"], false);
+    assert_eq!(applied["files_deleted"], false);
+    assert!(!root.join("docs/archive/old.md").exists());
+    assert_eq!(
+        fs::read_to_string(root.join("docs/archive/legacy-discussion.md")).unwrap(),
+        original
+    );
+    assert_eq!(
+        applied["suggestions"]["file_operations"][0]["status"],
+        "applied"
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
