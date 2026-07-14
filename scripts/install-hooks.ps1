@@ -1,4 +1,4 @@
-# 启用本仓库的 git 守门 hooks（pre-push: source-size guard + locked cargo-dev check + 拦截未 add 的 .rs）
+# 启用本仓库的 git 守门 hooks（pre-push: rustfmt + source-size + locked cargo-dev + 未 add .rs）
 # 任何 PC（包括服务器 codex CLI）clone 后必须执行一次。
 $RepoRoot = git rev-parse --show-toplevel
 if (-not $RepoRoot) { Write-Error "❌ 当前目录不在 git 仓库内"; exit 1 }
@@ -13,5 +13,5 @@ if ($IsLinux -or $IsMacOS) {
 }
 
 Write-Host "✅ 已启用 .githooks/ 作为 hook 目录" -ForegroundColor Green
-Write-Host "   pre-push 守门已激活：source-size guard + locked cargo-dev check + 拦截未 add 的 .rs" -ForegroundColor Gray
+Write-Host "   pre-push 守门已激活：rustfmt + source-size + locked cargo-dev + 未 add .rs" -ForegroundColor Gray
 git config --get core.hooksPath

@@ -2,11 +2,16 @@
 set -euo pipefail
 
 apply=false
+all=false
 files=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply)
       apply=true
+      shift
+      ;;
+    --all)
+      all=true
       shift
       ;;
     --files)
@@ -15,15 +20,44 @@ while [[ $# -gt 0 ]]; do
       break
       ;;
     *)
-      echo "Usage: scripts/format-rust.sh [--apply] [--files <file>...]" >&2
+      echo "Usage: scripts/format-rust.sh [--apply --all] [--apply --files <file>...]" >&2
       exit 2
       ;;
   esac
 done
 
+if [[ "$all" == true && ${#files[@]} -gt 0 ]]; then
+  echo "Choose either --all or --files; they cannot be combined." >&2
+  exit 2
+fi
+
+if [[ "$apply" == true && "$all" != true && ${#files[@]} -eq 0 ]]; then
+  echo "Refusing an implicit repository-wide write. Use --apply --files <changed.rs...> for daily work, or --apply --all in a dedicated format-only task." >&2
+  exit 2
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(git -C "$script_dir" rev-parse --show-toplevel)"
+repo_root="$(cd "$script_dir/.." && pwd)"
 cd "$repo_root"
+
+if [[ "$apply" == true && "$all" == true ]]; then
+  worktree_status="$(git status --porcelain=v1 --untracked-files=all)"
+  if [[ -n "$worktree_status" ]]; then
+    echo "Refusing a repository-wide write in a dirty worktree. Commit or isolate existing changes, then run --apply --all from a clean dedicated task." >&2
+    exit 2
+  fi
+fi
+
+if [[ ! -f ".rustfmt-version" ]]; then
+  echo "Rust formatter version lock is missing: .rustfmt-version" >&2
+  exit 1
+fi
+expected_rustfmt_version="$(tr -d '\r\n' < .rustfmt-version)"
+actual_rustfmt_version="$(rustfmt --version)"
+if [[ "$actual_rustfmt_version" != "$expected_rustfmt_version" ]]; then
+  echo "rustfmt version mismatch. Expected '$expected_rustfmt_version', got '$actual_rustfmt_version'. Use the baseline toolchain or create a dedicated format-baseline migration." >&2
+  exit 1
+fi
 
 manifests=(
   "server/Cargo.toml"
@@ -128,12 +162,37 @@ if [[ ${#files[@]} -gt 0 ]]; then
   exit 0
 fi
 
-for manifest in "${manifests[@]}"; do
-  if [[ "$apply" == true ]]; then
-    echo "Formatting $manifest"
-    cargo fmt --manifest-path "$manifest" --all
-  else
+if [[ "$apply" != true ]]; then
+  for manifest in "${manifests[@]}"; do
     echo "Checking $manifest"
     cargo fmt --manifest-path "$manifest" --all -- --check
+  done
+  exit 0
+fi
+
+full_format_clean() {
+  for manifest in "${manifests[@]}"; do
+    cargo fmt --manifest-path "$manifest" --all -- --check >/dev/null 2>&1 || return 1
+  done
+}
+
+converged=false
+for pass in 1 2 3; do
+  for manifest in "${manifests[@]}"; do
+    echo "Formatting $manifest (pass $pass/3)"
+    cargo fmt --manifest-path "$manifest" --all
+  done
+  if full_format_clean; then
+    echo "Full Rust format converged after $pass pass(es)"
+    converged=true
+    break
   fi
 done
+
+if [[ "$converged" != true ]]; then
+  echo "Full Rust format did not converge after 3 passes. Running a visible check for diagnostics." >&2
+  for manifest in "${manifests[@]}"; do
+    cargo fmt --manifest-path "$manifest" --all -- --check
+  done
+  exit 1
+fi

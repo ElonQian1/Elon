@@ -2,3 +2,4 @@
 # CRLF 会导致 bash 在 Linux/macOS 报 "syntax error near unexpected token `$'do\r''"
 *.sh         text eol=lf
 .githooks/*  text eol=lf
+*.rs         text eol=lf

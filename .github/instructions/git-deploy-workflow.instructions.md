@@ -25,6 +25,7 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 - 主工作区来源不明的未跟踪文件只产生卫生告警，不由其他任务自动提交或删除。
 - 当前任务 worktree 必须完全干净才可收尾；未跟踪源码/测试会显示 `candidate_track`，生成物会显示 `candidate_temporary_or_precise_ignore`。
 - 自动删除仅限 `.ai/workspace-policy.txt` 声明的临时根，目前是 `.ai-tmp/`。
+- 全局清理默认保护创建不足 60 分钟的 worktree，避免并行任务刚拿到 `EDIT_ROOT` 就被回收；当前任务仍由统一收尾定向清理。
 
 ## push 冲突
 
@@ -63,7 +64,7 @@ bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply -Files <本次改动.rs...>
 ```
 
-Linux/macOS 使用 `bash scripts/format-rust.sh --apply --files ...`。全量纯 rustfmt 变化与业务改动拆成独立提交。
+Linux/macOS 使用 `bash scripts/format-rust.sh --apply --files ...`。脚本按 `.rustfmt-version` 拒绝版本漂移；无参数只做全仓检查。全量写入只能在干净隔离任务中显式使用 `-Apply -All` / `--apply --all`，确认全部为纯 rustfmt 后先提交并推送独立 `style(rust)` commit，再提交业务改动。误触后若仍是纯 rustfmt，不为缩小 diff 反复撤销；工具链错误、混入语义变化或来源不明现场则停止并报告。
 
 ## 发布入口
 

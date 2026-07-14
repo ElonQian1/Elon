@@ -114,6 +114,29 @@ try {
     Invoke-Git $taskWorktree @("commit", "-m", "finish workflow task change") | Out-Null
     Invoke-Git $taskWorktree @("push", "origin", "HEAD:main") | Out-Null
 
+    # Global cleanup can run from another concurrent task immediately after a
+    # new worktree is created. Both recent clean worktrees must survive that
+    # scan even though their branches are already ancestors of origin/main.
+    Push-Location -LiteralPath $mainRepo
+    try {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $recentCleanupOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1") -Apply 2>&1
+            $recentCleanupExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+    } finally {
+        Pop-Location
+    }
+    $recentCleanupText = (($recentCleanupOutput | ForEach-Object { [string]$_ }) -join "`n").Trim()
+    if ($recentCleanupExitCode -ne 0) { throw "Recent-worktree cleanup fixture failed.`n$recentCleanupText" }
+    Assert-Contains $recentCleanupText "MinAgeMinutes=60" "Global cleanup must protect newly created concurrent worktrees."
+    $registeredAfterRecentCleanup = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
+    if (-not $registeredAfterRecentCleanup.Contains("branch refs/heads/codex/finish-fixture")) { throw "Global cleanup removed the newly created task worktree.`n$recentCleanupText" }
+    if (-not $registeredAfterRecentCleanup.Contains("branch refs/heads/codex/peer-fixture")) { throw "Global cleanup removed the newly created peer worktree.`n$recentCleanupText" }
+
     # A legacy untracked source-looking file must not block the tracked main
     # baseline from catching up, and must never be auto-added or deleted.
     $legacyPath = Join-Path $mainRepo "legacy-test.rs"

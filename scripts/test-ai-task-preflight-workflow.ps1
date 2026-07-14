@@ -382,3 +382,17 @@ $finishTestOutput | ForEach-Object { Write-Host ([string]$_) }
 if ($finishTestExitCode -ne 0) {
     throw "Unified finish workflow guard failed."
 }
+
+$formatWorkflowTest = Join-Path $repoRoot "scripts\test-format-rust-workflow.ps1"
+$oldPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $formatTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $formatWorkflowTest 2>&1
+    $formatTestExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $oldPreference
+}
+$formatTestOutput | ForEach-Object { Write-Host ([string]$_) }
+if ($formatTestExitCode -ne 0) {
+    throw "Rust format workflow guard failed."
+}

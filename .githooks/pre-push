@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# pre-push 守门：防止 push 出含编译断裂或漏 git add 新文件的 commit。
+# pre-push 守门：防止 push 出格式漂移、编译断裂或漏 git add 新文件的 commit。
 # 启用：cd <repo>; git config core.hooksPath .githooks
 # 或运行 scripts/install-hooks.ps1 / scripts/install-hooks.sh
 #
@@ -13,8 +13,17 @@ set -e
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; NC='\033[0m'
 ZERO_SHA='0000000000000000000000000000000000000000'
 
-REPO_ROOT="$(git rev-parse --show-toplevel)"
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 cd "$REPO_ROOT"
+
+# Git exports common-repository variables to hooks. In linked worktrees those
+# variables can make child scripts resolve the main checkout instead of the
+# worktree being pushed, so clear them after anchoring the actual hook path.
+git_local_env_vars="$(git rev-parse --local-env-vars)"
+if [ -n "$git_local_env_vars" ]; then
+  unset $git_local_env_vars
+fi
 
 PUSH_LINES=()
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -32,7 +41,18 @@ if [ -n "$UNTRACKED_RS" ]; then
   exit 1
 fi
 
-# 2. 源文件体量守门：历史红区可存在，但不能继续变大或新增红区文件
+# 2. 全仓 Rust 格式门禁：基线建立后不允许重新积累格式债
+if [ -f "scripts/format-rust.sh" ]; then
+  echo -e "${YELLOW}🔍 pre-push: scripts/format-rust.sh...${NC}"
+  if ! bash scripts/format-rust.sh 2>&1; then
+    echo -e "${RED}❌ pre-push 拒绝：Rust 全仓格式检查失败${NC}" >&2
+    echo -e "${YELLOW}   日常只格式化本次文件；如确需全量写入，使用 --apply --all 并拆出纯 style 提交。${NC}" >&2
+    exit 1
+  fi
+  echo -e "${GREEN}   ✅ Rust 全仓格式检查通过${NC}"
+fi
+
+# 3. 源文件体量守门：历史红区可存在，但不能继续变大或新增红区文件
 echo -e "${YELLOW}🔍 pre-push: scripts/check-source-size.ps1...${NC}"
 PS_CMD=""
 if command -v powershell >/dev/null 2>&1; then PS_CMD="powershell"; elif command -v pwsh >/dev/null 2>&1; then PS_CMD="pwsh"; fi
@@ -45,7 +65,7 @@ if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-siz
   exit 1
 fi
 
-# 3. cargo check 守门（如果存在 server/Cargo.toml）
+# 4. cargo check 守门（如果存在 server/Cargo.toml）
 if [ -f "server/Cargo.toml" ]; then
   echo -e "${YELLOW}🔍 pre-push: scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace...${NC}"
   if ! bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace --quiet 2>&1; then

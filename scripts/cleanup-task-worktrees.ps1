@@ -10,6 +10,7 @@
 #   2. 工作树没有未提交 / 未跟踪文件
 #   3. 当前所在分支已经合并进 origin/main（即没有未推送或未合并的工作）
 #   4. 不是当前正在使用的 worktree
+#   5. 创建时间超过 -MinAgeMinutes，避免清理刚创建、尚未来得及写入的并行任务
 #
 # 用法：
 #   powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1            # 预览
@@ -19,6 +20,7 @@ param(
     [switch]$Apply,
     [switch]$Force,
     [int]$KeepLast = 0,
+    [int]$MinAgeMinutes = 60,
     [switch]$DeleteRemoteBranches,
     [string[]]$ExcludePath = @()
 )
@@ -161,6 +163,14 @@ foreach ($wt in $taskWorktrees) {
     if ($normalized -ieq $currentWorktree) { $reasons += "当前正在使用" }
     if ($keepSet.ContainsKey($wt.Path))    { $reasons += "在 -KeepLast 保留范围内" }
     if ($excludeSet.ContainsKey($normalized)) { $reasons += "在 -ExcludePath 保护范围内" }
+
+    if ($MinAgeMinutes -gt 0 -and (Test-Path -LiteralPath $wt.Path)) {
+        $createdUtc = (Get-Item -LiteralPath $wt.Path -Force).CreationTimeUtc
+        $ageMinutes = ([DateTime]::UtcNow - $createdUtc).TotalMinutes
+        if ($ageMinutes -lt $MinAgeMinutes) {
+            $reasons += "近期创建保护(MinAgeMinutes=$MinAgeMinutes, age=$([Math]::Round($ageMinutes, 1)))"
+        }
+    }
 
     if (-not (Test-Path -LiteralPath $wt.Path)) {
         $reasons += "目录已不存在（可 prune）"

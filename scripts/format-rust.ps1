@@ -11,13 +11,14 @@
     powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1
 
 .EXAMPLE
-    powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply
+    powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply -All
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply -Files server/src/main.rs
 #>
 param(
     [switch]$Apply,
+    [switch]$All,
     [string[]]$Files = @(),
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingFiles = @()
@@ -25,8 +26,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
+$RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 Set-Location $RepoRoot
+
+$rustfmtVersionFile = Join-Path $RepoRoot ".rustfmt-version"
+if (-not (Test-Path -LiteralPath $rustfmtVersionFile)) {
+    throw "Rust formatter version lock is missing: .rustfmt-version"
+}
+$expectedRustfmtVersion = (Get-Content -Raw -LiteralPath $rustfmtVersionFile).Trim()
+$actualRustfmtVersion = (& rustfmt --version 2>&1 | Out-String).Trim()
+if ($LASTEXITCODE -ne 0) {
+    throw "rustfmt is unavailable. Install the rustfmt component for the repository toolchain."
+}
+if ($actualRustfmtVersion -ne $expectedRustfmtVersion) {
+    throw "rustfmt version mismatch. Expected '$expectedRustfmtVersion', got '$actualRustfmtVersion'. Use the baseline toolchain or create a dedicated format-baseline migration."
+}
 
 $crates = @(
     @{ Root = "server"; Manifest = "server/Cargo.toml" },
@@ -86,6 +100,27 @@ foreach ($crate in $crates) {
 
 $requestedFiles = @($Files) + @($RemainingFiles)
 
+if ($All -and $requestedFiles.Count -gt 0) {
+    [Console]::Error.WriteLine("Choose either -All or -Files; they cannot be combined.")
+    exit 2
+}
+
+if ($Apply -and -not $All -and $requestedFiles.Count -eq 0) {
+    [Console]::Error.WriteLine("Refusing an implicit repository-wide write. Use -Apply -Files <changed.rs...> for daily work, or -Apply -All in a dedicated format-only task.")
+    exit 2
+}
+
+if ($Apply -and $All) {
+    $worktreeStatus = (& git -C $RepoRoot status --porcelain=v1 --untracked-files=all 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to inspect the worktree before full formatting: $worktreeStatus"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($worktreeStatus)) {
+        [Console]::Error.WriteLine("Refusing a repository-wide write in a dirty worktree. Commit or isolate existing changes, then run -Apply -All from a clean dedicated task.")
+        exit 2
+    }
+}
+
 if ($requestedFiles.Count -gt 0) {
     $groups = @{}
     foreach ($file in ($requestedFiles | Select-Object -Unique)) {
@@ -133,12 +168,49 @@ if ($requestedFiles.Count -gt 0) {
     exit 0
 }
 
-foreach ($crate in $crates) {
-    if ($Apply) {
-        Write-Host "Formatting $($crate["Manifest"])"
-        Invoke-NativeCommand "cargo" @("fmt", "--manifest-path", $crate["Manifest"], "--all")
-    } else {
+if (-not $Apply) {
+    foreach ($crate in $crates) {
         Write-Host "Checking $($crate["Manifest"])"
         Invoke-NativeCommand "cargo" @("fmt", "--manifest-path", $crate["Manifest"], "--all", "--", "--check")
     }
+    exit 0
+}
+
+function Test-FullFormatClean {
+    foreach ($crate in $crates) {
+        $manifest = $crate["Manifest"]
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & cargo fmt --manifest-path $manifest --all -- --check *> $null
+            $exitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+        if ($exitCode -ne 0) {
+            return $false
+        }
+    }
+    return $true
+}
+
+$converged = $false
+for ($pass = 1; $pass -le 3; $pass++) {
+    foreach ($crate in $crates) {
+        Write-Host "Formatting $($crate["Manifest"]) (pass $pass/3)"
+        Invoke-NativeCommand "cargo" @("fmt", "--manifest-path", $crate["Manifest"], "--all")
+    }
+    if (Test-FullFormatClean) {
+        Write-Host "Full Rust format converged after $pass pass(es)"
+        $converged = $true
+        break
+    }
+}
+
+if (-not $converged) {
+    [Console]::Error.WriteLine("Full Rust format did not converge after 3 passes. Running a visible check for diagnostics.")
+    foreach ($crate in $crates) {
+        Invoke-NativeCommand "cargo" @("fmt", "--manifest-path", $crate["Manifest"], "--all", "--", "--check")
+    }
+    exit 1
 }
