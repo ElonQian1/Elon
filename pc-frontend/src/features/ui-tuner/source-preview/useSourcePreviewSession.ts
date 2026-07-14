@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { commitSourcePreview, loadSourcePreview } from './sourcePreviewApi'
 import { findSourceNode, sourcePatchValue, updateSourceNode } from './sourcePreviewTree'
 import type { PendingSourceNodePatch, SourcePreviewDocument, SourcePreviewPatch, SourcePreviewSaveState } from './types'
+import { useSourceRenderer } from './useSourceRenderer'
 
 interface PreviewSnapshot { document: SourcePreviewDocument; pending: Record<string, PendingSourceNodePatch> }
 interface PreviewHistory { past: PreviewSnapshot[]; future: PreviewSnapshot[] }
@@ -49,6 +50,7 @@ export function useSourcePreviewSession(initialProjectRoot: string) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [saveState, setSaveState] = useState<SourcePreviewSaveState>('preview')
+  const renderer = useSourceRenderer()
 
   useEffect(() => {
     if (initialProjectRoot && !projectRoot) setProjectRoot(initialProjectRoot)
@@ -59,17 +61,19 @@ export function useSourcePreviewSession(initialProjectRoot: string) {
     if (!root) { setError('请先选择或输入本机 Android 项目目录'); return }
     setLoading(true); setError('')
     try {
+      const rendererRefresh = renderer.refresh(root)
       const next = await loadSourcePreview(root, layoutFile)
       dispatch({ type: 'load', document: next })
       setSelectedKey(next.root.key)
       setSaveState('preview')
       window.localStorage.setItem('elon.uiTuner.sourceProjectRoot', root)
+      await rendererRefresh
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally { setLoading(false) }
-  }, [projectRoot])
+  }, [projectRoot, renderer.refresh])
 
-  const apply = useCallback((patch: SourcePreviewPatch) => { dispatch({ type: 'apply', patch }); setSaveState('preview') }, [])
+  const apply = useCallback((patch: SourcePreviewPatch) => { renderer.beginLocalDraft(); dispatch({ type: 'apply', patch }); setSaveState('preview') }, [renderer.beginLocalDraft])
   const undo = useCallback(() => { dispatch({ type: 'undo' }); setSaveState('preview') }, [])
   const redo = useCallback(() => { dispatch({ type: 'redo' }); setSaveState('preview') }, [])
 
@@ -97,5 +101,5 @@ export function useSourcePreviewSession(initialProjectRoot: string) {
   }, [editor])
 
   const selected = useMemo(() => findSourceNode(editor.document?.root ?? null, selectedKey), [editor.document, selectedKey])
-  return { projectRoot, setProjectRoot, document: editor.document, selected, selectedKey, setSelectedKey, pending: editor.pending, history: editor.history, loading, error, saveState, load, apply, undo, redo, commit }
+  return { projectRoot, setProjectRoot, document: editor.document, selected, selectedKey, setSelectedKey, pending: editor.pending, history: editor.history, loading, error, saveState, load, apply, undo, redo, commit, renderer }
 }

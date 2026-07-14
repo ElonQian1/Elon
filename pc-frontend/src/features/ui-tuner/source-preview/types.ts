@@ -1,5 +1,32 @@
 export type SourcePreviewMode = 'source' | 'evidence'
 export type SourcePreviewSaveState = 'preview' | 'saving' | 'saved' | 'error'
+export type SourcePreviewBackend = 'android_layoutlib' | 'android_preview_host' | 'react_twin'
+
+export interface ComposePreviewEntry {
+  id: string
+  kotlinFile: string
+  composable: string
+  label: string
+}
+
+export interface SourceRendererCapabilities {
+  ok: boolean
+  recommendedBackend: SourcePreviewBackend
+  layoutlib: { available: boolean; command?: string; detail: string }
+  previewHost: { availableAfterDebugBuild: boolean; detail: string }
+  reactTwin: { available: boolean; authoritative: boolean; detail: string }
+  composePreviews: ComposePreviewEntry[]
+}
+
+export interface ComposePreviewRender {
+  ok: boolean
+  backend: 'android_layoutlib'
+  authoritative: true
+  kotlinFile: string
+  composable: string
+  dataUrl: string
+  semanticsText: string
+}
 
 export interface SourcePreviewDocument {
   ok: boolean

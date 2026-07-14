@@ -31,8 +31,9 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
           canUndo={session.history.past.length > 0} canRedo={session.history.future.length > 0} hasPending={Object.keys(session.pending).length > 0}
           onModeChange={onModeChange} onProjectRootChange={session.setProjectRoot} onLoad={(layout) => { void session.load(layout) }} onSave={() => { void session.commit() }}
           onZoom={setZoom} onUndo={session.undo} onRedo={session.redo}
+          renderer={session.renderer}
         />
-        <SourceDrivenPreviewSurface document={session.document} selectedKey={session.selectedKey} zoom={zoom} loading={session.loading} error={session.error} onSelect={session.setSelectedKey} />
+        <SourceDrivenPreviewSurface document={session.document} androidRender={session.renderer.render} selectedKey={session.selectedKey} zoom={zoom} loading={session.loading || session.renderer.rendering} error={session.error || session.renderer.error} onSelect={session.setSelectedKey} />
       </section>
       <SourcePreviewInspector node={session.selected} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} onChange={session.apply} onSave={() => { void session.commit() }} />
     </div>
@@ -40,5 +41,5 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
 }
 
 export function EvidenceModeSwitch({ onModeChange }: { initialProjectRoot: string; onModeChange: (mode: SourcePreviewMode) => void }) {
-  return <div className={styles.modeBar}><div className={styles.modeTabs}><button className={styles.activeTab} onClick={() => onModeChange('evidence')}><MonitorSmartphone size={15} />Android 真实渲染</button><button onClick={() => onModeChange('source')}><Code2 size={15} />源码近似预览</button></div><span>画面来自真实 Android Renderer；选择框只负责点选，不会覆盖或模拟组件外观</span></div>
+  return <div className={styles.modeBar}><div className={styles.modeTabs}><button className={styles.activeTab} onClick={() => onModeChange('evidence')}><MonitorSmartphone size={15} />Android 真实渲染</button><button onClick={() => onModeChange('source')}><Code2 size={15} />Preview / 数字孪生</button></div><span>画面来自真实 Android Renderer；选择框只负责点选，不会覆盖或模拟组件外观</span></div>
 }
