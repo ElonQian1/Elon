@@ -34,6 +34,18 @@ use gradle::{
 };
 use install::install_debug_apk;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BuildVerificationMode {
+    SourceParity,
+    RuntimePreparation,
+}
+
+impl BuildVerificationMode {
+    fn requires_source_parity(self) -> bool {
+        self == Self::SourceParity
+    }
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BuildVerifyRequest {
@@ -129,7 +141,7 @@ async fn prepare_debug_runtime_inner(
         )
         .await;
     let session_id = session.id.clone();
-    let result = build_and_verify(
+    let result = build_and_verify_with_mode(
         broker,
         &session_id,
         BuildVerifyRequest {
@@ -138,6 +150,7 @@ async fn prepare_debug_runtime_inner(
             ..BuildVerifyRequest::default()
         },
         host_port,
+        BuildVerificationMode::RuntimePreparation,
     )
     .await;
     match result {
@@ -169,22 +182,48 @@ pub(crate) async fn build_and_verify(
     request: BuildVerifyRequest,
     host_port: u16,
 ) -> Result<BuildVerifyResult> {
+    build_and_verify_with_mode(
+        broker,
+        session_id,
+        request,
+        host_port,
+        BuildVerificationMode::SourceParity,
+    )
+    .await
+}
+
+async fn build_and_verify_with_mode(
+    broker: &LiveUiBroker,
+    session_id: &str,
+    request: BuildVerifyRequest,
+    host_port: u16,
+    mode: BuildVerificationMode,
+) -> Result<BuildVerifyResult> {
     let session = broker.session(session_id).await?;
-    let target_path = load_or_build_ui_ir(broker, session_id)
-        .await
-        .ok()
-        .and_then(|ir| ir.target_design.map(|target| target.path));
+    let target_path = if mode.requires_source_parity() {
+        load_or_build_ui_ir(broker, session_id)
+            .await
+            .ok()
+            .and_then(|ir| ir.target_design.map(|target| target.path))
+    } else {
+        None
+    };
     let project_root = canonical_project_root(&session)?;
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let live_snapshot = session.commit_snapshot().await;
-    let live_preview_png = capture_screen_png(&session.device_id).await?;
-    let live_preview_rect = verification_bounds(
-        &live_snapshot.nodes,
-        request.target_definition_id.as_deref(),
-        request.target_instance_key.as_deref(),
-    )?
-    .or_else(|| patched_bounds(&live_snapshot, true));
+    let live_preview = if mode.requires_source_parity() {
+        let png = capture_screen_png(&session.device_id).await?;
+        let rect = verification_bounds(
+            &live_snapshot.nodes,
+            request.target_definition_id.as_deref(),
+            request.target_instance_key.as_deref(),
+        )?
+        .or_else(|| patched_bounds(&live_snapshot, true));
+        Some((png, rect))
+    } else {
+        None
+    };
 
     let build_started = Instant::now();
     let artifact_not_before = SystemTime::now()
@@ -284,12 +323,18 @@ pub(crate) async fn build_and_verify(
             )
         })
         .transpose()?;
-    let source_parity_diff = compare_pngs(
-        &live_preview_png,
-        &screenshot,
-        live_preview_rect,
-        source_rect,
-    )?;
+    // A first-time Runtime preparation has no meaningful Live preview yet.
+    // Treat the freshly installed renderer as its own baseline and reserve the
+    // strict before/after parity gate for a real committed Live design session.
+    let source_parity_diff = match live_preview {
+        Some((live_preview_png, live_preview_rect)) => compare_pngs(
+            &live_preview_png,
+            &screenshot,
+            live_preview_rect,
+            source_rect,
+        )?,
+        None => compare_pngs(&screenshot, &screenshot, source_rect, source_rect)?,
+    };
     let verification_gate = evaluate_verification_gates(VerificationGateInput::new(
         Some(&source_parity_diff),
         visual_diff.as_ref(),
@@ -297,13 +342,19 @@ pub(crate) async fn build_and_verify(
     ));
     let source_parity_verified = verification_gate.source_parity == VerificationGateState::Passed;
     let status = verification_gate.status;
-    let message = match status {
-        "BUILD_VERIFIED" => {
-            "已由源码重新构建并安装；临时 Patch 已清空，源码一致性和目标设计门禁均通过。"
+    let message = if mode == BuildVerificationMode::RuntimePreparation {
+        "Debug Runtime 已构建、安装并连接，节点树已经就绪；首次准备不执行 Live→源码一致性验收。"
+    } else {
+        match status {
+            "BUILD_VERIFIED" => {
+                "已由源码重新构建并安装；临时 Patch 已清空，源码一致性和目标设计门禁均通过。"
+            }
+            "TARGET_MISMATCH" => "源码结果已与 Live 预览一致，但尚未达到目标设计门禁。",
+            "TARGET_NOT_CONFIGURED" => {
+                "源码结果已与 Live 预览一致，但设计拟合任务尚未配置目标配对。"
+            }
+            _ => "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。",
         }
-        "TARGET_MISMATCH" => "源码结果已与 Live 预览一致，但尚未达到目标设计门禁。",
-        "TARGET_NOT_CONFIGURED" => "源码结果已与 Live 预览一致，但设计拟合任务尚未配置目标配对。",
-        _ => "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。",
     }
     .to_string();
 
@@ -433,5 +484,11 @@ mod target_comparison_rect_tests {
             target_comparison_current_rect(None, Some(node_bounds)),
             Some(node_bounds)
         );
+    }
+
+    #[test]
+    fn runtime_preparation_does_not_require_a_live_baseline() {
+        assert!(BuildVerificationMode::SourceParity.requires_source_parity());
+        assert!(!BuildVerificationMode::RuntimePreparation.requires_source_parity());
     }
 }
