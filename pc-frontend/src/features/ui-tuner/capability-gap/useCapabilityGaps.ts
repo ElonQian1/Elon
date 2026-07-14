@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listCapabilityGaps } from './capabilityGapApi'
-import type { CapabilityGapDocument } from './types'
+import { getCapabilityReadiness, listCapabilityGaps } from './capabilityGapApi'
+import type { CapabilityGapDocument, CapabilityReadiness } from './types'
 
 const ACTIVE_STATUSES = new Set(['APPROVED', 'UPGRADING', 'PUBLISHED'])
 
 export function useCapabilityGaps(sessionId?: string) {
   const [gaps, setGaps] = useState<CapabilityGapDocument[]>([])
+  const [readiness, setReadiness] = useState<CapabilityReadiness | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const generationRef = useRef(0)
@@ -15,9 +16,13 @@ export function useCapabilityGaps(sessionId?: string) {
     const generation = generationRef.current
     setLoading(true)
     try {
-      const next = await listCapabilityGaps(sessionId)
+      const [next, nextReadiness] = await Promise.all([
+        listCapabilityGaps(sessionId),
+        getCapabilityReadiness(sessionId),
+      ])
       if (generation !== generationRef.current) return
       setGaps(next)
+      setReadiness(nextReadiness)
       setError('')
     } catch (refreshError) {
       if (generation !== generationRef.current) return
@@ -30,6 +35,7 @@ export function useCapabilityGaps(sessionId?: string) {
   useEffect(() => {
     generationRef.current += 1
     setGaps([])
+    setReadiness(null)
     setError('')
     if (!sessionId) return
     void refresh()
@@ -42,5 +48,5 @@ export function useCapabilityGaps(sessionId?: string) {
     return () => window.clearInterval(timer)
   }, [hasActiveGap, refresh, sessionId])
 
-  return { gaps, loading, error, refresh }
+  return { gaps, readiness, loading, error, refresh }
 }

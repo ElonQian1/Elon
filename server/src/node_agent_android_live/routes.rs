@@ -16,7 +16,7 @@ use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::build_verify::{
     build_and_verify, prepare_debug_runtime, BuildVerifyRequest, PrepareDebugRuntimeRequest,
 };
-use super::capability_gap::{control_gap, get_gap};
+use super::capability_gap::{check_capabilities, control_gap, get_gap};
 use super::design_diff_regions::{analyze_session_design_diff, DesignDiffRegionRequest};
 use super::frame::capture_frame;
 use super::mcp::{
@@ -114,10 +114,28 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             get(capability_gaps_handler),
         )
         .route(
+            "/api/android-live/sessions/:session_id/capabilities",
+            get(capabilities_handler),
+        )
+        .route(
             "/api/android-live/sessions/:session_id/capability-gaps/:gap_id",
             get(capability_gap_handler).post(capability_gap_command_handler),
         )
         .merge(super::fit_run::protected_routes())
+}
+
+async fn capabilities_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    let session = match runtime.live_ui.session(&session_id).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
+    };
+    match check_capabilities(&session, &json!({})).await {
+        Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
 }
 
 async fn capability_gaps_handler(

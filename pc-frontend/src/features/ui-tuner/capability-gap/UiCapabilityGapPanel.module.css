@@ -73,3 +73,28 @@
 .resume,
 .commit { display: block; overflow-wrap: anywhere; }
 .error { color: #fca5a5 !important; }
+
+.readinessReady,
+.readinessGap,
+.preparation {
+  display: grid;
+  gap: 5px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.readinessReady {
+  background: rgba(34, 197, 94, .14);
+  color: #a7f3d0;
+}
+
+.preparation {
+  background: rgba(245, 158, 11, .12);
+  color: #fde68a;
+}
+
+.readinessGap {
+  background: rgba(239, 68, 68, .14);
+  color: #fecaca;
+}

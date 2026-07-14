@@ -1,6 +1,19 @@
 import { nodeApi } from '../../node/localNodeApi'
 import { inspectorAdminUrl } from '../device/deviceInspectorApi'
-import type { CapabilityGapDocument } from './types'
+import type { CapabilityGapDocument, CapabilityReadiness } from './types'
+
+export async function getCapabilityReadiness(sessionId: string) {
+  const response = await nodeApi<{
+    ok: boolean
+    result: CapabilityReadiness
+  }>(
+    inspectorAdminUrl(),
+    `/api/android-live/sessions/${encodeURIComponent(sessionId)}/capabilities`,
+    {},
+    10_000,
+  )
+  return response.result
+}
 
 export async function listCapabilityGaps(sessionId: string) {
   const response = await nodeApi<{

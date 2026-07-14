@@ -6,7 +6,6 @@ import type {
   UIEventHandler,
 } from 'react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { UiCapabilityGapPanel } from '../capability-gap/UiCapabilityGapPanel'
 import type { UiTunerFilterResult } from '../filtering'
 import { AutoFitQueuePanel } from '../fit-run/AutoFitQueuePanel'
 import type { LivePreviewRequest, LiveUiFrame, LiveUiNode, LiveUiSession } from '../live/liveUiApi'
@@ -262,7 +261,6 @@ export function UiTunerComparisonWorkspace({
             </button>
             {designToolsOpen && (
               <div className={styles.designToolsContent}>
-                <UiCapabilityGapPanel sessionId={liveSession?.id} />
                 <DesignDiffRegionsPanel
                   sessionId={liveSession?.id}
                   targetReady

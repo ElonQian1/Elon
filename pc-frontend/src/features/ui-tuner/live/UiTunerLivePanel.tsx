@@ -17,6 +17,7 @@ import type { LiveMcpDescriptor } from './liveUiApi'
 import styles from './UiTunerLivePanel.module.css'
 import { UiTunerPreviewPanel } from './UiTunerPreviewPanel'
 import type { RuntimeDraftStatus } from './runtimeDraftModel'
+import { UiCapabilityGapPanel } from '../capability-gap/UiCapabilityGapPanel'
 
 interface UiTunerLivePanelProps {
   state: LiveUiConnectionState
@@ -124,6 +125,7 @@ export function UiTunerLivePanel({
       </div>
 
       {error && <p className={styles.hint}>{error}</p>}
+      {session?.id && <UiCapabilityGapPanel sessionId={session.id} />}
       {connected && (
         <div className={styles.connectedProjectField}>
           <label className={styles.projectField}>

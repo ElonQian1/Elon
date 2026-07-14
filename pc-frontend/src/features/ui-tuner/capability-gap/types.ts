@@ -40,3 +40,22 @@ export interface CapabilityGapDocument {
   updatedAt: string
   lastError?: string
 }
+
+export type CapabilityReadinessStatus = 'READY' | 'PREPARATION_REQUIRED' | 'PLATFORM_GAP'
+
+export interface CapabilityPreparationDetail {
+  capability: string
+  reason: string
+  next: string
+  requiredArgument?: string
+}
+
+export interface CapabilityReadiness {
+  status: CapabilityReadinessStatus
+  ready: string[]
+  preparationRequired: string[]
+  preparationDetails: CapabilityPreparationDetail[]
+  missing: string[]
+  missingDetails: Array<{ capability: string; reason: string }>
+  next: string
+}
