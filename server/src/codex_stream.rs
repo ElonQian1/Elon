@@ -39,6 +39,7 @@ pub(crate) fn stream_event_to_ws_messages(line: &str, model_used: Option<&str>) 
             let message = match value.get("status").and_then(Value::as_str) {
                 Some("AMBIGUOUS") => "当前表达可能涉及 UI，正在进行一次语义确认；确认后才会读取源码",
                 Some("LEARNED") => "已命中本项目的 UI 路由经验，跳过二次判断并进入实时调优",
+                Some("CLUSTER_LEARNED") => "已命中受控近义经验簇，零 Token 复用已验证的 UI 判断",
                 Some("LOCAL_CONFIRMED") => "本地规则已高置信度识别为 UI 任务，进入实时调优工具链",
                 Some("READY") => "已识别 UI 样式任务，正在使用实时调优工具链（先预览，后写回源码）",
                 _ => "已识别 UI 样式任务，但本地 UI 工件准备失败，正在安全降级诊断",

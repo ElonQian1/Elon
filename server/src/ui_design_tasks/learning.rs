@@ -21,7 +21,11 @@ pub(crate) fn finalize_ui_route_learning(
     };
     if !matches!(
         origin.as_str(),
-        "ambiguous_local" | "codex_rescue" | "local_confirmed" | "active_library"
+        "ambiguous_local"
+            | "codex_rescue"
+            | "local_confirmed"
+            | "active_library"
+            | "active_cluster"
     ) {
         return Ok(None);
     }

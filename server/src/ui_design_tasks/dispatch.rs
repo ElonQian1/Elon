@@ -28,22 +28,35 @@ pub(crate) fn resolve_ui_route_task(
         };
     }
     if let Ok(Some(entry)) = store.lookup_ui_route_learning(project_id, display_message) {
+        let clustered = entry.match_kind.as_deref() == Some("controlled_cluster");
         return match entry.learned_route {
             UiLearnedRoute::Ui => {
                 let mut task = force_ui_design_task(display_message, attachments);
                 task.route_learning_id = Some(entry.id);
-                task.route_learning_origin = Some("active_library".to_string());
+                task.route_learning_origin = Some(if clustered {
+                    "active_cluster".to_string()
+                } else {
+                    "active_library".to_string()
+                });
                 task.route_learning_phrase = Some(display_message.chars().take(2_000).collect());
                 ResolvedUiRouteTask {
                     task: Some(task),
                     suppress_inference: false,
-                    source: "active_library_ui",
+                    source: if clustered {
+                        "active_cluster_ui"
+                    } else {
+                        "active_library_ui"
+                    },
                 }
             }
             UiLearnedRoute::NonUi => ResolvedUiRouteTask {
                 task: None,
                 suppress_inference: true,
-                source: "active_library_non_ui",
+                source: if clustered {
+                    "active_cluster_non_ui"
+                } else {
+                    "active_library_non_ui"
+                },
             },
         };
     }
@@ -146,5 +159,32 @@ mod tests {
         assert!(promoted.contains("<elon-ui-design-task version=\"1\">"));
         assert!(promoted.contains("\"route_learning_origin\":\"codex_rescue\""));
         assert!(promoted.contains("ui_confirm_route"));
+    }
+
+    #[test]
+    fn controlled_synonym_reuses_verified_route_without_secondary_rescue() {
+        let store = store();
+        store
+            .confirm_ui_route_learning(
+                "project-1",
+                Some("user-1"),
+                "按钮太胖",
+                UiLearnedRoute::Ui,
+                UiRouteLearningSource::UserOverride,
+                "explicit correction",
+            )
+            .unwrap();
+        let resolved = resolve_ui_route_task(
+            &store,
+            "project-1",
+            "主操作太厚重",
+            None,
+            None,
+        );
+        assert_eq!(resolved.source, "active_cluster_ui");
+        assert_eq!(
+            resolved.task.unwrap().route_learning_origin.as_deref(),
+            Some("active_cluster")
+        );
     }
 }
