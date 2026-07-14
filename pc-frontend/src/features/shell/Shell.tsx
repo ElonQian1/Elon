@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert, WifiOff } from 'lucide-react'
 import ServerRail from './ServerRail'
+import DesktopTitleBar from './DesktopTitleBar'
+import { isDesktopShellFrameless } from './desktopShell'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
 import { useWorkbenchTabCoordinator } from './useWorkbenchTabCoordinator'
@@ -110,17 +112,20 @@ export default function Shell() {
   if (duplicateTab) return <DuplicateWorkbenchNotice />
 
   return (
-    <div className={styles.shell}>
-      <ServerRail />
-      <div className={styles.content}>
-        {!localMode && <AccountClaimBanner />}
-        <LocalModeBanner />
-        {!localMode && <NodeConnectBanner />}
-        <main className={styles.routeFrame}>
-          <Outlet />
-        </main>
+    <div className={styles.shellRoot}>
+      {isDesktopShellFrameless() && <DesktopTitleBar />}
+      <div className={styles.shell}>
+        <ServerRail />
+        <div className={styles.content}>
+          {!localMode && <AccountClaimBanner />}
+          <LocalModeBanner />
+          {!localMode && <NodeConnectBanner />}
+          <main className={styles.routeFrame}>
+            <Outlet />
+          </main>
+        </div>
+        {!localMode && <AppUpdateWatcher />}
       </div>
-      {!localMode && <AppUpdateWatcher />}
     </div>
   )
 }

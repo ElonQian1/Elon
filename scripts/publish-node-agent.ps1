@@ -244,7 +244,15 @@ curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-upda
 '@
     $raw = Invoke-RemoteBash -Script $script
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
-    return $raw | ConvertFrom-Json
+    try {
+        return $raw | ConvertFrom-Json
+    } catch {
+        # SSH 管道回传的大响应（含中文昵称等多字节字符）在 Windows PowerShell 5.1
+        # 偶发解析失败；广播本身已在服务器端成功执行，这里降级为“数量未知”，
+        # 不能让整个发布流程在收尾一步误报失败。
+        Write-Host "  广播响应 JSON 解析失败（不影响广播本身）：$($_.Exception.Message)" -ForegroundColor DarkYellow
+        return $null
+    }
 }
 
 function Invoke-RemoteNodePublicDevHandshakeStatus {
@@ -265,7 +273,12 @@ curl --noproxy '*' -fsS 'http://127.0.0.1:8080/api/admin/nodes/public-dev-handsh
 '@
     $raw = Invoke-RemoteBash -Script $script
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
-    return $raw | ConvertFrom-Json
+    try {
+        return $raw | ConvertFrom-Json
+    } catch {
+        Write-Host "  握手诊断响应 JSON 解析失败，跳过本轮：$($_.Exception.Message)" -ForegroundColor DarkYellow
+        return $null
+    }
 }
 
 function Invoke-NodePublicDevHandshakeStatus {

@@ -19,7 +19,10 @@
 //     避免加了个看不见效果的依赖）
 //   - 安装器/快捷方式接入（desktop-shell 作为新增 elon-desktop.exe）
 
-#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 mod autostart;
 
@@ -45,7 +48,8 @@ static NOTIFIED_BACKGROUND: AtomicBool = AtomicBool::new(false);
 /// （例如 `ELON_DESKTOP_URL=http://localhost:5173/pc`）或线上工作台联调；
 /// 默认打开线上工作台。
 fn target_url() -> String {
-    std::env::var("ELON_DESKTOP_URL").unwrap_or_else(|_| "http://43.139.149.158:8080/pc".to_string())
+    std::env::var("ELON_DESKTOP_URL")
+        .unwrap_or_else(|_| "http://43.139.149.158:8080/pc".to_string())
 }
 
 /// 呼出/隐藏窗口的全局快捷键。选 Ctrl+Alt+E：避开中文输入法常用的
@@ -119,8 +123,20 @@ const LOADING_OVERLAY_SCRIPT: &str = r#"
 })();
 "#;
 
+/// 无边框标记：告诉 pc-frontend “你跑在一龙桌面壳的无边框窗口里”，
+/// 页面据此渲染自己的 36px 标题栏（拖拽区 + 最小化/最大化/关闭按钮，
+/// 通过 window.__TAURI__.window 调用窗口控制）。浏览器里没有这个标记，
+/// 页面保持原样，两种宿主互不影响。
+const FRAMELESS_FLAG_SCRIPT: &str = "window.__ELON_DESKTOP_FRAMELESS__ = true;";
+
 fn main() {
     tauri::Builder::default()
+        // 单实例：用户重复双击客户端图标（或启动器再次 spawn elon-desktop）时，
+        // 不再开第二个窗口，而是把已有窗口唤出并聚焦。必须是第一个注册的插件，
+        // 这样重复启动的进程在做任何初始化之前就会退出。
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -143,6 +159,9 @@ fn main() {
                 .inner_size(1280.0, 800.0)
                 .min_inner_size(960.0, 600.0)
                 .center()
+                // 无边框：标题栏由 pc-frontend 根据 FRAMELESS_FLAG_SCRIPT 自己渲染，
+                // 视觉上与页面纯黑主题无缝，替代系统白色/浅色标题栏。
+                .decorations(false)
                 // 服务器 43.139.149.158 在本机网络环境下需要绕开系统代理才能直连
                 // （项目里 curl/SSH 访问该服务器都要求 --noproxy / ProxyCommand=none）。
                 // WebView2 默认走系统代理，这里强制直连，同时保留 wry 默认关闭的
@@ -151,6 +170,7 @@ fn main() {
                     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --no-proxy-server",
                 )
                 .initialization_script(LOADING_OVERLAY_SCRIPT)
+                .initialization_script(FRAMELESS_FLAG_SCRIPT)
                 .on_navigation(|url| {
                     println!("[elon-desktop] 导航 -> {url}");
                     true

@@ -1,8 +1,18 @@
+.shellRoot {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg-base);
+}
+
 .shell {
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  height: 100vh;
-  width: 100vw;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
   overflow: hidden;
   background: var(--bg-base);
 }

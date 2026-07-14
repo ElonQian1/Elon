@@ -1,0 +1,62 @@
+.titleBar {
+  height: 36px;
+  flex: 0 0 36px;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  background: var(--bg-base);
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dragArea {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.appTitle {
+  color: rgba(255, 255, 255, .78);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+}
+
+.controlButton {
+  width: 46px;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, .72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: background var(--transition), color var(--transition);
+}
+
+.controlButton:hover,
+.controlButton:focus-visible {
+  background: rgba(255, 255, 255, .10);
+  color: #ffffff;
+  outline: none;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  background: #e62129;
+  color: #ffffff;
+}
