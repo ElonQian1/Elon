@@ -233,10 +233,7 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
             compose = true;
             compose_source_count += 1;
         }
-        if !tooling_runtime
-            && content.contains("@Composable")
-            && looks_like_component_file(&name)
-        {
+        if !tooling_runtime && content.contains("@Composable") && looks_like_component_file(&name) {
             push_unique(&mut components, &relative_text);
         }
         if !tooling_runtime && (content.contains("@Preview") || name.contains("preview")) {
@@ -459,9 +456,8 @@ mod tests {
             "elon_ui_profile_runtime_{}",
             uuid::Uuid::new_v4().simple()
         ));
-        let runtime = root.join(
-            "android/ui-runtime-compose-debug/src/main/kotlin/com/elon/RuntimeGallery.kt",
-        );
+        let runtime = root
+            .join("android/ui-runtime-compose-debug/src/main/kotlin/com/elon/RuntimeGallery.kt");
         let layout = root.join("android/app/src/main/res/layout/activity_main.xml");
         fs::create_dir_all(runtime.parent().unwrap()).unwrap();
         fs::create_dir_all(layout.parent().unwrap()).unwrap();
@@ -480,10 +476,7 @@ mod tests {
             profile["capabilities"]["preferredAndroidUiToolkit"],
             "VIEWS"
         );
-        assert_eq!(
-            profile["capabilities"]["evidence"]["composeSourceFiles"],
-            0
-        );
+        assert_eq!(profile["capabilities"]["evidence"]["composeSourceFiles"], 0);
         fs::remove_dir_all(root).unwrap();
     }
 }
