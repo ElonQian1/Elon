@@ -51,12 +51,6 @@ export function useRuntimeDraftSession({
   const flushingRef = useRef(false)
   const resetKeyRef = useRef(resetKey)
   const epochRef = useRef(0)
-  const historyRef = useRef<{ past: RuntimeDraftState[]; future: RuntimeDraftState[] }>({
-    past: [],
-    future: [],
-  })
-  const gestureHistoryRef = useRef(new Set<string>())
-  const [, setHistoryRevision] = useState(0)
 
   const replaceState = useCallback((update: (current: RuntimeDraftState) => RuntimeDraftState) => {
     const next = update(stateRef.current)
@@ -68,11 +62,8 @@ export function useRuntimeDraftSession({
   const reset = useCallback(() => {
     epochRef.current += 1
     pendingRef.current.clear()
-    historyRef.current = { past: [], future: [] }
-    gestureHistoryRef.current.clear()
     stateRef.current = EMPTY_RUNTIME_DRAFT_STATE
     setState(EMPTY_RUNTIME_DRAFT_STATE)
-    setHistoryRevision((current) => current + 1)
   }, [])
 
   useEffect(() => {
@@ -144,18 +135,9 @@ export function useRuntimeDraftSession({
     void flush()
   }, [flush])
 
-  const rememberHistory = useCallback((gestureId?: string) => {
-    if (gestureId && gestureHistoryRef.current.has(gestureId)) return
-    if (gestureId) gestureHistoryRef.current.add(gestureId)
-    historyRef.current.past.push(stateRef.current)
-    historyRef.current.future = []
-    setHistoryRevision((current) => current + 1)
-  }, [])
-
   const apply = useCallback((operation: LivePatchOperation, scope: LiveUiScope) => {
     const target = selectedNode
     if (!target) return Promise.reject(new Error('当前选中元素尚未绑定 Live Node'))
-    rememberHistory()
     const local = preview([operation], scope)
     queue({
       epoch: epochRef.current,
@@ -165,12 +147,11 @@ export function useRuntimeDraftSession({
       send: () => applyRemote(operation, scope),
     })
     return Promise.resolve({ queued: true, revision: local.revision })
-  }, [applyRemote, preview, queue, rememberHistory, selectedNode])
+  }, [applyRemote, preview, queue, selectedNode])
 
   const applyGesture = useCallback((operations: LivePatchOperation[], gestureId: string) => {
     const target = selectedNode
     if (!target) return Promise.reject(new Error('当前选中元素尚未绑定 Live Node'))
-    rememberHistory(gestureId)
     const local = preview(operations, 'INSTANCE')
     queue({
       epoch: epochRef.current,
@@ -180,24 +161,7 @@ export function useRuntimeDraftSession({
       send: () => applyGestureRemote(operations, gestureId),
     })
     return Promise.resolve({ queued: true, revision: local.revision })
-  }, [applyGestureRemote, preview, queue, rememberHistory, selectedNode])
-
-  const restoreHistory = useCallback((direction: 'undo' | 'redo') => {
-    const source = direction === 'undo' ? historyRef.current.past : historyRef.current.future
-    const destination = direction === 'undo' ? historyRef.current.future : historyRef.current.past
-    const snapshot = source.pop()
-    if (!snapshot) return false
-    epochRef.current += 1
-    pendingRef.current.clear()
-    destination.push(stateRef.current)
-    stateRef.current = snapshot
-    setState(snapshot)
-    setHistoryRevision((current) => current + 1)
-    return true
-  }, [])
-
-  const undoLocal = useCallback(() => restoreHistory('undo'), [restoreHistory])
-  const redoLocal = useCallback(() => restoreHistory('redo'), [restoreHistory])
+  }, [applyGestureRemote, preview, queue, selectedNode])
 
   return useMemo(() => ({
     state,
@@ -206,9 +170,5 @@ export function useRuntimeDraftSession({
     apply,
     applyGesture,
     reset,
-    undoLocal,
-    redoLocal,
-    canUndo: historyRef.current.past.length > 0,
-    canRedo: historyRef.current.future.length > 0,
-  }), [apply, applyGesture, redoLocal, reset, state, undoLocal])
+  }), [apply, applyGesture, reset, state])
 }

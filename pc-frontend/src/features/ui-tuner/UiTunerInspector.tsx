@@ -43,8 +43,6 @@ interface UiTunerInspectorProps {
   onLiveUndo: () => Promise<void>
   onLiveRedo: () => Promise<void>
   liveUiDraftStatus: RuntimeDraftStatus
-  liveDraftCanUndo: boolean
-  liveDraftCanRedo: boolean
   livePrepareBusy: boolean
   livePrepareError: string
   livePrepareReady: boolean
@@ -78,8 +76,6 @@ export function UiTunerInspector({
   onLiveUndo,
   onLiveRedo,
   liveUiDraftStatus,
-  liveDraftCanUndo,
-  liveDraftCanRedo,
   livePrepareBusy,
   livePrepareError,
   livePrepareReady,
@@ -118,8 +114,6 @@ export function UiTunerInspector({
             uiIr={liveUi.uiIr}
             targetDesign={liveUi.targetDesign}
             draftStatus={liveUiDraftStatus}
-            localCanUndo={liveDraftCanUndo}
-            localCanRedo={liveDraftCanRedo}
             onApply={onLiveApply}
             onApplyGesture={onLiveApplyGesture}
             onGestureActive={liveUi.setGestureActive}
