@@ -42,6 +42,7 @@ internal class MainKeyboardInsetsAnimationActions(
     private var imeAnimationStartHeight = 0
     private var imeAnimationEndHeight = 0
     private val visibleFrame = Rect()
+    private val toolbarStatusBarInsets = MainToolbarStatusBarInsetController(binding)
 
     fun install() {
         baseChatListPaddingBottom = binding.chatList.paddingBottom
@@ -60,9 +61,10 @@ internal class MainKeyboardInsetsAnimationActions(
         installVisibleFrameFallback()
         installFocusFallback()
         installBottomBarLayoutSync()
+        toolbarStatusBarInsets.install()
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
-            applyMainToolbarStatusBarInset(binding, insets)
+            toolbarStatusBarInsets.update(insets)
             applyNavigationBarInset(insets)
             if (!runningImeAnimation) {
                 val keyboardHeight = keyboardHeightFromInsetsOrFrame(insets)

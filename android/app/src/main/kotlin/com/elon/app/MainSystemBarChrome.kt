@@ -3,12 +3,11 @@ package com.elon.app
 import android.graphics.Color
 import android.os.Build
 import android.view.View
-import android.view.ViewGroup
 import android.view.Window
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
 import com.elon.app.databinding.ActivityMainBinding
 
 internal fun shouldDrawChatBehindNavigationBar(binding: ActivityMainBinding): Boolean {
@@ -61,6 +60,7 @@ internal fun applyMainNavigationBarChrome(
     drawChatBehindNavigationBar: Boolean,
     opaqueColor: Int
 ) {
+    WindowCompat.setDecorFitsSystemWindows(window, true)
     window.navigationBarColor = if (drawChatBehindNavigationBar) Color.TRANSPARENT else opaqueColor
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         window.isNavigationBarContrastEnforced = false
@@ -101,32 +101,7 @@ internal fun ActivityMainBinding.restoreChatToolbar(backgroundColor: Int) {
     ViewCompat.requestApplyInsets(root)
 }
 
-internal fun applyMainToolbarStatusBarInset(
-    binding: ActivityMainBinding,
-    insets: WindowInsetsCompat
-) {
-    val params = binding.toolbar.layoutParams as? ViewGroup.MarginLayoutParams ?: return
-    val statusBarResourceId = binding.root.resources.getIdentifier(
-        "status_bar_height",
-        "dimen",
-        "android"
-    )
-    val statusBarResourceHeight = if (statusBarResourceId != 0) {
-        binding.root.resources.getDimensionPixelSize(statusBarResourceId)
-    } else {
-        0
-    }
-    val statusBarTop = maxOf(
-        insets.getInsets(WindowInsetsCompat.Type.statusBars()).top,
-        statusBarResourceHeight
-    )
-    val location = IntArray(2)
-    binding.toolbar.getLocationInWindow(location)
-    val toolbarTopWithoutAppliedMargin = location[1] - params.topMargin
-    val targetTopMargin = (statusBarTop - toolbarTopWithoutAppliedMargin).coerceAtLeast(0)
-    if (params.topMargin == targetTopMargin) return
-
-    params.topMargin = targetTopMargin
-    binding.toolbar.layoutParams = params
-    binding.toolbar.post { ViewCompat.requestApplyInsets(binding.root) }
-}
+internal fun resolveMainToolbarTopMargin(
+    statusBarInsetTop: Int,
+    rootTopInWindow: Int
+): Int = (statusBarInsetTop - rootTopInWindow).coerceAtLeast(0)
