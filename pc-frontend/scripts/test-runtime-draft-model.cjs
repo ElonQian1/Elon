@@ -2,11 +2,18 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { Module } = require('node:module')
+const React = require('react')
+const { renderToStaticMarkup } = require('react-dom/server')
 const ts = require('typescript')
 
 const projectRoot = path.resolve(__dirname, '..')
 const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'elon-runtime-draft-'))
-const outputFile = path.join(temporaryDirectory, 'runtimeDraftModel.cjs')
+const outputFile = path.join(temporaryDirectory, 'runtimeDraftModel.js')
+process.env.NODE_PATH = [path.join(projectRoot, 'node_modules'), process.env.NODE_PATH]
+  .filter(Boolean)
+  .join(path.delimiter)
+Module._initPaths()
 
 try {
   const sourceFile = path.join(projectRoot, 'src/features/ui-tuner/live/runtimeDraftModel.ts')
@@ -98,6 +105,55 @@ try {
   })
   assert.equal(runtimeDraftStatus(rejected), 'rejected')
   assert.ok(rejected.nodes[node.runtimeNodeId], 'Android 拒绝时 PC 草稿必须保留供用户修正')
+
+  const layerFile = path.join(projectRoot, 'src/features/ui-tuner/live/RuntimeDraftLayer.tsx')
+  const layerOutput = path.join(temporaryDirectory, 'RuntimeDraftLayer.js')
+  const layerCompiled = ts.transpileModule(fs.readFileSync(layerFile, 'utf8'), {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      jsx: ts.JsxEmit.ReactJSX,
+      esModuleInterop: true,
+    },
+    fileName: layerFile,
+  })
+  fs.writeFileSync(layerOutput, layerCompiled.outputText)
+  fs.writeFileSync(path.join(temporaryDirectory, 'RuntimeDraftLayer.module.css'), '')
+  const previousCssLoader = require.extensions['.css']
+  require.extensions['.css'] = (module) => {
+    module.exports = {
+      __esModule: true,
+      default: new Proxy({}, { get: (_target, property) => String(property) }),
+    }
+  }
+  try {
+    const { RuntimeDraftLayer } = require(layerOutput)
+    const styledDraft = applyRuntimeDraftOperations(
+      EMPTY_RUNTIME_DRAFT_STATE,
+      node,
+      [
+        { property: 'height', value: { type: 'dp', value: 48 } },
+        { property: 'textSize', value: { type: 'sp', value: 16 } },
+        { property: 'backgroundColor', value: { type: 'argb', value: '#CC112233' } },
+      ],
+      baseFrame,
+    )
+    const markup = renderToStaticMarkup(React.createElement(RuntimeDraftLayer, {
+      canvasBackground: '#000000',
+      frame: baseFrame,
+      nodes: [node],
+      state: styledDraft,
+    }))
+    assert.match(markup, /aria-label="PC 本地即时预览层"/)
+    assert.match(markup, /data-runtime-draft-node="rn_button"/)
+    assert.match(markup, /height:126px/)
+    assert.match(markup, /font-size:52\.5px/)
+    assert.match(markup, /background:#112233CC/i)
+    assert.match(markup, />立即支付<\/span>/)
+  } finally {
+    if (previousCssLoader) require.extensions['.css'] = previousCssLoader
+    else delete require.extensions['.css']
+  }
 
   console.log('runtime draft model: all assertions passed')
 } finally {
