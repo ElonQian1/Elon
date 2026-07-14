@@ -198,6 +198,16 @@ try {
   )
   assert.match(pageCss, /--layers-panel-width/)
   assert.match(pageCss, /\.focusCanvas/)
+  assert.match(
+    pageCss,
+    /\.toolbarActions button\s*\{[^}]*flex:\s*0 0 auto\s*;[^}]*white-space:\s*nowrap\s*;/s,
+    '顶部工具按钮不得因可用宽度变小而逐字竖排',
+  )
+  assert.match(
+    pageCss,
+    /\.viewControls\s*\{[^}]*flex:\s*0 0 auto\s*;/s,
+    '缩放控件组必须保持完整宽度并由工具栏统一横向滚动',
+  )
 
   console.log('ui tuner workspace: all assertions passed')
 } finally {

@@ -218,10 +218,13 @@
 }
 
 .toolbarActions button {
+  flex: 0 0 auto;
   padding: 0 10px;
+  white-space: nowrap;
 }
 
 .deviceSelect {
+  flex: 0 0 auto;
   width: 150px;
   min-width: 110px;
   height: 30px;
@@ -253,6 +256,7 @@
 }
 
 .viewControls {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -285,6 +289,7 @@
 }
 
 .historyControls {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -294,6 +299,7 @@
 }
 
 .workspaceControls {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 4px;
