@@ -9,13 +9,14 @@ import {
   type AndroidDeviceLease,
   type AndroidDeviceLeaseProof,
 } from './deviceLeaseApi'
+import { createDeviceLeaseClientId } from './deviceLeaseClientId'
 
 const CLIENT_ID_KEY = 'elon.pc.uiTuner.deviceLeaseClient.v1'
 
 function clientId() {
   const current = window.sessionStorage.getItem(CLIENT_ID_KEY)
   if (current) return current
-  const created = `uit_${crypto.randomUUID().replace(/-/g, '')}`
+  const created = createDeviceLeaseClientId()
   window.sessionStorage.setItem(CLIENT_ID_KEY, created)
   return created
 }

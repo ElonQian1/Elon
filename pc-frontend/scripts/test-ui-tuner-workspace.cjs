@@ -38,6 +38,21 @@ function compile(relativeSource, relativeOutput, jsx = false) {
 }
 
 try {
+  const clientIdOutput = compile(
+    'src/features/ui-tuner/device/deviceLeaseClientId.ts',
+    'device/deviceLeaseClientId.js',
+  )
+  const { createDeviceLeaseClientId } = require(clientIdOutput)
+  assert.equal(
+    createDeviceLeaseClientId({ randomUUID: () => '11111111-2222-3333-4444-555555555555' }),
+    'uit_11111111222233334444555555555555',
+  )
+  assert.match(
+    createDeviceLeaseClientId({}, () => 1_700_000_000_000, () => 0.123456),
+    /^uit_[a-z0-9]+_[a-z0-9]+$/,
+    '公网 HTTP 不提供 crypto.randomUUID 时仍须生成稳定格式的租约客户端 ID',
+  )
+
   const scaleOutput = compile(
     'src/features/ui-tuner/comparison/canvasViewportScale.ts',
     'comparison/canvasViewportScale.js',
