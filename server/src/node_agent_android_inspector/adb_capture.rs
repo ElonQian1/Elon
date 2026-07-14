@@ -63,7 +63,7 @@ pub(crate) async fn launch_app(device_id: &str, package_name: &str) -> Result<St
 }
 
 async fn launch_app_exact(device_id: &str, package_name: &str) -> Result<String> {
-    wake_device(device_id).await;
+    wake_device_for_user_interaction(device_id).await;
     let args = vec![
         "-s".to_string(),
         device_id.trim().to_string(),
@@ -78,7 +78,7 @@ async fn launch_app_exact(device_id: &str, package_name: &str) -> Result<String>
     run_adb_text(&args, Duration::from_secs(8), 128 * 1024).await
 }
 
-async fn wake_device(device_id: &str) {
+pub(crate) async fn wake_device_for_user_interaction(device_id: &str) {
     // A public test phone is often dozing between sessions. Launching an app
     // while the display is off succeeds at the Android process level but only
     // produces a black inspector frame. Wake and dismiss an unsecured

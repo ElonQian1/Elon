@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Error, Result};
 
+use crate::node_agent_android_inspector::adb_capture::wake_device_for_user_interaction;
 use crate::node_agent_android_inspector::adb_command::run_adb_text;
 
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(180);
@@ -16,6 +17,12 @@ pub(super) async fn install_debug_apk(
     apk: &Path,
     allow_debug_package_reset: bool,
 ) -> Result<String> {
+    // Vendor Android builds can require a visible, on-device confirmation for
+    // ADB installs. Public test phones often sleep between users, which leaves
+    // that prompt hidden behind a black screen and looks like a PC-side hang.
+    // Wake the display and dismiss only an unsecured keyguard immediately
+    // before installation. A PIN/fingerprint lock remains protected.
+    wake_device_for_user_interaction(device_id).await;
     match run_install(device_id, apk, true).await {
         Ok(output) => require_success(output),
         Err(error)
@@ -57,7 +64,7 @@ fn actionable_install_error(error: Error) -> Error {
     let detail = error.to_string();
     if detail.contains("INSTALL_FAILED_USER_RESTRICTED") {
         return anyhow!(
-            "手机系统拒绝安装调试 APK。请解锁手机，并在开发者选项中开启“通过 USB 安装”；若手机弹出安装确认，请点允许。原始错误：{detail}"
+            "手机系统拒绝安装调试 APK。已尝试自动点亮手机，请解锁后在开发者选项中开启“通过 USB 安装”；若手机弹出安装确认，请点允许，然后在 PC 网页点击重试。原始错误：{detail}"
         );
     }
     error
@@ -85,11 +92,21 @@ fn require_success(output: String) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::require_success;
+    use super::{actionable_install_error, require_success};
 
     #[test]
     fn install_output_requires_success_marker() {
         assert!(require_success("Success\n".to_string()).is_ok());
         assert!(require_success("Failure [INSTALL_FAILED]\n".to_string()).is_err());
+    }
+
+    #[test]
+    fn user_restricted_install_explains_visible_phone_action_and_retry() {
+        let error = actionable_install_error(anyhow::anyhow!(
+            "Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]"
+        ));
+        let message = error.to_string();
+        assert!(message.contains("已尝试自动点亮手机"));
+        assert!(message.contains("在 PC 网页点击重试"));
     }
 }
