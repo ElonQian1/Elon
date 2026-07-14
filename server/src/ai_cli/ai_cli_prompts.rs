@@ -1,4 +1,4 @@
-﻿use std::path::Path;
+use std::path::Path;
 
 use crate::{
     ai_cli::{codex_thread_uri, truncate_chars, AiCliRequestMode},
