@@ -406,12 +406,10 @@
 
 .runtimeSurfaceLive,
 .runtimeSurfaceFrozen {
-  position: sticky;
-  top: 12px;
-  left: 12px;
-  z-index: 20;
+  position: static;
   width: max-content;
-  margin: 12px 0 -42px 12px;
+  max-width: 100%;
+  margin: 0 0 12px;
   padding: 7px 10px;
   border: 1px solid rgba(255, 255, 255, .14);
   border-radius: 999px;
