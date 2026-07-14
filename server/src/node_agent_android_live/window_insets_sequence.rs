@@ -18,6 +18,8 @@ const MAX_ADB_TEXT: usize = 2 * 1024 * 1024;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TraceRequest {
+    device_id: Option<String>,
+    package_name: Option<String>,
     steps: Vec<TraceStep>,
     selectors: Vec<NodeSelector>,
     #[serde(default = "default_settle_ms")]
@@ -123,26 +125,29 @@ struct TraceState {
 pub(crate) async fn run(session: &LiveUiSession, arguments: Value) -> Result<Value> {
     let request: TraceRequest = serde_json::from_value(arguments).context("页面序列参数无效")?;
     validate_request(&request)?;
-    let view = session.view().await;
-    if !view.connected {
-        bail!("WINDOW_INSETS_SEQUENCE_TRACE 需要已连接的真实 Android Renderer")
-    }
-    let device_id = resolve_online_device_id(&session.device_id).await?;
+    let requested_device_id = request
+        .device_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(&session.device_id);
+    let package_name = request
+        .package_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(&session.package_name);
+    let device_id = resolve_online_device_id(requested_device_id).await?;
     let mut previous_nodes = Vec::new();
     let mut states = Vec::with_capacity(request.steps.len());
     for step in &request.steps {
-        perform_action(
-            &device_id,
-            &session.package_name,
-            &step.action,
-            &previous_nodes,
-        )
-        .await
-        .with_context(|| format!("执行页面序列步骤 {} 失败", step.name))?;
+        perform_action(&device_id, package_name, &step.action, &previous_nodes)
+            .await
+            .with_context(|| format!("执行页面序列步骤 {} 失败", step.name))?;
         tokio::time::sleep(Duration::from_millis(request.settle_ms)).await;
         let snapshot = capture_snapshot(CaptureRequest {
             device_id: device_id.clone(),
-            package_name: Some(session.package_name.clone()),
+            package_name: Some(package_name.to_string()),
             include_raw_xml: Some(false),
             include_screenshot_data_url: Some(false),
             launch_app: Some(false),
@@ -179,7 +184,7 @@ pub(crate) async fn run(session: &LiveUiSession, arguments: Value) -> Result<Val
     Ok(json!({
         "capability": "WINDOW_INSETS_SEQUENCE_TRACE",
         "deviceId": device_id,
-        "packageName": session.package_name,
+        "packageName": package_name,
         "states": states,
         "comparisons": compact_comparisons(&states),
     }))

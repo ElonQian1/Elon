@@ -151,7 +151,6 @@ fn runtime_required(capability: &str) -> bool {
             | "LOCAL_VISUAL_SOLVER"
             | "PERSISTENT_FIT_RUN"
             | "PATCH_FREE_BUILD_VERIFY"
-            | "WINDOW_INSETS_SEQUENCE_TRACE"
     )
 }
 

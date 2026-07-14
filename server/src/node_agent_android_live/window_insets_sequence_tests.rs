@@ -71,6 +71,8 @@ fn matches_resource_id_suffix_without_debug_package_coupling() {
 #[test]
 fn accepts_compact_launch_tap_node_back_sequence() {
     let request: TraceRequest = serde_json::from_value(json!({
+        "deviceId": "192.168.1.2:5555",
+        "packageName": "com.elon.app",
         "settleMs": 500,
         "steps": [
             {"name":"home", "action":{"type":"LAUNCH"}},

@@ -133,6 +133,8 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 "type":"object",
                 "required":["steps","selectors"],
                 "properties":{
+                    "deviceId":{"type":"string","description":"BOOTSTRAP 阶段必填；LIVE 阶段默认使用当前 Renderer 设备"},
+                    "packageName":{"type":"string","description":"BOOTSTRAP 阶段必填；必须是设备上已安装的应用包名"},
                     "settleMs":{"type":"integer","minimum":100,"maximum":5000,"default":700},
                     "steps":{
                         "type":"array","minItems":1,"maxItems":16,
