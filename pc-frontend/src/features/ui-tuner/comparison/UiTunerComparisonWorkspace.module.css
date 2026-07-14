@@ -347,6 +347,10 @@
   overflow: hidden;
 }
 
+.singlePane {
+  flex: 1;
+}
+
 .paneHeader {
   min-height: 34px;
   flex: 0 0 auto;
