@@ -41,6 +41,9 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_create_android_screen_scaffold"));
+    assert!(tools
+        .iter()
+        .any(|tool| tool["name"] == "ui_trace_window_insets_sequence"));
 }
 
 #[tokio::test]

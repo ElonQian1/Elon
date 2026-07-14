@@ -31,6 +31,7 @@ mod visual_diff;
 mod visual_solver;
 mod visual_solver_style_hints;
 mod visual_solver_values;
+mod window_insets_sequence;
 
 #[cfg(test)]
 mod design_diff_regions_tests;

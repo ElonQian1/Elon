@@ -240,7 +240,7 @@ pub(crate) async fn capture_screen_png(device_id: &str) -> Result<Vec<u8>> {
     Ok(capture_screenshot(&resolved_device_id, false).await?.bytes)
 }
 
-async fn resolve_online_device_id(requested_device_id: &str) -> Result<String> {
+pub(crate) async fn resolve_online_device_id(requested_device_id: &str) -> Result<String> {
     validate_device_id(requested_device_id)?;
     if adb_device_ready(requested_device_id).await {
         return Ok(requested_device_id.to_string());

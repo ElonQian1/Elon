@@ -127,6 +127,51 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             json!({"type":"object","properties":{}}),
         ),
         tool(
+            "ui_trace_window_insets_sequence",
+            "在真实 Android Renderer 上重放受限页面序列，并在每个状态采集 Window Insets 与指定 UiAutomator 节点坐标；返回紧凑状态和相对首状态的差值。",
+            json!({
+                "type":"object",
+                "required":["steps","selectors"],
+                "properties":{
+                    "settleMs":{"type":"integer","minimum":100,"maximum":5000,"default":700},
+                    "steps":{
+                        "type":"array","minItems":1,"maxItems":16,
+                        "items":{
+                            "type":"object","required":["name","action"],
+                            "properties":{
+                                "name":{"type":"string","minLength":1,"maxLength":80},
+                                "action":{
+                                    "type":"object","required":["type"],
+                                    "properties":{
+                                        "type":{"enum":["LAUNCH","TAP","TAP_NODE","BACK","WAIT"]},
+                                        "x":{"type":"integer","minimum":0},
+                                        "y":{"type":"integer","minimum":0},
+                                        "resourceIdSuffix":{"type":"string","maxLength":200},
+                                        "text":{"type":"string","maxLength":500},
+                                        "contentDescription":{"type":"string","maxLength":500},
+                                        "occurrence":{"type":"integer","minimum":0,"maximum":50}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "selectors":{
+                        "type":"array","minItems":1,"maxItems":16,
+                        "items":{
+                            "type":"object","required":["label"],
+                            "properties":{
+                                "label":{"type":"string","minLength":1,"maxLength":80},
+                                "resourceIdSuffix":{"type":"string","maxLength":200},
+                                "text":{"type":"string","maxLength":500},
+                                "contentDescription":{"type":"string","maxLength":500},
+                                "occurrence":{"type":"integer","minimum":0,"maximum":50}
+                            }
+                        }
+                    }
+                }
+            }),
+        ),
+        tool(
             "ui_get_node",
             "按 runtimeNodeId 或 definitionId 读取一个节点。",
             node_selector_schema(),

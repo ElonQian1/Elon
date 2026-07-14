@@ -25,6 +25,7 @@ const SUPPORTED_CAPABILITIES: &[&str] = &[
     "DETERMINISTIC_SOURCE_COMMIT",
     "CODEX_SOURCE_HANDOFF",
     "PATCH_FREE_BUILD_VERIFY",
+    "WINDOW_INSETS_SEQUENCE_TRACE",
 ];
 
 const KNOWN_PLATFORM_GAPS: &[&str] = &[
@@ -150,6 +151,7 @@ fn runtime_required(capability: &str) -> bool {
             | "LOCAL_VISUAL_SOLVER"
             | "PERSISTENT_FIT_RUN"
             | "PATCH_FREE_BUILD_VERIFY"
+            | "WINDOW_INSETS_SEQUENCE_TRACE"
     )
 }
 
@@ -585,6 +587,7 @@ mod tests {
             vec!["LIVE_STYLE_PATCH"]
         );
         assert!(SUPPORTED_CAPABILITIES.contains(&"PERSISTENT_FIT_RUN"));
+        assert!(SUPPORTED_CAPABILITIES.contains(&"WINDOW_INSETS_SEQUENCE_TRACE"));
     }
 
     #[test]

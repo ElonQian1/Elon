@@ -314,6 +314,10 @@ async fn call_tool(
                 "selectedRuntimeNodeId": ir.selected_runtime_node_id,
             })
         }
+        "ui_trace_window_insets_sequence" => {
+            let session = broker.session(&session_id).await?;
+            super::window_insets_sequence::run(&session, arguments).await?
+        }
         "ui_get_node" => {
             let ir = load_or_build_ui_ir(broker, &session_id).await?;
             let node = find_node(&ir, &arguments)?;
