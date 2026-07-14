@@ -1,0 +1,11 @@
+interface:
+  display_name: "一龙 Android UI 自动拟合"
+  short_description: "草图驱动真实 Android 拟合、写回与平台缺口恢复"
+  default_prompt: "Use $yilong-ui-design to import my UI sketch, fit the real Android screen, and verify the source result."
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "yilong_ui_live"
+      description: "一龙 PC 节点提供的真实 Android Renderer、FitRun 与源码写回工具"

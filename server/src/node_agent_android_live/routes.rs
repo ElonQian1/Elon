@@ -7,6 +7,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::NodeRuntime;
@@ -18,8 +19,8 @@ use super::build_verify::{
 use super::design_diff_regions::{analyze_session_design_diff, DesignDiffRegionRequest};
 use super::frame::capture_frame;
 use super::mcp::{
-    cleanup_descriptor, descriptor as mcp_descriptor, handle_request as handle_mcp_request,
-    McpQuery, McpRequest,
+    cleanup_descriptor, descriptor as mcp_descriptor, descriptor_for_project,
+    handle_request as handle_mcp_request, McpQuery, McpRequest,
 };
 use super::preview::{open_preview, PreviewOpenRequest};
 use super::protocol::{
@@ -139,7 +140,50 @@ async fn prepare_debug_runtime_handler(
 pub(crate) fn runtime_routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
         .route("/api/android-live/runtime", get(runtime_socket_handler))
+        .route(
+            "/api/android-live/project-mcp/bootstrap",
+            post(project_mcp_bootstrap_handler),
+        )
         .route("/api/android-live/mcp/:session_id", post(mcp_handler))
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProjectMcpBootstrapRequest {
+    project_root: String,
+}
+
+/// Codex 桌面端的仓库级 STDIO bridge 只通过 loopback 调用此入口。
+///
+/// 浏览器仍受本机 CORS 限制；这里不返回本机管理员令牌，只签发一个短生命周期
+/// Android Live MCP 会话令牌。调用方还必须证明目标是现存 Git 工作区，避免把
+/// 本机节点变成任意目录浏览器。
+async fn project_mcp_bootstrap_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(request): Json<ProjectMcpBootstrapRequest>,
+) -> Response {
+    let project_root = match std::path::PathBuf::from(request.project_root.trim()).canonicalize() {
+        Ok(root) if root.join(".git").exists() => root,
+        Ok(_) => return json_error(StatusCode::BAD_REQUEST, "projectRoot 不是 Git 工作区"),
+        Err(error) => {
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                format!("projectRoot 不存在或不可访问: {error}"),
+            )
+        }
+    };
+    let project_root = project_root.to_string_lossy().to_string();
+    let host_port = crate::node_agent_admin_open::admin_port_from_env();
+    match descriptor_for_project(&runtime.live_ui, &project_root, host_port).await {
+        Ok(Some(mcp)) => Json(json!({
+            "ok": true,
+            "projectRoot": project_root,
+            "mcp": mcp,
+        }))
+        .into_response(),
+        Ok(None) => json_error(StatusCode::SERVICE_UNAVAILABLE, "无法创建项目 UI MCP 会话"),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
 }
 
 async fn create_session_handler(
