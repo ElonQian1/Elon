@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Cursor;
 
 use super::*;
 use crate::node_agent_android_live::protocol::{LiveGeometry, LiveRect, LiveUiNode};
+use image::{DynamicImage, ImageFormat};
 
 #[test]
 fn accepts_safe_debug_application_id_suffix() {
@@ -85,6 +87,36 @@ fn verification_target_respects_instance_key() {
         .unwrap()
         .unwrap();
     assert_eq!(bounds.left, 100);
+}
+
+#[test]
+fn exact_process_frames_override_stale_node_geometry() {
+    let mut encoded = Cursor::new(Vec::new());
+    DynamicImage::new_rgba8(8, 8)
+        .write_to(&mut encoded, ImageFormat::WebP)
+        .expect("encode frame");
+    let frame = encoded.into_inner();
+    let (diff, scope) = compare_source_parity(
+        &frame,
+        &frame,
+        Some(PixelRect {
+            left: 0,
+            top: 0,
+            right: 4,
+            bottom: 4,
+        }),
+        Some(PixelRect {
+            left: 4,
+            top: 4,
+            right: 8,
+            bottom: 8,
+        }),
+    )
+    .expect("source parity");
+
+    assert_eq!(scope, "PROCESS_FRAME_EXACT");
+    assert_eq!(diff.visual_loss, 0.0);
+    assert!(diff.score_report.target_gate.passed);
 }
 
 fn test_node(runtime_id: &str, instance_key: Option<&str>, left: i32) -> LiveUiNode {

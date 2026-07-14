@@ -71,6 +71,7 @@ pub(crate) struct BuildVerifyResult {
     pub(crate) screenshot_height: u32,
     pub(crate) visual_diff: Option<VisualDiffResult>,
     pub(crate) source_parity_diff: VisualDiffResult,
+    pub(crate) source_parity_scope: &'static str,
     pub(crate) source_parity_verified: bool,
     pub(crate) verification_gate: VerificationGateResult,
     pub(crate) message: String,
@@ -327,14 +328,17 @@ async fn build_and_verify_with_mode(
     // A first-time Runtime preparation has no meaningful Live preview yet.
     // Treat the freshly installed renderer as its own baseline and reserve the
     // strict before/after parity gate for a real committed Live design session.
-    let source_parity_diff = match live_preview {
-        Some((live_preview_png, live_preview_rect)) => compare_pngs(
+    let (source_parity_diff, source_parity_scope) = match live_preview {
+        Some((live_preview_png, live_preview_rect)) => compare_source_parity(
             &live_preview_png,
             &screenshot,
             live_preview_rect,
             source_rect,
         )?,
-        None => compare_pngs(&screenshot, &screenshot, source_rect, source_rect)?,
+        None => (
+            compare_pngs(&screenshot, &screenshot, None, None)?,
+            "PROCESS_FRAME_BASELINE",
+        ),
     };
     let verification_gate = evaluate_verification_gates(VerificationGateInput::new(
         Some(&source_parity_diff),
@@ -371,10 +375,37 @@ async fn build_and_verify_with_mode(
         screenshot_height,
         visual_diff,
         source_parity_diff,
+        source_parity_scope,
         source_parity_verified,
         verification_gate,
         message,
     })
+}
+
+/// Prefer an exact whole-process-frame match before consulting node geometry.
+///
+/// Runtime geometry and the PixelCopy frame travel over separate messages. A
+/// recomposition can therefore leave a short-lived, stale node rectangle even
+/// though the before/after Android renderer output is byte-for-byte identical.
+/// Exact encoded-frame equality is stronger evidence than any crop comparison.
+/// When even one frame byte differs we retain the strict target-node crop gate,
+/// so unrelated dynamic pixels cannot hide a real component mismatch.
+fn compare_source_parity(
+    live_frame: &[u8],
+    source_frame: &[u8],
+    live_rect: Option<PixelRect>,
+    source_rect: Option<PixelRect>,
+) -> Result<(VisualDiffResult, &'static str)> {
+    if live_frame == source_frame {
+        return Ok((
+            compare_pngs(live_frame, source_frame, None, None)?,
+            "PROCESS_FRAME_EXACT",
+        ));
+    }
+    Ok((
+        compare_pngs(live_frame, source_frame, live_rect, source_rect)?,
+        "TARGET_NODE_CROP",
+    ))
 }
 
 fn target_comparison_current_rect(
