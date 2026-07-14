@@ -7,6 +7,7 @@ mod model;
 mod prompt;
 mod dispatch;
 mod learning;
+mod semantic_cluster;
 
 pub(crate) use intent::force_ui_design_task;
 pub(crate) use dispatch::{promote_codex_ui_route, resolve_ui_route_task};
