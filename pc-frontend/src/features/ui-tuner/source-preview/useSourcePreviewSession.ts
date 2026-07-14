@@ -95,10 +95,11 @@ export function useSourcePreviewSession(initialProjectRoot: string) {
       }
       const reloaded = await loadSourcePreview(document.projectRoot, document.selectedLayout)
       dispatch({ type: 'load', document: reloaded }); setSaveState('saved')
+      await renderer.rerender(document.projectRoot)
     } catch (reason) {
       setSaveState('error'); setError(reason instanceof Error ? reason.message : String(reason))
     }
-  }, [editor])
+  }, [editor, renderer.rerender])
 
   const selected = useMemo(() => findSourceNode(editor.document?.root ?? null, selectedKey), [editor.document, selectedKey])
   return { projectRoot, setProjectRoot, document: editor.document, selected, selectedKey, setSelectedKey, pending: editor.pending, history: editor.history, loading, error, saveState, load, apply, undo, redo, commit, renderer }
