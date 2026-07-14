@@ -2,8 +2,8 @@ use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 
 use super::{
-    load_entry, map_entry, normalize_ui_route_phrase, record_event, UiLearnedRoute,
-    UiRouteLearningEntry, UiRouteLearningSource, GLOBAL_SCOPE_ID, MAX_SAMPLE_CHARS,
+    load_entry, map_entry, normalize_ui_route_phrase, record_event, UiRouteLearningEntry,
+    UiRouteLearningSource, GLOBAL_SCOPE_ID, MAX_SAMPLE_CHARS,
 };
 use crate::store::{common::new_id, common::now, Store};
 
@@ -140,12 +140,13 @@ fn query_cluster(
                 OR (scope_type = 'global' AND scope_id = ?4))
          ORDER BY CASE scope_type WHEN 'project' THEN 0 ELSE 1 END, updated_at DESC",
     )?;
-    Ok(statement
+    let entries = statement
         .query_map(
             params![concept_key, concept_version, project_id, GLOBAL_SCOPE_ID],
             map_entry,
         )?
-        .collect::<rusqlite::Result<Vec<_>>>()?)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(entries)
 }
 
 fn record_cluster_conflict(
