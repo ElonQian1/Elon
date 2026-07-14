@@ -120,7 +120,7 @@ pub(crate) async fn handle_request(
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
-            "instructions": "模糊路由任务必须先调用 ui_confirm_route。确认 UI 后强制 Tool-first：任何源码编辑前先调用 ui_get_design_task、ui_get_project_profile、ui_get_runtime_status。已有 Runtime 再读 ui_get_screen_summary，并只读取目标节点/子树。样式请求必须优先 ui_propose_live_patch/ui_apply_live_patch；只有结构变化、未绑定属性或 Runtime 不可用时才读取 ui_get_source_bundle 并做最小源码修改，同时说明降级原因。全新页面使用档案默认值创建骨架、首次构建，再回到真实 Renderer。"
+            "instructions": "模糊路由任务必须先调用 ui_confirm_route。Codex 桌面端含草图的 UI 请求先调用 ui_import_desktop_task，再读取任务、项目档案和 Runtime 状态，并调用 ui_check_capabilities。已有 Runtime 再读屏幕摘要和目标子树。样式请求优先 Live Patch/FitRun；结构变化使用最小 CODEX_SOURCE_HANDOFF。若 ui_check_capabilities 证明是平台工具缺口，当前可信本地 Git 工作区已授权有熔断的自动升级与发布：创建 capability gap、升级、报告 commit/version、复检并恢复原 UI 任务。全新页面先创建骨架、首次构建，再回到真实 Android Renderer。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
@@ -438,6 +438,22 @@ async fn call_tool(
             let command = fit_command(action, &arguments)?;
             let context = fit_session_context(broker, &session_id).await?;
             json!({ "result": fit_runs.command(context, run_id, command).await? })
+        }
+        "ui_check_capabilities" => {
+            let session = broker.session(&session_id).await?;
+            super::capability_gap::check_capabilities(&session, &arguments).await?
+        }
+        "ui_report_capability_gap" => {
+            let session = broker.session(&session_id).await?;
+            super::capability_gap::report_gap(&session, &arguments)?
+        }
+        "ui_get_capability_gap" => {
+            let session = broker.session(&session_id).await?;
+            super::capability_gap::get_gap(&session, &arguments)?
+        }
+        "ui_control_capability_gap" => {
+            let session = broker.session(&session_id).await?;
+            super::capability_gap::control_gap(&session, &arguments)?
         }
         "ui_get_commit_plan" => {
             let session = broker.session(&session_id).await?;

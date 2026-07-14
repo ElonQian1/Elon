@@ -10,8 +10,14 @@ Required evidence:
 - The smallest proposed platform change.
 - A resume target describing the original UI step.
 
+Trusted boundary:
+
+- The skill and project MCP configuration are distributed with this repository.
+- Automatic source upgrade and publish apply only to the current canonical local Git workspace.
+- A different repository has neither this skill nor a project-scoped MCP session and cannot mutate Yilong source.
+
 Lifecycle:
 
-`AWAITING_APPROVAL -> APPROVED -> UPGRADING -> PUBLISHED -> RECHECKING -> RESUMED`
+`APPROVED -> UPGRADING -> PUBLISHED -> RESUMED`
 
-Only the PC workbench may move `AWAITING_APPROVAL` to `APPROVED`. Codex may start an approved upgrade, report the published commit/version, request a recheck, and resume the linked UI task. At most two platform upgrade rounds are allowed for one gap; otherwise move it to `HUMAN_REQUIRED`.
+The trusted local Git workspace authorizes the transition to `APPROVED` without a separate browser approval. Codex must report the before/after source revision, unique commit, release version, and changed files. Empty releases, duplicate commits, repeated failure signatures, and exhaustion of eight upgrade rounds move the gap to `HUMAN_REQUIRED`. A successful recheck must resume the linked UI task instead of ending after platform publication.

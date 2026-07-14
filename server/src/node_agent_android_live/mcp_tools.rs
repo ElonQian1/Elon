@@ -219,6 +219,63 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_check_capabilities",
+            "在编辑源码前检查当前一龙 UI 平台能否完成任务；区分运行环境尚未准备与平台自身能力缺口。",
+            json!({
+                "type":"object",
+                "properties":{
+                    "taskId":{"type":"string","maxLength":128},
+                    "requiredCapabilities":{
+                        "type":"array","minItems":1,"maxItems":32,
+                        "items":{"type":"string","maxLength":80}
+                    }
+                }
+            }),
+        ),
+        tool(
+            "ui_report_capability_gap",
+            "确认 PC UI 平台自身缺少能力后创建自动升级工件。仅适用于当前可信本地 Git 工作区；普通业务页面结构修改继续使用 CODEX_SOURCE_HANDOFF。",
+            json!({
+                "type":"object",
+                "required":["taskId","missingCapabilities","evidence","proposedChanges","resumeTarget"],
+                "properties":{
+                    "taskId":{"type":"string","maxLength":128},
+                    "fitRunId":{"type":"string","maxLength":128},
+                    "missingCapabilities":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"string","maxLength":80}},
+                    "evidence":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"string","maxLength":2000}},
+                    "proposedChanges":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"string","maxLength":2000}},
+                    "resumeTarget":{"type":"string","minLength":1,"maxLength":2000}
+                }
+            }),
+        ),
+        tool(
+            "ui_get_capability_gap",
+            "读取当前项目的平台能力缺口、自动升级轮次、发布结果和原 UI 任务恢复点。",
+            json!({
+                "type":"object",
+                "properties":{"gapId":{"type":"string","maxLength":128}}
+            }),
+        ),
+        tool(
+            "ui_control_capability_gap",
+            "驱动可信本地 Git 工作区的平台自动升级、发布、复检和恢复；重复失败或空发布会自动熔断。",
+            json!({
+                "type":"object",
+                "required":["gapId","action"],
+                "properties":{
+                    "gapId":{"type":"string","maxLength":128},
+                    "action":{"enum":["START_UPGRADE","PUBLISH_COMPLETED","RECHECK_PASSED","RECHECK_FAILED","UPGRADE_FAILED","CANCEL"]},
+                    "sourceRevisionBefore":{"type":"string","maxLength":256},
+                    "sourceRevisionAfter":{"type":"string","maxLength":256},
+                    "commitId":{"type":"string","maxLength":256},
+                    "version":{"type":"string","maxLength":256},
+                    "changedFiles":{"type":"array","minItems":1,"maxItems":128,"items":{"type":"string","maxLength":2000}},
+                    "failureSignature":{"type":"string","maxLength":500},
+                    "error":{"type":"string","maxLength":2000}
+                }
+            }),
+        ),
+        tool(
             "ui_get_commit_plan",
             "分析当前 LIVE 修改的确定性写回与 Codex 回退项。",
             json!({"type":"object","properties":{}}),
@@ -261,7 +318,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {
     let read_only = matches!(
         name,
-            "ui_confirm_route"
+        "ui_confirm_route"
             | "ui_get_project_profile"
             | "ui_get_design_task"
             | "ui_get_runtime_status"
@@ -275,6 +332,8 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
             | "ui_get_visual_diff"
             | "ui_propose_live_patch"
             | "ui_get_fit_run"
+            | "ui_check_capabilities"
+            | "ui_get_capability_gap"
             | "ui_get_commit_plan"
     );
     json!({
