@@ -81,6 +81,19 @@ pub(crate) struct UiRouteLearningEntry {
     pub(crate) alias_count: i64,
     pub(crate) match_kind: Option<String>,
     pub(crate) matched_alias: Option<String>,
+    pub(crate) aliases: Vec<UiRouteLearningAlias>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct UiRouteLearningAlias {
+    pub(crate) id: String,
+    pub(crate) sample_text: String,
+    pub(crate) source: String,
+    pub(crate) status: String,
+    pub(crate) hit_count: i64,
+    pub(crate) conflict_count: i64,
+    pub(crate) updated_at: String,
 }
 
 impl Store {
@@ -289,9 +302,12 @@ impl Store {
              WHERE scope_type = 'project' AND scope_id = ?1
              ORDER BY updated_at DESC LIMIT ?2",
         )?;
-        let entries = statement
+        let mut entries = statement
             .query_map(params![project_id, limit.clamp(1, 200) as i64], map_entry)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        for entry in &mut entries {
+            entry.aliases = lookup::load_aliases(&conn, &entry.id)?;
+        }
         Ok(entries)
     }
 }
@@ -342,6 +358,7 @@ pub(super) fn map_entry(row: &Row<'_>) -> rusqlite::Result<UiRouteLearningEntry>
         alias_count: row.get(18)?,
         match_kind: None,
         matched_alias: None,
+        aliases: Vec::new(),
     })
 }
 

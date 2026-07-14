@@ -3,7 +3,7 @@ use rusqlite::{params, OptionalExtension};
 
 use super::{
     load_entry, map_entry, normalize_ui_route_phrase, record_event, UiRouteLearningEntry,
-    UiRouteLearningSource, GLOBAL_SCOPE_ID, MAX_SAMPLE_CHARS,
+    UiRouteLearningAlias, UiRouteLearningSource, GLOBAL_SCOPE_ID, MAX_SAMPLE_CHARS,
 };
 use crate::store::{common::new_id, common::now, Store};
 
@@ -172,6 +172,33 @@ fn record_cluster_conflict(
         )?;
     }
     Ok(())
+}
+
+pub(super) fn load_aliases(
+    conn: &rusqlite::Connection,
+    entry_id: &str,
+) -> Result<Vec<UiRouteLearningAlias>> {
+    let mut statement = conn.prepare(
+        "SELECT id, sample_text, source, status, hit_count, conflict_count, updated_at
+         FROM ui_route_learning_aliases
+         WHERE entry_id = ?1
+         ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'candidate' THEN 1 ELSE 2 END,
+                  updated_at DESC",
+    )?;
+    let aliases = statement
+        .query_map(params![entry_id], |row| {
+            Ok(UiRouteLearningAlias {
+                id: row.get(0)?,
+                sample_text: row.get(1)?,
+                source: row.get(2)?,
+                status: row.get(3)?,
+                hit_count: row.get(4)?,
+                conflict_count: row.get(5)?,
+                updated_at: row.get(6)?,
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(aliases)
 }
 
 #[cfg(test)]
