@@ -55,6 +55,8 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
     private val prefs: SharedPreferences =
         activity.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
+    private val updatePolicy = appUpdatePolicy(BuildConfig.DEBUG)
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -93,7 +95,7 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
      * - 静默失败，不打扰用户
      */
     fun autoCheck() {
-        if (BuildConfig.DEBUG) return
+        if (!updatePolicy.selfUpdateEnabled) return
         val lastCheck = prefs.getLong(KEY_LAST_CHECK, 0)
         if (System.currentTimeMillis() - lastCheck < AUTO_CHECK_INTERVAL_MS) return
 
@@ -114,6 +116,10 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
      * - 忽略冷却期
      */
     fun manualCheck() {
+        if (!updatePolicy.selfUpdateEnabled) {
+            toast(updatePolicy.disabledMessage ?: "当前安装包不支持应用内更新")
+            return
+        }
         val loadingDialog = AlertDialog.Builder(activity)
             .setTitle("检查更新")
             .setMessage("正在检查...")
@@ -143,7 +149,7 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
      * 事件只作为提醒信号，真正弹窗前仍重新拉取 version.json，避免使用过期数据。
      */
     fun realtimeCheck(remoteVersionCode: Int = 0) {
-        if (BuildConfig.DEBUG) return
+        if (!updatePolicy.selfUpdateEnabled) return
         if (remoteVersionCode > 0 && remoteVersionCode <= BuildConfig.VERSION_CODE) return
 
         Thread {

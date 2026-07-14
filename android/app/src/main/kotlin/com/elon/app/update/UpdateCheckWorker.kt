@@ -29,6 +29,10 @@ class UpdateCheckWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        if (!appUpdatePolicy(BuildConfig.DEBUG).selfUpdateEnabled) {
+            Log.d(TAG, "UI 调试版由 PC 节点管理，跳过正式版更新检查")
+            return Result.success()
+        }
         return try {
             Log.d(TAG, "后台检查更新开始")
             val info = fetchVersionInfo() ?: return Result.success()
@@ -126,6 +130,11 @@ class UpdateCheckWorker(
 
         /** 应用启动时注册周期任务（已存在则保留，不重复注册） */
         fun schedule(context: Context) {
+            if (!appUpdatePolicy(BuildConfig.DEBUG).selfUpdateEnabled) {
+                WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+                Log.d(TAG, "UI 调试版由 PC 节点管理，已取消正式版更新任务")
+                return
+            }
             val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
                 INTERVAL_MINUTES, TimeUnit.MINUTES
             )

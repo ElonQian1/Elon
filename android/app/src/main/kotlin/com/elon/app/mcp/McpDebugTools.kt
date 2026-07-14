@@ -151,6 +151,7 @@ internal fun mcpDebugKeepalive(context: Context, args: JSONObject): JSONObject {
 }
 
 internal fun mcpUpdateStatus(args: JSONObject): JSONObject {
+    val updatePolicy = com.elon.app.update.appUpdatePolicy(BuildConfig.DEBUG)
     val url = args.optString("server_url")
         .takeIf { it.isNotBlank() }
         ?: "http://43.139.149.158:8080/app/version.json"
@@ -161,6 +162,8 @@ internal fun mcpUpdateStatus(args: JSONObject): JSONObject {
         .put("installed_version_code", BuildConfig.VERSION_CODE)
         .put("server_url", url)
         .put("server_version", server ?: JSONObject.NULL)
-        .put("update_available", latestCode > BuildConfig.VERSION_CODE)
+        .put("self_update_enabled", updatePolicy.selfUpdateEnabled)
+        .put("installer_owner", updatePolicy.installerOwner)
+        .put("update_available", updatePolicy.selfUpdateEnabled && latestCode > BuildConfig.VERSION_CODE)
     return toolResult("APK update status returned.", structured, isError = server == null)
 }

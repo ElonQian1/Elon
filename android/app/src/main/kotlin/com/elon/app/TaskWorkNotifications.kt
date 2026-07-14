@@ -188,6 +188,7 @@ internal fun notifyProjectTaskDoneFromGlobalWs(
 }
 
 internal fun showAppUpdateNotification(context: Context, json: JSONObject) {
+    if (!com.elon.app.update.appUpdatePolicy(BuildConfig.DEBUG).selfUpdateEnabled) return
     val versionCode = json.optInt("versionCode", 0)
     if (versionCode <= BuildConfig.VERSION_CODE) return
     if (!canPostNotifications(context)) return
