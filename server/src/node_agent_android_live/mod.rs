@@ -8,8 +8,9 @@ mod annotation_mapping;
 mod broker;
 mod build_verify;
 mod build_verify_apk;
-mod design_diff_regions;
+mod debug_package;
 mod design_bootstrap;
+mod design_diff_regions;
 mod fit_learning;
 pub(crate) mod fit_run;
 mod frame;
@@ -47,5 +48,6 @@ mod visual_diff_tests;
 mod visual_solver_style_hints_tests;
 
 pub(crate) use broker::LiveUiBroker;
+pub(crate) use debug_package::scoped_debug_application_id_suffix;
 pub(crate) use mcp::descriptor_for_project as mcp_descriptor_for_project;
 pub(crate) use routes::{protected_routes, runtime_routes};

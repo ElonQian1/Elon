@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::node_agent_android_inspector::{
     adb_capture::{capture_screen_png, launch_app},
-    adb_command::{run_adb_text, validate_device_id},
+    adb_command::validate_device_id,
     png_probe::png_dimensions,
 };
 
@@ -25,12 +25,14 @@ use super::visual_diff::{
 
 mod geometry;
 mod gradle;
+mod install;
 
 use geometry::{patched_bounds, patched_bounds_for_nodes, verification_bounds};
 use gradle::{
     canonical_project_root, find_gradle_root, gradle_wrapper, infer_debug_application_id_suffix,
     run_debug_build, validate_debug_application_id_suffix, validate_package_name,
 };
+use install::install_debug_apk;
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -208,17 +210,11 @@ pub(crate) async fn build_and_verify(
     let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
 
     validate_device_id(&session.device_id)?;
-    let install_output = run_adb_text(
-        &[
-            "-s".to_string(),
-            session.device_id.clone(),
-            "install".to_string(),
-            "-r".to_string(),
-            "-t".to_string(),
-            apk.display().to_string(),
-        ],
-        Duration::from_secs(180),
-        256 * 1024,
+    let install_output = install_debug_apk(
+        &session.device_id,
+        &session.package_name,
+        &apk,
+        debug_application_id_suffix.is_some(),
     )
     .await?;
     if !install_output.to_ascii_lowercase().contains("success") {

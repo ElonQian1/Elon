@@ -3,7 +3,7 @@ import { loadUiTunerDeviceDocument, saveUiTunerDeviceDocument } from '../uiTuner
 import type { UiTunerDocument } from '../types'
 import type { AndroidInspectorDevice, AndroidInspectorSnapshot } from './deviceInspectorApi'
 
-export const UI_TUNER_DEBUG_PACKAGE = 'com.elon.app.uituner'
+export const UI_TUNER_CAPTURE_PACKAGE = 'com.elon.app'
 
 export function androidDeviceIdentity(device: AndroidInspectorDevice) {
   return device.hardwareSerial?.trim() || device.serial
@@ -66,7 +66,7 @@ export function useUiTunerDeviceWorkspace({
     onNotice(`已切换到 ${selectedDevice.model ?? selectedDevice.serial}，正在读取这台手机…`)
     void capture({
       deviceId: selectedDevice.serial,
-      packageName: UI_TUNER_DEBUG_PACKAGE,
+      packageName: UI_TUNER_CAPTURE_PACKAGE,
       launchApp: true,
     })
   }, [capture, documentRef, identity, onLoadDocument, onNotice, selectedDevice])

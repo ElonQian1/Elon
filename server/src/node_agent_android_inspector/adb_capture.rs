@@ -63,6 +63,7 @@ pub(crate) async fn launch_app(device_id: &str, package_name: &str) -> Result<St
 }
 
 async fn launch_app_exact(device_id: &str, package_name: &str) -> Result<String> {
+    wake_device(device_id).await;
     let args = vec![
         "-s".to_string(),
         device_id.trim().to_string(),
@@ -75,6 +76,33 @@ async fn launch_app_exact(device_id: &str, package_name: &str) -> Result<String>
         "1".to_string(),
     ];
     run_adb_text(&args, Duration::from_secs(8), 128 * 1024).await
+}
+
+async fn wake_device(device_id: &str) {
+    // A public test phone is often dozing between sessions. Launching an app
+    // while the display is off succeeds at the Android process level but only
+    // produces a black inspector frame. Wake and dismiss an unsecured
+    // keyguard as a best-effort preparation; a secured lock screen remains
+    // protected and can still be unlocked manually.
+    let wake_args = vec![
+        "-s".to_string(),
+        device_id.to_string(),
+        "shell".to_string(),
+        "input".to_string(),
+        "keyevent".to_string(),
+        "KEYCODE_WAKEUP".to_string(),
+    ];
+    let _ = run_adb_text(&wake_args, Duration::from_secs(3), 16 * 1024).await;
+
+    let dismiss_args = vec![
+        "-s".to_string(),
+        device_id.to_string(),
+        "shell".to_string(),
+        "wm".to_string(),
+        "dismiss-keyguard".to_string(),
+    ];
+    let _ = run_adb_text(&dismiss_args, Duration::from_secs(3), 16 * 1024).await;
+    tokio::time::sleep(Duration::from_millis(300)).await;
 }
 
 pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnapshot> {
@@ -96,11 +124,11 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
     }
 
     let include_data_url = req.include_screenshot_data_url.unwrap_or(true);
-    let (activity_result, screenshot_result, xml_result) = tokio::join!(
-        current_activity(&device_id),
-        capture_screenshot(&device_id, include_data_url),
-        dump_xml(&device_id),
-    );
+    // 无线 ADB 在同一 transport 上并发执行 screencap/uiautomator/dumpsys 时，
+    // 部分真机会让其中一个子进程长期等待。顺序采集虽然多几秒，但能稳定返回画面。
+    let activity_result = current_activity(&device_id).await;
+    let screenshot_result = capture_screenshot(&device_id, include_data_url).await;
+    let xml_result = dump_xml(&device_id).await;
     let activity_name = activity_result.ok();
     let screenshot = screenshot_result.context("ADB 截图失败")?;
     let (xml_raw, mut nodes, xml_error) = match xml_result {
@@ -112,6 +140,18 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
         }
         Err(error) => (String::new(), Vec::new(), Some(format!("{error:#}"))),
     };
+    if req.launch_app.unwrap_or(false)
+        && locked_system_ui_covers_package(
+            activity_name.as_deref(),
+            &xml_raw,
+            &package_name,
+            &nodes,
+        )
+    {
+        bail!(
+            "手机当前停在锁屏或息屏界面，无法读取 {package_name} 的真实画面。请先在手机上解锁；调试版 APK 安装完成后会自动点亮并显示。"
+        );
+    }
     let source_map = attach_source_map(&mut nodes, req.project_root.as_deref());
     let captured_at = Utc::now().to_rfc3339();
     let artifact = persist_snapshot(PersistSnapshotInput {
@@ -147,6 +187,23 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
         source_bindings_path: source_map.bindings_path,
         artifact: Some(artifact),
     })
+}
+
+fn locked_system_ui_covers_package(
+    activity_name: Option<&str>,
+    xml: &str,
+    package_name: &str,
+    nodes: &[super::types::RuntimeUiNode],
+) -> bool {
+    if nodes
+        .iter()
+        .any(|node| node.package_name.as_deref() == Some(package_name))
+    {
+        return false;
+    }
+    activity_name.is_some_and(|activity| activity.contains("NotificationShade"))
+        || xml.contains("com.android.systemui:id/aod_root_view")
+        || xml.contains("package=\"com.miui.aod\"")
 }
 
 struct CapturedScreenshot {
@@ -294,16 +351,34 @@ fn matching_profile<'a>(
 }
 
 async fn dump_xml(device_id: &str) -> Result<String> {
-    let args = vec![
+    let remote_path = format!("/sdcard/elon-ui-{}.xml", uuid::Uuid::new_v4().simple());
+    let dump_args = vec![
+        "-s".to_string(),
+        device_id.to_string(),
+        "shell".to_string(),
+        "uiautomator".to_string(),
+        "dump".to_string(),
+        remote_path.clone(),
+    ];
+    run_adb_text(&dump_args, Duration::from_secs(10), 128 * 1024).await?;
+    let read_args = vec![
         "-s".to_string(),
         device_id.to_string(),
         "exec-out".to_string(),
-        "uiautomator".to_string(),
-        "dump".to_string(),
-        "/dev/stdout".to_string(),
+        "cat".to_string(),
+        remote_path.clone(),
     ];
-    let output = run_adb_text(&args, Duration::from_secs(8), MAX_TEXT).await?;
-    Ok(output)
+    let xml = run_adb_text(&read_args, Duration::from_secs(5), MAX_TEXT).await;
+    let cleanup_args = vec![
+        "-s".to_string(),
+        device_id.to_string(),
+        "shell".to_string(),
+        "rm".to_string(),
+        "-f".to_string(),
+        remote_path,
+    ];
+    let _ = run_adb_text(&cleanup_args, Duration::from_secs(3), 16 * 1024).await;
+    xml
 }
 
 async fn current_activity(device_id: &str) -> Result<String> {
@@ -454,6 +529,16 @@ adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp device product:AAK-AN00 mo
                 .as_deref(),
             Some("e0d909c3")
         );
+    }
+
+    #[test]
+    fn identifies_aod_cover_but_not_visible_target_package() {
+        assert!(locked_system_ui_covers_package(
+            Some("Window{abc u0 NotificationShade}"),
+            r#"<node package="com.android.systemui" resource-id="com.android.systemui:id/aod_root_view" />"#,
+            "com.elon.app.uituner_deadbeef",
+            &[],
+        ));
     }
 
     fn test_profile(hardware_serial: &str, endpoint: &str) -> AndroidDeviceProfile {

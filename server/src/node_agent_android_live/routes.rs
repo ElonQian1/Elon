@@ -112,7 +112,7 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
 
 async fn prepare_debug_runtime_handler(
     State(runtime): State<Arc<NodeRuntime>>,
-    Json(request): Json<PrepareDebugRuntimeRequest>,
+    Json(mut request): Json<PrepareDebugRuntimeRequest>,
 ) -> Response {
     if let Err(error) = crate::node_agent_android_device_lease::validate_android_device_lease(
         &runtime,
@@ -122,6 +122,13 @@ async fn prepare_debug_runtime_handler(
     {
         return json_error(StatusCode::CONFLICT, format!("{error:#}"));
     }
+    request.debug_application_id_suffix = match super::scoped_debug_application_id_suffix(
+        &request.debug_application_id_suffix,
+        &runtime.install_id,
+    ) {
+        Ok(suffix) => suffix,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    };
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
     match prepare_debug_runtime(&runtime.live_ui, request, host_port).await {
         Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),

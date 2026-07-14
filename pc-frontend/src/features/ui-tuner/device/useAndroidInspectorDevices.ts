@@ -25,7 +25,6 @@ interface UseAndroidInspectorDevicesOptions {
 }
 
 const SELECTED_DEVICE_STORAGE_KEY = 'elon.pc.uiTuner.selectedAndroidDevice.v1'
-const DEBUG_PACKAGE = 'com.elon.app.uituner'
 const DEFAULT_PACKAGE = 'com.elon.app'
 
 function deviceIdentity(device: AndroidInspectorDevice) {
@@ -183,7 +182,7 @@ export function useAndroidInspectorDevices({
       const lease = override?.launchApp === false ? undefined : await ensureLease?.(identity)
       window.localStorage.setItem(SELECTED_DEVICE_STORAGE_KEY, identity)
       setSelectedDeviceId(targetDevice.serial)
-      const preferredPackage = override?.packageName || packageName || DEBUG_PACKAGE
+      const preferredPackage = override?.packageName || packageName || DEFAULT_PACKAGE
       let snapshot: AndroidInspectorSnapshot
       try {
         snapshot = await captureAndroidSnapshot({

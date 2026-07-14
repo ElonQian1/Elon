@@ -36,6 +36,12 @@ import { buildStandardInsight, stringifyStandardPackage } from './standards'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { prepareLiveDebugRuntime } from './live/liveUiApi'
+import {
+  isLiveDebugPackage,
+  LIVE_DEBUG_SUFFIX,
+  liveDebugBasePackage,
+  liveDebugSuffix,
+} from './live/debugPackage'
 import { useRuntimeDocumentSync } from './live/useRuntimeDocumentSync'
 import { useRuntimeCanvasGesture } from './live/useRuntimeCanvasGesture'
 import { useRuntimeDraftSession } from './live/useRuntimeDraftSession'
@@ -67,7 +73,6 @@ interface HistoryState {
 
 const MIN_SIZE = 24
 const HISTORY_LIMIT = 80
-const LIVE_DEBUG_SUFFIX = '.uituner'
 const DEFAULT_ANDROID_PACKAGE = 'com.elon.app'
 const WORKSPACE_MODE_STORAGE_KEY = 'elon.uiTuner.workspaceMode.v2'
 function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
@@ -100,7 +105,7 @@ export default function UiTunerPage() {
   const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
   const [liveTargetPackage, setLiveTargetPackage] = useState(() => {
     const captured = tunerDoc.runtimeSnapshot?.packageName ?? ''
-    return captured.endsWith(LIVE_DEBUG_SUFFIX) ? captured : ''
+    return isLiveDebugPackage(captured) ? captured : ''
   })
   const [livePrepareBusy, setLivePrepareBusy] = useState(false)
   const [livePrepareError, setLivePrepareError] = useState('')
@@ -243,9 +248,8 @@ export default function UiTunerPage() {
     setTunerDoc(next)
     setSelectedId(getSelectedId(next, null))
     setHistory({ past: [], future: [] })
-    setLiveTargetPackage(next.runtimeSnapshot?.packageName?.endsWith(LIVE_DEBUG_SUFFIX)
-      ? next.runtimeSnapshot.packageName
-      : '')
+    const runtimePackage = next.runtimeSnapshot?.packageName ?? ''
+    setLiveTargetPackage(isLiveDebugPackage(runtimePackage) ? runtimePackage : '')
   }, [])
   const { selectedDeviceIdentity } = useUiTunerDeviceWorkspace({
     devices, selectedDeviceId, documentRef: tunerDocRef, onLoadDocument: loadDeviceDocument,
@@ -264,9 +268,7 @@ export default function UiTunerPage() {
       return
     }
     const capturedPackage = tunerDocRef.current.runtimeSnapshot?.packageName ?? DEFAULT_ANDROID_PACKAGE
-    const basePackageName = capturedPackage.endsWith(LIVE_DEBUG_SUFFIX)
-      ? capturedPackage.slice(0, -LIVE_DEBUG_SUFFIX.length)
-      : capturedPackage
+    const basePackageName = liveDebugBasePackage(capturedPackage)
     setLivePrepareBusy(true)
     setLivePrepareError('')
     setNotice('正在构建并安装实时调试包；首次构建可能需要几分钟…')
@@ -301,15 +303,15 @@ export default function UiTunerPage() {
       ? liveTargetPackage || tunerDoc.runtimeSnapshot?.packageName
       : undefined,
     projectRoot: effectiveProjectRoot,
-    debugApplicationIdSuffix: liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX) ? LIVE_DEBUG_SUFFIX : undefined,
+    debugApplicationIdSuffix: liveDebugSuffix(liveTargetPackage) || undefined,
     lease: deviceLease.proof,
     document: tunerDoc, selected, workspaceMode, documentRef: tunerDocRef, selectedIdRef,
     setDocument: setTunerDoc, setSelectedId, onNotice: setNotice,
   })
   const runtimeDocument = Boolean(
-    liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX)
-    || liveUi.session?.packageName.endsWith(LIVE_DEBUG_SUFFIX)
-    || tunerDoc.runtimeSnapshot?.packageName?.endsWith(LIVE_DEBUG_SUFFIX),
+    isLiveDebugPackage(liveTargetPackage)
+    || isLiveDebugPackage(liveUi.session?.packageName)
+    || isLiveDebugPackage(tunerDoc.runtimeSnapshot?.packageName),
   )
   const realRenderer = workspaceMode === 'evidence'
     && runtimeDocument
