@@ -204,7 +204,7 @@ pub(super) fn load_aliases(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::UiRouteLearningSource;
+    use crate::store::{UiLearnedRoute, UiRouteLearningSource};
     use crate::ui_route_learning_migration::{migration_v101, migration_v97};
 
     fn store() -> Store {
