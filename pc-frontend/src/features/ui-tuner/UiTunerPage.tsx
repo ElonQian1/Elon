@@ -725,6 +725,7 @@ export default function UiTunerPage() {
           uploadedTarget={liveUi.targetDesign}
           selectedId={selectedId}
           viewScale={viewScale}
+          viewportControls={comparisonViewport}
           targetScrollerRef={comparisonViewport.targetScrollerRef}
           currentScrollerRef={comparisonViewport.currentScrollerRef}
           onTargetScroll={comparisonViewport.onTargetScroll}

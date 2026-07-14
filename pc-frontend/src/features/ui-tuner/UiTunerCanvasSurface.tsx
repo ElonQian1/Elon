@@ -14,6 +14,15 @@ import type { RuntimeDraftState, RuntimeDraftStatus } from './live/runtimeDraftM
 import type { UiTunerDocument, UiTunerElement } from './types'
 import styles from './UiTunerPage.module.css'
 
+export interface UiTunerCanvasViewportControls {
+  actualSize: () => void
+  fitCanvasToStage: () => void
+  fitToStage: boolean
+  viewScaleLabel: string
+  zoomIn: () => void
+  zoomOut: () => void
+}
+
 interface UiTunerCanvasSurfaceProps {
   canvas: UiTunerDocument['canvas']
   filterResult: UiTunerFilterResult
@@ -29,6 +38,7 @@ interface UiTunerCanvasSurfaceProps {
   scrollerRef: RefObject<HTMLDivElement>
   selectedId: string | null
   viewScale: number
+  viewportControls: UiTunerCanvasViewportControls
   overlayLayer?: ReactNode
   onScroll?: UIEventHandler<HTMLDivElement>
   onCanvasKeyDown: KeyboardEventHandler<HTMLDivElement>
@@ -56,6 +66,7 @@ export function UiTunerCanvasSurface({
   scrollerRef,
   selectedId,
   viewScale,
+  viewportControls,
   overlayLayer,
   onScroll,
   onCanvasKeyDown,
@@ -65,15 +76,32 @@ export function UiTunerCanvasSurface({
 }: UiTunerCanvasSurfaceProps) {
   return (
     <div className={styles.canvasScroller} ref={scrollerRef} onScroll={onScroll}>
-      {realRenderer && (
-        <div className={
-          runtimeDraftStatus === 'rejected' || !runtimeConnected
-            ? styles.runtimeSurfaceFrozen
-            : styles.runtimeSurfaceLive
-        }>
-          {runtimeSurfaceLabel(runtimeConnected, runtimeDraftStatus)}
+      <div className={styles.canvasUtilityBar}>
+        {realRenderer && (
+          <div className={
+            runtimeDraftStatus === 'rejected' || !runtimeConnected
+              ? styles.runtimeSurfaceFrozen
+              : styles.runtimeSurfaceLive
+          }>
+            {runtimeSurfaceLabel(runtimeConnected, runtimeDraftStatus)}
+          </div>
+        )}
+        <div className={styles.canvasZoomControls} aria-label="画布快捷缩放">
+          <button type="button" onClick={viewportControls.zoomOut} aria-label="缩小画布" title="缩小画布（Ctrl/Cmd + -）">−</button>
+          <button type="button" className={styles.canvasZoomValue} onClick={viewportControls.actualSize} aria-label="恢复画布到 100%" title="恢复 100%（Ctrl/Cmd + 0）">
+            {viewportControls.viewScaleLabel}
+          </button>
+          <button type="button" onClick={viewportControls.zoomIn} aria-label="放大画布" title="放大画布（Ctrl/Cmd + +）">+</button>
+          <button
+            type="button"
+            className={viewportControls.fitToStage ? styles.activeCanvasZoom : ''}
+            onClick={viewportControls.fitCanvasToStage}
+            title="让完整画面适应当前区域"
+          >
+            适屏
+          </button>
         </div>
-      )}
+      </div>
       <div
         className={styles.canvasViewport}
         style={{ width: canvas.width * viewScale, height: canvas.height * viewScale }}

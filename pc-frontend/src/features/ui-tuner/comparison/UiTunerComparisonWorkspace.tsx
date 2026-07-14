@@ -15,7 +15,7 @@ import { useAutoFitQueue } from '../fit-run/useAutoFitQueue'
 import { useFitRun } from '../fit-run/useFitRun'
 import { useFitRunStore } from '../fit-run/fitRunStore'
 import type { UiTunerDocument, UiTunerElement } from '../types'
-import { UiTunerCanvasSurface } from '../UiTunerCanvasSurface'
+import { UiTunerCanvasSurface, type UiTunerCanvasViewportControls } from '../UiTunerCanvasSurface'
 import { ComparisonModeControls } from './ComparisonModeControls'
 import { ComparisonOverlayLayer } from './ComparisonOverlayLayer'
 import { CalibrationPanel } from './CalibrationPanel'
@@ -45,6 +45,7 @@ interface UiTunerComparisonWorkspaceProps {
   runtimeCanResize: boolean
   selectedId: string | null
   viewScale: number
+  viewportControls: UiTunerCanvasViewportControls
   targetScrollerRef: RefObject<HTMLDivElement>
   currentScrollerRef: RefObject<HTMLDivElement>
   onTargetScroll: UIEventHandler<HTMLDivElement>
@@ -79,6 +80,7 @@ export function UiTunerComparisonWorkspace({
   runtimeCanResize,
   selectedId,
   viewScale,
+  viewportControls,
   targetScrollerRef,
   currentScrollerRef,
   onTargetScroll,
@@ -210,6 +212,7 @@ export function UiTunerComparisonWorkspace({
       scrollerRef={currentScrollerRef}
       selectedId={selectedId}
       viewScale={viewScale}
+      viewportControls={viewportControls}
       overlayLayer={overlay}
       onScroll={onCurrentScroll}
       onCanvasKeyDown={onCanvasKeyDown}
