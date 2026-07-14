@@ -130,6 +130,9 @@ P1 规则：
 
 ## AI 执行流程
 
+Android UI Tuner、真实 Renderer、React 数字孪生和 APK/PWA 统一 Token 的权威流程见
+[`docs/android-real-renderer-ui-workflow.md`](android-real-renderer-ui-workflow.md)。React 数字孪生只负责即时草稿，最终结果必须由无 Runtime Patch 的 Android 构建真帧证明。
+
 AI 接到 UI 任务时，按以下顺序执行：
 
 1. 判断任务是否涉及 APP UI、Web 镜像 UI 或两者同步。
