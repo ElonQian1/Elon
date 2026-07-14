@@ -1,27 +1,17 @@
 ---
 name: elon-dev-task
-description: 按一龙项目强制工作流完成一次代码或文档任务
+description: 按一龙项目共享生命周期契约完成一次代码或文档任务
 agent: elon-implementer
 argument-hint: "<用户需求或任务描述>"
 ---
 
-你要按一龙项目工作流完成用户给出的任务：`${input:task:请输入用户需求}`。
+完成用户任务：`${input:task:请输入用户需求}`。
 
-必须先读 [AGENTS.md](../../AGENTS.md)，再按它路由到本任务真正相关的专项文档；不要固定全量读取所有 instructions/docs。
+先读 [AGENTS.md](../../AGENTS.md)，按路由选择专项文档；不要固定全量读取 instructions/docs。
 
-执行要求：
-
-1. 先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。
-2. 如果预检输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再定位和修改文件；不要在主 `main` 工作区直接编辑业务文件。
-3. 定位并阅读目标文件，不要盲改。
-4. 避免继续向巨型文件追加逻辑；触碰 1500 行以上文件时，除小修外优先抽出本次职责模块。
-5. 只做当前任务需要的最小修改。
-6. 根据影响范围运行最小有效验证。
-7. 如任务修改后端运行代码，不要递增 `server/Cargo.toml` 的 `version`；提交并 push 后先用 `scripts\check-task-complete.ps1 -Kind CodePushed` 校验代码已进入远端，再按需运行发布脚本。
-7.5. 如任务修改 `/pc` 新前端用户可见页面、布局、交互、遮挡、登录/账号卡、聊天页或项目工作台，`CodePushed` 只表示代码同步；除非用户明确说只同步代码或暂不发布，否则 push 后必须运行 `scripts\publish-server.ps1` / `scripts/publish-server.sh`，再运行 `scripts\check-task-complete.ps1 -Kind PcFrontend`。截图、遮挡、按图修 UI 类问题还必须做浏览器截图、DOM 坐标或线上页面检查；浏览器不可用时最终回复要明确未完成视觉验收。
-8. 只 stage 当前任务文件并 commit。
-9. push 到 `origin/main`；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main`，解决冲突后重推。不要因为 `origin/main` 在编码或构建期间前进就主动 rebase、重跑验证或重新发布。
-10. 如果本次在隔离 worktree 完成，回到原主工作区用 `git fetch origin` + `git pull --ff-only origin main` 同步已跟踪文件，不碰未跟踪文件。
-11. 如任务修改 APK 可安装端能力，至少运行 `scripts\check-task-complete.ps1 -Kind CodePushed`；明确负责 APK 发布时再运行 `scripts\publish-apk.ps1` 和 `scripts\check-task-complete.ps1 -Kind AndroidFeature`。
-12. 如任务修改 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI，至少运行 `pc-frontend` 构建和 `CodePushed`；除非用户明确说只同步代码或暂不发布，否则继续运行 `scripts\publish-server.ps1`，再用 `scripts\check-task-complete.ps1 -Kind PcFrontend`、`/pc` 和 `/api/server/version` 验证线上生效。截图、遮挡、错位、层级、弹窗或按图修复类问题必须定位真实组件并做视觉验收或说明替代证据。
-13. 结束时汇报提交 SHA、push 状态、主工作区同步状态、验证结果、部署状态；Android 任务汇报 APK 发布状态（已发布 / 被更新 main 接管 / 未尝试），PC 前端任务汇报 pc-next-dist 发布状态（已发布 / 被更新 main 接管 / 未尝试）和 `PcFrontend` 校验结果，发布成功时再汇报服务器版本接口结果和 `/pc` 验证结果。
+- 完整执行共享契约 `WF-START` 至 `WF-REPORT`，脚本输出优先。
+- 先定位真实代码和影响范围，再做最小安全改动；避免继续扩大巨型文件。
+- 按 `WF-FILES` 处理所有新增源码、测试、fixture 和临时产物。
+- 运行风险匹配的验证；平台用户可见改动按共享完成类型决定发布动作与收尾 Kind。
+- push 冲突只按 `WF-REBASE` 处理，不追逐持续前进的远端主线。
+- 最终必须包含 commit、push/发布证据和统一收尾状态；`FINALIZABLE=false` 时不得宣称完整结束。

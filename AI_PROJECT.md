@@ -71,13 +71,4 @@ HONOR 最近发现的 TLS mDNS 选择器为 `adb-ASUJ6R6324002425-ZDy0od (3)._ad
 
 ## 常用完成标准
 
-后端运行代码改动必须：
-
-1. 在隔离 worktree 中修改。
-2. `git add` 仅添加本任务文件。
-3. commit 后立即 push 到 `origin/main`。
-4. 运行 `scripts\check-task-complete.ps1 -Kind CodePushed`。
-5. 需要上线后端时运行 `scripts\publish-server.ps1`。
-6. 验证 `/health` 和 `/api/server/version`。
-
-Android/APK 改动只有用户明确要求安装包或下载链接时才发布 APK；普通代码任务到 CodePushed 即可收尾。
+所有写任务遵守 `.github/copilot-instructions.md` 的 `WF-START` 至 `WF-REPORT`。后端运行代码默认通过 `publish-server.*` 发布并以 `Server` 收尾；用户明确只同步代码时才用 `CodePushed`。Android、PC 前端和 Win 节点的默认发布边界也以共享契约的“完成类型”为准，不在本项目说明中复制步骤。

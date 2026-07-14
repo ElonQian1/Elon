@@ -1,50 +1,39 @@
 # Elon AI Task Template
 
-把复杂任务交给 AI 时，建议使用这个模板。它的目标是让 AI 先定位、再计划、再修改、再验证，避免直接乱改。
+复杂任务可用下面的轻量模板。项目规则不粘贴进任务正文，由 `AGENTS.md` 路由和 `WF-*` 契约提供。
 
 ```md
-## 任务目标
+## 目标
 
-请修改：
+请实现：
 
-## 必读上下文
+## 验收标准
 
-1. `AGENTS.md`
-2. `.github/copilot-instructions.md`
-3. `AI_PROJECT.md`
-4. `AI_ARCHITECTURE.md`
-5. `AI_INDEX.md`
-6. 与任务相关的 `.github/instructions/*.instructions.md`
+- 用户可见结果：
+- 不应改变：
+- 需要发布：是 / 否 / 由项目默认规则决定
+
+## 已知上下文
+
+- 相关模块或文件：
+- 错误、截图或复现步骤：
 
 ## 工作要求
 
-1. 先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。如果输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再修改；脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录。
-2. 先列出相关文件和为什么相关。
-3. 修改前输出文件计划 JSON。
-4. 不修改无关文件，不回退他人改动。
-5. 新增逻辑优先放入职责明确的小模块。
-6. 修改后运行最小有效验证命令。
-7. 提交前检查 `git status --short`，确认没有漏加新文件。
-8. commit 后 push 到 `origin/main`。
-9. 运行 CodePushed 检查。
-10. 后端运行代码改动需要发布并验证 `/health`、`/api/server/version`。
+1. 先读 `AGENTS.md` 和共享 `WF-*` 契约，只加载本任务需要的专项文档。
+2. 完整执行 `WF-START` 至 `WF-REPORT`，只在 `EDIT_ROOT` 修改。
+3. 先定位和规划，再做最小安全改动；不回退或夹带其他任务。
+4. 按 `WF-FILES` 处置源码、测试和临时产物，并运行风险匹配的验证。
+5. 根据改动选择正确发布动作和统一收尾 Kind。
+6. 只有统一收尾输出 `FINALIZABLE=true` 才宣告完成。
 
-## 验证命令
+## 最终回复
 
-按任务选择：
-
-- `cargo test --manifest-path .\server\Cargo.toml <module-or-test-name>`
-- `cargo check --manifest-path .\server\Cargo.toml`
-- `git diff --check`
-- Android 任务按发布规则使用 `scripts\publish-apk.ps1`
-
-## 最终回复必须包含
-
-- 当前项目情况判断。
-- 本次修改了什么。
-- 验证结果。
-- commit SHA。
-- 是否已 push。
-- 是否已部署后端或 APK。
-- 仍然缺什么。
+- 修改与验证结果
+- commit SHA 与 push/发布状态
+- `BUSINESS_STATUS`
+- `LOCAL_MAIN_STATUS`
+- `MAIN_UNTRACKED_STATUS`
+- `TASK_WORKTREE_STATUS`
+- 未完成项或风险
 ```

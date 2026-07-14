@@ -19,6 +19,11 @@ $heavyContextPatterns = @(
 )
 
 $hardLoadPattern = "(?is)(Read these files before acting|先读取|必须先读).*(copilot-instructions|git-deploy-workflow|modular-architecture|ai-agent-workflow|system-architecture)"
+$duplicatedLifecyclePatterns = @(
+    'scripts[\\/]ai-task-preflight\.ps1 -CreateWorktree',
+    'git pull --ff-only origin main',
+    'scripts[\\/]cleanup-task-worktrees\.ps1 -Apply'
+)
 
 function Get-RelativePath {
     param([string]$Path)
@@ -49,6 +54,14 @@ foreach ($file in ($files | Sort-Object FullName)) {
         $heavyRefs += $matches.Count
     }
     $hardLoad = $text -match $hardLoadPattern
+    $lifecycleDuplicates = 0
+    foreach ($pattern in $duplicatedLifecyclePatterns) {
+        $lifecycleDuplicates += [regex]::Matches(
+            $text,
+            $pattern,
+            [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+        ).Count
+    }
     $approxTokens = [int][math]::Ceiling($text.Length / 4.0)
     $relative = Get-RelativePath $file.FullName
 
@@ -65,12 +78,17 @@ foreach ($file in ($files | Sort-Object FullName)) {
     if ($heavyRefs -gt 0 -and -not $hardLoad) {
         $notes += "routed-heavy-refs=$heavyRefs"
     }
+    if ($lifecycleDuplicates -gt 0) {
+        $status = "fail"
+        $notes += "duplicated-lifecycle-commands=$lifecycleDuplicates"
+    }
 
     $row = [pscustomobject]@{
         Path = $relative
         Lines = $lines
         ApproxTokens = $approxTokens
         HeavyRefs = $heavyRefs
+        LifecycleDupes = $lifecycleDuplicates
         Status = $status
         Notes = ($notes -join ",")
     }

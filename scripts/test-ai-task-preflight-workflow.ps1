@@ -56,6 +56,10 @@ Assert-Contains $preflightContent "function Test-PcConversationWorktree" "PowerS
 Assert-Contains $preflightShContent "is_pc_conversation_worktree()" "Shell preflight must detect platform-created PC conversation worktrees."
 Assert-Contains $preflightContent "PC_CONVERSATION_WORKTREE=true" "PowerShell preflight must expose when the current workspace is already a PC conversation worktree."
 Assert-Contains $preflightShContent "PC_CONVERSATION_WORKTREE=true" "Shell preflight must expose when the current workspace is already a PC conversation worktree."
+Assert-Contains $preflightContent "FINISH_COMMAND_POWERSHELL=" "PowerShell preflight must print the deterministic finish entry point."
+Assert-Contains $preflightShContent "FINISH_COMMAND_SHELL=" "Shell preflight must print the deterministic finish entry point."
+Assert-Contains $preflightContent "--untracked-files=no" "PowerShell preflight must separate tracked main changes from untracked hygiene warnings."
+Assert-Contains $preflightShContent "--untracked-files=no" "Shell preflight must separate tracked main changes from untracked hygiene warnings."
 
 function Assert-DocumentContains {
     param(
@@ -78,6 +82,20 @@ function Assert-DocumentDoesNotContain {
     $docContent = Get-Content -Raw -LiteralPath $docPath
     if ($docContent.Contains($Snippet)) {
         throw "Workflow documentation still contains obsolete preflight/worktree guidance in $RelativePath. Forbidden: $Snippet"
+    }
+}
+
+function Assert-DocumentTokenBudget {
+    param(
+        [string]$RelativePath,
+        [int]$MaxApproxTokens
+    )
+
+    $docPath = Join-Path $repoRoot $RelativePath
+    $docContent = Get-Content -Raw -LiteralPath $docPath
+    $approxTokens = [int][Math]::Ceiling($docContent.Length / 4.0)
+    if ($approxTokens -gt $MaxApproxTokens) {
+        throw "Mandatory routing document exceeded its token budget: $RelativePath approxTokens=$approxTokens max=$MaxApproxTokens"
     }
 }
 
@@ -163,28 +181,47 @@ function Invoke-PreflightAndAssertNoNestedWorktree {
     return $outputText
 }
 
-Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
-Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "EDIT_ROOT"
-Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WORKTREE_CREATED=true"
-Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "EDIT_ROOT"
-Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "WORKTREE_PATH"
-Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "EDIT_ROOT"
-Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "nested worktree"
+Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "WF-START"
+Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "FINALIZABLE=true"
+Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WF-START"
+Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WF-FINISH"
+Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "scripts\finish-ai-task.ps1"
+Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "FINALIZABLE=true"
+Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "FINISH_COMMAND_*"
+Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "candidate_track"
+Assert-DocumentDoesNotContain -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet 'applyTo: "**"'
 Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "origin/main"
-Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "EDIT_ROOT"
-Assert-DocumentContains -RelativePath "AI_TASK_TEMPLATE.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
-Assert-DocumentContains -RelativePath "AI_TASK_TEMPLATE.md" -Snippet "EDIT_ROOT"
-Assert-DocumentContains -RelativePath ".github\prompts\elon-dev-task.prompt.md" -Snippet "WORKTREE_PATH"
-Assert-DocumentContains -RelativePath ".github\prompts\elon-apk-release.prompt.md" -Snippet "WORKTREE_PATH"
-Assert-DocumentContains -RelativePath ".github\agents\elon-implementer.agent.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
-Assert-DocumentContains -RelativePath ".github\agents\elon-planner.agent.md" -Snippet "ai-task-preflight"
-Assert-DocumentContains -RelativePath ".github\agents\elon-reviewer.agent.md" -Snippet "release API"
-Assert-DocumentContains -RelativePath ".github\skills\cloud-apk-dev\SKILL.md" -Snippet "WORKTREE_CREATED=true"
+Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "finish-ai-task.ps1"
+Assert-DocumentContains -RelativePath "AI_TASK_TEMPLATE.md" -Snippet "WF-REPORT"
+Assert-DocumentContains -RelativePath ".github\prompts\elon-dev-task.prompt.md" -Snippet "WF-REPORT"
+Assert-DocumentContains -RelativePath ".github\prompts\elon-apk-release.prompt.md" -Snippet "AndroidFeature"
+Assert-DocumentContains -RelativePath ".github\agents\elon-implementer.agent.md" -Snippet "WF-START"
+Assert-DocumentContains -RelativePath ".github\agents\elon-planner.agent.md" -Snippet "WF-REPORT"
+Assert-DocumentContains -RelativePath ".github\agents\elon-reviewer.agent.md" -Snippet "FINALIZABLE"
+Assert-DocumentContains -RelativePath ".github\skills\cloud-apk-dev\SKILL.md" -Snippet "WF-START"
+Assert-DocumentTokenBudget -RelativePath ".github\copilot-instructions.md" -MaxApproxTokens 1100
+Assert-DocumentTokenBudget -RelativePath "AGENTS.md" -MaxApproxTokens 750
+Assert-DocumentTokenBudget -RelativePath "CODEX.md" -MaxApproxTokens 500
+Assert-DocumentTokenBudget -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -MaxApproxTokens 1000
+Assert-DocumentTokenBudget -RelativePath "AI_TASK_TEMPLATE.md" -MaxApproxTokens 400
+$thinLifecycleAssets = @(
+    "AI_TASK_TEMPLATE.md",
+    ".github\prompts\elon-dev-task.prompt.md",
+    ".github\prompts\elon-apk-release.prompt.md",
+    ".github\agents\elon-implementer.agent.md",
+    ".github\agents\elon-planner.agent.md",
+    ".github\agents\elon-reviewer.agent.md",
+    ".github\skills\cloud-apk-dev\SKILL.md"
+)
+foreach ($asset in $thinLifecycleAssets) {
+    Assert-DocumentDoesNotContain -RelativePath $asset -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
+    Assert-DocumentDoesNotContain -RelativePath $asset -Snippet "git pull --ff-only origin main"
+}
 $parallelPublishDiscussionDoc = Join-Path "docs" ([string]::Concat([char]0x5e76, [char]0x884c, [char]0x53d1, [char]0x5e03, [char]0x8ba8, [char]0x8bba, ".md"))
 Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
 Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "WORKTREE_PATH"
-Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "scripts\cleanup-task-worktrees.ps1"
-Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "git fetch origin main"
+Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "scripts\finish-ai-task.ps1"
+Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "git pull --ff-only origin main"
 Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "Stop-Process"
 Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "bb64a-session"
 Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "bb64a-deploy"
@@ -259,6 +296,16 @@ try {
     Invoke-Git $seedRepo @("worktree", "add", "-b", "codex/existing-clean", $existingWorktree, "origin/main") | Out-Null
     New-Item -ItemType Directory -Path $createdWorktreeParent | Out-Null
 
+    # Advance origin/main from the task worktree while leaving an unrelated
+    # untracked file in the checked-out main baseline. Preflight must still
+    # fast-forward tracked main and preserve the unknown file.
+    $legacyMainFile = Join-Path $seedRepo "legacy-preflight-test.rs"
+    Set-Content -LiteralPath $legacyMainFile -Value "legacy diagnostic" -Encoding UTF8
+    Add-Content -LiteralPath (Join-Path $existingWorktree "README.md") -Value "task worktree advance"
+    Invoke-Git $existingWorktree @("add", "README.md") | Out-Null
+    Invoke-Git $existingWorktree @("commit", "-m", "advance origin from isolated task") | Out-Null
+    Invoke-Git $existingWorktree @("push", "origin", "HEAD:main") | Out-Null
+
     $outputText = Invoke-PreflightAndAssertNoNestedWorktree `
         -WorktreePath $existingWorktree `
         -WorktreeParent $createdWorktreeParent `
@@ -272,6 +319,12 @@ try {
     Assert-Contains $outputText "BEHIND=0" "Fixture should not be behind origin/main."
     Assert-Contains $outputText "NEXT=Workspace is already isolated and current enough for direct edits." "Clean current non-main worktree should remain usable."
     Assert-Contains $outputText "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main." "Preflight guard must warn that main is a baseline only."
+    Assert-Contains $outputText "MAIN_BASELINE_UNTRACKED=warning:1" "Untracked main files must be audited without blocking preflight sync."
+    Assert-Contains $outputText "MAIN_BASELINE_SYNC=synced_worktree:" "Preflight must fast-forward tracked main despite unrelated untracked files."
+    $mainAfterPreflight = Invoke-Git $seedRepo @("rev-parse", "HEAD")
+    $originAfterPreflight = Invoke-Git $seedRepo @("rev-parse", "origin/main")
+    if ($mainAfterPreflight -ne $originAfterPreflight) { throw "Preflight did not synchronize the checked-out main baseline." }
+    if (-not (Test-Path -LiteralPath $legacyMainFile)) { throw "Preflight deleted an unknown main untracked file." }
 
     Invoke-Git $seedRepo @("worktree", "add", "-b", "codex/path-only", $conversationPathOnlyWorktree, "origin/main") | Out-Null
     Invoke-Git $seedRepo @("worktree", "add", "-b", "ai/session/demo-project/branch-only", $conversationBranchOnlyWorktree, "origin/main") | Out-Null
@@ -314,4 +367,18 @@ try {
             Write-Warning "Skip cleanup for unexpected test path: $resolvedPath"
         }
     }
+}
+
+$finishWorkflowTest = Join-Path $repoRoot "scripts\test-ai-task-finish-workflow.ps1"
+$oldPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $finishTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $finishWorkflowTest 2>&1
+    $finishTestExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $oldPreference
+}
+$finishTestOutput | ForEach-Object { Write-Host ([string]$_) }
+if ($finishTestExitCode -ne 0) {
+    throw "Unified finish workflow guard failed."
 }

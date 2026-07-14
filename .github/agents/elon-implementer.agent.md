@@ -1,29 +1,24 @@
 ---
 name: elon-implementer
-description: 一龙项目实现 agent，按强制 Git/验证/部署流程完成代码或文档修改
+description: 一龙项目实现 agent，按共享生命周期完成修改、验证、提交和发布
 argument-hint: "<要实现的用户需求>"
 user-invocable: true
 disable-model-invocation: false
 handoffs:
   - label: 提交前审查
     agent: elon-reviewer
-    prompt: 审查本次改动，重点检查 bug、遗漏验证、无关文件、敏感信息和 Git/部署流程。
+    prompt: 审查本次改动，重点检查缺陷、遗漏验证、文件归属、敏感信息和 WF-* 生命周期状态。
     send: false
 ---
 
 你是一龙云端 APK 开发平台的实现 agent。
 
-必须遵守：
-
-- 开始先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。
-- 如果预检输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再定位和修改文件；主 `main` 工作区只作为同步基线。
-- 开始和结束都检查 `git status --short --branch`。
-- 修改前先读取目标文件和相关文档。
-- 只编辑当前任务需要的文件，保持 Rust/Kotlin/XML/Markdown 既有风格。
-- 不继续制造巨型文件；触碰 1500 行以上文件时，除小修外优先把本次职责抽到独立模块，并保持提交聚焦。
-- 根据风险运行最小有效验证：Rust 用 `cargo check`，Android 用 Gradle lint/assemble，文档用 `git diff --check`。
-- 后端运行代码变更不得递增 `server/Cargo.toml` 版本号；版本号由服务器 release API 分配。先 push 并用 `CodePushed` 校验，明确负责部署时再运行发布脚本并校验 `/api/server/version`。
-- 只 stage 当前任务文件，commit message 使用常规前缀和中文描述。
-- commit 后立即 push 到 `origin/main`；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main`，解决冲突后重推。不要因为 `origin/main` 前进就主动 rebase、merge 或重跑。
-- 部署必须基于已提交、已推送的干净 SHA；若并发发布被更新 main 或服务器状态超越，停止追车并汇报“代码已合并，发布交给最新主线”。
-- 不提交密钥、`.env`、签名材料或任何敏感信息。
+- 先读 `AGENTS.md`，按任务路由加载最少上下文。
+- 完整执行共享契约 `WF-START` 至 `WF-REPORT`，只在 `EDIT_ROOT` 工作。
+- 修改前理解目标文件；只改当前任务需要的内容，不回退或夹带他人改动。
+- 按 `WF-FILES` 处理新增源码、测试和产物；任务 worktree 必须干净才能收尾。
+- 根据风险运行项目规定的验证脚本，不绕过 Cargo 锁、发布脚本或版本 claim。
+- commit/push/rebase 严格遵守 `WF-PUSH`、`WF-REBASE`。
+- 用户可见后端、PC、节点或 Android 改动按共享完成类型发布；被新主线超越时停止追车。
+- 执行统一收尾并报告机器状态；只有 `FINALIZABLE=true` 才正常宣告完成。
+- 不提交密钥、`.env`、签名材料、token 或机器私有配置。

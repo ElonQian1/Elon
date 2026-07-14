@@ -39,8 +39,7 @@ PowerShell 5.1 可用：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed
 ```
 
 PowerShell 7 必须用：

@@ -84,17 +84,29 @@ function Sync-LocalMainBaseline {
         $mainPath = [string]$mainWorktree.Path
         $gitMarker = Join-Path $mainPath ".git"
         if (Test-Path -LiteralPath $gitMarker) {
-            $status = (& git -C $mainPath status --porcelain=v1 --untracked-files=normal)
+            $status = (& git -C $mainPath status --porcelain=v1 --untracked-files=no)
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "MAIN_BASELINE_SYNC=blocked_status_failed:$mainPath"
                 return
             }
             if (-not [string]::IsNullOrWhiteSpace(($status -join "`n"))) {
-                Write-Host "MAIN_BASELINE_SYNC=blocked_dirty:$mainPath"
+                Write-Host "MAIN_BASELINE_SYNC=blocked_tracked_changes:$mainPath"
                 return
             }
 
-            GitOutputInPath -Path $mainPath -GitArgs @("merge", "--ff-only", "origin/main") | Out-Null
+            $untracked = @(& git -C $mainPath -c core.quotePath=false status --porcelain=v1 --untracked-files=all) |
+                Where-Object { $_ -like "?? *" }
+            if ($untracked.Count -gt 0) {
+                Write-Host "MAIN_BASELINE_UNTRACKED=warning:$($untracked.Count)"
+            } else {
+                Write-Host "MAIN_BASELINE_UNTRACKED=clean"
+            }
+
+            $mergeOutput = & git -C $mainPath merge --ff-only origin/main 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "MAIN_BASELINE_SYNC=failed:${mainPath}:$($mergeOutput -join ' ')"
+                return
+            }
             Write-Host "MAIN_BASELINE_SYNC=synced_worktree:$mainPath"
             return
         }
@@ -172,8 +184,10 @@ function Write-AiWorkflowGuard {
     Write-Host "EDIT_STATE=$State"
     Write-Host "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
     Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
-    Write-Host "RULE_PUSH=after commit run git push origin HEAD:main, then scripts\check-task-complete.ps1 -Kind CodePushed."
-    Write-Host "RULE_FINISH=after push sync the main baseline with git pull --ff-only and run scripts\cleanup-task-worktrees.ps1 -Apply."
+    Write-Host "RULE_PUSH=after commit run git push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
+    Write-Host "RULE_FINISH=after push run scripts\finish-ai-task.ps1 -Kind <Kind>; it verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
+    Write-Host "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed"
+    Write-Host "FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed"
     Write-Host "AI_WORKFLOW_GUARD_END"
 }
 

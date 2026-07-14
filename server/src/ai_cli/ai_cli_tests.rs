@@ -180,21 +180,21 @@ fn development_prompt_keeps_project_workflow() {
     assert!(!prompt.contains(".github/copilot-instructions.md、.github/instructions/*.md、README.md、docs/ai-agent-workflow.md"));
 
     assert!(prompt.contains("scripts/publish-apk.ps1"));
-    assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind AndroidFeature"));
-    assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind CodeSync"));
+    assert!(prompt.contains("finish-ai-task.*` 的 `AndroidFeature` Kind"));
+    assert!(prompt.contains("只同步时用 `CodePushed`"));
     assert!(prompt.contains("scripts/publish-server.ps1"));
     assert!(prompt.contains("pc-frontend"));
     assert!(prompt.contains("pc-next-dist"));
     assert!(prompt.contains("/api/server/version"));
     assert!(prompt.contains("DOM/坐标/层级检查"));
-    assert!(prompt.contains("scripts/check-task-complete.ps1 -Kind PcFrontend"));
+    assert!(prompt.contains("统一收尾的 `PcFrontend` Kind"));
     assert!(prompt.contains("不要把 CodePushed 当成用户问题已解决"));
-    assert!(prompt.contains("不能只凭 `npm run build` 宣称用户问题已解决"));
-    assert!(prompt.contains("脚本负责版本分配、构建、上传、并发保护和 finish"));
-    assert!(prompt.contains("脚本负责版本分配、临时构建配置、上传、并发保护和 finish"));
-    assert!(prompt.contains("脚本输出 `NEXT=`、`ERROR_CODE=`、`DOC=`"));
+    assert!(prompt.contains("不能只凭 `npm run build` 宣称解决"));
+    assert!(prompt.contains("finish-ai-task.*"));
+    assert!(prompt.contains("FINALIZABLE=true"));
+    assert!(prompt.contains("脚本输出 `NEXT=`、`EDIT_ROOT=`、`FINISH_COMMAND_*=`、`FINALIZABLE=`"));
     assert!(prompt.contains("不要手动改 `server/Cargo.toml` 版本"));
-    assert!(prompt.contains("不要手动改或提交 `build.gradle` 版本字段"));
+    assert!(prompt.contains("不要提交 `build.gradle` 版本"));
     assert!(!prompt.contains("/api/release/claim"));
     assert!(!prompt.contains("ELON_BUILD_VERSION"));
     assert!(!prompt.contains("临时写入 build.gradle"));
@@ -205,7 +205,7 @@ fn development_prompt_keeps_project_workflow() {
     assert!(prompt.contains("5-15 行文件计划"));
     assert!(!prompt.contains("必须递增 server/Cargo.toml 的 package.version"));
     assert!(!prompt.contains("递增 versionCode/versionName"));
-    assert!(prompt.contains("会话 worktree/分支"));
+    assert!(prompt.contains("只有 push 被拒绝才 rebase"));
     assert!(prompt.contains("无 origin 项目本地 commit 即可"));
 }
 

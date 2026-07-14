@@ -1,6 +1,6 @@
 ﻿# CODEX Project Entry
 
-Last updated: 2026-07-05
+Last updated: 2026-07-14
 
 Codex-specific overlay. All shared rules live in `copilot-instructions.md` — do not duplicate them here.
 
@@ -15,7 +15,7 @@ By the time you read this, you have already read `AGENTS.md` → `.github/copilo
 
 ## Script Output Priority
 
-When a script prints `NEXT=`, `ERROR_CODE=`, `DOC=`, or a stop/retry message, follow that output first. Script/hook output wins over prose when they disagree.
+When a script prints `NEXT=`, `EDIT_ROOT=`, `FINISH_COMMAND_*=`, `FINALIZABLE=`, `ERROR_CODE=`, `DOC=`, or a stop/retry message, follow that output first. Script/hook output wins over prose when they disagree.
 
 ## Codex-Unique Runtime Rules
 

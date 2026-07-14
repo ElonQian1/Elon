@@ -1,0 +1,33 @@
+# AI workspace artifact policy v1
+#
+# Format: <rule> <value>
+# This file is consumed by scripts/finish-ai-task.*. Keep values relative to
+# the repository root. File names alone never decide whether a test is source
+# code or disposable output.
+
+temporary-root .ai-tmp/
+
+source-extension .rs
+source-extension .kt
+source-extension .java
+source-extension .xml
+source-extension .toml
+source-extension .ts
+source-extension .tsx
+source-extension .js
+source-extension .jsx
+source-extension .py
+source-extension .ps1
+source-extension .sh
+source-extension .md
+source-extension .json
+source-extension .yaml
+source-extension .yml
+source-extension .css
+source-extension .html
+source-extension .sql
+
+generated-extension .log
+generated-extension .tmp
+generated-extension .bak
+generated-extension .cache

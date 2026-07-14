@@ -3,9 +3,9 @@
 > 本文档描述 AI 代理在接收到用户需求后，如何安全地修改代码、触发编译、部署，并将结果反馈给用户。
 > 它是按需参考文档，不是每轮必读入口；常规任务先读 `AGENTS.md` / `CODEX.md`，只有完整流程、发布异常或任务卡住时再读本文。
 
-> **强制工作流规则**（git 提交、多 AI 并发、临时工作树部署）见：
+> **共享生命周期契约**见 `.github/copilot-instructions.md` 的 `WF-START` 至 `WF-REPORT`；Git、验证和发布实现细节见：
 > [.github/instructions/git-deploy-workflow.instructions.md](../.github/instructions/git-deploy-workflow.instructions.md)
-> 该文件保留 Git/部署细则；Codex 按 `AGENTS.md` 路由按需读取。
+> 本文和专项手册只按需读取，不能覆盖统一收尾脚本的机器状态。
 
 > **模块化与长期维护规则**（避免巨型文件、按职责拆模块、多 AI 并行边界）见：
 > [.github/instructions/modular-architecture.instructions.md](../.github/instructions/modular-architecture.instructions.md)
@@ -15,14 +15,14 @@
 
 ## 项目进入规则（APK / Web / 服务器 Codex CLI 通用）
 
-1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录；如果是 `BLOCKED_CREATE_WORKTREE_FIRST`，当前目录不能继续改。
+1. 任何写任务先执行 `WF-START`，并切到预检脚本输出的 `EDIT_ROOT`；它是本轮唯一允许编辑、格式化、测试和提交的目录。
 2. 如果存在 `AGENTS.md`、`CODEX.md` 或 `README.md`，先读轻量入口；`.github/instructions/*.md` 和 `docs/` 只在当前任务需要时读取。
 3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 rebase。`origin/main` 在编码或构建期间前进是并行常态，不是自动 rebase、重跑验证或重新发布的条件。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
-6. 如果任务在隔离 worktree 完成并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不要 stage、stash、删除或移动原主工作区的未跟踪文件，遇到同名路径冲突就报告。
-7. AI 任务状态必须拆成两层：第一层是业务完成状态，例如代码已进入 `origin/main`、服务器已发布成功、APK/PC 节点已验证；第二层是本机收尾状态，例如主工作区 `main` 快进失败、worktree 清理失败。本机收尾失败只能记录为 `cleanup_failed` 或 `local_main_diverged`，不能把已经成立的业务完成状态改回失败。
-8. Android APK 新功能默认先以“业务提交已进入 `origin/main`”为第一层完成定义；并行任务可以先用 `CodePushed` 收尾。只有用户明确要求安装包交付、下载链接或线上发布时，才以“服务器 APK 指向最新主线”为最终完成定义。
+6. 任务最后执行 `WF-FINISH`。统一收尾会验证远端、快进主基线、审计未跟踪文件并回收已合并 worktree；不要再手工拼接这些步骤。
+7. AI 任务状态拆成业务状态和本机收尾状态。业务已经进入 `origin/main` 后不会被清理告警改回失败，但只有 `FINALIZABLE=true` 才能正常宣告完整结束。
+8. Android APK 用户可见改动默认先进入 `origin/main`，再由 `publish-apk.*` 发布并以 `AndroidFeature` 收尾；只有用户或并行协调明确要求“只同步代码/暂不发布”时才用 `CodePushed` 收尾。
 9. `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI 改动必须拆成三层：代码进入 `origin/main`、前端构建通过、服务器 `$DATA_DIR/pc-next-dist/` 已由 `publish-server.*` 发布并通过 `/pc` 与 `/api/server/version` 校验。除非用户明确要求只同步代码或暂不发布，否则不能只以 `CodePushed` 作为最终完成。
 10. 截图、遮挡、错位、层级、弹窗或按图修复类 UI 问题，必须先把截图区域定位到真实组件/样式文件，再用本地预览、浏览器截图、DOM/坐标/层级检查之一做视觉验收。无法截图时必须说明替代证据；构建通过只能证明没有编译错误，不能单独证明用户可见问题已解决。
 11. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
@@ -36,7 +36,7 @@
 3. 只有 push 被 non-fast-forward 拒绝：才 `git fetch origin` + `git rebase origin/main`，解决冲突后再 push。
 4. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
 5. 发布阶段：如果构建产物被更新的 main 超越，停止上传旧产物，汇报“代码已合并，发布交给最新主线”，而不是重跑。
-6. 收尾阶段：如果主工作区 `main` 不能快进或 worktree 清理失败，只报告 `cleanup_failed` / `local_main_diverged`；不要覆盖已经完成的代码同步或发布状态。
+6. 收尾阶段：运行统一收尾；如果主 `main` 不能快进或 worktree 清理失败，分别报告业务状态和 `LOCAL_MAIN_STATUS` / `TASK_WORKTREE_STATUS`，不得伪造 `FINALIZABLE=true`。
 
 ---
 
@@ -191,8 +191,7 @@ AI 代理接收用户消息后，必须先判断需求类型：
 
 ### Rust 代码验证
 ```powershell
-cd server
-cargo check   # 只检查语法，不完整编译，速度快
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
 ```
 
 ### Android 代码验证
@@ -227,15 +226,13 @@ git commit -m "feat(用户需求): <用中文简洁描述本次修改内容>
 - 主体：中文，一句话描述用户看到的变化
 - 必须包含：用户ID、需求原文
 
-如果本次提交是在隔离 worktree 中完成并已推送到 `main`，回到原主工作区做安全同步：
+如果本次提交已 push，使用统一收尾完成主基线同步、文件审计和 worktree 回收：
 
 ```powershell
-cd "<原主工作区>"
-git fetch origin
-git pull --ff-only origin main
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind <Kind>
 ```
 
-这一步只让本地已跟踪文件追上远端；不得顺手 `git add`、stash、清理、删除或移动未跟踪文件。
+Linux/macOS 使用 `bash scripts/finish-ai-task.sh --kind <Kind>`。未知主工作区文件不会被自动修改，也不再阻止无路径冲突的已跟踪基线快进。
 
 ---
 
@@ -301,10 +298,10 @@ bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
 
 ### 7.3 Android APK 编译打包
 ```powershell
-cd android
-./gradlew assembleRelease
-# 编译产物: android/app/build/outputs/apk/release/app-release-unsigned.apk
+scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 ```
+
+一龙自项目的 release 构建、签名、上传和版本 claim 必须由发布脚本完成；不能用 Debug 包或手工 Gradle release 命令代替发布闭环。
 
 ### 7.4 APK 签名
 ```powershell
@@ -340,16 +337,16 @@ Linux/macOS 开发机使用 `bash scripts/publish-server.sh`。不得使用旧�
 Android 可安装端能力变更要先区分**代码同步**和**APK 发布**：
 
 ```powershell
-# 只确认代码已经合并到远端主线
-powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
+# 只交付代码时，用统一收尾确认远端主线、同步 main 并清理 worktree
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed
 
-# 需要交付可安装 APK 时，再单独跑发布
+# Android 用户可见改动默认继续发布；明确只同步代码时跳过
 scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
-powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind AndroidFeature
 ```
 
-- **代码同步完成**：业务代码已 commit 并 push 到 `origin/main`。如果用户明确说“先同步代码”“发布不一定成功”或“这次不用出 APK”，到这里即可结束任务。
-- **APK 发布完成**：只有当用户明确要求下载链接、线上 APK、安装包交付时，才要求 `AndroidFeature` 校验通过。
+- **代码同步完成**：业务代码已 commit 并 push 到 `origin/main`。只有用户明确说“先同步代码”“暂不发布”或并行任务只负责合并时，才以 `CodePushed` 收尾。
+- **APK 发布完成**：Android 用户可见改动默认要求 `publish-apk.*` 和 `AndroidFeature` 校验通过；被更新主线接管时按发布脚本结果汇报。
 
 发布脚本会完成：快进到当前 `origin/main`、向服务器申请版本号、临时注入 `build.gradle`、构建 release APK、还原版本字段、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。版本号不写入 git，也不会生成 release-only commit。
 
@@ -396,6 +393,7 @@ APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现�
 3. **禁止**把机器本地路径、密钥、签名材料或临时构建状态写入共享说明文件
 4. **每个用户任务**必须有完整的 git 提交记录，可溯源
 5. **不允许**一次修改范围过大（超过5个文件应拆分为多次任务）
-6. **Android 新功能禁止只交 PR 或 Debug 包**；默认先 push 到 `origin/main` 并用 `CodePushed` 校验，明确负责 APK 发布时再完成 `AndroidFeature` 闭环
+6. **Android 新功能禁止只交 PR 或 Debug 包**；默认 push 后继续发布并用统一收尾完成 `AndroidFeature`，明确只同步代码时才以 `CodePushed` 结束
 7. **后端运行代码变更必须先 push 到 `origin/main`**；版本号由服务器分配，发布脚本被后续 main 超越时停止追车并汇报，明确负责发布时再校验服务器 `/api/server/version`
 8. **不允许继续制造巨型文件**；新建源文件默认目标 ≤500 行，501-800 行可容忍但必须单一职责，超过 800 行必须拆分；新功能默认按职责模块化，入口文件只做组装和路由
+9. **修改任务不得跳过统一收尾**；`FINALIZABLE=false` 时必须继续处理或明确报告业务完成与本机收尾阻塞

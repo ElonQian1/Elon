@@ -165,17 +165,36 @@ function Sync-MainWorktreeIfClean {
         return
     }
 
-    $status = (& git -C $mainWorktree.Path status --porcelain=v1 --untracked-files=normal)
-    if (-not [string]::IsNullOrWhiteSpace(($status -join "`n"))) {
-        Write-Host "  MAIN_BASELINE_SYNC=blocked_dirty:$($mainWorktree.Path)"
+    # Unknown untracked files belong to a separate workspace-hygiene concern.
+    # They must not keep the tracked main baseline hundreds of commits behind.
+    # Git itself will reject the merge if an untracked path would be overwritten.
+    $trackedStatus = (& git -C $mainWorktree.Path status --porcelain=v1 --untracked-files=no)
+    if (-not [string]::IsNullOrWhiteSpace(($trackedStatus -join "`n"))) {
+        Write-Host "  MAIN_BASELINE_SYNC=blocked_tracked_changes:$($mainWorktree.Path)"
         Write-Host "  CLEANUP_STATUS=cleanup_failed"
-        Write-Host "  CLEANUP_STATUS_DETAIL=main_baseline_dirty_not_task_failure"
+        Write-Host "  CLEANUP_STATUS_DETAIL=main_baseline_tracked_changes_not_task_failure"
         return
     }
 
+    $untracked = @(& git -C $mainWorktree.Path -c core.quotePath=false status --porcelain=v1 --untracked-files=all) |
+        Where-Object { $_ -like "?? *" }
+    if ($untracked.Count -gt 0) {
+        Write-Host "  MAIN_BASELINE_UNTRACKED=warning:$($untracked.Count)"
+        $untracked | ForEach-Object { Write-Host "  MAIN_BASELINE_UNTRACKED_PATH=$($_.Substring(3))" }
+    } else {
+        Write-Host "  MAIN_BASELINE_UNTRACKED=clean"
+    }
+
     $before = (& git -C $mainWorktree.Path rev-parse --short HEAD).Trim()
-    $mergeOutput = & git -C $mainWorktree.Path merge --ff-only origin/main 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $mergeOutput = @(& git -C $mainWorktree.Path merge --ff-only origin/main 2>&1)
+        $mergeExitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldPreference
+    }
+    if ($mergeExitCode -ne 0) {
         $cleanupStatus = Get-CleanupStatusFromGitOutput -Output ($mergeOutput -join ' ')
         Write-Host "  MAIN_BASELINE_SYNC=failed:${cleanupStatus}:$($mergeOutput -join ' ')" -ForegroundColor Yellow
         Write-Host "  CLEANUP_STATUS=$cleanupStatus"
@@ -386,6 +405,11 @@ if ($Kind -eq "NodeAgent") {
 }
 
 if ($Kind -eq "DocsOnly") {
+    git merge-base --is-ancestor $head $originMain | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Stop-Check "DocsOnly task is not complete: local HEAD is not contained in origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
+    }
+
     Write-Host "DocsOnly completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"

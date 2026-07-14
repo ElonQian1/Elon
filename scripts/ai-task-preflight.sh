@@ -95,8 +95,10 @@ write_ai_workflow_guard() {
   echo "EDIT_STATE=$state"
   echo "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
   echo "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
-  echo "RULE_PUSH=after commit run git push origin HEAD:main, then run the CodePushed ancestor check for this platform."
-  echo "RULE_FINISH=after push sync the main baseline with git pull --ff-only and run scripts/cleanup-task-worktrees.sh --apply."
+  echo "RULE_PUSH=after commit run git push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
+  echo "RULE_FINISH=after push run scripts/finish-ai-task.sh --kind <Kind>; it verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
+  echo "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\finish-ai-task.ps1 -Kind CodePushed"
+  echo "FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed"
   echo "AI_WORKFLOW_GUARD_END"
 }
 
@@ -140,12 +142,24 @@ sync_local_main_baseline() {
 
   if [[ -n "$main_path" && -e "$main_path/.git" ]]; then
     local status
-    status="$(git -C "$main_path" status --porcelain=v1 --untracked-files=normal)"
+    status="$(git -C "$main_path" status --porcelain=v1 --untracked-files=no)"
     if [[ -n "$status" ]]; then
-      echo "MAIN_BASELINE_SYNC=blocked_dirty:$main_path"
+      echo "MAIN_BASELINE_SYNC=blocked_tracked_changes:$main_path"
       return 0
     fi
-    git -C "$main_path" merge --ff-only origin/main >/dev/null
+
+    local untracked_count merge_output
+    untracked_count="$(git -C "$main_path" -c core.quotePath=false status --porcelain=v1 --untracked-files=all | grep -c '^?? ' || true)"
+    if [[ "$untracked_count" -gt 0 ]]; then
+      echo "MAIN_BASELINE_UNTRACKED=warning:$untracked_count"
+    else
+      echo "MAIN_BASELINE_UNTRACKED=clean"
+    fi
+
+    if ! merge_output="$(git -C "$main_path" merge --ff-only origin/main 2>&1)"; then
+      echo "MAIN_BASELINE_SYNC=failed:$main_path:$merge_output"
+      return 0
+    fi
     echo "MAIN_BASELINE_SYNC=synced_worktree:$main_path"
     return 0
   fi

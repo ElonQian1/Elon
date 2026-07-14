@@ -299,12 +299,13 @@ pub(crate) fn build_development_cli_prompt(
 - 低算力模块化流程必须执行：写代码前先做 5-15 行文件计划，优先说明要新建/修改哪些 focused modules；新建源文件默认目标 <=500 行，501-800 行可容忍但必须单一职责，>800 行必须拆分；已有 >1500 行文件除小修外不得追加新功能，先把本次职责抽到独立模块；提交前用便宜行数检查复核本轮变更文件。
 - 项目规则和长期记忆以仓库文件为准，CLI 自身没有跨任务魔法记忆；如果本次改变了流程或约定，请同步更新项目内说明文档并提交。
 - 旁路 AI 模型结论只当证据；你仍是当前 Codex CLI 原生 session 的主执行上下文。
-- 对已有 Git 项目：修改前 fetch 并查看 git 状态；工作区干净才 rebase。若当前目录已是会话 worktree/分支，只在当前分支完成、验证、commit，并在有 origin 时 push 当前分支；无 origin 项目本地 commit 即可。push 被拒绝时先 rebase 再 push，不要 force push。
+- 对已有 Git 项目优先执行仓库入口定义的生命周期；没有项目规则时，修改前查看 git 状态，只提交本任务文件，有 origin 就 push。只有 push 被拒绝才 rebase，不要 force push；无 origin 项目本地 commit 即可。
 - 轻量项目工作流：先读 AGENTS.md/CODEX.md/CLAUDE.md/GEMINI.md/README 中存在的轻量入口；如果入口路由到 .github/copilot-instructions.md，按要求读取它，再按当前任务读取相关 .github/instructions 或 docs；未知项目按自己的说明和平台默认流程处理，不要把一龙自项目发布规则套到无关项目。
-- 如果改动影响一龙后端运行，始终先提交并 push 业务代码；只有当用户明确要求部署、验证线上服务或交付可运行后端时，才运行 `scripts/publish-server.ps1` 或 `scripts/publish-server.sh`。若用户只要求“代码先同步远端”，可用 `scripts/check-task-complete.ps1 -Kind CodeSync` 收尾。脚本负责版本分配、构建、上传、并发保护和 finish。不要手动改 `server/Cargo.toml` 版本；部署后验证 `/health` 和 `/api/server/version`。
-- 如果改动影响一龙 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI，不要把 CodePushed 当成用户问题已解决。除非用户明确说“只同步代码/暂不发布”，否则必须先运行 `pc-frontend` 的构建验证，再 push，之后运行 `scripts/publish-server.ps1` 或 `scripts/publish-server.sh` 上传 `$DATA_DIR/pc-next-dist`，再运行 `scripts/check-task-complete.ps1 -Kind PcFrontend` 校验 `/pc` 和 `/api/server/version` 指向本次 HEAD。遇到截图、遮挡、错位、层级、弹窗或按图修复类 UI 问题，先把截图中的区域定位到真实组件/样式文件，再用本地预览、浏览器截图、DOM/坐标/层级检查之一做视觉验收；无法截图时必须说明替代证据或未完成视觉验收，不能只凭 `npm run build` 宣称用户问题已解决。
-- 如果改动影响一龙 Android APK，始终先提交并 push 业务代码；若用户明确要求“只同步代码/先合并远端/这次发布不必成功”，push 完后可用 `scripts/check-task-complete.ps1 -Kind CodeSync` 收尾，不要继续追着发布结果反复同步 main。只有当用户明确要求可安装 APK、下载链接或线上发布时，才运行 `scripts/publish-apk.ps1` 和 `scripts/check-task-complete.ps1 -Kind AndroidFeature`；脚本负责版本分配、临时构建配置、上传、并发保护和 finish。不要手动改或提交 `build.gradle` 版本字段；签名文件只来自本机配置或环境变量。发布若因更新的 `origin/main` 或线上新版本抢先而中止，要说明“代码已同步，发布可稍后重试”，不要把代码同步任务重新拉回 rebase/重发循环。
-- 脚本输出 `NEXT=`、`ERROR_CODE=`、`DOC=` 或明确中止/恢复提示时，优先按脚本提示处理；只有仍无法判断时再读匹配细节文档。
+- 一龙仓库写任务必须执行入口中的 `WF-START` 至 `WF-REPORT`；有意创建的测试/fixture 要提交，一次性产物写入 `.ai-tmp/`，来源不明文件不擅自提交、忽略或删除。最终必须运行 `finish-ai-task.*`，只有 `FINALIZABLE=true` 才能正常宣告完整结束。
+- 如果改动影响一龙后端运行，先提交并 push；除非用户明确只同步代码，否则运行 `scripts/publish-server.ps1` 或 `.sh`，再用 `finish-ai-task.*` 的 `Server` Kind 收尾；只同步时用 `CodePushed`。不要手动改 `server/Cargo.toml` 版本，发布后验证 `/health` 和 `/api/server/version`。
+- 如果改动影响一龙 `pc-frontend/`、`/pc`、`/pc-next` 或用户可见 PC 工作台 UI，不要把 CodePushed 当成用户问题已解决。除非用户明确只同步代码，否则先构建、push，再运行 `scripts/publish-server.ps1` 或 `.sh` 上传 `pc-next-dist`，最后用统一收尾的 `PcFrontend` Kind 校验 `/pc` 和 `/api/server/version`。截图、遮挡、错位或按图修复还必须定位真实组件，并做浏览器截图、DOM/坐标/层级检查之一；不能只凭 `npm run build` 宣称解决。
+- 如果改动影响一龙 Android APK，先提交并 push；除非用户明确只同步代码，否则运行 `scripts/publish-apk.ps1` 或 `.sh`，最后用 `finish-ai-task.*` 的 `AndroidFeature` Kind。只同步时用 `CodePushed`。版本由脚本分配，不要提交 `build.gradle` 版本或签名材料。发布被更新主线接管时停止追车，分别报告业务与发布状态。
+- 脚本输出 `NEXT=`、`EDIT_ROOT=`、`FINISH_COMMAND_*=`、`FINALIZABLE=`、`ERROR_CODE=`、`DOC=` 或明确中止/恢复提示时，优先按脚本提示处理；只有仍无法判断时再读匹配细节文档。
 - 开始执行前，先用 1-2 句自然中文回应用户：说清楚你理解到的具体需求，以及接下来会先检查或修改哪里。为了让客户端识别，这一行必须以「用户可见：」开头。不要使用固定模板，不要提“CLI/后台/工作区”，不要承诺还没有完成的结果。
 - 执行过程中，只有当你有新的判断、阻塞、构建失败原因或下一步取舍时，才补充简短中文说明；这类说明也必须以「用户可见：」开头。命令细节和文件列表不需要写给用户。
 - 除了真正要展示给用户的自然说明外，不要在其他位置输出「用户可见：」。

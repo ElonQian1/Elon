@@ -554,8 +554,10 @@ Required direct tasks:
             $gitMessage += "`r`n- Do not stop after CodePushed. The task is incomplete until scripts\publish-server.ps1 succeeds and /api/server/version reports the current HEAD gitSha."
             $gitMessage += "`r`n- Run scripts\publish-server.ps1 after CodePushed succeeds."
             $gitMessage += "`r`n- Verify /health plus /api/server/version after publish."
+            $gitMessage += "`r`n- Run scripts\finish-ai-task.ps1 -Kind Server last; final reply requires FINALIZABLE=true."
         } else {
             $gitMessage += "`r`n- Do not publish APK or server unless a required code fix is made."
+            $gitMessage += "`r`n- Run scripts\finish-ai-task.ps1 -Kind CodePushed last; final reply requires FINALIZABLE=true."
         }
         $gitMessage += "`r`nFinal reply is allowed only after git fetch origin main, git log -1 --oneline -- $docPath, and git cat-file -e origin/main:$docPath succeed locally."
         if ($RunPublishProbe) {
@@ -610,8 +612,10 @@ Required direct tasks:
             if ($RunPublishProbe) {
                 $gitRetryMessage += "`r`n- This is server publish only. Do not run scripts\publish-apk.ps1, do not publish APK, and do not run check-task-complete.ps1 -Kind AndroidFeature."
                 $gitRetryMessage += "`r`n- After CodePushed succeeds, run scripts\publish-server.ps1 and verify /health plus /api/server/version."
+                $gitRetryMessage += "`r`n- Run scripts\finish-ai-task.ps1 -Kind Server last; final reply requires FINALIZABLE=true."
             } else {
                 $gitRetryMessage += "`r`n- Do not publish APK or server unless a required code fix is made."
+                $gitRetryMessage += "`r`n- Run scripts\finish-ai-task.ps1 -Kind CodePushed last; final reply requires FINALIZABLE=true."
             }
             $gitRetryMessage += "`r`nFinal reply is allowed only after git fetch origin main, git log -1 --oneline -- $docPath, and git cat-file -e origin/main:$docPath succeed locally."
             if ($RunPublishProbe) {
@@ -669,6 +673,7 @@ Required direct tasks:
 - Run git rev-parse HEAD and git rev-parse origin/main; both must equal $pushedCommit before publishing. If HEAD is behind origin/main, fast-forward or rebase without creating a new commit.
 - Run scripts\publish-server.ps1.
 - Verify /health and /api/server/version after publish. /api/server/version gitSha must equal $pushedCommit.
+- Run scripts\finish-ai-task.ps1 -Kind Server last; final reply requires FINALIZABLE=true.
 
 Your final reply must include SERVER_RELEASE_STATUS=published and must not include APK_RELEASE_STATUS=published unless quoting command output.
 End your final reply with marker $publishTrace.

@@ -33,6 +33,7 @@ Thumbs.db
 # Temporary AI deploy helpers
 scripts/_wsl_deploy.sh
 scripts/_deploy_temp*.sh
+/.ai-tmp/
 .runtime/
 /.elon/ui-design/
 .elon/ui-tuner/live/
