@@ -1,17 +1,17 @@
 {
   "primaryCard": {
-    "backgroundColor": "#FF5D3FD3",
+    "backgroundColor": "#FF2563EB",
     "contentColor": "#FFFFFFFF",
-    "cornerRadius": 20,
+    "cornerRadius": 24,
     "fontWeight": 600,
     "letterSpacing": 0.01,
     "lineHeight": 24,
     "opacity": 1,
     "paddingBottom": 16,
     "paddingEnd": 20,
-    "paddingStart": 21,
+    "paddingStart": 24,
     "paddingTop": 16,
     "textSize": 18,
-    "width": 280
+    "width": 320
   }
 }
