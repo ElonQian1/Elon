@@ -21,6 +21,7 @@ mod mcp;
 mod mcp_tools;
 mod preview;
 mod protocol;
+mod relational_layout_geometry;
 mod routes;
 mod source_commit;
 mod source_json;

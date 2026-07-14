@@ -174,6 +174,67 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_trace_relational_layout_geometry",
+            "在真实 Android Renderer 的多页面/多状态序列中稳定选择节点，计算节点、屏幕及安全内容区的边缘、中心、尺寸与间距关系，并执行带像素容差的可追溯断言。",
+            json!({
+                "type":"object",
+                "required":["steps","selectors","assertions"],
+                "properties":{
+                    "deviceId":{"type":"string"},
+                    "packageName":{"type":"string"},
+                    "settleMs":{"type":"integer","minimum":100,"maximum":5000,"default":700},
+                    "steps":{
+                        "type":"array","minItems":1,"maxItems":16,
+                        "items":{
+                            "type":"object","required":["name","action"],
+                            "properties":{
+                                "name":{"type":"string","minLength":1,"maxLength":80},
+                                "action":{
+                                    "type":"object","required":["type"],
+                                    "properties":{
+                                        "type":{"enum":["LAUNCH","TAP","TAP_NODE","BACK","WAIT"]},
+                                        "x":{"type":"integer","minimum":0},
+                                        "y":{"type":"integer","minimum":0},
+                                        "resourceIdSuffix":{"type":"string","maxLength":200},
+                                        "text":{"type":"string","maxLength":500},
+                                        "contentDescription":{"type":"string","maxLength":500},
+                                        "occurrence":{"type":"integer","minimum":0,"maximum":50}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "selectors":{
+                        "type":"array","minItems":1,"maxItems":16,
+                        "items":{
+                            "type":"object","required":["label"],
+                            "properties":{
+                                "label":{"type":"string","minLength":1,"maxLength":80},
+                                "resourceIdSuffix":{"type":"string","maxLength":200},
+                                "text":{"type":"string","maxLength":500},
+                                "contentDescription":{"type":"string","maxLength":500},
+                                "occurrence":{"type":"integer","minimum":0,"maximum":50}
+                            }
+                        }
+                    },
+                    "assertions":{
+                        "type":"array","minItems":1,"maxItems":32,
+                        "items":{
+                            "type":"object",
+                            "required":["name","left","right","tolerancePx"],
+                            "properties":{
+                                "name":{"type":"string","minLength":1,"maxLength":120},
+                                "left":geometry_operand_schema(),
+                                "right":geometry_operand_schema(),
+                                "expectedDeltaPx":{"type":"integer","default":0},
+                                "tolerancePx":{"type":"integer","minimum":0,"maximum":10000}
+                            }
+                        }
+                    }
+                }
+            }),
+        ),
+        tool(
             "ui_get_node",
             "按 runtimeNodeId 或 definitionId 读取一个节点。",
             node_selector_schema(),
@@ -339,6 +400,36 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_start_capability_upgrade",
+            "把已批准的平台能力缺口正式推进到 UPGRADING；必须记录升级前源码 revision。",
+            json!({
+                "type":"object",
+                "required":["gapId","sourceRevisionBefore"],
+                "properties":{
+                    "gapId":{"type":"string","maxLength":128},
+                    "sourceRevisionBefore":{"type":"string","maxLength":256}
+                }
+            }),
+        ),
+        tool(
+            "ui_complete_capability_upgrade",
+            "回报平台升级发布或复检结果，严格推进 PUBLISHED、RESUMED 或失败熔断状态。",
+            json!({
+                "type":"object",
+                "required":["gapId","transition"],
+                "properties":{
+                    "gapId":{"type":"string","maxLength":128},
+                    "transition":{"enum":["PUBLISH_COMPLETED","RECHECK_PASSED","RECHECK_FAILED","UPGRADE_FAILED","CANCEL"]},
+                    "sourceRevisionAfter":{"type":"string","maxLength":256},
+                    "commitId":{"type":"string","maxLength":256},
+                    "version":{"type":"string","maxLength":256},
+                    "changedFiles":{"type":"array","minItems":1,"maxItems":128,"items":{"type":"string","maxLength":2000}},
+                    "failureSignature":{"type":"string","maxLength":500},
+                    "error":{"type":"string","maxLength":2000}
+                }
+            }),
+        ),
+        tool(
             "ui_get_commit_plan",
             "分析当前 LIVE 修改的确定性写回与 Codex 回退项。",
             json!({"type":"object","properties":{}}),
@@ -408,6 +499,19 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
             "destructiveHint": false,
             "idempotentHint": read_only,
             "openWorldHint": false
+        }
+    })
+}
+
+fn geometry_operand_schema() -> Value {
+    json!({
+        "type":"object",
+        "required":["step","source","anchor"],
+        "properties":{
+            "step":{"type":"string","minLength":1,"maxLength":80},
+            "source":{"enum":["NODE","DISPLAY","SAFE_CONTENT"]},
+            "selector":{"type":"string","minLength":1,"maxLength":80},
+            "anchor":{"enum":["LEFT","TOP","RIGHT","BOTTOM","CENTER_X","CENTER_Y","WIDTH","HEIGHT"]}
         }
     })
 }

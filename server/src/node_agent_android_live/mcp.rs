@@ -318,6 +318,10 @@ async fn call_tool(
             let session = broker.session(&session_id).await?;
             super::window_insets_sequence::run(&session, arguments).await?
         }
+        "ui_trace_relational_layout_geometry" => {
+            let session = broker.session(&session_id).await?;
+            super::relational_layout_geometry::run(&session, arguments).await?
+        }
         "ui_get_node" => {
             let ir = load_or_build_ui_ir(broker, &session_id).await?;
             let node = find_node(&ir, &arguments)?;
@@ -462,6 +466,14 @@ async fn call_tool(
         "ui_control_capability_gap" => {
             let session = broker.session(&session_id).await?;
             super::capability_gap::control_gap(&session, &arguments)?
+        }
+        "ui_start_capability_upgrade" => {
+            let session = broker.session(&session_id).await?;
+            super::capability_gap::start_capability_upgrade(&session, &arguments)?
+        }
+        "ui_complete_capability_upgrade" => {
+            let session = broker.session(&session_id).await?;
+            super::capability_gap::complete_capability_upgrade(&session, &arguments)?
         }
         "ui_get_commit_plan" => {
             let session = broker.session(&session_id).await?;

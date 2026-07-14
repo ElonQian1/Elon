@@ -26,6 +26,7 @@ const SUPPORTED_CAPABILITIES: &[&str] = &[
     "CODEX_SOURCE_HANDOFF",
     "PATCH_FREE_BUILD_VERIFY",
     "WINDOW_INSETS_SEQUENCE_TRACE",
+    "RELATIONAL_LAYOUT_GEOMETRY_TRACE",
 ];
 
 const KNOWN_PLATFORM_GAPS: &[&str] = &[
@@ -151,6 +152,7 @@ fn runtime_required(capability: &str) -> bool {
             | "LOCAL_VISUAL_SOLVER"
             | "PERSISTENT_FIT_RUN"
             | "PATCH_FREE_BUILD_VERIFY"
+            | "RELATIONAL_LAYOUT_GEOMETRY_TRACE"
     )
 }
 
@@ -259,6 +261,37 @@ pub(crate) fn control_gap(session: &LiveUiSession, arguments: &Value) -> Result<
         "resumeOriginalTask": gap.status == CapabilityGapStatus::Resumed,
         "next": next_action(&gap),
     }))
+}
+
+pub(crate) fn start_capability_upgrade(
+    session: &LiveUiSession,
+    arguments: &Value,
+) -> Result<Value> {
+    control_gap(session, &arguments_with_action(arguments, "START_UPGRADE")?)
+}
+
+pub(crate) fn complete_capability_upgrade(
+    session: &LiveUiSession,
+    arguments: &Value,
+) -> Result<Value> {
+    let transition = required_text(arguments, "transition", 80)?.to_ascii_uppercase();
+    if !matches!(
+        transition.as_str(),
+        "PUBLISH_COMPLETED" | "RECHECK_PASSED" | "RECHECK_FAILED" | "UPGRADE_FAILED" | "CANCEL"
+    ) {
+        bail!("不支持的 capability upgrade completion transition: {transition}")
+    }
+    control_gap(session, &arguments_with_action(arguments, &transition)?)
+}
+
+fn arguments_with_action(arguments: &Value, action: &str) -> Result<Value> {
+    let mut object = arguments
+        .as_object()
+        .cloned()
+        .ok_or_else(|| anyhow!("capability upgrade 参数必须是对象"))?;
+    object.remove("transition");
+    object.insert("action".to_string(), Value::String(action.to_string()));
+    Ok(Value::Object(object))
 }
 
 pub(crate) fn list_gaps(root: &Path) -> Result<Vec<CapabilityGapDocument>> {
@@ -573,8 +606,8 @@ pub(crate) struct CapabilityGapDocument {
 #[cfg(test)]
 mod tests {
     use super::{
-        new_screen_bootstrap_readiness, normalize_capabilities, publish_completed,
-        CapabilityGapDocument, CapabilityGapStatus, CapabilityUpgradeAttempt,
+        arguments_with_action, new_screen_bootstrap_readiness, normalize_capabilities,
+        publish_completed, CapabilityGapDocument, CapabilityGapStatus, CapabilityUpgradeAttempt,
         CapabilityUpgradePolicy, NewScreenBootstrapReadiness, SUPPORTED_CAPABILITIES,
     };
     use serde_json::json;
@@ -587,6 +620,18 @@ mod tests {
         );
         assert!(SUPPORTED_CAPABILITIES.contains(&"PERSISTENT_FIT_RUN"));
         assert!(SUPPORTED_CAPABILITIES.contains(&"WINDOW_INSETS_SEQUENCE_TRACE"));
+        assert!(SUPPORTED_CAPABILITIES.contains(&"RELATIONAL_LAYOUT_GEOMETRY_TRACE"));
+    }
+
+    #[test]
+    fn explicit_upgrade_api_maps_transition_to_state_machine_action() {
+        let value = arguments_with_action(
+            &json!({"gapId":"gap_1","transition":"PUBLISH_COMPLETED"}),
+            "PUBLISH_COMPLETED",
+        )
+        .unwrap();
+        assert_eq!(value["action"], "PUBLISH_COMPLETED");
+        assert!(value.get("transition").is_none());
     }
 
     #[test]
