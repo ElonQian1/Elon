@@ -14,12 +14,14 @@ import {
   type AndroidInspectorSnapshot,
   type AndroidWirelessStatus,
 } from './deviceInspectorApi'
+import type { AndroidDeviceLeaseProof } from './deviceLeaseApi'
 
 interface UseAndroidInspectorDevicesOptions {
   onCaptured: (snapshot: AndroidInspectorSnapshot) => void
   onNotice: (message: string) => void
   projectRoot?: string
   packageName?: string
+  ensureLease?: (hardwareSerial: string) => Promise<AndroidDeviceLeaseProof>
 }
 
 const SELECTED_DEVICE_STORAGE_KEY = 'elon.pc.uiTuner.selectedAndroidDevice.v1'
@@ -108,6 +110,7 @@ export function useAndroidInspectorDevices({
   onNotice,
   projectRoot,
   packageName,
+  ensureLease,
 }: UseAndroidInspectorDevicesOptions) {
   const [devices, setDevices] = useState<AndroidInspectorDevice[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
@@ -177,6 +180,7 @@ export function useAndroidInspectorDevices({
         return null
       }
       const identity = deviceIdentity(targetDevice)
+      const lease = override?.launchApp === false ? undefined : await ensureLease?.(identity)
       window.localStorage.setItem(SELECTED_DEVICE_STORAGE_KEY, identity)
       setSelectedDeviceId(targetDevice.serial)
       const preferredPackage = override?.packageName || packageName || DEBUG_PACKAGE
@@ -187,6 +191,7 @@ export function useAndroidInspectorDevices({
           packageName: preferredPackage,
           launchApp: override?.launchApp ?? true,
           projectRoot,
+          lease,
         })
         if (preferredPackage !== DEFAULT_PACKAGE && foregroundPackage(snapshot) !== preferredPackage) {
           throw new Error(`${preferredPackage} 未在前台运行`)
@@ -198,6 +203,7 @@ export function useAndroidInspectorDevices({
           packageName: DEFAULT_PACKAGE,
           launchApp: true,
           projectRoot,
+          lease,
         })
       }
       if (isSystemOverlay(snapshot)) {
@@ -223,7 +229,7 @@ export function useAndroidInspectorDevices({
     } finally {
       setCaptureBusy(false)
     }
-  }, [onCaptured, onNotice, packageName, projectRoot, refreshDevices, selectedDeviceId])
+  }, [ensureLease, onCaptured, onNotice, packageName, projectRoot, refreshDevices, selectedDeviceId])
 
   const selectDevice = useCallback((deviceId: string) => {
     const selected = devices.find((device) => device.serial === deviceId)

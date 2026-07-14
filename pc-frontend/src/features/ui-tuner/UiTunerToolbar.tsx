@@ -17,6 +17,7 @@ import {
   Wifi,
 } from 'lucide-react'
 import type { AndroidInspectorDevice } from './device/deviceInspectorApi'
+import type { AndroidDeviceLease } from './device/deviceLeaseApi'
 import styles from './UiTunerPage.module.css'
 
 function deviceConnectionLabel(device: AndroidInspectorDevice) {
@@ -37,6 +38,9 @@ interface UiTunerToolbarProps {
   capturedDeviceId?: string
   liveConnected: boolean
   wirelessConnected: boolean
+  deviceLeaseLabel?: string
+  deviceLeaseBlocked?: boolean
+  deviceLeases: AndroidDeviceLease[]
   viewScaleLabel: string
   fitToStage: boolean
   canUndo: boolean
@@ -71,6 +75,9 @@ export function UiTunerToolbar({
   capturedDeviceId,
   liveConnected,
   wirelessConnected,
+  deviceLeaseLabel,
+  deviceLeaseBlocked,
+  deviceLeases,
   viewScaleLabel,
   fitToStage,
   canUndo,
@@ -117,7 +124,7 @@ export function UiTunerToolbar({
             : liveConnected ? styles.deviceStatusLive : styles.deviceStatus}
           title={captureIssue || deviceStatus}
         >
-          {deviceStatus}
+          {deviceStatus}{deviceLeaseLabel ? ` · ${deviceLeaseLabel}` : ''}
         </span>
       </div>
       <div className={styles.toolbarActions}>
@@ -142,6 +149,9 @@ export function UiTunerToolbar({
           {devices.map((device) => (
             <option key={device.serial} value={device.serial}>
               {device.model ?? device.serial} · {deviceConnectionLabel(device)} · {device.state}
+              {deviceLeases.find((lease) => lease.hardwareSerial === (device.hardwareSerial || device.serial))
+                ? ` · ${deviceLeases.find((lease) => lease.hardwareSerial === (device.hardwareSerial || device.serial))?.ownerDisplayName} 使用中`
+                : ''}
             </option>
           ))}
         </select>
@@ -160,8 +170,8 @@ export function UiTunerToolbar({
         <button
           type="button"
           onClick={onCaptureDeviceSnapshot}
-          disabled={captureBusy || deviceBusy}
-          title="一台手机会自动识别；多台手机时请先在左侧选择"
+          disabled={captureBusy || deviceBusy || deviceLeaseBlocked}
+          title={deviceLeaseBlocked ? '这台手机正被其他用户使用，请切换手机或等待自动释放' : '一台手机会自动识别；多台手机时请先在左侧选择'}
         >
           <Smartphone size={14} aria-hidden="true" />
           {captureBusy ? '读取真机中' : '调试真机'}

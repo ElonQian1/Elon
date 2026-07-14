@@ -258,6 +258,7 @@ async fn call_tool(
                     base_package_name,
                     project_root,
                     debug_application_id_suffix,
+                    lease: None,
                 },
                 crate::node_agent_admin_open::admin_port_from_env(),
             )

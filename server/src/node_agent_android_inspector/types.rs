@@ -124,6 +124,7 @@ pub(crate) struct AndroidDeviceIdentity {
 pub(crate) struct LaunchAppRequest {
     pub device_id: String,
     pub package_name: Option<String>,
+    pub lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -135,6 +136,7 @@ pub(crate) struct CaptureRequest {
     pub include_screenshot_data_url: Option<bool>,
     pub launch_app: Option<bool>,
     pub project_root: Option<String>,
+    pub lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -1,6 +1,7 @@
 import { nodeApi } from '../../node/localNodeApi'
 import { inspectorAdminUrl } from '../device/deviceInspectorApi'
 import type { VisualDiffResult } from './liveUiIrApi'
+import type { AndroidDeviceLeaseProof } from '../device/deviceLeaseApi'
 
 export type LiveUiScope = 'INSTANCE' | 'DEFINITION'
 
@@ -143,6 +144,7 @@ export async function prepareLiveDebugRuntime(input: {
   basePackageName: string
   projectRoot: string
   debugApplicationIdSuffix: string
+  lease: AndroidDeviceLeaseProof
 }): Promise<LiveDebugRuntimePrepareResult> {
   const response = await nodeApi<{ result: LiveDebugRuntimePrepareResult }>(
     inspectorAdminUrl(),
@@ -157,6 +159,7 @@ export async function startLiveUiSession(input: {
   deviceId: string
   packageName: string
   projectRoot?: string
+  lease: AndroidDeviceLeaseProof
 }): Promise<LiveUiSessionStart> {
   return nodeApi<LiveUiSessionStart>(
     inspectorAdminUrl(),

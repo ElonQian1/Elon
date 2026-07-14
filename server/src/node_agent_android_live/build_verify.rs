@@ -70,6 +70,7 @@ pub(crate) struct PrepareDebugRuntimeRequest {
     pub(crate) base_package_name: String,
     pub(crate) project_root: String,
     pub(crate) debug_application_id_suffix: String,
+    pub(crate) lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
 }
 
 #[derive(Debug, Serialize)]
@@ -273,10 +274,8 @@ pub(crate) async fn build_and_verify(
     // 重新部署后节点几何可能已经改变。目标门禁必须裁剪纯源码版本的
     // 实际 Runtime bounds，而不是继续沿用设计会话开始时的旧 currentRect。
     let verified_current_rect = source_rect.or(request.current_rect);
-    let target_comparison_rect = target_comparison_current_rect(
-        request.projected_current_rect,
-        verified_current_rect,
-    );
+    let target_comparison_rect =
+        target_comparison_current_rect(request.projected_current_rect, verified_current_rect);
     let visual_diff = target_path
         .as_deref()
         .map(|path| {

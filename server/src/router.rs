@@ -13,24 +13,26 @@ use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::types::AppState;
 use crate::ui_tuner_api;
+use crate::ui_tuner_device_lease_api;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, codex_vault_api, context_compiler,
     conversation_forks, external_app_api, external_app_chat_bootstrap, external_app_mvp_chat,
     external_app_route_c_sdk, external_app_tool_report_api, friend_api, global_ws, group_ai,
-    group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, peer_relay, project_api, project_attachments,
-    project_channels, project_chat, project_conversation_identity, project_deletion, project_docs,
-    project_git, project_join_requests, project_landing_api, project_membership, project_releases,
-    project_runtime_permission_api, project_space, project_space_task_snapshot,
-    project_storage_git, project_store, project_workspace_health, project_workspace_recovery,
-    release_claim, server_agent_runtime, speech_translate, token_usage_api, user_api,
-    user_archive_api, user_memory_api, user_progression, voice_asr_upload, voice_tts_api,
-    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
+    group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, peer_relay, project_api,
+    project_attachments, project_channels, project_chat, project_conversation_identity,
+    project_deletion, project_docs, project_git, project_join_requests, project_landing_api,
+    project_membership, project_releases, project_runtime_permission_api, project_space,
+    project_space_task_snapshot, project_storage_git, project_store, project_workspace_health,
+    project_workspace_recovery, release_claim, server_agent_runtime, speech_translate,
+    token_usage_api, user_api, user_archive_api, user_memory_api, user_progression,
+    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    voice_ws_virtual_mic, web,
 };
 
+mod admin_routes;
 mod node_routes;
 mod social_routes;
-mod admin_routes;
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
 ///
@@ -204,6 +206,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/me", get(auth_api::me))
         .merge(codex_vault_api::routes())
         .merge(ui_tuner_api::routes())
+        .merge(ui_tuner_device_lease_api::routes())
         .route("/api/me/progression", get(user_progression::get_my_progression))
         .route(
             "/api/external/apps/:app_id",

@@ -9,6 +9,7 @@ pub(crate) struct StartLiveSessionRequest {
     pub device_id: String,
     pub package_name: String,
     pub project_root: Option<String>,
+    pub lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

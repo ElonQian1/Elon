@@ -136,6 +136,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (99, "PC 节点 CLI 完成回放收件箱与离线结算绑定", crate::offline_completion_migration::migration_v99),
     (100, "Codex 共享租约单节点唯一性与旧授权收敛", crate::codex_vault_emergency_migration::migration_v100),
     (101, "UI 路由受控近义概念、别名审计与聚类命中", crate::ui_route_learning_migration::migration_v101),
+    (102, "项目 Android 测试设备多用户租约", crate::project_android_device_leases_migration::migration_v102),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import type {
   AndroidWirelessStatus,
 } from './deviceInspectorApi'
 import styles from './UiTunerDeviceDialog.module.css'
+import type { AndroidDeviceLease } from './deviceLeaseApi'
 
 interface UiTunerDeviceDialogProps {
   open: boolean
@@ -38,6 +39,7 @@ interface UiTunerDeviceDialogProps {
   onForget: (profileId: string) => void
   projectName?: string
   sharedHardwareSerials: string[]
+  leases: AndroidDeviceLease[]
   onToggleProjectShare: (profile: AndroidDeviceProfile, shared: boolean) => void
 }
 
@@ -75,6 +77,7 @@ export function UiTunerDeviceDialog({
   onForget,
   projectName,
   sharedHardwareSerials,
+  leases,
   onToggleProjectShare,
 }: UiTunerDeviceDialogProps) {
   const [displayName, setDisplayName] = useState('')
@@ -247,6 +250,7 @@ export function UiTunerDeviceDialog({
               {!status?.profiles.length && <div className={styles.empty}>尚未登记手机，请先完成第一步。</div>}
               {status?.profiles.map((profile) => {
                 const shared = sharedHardwareSerials.includes(profile.hardwareSerial)
+                const lease = leases.find((item) => item.hardwareSerial === profile.hardwareSerial)
                 return (
                 <article
                   key={profile.id}
@@ -260,6 +264,9 @@ export function UiTunerDeviceDialog({
                   </div>
                   <div className={styles.profileActions}>
                     <span data-state={profile.connectionState}>{STATE_LABELS[profile.connectionState]}</span>
+                    {lease && <span title={`占用至 ${new Date(lease.expiresAt).toLocaleTimeString()}`}>
+                      {lease.ownerDisplayName} 使用中
+                    </span>}
                     <button
                       type="button"
                       disabled={busy || !projectName || !profile.lastEndpoint}

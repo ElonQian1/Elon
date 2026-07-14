@@ -55,6 +55,7 @@ mod node_payout_tests;
 mod node_payouts;
 mod node_public_dev;
 mod pc_project_binding;
+mod project_android_device_leases;
 mod project_android_devices;
 mod project_branding;
 mod project_dev_profiles;
@@ -135,6 +136,9 @@ pub use node_compute_runs::{
 };
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use node_payouts::CreateNodePayout;
+pub(crate) use project_android_device_leases::{
+    AcquireAndroidDeviceLease, ProjectAndroidDeviceLease,
+};
 pub(crate) use project_android_devices::ProjectAndroidDevice;
 pub use project_dev_profiles::ProjectDevProfile;
 pub use project_execution_sessions::{

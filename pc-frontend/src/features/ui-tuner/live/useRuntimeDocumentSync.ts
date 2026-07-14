@@ -3,12 +3,14 @@ import type { SourcePreviewMode } from '../source-preview/types'
 import type { UiTunerDocument, UiTunerElement } from '../types'
 import { preferredRuntimeSelection, runtimeNodesToTunerDocument } from './runtimeNodeDocument'
 import { useLiveUiSession } from './useLiveUiSession'
+import type { AndroidDeviceLeaseProof } from '../device/deviceLeaseApi'
 
 interface RuntimeDocumentSyncOptions {
   deviceId?: string
   packageName?: string
   projectRoot?: string
   debugApplicationIdSuffix?: string
+  lease?: AndroidDeviceLeaseProof
   document: UiTunerDocument
   selected: UiTunerElement | null
   workspaceMode: SourcePreviewMode
@@ -26,6 +28,7 @@ export function useRuntimeDocumentSync(options: RuntimeDocumentSyncOptions) {
     packageName: options.packageName,
     projectRoot: options.projectRoot,
     debugApplicationIdSuffix: options.debugApplicationIdSuffix,
+    lease: options.lease,
     document: options.document,
     selected: options.selected,
     onNotice: options.onNotice,

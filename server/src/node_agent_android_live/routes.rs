@@ -114,6 +114,14 @@ async fn prepare_debug_runtime_handler(
     State(runtime): State<Arc<NodeRuntime>>,
     Json(request): Json<PrepareDebugRuntimeRequest>,
 ) -> Response {
+    if let Err(error) = crate::node_agent_android_device_lease::validate_android_device_lease(
+        &runtime,
+        request.lease.as_ref(),
+    )
+    .await
+    {
+        return json_error(StatusCode::CONFLICT, format!("{error:#}"));
+    }
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
     match prepare_debug_runtime(&runtime.live_ui, request, host_port).await {
         Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
@@ -131,6 +139,14 @@ async fn create_session_handler(
     State(runtime): State<Arc<NodeRuntime>>,
     Json(req): Json<StartLiveSessionRequest>,
 ) -> Response {
+    if let Err(error) = crate::node_agent_android_device_lease::validate_android_device_lease(
+        &runtime,
+        req.lease.as_ref(),
+    )
+    .await
+    {
+        return json_error(StatusCode::CONFLICT, format!("{error:#}"));
+    }
     let device_id = req.device_id.trim().to_string();
     let package_name = req.package_name.trim().to_string();
     let project_root = req
@@ -287,14 +303,7 @@ async fn mcp_handler(
     {
         return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}"));
     }
-    match handle_mcp_request(
-        &runtime.live_ui,
-        &runtime.ui_fit_runs,
-        &session_id,
-        request,
-    )
-    .await
-    {
+    match handle_mcp_request(&runtime.live_ui, &runtime.ui_fit_runs, &session_id, request).await {
         Some(response) => Json(response).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
     }

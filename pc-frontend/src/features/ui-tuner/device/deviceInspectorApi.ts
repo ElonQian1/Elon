@@ -1,5 +1,6 @@
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import { safeNodeAdminUrl } from '../../../lib/utils'
+import type { AndroidDeviceLeaseProof } from './deviceLeaseApi'
 
 export interface AndroidInspectorDevice {
   serial: string
@@ -329,6 +330,7 @@ export async function captureAndroidSnapshot(input: {
   packageName?: string
   launchApp?: boolean
   projectRoot?: string
+  lease?: AndroidDeviceLeaseProof
 }): Promise<AndroidInspectorSnapshot> {
   try {
     return await nodeApi<AndroidInspectorSnapshot>(
@@ -343,6 +345,7 @@ export async function captureAndroidSnapshot(input: {
           includeRawXml: false,
           includeScreenshotDataUrl: true,
           projectRoot: input.projectRoot?.trim() || undefined,
+          lease: input.lease,
         }),
       },
       38000,

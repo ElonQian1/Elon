@@ -18,15 +18,13 @@ import {
   isAppSidebarTemplateElement,
 } from './appSidebarTemplate'
 import { getMetrics, touch } from './uiTunerGeometry'
-import { type AndroidDeviceProfile, type AndroidInspectorSnapshot } from './device/deviceInspectorApi'
+import { type AndroidInspectorSnapshot } from './device/deviceInspectorApi'
 import { UiTunerDeviceDialog } from './device/UiTunerDeviceDialog'
 import { useAndroidInspectorDevices } from './device/useAndroidInspectorDevices'
+import { useAndroidDeviceLease } from './device/useAndroidDeviceLease'
+import type { AndroidDeviceLeaseProof } from './device/deviceLeaseApi'
 import { useUiTunerDeviceWorkspace } from './device/deviceWorkspace'
-import {
-  listProjectSharedAndroidDevices,
-  removeSharedAndroidDevice,
-  shareAndroidDeviceWithProject,
-} from './device/sharedDeviceApi'
+import { useProjectSharedAndroidDevices } from './device/useProjectSharedAndroidDevices'
 import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
 import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
 import {
@@ -91,14 +89,13 @@ export default function UiTunerPage() {
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
   const [history, setHistory] = useState<HistoryState>({ past: [], future: [] })
   const [notice, setNotice] = useState('')
-  const [sharedDeviceBusy, setSharedDeviceBusy] = useState(false)
-  const [sharedHardwareSerials, setSharedHardwareSerials] = useState<string[]>([])
   const [layerFilter, setLayerFilter] = useState<UiTunerFilterState>(DEFAULT_UI_TUNER_FILTER)
   const screenshotInputRef = useRef<HTMLInputElement>(null)
   const tunerDocRef = useRef(tunerDoc)
   const selectedIdRef = useRef<string | null>(selectedId)
   const verificationCaptureRef = useRef(false)
   const verificationBaselineRef = useRef<UiTunerVerificationBaseline | null>(null)
+  const ensureDeviceLeaseRef = useRef<(hardwareSerial: string) => Promise<AndroidDeviceLeaseProof>>()
   const [verificationReport, setVerificationReport] = useState<UiTunerVerificationReport | null>(null)
   const [liveTargetPackage, setLiveTargetPackage] = useState(() => {
     const captured = tunerDoc.runtimeSnapshot?.packageName ?? ''
@@ -147,21 +144,7 @@ export default function UiTunerPage() {
   // stale project record from committing LIVE changes into the wrong checkout.
   const effectiveProjectRoot = clean(liveProjectRoot) || projectRoot
 
-  useEffect(() => {
-    let cancelled = false
-    if (!activeProjectId) {
-      setSharedHardwareSerials([])
-      return () => { cancelled = true }
-    }
-    void listProjectSharedAndroidDevices(activeProjectId)
-      .then((devices) => {
-        if (!cancelled) setSharedHardwareSerials(devices.map((device) => device.hardwareSerial))
-      })
-      .catch(() => {
-        if (!cancelled) setSharedHardwareSerials([])
-      })
-    return () => { cancelled = true }
-  }, [activeProjectId])
+  const sharedDevices = useProjectSharedAndroidDevices(activeProjectId, setNotice)
 
   const changeWorkspaceMode = useCallback((mode: SourcePreviewMode) => {
     setWorkspaceMode(mode)
@@ -241,7 +224,19 @@ export default function UiTunerPage() {
     onNotice: setNotice,
     projectRoot: effectiveProjectRoot,
     packageName: liveTargetPackage || undefined,
+    ensureLease: (hardwareSerial) => {
+      const acquire = ensureDeviceLeaseRef.current
+      return acquire
+        ? acquire(hardwareSerial)
+        : Promise.reject(new Error('公共测试手机使用权尚未就绪，请稍后重试'))
+    },
   })
+
+  const selectedDevice = devices.find((device) => device.serial === selectedDeviceId)
+  const selectedHardwareSerial = selectedDevice?.hardwareSerial
+    || wirelessStatus?.profiles.find((profile) => profile.connectedDeviceId === selectedDeviceId)?.hardwareSerial
+  const deviceLease = useAndroidDeviceLease(activeProjectId, selectedHardwareSerial, setNotice)
+  ensureDeviceLeaseRef.current = deviceLease.ensureLease
 
   const loadDeviceDocument = useCallback((next: UiTunerDocument) => {
     setTunerDoc(next)
@@ -255,34 +250,6 @@ export default function UiTunerPage() {
     devices, selectedDeviceId, documentRef: tunerDocRef, onLoadDocument: loadDeviceDocument,
     onNotice: setNotice, capture: captureDeviceSnapshot,
   })
-
-  const toggleProjectDeviceShare = useCallback(async (
-    profile: AndroidDeviceProfile,
-    shared: boolean,
-  ) => {
-    if (!activeProjectId) {
-      setNotice('请先选择一个项目，再共享测试手机')
-      return
-    }
-    setSharedDeviceBusy(true)
-    try {
-      if (shared) {
-        await removeSharedAndroidDevice(activeProjectId, profile.hardwareSerial)
-        setSharedHardwareSerials((current) => current.filter((serial) => serial !== profile.hardwareSerial))
-        setNotice(`已停止向当前项目共享 ${profile.displayName}；其他项目和本机档案不受影响`)
-      } else {
-        await shareAndroidDeviceWithProject(activeProjectId, profile)
-        setSharedHardwareSerials((current) => (
-          current.includes(profile.hardwareSerial) ? current : [...current, profile.hardwareSerial]
-        ))
-        setNotice(`已把 ${profile.displayName} 共享到当前项目；获授权的 PC 节点将自动记住并尝试重连`)
-      }
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : '更新项目测试手机失败')
-    } finally {
-      setSharedDeviceBusy(false)
-    }
-  }, [activeProjectId])
 
   const prepareLiveRuntime = useCallback(async () => {
     if (!selectedDeviceId) {
@@ -303,11 +270,13 @@ export default function UiTunerPage() {
     setLivePrepareError('')
     setNotice('正在构建并安装实时调试包；首次构建可能需要几分钟…')
     try {
+      const lease = await deviceLease.ensureLease(selectedHardwareSerial)
       const prepared = await prepareLiveDebugRuntime({
         deviceId: selectedDeviceId,
         basePackageName,
         projectRoot: effectiveProjectRoot,
         debugApplicationIdSuffix: LIVE_DEBUG_SUFFIX,
+        lease,
       })
       setLiveTargetPackage(prepared.packageName)
       const snapshot = await captureDeviceSnapshot({
@@ -323,7 +292,7 @@ export default function UiTunerPage() {
     } finally {
       setLivePrepareBusy(false)
     }
-  }, [captureDeviceSnapshot, effectiveProjectRoot, selectedDeviceId, setDeviceDialogOpen])
+  }, [captureDeviceSnapshot, deviceLease.ensureLease, effectiveProjectRoot, selectedDeviceId, selectedHardwareSerial, setDeviceDialogOpen])
 
   const liveUi = useRuntimeDocumentSync({
     deviceId: tunerDoc.runtimeSnapshot?.deviceId === selectedDeviceId ? selectedDeviceId : undefined,
@@ -332,6 +301,7 @@ export default function UiTunerPage() {
       : undefined,
     projectRoot: effectiveProjectRoot,
     debugApplicationIdSuffix: liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX) ? LIVE_DEBUG_SUFFIX : undefined,
+    lease: deviceLease.proof,
     document: tunerDoc, selected, workspaceMode, documentRef: tunerDocRef, selectedIdRef,
     setDocument: setTunerDoc, setSelectedId, onNotice: setNotice,
   })
@@ -684,6 +654,13 @@ export default function UiTunerPage() {
           wirelessConnected={wirelessStatus?.profiles.some((profile) => (
             profile.connectionState === 'connected_wireless'
           )) ?? false}
+          deviceLeaseLabel={deviceLease.activeLease
+            ? deviceLease.proof
+              ? '我正在使用'
+              : `${deviceLease.activeLease.ownerDisplayName} 使用中`
+            : undefined}
+          deviceLeaseBlocked={Boolean(deviceLease.activeLease && !deviceLease.proof)}
+          deviceLeases={deviceLease.leases}
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
           canUndo={realRenderer ? runtimeDraft.status === 'rejected' || (runtimeDraft.status === 'confirmed' && (liveUi.session?.historyCount ?? 0) > 0) : history.past.length > 0}
@@ -772,7 +749,7 @@ export default function UiTunerPage() {
 
       <UiTunerDeviceDialog
         open={deviceDialogOpen}
-        busy={wirelessBusy || sharedDeviceBusy}
+        busy={wirelessBusy || sharedDevices.busy}
         status={wirelessStatus}
         devices={devices}
         selectedDeviceId={selectedDeviceId}
@@ -786,8 +763,9 @@ export default function UiTunerPage() {
         onConnectAddress={connectWirelessAddress}
         onForget={(profileId) => { void forgetWirelessDevice(profileId) }}
         projectName={activeProject?.display_name ?? activeProject?.name}
-        sharedHardwareSerials={sharedHardwareSerials}
-        onToggleProjectShare={(profile, shared) => { void toggleProjectDeviceShare(profile, shared) }}
+        sharedHardwareSerials={sharedDevices.hardwareSerials}
+        leases={deviceLease.leases}
+        onToggleProjectShare={(profile, shared) => { void sharedDevices.toggle(profile, shared) }}
       />
 
       <div className={styles.notice} aria-live="polite">

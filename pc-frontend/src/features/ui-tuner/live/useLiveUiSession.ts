@@ -34,6 +34,7 @@ import {
 } from './liveUiCommitApi'
 import { matchLiveNode, mergeEffectiveValues, messageOf } from './liveUiSessionHelpers'
 import { buildVerificationNotice } from './verification/notice'
+import type { AndroidDeviceLeaseProof } from '../device/deviceLeaseApi'
 
 export type LiveUiConnectionState = 'idle' | 'connecting' | 'connected' | 'attach_only' | 'error'
 
@@ -42,6 +43,7 @@ interface UseLiveUiSessionOptions {
   packageName?: string
   projectRoot?: string
   debugApplicationIdSuffix?: string
+  lease?: AndroidDeviceLeaseProof
   document: UiTunerDocument
   selected: UiTunerElement | null
   onNotice: (message: string) => void
@@ -52,6 +54,7 @@ export function useLiveUiSession({
   packageName,
   projectRoot,
   debugApplicationIdSuffix,
+  lease,
   document,
   selected,
   onNotice,
@@ -120,6 +123,7 @@ export function useLiveUiSession({
   useEffect(() => {
     const cleanDevice = deviceId?.trim()
     const cleanPackage = packageName?.trim()
+    const leaseId = lease?.leaseId
     const generation = ++generationRef.current
     let timer: number | undefined
     let disposed = false
@@ -137,7 +141,7 @@ export function useLiveUiSession({
       if (current) await queueStop(current)
     }
 
-    if (!cleanDevice || !cleanPackage) {
+    if (!cleanDevice || !cleanPackage || !lease || !leaseId) {
       void stopCurrent()
       setSession(null)
       treeRevisionRef.current = null
@@ -184,6 +188,7 @@ export function useLiveUiSession({
           deviceId: cleanDevice,
           packageName: cleanPackage,
           projectRoot,
+          lease,
         })
         const created = started.session
         if (disposed || generation !== generationRef.current) {
@@ -247,7 +252,7 @@ export function useLiveUiSession({
       sessionRef.current = null
       if (current) void queueStop(current)
     }
-  }, [deviceId, packageName, projectRoot, recoveryNonce, refresh])
+  }, [deviceId, lease?.leaseId, packageName, projectRoot, recoveryNonce, refresh])
 
   const refreshFrame = useCallback(async (sessionId?: string) => {
     const id = sessionId ?? sessionRef.current?.id

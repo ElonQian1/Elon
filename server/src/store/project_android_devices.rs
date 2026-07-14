@@ -77,7 +77,8 @@ impl Store {
              ORDER BY updated_at DESC",
         )?;
         let rows = stmt.query_map([project_id], map_device)?;
-        rows.collect::<rusqlite::Result<Vec<_>>>().map_err(Into::into)
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
     }
 
     pub(crate) fn delete_project_android_device(
@@ -86,10 +87,17 @@ impl Store {
         hardware_serial: &str,
     ) -> Result<bool> {
         let conn = self.conn()?;
-        Ok(conn.execute(
+        let tx = conn.unchecked_transaction()?;
+        tx.execute(
+            "DELETE FROM project_android_device_leases WHERE project_id = ?1 AND hardware_serial = ?2",
+            params![project_id, hardware_serial],
+        )?;
+        let removed = tx.execute(
             "DELETE FROM project_android_devices WHERE project_id = ?1 AND hardware_serial = ?2",
             params![project_id, hardware_serial],
-        )? > 0)
+        )? > 0;
+        tx.commit()?;
+        Ok(removed)
     }
 }
 

@@ -162,9 +162,17 @@ async fn forget_device_handler(
 }
 
 async fn launch_app_handler(
-    State(_runtime): State<Arc<NodeRuntime>>,
+    State(runtime): State<Arc<NodeRuntime>>,
     Json(req): Json<LaunchAppRequest>,
 ) -> Response {
+    if let Err(error) = crate::node_agent_android_device_lease::validate_android_device_lease(
+        &runtime,
+        req.lease.as_ref(),
+    )
+    .await
+    {
+        return json_error(StatusCode::CONFLICT, format!("{error:#}"));
+    }
     let package = req.package_name.as_deref().unwrap_or("com.elon.app");
     match launch_app(&req.device_id, package).await {
         Ok(output) => Json(json!({ "ok": true, "output": output })).into_response(),
@@ -173,9 +181,19 @@ async fn launch_app_handler(
 }
 
 async fn capture_handler(
-    State(_runtime): State<Arc<NodeRuntime>>,
+    State(runtime): State<Arc<NodeRuntime>>,
     Json(req): Json<CaptureRequest>,
 ) -> Response {
+    if req.launch_app.unwrap_or(false) {
+        if let Err(error) = crate::node_agent_android_device_lease::validate_android_device_lease(
+            &runtime,
+            req.lease.as_ref(),
+        )
+        .await
+        {
+            return json_error(StatusCode::CONFLICT, format!("{error:#}"));
+        }
+    }
     match tokio::time::timeout(Duration::from_secs(30), capture_snapshot(req)).await {
         Ok(Ok(snapshot)) => Json(snapshot).into_response(),
         Ok(Err(error)) => json_error(StatusCode::BAD_GATEWAY, format!("{error:#}")),
