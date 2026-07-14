@@ -86,12 +86,15 @@ pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnap
         tokio::time::sleep(Duration::from_millis(700)).await;
     }
 
-    let activity_name = current_activity(&device_id).await.ok();
-    let screenshot =
-        capture_screenshot(&device_id, req.include_screenshot_data_url.unwrap_or(true))
-            .await
-            .context("ADB 截图失败")?;
-    let (xml_raw, mut nodes, xml_error) = match dump_xml(&device_id).await {
+    let include_data_url = req.include_screenshot_data_url.unwrap_or(true);
+    let (activity_result, screenshot_result, xml_result) = tokio::join!(
+        current_activity(&device_id),
+        capture_screenshot(&device_id, include_data_url),
+        dump_xml(&device_id),
+    );
+    let activity_name = activity_result.ok();
+    let screenshot = screenshot_result.context("ADB 截图失败")?;
+    let (xml_raw, mut nodes, xml_error) = match xml_result {
         Ok(xml_raw) => {
             match validate_ui_xml(&xml_raw).and_then(|_| parse_runtime_nodes(&xml_raw)) {
                 Ok(nodes) => (xml_raw, nodes, None),

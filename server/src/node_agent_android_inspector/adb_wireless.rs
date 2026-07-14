@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+use futures::future::join_all;
 
 use super::adb_capture::{adb_status, connect_device, list_devices};
 use super::adb_command::{
@@ -130,9 +131,7 @@ pub(crate) async fn reconnect_devices(req: ReconnectRequest) -> Result<AndroidWi
     }
     endpoints.sort();
     endpoints.dedup();
-    for endpoint in endpoints {
-        let _ = connect_device(&endpoint).await;
-    }
+    join_all(endpoints.iter().map(|endpoint| connect_device(endpoint))).await;
     tokio::time::sleep(Duration::from_millis(250)).await;
     wireless_status().await
 }

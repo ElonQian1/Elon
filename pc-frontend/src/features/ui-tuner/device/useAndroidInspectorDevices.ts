@@ -22,6 +22,27 @@ interface UseAndroidInspectorDevicesOptions {
   packageName?: string
 }
 
+const SELECTED_DEVICE_STORAGE_KEY = 'elon.pc.uiTuner.selectedAndroidDevice.v1'
+const DEBUG_PACKAGE = 'com.elon.app.uituner'
+const DEFAULT_PACKAGE = 'com.elon.app'
+
+function deviceIdentity(device: AndroidInspectorDevice) {
+  return device.hardwareSerial?.trim() || device.serial
+}
+
+function rememberedDeviceIdentity() {
+  return typeof window === 'undefined' ? '' : window.localStorage.getItem(SELECTED_DEVICE_STORAGE_KEY) ?? ''
+}
+
+function chooseDeviceId(devices: AndroidInspectorDevice[], current: string) {
+  const ready = devices.filter((device) => device.state === 'device')
+  const currentDevice = ready.find((device) => device.serial === current)
+  if (currentDevice) return currentDevice.serial
+  const remembered = rememberedDeviceIdentity()
+  const rememberedDevice = ready.find((device) => deviceIdentity(device) === remembered)
+  return rememberedDevice?.serial ?? (ready.length === 1 ? ready[0].serial : '')
+}
+
 function selectCaptureDevice(devices: AndroidInspectorDevice[], preferredId: string) {
   const preferred = devices.find((device) => device.serial === preferredId)
   if (preferred?.state === 'device') return preferred
@@ -67,6 +88,19 @@ function captureFailureMessage(error: unknown) {
   return message || '真机捕获失败，请检查手机是否解锁并保持连接'
 }
 
+function isSystemOverlay(snapshot: AndroidInspectorSnapshot) {
+  const activity = snapshot.activityName?.toLowerCase() ?? ''
+  return activity.includes('notificationshade')
+    || activity.includes('statusbar')
+    || activity.includes('keyguard')
+    || activity.includes('systemui')
+}
+
+function foregroundPackage(snapshot: AndroidInspectorSnapshot) {
+  return snapshot.activityName
+    ?.match(/([A-Za-z0-9_.]+)\/[A-Za-z0-9_.$]+/)?.[1]
+}
+
 export function useAndroidInspectorDevices({
   onCaptured,
   onNotice,
@@ -77,6 +111,7 @@ export function useAndroidInspectorDevices({
   const [selectedDeviceId, setSelectedDeviceId] = useState('')
   const [deviceBusy, setDeviceBusy] = useState(false)
   const [captureBusy, setCaptureBusy] = useState(false)
+  const [captureIssue, setCaptureIssue] = useState('')
   const [wirelessBusy, setWirelessBusy] = useState(false)
   const [deviceDialogOpen, setDeviceDialogOpen] = useState(false)
   const [wirelessStatus, setWirelessStatus] = useState<AndroidWirelessStatus | null>(null)
@@ -85,16 +120,7 @@ export function useAndroidInspectorDevices({
     const normalizedDevices = normalizeDeviceInventory(status.devices)
     setWirelessStatus(status)
     setDevices(normalizedDevices)
-    setSelectedDeviceId((current) => {
-      const connectedProfile = status.profiles.find((profile) => profile.connectedDeviceId)
-      const profileDevice = connectedProfile
-        ? normalizedDevices.find((device) => device.hardwareSerial === connectedProfile.hardwareSerial)
-        : null
-      if (profileDevice?.serial) return profileDevice.serial
-      if (current && normalizedDevices.some((device) => device.serial === current)) return current
-      const readyDevices = normalizedDevices.filter((device) => device.state === 'device')
-      return readyDevices.length === 1 ? readyDevices[0].serial : ''
-    })
+    setSelectedDeviceId((current) => chooseDeviceId(normalizedDevices, current))
   }, [])
 
   const refreshDevices = useCallback(async (announce = true): Promise<AndroidInspectorDevice[]> => {
@@ -103,11 +129,7 @@ export function useAndroidInspectorDevices({
       const nextDevices = normalizeDeviceInventory(await listAndroidDevices())
       const readyDevices = nextDevices.filter((device) => device.state === 'device')
       setDevices(nextDevices)
-      setSelectedDeviceId((current) => (
-        current && nextDevices.some((device) => device.serial === current)
-          ? current
-          : readyDevices.length === 1 ? readyDevices[0].serial : ''
-      ))
+      setSelectedDeviceId((current) => chooseDeviceId(nextDevices, current))
       if (announce) {
         const unauthorized = nextDevices.some((device) => device.state === 'unauthorized')
         if (readyDevices.length > 1) {
@@ -132,8 +154,10 @@ export function useAndroidInspectorDevices({
   const captureDeviceSnapshot = useCallback(async (override?: {
     deviceId?: string
     packageName?: string
+    launchApp?: boolean
   }) => {
     setCaptureBusy(true)
+    setCaptureIssue('')
     try {
       onNotice('正在自动识别并读取真机画面…')
       const nextDevices = await refreshDevices(false)
@@ -150,21 +174,61 @@ export function useAndroidInspectorDevices({
         }
         return null
       }
+      const identity = deviceIdentity(targetDevice)
+      window.localStorage.setItem(SELECTED_DEVICE_STORAGE_KEY, identity)
       setSelectedDeviceId(targetDevice.serial)
-      const snapshot = await captureAndroidSnapshot({
-        deviceId: targetDevice.serial,
-        packageName: override?.packageName || packageName || 'com.elon.app',
-        projectRoot,
-      })
+      const preferredPackage = override?.packageName || packageName || DEBUG_PACKAGE
+      let snapshot: AndroidInspectorSnapshot
+      try {
+        snapshot = await captureAndroidSnapshot({
+          deviceId: targetDevice.serial,
+          packageName: preferredPackage,
+          launchApp: override?.launchApp ?? true,
+          projectRoot,
+        })
+        if (preferredPackage !== DEFAULT_PACKAGE && foregroundPackage(snapshot) !== preferredPackage) {
+          throw new Error(`${preferredPackage} 未在前台运行`)
+        }
+      } catch (error) {
+        if (preferredPackage === DEFAULT_PACKAGE) throw error
+        snapshot = await captureAndroidSnapshot({
+          deviceId: targetDevice.serial,
+          packageName: DEFAULT_PACKAGE,
+          launchApp: true,
+          projectRoot,
+        })
+      }
+      if (isSystemOverlay(snapshot)) {
+        const message = `已连接 ${deviceDisplayName(targetDevice)}，但手机当前停在锁屏或通知栏；请解锁并返回调试 APP 后重试`
+        setCaptureIssue(message)
+        onNotice(message)
+        return null
+      }
+      const actualPackage = foregroundPackage(snapshot)
+      if (actualPackage && actualPackage !== DEFAULT_PACKAGE && preferredPackage !== actualPackage) {
+        const message = `已连接 ${deviceDisplayName(targetDevice)}，但没有打开一龙调试 APP；请在右侧点击“构建并安装实时调试包”`
+        setCaptureIssue(message)
+        onNotice(message)
+        return null
+      }
       onCaptured(snapshot)
       return snapshot
     } catch (error) {
-      onNotice(captureFailureMessage(error))
+      const message = captureFailureMessage(error)
+      setCaptureIssue(message)
+      onNotice(message)
       return null
     } finally {
       setCaptureBusy(false)
     }
   }, [onCaptured, onNotice, packageName, projectRoot, refreshDevices, selectedDeviceId])
+
+  const selectDevice = useCallback((deviceId: string) => {
+    const selected = devices.find((device) => device.serial === deviceId)
+    if (selected) window.localStorage.setItem(SELECTED_DEVICE_STORAGE_KEY, deviceIdentity(selected))
+    else if (!deviceId) window.localStorage.removeItem(SELECTED_DEVICE_STORAGE_KEY)
+    setSelectedDeviceId(deviceId)
+  }, [devices])
 
   const refreshWirelessStatus = useCallback(async () => {
     setWirelessBusy(true)
@@ -207,15 +271,21 @@ export function useAndroidInspectorDevices({
   }, [applyWirelessStatus, onNotice])
 
   useEffect(() => {
-    void reconnectWirelessDevices(undefined, false)
+    const discoverDevices = async () => {
+      const status = await refreshWirelessStatus()
+      if (status && !status.devices.some((device) => device.state === 'device')) {
+        await reconnectWirelessDevices(undefined, false)
+      }
+    }
+    void discoverDevices()
     const reconnectAfterNodeDiscovery = () => {
-      void reconnectWirelessDevices(undefined, false)
+      void discoverDevices()
     }
     window.addEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, reconnectAfterNodeDiscovery)
     return () => {
       window.removeEventListener(LOCAL_NODE_BASE_CHANGED_EVENT, reconnectAfterNodeDiscovery)
     }
-  }, [reconnectWirelessDevices])
+  }, [reconnectWirelessDevices, refreshWirelessStatus])
 
   const registerWiredDevice = useCallback(async (deviceId: string, displayName?: string) => {
     setWirelessBusy(true)
@@ -304,10 +374,11 @@ export function useAndroidInspectorDevices({
     selectedDeviceId,
     deviceBusy,
     captureBusy,
+    captureIssue,
     wirelessBusy,
     deviceDialogOpen,
     wirelessStatus,
-    setSelectedDeviceId,
+    selectDevice,
     setDeviceDialogOpen,
     refreshDevices,
     refreshWirelessStatus,

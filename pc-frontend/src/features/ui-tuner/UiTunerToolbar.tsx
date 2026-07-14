@@ -33,6 +33,9 @@ interface UiTunerToolbarProps {
   selectedDeviceId: string
   deviceBusy: boolean
   captureBusy: boolean
+  captureIssue: string
+  capturedDeviceId?: string
+  liveConnected: boolean
   wirelessConnected: boolean
   viewScaleLabel: string
   fitToStage: boolean
@@ -64,6 +67,9 @@ export function UiTunerToolbar({
   selectedDeviceId,
   deviceBusy,
   captureBusy,
+  captureIssue,
+  capturedDeviceId,
+  liveConnected,
   wirelessConnected,
   viewScaleLabel,
   fitToStage,
@@ -87,11 +93,32 @@ export function UiTunerToolbar({
   onDownloadExport,
   onReset,
 }: UiTunerToolbarProps) {
+  const selectedDevice = devices.find((device) => device.serial === selectedDeviceId)
+  const selectedName = selectedDevice?.model ?? selectedDevice?.serial
+  const deviceStatus = !selectedName
+    ? '请选择手机'
+    : captureBusy
+      ? `正在读取 · ${selectedName}`
+      : captureIssue
+        ? `需处理 · ${selectedName}`
+        : liveConnected && capturedDeviceId === selectedDeviceId
+        ? `LIVE · ${selectedName}`
+        : capturedDeviceId === selectedDeviceId
+          ? `画面已读取 · ${selectedName}`
+          : `等待画面 · ${selectedName}`
   return (
     <header className={styles.toolbar}>
       <div className={styles.toolbarTitle}>
         <MousePointer2 size={16} aria-hidden="true" />
         <span>{canvasName}</span>
+        <span
+          className={captureIssue
+            ? styles.deviceStatusIssue
+            : liveConnected ? styles.deviceStatusLive : styles.deviceStatus}
+          title={captureIssue || deviceStatus}
+        >
+          {deviceStatus}
+        </span>
       </div>
       <div className={styles.toolbarActions}>
         <input

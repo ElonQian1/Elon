@@ -2,6 +2,7 @@ import type { UiTunerDocument, UiTunerExportElement } from './types'
 
 const STORAGE_KEY = 'elon.pc.uiTuner.document.v2.apk-source'
 const STORAGE_KEY_V3 = 'elon.pc.uiTuner.document.v3.runtime-source'
+const DEVICE_STORAGE_PREFIX = 'elon.pc.uiTuner.deviceDocument.v1.'
 
 function isUiTunerDocument(value: unknown): value is UiTunerDocument {
   if (!value || typeof value !== 'object') return false
@@ -30,6 +31,27 @@ export function loadUiTunerDocument(expectedSourceSignature?: string): UiTunerDo
 export function saveUiTunerDocument(document: UiTunerDocument) {
   if (typeof window === 'undefined') return
   window.localStorage.setItem(STORAGE_KEY_V3, JSON.stringify(document))
+}
+
+function deviceStorageKey(deviceIdentity: string) {
+  return `${DEVICE_STORAGE_PREFIX}${encodeURIComponent(deviceIdentity.trim())}`
+}
+
+export function loadUiTunerDeviceDocument(deviceIdentity: string): UiTunerDocument | null {
+  if (typeof window === 'undefined' || !deviceIdentity.trim()) return null
+  const raw = window.localStorage.getItem(deviceStorageKey(deviceIdentity))
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    return isUiTunerDocument(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+export function saveUiTunerDeviceDocument(deviceIdentity: string, document: UiTunerDocument) {
+  if (typeof window === 'undefined' || !deviceIdentity.trim()) return
+  window.localStorage.setItem(deviceStorageKey(deviceIdentity), JSON.stringify(document))
 }
 
 export function buildUiTunerExport(document: UiTunerDocument) {

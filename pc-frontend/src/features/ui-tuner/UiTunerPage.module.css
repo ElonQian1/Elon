@@ -153,6 +153,32 @@
   white-space: nowrap;
 }
 
+.deviceStatus,
+.deviceStatusLive,
+.deviceStatusIssue {
+  flex: 0 0 auto;
+  max-width: 190px;
+  padding: 3px 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 800;
+}
+
+.deviceStatusLive {
+  border-color: rgba(45, 212, 191, .45);
+  background: rgba(45, 212, 191, .1);
+  color: #5eead4;
+}
+
+.deviceStatusIssue {
+  border-color: rgba(251, 146, 60, .5);
+  background: rgba(251, 146, 60, .1);
+  color: #fdba74;
+}
+
 .toolbarActions {
   min-width: 0;
   display: flex;

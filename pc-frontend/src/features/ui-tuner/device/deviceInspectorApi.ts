@@ -161,6 +161,9 @@ function inspectorError(error: unknown, fallback: string): Error {
     || lower.includes('timeout')
     || lower.includes('timed out')
   ) {
+    if (fallback === '真机捕获失败') {
+      return new Error('真机捕获失败：采集超时，请保持手机解锁并停留在调试 APP 后重试')
+    }
     return new Error(`${fallback}：本机节点没有响应，请先启动或更新 Windows PC 节点客户端`)
   }
   if (message.includes('HTTP 404')) {
@@ -342,7 +345,7 @@ export async function captureAndroidSnapshot(input: {
           projectRoot: input.projectRoot?.trim() || undefined,
         }),
       },
-      18000,
+      38000,
     )
   } catch (error) {
     throw inspectorError(error, '真机捕获失败')

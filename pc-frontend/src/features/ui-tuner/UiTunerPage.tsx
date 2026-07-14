@@ -9,6 +9,7 @@ import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocum
 import {
   loadUiTunerDocument,
   saveUiTunerDocument,
+  saveUiTunerDeviceDocument,
   stringifyUiTunerExport,
 } from './uiTunerStorage'
 import {
@@ -20,6 +21,7 @@ import { getMetrics, touch } from './uiTunerGeometry'
 import { type AndroidDeviceProfile, type AndroidInspectorSnapshot } from './device/deviceInspectorApi'
 import { UiTunerDeviceDialog } from './device/UiTunerDeviceDialog'
 import { useAndroidInspectorDevices } from './device/useAndroidInspectorDevices'
+import { useUiTunerDeviceWorkspace } from './device/deviceWorkspace'
 import {
   listProjectSharedAndroidDevices,
   removeSharedAndroidDevice,
@@ -217,10 +219,11 @@ export default function UiTunerPage() {
     selectedDeviceId,
     deviceBusy,
     captureBusy,
+    captureIssue,
     wirelessBusy,
     deviceDialogOpen,
     wirelessStatus,
-    setSelectedDeviceId,
+    selectDevice,
     setDeviceDialogOpen,
     refreshDevices,
     refreshWirelessStatus,
@@ -237,6 +240,19 @@ export default function UiTunerPage() {
     onNotice: setNotice,
     projectRoot: effectiveProjectRoot,
     packageName: liveTargetPackage || undefined,
+  })
+
+  const loadDeviceDocument = useCallback((next: UiTunerDocument) => {
+    setTunerDoc(next)
+    setSelectedId(getSelectedId(next, null))
+    setHistory({ past: [], future: [] })
+    setLiveTargetPackage(next.runtimeSnapshot?.packageName?.endsWith(LIVE_DEBUG_SUFFIX)
+      ? next.runtimeSnapshot.packageName
+      : '')
+  }, [])
+  const { selectedDeviceIdentity } = useUiTunerDeviceWorkspace({
+    devices, selectedDeviceId, documentRef: tunerDocRef, onLoadDocument: loadDeviceDocument,
+    onNotice: setNotice, capture: captureDeviceSnapshot,
   })
 
   const toggleProjectDeviceShare = useCallback(async (
@@ -309,8 +325,10 @@ export default function UiTunerPage() {
   }, [captureDeviceSnapshot, effectiveProjectRoot, selectedDeviceId, setDeviceDialogOpen])
 
   const liveUi = useRuntimeDocumentSync({
-    deviceId: liveTargetPackage ? selectedDeviceId : tunerDoc.runtimeSnapshot?.deviceId,
-    packageName: liveTargetPackage || tunerDoc.runtimeSnapshot?.packageName,
+    deviceId: tunerDoc.runtimeSnapshot?.deviceId === selectedDeviceId ? selectedDeviceId : undefined,
+    packageName: tunerDoc.runtimeSnapshot?.deviceId === selectedDeviceId
+      ? liveTargetPackage || tunerDoc.runtimeSnapshot?.packageName
+      : undefined,
     projectRoot: effectiveProjectRoot,
     debugApplicationIdSuffix: liveTargetPackage.endsWith(LIVE_DEBUG_SUFFIX) ? LIVE_DEBUG_SUFFIX : undefined,
     document: tunerDoc, selected, workspaceMode, documentRef: tunerDocRef, selectedIdRef,
@@ -442,7 +460,8 @@ export default function UiTunerPage() {
 
   useEffect(() => {
     saveUiTunerDocument(tunerDoc)
-  }, [tunerDoc])
+    if (selectedDeviceIdentity) saveUiTunerDeviceDocument(selectedDeviceIdentity, tunerDoc)
+  }, [selectedDeviceIdentity, tunerDoc])
 
   useEffect(() => {
     if (!notice) return undefined
@@ -535,6 +554,7 @@ export default function UiTunerPage() {
 
   const saveNow = () => {
     saveUiTunerDocument(tunerDoc)
+    if (selectedDeviceIdentity) saveUiTunerDeviceDocument(selectedDeviceIdentity, tunerDoc)
     setNotice('已保存到本机草稿')
   }
 
@@ -657,6 +677,9 @@ export default function UiTunerPage() {
           selectedDeviceId={selectedDeviceId}
           deviceBusy={deviceBusy}
           captureBusy={captureBusy}
+          captureIssue={captureIssue}
+          capturedDeviceId={tunerDoc.runtimeSnapshot?.deviceId}
+          liveConnected={liveUi.state === 'connected'}
           wirelessConnected={wirelessStatus?.profiles.some((profile) => (
             profile.connectionState === 'connected_wireless'
           )) ?? false}
@@ -665,7 +688,7 @@ export default function UiTunerPage() {
           canUndo={realRenderer ? (liveUi.session?.historyCount ?? 0) > 0 : history.past.length > 0}
           canRedo={realRenderer ? (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
           onImportScreenshot={importScreenshot}
-          onSelectDevice={setSelectedDeviceId}
+          onSelectDevice={selectDevice}
           onRefreshDevices={refreshDevices}
           onOpenDeviceManager={openDeviceManager}
           onCaptureDeviceSnapshot={captureDeviceSnapshot}
@@ -747,7 +770,7 @@ export default function UiTunerPage() {
         devices={devices}
         selectedDeviceId={selectedDeviceId}
         onClose={() => setDeviceDialogOpen(false)}
-        onSelectDevice={setSelectedDeviceId}
+        onSelectDevice={selectDevice}
         onRefresh={() => { void refreshWirelessStatus() }}
         onRegister={registerWiredDevice}
         onPair={pairWirelessDevice}

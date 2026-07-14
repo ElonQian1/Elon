@@ -8,6 +8,7 @@ use axum::{
     Json, Router,
 };
 use serde_json::json;
+use std::time::Duration;
 
 use crate::NodeRuntime;
 
@@ -175,9 +176,13 @@ async fn capture_handler(
     State(_runtime): State<Arc<NodeRuntime>>,
     Json(req): Json<CaptureRequest>,
 ) -> Response {
-    match capture_snapshot(req).await {
-        Ok(snapshot) => Json(snapshot).into_response(),
-        Err(error) => json_error(StatusCode::BAD_GATEWAY, format!("{error:#}")),
+    match tokio::time::timeout(Duration::from_secs(30), capture_snapshot(req)).await {
+        Ok(Ok(snapshot)) => Json(snapshot).into_response(),
+        Ok(Err(error)) => json_error(StatusCode::BAD_GATEWAY, format!("{error:#}")),
+        Err(_) => json_error(
+            StatusCode::GATEWAY_TIMEOUT,
+            "真机采集超时，请保持手机解锁并停留在调试 APP 后重试".to_string(),
+        ),
     }
 }
 
