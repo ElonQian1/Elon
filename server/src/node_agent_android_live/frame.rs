@@ -20,6 +20,13 @@ pub(crate) struct LiveFrame {
     captured_at: String,
 }
 
+#[derive(Debug)]
+pub(crate) struct RuntimeFrameImage {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+}
+
 pub(crate) async fn capture_frame(session: &LiveUiSession) -> Result<LiveFrame> {
     if let Ok(value) = session.request_frame().await {
         if let Ok(frame) = parse_runtime_frame(&value) {
@@ -35,6 +42,33 @@ pub(crate) async fn capture_frame(session: &LiveUiSession) -> Result<LiveFrame> 
         bytes: png.len(),
         captured_at: Utc::now().to_rfc3339(),
     })
+}
+
+/// Captures only the pixels rendered by the application process. Build parity
+/// must not fall back to an ADB display screenshot because a sleeping device,
+/// notification shade, or vendor installer can otherwise become the baseline.
+pub(crate) async fn capture_runtime_frame_image(
+    session: &LiveUiSession,
+) -> Result<RuntimeFrameImage> {
+    let value = session.request_frame().await?;
+    let frame = parse_runtime_frame(&value)?;
+    Ok(RuntimeFrameImage {
+        bytes: decode_runtime_frame_bytes(&frame)?,
+        width: frame.width,
+        height: frame.height,
+    })
+}
+
+fn decode_runtime_frame_bytes(frame: &LiveFrame) -> Result<Vec<u8>> {
+    let (_, payload) = frame
+        .data_url
+        .split_once(',')
+        .context("Android 真实帧 dataUrl 无效")?;
+    let bytes = B64.decode(payload).context("Android 真实帧 Base64 无效")?;
+    if bytes.is_empty() || bytes.len() > 8 * 1024 * 1024 {
+        bail!("Android 真实帧图片大小无效");
+    }
+    Ok(bytes)
 }
 
 fn parse_runtime_frame(value: &Value) -> Result<LiveFrame> {
@@ -87,5 +121,22 @@ mod tests {
         }))
         .expect("runtime frame");
         assert_eq!((frame.width, frame.height, frame.bytes), (1080, 2400, 8));
+    }
+
+    #[test]
+    fn decodes_runtime_frame_payload() {
+        let payload = B64.encode(b"runtime-frame");
+        let frame = parse_runtime_frame(&json!({
+            "dataUrl": format!("data:image/webp;base64,{payload}"),
+            "width": 10,
+            "height": 20,
+            "bytes": 13,
+            "capturedAt": "123",
+        }))
+        .expect("runtime frame");
+        assert_eq!(
+            decode_runtime_frame_bytes(&frame).unwrap(),
+            b"runtime-frame"
+        );
     }
 }

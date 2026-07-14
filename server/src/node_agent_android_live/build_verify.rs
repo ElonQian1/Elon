@@ -4,14 +4,13 @@ use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::node_agent_android_inspector::{
-    adb_capture::{capture_screen_png, launch_app},
-    adb_command::validate_device_id,
-    png_probe::png_dimensions,
+    adb_capture::launch_app, adb_command::validate_device_id,
 };
 
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify_apk::select_fresh_debug_apk;
+use super::frame::{capture_runtime_frame_image, RuntimeFrameImage};
 use super::preview::{open_preview, PreviewOpenRequest};
 use super::protocol::LiveUiNode;
 use super::ui_ir::load_or_build_ui_ir;
@@ -213,14 +212,14 @@ async fn build_and_verify_with_mode(
     let wrapper = gradle_wrapper(&gradle_root)?;
     let live_snapshot = session.commit_snapshot().await;
     let live_preview = if mode.requires_source_parity() {
-        let png = capture_screen_png(&session.device_id).await?;
+        let frame = capture_stable_runtime_frame(&session).await?;
         let rect = verification_bounds(
             &live_snapshot.nodes,
             request.target_definition_id.as_deref(),
             request.target_instance_key.as_deref(),
         )?
         .or_else(|| patched_bounds(&live_snapshot, true));
-        Some((png, rect))
+        Some((frame.bytes, rect))
     } else {
         None
     };
@@ -297,8 +296,10 @@ async fn build_and_verify_with_mode(
     // stable Live preview creates false BUILD_MISMATCH results. Give the debug
     // renderer a deterministic settle window, then require consecutive frames.
     tokio::time::sleep(Duration::from_millis(2_200)).await;
-    let screenshot = capture_stable_screen(&session.device_id).await?;
-    let (screenshot_width, screenshot_height) = png_dimensions(&screenshot)?;
+    let source_frame = capture_stable_runtime_frame(&session).await?;
+    let screenshot_width = source_frame.width;
+    let screenshot_height = source_frame.height;
+    let screenshot = source_frame.bytes;
     let (_, redeployed_nodes) = broker.tree(session_id).await?;
     let source_rect = verification_bounds(
         &redeployed_nodes,
@@ -387,13 +388,13 @@ fn target_comparison_current_rect(
     projected_current_rect.or(verified_current_rect)
 }
 
-async fn capture_stable_screen(device_id: &str) -> Result<Vec<u8>> {
-    let mut previous = capture_screen_png(device_id).await?;
+async fn capture_stable_runtime_frame(session: &LiveUiSession) -> Result<RuntimeFrameImage> {
+    let mut previous = capture_runtime_frame_image(session).await?;
     let mut stable_frames = 0_u8;
     for _ in 0..10 {
         tokio::time::sleep(Duration::from_millis(350)).await;
-        let current = capture_screen_png(device_id).await?;
-        let diff = compare_pngs(&previous, &current, None, None)?;
+        let current = capture_runtime_frame_image(session).await?;
+        let diff = compare_pngs(&previous.bytes, &current.bytes, None, None)?;
         if diff.visual_loss <= 0.012 {
             stable_frames += 1;
             if stable_frames >= 2 {
