@@ -12,6 +12,7 @@ import type { UiTunerCodexContextPack } from './contextPack'
 import type { UiTunerVerificationReport } from './runtime/verification'
 import { UiTunerLivePanel } from './live/UiTunerLivePanel'
 import type { useLiveUiSession } from './live/useLiveUiSession'
+import type { LivePatchOperation, LiveUiScope } from './live/liveUiApi'
 import styles from './UiTunerPage.module.css'
 
 const MIN_SIZE = 24
@@ -36,6 +37,8 @@ interface UiTunerInspectorProps {
   onMutationTaskStarted: (pack: UiTunerCodexContextPack) => Promise<void> | void
   onRequestVerification: () => void
   liveUi: ReturnType<typeof useLiveUiSession>
+  onLiveApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
+  onLiveApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
   onLiveOptimisticUpdate: (patch: Partial<UiTunerElement>) => void
   livePrepareBusy: boolean
   livePrepareError: string
@@ -65,6 +68,8 @@ export function UiTunerInspector({
   onMutationTaskStarted,
   onRequestVerification,
   liveUi,
+  onLiveApply,
+  onLiveApplyGesture,
   onLiveOptimisticUpdate,
   livePrepareBusy,
   livePrepareError,
@@ -103,8 +108,8 @@ export function UiTunerInspector({
             mcp={liveUi.mcp}
             uiIr={liveUi.uiIr}
             targetDesign={liveUi.targetDesign}
-            onApply={liveUi.apply}
-            onApplyGesture={liveUi.applyGesture}
+            onApply={onLiveApply}
+            onApplyGesture={onLiveApplyGesture}
             onGestureActive={liveUi.setGestureActive}
             onUndo={liveUi.undo}
             onRedo={liveUi.redo}

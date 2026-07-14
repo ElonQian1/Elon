@@ -8,6 +8,7 @@ import { useCallback, useMemo, useState } from 'react'
 import type { UiTunerFilterResult } from '../filtering'
 import { AutoFitQueuePanel } from '../fit-run/AutoFitQueuePanel'
 import type { LivePreviewRequest, LiveUiFrame, LiveUiNode, LiveUiSession } from '../live/liveUiApi'
+import type { RuntimeDraftState } from '../live/runtimeDraftModel'
 import type { LiveTargetDesign } from '../live/liveUiIrApi'
 import { UiFitRunPanel } from '../fit-run/UiFitRunPanel'
 import { useAutoFitQueue } from '../fit-run/useAutoFitQueue'
@@ -30,6 +31,8 @@ interface UiTunerComparisonWorkspaceProps {
   document: UiTunerDocument
   filterResult: UiTunerFilterResult
   liveFrame: LiveUiFrame | null
+  runtimeDraftState: RuntimeDraftState
+  runtimeDraftStatus: 'confirmed' | 'local' | 'syncing' | 'calibrating' | 'rejected'
   liveNode: LiveUiNode | null
   liveNodes: LiveUiNode[]
   liveSession: LiveUiSession | null
@@ -62,6 +65,8 @@ export function UiTunerComparisonWorkspace({
   document,
   filterResult,
   liveFrame,
+  runtimeDraftState,
+  runtimeDraftStatus,
   liveNode,
   liveNodes,
   liveSession,
@@ -194,6 +199,9 @@ export function UiTunerComparisonWorkspace({
       canvas={currentCanvas}
       filterResult={filterResult}
       liveFrame={liveFrame}
+      liveNodes={liveNodes}
+      runtimeDraftState={runtimeDraftState}
+      runtimeDraftStatus={runtimeDraftStatus}
       realRenderer={realRenderer}
       runtimeConnected={runtimeConnected}
       runtimeGestureActive={runtimeGestureActive}

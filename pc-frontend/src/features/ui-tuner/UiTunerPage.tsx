@@ -40,6 +40,7 @@ import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
 import { prepareLiveDebugRuntime } from './live/liveUiApi'
 import { useRuntimeDocumentSync } from './live/useRuntimeDocumentSync'
 import { useRuntimeCanvasGesture } from './live/useRuntimeCanvasGesture'
+import { useRuntimeDraftSession } from './live/useRuntimeDraftSession'
 import { UiTunerLayersPanel } from './UiTunerLayersPanel'
 import { UiTunerToolbar } from './UiTunerToolbar'
 import { UiTunerComparisonWorkspace } from './comparison/UiTunerComparisonWorkspace'
@@ -342,6 +343,14 @@ export default function UiTunerPage() {
   const realRenderer = workspaceMode === 'evidence'
     && runtimeDocument
     && Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible)
+  const runtimeDraft = useRuntimeDraftSession({
+    frame: liveUi.liveFrame,
+    nodes: liveUi.nodes,
+    selectedNode: liveUi.selectedNode,
+    applyRemote: liveUi.apply,
+    applyGestureRemote: liveUi.applyGesture,
+    onNotice: setNotice,
+  })
   const canvasGesture = useRuntimeCanvasGesture({
     documentRef: tunerDocRef,
     setDocument: setTunerDoc,
@@ -351,7 +360,7 @@ export default function UiTunerPage() {
     realRenderer,
     runtimeConnected: liveUi.state === 'connected',
     viewScale,
-    applyRuntimeGesture: liveUi.applyGesture,
+    applyRuntimeGesture: runtimeDraft.applyGesture,
     setRuntimeGestureActive: liveUi.setGestureActive,
     onNotice: setNotice,
   })
@@ -710,6 +719,8 @@ export default function UiTunerPage() {
           document={tunerDoc}
           filterResult={filterResult}
           liveFrame={liveUi.liveFrame}
+          runtimeDraftState={runtimeDraft.state}
+          runtimeDraftStatus={runtimeDraft.status}
           realRenderer={realRenderer}
           runtimeConnected={liveUi.state === 'connected'}
           runtimeGestureActive={canvasGesture.runtimeGestureActive}
@@ -753,6 +764,8 @@ export default function UiTunerPage() {
         onMutationTaskStarted={handleMutationTaskStarted}
         onRequestVerification={() => { void requestPostTaskVerification() }}
         liveUi={liveUi}
+        onLiveApply={runtimeDraft.apply}
+        onLiveApplyGesture={runtimeDraft.applyGesture}
         onLiveOptimisticUpdate={handleLiveOptimisticUpdate}
         livePrepareBusy={livePrepareBusy}
         livePrepareError={livePrepareError}

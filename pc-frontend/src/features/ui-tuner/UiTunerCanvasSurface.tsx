@@ -8,6 +8,9 @@ import type {
 } from 'react'
 import type { UiTunerFilterResult } from './filtering'
 import type { LiveUiFrame } from './live/liveUiApi'
+import type { LiveUiNode } from './live/liveUiApi'
+import { RuntimeDraftLayer } from './live/RuntimeDraftLayer'
+import type { RuntimeDraftState } from './live/runtimeDraftModel'
 import type { UiTunerDocument, UiTunerElement } from './types'
 import styles from './UiTunerPage.module.css'
 
@@ -15,6 +18,9 @@ interface UiTunerCanvasSurfaceProps {
   canvas: UiTunerDocument['canvas']
   filterResult: UiTunerFilterResult
   liveFrame: LiveUiFrame | null
+  liveNodes: LiveUiNode[]
+  runtimeDraftState: RuntimeDraftState
+  runtimeDraftStatus: 'confirmed' | 'local' | 'syncing' | 'calibrating' | 'rejected'
   realRenderer: boolean
   runtimeConnected: boolean
   runtimeGestureActive: boolean
@@ -39,6 +45,9 @@ export function UiTunerCanvasSurface({
   canvas,
   filterResult,
   liveFrame,
+  liveNodes,
+  runtimeDraftState,
+  runtimeDraftStatus,
   realRenderer,
   runtimeConnected,
   runtimeGestureActive,
@@ -57,10 +66,12 @@ export function UiTunerCanvasSurface({
   return (
     <div className={styles.canvasScroller} ref={scrollerRef} onScroll={onScroll}>
       {realRenderer && (
-        <div className={runtimeConnected ? styles.runtimeSurfaceLive : styles.runtimeSurfaceFrozen}>
-          {runtimeConnected
-            ? runtimeGestureActive ? 'Android 正在实时重绘' : 'Android LIVE · 拖动真实组件'
-            : '真实画面已冻结 · Runtime 正在重连'}
+        <div className={
+          runtimeDraftStatus === 'rejected' || !runtimeConnected
+            ? styles.runtimeSurfaceFrozen
+            : styles.runtimeSurfaceLive
+        }>
+          {runtimeSurfaceLabel(runtimeConnected, runtimeDraftStatus)}
         </div>
       )}
       <div
@@ -94,6 +105,14 @@ export function UiTunerCanvasSurface({
               src={canvas.referenceImage.dataUrl}
               alt=""
               style={{ opacity: canvas.referenceImage.opacity }}
+            />
+          )}
+          {realRenderer && (
+            <RuntimeDraftLayer
+              canvasBackground={canvas.background}
+              frame={liveFrame}
+              nodes={liveNodes}
+              state={runtimeDraftState}
             />
           )}
           {overlayLayer}
@@ -181,4 +200,16 @@ export function UiTunerCanvasSurface({
       </div>
     </div>
   )
+}
+
+function runtimeSurfaceLabel(
+  connected: boolean,
+  status: UiTunerCanvasSurfaceProps['runtimeDraftStatus'],
+) {
+  if (!connected) return 'PC 草稿可继续编辑 · Android 正在重连'
+  if (status === 'local') return 'PC 即时重绘 · 等待同步 Android'
+  if (status === 'syncing') return 'PC 即时重绘 · Android 后台同步中'
+  if (status === 'calibrating') return 'Android 已应用 · 正在校准真机画面'
+  if (status === 'rejected') return 'PC 草稿已保留 · Android 同步失败'
+  return 'Android LIVE · PC 本地即时渲染'
 }
