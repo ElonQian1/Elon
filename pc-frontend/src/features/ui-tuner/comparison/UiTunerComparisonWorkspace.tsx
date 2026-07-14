@@ -40,7 +40,8 @@ interface UiTunerComparisonWorkspaceProps {
   liveSession: LiveUiSession | null
   previewRequest: LivePreviewRequest | null
   uploadedTarget: LiveTargetDesign | null
-  realRenderer: boolean
+  androidVisual: boolean
+  runtimeEditable: boolean
   runtimeConnected: boolean
   runtimeGestureActive: boolean
   runtimeCanMove: boolean
@@ -78,7 +79,8 @@ export function UiTunerComparisonWorkspace({
   liveSession,
   previewRequest,
   uploadedTarget,
-  realRenderer,
+  androidVisual,
+  runtimeEditable,
   runtimeConnected,
   runtimeGestureActive,
   runtimeCanMove,
@@ -216,7 +218,8 @@ export function UiTunerComparisonWorkspace({
       liveNodes={liveNodes}
       runtimeDraftState={runtimeDraftState}
       runtimeDraftStatus={runtimeDraftStatus}
-      realRenderer={realRenderer}
+      androidVisual={androidVisual}
+      runtimeEditable={runtimeEditable}
       runtimeConnected={runtimeConnected}
       runtimeGestureActive={runtimeGestureActive}
       runtimeCanMove={runtimeCanMove}

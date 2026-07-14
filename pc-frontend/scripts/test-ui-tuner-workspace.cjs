@@ -38,6 +38,39 @@ function compile(relativeSource, relativeOutput, jsx = false) {
 }
 
 try {
+  const renderModeOutput = compile(
+    'src/features/ui-tuner/rendering/renderMode.ts',
+    'rendering/renderMode.js',
+  )
+  const { deriveUiTunerRenderMode } = require(renderModeOutput)
+  assert.deepEqual(
+    deriveUiTunerRenderMode({
+      workspaceMode: 'evidence',
+      hasAndroidPixels: true,
+      runtimeDocument: false,
+    }),
+    { androidVisual: true, runtimeEditable: false },
+    '普通 APK 真机截图也必须进入无覆盖的 Android 真实画面模式',
+  )
+  assert.deepEqual(
+    deriveUiTunerRenderMode({
+      workspaceMode: 'evidence',
+      hasAndroidPixels: true,
+      runtimeDocument: true,
+    }),
+    { androidVisual: true, runtimeEditable: true },
+    '接入调试 Runtime 的 Android 画面应同时允许 LIVE 编辑',
+  )
+  assert.deepEqual(
+    deriveUiTunerRenderMode({
+      workspaceMode: 'source',
+      hasAndroidPixels: true,
+      runtimeDocument: true,
+    }),
+    { androidVisual: false, runtimeEditable: false },
+    '源码数字孪生模式不得误用 Android 真实画面交互状态',
+  )
+
   const clientIdOutput = compile(
     'src/features/ui-tuner/device/deviceLeaseClientId.ts',
     'device/deviceLeaseClientId.js',
@@ -261,6 +294,8 @@ try {
   assert.match(pageSource, /active=\{workspaceLayout\.focusMode\}/)
   assert.match(pageSource, /onExit=\{workspaceLayout\.exitFocusMode\}/)
   assert.match(pageSource, /onRecaptureDevice=\{\(\) => \{ void captureDeviceSnapshot\(\) \}\}/)
+  assert.match(pageSource, /realRenderer=\{renderMode\.androidVisual\}/)
+  assert.match(pageSource, /runtimeEditable=\{renderMode\.runtimeEditable\}/)
   const inspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/UiTunerInspector.tsx'),
     'utf8',

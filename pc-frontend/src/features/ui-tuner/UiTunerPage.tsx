@@ -65,6 +65,7 @@ import {
 import styles from './UiTunerPage.module.css'
 import { EvidenceModeSwitch, SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
 import type { SourcePreviewMode } from './source-preview/types'
+import { deriveUiTunerRenderMode } from './rendering/renderMode'
 import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
 
 interface HistoryState {
@@ -315,9 +316,10 @@ export default function UiTunerPage() {
     || isLiveDebugPackage(liveUi.session?.packageName)
     || isLiveDebugPackage(tunerDoc.runtimeSnapshot?.packageName),
   )
-  const realRenderer = workspaceMode === 'evidence'
-    && runtimeDocument
-    && Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible)
+  const renderMode = deriveUiTunerRenderMode({
+    workspaceMode, runtimeDocument,
+    hasAndroidPixels: Boolean(liveUi.liveFrame || tunerDoc.canvas.referenceImage?.visible),
+  })
   const runtimeDraft = useRuntimeDraftSession({
     resetKey: `${liveUi.session?.id ?? ''}:${liveUi.previewRequest ? JSON.stringify(liveUi.previewRequest) : ''}:${liveUi.buildVerifyResult?.apkPath ?? ''}`,
     frame: liveUi.liveFrame,
@@ -335,7 +337,7 @@ export default function UiTunerPage() {
     setSelectedId,
     pushHistorySnapshot,
     selectedNode: liveUi.selectedNode,
-    realRenderer,
+    realRenderer: renderMode.runtimeEditable,
     runtimeConnected: liveUi.state === 'connected',
     viewScale,
     applyRuntimeGesture: runtimeDraft.applyGesture,
@@ -636,7 +638,7 @@ export default function UiTunerPage() {
     >
       <FocusModeExitButton active={workspaceLayout.focusMode} onExit={workspaceLayout.exitFocusMode} />
       {workspaceLayout.leftPanelOpen && <UiTunerLayersPanel
-        realRenderer={realRenderer}
+        realRenderer={renderMode.androidVisual}
         filter={layerFilter}
         filterResult={filterResult}
         selectedId={selectedId}
@@ -674,8 +676,8 @@ export default function UiTunerPage() {
           viewScaleLabel={viewScaleLabel}
           fitToStage={fitToStage}
           fitToWidth={fitToWidth}
-          canUndo={realRenderer ? runtimeDraft.status === 'rejected' || (runtimeDraft.status === 'confirmed' && (liveUi.session?.historyCount ?? 0) > 0) : history.past.length > 0}
-          canRedo={realRenderer ? runtimeDraft.status === 'confirmed' && (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
+          canUndo={renderMode.runtimeEditable ? runtimeDraft.status === 'rejected' || (runtimeDraft.status === 'confirmed' && (liveUi.session?.historyCount ?? 0) > 0) : history.past.length > 0}
+          canRedo={renderMode.runtimeEditable ? runtimeDraft.status === 'confirmed' && (liveUi.session?.redoCount ?? 0) > 0 : history.future.length > 0}
           leftPanelOpen={workspaceLayout.leftPanelOpen}
           rightPanelOpen={workspaceLayout.rightPanelOpen}
           focusMode={workspaceLayout.focusMode}
@@ -689,8 +691,8 @@ export default function UiTunerPage() {
           onFitToStage={comparisonViewport.fitCanvasToStage}
           onFitToWidth={comparisonViewport.fitCanvasToWidth}
           onActualSize={comparisonViewport.actualSize}
-          onUndo={() => { if (realRenderer) void undoLive(); else undoHistory() }}
-          onRedo={() => { if (realRenderer) void redoLive(); else redoHistory() }}
+          onUndo={() => { if (renderMode.runtimeEditable) void undoLive(); else undoHistory() }}
+          onRedo={() => { if (renderMode.runtimeEditable) void redoLive(); else redoHistory() }}
           onSave={saveNow}
           onCopyExport={copyExport}
           onCopyCliPatch={copyCliPatch}
@@ -708,7 +710,8 @@ export default function UiTunerPage() {
           liveFrame={liveUi.liveFrame}
           runtimeDraftState={runtimeDraft.state}
           runtimeDraftStatus={runtimeDraft.status}
-          realRenderer={realRenderer}
+          androidVisual={renderMode.androidVisual}
+          runtimeEditable={renderMode.runtimeEditable}
           runtimeConnected={liveUi.state === 'connected'}
           runtimeGestureActive={canvasGesture.runtimeGestureActive}
           runtimeCanMove={canvasGesture.canMove}

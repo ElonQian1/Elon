@@ -21,7 +21,8 @@ interface UiTunerCanvasSurfaceProps {
   liveNodes: LiveUiNode[]
   runtimeDraftState: RuntimeDraftState
   runtimeDraftStatus: RuntimeDraftStatus
-  realRenderer: boolean
+  androidVisual: boolean
+  runtimeEditable: boolean
   runtimeConnected: boolean
   runtimeGestureActive: boolean
   runtimeCanMove: boolean
@@ -48,7 +49,8 @@ export function UiTunerCanvasSurface({
   liveNodes,
   runtimeDraftState,
   runtimeDraftStatus,
-  realRenderer,
+  androidVisual,
+  runtimeEditable,
   runtimeConnected,
   runtimeGestureActive,
   runtimeCanMove,
@@ -66,13 +68,15 @@ export function UiTunerCanvasSurface({
   return (
     <div className={styles.canvasSurface}>
       <div className={styles.canvasUtilityBar}>
-        {realRenderer && (
+        {androidVisual && (
           <div className={
             runtimeDraftStatus === 'rejected' || !runtimeConnected
               ? styles.runtimeSurfaceFrozen
               : styles.runtimeSurfaceLive
           }>
-            {runtimeSurfaceLabel(runtimeConnected, runtimeDraftStatus)}
+            {runtimeEditable
+              ? runtimeSurfaceLabel(runtimeConnected, runtimeDraftStatus)
+              : '真实 Android 快照 · 当前为只读点选'}
           </div>
         )}
       </div>
@@ -84,7 +88,7 @@ export function UiTunerCanvasSurface({
         <div
           className={[
             styles.canvas,
-            realRenderer && runtimeGestureActive ? styles.runtimeGestureCanvas : '',
+            runtimeEditable && runtimeGestureActive ? styles.runtimeGestureCanvas : '',
           ].join(' ')}
           style={{
             width: canvas.width,
@@ -99,7 +103,7 @@ export function UiTunerCanvasSurface({
             if (event.target === event.currentTarget) onClearSelection()
           }}
         >
-          {!realRenderer && <div className={styles.canvasGrid} aria-hidden="true" />}
+          {!androidVisual && <div className={styles.canvasGrid} aria-hidden="true" />}
           {liveFrame ? (
             <img className={styles.referenceImage} src={liveFrame.dataUrl} alt="真机实时画面" />
           ) : canvas.referenceImage?.visible && (
@@ -110,7 +114,7 @@ export function UiTunerCanvasSurface({
               style={{ opacity: canvas.referenceImage.opacity }}
             />
           )}
-          {realRenderer && (
+          {runtimeEditable && (
             <RuntimeDraftLayer
               canvasBackground={canvas.background}
               frame={liveFrame}
@@ -120,10 +124,10 @@ export function UiTunerCanvasSurface({
           )}
           {overlayLayer}
           {filterResult.visible.map(({ element, analysis }) => {
-            const draftRect = realRenderer && element.runtime?.nodeId
+            const draftRect = runtimeEditable && element.runtime?.nodeId
               ? runtimeDraftState.nodes[element.runtime.nodeId]?.visual.rect
               : undefined
-            const elementStyle: CSSProperties = realRenderer ? {
+            const elementStyle: CSSProperties = androidVisual ? {
               left: draftRect?.left ?? element.x,
               top: draftRect?.top ?? element.y,
               width: draftRect?.width ?? element.width,
@@ -149,11 +153,11 @@ export function UiTunerCanvasSurface({
               <button
                 key={element.id}
                 type="button"
-                aria-label={realRenderer ? `真实组件 ${element.name}` : undefined}
-                data-runtime-node-id={realRenderer ? element.runtime?.nodeId : undefined}
+                aria-label={androidVisual ? `真实组件 ${element.name}` : undefined}
+                data-runtime-node-id={androidVisual ? element.runtime?.nodeId : undefined}
                 className={[
                   styles.canvasElement,
-                  element.id === selectedId && !(realRenderer && runtimeGestureActive)
+                  element.id === selectedId && !(runtimeEditable && runtimeGestureActive)
                     ? styles.selectedElement
                     : '',
                   analysis.appearance === 'ghost'
@@ -163,11 +167,11 @@ export function UiTunerCanvasSurface({
                       : '',
                   analysis.isLocked ? styles.lockedElement : '',
                   styles[`kind_${element.kind}`],
-                  realRenderer ? styles.runtimeHitTarget : '',
+                  androidVisual ? styles.runtimeHitTarget : '',
                 ].join(' ')}
                 style={elementStyle}
                 onPointerDown={(event) => {
-                  if (realRenderer) {
+                  if (androidVisual) {
                     event.stopPropagation()
                     if (element.id === selectedId && runtimeCanMove) {
                       onElementPointerDown(event, element, 'move')
@@ -184,15 +188,15 @@ export function UiTunerCanvasSurface({
                   onElementPointerDown(event, element, 'move')
                 }}
               >
-                {!realRenderer && <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>}
-                {realRenderer && !runtimeGestureActive && element.id === selectedId && runtimeCanResize && (
+                {!androidVisual && <span>{analysis.appearance === 'outline' ? analysis.role : element.text}</span>}
+                {runtimeEditable && !runtimeGestureActive && element.id === selectedId && runtimeCanResize && (
                   <span
                     className={styles.runtimeResizeHandle}
                     aria-label="拖动缩放真实 Android 组件"
                     onPointerDown={(event) => onElementPointerDown(event, element, 'resize')}
                   />
                 )}
-                {!realRenderer && element.id === selectedId && !analysis.isLocked && (
+                {!androidVisual && element.id === selectedId && !analysis.isLocked && (
                   <span
                     className={styles.resizeHandle}
                     aria-hidden="true"
