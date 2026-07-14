@@ -24,12 +24,24 @@ pub(crate) struct CommitPreviewRequest {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SourcePreviewDocument {
     pub ok: bool,
+    pub ir_kind: String,
+    pub ir_version: u32,
     pub project_root: String,
     pub layout_files: Vec<String>,
     pub selected_layout: String,
     pub source_revision: String,
+    pub rendering: PreviewRendering,
     pub canvas: PreviewCanvas,
     pub root: PreviewNode,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PreviewRendering {
+    pub backend: String,
+    pub authoritative: bool,
+    pub source_of_truth: String,
+    pub calibration_required: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

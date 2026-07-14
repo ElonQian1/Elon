@@ -16,7 +16,12 @@ export function SourceDrivenPreviewSurface({ document, androidRender, selectedKe
       </div>}
       {!androidRender && document && (
         <div className={styles.deviceViewport} style={{ width: document.canvas.width * zoom, height: document.canvas.height * zoom }}>
-          <div className={styles.rendererDraftBadge}>React 数字孪生 · 本地草稿，待 Android 校准</div>
+          <div
+            className={styles.rendererDraftBadge}
+            title={`UI IR ${document.irVersion} · 真相来源：Android 源码`}
+          >
+            React 数字孪生 · 非权威本地草稿，待 Android 真帧校准
+          </div>
           <div className={styles.deviceCanvas} style={{ width: document.canvas.width, height: document.canvas.height, background: document.canvas.background, transform: `scale(${zoom})` }} onClick={() => onSelect(document.root.key)}>
             <SourcePreviewNode node={document.root} selectedKey={selectedKey} onSelect={onSelect} />
           </div>

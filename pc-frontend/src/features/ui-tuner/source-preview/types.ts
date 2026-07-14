@@ -30,10 +30,18 @@ export interface ComposePreviewRender {
 
 export interface SourcePreviewDocument {
   ok: boolean
+  irKind: 'elon.source_ui_ir'
+  irVersion: number
   projectRoot: string
   layoutFiles: string[]
   selectedLayout: string
   sourceRevision: string
+  rendering: {
+    backend: 'react_twin'
+    authoritative: false
+    sourceOfTruth: 'android_source'
+    calibrationRequired: true
+  }
   canvas: { width: number; height: number; background: string }
   root: SourcePreviewNode
 }

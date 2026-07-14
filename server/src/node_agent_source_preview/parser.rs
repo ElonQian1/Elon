@@ -46,10 +46,18 @@ pub(crate) fn load_document(
     let revision = hex::encode(Sha256::digest(content.as_bytes()));
     Ok(SourcePreviewDocument {
         ok: true,
+        ir_kind: "elon.source_ui_ir".into(),
+        ir_version: 1,
         project_root: root.to_string_lossy().to_string(),
         layout_files: layouts,
         selected_layout: selected,
         source_revision: revision,
+        rendering: PreviewRendering {
+            backend: "react_twin".into(),
+            authoritative: false,
+            source_of_truth: "android_source".into(),
+            calibration_required: true,
+        },
         canvas: PreviewCanvas {
             width: 393.0,
             height: 852.0,
