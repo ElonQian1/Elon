@@ -117,11 +117,14 @@ export function UiTunerCanvasSurface({
           )}
           {overlayLayer}
           {filterResult.visible.map(({ element, analysis }) => {
+            const draftRect = realRenderer && element.runtime?.nodeId
+              ? runtimeDraftState.nodes[element.runtime.nodeId]?.visual.rect
+              : undefined
             const elementStyle: CSSProperties = realRenderer ? {
-              left: element.x,
-              top: element.y,
-              width: element.width,
-              height: element.height,
+              left: draftRect?.left ?? element.x,
+              top: draftRect?.top ?? element.y,
+              width: draftRect?.width ?? element.width,
+              height: draftRect?.height ?? element.height,
             } : {
               left: element.x,
               top: element.y,

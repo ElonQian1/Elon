@@ -82,8 +82,6 @@ export function useLiveUiSession({
   const reconnectPromiseRef = useRef<Promise<void> | null>(null)
   const reconnectAttemptRef = useRef(0)
   const lastPreviewRef = useRef<LivePreviewRequest | null>(null)
-  const gestureFrameBusyRef = useRef(false)
-  const gestureFramePendingRef = useRef<string | null>(null)
   const livePollFailureRef = useRef(0)
   const recoveryInFlightRef = useRef(false)
 
@@ -258,23 +256,6 @@ export function useLiveUiSession({
     setLiveFrame(frame)
   }, [])
 
-  const requestGestureFrame = useCallback((sessionId: string) => {
-    gestureFramePendingRef.current = sessionId
-    if (gestureFrameBusyRef.current) return
-    gestureFrameBusyRef.current = true
-    void (async () => {
-      try {
-        while (gestureFramePendingRef.current) {
-          const pendingSessionId = gestureFramePendingRef.current
-          gestureFramePendingRef.current = null
-          await refreshFrame(pendingSessionId).catch(() => undefined)
-        }
-      } finally {
-        gestureFrameBusyRef.current = false
-      }
-    })()
-  }, [refreshFrame])
-
   const reconnect = useCallback(async () => {
     const current = sessionRef.current
     if (!current) {
@@ -329,7 +310,7 @@ export function useLiveUiSession({
       try {
         await refresh(session.id)
         livePollFailureRef.current = 0
-        await refreshFrame(session.id).catch(() => undefined)
+        if (!gestureActiveRef.current) await refreshFrame(session.id).catch(() => undefined)
       } catch {
         livePollFailureRef.current += 1
         if (livePollFailureRef.current >= 2 && !recoveryInFlightRef.current) {
@@ -342,7 +323,7 @@ export function useLiveUiSession({
       }
       if (!disposed) timer = window.setTimeout(
         () => { void pollRuntime() },
-        gestureActiveRef.current ? 160 : 1_500,
+        gestureActiveRef.current ? 650 : 1_500,
       )
     }
     void pollRuntime()
@@ -438,9 +419,6 @@ export function useLiveUiSession({
       )))
       setCommitPlan(null)
       setCommitResult(null)
-      if (gestureId) {
-        window.setTimeout(() => requestGestureFrame(currentSession.id), 16)
-      }
       if (!gestureId) {
         onNotice(`LIVE PREVIEW：${operations.map((item) => item.property).join('、')} 已在真机生效，源码尚未写入`)
         window.setTimeout(() => {
@@ -456,7 +434,7 @@ export function useLiveUiSession({
     } finally {
       if (!gestureId) setBusy(false)
     }
-  }, [nodes, onNotice, refresh, refreshFrame, requestGestureFrame, selected])
+  }, [nodes, onNotice, refresh, refreshFrame, selected])
 
   const apply = useCallback((operation: LivePatchOperation, scope: LiveUiScope) => (
     applyOperations([operation], scope)
@@ -474,7 +452,7 @@ export function useLiveUiSession({
       if (current?.connected) {
         window.setTimeout(() => {
           void Promise.all([refresh(current.id), refreshFrame(current.id)]).catch(() => undefined)
-        }, 80)
+        }, 160)
       }
     }
   }, [refresh, refreshFrame])

@@ -264,8 +264,8 @@ export function UiTunerComparisonWorkspace({
           </section>
           <section className={styles.pane} aria-label="真实 Android 现状">
             <header className={styles.paneHeader}>
-              <strong>真实 Android</strong>
-              <span>{liveFrame ? `${liveFrame.width} × ${liveFrame.height} · 实时` : '等待真机画面'}</span>
+              <strong>{runtimeDraftStatus === 'confirmed' ? '真实 Android' : 'PC 即时预览'}</strong>
+              <span>{currentPaneStatus(liveFrame, runtimeDraftStatus)}</span>
             </header>
             {currentSurface}
           </section>
@@ -277,6 +277,19 @@ export function UiTunerComparisonWorkspace({
       )}
     </div>
   )
+}
+
+function currentPaneStatus(
+  frame: LiveUiFrame | null,
+  status: UiTunerComparisonWorkspaceProps['runtimeDraftStatus'],
+) {
+  if (!frame) return '等待真机画面'
+  const size = `${frame.width} × ${frame.height}`
+  if (status === 'local') return `${size} · 尚未同步真机`
+  if (status === 'syncing') return `${size} · 真机后台同步中`
+  if (status === 'calibrating') return `${size} · 正在校准真机帧`
+  if (status === 'rejected') return `${size} · 真机同步失败`
+  return `${size} · 真机已校准`
 }
 
 const SOLVER_PROPERTIES = new Set([

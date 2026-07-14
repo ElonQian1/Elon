@@ -46,6 +46,7 @@ export interface RuntimeDraftNode {
   operations: Record<string, LivePropertyValue>
   visual: RuntimeDraftVisual
   baseFrameCapturedAt: string
+  confirmAfterMs?: number
   error?: string
 }
 
@@ -113,6 +114,7 @@ export function acknowledgeRuntimeDraft(
     ...draft,
     confirmedRevision: Math.max(draft.confirmedRevision, revision),
     phase: ack.status === 'APPLIED' ? 'acked' : 'rejected',
+    confirmAfterMs: ack.status === 'APPLIED' ? Date.now() + 120 : undefined,
     error: ack.status === 'APPLIED' ? undefined : ack.error || 'Android 拒绝了本次修改',
   }))
 }
@@ -135,9 +137,12 @@ export function confirmRuntimeDraftFrame(
   frame: LiveUiFrame | null,
 ): RuntimeDraftState {
   if (!frame) return state
+  const capturedAtMs = Date.parse(frame.capturedAt)
   const nodes = Object.fromEntries(Object.entries(state.nodes).filter(([, draft]) => !(
     draft.phase === 'acked'
     && draft.confirmedRevision === draft.localRevision
+    && Number.isFinite(capturedAtMs)
+    && capturedAtMs >= (draft.confirmAfterMs ?? Number.POSITIVE_INFINITY)
     && draft.baseFrameCapturedAt !== frame.capturedAt
   )))
   return Object.keys(nodes).length === Object.keys(state.nodes).length ? state : { ...state, nodes }
