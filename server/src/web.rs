@@ -52,6 +52,30 @@ const HOME_BOTTOM_NAV_PANEL_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_home_bottom_nav_panel.png");
 const HOME_BOTTOM_SEARCH_PILL_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_home_bottom_search_pill.png");
+const BOTTOM_NAV_PANEL_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_nav_primary_panel.png");
+const BOTTOM_NAV_SELECTED_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_nav_selected.png");
+const BOTTOM_NAV_COMPOSE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/bg_bottom_nav_compose.png");
+const BOTTOM_NAV_CHAT_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_chat.png");
+const BOTTOM_NAV_CHAT_ACTIVE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_chat_active.png");
+const BOTTOM_NAV_PROJECT_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_project.png");
+const BOTTOM_NAV_PROJECT_ACTIVE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_project_active.png");
+const BOTTOM_NAV_PROFILE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_profile.png");
+const BOTTOM_NAV_PROFILE_ACTIVE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_profile_active.png");
+const BOTTOM_NAV_MENU_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_menu.png");
+const BOTTOM_NAV_MENU_ACTIVE_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_menu_active.png");
+const BOTTOM_NAV_COMPOSE_ICON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_side_menu_new_chat.png");
 const INPUT_ADD_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_add_new.png");
 const INPUT_VOICE_WAVE_PNG: &[u8] =
@@ -141,6 +165,18 @@ fn build_html() -> String {
     let top_add_button_png_b64 = encode_png(TOP_ADD_BUTTON_PNG);
     let home_bottom_nav_panel_png_b64 = encode_png(HOME_BOTTOM_NAV_PANEL_PNG);
     let home_bottom_search_pill_png_b64 = encode_png(HOME_BOTTOM_SEARCH_PILL_PNG);
+    let bottom_nav_panel_png_b64 = encode_png(BOTTOM_NAV_PANEL_PNG);
+    let bottom_nav_selected_png_b64 = encode_png(BOTTOM_NAV_SELECTED_PNG);
+    let bottom_nav_compose_png_b64 = encode_png(BOTTOM_NAV_COMPOSE_PNG);
+    let bottom_nav_chat_png_b64 = encode_png(BOTTOM_NAV_CHAT_PNG);
+    let bottom_nav_chat_active_png_b64 = encode_png(BOTTOM_NAV_CHAT_ACTIVE_PNG);
+    let bottom_nav_project_png_b64 = encode_png(BOTTOM_NAV_PROJECT_PNG);
+    let bottom_nav_project_active_png_b64 = encode_png(BOTTOM_NAV_PROJECT_ACTIVE_PNG);
+    let bottom_nav_profile_png_b64 = encode_png(BOTTOM_NAV_PROFILE_PNG);
+    let bottom_nav_profile_active_png_b64 = encode_png(BOTTOM_NAV_PROFILE_ACTIVE_PNG);
+    let bottom_nav_menu_png_b64 = encode_png(BOTTOM_NAV_MENU_PNG);
+    let bottom_nav_menu_active_png_b64 = encode_png(BOTTOM_NAV_MENU_ACTIVE_PNG);
+    let bottom_nav_compose_icon_png_b64 = encode_png(BOTTOM_NAV_COMPOSE_ICON_PNG);
     let input_add_png_b64 = encode_png(INPUT_ADD_PNG);
     let input_voice_wave_png_b64 = encode_png(INPUT_VOICE_WAVE_PNG);
     let input_emoji_png_b64 = encode_png(INPUT_EMOJI_PNG);
@@ -202,6 +238,45 @@ fn build_html() -> String {
         .replace(
             "__HOME_BOTTOM_SEARCH_PILL_PNG_B64__",
             &home_bottom_search_pill_png_b64,
+        )
+        .replace("__BOTTOM_NAV_PANEL_PNG_B64__", &bottom_nav_panel_png_b64)
+        .replace(
+            "__BOTTOM_NAV_SELECTED_PNG_B64__",
+            &bottom_nav_selected_png_b64,
+        )
+        .replace(
+            "__BOTTOM_NAV_COMPOSE_PNG_B64__",
+            &bottom_nav_compose_png_b64,
+        )
+        .replace("__BOTTOM_NAV_CHAT_PNG_B64__", &bottom_nav_chat_png_b64)
+        .replace(
+            "__BOTTOM_NAV_CHAT_ACTIVE_PNG_B64__",
+            &bottom_nav_chat_active_png_b64,
+        )
+        .replace(
+            "__BOTTOM_NAV_PROJECT_PNG_B64__",
+            &bottom_nav_project_png_b64,
+        )
+        .replace(
+            "__BOTTOM_NAV_PROJECT_ACTIVE_PNG_B64__",
+            &bottom_nav_project_active_png_b64,
+        )
+        .replace(
+            "__BOTTOM_NAV_PROFILE_PNG_B64__",
+            &bottom_nav_profile_png_b64,
+        )
+        .replace(
+            "__BOTTOM_NAV_PROFILE_ACTIVE_PNG_B64__",
+            &bottom_nav_profile_active_png_b64,
+        )
+        .replace("__BOTTOM_NAV_MENU_PNG_B64__", &bottom_nav_menu_png_b64)
+        .replace(
+            "__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__",
+            &bottom_nav_menu_active_png_b64,
+        )
+        .replace(
+            "__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__",
+            &bottom_nav_compose_icon_png_b64,
         )
         .replace("__INPUT_ADD_PNG_B64__", &input_add_png_b64)
         .replace("__INPUT_VOICE_WAVE_PNG_B64__", &input_voice_wave_png_b64)

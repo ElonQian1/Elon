@@ -81,6 +81,7 @@ internal class MainInputComposerSetup(
         val modelButton = binding.modelButton
         val sendButton = binding.sendButton
         val bottomMenuHeight = activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_height)
+        val bottomEdgeGap = activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_edge_gap)
 
         inputEdit.detachFromParent()
         modelButton.detachFromParent()
@@ -90,7 +91,7 @@ internal class MainInputComposerSetup(
         root.minimumHeight = bottomMenuHeight
         root.clipChildren = false
         root.clipToPadding = false
-        root.setPadding(0, dp(12), 0, dp(6))
+        root.setPadding(0, dp(12), 0, bottomEdgeGap)
         root.setBackgroundColor(Color.argb(77, 0, 0, 0))
 
         val modeButtonRow = LinearLayout(activity).apply {

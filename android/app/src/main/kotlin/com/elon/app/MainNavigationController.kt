@@ -56,7 +56,7 @@ internal class MainNavigationController(
     private val onAgentTabSelected: () -> Unit,
     private val handleProjectSpaceInternalBack: () -> Boolean,
     private val openProjectSpacePostComposer: () -> Unit,
-    private val showCreateProjectDialog: () -> Unit
+    private val showCreateProjectDialog: () -> Unit, private val createConversationAndOpen: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -72,8 +72,7 @@ internal class MainNavigationController(
     private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
-    private val bottomNavigation = MainBottomNavigationController(
-        activity, binding, { selectBottomTab(it, false) }, showCreateProjectDialog, showFriendLocalSearch)
+    private val bottomNavigation = MainBottomNavigationController(activity, binding, { selectBottomTab(it, false) }, createConversationAndOpen)
     private val homeChrome = HomeChromeController(
         activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, bottomNavigation::setVisible,
         { showConversationHome(animate = false) },
@@ -1027,6 +1026,7 @@ internal class MainNavigationController(
         tab.setTextColor(color)
         tab.textSize = 14f
         tab.compoundDrawableTintList = ColorStateList.valueOf(color)
+        designMetrics.applyBottomTabAssetState(tab, selected)
     }
 
     private fun resetProjectHomeScroll() {

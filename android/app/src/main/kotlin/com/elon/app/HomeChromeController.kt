@@ -6,6 +6,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.PopupWindow
@@ -35,29 +36,32 @@ internal class HomeChromeController(
     fun setup() {
         projectCreateFab.setup()
         binding.homeMenuButton.setOnClickListener { showNavigationMenu() }
+        binding.bottomMenuButton.setOnClickListener {
+            showNavigationMenu(binding.bottomMenuButton)
+        }
     }
 
     fun showHome() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setBottomMenuVisible(false)
+        setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
-        binding.homeMenuButton.visibility = android.view.View.VISIBLE
+        binding.homeMenuButton.visibility = android.view.View.GONE
         projectCreateFab.hide()
     }
 
     fun showProjectPlazaEntry() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setBottomMenuVisible(false)
+        setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
-        binding.homeMenuButton.visibility = android.view.View.VISIBLE
+        binding.homeMenuButton.visibility = android.view.View.GONE
         projectCreateFab.hide()
     }
 
     fun showMenuOnly() {
         setNavigationBarColor(R.color.elon_bg_app)
-        setBottomMenuVisible(false)
+        setBottomMenuVisible(true)
         binding.projectSpaceAiMenu.visibility = android.view.View.GONE
-        binding.homeMenuButton.visibility = android.view.View.VISIBLE
+        binding.homeMenuButton.visibility = android.view.View.GONE
         projectCreateFab.hide()
     }
 
@@ -70,8 +74,13 @@ internal class HomeChromeController(
         binding.homeProjectCreateMenu.translationX = 0f
     }
 
-    private fun showNavigationMenu() {
+    private fun showNavigationMenu(anchor: View = binding.homeMenuButton) {
         actionPopupProvider()?.dismiss()
+        val openedFromBottomMenu = anchor === binding.bottomMenuButton
+        if (openedFromBottomMenu) {
+            binding.bottomMenuSelection.isSelected = true
+            binding.bottomMenuIcon.isSelected = true
+        }
         val panel = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(6), 0, dp(6))
@@ -111,10 +120,24 @@ internal class HomeChromeController(
             isOutsideTouchable = true
             elevation = dp(8).toFloat()
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            showAsDropDown(binding.homeMenuButton, dp(8), -dp(2))
+            setOnDismissListener {
+                if (openedFromBottomMenu) {
+                    binding.bottomMenuSelection.isSelected = false
+                    binding.bottomMenuIcon.isSelected = false
+                }
+            }
+            if (openedFromBottomMenu) {
+                showAsDropDown(
+                    anchor,
+                    anchor.width / 2 - dp(78),
+                    -anchor.height - dp(152)
+                )
+            } else {
+                showAsDropDown(anchor, dp(8), -dp(2))
+            }
         }
         panel.pivotX = 0f
-        panel.pivotY = 0f
+        panel.pivotY = if (openedFromBottomMenu) panel.height.toFloat() else 0f
         panel.animate()
             .alpha(1f)
             .scaleX(1f)

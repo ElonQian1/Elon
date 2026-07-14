@@ -10,25 +10,24 @@ internal class MainBottomNavigationController(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val selectTab: (TextView) -> Unit,
-    private val showCreateProjectDialog: () -> Unit,
-    private val showFriendLocalSearch: () -> Unit
+    private val createConversationAndOpen: () -> Unit
 ) {
     fun setup() {
         binding.tabChat.setOnClickListener { selectTab(binding.tabChat) }
         binding.tabProject.setOnClickListener { selectTab(binding.tabProject) }
         binding.tabProfile.setOnClickListener { selectTab(binding.tabProfile) }
-        binding.bottomNewProjectButton.setOnClickListener { showCreateProjectDialog() }
-        binding.bottomSearchButton.setOnClickListener {
-            if (!binding.tabChat.isSelected) selectTab(binding.tabChat)
-            showFriendLocalSearch()
+        binding.bottomComposeButton.setOnClickListener {
+            createConversationAndOpen()
         }
     }
 
-    @Suppress("UNUSED_PARAMETER")
     fun setVisible(visible: Boolean) {
-        // 主页导航已收束到左上角菜单，底部悬浮菜单暂时不渲染，也不再预留空白。
-        binding.pageTabs.visibility = View.GONE
-        val inset = 0
+        binding.pageTabs.visibility = if (visible) View.VISIBLE else View.GONE
+        val inset = if (visible) {
+            activity.resources.getDimensionPixelSize(R.dimen.main_bottom_menu_outer_height)
+        } else {
+            0
+        }
         listOfNotNull(
             binding.conversationPage.parent as? ScrollView,
             binding.projectScrollView,

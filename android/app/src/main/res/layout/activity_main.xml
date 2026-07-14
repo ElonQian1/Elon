@@ -1105,10 +1105,10 @@
             android:background="@android:color/transparent"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:paddingStart="16dp"
+            android:paddingStart="20dp"
             android:paddingTop="8dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="8dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="@dimen/main_bottom_menu_edge_gap"
             android:visibility="gone">
 
             <LinearLayout
@@ -1116,91 +1116,28 @@
                 android:layout_height="match_parent"
                 android:clipChildren="false"
                 android:clipToPadding="false"
-                android:orientation="vertical">
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
 
-                <LinearLayout
-                    android:id="@+id/homeBottomActionRow"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
+                <FrameLayout
+                    android:id="@+id/bottomNavPrimaryPanel"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/main_bottom_menu_height"
+                    android:layout_weight="1"
                     android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone">
+                    android:clipToPadding="false">
 
-                    <FrameLayout
-                        android:id="@+id/bottomNewProjectButton"
-                        android:layout_width="72dp"
-                        android:layout_height="48dp"
-                        android:clickable="true"
-                        android:contentDescription="新项目"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackgroundBorderless">
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/bg_bottom_nav_primary_panel" />
 
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="36dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:scaleType="fitXY"
-                            android:src="@drawable/bg_bottom_mode_pill_new" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:gravity="center"
-                            android:includeFontPadding="false"
-                            android:text="新项目"
-                            android:textColor="@color/elon_text_nav"
-                            android:textSize="14sp" />
-                    </FrameLayout>
-
-                    <Space
-                        android:layout_width="10dp"
-                        android:layout_height="1dp" />
-
-                    <FrameLayout
-                        android:id="@+id/bottomSearchButton"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_weight="1"
-                        android:clickable="true"
-                        android:contentDescription="搜索好友、项目或消息"
-                        android:focusable="true"
-                        android:foreground="?attr/selectableItemBackgroundBorderless">
-
-                        <ImageView
-                            android:layout_width="match_parent"
-                            android:layout_height="36dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:scaleType="fitXY"
-                            android:src="@drawable/bg_home_bottom_search_pill" />
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_gravity="start|center_vertical"
-                            android:layout_marginStart="18dp"
-                            android:contentDescription="@null"
-                            android:scaleType="fitCenter"
-                            android:src="@drawable/ic_top_search_custom" />
-                    </FrameLayout>
-                </LinearLayout>
-
-                <Space
-                    android:layout_width="1dp"
-                    android:layout_height="5dp"
-                    android:visibility="gone" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="83dp"
-                    android:background="@drawable/bg_home_bottom_nav_panel"
-                    android:clipChildren="false"
-                    android:clipToPadding="false"
-                    android:gravity="center"
-                    android:orientation="horizontal">
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
 
                     <FrameLayout
                         android:id="@+id/tabChatWrap"
@@ -1209,25 +1146,39 @@
                         android:layout_weight="1">
 
                         <ImageView
+                            android:id="@+id/tabChatSelection"
+                            android:layout_width="58dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:scaleType="fitXY"
+                            android:src="@drawable/bg_bottom_nav_item_selector" />
+
+                        <ImageView
+                            android:id="@+id/tabChatIcon"
                             android:layout_width="28dp"
                             android:layout_height="28dp"
-                            android:layout_gravity="top|center_horizontal"
-                            android:layout_marginTop="21dp"
+                            android:layout_gravity="center"
                             android:contentDescription="@null"
-                            android:src="@drawable/ic_tab_chat_custom" />
+                            android:src="@drawable/ic_bottom_nav_chat_selector" />
 
                         <TextView
                             android:id="@+id/tabChat"
-                            style="@style/MainTabLabel"
-                            android:text="好友" />
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@android:color/transparent"
+                            android:clickable="true"
+                            android:contentDescription="好友"
+                            android:focusable="true"
+                            android:text="" />
 
                         <TextView
                             android:id="@+id/tabChatBadge"
                             android:layout_width="22dp"
                             android:layout_height="22dp"
                             android:layout_gravity="top|center_horizontal"
-                            android:layout_marginStart="17dp"
-                            android:layout_marginTop="10dp"
+                            android:layout_marginStart="18dp"
+                            android:layout_marginTop="2dp"
                             android:gravity="center"
                             android:includeFontPadding="false"
                             android:textColor="@color/elon_text_primary"
@@ -1238,57 +1189,131 @@
                     </FrameLayout>
 
                     <FrameLayout
+                        android:id="@+id/tabProjectWrap"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1">
 
                         <ImageView
+                            android:id="@+id/tabProjectSelection"
+                            android:layout_width="58dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:scaleType="fitXY"
+                            android:src="@drawable/bg_bottom_nav_item_selector" />
+
+                        <ImageView
+                            android:id="@+id/tabProjectIcon"
                             android:layout_width="28dp"
                             android:layout_height="28dp"
-                            android:layout_gravity="top|center_horizontal"
-                            android:layout_marginTop="21dp"
+                            android:layout_gravity="center"
                             android:contentDescription="@null"
-                            android:src="@drawable/ic_tab_project_custom" />
+                            android:src="@drawable/ic_bottom_nav_project_selector" />
 
                         <TextView
                             android:id="@+id/tabProject"
-                            style="@style/MainTabLabel"
-                            android:text="项目" />
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@android:color/transparent"
+                            android:clickable="true"
+                            android:contentDescription="项目"
+                            android:focusable="true"
+                            android:text="" />
                     </FrameLayout>
 
                     <FrameLayout
+                        android:id="@+id/tabProfileWrap"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1">
 
                         <ImageView
+                            android:id="@+id/tabProfileSelection"
+                            android:layout_width="58dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:scaleType="fitXY"
+                            android:src="@drawable/bg_bottom_nav_item_selector" />
+
+                        <ImageView
+                            android:id="@+id/tabProfileIcon"
                             android:layout_width="28dp"
                             android:layout_height="28dp"
-                            android:layout_gravity="top|center_horizontal"
-                            android:layout_marginTop="21dp"
+                            android:layout_gravity="center"
                             android:contentDescription="@null"
-                            android:src="@drawable/ic_tab_profile_custom" />
+                            android:src="@drawable/ic_bottom_nav_profile_selector" />
 
                         <TextView
                             android:id="@+id/tabProfile"
-                            style="@style/MainTabLabel"
-                            android:text="我的" />
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="@android:color/transparent"
+                            android:clickable="true"
+                            android:contentDescription="我的"
+                            android:focusable="true"
+                            android:text="" />
                     </FrameLayout>
 
-                    <TextView
-                        android:id="@+id/tabMarket"
-                        style="@style/MainTabText"
-                        android:drawableTop="@drawable/ic_tab_store"
-                        android:text="商城"
-                        android:visibility="gone" />
+                    <FrameLayout
+                        android:id="@+id/bottomMenuButton"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:clickable="true"
+                        android:contentDescription="主菜单"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackgroundBorderless">
 
-                    <TextView
-                        android:id="@+id/tabAgent"
-                        style="@style/MainTabText"
-                        android:drawableTop="@drawable/ic_tab_agent"
-                        android:text="Agent"
-                        android:visibility="gone" />
-                </LinearLayout>
+                        <ImageView
+                            android:id="@+id/bottomMenuSelection"
+                            android:layout_width="58dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:scaleType="fitXY"
+                            android:src="@drawable/bg_bottom_nav_item_selector" />
+
+                        <ImageView
+                            android:id="@+id/bottomMenuIcon"
+                            android:layout_width="28dp"
+                            android:layout_height="28dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_bottom_nav_menu_selector" />
+                    </FrameLayout>
+
+                    </LinearLayout>
+                </FrameLayout>
+
+                <Space
+                    android:layout_width="12dp"
+                    android:layout_height="1dp" />
+
+                <FrameLayout
+                    android:id="@+id/bottomComposeButton"
+                    android:layout_width="@dimen/main_bottom_menu_height"
+                    android:layout_height="@dimen/main_bottom_menu_height"
+                    android:clickable="true"
+                    android:contentDescription="新建 AI 会话"
+                    android:focusable="true"
+                    android:foreground="?attr/selectableItemBackgroundBorderless">
+
+                    <ImageView
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:scaleType="fitXY"
+                        android:src="@drawable/bg_bottom_nav_compose" />
+
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_side_menu_new_chat" />
+                </FrameLayout>
             </LinearLayout>
         </FrameLayout>
 

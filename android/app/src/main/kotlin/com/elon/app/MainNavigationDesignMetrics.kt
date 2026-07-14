@@ -78,6 +78,17 @@ internal class MainNavigationDesignMetrics(
         }
     }
 
+    fun applyBottomTabAssetState(tab: TextView, selected: Boolean) {
+        val (selection, icon) = when (tab) {
+            binding.tabChat -> binding.tabChatSelection to binding.tabChatIcon
+            binding.tabProject -> binding.tabProjectSelection to binding.tabProjectIcon
+            binding.tabProfile -> binding.tabProfileSelection to binding.tabProfileIcon
+            else -> return
+        }
+        selection.isSelected = selected
+        icon.isSelected = selected
+    }
+
     private fun designPx(value: Int): Int {
         val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
         return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()

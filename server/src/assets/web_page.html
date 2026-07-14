@@ -75,7 +75,7 @@
       --bubble-error-ink: #c62828;
       --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
-      --bottom-menu-height: 99px;
+      --bottom-menu-height: 72px;
     }
     * { box-sizing: border-box; }
     * {
@@ -213,6 +213,13 @@
       z-index: 95;
       transform-origin: top left;
       animation: home-nav-pop 120ms ease both;
+    }
+    .home-nav-menu.bottom-anchor {
+      position: fixed;
+      left: auto;
+      right: 84px;
+      top: auto;
+      bottom: calc(80px + env(safe-area-inset-bottom));
     }
     .home-nav-menu button {
       width: 100%;
@@ -2854,9 +2861,9 @@
       background: rgba(0, 0, 0, 0.70);
       display: none;
       flex-direction: column;
-      min-height: calc(106px + env(safe-area-inset-bottom));
-      padding: 12px 20px 6px;
-      padding-bottom: max(6px, env(safe-area-inset-bottom));
+      min-height: calc(122px + env(safe-area-inset-bottom));
+      padding: 12px 20px 8px;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
       gap: 6px;
       align-items: stretch;
     }
@@ -2897,7 +2904,7 @@
       pointer-events: none;
     }
     .input-panel {
-      min-height: 48px;
+      min-height: 56px;
       background: url("data:image/png;base64,__BOTTOM_PANEL_PNG_B64__") center / 100% 100% no-repeat;
       border: 0 solid transparent;
       border-radius: 999px;
@@ -2911,14 +2918,14 @@
     }
     .input-bar.has-text .input-panel,
     .input-bar.input-focused .input-panel {
-      min-height: 132px;
+      min-height: 140px;
       background: var(--side-menu-bg);
       border: 1px solid #3B3B3E;
       border-radius: 32px;
       padding: 8px 10px 0;
     }
     .input-bar.attachments-open .input-panel {
-      min-height: 156px;
+      min-height: 164px;
       background: var(--side-menu-bg);
       border: 1px solid #3B3B3E;
       border-radius: 32px;
@@ -2927,8 +2934,8 @@
     .input-text-row {
       display: none;
       position: relative;
-      min-height: calc(var(--input-text-height, 42px) + var(--input-text-anchor-top, 12px) + 48px);
-      margin: 0 0 -48px 18px;
+      min-height: calc(var(--input-text-height, 42px) + var(--input-text-anchor-top, 12px) + 56px);
+      margin: 0 0 -56px 18px;
       padding-top: var(--input-text-anchor-top, 12px);
       padding-right: 42px;
       box-sizing: border-box;
@@ -2941,7 +2948,7 @@
       display: none;
     }
     .input-main-row {
-      height: 48px;
+      height: 56px;
       display: flex;
       align-items: center;
       gap: 8px;
@@ -3083,107 +3090,91 @@
     /* ===== Tab 栏 ===== */
     .tabs-bar {
       position: fixed;
-      left: 0;
-      right: 0;
+      left: 50%;
+      right: auto;
       bottom: 0;
+      width: 100%;
+      max-width: 720px;
+      transform: translateX(-50%);
       z-index: 20;
       background: transparent;
-      /* 主页入口暂时收束到左上角菜单，底部悬浮菜单不渲染。 */
-      display: none;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 5px;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 12px;
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
-      padding: 8px 16px calc(8px + env(safe-area-inset-bottom));
-    }
-    .bottom-menu-actions {
-      width: 100%;
-      height: 48px;
-      display: none;
-      align-items: center;
-      gap: 10px;
-      flex: none;
-    }
-    .bottom-action-button {
-      position: relative;
-      height: 48px;
-      border: 0;
-      background: transparent;
-      color: var(--tab-icon);
-      padding: 0;
-      cursor: pointer;
-      overflow: hidden;
-    }
-    .bottom-action-button::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 6px;
-      height: 36px;
-      background-position: center;
-      background-size: 100% 100%;
-      background-repeat: no-repeat;
-      pointer-events: none;
-    }
-    .bottom-new-project {
-      width: 72px;
-      flex: none;
-      font-size: 14px;
-    }
-    .bottom-new-project::before {
-      background-image: url("data:image/png;base64,__BOTTOM_MODE_PILL_PNG_B64__");
-    }
-    .bottom-new-project span {
-      position: relative;
-      z-index: 1;
-    }
-    .bottom-search {
-      flex: 1;
-      min-width: 0;
-      text-align: left;
-    }
-    .bottom-search::before {
-      background-image: url("data:image/png;base64,__HOME_BOTTOM_SEARCH_PILL_PNG_B64__");
-    }
-    .bottom-search img {
-      position: relative;
-      z-index: 1;
-      display: block;
-      width: 24px;
-      height: 24px;
-      margin-left: 18px;
-      object-fit: contain;
+      padding: 8px 20px max(8px, env(safe-area-inset-bottom));
     }
     .tabs-panel {
-      width: 100%;
-      height: 83px;
+      min-width: 0;
+      height: 56px;
       display: flex;
       align-items: stretch;
-      flex: none;
-      background: url("data:image/png;base64,__HOME_BOTTOM_NAV_PANEL_PNG_B64__") center / 100% 100% no-repeat;
+      flex: 1;
+      background: url("data:image/png;base64,__BOTTOM_NAV_PANEL_PNG_B64__") center / 100% 100% no-repeat;
       overflow: hidden;
     }
-    .tab {
+    .tab,
+    .bottom-menu-tab {
       flex: 1;
       position: relative;
       z-index: 1;
-      height: 83px;
+      min-width: 0;
+      height: 56px;
       background: transparent;
       border: 0;
       color: var(--tab-icon);
-      font-size: 14px;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 5px;
-      line-height: 14px;
-      padding: 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
       cursor: pointer;
     }
-    .tab.active { color: var(--tab-active); background: transparent; }
-    .tab .ic { width: 26px; height: 26px; display: block; }
-    .tab .ic img { width: 100%; height: 100%; object-fit: contain; }
-    .tab .ic svg { width: 100%; height: 100%; }
+    .tab-selection {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 58px;
+      height: 48px;
+      transform: translate(-50%, -50%);
+      object-fit: fill;
+      display: none;
+    }
+    .tab.active .tab-selection,
+    .bottom-menu-tab.active .tab-selection { display: block; }
+    .tab .ic,
+    .bottom-menu-tab .ic {
+      position: relative;
+      z-index: 1;
+      width: 28px;
+      height: 28px;
+      display: block;
+    }
+    .tab .ic img,
+    .bottom-menu-tab .ic img { width: 100%; height: 100%; object-fit: contain; }
+    .tab .active-icon,
+    .bottom-menu-tab .active-icon { display: none; }
+    .tab.active .inactive-icon,
+    .bottom-menu-tab.active .inactive-icon { display: none; }
+    .tab.active .active-icon,
+    .bottom-menu-tab.active .active-icon { display: block; }
+    .bottom-compose-button {
+      position: relative;
+      flex: 0 0 56px;
+      width: 56px;
+      height: 56px;
+      border: 0;
+      padding: 0;
+      background: url("data:image/png;base64,__BOTTOM_NAV_COMPOSE_PNG_B64__") center / 100% 100% no-repeat;
+      cursor: pointer;
+    }
+    .bottom-compose-button img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      display: block;
+      margin: auto;
+    }
     .project-space-ai-menu {
       grid-area: tabs;
       background: var(--store-detail-bg);
@@ -4346,29 +4337,40 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </form>
 
   <nav class="tabs-bar">
-    <div class="bottom-menu-actions">
-      <button class="bottom-action-button bottom-new-project" id="bottomNewProjectBtn" type="button">
-        <span>新项目</span>
-      </button>
-      <button class="bottom-action-button bottom-search" id="bottomSearchBtn" type="button" title="搜索好友、项目或消息" aria-label="搜索好友、项目或消息">
-        <img src="data:image/png;base64,__TOP_SEARCH_ICON_PNG_B64__" alt="" aria-hidden="true" />
-      </button>
-    </div>
     <div class="tabs-panel">
-      <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="好友" style="position:relative">
-        <span class="ic"><img src="data:image/png;base64,__TAB_CHAT_PNG_B64__" alt="" /></span>
-        <span>好友</span>
+      <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="好友" type="button" aria-label="好友">
+        <img class="tab-selection" src="data:image/png;base64,__BOTTOM_NAV_SELECTED_PNG_B64__" alt="" aria-hidden="true" />
+        <span class="ic">
+          <img class="inactive-icon" src="data:image/png;base64,__BOTTOM_NAV_CHAT_PNG_B64__" alt="" aria-hidden="true" />
+          <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_CHAT_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
+        </span>
         <span id="tabChatBadge" style="display:none;position:absolute;top:10px;right:calc(50% - 26px);background:#F04B4F;color:#fff;font-size:12px;font-weight:700;min-width:22px;height:22px;border-radius:11px;line-height:22px;text-align:center;padding:0 6px;box-sizing:border-box;"></span>
       </button>
-      <button class="tab" data-tab="projectPage" data-title="项目">
-        <span class="ic"><img src="data:image/png;base64,__TAB_PROJECT_PNG_B64__" alt="" /></span>
-        <span>项目</span>
+      <button class="tab" data-tab="projectPage" data-title="项目" type="button" aria-label="项目">
+        <img class="tab-selection" src="data:image/png;base64,__BOTTOM_NAV_SELECTED_PNG_B64__" alt="" aria-hidden="true" />
+        <span class="ic">
+          <img class="inactive-icon" src="data:image/png;base64,__BOTTOM_NAV_PROJECT_PNG_B64__" alt="" aria-hidden="true" />
+          <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_PROJECT_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
+        </span>
       </button>
-      <button class="tab" data-tab="profilePage" data-title="我的">
-        <span class="ic"><img src="data:image/png;base64,__TAB_PROFILE_PNG_B64__" alt="" /></span>
-        <span>我的</span>
+      <button class="tab" data-tab="profilePage" data-title="我的" type="button" aria-label="我的">
+        <img class="tab-selection" src="data:image/png;base64,__BOTTOM_NAV_SELECTED_PNG_B64__" alt="" aria-hidden="true" />
+        <span class="ic">
+          <img class="inactive-icon" src="data:image/png;base64,__BOTTOM_NAV_PROFILE_PNG_B64__" alt="" aria-hidden="true" />
+          <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_PROFILE_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
+        </span>
+      </button>
+      <button class="bottom-menu-tab" id="bottomMenuBtn" type="button" aria-label="主菜单">
+        <img class="tab-selection" src="data:image/png;base64,__BOTTOM_NAV_SELECTED_PNG_B64__" alt="" aria-hidden="true" />
+        <span class="ic">
+          <img class="inactive-icon" src="data:image/png;base64,__BOTTOM_NAV_MENU_PNG_B64__" alt="" aria-hidden="true" />
+          <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
+        </span>
       </button>
     </div>
+    <button class="bottom-compose-button" id="bottomComposeBtn" type="button" aria-label="新建会话">
+      <img src="data:image/png;base64,__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__" alt="" aria-hidden="true" />
+    </button>
   </nav>
   <nav class="project-space-ai-menu hidden" id="projectSpaceAiMenu">
     <button type="button" id="projectSpaceAiMenuBtn" title="发布帖子">
@@ -4667,8 +4669,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const searchBtn = $('searchBtn');
   const tabsBar = document.querySelector('.tabs-bar');
   const tabChatBtn = $('tabChatBtn');
-  const bottomNewProjectBtn = $('bottomNewProjectBtn');
-  const bottomSearchBtn = $('bottomSearchBtn');
+  const bottomMenuBtn = $('bottomMenuBtn');
+  const bottomComposeBtn = $('bottomComposeBtn');
   const projectSpaceAiMenu = $('projectSpaceAiMenu');
   const projectSpaceAiMenuBtn = $('projectSpaceAiMenuBtn');
   const homeProjectCreateMenu = $('homeProjectCreateMenu');
@@ -4848,7 +4850,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   function setHomeChromeVisible(visible, options = {}) {
     if (typeof options === 'string') options = { mode: options };
-    const showMenu = options.showMenu !== false;
+    const showMenu = false;
     const floatingMode = options.mode === 'home' ? 'home' : 'project';
     if (homeMenuBtn) homeMenuBtn.classList.toggle('hidden', !visible || !showMenu);
     if (homeProjectCreateMenu) {
@@ -4921,6 +4923,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       switchTab(button.dataset.homeNav);
     });
     document.addEventListener('click', () => homeNavMenu.classList.add('hidden'));
+  }
+  if (bottomMenuBtn && homeNavMenu) {
+    bottomMenuBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const opening = homeNavMenu.classList.contains('hidden');
+      homeNavMenu.classList.toggle('hidden', !opening);
+      homeNavMenu.classList.toggle('bottom-anchor', opening);
+      bottomMenuBtn.classList.toggle('active', opening);
+    });
+    homeNavMenu.addEventListener('click', () => bottomMenuBtn.classList.remove('active'));
+    document.addEventListener('click', () => bottomMenuBtn.classList.remove('active'));
   }
 
   const profileAvatar = $('profileAvatar');
@@ -9116,20 +9129,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     addFriendMask.classList.remove('active');
     setTopAddButtonExpanded(false);
   }
-  if (bottomNewProjectBtn) {
-    bottomNewProjectBtn.addEventListener('click', () => openNewProject(false));
-  }
-  if (bottomSearchBtn) {
-    bottomSearchBtn.addEventListener('click', () => {
-      if (currentTab !== 'chatPage' || isAnyChatActive()) {
-        if (tabChatBtn) tabChatBtn.click();
-      }
-      if (searchBar.classList.contains('hidden')) {
-        searchBtn.click();
-      } else {
-        searchInput.focus();
-      }
-    });
+  if (bottomComposeBtn) {
+    bottomComposeBtn.addEventListener('click', () => addBtn.click());
   }
   addBtn.addEventListener('click', () => {
     if (currentTab === 'chatPage' && !isAnyChatActive()) {
