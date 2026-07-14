@@ -350,46 +350,6 @@
   background: #0f1114;
 }
 
-.canvasZoomControls {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid rgba(255, 255, 255, .14);
-  border-radius: 10px;
-  background: rgba(8, 10, 13, .92);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, .26);
-}
-
-.canvasZoomControls button {
-  min-width: 30px;
-  height: 28px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: #e9edf3;
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.canvasZoomControls button:hover {
-  background: rgba(255, 255, 255, .1);
-}
-
-.canvasZoomControls .canvasZoomValue {
-  min-width: 52px;
-  color: #a8c7fa;
-  font-variant-numeric: tabular-nums;
-}
-
-.canvasZoomControls .activeCanvasZoom {
-  background: rgba(89, 215, 255, .16);
-  color: #bcefff;
-}
-
 .canvasViewport {
   position: relative;
   flex: 0 0 auto;

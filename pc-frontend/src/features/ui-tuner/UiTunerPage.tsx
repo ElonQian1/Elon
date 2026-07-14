@@ -723,7 +723,6 @@ export default function UiTunerPage() {
           viewScale={viewScale}
           designPaneOpen={workspaceLayout.designPaneOpen}
           splitRatio={workspaceLayout.splitRatio}
-          viewportControls={comparisonViewport}
           targetScrollerRef={comparisonViewport.targetScrollerRef}
           currentScrollerRef={comparisonViewport.currentScrollerRef}
           onTargetScroll={comparisonViewport.onTargetScroll}
