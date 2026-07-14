@@ -207,18 +207,14 @@ try {
       scrollerRef: { current: null },
       selectedId: null,
       viewScale: 0.5,
-      viewportControls: {
-        actualSize() {}, fitCanvasToStage() {}, fitToStage: false,
-        viewScaleLabel: '50%', zoomIn() {}, zoomOut() {},
-      },
       onCanvasKeyDown() {}, onClearSelection() {}, onElementPointerDown() {}, onSelectElement() {},
     }))
     const statusIndex = surfaceMarkup.indexOf('Android LIVE · PC 本地即时渲染')
     const zoomIndex = surfaceMarkup.indexOf('aria-label="画布快捷缩放"')
     const canvasIndex = surfaceMarkup.indexOf('tabindex="0"')
-    assert.ok(statusIndex >= 0 && zoomIndex >= 0 && canvasIndex >= 0)
-    assert.ok(statusIndex < canvasIndex && zoomIndex < canvasIndex, '状态和缩放控件必须位于设备画布外')
-    assert.match(surfaceMarkup, /恢复画布到 100%[^>]*>50%<\/button>/)
+    assert.ok(statusIndex >= 0 && canvasIndex >= 0)
+    assert.ok(statusIndex < canvasIndex, '真机同步状态必须位于设备画布外')
+    assert.equal(zoomIndex, -1, '设备画布内部不得重复渲染顶部工具栏已有的缩放控件')
 
     const pageCss = fs.readFileSync(
       path.join(projectRoot, 'src/features/ui-tuner/UiTunerPage.module.css'),
@@ -227,6 +223,16 @@ try {
     const runtimeSurfaceCss = pageCss.match(/\.runtimeSurfaceLive,[\s\S]*?\n}/)?.[0] ?? ''
     assert.doesNotMatch(runtimeSurfaceCss, /position:\s*sticky/)
     assert.doesNotMatch(runtimeSurfaceCss, /margin:[^;]*-/)
+
+    const comparisonCss = fs.readFileSync(
+      path.join(projectRoot, 'src/features/ui-tuner/comparison/UiTunerComparisonWorkspace.module.css'),
+      'utf8',
+    )
+    assert.match(
+      comparisonCss,
+      /\.singlePane\s*\{[^}]*flex:\s*1\s*;/s,
+      '无设计稿时真机单画布必须占满剩余高度，避免适高被错误压到最小缩放',
+    )
   } finally {
     if (previousCssLoader) require.extensions['.css'] = previousCssLoader
     else delete require.extensions['.css']
