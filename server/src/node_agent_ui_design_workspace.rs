@@ -23,6 +23,7 @@ pub(crate) fn ui_design_route_status(prompt: &str) -> Option<&'static str> {
         .and_then(Value::as_str)
     {
         Some("ambiguous_local") => Some("AMBIGUOUS"),
+        Some("cluster_conflict") => Some("AMBIGUOUS"),
         Some("active_library") => Some("LEARNED"),
         Some("active_cluster") => Some("CLUSTER_LEARNED"),
         Some("local_confirmed") => Some("LOCAL_CONFIRMED"),

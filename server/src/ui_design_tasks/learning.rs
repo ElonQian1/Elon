@@ -26,6 +26,7 @@ pub(crate) fn finalize_ui_route_learning(
             | "local_confirmed"
             | "active_library"
             | "active_cluster"
+            | "cluster_conflict"
     ) {
         return Ok(None);
     }

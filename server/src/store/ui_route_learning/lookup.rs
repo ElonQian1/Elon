@@ -94,6 +94,32 @@ impl Store {
         matched.matched_alias = Some(message.trim().chars().take(MAX_SAMPLE_CHARS).collect());
         Ok(Some(matched))
     }
+
+    pub(crate) fn has_ui_route_cluster_conflict(
+        &self,
+        project_id: &str,
+        message: &str,
+    ) -> Result<bool> {
+        let Some(concept) = crate::ui_design_tasks::controlled_ui_route_concept(message) else {
+            return Ok(false);
+        };
+        let conn = self.conn()?;
+        let route_count = conn.query_row(
+            "SELECT COUNT(DISTINCT learned_route)
+             FROM ui_route_learning_entries
+             WHERE concept_key = ?1 AND concept_version = ?2 AND status = 'active'
+               AND ((scope_type = 'project' AND scope_id = ?3)
+                    OR (scope_type = 'global' AND scope_id = ?4))",
+            params![
+                concept.key,
+                concept.version as i64,
+                project_id,
+                GLOBAL_SCOPE_ID
+            ],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(route_count > 1)
+    }
 }
 
 fn query_exact(

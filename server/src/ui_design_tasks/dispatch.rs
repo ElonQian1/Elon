@@ -60,6 +60,19 @@ pub(crate) fn resolve_ui_route_task(
             },
         };
     }
+    if store
+        .has_ui_route_cluster_conflict(project_id, display_message)
+        .unwrap_or(false)
+    {
+        let mut task = force_ui_design_task(display_message, attachments);
+        task.route_learning_origin = Some("cluster_conflict".to_string());
+        task.route_learning_phrase = Some(display_message.chars().take(2_000).collect());
+        return ResolvedUiRouteTask {
+            task: Some(task),
+            suppress_inference: false,
+            source: "cluster_conflict_secondary_rescue",
+        };
+    }
 
     let decision = classify_ui_route(display_message, attachments);
     if decision.class == UiRouteClass::Ambiguous {
@@ -185,6 +198,38 @@ mod tests {
         assert_eq!(
             resolved.task.unwrap().route_learning_origin.as_deref(),
             Some("active_cluster")
+        );
+    }
+
+    #[test]
+    fn conflicting_cluster_forces_secondary_confirmation() {
+        let store = store();
+        for (message, route) in [
+            ("按钮太胖", UiLearnedRoute::Ui),
+            ("按钮显得笨重", UiLearnedRoute::NonUi),
+        ] {
+            store
+                .confirm_ui_route_learning(
+                    "project-1",
+                    Some("user-1"),
+                    message,
+                    route,
+                    UiRouteLearningSource::UserOverride,
+                    "explicit correction",
+                )
+                .unwrap();
+        }
+        let resolved = resolve_ui_route_task(
+            &store,
+            "project-1",
+            "主操作太厚重",
+            None,
+            None,
+        );
+        assert_eq!(resolved.source, "cluster_conflict_secondary_rescue");
+        assert_eq!(
+            resolved.task.unwrap().route_learning_origin.as_deref(),
+            Some("cluster_conflict")
         );
     }
 }
