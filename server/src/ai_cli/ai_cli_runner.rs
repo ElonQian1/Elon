@@ -180,7 +180,6 @@ pub(crate) fn codex_thread_uri(session_id: &str) -> String {
     }
 }
 
-
 #[cfg(test)]
 #[path = "ai_cli_runner_tests.rs"]
 mod tests;

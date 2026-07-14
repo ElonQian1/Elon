@@ -107,7 +107,6 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
     )
 }
 
-
 #[path = "external_app_context_budget_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

@@ -352,7 +352,6 @@ impl OptionalOrigin for Result<ExternalAccountOrigin> {
     }
 }
 
-
 #[path = "external_apps_helpers.rs"]
 mod helpers;
 use self::helpers::*;

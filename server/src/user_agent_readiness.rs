@@ -160,7 +160,6 @@ pub(crate) fn custom_api_development_block_message(
     ))
 }
 
-
 #[cfg(test)]
 #[path = "user_agent_readiness_tests.rs"]
 mod tests;

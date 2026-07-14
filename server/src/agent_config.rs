@@ -314,7 +314,6 @@ fn clean_optional(value: String) -> Option<String> {
     }
 }
 
-
 #[cfg(test)]
 #[path = "agent_config_tests.rs"]
 mod tests;

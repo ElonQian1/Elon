@@ -1,12 +1,12 @@
+use crate::types::AppState;
+use crate::{
+    friend_api, group_ai, group_chat_retrieval_api, group_summary_api, project_api,
+    project_deletion, project_join_requests, project_membership, project_runtime_permission_api,
+    project_space, project_store,
+};
 use axum::routing::{delete, get, post};
 use axum::Router;
 use std::sync::Arc;
-use crate::types::AppState;
-use crate::{
-    friend_api, group_ai, group_chat_retrieval_api, group_summary_api,
-    project_api, project_deletion, project_join_requests, project_membership,
-    project_runtime_permission_api, project_space, project_store,
-};
 
 pub(super) fn routes() -> Router<Arc<AppState>> {
     Router::new()

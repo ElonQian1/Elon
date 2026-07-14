@@ -129,7 +129,6 @@ fn path_looks_windows_workspace(path: &str) -> bool {
         && (bytes[2] == b'\\' || bytes[2] == b'/')
 }
 
-
 #[cfg(test)]
 #[path = "agent_pc_workspace_tests.rs"]
 mod tests;

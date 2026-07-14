@@ -50,13 +50,7 @@ pub async fn fork_ai_chat_conversation(
         Ok(route) => route,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    fork_response(
-        &state,
-        &route.project_id,
-        &user.id,
-        &conversation_id,
-        req,
-    )
+    fork_response(&state, &route.project_id, &user.id, &conversation_id, req)
 }
 
 pub async fn fork_project_member_conversation(
@@ -114,20 +108,22 @@ fn fork_result(
     conversation_id: &str,
     req: ForkConversationRequest,
 ) -> Result<ForkConversationResponse, String> {
-    state.store.fork_conversation_at_message(
-        project_id,
-        user_id,
-        conversation_id,
-        &req.message_id,
-        req.new_conversation_id.as_deref(),
-        req.title.as_deref(),
-    )
-    .map(|result| ForkConversationResponse {
-        conversation_id: result.conversation_id,
-        source_conversation_id: result.source_conversation_id,
-        source_message_id: result.source_message_id,
-        title: result.title,
-        copied_message_count: result.copied_message_count,
-    })
-    .map_err(|err| err.to_string())
+    state
+        .store
+        .fork_conversation_at_message(
+            project_id,
+            user_id,
+            conversation_id,
+            &req.message_id,
+            req.new_conversation_id.as_deref(),
+            req.title.as_deref(),
+        )
+        .map(|result| ForkConversationResponse {
+            conversation_id: result.conversation_id,
+            source_conversation_id: result.source_conversation_id,
+            source_message_id: result.source_message_id,
+            title: result.title,
+            copied_message_count: result.copied_message_count,
+        })
+        .map_err(|err| err.to_string())
 }

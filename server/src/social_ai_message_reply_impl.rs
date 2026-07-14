@@ -224,7 +224,10 @@ pub(super) fn ensure_selected_message_source(reply: &str, selected_message_id: &
     format!("{reply}\n来源补充：selected_message_id {selected_message_id}")
 }
 
-pub(super) fn ensure_current_context_audit_source(reply: &str, external_context: Option<&Value>) -> String {
+pub(super) fn ensure_current_context_audit_source(
+    reply: &str,
+    external_context: Option<&Value>,
+) -> String {
     let Some(context_audit_id) = external_context
         .and_then(|context| context.get("context_audit_id"))
         .and_then(Value::as_str)
@@ -244,7 +247,10 @@ pub(super) fn ensure_current_context_audit_source(reply: &str, external_context:
     format!("{reply}\n来源补充：context_audit_id {context_audit_id}")
 }
 
-pub(super) fn replace_context_audit_id_values(reply: &str, current_context_audit_id: &str) -> String {
+pub(super) fn replace_context_audit_id_values(
+    reply: &str,
+    current_context_audit_id: &str,
+) -> String {
     let marker = "context_audit_id";
     let lower = reply.to_lowercase();
     let mut out = String::with_capacity(reply.len() + current_context_audit_id.len());
@@ -398,7 +404,6 @@ pub(super) fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> 
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     operation(&mut guard)
 }
-
 
 #[cfg(test)]
 #[path = "social_ai_message_reply_tests.rs"]

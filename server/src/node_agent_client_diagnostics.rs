@@ -37,7 +37,6 @@ pub(crate) fn export_diagnostics_file() -> Result<(PathBuf, bool), String> {
     export_diagnostics().map(|export| (export.path, export.opened))
 }
 
-
 #[path = "node_agent_client_diagnostics_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

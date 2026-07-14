@@ -39,7 +39,6 @@ pub(crate) fn migration_v85(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 #[path = "billing_usage_source_migration_tests.rs"]
 mod tests;

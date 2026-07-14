@@ -3,18 +3,34 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
-use crate::{agent_routing::quick_casual_reply, billing, billing_lifecycle, intent_router, tools, types::{AppState, WsMessage}};
+use crate::{
+    agent_routing::quick_casual_reply,
+    billing, billing_lifecycle, intent_router, tools,
+    types::{AppState, WsMessage},
+};
 
-use super::{AiCliRequestMode, NativeSessionScope, PcAgentRunOutcome, project_lightweight_chat_split_enabled, run_via_pc_agent};
-use super::{DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS, DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS};
-use super::ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message};
+use super::ai_cli_chat::{
+    chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message,
+};
 use super::ai_cli_chat_policy;
 use super::ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task};
-use super::ai_cli_native_session::{append_native_session_continuity, native_session_continuity_note, retire_native_session_and_schedule_repair, should_retry_without_native_session};
-use super::ai_cli_output::{extract_json_agent_message, extract_thread_id, format_cli_reply, truncate_chars};
-use super::ai_cli_process::{cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions};
+use super::ai_cli_native_session::{
+    append_native_session_continuity, native_session_continuity_note,
+    retire_native_session_and_schedule_repair, should_retry_without_native_session,
+};
+use super::ai_cli_output::{
+    extract_json_agent_message, extract_thread_id, format_cli_reply, truncate_chars,
+};
+use super::ai_cli_process::{
+    cap_option_timeout, configured_timeout_cap, run_cli_command_traced, supports_codex_sessions,
+};
 use super::ai_cli_prompts::build_cli_prompt;
 use super::ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext};
+use super::{
+    project_lightweight_chat_split_enabled, run_via_pc_agent, AiCliRequestMode, NativeSessionScope,
+    PcAgentRunOutcome,
+};
+use super::{DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS, DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS};
 
 pub(super) async fn run_with_workspace_mode(
     user_id: &str,

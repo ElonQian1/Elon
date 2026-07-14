@@ -148,7 +148,6 @@ impl ActionCounts {
     }
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_client_diagnostic_logs_tests.rs"]
 mod tests;

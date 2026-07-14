@@ -15,7 +15,6 @@ pub(crate) fn collect_rust_index(workspace: &Path, max_files: usize) -> RustInde
     index
 }
 
-
 #[path = "rust_symbols_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

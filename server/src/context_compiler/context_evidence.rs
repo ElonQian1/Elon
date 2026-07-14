@@ -58,7 +58,6 @@ pub(crate) fn build_context_evidence(
     }
 }
 
-
 #[path = "context_evidence_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

@@ -422,7 +422,6 @@ fn clamp_percent(value: f64) -> f64 {
     }
 }
 
-
 #[cfg(test)]
 #[path = "codex_vault_usage_estimation_tests.rs"]
 mod codex_vault_usage_estimation_tests;

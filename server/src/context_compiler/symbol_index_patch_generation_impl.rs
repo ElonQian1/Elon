@@ -106,7 +106,10 @@ pub(super) fn action_for_target(target: &PatchEditTarget, plan: &SymbolPatchPlan
     }
 }
 
-pub(super) fn constraints_for_target(target: &PatchEditTarget, plan: &SymbolPatchPlan) -> Vec<String> {
+pub(super) fn constraints_for_target(
+    target: &PatchEditTarget,
+    plan: &SymbolPatchPlan,
+) -> Vec<String> {
     let mut constraints = Vec::new();
     constraints.push("Do not edit files outside the diff contract allowed_files list.".to_string());
     constraints.push("Preserve unrelated public behavior and formatting style.".to_string());

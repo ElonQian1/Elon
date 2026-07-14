@@ -344,7 +344,6 @@ fn project_tool(tool: &Value) -> Value {
     })
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tools_tests.rs"]
 mod tests;

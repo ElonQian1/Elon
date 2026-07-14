@@ -761,7 +761,6 @@ fn task_pack_uses_error_rank_profile_for_error_queries() {
     fs::remove_dir_all(dir).unwrap();
 }
 
-
 // --- helpers ---
 pub(super) fn write_bundle(data_dir: &Path, day: &str, stem: &str, index: SymbolIndex) -> PathBuf {
     let bundle = data_dir.join("context-compiler").join(day).join(stem);

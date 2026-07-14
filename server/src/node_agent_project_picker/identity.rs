@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use serde_json::Value;
+use std::path::{Path, PathBuf};
 
 use crate::node_agent_project_manifest_identity::{
     detect_manifest_project_identity, detect_shallow_manifest_project_identity,
@@ -71,7 +71,10 @@ pub(super) fn detect_project_identity(
     }
 }
 
-pub(super) fn identity_from_landing(fallback_name: &str, landing: Option<&Value>) -> Option<ProjectIdentity> {
+pub(super) fn identity_from_landing(
+    fallback_name: &str,
+    landing: Option<&Value>,
+) -> Option<ProjectIdentity> {
     let object = landing?.as_object()?;
     let name = first_json_string(object, &["title"]);
     let description = first_json_string(object, &["tagline", "summary", "description"]);
@@ -83,7 +86,10 @@ pub(super) fn identity_from_landing(fallback_name: &str, landing: Option<&Value>
     )
 }
 
-pub(super) fn identity_from_package_json(fallback_name: &str, package_json: &Path) -> Option<ProjectIdentity> {
+pub(super) fn identity_from_package_json(
+    fallback_name: &str,
+    package_json: &Path,
+) -> Option<ProjectIdentity> {
     let object = std::fs::read_to_string(package_json)
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
@@ -250,7 +256,10 @@ pub(super) fn strip_markdown_inline(value: &str) -> String {
     output.trim().to_string()
 }
 
-pub(super) fn first_json_string(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<String> {
+pub(super) fn first_json_string(
+    object: &serde_json::Map<String, Value>,
+    keys: &[&str],
+) -> Option<String> {
     keys.iter()
         .find_map(|key| object.get(*key).and_then(|value| value.as_str()))
         .and_then(|value| clean_project_text(value, 240))
@@ -344,4 +353,3 @@ pub(super) fn is_go_major_version_suffix(value: &str) -> bool {
     };
     rest.len() <= 3 && rest.chars().all(|ch| ch.is_ascii_digit())
 }
-

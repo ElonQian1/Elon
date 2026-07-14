@@ -410,7 +410,6 @@ fn on_off(value: bool) -> &'static str {
     }
 }
 
-
 #[cfg(test)]
 #[path = "symbol_index_retrieval_plan_tests.rs"]
 mod tests;

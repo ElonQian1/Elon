@@ -498,7 +498,6 @@ fn json_string(value: &Value, key: &str) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_project_agent_runs_tests.rs"]
 mod tests;

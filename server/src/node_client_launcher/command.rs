@@ -141,7 +141,6 @@ fn apply_hidden_window(command: &mut Command) {
 #[cfg(not(windows))]
 fn apply_hidden_window(_command: &mut Command) {}
 
-
 #[cfg(test)]
 #[path = "command_tests.rs"]
 mod tests;

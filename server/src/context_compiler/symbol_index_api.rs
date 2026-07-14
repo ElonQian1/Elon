@@ -283,7 +283,6 @@ pub(crate) async fn get_symbol_retrieval_learning(
     }
 }
 
-
 mod query_helpers;
 
 use self::query_helpers::*;

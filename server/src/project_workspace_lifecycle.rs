@@ -176,7 +176,6 @@ fn cli_available(status: &ProjectWorkspaceInspectStatus) -> bool {
     status.codex_available || status.copilot_available
 }
 
-
 #[cfg(test)]
 #[path = "project_workspace_lifecycle_tests.rs"]
 mod tests;

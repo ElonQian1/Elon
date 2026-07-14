@@ -1,13 +1,21 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use crate::store::{is_system_project_name, is_system_project_source_type, system_project_key_for_source_type};
+use crate::store::{
+    is_system_project_name, is_system_project_source_type, system_project_key_for_source_type,
+};
 
-use super::common::{clean_optional, hash_password, new_id, normalize_account, now, safe_external_id, validate_password, verify_password};
-use super::{project_identities, pc_project_binding, project_branding, project_roles, project_runtime_permissions};
+use super::common::{
+    clean_optional, hash_password, new_id, normalize_account, now, safe_external_id,
+    validate_password, verify_password,
+};
 use super::project_helpers::*;
 use super::store_types::*;
 use super::store_types_project::*;
+use super::{
+    pc_project_binding, project_branding, project_identities, project_roles,
+    project_runtime_permissions,
+};
 
 impl super::Store {
     pub fn create_project(
@@ -455,5 +463,4 @@ impl super::Store {
             reused_existing: false,
         })
     }
-
 }

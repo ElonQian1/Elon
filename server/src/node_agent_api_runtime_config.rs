@@ -275,7 +275,6 @@ fn normalize_api_base(value: &str) -> String {
     value.trim().trim_end_matches('/').to_string()
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_api_runtime_config_tests.rs"]
 mod tests;

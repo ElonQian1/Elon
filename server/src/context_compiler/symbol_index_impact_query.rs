@@ -82,7 +82,6 @@ pub(crate) fn load_symbol_impact_db(
     })
 }
 
-
 #[path = "symbol_index_impact_query_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

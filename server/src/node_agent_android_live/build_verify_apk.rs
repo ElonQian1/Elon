@@ -37,8 +37,9 @@ pub(crate) fn select_fresh_debug_apk(
     let mut seen_application_ids = BTreeSet::new();
     let mut candidates = BTreeSet::new();
     for metadata_path in metadata_files {
-        let bytes = fs::read(&metadata_path)
-            .with_context(|| format!("读取 APK output metadata 失败: {}", metadata_path.display()))?;
+        let bytes = fs::read(&metadata_path).with_context(|| {
+            format!("读取 APK output metadata 失败: {}", metadata_path.display())
+        })?;
         let metadata: OutputMetadata = serde_json::from_slice(&bytes)
             .with_context(|| format!("APK output metadata 无效: {}", metadata_path.display()))?;
         let Some(application_id) = metadata.application_id else {
@@ -61,13 +62,16 @@ pub(crate) fn select_fresh_debug_apk(
                 continue;
             }
             let candidate = parent.join(&element.output_file);
-            let canonical = candidate.canonicalize().with_context(|| {
-                format!("metadata 引用的 APK 不存在: {}", candidate.display())
-            })?;
+            let canonical = candidate
+                .canonicalize()
+                .with_context(|| format!("metadata 引用的 APK 不存在: {}", candidate.display()))?;
             if !canonical.starts_with(&canonical_root)
                 || canonical.extension().and_then(|value| value.to_str()) != Some("apk")
             {
-                bail!("output metadata 引用了项目外或非 APK 文件: {}", canonical.display());
+                bail!(
+                    "output metadata 引用了项目外或非 APK 文件: {}",
+                    canonical.display()
+                );
             }
             let modified = fs::metadata(&canonical)?.modified()?;
             if modified < not_before {
@@ -77,7 +81,10 @@ pub(crate) fn select_fresh_debug_apk(
         }
     }
     match candidates.len() {
-        1 => Ok(candidates.into_iter().next().expect("candidate count checked")),
+        1 => Ok(candidates
+            .into_iter()
+            .next()
+            .expect("candidate count checked")),
         0 => bail!(
             "本次构建未产生 applicationId={} 的新 Debug APK；metadata 中发现: {:?}",
             expected_application_id,
@@ -99,12 +106,17 @@ fn collect_metadata(
     if depth > 10 || *visited > MAX_SCAN_FILES {
         return Ok(());
     }
-    for entry in fs::read_dir(dir).with_context(|| format!("读取构建目录失败: {}", dir.display()))? {
+    for entry in
+        fs::read_dir(dir).with_context(|| format!("读取构建目录失败: {}", dir.display()))?
+    {
         let entry = entry?;
         *visited += 1;
         let path = entry.path();
         if path.is_dir() {
-            if !matches!(entry.file_name().to_str(), Some(".git" | ".gradle" | "node_modules")) {
+            if !matches!(
+                entry.file_name().to_str(),
+                Some(".git" | ".gradle" | "node_modules")
+            ) {
                 collect_metadata(&path, depth + 1, visited, output)?;
             }
         } else if entry.file_name() == "output-metadata.json"

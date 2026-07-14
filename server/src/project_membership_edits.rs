@@ -9,16 +9,15 @@ use axum::{
 use serde_json::json;
 use std::sync::Arc;
 
+use super::{
+    ensure_role_management_allowed, ensure_role_set_management_allowed,
+    member_has_project_permission, publish_members_updated, requested_member_roles,
+    UpdateMemberModerationRequest, UpdateMemberRoleRequest,
+};
 use crate::{
     project_auth::{auth_from_headers, json_error},
     store::{PERMISSION_MANAGE_MEMBERS, PERMISSION_MODERATE_MEMBERS},
     types::AppState,
-};
-use super::{
-    ensure_role_management_allowed, ensure_role_set_management_allowed,
-    member_has_project_permission,
-    publish_members_updated, requested_member_roles,
-    UpdateMemberModerationRequest, UpdateMemberRoleRequest,
 };
 
 /// PATCH /api/projects/:id/members/:user_id — 修改成员角色（仅 owner/admin）

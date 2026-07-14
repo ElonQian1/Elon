@@ -85,7 +85,6 @@ fn truncate_pack(mut pack: String, max_chars: usize) -> String {
     truncated
 }
 
-
 #[cfg(test)]
 #[path = "context_pack_tests.rs"]
 mod tests;

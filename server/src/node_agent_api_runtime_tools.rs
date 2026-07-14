@@ -341,7 +341,6 @@ fn function_tool(name: &str, description: &str, parameters: Value) -> Value {
     })
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_api_runtime_tools_tests.rs"]
 mod tests;

@@ -342,7 +342,6 @@ pub(super) fn first_prompt_value(value: &Value, fields: &[&str]) -> Value {
         .unwrap_or(Value::Null)
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_budget_tests.rs"]
 mod tests;

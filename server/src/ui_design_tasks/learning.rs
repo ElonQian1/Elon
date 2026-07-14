@@ -1,9 +1,7 @@
 use anyhow::Result;
 use serde_json::Value;
 
-use crate::store::{
-    Store, UiLearnedRoute, UiRouteLearningEntry, UiRouteLearningSource,
-};
+use crate::store::{Store, UiLearnedRoute, UiRouteLearningEntry, UiRouteLearningSource};
 
 const TASK_MARKER_BEGIN: &str = "<elon-ui-design-task version=\"1\">";
 const TASK_MARKER_END: &str = "</elon-ui-design-task>";
@@ -109,7 +107,10 @@ fn observe_codex_route(jsonl: &str) -> RouteObservation {
         let Ok(event) = serde_json::from_str::<Value>(line.trim()) else {
             continue;
         };
-        let event_type = event.get("type").and_then(Value::as_str).unwrap_or_default();
+        let event_type = event
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
         let Some(item) = event.get("item") else {
             continue;
         };
@@ -223,8 +224,7 @@ mod tests {
     #[test]
     fn codex_rescue_activates_only_after_successful_ui_execution_evidence() {
         let store = store();
-        let prompt = super::super::dispatch::promote_codex_ui_route("让操作区更有呼吸感")
-            .unwrap();
+        let prompt = super::super::dispatch::promote_codex_ui_route("让操作区更有呼吸感").unwrap();
         let confirmation_only = r#"{"type":"item.started","item":{"type":"mcp_tool_call","name":"ui_confirm_route","arguments":{"route":"UI_DESIGN","reason":"视觉间距任务","confidence":0.9}}}"#;
         let candidate = finalize_ui_route_learning(
             &store,
@@ -247,16 +247,10 @@ mod tests {
             "\n",
             r#"{"type":"item.completed","item":{"type":"mcp_tool_call","name":"ui_apply_live_patch","status":"completed"}}"#
         );
-        let active = finalize_ui_route_learning(
-            &store,
-            "project-1",
-            "user-1",
-            &prompt,
-            verified,
-            true,
-        )
-        .unwrap()
-        .unwrap();
+        let active =
+            finalize_ui_route_learning(&store, "project-1", "user-1", &prompt, verified, true)
+                .unwrap()
+                .unwrap();
         assert_eq!(active.status, "active");
         assert_eq!(active.source, "execution_verified");
         assert_eq!(

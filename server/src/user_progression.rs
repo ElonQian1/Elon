@@ -223,7 +223,6 @@ fn tier_name(level: i64) -> &'static str {
     }
 }
 
-
 #[cfg(test)]
 #[path = "user_progression_tests.rs"]
 mod tests;

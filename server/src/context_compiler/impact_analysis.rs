@@ -38,7 +38,6 @@ pub(crate) fn build_rust_impact_analysis(
     }
 }
 
-
 #[path = "impact_analysis_helpers.rs"]
 mod helpers;
 use self::helpers::*;

@@ -528,7 +528,6 @@ fn audit_note_value(value: &str) -> String {
         .to_string()
 }
 
-
 fn channel_permission_options() -> serde_json::Value {
     serde_json::json!([
         { "key": "view_channel", "label": "查看频道" },
@@ -537,4 +536,3 @@ fn channel_permission_options() -> serde_json::Value {
         { "key": "manage_channel", "label": "管理频道权限" }
     ])
 }
-

@@ -9,12 +9,19 @@ use crate::{
     types::WsMessage,
 };
 
-use super::channel_ai_spawn::{insert_channel_ai_progress, insert_channel_ai_result, ChannelAiTask};
+use super::channel_ai_spawn::{
+    insert_channel_ai_progress, insert_channel_ai_result, ChannelAiTask,
+};
 
 pub(super) enum ChannelAiRecoveryTick {
     Healthy,
-    StartRecovery { timeout_secs: u64 },
-    RecoveryTimeout { timeout_secs: u64, recovery_secs: u64 },
+    StartRecovery {
+        timeout_secs: u64,
+    },
+    RecoveryTimeout {
+        timeout_secs: u64,
+        recovery_secs: u64,
+    },
 }
 
 pub(super) struct ChannelAiRecoveryWatchdog {
@@ -87,15 +94,17 @@ pub(super) fn record_recovery_timeout(
         recovery_secs
     );
     let raw_error = WsMessage::error(&msg).to_json();
-    let _ = task
-        .state
-        .store
-        .record_task_event(&task.task_id, &enrich_project_ws_event(raw_error, &task.task_id));
+    let _ = task.state.store.record_task_event(
+        &task.task_id,
+        &enrich_project_ws_event(raw_error, &task.task_id),
+    );
     insert_channel_ai_result(task, &result_message(&msg, None, Some("自动恢复超时")));
     msg
 }
 
-pub(super) fn pc_cli_communication_error_result(raw_reason: &str) -> (&'static str, String, &'static str) {
+pub(super) fn pc_cli_communication_error_result(
+    raw_reason: &str,
+) -> (&'static str, String, &'static str) {
     if is_pc_cli_communication_interruption(raw_reason) {
         return (
             "interrupted",

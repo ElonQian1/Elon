@@ -98,7 +98,6 @@ pub(crate) fn spawn_group_reply_for_message(
     Ok(())
 }
 
-
 #[path = "social_ai_message_reply_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

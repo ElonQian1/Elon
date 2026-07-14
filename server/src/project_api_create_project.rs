@@ -1,3 +1,9 @@
+use super::{archive_project_payload, clean_optional_string, CreateProjectRequest};
+use crate::{
+    project_auth::{auth_from_headers, json_error},
+    project_storage, project_workspace_provision,
+    types::AppState,
+};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -5,12 +11,6 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::{
-    project_auth::{auth_from_headers, json_error},
-    project_storage, project_workspace_provision,
-    types::AppState,
-};
-use super::{CreateProjectRequest, archive_project_payload, clean_optional_string};
 
 pub async fn create_project(
     State(state): State<Arc<AppState>>,
@@ -265,4 +265,3 @@ pub async fn create_project(
     }))
     .into_response()
 }
-

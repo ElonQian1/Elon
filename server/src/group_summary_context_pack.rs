@@ -446,7 +446,6 @@ pub(crate) fn ensure_fb2_summary_policy_shape(
     ensure_fb2_summary_context_audit_source(&sections.join("\n\n"), context_pack)
 }
 
-
 #[path = "group_summary_context_pack_helpers.rs"]
 mod helpers;
 use self::helpers::*;

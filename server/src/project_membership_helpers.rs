@@ -1,19 +1,19 @@
-use axum::{http::StatusCode, response::Response, Json};
-use serde_json::{Map, Value};
-use std::sync::Arc;
 use super::{
-    UpdateMemberRoleRequest,
-    MAX_PROJECT_DISPLAY_NAME_CHARS,
-    MAX_PROJECT_ICON_DATA_URL_BYTES,
+    UpdateMemberRoleRequest, MAX_PROJECT_DISPLAY_NAME_CHARS, MAX_PROJECT_ICON_DATA_URL_BYTES,
 };
 use crate::{
     project_auth::{can_edit, json_error},
     project_events,
     project_ws_protocol::enrich_project_ws_event,
-    store::{ProjectAccess, ProjectMemberEntry, PERMISSION_INVITE_MEMBERS, PERMISSION_MANAGE_MEMBERS,
-        PERMISSION_MANAGE_ROLES, PERMISSION_MANAGE_PROJECT_SETTINGS},
+    store::{
+        ProjectAccess, ProjectMemberEntry, PERMISSION_INVITE_MEMBERS, PERMISSION_MANAGE_MEMBERS,
+        PERMISSION_MANAGE_PROJECT_SETTINGS, PERMISSION_MANAGE_ROLES,
+    },
     types::AppState,
 };
+use axum::{http::StatusCode, response::Response, Json};
+use serde_json::{Map, Value};
+use std::sync::Arc;
 
 pub(crate) fn can_update_project_icon(role: &str) -> bool {
     role.trim().eq_ignore_ascii_case("owner")
@@ -23,7 +23,10 @@ pub(crate) fn can_update_project_brand(role: &str) -> bool {
     can_update_project_icon(role)
 }
 
-pub(crate) fn apply_member_presence(member: &mut crate::store::ProjectMemberEntry, connected: bool) {
+pub(crate) fn apply_member_presence(
+    member: &mut crate::store::ProjectMemberEntry,
+    connected: bool,
+) {
     let configured = member.presence_status.trim().to_ascii_lowercase();
     if !connected || configured == "invisible" {
         member.is_online = false;
@@ -326,7 +329,6 @@ pub(crate) fn clean_project_icon_data_url(
     }
     Ok(Some(value))
 }
-
 
 #[cfg(test)]
 #[path = "project_membership_tests.rs"]

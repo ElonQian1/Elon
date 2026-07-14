@@ -267,7 +267,6 @@ fn readiness_error(status: &str, error_code: &str, error: &str) -> Value {
     })
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_readiness_tests.rs"]
 mod tests;

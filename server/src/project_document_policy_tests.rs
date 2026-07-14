@@ -27,11 +27,8 @@ fn path_sets_authority_ceiling_and_default_retrieval() {
     assert_eq!(archive.authority, "historical");
     assert!(!archive.default_retrieval);
 
-    let historical = classify_project_document(
-        "documentation/historical/old-requirements.md",
-        "# Old\n",
-        6,
-    );
+    let historical =
+        classify_project_document("documentation/historical/old-requirements.md", "# Old\n", 6);
     assert_eq!(historical.lifecycle, "archived");
     assert_eq!(historical.authority, "historical");
 }

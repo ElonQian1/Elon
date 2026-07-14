@@ -451,7 +451,6 @@ pub(super) fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> 
     operation(&mut guard)
 }
 
-
 #[cfg(test)]
 #[path = "reply_core_tests.rs"]
 mod reply_core_tests;

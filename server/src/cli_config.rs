@@ -658,7 +658,6 @@ fn split_cli_args(raw: &str) -> Vec<String> {
     args
 }
 
-
 #[cfg(test)]
 #[path = "cli_config_tests.rs"]
 mod tests;

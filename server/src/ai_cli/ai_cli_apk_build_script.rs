@@ -55,7 +55,6 @@ pub(crate) fn pc_apk_sync_loader_command(
     )
 }
 
-
 #[path = "ai_cli_apk_build_script_impl.rs"]
 mod impl_mod;
 use self::impl_mod::*;

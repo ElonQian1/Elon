@@ -488,7 +488,6 @@ fn valid_approval_decision(value: &str) -> bool {
     )
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_cli_sidecar_tests.rs"]
 mod tests;

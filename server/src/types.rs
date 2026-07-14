@@ -357,7 +357,6 @@ fn safe_workspace_part(value: &str, max_len: usize) -> String {
         .collect()
 }
 
-
 #[cfg(test)]
 #[path = "types_tests.rs"]
 mod tests;

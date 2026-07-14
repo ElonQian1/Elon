@@ -95,24 +95,25 @@ impl Store {
                    AND (created_at < ?3 OR (created_at = ?3 AND id <= ?4))
                  ORDER BY created_at ASC, id ASC",
             )?;
-            let rows = stmt.query_map(
-                params![
-                    project_id,
-                    source_conversation_id,
-                    selected.0.as_str(),
-                    selected.1.as_str()
-                ],
-                |row| {
-                    Ok(MessageCopy {
-                        task_id: row.get(0)?,
-                        user_id: row.get(1)?,
-                        role: row.get(2)?,
-                        content: row.get(3)?,
-                        created_at: row.get(4)?,
-                    })
-                },
-            )?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+            let rows = stmt
+                .query_map(
+                    params![
+                        project_id,
+                        source_conversation_id,
+                        selected.0.as_str(),
+                        selected.1.as_str()
+                    ],
+                    |row| {
+                        Ok(MessageCopy {
+                            task_id: row.get(0)?,
+                            user_id: row.get(1)?,
+                            role: row.get(2)?,
+                            content: row.get(3)?,
+                            created_at: row.get(4)?,
+                        })
+                    },
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
             rows
         };
         if messages.is_empty() {
@@ -192,7 +193,12 @@ mod tests {
     fn fork_conversation_copies_messages_through_selected_message() {
         let store = temp_store();
         let user = store
-            .create_user("fork-owner@example.com", "secret1", Some("Fork Owner"), None)
+            .create_user(
+                "fork-owner@example.com",
+                "secret1",
+                Some("Fork Owner"),
+                None,
+            )
             .expect("user should be created");
         let project = store
             .create_project(&user.id, "Fork Project", None, None)
@@ -202,7 +208,14 @@ mod tests {
             .ensure_conversation(&project.id, &user.id, Some("source"), Some("源会话"))
             .expect("conversation should be created");
         store
-            .add_message(&project.id, Some("source"), None, Some(&user.id), "user", "one")
+            .add_message(
+                &project.id,
+                Some("source"),
+                None,
+                Some(&user.id),
+                "user",
+                "one",
+            )
             .expect("first message should be inserted");
         store
             .add_message(
@@ -215,7 +228,14 @@ mod tests {
             )
             .expect("second message should be inserted");
         store
-            .add_message(&project.id, Some("source"), None, Some(&user.id), "user", "three")
+            .add_message(
+                &project.id,
+                Some("source"),
+                None,
+                Some(&user.id),
+                "user",
+                "three",
+            )
             .expect("third message should be inserted");
         let source_messages = store
             .list_user_conversation_messages(&project.id, &user.id, "source", 10)
@@ -262,7 +282,14 @@ mod tests {
             .set_conversation_locked_agent_if_unset(&project.id, &user.id, "source", "claude-cli")
             .expect("agent should lock");
         store
-            .add_message(&project.id, Some("source"), None, Some(&user.id), "user", "hello")
+            .add_message(
+                &project.id,
+                Some("source"),
+                None,
+                Some(&user.id),
+                "user",
+                "hello",
+            )
             .expect("message should be inserted");
         let source_messages = store
             .list_user_conversation_messages(&project.id, &user.id, "source", 10)

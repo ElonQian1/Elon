@@ -112,7 +112,6 @@ fn serialized_chars(value: &Value) -> usize {
         .unwrap_or(usize::MAX)
 }
 
-
 #[cfg(test)]
 #[path = "server_agent_runtime_output_tests.rs"]
 mod tests;

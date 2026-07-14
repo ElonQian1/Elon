@@ -138,7 +138,6 @@ fn current_utc_week_window() -> (String, String) {
     (start.to_rfc3339(), end.to_rfc3339())
 }
 
-
 #[cfg(test)]
 #[path = "user_progression_tests.rs"]
 mod tests;

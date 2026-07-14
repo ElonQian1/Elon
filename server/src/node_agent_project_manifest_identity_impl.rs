@@ -143,7 +143,10 @@ pub(super) fn parse_toml_string(value: &str) -> Option<String> {
     None
 }
 
-pub(super) fn identity_from_go_mod(fallback_name: &str, go_mod: &Path) -> Option<ManifestProjectIdentity> {
+pub(super) fn identity_from_go_mod(
+    fallback_name: &str,
+    go_mod: &Path,
+) -> Option<ManifestProjectIdentity> {
     let module_path = go_module_path(go_mod)?;
     let name = go_module_name(&module_path)?;
     identity_from_parts(fallback_name, Some(name), None, "go.mod")
@@ -231,7 +234,10 @@ pub(super) fn identity_from_dotnet_project(
     identity_from_parts(fallback_name, name, description, &source)
 }
 
-pub(super) fn first_file_with_extension(project_root: &Path, extension: &str) -> Option<std::path::PathBuf> {
+pub(super) fn first_file_with_extension(
+    project_root: &Path,
+    extension: &str,
+) -> Option<std::path::PathBuf> {
     let mut files = std::fs::read_dir(project_root)
         .ok()?
         .filter_map(Result::ok)
@@ -347,7 +353,6 @@ pub(super) fn clean_project_text(value: &str, max_chars: usize) -> Option<String
 pub(super) fn default_project_description(name: &str) -> String {
     format!("绑定到本 PC 节点的本地项目: {name}")
 }
-
 
 #[cfg(test)]
 #[path = "node_agent_project_manifest_identity_tests.rs"]

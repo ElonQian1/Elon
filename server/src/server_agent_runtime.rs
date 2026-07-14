@@ -396,7 +396,6 @@ fn response_total_tokens(response: &Value) -> Option<i64> {
         .filter(|value| *value >= 0)
 }
 
-
 #[cfg(test)]
 #[path = "server_agent_runtime_tests.rs"]
 mod tests;

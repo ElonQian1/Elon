@@ -1,5 +1,5 @@
-use serde_json::{json, Value};
 use super::*;
+use serde_json::{json, Value};
 
 pub(super) fn maintenance_actions(install: &Value) -> Value {
     let supported = install
@@ -175,7 +175,11 @@ pub(super) fn primary_maintenance_action(actions: &Value) -> Value {
         .unwrap_or(Value::Null)
 }
 
-pub(super) fn maintenance_overview(install: &Value, primary_action: &Value, recent_events: &Value) -> Value {
+pub(super) fn maintenance_overview(
+    install: &Value,
+    primary_action: &Value,
+    recent_events: &Value,
+) -> Value {
     let supported = install
         .get("supported")
         .and_then(Value::as_bool)
@@ -344,4 +348,3 @@ pub(super) fn action(
         "confirmation": confirmation,
     })
 }
-

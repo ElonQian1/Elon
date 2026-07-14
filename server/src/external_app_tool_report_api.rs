@@ -291,7 +291,6 @@ fn recommendation(
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_tool_report_api_tests.rs"]
 mod tests;

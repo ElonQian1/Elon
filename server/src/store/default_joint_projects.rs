@@ -85,7 +85,6 @@ pub(crate) fn remove_legacy_default_joint_project_memberships_conn(
     conn.execute(&sql, []).map_err(Into::into)
 }
 
-
 #[cfg(test)]
 #[path = "default_joint_projects_tests.rs"]
 mod tests;

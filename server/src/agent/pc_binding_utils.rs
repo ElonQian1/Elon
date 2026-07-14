@@ -1,15 +1,15 @@
 // server/src/agent/pc_binding_utils.rs
 //! PC 绑定辅助工具函数
 
-use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
-use tracing::warn;
-use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 use crate::{
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     store::{ProjectAccess, ProjectDevProfile},
     types::{AppState, WsMessage},
 };
+use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
+use std::sync::Arc;
+use tokio::sync::mpsc::UnboundedSender;
+use tracing::warn;
 
 pub(super) fn clone_url_for_project_access(
     project: &ProjectAccess,

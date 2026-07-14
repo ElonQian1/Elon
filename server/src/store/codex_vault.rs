@@ -437,7 +437,6 @@ fn slot_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<CodexVaultSlotReco
     })
 }
 
-
 #[cfg(test)]
 #[path = "codex_vault_tests.rs"]
 mod codex_vault_tests;

@@ -159,7 +159,6 @@ pub(crate) fn public_context_query_intent_guidance(app_id: &str) -> Option<Value
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_query_intent_tests.rs"]
 mod tests;

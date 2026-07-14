@@ -53,7 +53,9 @@ pub(super) fn pc_project_reasoning_effort(
     let clean = requested_effort
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .map(|value| normalize_codex_reasoning_effort(value, PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT));
+        .map(|value| {
+            normalize_codex_reasoning_effort(value, PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT)
+        });
 
     clean.or_else(|| {
         if request_mode.is_passthrough() {
@@ -78,7 +80,10 @@ pub(super) fn pc_runtime_full_access(runtime_permission: Option<&str>) -> bool {
     )
 }
 
-pub(super) fn pc_agent_cli_node_timeout_secs(cli_name: &str, runtime_permission: Option<&str>) -> u64 {
+pub(super) fn pc_agent_cli_node_timeout_secs(
+    cli_name: &str,
+    runtime_permission: Option<&str>,
+) -> u64 {
     match cli_name.trim().to_ascii_lowercase().as_str() {
         "codex" if pc_runtime_full_access(runtime_permission) => 1200,
         "codex" => 300,
@@ -260,12 +265,8 @@ pub(super) fn pc_route_a_ui_args(
     prompt: &str,
     public_url: &str,
 ) -> Vec<String> {
-    let mut args = pc_route_a_extra_args(
-        cli_name,
-        native_session_id,
-        model,
-        codex_reasoning_effort,
-    );
+    let mut args =
+        pc_route_a_extra_args(cli_name, native_session_id, model, codex_reasoning_effort);
     if matches!(cli_name, "codex" | "copilot" | "claude" | "gemini") {
         for url in crate::ui_design_tasks::ui_design_image_attachment_urls(prompt, public_url) {
             args.push("--attachment".to_string());
@@ -274,4 +275,3 @@ pub(super) fn pc_route_a_ui_args(
     }
     args
 }
-

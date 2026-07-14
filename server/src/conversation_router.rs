@@ -128,7 +128,6 @@ pub fn resolve_project_conversation_route(
     Ok(ConversationRoute::project(project))
 }
 
-
 #[cfg(test)]
 #[path = "conversation_router_tests.rs"]
 mod tests;

@@ -431,7 +431,6 @@ fn read_alert_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<BillingAlertRow> 
     })
 }
 
-
 #[cfg(test)]
 #[path = "billing_alerts_tests.rs"]
 mod billing_alerts_tests;

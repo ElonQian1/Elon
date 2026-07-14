@@ -293,7 +293,6 @@ fn completed_outcome_count(outcome_summaries: &[RouteCBudgetOutcomeSummary], out
         .sum()
 }
 
-
 #[cfg(test)]
 #[path = "route_c_admin_tests.rs"]
 mod tests;

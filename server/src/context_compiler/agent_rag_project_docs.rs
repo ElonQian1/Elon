@@ -237,7 +237,6 @@ fn xml_escape(value: &str) -> String {
         .replace('"', "&quot;")
 }
 
-
 #[cfg(test)]
 #[path = "agent_rag_project_docs_tests.rs"]
 mod tests;

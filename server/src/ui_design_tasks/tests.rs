@@ -19,8 +19,14 @@ fn parses_mobile_camel_case_ui_design_task() {
     .expect("task should parse");
 
     assert_eq!(task.mode, UiDesignTaskMode::CreateNew);
-    assert_eq!(task.attachment_intent, UiDesignAttachmentIntent::TargetDesign);
-    assert_eq!(task.render_target.kind, UiDesignRenderTargetKind::PreviewHost);
+    assert_eq!(
+        task.attachment_intent,
+        UiDesignAttachmentIntent::TargetDesign
+    );
+    assert_eq!(
+        task.render_target.kind,
+        UiDesignRenderTargetKind::PreviewHost
+    );
     assert!(task.execution_policy.require_build_verification);
 }
 

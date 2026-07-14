@@ -483,7 +483,6 @@ impl Store {
 #[cfg(test)]
 mod task_release_tests;
 
-
 #[cfg(test)]
 #[path = "tasks_tests.rs"]
 mod tasks_tests;

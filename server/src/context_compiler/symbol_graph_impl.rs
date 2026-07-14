@@ -108,7 +108,10 @@ pub(super) fn add_test_relationships(
     }
 }
 
-pub(super) fn page_rank(symbols: &[RustSymbol], relationships: &[CodeRelationship]) -> HashMap<String, f64> {
+pub(super) fn page_rank(
+    symbols: &[RustSymbol],
+    relationships: &[CodeRelationship],
+) -> HashMap<String, f64> {
     let files = symbols
         .iter()
         .map(|symbol| symbol.path.clone())
@@ -359,7 +362,6 @@ pub(super) fn is_stop_word(term: &str) -> bool {
 pub(super) fn _path_for_tests(base: &Path, path: &Path) -> String {
     relative_path(base, path)
 }
-
 
 #[cfg(test)]
 #[path = "symbol_graph_tests.rs"]

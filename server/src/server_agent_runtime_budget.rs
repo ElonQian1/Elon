@@ -352,7 +352,6 @@ fn seconds_until_next_day(epoch_secs: u64) -> u64 {
     }
 }
 
-
 #[cfg(test)]
 #[path = "server_agent_runtime_budget_tests.rs"]
 mod tests;

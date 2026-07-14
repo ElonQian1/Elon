@@ -317,7 +317,6 @@ fn safe_component(value: &str) -> String {
     out
 }
 
-
 #[cfg(test)]
 #[path = "artifact_tests.rs"]
 mod tests;

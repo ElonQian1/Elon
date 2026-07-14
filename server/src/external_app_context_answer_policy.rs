@@ -183,7 +183,6 @@ pub(crate) fn prompt_answer_rules_block(_context: &Value) -> String {
     format!("<answer_rules>\n{rules}\n</answer_rules>")
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_answer_policy_tests.rs"]
 mod tests;

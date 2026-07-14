@@ -441,7 +441,6 @@ pub async fn append_project_cli_attachment_artifacts(
     )
 }
 
-
 #[cfg(test)]
 #[path = "project_attachment_notes_tests.rs"]
 mod project_attachment_notes_tests;

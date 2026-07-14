@@ -296,7 +296,6 @@ fn clean_optional(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
 
-
 #[cfg(test)]
 #[path = "group_ai_flow_tests.rs"]
 mod tests;

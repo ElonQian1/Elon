@@ -260,7 +260,6 @@ fn normalize_scope_id(scope_id: Option<&str>) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-
 #[cfg(test)]
 #[path = "user_memories_tests.rs"]
 mod tests;

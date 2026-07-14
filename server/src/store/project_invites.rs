@@ -286,7 +286,6 @@ fn invite_link_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProjectInvi
     })
 }
 
-
 #[cfg(test)]
 #[path = "project_invites_tests.rs"]
 mod tests;

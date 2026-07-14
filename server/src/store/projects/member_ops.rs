@@ -474,4 +474,3 @@ pub(crate) fn ensure_project_not_system(
     }
     Ok(())
 }
-

@@ -77,7 +77,6 @@ fn auto_reason(intent: QueryIntent, enabled: bool) -> &'static str {
     }
 }
 
-
 #[cfg(test)]
 #[path = "agent_rag_vector_policy_tests.rs"]
 mod tests;

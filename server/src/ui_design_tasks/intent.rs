@@ -170,18 +170,18 @@ fn classify_normalized_ui_route(
         score = score.max(0.82);
         reasons.push("视觉对象与审美描述同时出现");
     }
-    if contains_any(text, UI_SURFACE_MARKERS)
-        && contains_any(text, UI_SURFACE_ACTION_MARKERS)
-    {
+    if contains_any(text, UI_SURFACE_MARKERS) && contains_any(text, UI_SURFACE_ACTION_MARKERS) {
         score = score.max(0.84);
         reasons.push("页面对象与美化动作同时出现");
     }
     if contains_any(text, AMBIGUOUS_VISUAL_MARKERS) {
-        score = score.max(if has_subject || contains_any(text, AMBIGUOUS_REGION_MARKERS) {
-            0.62
-        } else {
-            0.45
-        });
+        score = score.max(
+            if has_subject || contains_any(text, AMBIGUOUS_REGION_MARKERS) {
+                0.62
+            } else {
+                0.45
+            },
+        );
         reasons.push("出现模糊视觉描述");
     }
     if has_subject && has_action {
@@ -366,7 +366,13 @@ const AMBIGUOUS_VISUAL_MARKERS: &[&str] = &[
     "太臃肿",
 ];
 const AMBIGUOUS_REGION_MARKERS: &[&str] = &[
-    "底部", "顶部", "主操作", "次操作", "这个区域", "这块", "这里",
+    "底部",
+    "顶部",
+    "主操作",
+    "次操作",
+    "这个区域",
+    "这块",
+    "这里",
 ];
 const CREATE_MARKERS: &[&str] = &[
     "全新页面",

@@ -182,7 +182,10 @@ pub(super) fn maybe_grant_external_app_trial_credit_tx(
     }))
 }
 
-pub(super) fn active_user_id_by_account_tx(tx: &Transaction<'_>, account: &str) -> Result<Option<String>> {
+pub(super) fn active_user_id_by_account_tx(
+    tx: &Transaction<'_>,
+    account: &str,
+) -> Result<Option<String>> {
     tx.query_row(
         "SELECT id
          FROM users
@@ -206,7 +209,10 @@ pub(super) fn user_exists_tx(tx: &Transaction<'_>, user_id: &str) -> Result<bool
         .is_some())
 }
 
-pub(super) fn public_user_by_id_conn(conn: &rusqlite::Connection, user_id: &str) -> Result<PublicUser> {
+pub(super) fn public_user_by_id_conn(
+    conn: &rusqlite::Connection,
+    user_id: &str,
+) -> Result<PublicUser> {
     conn.query_row(
         "SELECT id, phone, email, nickname, role, status, avatar_data_url
          FROM users

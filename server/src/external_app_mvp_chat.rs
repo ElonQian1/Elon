@@ -125,7 +125,6 @@ pub(crate) async fn mvp_chat_handler(
     .into_response()
 }
 
-
 #[path = "external_app_mvp_chat_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

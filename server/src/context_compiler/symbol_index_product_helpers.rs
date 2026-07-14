@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) fn derive_index_status(chunk_count: usize, missing_count: usize, stale_count: usize) -> String {
+pub(super) fn derive_index_status(
+    chunk_count: usize,
+    missing_count: usize,
+    stale_count: usize,
+) -> String {
     if chunk_count == 0 {
         INDEX_STATUS_UNINDEXED
     } else if stale_count > 0 {
@@ -50,7 +54,10 @@ pub(super) fn queue_counts(conn: &Connection) -> Result<BTreeMap<String, usize>>
     Ok(counts)
 }
 
-pub(super) fn load_latest_jobs(conn: &Connection, limit: usize) -> Result<Vec<EmbeddingJobSummary>> {
+pub(super) fn load_latest_jobs(
+    conn: &Connection,
+    limit: usize,
+) -> Result<Vec<EmbeddingJobSummary>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT id, trace_id, model, status, limit_count, force, scanned_count,

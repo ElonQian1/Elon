@@ -349,6 +349,5 @@ async fn events_response(
     .into_response()
 }
 
-
 mod helpers;
 use self::helpers::*;

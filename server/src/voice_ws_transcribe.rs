@@ -58,7 +58,6 @@ pub async fn ws_transcribe_handler(
     .into_response()
 }
 
-
 #[path = "voice_ws_transcribe_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

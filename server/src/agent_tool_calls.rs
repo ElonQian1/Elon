@@ -71,7 +71,6 @@ fn parse_tool_args(raw: Option<&str>) -> Value {
         .unwrap_or_else(|| json!({}))
 }
 
-
 #[cfg(test)]
 #[path = "agent_tool_calls_tests.rs"]
 mod tests;

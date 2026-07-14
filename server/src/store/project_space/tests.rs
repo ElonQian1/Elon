@@ -48,7 +48,12 @@ mod tests {
             .expect("feedback category should exist");
 
         let created = store
-            .create_project_channel(&owner.id, &project.id, "  版本   计划  ", Some(&feedback.id))
+            .create_project_channel(
+                &owner.id,
+                &project.id,
+                "  版本   计划  ",
+                Some(&feedback.id),
+            )
             .expect("channel should be created");
         assert_eq!(created.name, "版本 计划");
         assert_eq!(created.category_id.as_deref(), Some(feedback.id.as_str()));

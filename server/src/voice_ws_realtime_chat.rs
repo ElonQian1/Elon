@@ -49,7 +49,6 @@ pub async fn ws_realtime_chat_handler(
     .into_response()
 }
 
-
 #[path = "voice_ws_realtime_chat_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

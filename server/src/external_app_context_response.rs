@@ -118,7 +118,6 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
     out
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_response_tests.rs"]
 mod tests;

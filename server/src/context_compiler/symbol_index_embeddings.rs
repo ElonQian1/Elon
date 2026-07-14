@@ -406,7 +406,6 @@ fn to_usize(value: i64) -> usize {
     usize::try_from(value).unwrap_or_default()
 }
 
-
 #[cfg(test)]
 #[path = "symbol_index_embeddings_tests.rs"]
 mod tests;

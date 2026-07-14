@@ -335,7 +335,6 @@ pub(crate) fn status_payload_for(
     payload
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_cli_session_bridge_tests.rs"]
 mod tests;

@@ -345,7 +345,6 @@ fn context_answer_policy_schema(context: &Value) -> &str {
         .unwrap_or("unknown")
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tests.rs"]
 mod tests;

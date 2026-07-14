@@ -338,7 +338,6 @@ fn directory_files_with_extensions(path: &Path, extensions: &[&str]) -> Vec<Stri
         .collect()
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_project_profile_tests.rs"]
 mod tests;

@@ -7,8 +7,8 @@ use rusqlite::params;
 
 use super::token_usage::{
     UsageBillingSourceRow, UsageDayRow, UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats,
-    UsageTotals, BILLING_SOURCE_CLIENT_REPORTED, BILLING_SOURCE_OWN_CODEX,
-    BILLING_SOURCE_PLATFORM, BILLING_SOURCE_SHARED_CODEX, BILLING_SOURCE_USER_API_KEY,
+    UsageTotals, BILLING_SOURCE_CLIENT_REPORTED, BILLING_SOURCE_OWN_CODEX, BILLING_SOURCE_PLATFORM,
+    BILLING_SOURCE_SHARED_CODEX, BILLING_SOURCE_USER_API_KEY,
 };
 use super::Store;
 

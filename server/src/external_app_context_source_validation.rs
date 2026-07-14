@@ -417,7 +417,6 @@ fn compact_ids(ids: &[String]) -> String {
     compact
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_source_validation_tests.rs"]
 mod tests;

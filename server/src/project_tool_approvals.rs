@@ -330,7 +330,6 @@ fn approval_key(task_id: &str, approval_id: &str) -> String {
     format!("{task_id}:{approval_id}")
 }
 
-
 #[cfg(test)]
 #[path = "project_tool_approvals_tests.rs"]
 mod tests;

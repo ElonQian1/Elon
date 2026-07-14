@@ -195,7 +195,6 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tool_execution_tests.rs"]
 mod tests;

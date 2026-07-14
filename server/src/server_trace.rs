@@ -128,7 +128,6 @@ fn now_ms() -> i64 {
         .unwrap_or_default()
 }
 
-
 #[cfg(test)]
 #[path = "server_trace_tests.rs"]
 mod tests;

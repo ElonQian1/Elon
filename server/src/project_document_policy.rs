@@ -326,9 +326,16 @@ fn looks_like_discussion(file_name: &str) -> bool {
 
 fn is_historical_path(path: &str) -> bool {
     let padded = format!("/{}/", path.trim_matches('/'));
-    ["archive", "archives", "archived", "historical", "history", "legacy"]
-        .iter()
-        .any(|directory| padded.contains(&format!("/{directory}/")))
+    [
+        "archive",
+        "archives",
+        "archived",
+        "historical",
+        "history",
+        "legacy",
+    ]
+    .iter()
+    .any(|directory| padded.contains(&format!("/{directory}/")))
 }
 
 fn looks_like_report(file_name: &str) -> bool {

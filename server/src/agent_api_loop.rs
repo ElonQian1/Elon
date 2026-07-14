@@ -35,7 +35,6 @@ struct ResolvedApiAgent {
     allow_server_fallback: bool,
 }
 
-
 #[path = "agent_api_loop_helpers.rs"]
 mod helpers;
 use self::helpers::*;
@@ -396,4 +395,3 @@ pub(crate) async fn run_api_inner_with_workspace(
 
     Ok(())
 }
-

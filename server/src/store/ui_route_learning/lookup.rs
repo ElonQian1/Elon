@@ -2,8 +2,8 @@ use anyhow::Result;
 use rusqlite::{params, OptionalExtension};
 
 use super::{
-    load_entry, map_entry, normalize_ui_route_phrase, record_event, UiRouteLearningEntry,
-    UiRouteLearningAlias, UiRouteLearningSource, GLOBAL_SCOPE_ID, MAX_SAMPLE_CHARS,
+    load_entry, map_entry, normalize_ui_route_phrase, record_event, UiRouteLearningAlias,
+    UiRouteLearningEntry, UiRouteLearningSource, GLOBAL_SCOPE_ID, MAX_SAMPLE_CHARS,
 };
 use crate::store::{common::new_id, common::now, Store};
 
@@ -33,12 +33,7 @@ impl Store {
         let Some(concept) = crate::ui_design_tasks::controlled_ui_route_concept(message) else {
             return Ok(None);
         };
-        let entries = query_cluster(
-            &conn,
-            project_id,
-            concept.key,
-            concept.version as i64,
-        )?;
+        let entries = query_cluster(&conn, project_id, concept.key, concept.version as i64)?;
         let Some(first) = entries.first() else {
             return Ok(None);
         };
@@ -76,7 +71,11 @@ impl Store {
                 new_id("ui_route_alias"),
                 first.id,
                 phrase_key,
-                message.trim().chars().take(MAX_SAMPLE_CHARS).collect::<String>(),
+                message
+                    .trim()
+                    .chars()
+                    .take(MAX_SAMPLE_CHARS)
+                    .collect::<String>(),
                 timestamp,
             ],
         )?;

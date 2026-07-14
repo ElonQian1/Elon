@@ -213,7 +213,6 @@ fn fb2_tool_execution_policy(live_tool_ids: &[String]) -> Value {
     })
 }
 
-
 #[cfg(test)]
 #[path = "external_app_tool_manifest_tests.rs"]
 mod tests;

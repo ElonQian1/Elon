@@ -3,9 +3,16 @@ use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{path::{Path, PathBuf}, sync::Arc, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
-use super::{AuthCacheInspection, CodexVaultLocalStatus, ManagedAuthSlotInspection, ManagedSlotMeta, MAX_AUTH_JSON_BYTES};
+use super::{
+    AuthCacheInspection, CodexVaultLocalStatus, ManagedAuthSlotInspection, ManagedSlotMeta,
+    MAX_AUTH_JSON_BYTES,
+};
 
 pub(super) fn local_status() -> CodexVaultLocalStatus {
     let legacy_home = managed_codex_home();
@@ -187,7 +194,9 @@ pub(super) fn active_managed_slot_meta() -> Option<ManagedSlotMeta> {
     read_slot_meta(&active).ok().flatten()
 }
 
-pub(super) fn inspect_managed_slots(active_meta: Option<&ManagedSlotMeta>) -> Vec<ManagedAuthSlotInspection> {
+pub(super) fn inspect_managed_slots(
+    active_meta: Option<&ManagedSlotMeta>,
+) -> Vec<ManagedAuthSlotInspection> {
     let slots_root = managed_slots_root();
     let Ok(entries) = std::fs::read_dir(&slots_root) else {
         return Vec::new();
@@ -403,7 +412,10 @@ pub(super) async fn decode_cloud_response(resp: reqwest::Response) -> Result<Val
     Ok(value)
 }
 
-pub(super) fn error_response(status: StatusCode, message: impl ToString) -> (StatusCode, Json<Value>) {
+pub(super) fn error_response(
+    status: StatusCode,
+    message: impl ToString,
+) -> (StatusCode, Json<Value>) {
     (
         status,
         Json(json!({

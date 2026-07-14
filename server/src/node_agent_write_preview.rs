@@ -173,7 +173,6 @@ fn reject_sensitive_content(label: &str, content: &str) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_write_preview_tests.rs"]
 mod tests;

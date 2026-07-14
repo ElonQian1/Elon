@@ -235,7 +235,6 @@ fn i64_to_u64(value: i64) -> Option<u64> {
     u64::try_from(value).ok()
 }
 
-
 #[cfg(test)]
 #[path = "project_workspace_health_snapshots_tests.rs"]
 mod tests;

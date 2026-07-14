@@ -96,7 +96,6 @@ fn buffered_json_event(buffer: &str, model_used: Option<&str>) -> Option<Vec<Str
     Some(pc_cli_passthrough_events(trimmed, model_used))
 }
 
-
 #[cfg(test)]
 #[path = "pc_passthrough_events_tests.rs"]
 mod tests;

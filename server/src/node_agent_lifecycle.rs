@@ -492,7 +492,6 @@ fn now_ms() -> u64 {
         .unwrap_or_default()
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_lifecycle_tests.rs"]
 mod node_agent_lifecycle_tests;

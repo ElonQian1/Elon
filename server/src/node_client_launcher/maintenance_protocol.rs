@@ -145,7 +145,6 @@ fn open_path_command(path: &Path) -> std::process::Command {
     command
 }
 
-
 #[cfg(test)]
 #[path = "maintenance_protocol_tests.rs"]
 mod tests;

@@ -261,13 +261,10 @@ fn publish_completed(gap: &mut CapabilityGapDocument, arguments: &Value) -> Resu
     let version = required_text(arguments, "version", 256)?;
     let source_revision_after = required_text(arguments, "sourceRevisionAfter", 256)?;
     let changed_files = string_array(arguments, "changedFiles", 1, 128)?;
-    let duplicate_release = gap
-        .attempts
-        .iter()
-        .any(|item| {
-            item.commit_id.as_deref() == Some(commit_id.as_str())
-                || item.version.as_deref() == Some(version.as_str())
-        });
+    let duplicate_release = gap.attempts.iter().any(|item| {
+        item.commit_id.as_deref() == Some(commit_id.as_str())
+            || item.version.as_deref() == Some(version.as_str())
+    });
     let source_revision_before = gap
         .attempts
         .last()

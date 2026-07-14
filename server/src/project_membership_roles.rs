@@ -9,6 +9,16 @@ use axum::{
 use serde_json::{json, Value};
 use std::sync::Arc;
 
+use super::{
+    can_update_project_brand, can_update_project_icon, clean_project_display_name_update,
+    clean_project_icon_data_url, clean_project_icon_data_url_update,
+    ensure_role_management_allowed, ensure_role_management_allowed_by_level,
+    ensure_role_position_below_manager, ensure_role_set_management_allowed,
+    is_builtin_project_role, member_has_project_permission, project_brand_field,
+    project_role_permission_options, publish_members_updated, AddMemberRequest,
+    CreateProjectRoleRequest, ListMemberAuditQuery, UpdateProjectIconRequest,
+    UpdateProjectRoleRequest, VisibilityRequest,
+};
 use crate::{
     project_auth::{auth_from_headers, json_error},
     store::{
@@ -16,19 +26,6 @@ use crate::{
         PERMISSION_MANAGE_ROLES, PERMISSION_VIEW_AUDIT_LOG,
     },
     types::AppState,
-};
-use super::{
-    can_update_project_brand, can_update_project_icon,
-    clean_project_display_name_update, clean_project_icon_data_url,
-    clean_project_icon_data_url_update,
-    ensure_role_management_allowed, ensure_role_management_allowed_by_level,
-    ensure_role_position_below_manager, ensure_role_set_management_allowed,
-    is_builtin_project_role, member_has_project_permission,
-    project_brand_field, project_role_permission_options,
-    publish_members_updated,
-    AddMemberRequest, CreateProjectRoleRequest, ListMemberAuditQuery,
-    UpdateProjectIconRequest,
-    UpdateProjectRoleRequest, VisibilityRequest,
 };
 
 pub async fn list_member_audit(
@@ -593,4 +590,3 @@ pub async fn update_project_brand(
         }
     }
 }
-

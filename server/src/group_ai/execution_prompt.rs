@@ -99,7 +99,6 @@ fn role_guidance(role: &str) -> &'static str {
     "- 以实现交付为主：完成本角色负责的代码、测试、文档或诊断产物，并明确交给 reviewer 审核的证据。\n- 结果中列出关键文件、diff 摘要、测试命令和人工合并建议，便于系统登记 artifact 和 merge queue。"
 }
 
-
 #[cfg(test)]
 #[path = "execution_prompt_tests.rs"]
 mod tests;

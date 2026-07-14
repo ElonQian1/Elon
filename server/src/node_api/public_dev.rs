@@ -439,7 +439,6 @@ fn cli_lists_intersect(allowed: &[String], advertised: &[String]) -> bool {
     })
 }
 
-
 #[cfg(test)]
 #[path = "public_dev_tests.rs"]
 mod public_dev_tests;

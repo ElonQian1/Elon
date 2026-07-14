@@ -389,7 +389,6 @@ fn push_unique_hint(parts: &mut Vec<String>, value: Option<&str>) {
     }
 }
 
-
 #[cfg(test)]
 #[path = "group_summary_api_tests.rs"]
 mod tests;

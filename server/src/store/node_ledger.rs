@@ -595,7 +595,6 @@ fn fen_to_credits(fen: i64) -> f64 {
     fen.max(0) as f64 / 100.0
 }
 
-
 #[cfg(test)]
 #[path = "node_ledger_tests.rs"]
 mod tests;

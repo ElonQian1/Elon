@@ -1,8 +1,8 @@
+use super::*;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 #[cfg(windows)]
 use std::process::{Command, Stdio};
-use super::*;
 
 pub(super) fn status_payload() -> Value {
     let paths = maintenance_paths();
@@ -157,7 +157,6 @@ pub(super) fn with_install_status(mut payload: Value) -> Value {
     }
     payload
 }
-
 
 pub(super) fn open_target(raw_target: &str) -> Result<PathBuf, String> {
     let target = maintenance_target(raw_target)?;

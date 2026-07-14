@@ -285,7 +285,6 @@ fn ratio(numerator: i64, denominator: i64) -> f64 {
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_tool_executions_tests.rs"]
 mod tests;

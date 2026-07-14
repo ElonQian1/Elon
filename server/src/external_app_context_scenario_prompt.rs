@@ -326,7 +326,6 @@ fn compact_json_array(value: &Value) -> String {
         .unwrap_or_else(|| "none".to_string())
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_scenario_prompt_tests.rs"]
 mod tests;

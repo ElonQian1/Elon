@@ -45,7 +45,6 @@ pub(crate) fn run_symbol_patch_verification(
     }
 }
 
-
 #[path = "symbol_index_patch_verification_run_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

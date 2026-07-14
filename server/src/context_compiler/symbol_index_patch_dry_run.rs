@@ -134,7 +134,6 @@ pub(crate) fn dry_run_symbol_patch(
     }
 }
 
-
 #[path = "symbol_index_patch_dry_run_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

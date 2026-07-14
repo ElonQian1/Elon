@@ -2,25 +2,24 @@
 //!
 //! 本模块只描述任务意图和确定性路由，不负责执行 Codex、构建或 Live Runtime。
 
+mod dispatch;
 mod intent;
+mod learning;
 mod model;
 mod prompt;
-mod dispatch;
-mod learning;
 mod semantic_cluster;
 
-pub(crate) use intent::force_ui_design_task;
 pub(crate) use dispatch::{promote_codex_ui_route, resolve_ui_route_task};
+pub(crate) use intent::force_ui_design_task;
 pub(crate) use learning::finalize_ui_route_learning;
-pub(crate) use semantic_cluster::{
-    controlled_ui_concept_label, controlled_ui_route_concept,
-    CONTROLLED_UI_CONCEPT_VERSION,
-};
 pub(crate) use model::{
     UiDesignAttachmentIntent, UiDesignExecutionPolicy, UiDesignRenderTarget,
     UiDesignRenderTargetKind, UiDesignTaskEvidence, UiDesignTaskInput, UiDesignTaskMode,
 };
 pub(crate) use prompt::{append_ui_design_task_context, ui_design_image_attachment_urls};
+pub(crate) use semantic_cluster::{
+    controlled_ui_concept_label, controlled_ui_route_concept, CONTROLLED_UI_CONCEPT_VERSION,
+};
 
 #[cfg(test)]
 mod tests;

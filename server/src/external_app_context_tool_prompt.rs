@@ -224,7 +224,6 @@ fn first_value_as_string(value: &Value, fields: &[&str]) -> Option<String> {
     })
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tool_prompt_tests.rs"]
 mod tests;

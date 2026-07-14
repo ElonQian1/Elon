@@ -118,7 +118,6 @@ pub(crate) fn write_context_exports(
     Some(bytes)
 }
 
-
 #[path = "artifact_exports_builders.rs"]
 mod builders;
 use self::builders::*;

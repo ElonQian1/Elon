@@ -414,9 +414,7 @@ mod tests {
         fs::write(temp.join("README.md"), "changed\n").unwrap();
         let mut guard = ToolGuard::new(temp, None);
 
-        let status = guard
-            .invoke_action(&json!({"tool": "git_status"}))
-            .await;
+        let status = guard.invoke_action(&json!({"tool": "git_status"})).await;
         assert!(status.contains("git -c core.quotepath=false status"));
         assert!(status.contains("README.md"));
 
@@ -435,7 +433,9 @@ mod tests {
         assert!(log.contains("initial commit"));
 
         let show = guard
-            .invoke_action(&json!({"tool": "git_show", "revision": "HEAD", "path": "README.md", "stat": true}))
+            .invoke_action(
+                &json!({"tool": "git_show", "revision": "HEAD", "path": "README.md", "stat": true}),
+            )
             .await;
         assert!(show.contains("git -c core.quotepath=false show"));
         assert!(show.contains("--stat"));
@@ -460,18 +460,29 @@ mod tests {
         let guard = ToolGuard::new(temp, Some("project_write"));
 
         let existing = guard
-            .write_file_diff_preview(&json!({"tool": "write_file", "path": "note.txt", "content": "new\n"}))
-            .await.unwrap().unwrap();
+            .write_file_diff_preview(
+                &json!({"tool": "write_file", "path": "note.txt", "content": "new\n"}),
+            )
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(existing["kind"], "replace");
         assert_eq!(existing["files"][0], "note.txt");
         assert!(existing["preview"].as_str().unwrap().contains("-old"));
         assert!(existing["preview"].as_str().unwrap().contains("+new"));
 
         let created = guard
-            .write_file_diff_preview(&json!({"tool": "write_file", "path": "new.txt", "content": "hello\n"}))
-            .await.unwrap().unwrap();
+            .write_file_diff_preview(
+                &json!({"tool": "write_file", "path": "new.txt", "content": "hello\n"}),
+            )
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(created["kind"], "create");
-        assert!(created["preview"].as_str().unwrap().contains("--- /dev/null"));
+        assert!(created["preview"]
+            .as_str()
+            .unwrap()
+            .contains("--- /dev/null"));
         assert!(created["preview"].as_str().unwrap().contains("+hello"));
     }
 
@@ -490,7 +501,9 @@ mod tests {
 
         assert!(result.contains("补丁已应用"));
         assert_eq!(
-            std::fs::read_to_string(&file).unwrap().replace("\r\n", "\n"),
+            std::fs::read_to_string(&file)
+                .unwrap()
+                .replace("\r\n", "\n"),
             "new\n"
         );
     }

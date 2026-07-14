@@ -30,18 +30,14 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_get_screen_summary"));
-    assert!(tools
-        .iter()
-        .any(|tool| tool["name"] == "ui_confirm_route"));
+    assert!(tools.iter().any(|tool| tool["name"] == "ui_confirm_route"));
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_run_visual_solver"));
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_commit_bound_styles"));
-    assert!(tools
-        .iter()
-        .any(|tool| tool["name"] == "ui_start_fit_run"));
+    assert!(tools.iter().any(|tool| tool["name"] == "ui_start_fit_run"));
 }
 
 #[tokio::test]
@@ -62,9 +58,7 @@ async fn initialized_notification_has_no_json_rpc_response() {
     }))
     .unwrap();
     let fit_runs = FitRunService::live(broker.clone());
-    assert!(
-        handle_request(&broker, &fit_runs, &session.id, request)
-            .await
-            .is_none()
-    );
+    assert!(handle_request(&broker, &fit_runs, &session.id, request)
+        .await
+        .is_none());
 }

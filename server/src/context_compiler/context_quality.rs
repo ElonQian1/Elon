@@ -34,7 +34,6 @@ pub(crate) fn build_context_quality_report(
     }
 }
 
-
 #[path = "context_quality_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

@@ -150,9 +150,30 @@ mod tests {
 
     #[test]
     fn center_containing_node_scores_above_overlap_only_node() {
-        let target = LiveRect { left: 10, top: 10, right: 30, bottom: 30, width: 20, height: 20 };
-        let centered = LiveRect { left: 8, top: 8, right: 32, bottom: 32, width: 24, height: 24 };
-        let edge = LiveRect { left: 25, top: 10, right: 45, bottom: 30, width: 20, height: 20 };
+        let target = LiveRect {
+            left: 10,
+            top: 10,
+            right: 30,
+            bottom: 30,
+            width: 20,
+            height: 20,
+        };
+        let centered = LiveRect {
+            left: 8,
+            top: 8,
+            right: 32,
+            bottom: 32,
+            width: 24,
+            height: 24,
+        };
+        let edge = LiveRect {
+            left: 25,
+            top: 10,
+            right: 45,
+            bottom: 30,
+            width: 20,
+            height: 20,
+        };
         assert!(node_score(&target, &centered) > node_score(&target, &edge));
     }
 }

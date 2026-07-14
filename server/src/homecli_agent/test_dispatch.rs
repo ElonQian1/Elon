@@ -1,11 +1,16 @@
+use super::{agent_session::run_agent_session, AgentManager};
+use crate::{admin, types::AppState};
 use anyhow::Result;
-use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
+use axum::{
+    extract::State,
+    http::{HeaderMap, StatusCode},
+    response::IntoResponse,
+    Json,
+};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use homecli_proto::AgentToServer;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::Duration};
-use crate::{admin, types::AppState};
-use super::{AgentManager, agent_session::run_agent_session};
 
 #[derive(Debug, Deserialize)]
 pub struct TestDispatchReq {

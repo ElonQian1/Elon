@@ -172,7 +172,11 @@ impl UiDesignTaskInput {
         if self.behavior_notes.len() > 32 {
             return Err("behaviorNotes 最多允许 32 条".into());
         }
-        if self.behavior_notes.iter().any(|note| note.chars().count() > 2_000) {
+        if self
+            .behavior_notes
+            .iter()
+            .any(|note| note.chars().count() > 2_000)
+        {
             return Err("单条 behaviorNotes 不能超过 2000 个字符".into());
         }
         if self.reference_attachment_ids.len() > 16 {

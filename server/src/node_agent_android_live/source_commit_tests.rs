@@ -208,10 +208,8 @@ fn defers_single_instance_commit_for_repeated_definition() {
 
 #[test]
 fn mixed_plan_writes_deterministic_entries_and_preserves_codex_deferred_entries() {
-    let root = std::env::temp_dir().join(format!(
-        "elon-live-mixed-{}",
-        uuid::Uuid::new_v4().simple()
-    ));
+    let root =
+        std::env::temp_dir().join(format!("elon-live-mixed-{}", uuid::Uuid::new_v4().simple()));
     let layout_dir = root.join("app/src/main/res/layout");
     fs::create_dir_all(&layout_dir).expect("create layout dir");
     let layout_file = layout_dir.join("checkout.xml");

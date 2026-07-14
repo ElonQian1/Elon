@@ -1,8 +1,10 @@
+use super::utils::*;
 use super::ServerRuntimeRunResult;
 use super::MAX_TOOL_RESULT_CHARS;
-use super::utils::*;
 use crate::{
-    node_agent_runtime_approval::{requires_tool_approval, wait_for_tool_approval, ApprovalOutcome},
+    node_agent_runtime_approval::{
+        requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
+    },
     node_agent_runtime_events::{
         runtime_status_chunk, tool_approval_checkpoint, tool_approval_decision_chunk,
         tool_approval_id, tool_approval_required_chunk_with_diff_and_checkpoint, tool_call_chunk,
@@ -643,4 +645,3 @@ where
         total_tokens: usage.total_tokens,
     })
 }
-

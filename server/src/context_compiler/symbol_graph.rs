@@ -56,7 +56,6 @@ pub(crate) fn build_symbol_graph(
     }
 }
 
-
 #[path = "symbol_graph_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

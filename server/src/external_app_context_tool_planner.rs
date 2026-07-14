@@ -73,7 +73,6 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Fb2To
     plan_fb2_tools_with_platform_scope(context, topic_hint, platform_order_summary_enabled())
 }
 
-
 #[path = "external_app_context_tool_planner_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

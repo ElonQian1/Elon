@@ -61,7 +61,6 @@ pub(crate) fn migration_v84(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 #[path = "billing_trial_credit_migration_tests.rs"]
 mod tests;

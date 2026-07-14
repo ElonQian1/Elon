@@ -134,7 +134,6 @@ fn disables_runtime(value: &str) -> bool {
     )
 }
 
-
 #[cfg(test)]
 #[path = "server_agent_runtime_policy_tests.rs"]
 mod tests;

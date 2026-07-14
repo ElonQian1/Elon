@@ -227,7 +227,7 @@ async fn run_api_runtime_inner(
 }
 
 mod runtime_loop;
-use self::runtime_loop::{RuntimeLoopOptions, run_runtime_loop};
+use self::runtime_loop::{run_runtime_loop, RuntimeLoopOptions};
 
 #[cfg(test)]
 mod runtime_test;

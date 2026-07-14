@@ -405,7 +405,6 @@ fn user_project_counts_by_node(state: &AppState, user_id: &str) -> HashMap<Strin
     }
 }
 
-
 #[cfg(test)]
 #[path = "node_runtime_tests.rs"]
 mod tests;

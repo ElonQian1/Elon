@@ -456,7 +456,6 @@ impl Store {
         )?;
         Ok(())
     }
-
 }
 
 pub(crate) mod listing_cursor;

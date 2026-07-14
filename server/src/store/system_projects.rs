@@ -150,7 +150,6 @@ pub(crate) fn is_system_project_source_type(source_type: &str) -> bool {
     system_project_key_for_source_type(source_type).is_some()
 }
 
-
 #[cfg(test)]
 #[path = "system_projects_tests.rs"]
 mod tests;

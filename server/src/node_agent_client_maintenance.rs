@@ -144,7 +144,7 @@ use self::payload_helpers::*;
 mod actions;
 use self::actions::*;
 
+pub(crate) mod maintenance_ops;
 #[cfg(test)]
 mod maintenance_test;
-pub(crate) mod maintenance_ops;
 pub(crate) use self::maintenance_ops::*;

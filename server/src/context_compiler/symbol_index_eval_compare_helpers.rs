@@ -1,12 +1,10 @@
-use std::collections::{BTreeMap, BTreeSet};
-use serde_json::Value;
 use super::{
-    RunSnapshot, CaseSnapshot, MetricSpec, MetricDirection, EPSILON,
-    DEFAULT_CASE_LIMIT, MAX_CASE_LIMIT,
-    SymbolRetrievalRunCompareRun, SymbolRetrievalMetricDelta,
-    SymbolRetrievalIntentDelta, SymbolRetrievalCaseDelta,
-    SymbolRetrievalRunCompareResponse,
+    CaseSnapshot, MetricDirection, MetricSpec, RunSnapshot, SymbolRetrievalCaseDelta,
+    SymbolRetrievalIntentDelta, SymbolRetrievalMetricDelta, SymbolRetrievalRunCompareResponse,
+    SymbolRetrievalRunCompareRun, DEFAULT_CASE_LIMIT, EPSILON, MAX_CASE_LIMIT,
 };
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn aggregate_specs() -> &'static [MetricSpec] {
     &[

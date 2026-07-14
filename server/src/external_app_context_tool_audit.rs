@@ -137,7 +137,6 @@ fn result_has_current_user_order_data(result: &Value) -> bool {
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tool_audit_tests.rs"]
 mod tests;

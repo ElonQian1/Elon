@@ -1,5 +1,5 @@
-use std::{path::Path, sync::Arc, time::Duration};
 use anyhow::Result;
+use std::{path::Path, sync::Arc, time::Duration};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
 
@@ -7,7 +7,10 @@ use crate::{
     agent_api_loop::run_api_inner_with_workspace,
     agent_intent::{is_project_delivery_request, is_short_build_command, is_short_resume_command},
     agent_pc_workspace::{project_cli_runtime_permission, should_attempt_pc_apk_sync},
-    agent_routing::{api_agent_name, choose_backend, has_api_agents, is_local_cli_option, requested_agent_for_runtime_route, resolve_cli_option_id},
+    agent_routing::{
+        api_agent_name, choose_backend, has_api_agents, is_local_cli_option,
+        requested_agent_for_runtime_route, resolve_cli_option_id,
+    },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     pc_agent_runtime_choice::PcRuntimeRoutePreference,

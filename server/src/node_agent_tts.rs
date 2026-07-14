@@ -110,5 +110,3 @@ pub async fn run_tts_synthesis(
         }
     }
 }
-
-

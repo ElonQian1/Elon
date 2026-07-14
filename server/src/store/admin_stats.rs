@@ -483,5 +483,4 @@ impl Store {
             by_day,
         })
     }
-
 }

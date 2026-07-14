@@ -19,6 +19,14 @@ use crate::{
     types::{AppState, WsMessage},
 };
 
+use super::pc_binding_utils::*;
+pub(super) use super::pc_binding_utils::{
+    append_project_dev_profile_context, clone_url_for_project_access, inspect_pc_agent_workspace,
+    is_codex_fallback_error, node_cli_available, pc_agent_is_connected,
+    pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
+    pc_workspace_inspect_usable, pc_workspace_inspect_usable_for_route, send_optional_progress,
+    send_pc_workspace_unavailable_error,
+};
 use super::pc_node_select::{
     connected_pc_agent_for_route, connected_pc_agent_with_existing_workspace,
     connected_pc_agent_with_recorded_workspace_binding, connected_pc_project_agent_for_route,
@@ -27,14 +35,6 @@ use super::public_dev::{
     pc_agent_authorized_for_bound_node, pc_agent_authorized_for_route,
     pc_agent_belongs_to_user_quiet, pc_agent_runtime_ready_for_route,
     route_targets_public_dev_node,
-};
-use super::pc_binding_utils::*;
-pub(super) use super::pc_binding_utils::{
-    append_project_dev_profile_context, clone_url_for_project_access, inspect_pc_agent_workspace,
-    is_codex_fallback_error, node_cli_available, pc_agent_is_connected,
-    pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
-    pc_workspace_inspect_usable, pc_workspace_inspect_usable_for_route,
-    send_optional_progress, send_pc_workspace_unavailable_error,
 };
 
 #[derive(Debug, Clone)]
@@ -593,4 +593,3 @@ pub(super) async fn provision_pc_project_binding(
         workspace: provisioned.workspace_path,
     })
 }
-

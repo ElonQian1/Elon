@@ -417,7 +417,6 @@ fn is_operational_error_summary(value: &str) -> bool {
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '=' | ',' | ' '))
 }
 
-
 #[cfg(test)]
 #[path = "route_c_budget_tests.rs"]
 mod tests;

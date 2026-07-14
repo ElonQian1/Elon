@@ -497,7 +497,6 @@ fn compact_json(value: Value) -> Result<String> {
     serde_json::to_string(&value).context("序列化 RAG 工具结果失败")
 }
 
-
 #[cfg(test)]
 #[path = "agent_rag_context_tests.rs"]
 mod tests;

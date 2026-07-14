@@ -184,7 +184,6 @@ pub(crate) fn public_context_pack_template_guidance(app_id: &str) -> Option<Valu
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_pack_template_tests.rs"]
 mod tests;

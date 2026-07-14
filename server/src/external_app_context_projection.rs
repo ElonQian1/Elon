@@ -489,7 +489,6 @@ pub(crate) fn fb2_domain_scenario_matrix() -> Value {
     ])
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_projection_tests.rs"]
 mod tests;

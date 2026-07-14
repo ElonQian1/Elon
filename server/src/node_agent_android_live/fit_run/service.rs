@@ -207,13 +207,11 @@ fn interrupted_command_should_resume(command: &FitCommand, phase: FitRunPhase) -
         (
             FitCommand::Start { .. },
             FitRunPhase::Baselining | FitRunPhase::LocalSolving
-        ) | (
-            FitCommand::AcceptBest { .. },
-            FitRunPhase::SourceVerifying
-        ) | (
-            FitCommand::CodexCompleted { .. },
-            FitRunPhase::Rebuilding | FitRunPhase::Evaluating
-        )
+        ) | (FitCommand::AcceptBest { .. }, FitRunPhase::SourceVerifying)
+            | (
+                FitCommand::CodexCompleted { .. },
+                FitRunPhase::Rebuilding | FitRunPhase::Evaluating
+            )
     )
 }
 

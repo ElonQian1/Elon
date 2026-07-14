@@ -13,7 +13,10 @@ pub(super) fn load_metadata(conn: &Connection) -> Result<BTreeMap<String, String
     Ok(metadata)
 }
 
-pub(super) fn load_seed_symbols(conn: &Connection, query: &SymbolImpactQuery) -> Result<Vec<SymbolHit>> {
+pub(super) fn load_seed_symbols(
+    conn: &Connection,
+    query: &SymbolImpactQuery,
+) -> Result<Vec<SymbolHit>> {
     let mut by_id = BTreeMap::new();
     if let Some(symbol_id) = clean_filter(query.symbol_id.as_deref()) {
         if let Some(symbol) = load_symbol_by_id(conn, &symbol_id)? {
@@ -39,7 +42,11 @@ pub(super) fn load_symbol_by_id(conn: &Connection, symbol_id: &str) -> Result<Op
     rows.next().transpose().map_err(Into::into)
 }
 
-pub(super) fn load_symbols_by_path(conn: &Connection, path: &str, limit: usize) -> Result<Vec<SymbolHit>> {
+pub(super) fn load_symbols_by_path(
+    conn: &Connection,
+    path: &str,
+    limit: usize,
+) -> Result<Vec<SymbolHit>> {
     let sql = format!(
         "{} WHERE lower(replace(file_path, char(92), '/')) LIKE lower(?) ORDER BY file_path, start_line LIMIT ?",
         symbol_select_sql()
@@ -53,7 +60,10 @@ pub(super) fn load_symbols_by_path(conn: &Connection, path: &str, limit: usize) 
     collect_rows(rows)
 }
 
-pub(super) fn load_symbols_by_ids(conn: &Connection, ids: &BTreeSet<String>) -> Result<Vec<SymbolHit>> {
+pub(super) fn load_symbols_by_ids(
+    conn: &Connection,
+    ids: &BTreeSet<String>,
+) -> Result<Vec<SymbolHit>> {
     if ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -68,7 +78,10 @@ pub(super) fn load_symbols_by_ids(conn: &Connection, ids: &BTreeSet<String>) -> 
     collect_rows(rows)
 }
 
-pub(super) fn load_edge_path_symbols(conn: &Connection, edges: &[SymbolEdgeHit]) -> Result<Vec<SymbolHit>> {
+pub(super) fn load_edge_path_symbols(
+    conn: &Connection,
+    edges: &[SymbolEdgeHit],
+) -> Result<Vec<SymbolHit>> {
     let ids = edges
         .iter()
         .flat_map(|edge| [edge.from_symbol_id.as_deref(), edge.to_symbol_id.as_deref()])
@@ -156,7 +169,10 @@ pub(super) fn load_edges_for_symbols(
     collect_rows(rows)
 }
 
-pub(super) fn collect_impacted_ids(seed_ids: &BTreeSet<String>, edges: &[SymbolEdgeHit]) -> BTreeSet<String> {
+pub(super) fn collect_impacted_ids(
+    seed_ids: &BTreeSet<String>,
+    edges: &[SymbolEdgeHit],
+) -> BTreeSet<String> {
     edges
         .iter()
         .flat_map(|edge| [edge.from_symbol_id.as_deref(), edge.to_symbol_id.as_deref()])

@@ -435,7 +435,6 @@ fn latest_user_pc_workspace_binding(
     .map_err(Into::into)
 }
 
-
 #[cfg(test)]
 #[path = "pc_project_binding_tests.rs"]
 mod pc_project_binding_tests;

@@ -46,7 +46,6 @@ pub(crate) fn build_symbol_patch_generation(
     }
 }
 
-
 #[path = "symbol_index_patch_generation_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

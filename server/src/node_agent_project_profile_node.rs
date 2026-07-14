@@ -394,7 +394,6 @@ fn workspace_package_exec_command(
     }
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_project_profile_node_tests.rs"]
 mod tests;

@@ -208,7 +208,6 @@ pub(crate) fn public_context_index_guidance(app_id: &str) -> Option<Value> {
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_index_contract_tests.rs"]
 mod tests;

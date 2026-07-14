@@ -5,11 +5,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::{
-    pc_agent_runtime_choice::PcRuntimeRoutePreference,
-    project_auth::can_edit,
-    project_ws_protocol::ProjectAttachmentRef,
-    store::ProjectAccess,
-    types::AppState,
+    pc_agent_runtime_choice::PcRuntimeRoutePreference, project_auth::can_edit,
+    project_ws_protocol::ProjectAttachmentRef, store::ProjectAccess, types::AppState,
 };
 
 pub(crate) fn append_project_icon_context(
@@ -39,7 +36,9 @@ pub(crate) fn append_project_icon_context(
     format!("{message}\n\n[项目 APK 图标]\n{note}")
 }
 
-pub(crate) fn should_append_project_icon_context_for_pc_fast_path(needs_project_workflow: bool) -> bool {
+pub(crate) fn should_append_project_icon_context_for_pc_fast_path(
+    needs_project_workflow: bool,
+) -> bool {
     needs_project_workflow
 }
 
@@ -149,7 +148,9 @@ mod tests {
     }
 }
 
-pub(crate) fn clean_project_icon_context_data_url(project_icon_data_url: Option<&str>) -> Option<String> {
+pub(crate) fn clean_project_icon_context_data_url(
+    project_icon_data_url: Option<&str>,
+) -> Option<String> {
     let value = project_icon_data_url?.trim();
     if value.is_empty() || value.len() > MAX_PROJECT_ICON_CONTEXT_DATA_URL_BYTES {
         return None;
@@ -180,6 +181,3 @@ pub(crate) fn write_project_icon_metadata(
         .and_then(|json| std::fs::write(dir.join("project-icon.json"), json).ok())
         .is_some()
 }
-
-
-

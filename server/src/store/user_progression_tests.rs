@@ -1,117 +1,117 @@
-    use super::*;
-    use crate::store::{SettleParams, TokenUsageRecord};
+use super::*;
+use crate::store::{SettleParams, TokenUsageRecord};
 
-    fn temp_store() -> (Store, std::path::PathBuf) {
-        let path = std::env::temp_dir().join(format!(
-            "elon-user-progression-ledger-test-{}.sqlite",
-            uuid::Uuid::new_v4().simple()
-        ));
-        let _ = std::fs::remove_file(&path);
-        (Store::open(&path).expect("store should open"), path)
-    }
+fn temp_store() -> (Store, std::path::PathBuf) {
+    let path = std::env::temp_dir().join(format!(
+        "elon-user-progression-ledger-test-{}.sqlite",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let _ = std::fs::remove_file(&path);
+    (Store::open(&path).expect("store should open"), path)
+}
 
-    #[test]
-    fn ledger_counts_trusted_consumption_and_other_user_node_usage() {
-        let (store, path) = temp_store();
-        let user = store
-            .create_user("progression-user@example.com", "secret1", None, None)
-            .expect("user should create");
-        let consumer = store
-            .create_user("progression-consumer@example.com", "secret1", None, None)
-            .expect("consumer should create");
+#[test]
+fn ledger_counts_trusted_consumption_and_other_user_node_usage() {
+    let (store, path) = temp_store();
+    let user = store
+        .create_user("progression-user@example.com", "secret1", None, None)
+        .expect("user should create");
+    let consumer = store
+        .create_user("progression-consumer@example.com", "secret1", None, None)
+        .expect("consumer should create");
 
-        store
-            .record_token_usage(&TokenUsageRecord {
-                user_id: &user.id,
-                feature: "codex_cli_chat",
-                usage_mode: "server_codex_cli",
-                model: Some("gpt-5-codex"),
-                input_tokens: 80_000,
-                cached_input_tokens: 0,
-                output_tokens: 40_000,
-                reasoning_tokens: 0,
-                total_tokens: 120_000,
-                billing_source: None,
-                resource_owner_user_id: None,
-                idempotency_key: None,
-            })
-            .expect("trusted usage should record");
-        store
-            .record_token_usage(&TokenUsageRecord {
-                user_id: &user.id,
-                feature: "mobile_report",
-                usage_mode: "client_reported",
-                model: None,
-                input_tokens: 1_000_000,
-                cached_input_tokens: 0,
-                output_tokens: 0,
-                reasoning_tokens: 0,
-                total_tokens: 1_000_000,
-                billing_source: None,
-                resource_owner_user_id: None,
-                idempotency_key: None,
-            })
-            .expect("client report should record");
+    store
+        .record_token_usage(&TokenUsageRecord {
+            user_id: &user.id,
+            feature: "codex_cli_chat",
+            usage_mode: "server_codex_cli",
+            model: Some("gpt-5-codex"),
+            input_tokens: 80_000,
+            cached_input_tokens: 0,
+            output_tokens: 40_000,
+            reasoning_tokens: 0,
+            total_tokens: 120_000,
+            billing_source: None,
+            resource_owner_user_id: None,
+            idempotency_key: None,
+        })
+        .expect("trusted usage should record");
+    store
+        .record_token_usage(&TokenUsageRecord {
+            user_id: &user.id,
+            feature: "mobile_report",
+            usage_mode: "client_reported",
+            model: None,
+            input_tokens: 1_000_000,
+            cached_input_tokens: 0,
+            output_tokens: 0,
+            reasoning_tokens: 0,
+            total_tokens: 1_000_000,
+            billing_source: None,
+            resource_owner_user_id: None,
+            idempotency_key: None,
+        })
+        .expect("client report should record");
 
-        store
-            .settle_node_inference(SettleParams {
-                consumer_user_id: &consumer.id,
-                provider_user_id: &user.id,
-                node_id: "node-a",
-                model_id: "pc-cli/codex",
-                feature: "pc_agent_cli_dev",
-                usage_mode: "pc_agent_cli",
-                compute_call_id: Some("progression:req-1"),
-                token_usage_event_id: Some("tok-progression-1"),
-                billing_event_id: Some("bev-progression-1"),
-                prompt_tokens: 10_000,
-                completion_tokens: 2_500,
-                price_per_1k_credits: 1.0,
-                billed_cost_rmb_fen: 100,
-                accounting_status: Some("billed"),
-                provider_revenue_share_x1000: 800,
-                platform_fee_rate: 0.2,
-            })
-            .expect("provider settlement should record");
-        store
-            .settle_node_inference(SettleParams {
-                consumer_user_id: &user.id,
-                provider_user_id: &user.id,
-                node_id: "node-self",
-                model_id: "pc-cli/codex",
-                feature: "pc_agent_cli_dev",
-                usage_mode: "pc_agent_cli",
-                compute_call_id: Some("progression:req-self"),
-                token_usage_event_id: Some("tok-progression-self"),
-                billing_event_id: Some("bev-progression-self"),
-                prompt_tokens: 7_000,
-                completion_tokens: 3_000,
-                price_per_1k_credits: 1.0,
-                billed_cost_rmb_fen: 80,
-                accounting_status: Some("billed"),
-                provider_revenue_share_x1000: 800,
-                platform_fee_rate: 0.2,
-            })
-            .expect("self settlement should record");
+    store
+        .settle_node_inference(SettleParams {
+            consumer_user_id: &consumer.id,
+            provider_user_id: &user.id,
+            node_id: "node-a",
+            model_id: "pc-cli/codex",
+            feature: "pc_agent_cli_dev",
+            usage_mode: "pc_agent_cli",
+            compute_call_id: Some("progression:req-1"),
+            token_usage_event_id: Some("tok-progression-1"),
+            billing_event_id: Some("bev-progression-1"),
+            prompt_tokens: 10_000,
+            completion_tokens: 2_500,
+            price_per_1k_credits: 1.0,
+            billed_cost_rmb_fen: 100,
+            accounting_status: Some("billed"),
+            provider_revenue_share_x1000: 800,
+            platform_fee_rate: 0.2,
+        })
+        .expect("provider settlement should record");
+    store
+        .settle_node_inference(SettleParams {
+            consumer_user_id: &user.id,
+            provider_user_id: &user.id,
+            node_id: "node-self",
+            model_id: "pc-cli/codex",
+            feature: "pc_agent_cli_dev",
+            usage_mode: "pc_agent_cli",
+            compute_call_id: Some("progression:req-self"),
+            token_usage_event_id: Some("tok-progression-self"),
+            billing_event_id: Some("bev-progression-self"),
+            prompt_tokens: 7_000,
+            completion_tokens: 3_000,
+            price_per_1k_credits: 1.0,
+            billed_cost_rmb_fen: 80,
+            accounting_status: Some("billed"),
+            provider_revenue_share_x1000: 800,
+            platform_fee_rate: 0.2,
+        })
+        .expect("self settlement should record");
 
-        let ledger = store
-            .user_progression_ledger(&user.id)
-            .expect("ledger should load");
-        assert_eq!(ledger.consumed_tokens, 120_000);
-        assert_eq!(ledger.consumed_call_count, 1);
-        assert_eq!(ledger.platform_tokens, 120_000);
-        assert_eq!(ledger.own_codex_tokens, 0);
-        assert_eq!(ledger.shared_codex_tokens, 0);
-        assert_eq!(ledger.provided_tokens, 12_500);
-        assert_eq!(ledger.provided_run_count, 1);
-        assert_eq!(ledger.provider_earned_fen, 80);
-        assert_eq!(ledger.provider_week_tokens, 12_500);
-        assert_eq!(ledger.provider_week_run_count, 1);
-        assert_eq!(ledger.provider_week_billed_fen, 100);
-        assert_eq!(ledger.provider_week_earned_fen, 80);
-        assert!(ledger.provider_week_start_at.ends_with("+00:00"));
-        assert!(ledger.provider_week_end_at.ends_with("+00:00"));
+    let ledger = store
+        .user_progression_ledger(&user.id)
+        .expect("ledger should load");
+    assert_eq!(ledger.consumed_tokens, 120_000);
+    assert_eq!(ledger.consumed_call_count, 1);
+    assert_eq!(ledger.platform_tokens, 120_000);
+    assert_eq!(ledger.own_codex_tokens, 0);
+    assert_eq!(ledger.shared_codex_tokens, 0);
+    assert_eq!(ledger.provided_tokens, 12_500);
+    assert_eq!(ledger.provided_run_count, 1);
+    assert_eq!(ledger.provider_earned_fen, 80);
+    assert_eq!(ledger.provider_week_tokens, 12_500);
+    assert_eq!(ledger.provider_week_run_count, 1);
+    assert_eq!(ledger.provider_week_billed_fen, 100);
+    assert_eq!(ledger.provider_week_earned_fen, 80);
+    assert!(ledger.provider_week_start_at.ends_with("+00:00"));
+    assert!(ledger.provider_week_end_at.ends_with("+00:00"));
 
-        drop(store);
-        let _ = std::fs::remove_file(path);
-    }
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}

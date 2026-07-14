@@ -128,7 +128,6 @@ pub(super) fn load_context_memories(
     }
 }
 
-
 pub(super) async fn run_api_plan(
     state: &Arc<AppState>,
     agent: &crate::types::AgentConfig,

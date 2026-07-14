@@ -161,7 +161,11 @@ fn application_id_literal(text: &str) -> Option<String> {
         {
             return None;
         }
-        let value = remainder.trim().strip_prefix('=').unwrap_or(remainder.trim()).trim();
+        let value = remainder
+            .trim()
+            .strip_prefix('=')
+            .unwrap_or(remainder.trim())
+            .trim();
         let quote = value.chars().next()?;
         if !matches!(quote, '\'' | '"') {
             return None;

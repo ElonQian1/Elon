@@ -2,12 +2,12 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 use std::sync::Arc;
 
-use crate::types::{AgentConfig, AppState};
 use crate::agent_fallback::{is_retryable_agent_error, server_api_agents_in_fallback_order};
 use crate::agent_llm_call::friendly_ai_api_error;
+use crate::types::{AgentConfig, AppState};
 
 use super::helpers::extract_content;
-use super::{MAX_OUTPUT_TOKENS};
+use super::MAX_OUTPUT_TOKENS;
 
 pub(super) async fn call_route_c_model(
     state: &Arc<AppState>,

@@ -180,7 +180,6 @@ fn unavailable_status(reason: &'static str) -> ServerRuntimeCloudStatus {
     }
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_route_c_status_tests.rs"]
 mod tests;

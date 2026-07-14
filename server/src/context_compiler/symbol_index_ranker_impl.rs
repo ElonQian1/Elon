@@ -1,6 +1,10 @@
 use super::*;
 
-pub(super) fn symbol_context(symbol: &SymbolHit, index: usize, profile: &HybridRankProfile) -> ContextDraft {
+pub(super) fn symbol_context(
+    symbol: &SymbolHit,
+    index: usize,
+    profile: &HybridRankProfile,
+) -> ContextDraft {
     let importance = symbol.importance_score.unwrap_or_default();
     let is_test_context = looks_like_test(&symbol.file_path) || symbol.name.contains("test");
     ContextDraft {
@@ -209,7 +213,10 @@ pub(super) fn apply_plan_ranking(items: &mut [RankedContextItem], plan: &Retriev
     }
 }
 
-pub(super) fn rerank_items(mut items: Vec<RankedContextItem>, plan: &RetrievalPlan) -> Vec<RankedContextItem> {
+pub(super) fn rerank_items(
+    mut items: Vec<RankedContextItem>,
+    plan: &RetrievalPlan,
+) -> Vec<RankedContextItem> {
     items.sort_by(compare_ranked_candidates);
     apply_rerank_diversity(&mut items);
     items.sort_by(compare_ranked_candidates);
@@ -261,7 +268,10 @@ pub(super) fn item_has_source(item: &RankedContextItem, expected: &str) -> bool 
     item.source == expected || item.sources.iter().any(|source| source == expected)
 }
 
-pub(super) fn compare_ranked_candidates(left: &RankedContextItem, right: &RankedContextItem) -> Ordering {
+pub(super) fn compare_ranked_candidates(
+    left: &RankedContextItem,
+    right: &RankedContextItem,
+) -> Ordering {
     right
         .score
         .partial_cmp(&left.score)

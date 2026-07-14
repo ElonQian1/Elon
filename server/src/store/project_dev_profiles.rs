@@ -202,7 +202,6 @@ fn project_dev_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Pro
     })
 }
 
-
 #[cfg(test)]
 #[path = "project_dev_profiles_tests.rs"]
 mod tests;

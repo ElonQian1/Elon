@@ -367,7 +367,6 @@ impl Drop for PatchFileCleanup {
     }
 }
 
-
 #[cfg(test)]
 #[path = "tools_patch_tests.rs"]
 mod tests;

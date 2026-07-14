@@ -2,10 +2,10 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
 use super::common::{clean_optional, new_id, now, safe_external_id};
-use super::{project_identities, pc_project_binding, project_branding, project_roles};
 use super::project_helpers::*;
 use super::store_types::*;
 use super::store_types_project::*;
+use super::{pc_project_binding, project_branding, project_identities, project_roles};
 
 impl super::Store {
     pub fn ensure_project_for_user(
@@ -371,5 +371,4 @@ impl super::Store {
 
         self.get_project_access(user_id, project_id)
     }
-
 }

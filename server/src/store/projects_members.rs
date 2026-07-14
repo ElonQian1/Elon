@@ -9,11 +9,11 @@ use super::project_roles::{
     project_member_effective_role_locked, project_member_role_refs_locked,
     sync_project_member_roles_locked,
 };
-use crate::store::projects::member_ops::{ensure_project_not_system, project_member_entry};
 use super::{
     clean_optional, is_system_project_source_type, normalize_account, now, project_branding,
     ProjectDeletionTarget, ProjectMemberEntry, PublicProjectItem, Store,
 };
+use crate::store::projects::member_ops::{ensure_project_not_system, project_member_entry};
 
 impl Store {
     /// 管理员邀请/添加已注册用户为项目成员；若已是非 owner 成员则更新角色。

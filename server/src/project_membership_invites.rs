@@ -8,14 +8,14 @@ use axum::{
 };
 use std::sync::Arc;
 
+use super::{
+    ensure_role_management_allowed, member_has_project_permission, publish_members_updated,
+    CreateProjectInviteLinkRequest,
+};
 use crate::{
     project_auth::{auth_from_headers, json_error},
     store::PERMISSION_INVITE_MEMBERS,
     types::AppState,
-};
-use super::{
-    member_has_project_permission, ensure_role_management_allowed, publish_members_updated,
-    CreateProjectInviteLinkRequest,
 };
 
 pub async fn list_project_invite_links(

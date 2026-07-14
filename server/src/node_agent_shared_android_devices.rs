@@ -84,10 +84,7 @@ async fn sync_once(runtime: &NodeRuntime) -> Result<SyncOutcome> {
     if !status.is_success() {
         anyhow::bail!("共享设备接口返回 HTTP {}", status.as_u16());
     }
-    let body: SharedDevicesEnvelope = response
-        .json()
-        .await
-        .context("解析共享设备响应失败")?;
+    let body: SharedDevicesEnvelope = response.json().await.context("解析共享设备响应失败")?;
     let inputs: Vec<_> = body
         .devices
         .into_iter()

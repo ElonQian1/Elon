@@ -3,8 +3,8 @@ use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::{
-    pc_agent_runtime_choice::PcRuntimeRoutePreference, store::TaskSnapshot,
-    types::WsMessage, ui_design_tasks::UiDesignTaskInput,
+    pc_agent_runtime_choice::PcRuntimeRoutePreference, store::TaskSnapshot, types::WsMessage,
+    ui_design_tasks::UiDesignTaskInput,
 };
 
 pub const PROJECT_WS_BACKLOG_LIMIT: usize = 512;
@@ -334,7 +334,6 @@ fn current_wall_time_ms() -> u128 {
         .map(|duration| duration.as_millis())
         .unwrap_or_default()
 }
-
 
 #[cfg(test)]
 #[path = "project_ws_protocol_tests.rs"]

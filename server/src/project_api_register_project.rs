@@ -1,3 +1,9 @@
+use super::{clean_optional_string, RegisterExternalProjectRequest};
+use crate::{
+    project_auth::{auth_from_headers, json_error},
+    project_landing,
+    types::AppState,
+};
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
@@ -5,12 +11,6 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
-use crate::{
-    project_auth::{auth_from_headers, json_error},
-    project_landing,
-    types::AppState,
-};
-use super::{RegisterExternalProjectRequest, clean_optional_string};
 
 pub async fn register_external_project(
     State(state): State<Arc<AppState>>,
@@ -249,4 +249,3 @@ async fn ensure_node_belongs_to_user_or_legacy(
         Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
     }
 }
-

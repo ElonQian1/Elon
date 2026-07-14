@@ -68,7 +68,6 @@ fn compact_node_suffix(node_id: &str) -> String {
         .unwrap_or_else(|| short_node_id(node_id))
 }
 
-
 #[cfg(test)]
 #[path = "pc_node_display_tests.rs"]
 mod tests;

@@ -105,7 +105,6 @@ pub(crate) fn rank_hybrid_context_with_plan(
     rerank_items(ranked, plan)
 }
 
-
 #[path = "symbol_index_ranker_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

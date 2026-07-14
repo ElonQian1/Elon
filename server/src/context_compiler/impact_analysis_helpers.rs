@@ -1,6 +1,9 @@
 use super::*;
 
-pub(super) fn load_sources(workspace: &Path, symbols: &[RustSymbol]) -> HashMap<String, Vec<String>> {
+pub(super) fn load_sources(
+    workspace: &Path,
+    symbols: &[RustSymbol],
+) -> HashMap<String, Vec<String>> {
     let mut sources = HashMap::new();
     for path in symbols
         .iter()
@@ -407,7 +410,10 @@ pub(super) fn extract_enum_variants(
         .collect()
 }
 
-pub(super) fn extract_body_lines(symbol: &RustSymbol, sources: &HashMap<String, Vec<String>>) -> Vec<String> {
+pub(super) fn extract_body_lines(
+    symbol: &RustSymbol,
+    sources: &HashMap<String, Vec<String>>,
+) -> Vec<String> {
     sources
         .get(&symbol.path)
         .into_iter()

@@ -323,7 +323,6 @@ fn path_key(path: &Path) -> String {
     }
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_cli_tool_catalog_tests.rs"]
 mod node_agent_cli_tool_catalog_tests;

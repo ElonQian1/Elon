@@ -290,7 +290,6 @@ async fn clear_legacy_session(path: &Path, scope_key: &str) {
     }
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_codex_session_tests.rs"]
 mod tests;

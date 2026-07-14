@@ -4,8 +4,9 @@ use super::{
     ai_cli_output::{extract_json_agent_message, truncate_chars},
     ai_cli_types::{AiCliRequestMode, NativeSessionScope},
     pc_passthrough_reply::{
-        extract_codex_reply, extract_marker_lightweight_reply, pc_lightweight_no_readable_diagnostic,
-        sanitize_lightweight_pc_reply, strip_terminal_control_sequences,
+        extract_codex_reply, extract_marker_lightweight_reply,
+        pc_lightweight_no_readable_diagnostic, sanitize_lightweight_pc_reply,
+        strip_terminal_control_sequences,
     },
     PcAgentRunOutcome,
 };
@@ -50,7 +51,10 @@ pub(super) fn lightweight_pc_reply_delta(
     lightweight_reply_text_delta(&reply, streamed_reply)
 }
 
-pub(super) fn lightweight_reply_text_delta(reply: &str, streamed_reply: &mut String) -> Option<String> {
+pub(super) fn lightweight_reply_text_delta(
+    reply: &str,
+    streamed_reply: &mut String,
+) -> Option<String> {
     let reply = reply.trim();
     if reply.is_empty() || reply == streamed_reply.trim() {
         return None;
@@ -73,7 +77,10 @@ pub(super) fn lightweight_reply_text_delta(reply: &str, streamed_reply: &mut Str
     None
 }
 
-pub(super) fn extract_lightweight_pc_chat_timeout_reply(output: &str, is_codex: bool) -> Option<String> {
+pub(super) fn extract_lightweight_pc_chat_timeout_reply(
+    output: &str,
+    is_codex: bool,
+) -> Option<String> {
     let reply = extract_lightweight_pc_chat_reply(output, is_codex);
     (!reply.trim().is_empty()).then_some(reply)
 }
@@ -174,7 +181,10 @@ pub(super) fn sanitize_user_reply_line(line: &str) -> String {
         .to_string()
 }
 
-pub(super) fn pc_codex_progress_hint(text: &str, display_model: &str) -> Option<(&'static str, String)> {
+pub(super) fn pc_codex_progress_hint(
+    text: &str,
+    display_model: &str,
+) -> Option<(&'static str, String)> {
     let clean = strip_terminal_control_sequences(text);
     let lower = clean.to_ascii_lowercase();
 

@@ -1,7 +1,5 @@
 use super::ai_cli_output::extract_json_agent_message;
-use super::{
-    run_via_pc_agent_once, AiCliRequestMode, NativeSessionScope, PcAgentRunOutcome,
-};
+use super::{run_via_pc_agent_once, AiCliRequestMode, NativeSessionScope, PcAgentRunOutcome};
 use crate::types::{AppState, WsMessage};
 use anyhow::{anyhow, Result};
 use std::{path::Path, sync::Arc};
@@ -53,8 +51,10 @@ pub(super) async fn run_via_pc_agent(
     let promoted = crate::ui_design_tasks::promote_codex_ui_route(user_message)
         .map_err(|error| anyhow!("UI 路由救援契约生成失败：{error}"))?;
     let _ = tx.send(
-        WsMessage::progress(format!("Codex 已识别为 UI 任务，正在按需启用 UI 工具链：{reason}"))
-            .to_json(),
+        WsMessage::progress(format!(
+            "Codex 已识别为 UI 任务，正在按需启用 UI 工具链：{reason}"
+        ))
+        .to_json(),
     );
     match run_via_pc_agent_once(
         agent_id,
@@ -76,9 +76,9 @@ pub(super) async fn run_via_pc_agent(
     )
     .await?
     {
-        PcAgentRunOutcome::UiRerouteRequested { .. } => {
-            Err(anyhow!("Codex 在 UI 工具链内重复申请重路由，已停止以防循环"))
-        }
+        PcAgentRunOutcome::UiRerouteRequested { .. } => Err(anyhow!(
+            "Codex 在 UI 工具链内重复申请重路由，已停止以防循环"
+        )),
         outcome => Ok(outcome),
     }
 }

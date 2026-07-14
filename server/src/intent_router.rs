@@ -402,7 +402,6 @@ fn is_strong_app_asset(message: &str) -> bool {
     )
 }
 
-
 #[cfg(test)]
 #[path = "intent_router_tests.rs"]
 mod tests;

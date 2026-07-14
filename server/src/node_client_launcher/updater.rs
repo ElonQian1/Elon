@@ -30,7 +30,6 @@ pub(crate) fn update_client_if_needed(install_dir: &Path) -> Result<bool> {
     }
 }
 
-
 #[path = "updater_impl.rs"]
 mod updater_impl;
 use self::updater_impl::*;

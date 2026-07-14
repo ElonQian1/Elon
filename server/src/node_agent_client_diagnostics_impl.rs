@@ -340,7 +340,6 @@ pub(super) fn launcher_logs_dir() -> Option<PathBuf> {
         })
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_client_diagnostics_tests.rs"]
 mod tests;

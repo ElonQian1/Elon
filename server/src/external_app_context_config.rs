@@ -199,7 +199,6 @@ fn has_any_term(text: &str, lower: &str, terms: &[&str]) -> bool {
     })
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_config_tests.rs"]
 mod tests;

@@ -1,8 +1,18 @@
+use super::super::project_roles::{
+    project_member_effective_role_locked, project_member_has_permission_locked,
+    project_member_role_refs_locked,
+};
+use super::super::{
+    ProjectChannelMemberPermissionOverride, ProjectChannelPermissions,
+    ProjectChannelRolePermissionOverride, PERMISSION_MANAGE_PROJECT_SETTINGS,
+    PERMISSION_SEND_MESSAGES, PERMISSION_VIEW_MEMBERS,
+};
+use super::{
+    CHANNEL_PERMISSIONS, CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND,
+    CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW,
+};
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
-use super::{CHANNEL_PERMISSIONS, CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND, CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW};
-use super::super::{ProjectChannelMemberPermissionOverride, ProjectChannelPermissions, ProjectChannelRolePermissionOverride, PERMISSION_MANAGE_PROJECT_SETTINGS, PERMISSION_SEND_MESSAGES, PERMISSION_VIEW_MEMBERS};
-use super::super::project_roles::{project_member_effective_role_locked, project_member_has_permission_locked, project_member_role_refs_locked};
 
 pub(super) fn project_space_is_public_for_visitors_locked(
     conn: &rusqlite::Connection,

@@ -101,7 +101,6 @@ fn presence_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<UserPresenceSe
     })
 }
 
-
 #[cfg(test)]
 #[path = "user_presence_tests.rs"]
 mod tests;

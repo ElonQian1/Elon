@@ -7,13 +7,16 @@ use axum::{
 };
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use std::{net::{IpAddr, SocketAddr}, str::FromStr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     store::{
-        CreateUiTunerContextArtifact, ProjectAndroidDevice, UiLearnedRoute,
-        UiRouteLearningSource,
+        CreateUiTunerContextArtifact, ProjectAndroidDevice, UiLearnedRoute, UiRouteLearningSource,
     },
     types::AppState,
 };
@@ -110,9 +113,7 @@ async fn list_my_shared_android_devices(
     {
         match state.store.list_project_android_devices(&project.id) {
             Ok(mut project_devices) => devices.append(&mut project_devices),
-            Err(error) => {
-                return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
-            }
+            Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
         }
     }
     Json(serde_json::json!({ "devices": devices })).into_response()
@@ -139,7 +140,10 @@ async fn upsert_shared_android_device(
     }
     let display_name = body.display_name.trim();
     if display_name.is_empty() || display_name.chars().count() > 80 {
-        return json_error(StatusCode::BAD_REQUEST, "displayName 不能为空且不能超过 80 字");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "displayName 不能为空且不能超过 80 字",
+        );
     }
     let endpoint = match private_adb_endpoint(&body.last_endpoint) {
         Ok(endpoint) => endpoint,
@@ -151,7 +155,10 @@ async fn upsert_shared_android_device(
         .unwrap_or("unknown")
         .trim()
         .to_ascii_lowercase();
-    if !matches!(wireless_mode.as_str(), "unknown" | "legacy" | "tls" | "manual") {
+    if !matches!(
+        wireless_mode.as_str(),
+        "unknown" | "legacy" | "tls" | "manual"
+    ) {
         return json_error(StatusCode::BAD_REQUEST, "wirelessMode 不受支持");
     }
     let device = ProjectAndroidDevice {
@@ -196,8 +203,7 @@ async fn delete_shared_android_device(
 
 fn private_adb_endpoint(value: &str) -> Result<String, &'static str> {
     let endpoint = value.trim();
-    let address = SocketAddr::from_str(endpoint)
-        .map_err(|_| "lastEndpoint 必须是私网 IP:端口")?;
+    let address = SocketAddr::from_str(endpoint).map_err(|_| "lastEndpoint 必须是私网 IP:端口")?;
     if address.port() == 0 {
         return Err("lastEndpoint 端口无效");
     }

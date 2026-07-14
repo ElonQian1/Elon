@@ -167,7 +167,6 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_observability_tests.rs"]
 mod tests;

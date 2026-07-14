@@ -265,7 +265,6 @@ fn hardware_bonus(candidate: &NodeSummary) -> i64 {
     bonus
 }
 
-
 #[cfg(test)]
 #[path = "node_scheduler_tests.rs"]
 mod tests;

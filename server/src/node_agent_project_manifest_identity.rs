@@ -62,7 +62,6 @@ pub(crate) fn detect_shallow_manifest_project_identity(
     None
 }
 
-
 #[path = "node_agent_project_manifest_identity_impl.rs"]
 mod impl_funcs;
 use self::impl_funcs::*;

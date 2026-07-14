@@ -185,7 +185,6 @@ pub(super) fn is_source_token_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':')
 }
 
-
 #[cfg(test)]
 #[path = "group_summary_context_pack_tests.rs"]
 mod tests;

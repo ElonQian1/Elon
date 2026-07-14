@@ -162,7 +162,6 @@ pub(crate) fn public_context_projection_layer_guidance(app_id: &str) -> Option<V
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_projection_layer_tests.rs"]
 mod tests;

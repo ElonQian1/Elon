@@ -524,5 +524,4 @@ pub(super) fn build_impact_query(parts: ImpactQueryParts) -> Result<SymbolImpact
     })
 }
 
-
 use super::query_helpers::*;

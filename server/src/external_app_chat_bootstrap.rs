@@ -395,7 +395,6 @@ fn billing_contract(app_id: &str) -> Value {
     })
 }
 
-
 #[cfg(test)]
 #[path = "external_app_chat_bootstrap_tests.rs"]
 mod tests;

@@ -17,9 +17,8 @@ use crate::{
 
 use super::{
     LocalJournalProbe, PcDispatchContext, RuntimeEventView, RuntimeEventsResponse,
-    RuntimeSnapshotResponse, TaskAttachState, TaskSnapshotContext,
-    DEFAULT_EVENT_LIMIT, LOCAL_JOURNAL_PROBE_RETRY_DELAY, LOCAL_JOURNAL_PROBE_TIMEOUT,
-    TASK_MESSAGE_LIMIT,
+    RuntimeSnapshotResponse, TaskAttachState, TaskSnapshotContext, DEFAULT_EVENT_LIMIT,
+    LOCAL_JOURNAL_PROBE_RETRY_DELAY, LOCAL_JOURNAL_PROBE_TIMEOUT, TASK_MESSAGE_LIMIT,
 };
 
 pub(super) fn load_task_snapshot_context(
@@ -104,7 +103,11 @@ pub(super) fn user_project_from_auth(
         .map_err(|e| json_error(StatusCode::BAD_REQUEST, e.to_string()))
 }
 
-pub(super) fn attach_state(project_id: &str, channel_id: &str, task: &TaskSnapshot) -> TaskAttachState {
+pub(super) fn attach_state(
+    project_id: &str,
+    channel_id: &str,
+    task: &TaskSnapshot,
+) -> TaskAttachState {
     if project_space::is_channel_ai_task_active(&task.id, project_id, channel_id) {
         return TaskAttachState {
             status: "live",

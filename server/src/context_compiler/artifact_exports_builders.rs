@@ -346,7 +346,10 @@ pub(super) fn build_chunks_jsonl(index: &RepoContextIndex) -> String {
         + "\n"
 }
 
-pub(super) fn build_tests_jsonl(index: &RepoContextIndex, validation_plan: &ValidationPlan) -> String {
+pub(super) fn build_tests_jsonl(
+    index: &RepoContextIndex,
+    validation_plan: &ValidationPlan,
+) -> String {
     let mut lines = Vec::new();
 
     for target in &index.evidence.test_targets {
@@ -479,7 +482,11 @@ pub(super) fn semantic_fact_kind(method: SemanticQueryMethod) -> &'static str {
     }
 }
 
-pub(super) fn write_export_text(path: &Path, content: &str, files: &mut Vec<PathBuf>) -> Option<usize> {
+pub(super) fn write_export_text(
+    path: &Path,
+    content: &str,
+    files: &mut Vec<PathBuf>,
+) -> Option<usize> {
     fs::write(path, content.as_bytes()).ok()?;
     files.push(path.to_path_buf());
     Some(content.len())

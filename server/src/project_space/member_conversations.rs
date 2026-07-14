@@ -133,4 +133,3 @@ pub async fn update_member_conversation_visibility(
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
-

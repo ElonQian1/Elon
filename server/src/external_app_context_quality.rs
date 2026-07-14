@@ -193,7 +193,6 @@ fn has_prompt_text(value: Option<&Value>) -> bool {
         .unwrap_or(false)
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_quality_tests.rs"]
 mod tests;

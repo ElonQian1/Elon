@@ -232,7 +232,6 @@ fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 #[path = "pc_workspace_git_remote_tests.rs"]
 mod tests;

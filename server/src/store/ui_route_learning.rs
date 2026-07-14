@@ -158,7 +158,11 @@ impl Store {
         if phrase_key.chars().count() < 2 {
             return Err(anyhow!("UI 路由经验文本过短"));
         }
-        let sample_text = message.trim().chars().take(MAX_SAMPLE_CHARS).collect::<String>();
+        let sample_text = message
+            .trim()
+            .chars()
+            .take(MAX_SAMPLE_CHARS)
+            .collect::<String>();
         let concept = crate::ui_design_tasks::controlled_ui_route_concept(message);
         let concept_key = concept.as_ref().map(|value| value.key);
         let concept_version = concept.as_ref().map(|value| value.version as i64);
@@ -241,7 +245,13 @@ impl Store {
         record_event(
             &conn,
             &entry_id,
-            if conflict { "conflict" } else if activate { "confirmed" } else { "proposed" },
+            if conflict {
+                "conflict"
+            } else if activate {
+                "confirmed"
+            } else {
+                "proposed"
+            },
             learned_route,
             source,
             user_id,
@@ -314,7 +324,16 @@ impl Store {
 
 pub(crate) fn normalize_ui_route_phrase(message: &str) -> String {
     let mut normalized = message.to_lowercase();
-    for filler in ["麻烦", "请你", "请帮我", "帮我", "帮忙", "一下", "可以吗", "好吗"] {
+    for filler in [
+        "麻烦",
+        "请你",
+        "请帮我",
+        "帮我",
+        "帮忙",
+        "一下",
+        "可以吗",
+        "好吗",
+    ] {
         normalized = normalized.replace(filler, "");
     }
     normalized

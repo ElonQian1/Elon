@@ -157,7 +157,6 @@ fn push_reason(out: &mut Vec<String>, reason: &str) {
     }
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_gap_notice_tests.rs"]
 mod tests;

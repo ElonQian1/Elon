@@ -34,7 +34,6 @@ pub(crate) fn recover_from_task_events(
     recovered
 }
 
-
 #[cfg(test)]
 #[path = "project_tool_approval_recovery_tests.rs"]
 mod tests;

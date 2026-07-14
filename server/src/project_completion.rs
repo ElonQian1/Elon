@@ -125,7 +125,6 @@ fn is_no_remote_push_notice(line: &str) -> bool {
     mentions_push && mentions_no_remote
 }
 
-
 #[cfg(test)]
 #[path = "project_completion_tests.rs"]
 mod tests;

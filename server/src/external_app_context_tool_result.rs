@@ -139,7 +139,6 @@ fn source_ids_required(tool_name: &str) -> bool {
     )
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tool_result_tests.rs"]
 mod tests;

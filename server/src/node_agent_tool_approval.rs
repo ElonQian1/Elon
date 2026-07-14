@@ -163,7 +163,6 @@ fn now_ms() -> u128 {
         .unwrap_or_default()
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_tool_approval_tests.rs"]
 mod tests;

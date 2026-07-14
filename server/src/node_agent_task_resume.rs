@@ -554,7 +554,6 @@ fn resume_run_handle(attach: &TaskAttachState) -> Option<TaskResumeRunHandle> {
         })
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_task_resume_tests.rs"]
 mod tests;

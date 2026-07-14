@@ -547,7 +547,6 @@ pub(crate) fn load_retrieval_eval_set_summary(
     })
 }
 
-
 #[path = "symbol_index_product_helpers.rs"]
 mod helpers;
 use self::helpers::*;

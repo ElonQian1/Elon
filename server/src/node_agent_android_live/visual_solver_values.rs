@@ -141,8 +141,9 @@ pub(super) fn constrained_value(node: &LiveUiNode, property: &str, value: f64) -
             "opacity" => 0.0,
             "fontWeight" => 1.0,
             "letterSpacing" => -1.0,
-            "textSize" | "lineHeight" | "width" | "height" | "borderWidth"
-            | "cornerRadius.all" => 0.0,
+            "textSize" | "lineHeight" | "width" | "height" | "borderWidth" | "cornerRadius.all" => {
+                0.0
+            }
             _ => -10_000.0,
         });
     let maximum = constraints

@@ -268,7 +268,6 @@ pub(crate) fn source_role(relative_path: &str) -> &'static str {
     "source"
 }
 
-
 #[cfg(test)]
 #[path = "repo_snapshot_tests.rs"]
 mod tests;

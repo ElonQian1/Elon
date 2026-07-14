@@ -133,11 +133,7 @@ mod tests {
         );
         assert_eq!(resolved.source, "ambiguous_secondary_rescue");
         assert_eq!(
-            resolved
-                .task
-                .unwrap()
-                .route_learning_origin
-                .as_deref(),
+            resolved.task.unwrap().route_learning_origin.as_deref(),
             Some("ambiguous_local")
         );
     }
@@ -155,13 +151,8 @@ mod tests {
                 "explicit correction",
             )
             .unwrap();
-        let resolved = resolve_ui_route_task(
-            &store,
-            "project-1",
-            "请帮我调整按钮点击逻辑",
-            None,
-            None,
-        );
+        let resolved =
+            resolve_ui_route_task(&store, "project-1", "请帮我调整按钮点击逻辑", None, None);
         assert!(resolved.suppress_inference);
         assert!(resolved.task.is_none());
     }
@@ -187,13 +178,7 @@ mod tests {
                 "explicit correction",
             )
             .unwrap();
-        let resolved = resolve_ui_route_task(
-            &store,
-            "project-1",
-            "主操作太厚重",
-            None,
-            None,
-        );
+        let resolved = resolve_ui_route_task(&store, "project-1", "主操作太厚重", None, None);
         assert_eq!(resolved.source, "active_cluster_ui");
         assert_eq!(
             resolved.task.unwrap().route_learning_origin.as_deref(),
@@ -219,13 +204,7 @@ mod tests {
                 )
                 .unwrap();
         }
-        let resolved = resolve_ui_route_task(
-            &store,
-            "project-1",
-            "主操作太厚重",
-            None,
-            None,
-        );
+        let resolved = resolve_ui_route_task(&store, "project-1", "主操作太厚重", None, None);
         assert_eq!(resolved.source, "cluster_conflict_secondary_rescue");
         assert_eq!(
             resolved.task.unwrap().route_learning_origin.as_deref(),

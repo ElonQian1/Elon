@@ -16,7 +16,11 @@ pub(super) fn env_flag(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-pub(super) fn build_messages(app_id: &str, user_message: &str, req: &ExternalAppMvpChatRequest) -> Vec<Value> {
+pub(super) fn build_messages(
+    app_id: &str,
+    user_message: &str,
+    req: &ExternalAppMvpChatRequest,
+) -> Vec<Value> {
     let mut messages = vec![json!({
         "role": "system",
         "content": system_prompt(app_id)
@@ -179,7 +183,11 @@ pub(super) fn extract_reply(value: &Value) -> Option<String> {
         .filter(|text| !text.is_empty())
 }
 
-pub(super) fn suggest_tools(app_id: &str, message: &str, local_context: &Value) -> Vec<SuggestedTool> {
+pub(super) fn suggest_tools(
+    app_id: &str,
+    message: &str,
+    local_context: &Value,
+) -> Vec<SuggestedTool> {
     if app_id != "bb64a" {
         return Vec::new();
     }

@@ -460,7 +460,6 @@ pub async fn test_user_agent(
     }
 }
 
-
 #[path = "user_api_helpers.rs"]
 mod helpers;
 use self::helpers::*;
@@ -525,7 +524,6 @@ pub async fn put_my_avatar(
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }
-
 
 #[cfg(test)]
 #[path = "user_api_tests.rs"]

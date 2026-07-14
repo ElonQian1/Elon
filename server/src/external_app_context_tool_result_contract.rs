@@ -166,7 +166,6 @@ fn visibility_contract() -> Value {
     ])
 }
 
-
 #[cfg(test)]
 #[path = "external_app_context_tool_result_contract_tests.rs"]
 mod tests;

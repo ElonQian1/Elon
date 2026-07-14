@@ -48,12 +48,10 @@ mod tests {
         )
         .expect("fallback");
         assert!(fallback.contains(&"--codex-model=gpt-5.4".to_string()));
-        assert!(compatibility_fallback_args(
-            &fallback,
-            "requires a newer version of Codex",
-            ""
-        )
-        .is_none());
+        assert!(
+            compatibility_fallback_args(&fallback, "requires a newer version of Codex", "")
+                .is_none()
+        );
     }
 
     #[test]

@@ -392,26 +392,23 @@ pub async fn update_member_profile(
     }
 }
 
-
 #[path = "project_membership_invites.rs"]
 mod invites;
 pub use invites::{
-    list_project_invite_links, create_project_invite_link,
-    revoke_project_invite_link, get_project_invite_preview,
-    join_project_by_invite_link,
+    create_project_invite_link, get_project_invite_preview, join_project_by_invite_link,
+    list_project_invite_links, revoke_project_invite_link,
 };
 
 #[path = "project_membership_roles.rs"]
 mod roles;
 pub use roles::{
-    list_member_audit, add_member, update_visibility,
-    list_project_roles, create_project_role, update_project_role,
-    delete_project_role, update_project_icon, update_project_brand,
+    add_member, create_project_role, delete_project_role, list_member_audit, list_project_roles,
+    update_project_brand, update_project_icon, update_project_role, update_visibility,
 };
 
 #[path = "project_membership_edits.rs"]
 mod edits;
-pub use edits::{update_member_role, remove_member, update_member_moderation};
+pub use edits::{remove_member, update_member_moderation, update_member_role};
 #[path = "project_membership_helpers.rs"]
 mod helpers;
 pub(crate) use self::helpers::*;

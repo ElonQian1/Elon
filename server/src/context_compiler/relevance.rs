@@ -178,7 +178,6 @@ fn compact_line(line: &str) -> String {
     out
 }
 
-
 #[cfg(test)]
 #[path = "relevance_tests.rs"]
 mod tests;

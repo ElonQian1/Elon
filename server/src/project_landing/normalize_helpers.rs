@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use super::{MANIFEST_PATHS, MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS};
 
-
 pub(super) fn aggregate_variant_status(variants: &[Value], base_status: &str) -> String {
     let mut available_count = 0;
     let mut configured_missing_count = 0;

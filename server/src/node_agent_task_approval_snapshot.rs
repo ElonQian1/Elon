@@ -382,7 +382,6 @@ fn first_seq(approval: &TaskApprovalJournalItem) -> usize {
         .unwrap_or(usize::MAX)
 }
 
-
 #[cfg(test)]
 #[path = "node_agent_task_approval_snapshot_tests.rs"]
 mod tests;

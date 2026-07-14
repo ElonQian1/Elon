@@ -30,11 +30,8 @@ pub(super) fn finalize_ui_route_learning(
         Ok(Some(entry)) => {
             let sample = entry.sample_text.chars().take(40).collect::<String>();
             let _ = tx.send(
-                WsMessage::progress(format!(
-                    "已记录 UI 路由经验：{sample}（{}）",
-                    entry.status
-                ))
-                .to_json(),
+                WsMessage::progress(format!("已记录 UI 路由经验：{sample}（{}）", entry.status))
+                    .to_json(),
             );
         }
         Ok(None) => {}

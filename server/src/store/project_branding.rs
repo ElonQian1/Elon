@@ -345,7 +345,6 @@ fn path_ends_with_dir(path: &str, expected: &str) -> bool {
         .is_some_and(|name| name.eq_ignore_ascii_case(expected))
 }
 
-
 #[cfg(test)]
 #[path = "project_branding_tests.rs"]
 mod tests;

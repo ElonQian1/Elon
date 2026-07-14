@@ -2,9 +2,9 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 use serde_json::Value;
 
+use super::super::common::{new_id, now};
 use super::super::store_types::*;
 use super::super::store_types_project::*;
-use super::super::common::{now, new_id};
 
 pub(super) fn clean_doc_path(path: &str) -> Result<&str> {
     let path = path.trim();
@@ -104,7 +104,9 @@ pub(super) fn clean_title(input: Option<&str>, messages: &[GroupSummarySourceMes
     }
 }
 
-pub(super) fn group_ai_document_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupAiDocument> {
+pub(super) fn group_ai_document_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<GroupAiDocument> {
     Ok(GroupAiDocument {
         group_id: row.get(0)?,
         path: row.get(1)?,
@@ -129,7 +131,9 @@ pub(super) fn group_summary_source_from_row(
     })
 }
 
-pub(super) fn group_summary_post_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<GroupSummaryPost> {
+pub(super) fn group_summary_post_from_row(
+    row: &rusqlite::Row<'_>,
+) -> rusqlite::Result<GroupSummaryPost> {
     Ok(GroupSummaryPost {
         id: row.get(0)?,
         group_id: row.get(1)?,

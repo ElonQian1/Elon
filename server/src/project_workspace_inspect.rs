@@ -230,7 +230,6 @@ fn disk_free_bytes(path: &Path) -> Option<u64> {
     available_kb.checked_mul(1024)
 }
 
-
 #[cfg(test)]
 #[path = "project_workspace_inspect_tests.rs"]
 mod tests;

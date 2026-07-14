@@ -1,8 +1,8 @@
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 
-use super::{MANIFEST_PATHS, MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS};
 use super::normalize_helpers::*;
+use super::{MANIFEST_PATHS, MAX_ITEMS, MAX_LONG_TEXT, MAX_SHORT_TEXT, MAX_URL, MAX_VARIANTS};
 
 pub(super) fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
     let object = value.as_object()?;
@@ -471,4 +471,3 @@ pub(super) fn normalize_download_variant(value: &Value, id_hint: Option<&str>) -
     }
     Some(Value::Object(output))
 }
-

@@ -94,7 +94,6 @@ pub fn resolve_authenticated_voice_user(
     }
 }
 
-
 #[cfg(test)]
 #[path = "voice_protocol_tests.rs"]
 mod tests;

@@ -213,14 +213,13 @@ mod tests {
 
     #[test]
     fn text_only_ui_request_gets_structured_contract_automatically() {
-        let prompt =
-            append_ui_design_task_context(
-                "把支付按钮的圆角改小，间距更紧凑".into(),
-                None,
-                None,
-                true,
-            )
-                .expect("context should append");
+        let prompt = append_ui_design_task_context(
+            "把支付按钮的圆角改小，间距更紧凑".into(),
+            None,
+            None,
+            true,
+        )
+        .expect("context should append");
 
         assert!(prompt.contains(TASK_MARKER_BEGIN));
         assert!(prompt.contains("text-only UI request"));
@@ -244,13 +243,8 @@ mod tests {
             route_learning_origin: Some("ambiguous_local".into()),
             ..UiDesignTaskInput::default()
         };
-        let prompt = append_ui_design_task_context(
-            "让底部轻一点".into(),
-            Some(&task),
-            None,
-            true,
-        )
-        .unwrap();
+        let prompt =
+            append_ui_design_task_context("让底部轻一点".into(), Some(&task), None, true).unwrap();
         assert!(prompt.contains("AMBIGUOUS ROUTE GATE"));
         assert!(prompt.contains("ui_confirm_route"));
         assert!(prompt.find("ui_confirm_route") < prompt.find("TOOL-FIRST GATE"));
@@ -287,12 +281,7 @@ mod tests {
             annotations: Vec::new(),
         }];
         let prompt =
-            append_ui_design_task_context(
-                "创建页面".into(),
-                Some(&task),
-                Some(&attachments),
-                true,
-            )
+            append_ui_design_task_context("创建页面".into(), Some(&task), Some(&attachments), true)
                 .expect("context should append");
 
         assert_eq!(

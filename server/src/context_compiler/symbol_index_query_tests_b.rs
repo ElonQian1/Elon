@@ -36,8 +36,9 @@ use super::{
     symbol_index_vector_types::LOCAL_HASH_VECTOR_MODEL,
 };
 
-
-use super::symbol_index_query_tests::{write_bundle, load_first_embedding_test_chunks, sample_index, symbol, temp_dir};
+use super::symbol_index_query_tests::{
+    load_first_embedding_test_chunks, sample_index, symbol, temp_dir, write_bundle,
+};
 
 #[test]
 fn task_pack_uses_retrieval_plan_defaults_for_refactor_queries() {
@@ -565,4 +566,3 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
     drop(conn);
     fs::remove_dir_all(dir).unwrap();
 }
-

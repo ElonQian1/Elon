@@ -226,12 +226,7 @@ fn required_text(arguments: &Value, field: &str, max: usize) -> Result<String> {
     Ok(value.to_string())
 }
 
-fn enum_value(
-    value: &Value,
-    field: &str,
-    allowed: &[&str],
-    default: &str,
-) -> Result<String> {
+fn enum_value(value: &Value, field: &str, allowed: &[&str], default: &str) -> Result<String> {
     let candidate = value
         .get(field)
         .and_then(Value::as_str)

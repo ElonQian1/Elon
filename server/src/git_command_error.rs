@@ -95,7 +95,6 @@ fn configure_git_command(command: &mut Command) {
 #[cfg(not(windows))]
 fn configure_git_command(_command: &mut Command) {}
 
-
 #[cfg(test)]
 #[path = "git_command_error_tests.rs"]
 mod tests;
