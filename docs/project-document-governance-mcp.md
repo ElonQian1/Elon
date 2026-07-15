@@ -43,6 +43,15 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ## 3. 工具顺序
 
+整理任务携带统一的 `authorization_mode`，所有供应商使用同一语义：
+
+- `git_backed_full`（默认）：先创建“整理前”仅文档 Git 提交，再开放分类、建分区及 Markdown 重命名/移动；完成后创建“整理后”仅文档提交，不需要逐项 `reviewed` 或 `allow_*`。
+- `trusted_reversible`（兼容）：不自动创建 Git 提交，但仍可自动应用虚拟分区和安全 Markdown 路径操作。
+- `review_all`：应用工具必须传 `reviewed=true`；实体操作还必须分别声明 `allow_rename`、`allow_move`。
+- `suggestions_only`：只能分析、按需读取和保存建议，所有应用请求都会失败。
+
+默认开放不等于任意仓库写权限。四种模式都禁止越过 Git 工作区、符号链接逃逸、非文档操作和自动 push；当前整理器的实体操作只包含 rename/move，不覆盖、不删除、不改写正文。catalog、manifest、suggestions 与源文件 revision 校验始终启用。
+
 ### `project_docs_analyze`
 
 第一步调用。它扫描最多 500 份候选 Markdown，但不返回正文；默认每页 80 份，最大 200 份。输出包含：
@@ -79,7 +88,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_save_suggestions`
 
-模型提交 `status=ready` 的结构化建议。服务会验证：
+模型携带当前 `authorization_mode` 提交 `status=ready` 的结构化建议。服务会验证：
 
 - catalog revision 未变化；
 - 建议路径全部存在于目录；
@@ -95,7 +104,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_apply_suggestions`
 
-只有用户或产品审核流程已经确认时调用，并显式传 `reviewed=true`。工具把建议合并到虚拟分区配置，再将建议状态改为 `applied`：
+工具把建议合并到虚拟分区配置，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
 
 - catalog、manifest 和 suggestions revision 必须一致；
 - 重复调用是幂等的；
@@ -104,27 +113,27 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_apply_file_operations`
 
-只有用户在审核界面逐项确认后才能调用。它执行建议中的结构化 `file_operations`：
+它对请求中选定的结构化 `file_operations` 执行 Markdown 重命名/移动：
 
-- 请求必须带选中的 operation id、`reviewed=true`，并分别声明本次是否允许 `rename`、`move`；
+- 请求始终必须带选中的 operation id；默认 `git_backed_full` 自动授予 rename/move，并优先接收上一工具返回的 `git_baseline_commit`；`review_all` 才要求 `reviewed=true` 和对应 `allow_*`；
 - 每项使用 analyze 目录里的 `content_hash` 作为 `source_revision`，防止文档变化后仍按旧建议操作；
 - 只允许 Git 工作区内的 Markdown，禁止覆盖现有目标、删除文件、越过工作区或改写正文；
 - 执行后同步 `.elon/document-sections.json` 中受影响的路径，并把操作标记为 `applied`；
-- 不修改正文引用，也不自动 commit/push；页面必须提示用户继续审核 Git 变更。
+- 不修改正文引用、不自动 push；`git_backed_full` 成功响应必须同时提供 `git_baseline_commit`、`git_result_commit` 和 `git_document_transaction_complete=true`。
 
-这项授权是一次性、逐项的。修改正文、批量修复引用、归档、删除和 Git 发布必须分别设计更高权限，不能由 `rename`/`move` 隐含获得。
+AI 只能执行建议文件中列出的 operation id，不能借文档整理修改代码或 push。修改正文、批量修复引用、归档和删除尚未进入低 token 分类操作 schema；未来即使开放，也必须纳入同一整理前/后 Git 事务。
 
 ## 4. 网页端共享逻辑
 
-PC 网页端通过以下云端 API 审核应用：
+PC 网页端通过以下云端 API 应用虚拟分区：
 
 ```http
 POST /api/projects/:project_id/docs/organization/apply
 ```
 
-请求携带 `reviewed` 和三类 expected revision。云端通过项目绑定的 PC 节点读写两份 `.elon` JSON，并复用 MCP 相同的 Rust schema、清洗、真实路径校验、合并和幂等规则。网页端只负责展示与用户交互，不再自行实现建议合并算法。
+请求携带 `authorization_mode`、对应审核状态和三类 expected revision。云端通过项目绑定的 PC 节点读写两份 `.elon` JSON，并复用 MCP 相同的 Rust schema、清洗、真实路径校验、合并和幂等规则。网页端只负责展示与用户交互，不再自行实现建议合并算法。
 
-本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台，不强制跳转到开发频道。运行状态保存在系统临时目录，不写入 Git 工作区；建议和审核后的虚拟分区仍只使用两份 `.elon` JSON。逐项审核实体操作后，页面调用 `/api/project-docs/organization/apply-files`，由本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
+本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示从建议生成、虚拟分区应用到实体文件应用的每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台。页面按项目保存三档权限，默认选中“AI 自动整理（可信且可恢复）”。实体操作通过 `/api/project-docs/organization/apply-files` 交给本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
 手工新建分区、删除自定义分区和单篇虚拟归类仍写 `.elon/document-sections.json`；它们不会自动创建实际目录。AI 可以提出新分区，是否采用由审核者决定。
 
@@ -135,12 +144,12 @@ POST /api/projects/:project_id/docs/organization/apply
 - 会话先在 staging 目录完整写入，再原子发布；并发清理跳过创建中目录，损坏会话也有宽限期，不会删除另一代理刚创建的会话。
 - Markdown 读取继续经过工作区边界、符号链接、UTF-8 和 2 MiB 上限检查。
 - 建议与分区写入采用原子替换和 optimistic revision；实体操作还校验 catalog、建议、分区和源文件四类 revision。
-- 无效 JSON、未知路径、未知分区、过期 revision 或未审核应用都必须显式失败。
-- MCP 不可用时，AI 可以使用相同两份 JSON 契约完成建议，但仍要遵守先目录、再按需正文、最后审核应用的顺序。
+- 无效 JSON、未知路径、未知分区、过期 revision、权限模式不允许或缺少必要审核都必须显式失败。
+- MCP 不可用时，AI 可以使用相同两份 JSON 契约完成建议，但仍要遵守先目录、再按需正文、最后按当前权限模式应用的顺序。
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、审核门禁、revision 冲突、幂等应用、安全重命名/移动、禁止覆盖、逐项权限、阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
+Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、三档授权、revision 冲突、幂等应用、安全重命名/移动、禁止覆盖、自动授权阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
 
 发布前至少运行：
 
