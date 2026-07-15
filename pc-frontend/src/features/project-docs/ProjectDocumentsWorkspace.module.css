@@ -266,6 +266,9 @@
 .suggestionsHeader strong { font-size: 14px; }
 .suggestionsHeader small { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
 .suggestionsHeader button { display: flex; align-items: center; gap: 7px; height: 31px; padding: 0 11px; border-radius: 6px; color: #d4d6dd; background: rgba(255, 255, 255, .055); font-size: 10px; }
+.automationMode { display: grid; gap: 3px; margin-left: auto; }
+.automationMode span { color: var(--text-muted); font-size: 8px; }
+.automationMode select { height: 29px; min-width: 150px; padding: 0 24px 0 8px; border: 1px solid rgba(142, 103, 207, .35); border-radius: 6px; color: #e7ddf8; background: #2a2632; font-size: 9px; }
 .suggestionsBody { min-height: 0; overflow: auto; padding: 24px clamp(22px, 4vw, 54px) 50px; }
 .suggestionsBody > section { max-width: 980px; margin: 0 auto 26px; padding: 18px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 10px; background: rgba(255, 255, 255, .025); }
 .suggestionsBody h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; font-size: 13px; }
@@ -340,6 +343,7 @@
 .reviewPermission input { accent-color: #7e55c7; }
 .fileOperations > footer p { margin: 0; color: var(--text-muted); font-size: 9px; line-height: 1.5; }
 .fileOperations > footer .permissionWarning { color: #e5b66b; }
+.fileOperations > footer .trustedPermission { display: flex; align-items: center; gap: 6px; color: #8fd0aa; }
 .fileOperations > footer button { min-height: 31px; padding: 0 12px; border-radius: 6px; color: #fff; background: #7245bd; font-size: 10px; font-weight: 700; }
 .fileOperations > footer button:disabled { color: var(--text-muted); background: rgba(255, 255, 255, .05); }
 .suggestionsFooter { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 22px; border-top: 1px solid rgba(255, 255, 255, .07); background: rgba(0, 0, 0, .12); }

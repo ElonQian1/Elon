@@ -2,7 +2,8 @@ import { CheckCircle2, FileWarning, Lightbulb, RefreshCw, Sparkles } from 'lucid
 
 import { formatNumber } from './projectDocumentModel'
 import ProjectDocumentFileOperations from './ProjectDocumentFileOperations'
-import type { DocumentOrganizationSuggestions } from './projectDocumentSections'
+import { DOCUMENT_AUTOMATION_OPTIONS } from './projectDocumentAutomationPolicy'
+import type { DocumentAutomationMode, DocumentOrganizationSuggestions } from './projectDocumentSections'
 import type { DocumentOrganizationTrace } from './projectDocumentOrganizationStatus'
 import styles from './ProjectDocumentsWorkspace.module.css'
 
@@ -17,6 +18,8 @@ interface Props {
   applying: boolean
   applyingFiles: boolean
   canApplyFiles: boolean
+  automationMode: DocumentAutomationMode
+  onAutomationModeChange: (mode: DocumentAutomationMode) => void
   onRefresh: () => void
   onApply: () => void
   onApplyFiles: (input: { operationIds: string[]; allowRename: boolean; allowMove: boolean }) => Promise<void>
@@ -33,6 +36,8 @@ export default function ProjectDocumentSuggestions({
   applying,
   applyingFiles,
   canApplyFiles,
+  automationMode,
+  onAutomationModeChange,
   onRefresh,
   onApply,
   onApplyFiles,
@@ -46,9 +51,15 @@ export default function ProjectDocumentSuggestions({
           <span><Sparkles size={18} aria-hidden="true" /></span>
           <div>
             <strong>AI 整理建议</strong>
-            <small>建议与实际目录分开，审核后才应用</small>
+            <small>{automationMode === 'git_backed_full' ? '整理前 Git 备份，AI 完全整理，整理后自动提交' : '建议与实际目录分开，按当前权限处理'}</small>
           </div>
         </div>
+        <label className={styles.automationMode}>
+          <span>AI 权限</span>
+          <select value={automationMode} onChange={(event) => onAutomationModeChange(event.target.value as DocumentAutomationMode)}>
+            {DOCUMENT_AUTOMATION_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
         <button type="button" onClick={onRefresh} disabled={loading}>
           <RefreshCw size={15} className={loading ? styles.spinning : ''} aria-hidden="true" />
           刷新建议
@@ -89,11 +100,13 @@ export default function ProjectDocumentSuggestions({
                 <p>修复建议：{trace.error.recovery}</p>
               </div>
             )}
-            {(trace.catalog_revision || trace.suggestions_revision || trace.manifest_revision) && (
+            {(trace.catalog_revision || trace.suggestions_revision || trace.manifest_revision || trace.git_baseline_commit || trace.git_result_commit) && (
               <footer className={styles.traceRevisions}>
                 {trace.catalog_revision && <span>catalog <code>{shortRevision(trace.catalog_revision)}</code></span>}
                 {trace.suggestions_revision && <span>suggestions <code>{shortRevision(trace.suggestions_revision)}</code></span>}
                 {trace.manifest_revision && <span>manifest <code>{shortRevision(trace.manifest_revision)}</code></span>}
+                {trace.git_baseline_commit && <span>整理前 Git <code>{shortRevision(trace.git_baseline_commit)}</code></span>}
+                {trace.git_result_commit && <span>整理后 Git <code>{shortRevision(trace.git_result_commit)}</code></span>}
               </footer>
             )}
           </section>
@@ -105,7 +118,7 @@ export default function ProjectDocumentSuggestions({
           <div className={styles.suggestionEmpty}>
             <Lightbulb size={34} aria-hidden="true" />
             <strong>还没有 AI 整理建议</strong>
-            <span>点击“让当前 AI 生成整理建议”。AI 只写入结构化建议文件，不会自动移动项目文档。</span>
+            <span>点击“让当前 AI 生成整理建议”。默认会先备份文档，再自动整理并提交结果。</span>
           </div>
         )}
         {suggestions?.status === 'requested' && (
@@ -176,6 +189,7 @@ export default function ProjectDocumentSuggestions({
               operations={suggestions.file_operations}
               canApply={canApplyFiles}
               applying={applyingFiles}
+              automationMode={automationMode}
               onApply={onApplyFiles}
             />
           </>
@@ -183,9 +197,9 @@ export default function ProjectDocumentSuggestions({
       </div>
 
       <footer className={styles.suggestionsFooter}>
-        <span>应用只更新 `.elon/document-sections.json`，不移动或改写 Markdown。</span>
-        <button type="button" disabled={!ready || !canEdit || applying || suggestionCount === 0} onClick={onApply}>
-          {applying ? '应用中…' : '审核并应用分区建议'}
+        <span>{automationMode === 'git_backed_full' ? '默认建立整理前/后两个仅文档 Git 提交。' : '应用虚拟分区不会改写 Markdown 正文。'}</span>
+        <button type="button" disabled={(automationMode === 'git_backed_full' && !trackingAvailable) || automationMode === 'suggestions_only' || !ready || !canEdit || applying || suggestionCount === 0} onClick={onApply}>
+          {applying ? '应用中…' : automationMode === 'review_all' ? '审核并应用分区建议' : '应用分区建议'}
         </button>
       </footer>
     </main>

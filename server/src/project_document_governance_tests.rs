@@ -1,9 +1,8 @@
 use std::{fs, path::PathBuf};
 
 use crate::{
-    project_document_file_operations::{
-        apply_reviewed_file_operations, ApplyFileOperationsRequest,
-    },
+    project_document_authorization::DocumentAutomationMode,
+    project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
     project_document_files::write_project_document_file,
     project_document_governance::{
         to_pretty_json, CustomDocumentSection, DocumentOrganizationSuggestions, OrganizationStatus,
@@ -56,7 +55,7 @@ fn ready_suggestions() -> DocumentOrganizationSuggestions {
 }
 
 #[test]
-fn file_operations_require_per_action_permission_and_preserve_content() {
+fn trusted_file_operations_are_default_safe_and_preserve_content() {
     let root = workspace("file-operations");
     let original = fs::read_to_string(root.join("docs/archive/old.md")).unwrap();
     let analysis = analyze_workspace(&root, 0, 80, false).unwrap();
@@ -82,12 +81,20 @@ fn file_operations_require_per_action_permission_and_preserve_content() {
         reason: "名称应表达文档用途".to_string(),
         status: SuggestedFileOperationStatus::Proposed,
     }];
-    let saved = save_suggestions(&root, suggestions, catalog_revision, None).unwrap();
+    let saved = save_suggestions(
+        &root,
+        suggestions,
+        DocumentAutomationMode::TrustedReversible,
+        catalog_revision,
+        None,
+    )
+    .unwrap();
     let suggestions_revision = saved["suggestions_revision"].as_str().unwrap();
     let operation_ids = vec!["rename-old-note".to_string()];
-    let denied = apply_reviewed_file_operations(
+    let denied = apply_file_operations(
         &root,
         ApplyFileOperationsRequest {
+            authorization_mode: DocumentAutomationMode::ReviewAll,
             reviewed: true,
             operation_ids: &operation_ids,
             allow_rename: false,
@@ -95,26 +102,31 @@ fn file_operations_require_per_action_permission_and_preserve_content() {
             expected_catalog_revision: catalog_revision,
             expected_manifest_revision: None,
             expected_suggestions_revision: Some(suggestions_revision),
+            git_baseline_commit: None,
         },
     )
     .unwrap_err();
     assert!(denied.to_string().contains("rename 权限"));
-    let applied = apply_reviewed_file_operations(
+    let applied = apply_file_operations(
         &root,
         ApplyFileOperationsRequest {
-            reviewed: true,
+            authorization_mode: DocumentAutomationMode::TrustedReversible,
+            reviewed: false,
             operation_ids: &operation_ids,
-            allow_rename: true,
+            allow_rename: false,
             allow_move: false,
             expected_catalog_revision: catalog_revision,
             expected_manifest_revision: None,
             expected_suggestions_revision: Some(suggestions_revision),
+            git_baseline_commit: None,
         },
     )
     .unwrap();
     assert_eq!(applied["applied_count"], 1);
     assert_eq!(applied["content_changed"], false);
     assert_eq!(applied["files_deleted"], false);
+    assert_eq!(applied["authorization_mode"], "trusted_reversible");
+    assert_eq!(applied["auto_authorized"], true);
     assert!(!root.join("docs/archive/old.md").exists());
     assert_eq!(
         fs::read_to_string(root.join("docs/archive/legacy-discussion.md")).unwrap(),
@@ -159,7 +171,14 @@ fn save_rejects_hallucinated_paths() {
     let revision = analysis["catalog_revision"].as_str().unwrap();
     let mut suggestions = ready_suggestions();
     suggestions.assignments[0].path = "docs/missing.md".to_string();
-    let error = save_suggestions(&root, suggestions, revision, None).unwrap_err();
+    let error = save_suggestions(
+        &root,
+        suggestions,
+        DocumentAutomationMode::TrustedReversible,
+        revision,
+        None,
+    )
+    .unwrap_err();
     assert!(error.to_string().contains("不存在"));
     assert!(!root
         .join(".elon/document-organization-suggestions.json")
@@ -173,12 +192,27 @@ fn review_apply_is_revision_safe_and_idempotent() {
     let original_markdown = fs::read_to_string(root.join("docs/archive/old.md")).unwrap();
     let analysis = analyze_workspace(&root, 0, 80, false).unwrap();
     let catalog_revision = analysis["catalog_revision"].as_str().unwrap();
-    let saved = save_suggestions(&root, ready_suggestions(), catalog_revision, None).unwrap();
+    let saved = save_suggestions(
+        &root,
+        ready_suggestions(),
+        DocumentAutomationMode::TrustedReversible,
+        catalog_revision,
+        None,
+    )
+    .unwrap();
     let suggestion_revision = saved["suggestions_revision"].as_str().unwrap();
-    let repeated = save_suggestions(&root, ready_suggestions(), catalog_revision, None).unwrap();
+    let repeated = save_suggestions(
+        &root,
+        ready_suggestions(),
+        DocumentAutomationMode::TrustedReversible,
+        catalog_revision,
+        None,
+    )
+    .unwrap();
     assert_eq!(repeated["already_saved"], true);
     assert!(apply_saved_suggestions(
         &root,
+        DocumentAutomationMode::ReviewAll,
         false,
         catalog_revision,
         None,
@@ -187,7 +221,8 @@ fn review_apply_is_revision_safe_and_idempotent() {
     .is_err());
     let applied = apply_saved_suggestions(
         &root,
-        true,
+        DocumentAutomationMode::TrustedReversible,
+        false,
         catalog_revision,
         None,
         Some(suggestion_revision),
@@ -195,6 +230,8 @@ fn review_apply_is_revision_safe_and_idempotent() {
     .unwrap();
     assert_eq!(applied["status"], "applied");
     assert_eq!(applied["markdown_changed"], false);
+    assert_eq!(applied["authorization_mode"], "trusted_reversible");
+    assert_eq!(applied["auto_authorized"], true);
     assert_eq!(
         applied["manifest"]["assignments"]["docs/archive/old.md"],
         "custom:legacy-notes"
@@ -209,6 +246,7 @@ fn review_apply_is_revision_safe_and_idempotent() {
     assert_eq!(restored_ready.revision, suggestion_revision);
     let recovered = apply_saved_suggestions(
         &root,
+        DocumentAutomationMode::TrustedReversible,
         true,
         catalog_revision,
         None,
@@ -218,6 +256,7 @@ fn review_apply_is_revision_safe_and_idempotent() {
     assert_eq!(recovered["manifest_already_applied"], true);
     let replay = apply_saved_suggestions(
         &root,
+        DocumentAutomationMode::TrustedReversible,
         true,
         catalog_revision,
         None,

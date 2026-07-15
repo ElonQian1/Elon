@@ -116,9 +116,13 @@ assert(prompt.includes('.elon/document-organization-suggestions.json'))
 assert(prompt.includes('classification_model_tokens=0'))
 assert(prompt.includes('project_docs_analyze'))
 assert(prompt.includes('project_docs_get_status'))
-assert(prompt.includes('绝不能自行调用 project_docs_apply_suggestions'))
+assert(prompt.includes('权限模式：git_backed_full'))
+assert(prompt.includes('authorization_mode=git_backed_full'))
+assert(prompt.includes('git_baseline_commit'))
+assert(prompt.includes('git_result_commit'))
 assert(prompt.includes('project_docs_apply_file_operations'))
 assert(prompt.includes('source_revision'))
+assert(prompt.includes('不得越界、操作非 Markdown、修改代码或自动 push'))
 assert(prompt.length < 3000, '整理任务 Prompt 不应内嵌完整文档目录')
 assert(!prompt.includes('# Reviewer'))
 
@@ -134,8 +138,15 @@ assert(workspaceSource.includes('organization.trace?.catalog_revision'))
 const fileOperationsSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFileOperations.tsx',
 ), 'utf8')
-assert(fileOperationsSource.includes('逐项授权'))
+assert(fileOperationsSource.includes('已开放安全可恢复权限'))
 assert(fileOperationsSource.includes('不覆盖、不删除、不改正文'))
+
+const policySource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentAutomationPolicy.ts',
+), 'utf8')
+assert(policySource.includes("DEFAULT_DOCUMENT_AUTOMATION_MODE: DocumentAutomationMode = 'git_backed_full'"))
+assert(policySource.includes("value: 'review_all'"))
+assert(policySource.includes("value: 'suggestions_only'"))
 
 const statusSourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentOrganizationStatus.ts')
 const statusOutput = ts.transpileModule(fs.readFileSync(statusSourcePath, 'utf8'), {

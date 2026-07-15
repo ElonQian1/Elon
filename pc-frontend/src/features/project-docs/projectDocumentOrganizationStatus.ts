@@ -31,6 +31,8 @@ export interface DocumentOrganizationTrace {
   catalog_revision?: string
   manifest_revision?: string
   suggestions_revision?: string
+  git_baseline_commit?: string
+  git_result_commit?: string
   documents_cataloged: number
   ambiguous_documents: number
   documents_read: number
@@ -68,6 +70,8 @@ export function parseDocumentOrganizationTrace(value: unknown): DocumentOrganiza
     catalog_revision: optionalText(candidate.catalog_revision),
     manifest_revision: optionalText(candidate.manifest_revision),
     suggestions_revision: optionalText(candidate.suggestions_revision),
+    git_baseline_commit: optionalText(candidate.git_baseline_commit),
+    git_result_commit: optionalText(candidate.git_result_commit),
     documents_cataloged: safeNumber(candidate.documents_cataloged),
     ambiguous_documents: safeNumber(candidate.ambiguous_documents),
     documents_read: safeNumber(candidate.documents_read),

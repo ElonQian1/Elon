@@ -32,6 +32,10 @@ pub(crate) struct DocumentOrganizationTrace {
     pub manifest_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggestions_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_baseline_commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_result_commit: Option<String>,
     #[serde(default)]
     pub documents_cataloged: u64,
     #[serde(default)]
@@ -85,6 +89,8 @@ pub(crate) fn start_operation(workspace: &Path, operation_id: Option<&str>) -> R
             catalog_revision: None,
             manifest_revision: None,
             suggestions_revision: None,
+            git_baseline_commit: None,
+            git_result_commit: None,
             documents_cataloged: 0,
             ambiguous_documents: 0,
             documents_read: 0,
@@ -197,23 +203,77 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
                         .as_u64()
                         .unwrap_or(trace.estimated_tokens_used);
                 }
-                advance(
-                    &mut trace,
-                    "awaiting_review",
-                    "awaiting_review",
-                    "整理建议已生成",
-                    "建议已通过真实路径和 revision 校验，等待用户审核应用。",
-                );
+                match value["authorization_mode"]
+                    .as_str()
+                    .unwrap_or("git_backed_full")
+                {
+                    "review_all" => advance(
+                        &mut trace,
+                        "awaiting_review",
+                        "awaiting_review",
+                        "整理建议已生成",
+                        "当前为逐项审核模式，等待用户确认应用。",
+                    ),
+                    "suggestions_only" => advance(
+                        &mut trace,
+                        "suggestions_saved",
+                        "succeeded",
+                        "整理建议已生成",
+                        "当前为仅建议模式，没有应用任何分区或文件操作。",
+                    ),
+                    _ => advance(
+                        &mut trace,
+                        "suggestions_ready",
+                        "running",
+                        "整理建议已生成",
+                        "默认 Git 备份后完全整理权限已开放，继续应用文档操作。",
+                    ),
+                }
             }
             "project_docs_apply_suggestions" => {
                 trace.manifest_revision = string_field(value, "manifest_revision");
                 trace.suggestions_revision = string_field(value, "suggestions_revision");
+                trace.git_baseline_commit = string_field(value, "git_baseline_commit");
+                trace.git_result_commit = string_field(value, "git_result_commit");
+                let pending_files = value["suggestions"]["file_operations"]
+                    .as_array()
+                    .is_some_and(|operations| {
+                        operations
+                            .iter()
+                            .any(|operation| operation["status"] == "proposed")
+                    });
                 advance(
                     &mut trace,
-                    "applied",
-                    "succeeded",
+                    if pending_files {
+                        "virtual_applied"
+                    } else {
+                        "applied"
+                    },
+                    if pending_files {
+                        "running"
+                    } else {
+                        "succeeded"
+                    },
                     "分区建议已应用",
-                    "虚拟分区已更新；Markdown 未移动、删除或改写。",
+                    if pending_files {
+                        "整理前 Git 基线已保存，虚拟分区已更新；继续执行 Markdown 路径操作。"
+                    } else {
+                        "虚拟分区已更新，整理前和整理后 Git 提交均已保存。"
+                    },
+                );
+            }
+            "project_docs_apply_file_operations" => {
+                trace.catalog_revision = string_field(value, "catalog_revision");
+                trace.manifest_revision = string_field(value, "manifest_revision");
+                trace.suggestions_revision = string_field(value, "suggestions_revision");
+                trace.git_baseline_commit = string_field(value, "git_baseline_commit");
+                trace.git_result_commit = string_field(value, "git_result_commit");
+                advance(
+                    &mut trace,
+                    "files_applied",
+                    "succeeded",
+                    "安全文件整理已应用",
+                    "已完成 Markdown 重命名/移动，并保存整理前、整理后两个仅文档 Git 提交。",
                 );
             }
             _ => return Ok(()),
@@ -230,7 +290,10 @@ pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::
             "重新 analyze，合并最新建议 revision，并移除不存在的路径或未知分区。"
         }
         "project_docs_apply_suggestions" => {
-            "先刷新建议并明确审核；若 revision 已变化，重新 analyze 后再应用。"
+            "确认权限模式并刷新建议；若 revision 已变化，重新 analyze 后再应用。"
+        }
+        "project_docs_apply_file_operations" => {
+            "重新 analyze 获取最新文件哈希和目录 revision，确认目标未占用后重试。"
         }
         _ => "查看错误详情并重试当前步骤。",
     };
@@ -375,6 +438,8 @@ fn new_direct_trace() -> DocumentOrganizationTrace {
         catalog_revision: None,
         manifest_revision: None,
         suggestions_revision: None,
+        git_baseline_commit: None,
+        git_result_commit: None,
         documents_cataloged: 0,
         ambiguous_documents: 0,
         documents_read: 0,

@@ -1,4 +1,4 @@
-//! Explicitly reviewed Markdown rename/move operations for local project workspaces.
+//! Authorized Markdown rename/move operations for local project workspaces.
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::{json, Value};
@@ -6,9 +6,16 @@ use std::{collections::HashSet, path::Path};
 
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
+    project_document_authorization::{
+        authorize_document_apply, operation_permission_granted, DocumentAutomationMode,
+    },
     project_document_files::{
         move_project_document_file, read_project_document_file, write_project_document_file,
         ProjectDocumentFile,
+    },
+    project_document_git_transaction::{
+        commit_document_baseline, commit_document_result, current_document_head,
+        verify_document_baseline,
     },
     project_document_governance::{
         parse_manifest, parse_suggestions, to_pretty_json, DocumentSectionManifest,
@@ -18,6 +25,7 @@ use crate::{
 };
 
 pub(crate) struct ApplyFileOperationsRequest<'a> {
+    pub authorization_mode: DocumentAutomationMode,
     pub reviewed: bool,
     pub operation_ids: &'a [String],
     pub allow_rename: bool,
@@ -25,18 +33,17 @@ pub(crate) struct ApplyFileOperationsRequest<'a> {
     pub expected_catalog_revision: &'a str,
     pub expected_manifest_revision: Option<&'a str>,
     pub expected_suggestions_revision: Option<&'a str>,
+    pub git_baseline_commit: Option<&'a str>,
 }
 
-pub(crate) fn apply_reviewed_file_operations(
+pub(crate) fn apply_file_operations(
     workspace: &Path,
     request: ApplyFileOperationsRequest<'_>,
 ) -> Result<Value> {
     if !workspace.is_dir() || !workspace.join(".git").exists() {
         bail!("实体文档整理只允许在现存 Git 工作区执行");
     }
-    if !request.reviewed {
-        bail!("执行实体文档整理前必须显式传入 reviewed=true");
-    }
+    let authorization = authorize_document_apply(request.authorization_mode, request.reviewed)?;
     if request.operation_ids.is_empty() || request.operation_ids.len() > 100 {
         bail!("每次必须选择 1 到 100 个实体文档操作");
     }
@@ -90,7 +97,44 @@ pub(crate) fn apply_reviewed_file_operations(
         .filter(|operation| selected_ids.contains(&operation.id))
         .cloned()
         .collect::<Vec<_>>();
-    validate_permissions(&selected, request.allow_rename, request.allow_move)?;
+    validate_permissions(
+        &selected,
+        authorization,
+        request.allow_rename,
+        request.allow_move,
+    )?;
+    let pending = selected
+        .iter()
+        .filter(|operation| operation.status != SuggestedFileOperationStatus::Applied)
+        .collect::<Vec<_>>();
+    let git_baseline_commit =
+        if authorization.mode == DocumentAutomationMode::GitBackedFull && !pending.is_empty() {
+            let replaying_partial_result = pending
+                .iter()
+                .any(|operation| operation_target_matches(workspace, operation));
+            let baseline = if let Some(expected) = request.git_baseline_commit {
+                let head = current_document_head(workspace)?;
+                if head != expected {
+                    bail!("整理前 Git 基线已变化，请重新开始文档整理");
+                }
+                head
+            } else if replaying_partial_result {
+                current_document_head(workspace)?
+            } else {
+                commit_document_baseline(workspace)?
+            };
+            for operation in &pending {
+                verify_document_baseline(
+                    workspace,
+                    &baseline,
+                    &operation.source_path,
+                    &operation.source_revision,
+                )?;
+            }
+            Some(baseline)
+        } else {
+            None
+        };
     let mut results = Vec::new();
     for operation in &selected {
         let already_applied = operation.status == SuggestedFileOperationStatus::Applied
@@ -143,6 +187,11 @@ pub(crate) fn apply_reviewed_file_operations(
         request.expected_suggestions_revision,
     )
     .map_err(|error| anyhow!(error.message))?;
+    let git_result_commit = git_baseline_commit
+        .as_deref()
+        .map(|baseline| commit_document_result(workspace, baseline))
+        .transpose()?;
+    let git_document_transaction_complete = git_result_commit.is_some();
     let updated_catalog = catalog(workspace)?;
     Ok(json!({
         "ok": true,
@@ -155,6 +204,11 @@ pub(crate) fn apply_reviewed_file_operations(
         "manifest_revision": manifest_revision,
         "suggestions_revision": suggestions_saved.revision,
         "catalog_revision": updated_catalog.revision,
+        "authorization_mode": authorization.mode,
+        "auto_authorized": authorization.auto_authorized,
+        "git_baseline_commit": git_baseline_commit,
+        "git_result_commit": git_result_commit,
+        "git_document_transaction_complete": git_document_transaction_complete,
         "markdown_changed": true,
         "content_changed": false,
         "files_deleted": false,
@@ -164,15 +218,20 @@ pub(crate) fn apply_reviewed_file_operations(
 
 fn validate_permissions(
     operations: &[SuggestedFileOperation],
+    authorization: crate::project_document_authorization::DocumentAuthorization,
     allow_rename: bool,
     allow_move: bool,
 ) -> Result<()> {
     for operation in operations {
         match operation.kind {
-            SuggestedFileOperationKind::Rename if !allow_rename => {
+            SuggestedFileOperationKind::Rename
+                if !operation_permission_granted(authorization, allow_rename) =>
+            {
                 bail!("操作 {} 需要本次明确授予 rename 权限", operation.id)
             }
-            SuggestedFileOperationKind::Move if !allow_move => {
+            SuggestedFileOperationKind::Move
+                if !operation_permission_granted(authorization, allow_move) =>
+            {
                 bail!("操作 {} 需要本次明确授予 move 权限", operation.id)
             }
             _ => {}
