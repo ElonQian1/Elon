@@ -22,7 +22,22 @@ pub async fn run_exec(
 ) {
     use tokio::io::AsyncBufReadExt;
 
-    let mut build_run = if let Some(project_context) = project_context.as_ref() {
+    let mut build_run = if let Some(project_context) = project_context
+        .as_ref()
+        .filter(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()))
+    {
+        if let Err(error) = runtime
+            .ensure_node_data_root_for_workspace(Some(std::path::Path::new(&cwd)))
+            .await
+        {
+            let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
+                task_id,
+                message: format!(
+                    "客户端无法自动准备 AI 临时工作区；原项目没有被移动或删除。{error:#}"
+                ),
+            }));
+            return;
+        }
         let prepared = {
             let _transition = runtime.node_data_root_transition.lock().await;
             let data_paths = runtime.node_data_root.read().await.paths.clone();

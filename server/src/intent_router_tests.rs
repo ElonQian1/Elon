@@ -65,3 +65,22 @@ fn extracts_image_prompt_from_hybrid_request() {
     let prompt = image_prompt_from_message("给 App 生成一个猫咪图标并替换启动图标");
     assert_eq!(prompt, "猫咪图标");
 }
+
+#[test]
+fn explicit_read_only_diagnosis_outranks_development_words() {
+    let message = "请做一次只读诊断，不要修改文件、不要提交、不要发布";
+
+    assert!(explicitly_requests_read_only(message));
+}
+
+#[test]
+fn explicit_request_to_leave_read_only_mode_is_not_read_only() {
+    assert!(!explicitly_requests_read_only("不要只读，请修改并修复代码"));
+}
+
+#[test]
+fn scoped_no_change_request_can_still_modify_another_area() {
+    assert!(!explicitly_requests_read_only(
+        "不要修改后端，只修改前端提示文案"
+    ));
+}

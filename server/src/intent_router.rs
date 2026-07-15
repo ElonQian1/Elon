@@ -387,6 +387,43 @@ pub fn looks_like_development_request(message: &str) -> bool {
     classify(message).needs_code_change
 }
 
+/// Explicit user safety constraints outrank broad development keywords. This
+/// keeps requests such as "只读诊断项目，不要修改文件" out of write/build
+/// admission while still allowing the agent to inspect the bound project.
+pub fn explicitly_requests_read_only(message: &str) -> bool {
+    let normalized = normalize(message);
+    if contains_any(
+        &normalized,
+        &[
+            "不要只读",
+            "不是只读",
+            "非只读",
+            "not read-only",
+            "not readonly",
+        ],
+    ) {
+        return false;
+    }
+    contains_any(
+        &normalized,
+        &[
+            "只读",
+            "只检查",
+            "只诊断",
+            "仅检查",
+            "仅诊断",
+            "不要改文件",
+            "不要改动文件",
+            "不要修改文件",
+            "不修改文件",
+            "read-only",
+            "readonly",
+            "do not modify files",
+            "don't modify files",
+        ],
+    )
+}
+
 fn normalize(message: &str) -> String {
     message.trim().to_lowercase()
 }

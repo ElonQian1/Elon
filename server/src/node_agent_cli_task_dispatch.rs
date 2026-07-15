@@ -342,6 +342,26 @@ async fn run_cli_task(
         return;
     }
 
+    let managed_task_needs_data_root = project_context
+        .as_ref()
+        .is_some_and(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()));
+    if managed_task_needs_data_root {
+        if let Err(error) = runtime
+            .ensure_node_data_root_for_workspace(cwd.as_deref().map(std::path::Path::new))
+            .await
+        {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                format!("客户端无法自动准备 AI 临时工作区；原项目没有被移动或删除。{error:#}"),
+            );
+            return;
+        }
+    }
+
     // Workspace preparation and build admission share the data-root transition
     // lock. A root switch can happen before this transaction or after the
     // lease is registered, never between selecting a workspace and its cache.
@@ -384,7 +404,11 @@ async fn run_cli_task(
             return;
         }
     };
-    let build_run_guard = if let Some(project_context) = prepared_cwd.project_context.as_ref() {
+    let build_run_guard = if let Some(project_context) = prepared_cwd
+        .project_context
+        .as_ref()
+        .filter(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()))
+    {
         let Some(data_paths) = data_paths.as_ref() else {
             send_preflight_failure(
                 &runtime,

@@ -476,6 +476,43 @@ impl NodeRuntime {
         Ok(())
     }
 
+    /// Upgraded nodes may not yet have the unified data-root field. Prepare it
+    /// on the first managed project task, preferring a safe sibling of the
+    /// already-bound project so ordinary users never need to move folders.
+    pub(crate) async fn ensure_node_data_root_for_workspace(
+        &self,
+        workspace_hint: Option<&Path>,
+    ) -> anyhow::Result<NodeDataRootState> {
+        let _transition = self.node_data_root_transition.lock().await;
+        let current = self.node_data_root.read().await.clone();
+        if current.paths.is_some() {
+            return Ok(current);
+        }
+
+        let current_for_prepare = current.clone();
+        let workspace_hint = workspace_hint.map(Path::to_path_buf);
+        let install_id = self.install_id.clone();
+        let fallback_parent = node_agent_data_root::automatic_fallback_parent(
+            &crate::node_agent_config::state_path(),
+        )?;
+        let prepared = tokio::task::spawn_blocking(move || {
+            node_agent_data_root::prepare_automatic_root(
+                &current_for_prepare,
+                workspace_hint.as_deref(),
+                Some(&fallback_parent),
+                &install_id,
+            )
+        })
+        .await
+        .map_err(|error| anyhow::anyhow!("自动准备 AI 临时工作区异常结束: {error}"))??;
+        let state = self.set_node_data_root(prepared).await?;
+        info!(
+            root = %state.configured_root().map(|path| path.display().to_string()).unwrap_or_default(),
+            "已为升级节点自动准备 AI 临时工作区；原项目保持原位置"
+        );
+        Ok(state)
+    }
+
     pub(crate) async fn set_node_data_root(
         &self,
         paths: elon_pc_dev_runtime::NodeDataPaths,

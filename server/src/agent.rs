@@ -13,9 +13,8 @@ use crate::{
         is_short_build_command, is_short_resume_command,
     },
     agent_pc_workspace::{
-        project_chat_should_use_pc_cli, project_cli_runtime_permission,
-        project_cli_runtime_permission_fallback, project_requires_pc_workspace,
-        should_attempt_pc_apk_sync,
+        project_chat_should_use_pc_cli, project_cli_runtime_permission_fallback,
+        project_requires_pc_workspace, should_attempt_pc_apk_sync,
     },
     agent_routing::{
         api_agent_name, choose_backend, has_api_agents, is_local_cli_option,
@@ -201,7 +200,11 @@ pub async fn run_pc_cli_passthrough_for_project(
         ))
         .to_json(),
     );
-    let preferred_runtime_permission = project_cli_runtime_permission(project);
+    let preferred_runtime_permission =
+        crate::agent_pc_workspace::project_cli_runtime_permission_for_message(
+            project,
+            user_message,
+        );
     let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
         project_id: project.id.clone(),
         user_id: user_id.to_string(),
@@ -508,7 +511,7 @@ pub async fn plan_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: cid.to_string(),
-            runtime_permission: project_cli_runtime_permission(project),
+            runtime_permission: "read_only".to_string(),
         });
         let plan_result = ai_cli::run_with_pc_agent_workspace(
             agent_id,
@@ -586,7 +589,7 @@ pub async fn plan_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: conversation_id.unwrap_or("default").to_string(),
-            runtime_permission: project_cli_runtime_permission(project),
+            runtime_permission: "read_only".to_string(),
         }),
         user_message,
         None,

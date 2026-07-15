@@ -51,6 +51,14 @@ pub(super) fn spawn_provision(
             branch,
         } = request;
         let project_id_for_error = project_id.clone();
+        if let Err(error) = runtime.ensure_node_data_root_for_workspace(None).await {
+            let _ = out_tx.send(ws_text(&AgentToServer::ProjectWorkspaceProvisionError {
+                req_id,
+                project_id: project_id_for_error,
+                message: format!("客户端无法自动准备 AI 临时工作区；没有创建或移动项目。{error:#}"),
+            }));
+            return;
+        }
         let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let workspace_root = runtime
             .node_data_root
@@ -125,6 +133,16 @@ pub(super) fn spawn_prepare_storage(
             prepare_worktree,
         } = request;
         let project_id_for_error = project_id.clone();
+        if let Err(error) = runtime.ensure_node_data_root_for_workspace(None).await {
+            let _ = out_tx.send(ws_text(&AgentToServer::ProjectStorageRepoError {
+                req_id,
+                project_id: project_id_for_error,
+                message: format!(
+                    "客户端无法自动准备 AI 临时工作区；原项目没有被移动或删除。{error:#}"
+                ),
+            }));
+            return;
+        }
         let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let data_paths = runtime.node_data_root.read().await.paths.clone();
         let response = if let Some(data_paths) = data_paths {

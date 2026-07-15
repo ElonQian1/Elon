@@ -7,9 +7,11 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 
 pub(crate) mod admin;
+mod automatic;
 mod cleanup;
 mod marker;
 
+pub(crate) use automatic::{automatic_fallback_parent, prepare_automatic_root};
 pub(crate) use cleanup::{cleanup, CleanupEntry, CleanupResult};
 pub(crate) use marker::verify_root_marker;
 use marker::{claim_or_verify_root_marker, root_marker_belongs_to};
@@ -169,7 +171,7 @@ impl NodeDataRootState {
             "invalid_reason": self.invalid_reason,
             "migration_required": plan.iter().any(|item| item.has_data),
             "migration_plan": plan,
-            "legacy_policy": "preserve_read_only_no_automatic_git_move",
+            "legacy_policy": "keep_external_projects_in_place_and_automatically_prepare_managed_data",
         })
     }
 }

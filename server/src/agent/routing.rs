@@ -9,8 +9,8 @@ use crate::{
         is_short_build_command, is_short_resume_command,
     },
     agent_pc_workspace::{
-        project_chat_should_use_pc_cli, project_cli_runtime_permission,
-        project_cli_runtime_permission_fallback, project_requires_pc_workspace,
+        project_chat_should_use_pc_cli, project_cli_runtime_permission_fallback,
+        project_cli_runtime_permission_for_message, project_requires_pc_workspace,
         should_attempt_pc_apk_sync,
     },
     agent_routing::{
@@ -234,7 +234,10 @@ pub(super) async fn run_for_project_in_workspace_with_routing(
                 project_id: project.id.clone(),
                 user_id: user_id.to_string(),
                 conversation_id: cid.to_string(),
-                runtime_permission: project_cli_runtime_permission(project),
+                runtime_permission: project_cli_runtime_permission_for_message(
+                    project,
+                    user_message,
+                ),
             });
             let pc_user_message =
                 append_project_dev_profile_context(state, user_id, project, user_message);
@@ -369,7 +372,7 @@ pub(super) async fn run_for_project_in_workspace_with_routing(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: conversation_id.unwrap_or("default").to_string(),
-            runtime_permission: project_cli_runtime_permission(project),
+            runtime_permission: project_cli_runtime_permission_for_message(project, user_message),
         }),
         user_message,
         preflight_note.as_deref(),

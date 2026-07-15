@@ -22,9 +22,9 @@ pub(crate) struct BuildCachePolicy {
 impl Default for BuildCachePolicy {
     fn default() -> Self {
         Self {
-            min_free_bytes: env_u64("ELON_NODE_BUILD_MIN_FREE_BYTES").unwrap_or(10 * GIB),
+            min_free_bytes: env_u64("ELON_NODE_BUILD_MIN_FREE_BYTES").unwrap_or(4 * GIB),
             build_headroom_bytes: env_u64_allow_zero("ELON_NODE_BUILD_HEADROOM_BYTES")
-                .unwrap_or(24 * GIB),
+                .unwrap_or(8 * GIB),
             max_total_cache_bytes: env_u64("ELON_NODE_BUILD_MAX_CACHE_BYTES").unwrap_or(80 * GIB),
             max_project_rust_bytes: env_u64("ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES")
                 .unwrap_or(24 * GIB),
@@ -55,7 +55,7 @@ pub(crate) fn admit(
     let required_free = reservation::admission_required_free(policy, active_reserved_bytes);
     if free_bytes < required_free {
         return Err(anyhow!(
-            "PC 节点构建盘空间不足：安全底线 {} GiB + 活动任务预留 {} GiB + 本次构建预留 {} GiB，启动前需至少 {} GiB 空闲，当前约 {} GiB",
+            "AI 临时工作区可用空间不足（不是项目损坏，项目文件不会被删除）：安全底线 {} GiB + 运行中任务预留 {} GiB + 本次任务余量 {} GiB，开始前需至少 {} GiB 空闲，当前约 {} GiB。请释放该磁盘空间后重试",
             policy.min_free_bytes / GIB,
             active_reserved_bytes / GIB,
             policy.build_headroom_bytes / GIB,

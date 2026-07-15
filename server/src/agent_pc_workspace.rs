@@ -24,6 +24,17 @@ pub(crate) fn project_cli_runtime_permission(project: &ProjectAccess) -> String 
     }
 }
 
+pub(crate) fn project_cli_runtime_permission_for_message(
+    project: &ProjectAccess,
+    user_message: &str,
+) -> String {
+    if intent_router::explicitly_requests_read_only(user_message) {
+        "read_only".to_string()
+    } else {
+        project_cli_runtime_permission(project)
+    }
+}
+
 pub(crate) fn project_cli_runtime_permission_fallback(
     runtime_permission: &str,
     error_message: &str,

@@ -1,8 +1,8 @@
 use super::{
     pc_cli_chat_requested, pc_cli_chat_route_label, project_chat_should_use_pc_cli,
     project_cli_runtime_permission, project_cli_runtime_permission_fallback,
-    project_fields_require_pc_workspace, route_a_full_access_grant_error,
-    should_attempt_pc_apk_sync,
+    project_cli_runtime_permission_for_message, project_fields_require_pc_workspace,
+    route_a_full_access_grant_error, should_attempt_pc_apk_sync,
 };
 use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
 use crate::store::ProjectAccess;
@@ -71,6 +71,16 @@ fn pc_managed_projects_use_full_access_for_cli() {
     let project = pc_project("prj_pc", "android_kotlin", Some("node-local"));
 
     assert_eq!(project_cli_runtime_permission(&project), "full_access");
+}
+
+#[test]
+fn pc_managed_read_only_diagnosis_does_not_request_full_access() {
+    let project = pc_project("prj_pc", "android_kotlin", Some("node-local"));
+
+    assert_eq!(
+        project_cli_runtime_permission_for_message(&project, "只读诊断最近提交，不要修改文件"),
+        "read_only"
+    );
 }
 
 #[test]
