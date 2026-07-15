@@ -41,8 +41,12 @@ $repoRoot = $repoRoot.Trim()
 
 $preflightScript = Join-Path $repoRoot "scripts\ai-task-preflight.ps1"
 $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
+$cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
+$cleanupSh = Join-Path $repoRoot "scripts\cleanup-task-worktrees.sh"
 $preflightContent = Get-Content -Raw -LiteralPath $preflightScript
 $preflightShContent = Get-Content -Raw -LiteralPath $preflightSh
+$cleanupContent = Get-Content -Raw -LiteralPath $cleanupScript
+$cleanupShContent = Get-Content -Raw -LiteralPath $cleanupSh
 
 $expectedPsNeedsWorktree = '$needsWorktree = -not $isPcConversationWorktree -and ($AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline)'
 Assert-Contains $preflightContent $expectedPsNeedsWorktree "PowerShell preflight must not treat -CreateWorktree alone as a need for another worktree."
@@ -60,6 +64,10 @@ Assert-Contains $preflightContent "FINISH_COMMAND_POWERSHELL=" "PowerShell prefl
 Assert-Contains $preflightShContent "FINISH_COMMAND_SHELL=" "Shell preflight must print the deterministic finish entry point."
 Assert-Contains $preflightContent "--untracked-files=no" "PowerShell preflight must separate tracked main changes from untracked hygiene warnings."
 Assert-Contains $preflightShContent "--untracked-files=no" "Shell preflight must separate tracked main changes from untracked hygiene warnings."
+Assert-Contains $cleanupContent "Test-PlatformSessionWorktree" "PowerShell cleanup must recognize platform conversation worktrees."
+Assert-Contains $cleanupContent "ai/session/*" "PowerShell cleanup must include platform session branches in safe cleanup candidates."
+Assert-Contains $cleanupShContent "is_platform_session_worktree" "Shell cleanup must recognize platform conversation worktrees."
+Assert-Contains $cleanupShContent "--min-age-minutes" "Shell cleanup must support the same recent-worktree protection knob."
 
 function Assert-DocumentContains {
     param(
@@ -187,8 +195,10 @@ Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WF-FINISH"
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "scripts\finish-ai-task.ps1"
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "FINALIZABLE=true"
+Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "cleanup-task-worktrees.*"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "FINISH_COMMAND_*"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "candidate_track"
+Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "ai/session/*"
 Assert-DocumentDoesNotContain -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet 'applyTo: "**"'
 Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "origin/main"
 Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "finish-ai-task.ps1"

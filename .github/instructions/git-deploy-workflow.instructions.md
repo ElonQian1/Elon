@@ -25,7 +25,7 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 - 主工作区来源不明的未跟踪文件只产生卫生告警，不由其他任务自动提交或删除。
 - 当前任务 worktree 必须完全干净才可收尾；未跟踪源码/测试会显示 `candidate_track`，生成物会显示 `candidate_temporary_or_precise_ignore`。
 - 自动删除仅限 `.ai/workspace-policy.txt` 声明的临时根，目前是 `.ai-tmp/`。
-- 全局清理默认保护创建不足 60 分钟的 worktree，避免并行任务刚拿到 `EDIT_ROOT` 就被回收；当前任务仍由统一收尾定向清理。
+- 全局清理默认保护创建不足 60 分钟的 worktree，避免刚拿到 `EDIT_ROOT` 就被回收；当前任务由统一收尾定向清理。平台会话 / `ai/session/*` 仅在 clean、已合入且超龄时回收。
 
 ## push 冲突
 

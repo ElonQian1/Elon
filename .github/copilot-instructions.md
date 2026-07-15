@@ -33,7 +33,7 @@
 
 ### 平台会话 worktree 例外
 
-当前目录位于 `conversation-worktrees/<project>/<conversation>`，或分支为 `ai/session/<project>/<conversation>` 时，平台已经完成隔离；不要创建嵌套 worktree。仍需遵守 `WF-FILES` 至 `WF-REPORT`，平台 worktree 由平台回收。
+当前目录位于 `conversation-worktrees/<project>/<conversation>`，或分支为 `ai/session/<project>/<conversation>` 时，平台已经完成隔离；不要创建嵌套 worktree。仍需遵守 `WF-FILES` 至 `WF-REPORT`；平台会话 worktree 由 `cleanup-task-worktrees.*` 在 clean、已合入 `origin/main`、超过年龄保护且非当前 worktree 时回收。
 
 ## 文件处置契约
 

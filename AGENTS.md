@@ -38,6 +38,7 @@
 
 - 预检输出的 `EDIT_ROOT` 是唯一编辑根；平台 `conversation-worktrees` / `ai/session` 已隔离时不创建嵌套 worktree。
 - 收尾必须执行预检输出的 `FINISH_COMMAND_*`，只有 `FINALIZABLE=true` 才可正常宣告完成。
+- 平台会话 worktree 只在 clean、已合入 `origin/main`、超过年龄保护且非当前 worktree 时由清理脚本回收。
 - `origin/main` 前进不触发追车；只有 push 被 non-fast-forward 拒绝才 rebase。
 - 业务状态与本机收尾状态分开报告；未知主工作区文件不自动提交、删除或忽略，也不再阻止无冲突的 `main` 快进。
 - 脚本头有 `#requires -Version 7.0` 时使用 `pwsh`；其他 Windows bootstrap 脚本可用 `powershell.exe`。

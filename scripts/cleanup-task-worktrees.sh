@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 清理 ai-task-preflight 留下的孤儿 worktree
+# 清理 ai-task-preflight / 平台会话留下的孤儿 worktree
 # 与 cleanup-task-worktrees.ps1 行为等价。
 #
 # 用法：
@@ -7,12 +7,14 @@
 #   bash scripts/cleanup-task-worktrees.sh --apply        # 执行
 #   bash scripts/cleanup-task-worktrees.sh --apply --force --delete-remote
 #   bash scripts/cleanup-task-worktrees.sh --keep-last 3
+#   bash scripts/cleanup-task-worktrees.sh --min-age-minutes 0 --apply
 
 set -euo pipefail
 
 APPLY=0
 FORCE=0
 KEEP_LAST=0
+MIN_AGE_MINUTES=60
 DELETE_REMOTE=0
 EXCLUDE_PATHS=()
 
@@ -23,6 +25,8 @@ while [[ $# -gt 0 ]]; do
     --delete-remote) DELETE_REMOTE=1; shift ;;
     --keep-last=*) KEEP_LAST="${1#*=}"; shift ;;
     --keep-last) KEEP_LAST="${2:-0}"; shift 2 ;;
+    --min-age-minutes=*) MIN_AGE_MINUTES="${1#*=}"; shift ;;
+    --min-age-minutes) MIN_AGE_MINUTES="${2:-60}"; shift 2 ;;
     --exclude-path) EXCLUDE_PATHS+=("${2:?missing value for --exclude-path}"); shift 2 ;;
     -h|--help)
       sed -n '1,15p' "$0"
@@ -85,14 +89,36 @@ git_fetch_with_retry() {
 
 git_fetch_with_retry >/dev/null
 
-# 解析 worktree（采集任务命名和 codex/* 分支）
+path_mtime_epoch() {
+  local p="$1"
+  if stat -c %Y "$p" >/dev/null 2>&1; then
+    stat -c %Y "$p"
+  else
+    stat -f %m "$p"
+  fi
+}
+
+is_platform_session_worktree() {
+  local wt="$1" br="$2"
+  [[ "$br" == ai/session/* || "$wt" =~ (^|/)conversation-worktrees/[^/]+/[^/]+($|/) ]]
+}
+
+is_worktree_registered() {
+  local target="${1%/}"
+  git worktree list --porcelain | awk -v target="$target" '
+    /^worktree / { path=substr($0,10); sub(/[\/]+$/, "", path); if (path == target) found=1 }
+    END { exit(found ? 0 : 1) }
+  '
+}
+
+# 解析 worktree（采集任务命名、codex/* 分支和平台会话）
 mapfile -t lines < <(git worktree list --porcelain)
 declare -a wt_paths wt_branches
 path=""; branch=""
 flush() {
   if [[ -n "$path" ]]; then
     leaf="$(basename "$path")"
-    if [[ "$leaf" =~ ^${repo_leaf}-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?(-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?)?$ || "$branch" == codex/* ]]; then
+    if [[ "$leaf" =~ ^${repo_leaf}-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?(-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?)?$ || "$branch" == codex/* ]] || is_platform_session_worktree "$path" "$branch"; then
       wt_paths+=("$path"); wt_branches+=("$branch")
     fi
   fi
@@ -131,6 +157,15 @@ for i in "${!wt_paths[@]}"; do
   [[ -n "${keep_set[$wt]:-}" ]] && reasons+=("在 --keep-last 保留范围内")
   [[ -n "${exclude_set[$wt]:-}" ]] && reasons+=("在 --exclude-path 保护范围内")
 
+  if [[ "$MIN_AGE_MINUTES" -gt 0 && -d "$wt" ]]; then
+    created_epoch="$(path_mtime_epoch "$wt")"
+    now_epoch="$(date +%s)"
+    age_minutes=$(( (now_epoch - created_epoch) / 60 ))
+    if [[ "$age_minutes" -lt "$MIN_AGE_MINUTES" ]]; then
+      reasons+=("近期创建保护(MinAgeMinutes=$MIN_AGE_MINUTES, age=$age_minutes)")
+    fi
+  fi
+
   if [[ ! -d "$wt" ]]; then
     reasons+=("目录已不存在（可 prune）")
   else
@@ -139,9 +174,16 @@ for i in "${!wt_paths[@]}"; do
     elif [[ -n "$st" ]]; then
       reasons+=("有未提交/未跟踪改动")
     fi
-    if [[ "$FORCE" -eq 0 && -n "$br" ]]; then
-      if ! git merge-base --is-ancestor "$br" origin/main >/dev/null 2>&1; then
-        reasons+=("分支 $br 尚未合并进 origin/main（用 --force 跳过）")
+    if [[ "$FORCE" -eq 0 ]]; then
+      merge_ref="$(git -C "$wt" rev-parse HEAD 2>/dev/null || true)"
+      if [[ -z "$merge_ref" ]]; then
+        reasons+=("无法确认 HEAD 是否合并进 origin/main")
+      elif ! git merge-base --is-ancestor "$merge_ref" origin/main >/dev/null 2>&1; then
+        if [[ -n "$br" ]]; then
+          reasons+=("分支 $br 尚未合并进 origin/main（用 --force 跳过）")
+        else
+          reasons+=("HEAD ${merge_ref:0:7} 尚未合并进 origin/main（用 --force 跳过）")
+        fi
       fi
     fi
   fi
@@ -189,6 +231,7 @@ for i in "${!to_remove_paths[@]}"; do
   wt="${to_remove_paths[$i]}"; br="${to_remove_branches[$i]}"
   echo "removing $wt"
   if git worktree remove --force "$wt"; then
+    [[ -e "$wt" ]] && rm -rf "$wt"
     if [[ -n "$br" ]]; then
       if [[ "$FORCE" -eq 1 ]]; then
         git branch -D "$br" || true
@@ -199,7 +242,20 @@ for i in "${!to_remove_paths[@]}"; do
     fi
     removed=$((removed+1))
   else
-    echo "  失败"; failed=$((failed+1))
+    if is_worktree_registered "$wt"; then
+      echo "  失败"; failed=$((failed+1))
+    else
+      [[ -e "$wt" ]] && rm -rf "$wt"
+      if [[ -n "$br" ]]; then
+        if [[ "$FORCE" -eq 1 ]]; then
+          git branch -D "$br" || true
+        else
+          git branch -d "$br" || true
+        fi
+        [[ "$DELETE_REMOTE" -eq 1 ]] && git push origin --delete "$br" || true
+      fi
+      removed=$((removed+1))
+    fi
   fi
 done
 

@@ -3,10 +3,12 @@
 # 默认（dry-run）：只列出可清理 / 不可清理的项，不做任何修改。
 # -Apply：实际执行清理。
 # -Force：跳过"分支必须合并进 origin/main"的检查（不推荐）。
-# -KeepLast N：保留最近 N 个 task worktree（按时间戳倒序）。
+# -KeepLast N：保留最近 N 个 task / platform-session worktree（按时间戳倒序）。
+# -MinAgeMinutes N：保护最近创建的 worktree，默认 60。
 #
 # 安全规则（默认所有条件都必须满足才会删除）：
-#   1. worktree 路径形如 "<repo>-task-*"，或当前分支形如 "codex/*"
+#   1. worktree 路径形如 "<repo>-task-*"、当前分支形如 "codex/*"、
+#      当前分支形如 "ai/session/*"，或路径位于 conversation-worktrees/<project>/<conversation>
 #   2. 工作树没有未提交 / 未跟踪文件
 #   3. 当前所在分支已经合并进 origin/main（即没有未推送或未合并的工作）
 #   4. 不是当前正在使用的 worktree
@@ -96,6 +98,48 @@ function Normalize-WorktreePath {
     }
 }
 
+function Test-PlatformSessionWorktree {
+    param(
+        [string]$Path,
+        [string]$Branch
+    )
+
+    $normalized = Normalize-WorktreePath $Path
+    return (
+        ($Branch -and $Branch -like "ai/session/*") -or
+        ($normalized -match '(^|/)conversation-worktrees/[^/]+/[^/]+($|/)')
+    )
+}
+
+function Test-WorktreeRegistered {
+    param([string]$Path)
+
+    $target = Normalize-WorktreePath $Path
+    $currentEntry = @{}
+    foreach ($line in (& git worktree list --porcelain)) {
+        if ($line -eq "") {
+            if ($currentEntry.ContainsKey("Path") -and (Normalize-WorktreePath $currentEntry["Path"]) -ieq $target) {
+                return $true
+            }
+            $currentEntry = @{}
+            continue
+        }
+        $kv = $line -split " ", 2
+        if ($kv[0] -eq "worktree") { $currentEntry["Path"] = $kv[1] }
+    }
+    return ($currentEntry.ContainsKey("Path") -and (Normalize-WorktreePath $currentEntry["Path"]) -ieq $target)
+}
+
+function Remove-ResidualWorktreeDirectory {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $longPath = if ($fullPath.StartsWith('\\?\')) { $fullPath } else { '\\?\' + $fullPath }
+    Remove-Item -LiteralPath $longPath -Recurse -Force
+    Write-Host "  residual directory removed: $fullPath"
+}
+
 $repoRoot = GitOutput @("rev-parse", "--show-toplevel")
 Set-Location -LiteralPath $repoRoot
 
@@ -142,7 +186,8 @@ $pattern = "^$([regex]::Escape($repoLeaf))-task-$taskStampPattern(-task-$taskSta
 $taskWorktrees = $entries | Where-Object {
     $_.Path -and (
         ((Split-Path -Leaf $_.Path) -match $pattern) -or
-        ($_.Branch -and $_.Branch -like "codex/*")
+        ($_.Branch -and $_.Branch -like "codex/*") -or
+        (Test-PlatformSessionWorktree -Path $_.Path -Branch $_.Branch)
     )
 } | Sort-Object Path
 
@@ -183,11 +228,17 @@ foreach ($wt in $taskWorktrees) {
             $reasons += "有未提交/未跟踪改动"
         }
 
-        # 检查分支是否合并进 origin/main
-        if (-not $Force -and $wt.Branch) {
-            & git merge-base --is-ancestor $wt.Branch origin/main 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                $reasons += "分支 $($wt.Branch) 尚未合并进 origin/main（用 -Force 跳过）"
+        # 检查 HEAD 是否合并进 origin/main；detached 平台构建 worktree 也必须满足。
+        if (-not $Force) {
+            $mergeRef = if ($wt.Head) { $wt.Head } elseif ($wt.Branch) { $wt.Branch } else { "" }
+            if ([string]::IsNullOrWhiteSpace($mergeRef)) {
+                $reasons += "无法确认 HEAD 是否合并进 origin/main"
+            } else {
+                & git merge-base --is-ancestor $mergeRef origin/main 2>&1 | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    $label = if ($wt.Branch) { "分支 $($wt.Branch)" } else { "HEAD $($mergeRef.Substring(0, [Math]::Min(7, $mergeRef.Length)))" }
+                    $reasons += "$label 尚未合并进 origin/main（用 -Force 跳过）"
+                }
             }
         }
     }
@@ -238,7 +289,14 @@ foreach ($wt in $toRemove) {
     try {
         Write-Host "removing $($wt.Path)" -ForegroundColor Yellow
         & git worktree remove --force $wt.Path 2>&1 | ForEach-Object { Write-Host "  $_" }
-        if ($LASTEXITCODE -ne 0) { throw "worktree remove failed" }
+        if ($LASTEXITCODE -ne 0) {
+            if (Test-WorktreeRegistered -Path $wt.Path) {
+                throw "worktree remove failed"
+            }
+            Remove-ResidualWorktreeDirectory -Path $wt.Path
+        } else {
+            Remove-ResidualWorktreeDirectory -Path $wt.Path
+        }
 
         if ($wt.Branch) {
             $deleteFlag = if ($Force) { "-D" } else { "-d" }

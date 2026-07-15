@@ -83,6 +83,7 @@ try {
     $mainRepo = Join-Path $testRoot "main"
     $taskWorktree = Join-Path $testRoot "task-worktree"
     $peerWorktree = Join-Path $testRoot "peer-worktree"
+    $platformSessionWorktree = Join-Path $testRoot "conversation-worktrees\elon-self\cleanup-session"
 
     & git init --bare $originPath *> $null
     if ($LASTEXITCODE -ne 0) { throw "git init --bare failed" }
@@ -106,6 +107,8 @@ try {
     Invoke-Git $mainRepo @("push", "-u", "origin", "main") | Out-Null
     Invoke-Git $mainRepo @("worktree", "add", "-b", "codex/finish-fixture", $taskWorktree, "origin/main") | Out-Null
     Invoke-Git $mainRepo @("worktree", "add", "-b", "codex/peer-fixture", $peerWorktree, "origin/main") | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path -Parent $platformSessionWorktree) -Force | Out-Null
+    Invoke-Git $mainRepo @("worktree", "add", "-b", "ai/session/elon-self/cleanup-session", $platformSessionWorktree, "origin/main") | Out-Null
     Invoke-Git $taskWorktree @("config", "user.email", "finish-test@example.invalid") | Out-Null
     Invoke-Git $taskWorktree @("config", "user.name", "finish-test") | Out-Null
 
@@ -136,6 +139,7 @@ try {
     $registeredAfterRecentCleanup = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if (-not $registeredAfterRecentCleanup.Contains("branch refs/heads/codex/finish-fixture")) { throw "Global cleanup removed the newly created task worktree.`n$recentCleanupText" }
     if (-not $registeredAfterRecentCleanup.Contains("branch refs/heads/codex/peer-fixture")) { throw "Global cleanup removed the newly created peer worktree.`n$recentCleanupText" }
+    if (-not $registeredAfterRecentCleanup.Contains("branch refs/heads/ai/session/elon-self/cleanup-session")) { throw "Global cleanup removed the newly created platform session worktree.`n$recentCleanupText" }
 
     # A legacy untracked source-looking file must not block the tracked main
     # baseline from catching up, and must never be auto-added or deleted.
@@ -204,6 +208,27 @@ try {
     $registered = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if ($registered.Contains($taskWorktree)) { throw "Task worktree is still registered after unified finish cleanup." }
     if (-not $registered.Contains("branch refs/heads/codex/peer-fixture")) { throw "Unified finish removed another agent's merged worktree." }
+
+    Push-Location -LiteralPath $mainRepo
+    try {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $platformCleanupOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1") -Apply -MinAgeMinutes 0 -ExcludePath $peerWorktree 2>&1
+            $platformCleanupExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+    } finally {
+        Pop-Location
+    }
+    $platformCleanupText = (($platformCleanupOutput | ForEach-Object { [string]$_ }) -join "`n").Trim()
+    if ($platformCleanupExitCode -ne 0) { throw "Platform-session cleanup fixture failed.`n$platformCleanupText" }
+    Assert-Contains $platformCleanupText "ai/session/elon-self/cleanup-session" "Cleanup must include merged clean platform session worktrees."
+    $registeredAfterPlatformCleanup = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
+    if ($registeredAfterPlatformCleanup.Contains("branch refs/heads/ai/session/elon-self/cleanup-session")) { throw "Platform session worktree is still registered after cleanup.`n$platformCleanupText" }
+    if ($registeredAfterPlatformCleanup.Contains($platformSessionWorktree)) { throw "Platform session path is still registered after cleanup.`n$platformCleanupText" }
+    if (-not $registeredAfterPlatformCleanup.Contains("branch refs/heads/codex/peer-fixture")) { throw "Explicitly excluded peer worktree was removed by platform cleanup." }
 
     Write-Host "PASS ai-task-finish workflow guard"
 } finally {
