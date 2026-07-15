@@ -6,6 +6,7 @@ use std::sync::Arc;
 use homecli_proto::AgentToServer;
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
+use tracing::warn;
 
 use crate::{pc_storage_repo, pc_workspace_provisioner, ws_text, NodeRuntime};
 
@@ -52,12 +53,7 @@ pub(super) fn spawn_provision(
         } = request;
         let project_id_for_error = project_id.clone();
         if let Err(error) = runtime.ensure_node_data_root_for_workspace(None).await {
-            let _ = out_tx.send(ws_text(&AgentToServer::ProjectWorkspaceProvisionError {
-                req_id,
-                project_id: project_id_for_error,
-                message: format!("客户端无法自动准备 AI 临时工作区；没有创建或移动项目。{error:#}"),
-            }));
-            return;
+            warn!(%error, "推荐数据根自动回填失败；新项目回退到兼容工作区并继续创建");
         }
         let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let workspace_root = runtime
@@ -66,52 +62,43 @@ pub(super) fn spawn_provision(
             .await
             .paths
             .as_ref()
-            .map(elon_pc_dev_runtime::NodeDataPaths::workspaces);
-        let response = if let Some(workspace_root) = workspace_root {
-            match tokio::task::spawn_blocking(move || {
-                let _transition = transition;
-                pc_workspace_provisioner::provision_project_workspace_in(
-                    &workspace_root,
-                    pc_workspace_provisioner::ProjectWorkspaceRequest {
-                        project_id,
-                        user_id,
-                        name,
-                        template,
-                        repo_url,
-                        branch,
-                    },
-                )
-            })
-            .await
-            {
-                Ok(Ok(result)) => AgentToServer::ProjectWorkspaceProvisioned {
-                    req_id,
-                    project_id: project_id_for_error,
-                    workspace_path: result.workspace_path,
-                    git_head: result.git_head,
-                    git_remote_origin: result.git_remote_origin,
-                    git_branch: result.git_branch,
-                    created: result.created,
+            .map(elon_pc_dev_runtime::NodeDataPaths::workspaces)
+            .unwrap_or_else(elon_pc_dev_runtime::legacy_default_workspace_root);
+        let response = match tokio::task::spawn_blocking(move || {
+            let _transition = transition;
+            pc_workspace_provisioner::provision_project_workspace_in(
+                &workspace_root,
+                pc_workspace_provisioner::ProjectWorkspaceRequest {
+                    project_id,
+                    user_id,
+                    name,
+                    template,
+                    repo_url,
+                    branch,
                 },
-                Ok(Err(error)) => AgentToServer::ProjectWorkspaceProvisionError {
-                    req_id,
-                    project_id: project_id_for_error,
-                    message: error.to_string(),
-                },
-                Err(error) => AgentToServer::ProjectWorkspaceProvisionError {
-                    req_id,
-                    project_id: project_id_for_error,
-                    message: format!("PC 项目工作区准备任务异常结束: {error}"),
-                },
-            }
-        } else {
-            drop(transition);
-            AgentToServer::ProjectWorkspaceProvisionError {
+            )
+        })
+        .await
+        {
+            Ok(Ok(result)) => AgentToServer::ProjectWorkspaceProvisioned {
                 req_id,
                 project_id: project_id_for_error,
-                message: "PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘"
-                    .to_string(),
-            }
+                workspace_path: result.workspace_path,
+                git_head: result.git_head,
+                git_remote_origin: result.git_remote_origin,
+                git_branch: result.git_branch,
+                created: result.created,
+            },
+            Ok(Err(error)) => AgentToServer::ProjectWorkspaceProvisionError {
+                req_id,
+                project_id: project_id_for_error,
+                message: error.to_string(),
+            },
+            Err(error) => AgentToServer::ProjectWorkspaceProvisionError {
+                req_id,
+                project_id: project_id_for_error,
+                message: format!("PC 项目工作区准备任务异常结束: {error}"),
+            },
         };
         let _ = out_tx.send(ws_text(&response));
     });
@@ -134,20 +121,25 @@ pub(super) fn spawn_prepare_storage(
         } = request;
         let project_id_for_error = project_id.clone();
         if let Err(error) = runtime.ensure_node_data_root_for_workspace(None).await {
-            let _ = out_tx.send(ws_text(&AgentToServer::ProjectStorageRepoError {
-                req_id,
-                project_id: project_id_for_error,
-                message: format!(
-                    "客户端无法自动准备 AI 临时工作区；原项目没有被移动或删除。{error:#}"
-                ),
-            }));
-            return;
+            warn!(%error, "推荐数据根自动回填失败；Git 硬盘仓库继续使用原配置");
         }
         let transition = runtime.node_data_root_transition.clone().lock_owned().await;
         let data_paths = runtime.node_data_root.read().await.paths.clone();
-        let response = if let Some(data_paths) = data_paths {
+        let response = {
             let mut storage_settings = runtime.storage_settings.read().await.clone();
-            storage_settings.root_path = Some(data_paths.storage().to_string_lossy().to_string());
+            if storage_settings.root_path.is_none() {
+                storage_settings.root_path = data_paths
+                    .as_ref()
+                    .map(elon_pc_dev_runtime::NodeDataPaths::storage)
+                    .map(|path| path.to_string_lossy().to_string());
+            }
+            if storage_settings.root_path.is_none() {
+                storage_settings.root_path = Some(
+                    pc_storage_repo::default_storage_root()
+                        .to_string_lossy()
+                        .to_string(),
+                );
+            }
             match tokio::task::spawn_blocking(move || {
                 let _transition = transition;
                 pc_storage_repo::prepare_project_storage_repo(
@@ -183,13 +175,6 @@ pub(super) fn spawn_prepare_storage(
                     project_id: project_id_for_error,
                     message: format!("PC 项目存储准备任务异常结束: {error}"),
                 },
-            }
-        } else {
-            drop(transition);
-            AgentToServer::ProjectStorageRepoError {
-                req_id,
-                project_id: project_id_for_error,
-                message: "PC 节点尚未配置有效的统一数据根，已阻止项目存储回落到系统盘".to_string(),
             }
         };
         let _ = out_tx.send(ws_text(&response));

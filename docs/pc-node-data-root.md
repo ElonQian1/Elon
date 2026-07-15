@@ -1,53 +1,59 @@
-# PC 节点数据根、构建缓存与磁盘治理
+# PC 节点项目数据架构体检与渐进治理
 
 最后更新：2026-07-15
 
-本文是一龙 Windows PC 节点大体积数据的产品合同。目标是：源码在哪个盘，工作区、构建缓存和任务临时文件就由用户选择的数据盘统一承载，不再因为 Windows 用户目录的默认行为悄悄写满 C 盘。
+本文是一龙 Windows PC 节点数据根与构建缓存的产品合同。数据根不是“项目能不能运行”的许可证，而是一项 Harness 式辅助能力：先继承已经跑通的项目和缓存，再由 AI 只读分析、解释风险、给出整理方案，最后按用户确认渐进迁移。
 
-## 1. 为什么源码在 D 盘，C 盘仍会爆满
+## 1. 用户能听懂的一句话
 
-PC 节点过去只有分散的目录设置，没有统一的数据根：
+旧项目原来怎么跑，升级后还怎么跑。一龙推荐数据根只是给新建托管项目准备一个更整齐的工作区、缓存和临时文件目录；没配置、空间偏少或自动准备失败，都只提示，不会拦住已有项目，也不会复制一份旧缓存来额外占空间。
 
-- 项目工作区默认落在 `%USERPROFILE%\Elon\workspaces`。
-- 硬盘节点仓库默认落在 `%APPDATA%\elon-node-agent\storage`。
-- Rust 开发和节点发布 target 默认落在 `%LOCALAPPDATA%\Elon\build-target`。
-- Cargo registry、Gradle、npm/pnpm 和应用临时文件继续使用各工具的用户目录或 `%TEMP%`。
-- 会话 worktree 在 D 盘并不代表编译 target、Gradle 用户缓存和临时文件也在 D 盘。
+## 2. 永久产品不变量
 
-Rust 首次编译常产生数 GB 到数十 GB target；多个项目、toolchain 或发布 profile 再各建一份，很容易成为 C 盘耗尽的直接触发因素。会话文本通常不是主要占用。
+1. **继承优先**：已验证可运行的项目继续使用原路径、原环境变量和原共享缓存。
+2. **按路径判定**：只有实际位于当前节点数据根 `workspaces` 或 `storage` 下的项目，才启用平台推荐构建环境；不能仅凭“有项目上下文”就强制接管。
+3. **建议不阻断**：磁盘余量、缓存大小和项目数量都是体检指标，不是 CLI、Exec、写任务或构建任务的准入门禁。
+4. **自动回填可失败**：缺少推荐数据根时客户端可安全创建并持久化；失败后继续使用原项目，不把配置问题伪装成“项目空间不足”。
+5. **只读发现不等于接管**：发现外部缓存后 `automatic_action` 必须为 `none`；不得自动移动、改名、删除、写 marker 或改写项目环境。
+6. **显式清理有边界**：平台清理只覆盖当前节点数据根内由平台创建、可重建的 `cache` 和 `temp`；外部共享缓存、源码、Git、workspace、storage 和 artifact 永不进入自动清理范围。
+7. **迁移可预览、可回滚**：先说明收益、兼容性和空间变化，再由用户或 AI 在获得明确授权后执行；原缓存保留到新路径验证通过和观察期结束。
 
-## 2. 唯一设置：`ELON_NODE_DATA_ROOT`
+## 3. 为什么以前会突然多占空间
 
-普通用户不需要选择目录。升级节点在第一次写代码或构建前，会优先在已绑定项目的同级目录自动创建独立数据根，例如项目位于 `D:\Projects\my-app` 时使用 `D:\Projects\ElonNodeData`；已有外部项目保持原位置。环境变量只供无人值守部署和高级管理员覆盖，例如：
+旧版本里可能同时存在多套已经被脚本和项目复用的缓存：
+
+- 项目同级或跨子项目的共享 Rust `target`；
+- 当前仓库开发检查、测试共用的 target；
+- Windows 节点 EXE 发布缓存；
+- Linux 服务器/musl 发布缓存；
+- 仓库内部历史 `target`。
+
+如果升级只创建一个空数据根并强制注入新的 `CARGO_TARGET_DIR`，Cargo 会重新编译依赖，旧缓存仍在磁盘上，于是用户看到的是“缓存明明还在，却又要额外空间”。这是升级兼容缺失，不是用户项目突然变大。正确做法是对旧项目保留原环境，对新托管项目采用新架构，并把旧缓存先登记为外部可复用候选，而不是遗忘或复制。
+
+## 4. 两种数据策略
+
+| 项目类型 | 判定 | 默认行为 |
+|---|---|---|
+| 旧项目、用户自选目录、外部 Git 项目 | 工作目录不在当前数据根的 `workspaces/storage` 下 | 保留原项目和旧版会话 worktree 规则；保留传入和进程继承的缓存环境；不进入托管缓存准入 |
+| 新建平台托管项目 | 工作目录位于当前数据根的 `workspaces/storage` 下 | 使用推荐会话工作区、项目级构建目录和任务临时目录；容量只提示 |
+
+明确的新建托管 workspace/storage 协议仍可要求新节点能力，因为它是在创建新数据，不是让旧项目继续运行。服务器不得因为旧节点缺少新缓存能力而拒绝已有项目的普通 CLI/Exec，也不得在节点选择时过滤掉已经绑定且可运行的旧节点。
+
+## 5. 推荐数据根
+
+普通用户无需手动设置。客户端可以已绑定项目的位置为提示，在同盘安全位置自动准备推荐根；高级管理员可设置：
 
 ```dotenv
 ELON_NODE_DATA_ROOT=D:\ElonNodeData
 ```
 
-该环境变量用于安装器、无人值守部署和首次启动引导；本地管理页保存后，`node.json` 中的持久化值优先，确保重启不会被安装包里遗留的旧环境值悄悄改回。管理员若要重新以环境变量接管，应先显式清除持久化数据根，而不是同时维护两个相互竞争的真源。
-
-要求：
-
-1. 必须是绝对路径，不能直接选择 `C:\`、`D:\` 等磁盘根。
-2. 不能与旧 workspace、storage 或另一个数据根互相嵌套。
-3. 目录必须可创建、可写，且不能是重解析点、junction 或符号链接。
-4. 首次绑定时目录必须为空；节点先以不覆盖语义独占创建 marker，再创建派生目录。已有非空目录不能被“顺手认领”为数据根。
-5. 根目录标记绑定当前节点 `install_id`，不能让两台节点误用同一目录；每次清理前都会重新校验 marker。
-6. 节点凭证、登录 token 和小体积配置仍保留在 `%APPDATA%` 与安装目录的 `_internal\node-agent.env`；它们不是构建缓存，不能随着可移除数据盘迁移。
-
-`ELON_NODE_WORKSPACE_ROOT`、`ELON_PC_WORKSPACE_ROOT`、`NODE_WORKSPACE_ROOT`、`NODE_STORAGE_ROOT` 和 `ELON_STORAGE_ROOT` 只保留给尚未配置统一数据根的旧节点。统一数据根一旦生效，它们只用于迁移发现，不能继续覆盖真实 workspace/storage，否则状态页面会显示 D 盘而新任务仍悄悄写回 C 盘。
-
-## 3. 目录合同
+目录合同：
 
 ```text
 <ELON_NODE_DATA_ROOT>\
 ├─ .elon-node-data-root.json
 ├─ workspaces\
-│  ├─ <user-id>\<project-id>\repo\
-│  └─ conversation-worktrees\<project-id>\<conversation-id>\
 ├─ storage\
-│  ├─ git\projects\<user-id>\<project-id>.git\
-│  └─ worktrees\users\<user-id>\<project-id>\repo\
 ├─ cache\
 │  ├─ cargo-home\
 │  ├─ rust-targets\<project-id>\<toolchain-key>\target\
@@ -58,112 +64,66 @@ ELON_NODE_DATA_ROOT=D:\ElonNodeData
 └─ temp\<task-id>\
 ```
 
-职责边界：
+安全要求：
 
-- `workspaces`：用户代码和会话 Git worktree，属于重要数据。
-- `storage`：硬盘节点裸仓库和 owner checkout，属于重要数据。
-- `cache`：依赖、编译 target 和包管理器缓存，可重建。
-- `temp`：任务级下载、解包、附件和中间产物，可重建。
+- 根必须是绝对路径，不能直接使用磁盘根，也不能嵌套进已有项目、旧 workspace/storage 或另一个数据根。
+- 首次认领必须是空目录或带当前 `install_id` marker 的既有根；拒绝文件、符号链接、junction、重解析点和其他节点 marker。
+- 先完成路径和 marker 校验，再原子持久化 `node.json`，最后更新内存状态；失败保留旧配置。
+- 凭证、登录 token 和小体积节点配置仍在既有安全位置，它们不是构建缓存。
 
-自动清理只能处理 `cache`、`temp`。任何 TTL、LRU 或“立即清理缓存”都不得删除 `workspaces`、`storage`、`.git`、未提交文件或用户 artifact。
+## 6. 五类缓存的体检规则
 
-## 4. Rust target 的共享边界
+| 类别 | 常见来源 | 推荐作用域 | 默认建议 |
+|---|---|---|---|
+| 历史跨子项目共享 Rust 缓存 | `CARGO_TARGET_DIR`、项目祖先的 `shared\target` | 机器/产品家族共享 | 登记并原地复用；兼容性变化时只重建受影响部分 |
+| 当前开发检查、测试共享缓存 | `ELON_DEV_CARGO_TARGET_DIR`、`%LOCALAPPDATA%\Elon\build-target\elon-dev-cargo` | 同仓库跨 worktree | 继续由 `cargo-dev` 锁保护复用 |
+| Win 节点发布缓存 | `ELON_NODE_AGENT_TARGET_DIR`、`...\elon-node-agent` | Windows 发布 | 保持发布专用，不和开发或服务器 target 混用 |
+| 服务器发布共享缓存 | `RUST_SERVER_MUSL_TARGET_DIR`、`ELON_BUILD_TARGET_DIR`、`shared\server-musl-target` | Linux/musl 发布 | 继续由服务器发布脚本复用 |
+| 仓库旧缓存 | `<repo>\target`、`<repo>\server\target` | 单仓库历史 | 先确认最后使用入口；可保留复用，不自动删除 |
 
-Rust target 采用：
+“共享”不是把所有 target 粗暴合并。AI 必须比较 toolchain、target triple、profile、features、build script、环境变量和锁策略；不兼容的发布/开发作用域应分开，兼容的同项目 worktree 应尽量共享。
 
-```text
-cache\rust-targets\<project-id>\<toolchain-key>\target
-```
+## 7. 自动回填与失败降级
 
-规则：
+推荐数据根不存在时，客户端可尝试：
 
-- 同一项目的基础 repo 和所有会话 worktree 共享 target，避免每个会话重复下载和编译。
-- 不同项目使用不同 target，避免 feature、build script、环境变量和绝对 dep-info 互相污染。
-- 不同 Rust toolchain 使用不同 `toolchain-key`，例如 `stable-msvc`、`nightly-msvc`；Cargo 会继续在 target 内按 target triple 分目录。
-- 每个任务创建原子 lease，TTL/LRU 和人工清理都必须避开活跃 lease；同一项目与 toolchain 还持有跨进程 target 独占锁，不能仅依赖某一种构建工具自己的锁实现。
-- 云端只把带项目上下文的 CLI/Exec 任务派给声明 `project_build_cache_v1` 能力的新节点；滚动升级期间，旧节点不会静默绕过治理并继续使用用户目录默认缓存。
-- 跨项目复用依赖编译结果应使用受控的编译缓存层，不能把所有项目硬塞进一个 `D:\rust\shared\target`。
-- 服务端 musl 发布、Windows 节点发布和用户项目开发 profile 不能混用同一个 target。
+1. 从持久化配置、环境变量和已绑定项目位置推导候选根。
+2. 校验路径、可写性、重解析点、marker 和目录重叠。
+3. 创建托管目录并原子保存。
+4. 只对新托管项目启用推荐环境。
 
-节点启动项目任务时应注入绝对 `CARGO_TARGET_DIR`。如需迁移 Cargo registry，可同时注入：
+任一步失败都应记录可诊断原因并继续旧项目任务。无配置状态对 API 表示为 `configuration_recommended=true`、`configuration_required=false`、`governance_mode=advisory`。只有显式创建新托管 workspace 这类确实需要托管目录的操作，才可返回明确的创建失败；不得把失败扩大到外部项目。
 
-```text
-CARGO_HOME=<root>\cache\cargo-home
-```
+## 8. 容量是建议，不是硬门禁
 
-平台仓库自身的开发与发布缓存不属于用户项目缓存，应在本机未提交的 `.env.local` 分开设置：
+以下值保留作为体检基线，帮助 AI 估算风险：
 
-```dotenv
-ELON_DEV_CARGO_TARGET_DIR=D:\rust\shared\elon-dev-cargo-target
-ELON_NODE_AGENT_TARGET_DIR=D:\rust\shared\elon-node-agent-target
-RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
-```
-
-三者的 target triple、profile 和 features 不同，不能为了“共享”而指向同一个目录。`cargo-dev.ps1` 和 `publish-node-agent.ps1` 会读取 `.env.local`；共享仓库脚本不会把某台机器的 `D:` 盘写死为所有用户默认值。
-
-## 5. Gradle、Node 与任务 Temp 路由
-
-节点启动 AI CLI、生成项目命令或构建子进程时，环境变量至少应包含：
-
-| 工具 | 路由 |
+| 指标 | 默认建议 |
 |---|---|
-| Gradle | `GRADLE_USER_HOME=<root>\cache\gradle-home` |
-| npm | `npm_config_cache=<root>\cache\npm` |
-| pnpm | store 指向 `<root>\cache\pnpm-store` |
-| Yarn | `YARN_CACHE_FOLDER=<root>\cache\yarn`；项目内 `.yarn/cache` 随 workspace 一起位于数据盘 |
-| Cargo | `CARGO_HOME` 和项目级 `CARGO_TARGET_DIR` |
-| Windows 临时目录 | `TEMP=<root>\temp\<task-id>`、`TMP=...` |
-| 跨平台临时目录 | `TMPDIR=<root>\temp\<task-id>` |
+| 磁盘安全余量 | 4 GiB |
+| 单任务增长余量 | 8 GiB |
+| 节点托管 cache | 80 GiB |
+| 单托管项目 Rust cache | 24 GiB |
+| 失败任务诊断 temp | 建议保留 24 小时 |
+| 长期未使用缓存 | 30 天后列为人工整理候选 |
 
-Gradle 项目自己的 `.gradle`、`build` 和 Android 输出仍位于项目 workspace；workspace 已在数据根，因此不会回流 C 盘。Android SDK、JDK、Rust toolchain 和 Codex 安装目录属于工具安装，不应被缓存清理接口删除。
+超过建议值时任务继续运行，只生成警告和整理建议。节点不再因压力自动执行 TTL/LRU cache 删除；成功任务自己的临时目录仍可在进程结束后清理。任何实际批量清理都必须由用户显式发起，预览目标和大小，并避开活动 lease。
 
-任务结束后可回收任务 temp；异常终止时由 TTL 扫描补清。子进程仍在运行时不得删除对应 task temp。
+## 9. 体检与管理 API
 
-## 6. 旧节点迁移策略
-
-升级后自动完成数据根绑定，同时用以下规则保护 Git 数据：
-
-1. 有现成外部项目路径时，在项目同盘、同级选择独立目录；不认领、不移动、不改名现有项目。
-2. 候选目录必须为空或带当前 `install_id` marker；被其他文件占用时自动改用安装实例专属名称。
-3. 路径、marker、重解析点、目录重叠全部校验成功后，才原子写入 `node.json`；失败不覆盖原配置。
-4. 旧 workspace/storage 继续作为只读兼容和回滚来源；新会话 worktree、cache、temp 写入新根。
-5. 旧会话 worktree 不递归搬运；需要继续时从已验证的基础 Git repo 重建，脏文件和未 push 提交原地保留。
-6. storage 迁移只有在复制到暂存目录、执行 Git 完整性校验并可原子切换时才自动完成；否则旧目录保持不变并继续报告迁移计划。
-7. 自动绑定失败时只阻止需要写入托管目录的操作；明确只读的外部项目诊断继续使用原项目，不进入构建容量门禁。
-
-缓存不需要复制：新根创建空 cache 即可。旧 C 盘 target 可在确认没有 Cargo/Rustc 进程后删除；旧 Temp 只按白名单类型和年龄处理。
-
-升级后若尚未配置有效统一根，客户端会在第一次写任务前自动准备并持久化。只有已有显式配置损坏、所有候选目录不可写或发生安全校验冲突时才停止，并明确说明原项目未被移动或删除。
-
-## 7. 容量、TTL 与 LRU 默认
-
-产品默认建议如下；管理员可以收紧，不能扩大到 workspace/storage：
-
-| 项目 | 默认 |
-|---|---|
-| 构建前硬保留 | 4 GiB，可用 `ELON_NODE_BUILD_MIN_FREE_BYTES` 覆盖 |
-| 单次构建增长余量 | 8 GiB，可用 `ELON_NODE_BUILD_HEADROOM_BYTES` 覆盖；准入时与硬保留、其他活动任务预留相加 |
-| 节点 cache 配额 | 80 GiB，可用 `ELON_NODE_BUILD_MAX_CACHE_BYTES` 覆盖 |
-| 单项目 Rust cache 配额 | 24 GiB，可用 `ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES` 覆盖 |
-| 成功任务 temp | 子进程结束后立即清理 |
-| 失败、取消或异常任务 temp TTL | 24 小时 |
-| Rust/Gradle/Node cache TTL | 30 天未使用后进入 LRU 候选 |
-| LRU 顺序 | 最久未使用且没有活跃 lease 的项目缓存优先；活动项目绝不删除 |
-| 旧根回滚观察期 | 至少 7 天，并由用户显式确认清理 |
-
-默认情况下，第一次真正需要写入或构建的项目任务启动前至少需要 12 GiB 可用空间：4 GiB 是磁盘安全底线，8 GiB 是本次任务余量；并发任务各自预留 8 GiB。明确只读的项目诊断不创建构建 lease，也不以该容量线阻断。任务结束后若仍低于“安全底线 + 活动任务预留 + 下一任务余量”，节点会先清理无活跃 lease 的可重建缓存。大型 Rust/Android 项目仍建议使用空间更充足的 D/E 盘，管理员可按项目实测提高余量。
-
-## 8. 设置、状态与清理 API
-
-本地管理 API 受本地管理员 token 保护。
-
-查看状态和迁移计划：
+本地管理 API 受管理员 token 保护。
 
 ```http
 GET /api/node-data-root
 ```
 
-设置新根：
+返回推荐根状态、建议容量和不计算递归大小的缓存候选，保证常规页面刷新轻量。
+
+```http
+POST /api/node-data-root/analyze
+```
+
+用户点击“分析本机缓存架构”后执行只读大小统计，返回五类候选、来源、作用域、是否由平台管理、估算大小和建议。该接口不移动、不认领、不删除目录。
 
 ```http
 POST /api/node-data-root
@@ -172,9 +132,7 @@ Content-Type: application/json
 {"root_path":"D:\\ElonNodeData"}
 ```
 
-通过本地 API 设置时，`node.json` 是唯一持久化真源；写入采用同目录原子替换，失败时不会发布新的内存状态。当前进程会立即更新 `ELON_NODE_DATA_ROOT` 及所有派生路径，但仍建议重启节点，让以后启动的所有后台组件继承一致环境。安装目录 `_internal\node-agent.env` 只用于安装器或管理员手工配置，不和 API 进行非事务双写。
-
-清理前预览：
+只改变后续新建托管数据的位置，不改变已有外部项目。
 
 ```http
 POST /api/node-data-root/cleanup
@@ -183,38 +141,27 @@ Content-Type: application/json
 {"apply":false}
 ```
 
-明确执行：
+`apply=false` 只预览；`apply=true` 只删除推荐根内平台自建的可重建 cache/temp。活动任务期间禁止切换根和实际清理，避免竞态。
 
-```json
-{"apply":true}
-```
+## 10. 渐进整理流程
 
-清理接口检测到活动 CLI 或 Exec lease 时必须拒绝执行；未配置数据根时也必须拒绝，不能退回清理任意 `%USERPROFILE%` 或 `%TEMP%`。切换、任务准入和清理共用同一门闩，避免“检查时无任务、删除时任务已启动”的竞态。
+1. **盘点**：记录观察到的工作区、环境变量、`.env.local` 和约定目录；不修改现场。
+2. **解释**：告诉用户哪些缓存正在共享、哪些是重复或隔离合理，以及迁移会新增还是释放多少空间。
+3. **建议**：优先保持已跑通路径；只有新架构能明显降低重复、提升可观测性或避免 C 盘风险时才建议迁移。
+4. **预演**：给出来源、目标、兼容性检查、预计耗时、磁盘峰值和回滚路径。
+5. **执行**：取得明确授权后，先复制/重建并验证，再切换单个作用域；不做跨类别“大搬家”。
+6. **观察**：完成真实 check/test/build/publish 验证，保留旧缓存观察期。
+7. **清理**：再次预览并由用户确认；外部缓存即使已迁移也不自动删除。
 
-## 9. 回滚
+## 11. 发布回归要求
 
-1. 停止创建任务并等待活动 CLI/Cargo/Gradle 进程退出。
-2. 保留新旧根，不要先删除任一侧。
-3. 在本地管理页将数据根恢复为上一个带相同 `install_id` marker 的根；无人值守节点应先清除持久化值，再修改 `ELON_NODE_DATA_ROOT`。
-4. 重启节点并确认状态、项目 Git 远端和 workspace 可用。
-5. 对 storage 执行完整性检查，对项目检查 `git status` 和远端分支。
-6. 回滚完成后，新根的 cache/temp 可清；workspace/storage 仍需用户确认。
+每次修改数据根、节点握手、任务派发、构建环境或缓存清理时，至少覆盖：
 
-不能用修改环境变量的方式“回滚”尚未迁移或未 push 的工作区内容。长期恢复来源始终是已验证的 Git repo、remote 和 branch。
+- 无数据根的旧 `node.json`、损坏显式配置和自动回填失败；已有外部项目仍能执行 CLI 与 Exec。
+- 旧节点没有 `project_build_cache_v1` 能力；已有项目仍可派单，新建托管 workspace 协议才拒绝。
+- 外部项目保留 cwd 和环境；托管项目才注入推荐缓存。
+- 低磁盘、超建议配额、项目数偏多只产生建议，不拒绝任务、不自动清理。
+- 五类缓存盘点结果全部为只读候选，`automatic_action=none`。
+- 清理越界、重解析点和活动 lease 均被拒绝。
 
-## 10. 旧 C 盘只读盘点
-
-仓库提供 `scripts/inspect-node-disk-usage.ps1`：
-
-```powershell
-# 默认只预览
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-node-disk-usage.ps1
-
-# 显式清理两个已知可重建 Rust target
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-node-disk-usage.ps1 -Apply
-
-# 再包含 30 天前的严格 Temp 候选
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\inspect-node-disk-usage.ps1 -Apply -IncludeExpiredTemp -MinAgeDays 30
-```
-
-脚本拒绝系统根、候选根越界、重解析点和 Cargo/Rustc 活跃进程；默认不删除任何内容。它不是通用磁盘清理器，不处理 VS Code、Gradle、Codex 会话、浏览器或未知应用目录。
+事故与灰度规则见 `docs/node-agent-upgrade-compatibility.md`。

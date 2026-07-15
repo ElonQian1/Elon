@@ -1,7 +1,9 @@
 //! PC node capacity policy for code-project workspaces.
 //!
 //! Servers are not the default place for new code projects anymore, so PC nodes
-//! need an explicit admission check before provisioning another workspace.
+//! need an availability check plus advisory capacity guidance before
+//! provisioning another workspace. Disk and project-count guidance must not
+//! turn an otherwise usable node into an outage.
 
 use serde::Serialize;
 
@@ -41,7 +43,9 @@ pub fn assess_pc_node_capacity(
         warnings.push("PC 节点未上报可创建项目工作区的开发运行时能力".to_string());
     }
     if node.project_count >= project_limit {
-        warnings.push(format!("PC 节点项目数已达上限 {project_limit} 个"));
+        warnings.push(format!(
+            "PC 节点项目数已达到建议整理线 {project_limit} 个；仍可继续使用"
+        ));
     }
     match disk_free_bytes {
         Some(bytes) if bytes < min_free_bytes => warnings.push(format!(
@@ -52,19 +56,15 @@ pub fn assess_pc_node_capacity(
         _ => {}
     }
 
-    let hard_blocked = !node.online
-        || !node.cli_connected
-        || !node.workspace_provision_ready()
-        || node.project_count >= project_limit
-        || disk_free_bytes.is_some_and(|bytes| bytes < min_free_bytes);
+    let hard_blocked = !node.online || !node.cli_connected || !node.workspace_provision_ready();
     let (label, tone) = if !node.online {
         ("离线", "bad")
     } else if !node.cli_connected || !node.workspace_provision_ready() {
         ("开发运行时不可用", "bad")
     } else if node.project_count >= project_limit {
-        ("项目数已满", "bad")
+        ("建议整理项目", "warn")
     } else if disk_free_bytes.is_some_and(|bytes| bytes < min_free_bytes) {
-        ("磁盘不足", "bad")
+        ("建议整理磁盘", "warn")
     } else if disk_free_bytes.is_none() {
         ("容量未知", "warn")
     } else {
@@ -89,8 +89,11 @@ pub fn capacity_block_message(node: &NodeRuntime, capacity: &PcNodeCapacity) -> 
         .warnings
         .first()
         .cloned()
-        .unwrap_or_else(|| "容量策略不允许继续创建项目".to_string());
-    format!("PC 节点 {} 暂不能创建新项目：{reason}", node.display_name)
+        .unwrap_or_else(|| "节点开发运行时暂不可用".to_string());
+    format!(
+        "PC 节点 {} 暂不能连接开发运行时：{reason}",
+        node.display_name
+    )
 }
 
 pub fn max_projects_per_node() -> i64 {
@@ -125,14 +128,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn capacity_blocks_full_node() {
+    fn project_limit_is_advisory_for_an_available_node() {
         let mut node = test_node();
         node.project_count = max_projects_per_node();
 
         let capacity = assess_pc_node_capacity(&node, None);
 
-        assert!(!capacity.can_accept_project);
-        assert_eq!(capacity.label, "项目数已满");
+        assert!(capacity.can_accept_project);
+        assert_eq!(capacity.label, "建议整理项目");
+        assert_eq!(capacity.tone, "warn");
+    }
+
+    #[test]
+    fn low_disk_is_advisory_for_an_available_node() {
+        let node = test_node();
+        let snapshot = ProjectWorkspaceHealthSnapshot {
+            project_id: "project-a".to_string(),
+            node_id: Some("node-a".to_string()),
+            workspace_path: Some("D:/repo".to_string()),
+            can_run_on_pc: true,
+            verified_can_run_on_pc: Some(true),
+            health_label: "可运行".to_string(),
+            health_tone: "ok".to_string(),
+            recommended_action: String::new(),
+            warning_count: 0,
+            warnings: Vec::new(),
+            live_inspect: None,
+            inspect_error: None,
+            disk_free_bytes: Some(1),
+            path_exists: Some(true),
+            is_dir: Some(true),
+            is_git_worktree: Some(true),
+            cli_available: Some(true),
+            captured_at: String::new(),
+        };
+
+        let capacity = assess_pc_node_capacity(&node, Some(&snapshot));
+
+        assert!(capacity.can_accept_project);
+        assert_eq!(capacity.label, "建议整理磁盘");
+        assert_eq!(capacity.tone, "warn");
     }
 
     #[test]

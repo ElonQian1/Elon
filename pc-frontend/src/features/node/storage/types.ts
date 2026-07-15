@@ -32,9 +32,32 @@ export interface NodeBuildCacheStatus {
   captured_at_unix_secs?: number
 }
 
+export interface NodeCacheAdvisorCandidate {
+  kind?: string
+  label?: string
+  path?: string
+  source?: string
+  scope?: string
+  exists?: boolean
+  managed_by_platform?: boolean
+  automatic_action?: 'none' | string
+  estimated_bytes?: number | null
+  recommendation?: string
+}
+
+export interface NodeCacheAdvisorReport {
+  schema_version?: number
+  mode?: 'advisory' | string
+  summary?: string
+  candidates?: NodeCacheAdvisorCandidate[]
+  suggestions?: string[]
+}
+
 export interface NodeDataRootStatus {
   configured?: boolean
   configuration_required?: boolean
+  configuration_recommended?: boolean
+  governance_mode?: 'advisory' | string
   source?: 'environment' | 'persisted' | 'unconfigured' | string
   root_path?: string | null
   workspace_root?: string | null
@@ -55,6 +78,13 @@ export interface NodeDataRootStatus {
   cache_bytes?: number
   temp_bytes?: number
   build_cache?: NodeBuildCacheStatus
+  cache_advisor?: NodeCacheAdvisorReport
+}
+
+export interface NodeCacheAdvisorResponse {
+  ok?: boolean
+  cache_advisor?: NodeCacheAdvisorReport
+  message?: string
 }
 
 export interface NodeDataRootSetResponse {

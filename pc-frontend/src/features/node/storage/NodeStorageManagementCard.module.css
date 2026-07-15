@@ -26,7 +26,9 @@
 .sectionTitle span,
 .rootEditor small,
 .migrationItem small,
-.migrationItem p {
+.migrationItem p,
+.advisorItem small,
+.advisor p {
   margin: 0;
   color: var(--text-muted, #91a0b5);
   font-size: 12px;
@@ -157,7 +159,8 @@
 
 .pathList,
 .migration,
-.cleanupPreview {
+.cleanupPreview,
+.advisor {
   display: grid;
   gap: 9px;
 }
@@ -178,12 +181,32 @@
 }
 
 .migration,
-.cleanupPreview {
+.cleanupPreview,
+.advisor {
   padding: 13px;
   border: 1px solid rgba(245, 158, 11, .25);
   border-radius: 12px;
   background: rgba(245, 158, 11, .06);
 }
+
+.advisor {
+  border-color: rgba(59, 130, 246, .25);
+  background: rgba(59, 130, 246, .06);
+}
+
+.advisorItem {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(148, 163, 184, .14);
+}
+
+.advisorItem > span { color: var(--text-muted, #91a0b5); font-size: 11px; }
+.advisorItem code { overflow-wrap: anywhere; color: #bfdbfe; font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.advisorItem b { font-size: 11px; }
+.advisorItem small { grid-column: 2 / 4; }
+.advisor p { margin: 0; }
 
 .migrationItem {
   display: grid;
@@ -217,9 +240,11 @@
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pathList > div,
   .migrationItem,
-  .cleanupPreview > div { grid-template-columns: 1fr; }
+  .cleanupPreview > div,
+  .advisorItem { grid-template-columns: 1fr; }
   .migrationItem small,
-  .migrationItem p { grid-column: 1; }
+  .migrationItem p,
+  .advisorItem small { grid-column: 1; }
   .rootRow input,
   .rootRow button { width: 100%; box-sizing: border-box; }
 }

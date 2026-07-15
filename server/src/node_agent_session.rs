@@ -88,7 +88,9 @@ pub(super) async fn run_session(
     let workspace_root = data_root
         .paths
         .as_ref()
-        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces);
+        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces)
+        .or_else(|| data_root.legacy_workspace_root.clone())
+        .or_else(|| Some(elon_pc_dev_runtime::legacy_default_workspace_root()));
     let profile_clis = available_clis.clone();
     let server_runtime_ready = server_runtime_status.ready;
     let mut dev_runtime = tokio::task::spawn_blocking(move || {
@@ -105,14 +107,9 @@ pub(super) async fn run_session(
     if let Some(paths) = data_root.paths.as_ref() {
         dev_runtime.workspace_root_path = Some(paths.workspaces().to_string_lossy().to_string());
     } else {
-        dev_runtime.workspace_root_path = data_root
-            .configured_root()
-            .map(|path| path.to_string_lossy().to_string());
-        dev_runtime.workspace_root_writable = false;
-        dev_runtime.workspace_provision_ready = false;
         let issue = data_root.invalid_reason.as_deref().map_or_else(
-            || "尚未配置统一节点数据根，项目写入保持阻断".to_string(),
-            |reason| format!("统一节点数据根无效，项目写入保持阻断: {reason}"),
+            || "推荐数据根尚未配置；旧项目继续继承原工作区，客户端会在合适时机自动回填".to_string(),
+            |reason| format!("推荐数据根暂不可用，旧项目不受影响并继续使用原工作区: {reason}"),
         );
         if !dev_runtime.issues.iter().any(|existing| existing == &issue) {
             dev_runtime.issues.push(issue);

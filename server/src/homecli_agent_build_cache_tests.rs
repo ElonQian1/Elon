@@ -37,8 +37,11 @@ async fn registered_build_cache_agent() -> BuildCacheTestAgent {
 }
 
 #[tokio::test]
-async fn project_prompt_rejects_agent_without_build_cache_capability() {
-    let BuildCacheTestAgent { manager, .. } = registered_build_cache_agent().await;
+async fn existing_project_prompt_allows_agent_without_build_cache_capability() {
+    let BuildCacheTestAgent {
+        manager,
+        mut cmd_rx,
+    } = registered_build_cache_agent().await;
     manager
         .agents
         .write()
@@ -47,27 +50,68 @@ async fn project_prompt_rejects_agent_without_build_cache_capability() {
         .expect("registered agent")
         .capabilities
         .clear();
-
-    let error = match manager
-        .dispatch_cli_prompt_with_context_control(
-            "agent",
-            "codex".to_string(),
-            Vec::new(),
-            Some("D:/project".to_string()),
-            Some(project_context()),
-            "build".to_string(),
-        )
+    let ping_acks = manager
+        .agents
+        .read()
         .await
-    {
-        Ok(_) => panic!("legacy agent must be rejected"),
-        Err(error) => error,
-    };
+        .get("agent")
+        .expect("registered agent")
+        .ping_acks
+        .clone();
+    let expected_context = project_context();
+    let context_for_dispatch = expected_context.clone();
+    let manager_for_dispatch = manager.clone();
+    let dispatch_task = tokio::spawn(async move {
+        manager_for_dispatch
+            .dispatch_cli_prompt_with_context_control_id_and_credential_binding(
+                "existing-project-prompt".to_string(),
+                "agent",
+                "codex".to_string(),
+                Vec::new(),
+                Some("D:/project".to_string()),
+                Some(context_for_dispatch),
+                None,
+                false,
+                None,
+                "build".to_string(),
+            )
+            .await
+    });
 
-    assert!(error.to_string().contains("版本过旧"));
+    let nonce = match cmd_rx.recv().await {
+        Some(ServerToAgent::Ping { nonce }) => nonce.expect("probe ping has nonce"),
+        other => panic!("expected probe ping before CLI prompt, got {other:?}"),
+    };
+    ping_acks
+        .lock()
+        .await
+        .remove(&nonce)
+        .expect("probe ping waiter")
+        .send(())
+        .expect("probe waiter remains live");
+
+    match cmd_rx.recv().await {
+        Some(ServerToAgent::CliPrompt {
+            cwd,
+            project_context,
+            ..
+        }) => {
+            assert_eq!(cwd.as_deref(), Some("D:/project"));
+            let actual = project_context.expect("existing project context must be retained");
+            assert_eq!(actual.project_id, expected_context.project_id);
+            assert_eq!(actual.conversation_id, expected_context.conversation_id);
+        }
+        other => panic!("expected project CLI prompt, got {other:?}"),
+    }
+    let dispatch = dispatch_task
+        .await
+        .expect("dispatch join")
+        .expect("existing project prompt must remain compatible");
+    assert_eq!(dispatch.req_id, "existing-project-prompt");
 }
 
 #[tokio::test]
-async fn project_exec_rejects_agent_without_build_cache_capability() {
+async fn existing_project_exec_allows_agent_without_build_cache_capability() {
     let BuildCacheTestAgent {
         manager,
         mut cmd_rx,
@@ -82,28 +126,34 @@ async fn project_exec_rejects_agent_without_build_cache_capability() {
         .capabilities
         .clear();
 
-    let error = match manager
+    let expected_context = project_context();
+    let (task_id, _rx) = manager
         .dispatch_with_project_context(
             "agent",
             "cargo".to_string(),
             vec!["check".to_string()],
             "D:/project".to_string(),
             Vec::new(),
-            Some(project_context()),
+            Some(expected_context.clone()),
         )
         .await
-    {
-        Ok(_) => panic!("legacy agent must be rejected"),
-        Err(error) => error,
-    };
+        .expect("existing project exec must remain compatible");
 
-    let message = error.to_string();
-    assert!(message.contains("版本过旧"));
-    assert!(message.contains(homecli_proto::CAP_PROJECT_BUILD_CACHE_V1));
-    assert!(matches!(
-        cmd_rx.try_recv(),
-        Err(mpsc::error::TryRecvError::Empty)
-    ));
+    match cmd_rx.try_recv() {
+        Ok(ServerToAgent::Exec {
+            task_id: sent_task_id,
+            cwd,
+            project_context,
+            ..
+        }) => {
+            assert_eq!(sent_task_id, task_id);
+            assert_eq!(cwd, "D:/project");
+            let actual = project_context.expect("existing project context must be retained");
+            assert_eq!(actual.project_id, expected_context.project_id);
+            assert_eq!(actual.conversation_id, expected_context.conversation_id);
+        }
+        other => panic!("expected project exec, got {other:?}"),
+    }
 }
 
 #[tokio::test]

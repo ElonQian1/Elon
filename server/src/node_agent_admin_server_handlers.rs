@@ -53,15 +53,7 @@ pub(super) async fn admin_storage_config_set(
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     let enabled = req.enabled.unwrap_or(false);
     let data_root = rt.node_data_root.read().await.clone();
-    if enabled && data_root.paths.is_none() {
-        return (
-            axum::http::StatusCode::CONFLICT,
-            axum::Json(serde_json::json!({
-                "ok": false,
-                "error": data_root.invalid_reason.unwrap_or_else(|| "尚未配置统一节点数据根，不能启用硬盘服务".to_string()),
-            })),
-        );
-    }
+    let existing_root = rt.storage_settings.read().await.root_path.clone();
     let managed_storage_root = data_root
         .paths
         .as_ref()
@@ -72,8 +64,9 @@ pub(super) async fn admin_storage_config_set(
             .to_string_lossy()
             .to_string()
     });
-    let root_path = managed_storage_root
-        .or_else(|| clean_optional_admin_field(req.root_path.as_deref()))
+    let root_path = clean_optional_admin_field(req.root_path.as_deref())
+        .or(existing_root)
+        .or(managed_storage_root)
         .or_else(|| enabled.then(|| default_root));
     if enabled {
         if let Some(root) = root_path.as_deref() {

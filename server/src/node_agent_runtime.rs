@@ -55,6 +55,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     pub(crate) node_data_root: RwLock<NodeDataRootState>,
     pub(crate) node_data_root_transition: Arc<Mutex<()>>,
+    pub(crate) cache_advisor: crate::node_agent_cache_advisor::CacheArchitectureAdvisor,
     persisted_state_transition: Mutex<()>,
     pub(crate) active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
     pub(crate) cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
@@ -99,6 +100,8 @@ impl NodeRuntime {
             storage_settings: RwLock::new(storage_settings),
             node_data_root: RwLock::new(node_data_root),
             node_data_root_transition: Arc::new(Mutex::new(())),
+            cache_advisor: crate::node_agent_cache_advisor::CacheArchitectureAdvisor::load_default(
+            ),
             persisted_state_transition: Mutex::new(()),
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
             cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry::default(),
@@ -456,16 +459,10 @@ impl NodeRuntime {
     ) -> anyhow::Result<()> {
         let _transition = self.persisted_state_transition.lock().await;
         let data_root = self.node_data_root.read().await.clone();
-        if let Some(paths) = data_root.paths.as_ref() {
-            settings.root_path = Some(paths.storage().to_string_lossy().to_string());
-        } else if settings.enabled {
-            anyhow::bail!(
-                "尚未配置有效的节点数据根，硬盘服务保持阻断: {}",
-                data_root
-                    .invalid_reason
-                    .as_deref()
-                    .unwrap_or("统一数据根未配置")
-            );
+        if settings.root_path.is_none() {
+            if let Some(paths) = data_root.paths.as_ref() {
+                settings.root_path = Some(paths.storage().to_string_lossy().to_string());
+            }
         }
         let mut persisted = load_persisted()?;
         persisted.set_install_id(&self.install_id);
@@ -476,9 +473,9 @@ impl NodeRuntime {
         Ok(())
     }
 
-    /// Upgraded nodes may not yet have the unified data-root field. Prepare it
-    /// on the first managed project task, preferring a safe sibling of the
-    /// already-bound project so ordinary users never need to move folders.
+    /// Upgraded nodes may not yet have the recommended data-root field. Prepare
+    /// it best-effort on the first project task, preferring a safe sibling of
+    /// the already-bound project without adopting or moving the old project.
     pub(crate) async fn ensure_node_data_root_for_workspace(
         &self,
         workspace_hint: Option<&Path>,
@@ -531,13 +528,23 @@ impl NodeRuntime {
             .as_ref()
             .map(elon_pc_dev_runtime::NodeDataPaths::workspaces)
             .or(previous.legacy_workspace_root.clone());
-        let legacy_storage_root = previous
-            .paths
-            .as_ref()
-            .map(elon_pc_dev_runtime::NodeDataPaths::storage)
-            .or_else(|| storage.root_path.as_deref().map(std::path::PathBuf::from))
+        let legacy_storage_root = storage
+            .root_path
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                previous
+                    .paths
+                    .as_ref()
+                    .map(elon_pc_dev_runtime::NodeDataPaths::storage)
+            })
             .or(previous.legacy_storage_root.clone());
-        storage.root_path = Some(paths.storage().to_string_lossy().to_string());
+        // Selecting or auto-backfilling a recommendation must not silently
+        // repoint an already-running Git storage service. A new service with no
+        // prior path may use the recommended storage directory by default.
+        if storage.root_path.is_none() {
+            storage.root_path = Some(paths.storage().to_string_lossy().to_string());
+        }
         let next = NodeDataRootState::from_prepared_paths(
             paths.clone(),
             node_agent_data_root::NodeDataRootSource::Persisted,

@@ -39,6 +39,7 @@ mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_atomic_file;
 mod node_agent_build_runtime;
+mod node_agent_cache_advisor;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
 mod node_agent_cli_probe;
@@ -102,6 +103,7 @@ mod node_agent_local_pc_frontend;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
+mod node_agent_project_data_policy;
 mod node_agent_project_docs_mcp;
 mod node_agent_project_docs_mcp_tools;
 mod node_agent_project_documents;
@@ -309,7 +311,7 @@ async fn run_agent_runtime() -> Result<()> {
     if let Some(paths) = node_data_root.paths.as_ref() {
         node_agent_data_root::apply_to_process(paths);
     } else if let Some(reason) = node_data_root.invalid_reason.as_deref() {
-        warn!("节点数据根校验失败，项目构建与硬盘服务保持阻断状态: {reason}");
+        warn!("推荐数据根校验失败，将继续继承旧项目目录、缓存与硬盘服务配置: {reason}");
     }
     if node_data_root.source == node_agent_data_root::NodeDataRootSource::Environment
         && persisted.set_validated_node_data_root(&node_data_root)

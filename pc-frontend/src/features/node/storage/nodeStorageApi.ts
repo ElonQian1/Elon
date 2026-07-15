@@ -3,10 +3,12 @@ import type {
   NodeDataRootCleanupResponse,
   NodeDataRootSetResponse,
   NodeDataRootStatus,
+  NodeCacheAdvisorResponse,
 } from './types'
 
 const STATUS_PATH = '/api/node-data-root'
 const CLEANUP_PATH = '/api/node-data-root/cleanup'
+const ANALYZE_PATH = '/api/node-data-root/analyze'
 
 export function fetchNodeDataRoot(adminUrl: string): Promise<NodeDataRootStatus> {
   return nodeApi<NodeDataRootStatus>(adminUrl, STATUS_PATH, {}, 120000)
@@ -27,4 +29,10 @@ export function cleanupNodeDataRoot(
     method: 'POST',
     body: JSON.stringify({ apply }),
   }, apply ? 1800000 : 120000)
+}
+
+export function analyzeNodeCacheArchitecture(adminUrl: string): Promise<NodeCacheAdvisorResponse> {
+  return nodeApi<NodeCacheAdvisorResponse>(adminUrl, ANALYZE_PATH, {
+    method: 'POST',
+  }, 1800000)
 }

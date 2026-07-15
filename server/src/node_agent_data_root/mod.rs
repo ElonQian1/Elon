@@ -140,14 +140,14 @@ impl NodeDataRootState {
             "workspace",
             self.legacy_workspace_root.as_deref(),
             workspace_target.as_deref(),
-            "保留旧目录只读；确认无脏 worktree 后从 Git 基线在新根重建",
+            "旧项目继续原地运行；如用户选择迁移，再确认 Git 状态并从已验证基线在新根重建",
         );
         push_migration_item(
             &mut items,
             "storage",
             self.legacy_storage_root.as_deref(),
             storage_target.as_deref(),
-            "保留旧目录只读；裸仓库需复制并执行 Git 完整性校验后再切换",
+            "旧仓库继续原地运行；如用户选择迁移，复制裸仓库并完成 Git 完整性校验后再切换",
         );
         items
     }
@@ -161,7 +161,9 @@ impl NodeDataRootState {
         let configured = self.paths.is_some();
         serde_json::json!({
             "configured": configured,
-            "configuration_required": !configured,
+            "configuration_required": false,
+            "configuration_recommended": !configured,
+            "governance_mode": "advisory",
             "source": self.source,
             "root_path": self.configured_root().map(path_text),
             "workspace_root": self.paths.as_ref().map(|paths| path_text(&paths.workspaces())),
@@ -171,7 +173,7 @@ impl NodeDataRootState {
             "invalid_reason": self.invalid_reason,
             "migration_required": plan.iter().any(|item| item.has_data),
             "migration_plan": plan,
-            "legacy_policy": "keep_external_projects_in_place_and_automatically_prepare_managed_data",
+            "legacy_policy": "inherit_existing_projects_and_caches; recommend_managed_data_root_for_new_projects",
         })
     }
 }
@@ -453,7 +455,7 @@ fn push_migration_item(
         target_path: target.map(path_text),
         exists,
         has_data: exists && directory_has_entries(source),
-        read_only_compatibility: true,
+        read_only_compatibility: false,
         strategy,
     });
 }

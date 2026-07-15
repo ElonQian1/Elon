@@ -1,10 +1,5 @@
-use super::{
-    cleanup::{cleanup_expired, cleanup_for_pressure, CleanupReport},
-    paths::BuildRunPaths,
-    reservation,
-    telemetry::directory_size,
-};
-use anyhow::{anyhow, Result};
+use super::{cleanup::CleanupReport, paths::BuildRunPaths, reservation, telemetry::directory_size};
+use anyhow::Result;
 use std::path::{Path, PathBuf};
 
 const GIB: u64 = 1024 * 1024 * 1024;
@@ -15,8 +10,6 @@ pub(crate) struct BuildCachePolicy {
     pub(crate) build_headroom_bytes: u64,
     pub(crate) max_total_cache_bytes: u64,
     pub(crate) max_project_rust_bytes: u64,
-    pub(crate) temp_ttl_secs: u64,
-    pub(crate) cache_ttl_secs: u64,
 }
 
 impl Default for BuildCachePolicy {
@@ -28,8 +21,6 @@ impl Default for BuildCachePolicy {
             max_total_cache_bytes: env_u64("ELON_NODE_BUILD_MAX_CACHE_BYTES").unwrap_or(80 * GIB),
             max_project_rust_bytes: env_u64("ELON_NODE_BUILD_MAX_PROJECT_RUST_BYTES")
                 .unwrap_or(24 * GIB),
-            temp_ttl_secs: env_u64("ELON_NODE_BUILD_TEMP_TTL_SECS").unwrap_or(24 * 60 * 60),
-            cache_ttl_secs: env_u64("ELON_NODE_BUILD_CACHE_TTL_SECS").unwrap_or(30 * 24 * 60 * 60),
         }
     }
 }
@@ -39,57 +30,48 @@ pub(crate) fn admit(
     policy: &BuildCachePolicy,
     active_reserved_bytes: u64,
 ) -> Result<CleanupReport> {
-    let mut report = cleanup_expired(paths, policy)?;
-    if under_pressure(paths, policy, active_reserved_bytes) {
-        report.merge(cleanup_for_pressure(paths, policy, active_reserved_bytes)?);
+    for advisory in advisories(paths, policy, active_reserved_bytes) {
+        tracing::warn!(%advisory, "项目数据架构体检建议；不阻止任务、不自动清理缓存");
     }
+    Ok(CleanupReport::default())
+}
 
+pub(crate) fn advisories(
+    paths: &BuildRunPaths,
+    policy: &BuildCachePolicy,
+    active_reserved_bytes: u64,
+) -> Vec<String> {
+    let mut warnings = Vec::new();
     let cache_bytes = directory_size(&paths.cache_root);
     let project_bytes = directory_size(&paths.project_rust_root);
-    let free_bytes = disk_free_bytes(&paths.root).ok_or_else(|| {
-        anyhow!(
-            "无法读取 PC 节点构建盘可用容量，已按 fail-closed 拒绝启动任务: {}",
-            paths.root.display()
-        )
-    })?;
     let required_free = reservation::admission_required_free(policy, active_reserved_bytes);
-    if free_bytes < required_free {
-        return Err(anyhow!(
-            "AI 临时工作区可用空间不足（不是项目损坏，项目文件不会被删除）：安全底线 {} GiB + 运行中任务预留 {} GiB + 本次任务余量 {} GiB，开始前需至少 {} GiB 空闲，当前约 {} GiB。请释放该磁盘空间后重试",
-            policy.min_free_bytes / GIB,
-            active_reserved_bytes / GIB,
-            policy.build_headroom_bytes / GIB,
-            required_free / GIB,
-            free_bytes / GIB
-        ));
+    match disk_free_bytes(&paths.root) {
+        Some(free_bytes) if free_bytes < required_free => warnings.push(format!(
+            "AI 临时工作区剩余约 {} GiB，低于建议余量 {} GiB；任务继续运行，AI 可优先复用旧缓存或提出整理方案",
+            free_bytes / GIB,
+            required_free / GIB
+        )),
+        None => warnings.push(format!(
+            "暂时无法读取 {} 的可用容量；任务继续运行，实际构建结果作为判断依据",
+            paths.root.display()
+        )),
+        _ => {}
     }
     if cache_bytes > policy.max_total_cache_bytes {
-        return Err(anyhow!(
-            "PC 节点构建缓存超过总配额：{} GiB / {} GiB",
+        warnings.push(format!(
+            "一龙推荐缓存约 {} GiB，超过建议值 {} GiB；不会自动删除，可在体检后选择整理",
             cache_bytes / GIB,
             policy.max_total_cache_bytes / GIB
         ));
     }
     if project_bytes > policy.max_project_rust_bytes {
-        return Err(anyhow!(
-            "项目 Rust 构建缓存超过配额：{} GiB / {} GiB",
+        warnings.push(format!(
+            "当前托管项目 Rust 缓存约 {} GiB，超过建议值 {} GiB；不会阻止项目",
             project_bytes / GIB,
             policy.max_project_rust_bytes / GIB
         ));
     }
-    Ok(report)
-}
-
-pub(crate) fn under_pressure(
-    paths: &BuildRunPaths,
-    policy: &BuildCachePolicy,
-    active_reserved_bytes: u64,
-) -> bool {
-    directory_size(&paths.cache_root) > policy.max_total_cache_bytes
-        || directory_size(&paths.project_rust_root) > policy.max_project_rust_bytes
-        || disk_free_bytes(&paths.root)
-            .map(|bytes| bytes < reservation::cleanup_required_free(policy, active_reserved_bytes))
-            .unwrap_or(false)
+    warnings
 }
 
 pub(crate) fn required_free_bytes(policy: &BuildCachePolicy) -> u64 {

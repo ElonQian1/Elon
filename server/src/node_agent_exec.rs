@@ -22,6 +22,9 @@ pub async fn run_exec(
 ) {
     use tokio::io::AsyncBufReadExt;
 
+    runtime
+        .cache_advisor
+        .observe_workspace(std::path::Path::new(&cwd));
     let mut build_run = if let Some(project_context) = project_context
         .as_ref()
         .filter(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()))
@@ -30,42 +33,43 @@ pub async fn run_exec(
             .ensure_node_data_root_for_workspace(Some(std::path::Path::new(&cwd)))
             .await
         {
-            let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
-                task_id,
-                message: format!(
-                    "客户端无法自动准备 AI 临时工作区；原项目没有被移动或删除。{error:#}"
-                ),
-            }));
-            return;
+            warn!(
+                %error,
+                "AI 临时工作区自动回填失败；Exec 继续继承原项目与原缓存"
+            );
         }
         let prepared = {
             let _transition = runtime.node_data_root_transition.lock().await;
             let data_paths = runtime.node_data_root.read().await.paths.clone();
-            let Some(data_paths) = data_paths else {
-                let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
-                    task_id,
-                    message: "PC 节点尚未配置统一数据根，已阻止项目 Exec 回落到系统盘".into(),
-                }));
-                return;
-            };
-            crate::node_agent_build_runtime::prepare_run(
-                &data_paths,
-                crate::node_agent_build_runtime::BuildRunRequest {
-                    task_id: &task_id,
-                    project_id: &project_context.project_id,
-                    cwd: Some(std::path::Path::new(&cwd)),
-                },
-            )
+            let policy = crate::node_agent_project_data_policy::classify(
+                data_paths.as_ref(),
+                std::path::Path::new(&cwd),
+            );
+            if policy.uses_managed_workspace() {
+                data_paths.map(|data_paths| {
+                    crate::node_agent_build_runtime::prepare_run(
+                        &data_paths,
+                        crate::node_agent_build_runtime::BuildRunRequest {
+                            task_id: &task_id,
+                            project_id: &project_context.project_id,
+                            cwd: Some(std::path::Path::new(&cwd)),
+                        },
+                    )
+                })
+            } else {
+                None
+            }
         };
         match prepared {
-            Ok(run) => Some(run),
-            Err(error) => {
+            Some(Ok(run)) => Some(run),
+            Some(Err(error)) => {
                 let _ = out_tx.send(ws_text(&AgentToServer::TaskError {
                     task_id,
-                    message: format!("PC 节点构建环境门禁失败: {error:#}"),
+                    message: format!("一龙推荐构建环境准备失败: {error:#}"),
                 }));
                 return;
             }
+            None => None,
         }
     } else {
         None

@@ -342,23 +342,23 @@ async fn run_cli_task(
         return;
     }
 
-    let managed_task_needs_data_root = project_context
+    if let Some(cwd) = cwd.as_deref() {
+        runtime
+            .cache_advisor
+            .observe_workspace(std::path::Path::new(cwd));
+    }
+    let write_task_can_prepare_data_root = project_context
         .as_ref()
         .is_some_and(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()));
-    if managed_task_needs_data_root {
+    if write_task_can_prepare_data_root {
         if let Err(error) = runtime
             .ensure_node_data_root_for_workspace(cwd.as_deref().map(std::path::Path::new))
             .await
         {
-            send_preflight_failure(
-                &runtime,
-                &completion_context,
-                resolved_cli.name(),
-                &out_tx,
-                req_id,
-                format!("客户端无法自动准备 AI 临时工作区；原项目没有被移动或删除。{error:#}"),
+            warn!(
+                %error,
+                "AI 临时工作区自动回填失败；保留原项目与原缓存并继续任务"
             );
-            return;
         }
     }
 
@@ -367,21 +367,18 @@ async fn run_cli_task(
     // lease is registered, never between selecting a workspace and its cache.
     let transition = runtime.node_data_root_transition.clone().lock_owned().await;
     let data_paths = runtime.node_data_root.read().await.paths.clone();
-    let workspace_root = data_paths
-        .as_ref()
-        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces);
     let prepared = tokio::task::spawn_blocking(move || {
         let result = crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in(
-            workspace_root.as_deref(),
+            data_paths.as_ref(),
             cwd,
             project_context,
         );
-        (transition, result)
+        (transition, data_paths, result)
     })
     .await;
-    let (transition, prepared_cwd) = match prepared {
-        Ok((transition, Ok(cwd))) => (transition, cwd),
-        Ok((_transition, Err(error))) => {
+    let (transition, data_paths, prepared_cwd) = match prepared {
+        Ok((transition, data_paths, Ok(cwd))) => (transition, data_paths, cwd),
+        Ok((_transition, _data_paths, Err(error))) => {
             send_preflight_failure(
                 &runtime,
                 &completion_context,
@@ -408,38 +405,33 @@ async fn run_cli_task(
         .project_context
         .as_ref()
         .filter(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()))
+        .filter(|_| prepared_cwd.data_policy.uses_managed_workspace())
     {
-        let Some(data_paths) = data_paths.as_ref() else {
-            send_preflight_failure(
-                &runtime,
-                &completion_context,
-                resolved_cli.name(),
-                &out_tx,
-                req_id,
-                "PC 节点尚未配置统一数据根，已阻止项目构建回落到系统盘".to_string(),
-            );
-            return;
-        };
-        match crate::node_agent_build_runtime::register_cli_run(
-            data_paths,
-            crate::node_agent_build_runtime::BuildRunRequest {
-                task_id: &req_id_for_cleanup,
-                project_id: &project_context.project_id,
-                cwd: prepared_cwd.cwd.as_deref().map(std::path::Path::new),
-            },
-        ) {
-            Ok(run) => Some(run),
-            Err(error) => {
-                send_preflight_failure(
-                    &runtime,
-                    &completion_context,
-                    resolved_cli.name(),
-                    &out_tx,
-                    req_id,
-                    format!("PC 节点构建环境门禁失败: {error:#}"),
-                );
-                return;
+        if let Some(data_paths) = data_paths.as_ref() {
+            match crate::node_agent_build_runtime::register_cli_run(
+                data_paths,
+                crate::node_agent_build_runtime::BuildRunRequest {
+                    task_id: &req_id_for_cleanup,
+                    project_id: &project_context.project_id,
+                    cwd: prepared_cwd.cwd.as_deref().map(std::path::Path::new),
+                },
+            ) {
+                Ok(run) => Some(run),
+                Err(error) => {
+                    send_preflight_failure(
+                        &runtime,
+                        &completion_context,
+                        resolved_cli.name(),
+                        &out_tx,
+                        req_id,
+                        format!("一龙推荐构建环境准备失败: {error:#}"),
+                    );
+                    return;
+                }
             }
+        } else {
+            warn!("推荐数据根暂不可用，继续继承原项目构建环境");
+            None
         }
     } else {
         None

@@ -3,10 +3,11 @@ use super::{
     telemetry::unix_now,
 };
 use anyhow::{Context, Result};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-/// Records actual target use separately from artifact mtimes. Cache hits often
-/// do not modify target files, so filesystem mtime alone is not an LRU signal.
+/// Records actual target use separately from artifact mtimes for architecture
+/// advice and future user-authorized migration. This metadata never deletes a
+/// cache or blocks a task by itself.
 pub(crate) fn touch(paths: &BuildRunPaths) -> Result<()> {
     let target = target_usage_path(paths, &paths.project_key, &paths.toolchain_key);
     let parent = target.parent().expect("usage path has a parent");
@@ -20,16 +21,6 @@ pub(crate) fn touch(paths: &BuildRunPaths) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn last_used(
-    paths: &BuildRunPaths,
-    project_key: &str,
-    toolchain_key: &str,
-) -> Option<u64> {
-    std::fs::read_to_string(target_usage_path(paths, project_key, toolchain_key))
-        .ok()
-        .and_then(|value| value.trim().parse::<u64>().ok())
-}
-
 pub(crate) fn target_usage_path(
     paths: &BuildRunPaths,
     project_key: &str,
@@ -40,18 +31,4 @@ pub(crate) fn target_usage_path(
         .join("rust-targets")
         .join(project_key)
         .join(format!("{toolchain_key}.last-used"))
-}
-
-pub(crate) fn remove(path: Option<&Path>) {
-    if let Some(path) = path {
-        match std::fs::remove_file(path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => tracing::warn!(
-                error = %error,
-                path = %path.display(),
-                "清理 Rust target 使用记录失败"
-            ),
-        }
-    }
 }

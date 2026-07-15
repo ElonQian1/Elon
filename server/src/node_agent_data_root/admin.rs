@@ -21,7 +21,30 @@ pub(crate) async fn get(State(runtime): State<Arc<NodeRuntime>>) -> Json<serde_j
             payload["build_cache"] = serde_json::json!(build_cache);
         }
     }
+    payload["cache_advisor"] = serde_json::json!(runtime
+        .cache_advisor
+        .report(runtime.node_data_root.read().await.paths.as_ref(), false));
     Json(payload)
+}
+
+pub(crate) async fn analyze(
+    State(runtime): State<Arc<NodeRuntime>>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let data_paths = runtime.node_data_root.read().await.paths.clone();
+    let advisor = runtime.cache_advisor.clone();
+    match tokio::task::spawn_blocking(move || advisor.report(data_paths.as_ref(), true)).await {
+        Ok(report) => (
+            StatusCode::OK,
+            Json(serde_json::json!({
+                "ok": true,
+                "cache_advisor": report,
+            })),
+        ),
+        Err(reason) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("项目数据架构体检任务异常结束: {reason}"),
+        ),
+    }
 }
 
 #[derive(Deserialize)]

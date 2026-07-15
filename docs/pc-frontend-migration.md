@@ -180,7 +180,7 @@ PC 前端动态刷新分三层，后续新增模块必须接入这条链路，�
 | 项目中心、新建项目 | `pc_app_project_create.js`、`pc_app.js` | ✅ 已迁移到 `ProjectsPage`、`CreateProjectModal` | 项目中心默认广场，项目点击先展示项目首页 |
 | 项目广场 | `pc_app.js` | ✅ 已迁移到 `ProjectPlazaView` | `/pc/plaza` 和项目中心广场复用同一视图 |
 | AI 开发任务消息、审批、取消 | `pc_app_dev_tasks.js`、`pc_app_agent_runs.js`、`pc_app_task_snapshots.js` | 🟡 已迁移到 `features/dev/` 第一版 | 公开过程、恢复态、终态细节仍继续实测打磨 |
-| 本机节点和客户端维护 | `pc_app_node.js`、`pc_app_node_admin.js`、`pc_app_client_maintenance.js` | ✅ 已迁移到 `features/node/` 第一版 | 继续保留 `elon-node://`、更新和本机维护链路验收 |
+| 本机节点和客户端维护 | `pc_app_node.js`、`pc_app_node_admin.js`、`pc_app_client_maintenance.js` | ✅ 已迁移到 `features/node/`；已加入项目数据架构体检 | 旧/外部项目继承已跑通的目录与共享缓存；新项目优先推荐数据根；分析、容量和迁移均为建议，不得阻断任务 |
 | 电脑医生 | `pc_app_doctor.js` | ✅ 已迁移到 `DoctorPage` | 后续按诊断能力扩展 |
 | AI 声音/TTS | `pc_voice_project.js` | ✅ 已迁移到 `VoicePage` 第一版 | 与语音/TTS SDK 的边界继续在语音模块维护 |
 | 通知 | `pc_app_notifications.js` | ✅ 已迁移到 `useNotifications` + `features/realtime/` | 新模块应继续复用统一实时刷新链路 |

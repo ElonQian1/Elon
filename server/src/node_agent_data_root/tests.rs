@@ -165,7 +165,7 @@ fn legacy_roots_are_reported_without_being_moved() {
     assert!(state.migration_required());
     assert_eq!(plan.len(), 1);
     assert_eq!(plan[0].source_path, path_text(&legacy));
-    assert!(plan[0].read_only_compatibility);
+    assert!(!plan[0].read_only_compatibility);
     assert!(legacy.join("project.txt").is_file());
     let _ = std::fs::remove_dir_all(root);
 }

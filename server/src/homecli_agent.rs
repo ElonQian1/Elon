@@ -679,12 +679,11 @@ impl AgentManager {
 }
 
 fn require_project_build_cache(
-    agent: &AgentEntry,
-    project_context: Option<&homecli_proto::CliProjectContext>,
+    _agent: &AgentEntry,
+    _project_context: Option<&homecli_proto::CliProjectContext>,
 ) -> Result<()> {
-    if project_context.is_some() {
-        require_project_build_cache_capability(agent)?;
-    }
+    // Existing/external projects must keep running on their proven node. The
+    // capability remains required only by the explicit new-workspace protocol.
     Ok(())
 }
 
@@ -695,7 +694,7 @@ fn require_project_build_cache_capability(agent: &AgentEntry) -> Result<()> {
         .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
     {
         return Err(anyhow!(
-            "PC 节点版本过旧，尚不支持项目构建缓存磁盘治理；请等待节点自动更新后重试（节点版本 {}，协议 v{}，缺少能力 {}）",
+            "PC 节点版本过旧，尚不支持新建托管项目工作区；既有外部项目仍可继续运行（节点版本 {}，协议 v{}，缺少能力 {}）",
             agent.version,
             agent.proto_version,
             homecli_proto::CAP_PROJECT_BUILD_CACHE_V1,

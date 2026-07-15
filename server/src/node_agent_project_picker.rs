@@ -147,10 +147,7 @@ pub(crate) async fn prepare_default_project_folder(
         branch: clean_project_text(req.branch.as_deref().unwrap_or(""), 160),
     };
     if let Err(error) = runtime.ensure_node_data_root_for_workspace(None).await {
-        return json_error(
-            StatusCode::CONFLICT,
-            format!("客户端无法自动准备 AI 临时工作区；没有创建或移动项目。{error:#}"),
-        );
+        tracing::warn!(%error, "推荐数据根自动回填失败；默认项目回退到兼容工作区");
     }
     let transition = runtime.node_data_root_transition.clone().lock_owned().await;
     let workspace_root = runtime
@@ -159,14 +156,8 @@ pub(crate) async fn prepare_default_project_folder(
         .await
         .paths
         .as_ref()
-        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces);
-    let Some(workspace_root) = workspace_root else {
-        drop(transition);
-        return json_error(
-            StatusCode::CONFLICT,
-            "AI 临时工作区尚未准备完成，不能创建默认项目目录",
-        );
-    };
+        .map(elon_pc_dev_runtime::NodeDataPaths::workspaces)
+        .unwrap_or_else(elon_pc_dev_runtime::legacy_default_workspace_root);
     let provisioned = tokio::task::spawn_blocking(move || {
         let _transition = transition;
         pc_workspace_provisioner::provision_project_workspace_in(&workspace_root, request)

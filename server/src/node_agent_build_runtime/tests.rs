@@ -1,7 +1,7 @@
 use super::{
     active_leases,
-    admission::required_free_bytes,
-    cleanup::{cleanup_expired, remove_managed_path},
+    admission::{admit, advisories, required_free_bytes},
+    cleanup::remove_managed_path,
     paths::{ensure_within_root, resolve_run_paths},
     prepare_run,
     reservation::admission_required_free,
@@ -160,11 +160,29 @@ fn admission_reserves_build_headroom_above_disk_floor() {
         build_headroom_bytes: 24,
         max_total_cache_bytes: u64::MAX,
         max_project_rust_bytes: u64::MAX,
-        temp_ttl_secs: 1,
-        cache_ttl_secs: 1,
     };
     assert_eq!(required_free_bytes(&policy), 34);
     assert_eq!(admission_required_free(&policy, 7), 41);
+}
+
+#[test]
+fn capacity_limits_are_advisory_and_never_block_a_managed_run() {
+    let root = unique_root("advisory-admission");
+    let data_paths = NodeDataPaths::new(&root);
+    let paths = resolve_run_paths(&data_paths, "task-advisory", "project-advisory", None).unwrap();
+    fs::create_dir_all(&paths.cache_root).unwrap();
+    fs::create_dir_all(&paths.project_rust_root).unwrap();
+    fs::write(paths.project_rust_root.join("sample"), b"cache").unwrap();
+    let policy = BuildCachePolicy {
+        min_free_bytes: u64::MAX / 4,
+        build_headroom_bytes: u64::MAX / 4,
+        max_total_cache_bytes: 1,
+        max_project_rust_bytes: 1,
+    };
+
+    assert!(!advisories(&paths, &policy, 0).is_empty());
+    assert!(admit(&paths, &policy, 0).is_ok());
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]
@@ -203,7 +221,7 @@ fn prepared_run_creates_lease_and_removes_task_temp_on_drop() {
 }
 
 #[test]
-fn failed_run_retains_task_temp_for_ttl_diagnostics() {
+fn failed_run_retains_task_temp_for_explicit_diagnostics() {
     let root = unique_root("failed-temp");
     let data_paths = NodeDataPaths::new(&root);
     let run = prepare_run(
@@ -240,38 +258,6 @@ fn root_status_does_not_require_a_build_run_path() {
     assert_eq!(snapshot.root, root.to_string_lossy().to_string());
     assert!(snapshot.cache_bytes >= 5);
     assert!(snapshot.max_total_cache_bytes > 0);
-    let _ = fs::remove_dir_all(root);
-}
-
-#[test]
-fn expired_cleanup_keeps_current_run_lease() {
-    let root = unique_root("active-cleanup");
-    let data_paths = NodeDataPaths::new(&root);
-    let run = prepare_run(
-        &data_paths,
-        BuildRunRequest {
-            task_id: "task-active",
-            project_id: "project-active",
-            cwd: None,
-        },
-    )
-    .unwrap();
-    let paths = resolve_run_paths(&data_paths, "task-active", "project-active", None).unwrap();
-    let report = cleanup_expired(
-        &paths,
-        &BuildCachePolicy {
-            temp_ttl_secs: 1,
-            cache_ttl_secs: 1,
-            min_free_bytes: 1,
-            build_headroom_bytes: 0,
-            max_total_cache_bytes: u64::MAX,
-            max_project_rust_bytes: u64::MAX,
-        },
-    )
-    .unwrap();
-    assert!(paths.task_temp.exists());
-    assert!(report.skipped_active_paths >= 1);
-    drop(run);
     let _ = fs::remove_dir_all(root);
 }
 

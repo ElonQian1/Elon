@@ -14,6 +14,7 @@ mod tests;
 
 pub(crate) use admission::BuildCachePolicy;
 pub(crate) use environment::BuildEnvironment;
+pub(crate) use telemetry::directory_size;
 pub(crate) use telemetry::{BuildCacheTelemetry, NodeBuildCacheStatus};
 
 use admission::admit;
@@ -104,7 +105,6 @@ pub(crate) fn prepare_run(
     usage::touch(&paths)?;
     let active_reserved_bytes = reservation::active_reserved_bytes(&paths)?;
     let cleanup = admit(&paths, &policy, active_reserved_bytes)?;
-    telemetry::record_cleanup(&paths, &cleanup);
     prepare_run_directories(&paths)?;
     let lease = BuildRunLease::acquire(
         &paths,
@@ -121,7 +121,7 @@ pub(crate) fn prepare_run(
         cache_bytes = telemetry.cache_bytes,
         reclaimed_bytes = telemetry.reclaimed_bytes,
         disk_free_bytes = ?telemetry.disk_free_bytes,
-        "PC 节点已准备受治理的项目构建环境"
+        "PC 节点已准备推荐的项目构建环境；容量指标仅作建议"
     );
     Ok(PreparedBuildRun {
         environment,

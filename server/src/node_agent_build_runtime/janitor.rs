@@ -1,6 +1,6 @@
 use super::{
-    admission, cleanup, paths::BuildRunPaths, reservation, target_lock::AdmissionLock, telemetry,
-    usage, BuildCachePolicy,
+    cleanup, paths::BuildRunPaths, reservation, target_lock::AdmissionLock, telemetry, usage,
+    BuildCachePolicy,
 };
 use std::sync::{mpsc, OnceLock};
 
@@ -81,32 +81,7 @@ fn process(job: JanitorJob) {
         tracing::warn!(error = %error, "更新 Rust target 最后使用时间失败");
     }
 
-    let active_reserved_bytes = match reservation::active_reserved_bytes(&job.paths) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            tracing::warn!(error = %error, "无法可信读取活动构建预留，跳过破坏性压力清理");
-            telemetry::record_cleanup(&job.paths, &report);
-            super::invalidate_status(&job.paths.root);
-            let snapshot = telemetry::capture(
-                &job.paths,
-                job.initial_reclaimed_bytes
-                    .saturating_add(report.reclaimed_bytes),
-                &job.policy,
-            );
-            telemetry::persist(&job.paths, &snapshot);
-            return;
-        }
-    };
-    if admission::under_pressure(&job.paths, &job.policy, active_reserved_bytes) {
-        match cleanup::cleanup_for_pressure(&job.paths, &job.policy, active_reserved_bytes) {
-            Ok(pressure_report) => report.merge(pressure_report),
-            Err(error) => tracing::warn!(
-                error = %error,
-                project = %job.paths.project_key,
-                "PC 节点任务结束后的构建盘压力清理失败"
-            ),
-        }
-    }
+    let active_reserved_bytes = reservation::active_reserved_bytes(&job.paths).unwrap_or_default();
 
     telemetry::record_cleanup(&job.paths, &report);
     super::invalidate_status(&job.paths.root);
@@ -121,6 +96,6 @@ fn process(job: JanitorJob) {
         removed_paths = report.removed_paths,
         skipped_active_paths = report.skipped_active_paths,
         active_reserved_bytes,
-        "PC 节点构建缓存后台收尾完成"
+        "PC 节点构建缓存后台收尾完成；仅清理本次成功任务临时目录，缓存压力保持建议模式"
     );
 }

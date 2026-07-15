@@ -149,6 +149,10 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/node-data-root/cleanup",
                 axum::routing::post(node_agent_data_root::admin::cleanup),
             )
+            .route(
+                "/api/node-data-root/analyze",
+                axum::routing::post(node_agent_data_root::admin::analyze),
+            )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .route(
                 "/api/tts-relay-config",

@@ -1,4 +1,4 @@
-//! 节点配置与凭证持久化，以及启动阶段的数据根 fail-closed 校验。
+//! 节点配置与凭证持久化，以及启动阶段的推荐数据根所有权校验。
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -189,7 +189,7 @@ mod persistence_tests {
     }
 
     #[test]
-    fn valid_unified_root_owns_storage_path() {
+    fn existing_storage_path_survives_valid_recommended_root() {
         let root =
             std::env::temp_dir().join(format!("elon-node-storage-root-{}", uuid::Uuid::new_v4()));
         let data_root = super::super::node_agent_data_root::NodeDataRootState::from_prepared_paths(
@@ -205,13 +205,36 @@ mod persistence_tests {
         };
 
         let settings = initial_storage_settings(&persisted, &data_root);
+        assert!(settings.enabled);
+        assert_eq!(settings.root_path.as_deref(), Some(r"C:\legacy-storage"));
+    }
+
+    #[test]
+    fn new_storage_without_existing_path_uses_recommended_root() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-node-new-storage-root-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let data_root = super::super::node_agent_data_root::NodeDataRootState::from_prepared_paths(
+            elon_pc_dev_runtime::NodeDataPaths::new(&root),
+            super::super::node_agent_data_root::NodeDataRootSource::Persisted,
+            None,
+            None,
+        );
+        let persisted = PersistedState {
+            storage_enabled: Some(true),
+            ..PersistedState::default()
+        };
+
+        let settings = initial_storage_settings(&persisted, &data_root);
         let expected = root.join("storage").to_string_lossy().to_string();
 
+        assert!(settings.enabled);
         assert_eq!(settings.root_path.as_deref(), Some(expected.as_str()));
     }
 
     #[test]
-    fn invalid_explicit_data_root_blocks_legacy_storage_fallback() {
+    fn invalid_recommended_root_preserves_legacy_storage() {
         let root =
             std::env::temp_dir().join(format!("elon-node-invalid-root-{}", uuid::Uuid::new_v4()));
         let data_root = super::super::node_agent_data_root::NodeDataRootState::from_prepared_paths(
@@ -229,8 +252,8 @@ mod persistence_tests {
 
         let settings = initial_storage_settings(&persisted, &data_root);
 
-        assert!(!settings.enabled);
-        assert!(settings.root_path.is_none());
+        assert!(settings.enabled);
+        assert_eq!(settings.root_path.as_deref(), Some(r"C:\legacy-storage"));
     }
 
     #[test]
@@ -391,36 +414,30 @@ pub(super) fn initial_storage_settings(
         .or_else(|| super::node_agent_env::env_flag("ELON_STORAGE_ENABLED"))
         .or(persisted.storage_enabled)
         .unwrap_or(false);
-    let root_is_configured =
-        data_root.source != super::node_agent_data_root::NodeDataRootSource::Unconfigured;
-    let (enabled, root_path) = if let Some(paths) = data_root.paths.as_ref() {
-        // A valid unified root owns storage as well. Legacy overrides are
-        // migration inputs only and must not keep writing new data to C:.
-        (
-            requested_enabled,
-            Some(paths.storage().to_string_lossy().to_string()),
-        )
-    } else if root_is_configured {
-        // Explicit root configured but failed validation: block storage rather
-        // than silently falling back to the legacy user-profile directory.
-        (false, None)
-    } else {
-        (
-            // A legacy storage path may be retained for migration metadata,
-            // but it is never effective until a unified data root validates.
-            false,
-            explicit_root.or_else(|| persisted.storage_root.clone()),
-        )
-    };
+    let inherited_root = explicit_root
+        .or_else(|| persisted.storage_root.clone())
+        .or_else(|| {
+            data_root
+                .legacy_storage_root
+                .as_ref()
+                .map(|path| path.to_string_lossy().to_string())
+        });
+    let recommended_root = data_root
+        .paths
+        .as_ref()
+        .map(|paths| paths.storage().to_string_lossy().to_string());
+    // Upgrades must not silently switch a proven storage repository. The
+    // recommended root is only the default when no earlier path exists.
+    let root_path = inherited_root.or(recommended_root).or_else(|| {
+        requested_enabled.then(|| {
+            super::pc_storage_repo::legacy_default_storage_root()
+                .to_string_lossy()
+                .to_string()
+        })
+    });
     super::pc_storage_repo::StorageSettings {
-        enabled,
-        root_path: root_path.or_else(|| {
-            enabled.then(|| {
-                super::pc_storage_repo::default_storage_root()
-                    .to_string_lossy()
-                    .to_string()
-            })
-        }),
+        enabled: requested_enabled,
+        root_path,
         git_base_url,
     }
 }

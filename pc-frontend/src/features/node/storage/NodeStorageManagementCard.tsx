@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { cleanupNodeDataRoot, fetchNodeDataRoot, saveNodeDataRoot } from './nodeStorageApi'
-import type { NodeDataRootCleanupResult, NodeDataRootStatus } from './types'
+import { analyzeNodeCacheArchitecture, cleanupNodeDataRoot, fetchNodeDataRoot, saveNodeDataRoot } from './nodeStorageApi'
+import type { NodeCacheAdvisorReport, NodeDataRootCleanupResult, NodeDataRootStatus } from './types'
 import styles from './NodeStorageManagementCard.module.css'
 
 interface NodeStorageManagementCardProps {
   adminUrl: string
 }
 
-type BusyAction = '' | 'refresh' | 'save' | 'preview' | 'cleanup'
+type BusyAction = '' | 'refresh' | 'save' | 'preview' | 'cleanup' | 'analyze'
 
 function formatBytes(value?: number): string {
   if (!Number.isFinite(value) || (value ?? 0) < 0) return '未上报'
@@ -62,6 +62,7 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [cleanupPreview, setCleanupPreview] = useState<NodeDataRootCleanupResult | null>(null)
+  const [advisor, setAdvisor] = useState<NodeCacheAdvisorReport | null>(null)
   const rootDirty = useRef(false)
 
   const refresh = useCallback(async (quiet = false) => {
@@ -71,6 +72,9 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
     try {
       const next = await fetchNodeDataRoot(adminUrl)
       setStatus(next)
+      setAdvisor((current) => current?.candidates?.some((item) => item.estimated_bytes !== undefined)
+        ? current
+        : next.cache_advisor ?? null)
       if (!rootDirty.current) setRootPath(String(next.root_path ?? ''))
     } catch (caught) {
       setStatus(null)
@@ -88,8 +92,8 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
   const disk = diskNumbers(status)
   const freeRatio = disk.total && disk.free !== undefined ? disk.free / disk.total : undefined
   const pressure = status?.build_cache?.pressure
-    ? 'danger'
-    : freeRatio === undefined ? 'unknown' : freeRatio < 0.1 ? 'danger' : freeRatio < 0.2 ? 'warning' : 'ok'
+    ? 'warning'
+    : freeRatio === undefined ? 'unknown' : freeRatio < 0.2 ? 'warning' : 'ok'
   const warnings = useMemo(
     () => [...(status?.warnings ?? []), ...(status?.capacity_warnings ?? [])].filter(Boolean),
     [status],
@@ -116,8 +120,9 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
       setRootPath(String(response.data_root?.root_path ?? value))
       rootDirty.current = false
       setCleanupPreview(null)
+      setAdvisor(null)
       setMessage(response.restart_recommended
-        ? '数据根已保存。建议重启一龙开发平台，让后续任务全部使用新目录。'
+        ? '推荐数据根已保存。建议重启一龙开发平台；后续新建托管数据使用新目录，旧项目保持不变。'
         : response.message || '数据根已保存。')
       await refresh(true)
     } catch (caught) {
@@ -143,7 +148,7 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
   }
 
   async function applyCleanup() {
-    if (!window.confirm('只删除节点数据根下可重建的 cache 和 temp（包括失败任务诊断 Temp）。项目源码、工作区与 Git 仓库不会删除。继续吗？')) return
+    if (!window.confirm('只删除一龙数据根内由平台创建、可重新生成的 cache 和 temp（包括失败任务诊断 Temp）。外部共享缓存、项目源码、工作区与 Git 仓库都不会删除。继续吗？')) return
     setBusy('cleanup')
     setMessage('')
     setError('')
@@ -159,28 +164,48 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
     }
   }
 
+  async function analyzeCaches() {
+    setBusy('analyze')
+    setMessage('')
+    setError('')
+    try {
+      const response = await analyzeNodeCacheArchitecture(adminUrl)
+      setAdvisor(response.cache_advisor ?? null)
+      const count = response.cache_advisor?.candidates?.length ?? 0
+      setMessage(`只读体检完成，识别到 ${count} 处缓存架构。没有移动、接管或删除任何目录。`)
+    } catch (caught) {
+      setError(errorMessage(caught, '项目数据架构体检失败'))
+    } finally {
+      setBusy('')
+    }
+  }
+
   return (
     <section className={styles.card}>
       <div className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>AI 临时工作区</span>
-          <h4>客户端自动管理，项目仍在原位置</h4>
-          <p>这里不是你的项目目录。AI 工作时会在这里保存临时副本、编译缓存和中间文件，避免这些大文件悄悄挤满 C 盘；客户端会优先在项目同盘自动准备，通常无需设置。</p>
+          <span className={styles.eyebrow}>项目数据架构体检</span>
+          <h4>继承跑通的项目，再由 AI 渐进整理</h4>
+          <p>旧项目和外部项目继续使用原目录、原环境和共享缓存。一龙只读识别分散缓存并提出建议；新建托管项目优先使用推荐数据根，但容量建议不会阻止任务。</p>
         </div>
         <span className={styles.state} data-tone={status?.configured ? pressure : 'warning'}>
-          {busy === 'refresh' ? '检测中' : status?.configured ? '自动管理中' : '等待自动准备'}
+          {busy === 'refresh' || busy === 'analyze' ? '检测中' : status?.configured ? '建议模式' : '可自动回填'}
         </span>
       </div>
 
-      {status?.invalid_reason && <div className={styles.alert} data-tone="danger" role="alert">{status.invalid_reason}</div>}
+      {status?.invalid_reason && (
+        <div className={styles.alert} data-tone="warning" role="status">
+          推荐数据根暂不可用：{status.invalid_reason}。旧项目仍按原路径和原缓存继续运行。
+        </div>
+      )}
       {!status?.configured && !status?.invalid_reason && (
         <div className={styles.alert} data-tone="info" role="status">
-          无需手动搬项目。下一次需要写代码或构建时，客户端会在项目旁边创建独立工作区并完成安全绑定；只读检查可直接运行。
+          无需手动搬项目。客户端会尝试回填推荐数据根；失败时仍继承原项目和原缓存继续运行。
         </div>
       )}
       {status?.build_cache?.pressure && (
-        <div className={styles.alert} data-tone="danger" role="alert">
-          AI 临时工作区空间偏低。客户端会先清理可重新生成的缓存；仍不足时才暂停构建，项目源码不会被删除或损坏。
+        <div className={styles.alert} data-tone="warning" role="status">
+          推荐数据根空间偏低，AI 会把它作为整理建议；不会因此阻止原项目，也不会自动删除缓存。
         </div>
       )}
       {warnings.map((warning, index) => <div className={styles.alert} data-tone="warning" role="alert" key={`${warning}-${index}`}>{warning}</div>)}
@@ -214,10 +239,26 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
       <div className={styles.metrics}>
         <div><span>磁盘剩余</span><strong>{formatBytes(disk.free)}</strong></div>
         <div><span>磁盘容量</span><strong>{formatBytes(disk.total)}</strong></div>
-        <div><span>磁盘安全底线</span><strong>{formatBytes(status?.build_cache?.min_free_bytes)}</strong></div>
-        <div><span>本次任务预留</span><strong>{formatBytes(status?.build_cache?.build_headroom_bytes)}</strong></div>
+        <div><span>建议保留空间</span><strong>{formatBytes(status?.build_cache?.min_free_bytes)}</strong></div>
+        <div><span>建议任务余量</span><strong>{formatBytes(status?.build_cache?.build_headroom_bytes)}</strong></div>
         <div><span>缓存占用</span><strong>{formatBytes(status?.build_cache?.cache_bytes ?? status?.cache_bytes)}</strong></div>
         <div><span>临时占用</span><strong>{formatBytes(status?.build_cache?.temp_bytes ?? status?.temp_bytes)}</strong></div>
+      </div>
+
+      <div className={styles.advisor}>
+        <div className={styles.sectionTitle}>
+          <strong>AI 缓存架构建议</strong>
+          <span>{advisor?.summary || '运行只读体检后，会识别历史共享缓存、开发检查缓存、Win 节点发布缓存、服务器发布缓存和仓库旧缓存。'}</span>
+        </div>
+        {(advisor?.candidates ?? []).map((item, index) => (
+          <div className={styles.advisorItem} key={`${item.kind}-${item.path}-${index}`}>
+            <span>{item.label || item.kind || '缓存目录'}</span>
+            <code>{item.path || '未知目录'}</code>
+            <b>{item.estimated_bytes == null ? (item.exists ? '已发现' : '未发现') : formatBytes(item.estimated_bytes)}</b>
+            <small>{item.recommendation || '保持原地，等待 AI 给出兼容性与迁移建议。'}</small>
+          </div>
+        ))}
+        {(advisor?.suggestions ?? []).map((suggestion, index) => <p key={`${suggestion}-${index}`}>{suggestion}</p>)}
       </div>
 
       <div className={styles.pathList}>
@@ -233,7 +274,7 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
         <div className={styles.migration}>
           <div className={styles.sectionTitle}>
             <strong>旧版数据已进入兼容保护</strong>
-            <span>已有项目保持原位置；客户端自动使用新的临时工作区，不会擅自移动 Git 现场</span>
+            <span>已有项目继续原地运行；只有后续新建的托管数据优先使用推荐根，不会擅自移动 Git 现场</span>
           </div>
           {(status.migration_plan ?? []).filter((item) => item.has_data).map((item, index) => (
             <div className={styles.migrationItem} key={`${item.kind}-${item.source_path}-${index}`}>
@@ -260,10 +301,11 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
       )}
 
       <div className={styles.actions}>
-        <button type="button" onClick={() => void refresh()} disabled={!!busy}>刷新容量</button>
+        <button type="button" onClick={() => void refresh()} disabled={!!busy}>刷新状态</button>
+        <button type="button" onClick={analyzeCaches} disabled={!!busy}>{busy === 'analyze' ? '体检中…' : '分析本机缓存架构'}</button>
         <button type="button" onClick={previewCleanup} disabled={!!busy || !status?.configured}>预估可清理空间</button>
         <button type="button" className={styles.dangerButton} onClick={applyCleanup} disabled={!!busy || !status?.configured || tasks > 0}>
-          {busy === 'cleanup' ? '清理中…' : '安全清理缓存'}
+          {busy === 'cleanup' ? '清理中…' : '清理一龙自建缓存'}
         </button>
       </div>
 

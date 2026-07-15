@@ -1,7 +1,7 @@
 //! CLI 提示执行辅助函数（从 node_agent_main.rs 拆分）。
-//! 保持行为不变。
+//! 旧/外部项目继承已跑通的工作区与缓存，新托管项目使用推荐数据根。
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use homecli_proto::{AgentToServer, CliWorkspaceStatus};
 use tokio_tungstenite::tungstenite::Message;
@@ -146,38 +146,47 @@ pub struct PreparedCliPromptCwd {
     pub cwd: Option<String>,
     pub conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     pub project_context: Option<homecli_proto::CliProjectContext>,
+    pub data_policy: crate::node_agent_project_data_policy::ProjectDataPolicy,
 }
 
 pub fn prepare_cli_prompt_cwd(
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> anyhow::Result<PreparedCliPromptCwd> {
-    let workspace_root = elon_pc_dev_runtime::workspace_root();
-    prepare_cli_prompt_cwd_in(Some(&workspace_root), cwd, project_context)
+    let data_paths = elon_pc_dev_runtime::configured_node_data_root()
+        .map(elon_pc_dev_runtime::NodeDataPaths::new);
+    prepare_cli_prompt_cwd_in(data_paths.as_ref(), cwd, project_context)
 }
 
-/// Prepare a CLI cwd using a workspace root that was read from validated node
-/// runtime state. A missing root is allowed only for genuinely read-only work
-/// against an explicitly supplied external project.
+/// Existing/external projects keep the pre-upgrade conversation-worktree root
+/// and inherit the environment that already worked. Only projects created
+/// below the validated node roots opt into managed worktrees and caches.
 pub fn prepare_cli_prompt_cwd_in(
-    workspace_root: Option<&Path>,
+    data_paths: Option<&elon_pc_dev_runtime::NodeDataPaths>,
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> anyhow::Result<PreparedCliPromptCwd> {
     let managed_project = project_context.is_some();
     let (base_cwd, context) = node_agent_cli_security::prepare_cli_base_cwd(cwd, project_context)?;
+    let data_policy = crate::node_agent_project_data_policy::classify(data_paths, &base_cwd);
     if cli_prompt_read_only(context.runtime_permission.as_deref()) {
         return Ok(PreparedCliPromptCwd {
             cwd: Some(base_cwd.to_string_lossy().to_string()),
             conversation_workspace: None,
             project_context: managed_project.then_some(context),
+            data_policy,
         });
     }
-    let workspace_root = workspace_root.ok_or_else(|| {
-        anyhow::anyhow!("PC 节点尚未配置有效的统一数据根，已阻止项目工作区回落到系统盘")
-    })?;
+    let workspace_root = if data_policy.uses_managed_workspace() {
+        data_paths
+            .map(elon_pc_dev_runtime::NodeDataPaths::workspaces)
+            .ok_or_else(|| anyhow::anyhow!("一龙推荐工作区暂不可用，请继续使用原项目目录"))?
+    } else {
+        elon_pc_dev_runtime::legacy_workspace_root_override()
+            .unwrap_or_else(elon_pc_dev_runtime::legacy_default_workspace_root)
+    };
     let workspace = pc_workspace_provisioner::prepare_conversation_workspace_in(
-        workspace_root,
+        &workspace_root,
         base_cwd.to_string_lossy().as_ref(),
         &context.project_id,
         &context.conversation_id,
@@ -192,6 +201,7 @@ pub fn prepare_cli_prompt_cwd_in(
         cwd: Some(workspace.workspace_path.clone()),
         conversation_workspace: Some(workspace),
         project_context: managed_project.then_some(context),
+        data_policy,
     })
 }
 

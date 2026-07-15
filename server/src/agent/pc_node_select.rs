@@ -44,9 +44,6 @@ pub(super) async fn connected_pc_project_agent_for_route(
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<String> {
     for agent in state.agent_manager.list().await {
-        if !supports_project_build_cache(&agent.capabilities) {
-            continue;
-        }
         if route_targets_public_dev_node(pc_runtime_route)
             && pc_agent_belongs_to_user_quiet(state, user_id, &agent.agent_id)
         {
@@ -123,9 +120,6 @@ pub(super) async fn connected_pc_agent_with_recorded_workspace_binding(
         .map(str::trim)
         .filter(|value| !value.is_empty());
     for agent in state.agent_manager.list().await {
-        if !supports_project_build_cache(&agent.capabilities) {
-            continue;
-        }
         if skip_agent_id == Some(agent.agent_id.as_str()) {
             continue;
         }
@@ -176,9 +170,6 @@ pub(super) async fn connected_pc_agent_with_existing_workspace(
         .map(str::trim)
         .filter(|value| !value.is_empty());
     for agent in state.agent_manager.list().await {
-        if !supports_project_build_cache(&agent.capabilities) {
-            continue;
-        }
         if skip_agent_id == Some(agent.agent_id.as_str()) {
             continue;
         }
@@ -216,10 +207,4 @@ pub(super) async fn connected_pc_agent_with_existing_workspace(
         }
     }
     None
-}
-
-fn supports_project_build_cache(capabilities: &[String]) -> bool {
-    capabilities
-        .iter()
-        .any(|capability| capability == homecli_proto::CAP_PROJECT_BUILD_CACHE_V1)
 }
