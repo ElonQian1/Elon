@@ -10,6 +10,7 @@
 .shell {
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
@@ -18,6 +19,7 @@
 }
 
 .content {
+  min-height: 0;
   min-width: 0;
   overflow: hidden;
   display: flex;

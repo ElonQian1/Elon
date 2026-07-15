@@ -5,7 +5,8 @@
   position: relative;
   z-index: 10;
   width: var(--rail-width);
-  height: 100vh;
+  height: 100%;
+  min-height: 0;
   background: var(--rail);
   display: flex;
   flex-direction: column;
