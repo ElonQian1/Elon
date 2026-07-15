@@ -1147,8 +1147,8 @@
 
                         <ImageView
                             android:id="@+id/tabChatSelection"
-                            android:layout_width="58dp"
-                            android:layout_height="48dp"
+                            android:layout_width="@dimen/main_bottom_menu_selection_width"
+                            android:layout_height="@dimen/main_bottom_menu_selection_height"
                             android:layout_gravity="start|center_vertical"
                             android:layout_marginStart="@dimen/main_bottom_menu_selection_inset"
                             android:contentDescription="@null"
@@ -1197,8 +1197,8 @@
 
                         <ImageView
                             android:id="@+id/tabProjectSelection"
-                            android:layout_width="58dp"
-                            android:layout_height="48dp"
+                            android:layout_width="@dimen/main_bottom_menu_selection_width"
+                            android:layout_height="@dimen/main_bottom_menu_selection_height"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:scaleType="fitXY"
@@ -1231,8 +1231,8 @@
 
                         <ImageView
                             android:id="@+id/tabProfileSelection"
-                            android:layout_width="58dp"
-                            android:layout_height="48dp"
+                            android:layout_width="@dimen/main_bottom_menu_selection_width"
+                            android:layout_height="@dimen/main_bottom_menu_selection_height"
                             android:layout_gravity="center"
                             android:contentDescription="@null"
                             android:scaleType="fitXY"
@@ -1269,8 +1269,8 @@
 
                         <ImageView
                             android:id="@+id/bottomMenuSelection"
-                            android:layout_width="58dp"
-                            android:layout_height="48dp"
+                            android:layout_width="@dimen/main_bottom_menu_selection_width"
+                            android:layout_height="@dimen/main_bottom_menu_selection_height"
                             android:layout_gravity="end|center_vertical"
                             android:layout_marginEnd="@dimen/main_bottom_menu_selection_inset"
                             android:contentDescription="@null"
