@@ -3,7 +3,7 @@
  *
  * 将同一 task_id 的用户请求、过程消息和最终回复连成一个对话段：
  *  - 用户请求显示为右侧气泡
- *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
+ *  - 最终回复显示为左侧 AI 正文，避免被过程卡片淹没
  *  - 中间回复片段和工具按发生顺序直接展示，任务结束后仅折叠历史详情
  */
 import { PlayCircle, StopCircle } from 'lucide-react'
@@ -320,14 +320,14 @@ function DevTaskGroup({
 
       {resultMsg && (
         <>
-          <TaskAssistantBubble
+          <TaskAssistantReply
             message={resultMsg}
             tone={tone}
             label={replyLabelForTone(tone)}
             reason={terminalReason}
             time={assistantProcessTime}
-            beforeBubble={showProgressPanel ? renderProgressPanel(true, 'beforeReply') : null}
-            afterBubble={(
+            beforeReply={showProgressPanel ? renderProgressPanel(true, 'beforeReply') : null}
+            afterReply={(
               <>
                 <TaskTerminalActions
                   action={terminalAction}
@@ -373,14 +373,14 @@ function progressStatusForStage(
   return status
 }
 
-function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime, beforeBubble, afterBubble }: {
+function TaskAssistantReply({ message, tone, label, reason, time: fallbackTime, beforeReply, afterReply }: {
   message: ChatMessage
   tone: TaskTone
   label: string
   reason?: string
   time?: string
-  beforeBubble?: ReactNode
-  afterBubble?: ReactNode
+  beforeReply?: ReactNode
+  afterReply?: ReactNode
 }) {
   const content = taskResultDisplayText(message)
   if (!content) return null
@@ -399,14 +399,14 @@ function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime,
           <span>{label}</span>
           {time && <span>{time}</span>}
         </div>
-        {beforeBubble}
+        {beforeReply}
         <div
-          className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}
+          className={[styles.assistantReply, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}
           data-task-visible-content="result"
         >
           {hasMarkdown ? <MarkdownContent content={displayContent} copy /> : displayContent}
         </div>
-        {afterBubble}
+        {afterReply}
       </div>
     </div>
   )
