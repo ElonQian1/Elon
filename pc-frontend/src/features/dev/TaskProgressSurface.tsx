@@ -1,4 +1,5 @@
 import { AlertTriangle, FileCode2, KeyRound, ListChecks, Terminal } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { clean } from '../../lib/utils'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { DevTaskMessage } from './DevTaskCard'
@@ -29,11 +30,24 @@ export function TaskProgressHighlights({
   onCancel,
   onApprove,
 }: TaskProgressHighlightsProps) {
+  const failedCommandKey = firstFailedCommandKey(items)
+  const [openCommandKey, setOpenCommandKey] = useState<string | null>(null)
+  useEffect(() => {
+    if (failedCommandKey) setOpenCommandKey(failedCommandKey)
+  }, [failedCommandKey])
   return (
-    <div className={styles.progressHighlights}>
+    <div className={styles.progressHighlights} data-task-visible-content="progress">
       {items.map((item) => {
         if (item.surfaceType === 'commands') {
-          return <ProgressCommandGroup key={item.id} item={item} expandAll={expandAll} />
+          return (
+            <ProgressCommandGroup
+              key={item.id}
+              item={item}
+              expandAll={expandAll}
+              openCommandKey={openCommandKey}
+              onToggleCommand={(key) => setOpenCommandKey((current) => current === key ? null : key)}
+            />
+          )
         }
         if (item.surfaceType === 'artifact') {
           return (
@@ -156,7 +170,12 @@ export function progressSurfaceItems(stage: TaskTimelineStage, assistantItems: T
   return dedupeProgressSurfaceItems(items)
 }
 
-function ProgressCommandGroup({ item, expandAll = false }: { item: ProgressSurfaceItem; expandAll?: boolean }) {
+function ProgressCommandGroup({ item, expandAll = false, openCommandKey, onToggleCommand }: {
+  item: ProgressSurfaceItem
+  expandAll?: boolean
+  openCommandKey: string | null
+  onToggleCommand: (key: string) => void
+}) {
   const commandItems = (item.items ?? []).filter((commandItem) => clean(commandTextForSurface(commandItem)))
   if (!commandItems.length) return null
   const tone = commandSurfaceTone(commandItems)
@@ -183,18 +202,41 @@ function ProgressCommandGroup({ item, expandAll = false }: { item: ProgressSurfa
       </summary>
       <div className={styles.progressCommandList}>
         {visibleCommands.map((commandItem, index) => (
-          <details key={`${commandItem.id}-${index}`} className={styles.progressCommandLine} open={expandAll || commandItem.tone === 'failed'}>
-            <summary>
+          <div
+            key={`${commandItem.id}-${index}`}
+            className={styles.progressCommandLine}
+            data-open={openCommandKey === surfaceCommandKey(item, commandItem, index) ? 'true' : undefined}
+          >
+            <button
+              type="button"
+              className={styles.progressCommandLineButton}
+              aria-expanded={openCommandKey === surfaceCommandKey(item, commandItem, index)}
+              onClick={() => onToggleCommand(surfaceCommandKey(item, commandItem, index))}
+            >
               <span>{commandLineState(commandItem)}</span>
               <code title={commandTextForSurface(commandItem)}>{commandSummaryForSurface(commandTextForSurface(commandItem))}</code>
-            </summary>
-            <ProgressCommandDetail item={commandItem} />
-          </details>
+            </button>
+            {openCommandKey === surfaceCommandKey(item, commandItem, index) && <ProgressCommandDetail item={commandItem} />}
+          </div>
         ))}
         {hiddenCount > 0 && <div className={styles.progressCommandMore}>另有 {hiddenCount} 条命令</div>}
       </div>
     </details>
   )
+}
+
+function firstFailedCommandKey(items: ProgressSurfaceItem[]): string {
+  for (const item of items) {
+    if (item.surfaceType !== 'commands') continue
+    const commands = item.items ?? []
+    const index = commands.findIndex((command) => command.tone === 'failed')
+    if (index >= 0 && commands[index]) return surfaceCommandKey(item, commands[index], index)
+  }
+  return ''
+}
+
+function surfaceCommandKey(item: ProgressSurfaceItem, command: TimelineItem, index: number): string {
+  return `${item.id}:${command.id}:${index}`
 }
 
 function ProgressCommandDetail({ item }: { item: TimelineItem }) {

@@ -214,7 +214,10 @@ function DevTaskGroup({
         />
       )}
       {!displayCollapsed && hasProgressDetails && (
-        <div className={[styles.processBody, directPublicProcess ? styles.processBodyDirect : ''].filter(Boolean).join(' ')}>
+        <div
+          className={[styles.processBody, directPublicProcess ? styles.processBodyDirect : ''].filter(Boolean).join(' ')}
+          data-task-visible-content="process"
+        >
           <TaskTimeline
             model={timeline}
             taskContext={taskContext}
@@ -230,7 +233,7 @@ function DevTaskGroup({
   )
 
   return (
-    <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
+    <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')} data-task-turn data-task-state={tone}>
       {request && (
         <div className={styles.userTurn}>
           <div className={styles.userBody}>
@@ -259,7 +262,7 @@ function DevTaskGroup({
         !resultMsg && !hideCompletedProcessPanel ? (
           <div className={styles.assistantTurn}>
             <div className={styles.assistantAvatar}>AI</div>
-            <div className={styles.assistantBody}>
+            <div className={styles.assistantBody} data-task-assistant-body>
               <div className={styles.assistantMeta}>
                 <strong>一龙</strong>
                 <span>正在处理</span>
@@ -390,14 +393,17 @@ function TaskAssistantBubble({ message, tone, label, reason, time: fallbackTime,
   return (
     <div className={styles.assistantTurn}>
       <div className={styles.assistantAvatar}>AI</div>
-      <div className={styles.assistantBody}>
+      <div className={styles.assistantBody} data-task-assistant-body>
         <div className={styles.assistantMeta}>
           <strong>一龙</strong>
           <span>{label}</span>
           {time && <span>{time}</span>}
         </div>
         {beforeBubble}
-        <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
+        <div
+          className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}
+          data-task-visible-content="result"
+        >
           {hasMarkdown ? <MarkdownContent content={displayContent} copy /> : displayContent}
         </div>
         {afterBubble}

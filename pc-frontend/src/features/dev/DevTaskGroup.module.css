@@ -669,28 +669,36 @@
   min-width: 0;
 }
 
-.progressCommandLine > summary {
+.progressCommandLineButton {
+  width: 100%;
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
   user-select: none;
 }
 
-.progressCommandLine > summary::marker {
-  color: #687281;
-}
-
-.progressCommandLine > summary span {
+.progressCommandLineButton span {
   flex: 0 0 auto;
   color: #747d8b;
   font-size: 12px;
 }
 
-.progressCommandLine > summary:hover span,
-.progressCommandLine > summary:hover code {
+.progressCommandLineButton:hover span,
+.progressCommandLineButton:hover code,
+.progressCommandLineButton[aria-expanded="true"] span {
   color: #a2adbd;
+}
+
+.progressCommandLine[data-open="true"] > .progressCommandDetail {
+  margin: 4px 0 5px 20px;
 }
 
 .progressCommandSingle:hover span,

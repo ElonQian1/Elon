@@ -539,39 +539,41 @@
   min-width: 0;
 }
 
-.commandRunItem[open] {
+.commandRunItem[data-open="true"] {
   border-radius: 0;
   background: transparent;
   padding: 0 0 5px;
 }
 
-.commandRunItem > summary {
+.commandRunItemButton {
+  width: 100%;
   min-height: 25px;
   display: flex;
   align-items: center;
   gap: 5px;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #747d8d;
+  font: inherit;
   font-size: 12px;
   line-height: 1.4;
+  text-align: left;
   cursor: pointer;
   user-select: none;
 }
 
-.commandRunItem > summary > span {
+.commandRunItemButton > span {
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
-.commandRunItem > summary::marker {
-  color: #5f6876;
-}
-
-.commandRunItem > summary:hover {
+.commandRunItemButton:hover {
   color: #aeb8c9;
 }
 
-.commandRunItem > summary code {
+.commandRunItemButton code {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -606,11 +608,11 @@
   display: none;
 }
 
-.commandRunItem[open] > summary code {
+.commandRunItem[data-open="true"] .commandRunItemButton code {
   display: none;
 }
 
-.commandRunItem[open] .commandRunOpenLabel {
+.commandRunItem[data-open="true"] .commandRunOpenLabel {
   display: inline;
   color: #aeb8c9;
   font-weight: 700;

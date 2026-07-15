@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { LivePreview, livePreviewConfigFromLocation } from './task-progress-live-preview'
+import { parseReplayPreviewConfig } from './task-progress-replay/model'
+import { ReplayPreview } from './task-progress-replay/ReplayPreview'
 import type { ChatMessage, ToolEvent } from './features/dev/types'
 import { previewStartedAt as startedAt, previewTaskId as taskId, ScenarioPreview } from './task-progress-preview/ScenarioPreview'
 
@@ -310,6 +312,7 @@ const scenarios: Scenario[] = [
 
 function Preview() {
   const liveConfig = useMemo(() => livePreviewConfigFromLocation(), [])
+  const replayConfig = useMemo(() => parseReplayPreviewConfig(window.location.search), [])
   const [activeId, setActiveId] = useState<ViewId>(() => initialViewFromLocation())
   const [expandAll, setExpandAll] = useState(() => initialExpandFromLocation())
   const activeScenario = scenarios.find((item) => item.id === activeId)
@@ -322,6 +325,9 @@ function Preview() {
   const selectScenario = (view: ViewId) => {
     setActiveId(view)
     updatePreviewLocation(view, undefined)
+  }
+  if (replayConfig.enabled) {
+    return <><style>{previewCss}</style><ReplayPreview config={replayConfig} /></>
   }
   if (liveConfig.enabled) {
     return (

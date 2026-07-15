@@ -10,7 +10,7 @@ import {
   ListChecks,
   Terminal,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { DevTaskMessage } from './DevTaskCard'
 import MarkdownContent from '../markdown/MarkdownContent'
 import type { ProcessCard } from './taskProcessCardModel'
@@ -47,6 +47,13 @@ interface RuntimeReply {
 
 export default function TaskTimeline({ model, taskContext, completed = false, hideAssistantReplies = false, hideCommands = false, expandAll = false, onCancel, onApprove }: TaskTimelineProps) {
   const display = buildTimelineDisplay(model, { completed, hideAssistantReplies, hideCommands })
+  const failedCommandId = display.primaryBlocks
+    .flatMap((block) => block.type === 'commands' ? block.items : [])
+    .find((item) => item.tone === 'failed')?.id ?? ''
+  const [openCommandId, setOpenCommandId] = useState<string | null>(null)
+  useEffect(() => {
+    if (failedCommandId) setOpenCommandId(failedCommandId)
+  }, [failedCommandId])
   if (!display.hasVisibleTimeline) return null
 
   return (
@@ -54,7 +61,13 @@ export default function TaskTimeline({ model, taskContext, completed = false, hi
       {display.showStageAtTop && <StageCard stage={model.stage} />}
       {display.primaryBlocks.map((block) => (
         block.type === 'commands' ? (
-          <CommandRunGroup key={block.id} items={block.items} expandAll={expandAll} />
+          <CommandRunGroup
+            key={block.id}
+            items={block.items}
+            expandAll={expandAll}
+            openCommandId={openCommandId}
+            onToggleCommand={(itemId) => setOpenCommandId((current) => current === itemId ? null : itemId)}
+          />
         ) : (
           <TimelineRow
             key={block.item.id}
@@ -268,7 +281,12 @@ function shouldRenderEmbeddedMessage(item: TimelineItem): boolean {
     || type === 'tool_approval_decision'
 }
 
-function CommandRunGroup({ items, expandAll = false }: { items: TimelineItem[]; expandAll?: boolean }) {
+function CommandRunGroup({ items, expandAll = false, openCommandId, onToggleCommand }: {
+  items: TimelineItem[]
+  expandAll?: boolean
+  openCommandId: string | null
+  onToggleCommand: (itemId: string) => void
+}) {
   const failed = items.some((item) => item.tone === 'failed')
   return (
     <details className={styles.commandRunGroup} data-tone={failed ? 'failed' : undefined} open={expandAll}>
@@ -278,27 +296,31 @@ function CommandRunGroup({ items, expandAll = false }: { items: TimelineItem[]; 
       </summary>
       <div className={styles.commandRunBody}>
         {items.map((item, index) => (
-          <CommandRunItem key={`${item.id}-${index}`} item={item} />
+          <CommandRunItem
+            key={`${item.id}-${index}`}
+            item={item}
+            open={openCommandId === item.id}
+            onToggle={() => onToggleCommand(item.id)}
+          />
         ))}
       </div>
     </details>
   )
 }
 
-function CommandRunItem({ item }: { item: TimelineItem }) {
+function CommandRunItem({ item, open, onToggle }: { item: TimelineItem; open: boolean; onToggle: () => void }) {
   const process = item.process
   if (!process) return null
   const commandText = process.commandText ?? process.subtitle
-  const openByDefault = item.tone === 'failed'
   return (
-    <details className={styles.commandRunItem} open={openByDefault}>
-      <summary title={commandText}>
+    <div className={styles.commandRunItem} data-open={open ? 'true' : undefined}>
+      <button type="button" className={styles.commandRunItemButton} title={commandText} aria-expanded={open} onClick={onToggle}>
         <span className={styles.commandRunOpenLabel}>命令</span>
         <code>{commandSummary(commandText)}</code>
         <span className={styles.commandRunStatus} data-tone={item.tone}>{shellStatus(process).label}</span>
-      </summary>
-      <ShellProcessCardView process={process} />
-    </details>
+      </button>
+      {open && <ShellProcessCardView process={process} />}
+    </div>
   )
 }
 

@@ -1,0 +1,519 @@
+.replayWorkbenchPage {
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  gap: 24px;
+  padding: 20px 24px 40px;
+  background: #07080a;
+  color: #edf2f8;
+}
+
+.replayWorkbenchRail {
+  position: sticky;
+  top: 20px;
+  align-self: start;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.replayWorkbenchTitle {
+  display: grid;
+  gap: 4px;
+}
+
+.replayWorkbenchTitle strong {
+  font-size: 13px;
+}
+
+.replayWorkbenchTitle span,
+.replayCaptureSelect > span {
+  color: #78869a;
+  font-size: 11px;
+}
+
+.replayCaptureSelect {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.replayCaptureSelect select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 28px 0 9px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 5px;
+  background: #14171c;
+  color: #dce5f2;
+  font-size: 11px;
+}
+
+.replayFacts {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid rgba(148, 163, 184, .12);
+  border-bottom: 1px solid rgba(148, 163, 184, .12);
+}
+
+.replayFacts > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.replayFacts dt {
+  color: #6f7c8f;
+}
+
+.replayFacts dd {
+  min-width: 0;
+  margin: 0;
+  color: #b9c5d5;
+  font-family: "Cascadia Code", Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayFacts dd[data-tone="done"],
+.replayFacts dd[data-tone="completed"],
+.replayFacts dd[data-tone="success"] {
+  color: #6fd89a;
+}
+
+.replayFacts dd[data-tone="failed"],
+.replayFacts dd[data-tone="error"] {
+  color: #ff8f95;
+}
+
+.replayFileActions,
+.replayTransport,
+.replaySpeed {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.replayIconButton {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, .15);
+  border-radius: 5px;
+  background: transparent;
+  color: #8e9bad;
+  cursor: pointer;
+}
+
+.replayIconButton:hover:not(:disabled),
+.replayIconButton[data-active="true"] {
+  border-color: rgba(130, 160, 220, .38);
+  background: #1b2029;
+  color: #dbe7fa;
+}
+
+.replayIconButton[data-primary="true"] {
+  border-color: rgba(111, 145, 224, .5);
+  background: #263657;
+  color: #f4f7ff;
+}
+
+.replayIconButton:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.replayIssues {
+  display: grid;
+  gap: 7px;
+}
+
+.replayIssues > header {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #d4a65a;
+  font-size: 11px;
+}
+
+.replayIssues[data-clear="true"] > header {
+  color: #5fc88b;
+}
+
+.replayIssues > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 7px;
+  padding-left: 8px;
+  border-left: 2px solid #656f80;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.replayIssues > div[data-severity="error"] {
+  border-color: #df5962;
+}
+
+.replayIssues > div[data-severity="warning"] {
+  border-color: #c89542;
+}
+
+.replayIssues > div > span {
+  color: #6f7c8f;
+}
+
+.replayIssues > div > strong {
+  min-width: 0;
+  color: #aab6c7;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayWorkbenchStage {
+  width: min(1180px, 100%);
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.replayWorkbenchHeader {
+  min-width: 0;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.replayWorkbenchHeader > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.replayWorkbenchHeader strong {
+  min-width: 0;
+  color: #e6edf7;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayWorkbenchHeader span {
+  min-width: 0;
+  color: #7d899b;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayFrameCounter {
+  flex: 0 0 auto;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.replayToolbar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(100px, 1fr) auto auto auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 5px 7px;
+  border-top: 1px solid rgba(148, 163, 184, .13);
+  border-bottom: 1px solid rgba(148, 163, 184, .13);
+}
+
+.replayRange {
+  width: 100%;
+  min-width: 80px;
+  accent-color: #718ed3;
+}
+
+.replaySpeed {
+  padding: 2px;
+  border: 1px solid rgba(148, 163, 184, .14);
+  border-radius: 5px;
+}
+
+.replaySpeed button {
+  min-width: 35px;
+  height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #78869a;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.replaySpeed button[data-active="true"] {
+  background: #252b36;
+  color: #e5ebf4;
+}
+
+.replayTimelineMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #68768a;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+}
+
+.replayTimelineMeta span[data-change="true"] {
+  color: #79b894;
+}
+
+.replayViewport {
+  min-width: 0;
+  height: min(650px, calc(100vh - 168px));
+  min-height: 480px;
+  display: grid;
+  grid-template-rows: 42px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, .15);
+  background: #111318;
+}
+
+.replayViewport[aria-busy="true"] {
+  opacity: .78;
+}
+
+.replayConversation {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 66px;
+  background: #111318;
+}
+
+.replayConversation > [data-replay-feed] {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.replayConversation > [data-replay-feed] > * {
+  height: 100%;
+}
+
+.replayWorkbenchComposer {
+  position: relative;
+  z-index: 2;
+  background: #111318;
+}
+
+.replayLoadError {
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: #ff9ca2;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.replayFilmstrip {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  padding-top: 4px;
+}
+
+.replayFilmstrip > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8996a8;
+  font-size: 10px;
+}
+
+.replayFilmstrip > header span {
+  color: #657286;
+}
+
+.replayFilmstripTrack {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.replayFilmstripFrame {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgba(148, 163, 184, .13);
+  border-radius: 5px;
+  background: #0c0e12;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.replayFilmstripFrame:hover,
+.replayFilmstripFrame[data-active="true"] {
+  border-color: rgba(111, 145, 224, .55);
+}
+
+.replayFilmstripMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #778598;
+  font: 9px "Cascadia Code", Consolas, monospace;
+}
+
+.replayFilmstripMeta strong {
+  color: #c8d2df;
+}
+
+.replayFilmstripViewport {
+  height: 118px;
+  display: block;
+  overflow: hidden;
+  background: #111318;
+  pointer-events: none;
+}
+
+.replayFilmstripScale {
+  width: 820px;
+  height: 420px;
+  display: block;
+  transform: scale(.275);
+  transform-origin: top left;
+}
+
+.replayConversationCompact {
+  width: 820px;
+  height: 420px;
+  display: block;
+  overflow: hidden;
+}
+
+.replayConversationCompact > [data-replay-feed] {
+  width: 820px;
+  height: 420px;
+}
+
+.replayFilmstripTitle {
+  min-width: 0;
+  color: #8c99aa;
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replayInspector {
+  color: #758297;
+  font-size: 11px;
+}
+
+.replayInspector > summary {
+  width: fit-content;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.replayInspector > summary::-webkit-details-marker {
+  display: none;
+}
+
+.replayInspector pre {
+  max-height: 320px;
+  margin: 8px 0 0;
+  padding: 12px;
+  overflow: auto;
+  border-left: 2px solid rgba(111, 145, 224, .35);
+  background: #0c0e12;
+  color: #aab7c8;
+  font: 10px/1.55 "Cascadia Code", Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 900px) {
+  .replayWorkbenchPage {
+    grid-template-columns: 1fr;
+    padding: 14px 12px 32px;
+  }
+
+  .replayWorkbenchRail {
+    position: static;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .replayFacts,
+  .replayIssues {
+    grid-column: 1 / -1;
+  }
+
+  .replayToolbar {
+    grid-template-columns: auto minmax(80px, 1fr) auto auto;
+  }
+
+  .replaySpeed,
+  .replayToolbar > .replayIconButton:last-child {
+    display: none;
+  }
+
+  .replayFilmstripTrack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .replayWorkbenchRail {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .replayFacts,
+  .replayIssues {
+    grid-column: auto;
+  }
+
+  .replayToolbar {
+    grid-template-columns: auto minmax(70px, 1fr) auto;
+  }
+
+  .replayToolbar > .replayIconButton:nth-last-child(2) {
+    display: none;
+  }
+
+  .replayTransport .replayIconButton:first-child,
+  .replayTransport .replayIconButton:last-child {
+    display: none;
+  }
+
+  .replayViewport {
+    min-height: 430px;
+    height: calc(100vh - 210px);
+  }
+
+  .replayViewport > .replayTopbar span {
+    display: none;
+  }
+}
