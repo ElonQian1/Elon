@@ -18,7 +18,7 @@
   ],
   "assignments": [
     {
-      "path": "docs/1.md",
+      "path": "docs/apk-release-signing-secrets.md",
       "section_id": "on-demand",
       "reason": "签名环境变量操作说明，仅在 APK 发布或环境配置时按需查阅。"
     },
@@ -327,7 +327,7 @@
       "target_path": "docs/apk-release-signing-secrets.md",
       "source_revision": "5e1b807f2f5c0842983947e94925b5c6e469ee1a6c9b4dd05c5adfbb1b448c61",
       "reason": "正文是安全的 APK 签名变量运行手册，但 1.md 无法表达主题；仅在用户逐项审核后重命名。",
-      "status": "proposed"
+      "status": "applied"
     }
   ],
   "documents_read": 8,
