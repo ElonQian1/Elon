@@ -1,7 +1,7 @@
 {
   "version": 1,
   "status": "applied",
-  "summary": "基于 119 份文档的路径、标题、标题层级、哈希和生命周期完成零模型 token 预分类；57 份歧义文档均获得保守的虚拟分区建议。正文读取 0 份，新增“工具参考（非权威）”和“fb2 子项目资料”两个主题分区。虚拟分区不改变路径权威上限，扁平的现行文档仍建议后续通过独立 Git 迁移进入 docs/current。",
+  "summary": "真实 MCP 增量整理：扫描 120 份 Markdown，程序预分类模型 token 为 0；AI 按需读取 8 份高风险或新增歧义文档（约 4099 token），保留原有 57 项审核结果，并把新增 Android 真渲染工作流归入按需文档。docs/1.md 内容未发现真实密钥，但文件名不可检索，新增逐项审核的重命名建议。",
   "proposed_sections": [
     {
       "id": "tool-reference",
@@ -301,6 +301,11 @@
       "path": "docs/群体ai开发/群体ai开发.md",
       "section_id": "drafts",
       "reason": "无标题层级且缺少批准路径，保守作为群体 AI 笔记。"
+    },
+    {
+      "path": "docs/android-real-renderer-ui-workflow.md",
+      "section_id": "on-demand",
+      "reason": "当前有效的 Android 真渲染、数字孪生和 APK/PWA Token 工作流，只在 APP UI、UI Tuner 或双端样式任务命中时读取。"
     }
   ],
   "conflicts": [
@@ -314,6 +319,17 @@
     "把 docs/1.md 重命名为可检索的安全运行手册，并在迁移前检查是否含真实密钥。",
     "fb2-ai-center 目录应补 README 索引，分别声明 current、draft 和 evidence 子目录，避免专题资料混合权威状态。"
   ],
-  "documents_read": 0,
-  "estimated_tokens_used": 0
+  "file_operations": [
+    {
+      "id": "rename-apk-signing-runbook",
+      "kind": "rename",
+      "source_path": "docs/1.md",
+      "target_path": "docs/apk-release-signing-secrets.md",
+      "source_revision": "5e1b807f2f5c0842983947e94925b5c6e469ee1a6c9b4dd05c5adfbb1b448c61",
+      "reason": "正文是安全的 APK 签名变量运行手册，但 1.md 无法表达主题；仅在用户逐项审核后重命名。",
+      "status": "proposed"
+    }
+  ],
+  "documents_read": 8,
+  "estimated_tokens_used": 4099
 }

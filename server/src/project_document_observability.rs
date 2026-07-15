@@ -109,13 +109,15 @@ pub(crate) fn mark_session_ready(workspace: &Path, session_id: &str) -> Result<S
     with_trace_lock(|| {
         let mut trace = read_trace_unlocked(&workspace)?.unwrap_or_else(new_direct_trace);
         trace.session_id = Some(session_id.to_string());
-        advance(
-            &mut trace,
-            "session_ready",
-            "running",
-            "MCP 会话已就绪",
-            "AI 可直接调用供应商无关的项目文档工具。",
-        );
+        if can_advance_work(&trace) {
+            advance(
+                &mut trace,
+                "session_ready",
+                "running",
+                "MCP 会话已就绪",
+                "AI 可直接调用供应商无关的项目文档工具。",
+            );
+        }
         let operation_id = trace.operation_id.clone();
         write_trace_unlocked(&workspace, &trace)?;
         Ok(operation_id)
@@ -245,13 +247,15 @@ pub(crate) fn mark_dispatched(
         trace.task_id = task_id
             .filter(|value| !value.trim().is_empty())
             .map(str::to_string);
-        advance(
-            trace,
-            "task_dispatched",
-            "running",
-            "AI 整理任务已发送",
-            "等待所选 AI 供应商连接项目文档 MCP。",
-        );
+        if can_advance_work(trace) {
+            advance(
+                trace,
+                "task_dispatched",
+                "running",
+                "AI 整理任务已发送",
+                "等待所选 AI 供应商连接项目文档 MCP。",
+            );
+        }
     })
 }
 

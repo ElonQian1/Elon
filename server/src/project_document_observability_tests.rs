@@ -67,6 +67,8 @@ fn trace_exposes_each_successful_stage_and_token_budget() {
     assert_eq!(applied["task_id"], "task-7");
     assert!(applied["events"].as_array().unwrap().len() >= 7);
 
+    mark_session_ready(&root, "docs_session_refresh").unwrap();
+    mark_dispatched(&root, Some(operation), Some("task-refresh")).unwrap();
     record_tool_success(
         &root,
         "project_docs_analyze",
@@ -79,6 +81,8 @@ fn trace_exposes_each_successful_stage_and_token_budget() {
     let refreshed = get_status(&root, Some(operation)).unwrap();
     assert_eq!(refreshed["status"], "succeeded");
     assert_eq!(refreshed["current_stage"], "applied");
+    assert_eq!(refreshed["session_id"], "docs_session_refresh");
+    assert_eq!(refreshed["task_id"], "task-refresh");
     assert_eq!(
         refreshed["events"].as_array().unwrap().len(),
         applied["events"].as_array().unwrap().len()
