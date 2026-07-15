@@ -4,6 +4,7 @@ import { Bot, FilePlus2, FileText, FolderTree, RefreshCw, Save, Search, Sparkles
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import ProjectDocumentAccessNotice from './ProjectDocumentAccessNotice'
+import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
 import ProjectDocumentNotebookRail from './ProjectDocumentNotebookRail'
 import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
@@ -61,6 +62,7 @@ export default function ProjectDocumentsWorkspace({
   const [applyingSuggestions, setApplyingSuggestions] = useState(false)
   const [applyingFileOperations, setApplyingFileOperations] = useState(false)
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
+  const automationPolicy = useProjectDocumentAutomationPolicy(projectId)
   const sections = useMemo(() => buildDocumentSections(organization.manifest), [organization.manifest])
 
   const loadCatalog = useCallback(async () => {
@@ -237,6 +239,7 @@ export default function ProjectDocumentsWorkspace({
         catalog,
         organization.manifest,
         operationId,
+        automationPolicy.mode,
       ))
       await organization.markDispatched(operationId, response?.task_id)
       setMessage(operationId
@@ -254,8 +257,12 @@ export default function ProjectDocumentsWorkspace({
     if (!catalog) return
     setApplyingSuggestions(true)
     try {
-      await organization.applySuggestions(catalog.revision)
-      setMessage('AI 分区建议已应用；Markdown 文件未被移动或改写。')
+      const result = await organization.applySuggestions(catalog.revision, automationPolicy.mode)
+      setMessage(result?.git_result_commit
+        ? `AI 分区建议已应用；Git 已保存整理前 ${result.git_baseline_commit?.slice(0, 8)} 和整理后 ${result.git_result_commit.slice(0, 8)} 两个提交。`
+        : result?.git_baseline_commit
+          ? `整理前 Git 备份 ${result.git_baseline_commit.slice(0, 8)} 已保存；继续执行实体文档操作后会提交整理结果。`
+          : 'AI 分区建议已应用；Markdown 文件未被移动或改写。')
     } catch (error) {
       setMessage(errorMessage(error, '应用 AI 建议失败'))
     } finally {
@@ -271,8 +278,12 @@ export default function ProjectDocumentsWorkspace({
     try {
       const result = await organization.applyFileOperations({
         catalogRevision: localCatalogRevision,
+        authorizationMode: automationPolicy.mode,
         ...input,
       })
+      if (result.git_baseline_commit && result.git_result_commit) {
+        setMessage(`文档整理已完成：Git 已保存整理前 ${result.git_baseline_commit.slice(0, 8)} 和整理后 ${result.git_result_commit.slice(0, 8)} 两个提交。`)
+      }
       const selectedMove = result.operations.find((operation) => operation.source_path === selectedPath)
       if (selectedMove) {
         setDocument(null)
@@ -323,6 +334,8 @@ export default function ProjectDocumentsWorkspace({
           applying={applyingSuggestions}
           applyingFiles={applyingFileOperations}
           canApplyFiles={!!catalog?.can_edit && organization.trackingAvailable && !!organization.trace?.catalog_revision}
+          automationMode={automationPolicy.mode}
+          onAutomationModeChange={automationPolicy.setMode}
           onRefresh={organization.reload}
           onApply={applySuggestions}
           onApplyFiles={applyFileOperations}

@@ -13,6 +13,7 @@ use std::sync::Arc;
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_docs_snapshot::load_project_documents_catalog_snapshot,
+    project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_gateway::{read_optional_project_file, write_project_file},
     project_document_governance::{
         apply_suggestions, parse_manifest, parse_suggestions, to_pretty_json, SECTION_CONFIG_PATH,
@@ -23,6 +24,9 @@ use crate::{
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ApplyOrganizationRequest {
+    #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
+    #[serde(default)]
     reviewed: bool,
     expected_catalog_revision: String,
     #[serde(default)]
@@ -37,12 +41,17 @@ pub(crate) async fn apply_organization_suggestions(
     Path(project_id): Path<String>,
     Json(request): Json<ApplyOrganizationRequest>,
 ) -> Response {
-    if !request.reviewed {
+    if request.authorization_mode == DocumentAutomationMode::GitBackedFull {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "应用 AI 文档整理建议前必须显式确认 reviewed=true",
+            "git_backed_full 必须由项目本机节点创建整理前/后 Git 提交",
         );
     }
+    let authorization = match authorize_document_apply(request.authorization_mode, request.reviewed)
+    {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    };
     let user = match auth_from_headers(&state, &headers) {
         Ok(user) => user,
         Err(error) => return json_error(StatusCode::UNAUTHORIZED, error.to_string()),
@@ -101,6 +110,8 @@ pub(crate) async fn apply_organization_suggestions(
             "suggestions": result.suggestions,
             "manifest_revision": manifest_file.map(|file| file.revision),
             "suggestions_revision": suggestions_file.map(|file| file.revision),
+            "authorization_mode": authorization.mode,
+            "auto_authorized": authorization.auto_authorized,
             "markdown_changed": false,
         }))
         .into_response();
@@ -171,6 +182,8 @@ pub(crate) async fn apply_organization_suggestions(
         "suggestions": result.suggestions,
         "manifest_revision": manifest_revision,
         "suggestions_revision": suggestions_saved.revision,
+        "authorization_mode": authorization.mode,
+        "auto_authorized": authorization.auto_authorized,
         "manifest_already_applied": manifest_already_applied,
         "applied_assignments": result.applied_assignments,
         "skipped_assignments": result.skipped_assignments,

@@ -42,6 +42,7 @@ fn trace_exposes_each_successful_stage_and_token_budget() {
         &json!({
             "catalog_revision":"catalog-1",
             "suggestions_revision":"suggestions-1",
+            "authorization_mode":"review_all",
             "suggestions":{"documents_read":3,"estimated_tokens_used":240}
         }),
     );
@@ -87,6 +88,53 @@ fn trace_exposes_each_successful_stage_and_token_budget() {
         refreshed["events"].as_array().unwrap().len(),
         applied["events"].as_array().unwrap().len()
     );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn trusted_mode_stays_observable_through_real_file_apply_stage() {
+    let root = workspace();
+    let operation = "docs_trusted_apply";
+    start_operation(&root, Some(operation)).unwrap();
+    record_tool_success(
+        &root,
+        "project_docs_save_suggestions",
+        &json!({
+            "catalog_revision":"catalog-1",
+            "suggestions_revision":"suggestions-1",
+            "authorization_mode":"trusted_reversible",
+            "suggestions":{"documents_read":1,"estimated_tokens_used":40}
+        }),
+    );
+    assert_eq!(
+        get_status(&root, Some(operation)).unwrap()["current_stage"],
+        "suggestions_ready"
+    );
+    record_tool_success(
+        &root,
+        "project_docs_apply_suggestions",
+        &json!({
+            "manifest_revision":"manifest-1",
+            "suggestions_revision":"suggestions-2",
+            "suggestions":{"file_operations":[{"status":"proposed"}]}
+        }),
+    );
+    assert_eq!(
+        get_status(&root, Some(operation)).unwrap()["current_stage"],
+        "virtual_applied"
+    );
+    record_tool_success(
+        &root,
+        "project_docs_apply_file_operations",
+        &json!({
+            "catalog_revision":"catalog-2",
+            "manifest_revision":"manifest-2",
+            "suggestions_revision":"suggestions-3"
+        }),
+    );
+    let applied = get_status(&root, Some(operation)).unwrap();
+    assert_eq!(applied["status"], "succeeded");
+    assert_eq!(applied["current_stage"], "files_applied");
     fs::remove_dir_all(root).unwrap();
 }
 

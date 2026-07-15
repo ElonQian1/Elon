@@ -179,7 +179,7 @@ pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Opt
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
-            "instructions": "先调用 project_docs_analyze。目录预分类不读取正文且 classification_model_tokens=0；仅用 project_docs_read 按需读 ambiguous 或任务相关文档。AI 先用 project_docs_save_suggestions 写结构化建议；没有用户明确审核不得调用 project_docs_apply_suggestions 或 project_docs_apply_file_operations。实体整理只允许逐项审核的 Markdown 重命名/移动，禁止覆盖、删除、改写正文或自动提交 Git。"
+            "instructions": "先调用 project_docs_analyze。目录预分类不读取正文且 classification_model_tokens=0；仅用 project_docs_read 按需读 ambiguous 或任务相关文档。AI 用 project_docs_save_suggestions 写结构化建议。authorization_mode 默认 git_backed_full：apply_suggestions 先提交整理前文档基线；有实体操作时把返回的 git_baseline_commit 传给 apply_file_operations，完成重命名/移动和整理后提交。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),

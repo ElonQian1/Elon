@@ -8,13 +8,15 @@ use std::{collections::HashSet, path::Path};
 
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
+    project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{
         read_project_document_file, write_project_document_file, ProjectDocumentFile,
     },
+    project_document_git_transaction::{commit_document_baseline, commit_document_result},
     project_document_governance::{
         apply_suggestions, effective_section, parse_manifest, parse_suggestions, to_pretty_json,
         validate_ready_suggestions, DocumentOrganizationSuggestions, DocumentSectionManifest,
-        OrganizationStatus, SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
+        SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
 };
 
@@ -188,6 +190,7 @@ pub(crate) fn read_documents(
 pub(crate) fn save_suggestions(
     workspace: &Path,
     suggestions: DocumentOrganizationSuggestions,
+    authorization_mode: DocumentAutomationMode,
     expected_catalog_revision: &str,
     expected_suggestions_revision: Option<&str>,
 ) -> Result<Value> {
@@ -202,7 +205,9 @@ pub(crate) fn save_suggestions(
             "catalog_revision": snapshot.revision,
             "suggestions_revision": existing.revision,
             "suggestions": suggestions,
-            "requires_user_review": true,
+            "authorization_mode": authorization_mode,
+            "requires_user_review": authorization_mode == DocumentAutomationMode::ReviewAll,
+            "apply_allowed": authorization_mode != DocumentAutomationMode::SuggestionsOnly,
             "markdown_changed": false,
         }));
     }
@@ -225,7 +230,9 @@ pub(crate) fn save_suggestions(
         "catalog_revision": snapshot.revision,
         "suggestions_revision": saved.revision,
         "suggestions": suggestions,
-        "requires_user_review": true,
+        "authorization_mode": authorization_mode,
+        "requires_user_review": authorization_mode == DocumentAutomationMode::ReviewAll,
+        "apply_allowed": authorization_mode != DocumentAutomationMode::SuggestionsOnly,
         "markdown_changed": false,
     }))
 }
@@ -235,20 +242,20 @@ pub(crate) fn get_suggestions(workspace: &Path) -> Result<Value> {
     Ok(json!({
         "suggestions": suggestions.value,
         "suggestions_revision": suggestions.revision,
-        "requires_user_review": suggestions.value.as_ref().is_some_and(|value| value.status == OrganizationStatus::Ready),
+        "default_authorization_mode": DocumentAutomationMode::TrustedReversible,
+        "requires_user_review": false,
     }))
 }
 
 pub(crate) fn apply_saved_suggestions(
     workspace: &Path,
+    authorization_mode: DocumentAutomationMode,
     reviewed: bool,
     expected_catalog_revision: &str,
     expected_manifest_revision: Option<&str>,
     expected_suggestions_revision: Option<&str>,
 ) -> Result<Value> {
-    if !reviewed {
-        bail!("应用 AI 文档整理建议前必须显式传入 reviewed=true");
-    }
+    let authorization = authorize_document_apply(authorization_mode, reviewed)?;
     let snapshot = catalog(workspace)?;
     verify_catalog_revision(&snapshot, Some(expected_catalog_revision))?;
     let manifest = load_manifest(workspace)?;
@@ -270,6 +277,8 @@ pub(crate) fn apply_saved_suggestions(
             "suggestions": result.suggestions,
             "manifest_revision": manifest.revision,
             "suggestions_revision": suggestions.revision,
+            "authorization_mode": authorization.mode,
+            "auto_authorized": authorization.auto_authorized,
             "markdown_changed": false,
         }));
     }
@@ -286,6 +295,15 @@ pub(crate) fn apply_saved_suggestions(
             expected_manifest_revision,
         )?;
     }
+    let pending_file_operations = result.suggestions.file_operations.iter().any(|operation| {
+        operation.status
+            == crate::project_document_governance::SuggestedFileOperationStatus::Proposed
+    });
+    let git_baseline_commit = if authorization.mode == DocumentAutomationMode::GitBackedFull {
+        Some(commit_document_baseline(workspace)?)
+    } else {
+        None
+    };
     let manifest_content = to_pretty_json(&result.manifest)?;
     let manifest_revision = if manifest_already_applied {
         manifest.revision
@@ -309,6 +327,15 @@ pub(crate) fn apply_saved_suggestions(
         expected_suggestions_revision,
     )
     .map_err(|error| anyhow!(error.message))?;
+    let git_result_commit = if !pending_file_operations {
+        git_baseline_commit
+            .as_deref()
+            .map(|baseline| commit_document_result(workspace, baseline))
+            .transpose()?
+    } else {
+        None
+    };
+    let git_document_transaction_complete = git_result_commit.is_some();
     Ok(json!({
         "status": "applied",
         "already_applied": false,
@@ -319,6 +346,11 @@ pub(crate) fn apply_saved_suggestions(
         "manifest_already_applied": manifest_already_applied,
         "applied_assignments": result.applied_assignments,
         "skipped_assignments": result.skipped_assignments,
+        "authorization_mode": authorization.mode,
+        "auto_authorized": authorization.auto_authorized,
+        "git_baseline_commit": git_baseline_commit,
+        "git_result_commit": git_result_commit,
+        "git_document_transaction_complete": git_document_transaction_complete,
         "markdown_changed": false,
     }))
 }

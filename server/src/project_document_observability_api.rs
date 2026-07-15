@@ -6,11 +6,12 @@ use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 
 use crate::{
-    project_document_file_operations::{
-        apply_reviewed_file_operations, ApplyFileOperationsRequest,
-    },
+    project_document_authorization::DocumentAutomationMode,
+    project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
+    project_document_governance_service::apply_saved_suggestions,
     project_document_observability::{
-        get_status, mark_applied, mark_dispatched, mark_failure, start_operation,
+        get_status, mark_applied, mark_dispatched, mark_failure, record_tool_failure,
+        record_tool_success, start_operation,
     },
     NodeRuntime,
 };
@@ -33,6 +34,8 @@ struct OperationRequest {
     #[serde(default)]
     suggestions_revision: Option<String>,
     #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
+    #[serde(default)]
     reviewed: bool,
     #[serde(default)]
     operation_ids: Vec<String>,
@@ -46,6 +49,8 @@ struct OperationRequest {
     expected_manifest_revision: Option<String>,
     #[serde(default)]
     expected_suggestions_revision: Option<String>,
+    #[serde(default)]
+    git_baseline_commit: Option<String>,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -67,6 +72,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/project-docs/organization/apply-files",
             post(apply_files_handler),
+        )
+        .route(
+            "/api/project-docs/organization/apply-suggestions",
+            post(apply_suggestions_handler),
         )
 }
 
@@ -90,6 +99,10 @@ pub(crate) fn test_routes() -> Router {
         .route(
             "/api/project-docs/organization/apply-files",
             post(apply_files_handler),
+        )
+        .route(
+            "/api/project-docs/organization/apply-suggestions",
+            post(apply_suggestions_handler),
         )
 }
 
@@ -138,18 +151,46 @@ async fn fail_handler(Json(request): Json<OperationRequest>) -> axum::response::
 }
 
 async fn apply_files_handler(Json(request): Json<OperationRequest>) -> axum::response::Response {
-    value_response(apply_reviewed_file_operations(
-        Path::new(request.project_root.trim()),
-        ApplyFileOperationsRequest {
-            reviewed: request.reviewed,
-            operation_ids: &request.operation_ids,
-            allow_rename: request.allow_rename,
-            allow_move: request.allow_move,
-            expected_catalog_revision: request.expected_catalog_revision.as_deref().unwrap_or(""),
-            expected_manifest_revision: request.expected_manifest_revision.as_deref(),
-            expected_suggestions_revision: request.expected_suggestions_revision.as_deref(),
-        },
-    ))
+    let workspace = Path::new(request.project_root.trim());
+    recorded_value_response(
+        workspace,
+        "project_docs_apply_file_operations",
+        apply_file_operations(
+            workspace,
+            ApplyFileOperationsRequest {
+                authorization_mode: request.authorization_mode,
+                reviewed: request.reviewed,
+                operation_ids: &request.operation_ids,
+                allow_rename: request.allow_rename,
+                allow_move: request.allow_move,
+                expected_catalog_revision: request
+                    .expected_catalog_revision
+                    .as_deref()
+                    .unwrap_or(""),
+                expected_manifest_revision: request.expected_manifest_revision.as_deref(),
+                expected_suggestions_revision: request.expected_suggestions_revision.as_deref(),
+                git_baseline_commit: request.git_baseline_commit.as_deref(),
+            },
+        ),
+    )
+}
+
+async fn apply_suggestions_handler(
+    Json(request): Json<OperationRequest>,
+) -> axum::response::Response {
+    let workspace = Path::new(request.project_root.trim());
+    recorded_value_response(
+        workspace,
+        "project_docs_apply_suggestions",
+        apply_saved_suggestions(
+            workspace,
+            request.authorization_mode,
+            request.reviewed,
+            request.expected_catalog_revision.as_deref().unwrap_or(""),
+            request.expected_manifest_revision.as_deref(),
+            request.expected_suggestions_revision.as_deref(),
+        ),
+    )
 }
 
 fn operation_response(result: anyhow::Result<Value>) -> axum::response::Response {
@@ -172,4 +213,16 @@ fn value_response(result: anyhow::Result<Value>) -> axum::response::Response {
         )
             .into_response(),
     }
+}
+
+fn recorded_value_response(
+    workspace: &Path,
+    tool: &str,
+    result: anyhow::Result<Value>,
+) -> axum::response::Response {
+    match &result {
+        Ok(value) => record_tool_success(workspace, tool, value),
+        Err(error) => record_tool_failure(workspace, tool, error),
+    }
+    value_response(result)
 }

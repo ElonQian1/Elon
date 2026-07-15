@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 use std::sync::Arc;
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, process::Command};
 
 use crate::node_agent_project_docs_mcp::{
     authorize_session, descriptor_for_project, handle_request, test_transport_routes, McpRequest,
@@ -11,8 +11,35 @@ fn workspace() -> PathBuf {
         "elon_project_docs_mcp_test_{}",
         uuid::Uuid::new_v4().simple()
     ));
-    fs::create_dir_all(root.join(".git")).unwrap();
+    fs::create_dir_all(&root).unwrap();
     fs::write(root.join("AGENTS.md"), "# Agent entry\n").unwrap();
+    assert!(Command::new("git")
+        .current_dir(&root)
+        .args(["init", "-q"])
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("git")
+        .current_dir(&root)
+        .args(["add", "AGENTS.md"])
+        .status()
+        .unwrap()
+        .success());
+    assert!(Command::new("git")
+        .current_dir(&root)
+        .args([
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-q",
+            "-m",
+            "initial"
+        ])
+        .status()
+        .unwrap()
+        .success());
     root
 }
 
@@ -140,7 +167,6 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "params":{
                 "name":"project_docs_apply_suggestions",
                 "arguments":{
-                    "reviewed":true,
                     "expected_catalog_revision":catalog_revision,
                     "expected_suggestions_revision":suggestions_revision
                 }
@@ -154,8 +180,15 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         applied["result"]["structuredContent"]["markdown_changed"],
         false
     );
+    assert_eq!(
+        applied["result"]["structuredContent"]["auto_authorized"],
+        true
+    );
     let applied_suggestions_revision = applied["result"]["structuredContent"]
         ["suggestions_revision"]
+        .as_str()
+        .unwrap();
+    let git_baseline_commit = applied["result"]["structuredContent"]["git_baseline_commit"]
         .as_str()
         .unwrap();
     let files_applied = handle_request(
@@ -165,13 +198,11 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "params":{
                 "name":"project_docs_apply_file_operations",
                 "arguments":{
-                    "reviewed":true,
                     "operation_ids":["rename-agent-entry"],
-                    "allow_rename":true,
-                    "allow_move":false,
                     "expected_catalog_revision":catalog_revision,
                     "expected_manifest_revision":applied["result"]["structuredContent"]["manifest_revision"],
                     "expected_suggestions_revision":applied_suggestions_revision
+                    ,"git_baseline_commit":git_baseline_commit
                 }
             }
         })),
@@ -181,6 +212,19 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert_eq!(
         files_applied["result"]["structuredContent"]["status"],
         "file_operations_applied"
+    );
+    assert_eq!(
+        files_applied["result"]["structuredContent"]["auto_authorized"],
+        true
+    );
+    assert_eq!(
+        files_applied["result"]["structuredContent"]["git_document_transaction_complete"],
+        true
+    );
+    assert!(
+        files_applied["result"]["structuredContent"]["git_result_commit"]
+            .as_str()
+            .is_some()
     );
     assert!(root.join("AI_AGENT.md").is_file());
     assert!(!root.join("AGENTS.md").exists());

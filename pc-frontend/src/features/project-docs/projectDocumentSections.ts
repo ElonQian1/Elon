@@ -41,6 +41,8 @@ export interface SuggestedFileOperation {
   status: 'proposed' | 'applied'
 }
 
+export type DocumentAutomationMode = 'git_backed_full' | 'trusted_reversible' | 'review_all' | 'suggestions_only'
+
 export interface DocumentOrganizationSuggestions {
   version: 1
   status: 'requested' | 'ready' | 'applied'
@@ -211,22 +213,27 @@ export function buildOrganizationPrompt(
   catalog: DocumentCatalog,
   manifest: DocumentSectionManifest,
   operationId?: string,
+  authorizationMode: DocumentAutomationMode = 'git_backed_full',
 ) {
   const customSections = manifest.sections.length
     ? manifest.sections.map((section) => `${customSectionKey(section.id)}=${section.label}`).join(', ')
     : '无'
   const ambiguous = catalog.documents.filter((document) => document.metadata.ambiguous).length
+  const authorizationInstruction = authorizationMode === 'git_backed_full' || authorizationMode === 'trusted_reversible'
+    ? `⑤ 使用 authorization_mode=${authorizationMode} 调用 project_docs_apply_suggestions；⑥ 若有 proposed file_operations，选择全部整理项调用 project_docs_apply_file_operations，不需要 reviewed/allow 标志；git_backed_full 必须确认响应同时包含整理前 git_baseline_commit 和整理后 git_result_commit；⑦ project_docs_get_status 核对最终状态。`
+    : authorizationMode === 'review_all'
+      ? '⑤ 调用 project_docs_get_status 后停在等待审核；没有用户确认，不得调用任何 apply 工具。'
+      : '⑤ 调用 project_docs_get_status 后结束；当前是 suggestions_only，禁止调用任何 apply 工具。'
   return `<elon-project-docs-task version="1">\n请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
-    `运行 ID：${operationId || '由 MCP 会话生成'}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；现有自定义分区：${customSections}。\n` +
+    `运行 ID：${operationId || '由 MCP 会话生成'}。权限模式：${authorizationMode}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；现有自定义分区：${customSections}。\n` +
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
     '① project_docs_analyze 获取 classification_model_tokens=0 的完整紧凑目录；' +
     '② 仅对仍无法根据路径、标题和 headings 判断的少量文档调用 project_docs_read；' +
-    '③ project_docs_save_suggestions 保存 ready 建议；' +
-    '④ project_docs_get_status 确认阶段、revision、读取数与 token；' +
-    '⑤ 停在等待审核，绝不能自行调用 project_docs_apply_suggestions。' +
+    '③ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
+    `④ 保存后按当前权限继续；${authorizationInstruction}` +
     '如发现命名含糊或路径放错，可在 file_operations 中提出结构化 rename/move；source_revision 必须使用 analyze 返回的 content_hash。' +
     `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
-    '没有用户在审核界面逐项确认 rename/move 权限，绝不能调用 project_docs_apply_file_operations。' +
+    'git_backed_full 会自动完成整理前和整理后两次仅文档 Git 提交；任何模式都不得越界、操作非 Markdown、修改代码或自动 push。' +
     '虚拟分区不改变真实路径的 role、lifecycle、authority 或 default_retrieval；不能借虚拟 current 提升权威性。' +
     '只为确有改进价值的文档生成 assignments，新分区最多 8 个，并如实记录实际正文读取数和 token。' +
     '如果当前供应商确实没有 MCP，才使用同一顺序做本地元数据扫描并写建议 JSON；不要全文扫描 docs。'

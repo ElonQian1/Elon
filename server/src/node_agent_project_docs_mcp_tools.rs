@@ -4,9 +4,8 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 use crate::{
-    project_document_file_operations::{
-        apply_reviewed_file_operations, ApplyFileOperationsRequest,
-    },
+    project_document_authorization::DocumentAutomationMode,
+    project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
     project_document_governance::DocumentOrganizationSuggestions,
     project_document_governance_service::{
         analyze_workspace, apply_saved_suggestions, default_page_size, default_read_chars,
@@ -37,6 +36,8 @@ struct ReadArguments {
 #[derive(Debug, Deserialize)]
 struct SaveSuggestionsArguments {
     suggestions: DocumentOrganizationSuggestions,
+    #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
     expected_catalog_revision: String,
     #[serde(default)]
     expected_suggestions_revision: Option<String>,
@@ -44,6 +45,9 @@ struct SaveSuggestionsArguments {
 
 #[derive(Debug, Deserialize)]
 struct ApplySuggestionsArguments {
+    #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
+    #[serde(default)]
     reviewed: bool,
     expected_catalog_revision: String,
     #[serde(default)]
@@ -54,6 +58,9 @@ struct ApplySuggestionsArguments {
 
 #[derive(Debug, Deserialize)]
 struct ApplyFileOperationsArguments {
+    #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
+    #[serde(default)]
     reviewed: bool,
     operation_ids: Vec<String>,
     #[serde(default)]
@@ -65,6 +72,8 @@ struct ApplyFileOperationsArguments {
     expected_manifest_revision: Option<String>,
     #[serde(default)]
     expected_suggestions_revision: Option<String>,
+    #[serde(default)]
+    git_baseline_commit: Option<String>,
 }
 
 pub(crate) fn tool_definitions() -> Vec<Value> {
@@ -112,6 +121,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 "required":["suggestions","expected_catalog_revision"],
                 "properties":{
                     "expected_catalog_revision":{"type":"string","minLength":1},
+                    "authorization_mode":{"type":"string","enum":["git_backed_full","trusted_reversible","review_all","suggestions_only"],"default":"git_backed_full"},
                     "expected_suggestions_revision":{"type":"string"},
                     "suggestions":suggestions_schema()
                 }
@@ -119,12 +129,13 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "project_docs_apply_suggestions",
-            "仅在用户或审核流程明确确认后，把 ready 建议应用为虚拟分区配置并把建议标记 applied。必须 reviewed=true 且 revisions 一致；不会移动或改写 Markdown。",
+            "把 ready 建议应用为虚拟分区配置并标记 applied。authorization_mode 默认 git_backed_full：先创建仅文档 Git 基线；无实体操作时立即提交整理结果，有实体操作时把基线 SHA 交给 apply_file_operations 完成整理后提交。review_all 需要 reviewed=true；suggestions_only 禁止应用。",
             json!({
                 "type":"object",
-                "required":["reviewed","expected_catalog_revision"],
+                "required":["expected_catalog_revision"],
                 "properties":{
-                    "reviewed":{"type":"boolean","const":true},
+                    "authorization_mode":{"type":"string","enum":["git_backed_full","trusted_reversible","review_all","suggestions_only"],"default":"git_backed_full"},
+                    "reviewed":{"type":"boolean","default":false},
                     "expected_catalog_revision":{"type":"string","minLength":1},
                     "expected_manifest_revision":{"type":"string"},
                     "expected_suggestions_revision":{"type":"string"}
@@ -133,18 +144,20 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "project_docs_apply_file_operations",
-            "仅在用户逐项审核后，对选中的 Markdown 执行重命名或移动。必须 reviewed=true，并分别授予 rename/move 权限；校验目录、建议和源文件 revision；禁止覆盖、删除、越界、改写正文或自动提交 Git。",
+            "对选中的 Markdown 执行重命名或移动。authorization_mode 默认 git_backed_full：确认整理前 Git 基线后自动执行，并创建整理后仅文档提交；review_all 需要 reviewed=true 和对应权限；suggestions_only 禁止应用。始终校验 revision，禁止覆盖、越界、修改代码或自动 push。",
             json!({
                 "type":"object",
-                "required":["reviewed","operation_ids","expected_catalog_revision"],
+                "required":["operation_ids","expected_catalog_revision"],
                 "properties":{
-                    "reviewed":{"type":"boolean","const":true},
+                    "authorization_mode":{"type":"string","enum":["git_backed_full","trusted_reversible","review_all","suggestions_only"],"default":"git_backed_full"},
+                    "reviewed":{"type":"boolean","default":false},
                     "operation_ids":{"type":"array","minItems":1,"maxItems":100,"items":{"type":"string"}},
                     "allow_rename":{"type":"boolean","default":false},
                     "allow_move":{"type":"boolean","default":false},
                     "expected_catalog_revision":{"type":"string","minLength":1},
                     "expected_manifest_revision":{"type":"string"},
                     "expected_suggestions_revision":{"type":"string"}
+                    ,"git_baseline_commit":{"type":"string","description":"git_backed_full 下优先传 apply_suggestions 返回的整理前提交 SHA。"}
                 }
             }),
         ),
@@ -188,6 +201,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                 save_suggestions(
                     workspace,
                     input.suggestions,
+                    input.authorization_mode,
                     &input.expected_catalog_revision,
                     input.expected_suggestions_revision.as_deref(),
                 )
@@ -196,6 +210,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                 let input: ApplySuggestionsArguments = decode(arguments, name)?;
                 apply_saved_suggestions(
                     workspace,
+                    input.authorization_mode,
                     input.reviewed,
                     &input.expected_catalog_revision,
                     input.expected_manifest_revision.as_deref(),
@@ -204,9 +219,10 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
             }
             "project_docs_apply_file_operations" => {
                 let input: ApplyFileOperationsArguments = decode(arguments, name)?;
-                apply_reviewed_file_operations(
+                apply_file_operations(
                     workspace,
                     ApplyFileOperationsRequest {
+                        authorization_mode: input.authorization_mode,
                         reviewed: input.reviewed,
                         operation_ids: &input.operation_ids,
                         allow_rename: input.allow_rename,
@@ -216,6 +232,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                         expected_suggestions_revision: input
                             .expected_suggestions_revision
                             .as_deref(),
+                        git_baseline_commit: input.git_baseline_commit.as_deref(),
                     },
                 )
             }

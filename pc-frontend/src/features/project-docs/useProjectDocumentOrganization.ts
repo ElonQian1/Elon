@@ -22,6 +22,7 @@ import {
   SECTION_CONFIG_PATH,
   serializeProjectDocumentJson,
   type DocumentOrganizationSuggestions,
+  type DocumentAutomationMode,
   type DocumentSectionManifest,
 } from './projectDocumentSections'
 
@@ -35,6 +36,9 @@ interface AppliedOrganizationResponse {
   suggestions: DocumentOrganizationSuggestions
   manifest_revision?: string
   suggestions_revision?: string
+  git_baseline_commit?: string
+  git_result_commit?: string
+  git_document_transaction_complete?: boolean
 }
 
 export interface AppliedFileOperationResult {
@@ -52,6 +56,9 @@ interface AppliedFileOperationsResponse {
   manifest_revision?: string
   suggestions_revision?: string
   catalog_revision: string
+  git_baseline_commit?: string
+  git_result_commit?: string
+  git_document_transaction_complete?: boolean
 }
 
 export function useProjectDocumentOrganization(
@@ -215,22 +222,38 @@ export function useProjectDocumentOrganization(
     return nextManifest
   }, [manifestFile.value, saveManifest])
 
-  const applySuggestions = useCallback(async (catalogRevision: string) => {
+  const applySuggestions = useCallback(async (
+    catalogRevision: string,
+    authorizationMode: DocumentAutomationMode,
+  ) => {
     const suggestions = suggestionsFile.value
-    if (!suggestions || suggestions.status !== 'ready') return manifestFile.value
-    const result = await api.post<AppliedOrganizationResponse>(
-      `/api/projects/${encodeURIComponent(projectId)}/docs/organization/apply`,
-      {
-        reviewed: true,
-        expected_catalog_revision: catalogRevision,
-        expected_manifest_revision: manifestFile.revision,
-        expected_suggestions_revision: suggestionsFile.revision,
-      },
-    )
+    if (!suggestions || suggestions.status !== 'ready') return null
+    if (authorizationMode === 'git_backed_full' && !trackingAvailable) {
+      throw new Error('Git 备份后完全整理必须连接项目本机节点')
+    }
+    const request = {
+      authorization_mode: authorizationMode,
+      reviewed: authorizationMode === 'review_all',
+      expected_catalog_revision: authorizationMode === 'git_backed_full'
+        ? trace?.catalog_revision || catalogRevision
+        : catalogRevision,
+      expected_manifest_revision: manifestFile.revision,
+      expected_suggestions_revision: suggestionsFile.revision,
+    }
+    const result = authorizationMode === 'git_backed_full'
+      ? await nodeApi<AppliedOrganizationResponse>(
+        trackingRuntime.adminUrl,
+        '/api/project-docs/organization/apply-suggestions',
+        { method: 'POST', body: JSON.stringify({ project_root: trackingRuntime.projectRoot, ...request }) },
+      )
+      : await api.post<AppliedOrganizationResponse>(
+        `/api/projects/${encodeURIComponent(projectId)}/docs/organization/apply`,
+        request,
+      )
     setManifestFile({ value: result.manifest, revision: result.manifest_revision })
     setSuggestionsFile({ value: result.suggestions, revision: result.suggestions_revision })
     const operationId = trace?.operation_id
-    if (trackingAvailable && operationId) {
+    if (authorizationMode !== 'git_backed_full' && trackingAvailable && operationId) {
       try {
         await trackingRequest('/api/project-docs/organization/applied', {
           operation_id: operationId,
@@ -241,11 +264,13 @@ export function useProjectDocumentOrganization(
         setTrackingError(errorMessage(reason, '分区已应用，但记录观测状态失败'))
       }
     }
-    return result.manifest
-  }, [manifestFile.revision, manifestFile.value, projectId, suggestionsFile.revision, suggestionsFile.value, trace?.operation_id, trackingAvailable, trackingRequest])
+    if (authorizationMode === 'git_backed_full') await loadStatus()
+    return result
+  }, [loadStatus, manifestFile.revision, projectId, suggestionsFile.revision, suggestionsFile.value, trace?.catalog_revision, trace?.operation_id, trackingAvailable, trackingRequest, trackingRuntime.adminUrl, trackingRuntime.projectRoot])
 
   const applyFileOperations = useCallback(async (input: {
     catalogRevision: string
+    authorizationMode: DocumentAutomationMode
     operationIds: string[]
     allowRename: boolean
     allowMove: boolean
@@ -260,13 +285,17 @@ export function useProjectDocumentOrganization(
           method: 'POST',
           body: JSON.stringify({
             project_root: trackingRuntime.projectRoot,
-            reviewed: true,
+            authorization_mode: input.authorizationMode,
+            reviewed: input.authorizationMode === 'review_all',
             operation_ids: input.operationIds,
-            allow_rename: input.allowRename,
-            allow_move: input.allowMove,
+            allow_rename: input.authorizationMode === 'review_all' && input.allowRename,
+            allow_move: input.authorizationMode === 'review_all' && input.allowMove,
             expected_catalog_revision: input.catalogRevision,
             expected_manifest_revision: manifestFile.revision,
             expected_suggestions_revision: suggestionsFile.revision,
+            git_baseline_commit: input.authorizationMode === 'git_backed_full'
+              ? trace?.git_baseline_commit
+              : undefined,
           }),
         },
       )
@@ -277,7 +306,7 @@ export function useProjectDocumentOrganization(
       setError(errorMessage(reason, '实体文档整理失败'))
       throw reason
     }
-  }, [manifestFile.revision, suggestionsFile.revision, trackingAvailable, trackingRuntime.adminUrl, trackingRuntime.projectRoot])
+  }, [manifestFile.revision, suggestionsFile.revision, trace?.git_baseline_commit, trackingAvailable, trackingRuntime.adminUrl, trackingRuntime.projectRoot])
 
   const reload = useCallback(async () => {
     await Promise.all([load(), loadStatus()])
