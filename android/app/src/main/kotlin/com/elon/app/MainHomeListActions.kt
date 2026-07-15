@@ -12,6 +12,7 @@ import android.view.inputmethod.InputMethodManager
 import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
@@ -38,6 +39,7 @@ internal class MainHomeListActions(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
     private val showProjectPlaza: () -> Unit,
+    private val showProjectHome: () -> Unit,
     private val openFriendPageProject: (Int) -> Unit,
     private val openProject: (Int) -> Unit,
     private val openProjectConversations: (Int) -> Unit,
@@ -49,10 +51,12 @@ internal class MainHomeListActions(
 ) {
     private var friendSearchActive = false
     private var friendSearchQuery = ""
+    private var friendSearchPreviousFilterMode: HomeListFilterMode? = null
     private var shouldFocusFriendSearch = false
     private var animateFriendSearchEnter = false
-    private var homeListFilterMode = HomeListFilterMode.All
+    private var homeListFilterMode = HomeListFilterMode.Friends
     private var pullFilterController: HomePullFilterController? = null
+    private var homeWorkspaceSurface: HomeWorkspaceSurface? = null
     private var personalProjectsExpanded = false
     private var jointProjectsExpanded = false
     private var plazaBannerProjects: List<StoreProject> = emptyList()
@@ -73,7 +77,18 @@ internal class MainHomeListActions(
                     !friendSearchActive
             },
             currentMode = { homeListFilterMode },
-            applyMode = ::applyHomeListFilterMode
+            applyMode = ::applyHomeListFilterMode,
+            activationRegion = { event -> homeWorkspaceSurface?.contains(event) == true },
+            stretchTarget = { homeWorkspaceSurface?.friendsPanel ?: binding.conversationPage },
+            indicatorTopMargin = {
+                val surface = homeWorkspaceSurface
+                if (surface == null) {
+                    dp(8)
+                } else {
+                    val scrollY = (binding.conversationPage.parent as? ScrollView)?.scrollY ?: 0
+                    (surface.friendsPanel.top - scrollY + dp(8)).coerceAtLeast(dp(8))
+                }
+            }
         ).also { it.attach() }
     }
 
@@ -81,6 +96,7 @@ internal class MainHomeListActions(
         if (binding.conversationPage.visibility != View.VISIBLE || binding.chatPage.visibility == View.VISIBLE) return
         friendSearchActive = true
         friendSearchQuery = ""
+        friendSearchPreviousFilterMode = homeListFilterMode
         shouldFocusFriendSearch = true
         animateFriendSearchEnter = true
         homeListFilterMode = HomeListFilterMode.All
@@ -96,7 +112,7 @@ internal class MainHomeListActions(
     }
 
     fun currentConversationHomeTitle(): String {
-        return if (friendSearchActive) "搜索" else homeListFilterMode.titleText()
+        return "你的工作室"
     }
 
     fun renderConversationList() {
@@ -113,61 +129,75 @@ internal class MainHomeListActions(
         if (listVisible) {
             binding.topTitleText.text = currentConversationHomeTitle()
             binding.searchButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
-            binding.addButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
+            binding.addButton.visibility = View.GONE
         }
 
         homeRows().cancelHomeRowShimmer()
         binding.conversationPage.removeAllViews()
+        val surface = HomeWorkspaceDashboardView(
+            activity = activity,
+            dp = dp,
+            selectableForeground = selectableForeground,
+            showCreateProjectDialog = showCreateProjectDialog,
+            showProjectHome = showProjectHome,
+            showAddFriendDialog = showAddFriendDialog,
+            openProject = openProject,
+            showProjectActions = showProjectActions
+        ).render(
+            root = binding.conversationPage,
+            projects = projects(),
+            friendSectionTitle = if (friendSearchActive) "搜索" else homeListFilterMode.titleText()
+        )
+        homeWorkspaceSurface = surface
+        val rows = surface.friendRows
         if (friendSearchActive) {
-            binding.conversationPage.addView(createFriendSearchHeader())
+            rows.addView(createFriendSearchHeader())
             renderFriendSearchResults()
             return
         }
         val chatItems = filterHomeChatItemsForMode(buildHomeChatItems())
         if (chatItems.isEmpty()) {
             if (homeListFilterMode == HomeListFilterMode.All) {
-                binding.conversationPage.addView(
+                rows.addView(
                     homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
                         showAddFriendDialog()
                     }
                 )
             } else {
-                binding.conversationPage.addView(createHomeFilterEmptyRow())
+                rows.addView(createHomeFilterEmptyRow())
             }
             return
         }
-        renderHomeChatItems(chatItems)
+        renderHomeChatItems(chatItems, rows)
     }
 
     private fun renderFriendSearchResults() {
+        val rows = homeWorkspaceSurface?.friendRows ?: return
         val resultStartIndex = if (friendSearchActive) 1 else 0
-        while (binding.conversationPage.childCount > resultStartIndex) {
-            binding.conversationPage.removeViewAt(resultStartIndex)
+        while (rows.childCount > resultStartIndex) {
+            rows.removeViewAt(resultStartIndex)
         }
         val allChatItems = filterHomeChatItemsForMode(buildHomeChatItems())
         val chatItems = filterHomeChatItems(allChatItems)
         if (chatItems.isEmpty()) {
             if (friendSearchActive) {
-                binding.conversationPage.addView(createFriendSearchEmptyRow())
+                rows.addView(createFriendSearchEmptyRow())
                 return
             }
         }
-        renderHomeChatItems(chatItems)
+        renderHomeChatItems(chatItems, rows)
     }
 
-    private fun renderHomeChatItems(chatItems: List<HomeChatItem>) {
-        chatItems.forEachIndexed { index, item ->
-            if (index > 0) {
-                binding.conversationPage.addView(homeRows().createConversationDivider())
-            }
+    private fun renderHomeChatItems(chatItems: List<HomeChatItem>, rows: LinearLayout) {
+        chatItems.forEach { item ->
             when (item) {
-                is HomeChatItem.FriendItem -> binding.conversationPage.addView(
+                is HomeChatItem.FriendItem -> rows.addView(
                     homeRows().createFriendRow(item.friend) {
                         clearFriendSearchState()
                         openFriend(item.friend)
                     }
                 )
-                is HomeChatItem.GroupItem -> binding.conversationPage.addView(
+                is HomeChatItem.GroupItem -> rows.addView(
                     homeRows().createGroupRow(item.group) {
                         clearFriendSearchState()
                         openGroup(item.group)
@@ -201,7 +231,7 @@ internal class MainHomeListActions(
                         showProjectActions(item.index, anchor)
                         true
                     }
-                    binding.conversationPage.addView(row)
+                    rows.addView(row)
                 }
             }
         }
@@ -215,6 +245,8 @@ internal class MainHomeListActions(
         friendSearchQuery = ""
         shouldFocusFriendSearch = false
         animateFriendSearchEnter = false
+        friendSearchPreviousFilterMode?.let { homeListFilterMode = it }
+        friendSearchPreviousFilterMode = null
     }
 
     private fun applyHomeListFilterMode(mode: HomeListFilterMode) {
@@ -304,7 +336,7 @@ internal class MainHomeListActions(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(8), dp(14), dp(8))
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.TRANSPARENT)
             alpha = if (animateEnter) 0f else 1f
             translationY = if (animateEnter) -dp(8).toFloat() else 0f
             clipToPadding = false

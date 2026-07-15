@@ -110,6 +110,7 @@ internal class MainInputComposerSetup(
         }
 
         val inputPanelContainer = LinearLayout(activity).apply {
+            id = R.id.chatInputCapsule
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT

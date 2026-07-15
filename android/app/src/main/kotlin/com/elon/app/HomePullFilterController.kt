@@ -35,7 +35,10 @@ internal class HomePullFilterController(
     private val dp: (Int) -> Int,
     private val isEnabled: () -> Boolean,
     private val currentMode: () -> HomeListFilterMode,
-    private val applyMode: (HomeListFilterMode) -> Unit
+    private val applyMode: (HomeListFilterMode) -> Unit,
+    private val activationRegion: (MotionEvent) -> Boolean = { true },
+    private val stretchTarget: () -> View = { binding.conversationPage },
+    private val indicatorTopMargin: () -> Int = { dp(8) }
 ) {
     private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
     private val activationDistance = maxOf(touchSlop * 1.6f, dp(24).toFloat())
@@ -55,8 +58,10 @@ internal class HomePullFilterController(
     private var thresholdReadySince = 0L
     private var maxGestureDistance = 0f
     private var startedAtTop = false
+    private var startedInsideActivationRegion = false
     private var gestureRejected = false
     private var lastModeAppliedAt = 0L
+    private var activeStretchTarget: View? = null
 
     private val longHoldRunnable = Runnable {
         if (!pulling || !isPastReleaseThreshold()) return@Runnable
@@ -106,13 +111,14 @@ internal class HomePullFilterController(
                 thresholdReadySince = 0L
                 maxGestureDistance = 0f
                 startedAtTop = !scrollView.canScrollVertically(-1)
+                startedInsideActivationRegion = activationRegion(event)
                 gestureRejected = false
                 cancelLongHold()
                 return false
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (!startedAtTop || gestureRejected) {
+                if (!startedAtTop || !startedInsideActivationRegion || gestureRejected) {
                     return false
                 }
                 val dy = event.y - downY
@@ -164,13 +170,18 @@ internal class HomePullFilterController(
     }
 
     private fun showIndicator() {
+        (indicator.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+            params.topMargin = indicatorTopMargin()
+            indicator.layoutParams = params
+        }
         indicator.animate().cancel()
         indicator.visibility = View.VISIBLE
         indicator.alpha = 1f
         indicator.scaleX = 0.86f
         indicator.scaleY = 0.86f
         indicator.translationY = 0f
-        binding.conversationPage.animate().cancel()
+        activeStretchTarget = stretchTarget()
+        activeStretchTarget?.animate()?.cancel()
         indicator.start()
         indicator.update(currentMode().nextPullMode(), 0f)
     }
@@ -184,7 +195,7 @@ internal class HomePullFilterController(
         indicator.translationY = min(cappedDistance * 0.34f, dp(34).toFloat())
         indicator.scaleX = 0.86f + 0.14f * nextProgress
         indicator.scaleY = indicator.scaleX
-        binding.conversationPage.translationY = min(cappedDistance * 0.22f, maxContentStretch)
+        activeStretchTarget?.translationY = min(cappedDistance * 0.22f, maxContentStretch)
 
         if (nextProgress >= RELEASE_PROGRESS_THRESHOLD) {
             if (thresholdReadySince == 0L) thresholdReadySince = eventTime
@@ -230,10 +241,11 @@ internal class HomePullFilterController(
             }
             .start()
 
-        binding.conversationPage.animate()
-            .translationY(0f)
-            .setDuration(durationMs)
-            .start()
+        activeStretchTarget?.animate()?.apply {
+            translationY(0f)
+            setDuration(durationMs)
+            start()
+        }
     }
 
     private fun resetGesture() {
@@ -243,7 +255,9 @@ internal class HomePullFilterController(
         thresholdReadySince = 0L
         maxGestureDistance = 0f
         startedAtTop = false
+        startedInsideActivationRegion = false
         gestureRejected = false
+        activeStretchTarget = null
         cancelLongHold()
     }
 

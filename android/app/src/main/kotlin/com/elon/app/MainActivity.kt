@@ -976,7 +976,7 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
-            showProjectPlaza = { navigationController.showProjectPlaza() },
+            showProjectPlaza = { navigationController.showProjectPlaza() }, showProjectHome = { navigationController.showProjectHome(animate = true) },
             openFriendPageProject = { index ->
                 s.projects.getOrNull(index)?.let(::clearProjectTaskCompletionBadge)
                 navigationController.captureProjectEntryReturnTarget()

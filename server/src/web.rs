@@ -78,6 +78,28 @@ const BOTTOM_NAV_MENU_ACTIVE_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_menu_active.png");
 const BOTTOM_NAV_COMPOSE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_side_menu_new_chat.png");
+const HOME_WORKSPACE_FRIENDS_PANEL_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/bg_home_workspace_friends_panel.png"
+);
+const HOME_WORKSPACE_BOTTOM_NAV_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/bg_home_workspace_bottom_nav.png"
+);
+const HOME_WORKSPACE_PROJECT_ADD_OUTLINE_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/bg_home_workspace_project_add_outline.png"
+);
+const HOME_WORKSPACE_PROJECT_ADD_INNER_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/bg_home_workspace_project_add_inner.png"
+);
+const HOME_WORKSPACE_DRAG_HANDLE_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/bg_home_workspace_drag_handle.png"
+);
+const HOME_WORKSPACE_PROJECT_PLACEHOLDER_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-nodpi/bg_home_workspace_project_placeholder.png"
+);
+const HOME_WORKSPACE_CHEVRON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_workspace_chevron.png");
+const HOME_WORKSPACE_ADD_FRIEND_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_top_add_plus_custom.png");
 const INPUT_ADD_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_add_new.png");
 const INPUT_VOICE_WAVE_PNG: &[u8] =
@@ -179,6 +201,16 @@ fn build_html() -> String {
     let bottom_nav_menu_png_b64 = encode_png(BOTTOM_NAV_MENU_PNG);
     let bottom_nav_menu_active_png_b64 = encode_png(BOTTOM_NAV_MENU_ACTIVE_PNG);
     let bottom_nav_compose_icon_png_b64 = encode_png(BOTTOM_NAV_COMPOSE_ICON_PNG);
+    let home_workspace_friends_panel_png_b64 = encode_png(HOME_WORKSPACE_FRIENDS_PANEL_PNG);
+    let home_workspace_bottom_nav_png_b64 = encode_png(HOME_WORKSPACE_BOTTOM_NAV_PNG);
+    let home_workspace_project_add_outline_png_b64 =
+        encode_png(HOME_WORKSPACE_PROJECT_ADD_OUTLINE_PNG);
+    let home_workspace_project_add_inner_png_b64 = encode_png(HOME_WORKSPACE_PROJECT_ADD_INNER_PNG);
+    let home_workspace_drag_handle_png_b64 = encode_png(HOME_WORKSPACE_DRAG_HANDLE_PNG);
+    let home_workspace_project_placeholder_png_b64 =
+        encode_png(HOME_WORKSPACE_PROJECT_PLACEHOLDER_PNG);
+    let home_workspace_chevron_png_b64 = encode_png(HOME_WORKSPACE_CHEVRON_PNG);
+    let home_workspace_add_friend_png_b64 = encode_png(HOME_WORKSPACE_ADD_FRIEND_PNG);
     let input_add_png_b64 = encode_png(INPUT_ADD_PNG);
     let input_voice_wave_png_b64 = encode_png(INPUT_VOICE_WAVE_PNG);
     let input_emoji_png_b64 = encode_png(INPUT_EMOJI_PNG);
@@ -279,6 +311,38 @@ fn build_html() -> String {
         .replace(
             "__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__",
             &bottom_nav_compose_icon_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_FRIENDS_PANEL_PNG_B64__",
+            &home_workspace_friends_panel_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_BOTTOM_NAV_PNG_B64__",
+            &home_workspace_bottom_nav_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_PROJECT_ADD_OUTLINE_PNG_B64__",
+            &home_workspace_project_add_outline_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_PROJECT_ADD_INNER_PNG_B64__",
+            &home_workspace_project_add_inner_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_DRAG_HANDLE_PNG_B64__",
+            &home_workspace_drag_handle_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_PROJECT_PLACEHOLDER_PNG_B64__",
+            &home_workspace_project_placeholder_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_CHEVRON_PNG_B64__",
+            &home_workspace_chevron_png_b64,
+        )
+        .replace(
+            "__HOME_WORKSPACE_ADD_FRIEND_PNG_B64__",
+            &home_workspace_add_friend_png_b64,
         )
         .replace("__INPUT_ADD_PNG_B64__", &input_add_png_b64)
         .replace("__INPUT_VOICE_WAVE_PNG_B64__", &input_voice_wave_png_b64)

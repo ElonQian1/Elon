@@ -304,12 +304,149 @@
     .page.active { display: flex; }
 
     /* ===== 会话页 ===== */
+    .workspace-home {
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    .workspace-projects {
+      flex: 0 0 153px;
+      min-height: 153px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+    .workspace-projects-header {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px 0 20px;
+      box-sizing: border-box;
+    }
+    .workspace-projects-header h2,
+    .workspace-friends-header h2 {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+      color: var(--ink);
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1;
+    }
+    .workspace-projects-link,
+    .workspace-add-friend {
+      width: 48px;
+      height: 44px;
+      flex: 0 0 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .workspace-projects-header h2,
+    .workspace-projects-link img { transform: translateY(-6px); }
+    .workspace-projects-link img { width: 16px; height: 16px; object-fit: contain; }
+    .workspace-add-friend img { width: 28px; height: 28px; object-fit: contain; }
+    .workspace-project-strip {
+      height: 109px;
+      display: flex;
+      align-items: flex-start;
+      gap: 0;
+      padding: 3px 12px 0 21px;
+      box-sizing: border-box;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+    }
+    .workspace-project-strip::-webkit-scrollbar { display: none; }
+    .workspace-project-tile {
+      position: relative;
+      width: 72px;
+      height: 88px;
+      flex: 0 0 72px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .workspace-project-tile:first-child { margin-right: 8px; }
+    .workspace-project-circle {
+      position: absolute;
+      top: 0;
+      left: 8px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+    .workspace-project-add-outline,
+    .workspace-project-add-inner,
+    .workspace-project-add-icon {
+      position: absolute;
+      object-fit: fill;
+      pointer-events: none;
+    }
+    .workspace-project-add-outline { left: 8px; top: 0; width: 56px; height: 56px; }
+    .workspace-project-add-inner { left: 13px; top: 5px; width: 46px; height: 46px; }
+    .workspace-project-add-icon { left: 23px; top: 15px; width: 26px; height: 26px; object-fit: contain; }
+    .workspace-project-label {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 28px;
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 28px;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .workspace-friends-panel {
+      position: relative;
+      flex: 1 0 555px;
+      min-height: 555px;
+      padding: 21px 0 calc(88px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      background: url("data:image/png;base64,__HOME_WORKSPACE_FRIENDS_PANEL_PNG_B64__") center top / 100% 100% no-repeat;
+      transition: transform 180ms cubic-bezier(.2,.7,.2,1);
+      will-change: transform;
+    }
+    .workspace-friends-panel.pulling { transition: none; }
+    .workspace-drag-handle {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      width: 66px;
+      height: 5px;
+      transform: translateX(-50%);
+      object-fit: fill;
+      pointer-events: none;
+    }
+    .workspace-friends-header {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px 0 20px;
+      box-sizing: border-box;
+    }
     .conversation-list {
       flex: 0 0 auto;
       transition: transform 180ms cubic-bezier(.2,.7,.2,1);
       will-change: transform;
     }
     .conversation-list.pulling { transition: none; }
+    .workspace-friends-panel .conversation-item {
+      background: transparent;
+      border-bottom: 0;
+    }
+    .workspace-home + .chat-view { min-height: 100%; }
     .conversation-filter-pull {
       position: absolute;
       top: 8px;
@@ -323,6 +460,7 @@
       transition: opacity 160ms ease, transform 160ms ease;
       --pull-filter-offset: 100;
     }
+    .content:has(.workspace-home:not(.hidden)) .conversation-filter-pull { top: 161px; }
     .conversation-filter-pull.visible {
       opacity: 1;
       transform: translate(-50%, var(--pull-offset, 0px)) scale(var(--pull-scale, 1));
@@ -3115,6 +3253,15 @@
       background: url("data:image/png;base64,__BOTTOM_NAV_PANEL_PNG_B64__") center / 100% 100% no-repeat;
       overflow: hidden;
     }
+    .tabs-bar.workspace-home {
+      gap: 0;
+      padding-left: 30px;
+      padding-right: 30px;
+    }
+    .tabs-bar.workspace-home .tabs-panel {
+      background-image: url("data:image/png;base64,__HOME_WORKSPACE_BOTTOM_NAV_PNG_B64__");
+    }
+    .tabs-bar.workspace-home .bottom-compose-button { display: none; }
     .tab,
     .bottom-menu-tab {
       flex: 1;
@@ -3823,10 +3970,30 @@
     <!-- 聊天首页：好友/群聊列表（默认）/ 进入项目后切到项目聊天视图 -->
     <div id="chatPage" class="page active">
       <!-- 列表状态 -->
-      <div id="searchBar" class="search-bar hidden">
-        <input id="searchInput" type="search" placeholder="搜索好友、群聊、最近消息" />
+      <div id="workspaceHome" class="workspace-home">
+        <section class="workspace-projects" aria-labelledby="workspaceProjectsTitle">
+          <header class="workspace-projects-header">
+            <h2 id="workspaceProjectsTitle">项目</h2>
+            <button id="workspaceProjectsBtn" class="workspace-projects-link" type="button" aria-label="查看全部项目">
+              <img src="data:image/png;base64,__HOME_WORKSPACE_CHEVRON_PNG_B64__" alt="" aria-hidden="true" />
+            </button>
+          </header>
+          <div id="workspaceProjectStrip" class="workspace-project-strip"></div>
+        </section>
+        <section id="workspaceFriendsPanel" class="workspace-friends-panel" aria-labelledby="workspaceFriendTitle">
+          <img class="workspace-drag-handle" src="data:image/png;base64,__HOME_WORKSPACE_DRAG_HANDLE_PNG_B64__" alt="" aria-hidden="true" />
+          <header class="workspace-friends-header">
+            <h2 id="workspaceFriendTitle">好友</h2>
+            <button id="workspaceAddFriendBtn" class="workspace-add-friend" type="button" aria-label="添加好友">
+              <img src="data:image/png;base64,__HOME_WORKSPACE_ADD_FRIEND_PNG_B64__" alt="" aria-hidden="true" />
+            </button>
+          </header>
+          <div id="searchBar" class="search-bar hidden">
+            <input id="searchInput" type="search" placeholder="搜索好友、群聊、最近消息" />
+          </div>
+          <div id="conversationList" class="conversation-list"></div>
+        </section>
       </div>
-      <div id="conversationList" class="conversation-list"></div>
       <!-- 项目内聊天视图 -->
       <div id="chatView" class="chat-view hidden">
         <div class="stage-hint" id="stageHint">
@@ -4687,6 +4854,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const homeProjectCreateMenuBtn = $('homeProjectCreateMenuBtn');
 
   const chatHomePage = $('chatPage');
+  const workspaceHome = $('workspaceHome');
+  const workspaceProjectStrip = $('workspaceProjectStrip');
+  const workspaceProjectsBtn = $('workspaceProjectsBtn');
+  const workspaceFriendsPanel = $('workspaceFriendsPanel');
+  const workspaceFriendTitle = $('workspaceFriendTitle');
+  const workspaceAddFriendBtn = $('workspaceAddFriendBtn');
   const conversationList = $('conversationList');
   const conversationFilterPull = $('conversationFilterPull');
   const projectPage = $('projectPage');
@@ -5160,7 +5333,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let progressLog = [];
   let pendingVisibilityProject = null;
   let searchQuery = '';
-  let contactFilterMode = 'all';
+  let contactFilterMode = 'friends';
+  let contactFilterModeBeforeSearch = 'friends';
   let selectedAgent = '';
   const RUNTIME_ROUTE_KEY = 'elon_runtime_route';
   const RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_runtime_route_default_v2';
@@ -6056,13 +6230,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     } else if (inGroupChat) {
       topTitle.textContent = groupDisplayName(currentGroup);
     } else if (tabId === 'chatPage') {
-      topTitle.textContent = contactFilterTitle();
+      topTitle.textContent = '你的工作室';
     } else {
       topTitle.textContent = t ? t.dataset.title : '';
     }
     // 兜底：chatPage 且没有激活聊天 → 强制回到好友/群聊列表态
     if (tabId === 'chatPage' && !inChat) {
       chatView.classList.add('hidden');
+      if (workspaceHome) workspaceHome.classList.remove('hidden');
       conversationList.classList.remove('hidden');
       stageHint.classList.add('hidden');
       loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
@@ -6084,7 +6259,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
     renderGroupSummaryStrip(groupSummaryPosts[0] || null, !inGroupChat);
-    if (tabsBar) tabsBar.classList.toggle('hidden', inChat);
+    if (tabsBar) {
+      tabsBar.classList.toggle('hidden', inChat);
+      tabsBar.classList.toggle('workspace-home', isChatHome);
+    }
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     setHomeChromeVisible(isChatHome || inProjectHome || isProfileHome, {
       mode: inProjectHome ? 'home' : 'project',
@@ -6098,11 +6276,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     setMoreButtonMode('chat');
     moreBtn.style.display = isContactChatActive() ? '' : 'none';
     // 新建按钮：聊天首页和项目首页都显示；项目首页同时有页内入口，保持与 APK 一致。
-    const addAsFriend = tabId === 'chatPage' && !inChat;
     const addAsProject = inProjectHome;
-    addBtn.style.display = (addAsFriend || addAsProject) ? '' : 'none';
+    addBtn.style.display = addAsProject ? '' : 'none';
     setAddButtonMode(addAsProject ? 'project' : 'friend');
-    searchBtn.style.display = 'none';
+    searchBtn.style.display = isChatHome ? '' : 'none';
     updateSendButtonState();
     // 下载页：切入"我的"时刷新版本信息
     if (tabId === 'profilePage') {
@@ -6144,6 +6321,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentProject = null;
     progressLog = [];
     chatView.classList.add('hidden');
+    if (workspaceHome) workspaceHome.classList.remove('hidden');
     conversationList.classList.remove('hidden');
     setInputBarActive(false);
     closeWebChatSideMenu();
@@ -6397,8 +6575,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function nextContactFilterMode() {
-    if (contactFilterMode === 'projects') return 'friends';
-    return 'projects';
+    if (contactFilterMode === 'friends') return 'all';
+    if (contactFilterMode === 'all') return 'projects';
+    return 'friends';
   }
 
   function contactFilterTitle() {
@@ -6423,10 +6602,55 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatPage.scrollTop = 0;
   }
 
+  function createWorkspaceProjectTile(project, index) {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'workspace-project-tile';
+    const icon = document.createElement('img');
+    icon.className = 'workspace-project-circle';
+    icon.alt = '';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.src = projectIconUrlOf(project)
+      || 'data:image/png;base64,__HOME_WORKSPACE_PROJECT_PLACEHOLDER_PNG_B64__';
+    const label = document.createElement('span');
+    label.className = 'workspace-project-label';
+    label.textContent = projectNameOf(project);
+    tile.setAttribute('aria-label', '打开项目 ' + projectNameOf(project));
+    tile.appendChild(icon);
+    tile.appendChild(label);
+    tile.addEventListener('click', () => {
+      clearProjectTaskCompletionBadge(project);
+      renderConversationList();
+      selectProject(project, index);
+    });
+    return tile;
+  }
+
+  function renderWorkspaceProjectStrip() {
+    if (!workspaceProjectStrip) return;
+    workspaceProjectStrip.innerHTML = '';
+    const addTile = document.createElement('button');
+    addTile.type = 'button';
+    addTile.className = 'workspace-project-tile';
+    addTile.setAttribute('aria-label', '新增项目');
+    addTile.innerHTML = `
+      <img class="workspace-project-add-outline" src="data:image/png;base64,__HOME_WORKSPACE_PROJECT_ADD_OUTLINE_PNG_B64__" alt="" aria-hidden="true" />
+      <img class="workspace-project-add-inner" src="data:image/png;base64,__HOME_WORKSPACE_PROJECT_ADD_INNER_PNG_B64__" alt="" aria-hidden="true" />
+      <img class="workspace-project-add-icon" src="data:image/png;base64,__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__" alt="" aria-hidden="true" />
+      <span class="workspace-project-label">新增</span>`;
+    addTile.addEventListener('click', openNewProject);
+    workspaceProjectStrip.appendChild(addTile);
+    projects.forEach((project, index) => {
+      workspaceProjectStrip.appendChild(createWorkspaceProjectTile(project, index));
+    });
+  }
+
   function renderConversationList() {
     if (currentTab === 'chatPage' && !isAnyChatActive()) {
-      topTitle.textContent = contactFilterTitle();
+      topTitle.textContent = '你的工作室';
     }
+    if (workspaceFriendTitle) workspaceFriendTitle.textContent = contactFilterTitle();
+    renderWorkspaceProjectStrip();
     const query = normalizeSearch(searchQuery);
     const baseItems = groups.map((group) => ({ kind: 'group', data: group }))
       .concat(friends.map((friend) => ({ kind: 'friend', data: friend })))
@@ -6465,6 +6689,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     updateChatTabBadge();
   }
 
+  if (workspaceProjectsBtn) {
+    workspaceProjectsBtn.addEventListener('click', () => {
+      switchTab('projectPage');
+      showProjectHomeTab();
+    });
+  }
+  if (workspaceAddFriendBtn) workspaceAddFriendBtn.addEventListener('click', openAddFriendDialog);
+
   const contactPullState = {
     active: false,
     startedAtTop: false,
@@ -6486,6 +6718,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isContactPullEnabled() {
     return currentTab === 'chatPage'
       && conversationList
+      && workspaceFriendsPanel
+      && !workspaceFriendsPanel.classList.contains('hidden')
       && !conversationList.classList.contains('hidden')
       && chatView.classList.contains('hidden')
       && searchBar.classList.contains('hidden')
@@ -6498,11 +6732,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const progress = Math.max(0, Math.min(capped / CONTACT_PULL_TRIGGER, 1));
     contactPullState.progress = progress;
     conversationFilterPull.classList.add('visible');
-    conversationList.classList.add('pulling');
+    workspaceFriendsPanel.classList.add('pulling');
     conversationFilterPull.style.setProperty('--pull-filter-offset', (100 * (1 - progress)).toFixed(2));
     conversationFilterPull.style.setProperty('--pull-offset', Math.min(capped * 0.34, 34).toFixed(1) + 'px');
     conversationFilterPull.style.setProperty('--pull-scale', (0.86 + 0.14 * progress).toFixed(3));
-    conversationList.style.transform = `translateY(${Math.min(capped * 0.22, 28).toFixed(1)}px)`;
+    workspaceFriendsPanel.style.transform = `translateY(${Math.min(capped * 0.22, 28).toFixed(1)}px)`;
     if (progress >= 1 && !contactPullState.holdTimer && !contactPullState.holdTriggered) {
       if (!contactPullState.readySince) contactPullState.readySince = Date.now();
       contactPullState.holdTimer = window.setTimeout(() => {
@@ -6532,8 +6766,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     conversationFilterPull.style.setProperty('--pull-filter-offset', '100');
     conversationFilterPull.style.setProperty('--pull-offset', '0px');
     conversationFilterPull.style.setProperty('--pull-scale', '0.86');
-    conversationList.classList.remove('pulling');
-    conversationList.style.transform = 'translateY(0px)';
+    workspaceFriendsPanel.classList.remove('pulling');
+    workspaceFriendsPanel.style.transform = 'translateY(0px)';
   }
 
   function resetContactPullState() {
@@ -6552,7 +6786,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function installContactPullFilterGesture() {
-    chatPage.addEventListener('touchstart', (event) => {
+    if (!workspaceFriendsPanel) return;
+    workspaceFriendsPanel.addEventListener('touchstart', (event) => {
       if (!isContactPullEnabled() || !event.touches.length) return;
       const touch = event.touches[0];
       contactPullState.startX = touch.clientX;
@@ -6566,7 +6801,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       clearConversationPullHold();
     }, { passive: true });
 
-    chatPage.addEventListener('touchmove', (event) => {
+    workspaceFriendsPanel.addEventListener('touchmove', (event) => {
       if (!event.touches.length) return;
       if (!contactPullState.startedAtTop || contactPullState.rejected) return;
       const touch = event.touches[0];
@@ -6597,8 +6832,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       hideConversationPullIndicator();
       resetContactPullState();
     };
-    chatPage.addEventListener('touchend', finish, { passive: true });
-    chatPage.addEventListener('touchcancel', finish, { passive: true });
+    workspaceFriendsPanel.addEventListener('touchend', finish, { passive: true });
+    workspaceFriendsPanel.addEventListener('touchcancel', finish, { passive: true });
   }
 
   installContactPullFilterGesture();
@@ -6621,6 +6856,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === 'chatPage'));
     pages.forEach((p) => p.classList.toggle('active', p.id === 'chatPage'));
     progressLog = [];
+    if (workspaceHome) workspaceHome.classList.add('hidden');
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
     chatList.innerHTML = '';
@@ -6672,6 +6908,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     groupSummaryPosts = [];
     renderGroupSummaryStrip(null, true);
     chatView.classList.add('hidden');
+    if (workspaceHome) workspaceHome.classList.remove('hidden');
     conversationList.classList.remove('hidden');
     setInputBarActive(false);
     closeWebChatSideMenu();
@@ -6695,6 +6932,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function applyContactChatChrome() {
+    if (workspaceHome) workspaceHome.classList.add('hidden');
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
     stageHint.classList.add('hidden');
@@ -10137,6 +10375,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         currentProject = null;
         progressLog = [];
         chatView.classList.add('hidden');
+        if (workspaceHome) workspaceHome.classList.remove('hidden');
         conversationList.classList.remove('hidden');
         setInputBarActive(false);
         backBtn.style.display = 'none';
@@ -10157,12 +10396,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const nowHidden = searchBar.classList.toggle('hidden');
     if (!nowHidden) {
       searchQuery = '';
+      contactFilterModeBeforeSearch = contactFilterMode;
       contactFilterMode = 'all';
       searchInput.value = '';
       renderConversationList();
       searchInput.focus();
     } else {
       searchQuery = '';
+      contactFilterMode = contactFilterModeBeforeSearch;
       renderConversationList();
     }
   });
@@ -10174,6 +10415,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (e.key === 'Escape') {
       searchBar.classList.add('hidden');
       searchQuery = '';
+      contactFilterMode = contactFilterModeBeforeSearch;
       searchInput.value = '';
       renderConversationList();
     }
@@ -10217,6 +10459,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentProject = null;
     progressLog = [];
     chatView.classList.add('hidden');
+    if (workspaceHome) workspaceHome.classList.remove('hidden');
     conversationList.classList.remove('hidden');
     setInputBarActive(false);
     backBtn.style.display = 'none';

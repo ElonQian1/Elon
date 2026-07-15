@@ -248,8 +248,8 @@ internal class MainNavigationController(
         binding.inputLayout.visibility = View.GONE
         if (tab == binding.tabChat) homeChrome.showHome() else if (tab == binding.tabProfile) homeChrome.showMenuOnly() else showMainTabs()
         binding.backButton.visibility = View.GONE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
+        binding.searchButton.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
+        binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
@@ -852,8 +852,8 @@ internal class MainNavigationController(
         homeChrome.showHome()
         hideProjectTopTabs()
         binding.backButton.visibility = View.GONE
-        binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.VISIBLE
+        binding.searchButton.visibility = View.VISIBLE
+        binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
