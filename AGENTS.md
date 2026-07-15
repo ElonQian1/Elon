@@ -25,7 +25,7 @@
 | 模块化、拆文件、巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和相关源码 |
 | PC 工作台、`/pc`、React/Vite/TypeScript | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md`、`AI_INDEX.md` |
-| Windows PC 节点客户端、自更新、推送更新 | Git/发布手册和相关源码 |
+| Windows PC 节点客户端、自更新、推送更新 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册和相关源码 |
 | 完整开发流程、复杂发布或任务卡住 | `docs/ai-agent-workflow.md` |
 | Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
 | APP UI、主题、颜色、导航、卡片 | `docs/Design.md`、`docs/APP 颜色规范.md`；涉及 APK/网页同步再读 `.github/instructions/apk-web-ui-sync.instructions.md` |

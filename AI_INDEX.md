@@ -12,6 +12,7 @@
 | PC 节点 AI 三层架构 / Codex JSON、pipe sidecar 与 PTY 分工 | `AI_ARCHITECTURE.md` 的“PC 节点 AI 运行路线”、`docs/符号索引讨论/我们项目的cli能力.md` |
 | Win 节点轻量工具箱 / Codex CLI 临时 PATH / 工具收录策略 | `docs/win-node-toolbox.md`、`server/src/node_agent_cli_env.rs`、`server/src/node_agent_cli_tool_catalog.rs` |
 | PC 节点数据根 / 构建缓存 / C 盘治理 / 旧目录迁移 | `docs/pc-node-data-root.md`、`server/pc-dev-runtime/src/node_data_paths.rs`、`server/src/node_agent_data_root/` |
+| Windows 节点升级兼容 / 自动迁移 / 灰度 / 事故处置 | `docs/node-agent-upgrade-compatibility.md` |
 | 项目文档权威性 / 低 token 分类 / OneNote 虚拟分区 / 供应商无关 MCP / 分阶段诊断 | `.github/instructions/document-authority.instructions.md`、`docs/project-document-governance-mcp.md`、`server/src/project_document_governance*.rs`、`server/src/project_document_observability*.rs`、`server/src/node_agent_project_docs_mcp*.rs` |
 | 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
 | 用户等级、经验条、token 消耗/分享算力经验 | `server/src/user_progression.rs`、`server/src/store/user_progression.rs`、`server/src/token_usage_api.rs`、`server/src/store/node_ledger.rs` |
