@@ -65,6 +65,22 @@
 }
 
 .alert[data-tone="warning"] { color: #fcd34d; background: rgba(245, 158, 11, .11); }
+.alert[data-tone="info"] { color: #bfdbfe; background: rgba(59, 130, 246, .11); }
+
+.advancedSettings {
+  border: 1px solid var(--border, #334155);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.advancedSettings summary {
+  color: var(--muted, #94a3b8);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.advancedSettings[open] summary { margin-bottom: 12px; }
 .alert[data-tone="danger"],
 .error { color: #fca5a5; background: rgba(239, 68, 68, .11); }
 .success { color: #86efac; background: rgba(34, 197, 94, .11); }

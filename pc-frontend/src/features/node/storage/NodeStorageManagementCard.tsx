@@ -163,51 +163,59 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
     <section className={styles.card}>
       <div className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>节点数据盘</span>
-          <h4>项目与构建缓存统一落盘</h4>
-          <p>建议选择空间充足的本地非系统盘。客户端只管理该根目录下的派生目录。</p>
+          <span className={styles.eyebrow}>AI 临时工作区</span>
+          <h4>客户端自动管理，项目仍在原位置</h4>
+          <p>这里不是你的项目目录。AI 工作时会在这里保存临时副本、编译缓存和中间文件，避免这些大文件悄悄挤满 C 盘；客户端会优先在项目同盘自动准备，通常无需设置。</p>
         </div>
         <span className={styles.state} data-tone={status?.configured ? pressure : 'warning'}>
-          {busy === 'refresh' ? '检测中' : status?.configured ? '已配置' : '待配置'}
+          {busy === 'refresh' ? '检测中' : status?.configured ? '自动管理中' : '等待自动准备'}
         </span>
       </div>
 
       {status?.invalid_reason && <div className={styles.alert} data-tone="danger" role="alert">{status.invalid_reason}</div>}
+      {!status?.configured && !status?.invalid_reason && (
+        <div className={styles.alert} data-tone="info" role="status">
+          无需手动搬项目。下一次需要写代码或构建时，客户端会在项目旁边创建独立工作区并完成安全绑定；只读检查可直接运行。
+        </div>
+      )}
       {status?.build_cache?.pressure && (
         <div className={styles.alert} data-tone="danger" role="alert">
-          构建盘已触发容量保护；新任务会先按 TTL/LRU 回收，仍不足时拒绝启动，避免写满系统盘。
+          AI 临时工作区空间偏低。客户端会先清理可重新生成的缓存；仍不足时才暂停构建，项目源码不会被删除或损坏。
         </div>
       )}
       {warnings.map((warning, index) => <div className={styles.alert} data-tone="warning" role="alert" key={`${warning}-${index}`}>{warning}</div>)}
       {tasks > 0 && <div className={styles.alert} data-tone="warning" role="alert">当前有 {tasks} 个任务运行，切换数据根和实际清理会被安全阻止。</div>}
 
-      <div className={styles.rootEditor}>
-        <label htmlFor="elon-node-data-root">数据根绝对路径</label>
-        <div className={styles.rootRow}>
-          <input
-            id="elon-node-data-root"
-            value={rootPath}
-            onChange={(event) => {
-              rootDirty.current = true
-              setRootPath(event.target.value)
-            }}
-            placeholder="D:\\ElonNodeData"
-            spellCheck={false}
-            autoComplete="off"
-            aria-describedby="elon-node-data-root-help"
-          />
-          <button type="button" className={styles.primaryButton} onClick={saveRoot} disabled={!!busy || !rootPath.trim() || tasks > 0}>
-            {busy === 'save' ? '保存中…' : '保存数据根'}
-          </button>
+      <details className={styles.advancedSettings}>
+        <summary>高级设置：手动更换存放位置</summary>
+        <div className={styles.rootEditor}>
+          <label htmlFor="elon-node-data-root">AI 临时工作区绝对路径</label>
+          <div className={styles.rootRow}>
+            <input
+              id="elon-node-data-root"
+              value={rootPath}
+              onChange={(event) => {
+                rootDirty.current = true
+                setRootPath(event.target.value)
+              }}
+              placeholder="D:\\ElonNodeData"
+              spellCheck={false}
+              autoComplete="off"
+              aria-describedby="elon-node-data-root-help"
+            />
+            <button type="button" className={styles.primaryButton} onClick={saveRoot} disabled={!!busy || !rootPath.trim() || tasks > 0}>
+              {busy === 'save' ? '保存中…' : '更换位置'}
+            </button>
+          </div>
+          <small id="elon-node-data-root-help">仅供高级用户调整。不能直接使用磁盘根目录，也不能放进现有项目目录。</small>
         </div>
-        <small id="elon-node-data-root-help">不能直接使用磁盘根目录，也不能与旧工作区或硬盘仓库互相嵌套。</small>
-      </div>
+      </details>
 
       <div className={styles.metrics}>
         <div><span>磁盘剩余</span><strong>{formatBytes(disk.free)}</strong></div>
         <div><span>磁盘容量</span><strong>{formatBytes(disk.total)}</strong></div>
-        <div><span>构建硬保留</span><strong>{formatBytes(status?.build_cache?.min_free_bytes)}</strong></div>
-        <div><span>单次构建余量</span><strong>{formatBytes(status?.build_cache?.build_headroom_bytes)}</strong></div>
+        <div><span>磁盘安全底线</span><strong>{formatBytes(status?.build_cache?.min_free_bytes)}</strong></div>
+        <div><span>本次任务预留</span><strong>{formatBytes(status?.build_cache?.build_headroom_bytes)}</strong></div>
         <div><span>缓存占用</span><strong>{formatBytes(status?.build_cache?.cache_bytes ?? status?.cache_bytes)}</strong></div>
         <div><span>临时占用</span><strong>{formatBytes(status?.build_cache?.temp_bytes ?? status?.temp_bytes)}</strong></div>
       </div>
@@ -224,8 +232,8 @@ export default function NodeStorageManagementCard({ adminUrl }: NodeStorageManag
       {status?.migration_required && (
         <div className={styles.migration}>
           <div className={styles.sectionTitle}>
-            <strong>检测到旧目录数据</strong>
-            <span>旧根只读保留，不会自动移动 Git 工作现场</span>
+            <strong>旧版数据已进入兼容保护</strong>
+            <span>已有项目保持原位置；客户端自动使用新的临时工作区，不会擅自移动 Git 现场</span>
           </div>
           {(status.migration_plan ?? []).filter((item) => item.has_data).map((item, index) => (
             <div className={styles.migrationItem} key={`${item.kind}-${item.source_path}-${index}`}>
