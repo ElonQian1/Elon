@@ -1,4 +1,5 @@
 import { Code2, LoaderCircle, MonitorSmartphone, Redo2, Save, Undo2, ZoomIn, ZoomOut } from 'lucide-react'
+import { UiWorkspaceModeBar } from '../workspace/UiWorkspaceModeBar'
 import type { SourcePreviewDocument, SourcePreviewMode, SourcePreviewSaveState } from './types'
 import type { useSourceRenderer } from './useSourceRenderer'
 import styles from './SourcePreview.module.css'
@@ -13,10 +14,7 @@ export function SourcePreviewModeBar(props: Props) {
   const savedLabel = props.saveState === 'saved' ? '源码已保存' : props.saveState === 'saving' ? '正在写回…' : props.saveState === 'error' ? '保存失败' : '动态预览'
   return (
     <div className={styles.modeBar}>
-      <div className={styles.modeTabs}>
-        <button className={props.mode === 'evidence' ? styles.activeTab : ''} onClick={() => props.onModeChange('evidence')}><MonitorSmartphone size={15} />Android 真实渲染</button>
-        <button className={props.mode === 'source' ? styles.activeTab : ''} onClick={() => props.onModeChange('source')}><Code2 size={15} />Preview / 数字孪生</button>
-      </div>
+      <UiWorkspaceModeBar mode={props.mode} onModeChange={props.onModeChange} compact />
       {props.mode === 'source' && <>
         <input className={styles.projectInput} value={props.projectRoot} onChange={(event) => props.onProjectRootChange(event.target.value)} placeholder="本机 Android 项目目录" />
         {props.document && <select value={props.document.selectedLayout} onChange={(event) => props.onLoad(event.target.value)}>{props.document.layoutFiles.map((file) => { const parts = file.split('/'); return <option key={file} value={file}>{parts[parts.length - 1]}</option> })}</select>}

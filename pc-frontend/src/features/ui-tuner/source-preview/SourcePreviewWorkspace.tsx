@@ -1,17 +1,26 @@
-import { Code2, MonitorSmartphone } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import pageStyles from '../UiTunerPage.module.css'
+import {
+  findSourceSelection,
+  sourceSelectionHint,
+  type UiWorkspaceSelectionHint,
+} from '../workspace/uiWorkspaceSelection'
 import { SourceDrivenPreviewSurface } from './SourceDrivenPreviewSurface'
 import { SourcePreviewInspector } from './SourcePreviewInspector'
 import { SourcePreviewModeBar } from './SourcePreviewModeBar'
 import { SourcePreviewTreePanel } from './SourcePreviewTreePanel'
 import { useSourcePreviewSession } from './useSourcePreviewSession'
 import type { SourcePreviewMode } from './types'
-import styles from './SourcePreview.module.css'
 
-interface Props { initialProjectRoot: string; active?: boolean; onModeChange: (mode: SourcePreviewMode) => void }
+interface Props {
+  initialProjectRoot: string
+  active?: boolean
+  onModeChange: (mode: SourcePreviewMode) => void
+  selectionHint?: UiWorkspaceSelectionHint | null
+  onSelectionHintChange?: (hint: UiWorkspaceSelectionHint) => void
+}
 
-export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onModeChange }: Props) {
+export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onModeChange, selectionHint, onSelectionHintChange }: Props) {
   const rememberedRoot = window.localStorage.getItem('elon.uiTuner.sourceProjectRoot') ?? ''
   const session = useSourcePreviewSession(initialProjectRoot || rememberedRoot)
   const [zoom, setZoom] = useState(.82)
@@ -22,6 +31,13 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
       void session.load()
     }
   }, [session.load, session.projectRoot])
+  useEffect(() => {
+    const match = findSourceSelection(session.document?.root ?? null, selectionHint ?? null)
+    if (match && match !== session.selectedKey) session.setSelectedKey(match)
+  }, [selectionHint, session.document?.root, session.selectedKey, session.setSelectedKey])
+  useEffect(() => {
+    if (session.selected) onSelectionHintChange?.(sourceSelectionHint(session.selected))
+  }, [onSelectionHintChange, session.selected])
   return (
     <div className={pageStyles.page} style={{ display: active ? 'grid' : 'none' }}>
       <SourcePreviewTreePanel root={session.document?.root ?? null} selectedKey={session.selectedKey} onSelect={session.setSelectedKey} />
@@ -38,8 +54,4 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
       <SourcePreviewInspector node={session.selected} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} onChange={session.apply} onSave={() => { void session.commit() }} />
     </div>
   )
-}
-
-export function EvidenceModeSwitch({ onModeChange }: { initialProjectRoot: string; onModeChange: (mode: SourcePreviewMode) => void }) {
-  return <div className={styles.modeBar}><div className={styles.modeTabs}><button className={styles.activeTab} onClick={() => onModeChange('evidence')}><MonitorSmartphone size={15} />Android 真实渲染</button><button onClick={() => onModeChange('source')}><Code2 size={15} />Preview / 数字孪生</button></div><span>画面来自真实 Android Renderer；选择框只负责点选，不会覆盖或模拟组件外观</span></div>
 }

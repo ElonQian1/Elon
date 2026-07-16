@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { APK_STYLE_SOURCE_SIGNATURE, createBlankElement, createInitialTunerDocument } from './presets'
 import {
   loadUiTunerDocument,
@@ -63,26 +57,20 @@ import {
   type UiTunerVerificationReport,
 } from './runtime/verification'
 import styles from './UiTunerPage.module.css'
-import { EvidenceModeSwitch, SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
+import { SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
 import type { SourcePreviewMode } from './source-preview/types'
 import { deriveUiTunerRenderMode } from './rendering/renderMode'
 import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
-
-interface HistoryState {
-  past: UiTunerDocument[]
-  future: UiTunerDocument[]
-}
-const MIN_SIZE = 24
-const HISTORY_LIMIT = 80
-const DEFAULT_ANDROID_PACKAGE = 'com.elon.app'
-const WORKSPACE_MODE_STORAGE_KEY = 'elon.uiTuner.workspaceMode.v2'
-function getSelectedId(document: UiTunerDocument, preferredId: string | null) {
-  if (preferredId && document.elements.some((element) => element.id === preferredId)) {
-    return preferredId
-  }
-  return document.elements[0]?.id ?? null
-}
-
+import { UiWorkspaceModeBar } from './workspace/UiWorkspaceModeBar'
+import { getSelectedId } from './workspace/uiWorkspaceSelection'
+import { useUiWorkspaceSelectionSync } from './workspace/useUiWorkspaceSelectionSync'
+import {
+  DEFAULT_ANDROID_PACKAGE,
+  UI_TUNER_HISTORY_LIMIT,
+  UI_TUNER_MIN_SIZE,
+  WORKSPACE_MODE_STORAGE_KEY,
+  type UiTunerHistoryState,
+} from './workspace/uiTunerWorkspaceState'
 export default function UiTunerPage() {
   const [workspaceMode, setWorkspaceMode] = useState<SourcePreviewMode>(() => (
     window.localStorage.getItem(WORKSPACE_MODE_STORAGE_KEY) as SourcePreviewMode | null
@@ -94,7 +82,7 @@ export default function UiTunerPage() {
     loadUiTunerDocument(APK_STYLE_SOURCE_SIGNATURE) ?? createInitialTunerDocument()
   ))
   const [selectedId, setSelectedId] = useState<string | null>(() => tunerDoc.elements[0]?.id ?? null)
-  const [history, setHistory] = useState<HistoryState>({ past: [], future: [] })
+  const [history, setHistory] = useState<UiTunerHistoryState>({ past: [], future: [] })
   const [notice, setNotice] = useState('')
   const [layerFilter, setLayerFilter] = useState<UiTunerFilterState>(DEFAULT_UI_TUNER_FILTER)
   const screenshotInputRef = useRef<HTMLInputElement>(null)
@@ -122,6 +110,7 @@ export default function UiTunerPage() {
     () => tunerDoc.elements.find((element) => element.id === selectedId) ?? null,
     [selectedId, tunerDoc.elements],
   )
+  const workspaceSelection = useUiWorkspaceSelectionSync(selected, tunerDoc.elements, setSelectedId)
   const exportJson = useMemo(() => stringifyUiTunerExport(tunerDoc), [tunerDoc])
   const metrics = useMemo(
     () => (selected ? getMetrics(selected, tunerDoc.elements, tunerDoc.canvas) : []),
@@ -171,7 +160,7 @@ export default function UiTunerPage() {
 
   const pushHistorySnapshot = useCallback((snapshot: UiTunerDocument) => {
     setHistory((current) => ({
-      past: [...current.past.slice(-(HISTORY_LIMIT - 1)), snapshot],
+      past: [...current.past.slice(-(UI_TUNER_HISTORY_LIMIT - 1)), snapshot],
       future: [],
     }))
   }, [])
@@ -184,7 +173,7 @@ export default function UiTunerPage() {
       const next = update(current)
       pushHistorySnapshot(current)
       const preferredId = preferredSelectedId === undefined ? selectedIdRef.current : preferredSelectedId
-      setSelectedId(getSelectedId(next, preferredId))
+      setSelectedId(getSelectedId(next.elements, preferredId))
       return next
     })
   }, [pushHistorySnapshot])
@@ -248,7 +237,7 @@ export default function UiTunerPage() {
 
   const loadDeviceDocument = useCallback((next: UiTunerDocument) => {
     setTunerDoc(next)
-    setSelectedId(getSelectedId(next, null))
+    setSelectedId(getSelectedId(next.elements, null))
     setHistory({ past: [], future: [] })
     const runtimePackage = next.runtimeSnapshot?.packageName ?? ''
     setLiveTargetPackage(isLiveDebugPackage(runtimePackage) ? runtimePackage : '')
@@ -401,11 +390,11 @@ export default function UiTunerPage() {
       if (!previous) return current
       const present = tunerDocRef.current
       setTunerDoc(previous)
-      setSelectedId((id) => getSelectedId(previous, id))
+      setSelectedId((id) => getSelectedId(previous.elements, id))
       setNotice('已撤回一步')
       return {
         past: current.past.slice(0, -1),
-        future: [present, ...current.future].slice(0, HISTORY_LIMIT),
+        future: [present, ...current.future].slice(0, UI_TUNER_HISTORY_LIMIT),
       }
     })
   }, [])
@@ -416,10 +405,10 @@ export default function UiTunerPage() {
       if (!next) return current
       const present = tunerDocRef.current
       setTunerDoc(next)
-      setSelectedId((id) => getSelectedId(next, id))
+      setSelectedId((id) => getSelectedId(next.elements, id))
       setNotice('已重做一步')
       return {
-        past: [...current.past.slice(-(HISTORY_LIMIT - 1)), present],
+        past: [...current.past.slice(-(UI_TUNER_HISTORY_LIMIT - 1)), present],
         future: current.future.slice(1),
       }
     })
@@ -583,8 +572,8 @@ export default function UiTunerPage() {
       if (!dataUrl) return
       const image = new Image()
       image.onload = () => {
-        const width = Math.max(Math.round(image.naturalWidth), MIN_SIZE)
-        const height = Math.max(Math.round(image.naturalHeight), MIN_SIZE)
+        const width = Math.max(Math.round(image.naturalWidth), UI_TUNER_MIN_SIZE)
+        const height = Math.max(Math.round(image.naturalHeight), UI_TUNER_MIN_SIZE)
         commitDocument((current) => {
           const imported = {
             dataUrl,
@@ -623,7 +612,13 @@ export default function UiTunerPage() {
 
   return (
     <>
-    <SourcePreviewWorkspace active={workspaceMode === 'source'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
+    <SourcePreviewWorkspace
+      active={workspaceMode === 'source'}
+      initialProjectRoot={effectiveProjectRoot}
+      onModeChange={changeWorkspaceMode}
+      selectionHint={workspaceSelection.sourceHint}
+      onSelectionHintChange={workspaceSelection.onSourceSelection}
+    />
     <div
       className={[
         styles.page,
@@ -649,7 +644,7 @@ export default function UiTunerPage() {
       />}
 
       <section className={styles.stage}>
-        <EvidenceModeSwitch initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
+        <UiWorkspaceModeBar mode={workspaceMode} onModeChange={changeWorkspaceMode} />
         <UiTunerToolbar
           canvasName={tunerDoc.canvas.name}
           screenshotInputRef={screenshotInputRef}

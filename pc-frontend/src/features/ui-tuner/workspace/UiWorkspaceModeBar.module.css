@@ -1,0 +1,69 @@
+.bar {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #2a2a2a;
+  background: #111111;
+  color: #d9d9d9;
+  font-size: 12px;
+}
+
+.compact {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.tabs {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.tabs button {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid #3d3d3d;
+  background: #1a1a1a;
+  color: #c8c8c8;
+}
+
+.tabs button:first-child {
+  border-radius: 9px 0 0 9px;
+}
+
+.tabs button:last-child {
+  border-left: 0;
+  border-radius: 0 9px 9px 0;
+}
+
+.tabs .active {
+  border-color: #f4f5fb;
+  background: #f4f5fb;
+  color: #111111;
+}
+
+.status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compareHint {
+  margin-left: auto;
+  color: #777777;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .compareHint {
+    display: none;
+  }
+}
+

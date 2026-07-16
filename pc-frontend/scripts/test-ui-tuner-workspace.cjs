@@ -71,6 +71,42 @@ try {
     '源码数字孪生模式不得误用 Android 真实画面交互状态',
   )
 
+  const selectionOutput = compile(
+    'src/features/ui-tuner/workspace/uiWorkspaceSelection.ts',
+    'workspace/uiWorkspaceSelection.js',
+  )
+  const { findEvidenceSelection, findSourceSelection } = require(selectionOutput)
+  const sourceButton = {
+    key: 'source/pay-button',
+    resourceId: '@+id/pay_button',
+    tag: 'Button',
+    name: '立即支付',
+    source: { layoutFile: 'res/layout/checkout.xml' },
+    style: { text: '立即支付' },
+    children: [],
+  }
+  const sourceRoot = {
+    key: 'source/root',
+    tag: 'LinearLayout',
+    name: '结算页',
+    source: { layoutFile: 'res/layout/checkout.xml' },
+    style: { text: '' },
+    children: [sourceButton],
+  }
+  assert.equal(
+    findSourceSelection(sourceRoot, { resourceId: 'com.elon.app:id/pay_button' }),
+    sourceButton.key,
+    'Android 真帧选区切到本地草稿后应按 resource-id 定位同一组件',
+  )
+  assert.equal(
+    findEvidenceSelection([
+      { id: 'title', name: '标题', text: '订单', runtime: { resourceId: 'id/title' } },
+      { id: 'pay', name: '立即支付', text: '立即支付', runtime: { resourceId: 'id/pay_button' } },
+    ], { resourceId: '@+id/pay_button' }),
+    'pay',
+    '本地草稿选区返回 Android 真帧时应保留语义选中对象',
+  )
+
   const clientIdOutput = compile(
     'src/features/ui-tuner/device/deviceLeaseClientId.ts',
     'device/deviceLeaseClientId.js',
@@ -296,6 +332,13 @@ try {
   assert.match(pageSource, /onRecaptureDevice=\{\(\) => \{ void captureDeviceSnapshot\(\) \}\}/)
   assert.match(pageSource, /realRenderer=\{renderMode\.androidVisual\}/)
   assert.match(pageSource, /runtimeEditable=\{renderMode\.runtimeEditable\}/)
+  assert.match(pageSource, /<UiWorkspaceModeBar/)
+  const workspaceModeSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/workspace/UiWorkspaceModeBar.tsx'),
+    'utf8',
+  )
+  assert.match(workspaceModeSource, /Android 真帧/)
+  assert.match(workspaceModeSource, /本地草稿/)
   const inspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/UiTunerInspector.tsx'),
     'utf8',
