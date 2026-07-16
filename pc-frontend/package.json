@@ -18,6 +18,8 @@
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
     "test:plaza": "node scripts/test-project-plaza-carousel.mjs",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",
+    "check:bundle-budget": "node ../scripts/check-pc-frontend-bundle-budget.js",
+    "test:admin-realtime": "node ../scripts/test-admin-realtime-health.js",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
