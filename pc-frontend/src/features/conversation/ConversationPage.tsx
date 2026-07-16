@@ -27,8 +27,8 @@ import ConversationTopbarActions from './ConversationTopbarActions'
 import { useConversationRealtimeRefresh } from './useConversationRealtimeRefresh'
 import { useConversationAutoScroll } from './useConversationAutoScroll'
 import { useConversationTaskActions } from './useConversationTaskActions'
-import ConversationMemberSidebar from './ConversationMemberSidebar'
-import type { MemberPanelScope } from './ConversationMemberSidebar'
+import ProjectContextSidebar from './ProjectContextSidebar'
+import type { ProjectMemberScope } from './ProjectContextSidebar'
 import WorkspacePanelResizeHandle from './WorkspacePanelResizeHandle'
 import { api } from '../../api/client'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
@@ -52,7 +52,6 @@ import type {
   ProjectInvitePreview,
   ProjectInvitePreviewResponse,
   ProjectMember,
-  UserPresenceSettings,
 } from './types'
 import MemberConversationList from './MemberConversationList'
 import {
@@ -79,15 +78,12 @@ import type {
 } from './memberConversationApi'
 import {
   channelCanManage,
-  channelPermissionSummary,
-  membersHaveChannelPermissionMap,
   membersForChannel,
   projectMemberHasRolePermission,
   ROLE_PERMISSION_INVITE_MEMBERS,
   ROLE_PERMISSION_MANAGE_MEMBERS,
   ROLE_PERMISSION_MANAGE_ROLES,
   ROLE_PERMISSION_MODERATE_MEMBERS,
-  ROLE_PERMISSION_VIEW_AUDIT_LOG,
   inviteTitle,
   roleLabel,
 } from './memberUtils'
@@ -97,22 +93,16 @@ import {
   delay,
   loadAiDevelopmentTaskMessages,
   mergeProjectRecords,
-  normalizeOwnPresenceStatus,
-  ownPresenceSummary,
   projectRoleCanAutoBind,
   projectRoleLabel,
   shortNodeId,
   taskMessageCacheKey,
   titleFromMessage,
 } from './conversationPageHelpers'
-import { PresenceDrawer } from './PresenceDrawer'
 import { InviteDrawer } from './InviteDrawer'
-import { ModerationDrawer } from './ModerationDrawer'
-import { MemberAuditDrawer } from './MemberAuditDrawer'
 import { RoleManagementDrawer } from './RoleManagementDrawer'
 import { PermissionDrawer } from './PermissionDrawer'
 import { MemberDetailDrawer } from './MemberDetailDrawer'
-import { MemberDirectoryDrawer } from './MemberDirectoryDrawer'
 import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import { DEFAULT_POPOVER_ANCHOR, type PopoverAnchor } from '../../lib/popoverPosition'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
@@ -159,18 +149,11 @@ export default function ConversationPage() {
     typeof window === 'undefined' ? null : window.localStorage,
   ))
   const [showPermissions, setShowPermissions] = useState(false)
-  const [showPresence, setShowPresence] = useState(false)
-  const [myPresence, setMyPresence] = useState<UserPresenceSettings | null>(null)
   const [showInvites, setShowInvites] = useState(false)
-  const [showModeration, setShowModeration] = useState(false)
-  const [showAudit, setShowAudit] = useState(false)
   const [showRoles, setShowRoles] = useState(false)
-  const [showDirectory, setShowDirectory] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [detailMember, setDetailMember] = useState<ProjectMember | null>(null)
-  const [memberPanelScope, setMemberPanelScope] = useState<MemberPanelScope>('project')
-  const [memberSelectionMode, setMemberSelectionMode] = useState(false)
-  const [moderationFocusMemberId, setModerationFocusMemberId] = useState('')
+  const [memberPanelScope, setMemberPanelScope] = useState<ProjectMemberScope>('project')
   const [memberPopoverAnchor, setMemberPopoverAnchor] = useState<PopoverAnchor>(DEFAULT_POPOVER_ANCHOR)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
   const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
@@ -217,11 +200,6 @@ export default function ConversationPage() {
     setRuntimeRoute(route)
     setDirectPcCli(false)
   }, [])
-  const handlePresenceSaved = useCallback(async (presence: UserPresenceSettings) => {
-    setMyPresence(presence)
-    await reloadProjectSpace()
-  }, [reloadProjectSpace])
-
   const {
     feedRef,
     handleFeedScroll,
@@ -238,53 +216,6 @@ export default function ConversationPage() {
   })
 
   useEffect(() => { loadProjects() }, [user?.id])
-
-  useEffect(() => {
-    let canceled = false
-    if (!user?.id) {
-      setMyPresence(null)
-      return () => { canceled = true }
-    }
-    api.get<UserPresenceSettings>('/api/me/presence')
-      .then((presence) => {
-        if (!canceled) setMyPresence(presence)
-      })
-      .catch(() => {
-        if (!canceled) setMyPresence(null)
-      })
-    return () => { canceled = true }
-  }, [user?.id])
-
-  useEffect(() => {
-    if (!user?.id) return
-    const userId = user.id
-    function onPresence(event: Event) {
-      const detail = (event as CustomEvent<{
-        userId?: string
-        status?: string
-        customStatus?: string | null
-        custom_status?: string | null
-        activity?: string | null
-        updatedAt?: string
-        updated_at?: string
-      }>).detail
-      if (!detail || detail.userId !== userId) return
-      setMyPresence((prev) => ({
-        user_id: userId,
-        status: detail.status ?? prev?.status ?? 'online',
-        custom_status: Object.prototype.hasOwnProperty.call(detail, 'customStatus')
-          || Object.prototype.hasOwnProperty.call(detail, 'custom_status')
-          ? detail.customStatus ?? detail.custom_status ?? null
-          : prev?.custom_status ?? null,
-        activity: Object.prototype.hasOwnProperty.call(detail, 'activity')
-          ? detail.activity ?? null
-          : prev?.activity ?? null,
-        updated_at: detail.updatedAt ?? detail.updated_at ?? prev?.updated_at,
-      }))
-    }
-    window.addEventListener('elon:presence', onPresence)
-    return () => window.removeEventListener('elon:presence', onPresence)
-  }, [user?.id])
 
   useEffect(() => {
     persistProjectRuntimeRouteSelection(window.localStorage, runtimeRoute)
@@ -354,10 +285,7 @@ export default function ConversationPage() {
     setDetailMember(null)
     setPermissionFocusMemberId('')
     setRoleFocusMemberId('')
-    setModerationFocusMemberId('')
-    setShowAudit(false)
     setShowRoles(false)
-    setShowDirectory(false)
     setMemberPanelScope(activeChannelId ? 'channel' : 'project')
   }, [activeProjectId, activeChannelId])
 
@@ -745,42 +673,15 @@ export default function ConversationPage() {
   const canInviteMembers = !!activeProjectId
     && !!currentProjectMember
     && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_INVITE_MEMBERS)
-  const canViewMemberAudit = !!activeProjectId
-    && !!currentProjectMember
-    && (
-      projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_VIEW_AUDIT_LOG)
-      || canManageMembers
-    )
   const canManageRoles = !!activeProjectId
     && !!currentProjectMember
     && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_ROLES)
   const canUseRoleManager = canManageRoles || canManageMembers
-  const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
-  const activeMemberPanelScope: MemberPanelScope = activeChannelId && memberPanelScope === 'channel' ? 'channel' : 'project'
-  const panelUsesChannelScope = activeMemberPanelScope === 'channel'
-  const panelUsesChannelPermissions = panelUsesChannelScope && hasChannelMemberPermissions
+  const panelUsesChannelScope = !!activeChannelId && memberPanelScope === 'channel'
   const panelMembers = useMemo(
     () => panelUsesChannelScope ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
     [spaceMembers, activeChannelId, panelUsesChannelScope],
   )
-  const memberPanelTitle = panelUsesChannelScope ? '频道成员' : activeProjectId ? '项目大厅' : '工作台'
-  const memberPanelContext = panelUsesChannelScope
-    ? activeChannel?.name ?? '当前频道'
-    : activeProject?.name ?? '我的项目'
-  const memberPanelCount = activeProjectId ? panelMembers.length : (user ? 1 : 0)
-  const ownPresenceStatus = normalizeOwnPresenceStatus(myPresence?.status ?? user?.status ?? 'online')
-  const ownPresenceAvatarStatus = ownPresenceStatus === 'invisible' ? 'offline' : ownPresenceStatus
-  const ownPresenceSubtitle = ownPresenceSummary(myPresence, ownPresenceStatus)
-  const ownAvatarUrl = clean(user?.avatar_data_url ?? '')
-  const ownDisplayName = user ? (user.nickname ?? user.account) : ''
-  const ownInitial = ownDisplayName ? ownDisplayName[0].toUpperCase() : '?'
-  const memberPanelSummary = panelUsesChannelScope && activeChannel
-    ? panelUsesChannelPermissions
-      ? channelPermissionSummary(activeChannel, panelMembers.length, spaceMembers.length, true)
-      : `${activeChannel.name} · 当前频道未设置成员级可见限制，显示项目内全部成员`
-    : activeProjectId
-      ? `项目大厅显示 ${spaceMembers.length} 位项目成员，适合查看全局在线、角色和管理状态`
-      : '个人 AI 工作台'
 
   // 成员卡片弹窗
   // (memberPopover state removed - not currently used)
@@ -1277,10 +1178,7 @@ export default function ConversationPage() {
               activeProjectId={activeProjectId}
               activeChannelId={activeChannelId}
               memberCollapsed={workspacePanels.memberCollapsed}
-              memberSelectionMode={memberSelectionMode}
               onToggleMemberPanel={workspacePanels.toggleMemberPanel}
-              onEnableMemberSelection={() => setMemberSelectionMode(true)}
-              onNavigateNode={() => navigate('/node')}
             />}
         </header>
 
@@ -1422,27 +1320,20 @@ export default function ConversationPage() {
         )}
       </div>
 
-      {/* ══ 成员面板 ══ */}
-      {sessionView !== 'new' && <ConversationMemberSidebar
+      {/* ══ 项目上下文面板 ══ */}
+      {sessionView !== 'new' && activeProject && <ProjectContextSidebar
         workspacePanels={workspacePanels}
-        title={memberPanelTitle}
-        count={memberPanelCount}
-        context={memberPanelContext}
-        activeProjectId={activeProjectId}
+        project={activeProject}
+        activeProjectRole={activeProjectRole}
         activeChannelId={activeChannelId}
         activeChannel={activeChannel}
         channels={channels}
         canInviteMembers={canInviteMembers}
         canUseRoleManager={canUseRoleManager}
-        canViewMemberAudit={canViewMemberAudit}
         canManagePermissions={canManagePermissions}
         canModerateMembers={canModerateMembers}
         canManageMembers={canManageMembers}
         panelUsesChannelScope={panelUsesChannelScope}
-        panelUsesChannelPermissions={panelUsesChannelPermissions}
-        memberPanelSummary={memberPanelSummary}
-        selectionMode={memberSelectionMode}
-        onSelectionModeChange={setMemberSelectionMode}
         panelMembers={panelMembers}
         spaceMembers={spaceMembers}
         spaceLoading={spaceLoading}
@@ -1450,24 +1341,18 @@ export default function ConversationPage() {
         memberMenu={memberMenu}
         selectedMember={selectedMember}
         memberPopoverAnchor={memberPopoverAnchor}
-        isDevChannel={isDevChannel}
-        activeWorkspacePath={activeWorkspacePath}
-        isAssistingMember={isAssistingMember}
-        activeConversationTargetId={activeConversationTargetId}
         user={user}
-        ownPresenceAvatarStatus={ownPresenceAvatarStatus}
-        ownAvatarUrl={ownAvatarUrl}
-        ownInitial={ownInitial}
-        ownDisplayName={ownDisplayName}
-        ownPresenceSubtitle={ownPresenceSubtitle}
-        onShowPresence={() => setShowPresence(true)}
-        onShowDirectory={() => setShowDirectory(true)}
+        localNodeId={localNodeId}
+        localNodeName={clean(localNode?.device_name ?? '')}
+        localNodeReady={localNodeReady}
+        onProjectChanged={async () => {
+          await reloadProjectSpace()
+          await loadProjects()
+        }}
+        onOpenProjectSettings={() => navigate(`/projects/${activeProjectId}?tab=settings`)}
+        onOpenWorkspaceSettings={() => navigate(`/projects/${activeProjectId}?tab=workspace`)}
         onOpenMembersPage={() => navigate(`/projects/${activeProjectId}/members`)}
         onShowInvites={() => setShowInvites(true)}
-        onOpenModeration={() => { setModerationFocusMemberId(''); setShowModeration(true) }}
-        onOpenRoleManager={() => { setRoleFocusMemberId(''); setShowRoles(true) }}
-        onShowAudit={() => setShowAudit(true)}
-        onOpenPermissionManager={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}
         onCloseMemberMenu={() => setMemberMenu(null)}
         onOpenMemberProfile={openMemberProfile}
         onOpenMemberDetails={openMemberDetails}
@@ -1520,53 +1405,8 @@ export default function ConversationPage() {
         />
       )}
 
-      {showPresence && (
-        <PresenceDrawer onClose={() => setShowPresence(false)} onSaved={handlePresenceSaved} />
-      )}
       {showInvites && activeProjectId && (
         <InviteDrawer projectId={activeProjectId} onClose={() => setShowInvites(false)} />
-      )}
-      {showModeration && activeProjectId && (
-        <ModerationDrawer
-          projectId={activeProjectId}
-          members={members}
-          initialMemberId={moderationFocusMemberId}
-          onClose={() => { setShowModeration(false); setModerationFocusMemberId('') }}
-          onSaved={reloadProjectSpace}
-        />
-      )}
-      {showDirectory && activeProjectId && (
-        <MemberDirectoryDrawer
-          projectId={activeProjectId}
-          members={members}
-          channels={channels}
-          currentUserId={user?.id}
-          canManageMembers={canManageMembers}
-          canManageRoles={canUseRoleManager}
-          canModerate={canModerateMembers}
-          onSaved={reloadProjectSpace}
-          onClose={() => setShowDirectory(false)}
-          onOpenDetails={(member) => {
-            setShowDirectory(false)
-            openMemberDetails(member)
-          }}
-          onOpenConversations={(member) => {
-            setShowDirectory(false)
-            openMemberConversations(member)
-          }}
-          onOpenRoles={canUseRoleManager ? (member) => {
-            setShowDirectory(false)
-            openMemberRoles(member)
-          } : undefined}
-          onOpenModerationCenter={(member) => {
-            setShowDirectory(false)
-            setModerationFocusMemberId(member?.user_id ?? '')
-            setShowModeration(true)
-          }}
-        />
-      )}
-      {showAudit && activeProjectId && (
-        <MemberAuditDrawer projectId={activeProjectId} onClose={() => setShowAudit(false)} />
       )}
       {showRoles && activeProjectId && (
         <RoleManagementDrawer

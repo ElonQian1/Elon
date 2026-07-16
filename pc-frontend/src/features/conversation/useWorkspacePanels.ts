@@ -20,9 +20,9 @@ const COLLAPSED_CHANNEL_WIDTH = 44
 const CHANNEL_MIN = 220
 const CHANNEL_MAX = 360
 const CHANNEL_DEFAULT = 272
-const MEMBER_MIN = 260
+const MEMBER_MIN = 300
 const MEMBER_MAX = 420
-const MEMBER_DEFAULT = 300
+const MEMBER_DEFAULT = 328
 
 export function useWorkspacePanels() {
   const [state, setState] = useState<WorkspacePanelState>(initialWorkspacePanelState)
@@ -125,11 +125,12 @@ export type WorkspacePanels = ReturnType<typeof useWorkspacePanels>
 
 function initialWorkspacePanelState(): WorkspacePanelState {
   const stored = readWorkspacePanelState()
+  const compactViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 1180px)').matches
   return {
     channelWidth: clamp(Number(stored?.channelWidth ?? CHANNEL_DEFAULT), CHANNEL_MIN, CHANNEL_MAX),
     memberWidth: clamp(Number(stored?.memberWidth ?? MEMBER_DEFAULT), MEMBER_MIN, MEMBER_MAX),
     channelCollapsed: stored?.channelCollapsed === true,
-    memberCollapsed: stored?.memberCollapsed === true,
+    memberCollapsed: typeof stored?.memberCollapsed === 'boolean' ? stored.memberCollapsed : compactViewport,
   }
 }
 

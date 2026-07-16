@@ -7,6 +7,7 @@ import { useUserProgression } from '../billing/useUserProgression'
 import UserAvatar, { userDisplayName } from './UserAvatar'
 import UserAccountMenu from './UserAccountMenu'
 import { presenceSummary, useMyPresence } from './useMyPresence'
+import { PresenceDrawer } from '../conversation/PresenceDrawer'
 import styles from './SidebarUserStrip.module.css'
 
 export default function SidebarUserStrip() {
@@ -14,6 +15,7 @@ export default function SidebarUserStrip() {
   const accountMenuId = useId()
   const stripRef = useRef<HTMLDivElement>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [presenceOpen, setPresenceOpen] = useState(false)
   const user = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
@@ -83,7 +85,11 @@ export default function SidebarUserStrip() {
           anchorRef={stripRef}
           onClose={closeMenu}
           onLogout={handleLogout}
+          onOpenPresence={() => setPresenceOpen(true)}
         />
+      )}
+      {presenceOpen && (
+        <PresenceDrawer onClose={() => setPresenceOpen(false)} onSaved={() => {}} />
       )}
     </div>
   )

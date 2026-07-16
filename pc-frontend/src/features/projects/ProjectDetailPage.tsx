@@ -52,7 +52,7 @@ export default function ProjectDetailPage() {
   const reloadProjectSpace = useProjectStore((s) => s.reloadProjectSpace)
   const loadProjects = useProjectStore((s) => s.loadProjects)
 
-  const [tab, setTab] = useState<Tab>(() => location.pathname.endsWith('/members') ? 'members' : 'overview')
+  const [tab, setTab] = useState<Tab>(() => tabFromLocation(location.pathname, location.search))
   const [health, setHealth] = useState<WorkspaceHealth | null>(null)
   const [healthLoading, setHealthLoading] = useState(false)
   const [memberList, setMemberList] = useState<ProjectMember[]>([])
@@ -74,8 +74,8 @@ export default function ProjectDetailPage() {
   }, [id])
 
   useEffect(() => {
-    if (location.pathname.endsWith('/members')) setTab('members')
-  }, [location.pathname])
+    setTab(tabFromLocation(location.pathname, location.search))
+  }, [location.pathname, location.search])
 
   useEffect(() => {
     if (space?.members) setMemberList(space.members)
@@ -129,7 +129,8 @@ export default function ProjectDetailPage() {
       if (!location.pathname.endsWith('/members')) navigate(`/projects/${id}/members`)
       return
     }
-    if (location.pathname.endsWith('/members')) navigate(`/projects/${id}`)
+    const nextLocation = nextTab === 'overview' ? `/projects/${id}` : `/projects/${id}?tab=${nextTab}`
+    if (`${location.pathname}${location.search}` !== nextLocation) navigate(nextLocation)
   }
 
   return (
@@ -246,6 +247,12 @@ export default function ProjectDetailPage() {
       </div>
     </div>
   )
+}
+
+function tabFromLocation(pathname: string, search: string): Tab {
+  if (pathname.endsWith('/members')) return 'members'
+  const requested = new URLSearchParams(search).get('tab')
+  return DETAIL_TABS.some(({ key }) => key === requested) ? requested as Tab : 'overview'
 }
 
 type StoreProject = ReturnType<typeof useProjectStore.getState>['projects'][number] | null | undefined

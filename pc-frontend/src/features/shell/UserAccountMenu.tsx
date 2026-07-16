@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, RefObject } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ExternalLink, FolderPlus, LogOut, Settings } from 'lucide-react'
+import { Activity, ExternalLink, FolderPlus, LogOut, Settings, Smartphone } from 'lucide-react'
 import type { User } from '../../store/auth'
 import { getPcLegacyUrl, rememberPcLegacyToken } from './pcLegacyUrl'
 import UserAvatar, { userAccountMeta, userDisplayName } from './UserAvatar'
@@ -22,6 +22,7 @@ interface Props {
   anchorRef: RefObject<HTMLElement>
   onClose: () => void
   onLogout: () => void
+  onOpenPresence: () => void
 }
 
 interface MenuPosition {
@@ -40,6 +41,7 @@ export default function UserAccountMenu({
   anchorRef,
   onClose,
   onLogout,
+  onOpenPresence,
 }: Props) {
   const navigate = useNavigate()
   const menuRef = useRef<HTMLDivElement>(null)
@@ -117,6 +119,11 @@ export default function UserAccountMenu({
     onLogout()
   }
 
+  function editPresence() {
+    onClose()
+    onOpenPresence()
+  }
+
   if (!open || !menuPosition) return null
 
   const menuStyle: CSSProperties = {
@@ -153,6 +160,19 @@ export default function UserAccountMenu({
         className={styles.row}
         type="button"
         role="menuitem"
+        onClick={editPresence}
+      >
+        <Activity size={17} aria-hidden="true" />
+        <span>
+          <strong>我的状态</strong>
+          <small>{presence ? presenceSummary(presence) : '设置在线、离开、勿扰或隐身'}</small>
+        </span>
+      </button>
+
+      <button
+        className={styles.row}
+        type="button"
+        role="menuitem"
         onClick={() => go('/account')}
       >
         <Settings size={17} aria-hidden="true" />
@@ -170,10 +190,18 @@ export default function UserAccountMenu({
       >
         <FolderPlus size={17} aria-hidden="true" />
         <span>
-          <strong>导入电脑代码</strong>
-          <small>把已有代码文件夹加入工作台</small>
+          <strong>电脑与算力</strong>
+          <small>节点连接、代码目录和算力共享</small>
         </span>
       </button>
+
+      <a className={styles.row} role="menuitem" href="/app/download" target="_blank" rel="noreferrer">
+        <Smartphone size={17} aria-hidden="true" />
+        <span>
+          <strong>移动端</strong>
+          <small>打开手机端下载与连接入口</small>
+        </span>
+      </a>
 
       <a
         className={styles.row}

@@ -31,7 +31,7 @@ assert.match(landingCss, /width:\s*min\(1120px, 100%\)/, 'project landing should
 assert.match(conversationPage, /onSelectChannel=\{\(id\) => \{ void openDevelopmentDraft\(id\) \}\}/, 'continue development should open a draft conversation')
 assert.ok(conversationPage.includes("channels.find((channel) => channel.id === id)?.kind === 'ai_development') openDevelopmentDraft(id)"), 'clicking the AI development channel should open the same draft conversation')
 assert.match(conversationPage, /sessionView === 'new'[\s\S]*<NewConversationDraft/, 'new sessions should use the dedicated draft canvas')
-assert.match(conversationPage, /sessionView !== 'new' && <ConversationMemberSidebar/, 'draft mode should hide the member and agent sidebar')
+assert.match(conversationPage, /sessionView !== 'new' && activeProject && <ProjectContextSidebar/, 'draft mode should hide the project context sidebar')
 assert.match(conversationPage, /function startNewSession\(\)[\s\S]*waitingForNewSession\.current = false/, 'opening an empty draft must not wait for or create a real conversation')
 for (const label of ['开发新功能', '修复一个问题', '继续未完成任务', '分析当前项目', '发送第一条消息后才会创建真实会话']) {
   assert.ok(conversationDraft.includes(label), `new conversation draft should include ${label}`)

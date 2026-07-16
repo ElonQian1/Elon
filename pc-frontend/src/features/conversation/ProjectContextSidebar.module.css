@@ -1,0 +1,614 @@
+.panel {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  display: grid;
+  grid-template-rows: 58px 42px minmax(0, 1fr);
+  background: #1a1a1a;
+  border-left: 1px solid rgba(255, 255, 255, .08);
+  color: var(--text);
+}
+
+.header {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.header > div {
+  min-width: 0;
+}
+
+.header strong,
+.header span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header strong {
+  color: #d9d9d9;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.header span {
+  margin-top: 3px;
+  color: #777;
+  font-size: 11px;
+}
+
+.iconButton,
+.rowAction,
+.infoRow button,
+.moreButton {
+  border: 0;
+  background: transparent;
+  color: #afafaf;
+  cursor: pointer;
+}
+
+.iconButton {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.iconButton:hover,
+.rowAction:hover,
+.infoRow button:hover,
+.moreButton:hover {
+  background: rgba(255, 255, 255, .06);
+  color: #d9d9d9;
+}
+
+.iconButton:focus-visible,
+.rowAction:focus-visible,
+.infoRow button:focus-visible,
+.moreButton:focus-visible,
+.tabs button:focus-visible,
+.logoButton:focus-visible,
+.fullSettingsButton:focus-visible,
+.memberToolbar button:focus-visible,
+.scopeSwitch button:focus-visible,
+.avatarButton:focus-visible,
+.memberCopy:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.tabs button {
+  min-width: 0;
+  position: relative;
+  border: 0;
+  background: transparent;
+  color: #777;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tabs button::after {
+  content: "";
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.tabs button[data-active="true"] {
+  color: #d9d9d9;
+}
+
+.tabs button[data-active="true"]::after {
+  background: #d9d9d9;
+}
+
+.tabs span {
+  color: #777;
+  font-size: 11px;
+}
+
+.content {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  scrollbar-width: thin;
+}
+
+.identity {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.logoButton {
+  width: 60px;
+  height: 60px;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 10px;
+  background: #272727;
+  color: #d9d9d9;
+  font-size: 23px;
+  font-weight: 800;
+}
+
+.logoButton:not(:disabled) {
+  cursor: pointer;
+}
+
+.logoButton:disabled {
+  cursor: default;
+}
+
+.logoButton img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.logoButton em {
+  position: absolute;
+  inset: auto 0 0;
+  height: 23px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: rgba(0, 0, 0, .76);
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  opacity: 0;
+  transition: opacity .15s ease;
+}
+
+.logoButton:hover em,
+.logoButton:focus-visible em {
+  opacity: 1;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.identity > div {
+  min-width: 0;
+}
+
+.identity > div > strong,
+.identity > div > span,
+.identity p {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.identity > div > strong {
+  color: #f4f5fb;
+  font-size: 16px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.identity > div > span {
+  margin-top: 4px;
+  color: #b8b8b8;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.identity p {
+  max-height: 38px;
+  margin: 7px 0 0;
+  color: #777;
+  font-size: 11px;
+  line-height: 19px;
+}
+
+.section {
+  padding: 18px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.sectionTitle,
+.memberToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sectionTitle strong,
+.memberToolbar strong {
+  color: #d9d9d9;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.sectionTitle button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #afafaf;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.sectionTitle button:hover {
+  color: #d9d9d9;
+  text-decoration: underline;
+}
+
+.detailRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 32px;
+  gap: 10px;
+  align-items: center;
+  min-height: 66px;
+}
+
+.detailRow + .detailRow {
+  border-top: 1px solid rgba(255, 255, 255, .05);
+}
+
+.detailRow > div {
+  min-width: 0;
+}
+
+.detailRow span,
+.detailRow strong,
+.detailRow small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailRow span,
+.detailRow small {
+  color: #777;
+  font-size: 10px;
+}
+
+.detailRow strong {
+  margin: 3px 0;
+  color: #d9d9d9;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.statusDot {
+  width: 9px;
+  height: 9px;
+  justify-self: center;
+  border-radius: 50%;
+  background: #777;
+}
+
+.statusDot[data-state="在线"] {
+  background: #58be6a;
+}
+
+.statusDot[data-state="离线"] {
+  background: #e62129;
+}
+
+.rowIcon {
+  justify-self: center;
+  color: #afafaf;
+}
+
+.rowAction {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+
+.inlineNotice,
+.feedback,
+.empty {
+  color: #afafaf;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.inlineNotice {
+  margin: 8px 0 0;
+}
+
+.feedback {
+  margin: 14px 0 0;
+}
+
+.infoRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 28px;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+}
+
+.infoRow > span {
+  color: #777;
+  font-size: 11px;
+}
+
+.infoRow > strong {
+  overflow: hidden;
+  color: #d9d9d9;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.infoRow button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+}
+
+.fullSettingsButton {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 10px;
+  background: transparent;
+  color: #d9d9d9;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fullSettingsButton:hover {
+  background: rgba(255, 255, 255, .05);
+}
+
+.membersPane {
+  min-height: 100%;
+}
+
+.memberToolbar > div {
+  min-width: 0;
+}
+
+.memberToolbar strong,
+.memberToolbar span {
+  display: block;
+}
+
+.memberToolbar span {
+  margin-top: 3px;
+  color: #777;
+  font-size: 11px;
+}
+
+.memberToolbar > button {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 18px;
+  background: #fff;
+  color: #000;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.scopeSwitch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px;
+  margin: 14px 0 12px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #272727;
+}
+
+.scopeSwitch button {
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #777;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scopeSwitch button[data-active="true"] {
+  background: #1f2023;
+  color: #d9d9d9;
+}
+
+.memberSearch {
+  width: 100%;
+  height: 36px;
+  margin-bottom: 10px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  background: #272727;
+  color: #d9d9d9;
+  font: inherit;
+  font-size: 12px;
+}
+
+.memberSearch:focus {
+  border-color: rgba(217, 217, 217, .32);
+  outline: none;
+}
+
+.memberList {
+  min-width: 0;
+}
+
+.memberRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 32px;
+  gap: 10px;
+  align-items: center;
+  min-height: 54px;
+  border-radius: 10px;
+}
+
+.memberRow:hover {
+  background: rgba(255, 255, 255, .04);
+}
+
+.avatarButton,
+.memberCopy {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.avatarButton {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.memberAvatar {
+  width: 34px;
+  height: 34px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #272727;
+  color: #d9d9d9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.memberAvatar::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border: 3px solid #1a1a1a;
+  border-radius: 50%;
+  background: #777;
+}
+
+.memberAvatar[data-status="online"]::after {
+  background: #58be6a;
+}
+
+.memberAvatar[data-status="dnd"]::after {
+  background: #e62129;
+}
+
+.memberAvatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.memberCopy {
+  padding: 6px 0;
+  text-align: left;
+}
+
+.memberCopy strong,
+.memberCopy span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberCopy strong {
+  color: #d9d9d9;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.memberCopy span {
+  margin-top: 3px;
+  color: #777;
+  font-size: 10px;
+}
+
+.moreButton {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  opacity: .55;
+}
+
+.memberRow:hover .moreButton,
+.moreButton:focus-visible {
+  opacity: 1;
+}
+
+.empty {
+  margin: 18px 0;
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .panel {
+    position: absolute;
+    z-index: 30;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(360px, 92vw);
+    box-shadow: -18px 0 38px rgba(0, 0, 0, .48);
+  }
+}
