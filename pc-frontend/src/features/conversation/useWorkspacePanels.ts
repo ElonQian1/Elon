@@ -125,7 +125,7 @@ export type WorkspacePanels = ReturnType<typeof useWorkspacePanels>
 
 function initialWorkspacePanelState(): WorkspacePanelState {
   const stored = readWorkspacePanelState()
-  const compactViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 1180px)').matches
+  const compactViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 1440px)').matches
   return {
     channelWidth: clamp(Number(stored?.channelWidth ?? CHANNEL_DEFAULT), CHANNEL_MIN, CHANNEL_MAX),
     memberWidth: clamp(Number(stored?.memberWidth ?? MEMBER_DEFAULT), MEMBER_MIN, MEMBER_MAX),

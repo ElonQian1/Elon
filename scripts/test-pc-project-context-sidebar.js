@@ -22,7 +22,7 @@ assert.match(sidebar, /icon_data_url[\s\S]*updateLogo/, 'project logo should be 
 assert.match(sidebar, /copyText\(workspacePath, '工作目录已复制'\)/, 'workspace path should be directly copyable')
 assert.match(sidebar, /canInviteMembers[\s\S]*onShowInvites/, 'invitation should be the member tab primary action')
 assert.match(sidebarCss, /grid-template-rows:\s*58px 42px minmax\(0, 1fr\)/, 'sidebar should keep a stable header, tabs, and scrollable content')
-assert.match(sidebarCss, /@media \(max-width: 1180px\)[\s\S]*position:\s*absolute/, 'compact desktop should use an overlay sidebar')
+assert.match(sidebarCss, /@media \(max-width: 1440px\)[\s\S]*position:\s*absolute/, 'compact desktop should use an overlay sidebar')
 
 assert.ok(!topbar.includes('分享算力'), 'project topbar should not contain the user-level compute action')
 assert.ok(!topbar.includes('移动端'), 'project topbar should not contain the global mobile action')

@@ -601,7 +601,7 @@
   text-align: center;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1440px) {
   .panel {
     position: absolute;
     z-index: 30;
