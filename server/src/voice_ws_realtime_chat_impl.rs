@@ -18,56 +18,52 @@ pub(super) async fn handle(
         ..
     }) = hello
     else {
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Error {
-                    code: "bad_hello",
-                    message: "首帧必须是 hello 文本消息".into(),
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Error {
+                code: "bad_hello",
+                message: "首帧必须是 hello 文本消息".into(),
+            },
+        )
+        .await;
         return Ok(());
     };
     let user_id = match resolve_authenticated_voice_user(&authenticated_user_id, user_id) {
         Ok(user_id) => user_id,
         Err(message) => {
-            let _ = sender
-                .send(Message::Text(
-                    ServerEvent::Error {
-                        code: "user_mismatch",
-                        message,
-                    }
-                    .to_json(),
-                ))
-                .await;
+            let _ = send_json(
+                &mut sender,
+                &ServerEvent::Error {
+                    code: "user_mismatch",
+                    message,
+                },
+            )
+            .await;
             return Ok(());
         }
     };
     if target.as_deref() != Some(VOICE_TARGET_SOCIAL_AI_DIRECT)
         && target.as_deref() != Some(VOICE_TARGET_PHONE_CONTROL)
     {
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Error {
-                    code: "unsupported_target",
-                    message: "全双工实时通话支持 social_ai_direct 或 phone_control".into(),
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Error {
+                code: "unsupported_target",
+                message: "全双工实时通话支持 social_ai_direct 或 phone_control".into(),
+            },
+        )
+        .await;
         return Ok(());
     }
     if let Err(msg) = check_format_declaration(sample_rate, channels) {
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Error {
-                    code: "bad_format",
-                    message: msg,
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Error {
+                code: "bad_format",
+                message: msg,
+            },
+        )
+        .await;
         return Ok(());
     }
 
@@ -86,41 +82,38 @@ pub(super) async fn handle(
         cfg.read_api_key_from_agents(&agents_cfg)
     };
     let Some(api_key) = api_key else {
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Error {
-                    code: "realtime_chat_connect",
-                    message: cfg.missing_key_message(),
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Error {
+                code: "realtime_chat_connect",
+                message: cfg.missing_key_message(),
+            },
+        )
+        .await;
         return Ok(());
     };
     let mut session = match RealtimeChatSession::connect(&cfg, instructions, api_key).await {
         Ok(session) => session,
         Err(err) => {
-            let _ = sender
-                .send(Message::Text(
-                    ServerEvent::Error {
-                        code: "realtime_chat_connect",
-                        message: err.to_string(),
-                    }
-                    .to_json(),
-                ))
-                .await;
+            let _ = send_json(
+                &mut sender,
+                &ServerEvent::Error {
+                    code: "realtime_chat_connect",
+                    message: err.to_string(),
+                },
+            )
+            .await;
             return Ok(());
         }
     };
 
-    let _ = sender
-        .send(Message::Text(
-            ServerEvent::Ready {
-                mode: "realtime_chat",
-            }
-            .to_json(),
-        ))
-        .await;
+    let _ = send_json(
+        &mut sender,
+        &ServerEvent::Ready {
+            mode: "realtime_chat",
+        },
+    )
+    .await;
     info!(target: "voice", user_id, "realtime chat 会话已建立");
 
     let mut turn_input_pcm_bytes: usize = 0;
@@ -128,13 +121,13 @@ pub(super) async fn handle(
     let accounting_session_id = uuid::Uuid::new_v4().simple().to_string();
     let mut accounting_turn_index: u64 = 0;
     let mut turn_billing_call: Option<crate::billing_lifecycle::TrustedBillingCall<'_>> = None;
+    let mut close_reason = WsCloseReason::WriteFailed;
     loop {
         tokio::select! {
             biased;
             client_msg = receiver.next() => {
-                let Some(msg) = client_msg else { break; };
-                match msg {
-                    Ok(Message::Binary(bytes)) => {
+                match receive_data_or_control(client_msg, &mut sender).await {
+                    WsIncoming::Binary(bytes) => {
                         match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
                             PcmCheck::Ok => {
                                 if turn_billing_call.is_none() {
@@ -151,10 +144,10 @@ pub(super) async fn handle(
                                     ) {
                                         Ok(call) => turn_billing_call = Some(call),
                                         Err(message) => {
-                                            let _ = sender.send(Message::Text(ServerEvent::Error {
+                                            let _ = send_json(&mut sender, &ServerEvent::Error {
                                                 code: "payment_required",
                                                 message,
-                                            }.to_json())).await;
+                                            }).await;
                                             break;
                                         }
                                     }
@@ -166,67 +159,73 @@ pub(super) async fn handle(
                                 }
                             }
                             PcmCheck::OddBytes => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(&mut sender, &ServerEvent::Error {
                                     code: "odd_bytes",
                                     message: "PCM16 帧字节数必须是偶数".into(),
-                                }.to_json())).await;
+                                }).await;
                             }
                             PcmCheck::TooLarge => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(&mut sender, &ServerEvent::Error {
                                     code: "too_large",
                                     message: "单帧过大".into(),
-                                }.to_json())).await;
+                                }).await;
                             }
                         }
                     }
-                    Ok(Message::Text(text)) => {
+                    WsIncoming::Text(text) => {
                         match serde_json::from_str::<ClientControl>(&text).ok() {
                             Some(ClientControl::Commit) => {
                                 let _ = session.commit();
                             }
-                            Some(ClientControl::Close) | None => break,
+                            Some(ClientControl::Close) | None => {
+                                close_reason = WsCloseReason::ClientControlClose;
+                                break;
+                            }
                             Some(ClientControl::Hello { .. }) => {}
                         }
                     }
-                    Ok(Message::Close(_)) | Err(_) => break,
-                    _ => {}
+                    WsIncoming::Closed(reason) => {
+                        close_reason = reason;
+                        break;
+                    }
+                    WsIncoming::Continue => {}
                 }
             }
             Some(event) = session.event_rx.recv() => {
                 match event {
                     RealtimeChatEvent::SessionUpdated => {}
                     RealtimeChatEvent::UserSpeechStarted => {
-                        let _ = sender.send(Message::Text(ServerEvent::RealtimeSpeechStarted.to_json())).await;
+                        let _ = send_json(&mut sender, &ServerEvent::RealtimeSpeechStarted).await;
                     }
                     RealtimeChatEvent::UserSpeechStopped => {
-                        let _ = sender.send(Message::Text(ServerEvent::RealtimeSpeechStopped.to_json())).await;
+                        let _ = send_json(&mut sender, &ServerEvent::RealtimeSpeechStopped).await;
                     }
                     RealtimeChatEvent::UserTranscriptDelta(text) => {
-                        let _ = sender.send(Message::Text(ServerEvent::TranscriptDelta { text }.to_json())).await;
+                        let _ = send_json(&mut sender, &ServerEvent::TranscriptDelta { text }).await;
                     }
                     RealtimeChatEvent::UserTranscriptFinal(text) => {
                         let text = text.trim().to_string();
                         if !text.is_empty() {
                             store_user_voice_message(&state, &user_id, &text);
-                            let _ = sender.send(Message::Text(ServerEvent::TranscriptFinal { text }.to_json())).await;
+                            let _ = send_json(&mut sender, &ServerEvent::TranscriptFinal { text }).await;
                         }
                     }
                     RealtimeChatEvent::AiTranscriptDelta(text) => {
-                        let _ = sender.send(Message::Text(ServerEvent::RealtimeAiTranscriptDelta { text }.to_json())).await;
+                        let _ = send_json(&mut sender, &ServerEvent::RealtimeAiTranscriptDelta { text }).await;
                     }
                     RealtimeChatEvent::AiTranscriptDone(text) => {
                         let text = text.trim().to_string();
                         if !text.is_empty() {
                             store_ai_voice_message(&state, &user_id, &text);
-                            let _ = sender.send(Message::Text(ServerEvent::RealtimeAiTranscriptDone { text }.to_json())).await;
+                            let _ = send_json(&mut sender, &ServerEvent::RealtimeAiTranscriptDone { text }).await;
                         }
                     }
                     RealtimeChatEvent::AudioDelta(bytes) => {
                         turn_output_pcm_bytes += bytes.len();
-                        let _ = sender.send(Message::Binary(bytes)).await;
+                        let _ = sender.send(Message::Binary(bytes.to_vec())).await;
                     }
                     RealtimeChatEvent::AudioDone => {
-                        let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
+                        let _ = send_json(&mut sender, &ServerEvent::RealtimeResponseDone).await;
                     }
                     RealtimeChatEvent::ResponseDone { response_id, usage } => {
                         let accounting_key = turn_billing_call
@@ -283,16 +282,16 @@ pub(super) async fn handle(
                         turn_billing_call = None;
                         turn_input_pcm_bytes = 0;
                         turn_output_pcm_bytes = 0;
-                        let _ = sender.send(Message::Text(ServerEvent::RealtimeResponseDone.to_json())).await;
+                        let _ = send_json(&mut sender, &ServerEvent::RealtimeResponseDone).await;
                     }
                     RealtimeChatEvent::Error(message) => {
                         if let Some(mut call) = turn_billing_call.take() {
                             call.release_error();
                         }
-                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                        let _ = send_json(&mut sender, &ServerEvent::Error {
                             code: "realtime_chat",
                             message,
-                        }.to_json())).await;
+                        }).await;
                     }
                     RealtimeChatEvent::Closed => break,
                 }
@@ -301,6 +300,11 @@ pub(super) async fn handle(
     }
 
     session.close();
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::VoiceRealtimeChat,
+        close_reason.as_str(),
+    );
     Ok(())
 }
 

@@ -1,17 +1,21 @@
 use axum::{
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
+        ws::{WebSocket, WebSocketUpgrade},
         Query, State,
     },
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc, sync::LazyLock};
 use tokio::sync::broadcast;
 
-use crate::types::AppState;
+use crate::{
+    realtime_metrics::{self, RealtimeChannel},
+    types::AppState,
+    ws_transport::{receive_data_or_control, send_text, WsCloseReason, WsIncoming},
+};
 
 static APP_UPDATE_TX: LazyLock<broadcast::Sender<String>> = LazyLock::new(|| {
     let (tx, _) = broadcast::channel(64);
@@ -129,10 +133,16 @@ async fn handle_notify_ws(
 ) {
     let (mut sender, mut receiver) = socket.split();
     let mut update_rx = subscribe();
+    let mut close_reason = WsCloseReason::WriteFailed;
 
     // 连接时若服务器已有更新版本，立即推送一次
     if let Some(event) = latest_update_event_for_client(&state, client_version_code).await {
-        if sender.send(Message::Text(event)).await.is_err() {
+        if !send_text(&mut sender, event).await {
+            realtime_metrics::record_close_with_store(
+                &state.store,
+                RealtimeChannel::AppNotify,
+                WsCloseReason::WriteFailed.as_str(),
+            );
             return;
         }
     }
@@ -142,21 +152,26 @@ async fn handle_notify_ws(
             update = update_rx.recv() => {
                 if let Ok(event) = update {
                     if is_newer_for_client(&event, client_version_code)
-                        && sender.send(Message::Text(event)).await.is_err()
+                        && !send_text(&mut sender, event).await
                     {
                         break;
                     }
                 }
             }
             incoming = receiver.next() => {
-                match incoming {
-                    Some(Ok(Message::Ping(p))) => {
-                        if sender.send(Message::Pong(p)).await.is_err() { break; }
+                match receive_data_or_control(incoming, &mut sender).await {
+                    WsIncoming::Closed(reason) => {
+                        close_reason = reason;
+                        break;
                     }
-                    Some(Ok(Message::Pong(_))) | Some(Ok(Message::Text(_))) => {}
-                    _ => break,
+                    WsIncoming::Text(_) | WsIncoming::Binary(_) | WsIncoming::Continue => {}
                 }
             }
         }
     }
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::AppNotify,
+        close_reason.as_str(),
+    );
 }

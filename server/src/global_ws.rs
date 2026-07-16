@@ -17,16 +17,22 @@
 
 use axum::{
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
+        ws::{WebSocket, WebSocketUpgrade},
         Query, State,
     },
     response::Response,
 };
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::broadcast::error::RecvError;
 
-use crate::types::AppState;
+use crate::{
+    realtime_metrics::{self, RealtimeChannel},
+    types::AppState,
+    ws_transport::{
+        receive_data_or_control, send_text, text_message_type_is, WsCloseReason, WsIncoming,
+    },
+};
 
 pub async fn global_ws_handler(
     ws: WebSocketUpgrade,
@@ -62,6 +68,7 @@ async fn handle(
     let mut billing_rx = crate::billing_events::subscribe();
     let mut read_receipt_rx = crate::read_receipt_events::subscribe();
     let mut join_req_rx = crate::join_request_events::subscribe();
+    let mut close_reason = WsCloseReason::WriteFailed;
 
     // 认证用户上线：注册在线状态并广播给所有已连接用户
     if let Some(ref uid) = authenticated_user_id {
@@ -72,7 +79,12 @@ async fn handle(
     if let Some(event) =
         crate::app_update::latest_update_event_for_client(&state, client_version_code).await
     {
-        if tx.send(Message::Text(event)).await.is_err() {
+        if !send_text(&mut tx, event).await {
+            realtime_metrics::record_close_with_store(
+                &state.store,
+                RealtimeChannel::GlobalApp,
+                WsCloseReason::WriteFailed.as_str(),
+            );
             // 连接前就断了，直接下线注销
             if let Some(ref uid) = authenticated_user_id {
                 mark_offline(&state, uid).await;
@@ -86,7 +98,7 @@ async fn handle(
             msg = update_rx.recv() => {
                 match msg {
                     Ok(event) if crate::app_update::is_newer_for_client(&event, client_version_code) => {
-                        if tx.send(Message::Text(event)).await.is_err() { break; }
+                        if !send_text(&mut tx, event).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 跳过积压消息，等下一条 */ }
                     _ => {}
@@ -96,7 +108,7 @@ async fn handle(
                 match msg {
                     Ok(event) if authenticated_user_id.as_deref() == Some(event.to_user_id.as_str()) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 下次列表刷新会补齐未读状态 */ }
                     _ => {}
@@ -108,7 +120,7 @@ async fn handle(
                         .as_ref()
                         .is_some_and(|user_id| event.recipient_user_ids.iter().any(|id| id == user_id)) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 下次群列表刷新会补齐未读状态 */ }
                     _ => {}
@@ -121,7 +133,7 @@ async fn handle(
                         .as_ref()
                         .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 项目列表刷新时可服主务器查最新状态 */ }
                     _ => {}
@@ -133,7 +145,7 @@ async fn handle(
                         .as_ref()
                         .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => {}
                     _ => {}
@@ -145,7 +157,7 @@ async fn handle(
                         .as_ref()
                         .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => {}
                     _ => {}
@@ -157,7 +169,7 @@ async fn handle(
                         .as_ref()
                         .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => {}
                     _ => {}
@@ -176,7 +188,7 @@ async fn handle(
                                     .unwrap_or(false)
                             {
                                 let Some(payload) = event.to_json() else { continue; };
-                                if tx.send(Message::Text(payload)).await.is_err() { break; }
+                                if !send_text(&mut tx, payload).await { break; }
                             }
                         }
                     }
@@ -189,7 +201,7 @@ async fn handle(
                 match msg {
                     Ok(event) if authenticated_user_id.as_deref() == Some(event.to_user_id.as_str()) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 跳过积压，不影响体验 */ }
                     _ => {}
@@ -200,7 +212,7 @@ async fn handle(
                 match msg {
                     Ok(event) if authenticated_user_id.as_deref() == Some(event.user_id.as_str()) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => {}
                     _ => {}
@@ -211,7 +223,7 @@ async fn handle(
                 match msg {
                     Ok(event) if authenticated_user_id.as_deref() == Some(event.to_user_id.as_str()) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 跳过积压，客户端轮询时可重新获取 */ }
                     _ => {}
@@ -222,37 +234,41 @@ async fn handle(
                 match msg {
                     Ok(event) if authenticated_user_id.as_deref() == Some(event.target_user_id.as_str()) => {
                         let Some(payload) = event.to_json() else { continue; };
-                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                        if !send_text(&mut tx, payload).await { break; }
                     }
                     Err(RecvError::Lagged(_)) => {}
                     _ => {}
                 }
             }
             incoming = rx.next() => {
-                match incoming {
-                    Some(Ok(Message::Ping(p))) => {
-                        if tx.send(Message::Pong(p)).await.is_err() { break; }
-                    }
+                match receive_data_or_control(incoming, &mut tx).await {
                     // 解析客户端发来的文本消息
-                    Some(Ok(Message::Text(text))) => {
-                        if let (Some(uid), Ok(json)) = (
-                            authenticated_user_id.as_deref(),
-                            serde_json::from_str::<serde_json::Value>(&text),
-                        ) {
-                            let msg_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                            if msg_type == "typing" {
-                                if let Some(to_uid) = json.get("toUserId").and_then(|v| v.as_str()) {
-                                    crate::typing_events::publish(uid.to_string(), to_uid.to_string());
+                    WsIncoming::Text(text) => {
+                        if let Some(uid) = authenticated_user_id.as_deref() {
+                            if text_message_type_is(&text, "typing") {
+                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                                    if let Some(to_uid) = json.get("toUserId").and_then(|v| v.as_str()) {
+                                        crate::typing_events::publish(uid.to_string(), to_uid.to_string());
+                                    }
                                 }
                             }
                         }
                     }
-                    Some(Ok(_)) => {} // 其余类型忽略
-                    _ => break,      // 连接关闭或错误
+                    WsIncoming::Closed(reason) => {
+                        close_reason = reason;
+                        break;
+                    }
+                    WsIncoming::Binary(_) | WsIncoming::Continue => {} // 其余类型忽略
                 }
             }
         }
     }
+
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::GlobalApp,
+        close_reason.as_str(),
+    );
 
     // 用户断线：注销在线状态
     if let Some(ref uid) = authenticated_user_id {

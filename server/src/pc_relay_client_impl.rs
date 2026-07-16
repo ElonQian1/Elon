@@ -88,7 +88,7 @@ pub(super) async fn run_relay_session(
         dev_runtime: None,
         lifecycle: None,
     };
-    out_tx.send(Message::Text(serde_json::to_string(&register)?))?;
+    try_send_json(&out_tx, &register)?;
     info!("[relay-client] Register 发送完毕，等待请求...");
 
     let http_client = reqwest::Client::builder()
@@ -160,7 +160,7 @@ pub(super) async fn run_relay_session(
                     let resp =
                         handle_http_request(&client, &req_id, &method, &url, headers, body_b64)
                             .await;
-                    let _ = tx.send(Message::Text(serde_json::to_string(&resp).unwrap()));
+                    let _ = try_send_json(&tx, &resp);
                 });
             }
             ServerToAgent::AndroidDeviceHostRequest { request } => {
@@ -224,12 +224,12 @@ pub(super) async fn run_relay_session(
                             .to_string(),
                     ),
                 };
-                let _ = out_tx.send(Message::Text(serde_json::to_string(&response)?));
+                let _ = try_send_json(&out_tx, &response);
             }
 
             ServerToAgent::Ping { nonce } => {
                 let pong = AgentToServer::Pong { nonce };
-                let _ = control_tx.send(Message::Text(serde_json::to_string(&pong)?));
+                let _ = try_send_json(&control_tx, &pong);
             }
 
             ServerToAgent::ProvisionProjectWorkspace {
@@ -270,7 +270,7 @@ pub(super) async fn run_relay_session(
                                 message: e.to_string(),
                             },
                         };
-                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                    let _ = try_send_json(&tx, &response);
                 });
             }
 
@@ -282,7 +282,7 @@ pub(super) async fn run_relay_session(
                     project_id,
                     message: "此 relay 客户端未启用项目硬盘服务，请使用 elon-node-agent".into(),
                 };
-                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+                let _ = try_send_json(&out_tx, &err);
             }
 
             ServerToAgent::InspectProjectWorkspace {
@@ -333,7 +333,7 @@ pub(super) async fn run_relay_session(
                                 message: e.to_string(),
                             },
                         };
-                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                    let _ = try_send_json(&tx, &response);
                 });
             }
             ServerToAgent::ReadProjectDocumentFederation { req_id, request } => {
@@ -446,7 +446,7 @@ pub(super) async fn run_relay_session(
                             message: e.to_string(),
                         },
                     };
-                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                    let _ = try_send_json(&tx, &response);
                 });
             }
             // Exec 在本地 relay 模式下不支持（使用 CliPrompt 替代）
@@ -455,7 +455,7 @@ pub(super) async fn run_relay_session(
                     task_id,
                     message: "本地 relay 模式请使用 CliPrompt 代替 Exec".into(),
                 };
-                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+                let _ = try_send_json(&out_tx, &err);
             }
             ServerToAgent::Cancel { task_id, .. } => {
                 let abort = running_cli_tasks.lock().await.remove(&task_id);
@@ -475,7 +475,7 @@ pub(super) async fn run_relay_session(
                         model: None,
                         workspace_status: None,
                     };
-                    let _ = out_tx.send(Message::Text(serde_json::to_string(&done)?));
+                    let _ = try_send_json(&out_tx, &done);
                 } else {
                     warn!("[relay-client] 收到取消请求，但未找到运行中的 CLI 任务: {task_id}");
                     let err = AgentToServer::TaskError {
@@ -484,7 +484,7 @@ pub(super) async fn run_relay_session(
                             "未找到运行中的本地 CLI 任务，可能已经结束或不在此 relay 客户端执行"
                                 .into(),
                     };
-                    let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+                    let _ = try_send_json(&out_tx, &err);
                 }
             }
 
@@ -498,7 +498,7 @@ pub(super) async fn run_relay_session(
                     req_id,
                     message: "此节点未配置 LLM 推理能力".into(),
                 };
-                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+                let _ = try_send_json(&out_tx, &err);
             }
 
             // TTS 合成请求 —— pc_relay_client 不处理（由 node_agent_main 处理）
@@ -507,7 +507,7 @@ pub(super) async fn run_relay_session(
                     req_id,
                     message: "此节点未配置 TTS 能力".into(),
                 };
-                let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+                let _ = try_send_json(&out_tx, &err);
             }
 
             // 更新指令由 node_agent_main 处理；此处静默忽略

@@ -116,6 +116,7 @@
   <button class="tab-btn" onclick="switchTab('users',this)">馃懃 鐢ㄦ埛鍒楄〃</button>
   <button class="tab-btn" onclick="switchTab('projects',this)">馃摝 鐢ㄦ埛椤圭洰</button>
   <button class="tab-btn" onclick="switchTab('sessions',this)">馃摫 娲昏穬璁惧</button>
+  <button class="tab-btn" onclick="switchTab('realtime',this)">Realtime</button>
   <button class="tab-btn" onclick="switchTab('tokens',this)">📊 Token 用量</button>
   <button class="tab-btn" onclick="switchTab('billing',this)">💰 预存充值</button>
 </div>
@@ -199,6 +200,70 @@
       </thead>
       <tbody id="sessionTableBody"><tr><td colspan="5" style="text-align:center;padding:24px"><div class="loader"></div></td></tr></tbody>
     </table>
+  </div>
+</div>
+</div>
+
+<!-- ── Realtime health ───────────────────────────────────────────────────── -->
+<div id="tab-realtime" class="tab-pane">
+<div class="container">
+  <div class="toolbar" style="margin-bottom:16px">
+    <div>
+      <h2>Realtime Health</h2>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:4px">WebSocket close counters by channel and reason</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="realtimeWindow" onchange="loadRealtimeHealth()" style="background:var(--input-bg);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:6px;font-size:13px">
+        <option value="last_1h">last 1h</option>
+        <option value="last_24h" selected>last 24h</option>
+        <option value="all_time">all time</option>
+        <option value="process">process</option>
+      </select>
+      <button class="btn btn-ghost" onclick="loadRealtimeHealth()">Refresh</button>
+    </div>
+  </div>
+
+  <div id="realtimeSummaryCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+    <div class="loader"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="font-size:15px">Realtime alerts</h3>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">Threshold alerts for last 1h read errors, write failures, and timeouts</div>
+      </div>
+      <span id="realtimeAlertsSubtitle" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div id="realtimeAlertsList" style="display:flex;flex-direction:column;gap:10px">
+      <div style="padding:18px;color:var(--text-dim);text-align:center">No data loaded</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <h3 style="font-size:15px">Close reason detail</h3>
+        <div style="font-size:12px;color:var(--text-dim);margin-top:4px">last_1h / last_24h / all_time are persisted in SQLite; process resets on restart</div>
+      </div>
+      <span id="realtimeCloseSubtitle" style="font-size:12px;color:var(--text-dim)"></span>
+    </div>
+    <div style="overflow:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead>
+          <tr style="background:var(--bg);color:var(--text-dim);text-align:left">
+            <th style="padding:8px 10px">channel</th>
+            <th style="padding:8px 10px">close_reason</th>
+            <th style="padding:8px 10px">category</th>
+            <th style="padding:8px 10px">first_check</th>
+            <th style="padding:8px 10px;text-align:right">count</th>
+          </tr>
+        </thead>
+        <tbody id="realtimeCloseMetricsBody">
+          <tr><td colspan="3" style="padding:24px;text-align:center;color:var(--text-dim)">No data loaded</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
 </div>
@@ -536,6 +601,7 @@ function switchTab(name, btn) {
   if (name === 'users') loadUsers();
   if (name === 'projects') loadProjects();
   if (name === 'sessions') loadSessions();
+  if (name === 'realtime') loadRealtimeHealth();
 
   if (name === 'tokens') loadTokenStats();
   if (name === 'billing') loadBilling();
@@ -653,6 +719,172 @@ function renderSessions(data) {
       <td style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${esc(s.expires_at || '')}</td>
     </tr>`;
   }).join('');
+}
+
+async function loadRealtimeHealth() {
+  const cards = document.getElementById('realtimeSummaryCards');
+  const tbody = document.getElementById('realtimeCloseMetricsBody');
+  const subtitle = document.getElementById('realtimeCloseSubtitle');
+  const alertsList = document.getElementById('realtimeAlertsList');
+  if (!cards || !tbody) return;
+  cards.innerHTML = '<div class="loader"></div>';
+  tbody.innerHTML = '<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--text-dim)">Loading...</td></tr>';
+  if (alertsList) alertsList.innerHTML = '<div style="padding:18px;color:var(--text-dim);text-align:center">Loading...</div>';
+  if (subtitle) subtitle.textContent = '';
+  try {
+    const [res, diagnosticsRes] = await Promise.all([
+      apiFetch('GET', '/api/admin/realtime/close-metrics'),
+      apiFetch('GET', '/api/admin/realtime/diagnostics'),
+    ]);
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      const msg = esc(j.error || 'load failed');
+      cards.innerHTML = '<span style="color:var(--danger)">' + msg + '</span>';
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;color:var(--danger)">' + msg + '</td></tr>';
+      if (alertsList) alertsList.innerHTML = '<div style="padding:18px;color:var(--danger)">' + msg + '</div>';
+      return;
+    }
+    const data = await res.json();
+    const diagnostics = diagnosticsRes && diagnosticsRes.ok ? await diagnosticsRes.json().catch(() => null) : null;
+    const selectedWindow = document.getElementById('realtimeWindow')?.value || 'last_24h';
+    const windows = data.windows || {};
+    renderRealtimeAlerts(data.alerts || [], diagnostics);
+    renderRealtimeHealth(windows[selectedWindow] || data.metrics || [], selectedWindow, diagnostics);
+  } catch(e) {
+    const msg = esc(e.message || String(e));
+    cards.innerHTML = '<span style="color:var(--danger)">' + msg + '</span>';
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:20px;color:var(--danger)">' + msg + '</td></tr>';
+    if (alertsList) alertsList.innerHTML = '<div style="padding:18px;color:var(--danger)">' + msg + '</div>';
+  }
+}
+
+function renderRealtimeAlerts(alerts, diagnostics) {
+  const list = document.getElementById('realtimeAlertsList');
+  const subtitle = document.getElementById('realtimeAlertsSubtitle');
+  if (!list) return;
+  if (subtitle) subtitle.textContent = alerts.length ? alerts.length + ' open' : 'none';
+  if (!alerts.length) {
+    list.innerHTML = '<div style="padding:18px;color:var(--text-dim);text-align:center">No open realtime alerts</div>';
+    return;
+  }
+  const maps = realtimeDiagnosticsMaps(diagnostics);
+  list.innerHTML = alerts.map(alert => {
+    const color = alert.severity === 'critical' ? 'var(--danger)' : alert.severity === 'warning' ? 'var(--warn)' : 'var(--text-dim)';
+    const bucket = realtimeAlertBucket(alert);
+    const bucketReasons = bucket ? Object.values(maps.closeReasons).filter(reason => reason.alert_bucket === bucket) : [];
+    const firstChecks = bucketReasons.map(reason => reason.first_check).filter(Boolean);
+    const diagnosticHint = bucket
+      ? `<div style="font-size:11px;color:var(--text-dim);margin-top:6px">bucket: ${esc(bucket)}${firstChecks[0] ? ' · first check: ' + esc(firstChecks[0]) : ''}</div>`
+      : '';
+    return `<div style="border:1px solid ${color};border-radius:8px;padding:12px 14px;background:rgba(0,0,0,.12)">
+      <div style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+        <div style="font-weight:700;color:${color}">${esc(alert.severity || '')} · ${esc(alert.title || '')}</div>
+        <div style="font-size:18px;font-weight:800;color:${color}">${esc(alert.metric_value || 0)}</div>
+      </div>
+      <div style="font-size:12px;color:var(--text-dim);margin-top:6px;line-height:1.5">${esc(alert.detail || '')}</div>
+      ${diagnosticHint}
+      <div style="font-size:11px;color:var(--text-dim);margin-top:6px">${esc(alert.fingerprint || '')} · ${esc(alert.updated_at || '')}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderRealtimeHealth(rows, windowName, diagnostics) {
+  const cards = document.getElementById('realtimeSummaryCards');
+  const tbody = document.getElementById('realtimeCloseMetricsBody');
+  const subtitle = document.getElementById('realtimeCloseSubtitle');
+  const maps = realtimeDiagnosticsMaps(diagnostics);
+  const sorted = rows.slice().sort((a, b) => {
+    const channelCmp = String(a.channel || '').localeCompare(String(b.channel || ''));
+    if (channelCmp) return channelCmp;
+    return Number(b.count || 0) - Number(a.count || 0);
+  });
+  const totals = {};
+  let totalClose = 0;
+  for (const row of sorted) {
+    const channel = row.channel || 'unknown';
+    const count = Number(row.count || 0);
+    totals[channel] = (totals[channel] || 0) + count;
+    totalClose += count;
+  }
+  const channels = Object.keys(totals).sort();
+  if (subtitle) subtitle.textContent = windowName + ' / ' + sorted.length + ' reason rows / ' + channels.length + ' channels';
+  if (!sorted.length) {
+    cards.innerHTML = [
+      realtimeSummaryCard('window', windowName || 'last_24h', 'var(--text-dim)'),
+      realtimeSummaryCard('total_closes', '0', 'var(--text-dim)'),
+      realtimeSummaryCard('channels', '0', 'var(--text-dim)'),
+    ].join('');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-dim)">No close metrics yet</td></tr>';
+    return;
+  }
+  cards.innerHTML = [
+    realtimeSummaryCard('window', windowName || 'last_24h', 'var(--text-dim)'),
+    realtimeSummaryCard('total_closes', String(totalClose), 'var(--accent)'),
+    realtimeSummaryCard('channels', String(channels.length), 'var(--success)'),
+    ...channels.map(channel => realtimeSummaryCard(channel, String(totals[channel]), realtimeChannelColor(channel))),
+  ].join('');
+  tbody.innerHTML = sorted.map(row => {
+    const reason = row.close_reason || '';
+    const reasonDiag = maps.closeReasons[reason] || {};
+    const category = reasonDiag.category || 'unknown';
+    const bucket = reasonDiag.alert_bucket ? ' / ' + reasonDiag.alert_bucket : '';
+    const firstCheck = reasonDiag.first_check || '';
+    const color = realtimeReasonColor(reason);
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:8px 10px;font-weight:600">${esc(row.channel || '')}</td>
+      <td style="padding:8px 10px;color:${color}">${esc(reason)}</td>
+      <td style="padding:8px 10px;color:${color};font-size:12px">${esc(category + bucket)}</td>
+      <td style="padding:8px 10px;color:var(--text-dim);font-size:12px;max-width:360px;line-height:1.4">${esc(firstCheck || 'No diagnostics available')}</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:700">${esc(row.count || 0)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function realtimeDiagnosticsMaps(diagnostics) {
+  const closeReasons = {};
+  const channels = {};
+  for (const reason of diagnostics?.close_reasons || []) {
+    if (reason && reason.id) closeReasons[reason.id] = reason;
+  }
+  for (const channel of diagnostics?.channels || []) {
+    if (channel && channel.id) channels[channel.id] = channel;
+  }
+  return { closeReasons, channels };
+}
+
+function realtimeAlertBucket(alert) {
+  const fp = String(alert?.fingerprint || '');
+  if (fp.includes('read-errors')) return 'read_error';
+  if (fp.includes('write-failures')) return 'write_failure';
+  if (fp.includes('timeouts')) return 'timeout';
+  return '';
+}
+
+function realtimeSummaryCard(label, value, color) {
+  return `<div class="card" style="text-align:center;padding:18px 10px">
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;word-break:break-word">${esc(label)}</div>
+    <div style="font-size:24px;font-weight:700;color:${color}">${esc(value)}</div>
+  </div>`;
+}
+
+function realtimeReasonColor(reason) {
+  if (reason === 'read_error' || reason === 'write_failed' || reason === 'pong_write_failed' || reason === 'writer_closed' || reason === 'peer_read_error' || reason === 'peer_write_error') {
+    return 'var(--danger)';
+  }
+  if (reason === 'reader_ended' || reason === 'reader_timeout' || reason === 'peer_reader_ended') {
+    return 'var(--warn)';
+  }
+  if (reason === 'client_control_close' || reason === 'peer_closed' || reason === 'reader_closed') {
+    return 'var(--success)';
+  }
+  return 'var(--text)';
+}
+
+function realtimeChannelColor(channel) {
+  if (String(channel).startsWith('voice_')) return '#38bdf8';
+  if (channel === 'homecli_agent' || channel === 'project_ws') return '#fbbf24';
+  if (channel === 'peer_relay') return 'var(--success)';
+  return 'var(--text-dim)';
 }
 
 function renderProjects(data) {
@@ -1182,6 +1414,18 @@ function closeConvModal() {
     <div class="form-group">
       <label>冻结预授权告警阈值（条）</label>
       <input type="number" id="cfgReservationAlert" placeholder="100" min="1" step="1" />
+    </div>
+    <div class="form-group">
+      <label>Realtime read_error 告警阈值（次/小时）</label>
+      <input type="number" id="cfgRealtimeReadAlert" placeholder="20" min="1" step="1" />
+    </div>
+    <div class="form-group">
+      <label>Realtime write_failed 告警阈值（次/小时）</label>
+      <input type="number" id="cfgRealtimeWriteAlert" placeholder="20" min="1" step="1" />
+    </div>
+    <div class="form-group">
+      <label>Realtime timeout 告警阈值（次/小时）</label>
+      <input type="number" id="cfgRealtimeTimeoutAlert" placeholder="5" min="1" step="1" />
     </div>
     <div class="form-group">
       <label>节点提供者分账比例（%，如 80）</label>
@@ -2075,6 +2319,9 @@ function renderBillingConfig(cfg) {
   const threshold = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
   const newUserTrial = ((cfg.new_user_trial_credit_fen ?? 30000) / 100).toFixed(2);
   const reservationAlert = cfg.billing_open_reservation_alert_threshold || 100;
+  const realtimeReadAlert = cfg.realtime_close_read_error_alert_threshold_1h || 20;
+  const realtimeWriteAlert = cfg.realtime_close_write_failure_alert_threshold_1h || 20;
+  const realtimeTimeoutAlert = cfg.realtime_close_timeout_alert_threshold_1h || 5;
   const nodeShare = ((cfg.node_provider_revenue_share_x1000 || 800) / 10).toFixed(0);
   const nodePayoutMin = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
   card.innerHTML = `<div class="card" style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;padding:16px 20px">
@@ -2083,6 +2330,9 @@ function renderBillingConfig(cfg) {
     <div><span style="font-size:12px;color:var(--text-dim)">低余额预警 &nbsp;</span><strong>¥${threshold}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">新用户试用 &nbsp;</span><strong>¥${newUserTrial}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">冻结告警 &nbsp;</span><strong>${reservationAlert} 条</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">Realtime 读错/h &nbsp;</span><strong>${realtimeReadAlert}</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">Realtime 写错/h &nbsp;</span><strong>${realtimeWriteAlert}</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">Realtime 超时/h &nbsp;</span><strong>${realtimeTimeoutAlert}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">节点分账 &nbsp;</span><strong>${nodeShare}%</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">最低提现 &nbsp;</span><strong>¥${nodePayoutMin}</strong></div>
     <button class="btn btn-ghost" style="margin-left:auto;padding:5px 14px;font-size:12px" onclick="openConfigModal()">修改配置</button>
@@ -2243,6 +2493,9 @@ function openConfigModal() {
     document.getElementById('cfgThreshold').value = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
     document.getElementById('cfgNewUserTrial').value = ((cfg.new_user_trial_credit_fen ?? 30000) / 100).toFixed(2);
     document.getElementById('cfgReservationAlert').value = String(cfg.billing_open_reservation_alert_threshold || 100);
+    document.getElementById('cfgRealtimeReadAlert').value = String(cfg.realtime_close_read_error_alert_threshold_1h || 20);
+    document.getElementById('cfgRealtimeWriteAlert').value = String(cfg.realtime_close_write_failure_alert_threshold_1h || 20);
+    document.getElementById('cfgRealtimeTimeoutAlert').value = String(cfg.realtime_close_timeout_alert_threshold_1h || 5);
     document.getElementById('cfgNodeProviderShare').value = String(Math.round((cfg.node_provider_revenue_share_x1000 || 800) / 10));
     document.getElementById('cfgNodePayoutMin').value = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
     document.getElementById('billingConfigModal').classList.add('open');
@@ -2261,11 +2514,17 @@ async function saveConfig() {
   const threshStr = document.getElementById('cfgThreshold').value.trim();
   const newUserTrialStr = document.getElementById('cfgNewUserTrial').value.trim();
   const reservationAlertStr = document.getElementById('cfgReservationAlert').value.trim();
+  const realtimeReadAlertStr = document.getElementById('cfgRealtimeReadAlert').value.trim();
+  const realtimeWriteAlertStr = document.getElementById('cfgRealtimeWriteAlert').value.trim();
+  const realtimeTimeoutAlertStr = document.getElementById('cfgRealtimeTimeoutAlert').value.trim();
   const nodeShareStr = document.getElementById('cfgNodeProviderShare').value.trim();
   const nodePayoutMinStr = document.getElementById('cfgNodePayoutMin').value.trim();
   if (!rateStr || isNaN(parseFloat(rateStr))) return toast('汇率格式无效', 'err');
   if (!markupStr || isNaN(parseFloat(markupStr))) return toast('加价倍数格式无效', 'err');
   if (newUserTrialStr && (isNaN(parseFloat(newUserTrialStr)) || parseFloat(newUserTrialStr) < 0)) return toast('新用户试用额度不能小于 0', 'err');
+  if (realtimeReadAlertStr && (isNaN(parseFloat(realtimeReadAlertStr)) || parseFloat(realtimeReadAlertStr) < 1)) return toast('Realtime read_error 阈值必须大于 0', 'err');
+  if (realtimeWriteAlertStr && (isNaN(parseFloat(realtimeWriteAlertStr)) || parseFloat(realtimeWriteAlertStr) < 1)) return toast('Realtime write_failed 阈值必须大于 0', 'err');
+  if (realtimeTimeoutAlertStr && (isNaN(parseFloat(realtimeTimeoutAlertStr)) || parseFloat(realtimeTimeoutAlertStr) < 1)) return toast('Realtime timeout 阈值必须大于 0', 'err');
   if (nodeShareStr && (isNaN(parseFloat(nodeShareStr)) || parseFloat(nodeShareStr) < 0 || parseFloat(nodeShareStr) > 100)) return toast('节点分账比例需为 0-100', 'err');
   if (nodePayoutMinStr && (isNaN(parseFloat(nodePayoutMinStr)) || parseFloat(nodePayoutMinStr) <= 0)) return toast('最低提现金额必须大于 0', 'err');
   const rate_x10000 = String(Math.round(parseFloat(rateStr) * 10000));
@@ -2273,6 +2532,9 @@ async function saveConfig() {
   const threshold_fen = String(Math.round(parseFloat(threshStr || '1') * 100));
   const new_user_trial_fen = String(Math.max(0, Math.round(parseFloat(newUserTrialStr || '300') * 100)));
   const reservation_alert = String(Math.max(1, Math.round(parseFloat(reservationAlertStr || '100'))));
+  const realtime_read_alert = String(Math.max(1, Math.round(parseFloat(realtimeReadAlertStr || '20'))));
+  const realtime_write_alert = String(Math.max(1, Math.round(parseFloat(realtimeWriteAlertStr || '20'))));
+  const realtime_timeout_alert = String(Math.max(1, Math.round(parseFloat(realtimeTimeoutAlertStr || '5'))));
   const node_provider_share = String(Math.round(parseFloat(nodeShareStr || '80') * 10));
   const node_payout_min = String(Math.max(1, Math.round(parseFloat(nodePayoutMinStr || '1') * 100)));
   try {
@@ -2283,7 +2545,10 @@ async function saveConfig() {
     const r5 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_provider_revenue_share_x1000', value: node_provider_share });
     const r6 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_payout_min_fen', value: node_payout_min });
     const r7 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'new_user_trial_credit_fen', value: new_user_trial_fen });
-    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok || !r6.ok || !r7.ok) return toast('部分配置保存失败', 'err');
+    const r8 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'realtime_close_read_error_alert_threshold_1h', value: realtime_read_alert });
+    const r9 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'realtime_close_write_failure_alert_threshold_1h', value: realtime_write_alert });
+    const r10 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'realtime_close_timeout_alert_threshold_1h', value: realtime_timeout_alert });
+    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok || !r6.ok || !r7.ok || !r8.ok || !r9.ok || !r10.ok) return toast('部分配置保存失败', 'err');
     closeConfigModal();
     toast('配置已保存', 'ok');
     loadBilling();

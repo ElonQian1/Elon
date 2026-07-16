@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
+use crate::ws_client_transport::try_send_json;
+
 const STATUS_PREVIEW_LIMIT: usize = 40;
 
 pub fn audit_project_git_worktrees(workspace_path: &str) -> Result<ProjectGitWorktreeAudit> {
@@ -69,7 +71,7 @@ pub fn spawn_git_worktree_audit_response(
     tracing::info!("AuditProjectGitWorktrees: {}", req_id);
     tokio::spawn(async move {
         let response = git_worktree_audit_response(req_id, &workspace_path);
-        let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+        let _ = try_send_json(&tx, &response);
     });
 }
 

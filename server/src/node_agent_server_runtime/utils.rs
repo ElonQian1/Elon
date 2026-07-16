@@ -534,7 +534,7 @@ pub(crate) fn send_chunk(
     if let Some(journal) = task_journal {
         let _ = journal.record_cli_chunk(req_id, "runtime", &text);
     }
-    let _ = out_tx.send(Message::Text(
+    let _ = out_tx.send(Message::text(
         serde_json::to_string(&AgentToServer::CliChunk {
             req_id: req_id.to_string(),
             text,

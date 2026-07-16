@@ -23,42 +23,39 @@ pub(super) async fn handle(
         channels,
     }) = hello
     else {
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Error {
-                    code: "bad_hello",
-                    message: "首帧必须是 hello 文本消息".into(),
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Error {
+                code: "bad_hello",
+                message: "首帧必须是 hello 文本消息".into(),
+            },
+        )
+        .await;
         return Ok(());
     };
     let user_id = match resolve_authenticated_voice_user(&authenticated_user_id, user_id) {
         Ok(user_id) => user_id,
         Err(message) => {
-            let _ = sender
-                .send(Message::Text(
-                    ServerEvent::Error {
-                        code: "user_mismatch",
-                        message,
-                    }
-                    .to_json(),
-                ))
-                .await;
+            let _ = send_json(
+                &mut sender,
+                &ServerEvent::Error {
+                    code: "user_mismatch",
+                    message,
+                },
+            )
+            .await;
             return Ok(());
         }
     };
     if let Err(msg) = check_format_declaration(sample_rate, channels) {
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Error {
-                    code: "bad_format",
-                    message: msg,
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Error {
+                code: "bad_format",
+                message: msg,
+            },
+        )
+        .await;
         return Ok(());
     }
 
@@ -71,14 +68,13 @@ pub(super) async fn handle(
             conversation_id: conversation_id.clone(),
             group_id: group_id.clone(),
         };
-        let _ = sender
-            .send(Message::Text(
-                ServerEvent::Ready {
-                    mode: "transcribe_local",
-                }
-                .to_json(),
-            ))
-            .await;
+        let _ = send_json(
+            &mut sender,
+            &ServerEvent::Ready {
+                mode: "transcribe_local",
+            },
+        )
+        .await;
         info!(target: "voice", user_id, "whisper-local 会话已建立");
         run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
             let cfg = whisper_cfg.clone();
@@ -103,15 +99,16 @@ pub(super) async fn handle(
 
             if candidates.is_empty() {
                 warn!(target: "voice", user_id, "无可用 ASR 服务（无 key 配置）");
-                let _ = sender
-                    .send(Message::Text(
-                        ServerEvent::Error {
-                            code: "no_asr",
-                            message: "语音识别服务暂不可用（服务器未配置 OPENAI_API_KEY / WHISPER_REST_KEY）".into(),
-                        }
-                        .to_json(),
-                    ))
-                    .await;
+                let _ = send_json(
+                    &mut sender,
+                    &ServerEvent::Error {
+                        code: "no_asr",
+                        message:
+                            "语音识别服务暂不可用（服务器未配置 OPENAI_API_KEY / WHISPER_REST_KEY）"
+                                .into(),
+                    },
+                )
+                .await;
                 return Ok(());
             }
 
@@ -122,14 +119,13 @@ pub(super) async fn handle(
                 conversation_id: conversation_id.clone(),
                 group_id: group_id.clone(),
             };
-            let _ = sender
-                .send(Message::Text(
-                    ServerEvent::Ready {
-                        mode: "transcribe_rest",
-                    }
-                    .to_json(),
-                ))
-                .await;
+            let _ = send_json(
+                &mut sender,
+                &ServerEvent::Ready {
+                    mode: "transcribe_rest",
+                },
+            )
+            .await;
             info!(target: "voice", user_id, "Tier 3 REST 转写会话已建立（{} 个候选）", candidates.len());
             run_buffered_loop(&state, &mut sender, &mut receiver, target, move |pcm| {
                 let cands = candidates.clone();
@@ -148,11 +144,7 @@ pub(super) async fn handle(
         }
     };
 
-    let _ = sender
-        .send(Message::Text(
-            ServerEvent::Ready { mode: "transcribe" }.to_json(),
-        ))
-        .await;
+    let _ = send_json(&mut sender, &ServerEvent::Ready { mode: "transcribe" }).await;
     info!(target: "voice", user_id, "transcribe 会话已建立");
 
     let target = DispatchTarget {
@@ -168,27 +160,27 @@ pub(super) async fn handle(
 
     // 4. 并发：客户端循环 + 转写事件循环 + AI 回复流
     let mut turn_pcm_bytes: usize = 0;
+    let mut close_reason = WsCloseReason::WriteFailed;
     loop {
         tokio::select! {
             biased;
             client_msg = receiver.next() => {
-                let Some(msg) = client_msg else { break; };
-                match msg {
-                    Ok(Message::Binary(bytes)) => {
+                match receive_data_or_control(client_msg, &mut sender).await {
+                    WsIncoming::Binary(bytes) => {
                         match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
                             PcmCheck::Ok => {}
                             PcmCheck::OddBytes => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(&mut sender, &ServerEvent::Error {
                                     code: "odd_bytes",
                                     message: "PCM16 帧字节数必须是偶数".into(),
-                                }.to_json())).await;
+                                }).await;
                                 continue;
                             }
                             PcmCheck::TooLarge => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(&mut sender, &ServerEvent::Error {
                                     code: "too_large",
                                     message: "单帧过大".into(),
-                                }.to_json())).await;
+                                }).await;
                                 continue;
                             }
                         }
@@ -198,66 +190,80 @@ pub(super) async fn handle(
                             break;
                         }
                     }
-                    Ok(Message::Text(text)) => {
+                    WsIncoming::Text(text) => {
                         match serde_json::from_str::<ClientControl>(&text).ok() {
                             Some(ClientControl::Commit) => {
                                 let _ = transcriber.commit();
                             }
-                            Some(ClientControl::Close) | None => break,
+                            Some(ClientControl::Close) | None => {
+                                close_reason = WsCloseReason::ClientControlClose;
+                                break;
+                            }
                             Some(ClientControl::Hello { .. }) => {}
                         }
                     }
-                    Ok(Message::Close(_)) | Err(_) => break,
-                    _ => {}
+                    WsIncoming::Closed(reason) => {
+                        close_reason = reason;
+                        break;
+                    }
+                    WsIncoming::Continue => {}
                 }
             }
             Some(event) = transcriber.event_rx.recv() => {
                 match event {
                     TranscriptEvent::Delta(text) => {
-                        let _ = sender.send(Message::Text(
-                            ServerEvent::TranscriptDelta { text }.to_json()
-                        )).await;
+                        let _ = send_json(&mut sender, &ServerEvent::TranscriptDelta { text }).await;
                     }
                     TranscriptEvent::Final(text) => {
                         if turn_pcm_bytes > 0 {
                             turn_pcm_bytes = 0;
                         }
-                        let _ = sender.send(Message::Text(
-                            ServerEvent::TranscriptFinal { text: text.clone() }.to_json()
-                        )).await;
+                        let _ = send_json(
+                            &mut sender,
+                            &ServerEvent::TranscriptFinal { text: text.clone() },
+                        )
+                        .await;
                         // 每次 Final 都用同一个 ai_reply_tx（可 clone，多轮共用一个 rx）
                         match dispatch_transcript(&state, &target, &text, ai_reply_tx.clone()).await {
                             Ok(outcome) => {
-                                let _ = sender.send(Message::Text(ServerEvent::CliDispatched {
+                                let _ = send_json(&mut sender, &ServerEvent::CliDispatched {
                                     ok: outcome.ok,
                                     message: outcome.message,
-                                }.to_json())).await;
+                                }).await;
                             }
                             Err(err) => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(&mut sender, &ServerEvent::Error {
                                     code: "dispatch",
                                     message: err.to_string(),
-                                }.to_json())).await;
+                                }).await;
                             }
                         }
                     }
                     TranscriptEvent::Error(msg) => {
-                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                        let _ = send_json(&mut sender, &ServerEvent::Error {
                             code: "realtime",
                             message: msg,
-                        }.to_json())).await;
+                        }).await;
                     }
                     TranscriptEvent::Closed => break,
                 }
             }
             // AI 任务产生的进度/完成/错误消息，透传给手机
             Some(raw_json) = ai_reply_rx.recv() => {
-                let _ = sender.send(Message::Text(raw_json)).await;
+                if !send_text(&mut sender, raw_json).await {
+                    close_reason = WsCloseReason::WriteFailed;
+                    break;
+                }
             }
         }
     }
 
     transcriber.close();
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::VoiceTranscribe,
+        close_reason.as_str(),
+    );
     Ok(())
 }
 
@@ -275,32 +281,31 @@ pub(super) async fn run_buffered_loop(
 ) {
     let (ai_reply_tx, mut ai_reply_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let mut pcm_buf: Vec<u8> = Vec::new();
-    loop {
+    let close_reason = loop {
         tokio::select! {
             biased;
             client_msg = receiver.next() => {
-                let Some(msg) = client_msg else { break; };
-                match msg {
-                    Ok(Message::Binary(bytes)) => {
+                match receive_data_or_control(client_msg, sender).await {
+                    WsIncoming::Binary(bytes) => {
                         match check_pcm16_frame(&bytes, MAX_BUFFERED_BYTES) {
                             PcmCheck::Ok => pcm_buf.extend_from_slice(&bytes),
                             PcmCheck::OddBytes => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(sender, &ServerEvent::Error {
                                     code: "odd_bytes",
                                     message: "PCM16 帧字节数必须是偶数".into(),
-                                }.to_json())).await;
+                                }).await;
                                 continue;
                             }
                             PcmCheck::TooLarge => {
-                                let _ = sender.send(Message::Text(ServerEvent::Error {
+                                let _ = send_json(sender, &ServerEvent::Error {
                                     code: "too_large",
                                     message: "单帧过大".into(),
-                                }.to_json())).await;
+                                }).await;
                                 continue;
                             }
                         }
                     }
-                    Ok(Message::Text(text)) => {
+                    WsIncoming::Text(text) => {
                         match serde_json::from_str::<ClientControl>(&text).ok() {
                             Some(ClientControl::Commit) => {
                                 if pcm_buf.is_empty() { continue; }
@@ -312,42 +317,54 @@ pub(super) async fn run_buffered_loop(
                                     Ok(t) => t,
                                     Err(err) => {
                                         warn!(target: "voice", "ASR 转写失败: {err:#}");
-                                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                                        let _ = send_json(sender, &ServerEvent::Error {
                                             code: "asr_failed",
                                             message: format!("转写失败：{err}"),
-                                        }.to_json())).await;
+                                        }).await;
                                         continue;
                                     }
                                 };
-                                let _ = sender.send(Message::Text(
-                                    ServerEvent::TranscriptFinal { text: transcript.clone() }.to_json()
-                                )).await;
+                                let _ = send_json(
+                                    sender,
+                                    &ServerEvent::TranscriptFinal { text: transcript.clone() },
+                                ).await;
                                 match dispatch_transcript(state, &target, &transcript, ai_reply_tx.clone()).await {
                                     Ok(outcome) => {
-                                        let _ = sender.send(Message::Text(ServerEvent::CliDispatched {
+                                        let _ = send_json(sender, &ServerEvent::CliDispatched {
                                             ok: outcome.ok,
                                             message: outcome.message,
-                                        }.to_json())).await;
+                                        }).await;
                                     }
                                     Err(err) => {
-                                        let _ = sender.send(Message::Text(ServerEvent::Error {
+                                        let _ = send_json(sender, &ServerEvent::Error {
                                             code: "dispatch",
                                             message: err.to_string(),
-                                        }.to_json())).await;
+                                        }).await;
                                     }
                                 }
                             }
-                            Some(ClientControl::Close) | None => break,
+                            Some(ClientControl::Close) | None => {
+                                break WsCloseReason::ClientControlClose;
+                            }
                             Some(ClientControl::Hello { .. }) => {}
                         }
                     }
-                    Ok(Message::Close(_)) | Err(_) => break,
-                    _ => {}
+                    WsIncoming::Closed(reason) => {
+                        break reason;
+                    }
+                    WsIncoming::Continue => {}
                 }
             }
             Some(raw_json) = ai_reply_rx.recv() => {
-                let _ = sender.send(Message::Text(raw_json)).await;
+                if !send_text(sender, raw_json).await {
+                    break WsCloseReason::WriteFailed;
+                }
             }
         }
-    }
+    };
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::VoiceTranscribe,
+        close_reason.as_str(),
+    );
 }

@@ -21,6 +21,8 @@ use tokio::{
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
+use crate::ws_client_transport::try_send_json;
+
 /// WS ping 间隔：每 30s 向云端发一次 WS-level Ping，检测 zombie 连接
 const WS_PING_INTERVAL: Duration = Duration::from_secs(30);
 /// The in-process legacy relay never persists terminal CLI events to an outbox.

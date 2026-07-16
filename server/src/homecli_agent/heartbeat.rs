@@ -5,6 +5,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot, watch, Mutex};
 use uuid::Uuid;
 
+use crate::ws_transport::try_json_text_message;
+
 pub(super) const AGENT_HEARTBEAT_MAX_MISSED_ACKS: u32 = 3;
 
 const AGENT_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(10);
@@ -63,10 +65,10 @@ pub(super) async fn send_protocol_ping_control(
     let nonce = Uuid::new_v4().to_string();
     let (ack_tx, ack_rx) = oneshot::channel();
     ping_acks.lock().await.insert(nonce.clone(), ack_tx);
-    let text = serde_json::to_string(&ServerToAgent::Ping {
+    let frame = try_json_text_message(&ServerToAgent::Ping {
         nonce: Some(nonce.clone()),
     })?;
-    if control_tx.send(Message::Text(text)).is_err() {
+    if control_tx.send(frame).is_err() {
         ping_acks.lock().await.remove(&nonce);
         return Err(anyhow!("agent writer closed before ping: {agent_id}"));
     }

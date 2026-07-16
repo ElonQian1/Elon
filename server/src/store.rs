@@ -77,6 +77,9 @@ mod project_ops;
 mod project_query;
 pub(crate) mod project_releases;
 mod project_roles;
+mod realtime_close_events;
+#[cfg(test)]
+mod realtime_close_events_tests;
 mod project_runtime_permissions;
 mod project_space;
 mod project_storage;
@@ -156,6 +159,7 @@ pub use project_roles::{
     PERMISSION_MANAGE_ROLES, PERMISSION_MODERATE_MEMBERS, PERMISSION_SEND_MESSAGES,
     PERMISSION_VIEW_AUDIT_LOG, PERMISSION_VIEW_MEMBERS,
 };
+pub use realtime_close_events::RealtimeCloseMetricRow;
 pub use project_space::{
     CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND, CHANNEL_PERMISSION_START_AI,
     CHANNEL_PERMISSION_VIEW,

@@ -4,6 +4,8 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
+use crate::ws_client_transport::try_send_json;
+
 pub(crate) async fn handle_cli_prompt(
     req_id: String,
     cli: String,
@@ -353,11 +355,8 @@ async fn run_cli_and_stream(
     Ok(status.success())
 }
 
-fn send_agent_event(
-    out: &mpsc::UnboundedSender<Message>,
-    event: &AgentToServer,
-) -> std::result::Result<(), mpsc::error::SendError<Message>> {
-    out.send(Message::Text(serde_json::to_string(event).unwrap()))
+fn send_agent_event(out: &mpsc::UnboundedSender<Message>, event: &AgentToServer) -> Result<()> {
+    try_send_json(out, event)
 }
 
 fn hide_relay_command_window(_command: &mut tokio::process::Command) {
