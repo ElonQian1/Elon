@@ -15,6 +15,8 @@ const MAX_PROCESSED_COMMANDS: usize = 128;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CreateFitRunRequest {
+    #[serde(default)]
+    pub(crate) task_id: Option<String>,
     pub(crate) pair: FitTargetPair,
     #[serde(default)]
     pub(crate) environment: FitEnvironment,
@@ -30,6 +32,9 @@ pub(crate) struct CreateFitRunRequest {
 
 impl CreateFitRunRequest {
     pub(crate) fn validate(&self) -> Result<()> {
+        if let Some(task_id) = self.task_id.as_deref() {
+            validate_identifier(task_id, "taskId")?;
+        }
         self.pair.validate()?;
         self.budget.validate()?;
         self.thresholds.validate()?;
@@ -50,6 +55,8 @@ impl CreateFitRunRequest {
 pub(crate) struct FitRunDocument {
     pub(crate) schema_version: u32,
     pub(crate) run_id: String,
+    #[serde(default)]
+    pub(crate) task_id: Option<String>,
     pub(crate) session_id: String,
     pub(crate) project_root: String,
     pub(crate) package_name: String,
@@ -88,6 +95,7 @@ impl FitRunDocument {
         Ok(Self {
             schema_version: FIT_RUN_SCHEMA_VERSION,
             run_id: format!("fit_{}", uuid::Uuid::new_v4().simple()),
+            task_id: request.task_id,
             session_id: context.session_id,
             project_root: context.project_root,
             package_name: context.package_name,
@@ -121,6 +129,9 @@ impl FitRunDocument {
             bail!("不支持的 FitRun schemaVersion: {}", self.schema_version);
         }
         validate_identifier(&self.run_id, "runId")?;
+        if let Some(task_id) = self.task_id.as_deref() {
+            validate_identifier(task_id, "taskId")?;
+        }
         self.pair.validate()?;
         self.budget.validate()?;
         self.thresholds.validate()?;

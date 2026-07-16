@@ -50,7 +50,7 @@ pub(crate) fn append_ui_design_task_context(
          - {mode_contract}\n\
          - {image_contract}\n\
          - {route_confirmation_contract}\n\
-         - TOOL-FIRST GATE: before any source edit, call ui_get_design_task, ui_get_project_profile and ui_get_runtime_status. Do not begin with repository-wide source reading.\n\
+         - TOOL-FIRST GATE: before any source edit, call ui_get_design_task, ui_get_project_profile, ui_get_runtime_status and ui_check_capabilities. Normally omit requiredCapabilities; an explicit list is additive and cannot suppress requirements derived from the task or project parity policy. Do not begin with repository-wide source reading.\n\
          - For style-only requests, resolve the smallest matching Runtime node and try ui_propose_live_patch/ui_apply_live_patch first. Let the user-visible real renderer prove the change before committing it.\n\
          - Source editing is allowed only for structural changes, unbound properties or an unavailable/unsupported Runtime. State that fallback reason explicitly and read only ui_get_source_bundle or the smallest necessary files.\n\
          - Prefer project UI profile, component catalog, design tokens and targeted source bundles over scanning the whole repository.\n\
@@ -60,7 +60,8 @@ pub(crate) fn append_ui_design_task_context(
          - If a FitRun reaches AWAITING_CODEX, use its compact handoff to make the smallest structural/source change, report it with ui_control_fit_run, and let the run continue.\n\
          - If a FitRun reaches CANDIDATE_READY, confirm it with ACCEPT_BEST so deterministic write-back, patch-free build verification and reusable learning can finish.\n\
          - Runtime patches are previews only; never report completion until source write-back and patch-free build verification pass when requireBuildVerification is true.\n\
-         - Finish with a concise Chinese result containing created/changed files, FitRun outcomes, final visual loss, verification status, APK result and any remaining human decision."
+         - Before repository finish, call ui_check_workflow_completion. If completionReady=false, follow its next action; a platform publication is not completion of the original UI task.\n\
+         - Finish with a concise Chinese result containing created/changed files, FitRun status, final visual loss and threshold, cross-platform visual parity, APK result, any remaining human decision, then the separate repository finish fields BUSINESS_STATUS, LOCAL_MAIN_STATUS, TASK_WORKTREE_STATUS, MAIN_UNTRACKED_STATUS and FINALIZABLE."
     ))
 }
 
@@ -226,6 +227,9 @@ mod tests {
         assert!(prompt.contains("MODIFY_EXISTING"));
         assert!(prompt.contains("TOOL-FIRST GATE"));
         assert!(prompt.contains("before any source edit"));
+        assert!(prompt.contains("requiredCapabilities; an explicit list is additive"));
+        assert!(prompt.contains("ui_check_workflow_completion"));
+        assert!(prompt.contains("LOCAL_MAIN_STATUS"));
     }
 
     #[test]

@@ -1,10 +1,8 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::{
@@ -120,7 +118,7 @@ pub(crate) async fn handle_request(
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
-            "instructions": "模糊路由任务必须先调用 ui_confirm_route。Codex 桌面端含草图的 UI 请求先调用 ui_import_desktop_task，再读取任务、项目档案和 Runtime 状态，并调用 ui_check_capabilities。已有 Runtime 再读屏幕摘要和目标子树。样式请求优先 Live Patch/FitRun；结构变化使用最小 CODEX_SOURCE_HANDOFF。若 ui_check_capabilities 证明是平台工具缺口，当前可信本地 Git 工作区已授权有熔断的自动升级与发布：创建 capability gap、升级、报告 commit/version、复检并恢复原 UI 任务。全新页面先创建骨架、首次构建，再回到真实 Android Renderer。"
+            "instructions": "模糊路由任务必须先调用 ui_confirm_route。Codex 桌面端含草图的 UI 请求先调用 ui_import_desktop_task，再读取任务、项目档案和 Runtime 状态，并调用 ui_check_capabilities；requiredCapabilities 只能追加，不能删除系统按任务和项目规则推导的能力。已有 Runtime 再读屏幕摘要和目标子树。样式请求优先 Live Patch/FitRun；结构变化使用最小 CODEX_SOURCE_HANDOFF。若 ui_check_capabilities 证明是平台工具缺口，当前可信本地 Git 工作区已授权有熔断的自动升级与发布：创建 capability gap、升级、报告 commit/version、复检并恢复原 UI 任务。全新页面先创建骨架、首次构建，再回到真实 Android Renderer。完成前必须调用 ui_check_workflow_completion；completionReady=false 时不得宣告完成。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
@@ -391,7 +389,9 @@ async fn call_tool(
                     .unwrap_or_else(|| json!({ "screenId": node.screen_id })),
             )
             .context("environment 参数无效")?;
+            let session = broker.session(&session_id).await?;
             let request = CreateFitRunRequest {
+                task_id: super::design_bootstrap::design_task_id(&session, &arguments),
                 pair: FitTargetPair {
                     target_design_id: target.id.clone(),
                     target_sha256: target.sha256.clone(),
@@ -454,6 +454,9 @@ async fn call_tool(
         "ui_check_capabilities" => {
             let session = broker.session(&session_id).await?;
             super::capability_gap::check_capabilities(&session, &arguments).await?
+        }
+        "ui_check_workflow_completion" => {
+            super::task_completion::verify(broker, fit_runs, &session_id, &arguments).await?
         }
         "ui_report_capability_gap" => {
             let session = broker.session(&session_id).await?;

@@ -40,6 +40,21 @@ pub(crate) fn design_task(session: &LiveUiSession, arguments: &Value) -> Result<
     }))
 }
 
+pub(crate) fn design_task_id(session: &LiveUiSession, arguments: &Value) -> Option<String> {
+    arguments
+        .get("taskId")
+        .and_then(Value::as_str)
+        .map(ToOwned::to_owned)
+        .or_else(|| {
+            design_task(session, arguments).ok().and_then(|task| {
+                task.pointer("/task/task/taskId")
+                    .or_else(|| task.pointer("/task/task/task_id"))
+                    .and_then(Value::as_str)
+                    .map(ToOwned::to_owned)
+            })
+        })
+}
+
 pub(crate) fn create_compose_screen_scaffold(
     session: &LiveUiSession,
     arguments: &Value,
@@ -210,41 +225,16 @@ pub(crate) fn target_design_upload(
     let envelope = bundle
         .get("task")
         .ok_or_else(|| anyhow!("设计任务缺少 task.json"))?;
-    let intent = envelope
-        .pointer("/task/attachment_intent")
-        .or_else(|| envelope.pointer("/task/attachmentIntent"))
-        .and_then(Value::as_str)
-        .unwrap_or("AUTO");
-    if intent != "TARGET_DESIGN" {
-        bail!(
-            "只有 TARGET_DESIGN 可绑定为像素目标；当前是 {intent}，标注层和风格参考不得参与像素拟合"
-        );
-    }
-    let requested_id = arguments
-        .get("attachmentId")
-        .and_then(Value::as_str)
-        .or_else(|| {
-            envelope
-                .pointer("/task/target_design_attachment_id")
-                .or_else(|| envelope.pointer("/task/targetDesignAttachmentId"))
-                .and_then(Value::as_str)
-        });
+    let requested_id = arguments.get("attachmentId").and_then(Value::as_str);
     let entries = bundle
         .pointer("/attachments/attachments")
         .and_then(Value::as_array)
         .ok_or_else(|| anyhow!("设计任务没有本地附件"))?;
-    let entry = requested_id
-        .and_then(|attachment_id| {
-            entries.iter().find(|entry| {
-                entry
-                    .pointer("/metadata/attachment_id")
-                    .or_else(|| entry.pointer("/metadata/attachmentId"))
-                    .and_then(Value::as_str)
-                    == Some(attachment_id)
-            })
-        })
-        .or_else(|| entries.first())
-        .ok_or_else(|| anyhow!("找不到目标设计附件"))?;
+    let entry = super::target_design_attachment::select_target_design_entry(
+        envelope,
+        entries,
+        requested_id,
+    )?;
     if entry.get("verified").and_then(Value::as_bool) != Some(true) {
         bail!("目标设计附件 SHA 校验未通过");
     }

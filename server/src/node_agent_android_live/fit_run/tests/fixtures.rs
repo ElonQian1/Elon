@@ -146,6 +146,7 @@ pub(super) fn context(project_root: &str) -> FitSessionContext {
 
 pub(super) fn request(auto_start: bool) -> CreateFitRunRequest {
     CreateFitRunRequest {
+        task_id: Some("task-test".to_string()),
         pair: FitTargetPair {
             target_design_id: "target-1".to_string(),
             target_sha256: "abc123".to_string(),

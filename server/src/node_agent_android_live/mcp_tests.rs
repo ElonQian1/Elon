@@ -53,6 +53,9 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_complete_capability_upgrade"));
+    assert!(tools
+        .iter()
+        .any(|tool| tool["name"] == "ui_check_workflow_completion"));
 }
 
 #[tokio::test]

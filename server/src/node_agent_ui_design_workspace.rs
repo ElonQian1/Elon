@@ -174,6 +174,12 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
     let mut build_files = Vec::new();
     let mut application_id = None;
     let mut android_namespace = None;
+    let apk_web_mirror_path = root.join("server/src/assets/web_page.html");
+    let apk_web_parity_policy_path =
+        root.join(".github/instructions/apk-web-ui-sync.instructions.md");
+    let apk_web_ui_parity_required = root.join("android").is_dir()
+        && apk_web_mirror_path.is_file()
+        && apk_web_parity_policy_path.is_file();
 
     let walker = WalkBuilder::new(root)
         .hidden(false)
@@ -270,11 +276,14 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
             "jetpackCompose": compose,
             "androidViews": android_views,
             "pwa": pwa,
+            "apkWebUiParityRequired": apk_web_ui_parity_required,
             "preferredAndroidUiToolkit": preferred_android_ui_toolkit(compose, android_views),
             "evidence": {
                 "composeSourceFiles": compose_source_count,
                 "viewLayoutFiles": view_layout_count,
                 "toolingRuntimeExcluded": true,
+                "apkWebMirror": apk_web_mirror_path.is_file(),
+                "apkWebParityPolicy": apk_web_parity_policy_path.is_file(),
             }
         },
         "android": {
@@ -477,6 +486,27 @@ mod tests {
             "VIEWS"
         );
         assert_eq!(profile["capabilities"]["evidence"]["composeSourceFiles"], 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn profile_marks_repository_with_android_web_mirror_policy_as_parity_required() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_ui_profile_parity_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(root.join("android")).unwrap();
+        let mirror = root.join("server/src/assets/web_page.html");
+        let policy = root.join(".github/instructions/apk-web-ui-sync.instructions.md");
+        fs::create_dir_all(mirror.parent().unwrap()).unwrap();
+        fs::create_dir_all(policy.parent().unwrap()).unwrap();
+        fs::write(&mirror, "<!doctype html>").unwrap();
+        fs::write(&policy, "APK UI and Web mirror must stay aligned").unwrap();
+
+        let profile = build_project_ui_profile(&root).unwrap();
+
+        assert_eq!(profile["capabilities"]["apkWebUiParityRequired"], true);
+        assert_eq!(profile["capabilities"]["evidence"]["apkWebMirror"], true);
         fs::remove_dir_all(root).unwrap();
     }
 }

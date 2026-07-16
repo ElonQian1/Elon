@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::broker::LiveUiSession;
+use super::capability_requirements::requested_capabilities;
 
 const SCHEMA_VERSION: u32 = 1;
 const MAX_UPGRADE_ROUNDS: u32 = 8;
@@ -42,17 +43,27 @@ pub(crate) async fn check_capabilities(
     session: &LiveUiSession,
     arguments: &Value,
 ) -> Result<Value> {
-    let requested = requested_capabilities(session, arguments)?;
     let view = session.view().await;
+    let task = super::design_bootstrap::design_task(session, arguments).ok();
     let profile = super::design_bootstrap::project_profile(session).ok();
+    let requirements = requested_capabilities(arguments, task.as_ref(), profile.as_ref())?;
     let mut ready = Vec::new();
     let mut preparation = Vec::new();
     let mut preparation_details = Vec::new();
     let mut missing = Vec::new();
     let mut missing_details = Vec::new();
-    for capability in requested {
+    for capability in requirements.effective.iter().cloned() {
         if !SUPPORTED_CAPABILITIES.contains(&capability.as_str()) {
-            missing.push(capability);
+            missing.push(capability.clone());
+            missing_details.push(json!({
+                "capability": capability,
+                "reason": if KNOWN_PLATFORM_GAPS.contains(&capability.as_str()) {
+                    "KNOWN_PLATFORM_GAP"
+                } else {
+                    "UNSUPPORTED_CAPABILITY"
+                },
+                "automaticUpgradeRequired": true,
+            }));
             continue;
         }
         if capability == "NEW_SCREEN_BOOTSTRAP" {
@@ -126,6 +137,13 @@ pub(crate) async fn check_capabilities(
         "preparationDetails": preparation_details,
         "missing": missing,
         "missingDetails": missing_details,
+        "declaredCapabilities": requirements.declared,
+        "derivedCapabilities": requirements.derived,
+        "effectiveCapabilities": requirements.effective,
+        "capabilityDerivation": {
+            "callerMayOnlyAddRequirements": true,
+            "reasons": requirements.reasons,
+        },
         "supportedCapabilities": SUPPORTED_CAPABILITIES,
         "knownPlatformGaps": KNOWN_PLATFORM_GAPS,
         "automaticPlatformUpgrade": {
@@ -306,42 +324,6 @@ pub(crate) fn list_gaps(root: &Path) -> Result<Vec<CapabilityGapDocument>> {
         .collect::<Vec<_>>();
     gaps.sort_by(|left: &CapabilityGapDocument, right| right.updated_at.cmp(&left.updated_at));
     Ok(gaps)
-}
-
-fn requested_capabilities(session: &LiveUiSession, arguments: &Value) -> Result<Vec<String>> {
-    if arguments.get("requiredCapabilities").is_some() {
-        return string_array(arguments, "requiredCapabilities", 1, 32)
-            .map(|items| normalize_capabilities(&items));
-    }
-    let task = super::design_bootstrap::design_task(session, arguments).ok();
-    let mode = task
-        .as_ref()
-        .and_then(|value| value.pointer("/task/task/mode"))
-        .and_then(Value::as_str)
-        .unwrap_or("AUTO");
-    let intent = task
-        .as_ref()
-        .and_then(|value| value.pointer("/task/task/attachmentIntent"))
-        .and_then(Value::as_str)
-        .unwrap_or("AUTO");
-    let mut required = vec![
-        "DESKTOP_TASK_IMPORT",
-        "PROJECT_UI_PROFILE",
-        "CODEX_SOURCE_HANDOFF",
-        "PATCH_FREE_BUILD_VERIFY",
-    ];
-    if mode == "CREATE_NEW" {
-        required.push("NEW_SCREEN_BOOTSTRAP");
-    }
-    if intent == "TARGET_DESIGN" {
-        required.extend([
-            "TARGET_DESIGN_BINDING",
-            "REAL_ANDROID_RENDERER",
-            "LOCAL_VISUAL_SOLVER",
-            "PERSISTENT_FIT_RUN",
-        ]);
-    }
-    Ok(required.into_iter().map(str::to_string).collect())
 }
 
 fn start_upgrade(gap: &mut CapabilityGapDocument, arguments: &Value) -> Result<()> {

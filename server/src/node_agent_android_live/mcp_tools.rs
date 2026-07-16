@@ -306,6 +306,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 "type":"object",
                 "required":["runtimeNodeId","targetRect","projectedTargetRect"],
                 "properties":{
+                    "taskId":{"type":"string","maxLength":128,"description":"可选；默认绑定当前结构化 UI 任务"},
                     "runtimeNodeId":{"type":"string"},
                     "targetRect":rect_value_schema(),
                     "projectedTargetRect":rect_value_schema(),
@@ -344,7 +345,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_check_capabilities",
-            "在编辑源码前检查当前一龙 UI 平台能否完成任务；区分运行环境尚未准备与平台自身能力缺口。",
+            "在编辑源码前检查当前一龙 UI 平台能否完成任务；系统会从结构化任务和项目规则推导必需能力，requiredCapabilities 只能追加而不能削弱。",
             json!({
                 "type":"object",
                 "properties":{
@@ -354,6 +355,14 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         "items":{"type":"string","maxLength":80}
                     }
                 }
+            }),
+        ),
+        tool(
+            "ui_check_workflow_completion",
+            "UI 任务收尾前的强制门禁：重新推导必需能力，检查目标图绑定、Accepted FitRun、源码/无补丁验证和 APK/Web 跨端视觉工件。completionReady=false 时不得宣告完成。",
+            json!({
+                "type":"object",
+                "properties":{"taskId":{"type":"string","maxLength":128}}
             }),
         ),
         tool(
@@ -487,6 +496,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
             | "ui_propose_live_patch"
             | "ui_get_fit_run"
             | "ui_check_capabilities"
+            | "ui_check_workflow_completion"
             | "ui_get_capability_gap"
             | "ui_get_commit_plan"
     );
@@ -529,6 +539,7 @@ mod annotation_tests {
             "ui_get_project_profile",
             "ui_get_runtime_status",
             "ui_list_render_devices",
+            "ui_check_workflow_completion",
         ] {
             let tool = tools
                 .iter()
