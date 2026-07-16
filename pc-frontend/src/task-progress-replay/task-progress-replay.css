@@ -5,8 +5,8 @@
   grid-template-columns: 228px minmax(0, 1fr);
   gap: 24px;
   padding: 20px 24px 40px;
-  background: #07080a;
-  color: #edf2f8;
+  background: #0d0d0e;
+  color: var(--conversation-text);
 }
 
 .replayWorkbenchRail {
@@ -29,7 +29,7 @@
 
 .replayWorkbenchTitle span,
 .replayCaptureSelect > span {
-  color: #78869a;
+  color: var(--conversation-text-muted);
   font-size: 11px;
 }
 
@@ -44,10 +44,10 @@
   min-width: 0;
   height: 34px;
   padding: 0 28px 0 9px;
-  border: 1px solid rgba(148, 163, 184, .18);
+  border: 1px solid var(--conversation-line-strong);
   border-radius: 5px;
-  background: #14171c;
-  color: #dce5f2;
+  background: var(--conversation-surface);
+  color: var(--conversation-text-soft);
   font-size: 11px;
 }
 
@@ -56,8 +56,8 @@
   gap: 7px;
   margin: 0;
   padding: 12px 0;
-  border-top: 1px solid rgba(148, 163, 184, .12);
-  border-bottom: 1px solid rgba(148, 163, 184, .12);
+  border-top: 1px solid var(--conversation-line);
+  border-bottom: 1px solid var(--conversation-line);
 }
 
 .replayFacts > div {
@@ -70,13 +70,13 @@
 }
 
 .replayFacts dt {
-  color: #6f7c8f;
+  color: var(--conversation-text-subtle);
 }
 
 .replayFacts dd {
   min-width: 0;
   margin: 0;
-  color: #b9c5d5;
+  color: var(--conversation-text-soft);
   font-family: "Cascadia Code", Consolas, monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -86,12 +86,12 @@
 .replayFacts dd[data-tone="done"],
 .replayFacts dd[data-tone="completed"],
 .replayFacts dd[data-tone="success"] {
-  color: #6fd89a;
+  color: var(--conversation-success);
 }
 
 .replayFacts dd[data-tone="failed"],
 .replayFacts dd[data-tone="error"] {
-  color: #ff8f95;
+  color: var(--conversation-danger);
 }
 
 .replayFileActions,
@@ -109,24 +109,24 @@
   display: grid;
   place-items: center;
   padding: 0;
-  border: 1px solid rgba(148, 163, 184, .15);
+  border: 1px solid var(--conversation-line);
   border-radius: 5px;
   background: transparent;
-  color: #8e9bad;
+  color: var(--conversation-text-muted);
   cursor: pointer;
 }
 
 .replayIconButton:hover:not(:disabled),
 .replayIconButton[data-active="true"] {
-  border-color: rgba(130, 160, 220, .38);
-  background: #1b2029;
-  color: #dbe7fa;
+  border-color: var(--conversation-line-strong);
+  background: var(--conversation-elevated);
+  color: var(--conversation-text);
 }
 
 .replayIconButton[data-primary="true"] {
-  border-color: rgba(111, 145, 224, .5);
-  background: #263657;
-  color: #f4f7ff;
+  border-color: rgba(154, 183, 235, .42);
+  background: rgba(154, 183, 235, .12);
+  color: var(--conversation-text);
 }
 
 .replayIconButton:disabled {
@@ -144,12 +144,12 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: #d4a65a;
+  color: var(--conversation-warning);
   font-size: 11px;
 }
 
 .replayIssues[data-clear="true"] > header {
-  color: #5fc88b;
+  color: var(--conversation-success);
 }
 
 .replayIssues > div {
@@ -208,7 +208,7 @@
 
 .replayWorkbenchHeader strong {
   min-width: 0;
-  color: #e6edf7;
+  color: var(--conversation-text);
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -217,7 +217,7 @@
 
 .replayWorkbenchHeader span {
   min-width: 0;
-  color: #7d899b;
+  color: var(--conversation-text-muted);
   font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -237,19 +237,19 @@
   gap: 10px;
   min-height: 42px;
   padding: 5px 7px;
-  border-top: 1px solid rgba(148, 163, 184, .13);
-  border-bottom: 1px solid rgba(148, 163, 184, .13);
+  border-top: 1px solid var(--conversation-line);
+  border-bottom: 1px solid var(--conversation-line);
 }
 
 .replayRange {
   width: 100%;
   min-width: 80px;
-  accent-color: #718ed3;
+  accent-color: var(--conversation-info);
 }
 
 .replaySpeed {
   padding: 2px;
-  border: 1px solid rgba(148, 163, 184, .14);
+  border: 1px solid var(--conversation-line);
   border-radius: 5px;
 }
 
@@ -260,27 +260,27 @@
   border: 0;
   border-radius: 3px;
   background: transparent;
-  color: #78869a;
+  color: var(--conversation-text-muted);
   font-size: 10px;
   cursor: pointer;
 }
 
 .replaySpeed button[data-active="true"] {
-  background: #252b36;
-  color: #e5ebf4;
+  background: var(--conversation-elevated);
+  color: var(--conversation-text);
 }
 
 .replayTimelineMeta {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: #68768a;
+  color: var(--conversation-text-subtle);
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 10px;
 }
 
 .replayTimelineMeta span[data-change="true"] {
-  color: #79b894;
+  color: var(--conversation-success);
 }
 
 .replayViewport {
@@ -290,8 +290,8 @@
   display: grid;
   grid-template-rows: 42px minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid rgba(148, 163, 184, .15);
-  background: #111318;
+  border: 1px solid var(--conversation-line);
+  background: var(--conversation-canvas);
 }
 
 .replayViewport[aria-busy="true"] {
@@ -302,8 +302,8 @@
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 66px;
-  background: #111318;
+  grid-template-rows: minmax(0, 1fr) 86px;
+  background: var(--conversation-canvas);
 }
 
 .replayConversation > [data-replay-feed] {
@@ -319,14 +319,14 @@
 .replayWorkbenchComposer {
   position: relative;
   z-index: 2;
-  background: #111318;
+  background: transparent;
 }
 
 .replayLoadError {
   display: grid;
   place-items: center;
   padding: 32px;
-  color: #ff9ca2;
+  color: var(--conversation-danger);
   font-size: 12px;
   white-space: pre-wrap;
 }
@@ -362,9 +362,9 @@
   display: grid;
   gap: 4px;
   padding: 5px;
-  border: 1px solid rgba(148, 163, 184, .13);
+  border: 1px solid var(--conversation-line);
   border-radius: 5px;
-  background: #0c0e12;
+  background: var(--conversation-code-surface);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -372,7 +372,7 @@
 
 .replayFilmstripFrame:hover,
 .replayFilmstripFrame[data-active="true"] {
-  border-color: rgba(111, 145, 224, .55);
+  border-color: rgba(154, 183, 235, .46);
 }
 
 .replayFilmstripMeta {
@@ -391,7 +391,7 @@
   height: 118px;
   display: block;
   overflow: hidden;
-  background: #111318;
+  background: var(--conversation-canvas);
   pointer-events: none;
 }
 

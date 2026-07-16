@@ -396,7 +396,7 @@ function TaskAssistantReply({ message, tone, label, reason, time: fallbackTime, 
       <div className={styles.assistantBody} data-task-assistant-body>
         <div className={styles.assistantMeta}>
           <strong>一龙</strong>
-          <span>{label}</span>
+          {label && <span>{label}</span>}
           {time && <span>{time}</span>}
         </div>
         {beforeReply}
@@ -415,7 +415,7 @@ function TaskAssistantReply({ message, tone, label, reason, time: fallbackTime, 
 function replyLabelForTone(tone: TaskTone): string {
   if (tone === 'failed') return '任务失败'
   if (tone === 'canceled') return '任务已停止'
-  return '最终回复'
+  return ''
 }
 
 function shouldDefaultOpenProcess(

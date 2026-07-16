@@ -4,13 +4,13 @@
   bottom: 0;
   left: 0;
   z-index: 12;
-  padding: 38px clamp(18px, 2.4vw, 34px) 18px;
+  padding: 34px clamp(18px, 2.4vw, 34px) 16px;
   pointer-events: none;
-  background: linear-gradient(180deg, rgba(20, 21, 24, 0), rgba(20, 21, 24, .42) 64%, rgba(20, 21, 24, .72));
+  background: linear-gradient(180deg, rgba(21, 21, 22, 0), rgba(21, 21, 22, .58) 58%, var(--conversation-canvas));
 }
 
 .panel {
-  width: min(100%, 950px);
+  width: min(100%, var(--conversation-composer-width));
   margin: 0 auto;
   display: grid;
   gap: 7px;
@@ -35,10 +35,10 @@
 .projectPrewarmToggle {
   min-width: 0;
   height: 28px;
-  border: 1px solid rgba(255, 255, 255, .075);
+  border: 1px solid var(--conversation-line);
   border-radius: 6px;
-  background: rgba(255, 255, 255, .045);
-  color: var(--text-soft);
+  background: rgba(255, 255, 255, .035);
+  color: var(--conversation-text-muted);
 }
 
 .modelBtn {
@@ -53,8 +53,8 @@
 .modelBtn:hover,
 .directCliToggle:hover,
 .projectPrewarmToggle:hover {
-  background: rgba(255, 255, 255, .08);
-  color: var(--text);
+  background: rgba(255, 255, 255, .065);
+  color: var(--conversation-text);
 }
 
 .modelBtn span,
@@ -79,12 +79,12 @@
   grid-template-columns: 34px minmax(0, 1fr) auto 36px;
   gap: 5px;
   align-items: center;
-  min-height: 58px;
-  padding: 7px;
-  border: 1px solid rgba(255, 255, 255, .105);
+  min-height: 60px;
+  padding: 8px;
+  border: 1px solid var(--conversation-line-strong);
   border-radius: 8px;
-  background: rgba(42, 45, 52, .98);
-  box-shadow: 0 16px 46px rgba(0, 0, 0, .34), inset 0 1px 0 rgba(255, 255, 255, .045);
+  background: rgba(30, 30, 32, .98);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, .28), inset 0 1px 0 rgba(255, 255, 255, .035);
 }
 
 .textarea {
@@ -97,15 +97,15 @@
   border: 0;
   outline: none;
   background: transparent;
-  color: var(--text);
+  color: var(--conversation-text);
   padding: 9px 8px;
   line-height: 1.45;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .textarea::placeholder {
-  color: var(--text-muted);
+  color: var(--conversation-text-muted);
 }
 
 .textarea:disabled {
@@ -120,18 +120,18 @@
   place-items: center;
   border: 0;
   border-radius: 6px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--conversation-text);
+  color: #111113;
   transition: background .12s, color .12s, opacity .12s;
 }
 
 .sendBtn:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: #ffffff;
 }
 
 .sendBtn:disabled {
-  background: #30323a;
-  color: #777b86;
+  background: rgba(255, 255, 255, .055);
+  color: var(--conversation-text-subtle);
   cursor: not-allowed;
 }
 
@@ -179,8 +179,8 @@
   width: 28px;
   height: 16px;
   border-radius: 999px;
-  background: #1f2229;
-  border: 1px solid #474b55;
+  background: #171719;
+  border: 1px solid var(--conversation-line-strong);
 }
 
 .directCliSwitch::after {
@@ -191,18 +191,18 @@
   left: 3px;
   top: 2px;
   border-radius: 50%;
-  background: #8b92a0;
+  background: var(--conversation-text-muted);
   transition: transform .12s, background .12s;
 }
 
 .directCliToggle[data-active="true"] .directCliSwitch {
-  background: rgba(37, 211, 102, .22);
-  border-color: rgba(37, 211, 102, .55);
+  background: rgba(84, 197, 138, .2);
+  border-color: rgba(84, 197, 138, .52);
 }
 
 .directCliToggle[data-active="true"] .directCliSwitch::after {
   transform: translateX(12px);
-  background: var(--green);
+  background: var(--conversation-success);
 }
 
 .inlineControls {
@@ -231,7 +231,7 @@
 }
 
 .directCliCopy strong {
-  color: var(--text-soft);
+  color: var(--conversation-text-soft);
   font-size: 11px;
   font-weight: 850;
 }
@@ -246,15 +246,15 @@
   justify-content: center;
   gap: 6px;
   padding: 0 8px;
-  color: var(--text-muted);
+  color: var(--conversation-text-muted);
   cursor: pointer;
   user-select: none;
 }
 
 .projectPrewarmToggle[data-active="true"] {
-  color: var(--text-soft);
-  border-color: rgba(82, 140, 255, .45);
-  background: rgba(82, 140, 255, .13);
+  color: var(--conversation-text-soft);
+  border-color: rgba(154, 183, 235, .4);
+  background: rgba(154, 183, 235, .1);
 }
 
 .projectPrewarmToggle span {
@@ -266,8 +266,8 @@
 }
 
 .projectPrewarmToggle[data-active="true"] span {
-  background: #70a2ff;
-  box-shadow: 0 0 0 3px rgba(112, 162, 255, .2);
+  background: var(--conversation-info);
+  box-shadow: none;
 }
 
 .projectPrewarmToggle strong {
@@ -283,7 +283,7 @@
 
 .errorStack p {
   margin: 0;
-  color: var(--red);
+  color: var(--conversation-danger);
   font-size: 12px;
 }
 

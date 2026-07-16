@@ -1,3 +1,5 @@
+@import './conversation-tokens.css';
+
 /* 全局暗色主题：Material + enterprise quiet UI tokens */
 
 *, *::before, *::after {

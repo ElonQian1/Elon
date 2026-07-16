@@ -1,0 +1,20 @@
+:root {
+  --conversation-canvas: #151516;
+  --conversation-surface: #1b1b1d;
+  --conversation-elevated: #222225;
+  --conversation-code-surface: #101011;
+  --conversation-line: rgba(255, 255, 255, .08);
+  --conversation-line-strong: rgba(255, 255, 255, .14);
+  --conversation-text: #f0f0f2;
+  --conversation-text-soft: #d0d0d4;
+  --conversation-text-muted: #8d8d95;
+  --conversation-text-subtle: #6f6f77;
+  --conversation-success: #54c58a;
+  --conversation-info: #9ab7eb;
+  --conversation-warning: #e3b65c;
+  --conversation-danger: #ff7a82;
+  --conversation-reading-width: 860px;
+  --conversation-composer-width: 860px;
+  --conversation-body-size: 14px;
+  --conversation-body-leading: 1.62;
+}

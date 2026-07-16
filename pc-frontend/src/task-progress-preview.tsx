@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { LivePreview, livePreviewConfigFromLocation } from './task-progress-live-preview'
 import { parseReplayPreviewConfig } from './task-progress-replay/model'
 import { ReplayPreview } from './task-progress-replay/ReplayPreview'
+import './styles/conversation-tokens.css'
 import type { ChatMessage, ToolEvent } from './features/dev/types'
 import { previewStartedAt as startedAt, previewTaskId as taskId, ScenarioPreview } from './task-progress-preview/ScenarioPreview'
 
@@ -458,13 +459,13 @@ function toolResult(output: string, exitCode: number): ChatMessage {
 
 const previewCss = `
 :root {
-  --surface: #111318;
-  --surface-2: #151922;
-  --border: rgba(148, 163, 184, .16);
-  --text: #eef3fb;
-  --text-soft: #d8e1ee;
-  --text-muted: #7f8ca3;
-  --accent: #5865f2;
+  --surface: var(--conversation-surface);
+  --surface-2: var(--conversation-elevated);
+  --border: var(--conversation-line);
+  --text: var(--conversation-text);
+  --text-soft: var(--conversation-text-soft);
+  --text-muted: var(--conversation-text-muted);
+  --accent: var(--conversation-info);
 }
 
 html,
@@ -475,7 +476,7 @@ body,
 
 body {
   margin: 0;
-  background: #050607;
+  background: #0d0d0e;
   color: var(--text);
   font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
 }
@@ -489,9 +490,9 @@ button {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 188px minmax(0, 1fr);
-  gap: 28px;
-  padding: 22px 28px;
-  background: #050607;
+  gap: 22px;
+  padding: 20px 24px;
+  background: #0d0d0e;
 }
 
 .previewRail {
@@ -503,7 +504,7 @@ button {
 }
 
 .previewRail > strong {
-  color: #dce5f3;
+  color: var(--conversation-text-soft);
   font-size: 13px;
 }
 
@@ -513,7 +514,7 @@ button {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #8d99aa;
+  color: var(--conversation-text-muted);
   padding: 0;
   text-align: left;
   font-size: 12px;
@@ -522,12 +523,12 @@ button {
 }
 
 .expandToggle {
-  color: #cbd6ff;
+  color: var(--conversation-text-soft);
   background: transparent;
 }
 
 .expandToggle[data-active="true"] {
-  color: #b8f2cc;
+  color: var(--conversation-success);
   background: transparent;
 }
 
@@ -540,7 +541,7 @@ button {
 .scenarioTabs button[data-active="true"] {
   border-color: transparent;
   background: transparent;
-  color: #eef3fb;
+  color: var(--conversation-text);
 }
 
 .scenarioTabs button[data-active="true"] {
@@ -563,7 +564,7 @@ button {
   width: 100%;
   min-height: 120px;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, .10);
+  border-bottom: 1px solid var(--conversation-line);
 }
 
 .scenarioFrame > header {
@@ -571,12 +572,12 @@ button {
   align-items: center;
   gap: 8px;
   margin: 0 0 10px 44px;
-  color: #dce5f3;
+  color: var(--conversation-text-soft);
   font-size: 12px;
 }
 
 .scenarioFrame > header span {
-  color: #6f7b8f;
+  color: var(--conversation-text-subtle);
   font-size: 11px;
 }
 
@@ -584,11 +585,11 @@ button {
   height: min(720px, calc(100vh - 76px));
   min-height: 420px;
   display: grid;
-  grid-template-rows: 42px minmax(0, 1fr) 66px;
+  grid-template-rows: 44px minmax(0, 1fr) 86px;
   overflow: hidden;
-  background: #111318;
-  border: 1px solid rgba(148, 163, 184, .14);
-  box-shadow: 0 18px 54px rgba(0, 0, 0, .28);
+  background: var(--conversation-canvas);
+  border: 1px solid var(--conversation-line);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .22);
 }
 
 .previewMatrix .conversationReplay {
@@ -602,13 +603,13 @@ button {
   gap: 12px;
   min-width: 0;
   padding: 0 18px;
-  border-bottom: 1px solid rgba(148, 163, 184, .10);
-  background: #151922;
+  border-bottom: 1px solid var(--conversation-line);
+  background: var(--conversation-canvas);
 }
 
 .replayTopbar strong {
   min-width: 0;
-  color: #edf3ff;
+  color: var(--conversation-text);
   font-size: 13px;
   font-weight: 800;
   overflow: hidden;
@@ -618,7 +619,7 @@ button {
 
 .replayTopbar span {
   min-width: 0;
-  color: #7f8ca3;
+  color: var(--conversation-text-muted);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -636,31 +637,34 @@ button {
 .replayStatus button {
   min-height: 25px;
   padding: 3px 8px;
-  border: 1px solid rgba(137, 174, 255, .28);
+  border: 1px solid var(--conversation-line-strong);
   border-radius: 4px;
-  background: rgba(82, 122, 214, .08);
-  color: #9db3e7;
+  background: rgba(255, 255, 255, .035);
+  color: var(--conversation-text-muted);
   font: inherit;
   font-size: 11px;
   cursor: pointer;
 }
 
 .replayStatus button[data-node-ready='true'] {
-  border-color: rgba(46, 168, 97, .3);
-  background: rgba(46, 168, 97, .08);
-  color: #85d5a4;
+  border-color: rgba(84, 197, 138, .3);
+  background: rgba(84, 197, 138, .07);
+  color: var(--conversation-success);
   cursor: default;
 }
 
 .replayComposer {
-  align-self: stretch;
+  align-self: center;
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr) auto 32px;
   align-items: center;
-  gap: 8px;
-  padding: 11px 14px;
-  border-top: 1px solid rgba(148, 163, 184, .10);
-  background: linear-gradient(180deg, rgba(17, 19, 24, .86), #111318);
+  gap: 6px;
+  margin: 8px 16px 14px;
+  padding: 8px;
+  border: 1px solid var(--conversation-line-strong);
+  border-radius: 8px;
+  background: rgba(30, 30, 32, .98);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .26);
 }
 
 .replayComposer button,
@@ -669,9 +673,10 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(148, 163, 184, .18);
-  background: #20242f;
-  color: #cdd7e7;
+  border: 1px solid var(--conversation-line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .035);
+  color: var(--conversation-text-muted);
   font-size: 12px;
   font-weight: 800;
 }
@@ -680,6 +685,8 @@ button {
   width: 32px;
   padding: 0;
   cursor: pointer;
+  border-color: transparent;
+  background: transparent;
 }
 
 .replayComposer span {
@@ -691,11 +698,11 @@ button {
   height: 40px;
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  background: #1b1f29;
-  border: 1px solid rgba(148, 163, 184, .14);
-  color: #7f8ca3;
-  font-size: 13px;
+  padding: 0 8px;
+  background: transparent;
+  border: 0;
+  color: var(--conversation-text-muted);
+  font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -709,7 +716,7 @@ button {
   display: grid;
   gap: 7px;
   padding-top: 4px;
-  color: #748198;
+  color: var(--conversation-text-subtle);
   font-family: 'Cascadia Code', 'Consolas', monospace;
   font-size: 11px;
   line-height: 1.45;

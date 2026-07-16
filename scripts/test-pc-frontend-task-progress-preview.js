@@ -13,6 +13,8 @@ const timelinePath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'dev'
 const taskActionsPath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'conversation', 'useConversationTaskActions.ts')
 const projectStorePath = path.join(repoRoot, 'pc-frontend', 'src', 'features', 'conversation', 'useProjectStore.ts')
 const channelAiPath = path.join(repoRoot, 'server', 'src', 'project_space', 'channel_ai.rs')
+const conversationTokensPath = path.join(repoRoot, 'pc-frontend', 'src', 'styles', 'conversation-tokens.css')
+const replayStylesPath = path.join(repoRoot, 'pc-frontend', 'src', 'task-progress-replay', 'task-progress-replay.css')
 
 const previewSource = fs.readFileSync(previewPath, 'utf8')
 const previewUiSource = `${previewSource}\n${fs.readFileSync(scenarioPreviewPath, 'utf8')}`
@@ -24,6 +26,8 @@ const timelineSource = fs.readFileSync(timelinePath, 'utf8')
 const taskActionsSource = fs.readFileSync(taskActionsPath, 'utf8')
 const projectStoreSource = fs.readFileSync(projectStorePath, 'utf8')
 const channelAiSource = fs.readFileSync(channelAiPath, 'utf8')
+const conversationTokensSource = fs.readFileSync(conversationTokensPath, 'utf8')
+const replayStylesSource = fs.readFileSync(replayStylesPath, 'utf8')
 
 assert.match(
   viteConfigSource,
@@ -75,6 +79,10 @@ assert.match(
 )
 assert.match(previewSource, /收起工具详情/)
 assert.match(previewSource, /展开工具详情/)
+assert.match(previewSource, /import '\.\/styles\/conversation-tokens\.css'/)
+assert.match(conversationTokensSource, /--conversation-reading-width:\s*860px/)
+assert.match(conversationTokensSource, /--conversation-body-size:\s*14px/)
+assert.match(replayStylesSource, /background:\s*var\(--conversation-canvas\)/)
 assert.match(
   taskGroupSource,
   /const directPublicProcess = !resultMsg/,
@@ -100,6 +108,8 @@ assert.match(
   /<TaskTerminalActions[\s\S]*<TaskCompletionMeta timeline=\{timeline\} \/>/,
   'terminal actions and usage metadata should render after the final reply',
 )
+assert.match(taskGroupSource, /if \(tone === 'canceled'\) return '任务已停止'[\s\S]*return ''/)
+assert.doesNotMatch(taskGroupSource, /return '最终回复'/)
 assert.match(
   previewUiSource,
   /模拟节点重连/,

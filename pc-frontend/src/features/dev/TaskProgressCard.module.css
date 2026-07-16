@@ -9,7 +9,7 @@
   padding: 2px 0 0;
   background: transparent;
   box-shadow: none;
-  color: var(--text-soft);
+  color: var(--conversation-text-soft);
 }
 
 .compactCard {
@@ -18,7 +18,7 @@
   padding: 0;
   background: transparent;
   box-shadow: none;
-  opacity: .9;
+  opacity: 1;
 }
 
 .compactRow {
@@ -39,11 +39,11 @@
   gap: 6px;
   border: 0;
   border-radius: 6px;
-  padding: 0 5px 0 0;
+  padding: 0;
   background: transparent;
-  color: #8793a7;
+  color: var(--conversation-text-muted);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
   line-height: 1.2;
   text-align: left;
   cursor: pointer;
@@ -51,7 +51,7 @@
 
 .compactButton:hover {
   background: transparent;
-  color: #c7d2e2;
+  color: var(--conversation-text-soft);
 }
 
 .summaryOnlyCard {
@@ -67,7 +67,7 @@
 }
 
 .compactTitle {
-  color: #aeb9ca;
+  color: var(--conversation-text-soft);
   font-weight: 680;
 }
 
@@ -75,7 +75,7 @@
   width: 7px;
   height: 7px;
   margin-top: 0;
-  box-shadow: 0 0 0 2px rgba(35, 165, 90, .12);
+  box-shadow: none;
 }
 
 .compactSummary {
@@ -83,7 +83,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #7a879a;
+  color: var(--conversation-text-muted);
   font-weight: 620;
 }
 
@@ -107,24 +107,24 @@
 }
 
 .streamKicker {
-  color: #7f8ca3;
-  font-size: 11px;
+  color: var(--conversation-text-muted);
+  font-size: 11.5px;
   font-weight: 700;
   line-height: 1.2;
 }
 
 .streamText strong {
-  color: #eef3fb;
-  font-size: 13px;
+  color: var(--conversation-text);
+  font-size: var(--conversation-body-size);
   font-weight: 730;
   line-height: 1.45;
 }
 
 .streamText p {
   margin: 0;
-  color: #9daabd;
-  font-size: 12.5px;
-  line-height: 1.55;
+  color: var(--conversation-text-soft);
+  font-size: var(--conversation-body-size);
+  line-height: var(--conversation-body-leading);
 }
 
 .card[data-mode="stream"] .statusDot {
@@ -138,14 +138,14 @@
   align-self: start;
   border-color: transparent;
   background: transparent;
-  color: #7a8596;
+  color: var(--conversation-text-subtle);
   padding: 0;
 }
 
 .card[data-mode="stream"] .cancelButton:hover {
   border-color: transparent;
   background: transparent;
-  color: #ffb1b4;
+  color: var(--conversation-danger);
   opacity: 1;
 }
 
@@ -170,29 +170,29 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #4f8cff;
-  box-shadow: 0 0 0 3px rgba(79, 140, 255, .13);
+  background: var(--conversation-info);
+  box-shadow: none;
   margin-top: 6px;
 }
 
 .card[data-tone="done"] .statusDot {
-  background: #23a55a;
-  box-shadow: 0 0 0 3px rgba(35, 165, 90, .13);
+  background: var(--conversation-success);
+  box-shadow: none;
 }
 
 .card[data-tone="failed"] .statusDot {
-  background: #da373c;
-  box-shadow: 0 0 0 3px rgba(218, 55, 60, .13);
+  background: var(--conversation-danger);
+  box-shadow: none;
 }
 
 .card[data-tone="canceled"] .statusDot {
-  background: #8a93a3;
-  box-shadow: 0 0 0 3px rgba(138, 147, 163, .12);
+  background: var(--conversation-text-subtle);
+  box-shadow: none;
 }
 
 .card[data-tone="approval"] .statusDot {
-  background: #f0b232;
-  box-shadow: 0 0 0 3px rgba(240, 178, 50, .14);
+  background: var(--conversation-warning);
+  box-shadow: none;
 }
 
 .headerText {
@@ -202,8 +202,8 @@
 }
 
 .headerText span {
-  color: #8d98aa;
-  font-size: 11px;
+  color: var(--conversation-text-muted);
+  font-size: 11.5px;
   line-height: 1.2;
 }
 
@@ -212,8 +212,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #eef3fb;
-  font-size: 13px;
+  color: var(--conversation-text);
+  font-size: var(--conversation-body-size);
   font-weight: 760;
   line-height: 1.35;
 }
@@ -228,7 +228,7 @@
   border-radius: 50%;
   padding: 0;
   background: transparent;
-  color: #8d98aa;
+  color: var(--conversation-text-subtle);
   font: inherit;
   cursor: pointer;
   opacity: 0;
@@ -251,7 +251,7 @@
 
 .cancelButton:hover {
   background: rgba(218, 55, 60, .08);
-  color: #ffb1b4;
+  color: var(--conversation-danger);
   opacity: 1;
 }
 
@@ -287,15 +287,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #dce6f4;
-  font-size: 13px;
+  color: var(--conversation-text-soft);
+  font-size: var(--conversation-body-size);
   font-weight: 720;
   line-height: 1.4;
 }
 
 .currentHead em {
   flex: 0 0 auto;
-  color: #8d98aa;
+  color: var(--conversation-text-muted);
   font-family: 'Cascadia Code', 'Consolas', monospace;
   font-size: 11px;
   font-style: normal;
@@ -304,9 +304,9 @@
 
 .current p {
   margin: 0;
-  color: #a3afc1;
-  font-size: 12.5px;
-  line-height: 1.55;
+  color: var(--conversation-text-soft);
+  font-size: var(--conversation-body-size);
+  line-height: var(--conversation-body-leading);
 }
 
 .stageActions {
@@ -333,7 +333,7 @@
   border-radius: 0;
   padding: 0;
   background: transparent;
-  color: #8f9caf;
+  color: var(--conversation-text-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 720;
@@ -345,15 +345,15 @@
 .stageActions button:hover,
 .stageActions a:hover {
   background: transparent;
-  color: #eef3fb;
+  color: var(--conversation-text);
 }
 
 .stageActions .stagePrimaryAction {
-  color: #d8e2ff;
+  color: var(--conversation-text-soft);
 }
 
 .stageActions .stagePrimaryAction svg {
-  color: #9eb4ff;
+  color: var(--conversation-info);
 }
 
 .stageHelp {
@@ -365,7 +365,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #8f9caf;
+  color: var(--conversation-text-muted);
   font-size: 12px;
   font-weight: 720;
   line-height: 1;
@@ -379,7 +379,7 @@
 
 .stageHelp > summary:hover,
 .stageHelp[open] > summary {
-  color: #eef3fb;
+  color: var(--conversation-text);
 }
 
 .stageHelpMenu {
@@ -391,9 +391,9 @@
   display: grid;
   gap: 2px;
   padding: 5px;
-  border: 1px solid rgba(148, 163, 184, .16);
+  border: 1px solid var(--conversation-line-strong);
   border-radius: 6px;
-  background: #1b1f27;
+  background: var(--conversation-elevated);
   box-shadow: 0 12px 28px rgba(0, 0, 0, .34);
 }
 
@@ -402,14 +402,14 @@
   min-height: 28px;
   padding: 0 8px;
   border-radius: 4px;
-  color: #aeb9ca;
+  color: var(--conversation-text-soft);
   justify-content: flex-start;
 }
 
 .stageActions .stageHelpMenu button:hover,
 .stageActions .stageHelpMenu a:hover {
   background: rgba(255, 255, 255, .055);
-  color: #eef3fb;
+  color: var(--conversation-text);
 }
 
 .detailButton {
@@ -425,7 +425,7 @@
   border-radius: 0;
   padding: 0 0 0 17px;
   background: transparent;
-  color: #7f8ca3;
+  color: var(--conversation-text-muted);
   font: inherit;
   font-size: 12px;
   font-weight: 650;
