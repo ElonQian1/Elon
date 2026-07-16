@@ -16,6 +16,7 @@ import { ModelPickerPopover } from '../models/ModelPicker'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
+import NewConversationDraft from './NewConversationDraft'
 import ChannelNavList from './ChannelNavList'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
@@ -193,7 +194,6 @@ export default function ConversationPage() {
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   // 会话视图模式：null=默认(全部) / 'new'=新建空会话 / string=会话 ID
   const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
-  const prevSessionIdsRef = useRef<Set<string>>(new Set())
   const waitingForNewSession = useRef(false)
   const conversationMessageCacheRef = useRef<Map<string, ConversationMessageCacheEntry>>(new Map())
   const taskMessageCacheRef = useRef<Map<string, TaskMessageCacheEntry>>(new Map())
@@ -879,16 +879,6 @@ export default function ConversationPage() {
     setMemberConversations,
   })
 
-  // sessionView='new' 时，一旦会话列表出现新会话，自动切入
-  useEffect(() => {
-    if (!waitingForNewSession.current) return
-    const newConv = memberConversations.find((c) => !prevSessionIdsRef.current.has(c.id))
-    if (newConv) {
-      waitingForNewSession.current = false
-      openConversation(newConv.id)
-    }
-  }, [memberConversations])
-
   // 切换频道时重置会话视图
   useEffect(() => {
     requestFeedAutoFollow()
@@ -1013,12 +1003,17 @@ export default function ConversationPage() {
       return
     }
     conversationLoadSeqRef.current += 1
-    prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
     setSessionView('new')
     setConvMessages([])
     setSessionTaskMessages([])
-    waitingForNewSession.current = true
+    waitingForNewSession.current = false
     setTimeout(() => textareaRef.current?.focus(), 50)
+  }
+
+  function openDevelopmentDraft(channelId: string) { void selectChannel(channelId).catch(() => {}); window.requestAnimationFrame(startNewSession) }
+  function chooseDraftPrompt(prompt: string) {
+    setInput(prompt)
+    window.requestAnimationFrame(() => { autoResize(); textareaRef.current?.focus(); textareaRef.current?.setSelectionRange(prompt.length, prompt.length) })
   }
 
   function openSession(convId: string) {
@@ -1120,7 +1115,7 @@ export default function ConversationPage() {
       className={styles.layout}
       style={workspacePanels.layoutStyle}
       data-channel-collapsed={workspacePanels.channelCollapsed ? 'true' : undefined}
-      data-member-collapsed={workspacePanels.memberCollapsed ? 'true' : undefined}
+      data-member-collapsed={workspacePanels.memberCollapsed || sessionView === 'new' ? 'true' : undefined}
     >
 
       {/* ══ 频道面板 ══ */}
@@ -1272,25 +1267,24 @@ export default function ConversationPage() {
             </span>
             <div>
               <strong className={styles.chatTitleText}>
-                {activeChannel?.name ?? activeProject?.name ?? '选择项目开始对话'}
+                {sessionView === 'new' ? `${activeChannel?.name ?? 'AI开发'} · 新对话` : activeChannel?.name ?? activeProject?.name ?? '选择项目开始对话'}
               </strong>
-              {activeChannel?.description && (
-                <span className={styles.chatTitleSub}>{activeChannel.description}</span>
-              )}
+              {sessionView === 'new' && <span className={styles.chatTitleSub}>尚未创建会话</span>}
+              {sessionView !== 'new' && activeChannel?.description && <span className={styles.chatTitleSub}>{activeChannel.description}</span>}
             </div>
           </div>
-          <ConversationTopbarActions
-            activeProjectId={activeProjectId}
-            activeChannelId={activeChannelId}
-            memberCollapsed={workspacePanels.memberCollapsed}
-            memberSelectionMode={memberSelectionMode}
-            onToggleMemberPanel={workspacePanels.toggleMemberPanel}
-            onEnableMemberSelection={() => setMemberSelectionMode(true)}
-            onNavigateNode={() => navigate('/node')}
-          />
+          {sessionView !== 'new' && <ConversationTopbarActions
+              activeProjectId={activeProjectId}
+              activeChannelId={activeChannelId}
+              memberCollapsed={workspacePanels.memberCollapsed}
+              memberSelectionMode={memberSelectionMode}
+              onToggleMemberPanel={workspacePanels.toggleMemberPanel}
+              onEnableMemberSelection={() => setMemberSelectionMode(true)}
+              onNavigateNode={() => navigate('/node')}
+            />}
         </header>
 
-        <div className={styles.chatStatusStack}>
+        {sessionView !== 'new' && <div className={styles.chatStatusStack}>
           {activeProjectId && (
             <>
               {showLocalNodeStatus && (
@@ -1330,11 +1324,17 @@ export default function ConversationPage() {
               )}
             </>
           )}
-        </div>
+        </div>}
 
         {/* 消息列表（1fr）*/}
         {/* 无频道或未选中会话（landing）vs 选中会话（feed）*/}
-        {sessionView === null ? (
+        {sessionView === 'new' ? (
+          <NewConversationDraft
+            projectName={activeProject?.name ?? '当前项目'} channelName={activeChannel?.name ?? 'AI开发'} localNodeReady={localNodeReady}
+            usesLocalNode={projectBoundToLocalNode || directPcCliActive || shouldPreferLocalNode}
+            onChoosePrompt={chooseDraftPrompt}
+          />
+        ) : sessionView === null ? (
           <div className={styles.messageList}>
             {!activeProjectId ? (
               /* 无项目：全局欢迎页 */
@@ -1355,7 +1355,7 @@ export default function ConversationPage() {
                   project={activeProject}
                   channels={channels}
                   landing={landing}
-                  onSelectChannel={(id) => { setSessionView(null); selectChannel(id) }}
+                  onSelectChannel={(id) => { void openDevelopmentDraft(id) }}
                 />
               )
             )}
@@ -1423,7 +1423,7 @@ export default function ConversationPage() {
       </div>
 
       {/* ══ 成员面板 ══ */}
-      <ConversationMemberSidebar
+      {sessionView !== 'new' && <ConversationMemberSidebar
         workspacePanels={workspacePanels}
         title={memberPanelTitle}
         count={memberPanelCount}
@@ -1480,7 +1480,7 @@ export default function ConversationPage() {
         onSetMemberPanelScope={setMemberPanelScope}
         onSelectMember={(m, anchor) => { setSelectedMember(m); setMemberPopoverAnchor(anchor) }}
         onOpenMemberMenu={setMemberMenu}
-      />
+      />}
 
       {(invitePreview || inviteStatus) && inviteCode && (
         <div className={styles.inviteBanner}>
