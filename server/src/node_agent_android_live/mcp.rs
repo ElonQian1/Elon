@@ -458,6 +458,10 @@ async fn call_tool(
         "ui_check_workflow_completion" => {
             super::task_completion::verify(broker, fit_runs, &session_id, &arguments).await?
         }
+        "ui_write_cross_platform_verification" => super::cross_platform_verification::write(
+            broker.session(&session_id).await?.as_ref(),
+            &arguments,
+        )?,
         "ui_report_capability_gap" => {
             let session = broker.session(&session_id).await?;
             super::capability_gap::report_gap(&session, &arguments)?
@@ -507,7 +511,6 @@ async fn call_tool(
         "isError": false,
     }))
 }
-
 async fn fit_session_context(broker: &LiveUiBroker, session_id: &str) -> Result<FitSessionContext> {
     let session = broker.session(session_id).await?;
     let view = session.view().await;
@@ -526,14 +529,12 @@ async fn fit_session_context(broker: &LiveUiBroker, session_id: &str) -> Result<
         source_revision,
     })
 }
-
 fn fit_rect(value: Option<&Value>) -> Result<FitRect> {
     let rect: FitRect = serde_json::from_value(value.cloned().unwrap_or(Value::Null))
         .context("FitRun 矩形参数无效")?;
     rect.validate("FitRun rect")?;
     Ok(rect)
 }
-
 fn fit_command(action: &str, arguments: &Value) -> Result<FitCommand> {
     let command_id = format!("mcp_{}", uuid::Uuid::new_v4().simple());
     let required = |key: &str| -> Result<String> {
@@ -570,7 +571,6 @@ fn fit_command(action: &str, arguments: &Value) -> Result<FitCommand> {
     };
     serde_json::from_value(value).context("FitRun 控制命令无效")
 }
-
 fn find_node<'a>(
     ir: &'a UiIrDocument,
     arguments: &Value,

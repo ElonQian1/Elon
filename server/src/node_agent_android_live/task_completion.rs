@@ -120,7 +120,7 @@ pub(crate) async fn verify(
                     "evidencePath":evidence_path,
                     "reason":format!("{error:#}"),
                 }));
-                next.push(json!("CROSS_PLATFORM_STYLE_WRITEBACK_AND_VERIFY"));
+                next.push(json!("ui_write_cross_platform_verification"));
             }
         }
     } else {
@@ -254,7 +254,7 @@ fn fit_run_acceptance(run: &FitRunDocument) -> Value {
     })
 }
 
-fn cross_platform_evidence(
+pub(crate) fn cross_platform_evidence(
     path: &Path,
     task_id: &str,
     expected_source_revision: Option<&str>,

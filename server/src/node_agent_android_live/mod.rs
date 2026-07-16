@@ -10,6 +10,7 @@ mod build_verify;
 mod build_verify_apk;
 mod capability_gap;
 mod capability_requirements;
+mod cross_platform_verification;
 mod debug_package;
 mod design_bootstrap;
 mod design_diff_regions;

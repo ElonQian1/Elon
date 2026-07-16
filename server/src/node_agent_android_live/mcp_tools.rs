@@ -366,6 +366,31 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_write_cross_platform_verification",
+            "把真实 Android/Web 截图复制进当前任务目录，绑定当前 Git revision，校验视觉 loss、源码写回与无补丁构建后原子生成 cross-platform-verification.json。",
+            json!({
+                "type":"object",
+                "required":[
+                    "taskId",
+                    "androidArtifact",
+                    "webArtifact",
+                    "visualLoss",
+                    "maxVisualLoss",
+                    "sourceWritebackVerified",
+                    "patchFreeBuildVerified"
+                ],
+                "properties":{
+                    "taskId":{"type":"string","minLength":1,"maxLength":128},
+                    "androidArtifact":{"type":"string","minLength":1,"maxLength":4000},
+                    "webArtifact":{"type":"string","minLength":1,"maxLength":4000},
+                    "visualLoss":{"type":"number","minimum":0,"maximum":1},
+                    "maxVisualLoss":{"type":"number","minimum":0,"maximum":1},
+                    "sourceWritebackVerified":{"const":true},
+                    "patchFreeBuildVerified":{"const":true}
+                }
+            }),
+        ),
+        tool(
             "ui_report_capability_gap",
             "确认 PC UI 平台自身缺少能力后创建自动升级工件。仅适用于当前可信本地 Git 工作区；普通业务页面结构修改继续使用 CODEX_SOURCE_HANDOFF。",
             json!({

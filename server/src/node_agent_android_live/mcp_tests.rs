@@ -64,6 +64,9 @@ async fn mcp_lists_compact_ui_tools() {
         desktop_import["inputSchema"]["properties"]["attachments"]["maxItems"],
         64
     );
+    assert!(tools
+        .iter()
+        .any(|tool| tool["name"] == "ui_write_cross_platform_verification"));
 }
 
 #[tokio::test]
