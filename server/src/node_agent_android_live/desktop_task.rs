@@ -51,54 +51,31 @@ pub(crate) fn import_desktop_task(session: &LiveUiSession, arguments: &Value) ->
     if task_root.exists() {
         bail!("桌面 UI 任务已存在，拒绝覆盖: {task_id}");
     }
+    let prepared_attachments = attachments
+        .iter()
+        .enumerate()
+        .map(|(index, attachment)| prepare_attachment(attachment, index, &overall_intent))
+        .collect::<Result<Vec<_>>>()?;
     fs::create_dir_all(task_root.join("attachments"))?;
     let mut metadata = Vec::with_capacity(attachments.len());
     let mut local_entries = Vec::with_capacity(attachments.len());
     let mut target_design_attachment_id = None;
-    for (index, attachment) in attachments.iter().enumerate() {
-        let source = attachment
-            .get("path")
-            .and_then(Value::as_str)
-            .map(PathBuf::from)
-            .ok_or_else(|| anyhow!("attachments[{index}].path 缺失"))?
-            .canonicalize()
-            .with_context(|| format!("桌面草图不存在: attachments[{index}]"))?;
-        let file = validate_image(&source)?;
+    for (index, prepared) in prepared_attachments.into_iter().enumerate() {
         let attachment_id = format!("desktop_image_{:02}", index + 1);
         let target = task_root
             .join("attachments")
-            .join(format!("{attachment_id}.{}", file.extension));
-        fs::copy(&source, &target)?;
+            .join(format!("{attachment_id}.{}", prepared.file.extension));
+        fs::copy(&prepared.source, &target)?;
         let bytes = fs::read(&target)?;
         let sha256 = hex::encode(Sha256::digest(&bytes));
-        let intent = enum_value(
-            attachment,
-            "intent",
-            &[
-                "AUTO",
-                "TARGET_DESIGN",
-                "ANNOTATED_CHANGE_REQUEST",
-                "REFERENCE_STYLE",
-                "CURRENT_SCREENSHOT",
-            ],
-            &overall_intent,
-        )?;
+        let intent = prepared.intent;
         if target_design_attachment_id.is_none() && intent == "TARGET_DESIGN" {
             target_design_attachment_id = Some(attachment_id.clone());
         }
-        let display_name = attachment
-            .get("displayName")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or(&file.display_name)
-            .chars()
-            .take(240)
-            .collect::<String>();
         let item = json!({
             "attachmentId": attachment_id,
-            "displayName": display_name,
-            "mimeType": file.mime_type,
+            "displayName": prepared.display_name,
+            "mimeType": prepared.file.mime_type,
             "sha256": sha256,
             "intent": intent,
             "source": "CODEX_DESKTOP",
@@ -172,6 +149,55 @@ struct ImageFile {
     display_name: String,
     extension: String,
     mime_type: &'static str,
+}
+
+struct PreparedAttachment {
+    source: PathBuf,
+    file: ImageFile,
+    intent: String,
+    display_name: String,
+}
+
+fn prepare_attachment(
+    attachment: &Value,
+    index: usize,
+    overall_intent: &str,
+) -> Result<PreparedAttachment> {
+    let source = attachment
+        .get("path")
+        .and_then(Value::as_str)
+        .map(PathBuf::from)
+        .ok_or_else(|| anyhow!("attachments[{index}].path 缺失"))?
+        .canonicalize()
+        .with_context(|| format!("桌面草图不存在: attachments[{index}]"))?;
+    let file = validate_image(&source)?;
+    let intent = enum_value(
+        attachment,
+        "intent",
+        &[
+            "AUTO",
+            "TARGET_DESIGN",
+            "ANNOTATED_CHANGE_REQUEST",
+            "REFERENCE_STYLE",
+            "CURRENT_SCREENSHOT",
+        ],
+        overall_intent,
+    )?;
+    let display_name = attachment
+        .get("displayName")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(&file.display_name)
+        .chars()
+        .take(240)
+        .collect();
+    Ok(PreparedAttachment {
+        source,
+        file,
+        intent,
+        display_name,
+    })
 }
 
 fn validate_image(path: &Path) -> Result<ImageFile> {
@@ -253,7 +279,9 @@ fn validate_attachment_count(count: usize) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{safe_id, validate_attachment_count};
+    use super::{import_desktop_task, safe_id, validate_attachment_count};
+    use crate::node_agent_android_live::broker::LiveUiBroker;
+    use serde_json::json;
 
     #[test]
     fn desktop_task_id_cannot_escape_workspace() {
@@ -265,5 +293,35 @@ mod tests {
         assert!(validate_attachment_count(9).is_ok());
         assert!(validate_attachment_count(64).is_ok());
         assert!(validate_attachment_count(65).is_err());
+    }
+
+    #[tokio::test]
+    async fn invalid_attachment_does_not_leave_partial_task_directory() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-desktop-import-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let broker = LiveUiBroker::new();
+        let session = broker
+            .create_session(
+                "device-1".to_string(),
+                "com.example.debug".to_string(),
+                Some(root.to_string_lossy().into_owned()),
+                38917,
+            )
+            .await;
+        let task_id = "invalid-attachment";
+        let result = import_desktop_task(
+            &session,
+            &json!({
+                "request": "verify failed imports stay atomic",
+                "taskId": task_id,
+                "attachments": [{"path": root.join("missing.png")}],
+            }),
+        );
+        assert!(result.is_err());
+        assert!(!root.join(".elon/ui-design/tasks").join(task_id).exists());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
