@@ -1,24 +1,24 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Apple,
+  ArrowRight,
   CircleCheck,
   Download,
   ExternalLink,
   FileText,
-  Globe2,
   Hash,
-  Laptop,
-  Monitor,
   PackageCheck,
   Rocket,
-  Smartphone,
-  Terminal,
+  Sparkles,
   UsersRound,
   Wrench,
 } from 'lucide-react'
-
 import { formatTime } from '../../lib/utils'
 import type { Channel, Project, ProjectLanding as ProjectLandingData, ProjectLandingDownload } from './types'
+import ProjectLandingDownloads, {
+  firstLandingDownload,
+  isLandingDownloadEnabled,
+  landingDownloadUrl,
+} from './ProjectLandingDownloads'
 import styles from './ProjectLanding.module.css'
 
 interface Props {
@@ -37,36 +37,33 @@ interface PrimaryAction {
   onClick: () => void
 }
 
-const ACTIVE_STATUSES = new Set(['available', 'external', 'partial'])
-const PASSIVE_STATUSES = new Set(['coming_soon', 'planned', 'pending', 'needs_configuration', 'not_deployed'])
-
-const PLATFORM_META: Record<string, { label: string; short: string; icon: LucideIcon }> = {
-  android: { label: 'Android APK', short: 'APK', icon: Smartphone },
-  windows: { label: 'Windows 客户端', short: 'Win', icon: Monitor },
-  web: { label: '网页端', short: 'Web', icon: Globe2 },
-  ios: { label: 'iOS / PWA', short: 'iOS', icon: Apple },
-  macos: { label: 'macOS', short: 'Mac', icon: Laptop },
-  linux: { label: 'Linux', short: 'Linux', icon: Terminal },
+interface WorkflowItem {
+  number: string
+  title: string
+  detail: string
+  action: string
+  current?: boolean
+  disabled?: boolean
+  onClick: () => void
 }
 
 export default function ProjectLanding({ project, channels, landing, onSelectChannel }: Props) {
   const devChannel = channels.find((channel) => channel.kind === 'ai_development')
   const buildChannel = channels.find((channel) => channel.kind === 'builds')
   const downloads = landing?.downloads ?? []
-  const availableDownloads = downloads.filter((download) => isDownloadEnabled(download))
-  const firstDownload = availableDownloads[0]
-  const resources = landing?.resources?.filter((resource) => resource.url) ?? []
-  const externalUrl = landing?.custom_landing_url || landing?.web_url || resources[0]?.url
+  const availableDownloads = downloads.filter(isLandingDownloadEnabled)
+  const firstDownload = firstLandingDownload(downloads)
+  const resources = projectResources(landing)
+  const quickChannels = channels
+    .filter((channel) => channel.id !== devChannel?.id && channel.id !== buildChannel?.id)
+    .slice(0, 6)
   const tagline = landing?.tagline || project.description || '项目空间'
-  const description = landing?.summary || landing?.description || project.description
+  const description = landing?.summary || landing?.description || project.description || '这个项目由一龙平台托管，已接入项目协作、AI 开发和交付流程。'
+  const highlights = (landing?.highlights ?? []).filter(Boolean).slice(0, 4)
+  const targetUsers = (landing?.target_users ?? []).filter(Boolean).slice(0, 4)
   const updatedAt = project.updated_at ? formatTime(project.updated_at) : ''
-  const primaryAction = buildPrimaryAction({
-    devChannel,
-    buildChannel,
-    firstDownload,
-    externalUrl,
-    onSelectChannel,
-  })
+  const primaryAction = buildPrimaryAction({ devChannel, buildChannel, firstDownload, resources, onSelectChannel })
+  const workflow = buildWorkflow({ devChannel, buildChannel, availableDownloads, onSelectChannel })
 
   return (
     <div className={styles.landing}>
@@ -81,7 +78,7 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
             </div>
             <h2>{project.name}</h2>
             <p>{tagline}</p>
-            {description && description !== tagline && <span className={styles.summary}>{description}</span>}
+            {description !== tagline && <span className={styles.summary}>{description}</span>}
             <div className={styles.metaRow}>
               <MetaPill icon={UsersRound} label={project.member_count ? `${project.member_count} 位成员` : '项目成员'} />
               <MetaPill icon={Hash} label={`${channels.length} 个频道`} />
@@ -97,9 +94,7 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
             disabled={primaryAction.disabled}
             onClick={primaryAction.onClick}
           >
-            <span className={styles.primaryIcon}>
-              <primaryAction.icon size={22} aria-hidden="true" />
-            </span>
+            <span className={styles.primaryIcon}><primaryAction.icon size={23} aria-hidden="true" /></span>
             <span className={styles.primaryCopy}>
               <strong>{primaryAction.title}</strong>
               <small>{primaryAction.detail}</small>
@@ -109,16 +104,68 @@ export default function ProjectLanding({ project, channels, landing, onSelectCha
         </div>
       </section>
 
-      {downloads.length > 0 && (
-        <section id="landing-downloads" className={styles.downloadSection}>
-          <SectionHeader icon={Download} title="下载安装" note={availableDownloads.length ? '可用入口优先显示' : '等待发布'} />
-          <div className={styles.downloadGrid}>
-            {downloads.map((download, index) => (
-              <DownloadCard key={`${download.platform ?? 'download'}-${index}`} download={download} />
-            ))}
-          </div>
+      <section className={styles.startSection} aria-label="项目工作流程">
+        <div className={styles.startHeader}>
+          <span className={styles.sectionEyebrow}>从这里继续</span>
+          <strong>需求、构建和安装，一页看清下一步</strong>
+          <p>第一次进入可以按顺序完成；回来继续时，直接点击当前可用步骤。</p>
+        </div>
+        <div className={styles.workflowGrid}>
+          {workflow.map((item) => <WorkflowStep key={item.number} item={item} />)}
+        </div>
+      </section>
+
+      <div className={styles.overviewGrid}>
+        <section className={styles.infoPanel}>
+          <PanelHeader icon={Sparkles} title="项目介绍" note="了解项目定位与适用场景" />
+          <p className={styles.overviewText}>{description}</p>
+          {highlights.length > 0 && (
+            <div className={styles.highlightGrid}>
+              {highlights.map((highlight) => <span className={styles.highlightItem} key={highlight}>{highlight}</span>)}
+            </div>
+          )}
+          {targetUsers.length > 0 && (
+            <div className={styles.targetList}>
+              <strong>适用人群</strong>
+              {targetUsers.map((target) => <span key={target}>{target}</span>)}
+            </div>
+          )}
         </section>
-      )}
+
+        <section className={styles.infoPanel}>
+          <PanelHeader icon={Hash} title="项目入口" note="快速前往常用频道与资料" />
+          {quickChannels.length > 0 && (
+            <div className={styles.quickGrid}>
+              {quickChannels.map((channel) => (
+                <button className={styles.quickChannel} type="button" key={channel.id} onClick={() => onSelectChannel(channel.id)}>
+                  <span className={styles.quickIcon}><Hash size={14} aria-hidden="true" /></span>
+                  <span>
+                    <strong>{channel.name}</strong>
+                    <small>{channel.description || channelKindLabel(channel.kind)}</small>
+                  </span>
+                  <ArrowRight size={15} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+          {resources.length > 0 && (
+            <div className={styles.resourceList}>
+              {resources.map((resource) => (
+                <button className={styles.resourceLink} type="button" key={`${resource.label}-${resource.url}`} onClick={() => openUrl(resource.url)}>
+                  <FileText size={14} aria-hidden="true" />
+                  <span>{resource.label}</span>
+                  <ExternalLink size={13} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+          {quickChannels.length === 0 && resources.length === 0 && (
+            <p className={styles.emptyCopy}>项目入口正在配置；你仍可以从左侧频道开始工作。</p>
+          )}
+        </section>
+      </div>
+
+      <ProjectLandingDownloads downloads={downloads} />
     </div>
   )
 }
@@ -131,184 +178,112 @@ function ProjectIcon({ project }: { project: Project }) {
 }
 
 function MetaPill({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <span className={styles.metaPill}>
-      <Icon size={14} aria-hidden="true" />
-      {label}
-    </span>
-  )
+  return <span className={styles.metaPill}><Icon size={14} aria-hidden="true" />{label}</span>
 }
 
-function SectionHeader({ icon: Icon, title, note }: { icon: LucideIcon; title: string; note?: string }) {
+function PanelHeader({ icon: Icon, title, note }: { icon: LucideIcon; title: string; note: string }) {
   return (
-    <div className={styles.sectionHeader}>
-      <Icon size={16} aria-hidden="true" />
-      <strong>{title}</strong>
-      {note && <span>{note}</span>}
+    <div className={styles.panelHeader}>
+      <span className={styles.panelHeaderIcon}><Icon size={17} aria-hidden="true" /></span>
+      <div><strong>{title}</strong><small>{note}</small></div>
     </div>
   )
 }
 
-function DownloadCard({ download }: { download: ProjectLandingDownload }) {
-  const enabled = isDownloadEnabled(download)
-  const platform = normalizePlatform(download.platform)
-  const meta = PLATFORM_META[platform] ?? { label: download.platform || '通用下载', short: download.short || 'Pkg', icon: FileText }
-  const Icon = meta.icon
-  const status = normalizeStatus(download.status, download)
-  const variantCount = download.variants?.filter((variant) => isVariantEnabled(variant)).length ?? 0
-
+function WorkflowStep({ item }: { item: WorkflowItem }) {
   return (
     <button
-      className={[
-        styles.downloadCard,
-        styles[`status_${statusClass(status)}`] ?? '',
-        enabled ? '' : styles.downloadDisabled,
-      ].join(' ')}
+      className={styles.workflowStep}
+      data-current={item.current ? 'true' : undefined}
       type="button"
-      disabled={!enabled}
-      onClick={() => openDownload(download)}
+      disabled={item.disabled}
+      onClick={item.onClick}
     >
-      <span className={styles.platformBadge}>
-        <Icon size={18} aria-hidden="true" />
-      </span>
-      <span className={styles.downloadCopy}>
-        <strong>{download.label || meta.label}</strong>
-        <small>{[download.version, downloadSizeLabel(download)].filter(Boolean).join(' / ') || download.short || meta.short}</small>
-        {download.note && <em>{download.note}</em>}
-      </span>
-      <span className={styles.downloadStatus}>{statusLabel(status, enabled)}</span>
-      {variantCount > 0 && <span className={styles.variantHint}>{variantCount} 个版本</span>}
+      <span className={styles.workflowNumber}>{item.number}</span>
+      <span className={styles.workflowCopy}><strong>{item.title}</strong><small>{item.detail}</small></span>
+      <em className={styles.workflowAction}>{item.action}<ArrowRight size={13} aria-hidden="true" /></em>
     </button>
   )
+}
+
+function buildWorkflow({
+  devChannel,
+  buildChannel,
+  availableDownloads,
+  onSelectChannel,
+}: {
+  devChannel?: Channel
+  buildChannel?: Channel
+  availableDownloads: ProjectLandingDownload[]
+  onSelectChannel: (id: string) => void
+}): WorkflowItem[] {
+  const hasDownload = availableDownloads.length > 0
+  return [
+    {
+      number: '1',
+      title: '开始做应用',
+      detail: devChannel ? '描述需求、修复问题或继续上次开发。' : '项目还没有配置 AI 开发频道。',
+      action: devChannel ? '开始' : '未配置',
+      current: !!devChannel,
+      disabled: !devChannel,
+      onClick: () => devChannel && onSelectChannel(devChannel.id),
+    },
+    {
+      number: '2',
+      title: '生成安装包',
+      detail: buildChannel ? '查看构建、发布和交付进度。' : '项目还没有配置构建频道。',
+      action: buildChannel ? '查看' : '未配置',
+      disabled: !buildChannel,
+      onClick: () => buildChannel && onSelectChannel(buildChannel.id),
+    },
+    {
+      number: '3',
+      title: '安装与接入',
+      detail: hasDownload ? `${availableDownloads.length} 个入口可直接使用。` : '生成安装包后会在这里出现。',
+      action: hasDownload ? '前往' : '等待',
+      disabled: !hasDownload,
+      onClick: () => document.getElementById('project-landing-downloads')?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    },
+  ]
 }
 
 function buildPrimaryAction({
   devChannel,
   buildChannel,
   firstDownload,
-  externalUrl,
+  resources,
   onSelectChannel,
 }: {
   devChannel?: Channel
   buildChannel?: Channel
   firstDownload?: ProjectLandingDownload
-  externalUrl?: string
+  resources: Array<{ label: string; url: string }>
   onSelectChannel: (id: string) => void
 }): PrimaryAction {
-  if (devChannel) {
-    return {
-      icon: Rocket,
-      title: '继续开发',
-      detail: devChannel.description || '进入 AI 开发频道',
-      label: devChannel.name,
-      onClick: () => onSelectChannel(devChannel.id),
-    }
-  }
-  if (buildChannel) {
-    return {
-      icon: PackageCheck,
-      title: '查看交付',
-      detail: buildChannel.description || '进入构建与安装包频道',
-      label: buildChannel.name,
-      onClick: () => onSelectChannel(buildChannel.id),
-    }
-  }
-  if (firstDownload) {
-    return {
-      icon: Download,
-      title: '安装使用',
-      detail: downloadLabel(firstDownload),
-      label: '下载',
-      onClick: () => openDownload(firstDownload),
-    }
-  }
-  if (externalUrl) {
-    return {
-      icon: ExternalLink,
-      title: '打开项目',
-      detail: '查看项目主页或外部入口',
-      label: '打开',
-      onClick: () => openUrl(externalUrl),
-    }
-  }
-  return {
-    icon: Wrench,
-    title: '等待配置',
-    detail: '项目入口会在频道或交付配置后出现',
-    label: '未就绪',
-    disabled: true,
-    onClick: () => undefined,
-  }
+  if (devChannel) return { icon: Rocket, title: '继续开发', detail: devChannel.description || '进入 AI 开发频道', label: devChannel.name, onClick: () => onSelectChannel(devChannel.id) }
+  if (buildChannel) return { icon: PackageCheck, title: '查看交付', detail: buildChannel.description || '进入构建与安装包频道', label: buildChannel.name, onClick: () => onSelectChannel(buildChannel.id) }
+  if (firstDownload) return { icon: Download, title: '安装使用', detail: firstDownload.label || '下载可用客户端', label: '下载', onClick: () => openUrl(landingDownloadUrl(firstDownload)) }
+  if (resources[0]) return { icon: ExternalLink, title: '打开项目', detail: '查看项目主页或外部入口', label: '打开', onClick: () => openUrl(resources[0].url) }
+  return { icon: Wrench, title: '等待配置', detail: '项目入口会在频道或交付配置后出现', label: '未就绪', disabled: true, onClick: () => undefined }
 }
 
-function normalizePlatform(platform?: string) {
-  const raw = String(platform ?? '').toLowerCase().replace(/[\s_-]+/g, '')
-  if (raw === 'apk' || raw === 'androidapk') return 'android'
-  if (raw === 'win' || raw === 'windowsclient') return 'windows'
-  if (raw === 'mac' || raw === 'osx' || raw === 'darwin') return 'macos'
-  if (raw === 'browser' || raw === 'h5' || raw === 'website') return 'web'
-  return raw
+function projectResources(landing: ProjectLandingData | null) {
+  const candidates = [
+    landing?.custom_landing_url ? { label: '完整项目介绍', url: landing.custom_landing_url } : null,
+    landing?.web_url ? { label: '打开网页端', url: landing.web_url } : null,
+    ...(landing?.resources ?? []).map((resource) => ({ label: resource.label || '相关资料', url: resource.url || '' })),
+  ].filter((resource): resource is { label: string; url: string } => !!resource?.url)
+  return candidates.filter((resource, index) => candidates.findIndex((candidate) => candidate.url === resource.url) === index)
 }
 
-function normalizeStatus(status: string | undefined, download: ProjectLandingDownload) {
-  if (status) return status.toLowerCase()
-  return downloadUrl(download) ? 'available' : 'planned'
-}
-
-function statusLabel(status: string, enabled: boolean) {
-  if (enabled) return status === 'external' ? '外部入口' : '可用'
-  if (status === 'coming_soon') return '即将支持'
-  if (status === 'planned') return '计划中'
-  if (status === 'unavailable') return '暂不可用'
-  if (PASSIVE_STATUSES.has(status)) return '待发布'
-  return '待配置'
-}
-
-function statusClass(status: string) {
-  return status.replace(/[^a-z0-9]+/g, '_')
-}
-
-function downloadLabel(download: ProjectLandingDownload) {
-  const platform = normalizePlatform(download.platform)
-  const meta = PLATFORM_META[platform]
-  return download.label || meta?.label || download.platform || '下载项目'
-}
-
-function downloadSizeLabel(download: ProjectLandingDownload) {
-  if (download.size) return download.size
-  if (download.size_label) return download.size_label
-  if (download.sizeLabel) return download.sizeLabel
-  return formatDownloadBytes(download.size_bytes ?? download.sizeBytes)
-}
-
-function formatDownloadBytes(value: string | number | undefined) {
-  const bytes = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(bytes) || bytes <= 0) return ''
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${bytes} B`
-}
-
-function isDownloadEnabled(download: ProjectLandingDownload) {
-  const status = normalizeStatus(download.status, download)
-  return ACTIVE_STATUSES.has(status) || (!!downloadUrl(download) && !PASSIVE_STATUSES.has(status))
-}
-
-function isVariantEnabled(variant: NonNullable<ProjectLandingDownload['variants']>[number]) {
-  const status = String(variant.status ?? '').toLowerCase()
-  return ACTIVE_STATUSES.has(status) || (!!variant.url && !PASSIVE_STATUSES.has(status))
-}
-
-function downloadUrl(download: ProjectLandingDownload) {
-  if (download.url) return download.url
-  return download.variants?.find((variant) => isVariantEnabled(variant) && variant.url)?.url
-}
-
-function openDownload(download: ProjectLandingDownload) {
-  const url = downloadUrl(download)
-  if (url) openUrl(url)
+function channelKindLabel(kind?: string) {
+  if (kind === 'announcements' || kind === 'announcement') return '项目公告'
+  if (kind === 'docs') return '项目文档'
+  if (kind === 'discussion') return '项目讨论'
+  if (kind === 'issues') return '问题与反馈'
+  return '项目频道'
 }
 
 function openUrl(url: string) {
-  window.open(url, '_blank', 'noopener')
+  if (url) window.open(url, '_blank', 'noopener')
 }

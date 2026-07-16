@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CalendarDays, ChevronRight, Code2, FolderKanban, Plus, Settings, Store, UsersRound } from 'lucide-react'
+import {
+  ChevronRight,
+  FolderKanban,
+  LoaderCircle,
+  Plus,
+  Settings,
+  Store,
+  UsersRound,
+} from 'lucide-react'
 import { CreateProjectModal } from './CreateProjectModal'
 import { useProjectStore } from '../conversation/useProjectStore'
 import type { Project } from '../conversation/types'
@@ -14,12 +22,11 @@ export default function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showCreate, setShowCreate] = useState(false)
   const [query, setQuery] = useState('')
+  const [openingProjectId, setOpeningProjectId] = useState('')
   const projects = useProjectStore((state) => state.projects)
   const projectsLoaded = useProjectStore((state) => state.projectsLoaded)
   const loadProjects = useProjectStore((state) => state.loadProjects)
   const activeTab = normalizeTab(searchParams.get('tab'))
-  const selectedProjectId = searchParams.get('project') ?? ''
-  const selectedProject = projects.find((project) => project.id === selectedProjectId)
 
   useEffect(() => {
     loadProjects().catch(() => {})
@@ -44,19 +51,21 @@ export default function ProjectsPage() {
     setSearchParams(tab === 'plaza' ? {} : { tab })
   }
 
-  function showProjectHome(projectId: string) {
-    setSearchParams({ project: projectId })
-  }
-
-  async function continueProject(projectId: string) {
-    await useProjectStore.getState().selectProject(projectId)
-    navigate('/workspace')
+  async function openProject(projectId: string) {
+    if (!projectId || openingProjectId) return
+    setOpeningProjectId(projectId)
+    try {
+      await useProjectStore.getState().selectProject(projectId)
+      navigate('/workspace')
+    } finally {
+      setOpeningProjectId('')
+    }
   }
 
   async function handleCreated(project: { id?: string }) {
     setShowCreate(false)
     await loadProjects()
-    if (project.id) showProjectHome(project.id)
+    if (project.id) await openProject(project.id)
   }
 
   return (
@@ -65,7 +74,7 @@ export default function ProjectsPage() {
         <div className={styles.sidebarHeader}>
           <div>
             <strong>项目中心</strong>
-            <span>我的项目工作台</span>
+            <span>选择项目，直接开始工作</span>
           </div>
           <button className={styles.sideCreateBtn} onClick={() => setShowCreate(true)} type="button" title="新建项目">
             <Plus size={16} aria-hidden="true" />
@@ -75,9 +84,9 @@ export default function ProjectsPage() {
         <div className={styles.sideNav} role="tablist" aria-label="项目中心">
           <button
             className={styles.sideNavBtn}
-            data-active={activeTab === 'mine' || selectedProject ? 'true' : 'false'}
+            data-active={activeTab === 'mine' ? 'true' : 'false'}
             role="tab"
-            aria-selected={activeTab === 'mine' || !!selectedProject}
+            aria-selected={activeTab === 'mine'}
             onClick={() => switchTab('mine')}
             type="button"
           >
@@ -87,9 +96,9 @@ export default function ProjectsPage() {
           </button>
           <button
             className={styles.sideNavBtn}
-            data-active={activeTab === 'plaza' && !selectedProject ? 'true' : 'false'}
+            data-active={activeTab === 'plaza' ? 'true' : 'false'}
             role="tab"
-            aria-selected={activeTab === 'plaza' && !selectedProject}
+            aria-selected={activeTab === 'plaza'}
             onClick={() => switchTab('plaza')}
             type="button"
           >
@@ -98,74 +107,92 @@ export default function ProjectsPage() {
           </button>
         </div>
 
-        <div className={styles.sideSectionTitle}>我的项目</div>
+        <div className={styles.sideSectionTitle}>快速进入</div>
         <div className={styles.sideProjectList}>
           {!projectsLoaded && <div className={styles.sideEmpty}>读取中...</div>}
           {projectsLoaded && projects.length === 0 && <div className={styles.sideEmpty}>暂无项目</div>}
-          {projects.map((project) => (
-            <button
-              key={project.id}
-              className={styles.sideProject}
-              data-active={selectedProjectId === project.id ? 'true' : undefined}
-              onClick={() => showProjectHome(project.id)}
-              type="button"
-              title={project.name}
-            >
-              <ProjectIcon project={project} compact />
-              <span>
-                <strong>{project.name}</strong>
-                <small>{roleLabel(project.my_role || project.role)}</small>
-              </span>
-            </button>
-          ))}
+          {projects.map((project) => {
+            const opening = openingProjectId === project.id
+            return (
+              <button
+                key={project.id}
+                className={styles.sideProject}
+                data-opening={opening ? 'true' : undefined}
+                onClick={() => void openProject(project.id)}
+                type="button"
+                title={`进入 ${project.name}`}
+                disabled={!!openingProjectId}
+              >
+                <ProjectIcon project={project} compact />
+                <span>
+                  <strong>{project.name}</strong>
+                  <small>{opening ? '正在打开项目首页…' : roleLabel(project.my_role || project.role)}</small>
+                </span>
+                {opening && <LoaderCircle className={styles.spinner} size={14} aria-hidden="true" />}
+              </button>
+            )
+          })}
         </div>
       </aside>
 
-      <main className={[styles.main, activeTab === 'plaza' && !selectedProject ? styles.mainPlaza : ''].join(' ')}>
-        {activeTab === 'mine' && !selectedProject && (
+      <main className={styles.main}>
+        {activeTab === 'mine' && (
           <header className={styles.header}>
             <div className={styles.titleBlock}>
+              <span>我的工作空间</span>
               <h1>我的项目</h1>
-              <p>管理你的应用项目，进入项目后继续查看频道和会话。</p>
+              <p>点击项目直接进入介绍页、频道和会话；设置与成员管理保留在次级入口。</p>
             </div>
-            <button className={styles.createBtn} onClick={() => setShowCreate(true)} type="button">
-              <Plus size={16} aria-hidden="true" />
-              <span>新建项目</span>
-            </button>
+            <div className={styles.headerActions}>
+              <button className={styles.plazaBtn} onClick={() => switchTab('plaza')} type="button">
+                <Store size={16} aria-hidden="true" />
+                <span>浏览项目广场</span>
+              </button>
+              <button className={styles.createBtn} onClick={() => setShowCreate(true)} type="button">
+                <Plus size={16} aria-hidden="true" />
+                <span>新建项目</span>
+              </button>
+            </div>
           </header>
         )}
 
         <div className={styles.content}>
-          {selectedProject ? (
-            <ProjectHome
-              project={selectedProject}
-              onContinue={continueProject}
-              onSettings={(projectId) => navigate(`/projects/${projectId}`)}
-              onMembers={(projectId) => navigate(`/projects/${projectId}/members`)}
-            />
-          ) : activeTab === 'mine' ? (
+          {activeTab === 'mine' ? (
             <section className={styles.minePanel} aria-label="我的项目">
               <div className={styles.mineToolbar}>
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="搜索我的项目"
-                />
-                <button type="button" onClick={() => switchTab('plaza')}>去项目广场</button>
+                <label>
+                  <span className={styles.srOnly}>搜索我的项目</span>
+                  <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="搜索项目名称、简介或模板"
+                  />
+                </label>
+                <div className={styles.projectCount}>
+                  <strong>{filteredProjects.length}</strong>
+                  <span>{query ? '个匹配项目' : '个可用项目'}</span>
+                </div>
               </div>
 
               {!projectsLoaded ? (
                 <div className={styles.emptyState}>读取项目列表...</div>
               ) : filteredProjects.length === 0 ? (
                 <div className={styles.emptyState}>
-                  <FolderKanban size={24} aria-hidden="true" />
+                  <FolderKanban size={28} aria-hidden="true" />
                   <strong>{query ? '没有匹配的项目' : '还没有项目'}</strong>
-                  <span>{query ? '换个关键词，或清空搜索。' : '可以新建项目，或去项目广场加入公开项目。'}</span>
+                  <span>{query ? '换个关键词，或清空搜索。' : '新建项目，或从项目广场加入一个公开项目。'}</span>
                 </div>
               ) : (
                 <div className={styles.projectList}>
                   {filteredProjects.map((project) => (
-                    <ProjectRow key={project.id} project={project} onOpen={showProjectHome} />
+                    <ProjectRow
+                      key={project.id}
+                      project={project}
+                      opening={openingProjectId === project.id}
+                      disabled={!!openingProjectId}
+                      onOpen={openProject}
+                      onManage={(projectId) => navigate(`/projects/${projectId}`)}
+                    />
                   ))}
                 </div>
               )}
@@ -175,51 +202,6 @@ export default function ProjectsPage() {
           )}
         </div>
       </main>
-
-      <aside className={styles.rightPanel} aria-label="项目中心侧栏">
-        <section className={styles.rightSection}>
-          <span className={styles.rightEyebrow}>当前</span>
-          <strong>{selectedProject ? '正在查看项目首页' : activeTab === 'plaza' ? '正在浏览项目广场' : '正在管理我的项目'}</strong>
-          <p>{selectedProject ? '这里先展示项目资料和入口；点击继续开发后才进入项目频道和会话工作台。' : activeTab === 'plaza' ? '中间区域默认展示公开项目，左侧保留你的项目入口。' : '从左侧或列表进入项目后，会先看到项目首页。'}</p>
-        </section>
-
-        <section className={styles.rightStats} aria-label="项目统计">
-          <div>
-            <strong>{projects.length}</strong>
-            <span>我的项目</span>
-          </div>
-          <div>
-            <strong>{filteredProjects.length}</strong>
-            <span>当前匹配</span>
-          </div>
-        </section>
-
-        <section className={styles.rightActions} aria-label="快捷操作">
-          {selectedProject && (
-            <button type="button" onClick={() => continueProject(selectedProject.id)}>
-              <Code2 size={15} aria-hidden="true" />
-              <span>继续开发</span>
-            </button>
-          )}
-          <button type="button" onClick={() => switchTab('plaza')}>
-            <Store size={15} aria-hidden="true" />
-            <span>浏览项目广场</span>
-          </button>
-          <button type="button" onClick={() => switchTab('mine')}>
-            <FolderKanban size={15} aria-hidden="true" />
-            <span>查看我的项目</span>
-          </button>
-          <button type="button" onClick={() => setShowCreate(true)}>
-            <Plus size={15} aria-hidden="true" />
-            <span>新建项目</span>
-          </button>
-        </section>
-
-        <section className={styles.rightSection}>
-          <span className={styles.rightEyebrow}>结构</span>
-          <p>左侧负责浏览项目，中间展示项目首页或广场；只有继续开发时才进入频道、会话和成员侧栏。</p>
-        </section>
-      </aside>
 
       {showCreate && (
         <CreateProjectModal
@@ -232,89 +214,46 @@ export default function ProjectsPage() {
   )
 }
 
-function ProjectHome({
+function ProjectRow({
   project,
-  onContinue,
-  onSettings,
-  onMembers,
+  opening,
+  disabled,
+  onOpen,
+  onManage,
 }: {
   project: Project
-  onContinue: (projectId: string) => void
-  onSettings: (projectId: string) => void
-  onMembers: (projectId: string) => void
+  opening: boolean
+  disabled: boolean
+  onOpen: (projectId: string) => void
+  onManage: (projectId: string) => void
 }) {
   return (
-    <section className={styles.projectHome} aria-label="项目首页">
-      <div className={styles.projectHero}>
+    <article className={styles.projectRow} data-opening={opening ? 'true' : undefined}>
+      <button className={styles.projectOpen} type="button" onClick={() => void onOpen(project.id)} disabled={disabled}>
         <ProjectIcon project={project} />
-        <div className={styles.projectHeroText}>
-          <span>{roleLabel(project.my_role || project.role)}</span>
-          <h1>{project.name}</h1>
-          <p>{project.description || '这个项目还没有填写简介。'}</p>
-        </div>
-        <button className={styles.continueBtn} type="button" onClick={() => onContinue(project.id)}>
-          <Code2 size={16} aria-hidden="true" />
-          <span>继续开发</span>
-        </button>
-      </div>
-
-      <div className={styles.projectHomeGrid}>
-        <div className={styles.projectHomeCard}>
-          <strong>项目资料</strong>
-          <dl>
-            <div><dt>项目 ID</dt><dd>{project.id}</dd></div>
-            <div><dt>模板</dt><dd>{project.template || '-'}</dd></div>
-            <div><dt>来源</dt><dd>{project.source_type || '项目中心'}</dd></div>
-          </dl>
-        </div>
-
-        <div className={styles.projectHomeCard}>
-          <strong>状态</strong>
-          <dl>
-            <div><dt>成员</dt><dd>{project.member_count ?? 1}</dd></div>
-            <div><dt>角色</dt><dd>{roleLabel(project.my_role || project.role)}</dd></div>
-            <div><dt>更新</dt><dd>{formatProjectDate(project.updated_at || project.created_at)}</dd></div>
-          </dl>
-        </div>
-
-        <div className={styles.projectHomeActions}>
-          <button type="button" onClick={() => onContinue(project.id)}>
-            <Code2 size={15} aria-hidden="true" />
-            <span>继续开发</span>
-          </button>
-          <button type="button" onClick={() => onSettings(project.id)}>
-            <Settings size={15} aria-hidden="true" />
-            <span>项目设置</span>
-          </button>
-          <button type="button" onClick={() => onMembers(project.id)}>
-            <UsersRound size={15} aria-hidden="true" />
-            <span>成员管理</span>
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.projectHomeNote}>
-        <CalendarDays size={15} aria-hidden="true" />
-        <span>项目首页用于浏览和管理；开发会话、频道和 AI 运行过程会在继续开发后打开。</span>
-      </div>
-    </section>
-  )
-}
-
-function ProjectRow({ project, onOpen }: { project: Project; onOpen: (projectId: string) => void }) {
-  return (
-    <button className={styles.projectRow} type="button" onClick={() => onOpen(project.id)}>
-      <ProjectIcon project={project} />
-      <span className={styles.projectMain}>
-        <strong>{project.name}</strong>
-        <span>{project.description || '暂无简介'}</span>
-        <em>
-          <UsersRound size={13} aria-hidden="true" />
-          {project.member_count ?? 1} 成员 · {roleLabel(project.my_role || project.role)} · {formatProjectDate(project.updated_at || project.created_at)}
-        </em>
-      </span>
-      <ChevronRight className={styles.projectChevron} size={17} aria-hidden="true" />
-    </button>
+        <span className={styles.projectMain}>
+          <strong>{project.name}</strong>
+          <span>{project.description || '这个项目还没有填写简介。'}</span>
+          <em>
+            <UsersRound size={13} aria-hidden="true" />
+            {project.member_count ?? 1} 位成员 · {roleLabel(project.my_role || project.role)} · {formatProjectDate(project.updated_at || project.created_at)}
+          </em>
+        </span>
+        <span className={styles.openHint}>
+          {opening ? <LoaderCircle className={styles.spinner} size={15} aria-hidden="true" /> : <ChevronRight size={17} aria-hidden="true" />}
+          {opening ? '正在打开' : '进入项目'}
+        </span>
+      </button>
+      <button
+        className={styles.projectManage}
+        type="button"
+        onClick={() => onManage(project.id)}
+        title="管理项目"
+        aria-label={`管理 ${project.name}`}
+      >
+        <Settings size={15} aria-hidden="true" />
+      </button>
+    </article>
   )
 }
 

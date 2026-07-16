@@ -1,0 +1,312 @@
+.downloadSection {
+  min-width: 0;
+  margin-top: 14px;
+  padding: 18px;
+  scroll-margin-top: 16px;
+  border: 1px solid rgba(255, 255, 255, .075);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .022);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.panelHeaderIcon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border-radius: 9px;
+  background: rgba(113, 144, 184, .12);
+  color: #a9c0df;
+}
+
+.sectionHeader div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sectionHeader strong {
+  color: #eef2f7;
+  font-size: 13.5px;
+  font-weight: 900;
+}
+
+.sectionHeader small {
+  color: #7f8997;
+  font-size: 11px;
+}
+
+.sectionHeader em {
+  margin-left: auto;
+  color: #7f8995;
+  font-size: 10.5px;
+  font-style: normal;
+}
+
+.downloadGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.downloadCard,
+.variantCard {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, .085);
+  border-radius: 10px;
+  background: #1b1d22;
+  color: inherit;
+}
+
+.downloadCard {
+  min-height: 94px;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  text-align: left;
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+
+.downloadCard:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(92, 174, 123, .39);
+  background: #1d2420;
+}
+
+.downloadDisabled {
+  cursor: default;
+  opacity: .57;
+}
+
+.platformBadge {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(72, 158, 104, .22);
+  color: #a7e2ba;
+}
+
+.status_planned .platformBadge,
+.status_pending .platformBadge,
+.status_needs_configuration .platformBadge,
+.status_not_deployed .platformBadge,
+.status_unavailable .platformBadge {
+  background: rgba(121, 130, 144, .14);
+  color: #929ba8;
+}
+
+.downloadCopy {
+  min-width: 0;
+}
+
+.downloadCopy strong,
+.downloadCopy small,
+.downloadCopy em {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.downloadCopy strong {
+  color: #eef2f7;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.downloadCopy small {
+  margin-top: 4px;
+  color: #9aa4b1;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.downloadCopy em {
+  display: -webkit-box;
+  margin-top: 5px;
+  color: #7f8996;
+  font-size: 10.5px;
+  font-style: normal;
+  line-height: 1.35;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.downloadStatus {
+  align-self: start;
+  color: #9bcfad;
+  font-size: 10.5px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.variantCard {
+  grid-column: 1 / -1;
+  padding: 13px;
+}
+
+.variantHeader {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.variantList {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0 58px;
+}
+
+.variantRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .025);
+}
+
+.variantCopy {
+  min-width: 0;
+}
+
+.variantCopy strong,
+.variantCopy small,
+.variantCopy em {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.variantCopy strong {
+  color: #dfe5ec;
+  font-size: 11.5px;
+}
+
+.variantCopy small {
+  margin-top: 2px;
+  color: #8993a0;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.variantCopy em {
+  margin-top: 3px;
+  color: #727c88;
+  font-size: 10px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.variantAction {
+  min-width: 54px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(83, 174, 116, .32);
+  border-radius: 7px;
+  background: rgba(55, 135, 84, .17);
+  color: #afe1bf;
+  font-size: 10.5px;
+  font-weight: 850;
+}
+
+.variantAction:disabled {
+  border-color: rgba(255, 255, 255, .07);
+  background: rgba(255, 255, 255, .03);
+  color: #777f8a;
+}
+
+.downloadEmpty {
+  min-height: 110px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  border: 1px dashed rgba(255, 255, 255, .09);
+  border-radius: 10px;
+  color: #7f8996;
+  text-align: center;
+}
+
+.downloadEmpty strong {
+  color: #cbd2dc;
+  font-size: 12.5px;
+}
+
+.downloadEmpty span {
+  max-width: 480px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .downloadGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .variantCard {
+    grid-column: auto;
+  }
+
+  .variantList {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .downloadSection {
+    border-radius: 10px;
+  }
+
+  .sectionHeader em {
+    display: none;
+  }
+
+  .downloadCard,
+  .variantHeader {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .platformBadge {
+    width: 40px;
+    height: 40px;
+  }
+
+  .downloadStatus {
+    grid-column: 2;
+  }
+
+  .variantRow {
+    grid-template-columns: 1fr;
+  }
+
+  .variantAction {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .downloadCard {
+    transition: none;
+  }
+}

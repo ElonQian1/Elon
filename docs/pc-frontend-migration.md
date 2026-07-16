@@ -85,7 +85,7 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 项目中心双 Tab（我的项目 / 项目广场）| 🔴 高 | `src/features/projects/ProjectsPage.tsx` | ✅ 已恢复，`/pc/projects` 保留第二/右侧栏；默认中间展示项目广场，点击项目先展示项目首页，继续开发再进入会话工作台 |
+| 项目中心双 Tab（我的项目 / 项目广场）| 🔴 高 | `src/features/projects/ProjectsPage.tsx` | ✅ 已恢复；项目卡和左侧项目入口现在直接进入会话工作台内的项目主页，不再经过重复资料中转页；设置与成员管理保留为次级入口 |
 | 项目广场列表（过滤/搜索/cursor 分页）| 🟡 中 | `src/features/plaza/ProjectPlazaView.tsx` | ✅ 已完成，`/pc/plaza` 与项目中心广场 Tab 复用同一视图；PC 新前端默认使用 `page_mode=cursor` 加载更多，旧 offset 仅保留兼容 |
 | 加入/申请加入项目 | 🟡 中 | `src/features/plaza/` | ✅ 已完成，加入后刷新我的项目 |
 | 项目卡片分享 | 🟢 低 | `src/features/plaza/ProjectCard.tsx` | ⬜ 未开始 |
@@ -177,7 +177,7 @@ PC 前端动态刷新分三层，后续新增模块必须接入这条链路，�
 | 应用壳、侧边栏、频道列表 | `pc_app.html`、`pc_app.js` | ✅ 已迁移到 `Shell`、`ConversationPage`、`ChannelNavList` | 频道固定、展开/折叠已在新前端维护 |
 | 登录、注册、账号菜单 | `pc_app.js` | ✅ 已迁移到 `auth/` 和 `shell/` | 旧入口源码已删除 |
 | 模型/运行路线选择 | `pc_app_models.js`、`pc_app_models.css` | 🟡 已迁移第一版到会话页运行路线控件 | 后续继续跟 Route A/B/C 产品文案对齐 |
-| 项目中心、新建项目 | `pc_app_project_create.js`、`pc_app.js` | ✅ 已迁移到 `ProjectsPage`、`CreateProjectModal` | 项目中心默认广场，项目点击先展示项目首页 |
+| 项目中心、新建项目 | `pc_app_project_create.js`、`pc_app.js` | ✅ 已迁移到 `ProjectsPage`、`CreateProjectModal` | 项目中心默认广场；点击项目直接进入工作台项目主页，新建项目完成后同样直达主页 |
 | 项目广场 | `pc_app.js` | ✅ 已迁移到 `ProjectPlazaView` | `/pc/plaza` 和项目中心广场复用同一视图 |
 | AI 开发任务消息、审批、取消 | `pc_app_dev_tasks.js`、`pc_app_agent_runs.js`、`pc_app_task_snapshots.js` | 🟡 已迁移到 `features/dev/` 第一版 | 公开过程、恢复态、终态细节仍继续实测打磨 |
 | 本机节点和客户端维护 | `pc_app_node.js`、`pc_app_node_admin.js`、`pc_app_client_maintenance.js` | ✅ 已迁移到 `features/node/`；已加入项目数据架构体检 | 旧/外部项目继承已跑通的目录与共享缓存；新项目优先推荐数据根；分析、容量和迁移均为建议，不得阻断任务 |
