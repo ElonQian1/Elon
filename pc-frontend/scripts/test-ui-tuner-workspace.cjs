@@ -71,6 +71,22 @@ try {
     '源码数字孪生模式不得误用 Android 真实画面交互状态',
   )
 
+  const projectRootOutput = compile(
+    'src/features/ui-tuner/source-preview/sourcePreviewProjectRoot.ts',
+    'source-preview/sourcePreviewProjectRoot.js',
+  )
+  const { androidProjectRootCandidates } = require(projectRootOutput)
+  assert.deepEqual(
+    androidProjectRootCandidates('D:\\projects\\elon'),
+    [
+      'D:\\projects\\elon',
+      'D:\\projects\\elon\\android\\app',
+      'D:\\projects\\elon\\android',
+      'D:\\projects\\elon\\app',
+    ],
+    '仓库根应自动下探常见 Android app 模块，避免切到草稿后误报没有 XML',
+  )
+
   const selectionOutput = compile(
     'src/features/ui-tuner/workspace/uiWorkspaceSelection.ts',
     'workspace/uiWorkspaceSelection.js',

@@ -1,6 +1,7 @@
 import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { ComposePreviewEntry, ComposePreviewRender, SourcePreviewDocument, SourceRendererCapabilities } from './types'
+import { androidProjectRootCandidates } from './sourcePreviewProjectRoot'
 
 export function sourcePreviewAdminUrl(): string {
   return safeNodeAdminUrl()
@@ -8,10 +9,20 @@ export function sourcePreviewAdminUrl(): string {
 export async function loadSourcePreview(projectRoot: string, layoutFile?: string): Promise<SourcePreviewDocument> {
   const baseUrl = sourcePreviewAdminUrl()
   await probeLocalNode(baseUrl)
-  return nodeApi<SourcePreviewDocument>(baseUrl, '/api/source-preview/load', {
-    method: 'POST',
-    body: JSON.stringify({ projectRoot, layoutFile }),
-  }, 15000)
+  const candidates = layoutFile ? [projectRoot] : androidProjectRootCandidates(projectRoot)
+  let lastError: unknown
+  for (const candidate of candidates) {
+    try {
+      return await nodeApi<SourcePreviewDocument>(baseUrl, '/api/source-preview/load', {
+        method: 'POST',
+        body: JSON.stringify({ projectRoot: candidate, layoutFile }),
+      }, 15000)
+    } catch (error) {
+      lastError = error
+      if (!String(error).includes('没有找到 src/main/res/layout')) throw error
+    }
+  }
+  throw lastError
 }
 
 export async function loadSourceRenderers(projectRoot: string): Promise<SourceRendererCapabilities> {

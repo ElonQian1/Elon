@@ -61,13 +61,13 @@ export function useSourcePreviewSession(initialProjectRoot: string) {
     if (!root) { setError('请先选择或输入本机 Android 项目目录'); return }
     setLoading(true); setError('')
     try {
-      const rendererRefresh = renderer.refresh(root)
       const next = await loadSourcePreview(root, layoutFile)
       dispatch({ type: 'load', document: next })
       setSelectedKey(next.root.key)
       setSaveState('preview')
-      window.localStorage.setItem('elon.uiTuner.sourceProjectRoot', root)
-      await rendererRefresh
+      setProjectRoot(next.projectRoot)
+      window.localStorage.setItem('elon.uiTuner.sourceProjectRoot', next.projectRoot)
+      await renderer.refresh(next.projectRoot)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally { setLoading(false) }
