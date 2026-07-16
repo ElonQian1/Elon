@@ -405,6 +405,16 @@ try {
   assert.match(sourceInspectorSource, /\['text', 'button', 'input'\]\.includes\(node\.kind\)/)
   assert.match(sourceInspectorSource, /转到 Android 真帧校准/)
   assert.match(sourceInspectorSource, /只发送当前组件，不重复读取整棵源码树/)
+  const sourceModeBarSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewModeBar.tsx'),
+    'utf8',
+  )
+  assert.match(sourceModeBarSource, /继续编辑草稿/)
+  const sourceWorkspaceSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
+    'utf8',
+  )
+  assert.match(sourceWorkspaceSource, /renderer\.beginLocalDraft\(\); session\.apply\(patch\)/)
   const focusExitSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/workspace/FocusModeExitButton.tsx'),
     'utf8',
