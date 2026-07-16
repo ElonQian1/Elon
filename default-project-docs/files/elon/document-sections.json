@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "profile": "auto",
+  "home": {
+    "title": "项目知识库",
+    "summary": "从项目总览开始，按主题理解架构、参考资料、操作指南和决策；文档权威性在治理视图中单独判断。",
+    "entrypoint": "docs/project-readme.md",
+    "start_here": [
+      "docs/project-readme.md",
+      "AI_PROJECT.md",
+      "AI_ARCHITECTURE.md",
+      "AI_INDEX.md"
+    ]
+  },
+  "sections": [
+    { "id": "overview", "label": "项目总览", "detail": "项目定位、范围和推荐阅读", "color": "#9A74E8", "parent_id": "", "order": 10, "icon": "compass", "entrypoint": "docs/project-readme.md" },
+    { "id": "architecture", "label": "架构与设计", "detail": "总体结构、模块边界和关键数据流", "color": "#5F8FE3", "parent_id": "", "order": 20, "icon": "blocks", "entrypoint": "AI_ARCHITECTURE.md" },
+    { "id": "reference", "label": "参考资料", "detail": "代码、接口、数据模型和项目索引", "color": "#4FA9B8", "parent_id": "", "order": 30, "icon": "book-key", "entrypoint": "AI_INDEX.md" },
+    { "id": "guides", "label": "指南与操作", "detail": "面向任务的开发和操作步骤", "color": "#5FBC88", "parent_id": "", "order": 40, "icon": "route", "entrypoint": "AI_TASK_TEMPLATE.md" },
+    { "id": "decisions", "label": "决策记录", "detail": "已接受决策及其原因", "color": "#C884DD", "parent_id": "", "order": 50, "icon": "milestone", "entrypoint": "" },
+    { "id": "workbench", "label": "工作区", "detail": "草稿、讨论、证据和待整理材料", "color": "#C58C55", "parent_id": "", "order": 90, "icon": "notebook-pen", "entrypoint": "" }
+  ],
+  "assignments": {
+    "AI_PROJECT.md": "custom:overview",
+    "docs/project-readme.md": "custom:overview",
+    "AI_ARCHITECTURE.md": "custom:architecture",
+    "AI_INDEX.md": "custom:reference",
+    "AI_TASK_TEMPLATE.md": "custom:guides"
+  },
+  "governance_overrides": {},
+  "document_metadata": {
+    "docs/project-readme.md": { "doc_type": "overview", "audience": ["项目成员"], "owner": "", "version": "", "related": ["AI_PROJECT.md"], "supersedes": [] },
+    "AI_ARCHITECTURE.md": { "doc_type": "architecture", "audience": ["开发者", "AI 代理"], "owner": "", "version": "", "related": ["AI_INDEX.md"], "supersedes": [] },
+    "AI_INDEX.md": { "doc_type": "reference", "audience": ["开发者", "AI 代理"], "owner": "", "version": "", "related": ["AI_ARCHITECTURE.md"], "supersedes": [] }
+  }
+}

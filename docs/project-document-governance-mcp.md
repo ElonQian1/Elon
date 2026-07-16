@@ -1,16 +1,16 @@
 # 项目文档治理 MCP
 
-最后更新：2026-07-15
+最后更新：2026-07-17
 
 本文是接入或诊断项目文档治理 MCP 时才读取的按需手册。日常文档任务先遵循 `.github/instructions/document-authority.instructions.md`，不要把本文复制到 Codex、Claude、Gemini 或 Copilot 的私有桥接文件。
 
-## 1. 网页分区和实际目录的关系
+## 1. 知识架构、治理属性和实际目录
 
 - Git 工作区中的 Markdown 和路径是内容真源。
 - 路径决定文档权威性上限；正文只能降低自身生命周期，不能越过路径上限。
-- PC 网页端的系统分区先由程序根据 `role`、`lifecycle`、`authority` 和 `ambiguous` 派生。
-- `.elon/document-sections.json` 只保存用户自定义分区和虚拟归类覆盖，不移动实际文件。
-- 虚拟分区只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
+- PC 网页端“知识架构”按项目主题浏览，“治理视图”根据 `role`、`lifecycle`、`authority` 和 `ambiguous` 判断权威性；两者是正交维度。
+- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖和文档关系，不移动实际文件。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
+- 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
 
@@ -59,10 +59,10 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 - `catalog_revision`；
 - 路径、标题、大小、哈希和标题层级；
 - `role`、`lifecycle`、`authority`、`default_retrieval`、`ambiguous`；
-- 自动分区、用户覆盖、现有建议；
+- 自动治理分区、知识架构健康度、用户覆盖和现有建议；
 - 全量读取估算、默认读取估算和预计避免 token。
 
-`classification_model_tokens` 固定为 `0`，表示预分类没有调用模型，不表示后续 AI 判断不消耗 token。
+`classification_model_tokens` 固定为 `0`，表示预分类没有调用模型，不表示后续 AI 判断不消耗 token。`knowledge_architecture` 还返回项目类型推断、完整度分数、基础文档覆盖、过期/歧义/重复标题、缺失文档类型和推荐主题。
 
 ### `project_docs_get_status`
 
@@ -93,7 +93,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 - catalog revision 未变化；
 - 建议路径全部存在于目录；
 - 系统分区或自定义分区引用有效；
-- 新分区不超过 8 个，建议归类不超过 500 条；
+- 新分区不超过 16 个、层级不超过四层，建议归类不超过 500 条；
 - 当前建议 revision 未被其他会话修改。
 
 该工具只能写建议 JSON，不能写分区配置或 Markdown。
@@ -104,7 +104,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_apply_suggestions`
 
-工具把建议合并到虚拟分区配置，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
+工具把建议的项目类型、知识首页、层级主题、文档关系和归类合并到知识架构清单，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
 
 - catalog、manifest 和 suggestions revision 必须一致；
 - 重复调用是幂等的；
@@ -135,7 +135,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示从建议生成、虚拟分区应用到实体文件应用的每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台。页面按项目保存三档权限，默认选中“AI 自动整理（可信且可恢复）”。实体操作通过 `/api/project-docs/organization/apply-files` 交给本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
-手工新建分区、删除自定义分区和单篇虚拟归类仍写 `.elon/document-sections.json`；它们不会自动创建实际目录。AI 可以提出新分区，是否采用由审核者决定。
+知识首页允许用户固定项目模板；手工新建一级/子分区、删除主题子树和单篇主题/治理归类仍写 `.elon/document-sections.json`，不会自动创建或删除实际目录。AI 可以提出新的项目模板、首页、分区、缺失文档和关系建议；是否自动应用由统一权限模式决定。
 
 ## 5. 安全和失败原则
 

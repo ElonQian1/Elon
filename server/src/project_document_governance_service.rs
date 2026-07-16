@@ -8,6 +8,7 @@ use std::{collections::HashSet, path::Path};
 
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
+    project_document_architecture::analyze_knowledge_architecture,
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{
         read_project_document_file, write_project_document_file, ProjectDocumentFile,
@@ -94,6 +95,8 @@ pub(crate) fn analyze_workspace(
         .iter()
         .filter(|document| !document.metadata.default_retrieval)
         .count();
+    let knowledge_architecture =
+        analyze_knowledge_architecture(&snapshot.documents, &manifest.value);
     Ok(json!({
         "workspace": snapshot.workspace_path,
         "catalog_revision": snapshot.revision,
@@ -114,21 +117,22 @@ pub(crate) fn analyze_workspace(
             "ambiguous_documents": ambiguous_documents,
             "excluded_by_default": excluded_by_default,
         },
+        "knowledge_architecture": knowledge_architecture,
         "documents": documents,
         "manifest": manifest.value,
         "manifest_revision": manifest.revision,
         "suggestions": suggestions.value,
         "suggestions_revision": suggestions.revision,
         "permissions": {
-            "virtual_organization": {"requires_review": true, "changes_markdown": false},
+            "virtual_organization": {"default_mode": "git_backed_full", "changes_markdown": false},
             "file_operations": {
                 "requires_item_review": true,
                 "one_shot_permissions": ["rename", "move"],
                 "allowed_scope": "workspace_markdown_only",
-                "forbidden": ["overwrite", "delete", "edit_content", "outside_workspace", "git_commit", "git_push"]
+                "forbidden": ["overwrite", "delete", "edit_content", "outside_workspace", "git_push"]
             }
         },
-        "next": "Only read ambiguous or task-relevant paths. Save virtual assignments and optional structured rename/move file_operations, then stop for item-by-item user review.",
+        "next": "Use the metadata-only knowledge_architecture diagnostics, read only ambiguous or task-relevant paths, then save topic hierarchy, knowledge home, document relationships and optional safe rename/move operations under the selected authorization mode.",
     }))
 }
 

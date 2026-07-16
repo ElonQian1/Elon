@@ -162,6 +162,14 @@ const DEFAULT_PROJECT_FILES: &[DefaultProjectFile] = &[
             "/../default-project-docs/files/elon/default-docs.json"
         )),
     },
+    DefaultProjectFile {
+        path: ".elon/document-sections.json",
+        title: None,
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/elon/document-sections.json"
+        )),
+    },
 ];
 
 pub(crate) fn default_project_documents() -> Vec<ProjectDocumentEntry> {

@@ -13,7 +13,7 @@
 | Win 节点轻量工具箱 / Codex CLI 临时 PATH / 工具收录策略 | `docs/win-node-toolbox.md`、`server/src/node_agent_cli_env.rs`、`server/src/node_agent_cli_tool_catalog.rs` |
 | PC 节点项目数据架构体检 / 共享缓存分析 / 渐进治理 | `docs/pc-node-data-root.md`、`server/pc-dev-runtime/src/node_data_paths.rs`、`server/src/node_agent_data_root/`、`server/src/node_agent_cache_advisor.rs` |
 | Windows 节点升级兼容 / 自动迁移 / 灰度 / 事故处置 | `docs/node-agent-upgrade-compatibility.md` |
-| 项目文档权威性 / 低 token 分类 / OneNote 虚拟分区 / 供应商无关 MCP / 分阶段诊断 | `.github/instructions/document-authority.instructions.md`、`docs/project-document-governance-mcp.md`、`server/src/project_document_governance*.rs`、`server/src/project_document_observability*.rs`、`server/src/node_agent_project_docs_mcp*.rs` |
+| 项目知识首页 / 主题知识树 / 独立治理属性 / 低 token 健康诊断 / 供应商无关 MCP | `docs/README.md`、`.github/instructions/document-authority.instructions.md`、`docs/project-document-governance-mcp.md`、`pc-frontend/src/features/project-docs/`、`server/src/project_document_architecture.rs`、`server/src/project_document_governance*.rs`、`server/src/node_agent_project_docs_mcp*.rs` |
 | 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
 | 用户等级、经验条、token 消耗/分享算力经验 | `server/src/user_progression.rs`、`server/src/store/user_progression.rs`、`server/src/token_usage_api.rs`、`server/src/store/node_ledger.rs` |
 | context compiler / repo map | `server/src/context_compiler/` |

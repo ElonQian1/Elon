@@ -84,7 +84,15 @@ export function useProjectDocumentOrganization(
       readJsonFile(projectId, ORGANIZATION_SUGGESTIONS_PATH),
     ])
     setManifestFile({
-      value: manifest ? parseSectionManifest(manifest.content) : { version: 1, sections: [], assignments: {} },
+      value: manifest ? parseSectionManifest(manifest.content) : {
+        version: 1,
+        profile: 'auto',
+        home: { title: '', summary: '', entrypoint: '', start_here: [] },
+        sections: [],
+        assignments: {},
+        governance_overrides: {},
+        document_metadata: {},
+      },
       revision: manifest?.revision,
     })
     setSuggestionsFile({
@@ -188,8 +196,8 @@ export function useProjectDocumentOrganization(
     return value
   }, [manifestFile.revision, projectId])
 
-  const addSection = useCallback(async (label: string) => {
-    const section = createCustomSection(label, manifestFile.value.sections)
+  const addSection = useCallback(async (label: string, parentId = '') => {
+    const section = createCustomSection(label, manifestFile.value.sections, parentId)
     await saveManifest({
       ...manifestFile.value,
       sections: [...manifestFile.value.sections, section],
@@ -199,28 +207,49 @@ export function useProjectDocumentOrganization(
 
   const removeSection = useCallback(async (sectionKey: string) => {
     const id = sectionKey.replace(/^custom:/, '')
+    const removedIds = new Set([id])
+    let changed = true
+    while (changed) {
+      changed = false
+      manifestFile.value.sections.forEach((section) => {
+        if (removedIds.has(section.parent_id) && !removedIds.has(section.id)) {
+          removedIds.add(section.id)
+          changed = true
+        }
+      })
+    }
     const assignments = Object.fromEntries(
-      Object.entries(manifestFile.value.assignments).filter(([, assigned]) => assigned !== sectionKey),
+      Object.entries(manifestFile.value.assignments).filter(([, assigned]) => !removedIds.has(assigned.replace(/^custom:/, ''))),
     )
     await saveManifest({
-      version: 1,
-      sections: manifestFile.value.sections.filter((section) => section.id !== id),
+      ...manifestFile.value,
+      sections: manifestFile.value.sections.filter((section) => !removedIds.has(section.id)),
       assignments,
     })
   }, [manifestFile.value, saveManifest])
 
-  const assignDocument = useCallback(async (path: string, sectionKey: string) => {
+  const assignDocument = useCallback(async (
+    path: string,
+    sectionKey: string,
+    facet: 'knowledge' | 'governance',
+  ) => {
     const normalized = normalizePath(path)
-    const assignments = { ...manifestFile.value.assignments }
+    const field = facet === 'knowledge' ? 'assignments' : 'governance_overrides'
+    const assignments = { ...manifestFile.value[field] }
     if (sectionKey) assignments[normalized] = sectionKey
     else delete assignments[normalized]
     const nextManifest = {
       ...manifestFile.value,
-      assignments,
+      [field]: assignments,
     }
     await saveManifest(nextManifest)
     return nextManifest
   }, [manifestFile.value, saveManifest])
+
+  const setProfile = useCallback(async (profile: string) => saveManifest({
+    ...manifestFile.value,
+    profile,
+  }), [manifestFile.value, saveManifest])
 
   const applySuggestions = useCallback(async (
     catalogRevision: string,
@@ -327,6 +356,7 @@ export function useProjectDocumentOrganization(
     addSection,
     removeSection,
     assignDocument,
+    setProfile,
     applySuggestions,
     applyFileOperations,
   }

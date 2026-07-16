@@ -43,7 +43,7 @@ server/src/
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
 | Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
-| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 分类目录） | 🔴 高 | `src/features/project-docs/` | ✅ 已补齐互斥系统分区、项目内可移植自定义分区、文档健康度和 AI 建议区；目录/正文/应用/Git 阶段可观测；默认先提交整理前文档，再开放分类、建分区和 Markdown rename/move，整理后自动提交结果；不夹带代码、不自动 push；用户可切换逐项审核或仅建议；网页与供应商无关 MCP 共用 Rust 治理内核 |
+| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 知识架构） | 🔴 高 | `src/features/project-docs/` | ✅ 已实现知识首页、推荐阅读、软件平台/API/产品/研究/运维/个人知识模板、最多四层主题树与独立治理视图；用户可建父/子分区、固定项目模板和分别覆盖主题/治理属性；完整度、过期、歧义、重复标题与缺失类型由程序零模型 token 诊断；AI 建议、目录/正文/应用/Git 阶段可观测；默认整理前/后双提交，可执行安全 Markdown rename/move，不夹带代码、不自动 push；网页与供应商无关 MCP 共用 Rust 内核 |
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |

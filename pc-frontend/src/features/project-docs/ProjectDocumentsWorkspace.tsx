@@ -4,11 +4,21 @@ import { Bot, FilePlus2, FileText, FolderTree, RefreshCw, Save, Search, Sparkles
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import ProjectDocumentAccessNotice from './ProjectDocumentAccessNotice'
+import ProjectDocumentArchitectureHealth from './ProjectDocumentArchitectureHealth'
 import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
+import ProjectDocumentKnowledgeHome from './ProjectDocumentKnowledgeHome'
 import ProjectDocumentNotebookRail from './ProjectDocumentNotebookRail'
 import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
+import {
+  analyzeKnowledgeArchitecture,
+  buildKnowledgeSections,
+  KNOWLEDGE_HOME_SECTION,
+  knowledgeSectionCounts,
+  topicSectionForDocument,
+  type DocumentNavigationMode,
+} from './projectDocumentArchitecture'
 import {
   formatNumber,
   lifecycleLabel,
@@ -19,6 +29,7 @@ import {
 import {
   buildDocumentSections,
   buildOrganizationPrompt,
+  governanceSectionForDocument,
   sectionForDocument,
   type DocumentSection,
 } from './projectDocumentSections'
@@ -48,7 +59,8 @@ export default function ProjectDocumentsWorkspace({
   const [catalog, setCatalog] = useState<DocumentCatalog | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(true)
   const [catalogError, setCatalogError] = useState('')
-  const [activeSection, setActiveSection] = useState('required')
+  const [navigationMode, setNavigationMode] = useState<DocumentNavigationMode>('knowledge')
+  const [activeSection, setActiveSection] = useState(KNOWLEDGE_HOME_SECTION)
   const [query, setQuery] = useState('')
   const [selectedPath, setSelectedPath] = useState('')
   const [document, setDocument] = useState<DocumentFile | null>(null)
@@ -63,7 +75,14 @@ export default function ProjectDocumentsWorkspace({
   const [applyingFileOperations, setApplyingFileOperations] = useState(false)
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const automationPolicy = useProjectDocumentAutomationPolicy(projectId)
-  const sections = useMemo(() => buildDocumentSections(organization.manifest), [organization.manifest])
+  const governanceSections = useMemo(() => buildDocumentSections(organization.manifest)
+    .filter((section) => !section.custom), [organization.manifest])
+  const knowledgeSections = useMemo(() => buildKnowledgeSections(catalog, organization.manifest), [catalog, organization.manifest])
+  const sections = navigationMode === 'knowledge' ? knowledgeSections : governanceSections
+  const architectureHealth = useMemo(
+    () => analyzeKnowledgeArchitecture(catalog, organization.manifest),
+    [catalog, organization.manifest],
+  )
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -89,11 +108,23 @@ export default function ProjectDocumentsWorkspace({
   )
   const automaticSectionKey = useMemo(() => {
     if (!selectedEntry) return 'unclassified'
-    const assignments = { ...organization.manifest.assignments }
+    const field = navigationMode === 'knowledge' ? 'assignments' : 'governance_overrides'
+    const assignments = { ...organization.manifest[field] }
     delete assignments[normalizeDocumentPath(selectedEntry.path)]
-    return sectionForDocument(selectedEntry, { ...organization.manifest, assignments })
-  }, [organization.manifest, selectedEntry])
+    return navigationMode === 'knowledge'
+      ? topicSectionForDocument(selectedEntry, catalog, { ...organization.manifest, assignments })
+      : governanceSectionForDocument(selectedEntry, { ...organization.manifest, governance_overrides: assignments })
+  }, [catalog, navigationMode, organization.manifest, selectedEntry])
   const automaticSectionLabel = sections.find((section) => section.key === automaticSectionKey)?.label ?? '等待整理'
+  const assignmentSections = navigationMode === 'knowledge'
+    ? knowledgeSections.filter((section) => section.custom)
+    : governanceSections.filter((section) => !section.virtual)
+  const persistedAssignment = selectedEntry
+    ? organization.manifest[navigationMode === 'knowledge' ? 'assignments' : 'governance_overrides'][normalizeDocumentPath(selectedEntry.path)]
+    : undefined
+  const selectedAssignment = assignmentSections.some((section) => section.key === persistedAssignment)
+    ? persistedAssignment
+    : AUTOMATIC_SECTION
   const dirty = !!document && draft !== document.content
 
   const openDocument = useCallback(async (path: string) => {
@@ -121,30 +152,51 @@ export default function ProjectDocumentsWorkspace({
     if (selectedPath) openDocument(selectedPath)
   }, [openDocument, selectedPath])
 
-  const sectionCounts = useMemo(() => {
-    const counts = Object.fromEntries(sections.map((section) => [section.key, 0])) as Record<string, number>
+  const governanceCounts = useMemo(() => {
+    const counts = Object.fromEntries(governanceSections.map((section) => [section.key, 0])) as Record<string, number>
     for (const entry of catalog?.documents ?? []) {
-      const section = sectionForDocument(entry, organization.manifest)
+      const section = governanceSectionForDocument(entry, organization.manifest)
       counts[section] = (counts[section] ?? 0) + 1
     }
+    return counts
+  }, [catalog, governanceSections, organization.manifest])
+  const sectionCounts = useMemo(() => {
+    const counts = navigationMode === 'knowledge'
+      ? knowledgeSectionCounts(catalog, organization.manifest, knowledgeSections)
+      : { ...governanceCounts }
     counts.suggestions = organization.suggestions
       ? organization.suggestions.proposed_sections.length
         + organization.suggestions.assignments.length
         + organization.suggestions.file_operations.filter((operation) => operation.status === 'proposed').length || 1
       : 0
     return counts
-  }, [catalog, organization.manifest, organization.suggestions, sections])
+  }, [catalog, governanceCounts, knowledgeSections, navigationMode, organization.manifest, organization.suggestions])
 
   const activeSectionDefinition = sections.find((section) => section.key === activeSection) ?? sections[0]
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return (catalog?.documents ?? [])
-      .filter((entry) => sectionForDocument(entry, organization.manifest) === activeSection)
+      .filter((entry) => (navigationMode === 'knowledge'
+        ? topicSectionForDocument(entry, catalog, organization.manifest)
+        : governanceSectionForDocument(entry, organization.manifest)) === activeSection)
       .filter((entry) => !normalizedQuery
         || entry.title.toLowerCase().includes(normalizedQuery)
         || entry.path.toLowerCase().includes(normalizedQuery))
       .sort((left, right) => left.path.localeCompare(right.path, 'zh-CN'))
-  }, [activeSection, catalog, organization.manifest, query])
+  }, [activeSection, catalog, navigationMode, organization.manifest, query])
+
+  function changeNavigationMode(mode: DocumentNavigationMode) {
+    setNavigationMode(mode)
+    setActiveSection(mode === 'knowledge' ? KNOWLEDGE_HOME_SECTION : 'required')
+  }
+
+  function openDocumentFromHome(path: string) {
+    const entry = catalog?.documents.find((document) => document.path === path)
+    if (!entry) return
+    setNavigationMode('knowledge')
+    setActiveSection(topicSectionForDocument(entry, catalog, organization.manifest))
+    chooseDocument(path)
+  }
 
   function chooseDocument(path: string) {
     if (dirty && !window.confirm('当前文档有未保存修改，确定切换吗？')) return
@@ -181,6 +233,7 @@ export default function ProjectDocumentsWorkspace({
         content: `# ${title}\n\n`,
       })
       await loadCatalog()
+      setNavigationMode('governance')
       setActiveSection('unclassified')
       setSelectedPath(path)
       setViewMode('edit')
@@ -192,8 +245,26 @@ export default function ProjectDocumentsWorkspace({
   async function createSection() {
     const label = window.prompt('新分区名称')?.trim()
     if (!label) return
+    let parentId = ''
+    if (organization.manifest.sections.length) {
+      const choices = organization.manifest.sections.map((section) => `${section.label} (${section.id})`).join('\n')
+      const requestedParent = window.prompt(`父分区（可留空创建一级分区）\n${choices}`, '')
+      if (requestedParent === null) return
+      const normalizedParent = requestedParent.trim().toLowerCase()
+      if (normalizedParent) {
+        const parent = organization.manifest.sections.find((section) => (
+          section.id.toLowerCase() === normalizedParent || section.label.toLowerCase() === normalizedParent
+        ))
+        if (!parent) {
+          setMessage('没有找到指定父分区；请填写括号内 id 或完整分区名称。')
+          return
+        }
+        parentId = parent.id
+      }
+    }
     try {
-      const key = await organization.addSection(label)
+      const key = await organization.addSection(label, parentId)
+      setNavigationMode('knowledge')
       setActiveSection(key)
     } catch (error) {
       setMessage(errorMessage(error, '新建分区失败'))
@@ -204,7 +275,7 @@ export default function ProjectDocumentsWorkspace({
     if (!section.custom || !window.confirm(`删除分区“${section.label}”？文档不会被删除。`)) return
     try {
       await organization.removeSection(section.key)
-      if (activeSection === section.key) setActiveSection('unclassified')
+      if (activeSection === section.key) setActiveSection(KNOWLEDGE_HOME_SECTION)
     } catch (error) {
       setMessage(errorMessage(error, '删除分区失败'))
     }
@@ -216,12 +287,17 @@ export default function ProjectDocumentsWorkspace({
       const nextManifest = await organization.assignDocument(
         selectedEntry.path,
         sectionKey === AUTOMATIC_SECTION ? '' : sectionKey,
+        navigationMode,
       )
-      const nextSection = sectionForDocument(selectedEntry, nextManifest)
+      const nextSection = navigationMode === 'knowledge'
+        ? topicSectionForDocument(selectedEntry, catalog, nextManifest)
+        : sectionForDocument(selectedEntry, nextManifest)
       setActiveSection(nextSection)
       setMessage(sectionKey === AUTOMATIC_SECTION
         ? '已恢复按路径和元数据自动分类。'
-        : '分区已保存；只更新虚拟分类，文件路径未改变。')
+        : navigationMode === 'knowledge'
+          ? '主题归类已保存；治理属性和真实文件路径均未改变。'
+          : '治理归类已保存；主题知识树和真实文件路径均未改变。')
     } catch (error) {
       setMessage(errorMessage(error, '保存文档分区失败'))
     }
@@ -315,14 +391,31 @@ export default function ProjectDocumentsWorkspace({
         activeSection={activeSection}
         counts={sectionCounts}
         budget={catalog?.budget}
+        navigationMode={navigationMode}
         canEdit={!!catalog?.can_edit}
         onBack={onBack}
+        onNavigationModeChange={changeNavigationMode}
         onSelect={setActiveSection}
         onCreate={createSection}
         onRemove={removeSection}
       />
 
-      {activeSection === 'suggestions' ? (
+      {activeSection === KNOWLEDGE_HOME_SECTION ? (
+        <ProjectDocumentKnowledgeHome
+          projectName={projectName}
+          catalog={catalog}
+          manifest={organization.manifest}
+          health={architectureHealth}
+          sections={knowledgeSections}
+          counts={knowledgeSectionCounts(catalog, organization.manifest, knowledgeSections)}
+          onOpenDocument={openDocumentFromHome}
+          onOpenSection={setActiveSection}
+          onOpenSuggestions={() => setActiveSection('suggestions')}
+          onProfileChange={(profile) => organization.setProfile(profile).catch((error) => {
+            setMessage(errorMessage(error, '保存项目知识模板失败'))
+          })}
+        />
+      ) : activeSection === 'suggestions' ? (
         <ProjectDocumentSuggestions
           suggestions={organization.suggestions}
           trace={organization.trace}
@@ -356,12 +449,20 @@ export default function ProjectDocumentsWorkspace({
               <Search size={14} aria-hidden="true" />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索标题或路径" />
             </label>
-            <ProjectDocumentHealthSummary
-              catalog={catalog}
-              unclassified={sectionCounts.unclassified ?? 0}
-              suggestions={organization.suggestions}
-              onOpenSuggestions={() => setActiveSection('suggestions')}
-            />
+            {navigationMode === 'knowledge' ? (
+              <ProjectDocumentArchitectureHealth
+                health={architectureHealth}
+                onOpenHome={() => setActiveSection(KNOWLEDGE_HOME_SECTION)}
+                onOpenSuggestions={() => setActiveSection('suggestions')}
+              />
+            ) : (
+              <ProjectDocumentHealthSummary
+                catalog={catalog}
+                unclassified={governanceCounts.unclassified ?? 0}
+                suggestions={organization.suggestions}
+                onOpenSuggestions={() => setActiveSection('suggestions')}
+              />
+            )}
             <div className={styles.pageList}>
               {catalogError && <div className={styles.errorBox}>{catalogError}</div>}
               {!catalogLoading && !catalogError && visibleDocuments.length === 0 && <div className={styles.emptyList}>这个分区还没有文档</div>}
@@ -421,14 +522,14 @@ export default function ProjectDocumentsWorkspace({
                 <span>{selectedEntry.metadata.authority || 'unknown'}</span>
                 <select
                   aria-label="文档分区"
-                  value={organization.manifest.assignments[normalizeDocumentPath(selectedEntry.path)] ?? AUTOMATIC_SECTION}
+                  value={selectedAssignment}
                   disabled={!catalog?.can_edit}
                   onChange={(event) => assignSelectedDocument(event.target.value)}
                 >
                   <option value={AUTOMATIC_SECTION}>
                     自动：{automaticSectionLabel}
                   </option>
-                  {sections.filter((section) => !section.virtual).map((section) => (
+                  {assignmentSections.map((section) => (
                     <option key={section.key} value={section.key}>{section.label}</option>
                   ))}
                 </select>

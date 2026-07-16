@@ -18,9 +18,9 @@ use crate::{
         verify_document_baseline,
     },
     project_document_governance::{
-        parse_manifest, parse_suggestions, to_pretty_json, DocumentSectionManifest,
-        SuggestedFileOperation, SuggestedFileOperationKind, SuggestedFileOperationStatus,
-        SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
+        parse_manifest, parse_suggestions, to_pretty_json, DocumentOrganizationSuggestions,
+        DocumentSectionManifest, SuggestedFileOperation, SuggestedFileOperationKind,
+        SuggestedFileOperationStatus, SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
 };
 
@@ -148,16 +148,16 @@ pub(crate) fn apply_file_operations(
             )
             .map_err(|error| anyhow!(error.message))?;
         }
-        remap_manifest_assignment(
+        remap_manifest_document_path(
             &mut manifest,
             &operation.source_path,
             &operation.target_path,
         );
-        for assignment in &mut suggestions.assignments {
-            if assignment.path.eq_ignore_ascii_case(&operation.source_path) {
-                assignment.path = operation.target_path.clone();
-            }
-        }
+        remap_suggestion_document_path(
+            &mut suggestions,
+            &operation.source_path,
+            &operation.target_path,
+        );
         if let Some(saved) = suggestions
             .file_operations
             .iter_mut()
@@ -249,22 +249,90 @@ fn operation_target_matches(workspace: &Path, operation: &SuggestedFileOperation
         .unwrap_or(false)
 }
 
-fn remap_manifest_assignment(
+fn remap_manifest_document_path(
     manifest: &mut DocumentSectionManifest,
     source_path: &str,
     target_path: &str,
 ) {
-    let source_key = manifest
-        .assignments
+    remap_string_map_key(&mut manifest.assignments, source_path, target_path);
+    remap_string_map_key(&mut manifest.governance_overrides, source_path, target_path);
+    replace_path(&mut manifest.home.entrypoint, source_path, target_path);
+    replace_paths(&mut manifest.home.start_here, source_path, target_path);
+    for section in &mut manifest.sections {
+        replace_path(&mut section.entrypoint, source_path, target_path);
+    }
+    if let Some(source_key) = matching_key(&manifest.document_metadata, source_path) {
+        if let Some(metadata) = manifest.document_metadata.remove(&source_key) {
+            manifest
+                .document_metadata
+                .insert(target_path.to_string(), metadata);
+        }
+    }
+    for metadata in manifest.document_metadata.values_mut() {
+        replace_paths(&mut metadata.related, source_path, target_path);
+        replace_paths(&mut metadata.supersedes, source_path, target_path);
+    }
+}
+
+fn remap_suggestion_document_path(
+    suggestions: &mut DocumentOrganizationSuggestions,
+    source_path: &str,
+    target_path: &str,
+) {
+    for assignment in &mut suggestions.assignments {
+        replace_path(&mut assignment.path, source_path, target_path);
+    }
+    if let Some(home) = &mut suggestions.proposed_home {
+        replace_path(&mut home.entrypoint, source_path, target_path);
+        replace_paths(&mut home.start_here, source_path, target_path);
+    }
+    for section in &mut suggestions.proposed_sections {
+        replace_path(&mut section.entrypoint, source_path, target_path);
+    }
+    if let Some(source_key) = matching_key(&suggestions.document_metadata, source_path) {
+        if let Some(metadata) = suggestions.document_metadata.remove(&source_key) {
+            suggestions
+                .document_metadata
+                .insert(target_path.to_string(), metadata);
+        }
+    }
+    for metadata in suggestions.document_metadata.values_mut() {
+        replace_paths(&mut metadata.related, source_path, target_path);
+        replace_paths(&mut metadata.supersedes, source_path, target_path);
+    }
+}
+
+fn remap_string_map_key(
+    values: &mut std::collections::BTreeMap<String, String>,
+    source_path: &str,
+    target_path: &str,
+) {
+    if let Some(source_key) = matching_key(values, source_path) {
+        if let Some(value) = values.remove(&source_key) {
+            values.insert(target_path.to_string(), value);
+        }
+    }
+}
+
+fn matching_key<T>(
+    values: &std::collections::BTreeMap<String, T>,
+    source_path: &str,
+) -> Option<String> {
+    values
         .keys()
         .find(|path| path.eq_ignore_ascii_case(source_path))
-        .cloned();
-    if let Some(source_key) = source_key {
-        if let Some(section) = manifest.assignments.remove(&source_key) {
-            manifest
-                .assignments
-                .insert(target_path.to_string(), section);
-        }
+        .cloned()
+}
+
+fn replace_paths(values: &mut [String], source_path: &str, target_path: &str) {
+    for value in values {
+        replace_path(value, source_path, target_path);
+    }
+}
+
+fn replace_path(value: &mut String, source_path: &str, target_path: &str) {
+    if value.eq_ignore_ascii_case(source_path) {
+        *value = target_path.to_string();
     }
 }
 

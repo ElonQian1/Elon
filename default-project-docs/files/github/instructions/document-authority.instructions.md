@@ -35,10 +35,20 @@ AI 首轮只根据路径和元数据形成分类、冲突和迁移建议，不�
 
 ## 分区和 AI 建议
 
-- `.elon/document-sections.json` 保存项目共享的虚拟分区和文档归类，不改变文件实际路径。
+- `.elon/document-sections.json` 保存所有 AI 供应商共享的项目知识架构：项目类型 `profile`、知识首页 `home`、最多四层主题 `sections`、主题固定项 `assignments`、治理覆盖 `governance_overrides` 和文档关系 `document_metadata`；不改变文件实际路径。
+- 主题知识树回答“讲什么”，治理视图回答“能否作为当前事实”。两条轴必须分离；主题位置不能提高路径权威性。PC 工作台分别展示“知识架构”和“治理视图”。
+- 项目模板可选软件平台、API/SDK、产品、研究、运维或个人知识库；模板是起点，不要求所有项目采用同一分区。路径和标题能确定主题时由程序自动归类，关键入口再显式固定。
 - `.elon/document-organization-suggestions.json` 保存 AI 的结构化整理建议；AI 整理任务只可写这一份建议文件。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - 默认 `git_backed_full`：先提交整理前原始文档，再自动应用新分区、虚拟归类及结构化建议中的项目内 Markdown 重命名/移动，最后提交整理结果。
 - 用户可切换 `review_all`（逐项审核）或 `suggestions_only`（只生成建议）；所有 AI 供应商使用同名模式。
 - `review_all` 才要求用户逐项核对并授予本次 `rename`/`move`；`suggestions_only` 禁止应用。
 - 实体整理只允许项目内 Markdown，必须校验源文件哈希，禁止覆盖、删除、越界、改写代码或自动 push。当前分类操作不改正文；正文修改、引用重写、归档和删除未来也必须纳入同一整理前/后 Git 事务。
+
+## 供应商无关 MCP 顺序
+
+1. `project_docs_analyze` 只读路径和元数据，并返回零模型 token 的 `knowledge_architecture` 健康诊断。
+2. 只对歧义、冲突或缺失入口调用 `project_docs_read`，不得全库读取正文。
+3. `project_docs_save_suggestions` 保存项目类型、首页、层级主题、文档关系、归类和实体操作建议。
+4. 默认 `git_backed_full` 继续应用建议与文件操作，并确认整理前、整理后两个 Git commit；`review_all` 等用户确认，`suggestions_only` 禁止应用。
+5. MCP 不可用时仍使用相同两份 `.elon` JSON，不建立供应商私有真源。

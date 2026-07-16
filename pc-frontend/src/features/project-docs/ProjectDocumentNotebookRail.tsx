@@ -1,6 +1,7 @@
-import { ArrowLeft, BookOpen, FolderPlus, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowLeft, BookOpen, FolderPlus, LibraryBig, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { formatNumber, type DocumentBudget } from './projectDocumentModel'
+import type { DocumentNavigationMode } from './projectDocumentArchitecture'
 import type { DocumentSection } from './projectDocumentSections'
 import styles from './ProjectDocumentsWorkspace.module.css'
 
@@ -10,8 +11,10 @@ interface Props {
   activeSection: string
   counts: Record<string, number>
   budget?: DocumentBudget
+  navigationMode: DocumentNavigationMode
   canEdit: boolean
   onBack: () => void
+  onNavigationModeChange: (mode: DocumentNavigationMode) => void
   onSelect: (section: string) => void
   onCreate: () => void
   onRemove: (section: DocumentSection) => void
@@ -23,8 +26,10 @@ export default function ProjectDocumentNotebookRail({
   activeSection,
   counts,
   budget,
+  navigationMode,
   canEdit,
   onBack,
+  onNavigationModeChange,
   onSelect,
   onCreate,
   onRemove,
@@ -53,9 +58,18 @@ export default function ProjectDocumentNotebookRail({
         </button>
       </div>
 
+      <div className={styles.navigationMode} role="tablist" aria-label="文档浏览方式">
+        <button type="button" role="tab" aria-selected={navigationMode === 'knowledge'} onClick={() => onNavigationModeChange('knowledge')}>
+          <LibraryBig size={13} />知识架构
+        </button>
+        <button type="button" role="tab" aria-selected={navigationMode === 'governance'} onClick={() => onNavigationModeChange('governance')}>
+          <ShieldCheck size={13} />治理视图
+        </button>
+      </div>
+
       <div className={styles.sectionList}>
         {sections.map((section) => (
-          <div className={styles.sectionRow} key={section.key}>
+          <div className={styles.sectionRow} key={section.key} style={{ paddingLeft: `${Math.min(section.depth ?? 0, 3) * 13}px` }}>
             <button
               className={[styles.sectionButton, activeSection === section.key ? styles.sectionActive : ''].join(' ')}
               type="button"
@@ -68,7 +82,7 @@ export default function ProjectDocumentNotebookRail({
               </span>
               <em>{counts[section.key] ?? 0}</em>
             </button>
-            {section.custom && canEdit && (
+            {section.custom && canEdit && navigationMode === 'knowledge' && (
               <button
                 className={styles.removeSectionButton}
                 type="button"

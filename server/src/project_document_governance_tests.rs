@@ -5,7 +5,8 @@ use crate::{
     project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
     project_document_files::write_project_document_file,
     project_document_governance::{
-        to_pretty_json, CustomDocumentSection, DocumentOrganizationSuggestions, OrganizationStatus,
+        parse_manifest, to_pretty_json, CustomDocumentSection, DocumentKnowledgeHome,
+        DocumentKnowledgeMetadata, DocumentOrganizationSuggestions, OrganizationStatus,
         SuggestedAssignment, SuggestedFileOperation, SuggestedFileOperationKind,
         SuggestedFileOperationStatus, SUGGESTIONS_CONFIG_PATH,
     },
@@ -35,11 +36,13 @@ fn ready_suggestions() -> DocumentOrganizationSuggestions {
         version: 1,
         status: OrganizationStatus::Ready,
         summary: "把旧讨论保持在历史归档。".to_string(),
+        proposed_profile: "auto".to_string(),
         proposed_sections: vec![CustomDocumentSection {
             id: "legacy-notes".to_string(),
             label: "旧笔记".to_string(),
             detail: "仅用于历史追溯".to_string(),
             color: "#747984".to_string(),
+            ..CustomDocumentSection::default()
         }],
         assignments: vec![SuggestedAssignment {
             path: "docs/archive/old.md".to_string(),
@@ -51,7 +54,25 @@ fn ready_suggestions() -> DocumentOrganizationSuggestions {
         file_operations: Vec::new(),
         documents_read: 0,
         estimated_tokens_used: 0,
+        ..DocumentOrganizationSuggestions::default()
     }
+}
+
+#[test]
+fn legacy_assignments_are_split_into_topic_and_governance_facets() {
+    let manifest = parse_manifest(Some(
+        r##"{
+          "version": 1,
+          "sections": [{"id":"api","label":"API","detail":"Reference","color":"#123456"}],
+          "assignments": {"docs/api.md":"custom:api","docs/draft.md":"drafts"},
+          "governance_overrides": {"docs/api.md":"current"}
+        }"##,
+    ))
+    .unwrap();
+    assert_eq!(manifest.assignments["docs/api.md"], "custom:api");
+    assert_eq!(manifest.governance_overrides["docs/api.md"], "current");
+    assert_eq!(manifest.governance_overrides["docs/draft.md"], "drafts");
+    assert!(!manifest.assignments.contains_key("docs/draft.md"));
 }
 
 #[test]
@@ -70,8 +91,22 @@ fn trusted_file_operations_are_default_safe_and_preserve_content() {
         .unwrap()
         .to_string();
     let mut suggestions = ready_suggestions();
-    suggestions.assignments.clear();
-    suggestions.proposed_sections.clear();
+    suggestions.proposed_home = Some(DocumentKnowledgeHome {
+        title: "Knowledge home".to_string(),
+        summary: "Entry path must follow a safe rename.".to_string(),
+        entrypoint: "docs/archive/old.md".to_string(),
+        start_here: vec!["docs/archive/old.md".to_string()],
+    });
+    suggestions.proposed_sections[0].entrypoint = "docs/archive/old.md".to_string();
+    suggestions.document_metadata.insert(
+        "docs/archive/old.md".to_string(),
+        DocumentKnowledgeMetadata {
+            doc_type: "archive".to_string(),
+            related: vec!["AGENTS.md".to_string()],
+            supersedes: vec!["docs/archive/old.md".to_string()],
+            ..DocumentKnowledgeMetadata::default()
+        },
+    );
     suggestions.file_operations = vec![SuggestedFileOperation {
         id: "rename-old-note".to_string(),
         kind: SuggestedFileOperationKind::Rename,
@@ -90,6 +125,17 @@ fn trusted_file_operations_are_default_safe_and_preserve_content() {
     )
     .unwrap();
     let suggestions_revision = saved["suggestions_revision"].as_str().unwrap();
+    let organized = apply_saved_suggestions(
+        &root,
+        DocumentAutomationMode::TrustedReversible,
+        false,
+        catalog_revision,
+        None,
+        Some(suggestions_revision),
+    )
+    .unwrap();
+    let manifest_revision = organized["manifest_revision"].as_str().unwrap();
+    let suggestions_revision = organized["suggestions_revision"].as_str().unwrap();
     let operation_ids = vec!["rename-old-note".to_string()];
     let denied = apply_file_operations(
         &root,
@@ -100,7 +146,7 @@ fn trusted_file_operations_are_default_safe_and_preserve_content() {
             allow_rename: false,
             allow_move: false,
             expected_catalog_revision: catalog_revision,
-            expected_manifest_revision: None,
+            expected_manifest_revision: Some(manifest_revision),
             expected_suggestions_revision: Some(suggestions_revision),
             git_baseline_commit: None,
         },
@@ -116,7 +162,7 @@ fn trusted_file_operations_are_default_safe_and_preserve_content() {
             allow_rename: false,
             allow_move: false,
             expected_catalog_revision: catalog_revision,
-            expected_manifest_revision: None,
+            expected_manifest_revision: Some(manifest_revision),
             expected_suggestions_revision: Some(suggestions_revision),
             git_baseline_commit: None,
         },
@@ -135,6 +181,25 @@ fn trusted_file_operations_are_default_safe_and_preserve_content() {
     assert_eq!(
         applied["suggestions"]["file_operations"][0]["status"],
         "applied"
+    );
+    assert_eq!(
+        applied["manifest"]["home"]["entrypoint"],
+        "docs/archive/legacy-discussion.md"
+    );
+    assert_eq!(
+        applied["manifest"]["sections"][0]["entrypoint"],
+        "docs/archive/legacy-discussion.md"
+    );
+    assert!(applied["manifest"]["assignments"]
+        .get("docs/archive/legacy-discussion.md")
+        .is_some());
+    assert!(applied["manifest"]["document_metadata"]
+        .get("docs/archive/legacy-discussion.md")
+        .is_some());
+    assert_eq!(
+        applied["manifest"]["document_metadata"]["docs/archive/legacy-discussion.md"]["supersedes"]
+            [0],
+        "docs/archive/legacy-discussion.md"
     );
     fs::remove_dir_all(root).unwrap();
 }

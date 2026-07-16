@@ -34,6 +34,8 @@ fn default_docs_seed_missing_files_without_overwriting_user_docs() {
     )
     .unwrap();
     let metadata = std::fs::read_to_string(root.join(".elon/default-docs.json")).unwrap();
+    let knowledge_architecture =
+        std::fs::read_to_string(root.join(".elon/document-sections.json")).unwrap();
     let _ = std::fs::remove_dir_all(&root);
 
     assert!(created > 0);
@@ -42,6 +44,8 @@ fn default_docs_seed_missing_files_without_overwriting_user_docs() {
     assert!(copilot.contains("共享规则权威来源"));
     assert!(document_authority.contains("路径权威上限"));
     assert!(metadata.contains("copilot-primary-bridged-agents"));
+    assert!(knowledge_architecture.contains("项目知识库"));
+    assert!(knowledge_architecture.contains("document_metadata"));
 }
 
 #[test]

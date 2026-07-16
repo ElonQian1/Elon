@@ -8,12 +8,36 @@ export interface CustomDocumentSection {
   label: string
   detail: string
   color: string
+  parent_id: string
+  order: number
+  icon: string
+  entrypoint: string
+}
+
+export interface DocumentKnowledgeHome {
+  title: string
+  summary: string
+  entrypoint: string
+  start_here: string[]
+}
+
+export interface DocumentKnowledgeMetadata {
+  doc_type: string
+  audience: string[]
+  owner: string
+  version: string
+  related: string[]
+  supersedes: string[]
 }
 
 export interface DocumentSectionManifest {
   version: 1
+  profile: string
+  home: DocumentKnowledgeHome
   sections: CustomDocumentSection[]
   assignments: Record<string, string>
+  governance_overrides: Record<string, string>
+  document_metadata: Record<string, DocumentKnowledgeMetadata>
 }
 
 export interface DocumentSection {
@@ -23,6 +47,12 @@ export interface DocumentSection {
   color: string
   custom?: boolean
   virtual?: boolean
+  template?: boolean
+  parentId?: string
+  order?: number
+  icon?: string
+  entrypoint?: string
+  depth?: number
 }
 
 export interface SuggestedAssignment {
@@ -47,10 +77,15 @@ export interface DocumentOrganizationSuggestions {
   version: 1
   status: 'requested' | 'ready' | 'applied'
   summary: string
+  proposed_profile: string
+  proposed_home: DocumentKnowledgeHome | null
   proposed_sections: CustomDocumentSection[]
   assignments: SuggestedAssignment[]
   conflicts: string[]
   move_suggestions: string[]
+  architecture_findings: string[]
+  missing_document_types: string[]
+  document_metadata: Record<string, DocumentKnowledgeMetadata>
   file_operations: SuggestedFileOperation[]
   documents_read: number
   estimated_tokens_used: number
@@ -58,8 +93,12 @@ export interface DocumentOrganizationSuggestions {
 
 export const EMPTY_SECTION_MANIFEST: DocumentSectionManifest = {
   version: 1,
+  profile: 'auto',
+  home: { title: '', summary: '', entrypoint: '', start_here: [] },
   sections: [],
   assignments: {},
+  governance_overrides: {},
+  document_metadata: {},
 }
 
 export const SYSTEM_DOCUMENT_SECTIONS: DocumentSection[] = [
@@ -83,14 +122,27 @@ export const SUGGESTIONS_SECTION: DocumentSection = {
 }
 
 export function buildDocumentSections(manifest: DocumentSectionManifest): DocumentSection[] {
-  const custom = manifest.sections.map((section) => ({
+  const custom = [...manifest.sections].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label, 'zh-CN')).map((section) => ({
     key: customSectionKey(section.id),
     label: section.label,
     detail: section.detail || '用户自定义项目分区',
     color: section.color || '#7b8aa5',
     custom: true,
+    parentId: section.parent_id ? customSectionKey(section.parent_id) : undefined,
+    order: section.order,
+    icon: section.icon,
+    entrypoint: section.entrypoint,
   }))
   return [...SYSTEM_DOCUMENT_SECTIONS, ...custom, SUGGESTIONS_SECTION]
+}
+
+export function governanceSectionForDocument(
+  document: ProjectDocumentEntry,
+  manifest: DocumentSectionManifest,
+): string {
+  const assigned = manifest.governance_overrides[normalizedPath(document.path)]
+  if (assigned && SYSTEM_DOCUMENT_SECTIONS.some((section) => section.key === assigned)) return assigned
+  return automaticGovernanceSection(document)
 }
 
 export function sectionForDocument(
@@ -98,9 +150,11 @@ export function sectionForDocument(
   manifest: DocumentSectionManifest,
 ): string {
   const assigned = manifest.assignments[normalizedPath(document.path)]
-  const validKeys = new Set(buildDocumentSections(manifest).filter((section) => !section.virtual).map((section) => section.key))
-  if (assigned && validKeys.has(assigned)) return assigned
+  if (assigned?.startsWith('custom:') && manifest.sections.some((section) => customSectionKey(section.id) === assigned)) return assigned
+  return governanceSectionForDocument(document, manifest)
+}
 
+function automaticGovernanceSection(document: ProjectDocumentEntry): string {
   const { role, lifecycle, ambiguous } = document.metadata
   if (lifecycle === 'archived' || role === 'archive') return 'archive'
   if (['policy', 'router'].includes(role)) return 'required'
@@ -121,19 +175,43 @@ export function parseSectionManifest(content: string): DocumentSectionManifest {
     const sections = Array.isArray(value.sections)
       ? value.sections.map(sanitizeCustomSection).filter((section): section is CustomDocumentSection => !!section)
       : []
-    const validSectionKeys = new Set([
-      ...SYSTEM_DOCUMENT_SECTIONS.map((section) => section.key),
-      ...sections.map((section) => customSectionKey(section.id)),
-    ])
+    const customSectionKeys = new Set(sections.map((section) => customSectionKey(section.id)))
+    const governanceSectionKeys = new Set(SYSTEM_DOCUMENT_SECTIONS.map((section) => section.key))
     const assignments: Record<string, string> = {}
+    const governanceOverrides: Record<string, string> = {}
     if (value.assignments && typeof value.assignments === 'object') {
       for (const [path, section] of Object.entries(value.assignments)) {
-        if (typeof section === 'string' && validSectionKeys.has(section) && normalizedPath(path)) {
-          assignments[normalizedPath(path)] = section
+        const normalized = normalizedPath(path)
+        if (typeof section !== 'string' || !normalized) continue
+        if (customSectionKeys.has(section)) assignments[normalized] = section
+        else if (governanceSectionKeys.has(section)) governanceOverrides[normalized] = section
+      }
+    }
+    if (value.governance_overrides && typeof value.governance_overrides === 'object') {
+      for (const [path, section] of Object.entries(value.governance_overrides)) {
+        const normalized = normalizedPath(path)
+        if (typeof section === 'string' && governanceSectionKeys.has(section) && normalized) {
+          governanceOverrides[normalized] = section
         }
       }
     }
-    return { version: 1, sections, assignments }
+    const documentMetadata: Record<string, DocumentKnowledgeMetadata> = {}
+    if (value.document_metadata && typeof value.document_metadata === 'object') {
+      for (const [path, metadata] of Object.entries(value.document_metadata)) {
+        const normalized = normalizedPath(path)
+        const sanitized = sanitizeKnowledgeMetadata(metadata)
+        if (normalized && sanitized) documentMetadata[normalized] = sanitized
+      }
+    }
+    return {
+      version: 1,
+      profile: sanitizeProfile(value.profile),
+      home: sanitizeKnowledgeHome(value.home),
+      sections,
+      assignments,
+      governance_overrides: governanceOverrides,
+      document_metadata: documentMetadata,
+    }
   } catch {
     return cloneEmptyManifest()
   }
@@ -148,7 +226,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       : 'requested'
     const proposedSections = uniqueSections(Array.isArray(value.proposed_sections)
       ? value.proposed_sections.map(sanitizeCustomSection).filter((section): section is CustomDocumentSection => !!section)
-      : []).slice(0, 8)
+      : []).slice(0, 16)
     const assignments = Array.isArray(value.assignments)
       ? value.assignments.slice(0, 500).flatMap((assignment) => {
         if (!assignment || typeof assignment !== 'object') return []
@@ -183,10 +261,15 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       version: 1,
       status,
       summary: String(value.summary ?? '').slice(0, 4000),
+      proposed_profile: sanitizeProfile(value.proposed_profile),
+      proposed_home: value.proposed_home ? sanitizeKnowledgeHome(value.proposed_home) : null,
       proposed_sections: proposedSections,
       assignments,
       conflicts: stringArray(value.conflicts, 100),
       move_suggestions: stringArray(value.move_suggestions, 100),
+      architecture_findings: stringArray(value.architecture_findings, 100),
+      missing_document_types: stringArray(value.missing_document_types, 100).map((entry) => entry.slice(0, 120)),
+      document_metadata: sanitizeKnowledgeMetadataMap(value.document_metadata),
       file_operations: fileOperations,
       documents_read: safeNonNegativeNumber(value.documents_read),
       estimated_tokens_used: safeNonNegativeNumber(value.estimated_tokens_used),
@@ -196,12 +279,21 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
   }
 }
 
-export function createCustomSection(label: string, existing: CustomDocumentSection[]): CustomDocumentSection {
+export function createCustomSection(
+  label: string,
+  existing: CustomDocumentSection[],
+  parentId = '',
+): CustomDocumentSection {
   const base = sanitizeSectionId(label) || `section-${Date.now()}`
   let id = base
   let suffix = 2
   while (existing.some((section) => section.id === id)) id = `${base}-${suffix++}`
-  return { id, label: label.trim().slice(0, 40), detail: '用户自定义项目分区', color: '#7f8fb3' }
+  return {
+    id, label: label.trim().slice(0, 40), detail: '用户自定义项目分区', color: '#7f8fb3',
+    parent_id: existing.some((section) => section.id === parentId) ? parentId : '',
+    order: Math.max(0, ...existing.filter((section) => section.parent_id === parentId).map((section) => section.order || 0)) + 10,
+    icon: '', entrypoint: '',
+  }
 }
 
 export function customSectionKey(id: string) {
@@ -225,17 +317,19 @@ export function buildOrganizationPrompt(
       ? '⑤ 调用 project_docs_get_status 后停在等待审核；没有用户确认，不得调用任何 apply 工具。'
       : '⑤ 调用 project_docs_get_status 后结束；当前是 suggestions_only，禁止调用任何 apply 工具。'
   return `<elon-project-docs-task version="1">\n请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
-    `运行 ID：${operationId || '由 MCP 会话生成'}。权限模式：${authorizationMode}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；现有自定义分区：${customSections}。\n` +
+    `运行 ID：${operationId || '由 MCP 会话生成'}。权限模式：${authorizationMode}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；当前项目类型：${manifest.profile}；现有主题分区：${customSections}。\n` +
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
     '① project_docs_analyze 获取 classification_model_tokens=0 的完整紧凑目录；' +
     '② 仅对仍无法根据路径、标题和 headings 判断的少量文档调用 project_docs_read；' +
     '③ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
     `④ 保存后按当前权限继续；${authorizationInstruction}` +
+    '先根据 analyze 返回的 knowledge_architecture 判断项目类型和缺失基础文档；建议必须同时考虑面向人的主题知识树与面向 AI 的治理属性。' +
+    '可提出 proposed_profile、层级 proposed_sections、proposed_home、document_metadata（类型、读者、关系、替代关系）；不要把 required/on-demand 等治理状态当成主题目录。' +
     '如发现命名含糊或路径放错，可在 file_operations 中提出结构化 rename/move；source_revision 必须使用 analyze 返回的 content_hash。' +
     `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
     'git_backed_full 会自动完成整理前和整理后两次仅文档 Git 提交；任何模式都不得越界、操作非 Markdown、修改代码或自动 push。' +
     '虚拟分区不改变真实路径的 role、lifecycle、authority 或 default_retrieval；不能借虚拟 current 提升权威性。' +
-    '只为确有改进价值的文档生成 assignments，新分区最多 8 个，并如实记录实际正文读取数和 token。' +
+    '只为确有改进价值的文档生成 assignments，层级主题最多 16 个，并在 architecture_findings 与 missing_document_types 中记录结构缺口；如实记录实际正文读取数和 token。' +
     '如果当前供应商确实没有 MCP，才使用同一顺序做本地元数据扫描并写建议 JSON；不要全文扫描 docs。'
 }
 
@@ -250,7 +344,57 @@ function sanitizeCustomSection(value: unknown): CustomDocumentSection | null {
   const label = String(candidate.label ?? '').trim().slice(0, 40)
   if (!id || !label) return null
   const color = /^#[0-9a-f]{6}$/i.test(candidate.color ?? '') ? String(candidate.color) : '#7f8fb3'
-  return { id, label, detail: String(candidate.detail ?? '').trim().slice(0, 120), color }
+  return {
+    id,
+    label,
+    detail: String(candidate.detail ?? '').trim().slice(0, 120),
+    color,
+    parent_id: sanitizeSectionId(candidate.parent_id ?? ''),
+    order: Math.min(9999, Math.max(0, Math.floor(Number(candidate.order) || 0))),
+    icon: String(candidate.icon ?? '').trim().slice(0, 32),
+    entrypoint: normalizedPath(candidate.entrypoint ?? ''),
+  }
+}
+
+function sanitizeProfile(value: unknown) {
+  const profile = String(value ?? '').trim().toLowerCase()
+  return ['software-platform', 'software-api', 'product', 'research', 'operations', 'personal-knowledge'].includes(profile)
+    ? profile
+    : 'auto'
+}
+
+function sanitizeKnowledgeHome(value: unknown): DocumentKnowledgeHome {
+  const candidate = value && typeof value === 'object' ? value as Partial<DocumentKnowledgeHome> : {}
+  return {
+    title: String(candidate.title ?? '').trim().slice(0, 80),
+    summary: String(candidate.summary ?? '').trim().slice(0, 1000),
+    entrypoint: normalizedPath(candidate.entrypoint ?? ''),
+    start_here: stringArray(candidate.start_here, 12).map(normalizedPath).filter(Boolean),
+  }
+}
+
+function sanitizeKnowledgeMetadata(value: unknown): DocumentKnowledgeMetadata | null {
+  if (!value || typeof value !== 'object') return null
+  const candidate = value as Partial<DocumentKnowledgeMetadata>
+  return {
+    doc_type: String(candidate.doc_type ?? '').trim().slice(0, 64),
+    audience: stringArray(candidate.audience, 12).map((entry) => entry.slice(0, 80)),
+    owner: String(candidate.owner ?? '').trim().slice(0, 80),
+    version: String(candidate.version ?? '').trim().slice(0, 40),
+    related: stringArray(candidate.related, 24).map(normalizedPath).filter(Boolean),
+    supersedes: stringArray(candidate.supersedes, 24).map(normalizedPath).filter(Boolean),
+  }
+}
+
+function sanitizeKnowledgeMetadataMap(value: unknown) {
+  const output: Record<string, DocumentKnowledgeMetadata> = {}
+  if (!value || typeof value !== 'object') return output
+  for (const [path, metadata] of Object.entries(value)) {
+    const normalized = normalizedPath(path)
+    const sanitized = sanitizeKnowledgeMetadata(metadata)
+    if (normalized && sanitized) output[normalized] = sanitized
+  }
+  return output
 }
 
 function sanitizeSectionId(value: string) {
@@ -280,5 +424,13 @@ function uniqueSections(sections: CustomDocumentSection[]) {
 }
 
 function cloneEmptyManifest(): DocumentSectionManifest {
-  return { version: 1, sections: [], assignments: {} }
+  return {
+    version: 1,
+    profile: 'auto',
+    home: { title: '', summary: '', entrypoint: '', start_here: [] },
+    sections: [],
+    assignments: {},
+    governance_overrides: {},
+    document_metadata: {},
+  }
 }

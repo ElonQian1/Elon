@@ -44,8 +44,13 @@ function document(pathName, role, lifecycle = 'active', ambiguous = false) {
 const manifest = parseSectionManifest(JSON.stringify({
   version: 1,
   sections: [{ id: 'research', label: '研究', detail: '研究笔记', color: '#123456' }],
-  assignments: { 'docs/research.md': 'custom:research' },
+  assignments: { 'docs/research.md': 'custom:research', 'docs/discussion.md': 'drafts' },
+  governance_overrides: { 'docs/unknown.md': 'on-demand' },
 }))
+assert.equal(manifest.assignments['docs/research.md'], 'custom:research')
+assert.equal(manifest.assignments['docs/discussion.md'], undefined)
+assert.equal(manifest.governance_overrides['docs/discussion.md'], 'drafts', '旧清单的治理归类应自动迁移')
+assert.equal(manifest.governance_overrides['docs/unknown.md'], 'on-demand')
 const documents = [
   document('AGENTS.md', 'router'),
   document('.github/agents/reviewer.agent.md', 'agent_definition'),
@@ -60,7 +65,7 @@ assert.deepEqual(sections, [
   'customizations',
   'on-demand',
   'drafts',
-  'unclassified',
+  'on-demand',
   'custom:research',
 ])
 assert.equal(sections.length, documents.length, '每份文档必须只属于一个分区')
@@ -96,7 +101,7 @@ const boundedSuggestions = parseOrganizationSuggestions(JSON.stringify({
     path: `docs/${index}.md`, section_id: 'current', reason: 'test',
   })),
 }))
-assert.equal(boundedSuggestions.proposed_sections.length, 8)
+assert.equal(boundedSuggestions.proposed_sections.length, 12)
 assert.equal(boundedSuggestions.assignments.length, 500)
 
 const catalog = {
@@ -122,9 +127,20 @@ assert(prompt.includes('git_baseline_commit'))
 assert(prompt.includes('git_result_commit'))
 assert(prompt.includes('project_docs_apply_file_operations'))
 assert(prompt.includes('source_revision'))
+assert(prompt.includes('knowledge_architecture'))
+assert(prompt.includes('主题知识树'))
 assert(prompt.includes('不得越界、操作非 Markdown、修改代码或自动 push'))
 assert(prompt.length < 3000, '整理任务 Prompt 不应内嵌完整文档目录')
 assert(!prompt.includes('# Reviewer'))
+
+const architectureSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentArchitecture.ts',
+), 'utf8')
+assert(architectureSource.includes("DocumentNavigationMode = 'knowledge' | 'governance'"))
+assert(architectureSource.includes("key: 'software-platform'"))
+assert(architectureSource.includes('analyzeKnowledgeArchitecture'))
+assert(architectureSource.includes('topicSectionForDocument'))
+assert(architectureSource.includes('const topics = [...templateSections, ...customSections]'))
 
 const workspaceSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsWorkspace.tsx',

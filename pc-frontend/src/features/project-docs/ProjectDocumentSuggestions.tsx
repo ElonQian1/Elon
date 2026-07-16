@@ -43,7 +43,10 @@ export default function ProjectDocumentSuggestions({
   onApplyFiles,
 }: Props) {
   const ready = suggestions?.status === 'ready'
-  const suggestionCount = (suggestions?.proposed_sections.length ?? 0) + (suggestions?.assignments.length ?? 0)
+  const suggestionCount = (suggestions?.proposed_sections.length ?? 0)
+    + (suggestions?.assignments.length ?? 0)
+    + Object.keys(suggestions?.document_metadata ?? {}).length
+    + (suggestions?.proposed_home ? 1 : 0)
   return (
     <main className={styles.suggestionsPane}>
       <header className={styles.suggestionsHeader}>
@@ -142,17 +145,28 @@ export default function ProjectDocumentSuggestions({
             </section>
 
             <section>
-              <h3>建议新分区 <em>{suggestions.proposed_sections.length}</em></h3>
+              <h3>项目知识架构</h3>
+              <div className={styles.architectureProposal}>
+                <article><span>项目类型</span><strong>{profileLabel(suggestions.proposed_profile)}</strong></article>
+                <article><span>知识首页</span><strong>{suggestions.proposed_home?.title || '沿用当前设置'}</strong></article>
+                <article><span>文档关系</span><strong>{Object.keys(suggestions.document_metadata).length} 份</strong></article>
+                <article><span>基础文档缺口</span><strong>{suggestions.missing_document_types.length} 类</strong></article>
+              </div>
+              {!!suggestions.architecture_findings.length && <ul>{suggestions.architecture_findings.map((finding) => <li key={finding}>{finding}</li>)}</ul>}
+            </section>
+
+            <section>
+              <h3>建议主题知识树 <em>{suggestions.proposed_sections.length}</em></h3>
               <div className={styles.proposedSections}>
                 {suggestions.proposed_sections.map((section) => (
                   <article key={section.id}>
                     <i style={{ background: section.color }} />
                     <strong>{section.label}</strong>
                     <span>{section.detail}</span>
-                    <code>custom:{section.id}</code>
+                    <code>{section.parent_id ? `${section.parent_id} / ` : ''}custom:{section.id}</code>
                   </article>
                 ))}
-                {!suggestions.proposed_sections.length && <p>不需要新增分区。</p>}
+                {!suggestions.proposed_sections.length && <p>不需要新增主题。</p>}
               </div>
             </section>
 
@@ -166,7 +180,7 @@ export default function ProjectDocumentSuggestions({
                     <span>{assignment.reason}</span>
                   </article>
                 ))}
-                {!suggestions.assignments.length && <p>没有文档需要调整虚拟分区。</p>}
+                {!suggestions.assignments.length && <p>没有文档需要调整主题归类。</p>}
               </div>
             </section>
 
@@ -213,4 +227,17 @@ function formatTraceTime(value: number) {
 
 function shortRevision(value: string) {
   return value.length > 12 ? `${value.slice(0, 12)}…` : value
+}
+
+function profileLabel(profile: string) {
+  const labels: Record<string, string> = {
+    'software-platform': '软件平台',
+    'software-api': 'API / SDK',
+    product: '产品与业务',
+    research: '研究项目',
+    operations: '运维项目',
+    'personal-knowledge': '个人知识库',
+    auto: '自动判断',
+  }
+  return labels[profile] ?? profile
 }

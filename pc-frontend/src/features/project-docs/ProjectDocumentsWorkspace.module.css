@@ -17,9 +17,12 @@
 
 .notebookRail {
   display: grid;
-  grid-template-rows: 50px auto minmax(0, 1fr) auto;
+  grid-template-rows: 50px auto 38px minmax(0, 1fr) auto;
   background: #17181c;
 }
+.navigationMode { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 0 10px 7px; padding: 3px; border-radius: 7px; background: rgba(0, 0, 0, .2); }
+.navigationMode button { display: flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; border-radius: 5px; color: var(--text-muted); font-size: 9px; }
+.navigationMode button[aria-selected="true"] { color: #f0e8ff; background: rgba(125, 79, 198, .34); }
 
 .backButton {
   display: flex;
@@ -318,6 +321,11 @@
 .proposedSections strong { font-size: 11px; }
 .proposedSections span { color: var(--text-muted); font-size: 10px; }
 .proposedSections code { color: #bda5e8; font-size: 9px; }
+.architectureProposal { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 13px; }
+.architectureProposal article { padding: 10px; border-radius: 7px; background: rgba(255, 255, 255, .035); }
+.architectureProposal span, .architectureProposal strong { display: block; }
+.architectureProposal span { color: var(--text-muted); font-size: 8px; }
+.architectureProposal strong { margin-top: 5px; color: #dfd4f3; font-size: 11px; }
 .assignmentList { display: grid; gap: 6px; }
 .assignmentList article { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(120px, .3fr) minmax(220px, 1fr); gap: 10px; align-items: center; padding: 9px 11px; border-radius: 6px; background: rgba(255, 255, 255, .03); }
 .assignmentList code { overflow: hidden; color: #cab6ed; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }

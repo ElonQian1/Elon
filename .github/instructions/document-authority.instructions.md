@@ -40,19 +40,21 @@ applyTo: "**/*.md"
 
 ## 分区和 AI 建议的可移植约定
 
-- `.elon/document-sections.json` 是项目共享的虚拟分区和文档归类配置；它不改变文件实际路径。
-- 虚拟分区是 OneNote 式浏览维度，不是第二套权威性。把扁平文档审核归入 `current` 或自定义主题后，其 `role`、`lifecycle`、`authority` 和 `default_retrieval` 仍由真实路径决定；要提高路径权威上限必须另行审核 Git 迁移。
+- `.elon/document-sections.json` 是所有 AI 供应商共享的知识架构清单；它包含项目类型 `profile`、知识首页 `home`、最多四层的主题 `sections`、主题固定项 `assignments`、治理覆盖 `governance_overrides` 和文档关系 `document_metadata`，不改变文件实际路径。
+- 主题知识树回答“文档讲什么”，治理属性回答“文档能否作为当前事实”。两条轴必须分开：同一文档可以属于“后端与 API”，同时是“草稿”或“历史归档”；主题位置绝不提升 `role`、`lifecycle`、`authority` 或 `default_retrieval`。
+- 新项目从软件平台、API/SDK、产品、研究、运维或个人知识库模板开始；模板只是可迭代起点，不要求所有项目使用同一分区。程序可根据路径和标题自动归类，关键入口再用 `assignments` 固定。
+- PC 工作台的“知识架构”用于项目地图、层级主题和推荐阅读；“治理视图”用于必须、按需、当前、草稿、证据、归档和等待整理。用户和 AI 都可新增主题或子主题，删除父主题时其子树一并移除，但不删除 Markdown。
 - `.elon/document-organization-suggestions.json` 是 AI 整理建议的结构化产物；AI 整理任务只可写这一份建议文件。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - 文档整理默认使用 `git_backed_full`：先创建整理前仅文档 Git 提交，再自动创建虚拟分区、应用归类及执行结构化建议中选定的 Markdown 重命名/移动，最后创建整理后仅文档提交。
 - 用户可切换 `review_all`（逐项审核）或 `suggestions_only`（只生成建议）；所有供应商必须使用同名模式，不能另建私有权限语义。
-- AI 可在建议中提供结构化 `file_operations`，用于改善含糊文件名或错误目录；每项必须带 analyze 返回的源文件哈希。
+- AI 建议可同时包含项目类型、知识首页、层级主题、缺失文档类型、文档关系和结构化 `file_operations`；每个实体操作必须带 analyze 返回的源文件哈希。
 - 应用虚拟分区建议不等于移动 Markdown。`git_backed_full` 只对项目内、建议中明确列出的 Markdown rename/move 开放完全整理权限；始终禁止覆盖、删除、越界、非文档操作、代码改动或自动 push。
 - 修改正文、批量修复引用、归档、删除、两次仅文档事务提交之外的 commit，以及任何 push 都是更高权限，不能由实体整理授权隐含获得。
 
 ## 供应商无关 MCP 顺序
 
-- 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据，`classification_model_tokens=0`。
+- 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据、`knowledge_architecture` 健康度与缺口，`classification_model_tokens=0`。
 - 诊断或观察整理运行时调用 `project_docs_get_status`；它返回阶段、revision、读取数、token 估算、错误代码和修复建议，不读取 Markdown。
 - 只对 `ambiguous` 或当前任务命中的路径调用 `project_docs_read`，不得借 MCP 全量读取 Markdown。
 - 模型完成判断后携带当前 `authorization_mode` 调用 `project_docs_save_suggestions`；该工具只写建议 JSON，并校验目录 revision、真实路径和结构上限。

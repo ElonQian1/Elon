@@ -106,6 +106,22 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_apply_file_operations"
         ]
     );
+    let save_schema = listed["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|tool| tool["name"] == "project_docs_save_suggestions")
+        .unwrap();
+    let suggestion_properties =
+        &save_schema["inputSchema"]["properties"]["suggestions"]["properties"];
+    assert!(suggestion_properties.get("proposed_profile").is_some());
+    assert!(suggestion_properties.get("proposed_home").is_some());
+    assert!(suggestion_properties.get("document_metadata").is_some());
+    assert!(
+        suggestion_properties["proposed_sections"]["items"]["properties"]
+            .get("parent_id")
+            .is_some()
+    );
     let analyzed = handle_request(
         &root,
         request(json!({
@@ -118,6 +134,11 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert_eq!(
         analyzed["result"]["structuredContent"]["budget"]["classification_model_tokens"],
         0
+    );
+    assert!(
+        analyzed["result"]["structuredContent"]["knowledge_architecture"]
+            .get("score")
+            .is_some()
     );
     assert!(analyzed.get("error").is_none());
     let catalog_revision = analyzed["result"]["structuredContent"]["catalog_revision"]
@@ -176,6 +197,10 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     .await
     .unwrap();
     assert_eq!(applied["result"]["structuredContent"]["status"], "applied");
+    assert_eq!(
+        applied["result"]["structuredContent"]["manifest"]["governance_overrides"]["AGENTS.md"],
+        "required"
+    );
     assert_eq!(
         applied["result"]["structuredContent"]["markdown_changed"],
         false

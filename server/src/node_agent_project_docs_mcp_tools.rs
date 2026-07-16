@@ -80,7 +80,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
     vec![
         tool(
             "project_docs_analyze",
-            "零模型 token 扫描当前 Git 项目的文档路径、标题、哈希、标题层级、生命周期与权威性，并分页返回紧凑目录、虚拟分区和现有 AI 建议。文档治理任务第一步调用；不会读取正文或修改文件。",
+            "零模型 token 扫描当前 Git 项目的文档路径、标题、哈希、标题层级、生命周期与权威性，并返回项目类型推断、知识架构完整度、缺失基础文档、紧凑目录、虚拟分区和现有 AI 建议。文档治理任务第一步调用；不会读取正文或修改文件。",
             json!({
                 "type":"object",
                 "properties":{
@@ -115,7 +115,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "project_docs_save_suggestions",
-            "保存 AI 根据紧凑目录形成的结构化建议。只能写 .elon/document-organization-suggestions.json，不能移动、删除、改写 Markdown，也不能直接更新分区配置。",
+            "保存 AI 根据紧凑目录形成的结构化建议，包括项目类型、层级主题、知识首页、文档关系和安全路径操作。只能写 .elon/document-organization-suggestions.json，不能移动、删除、改写 Markdown，也不能直接更新分区配置。",
             json!({
                 "type":"object",
                 "required":["suggestions","expected_catalog_revision"],
@@ -284,15 +284,21 @@ fn suggestions_schema() -> Value {
             "version":{"type":"integer","const":1},
             "status":{"type":"string","const":"ready"},
             "summary":{"type":"string","maxLength":4000},
+            "proposed_profile":{"type":"string","enum":["auto","software-platform","software-api","product","research","operations","personal-knowledge"],"default":"auto"},
+            "proposed_home":knowledge_home_schema(),
             "proposed_sections":{
-                "type":"array","maxItems":8,
+                "type":"array","maxItems":16,
                 "items":{
                     "type":"object","required":["id","label","detail","color"],
                     "properties":{
                         "id":{"type":"string","maxLength":48},
                         "label":{"type":"string","maxLength":40},
                         "detail":{"type":"string","maxLength":120},
-                        "color":{"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"}
+                        "color":{"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"},
+                        "parent_id":{"type":"string","maxLength":48,"default":""},
+                        "order":{"type":"integer","minimum":0,"maximum":9999,"default":0},
+                        "icon":{"type":"string","maxLength":32,"default":""},
+                        "entrypoint":{"type":"string","default":""}
                     }
                 }
             },
@@ -309,6 +315,12 @@ fn suggestions_schema() -> Value {
             },
             "conflicts":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
             "move_suggestions":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
+            "architecture_findings":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
+            "missing_document_types":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":120}},
+            "document_metadata":{
+                "type":"object","maxProperties":500,
+                "additionalProperties":knowledge_metadata_schema()
+            },
             "file_operations":{
                 "type":"array","maxItems":100,
                 "items":{
@@ -327,6 +339,32 @@ fn suggestions_schema() -> Value {
             },
             "documents_read":{"type":"integer","minimum":0},
             "estimated_tokens_used":{"type":"integer","minimum":0}
+        }
+    })
+}
+
+fn knowledge_home_schema() -> Value {
+    json!({
+        "type":"object",
+        "properties":{
+            "title":{"type":"string","maxLength":80},
+            "summary":{"type":"string","maxLength":1000},
+            "entrypoint":{"type":"string"},
+            "start_here":{"type":"array","maxItems":12,"items":{"type":"string"}}
+        }
+    })
+}
+
+fn knowledge_metadata_schema() -> Value {
+    json!({
+        "type":"object",
+        "properties":{
+            "doc_type":{"type":"string","maxLength":64},
+            "audience":{"type":"array","maxItems":12,"items":{"type":"string","maxLength":80}},
+            "owner":{"type":"string","maxLength":80},
+            "version":{"type":"string","maxLength":40},
+            "related":{"type":"array","maxItems":24,"items":{"type":"string"}},
+            "supersedes":{"type":"array","maxItems":24,"items":{"type":"string"}}
         }
     })
 }

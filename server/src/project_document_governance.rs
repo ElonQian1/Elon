@@ -14,7 +14,7 @@ pub(crate) use crate::project_document_file_operation_model::{
 
 pub(crate) const SECTION_CONFIG_PATH: &str = ".elon/document-sections.json";
 pub(crate) const SUGGESTIONS_CONFIG_PATH: &str = ".elon/document-organization-suggestions.json";
-pub(crate) const MAX_PROPOSED_SECTIONS: usize = 8;
+pub(crate) const MAX_PROPOSED_SECTIONS: usize = 16;
 pub(crate) const MAX_SUGGESTED_ASSIGNMENTS: usize = 500;
 pub(crate) const MAX_SUGGESTED_FILE_OPERATIONS: usize = 100;
 
@@ -30,7 +30,7 @@ const SYSTEM_SECTION_KEYS: &[&str] = &[
     "unclassified",
 ];
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct CustomDocumentSection {
     pub id: String,
     pub label: String,
@@ -38,6 +38,42 @@ pub(crate) struct CustomDocumentSection {
     pub detail: String,
     #[serde(default = "default_section_color")]
     pub color: String,
+    #[serde(default)]
+    pub parent_id: String,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default)]
+    pub icon: String,
+    #[serde(default)]
+    pub entrypoint: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentKnowledgeHome {
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub entrypoint: String,
+    #[serde(default)]
+    pub start_here: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentKnowledgeMetadata {
+    #[serde(default)]
+    pub doc_type: String,
+    #[serde(default)]
+    pub audience: Vec<String>,
+    #[serde(default)]
+    pub owner: String,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub related: Vec<String>,
+    #[serde(default)]
+    pub supersedes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -45,17 +81,29 @@ pub(crate) struct DocumentSectionManifest {
     #[serde(default = "schema_version")]
     pub version: u8,
     #[serde(default)]
+    pub profile: String,
+    #[serde(default)]
+    pub home: DocumentKnowledgeHome,
+    #[serde(default)]
     pub sections: Vec<CustomDocumentSection>,
     #[serde(default)]
     pub assignments: BTreeMap<String, String>,
+    #[serde(default)]
+    pub governance_overrides: BTreeMap<String, String>,
+    #[serde(default)]
+    pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
 }
 
 impl Default for DocumentSectionManifest {
     fn default() -> Self {
         Self {
             version: schema_version(),
+            profile: "auto".to_string(),
+            home: DocumentKnowledgeHome::default(),
             sections: Vec::new(),
             assignments: BTreeMap::new(),
+            governance_overrides: BTreeMap::new(),
+            document_metadata: BTreeMap::new(),
         }
     }
 }
@@ -82,7 +130,7 @@ impl Default for OrganizationStatus {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct DocumentOrganizationSuggestions {
     #[serde(default = "schema_version")]
     pub version: u8,
@@ -91,6 +139,10 @@ pub(crate) struct DocumentOrganizationSuggestions {
     #[serde(default)]
     pub summary: String,
     #[serde(default)]
+    pub proposed_profile: String,
+    #[serde(default)]
+    pub proposed_home: Option<DocumentKnowledgeHome>,
+    #[serde(default)]
     pub proposed_sections: Vec<CustomDocumentSection>,
     #[serde(default)]
     pub assignments: Vec<SuggestedAssignment>,
@@ -98,6 +150,12 @@ pub(crate) struct DocumentOrganizationSuggestions {
     pub conflicts: Vec<String>,
     #[serde(default)]
     pub move_suggestions: Vec<String>,
+    #[serde(default)]
+    pub architecture_findings: Vec<String>,
+    #[serde(default)]
+    pub missing_document_types: Vec<String>,
+    #[serde(default)]
+    pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
     #[serde(default)]
     pub file_operations: Vec<SuggestedFileOperation>,
     #[serde(default)]
@@ -137,21 +195,57 @@ pub(crate) fn normalize_manifest(
     if manifest.version != schema_version() {
         bail!("document-sections.json 仅支持 version=1");
     }
-    if manifest.sections.len() > 64 || manifest.assignments.len() > 5_000 {
+    if manifest.sections.len() > 64
+        || manifest.assignments.len() > 5_000
+        || manifest.governance_overrides.len() > 5_000
+        || manifest.document_metadata.len() > 5_000
+    {
         bail!("项目文档分区配置超过安全上限");
     }
+    manifest.profile = sanitize_profile(&manifest.profile);
+    manifest.home = sanitize_home(manifest.home)?;
     manifest.sections = unique_sections(manifest.sections, 64)?;
+    validate_section_tree(&manifest.sections)?;
     let valid_keys = valid_section_keys(&manifest.sections);
     let mut assignments = BTreeMap::new();
+    let mut governance_overrides = manifest
+        .governance_overrides
+        .into_iter()
+        .map(|(path, section)| {
+            let path = normalize_document_path(&path)?;
+            let section = section.trim().to_string();
+            if !SYSTEM_SECTION_KEYS.contains(&section.as_str()) {
+                bail!("治理覆盖引用了未知治理分区：{section}");
+            }
+            Ok((path, section))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
     for (path, section) in manifest.assignments {
         let path = normalize_document_path(&path)?;
         let section = normalize_section_key(&section, &manifest.sections);
         if !valid_keys.contains(&section) {
             bail!("分区配置引用了未知分区：{section}");
         }
-        assignments.insert(path, section);
+        if SYSTEM_SECTION_KEYS.contains(&section.as_str()) {
+            // Backward compatibility: manifests written before knowledge/governance
+            // separation stored both facets in `assignments`.
+            governance_overrides.insert(path, section);
+        } else {
+            assignments.insert(path, section);
+        }
     }
     manifest.assignments = assignments;
+    manifest.governance_overrides = governance_overrides;
+    manifest.document_metadata = manifest
+        .document_metadata
+        .into_iter()
+        .map(|(path, metadata)| {
+            Ok((
+                normalize_document_path(&path)?,
+                sanitize_knowledge_metadata(metadata)?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
     Ok(manifest)
 }
 
@@ -165,13 +259,19 @@ pub(crate) fn normalize_suggestions(
         || suggestions.assignments.len() > MAX_SUGGESTED_ASSIGNMENTS
         || suggestions.conflicts.len() > 100
         || suggestions.move_suggestions.len() > 100
+        || suggestions.architecture_findings.len() > 100
+        || suggestions.missing_document_types.len() > 100
+        || suggestions.document_metadata.len() > MAX_SUGGESTED_ASSIGNMENTS
         || suggestions.file_operations.len() > MAX_SUGGESTED_FILE_OPERATIONS
     {
         bail!("AI 文档整理建议超过安全上限");
     }
     suggestions.summary = truncate_chars(suggestions.summary.trim(), 4_000);
+    suggestions.proposed_profile = sanitize_profile(&suggestions.proposed_profile);
+    suggestions.proposed_home = suggestions.proposed_home.map(sanitize_home).transpose()?;
     suggestions.proposed_sections =
         unique_sections(suggestions.proposed_sections, MAX_PROPOSED_SECTIONS)?;
+    validate_section_tree(&suggestions.proposed_sections)?;
     suggestions.assignments = suggestions
         .assignments
         .into_iter()
@@ -185,6 +285,20 @@ pub(crate) fn normalize_suggestions(
         .collect::<Result<Vec<_>>>()?;
     suggestions.conflicts = bounded_strings(suggestions.conflicts, 100, 1_000);
     suggestions.move_suggestions = bounded_strings(suggestions.move_suggestions, 100, 1_000);
+    suggestions.architecture_findings =
+        bounded_strings(suggestions.architecture_findings, 100, 1_000);
+    suggestions.missing_document_types =
+        bounded_strings(suggestions.missing_document_types, 100, 120);
+    suggestions.document_metadata = suggestions
+        .document_metadata
+        .into_iter()
+        .map(|(path, metadata)| {
+            Ok((
+                normalize_document_path(&path)?,
+                sanitize_knowledge_metadata(metadata)?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
     suggestions.file_operations = normalize_file_operations(suggestions.file_operations)?;
     Ok(suggestions)
 }
@@ -208,6 +322,7 @@ pub(crate) fn validate_ready_suggestions(
             bail!("AI 建议引用了未知分区：{}", assignment.section_id);
         }
     }
+    validate_suggested_paths(&suggestions, &known_paths)?;
     validate_file_operations(&suggestions.file_operations, documents, &known_paths)?;
     Ok(suggestions)
 }
@@ -240,6 +355,15 @@ pub(crate) fn apply_suggestions(
     for section in suggestions.proposed_sections.iter().cloned() {
         sections.insert(section.id.clone(), section);
     }
+    if suggestions.proposed_profile != "auto" {
+        manifest.profile = suggestions.proposed_profile.clone();
+    }
+    if let Some(home) = suggestions.proposed_home.clone() {
+        manifest.home = home;
+    }
+    manifest
+        .document_metadata
+        .extend(suggestions.document_metadata.clone());
     manifest.sections = sections.into_values().collect();
     let valid_keys = valid_section_keys(&manifest.sections);
     let mut applied = 0usize;
@@ -249,9 +373,15 @@ pub(crate) fn apply_suggestions(
         if known_paths.contains(&assignment.path.to_ascii_lowercase())
             && valid_keys.contains(&section)
         {
-            manifest
-                .assignments
-                .insert(assignment.path.clone(), section);
+            if SYSTEM_SECTION_KEYS.contains(&section.as_str()) {
+                manifest
+                    .governance_overrides
+                    .insert(assignment.path.clone(), section);
+            } else {
+                manifest
+                    .assignments
+                    .insert(assignment.path.clone(), section);
+            }
             applied += 1;
         } else {
             skipped += 1;
@@ -342,6 +472,14 @@ fn sanitize_section(mut section: CustomDocumentSection) -> Result<CustomDocument
     section.label = truncate_chars(section.label.trim(), 40);
     section.detail = truncate_chars(section.detail.trim(), 120);
     section.color = section.color.trim().to_string();
+    section.parent_id = sanitize_section_id(&section.parent_id);
+    section.order = section.order.clamp(0, 9_999);
+    section.icon = truncate_chars(section.icon.trim(), 32);
+    section.entrypoint = if section.entrypoint.trim().is_empty() {
+        String::new()
+    } else {
+        normalize_document_path(&section.entrypoint)?
+    };
     if section.id.is_empty() || section.label.is_empty() {
         bail!("自定义分区必须包含有效 id 和 label");
     }
@@ -349,6 +487,116 @@ fn sanitize_section(mut section: CustomDocumentSection) -> Result<CustomDocument
         section.color = default_section_color();
     }
     Ok(section)
+}
+
+fn validate_section_tree(sections: &[CustomDocumentSection]) -> Result<()> {
+    let parents = sections
+        .iter()
+        .map(|section| (section.id.as_str(), section.parent_id.as_str()))
+        .collect::<HashMap<_, _>>();
+    for section in sections {
+        if !section.parent_id.is_empty() && !parents.contains_key(section.parent_id.as_str()) {
+            bail!("知识分区引用了不存在的父分区：{}", section.parent_id);
+        }
+        let mut cursor = section.id.as_str();
+        let mut visited = HashSet::new();
+        for _ in 0..=4 {
+            if !visited.insert(cursor) {
+                bail!("知识分区层级存在循环：{}", section.id);
+            }
+            let parent = parents.get(cursor).copied().unwrap_or_default();
+            if parent.is_empty() {
+                cursor = "";
+                break;
+            }
+            cursor = parent;
+        }
+        if !cursor.is_empty() {
+            bail!("知识分区层级最多支持 4 层：{}", section.id);
+        }
+    }
+    Ok(())
+}
+
+fn sanitize_profile(value: &str) -> String {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "software-platform" | "software-api" | "product" | "research" | "operations"
+        | "personal-knowledge" => value.trim().to_ascii_lowercase(),
+        _ => "auto".to_string(),
+    }
+}
+
+fn sanitize_home(mut home: DocumentKnowledgeHome) -> Result<DocumentKnowledgeHome> {
+    home.title = truncate_chars(home.title.trim(), 80);
+    home.summary = truncate_chars(home.summary.trim(), 1_000);
+    home.entrypoint = if home.entrypoint.trim().is_empty() {
+        String::new()
+    } else {
+        normalize_document_path(&home.entrypoint)?
+    };
+    home.start_here = home
+        .start_here
+        .into_iter()
+        .take(12)
+        .map(|path| normalize_document_path(&path))
+        .collect::<Result<Vec<_>>>()?;
+    home.start_here.sort();
+    home.start_here.dedup();
+    Ok(home)
+}
+
+fn sanitize_knowledge_metadata(
+    mut metadata: DocumentKnowledgeMetadata,
+) -> Result<DocumentKnowledgeMetadata> {
+    metadata.doc_type = truncate_chars(metadata.doc_type.trim(), 64);
+    metadata.owner = truncate_chars(metadata.owner.trim(), 80);
+    metadata.version = truncate_chars(metadata.version.trim(), 40);
+    metadata.audience = bounded_strings(metadata.audience, 12, 80);
+    metadata.related = metadata
+        .related
+        .into_iter()
+        .take(24)
+        .map(|path| normalize_document_path(&path))
+        .collect::<Result<Vec<_>>>()?;
+    metadata.supersedes = metadata
+        .supersedes
+        .into_iter()
+        .take(24)
+        .map(|path| normalize_document_path(&path))
+        .collect::<Result<Vec<_>>>()?;
+    metadata.related.sort();
+    metadata.related.dedup();
+    metadata.supersedes.sort();
+    metadata.supersedes.dedup();
+    Ok(metadata)
+}
+
+fn validate_suggested_paths(
+    suggestions: &DocumentOrganizationSuggestions,
+    known_paths: &HashSet<String>,
+) -> Result<()> {
+    let validate = |path: &str| {
+        if known_paths.contains(&path.to_ascii_lowercase()) {
+            Ok(())
+        } else {
+            bail!("知识架构建议引用了目录中不存在的文档：{path}")
+        }
+    };
+    if let Some(home) = &suggestions.proposed_home {
+        if !home.entrypoint.is_empty() {
+            validate(&home.entrypoint)?;
+        }
+        for path in &home.start_here {
+            validate(path)?;
+        }
+    }
+    for (path, metadata) in &suggestions.document_metadata {
+        validate(path)?;
+        for related in metadata.related.iter().chain(&metadata.supersedes) {
+            validate(related)?;
+        }
+    }
+    Ok(())
 }
 
 fn valid_section_keys(sections: &[CustomDocumentSection]) -> HashSet<String> {
