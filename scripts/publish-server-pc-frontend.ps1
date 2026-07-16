@@ -83,6 +83,30 @@ function Write-GitTextFile {
     [System.IO.File]::WriteAllLines($Destination, [string[]]$content, $utf8NoBom)
 }
 
+function Invoke-PcFrontendBundleBudget {
+    param([string]$FrontendDir)
+
+    $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $FrontendDir ".."))
+    $distDir = Join-Path $FrontendDir "dist"
+    $budgetScript = Join-Path $repoRoot "scripts\check-pc-frontend-bundle-budget.js"
+    if (-not (Test-Path (Join-Path $distDir "index.html"))) {
+        throw "PC frontend dist is missing index.html: $distDir"
+    }
+    if (-not (Test-Path $budgetScript)) {
+        throw "PC frontend bundle budget script is missing: $budgetScript"
+    }
+    if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
+        throw "node is unavailable for the PC frontend bundle budget check"
+    }
+
+    Write-Host "   Checking PC frontend bundle budget..." -ForegroundColor Gray
+    $budgetExit = Invoke-LoggedCmd -Command "node `"$budgetScript`" --dist `"$distDir`""
+    if ($budgetExit -ne 0) {
+        throw "PC frontend bundle budget check failed, exit=$budgetExit"
+    }
+    Write-Host "   PC frontend bundle budget passed" -ForegroundColor Green
+}
+
 function Invoke-PcFrontendLocalBuild {
     param([string]$FrontendDir)
     $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"

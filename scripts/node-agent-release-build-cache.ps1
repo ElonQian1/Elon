@@ -47,6 +47,7 @@ function Invoke-NodeAgentPcFrontendBuild {
     if (-not (Test-Path (Join-Path $PcDistDir 'index.html'))) {
         throw "PC frontend dist is missing index.html: $PcDistDir"
     }
+    Invoke-PcFrontendBundleBudget -FrontendDir $PcFrontendDir
     Write-Host "   PC frontend dist ready: $PcDistDir" -ForegroundColor Green
 }
 

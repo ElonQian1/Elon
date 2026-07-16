@@ -77,6 +77,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
+. (Join-Path $PSScriptRoot "publish-health-checks.ps1")
 
 Set-ElonProjectDirectNetwork
 
@@ -881,6 +882,7 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
         }
     }
 
+    Invoke-PcFrontendBundleBudget -FrontendDir $PcFrontendDir
     $pcPublished = Publish-StaticDist -LocalDir $PcDistDir -RemoteDir $RemotePcDist `
         -Label "新版 PC 前端 dist" -Required
     if (-not $pcPublished) { throw '新版 PC 前端发布未完成' }
@@ -888,7 +890,6 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
 } else {
     throw 'pc-frontend/ 不存在，统一发布批次失败关闭'
 }
-
 try {
     Write-Host "3.5⃣  生成旧版 PC 对照快照（$($PcLegacyBaseCommit.Substring(0, 8))）..." -ForegroundColor Yellow
     $PcLegacyDistDir = Export-PcLegacyDist -Commit $PcLegacyBaseCommit -OutDir $PcLegacyDistDir
@@ -1040,19 +1041,11 @@ Write-Host "   ✅ SHA 记录已写入服务器 (.deployed-sha = $Sha)" -Foregro
 # ─────────────────────────────────────────────────────────────
 Write-Host "6⃣  等待服务启动（3 秒）..." -ForegroundColor Yellow
 Start-Sleep 3
-
-$health = curl.exe --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/health" 2>&1
-if ($health -and $health.ToString().Trim() -ne "") {
-    Write-Host "   ✅ 健康检查: $health" -ForegroundColor Green
-} else {
-    Write-Host "   ⚠️  健康检查无响应（服务可能还在启动中，手动确认：curl.exe --noproxy '*' http://43.139.149.158:8080/health）" -ForegroundColor Yellow
-}
-
-$serverVersionResp = curl.exe --noproxy '*' -s --max-time 10 "http://43.139.149.158:8080/api/server/version" 2>&1
-if ($serverVersionResp -and $serverVersionResp.ToString().Trim() -ne "") {
-    Write-Host "   ✅ 后端版本接口: $serverVersionResp" -ForegroundColor Green
-} else {
-    Write-Host "   ⚠️  后端版本接口无响应（手动确认：curl.exe --noproxy '*' http://43.139.149.158:8080/api/server/version）" -ForegroundColor Yellow
+try {
+    Invoke-ElonServerPostDeploySmoke -BaseUrl $ServerHttpBase -ExpectedVersionName $AssignedVersion -ExpectedGitSha $ShaBig | Out-Null
+} catch {
+    Complete-Release -Success $false -ErrorMessage "post-deploy smoke failed: $_"
+    Write-Error "❌ 部署后 smoke 失败：$_"
 }
 
 # The first deployment from a legacy release API resumes a token that did not
