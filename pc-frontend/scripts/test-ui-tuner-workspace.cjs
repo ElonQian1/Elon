@@ -290,6 +290,34 @@ try {
     assert.match(tabsMarkup, /aria-selected="true"[^>]*>设计</)
     assert.match(tabsMarkup, />AI</)
     assert.match(tabsMarkup, />检查</)
+
+    const progressOutput = compile(
+      'src/features/ui-tuner/workspace/UiDesignProgressBar.tsx',
+      'workspace/UiDesignProgressBar.js',
+      true,
+    )
+    fs.writeFileSync(path.join(temporaryDirectory, 'workspace/UiDesignProgressBar.module.css'), '')
+    const { AndroidUiDesignProgress, SourceUiDesignProgress } = require(progressOutput)
+    const sourceProgressMarkup = renderToStaticMarkup(React.createElement(SourceUiDesignProgress, {
+      hasDocument: true,
+      pendingCount: 2,
+      saveState: 'preview',
+    }))
+    assert.match(sourceProgressMarkup, /aria-label="设计落地进度"/)
+    assert.match(sourceProgressMarkup, /2 个组件已调整/)
+    assert.match(sourceProgressMarkup, /等待真帧校准/)
+    const androidProgressMarkup = renderToStaticMarkup(React.createElement(AndroidUiDesignProgress, {
+      draftStatus: 'confirmed',
+      liveUi: {
+        state: 'connected',
+        session: { historyCount: 1 },
+        commitResult: { status: 'SOURCE_SAVED' },
+        buildVerifyResult: { status: 'BUILD_VERIFIED' },
+      },
+    }))
+    assert.match(androidProgressMarkup, /Runtime 已连接/)
+    assert.match(androidProgressMarkup, /已保存源码/)
+    assert.match(androidProgressMarkup, /无 Patch 验证通过/)
   } finally {
     if (previousCssLoader) require.extensions['.css'] = previousCssLoader
     else delete require.extensions['.css']

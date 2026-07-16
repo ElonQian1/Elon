@@ -64,6 +64,7 @@ import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
 import { UiWorkspaceModeBar } from './workspace/UiWorkspaceModeBar'
 import { getSelectedId } from './workspace/uiWorkspaceSelection'
 import { useUiWorkspaceSelectionSync } from './workspace/useUiWorkspaceSelectionSync'
+import { AndroidUiDesignProgress } from './workspace/UiDesignProgressBar'
 import {
   DEFAULT_ANDROID_PACKAGE,
   UI_TUNER_HISTORY_LIMIT,
@@ -695,6 +696,7 @@ export default function UiTunerPage() {
           onToggleRightPanel={workspaceLayout.toggleRightPanel}
           onToggleFocusMode={workspaceLayout.toggleFocusMode}
         />
+        <AndroidUiDesignProgress liveUi={liveUi} draftStatus={runtimeDraft.status} />
 
         <UiTunerComparisonWorkspace
           document={tunerDoc}
