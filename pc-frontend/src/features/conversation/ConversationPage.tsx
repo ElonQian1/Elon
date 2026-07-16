@@ -1196,7 +1196,7 @@ export default function ConversationPage() {
               <ChannelNavList
                 projectId={activeProjectId} channels={filteredChannels}
                 activeChannelId={activeChannelId}
-                onSelectChannel={selectChannel}
+                onSelectChannel={(id) => { if (channels.find((channel) => channel.id === id)?.kind === 'ai_development') openDevelopmentDraft(id); else void selectChannel(id) }}
               />
 
               {activeConversationTarget && (

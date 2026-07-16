@@ -29,6 +29,7 @@ assert.ok(landingDownloads.includes('variantList'), 'download variants should st
 assert.match(landingCss, /width:\s*min\(1120px, 100%\)/, 'project landing should restore the wider desktop composition')
 
 assert.match(conversationPage, /onSelectChannel=\{\(id\) => \{ void openDevelopmentDraft\(id\) \}\}/, 'continue development should open a draft conversation')
+assert.ok(conversationPage.includes("channels.find((channel) => channel.id === id)?.kind === 'ai_development') openDevelopmentDraft(id)"), 'clicking the AI development channel should open the same draft conversation')
 assert.match(conversationPage, /sessionView === 'new'[\s\S]*<NewConversationDraft/, 'new sessions should use the dedicated draft canvas')
 assert.match(conversationPage, /sessionView !== 'new' && <ConversationMemberSidebar/, 'draft mode should hide the member and agent sidebar')
 assert.match(conversationPage, /function startNewSession\(\)[\s\S]*waitingForNewSession\.current = false/, 'opening an empty draft must not wait for or create a real conversation')
