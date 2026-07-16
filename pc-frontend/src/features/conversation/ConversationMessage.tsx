@@ -7,7 +7,7 @@ import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext, taskResultDisplayText, taskResultTone } from '../dev/devTaskUtils'
 import { formatTime } from '../../lib/utils'
 import UserAvatar from '../shell/UserAvatar'
-import MessageActions, { messageCopySourceId } from '../message-actions/MessageActions'
+import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './ConversationPage.module.css'
 
 interface MessageItemProps {
@@ -76,7 +76,7 @@ export const MessageItem = memo(function MessageItem({ message, isDevChannel, ta
     : /!\[[^\]]*]\([^)]+\)|\[[^\]]+]\([^)]+\)|`|^\s*https?:\/\/\S+?(?:\.(?:png|jpe?g|gif|webp)|\/(?:chat-)?attachments\/\S+)/im.test(content)
 
   return (
-    <div className={[styles.messageRow, isOwn ? styles.ownRow : '', isAi ? styles.aiRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
+    <div className={[styles.messageRow, messageActionsHostClassName, isOwn ? styles.ownRow : '', isAi ? styles.aiRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
       <MessageAvatar message={message} isAi={isAi} isOwn={isOwn} displayName={displayName} user={user} />
       <div className={styles.messageBody}>
         <div className={styles.messageMeta}>

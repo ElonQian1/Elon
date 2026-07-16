@@ -7,6 +7,7 @@
   margin-top: 3px;
   color: var(--text-muted);
   opacity: .64;
+  transition: opacity .14s ease;
 }
 
 .actions:hover,
@@ -137,4 +138,22 @@
 
 .copyFailed {
   color: #ef8a8a;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .actions {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .actionHost:hover .actions,
+  .actionHost:focus-within .actions {
+    opacity: .64;
+    pointer-events: auto;
+  }
+
+  .actionHost:hover .actions:hover,
+  .actionHost:focus-within .actions:focus-within {
+    opacity: 1;
+  }
 }

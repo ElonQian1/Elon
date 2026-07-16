@@ -3,7 +3,7 @@ import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import { formatTime } from '../../lib/utils'
 import { forkAiConversation, forkTitleFromContent } from '../conversation/conversationForkApi'
 import MarkdownContent from '../markdown/MarkdownContent'
-import MessageActions, { messageCopySourceId } from '../message-actions/MessageActions'
+import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import UserAvatar from '../shell/UserAvatar'
 import styles from './AiChatPage.module.css'
 
@@ -47,7 +47,7 @@ export default function AiChatMessageRow({
   const canFork = !!activeConvId && !!message.id
 
   return (
-    <div className={[styles.msgRow, isUser ? styles.ownRow : ''].join(' ')}>
+    <div className={[styles.msgRow, messageActionsHostClassName, isUser ? styles.ownRow : ''].join(' ')}>
       {isUser
         ? <UserAvatar user={user} size="compact" className={styles.avatar} />
         : <div className={[styles.avatar, isNode ? styles.nodeAvatar : ''].join(' ')}>{isNode ? '\u{1F5A5}\uFE0F' : 'AI'}</div>}

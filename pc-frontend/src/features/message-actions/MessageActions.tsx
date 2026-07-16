@@ -18,6 +18,8 @@ interface MessageActionsProps {
 
 const FEEDBACK_PREFIX = 'elon.pc.messageFeedback'
 
+export const messageActionsHostClassName = styles.actionHost
+
 export default function MessageActions({
   content,
   messageKey,

@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/auth'
 import { clean, formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
 import MarkdownContent from '../markdown/MarkdownContent'
-import MessageActions, { messageCopySourceId } from '../message-actions/MessageActions'
+import MessageActions, { messageActionsHostClassName, messageCopySourceId } from '../message-actions/MessageActions'
 import styles from './FriendsPage.module.css'
 
 interface Friend {
@@ -545,7 +545,7 @@ export default function FriendsPage() {
                 ? (m.sender_name ?? '群成员')
                 : activeItem?.title ?? '对方')
             return (
-              <div key={m.id ?? i} className={[styles.msgRow, isMe ? styles.ownRow : ''].join(' ')}>
+              <div key={m.id ?? i} className={[styles.msgRow, messageActionsHostClassName, isMe ? styles.ownRow : ''].join(' ')}>
                 <div className={styles.avatar}>
                   {avatarInitial(senderName, isMe ? '我' : activeItem?.kind === 'group' ? '群' : '友')}
                 </div>
