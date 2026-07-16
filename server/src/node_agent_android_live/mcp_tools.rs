@@ -32,7 +32,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "mode":{"enum":["AUTO","MODIFY_EXISTING","EXTEND_EXISTING","CREATE_NEW"]},
                     "attachmentIntent":{"enum":["AUTO","TARGET_DESIGN","ANNOTATED_CHANGE_REQUEST","REFERENCE_STYLE","CURRENT_SCREENSHOT"]},
                     "attachments":{
-                        "type":"array","maxItems":8,
+                        "type":"array","maxItems":64,
                         "items":{
                             "type":"object","required":["path"],
                             "properties":{

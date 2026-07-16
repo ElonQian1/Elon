@@ -56,6 +56,14 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_check_workflow_completion"));
+    let desktop_import = tools
+        .iter()
+        .find(|tool| tool["name"] == "ui_import_desktop_task")
+        .expect("desktop task import tool must be exposed");
+    assert_eq!(
+        desktop_import["inputSchema"]["properties"]["attachments"]["maxItems"],
+        64
+    );
 }
 
 #[tokio::test]

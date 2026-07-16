@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 
 use super::broker::LiveUiSession;
 
-const MAX_ATTACHMENTS: usize = 8;
+const MAX_ATTACHMENTS: usize = 64;
 const MAX_IMAGE_BYTES: u64 = 16 * 1024 * 1024;
 
 pub(crate) fn import_desktop_task(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
@@ -37,6 +37,12 @@ pub(crate) fn import_desktop_task(session: &LiveUiSession, arguments: &Value) ->
         .map(safe_id)
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| format!("desktop_{}", uuid::Uuid::new_v4().simple()));
+    let attachments = arguments
+        .get("attachments")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    validate_attachment_count(attachments.len())?;
     let task_root = root
         .join(".elon")
         .join("ui-design")
@@ -46,15 +52,6 @@ pub(crate) fn import_desktop_task(session: &LiveUiSession, arguments: &Value) ->
         bail!("桌面 UI 任务已存在，拒绝覆盖: {task_id}");
     }
     fs::create_dir_all(task_root.join("attachments"))?;
-
-    let attachments = arguments
-        .get("attachments")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    if attachments.len() > MAX_ATTACHMENTS {
-        bail!("Codex 桌面 UI 任务最多允许 {MAX_ATTACHMENTS} 张图片");
-    }
     let mut metadata = Vec::with_capacity(attachments.len());
     let mut local_entries = Vec::with_capacity(attachments.len());
     let mut target_design_attachment_id = None;
@@ -247,12 +244,26 @@ fn safe_id(value: &str) -> String {
         .collect()
 }
 
+fn validate_attachment_count(count: usize) -> Result<()> {
+    if count > MAX_ATTACHMENTS {
+        bail!("Codex 桌面 UI 任务最多允许 {MAX_ATTACHMENTS} 张图片");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::safe_id;
+    use super::{safe_id, validate_attachment_count};
 
     #[test]
     fn desktop_task_id_cannot_escape_workspace() {
         assert_eq!(safe_id("../../ui:task"), "uitask");
+    }
+
+    #[test]
+    fn desktop_task_accepts_large_reference_asset_sets() {
+        assert!(validate_attachment_count(9).is_ok());
+        assert!(validate_attachment_count(64).is_ok());
+        assert!(validate_attachment_count(65).is_err());
     }
 }
