@@ -1,0 +1,33 @@
+.tabs {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid #293241;
+  background: color-mix(in srgb, #111827 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.tabs button {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #91a2b8;
+  font-weight: 700;
+}
+
+.tabs button:hover {
+  background: #1b2636;
+  color: #edf5ff;
+}
+
+.tabs .active {
+  border-color: #526277;
+  background: #f8fafc;
+  color: #111827;
+}

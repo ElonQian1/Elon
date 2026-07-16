@@ -51,7 +51,7 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
         />
         <SourceDrivenPreviewSurface document={session.document} androidRender={session.renderer.render} selectedKey={session.selectedKey} zoom={zoom} loading={session.loading || session.renderer.rendering} error={session.error || session.renderer.error} onSelect={session.setSelectedKey} />
       </section>
-      <SourcePreviewInspector node={session.selected} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} onChange={session.apply} onSave={() => { void session.commit() }} />
+      <SourcePreviewInspector node={session.selected} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} onChange={session.apply} onSave={() => { void session.commit() }} onModeChange={onModeChange} />
     </div>
   )
 }

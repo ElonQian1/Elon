@@ -1,0 +1,8 @@
+.aiPanel { display: grid; gap: 10px; }
+.aiPanel strong { color: #edf5ff; font-size: 12px; }
+.aiPanel p, .aiPanel small { margin: 0; color: #8290a4; font-size: 10px; line-height: 1.55; }
+.aiPanel button { min-height: 34px; border: 1px solid #3a485c; border-radius: 8px; background: #1c2838; color: #e8eff8; font-weight: 700; }
+.aiPanel button:first-of-type { background: #f8fafc; color: #111827; }
+.rawInfo dl { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 7px; margin: 0; font-size: 10px; }
+.rawInfo dt { color: #8290a4; }
+.rawInfo dd { min-width: 0; margin: 0; color: #dbe5f2; overflow-wrap: anywhere; }

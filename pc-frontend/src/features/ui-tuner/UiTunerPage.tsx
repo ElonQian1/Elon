@@ -763,6 +763,8 @@ export default function UiTunerPage() {
         onPrepareLiveRuntime={() => { void prepareLiveRuntime() }}
         captureBusy={captureBusy}
         onRecaptureDevice={() => { void captureDeviceSnapshot() }}
+        runtimeEditable={renderMode.runtimeEditable}
+        onSwitchToDraft={() => changeWorkspaceMode('source')}
       />}
 
       <UiTunerDeviceDialog

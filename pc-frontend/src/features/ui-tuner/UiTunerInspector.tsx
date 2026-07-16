@@ -14,6 +14,8 @@ import { UiTunerLivePanel } from './live/UiTunerLivePanel'
 import type { useLiveUiSession } from './live/useLiveUiSession'
 import type { LivePatchOperation, LiveUiScope } from './live/liveUiApi'
 import type { RuntimeDraftStatus } from './live/runtimeDraftModel'
+import { UiDesignGateway } from './inspector/UiDesignGateway'
+import { UiInspectorTabs, type UiInspectorTab } from './inspector/UiInspectorTabs'
 import styles from './UiTunerPage.module.css'
 
 const MIN_SIZE = 24
@@ -52,6 +54,8 @@ interface UiTunerInspectorProps {
   onPrepareLiveRuntime: () => void
   captureBusy: boolean
   onRecaptureDevice: () => void
+  runtimeEditable: boolean
+  onSwitchToDraft: () => void
 }
 
 export function UiTunerInspector({
@@ -87,101 +91,128 @@ export function UiTunerInspector({
   onPrepareLiveRuntime,
   captureBusy,
   onRecaptureDevice,
+  runtimeEditable,
+  onSwitchToDraft,
 }: UiTunerInspectorProps) {
+  const [activeTab, setActiveTab] = useState<UiInspectorTab>('design')
   const [showExportJson, setShowExportJson] = useState(false)
+  const androidReadOnly = Boolean(tunerDoc.runtimeSnapshot) && !runtimeEditable
+  const supportsTypography = selected?.kind === 'text' || selected?.kind === 'button'
   return (
     <aside className={styles.inspector}>
-      <CanvasSection
-        tunerDoc={tunerDoc}
-        filterResult={filterResult}
-        onUpdateCanvas={onUpdateCanvas}
-        onSetProductMode={onSetProductMode}
-        onSetDebugMode={onSetDebugMode}
-        captureBusy={captureBusy}
-        onRecaptureDevice={onRecaptureDevice}
-      />
-
-      {selected ? (
+      <UiInspectorTabs value={activeTab} onChange={setActiveTab} />
+      {activeTab === 'design' && (selected ? (
         <>
-          <SelectedSection
-            tunerDoc={tunerDoc}
-            selected={selected}
-            metrics={metrics}
-            onUpdateElement={onUpdateElement}
-            onDeleteSelected={onDeleteSelected}
-          />
-          <UiTunerLivePanel
-            state={liveUi.state}
-            error={liveUi.error}
-            busy={liveUi.busy}
-            session={liveUi.session}
-            node={liveUi.selectedNode}
-            mcp={liveUi.mcp}
-            uiIr={liveUi.uiIr}
-            targetDesign={liveUi.targetDesign}
-            draftStatus={liveUiDraftStatus}
-            onApply={onLiveApply}
-            onApplyGesture={onLiveApplyGesture}
-            onGestureActive={liveUi.setGestureActive}
-            onUndo={onLiveUndo}
-            onRedo={onLiveRedo}
-            onReconnect={liveUi.reconnect}
-            commitPlan={liveUi.commitPlan}
-            commitResult={liveUi.commitResult}
-            onPreviewCommit={liveUi.previewCommit}
-            onCommit={liveUi.commit}
-            onOpenPreview={liveUi.openPreview}
-            buildVerifyResult={liveUi.buildVerifyResult}
-            onBuildVerify={liveUi.buildVerify}
-            prepareBusy={livePrepareBusy}
-            prepareError={livePrepareError}
-            prepareReady={livePrepareReady}
-            debugPackage={liveDebugPackage}
-            projectRoot={liveProjectRoot}
-            onProjectRootChange={onLiveProjectRootChange}
-            onPrepareRuntime={onPrepareLiveRuntime}
-          />
-          <UiTunerStandardsPanel
-            insight={standardInsight}
-            appliedStandard={selected.standard}
-            onApplyStandard={onApplyStandard}
-            onCopyStandardPackage={onCopyStandardPackage}
-          />
-          <UiTunerCodexPanel
-            tunerDoc={tunerDoc}
-            selected={selected}
-            metrics={metrics}
-            filterResult={filterResult}
-            standardInsight={standardInsight}
-            verificationReport={verificationReport}
-            onMutationTaskStarted={onMutationTaskStarted}
-            onRequestVerification={onRequestVerification}
-            liveUi={liveUi}
-          />
-          <GeometrySection tunerDoc={tunerDoc} selected={selected} onUpdateElement={onUpdateElement} />
-          <TypographySection selected={selected} onUpdateElement={onUpdateElement} />
-          <AppearanceSection selected={selected} onUpdateElement={onUpdateElement} />
+          <SelectedDesignSection selected={selected} onUpdateElement={onUpdateElement} readOnly={androidReadOnly} />
+          {androidReadOnly ? (
+            <UiDesignGateway
+              title="先在可编辑草稿里即时设计，或连接 Runtime 直接改真机"
+              detail="普通 APK 真帧没有通用样式反射接口；直接改右侧数值不会可靠改变这张真实截图。"
+              onCreateDraft={onSwitchToDraft}
+              onConnectLive={onPrepareLiveRuntime}
+              onOpenAi={() => setActiveTab('ai')}
+              liveDisabled={!livePrepareReady || livePrepareBusy}
+            />
+          ) : runtimeEditable ? (
+            <LiveDesignPanel
+              liveUi={liveUi} draftStatus={liveUiDraftStatus}
+              onApply={onLiveApply} onApplyGesture={onLiveApplyGesture}
+              onUndo={onLiveUndo} onRedo={onLiveRedo}
+              prepareBusy={livePrepareBusy} prepareError={livePrepareError}
+              prepareReady={livePrepareReady} debugPackage={liveDebugPackage}
+              projectRoot={liveProjectRoot} onProjectRootChange={onLiveProjectRootChange}
+              onPrepareRuntime={onPrepareLiveRuntime}
+            />
+          ) : (
+            <>
+              <GeometrySection tunerDoc={tunerDoc} selected={selected} onUpdateElement={onUpdateElement} />
+              {supportsTypography && <TypographySection selected={selected} onUpdateElement={onUpdateElement} />}
+              <AppearanceSection selected={selected} onUpdateElement={onUpdateElement} />
+            </>
+          )}
         </>
       ) : (
         <section className={styles.emptyState}>
           <Move size={18} aria-hidden="true" />
-          <p>点击画布上的板块后，可在这里调位置、字号、行高、内边距和颜色。</p>
+          <p>先在画布或左侧组件树选择元素，再从这里调整样式。</p>
         </section>
+      ))}
+
+      {activeTab === 'ai' && selected && (
+        <>
+          <UiTunerCodexPanel
+            tunerDoc={tunerDoc} selected={selected} metrics={metrics} filterResult={filterResult}
+            standardInsight={standardInsight} verificationReport={verificationReport}
+            onMutationTaskStarted={onMutationTaskStarted} onRequestVerification={onRequestVerification}
+            liveUi={liveUi}
+          />
+          <UiTunerStandardsPanel
+            insight={standardInsight} appliedStandard={selected.standard}
+            onApplyStandard={onApplyStandard} onCopyStandardPackage={onCopyStandardPackage}
+          />
+        </>
       )}
 
-      <section className={styles.section}>
-        <h2>导出参数</h2>
-        <button type="button" onClick={() => setShowExportJson((current) => !current)}>
-          {showExportJson ? '收起完整参数' : '查看完整参数'}
-        </button>
-        {showExportJson && <textarea className={styles.exportBox} value={exportJson} readOnly />}
-      </section>
-
-      <div className={styles.inspectorFooterActions}>
-        <button type="button" onClick={onCopyCliPatch}>复制 CLI 包</button>
-        <button type="button" onClick={onCopyStandardPackage}>复制标准草案</button>
-      </div>
+      {activeTab === 'inspect' && (
+        <>
+          <CanvasSection
+            tunerDoc={tunerDoc} filterResult={filterResult} onUpdateCanvas={onUpdateCanvas}
+            onSetProductMode={onSetProductMode} onSetDebugMode={onSetDebugMode}
+            captureBusy={captureBusy} onRecaptureDevice={onRecaptureDevice}
+          />
+          {selected && (
+            <SelectedDebugSection selected={selected} metrics={metrics} onDeleteSelected={onDeleteSelected} />
+          )}
+          <section className={styles.section}>
+            <h2>导出参数</h2>
+            <button type="button" onClick={() => setShowExportJson((current) => !current)}>
+              {showExportJson ? '收起完整参数' : '查看完整参数'}
+            </button>
+            {showExportJson && <textarea className={styles.exportBox} value={exportJson} readOnly />}
+          </section>
+          <div className={styles.inspectorFooterActions}>
+            <button type="button" onClick={onCopyCliPatch}>复制 CLI 包</button>
+            <button type="button" onClick={onCopyStandardPackage}>复制标准草案</button>
+          </div>
+        </>
+      )}
     </aside>
+  )
+}
+
+interface LiveDesignPanelProps {
+  liveUi: ReturnType<typeof useLiveUiSession>
+  draftStatus: RuntimeDraftStatus
+  onApply: (operation: LivePatchOperation, scope: LiveUiScope) => Promise<unknown>
+  onApplyGesture: (operations: LivePatchOperation[], gestureId: string) => Promise<unknown>
+  onUndo: () => Promise<void>
+  onRedo: () => Promise<void>
+  prepareBusy: boolean
+  prepareError: string
+  prepareReady: boolean
+  debugPackage: string
+  projectRoot: string
+  onProjectRootChange: (value: string) => void
+  onPrepareRuntime: () => void
+}
+
+function LiveDesignPanel(props: LiveDesignPanelProps) {
+  const { liveUi } = props
+  return (
+    <UiTunerLivePanel
+      state={liveUi.state} error={liveUi.error} busy={liveUi.busy}
+      session={liveUi.session} node={liveUi.selectedNode} mcp={liveUi.mcp}
+      uiIr={liveUi.uiIr} targetDesign={liveUi.targetDesign} draftStatus={props.draftStatus}
+      onApply={props.onApply} onApplyGesture={props.onApplyGesture}
+      onGestureActive={liveUi.setGestureActive} onUndo={props.onUndo} onRedo={props.onRedo}
+      onReconnect={liveUi.reconnect} commitPlan={liveUi.commitPlan} commitResult={liveUi.commitResult}
+      onPreviewCommit={liveUi.previewCommit} onCommit={liveUi.commit}
+      onOpenPreview={liveUi.openPreview} buildVerifyResult={liveUi.buildVerifyResult}
+      onBuildVerify={liveUi.buildVerify} prepareBusy={props.prepareBusy}
+      prepareError={props.prepareError} prepareReady={props.prepareReady}
+      debugPackage={props.debugPackage} projectRoot={props.projectRoot}
+      onProjectRootChange={props.onProjectRootChange} onPrepareRuntime={props.onPrepareRuntime}
+    />
   )
 }
 
@@ -381,36 +412,54 @@ function TargetDesignPanel({ tunerDoc, onUpdateCanvas }: ReferenceImagePanelProp
   )
 }
 
-interface SelectedSectionProps {
-  tunerDoc: UiTunerDocument
+interface SelectedDesignSectionProps {
   selected: UiTunerElement
-  metrics: MetricItem[]
   onUpdateElement: (id: string, patch: Partial<UiTunerElement>) => void
-  onDeleteSelected: () => void
+  readOnly: boolean
 }
 
-function SelectedSection({
+function SelectedDesignSection({
   selected,
-  metrics,
   onUpdateElement,
-  onDeleteSelected,
-}: SelectedSectionProps) {
+  readOnly,
+}: SelectedDesignSectionProps) {
+  const supportsText = selected.kind === 'text' || selected.kind === 'button'
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
         <h2>{selected.name}</h2>
+        <small>{selected.kind === 'text' ? '文字' : selected.kind === 'button' ? '按钮' : selected.kind === 'media' ? '图片' : '容器'}</small>
+      </div>
+      <label className={styles.fieldFull}>
+        <span>图层名</span>
+        <input disabled={readOnly} value={selected.name} onChange={(event) => onUpdateElement(selected.id, { name: event.currentTarget.value })} />
+      </label>
+      {supportsText && <label className={styles.fieldFull}>
+        <span>文本</span>
+        <textarea disabled={readOnly} value={selected.text} onChange={(event) => onUpdateElement(selected.id, { text: event.currentTarget.value })} />
+      </label>}
+      {readOnly && <small>当前数值来自 Android 捕获，仅用于识别组件；请选择下方一种可编辑方式。</small>}
+    </section>
+  )
+}
+
+function SelectedDebugSection({
+  selected,
+  metrics,
+  onDeleteSelected,
+}: {
+  selected: UiTunerElement
+  metrics: MetricItem[]
+  onDeleteSelected: () => void
+}) {
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <h2>节点与源码</h2>
         <button type="button" onClick={onDeleteSelected} aria-label="删除选中元素">
           <Trash2 size={14} aria-hidden="true" />
         </button>
       </div>
-      <label className={styles.fieldFull}>
-        <span>图层名</span>
-        <input value={selected.name} onChange={(event) => onUpdateElement(selected.id, { name: event.currentTarget.value })} />
-      </label>
-      <label className={styles.fieldFull}>
-        <span>文本</span>
-        <textarea value={selected.text} onChange={(event) => onUpdateElement(selected.id, { text: event.currentTarget.value })} />
-      </label>
       <div className={styles.metricGrid}>
         {metrics.map((metric) => (
           <div key={metric.label}>

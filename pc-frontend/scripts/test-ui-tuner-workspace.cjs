@@ -274,6 +274,22 @@ try {
     assert.match(markup, /aria-valuemax="80"/)
     assert.match(markup, /aria-valuenow="35"/)
     assert.match(markup, /tabindex="0"/)
+
+    const tabsOutput = compile(
+      'src/features/ui-tuner/inspector/UiInspectorTabs.tsx',
+      'inspector/UiInspectorTabs.js',
+      true,
+    )
+    fs.writeFileSync(path.join(temporaryDirectory, 'inspector/UiInspectorTabs.module.css'), '')
+    const { UiInspectorTabs } = require(tabsOutput)
+    const tabsMarkup = renderToStaticMarkup(React.createElement(UiInspectorTabs, {
+      value: 'design',
+      onChange() {},
+    }))
+    assert.match(tabsMarkup, /aria-label="属性面板模式"/)
+    assert.match(tabsMarkup, /aria-selected="true"[^>]*>设计</)
+    assert.match(tabsMarkup, />AI</)
+    assert.match(tabsMarkup, />检查</)
   } finally {
     if (previousCssLoader) require.extensions['.css'] = previousCssLoader
     else delete require.extensions['.css']
@@ -346,6 +362,21 @@ try {
   assert.match(inspectorSource, /window\.confirm\('移除后将暂时看不到真机底图/)
   assert.match(inspectorSource, /真机画面底图已移除/)
   assert.match(inspectorSource, /重新读取真机画面/)
+  assert.match(inspectorSource, /<UiInspectorTabs/)
+  assert.match(inspectorSource, /<UiDesignGateway/)
+  assert.match(inspectorSource, /supportsTypography/)
+  const gatewaySource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/inspector/UiDesignGateway.tsx'),
+    'utf8',
+  )
+  assert.match(gatewaySource, /建立可编辑草稿/)
+  const sourceInspectorSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewInspector.tsx'),
+    'utf8',
+  )
+  assert.match(sourceInspectorSource, /\['text', 'button', 'input'\]\.includes\(node\.kind\)/)
+  assert.match(sourceInspectorSource, /转到 Android 真帧校准/)
+  assert.match(sourceInspectorSource, /只发送当前组件，不重复读取整棵源码树/)
   const focusExitSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/workspace/FocusModeExitButton.tsx'),
     'utf8',
