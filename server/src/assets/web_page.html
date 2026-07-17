@@ -10671,8 +10671,6 @@ if ('serviceWorker' in navigator) {
   const PROTOCOL_VERSION = 1;
   const originalInlineStyles = new Map();
   let selectedElement = null;
-  let hoveredElement = null;
-  let hoverFrame = 0;
   let selecting = true;
 
   document.body.classList.add('ui-tuner-preview-active', 'ui-tuner-preview-selecting');
@@ -10748,18 +10746,8 @@ if ('serviceWorker' in navigator) {
   function selectElement(element, reason) {
     const rect = element.getBoundingClientRect();
     selectedElement = element;
-    hoveredElement = element;
     drawSelection(element, rect);
     post('selection', { reason: reason || 'pointer', node: snapshotOf(element, rect) });
-  }
-
-  function scheduleHoverSelection(element) {
-    hoveredElement = element;
-    if (hoverFrame) return;
-    hoverFrame = window.requestAnimationFrame(() => {
-      hoverFrame = 0;
-      if (selecting && hoveredElement) drawSelection(hoveredElement);
-    });
   }
 
   function cssDimension(value) {
@@ -10812,24 +10800,12 @@ if ('serviceWorker' in navigator) {
     post('styles-reset', {});
   }
 
-  document.addEventListener('pointerover', (event) => {
-    if (!selecting) return;
-    const target = findDesignTarget(event.target);
-    if (target && target !== hoveredElement) scheduleHoverSelection(target);
-  }, true);
-  document.addEventListener('pointerout', () => {
-    if (selecting) scheduleHoverSelection(selectedElement);
-  }, true);
   document.addEventListener('click', (event) => {
     if (!selecting) return;
     const target = findDesignTarget(event.target);
     if (!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (hoverFrame) {
-      window.cancelAnimationFrame(hoverFrame);
-      hoverFrame = 0;
-    }
     selectElement(target, 'click');
   }, true);
   window.addEventListener('scroll', () => drawSelection(selectedElement), true);
