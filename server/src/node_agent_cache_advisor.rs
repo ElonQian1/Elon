@@ -59,6 +59,7 @@ struct CandidateSeed {
     source: String,
     scope: &'static str,
     managed_by_platform: bool,
+    automatic_action: &'static str,
     recommendation: &'static str,
 }
 
@@ -133,6 +134,7 @@ impl CacheArchitectureAdvisor {
                 source: "node_data_root".to_string(),
                 scope: "platform_managed",
                 managed_by_platform: true,
+                automatic_action: "platform_data_lifecycle",
                 recommendation:
                     "新建托管项目可继续使用；平台只管理该数据根内自己创建的缓存和临时文件。",
             });
@@ -160,7 +162,7 @@ impl CacheArchitectureAdvisor {
                     scope: seed.scope,
                     exists,
                     managed_by_platform: seed.managed_by_platform,
-                    automatic_action: "none",
+                    automatic_action: seed.automatic_action,
                     estimated_bytes,
                     recommendation: seed.recommendation,
                 }
@@ -170,12 +172,13 @@ impl CacheArchitectureAdvisor {
 
         CacheArchitectureReport {
             schema_version: ADVISOR_SCHEMA_VERSION,
-            mode: "advisory",
-            summary: "只读识别并给出渐进整理建议；不会因升级移动、接管或清理已有项目和外部缓存。",
+            mode: "managed_v2_with_external_advisory",
+            summary: "平台只对 rust-cache-v2 自有分区执行磁盘水位治理；历史项目和外部缓存仍只读登记，不自动移动或删除。",
             candidates,
             suggestions: vec![
                 "先复用已经验证成功的项目路径和共享缓存，再根据工具链、target triple、profile 与 features 判断是否值得迁移。",
                 "开发检查、Win 节点发布、服务器发布使用不同缓存作用域，不强行合并成一个 target。",
+                "跨项目复用由全局 registry/git 与 sccache 承担；Cargo 中间产物按工具链、项目、domain 和工作区隔离。",
                 "迁移必须先预览、可回滚并由用户或 AI 明确执行；外部缓存永远不进入平台自动清理范围。",
             ],
         }
@@ -203,6 +206,10 @@ fn add_environment_candidates(seeds: &mut Vec<CandidateSeed>) {
         else {
             continue;
         };
+        if key == "ELON_RUST_CACHE_ROOT" {
+            seeds.push(managed_v2_seed(path, "environment"));
+            continue;
+        }
         seeds.push(CandidateSeed {
             kind,
             label,
@@ -210,6 +217,7 @@ fn add_environment_candidates(seeds: &mut Vec<CandidateSeed>) {
             source: format!("environment:{key}"),
             scope,
             managed_by_platform: false,
+            automatic_action: "none",
             recommendation,
         });
     }
@@ -236,6 +244,14 @@ fn add_default_candidates(seeds: &mut Vec<CandidateSeed>) {
         "release",
         "继续作为 Win 节点发布专用缓存；不要与开发或服务器发布 target 混用。",
     ));
+    let local_v2 = local.join("Elon").join("rust-cache-v2");
+    if local_v2.is_dir() {
+        seeds.push(managed_v2_seed(local_v2, "windows_default"));
+    }
+    let shared_v2 = PathBuf::from(r"D:\rust\shared\rust-cache-v2");
+    if shared_v2.is_dir() {
+        seeds.push(managed_v2_seed(shared_v2, "windows_shared_convention"));
+    }
 }
 
 fn add_workspace_candidates(seeds: &mut Vec<CandidateSeed>, workspace: &Path) {
@@ -305,13 +321,19 @@ fn add_dotenv_candidates(seeds: &mut Vec<CandidateSeed>, path: &Path) {
                 .unwrap_or_else(|| Path::new("."))
                 .join(candidate)
         };
+        let managed_v2 = key.eq_ignore_ascii_case("ELON_RUST_CACHE_ROOT");
         seeds.push(CandidateSeed {
             kind,
             label,
             path: candidate,
             source: format!("dotenv:{}:{key}", path.display()),
             scope,
-            managed_by_platform: false,
+            managed_by_platform: managed_v2,
+            automatic_action: if managed_v2 {
+                "disk_watermark_lru_ttl"
+            } else {
+                "none"
+            },
             recommendation,
         });
     }
@@ -323,7 +345,7 @@ fn candidate_variables() -> [(
     &'static str,
     &'static str,
     &'static str,
-); 5] {
+); 6] {
     [
         (
             "CARGO_TARGET_DIR",
@@ -360,7 +382,27 @@ fn candidate_variables() -> [(
             "release",
             "继续由服务器发布脚本复用；与 Windows target 和开发 profile 分开。",
         ),
+        (
+            "ELON_RUST_CACHE_ROOT",
+            "managed_rust_cache_v2",
+            "机器级 Rust 缓存平台 v2",
+            "machine_managed",
+            "由平台按磁盘水位、LRU/TTL 和活动锁治理；外部 legacy 路径不在自动清理范围。",
+        ),
     ]
+}
+
+fn managed_v2_seed(path: PathBuf, source: &'static str) -> CandidateSeed {
+    CandidateSeed {
+        kind: "managed_rust_cache_v2",
+        label: "机器级 Rust 缓存平台 v2",
+        path,
+        source: source.to_string(),
+        scope: "machine_managed",
+        managed_by_platform: true,
+        automatic_action: "disk_watermark_lru_ttl",
+        recommendation: "继续使用；只清理平台根内无活动锁的冷分区，历史和外部缓存保持只读登记。",
+    }
 }
 
 fn seed(
@@ -378,6 +420,7 @@ fn seed(
         source: source.to_string(),
         scope,
         managed_by_platform: false,
+        automatic_action: "none",
         recommendation,
     }
 }
@@ -446,6 +489,7 @@ mod tests {
         assert!(report
             .candidates
             .iter()
+            .filter(|item| !item.managed_by_platform)
             .all(|item| item.automatic_action == "none"));
         let _ = std::fs::remove_dir_all(root);
     }

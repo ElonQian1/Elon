@@ -1,6 +1,6 @@
 # PC 节点项目数据架构体检与渐进治理
 
-最后更新：2026-07-15
+最后更新：2026-07-17
 
 本文是一龙 Windows PC 节点数据根与构建缓存的产品合同。数据根不是“项目能不能运行”的许可证，而是一项 Harness 式辅助能力：先继承已经跑通的项目和缓存，再由 AI 只读分析、解释风险、给出整理方案，最后按用户确认渐进迁移。
 
@@ -15,7 +15,7 @@
 3. **建议不阻断**：磁盘余量、缓存大小和项目数量都是体检指标，不是 CLI、Exec、写任务或构建任务的准入门禁。
 4. **自动回填可失败**：缺少推荐数据根时客户端可安全创建并持久化；失败后继续使用原项目，不把配置问题伪装成“项目空间不足”。
 5. **只读发现不等于接管**：发现外部缓存后 `automatic_action` 必须为 `none`；不得自动移动、改名、删除、写 marker 或改写项目环境。
-6. **显式清理有边界**：平台清理只覆盖当前节点数据根内由平台创建、可重建的 `cache` 和 `temp`；外部共享缓存、源码、Git、workspace、storage 和 artifact 永不进入自动清理范围。
+6. **显式清理有边界**：节点数据清理只覆盖当前节点数据根内由平台创建、可重建的 `cache` 和 `temp`；开发机显式激活的 `rust-cache-v2` 另按磁盘水位治理。外部共享缓存、源码、Git、workspace、storage 和 artifact 永不进入自动清理范围。
 7. **迁移可预览、可回滚**：先说明收益、兼容性和空间变化，再由用户或 AI 在获得明确授权后执行；原缓存保留到新路径验证通过和观察期结束。
 
 ## 3. 为什么以前会突然多占空间
@@ -75,8 +75,9 @@ ELON_NODE_DATA_ROOT=D:\ElonNodeData
 
 | 类别 | 常见来源 | 推荐作用域 | 默认建议 |
 |---|---|---|---|
+| 机器级 Rust 缓存平台 v2 | `ELON_RUST_CACHE_ROOT`、`shared\rust-cache-v2` | 所有注册 Rust 项目 | sccache 跨项目共享，build-dir 按兼容域和工作区隔离；只治理平台自有分区 |
 | 历史跨子项目共享 Rust 缓存 | `CARGO_TARGET_DIR`、项目祖先的 `shared\target` | 机器/产品家族共享 | 登记并原地复用；兼容性变化时只重建受影响部分 |
-| 当前开发检查、测试共享缓存 | `ELON_DEV_CARGO_TARGET_DIR`、`%LOCALAPPDATA%\Elon\build-target\elon-dev-cargo` | 同仓库跨 worktree | 继续由 `cargo-dev` 锁保护复用 |
+| 当前开发检查、测试共享缓存 | `ELON_DEV_CARGO_TARGET_DIR`、`%LOCALAPPDATA%\Elon\build-target\elon-dev-cargo` | 同仓库跨 worktree 的旧版路径 | 作为 legacy 登记；新版 `cargo-dev` 使用 v2 build-dir 与 workspace-local target |
 | Win 节点发布缓存 | `ELON_NODE_AGENT_TARGET_DIR`、`...\elon-node-agent` | Windows 发布 | 保持发布专用，不和开发或服务器 target 混用 |
 | 服务器发布共享缓存 | `RUST_SERVER_MUSL_TARGET_DIR`、`ELON_BUILD_TARGET_DIR`、`shared\server-musl-target` | Linux/musl 发布 | 继续由服务器发布脚本复用 |
 | 仓库旧缓存 | `<repo>\target`、`<repo>\server\target` | 单仓库历史 | 先确认最后使用入口；可保留复用，不自动删除 |
@@ -107,7 +108,9 @@ ELON_NODE_DATA_ROOT=D:\ElonNodeData
 | 失败任务诊断 temp | 建议保留 24 小时 |
 | 长期未使用缓存 | 30 天后列为人工整理候选 |
 
-超过建议值时任务继续运行，只生成警告和整理建议。节点不再因压力自动执行 TTL/LRU cache 删除；成功任务自己的临时目录仍可在进程结束后清理。任何实际批量清理都必须由用户显式发起，预览目标和大小，并避开活动 lease。
+上述指标适用于节点数据根，超过建议值时普通 CLI/Exec 任务继续运行，只生成警告。节点数据根不因压力自动删除外部或历史缓存；成功任务自己的临时目录仍可在进程结束后清理。
+
+显式安装的开发机 `rust-cache-v2` 使用另一套合同：不设置项目级固定容量，只在整盘低于 warning 水位时按旧工具链、quarantine、LRU 顺序回收平台自有分区，达到 recovery 水位即停止；活动锁和 Cargo/rustc 进程会阻止实际删除。详见 `docs/rust-cache-platform.md`。
 
 ## 9. 体检与管理 API
 

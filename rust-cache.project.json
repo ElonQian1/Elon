@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "project_id": "elon-cli",
+  "default_domain": "dev-windows-msvc"
+}

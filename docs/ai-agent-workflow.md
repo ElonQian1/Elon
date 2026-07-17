@@ -274,12 +274,9 @@ bash scripts/publish-server.sh --skip-upload
 
 ### 7.2 Rust 日常验证缓存
 
-发布构建缓存只服务于 `publish-server.*` 的 Linux musl release 产物。日常开发验证使用单独的开发 target：
+发布构建缓存只服务于 `publish-server.*` 的 Linux musl release 产物。Windows 日常开发验证使用机器级 Rust 缓存平台：最终产物留在 workspace，Cargo 中间产物按工具链、项目、domain 和 workspace hash 隔离，跨项目对象复用交给 sccache。
 
 ```powershell
-# .env.local（不提交）
-ELON_DEV_CARGO_TARGET_DIR=D:\rust\shared\elon-dev-cargo-target
-
 # Windows
 powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
 powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml pc_lightweight
@@ -294,7 +291,9 @@ bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
 bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
 ```
 
-`scripts/cargo-dev.*` 会读取 `.env.local`，设置 `CARGO_TARGET_DIR`，并在目标目录上加锁。这样多个 worktree / 多个 AI 可以复用同一份日常编译缓存，但不会同时写入同一个 target。版本化的 pre-push hook 也走同一个 `cargo-dev` 入口。不要并行裸跑 `cargo check` 和 `cargo test` 到同一个 `server/target` 或同一个共享 target；如确实要并行验证，必须显式指定不同 `ELON_DEV_CARGO_TARGET_DIR` / `-TargetDir` / `--target-dir`。
+Windows `scripts/cargo-dev.ps1` 委托 `scripts/rust-cache.ps1` 的模块：设置 `CARGO_BUILD_BUILD_DIR`、workspace-local `CARGO_TARGET_DIR`、sccache 和分区锁。旧 `ELON_DEV_CARGO_TARGET_DIR` 只作为 legacy 路径登记，不再作为 Windows 日常入口；需要覆盖最终产物位置时显式使用 `-TargetDir`。版本化 pre-push hook 仍走 `cargo-dev`。平台说明和 GC 边界见 `docs/rust-cache-platform.md`。
+
+Linux/macOS 的 `scripts/cargo-dev.sh` 暂时继续使用绝对 `ELON_DEV_CARGO_TARGET_DIR` 和目标目录锁；不得使用相对路径。
 
 ### 7.3 Android APK 编译打包
 ```powershell
