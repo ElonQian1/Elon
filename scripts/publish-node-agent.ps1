@@ -21,7 +21,8 @@ param(
     [string]$AdminToken = "",
     [string]$Changelog = "",
     [int]$HandshakeWaitSec = 90,
-    [switch]$SkipHandshakeWait
+    [switch]$SkipHandshakeWait,
+    [switch]$RequireAllOnlineTargetBuild
 )
 
 Set-StrictMode -Version Latest
@@ -354,6 +355,9 @@ function Wait-NodePublicDevHandshake {
             })
             if ($pending.Count -eq 0) {
                 Write-Host "  在线公开开发节点均已运行目标构建并完成握手。" -ForegroundColor Green
+                Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=ready"
+                Write-Output "NODE_AGENT_TARGET_BUILD_READY=$($targetReadyNodes.Count)"
+                Write-Output "NODE_AGENT_TARGET_BUILD_PENDING=0"
                 return
             }
 
@@ -366,7 +370,12 @@ function Wait-NodePublicDevHandshake {
                 Write-Host ("  待握手节点：" + ($sample -join "；")) -ForegroundColor DarkYellow
             }
         } catch {
-            throw "公开开发握手诊断失败：$($_.Exception.Message)"
+            if ($RequireAllOnlineTargetBuild) {
+                throw "公开开发握手诊断失败：$($_.Exception.Message)"
+            }
+            Write-Host "  公开开发握手诊断不可用；发布产物已上传，但目标构建切换状态未验证：$($_.Exception.Message)" -ForegroundColor DarkYellow
+            Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=unverified"
+            return
         }
 
         if ((Get-Date) -ge $deadline) { break }
@@ -382,10 +391,25 @@ function Wait-NodePublicDevHandshake {
             )
         })
         if ($pending.Count -gt 0) {
-            throw "公开开发握手等待超时，仍有 $($pending.Count) 个在线节点未运行目标构建或未完成握手；请查看 PC 节点页或 admin 诊断接口。"
+            $onlineCount = @($lastReport.nodes | Where-Object {
+                $_.public_dev_enabled -and $_.online
+            }).Count
+            $readyCount = $onlineCount - $pending.Count
+            Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=partial"
+            Write-Output "NODE_AGENT_TARGET_BUILD_READY=$readyCount"
+            Write-Output "NODE_AGENT_TARGET_BUILD_PENDING=$($pending.Count)"
+            if ($RequireAllOnlineTargetBuild) {
+                throw "公开开发握手等待超时，仍有 $($pending.Count) 个在线节点未运行目标构建或未完成握手；请查看 PC 节点页或 admin 诊断接口。"
+            }
+            Write-Host "  目标构建已在 $readyCount/$onlineCount 个在线节点生效；其余 $($pending.Count) 个节点延期更新，不阻断本次发布收尾。" -ForegroundColor Yellow
+            return
         }
     } else {
-        throw "公开开发握手等待超时，未拿到诊断报告。"
+        if ($RequireAllOnlineTargetBuild) {
+            throw "公开开发握手等待超时，未拿到诊断报告。"
+        }
+        Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=unverified"
+        Write-Host "  公开开发握手等待超时且未拿到诊断报告；发布产物已上传，节点切换状态待后续确认。" -ForegroundColor Yellow
     }
 }
 

@@ -45,4 +45,12 @@ Assert-True (-not (Test-NodeAgentPublishHandshakeReady `
     -TargetReleaseIdentity $target)) `
     "The target build must not pass before its capability handshake is ready"
 
+$publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+Assert-True ($publishScript.Contains('[switch]$RequireAllOnlineTargetBuild')) `
+    "The publisher must expose an explicit strict rollout switch"
+Assert-True ($publishScript.Contains('NODE_AGENT_TARGET_BUILD_STATUS=partial')) `
+    "The publisher must report partial rollout without claiming ready"
+Assert-True ($publishScript.Contains('if ($RequireAllOnlineTargetBuild)')) `
+    "Strict rollout must remain available when every online node is required"
+
 Write-Host "NODE_AGENT_RELEASE_CONTRACT_TESTS=passed" -ForegroundColor Green
