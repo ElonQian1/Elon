@@ -414,7 +414,8 @@ try {
     'utf8',
   )
   assert.match(gatewaySource, /正在自动准备 · 无需选择模式/)
-  assert.match(gatewaySource, /你不需要配置 Runtime、草稿或源码绑定/)
+  assert.match(gatewaySource, /连接较慢时先进入草稿，不阻塞设计/)
+  assert.match(gatewaySource, /你不需要等待 Runtime/)
   assert.doesNotMatch(gatewaySource, /连接 LIVE Runtime/)
   assert.doesNotMatch(gatewaySource, /让 AI 建立绑定/)
   const automaticSetupSource = fs.readFileSync(
@@ -423,6 +424,8 @@ try {
   )
   assert.match(automaticSetupSource, /prepareRuntimeRef\.current\(\)/)
   assert.match(automaticSetupSource, /useDraftRef\.current\(\)/)
+  assert.match(automaticSetupSource, /RUNTIME_BACKGROUND_FALLBACK_MS = 8000/)
+  assert.doesNotMatch(automaticSetupSource, /setupKey \|\| runtimeBusy\) return undefined/)
   assert.match(inspectorSource, /useAutomaticDesignSetup\(/)
   const sourceInspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewInspector.tsx'),

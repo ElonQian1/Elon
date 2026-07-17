@@ -11,6 +11,7 @@ interface AutomaticDesignSetupOptions {
 }
 
 const DRAFT_FALLBACK_DELAY_MS = 1800
+const RUNTIME_BACKGROUND_FALLBACK_MS = 8000
 
 /**
  * Pick the best editable path without asking a designer to understand the
@@ -33,29 +34,28 @@ export function useAutomaticDesignSetup({
   useDraftRef.current = onUseDraft
 
   useEffect(() => {
-    if (!enabled || !setupKey || runtimeBusy) return undefined
+    if (!enabled || !setupKey) return undefined
 
-    if (runtimeError) {
-      if (draftFallbackRef.current !== setupKey) {
-        draftFallbackRef.current = setupKey
-        useDraftRef.current()
-      }
-      return undefined
-    }
-
-    if (runtimeReady) {
-      if (runtimeAttemptRef.current !== setupKey) {
-        runtimeAttemptRef.current = setupKey
-        prepareRuntimeRef.current()
-      }
-      return undefined
-    }
-
-    const fallbackTimer = window.setTimeout(() => {
+    const fallbackToDraft = () => {
       if (draftFallbackRef.current === setupKey) return
       draftFallbackRef.current = setupKey
       useDraftRef.current()
-    }, DRAFT_FALLBACK_DELAY_MS)
+    }
+
+    if (runtimeError) {
+      fallbackToDraft()
+      return undefined
+    }
+
+    if (runtimeReady && runtimeAttemptRef.current !== setupKey) {
+      runtimeAttemptRef.current = setupKey
+      prepareRuntimeRef.current()
+    }
+
+    const waitingForRuntime = runtimeBusy || runtimeAttemptRef.current === setupKey
+    const fallbackTimer = window.setTimeout(() => {
+      fallbackToDraft()
+    }, waitingForRuntime ? RUNTIME_BACKGROUND_FALLBACK_MS : DRAFT_FALLBACK_DELAY_MS)
 
     return () => window.clearTimeout(fallbackTimer)
   }, [

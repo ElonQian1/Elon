@@ -21,15 +21,15 @@ export function UiDesignGateway({
       </div>
       <p>
         {preparingRuntime
-          ? '系统会自动构建调试环境、连接当前手机，并把右侧切换成可直接修改的样式面板。'
+          ? '系统会自动连接当前手机；如果连接较慢，会先打开本地草稿，真实 Android 在后台继续准备。'
           : '系统正在读取项目源码；准备完成后会直接进入可编辑画布。'}
       </p>
       <ol className={styles.steps}>
         <li className={styles.done}>已识别当前 Android 组件</li>
         <li className={styles.active}>自动选择最准确的编辑引擎</li>
-        <li>准备完成后直接显示样式属性</li>
+        <li>连接较慢时先进入草稿，不阻塞设计</li>
       </ol>
-      <small>你不需要配置 Runtime、草稿或源码绑定；系统会自动选择并在写回后用 Android 真帧校准。</small>
+      <small>你不需要等待 Runtime；后台准备完成后，系统仍会用 Android 真帧校准写回结果。</small>
     </section>
   )
 }
