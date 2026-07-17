@@ -202,6 +202,7 @@
     "docs/group-chat-summary-system.md": "custom:ai-context",
     "docs/记忆系统.md": "custom:ai-context",
     "docs/user-project-system.md": "custom:project-system",
+    "docs/supervised-pc-project-development.md": "custom:project-system",
     "docs/project-store-architecture.md": "custom:project-system",
     "docs/project-landing-manifest.md": "custom:project-system",
     "docs/ai-agent-workflow.md": "custom:operations",
@@ -264,6 +265,7 @@
     "docs/query-chat-records.md": "on-demand",
     "docs/route-c-sdk-mvp.md": "current",
     "docs/shared-android-device-host.md": "on-demand",
+    "docs/supervised-pc-project-development.md": "current",
     "docs/system-architecture.md": "current",
     "docs/token消费统计.md": "drafts",
     "docs/user-project-system.md": "current",
@@ -334,6 +336,17 @@
       "related": ["docs/pc-frontend-migration.md"],
       "supersedes": []
     },
+    "docs/supervised-pc-project-development.md": {
+      "doc_type": "operations",
+      "audience": ["开发者", "AI 代理", "项目管理者"],
+      "owner": "项目维护者",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 60,
+      "implementation_refs": ["file:server/src/ai_cli/pc_agent_dispatch.rs", "file:server/src/node_agent_main.rs"],
+      "version": "1",
+      "related": ["docs/system-architecture.md", "docs/user-project-system.md", "docs/ai-agent-workflow.md"],
+      "supersedes": []
+    },
     "AGENTS.md": {
       "id": "ai-work-entry",
       "doc_type": "router",
@@ -364,6 +377,7 @@
       { "id": "cap-ai-tasks", "view": "capabilities", "kind": "capability", "label": "AI 对话与任务", "detail": "从需求讨论到隔离执行、过程展示和验收", "parent_id": "cap-collaboration", "order": 20, "color": "#A884ED", "entrypoint": "AI_PROJECT.md", "document_paths": ["AI_PROJECT.md", "AI_ARCHITECTURE.md"], "implementation_refs": ["file:server/src/project_space/channel_ai.rs", "file:pc-frontend/src/features/dev/TaskProgressSurface.tsx"], "tags": ["conversation", "task", "matter"] },
       { "id": "cap-multi-agent", "view": "capabilities", "kind": "capability", "label": "多代理协作", "detail": "规划、分工、审查、合并门禁与群体 AI", "parent_id": "cap-collaboration", "order": 30, "color": "#A884ED", "entrypoint": "docs/群体ai开发/群体AI开发功能需求与架构设计.md", "document_paths": ["docs/群体ai开发/群体AI开发功能需求与架构设计.md"], "implementation_refs": ["file:server/src/group_ai/planner.rs", "file:server/src/group_ai/review_gate.rs"], "tags": ["multi-agent", "planner", "reviewer"] },
       { "id": "cap-git-delivery", "view": "capabilities", "kind": "workflow", "label": "Git 工作区与交付", "detail": "预检、隔离 worktree、验证、提交、推送和统一收尾", "parent_id": "cap-collaboration", "order": 40, "color": "#A884ED", "entrypoint": "docs/ai-agent-workflow.md", "document_paths": ["docs/ai-agent-workflow.md", "AI_TASK_TEMPLATE.md"], "implementation_refs": ["file:scripts/ai-task-preflight.ps1", "file:scripts/finish-ai-task.ps1"], "tags": ["git", "worktree", "delivery"] },
+      { "id": "cap-supervised-pc-development", "view": "capabilities", "kind": "workflow", "label": "桌面监督与 PC 执行", "detail": "Codex 桌面派发和验收、PC 节点执行、证据回传及平台改进续跑", "parent_id": "cap-collaboration", "order": 50, "color": "#A884ED", "entrypoint": "docs/supervised-pc-project-development.md", "document_paths": ["docs/supervised-pc-project-development.md", "docs/system-architecture.md", "docs/user-project-system.md"], "implementation_refs": ["file:server/src/ai_cli/pc_agent_dispatch.rs", "file:server/src/project_space/channel_ai_recovery.rs"], "tags": ["supervision", "pc-node", "route-a", "evidence", "dogfooding", "recovery"] },
 
       { "id": "cap-knowledge", "view": "capabilities", "kind": "domain", "label": "项目知识库", "detail": "Markdown、权威治理、AI 整理、图谱和版本恢复", "parent_id": "", "order": 20, "color": "#58A8DF", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md", "docs/README.md"], "implementation_refs": ["file:server/src/project_document_governance.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"], "tags": ["document", "knowledge", "governance"] },
       { "id": "cap-markdown", "view": "capabilities", "kind": "capability", "label": "Markdown 编辑阅读", "detail": "OneNote 式分区、按需读取、编辑和渲染预览", "parent_id": "cap-knowledge", "order": 10, "color": "#69B5D0", "entrypoint": "docs/pc-frontend-migration.md", "document_paths": ["docs/pc-frontend-migration.md"], "implementation_refs": ["file:pc-frontend/src/features/project-docs/ProjectDocumentEditorPane.tsx"], "tags": ["markdown", "editor", "preview"] },

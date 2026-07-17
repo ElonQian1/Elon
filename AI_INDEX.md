@@ -9,6 +9,7 @@
 | Rust 服务启动和路由 | `server/src/main.rs` |
 | 项目 API / 项目空间 | `server/src/project_api.rs` 及同领域拆分模块 |
 | AI CLI 调度 | `server/src/ai_cli/`、`server/src/agent.rs` |
+| Codex 桌面监督、一龙 PC 执行、用户任务与平台改进双闭环 | `docs/supervised-pc-project-development.md`、`docs/system-architecture.md` 的“PC 节点 AI 运行路线” |
 | PC 节点 AI 三层架构 / Codex JSON、pipe sidecar 与 PTY 分工 | `AI_ARCHITECTURE.md` 的“PC 节点 AI 运行路线”、`docs/符号索引讨论/我们项目的cli能力.md` |
 | Win 节点轻量工具箱 / Codex CLI 临时 PATH / 工具收录策略 | `docs/win-node-toolbox.md`、`server/src/node_agent_cli_env.rs`、`server/src/node_agent_cli_tool_catalog.rs` |
 | PC 节点项目数据架构体检 / 共享缓存分析 / 渐进治理 | `docs/pc-node-data-root.md`、`server/pc-dev-runtime/src/node_data_paths.rs`、`server/src/node_agent_data_root/`、`server/src/node_agent_cache_advisor.rs` |
