@@ -359,7 +359,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_check_workflow_completion",
-            "UI 任务收尾前的强制门禁：重新推导必需能力，检查目标图绑定、Accepted FitRun、源码/无补丁验证和 APK/Web 跨端视觉工件。completionReady=false 时不得宣告完成。",
+            "UI 任务收尾前的强制门禁：completionReady 表示平台全闭环；businessDeliveryReady 表示业务 UI 已通过并可在非阻塞平台进化分流后先行交付。",
             json!({
                 "type":"object",
                 "properties":{"taskId":{"type":"string","maxLength":128}}
@@ -392,17 +392,35 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_report_capability_gap",
-            "确认 PC UI 平台自身缺少能力后创建自动升级工件。仅适用于当前可信本地 Git 工作区；普通业务页面结构修改继续使用 CODEX_SOURCE_HANDOFF。",
+            "确认 PC UI 平台自身缺少能力后创建分流工件。业务任务只产出 Codex Desktop Worktree handoff；独立 EVOLUTION_THREAD 才执行升级与发布。",
             json!({
                 "type":"object",
                 "required":["taskId","missingCapabilities","evidence","proposedChanges","resumeTarget"],
                 "properties":{
                     "taskId":{"type":"string","maxLength":128},
                     "fitRunId":{"type":"string","maxLength":128},
+                    "executionMode":{"enum":["BUSINESS_THREAD","EVOLUTION_THREAD"],"default":"BUSINESS_THREAD"},
+                    "deliveryImpact":{"enum":["DELIVERY_BLOCKING","DELIVERY_NON_BLOCKING","EVOLUTION_ONLY"],"default":"DELIVERY_BLOCKING"},
+                    "originGapId":{"type":"string","maxLength":128},
+                    "originThreadId":{"type":"string","maxLength":128},
                     "missingCapabilities":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"string","maxLength":80}},
                     "evidence":{"type":"array","minItems":1,"maxItems":32,"items":{"type":"string","maxLength":2000}},
                     "proposedChanges":{"type":"array","minItems":1,"maxItems":16,"items":{"type":"string","maxLength":2000}},
-                    "resumeTarget":{"type":"string","minLength":1,"maxLength":2000}
+                    "resumeTarget":{"type":"string","minLength":1,"maxLength":2000},
+                    "businessDelivery":{
+                        "type":"object",
+                        "required":["sourceRevision","sourceWritebackVerified","patchFreeBuildVerified","visualLoss","maxVisualLoss","sourceParityLoss","maxSourceParityLoss","reason"],
+                        "properties":{
+                            "sourceRevision":{"type":"string","minLength":1,"maxLength":256},
+                            "sourceWritebackVerified":{"const":true},
+                            "patchFreeBuildVerified":{"const":true},
+                            "visualLoss":{"type":"number","minimum":0,"maximum":1},
+                            "maxVisualLoss":{"type":"number","minimum":0,"maximum":1},
+                            "sourceParityLoss":{"type":"number","minimum":0,"maximum":1},
+                            "maxSourceParityLoss":{"type":"number","minimum":0,"maximum":1},
+                            "reason":{"type":"string","minLength":1,"maxLength":2000}
+                        }
+                    }
                 }
             }),
         ),
@@ -416,7 +434,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_control_capability_gap",
-            "驱动可信本地 Git 工作区的平台自动升级、发布、复检和恢复；重复失败或空发布会自动熔断。",
+            "仅在独立 EVOLUTION_THREAD 中驱动可信本地 Git 工作区的平台升级、发布和复检；业务任务的 DEFERRED gap 不允许启动升级。",
             json!({
                 "type":"object",
                 "required":["gapId","action"],
@@ -577,6 +595,27 @@ mod annotation_tests {
             .find(|tool| tool["name"] == "ui_apply_live_patch")
             .expect("live patch tool");
         assert_eq!(apply["annotations"]["readOnlyHint"], false);
+    }
+
+    #[test]
+    fn capability_gap_schema_exposes_nonblocking_business_handoff_evidence() {
+        let tools = tool_definitions();
+        let tool = tools
+            .iter()
+            .find(|tool| tool["name"] == "ui_report_capability_gap")
+            .expect("capability gap tool");
+        let schema = &tool["inputSchema"];
+        assert_eq!(
+            schema["properties"]["executionMode"]["enum"][1],
+            "EVOLUTION_THREAD"
+        );
+        assert_eq!(
+            schema["properties"]["deliveryImpact"]["enum"][1],
+            "DELIVERY_NON_BLOCKING"
+        );
+        assert!(schema["properties"]["businessDelivery"]["required"]
+            .as_array()
+            .is_some_and(|values| values.iter().any(|value| value == "sourceRevision")));
     }
 }
 

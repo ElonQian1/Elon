@@ -10,6 +10,10 @@ use serde_json::{json, Value};
 use super::broker::LiveUiSession;
 use super::capability_requirements::requested_capabilities;
 
+mod handoff;
+
+pub(crate) use handoff::DelegatedCapabilityGap;
+
 const SCHEMA_VERSION: u32 = 1;
 const MAX_UPGRADE_ROUNDS: u32 = 8;
 
@@ -198,7 +202,7 @@ fn new_screen_bootstrap_readiness(profile: Option<&Value>) -> NewScreenBootstrap
     }
 }
 
-pub(crate) fn report_gap(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
+pub(crate) async fn report_gap(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     let root = canonical_project_root(session)?;
     let task_id = required_id(arguments, "taskId")?;
     let missing_capabilities =
@@ -211,14 +215,23 @@ pub(crate) fn report_gap(session: &LiveUiSession, arguments: &Value) -> Result<V
     let evidence = string_array(arguments, "evidence", 1, 32)?;
     let proposed_changes = string_array(arguments, "proposedChanges", 1, 16)?;
     let resume_target = required_text(arguments, "resumeTarget", 2_000)?;
+    let fit_run_id = optional_id(arguments, "fitRunId")?;
+    let delegation = handoff::CapabilityGapHandoffPolicy::from_report(arguments)?;
+    delegation
+        .validate_report(session, fit_run_id.as_deref())
+        .await?;
     let now = Utc::now().to_rfc3339();
     let gap = CapabilityGapDocument {
         schema_version: SCHEMA_VERSION,
         gap_id: format!("gap_{}", uuid::Uuid::new_v4().simple()),
         task_id,
-        fit_run_id: optional_id(arguments, "fitRunId")?,
+        fit_run_id,
         project_root: root.to_string_lossy().to_string(),
-        status: CapabilityGapStatus::Approved,
+        status: if delegation.is_business_thread() {
+            CapabilityGapStatus::Deferred
+        } else {
+            CapabilityGapStatus::Approved
+        },
         missing_capabilities,
         evidence,
         proposed_changes,
@@ -229,6 +242,7 @@ pub(crate) fn report_gap(session: &LiveUiSession, arguments: &Value) -> Result<V
             automatic_publish: true,
             max_upgrade_rounds: MAX_UPGRADE_ROUNDS,
         },
+        delegation,
         upgrade_rounds: 0,
         attempts: Vec::new(),
         failure_signatures: Vec::new(),
@@ -237,11 +251,28 @@ pub(crate) fn report_gap(session: &LiveUiSession, arguments: &Value) -> Result<V
         last_error: None,
     };
     save_gap(&gap)?;
+    let thread_handoff = gap.delegation.thread_handoff(&gap);
     Ok(json!({
-        "gap": gap,
-        "next": "ui_control_capability_gap START_UPGRADE",
-        "instruction": "该 Git 工作区已授权自动平台升级与发布；完成发布后必须回报 commit/version 并重新检查原任务。"
+        "gap": &gap,
+        "threadHandoff": thread_handoff,
+        "next": next_action(&gap),
+        "instruction": if gap.status == CapabilityGapStatus::Deferred {
+            "原 UI 任务不得继续执行平台升级。按 threadHandoff 新建独立 Codex Desktop Worktree 任务；非阻塞缺口先检查 businessDeliveryReady 并收尾业务任务。"
+        } else {
+            "这是独立平台进化任务；请升级、发布、复检并通知原 UI 任务。"
+        }
     }))
+}
+
+pub(crate) fn delegated_gap(
+    session: &LiveUiSession,
+    task_id: &str,
+) -> Result<Option<DelegatedCapabilityGap>> {
+    let root = canonical_project_root(session)?;
+    Ok(list_gaps(&root)?
+        .iter()
+        .find(|gap| handoff::is_delegated_business_gap(gap, task_id))
+        .map(DelegatedCapabilityGap::from_gap))
 }
 
 pub(crate) fn get_gap(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
@@ -262,7 +293,11 @@ pub(crate) fn control_gap(session: &LiveUiSession, arguments: &Value) -> Result<
         "PUBLISH_COMPLETED" => publish_completed(&mut gap, arguments)?,
         "RECHECK_PASSED" => {
             require_status(&gap, CapabilityGapStatus::Published)?;
-            gap.status = CapabilityGapStatus::Resumed;
+            gap.status = if gap.delegation.is_evolution_thread() {
+                CapabilityGapStatus::Completed
+            } else {
+                CapabilityGapStatus::Resumed
+            };
             gap.last_error = None;
         }
         "RECHECK_FAILED" | "UPGRADE_FAILED" => record_failure(&mut gap, arguments)?,
@@ -277,6 +312,7 @@ pub(crate) fn control_gap(session: &LiveUiSession, arguments: &Value) -> Result<
     Ok(json!({
         "gap": gap,
         "resumeOriginalTask": gap.status == CapabilityGapStatus::Resumed,
+        "notifyOriginTask": gap.status == CapabilityGapStatus::Completed,
         "next": next_action(&gap),
     }))
 }
@@ -524,10 +560,12 @@ fn require_status(gap: &CapabilityGapDocument, expected: CapabilityGapStatus) ->
 
 fn next_action(gap: &CapabilityGapDocument) -> &'static str {
     match gap.status {
+        CapabilityGapStatus::Deferred => "CREATE_EVOLUTION_THREAD",
         CapabilityGapStatus::Approved => "START_UPGRADE",
         CapabilityGapStatus::Upgrading => "PUBLISH_COMPLETED",
         CapabilityGapStatus::Published => "RECHECK_ORIGINAL_TASK",
         CapabilityGapStatus::Resumed => "RESUME_ORIGINAL_UI_TASK",
+        CapabilityGapStatus::Completed => "NOTIFY_ORIGIN_THREAD",
         CapabilityGapStatus::HumanRequired => "HUMAN_DECISION_REQUIRED",
     }
 }
@@ -535,10 +573,12 @@ fn next_action(gap: &CapabilityGapDocument) -> &'static str {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum CapabilityGapStatus {
+    Deferred,
     Approved,
     Upgrading,
     Published,
     Resumed,
+    Completed,
     HumanRequired,
 }
 
@@ -577,6 +617,8 @@ pub(crate) struct CapabilityGapDocument {
     proposed_changes: Vec<String>,
     resume_target: String,
     policy: CapabilityUpgradePolicy,
+    #[serde(default)]
+    delegation: handoff::CapabilityGapHandoffPolicy,
     upgrade_rounds: u32,
     attempts: Vec<CapabilityUpgradeAttempt>,
     failure_signatures: Vec<String>,
@@ -662,6 +704,30 @@ mod tests {
         );
     }
 
+    #[test]
+    fn business_gap_handoff_recreates_an_independent_evolution_gap() {
+        let mut gap = test_gap();
+        gap.status = CapabilityGapStatus::Deferred;
+        gap.delegation = super::handoff::CapabilityGapHandoffPolicy::from_report(&json!({
+            "executionMode":"BUSINESS_THREAD",
+            "deliveryImpact":"DELIVERY_BLOCKING",
+            "originThreadId":"019f-origin"
+        }))
+        .unwrap();
+        let handoff = gap.delegation.thread_handoff(&gap);
+        assert_eq!(handoff["environment"], "WORKTREE");
+        assert_eq!(
+            handoff["reportArguments"]["executionMode"],
+            "EVOLUTION_THREAD"
+        );
+        assert_eq!(
+            handoff["reportArguments"]["deliveryImpact"],
+            "EVOLUTION_ONLY"
+        );
+        assert_eq!(handoff["reportArguments"]["originGapId"], "gap_test");
+        assert_eq!(handoff["waitForOrigin"], false);
+    }
+
     fn test_gap() -> CapabilityGapDocument {
         CapabilityGapDocument {
             schema_version: 1,
@@ -680,6 +746,7 @@ mod tests {
                 automatic_publish: true,
                 max_upgrade_rounds: 8,
             },
+            delegation: super::handoff::CapabilityGapHandoffPolicy::default(),
             upgrade_rounds: 1,
             attempts: vec![CapabilityUpgradeAttempt {
                 round: 1,
