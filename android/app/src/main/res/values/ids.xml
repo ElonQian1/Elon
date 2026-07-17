@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <item name="homeWorkspaceProjectSection" type="id" />
-    <item name="homeWorkspaceProjectStrip" type="id" />
-    <item name="homeWorkspaceProjectsButton" type="id" />
-    <item name="homeWorkspaceFriendsPanel" type="id" />
-    <item name="homeWorkspaceFriendRows" type="id" />
-    <item name="chatInputCapsule" type="id" />
-</resources>
