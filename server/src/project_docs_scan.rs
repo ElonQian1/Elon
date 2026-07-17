@@ -3,6 +3,7 @@
 //! Shared Markdown discovery for project documentation surfaces.
 use anyhow::{anyhow, Result};
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentsSnapshot};
+use ignore::WalkBuilder;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashSet,
@@ -11,11 +12,15 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::project_default_docs::{default_project_documents, ensure_default_docs_in_workspace};
-use crate::project_document_policy::classify_project_document;
+use crate::{
+    project_default_docs::{default_project_documents, ensure_default_docs_in_workspace},
+    project_document_index::{file_modified_millis, ProjectDocumentIndex},
+    project_document_maintenance::enrich_catalog,
+    project_document_policy::classify_project_document,
+};
 
 const MAX_DOCUMENTS: usize = 48;
-const MAX_CATALOG_DOCUMENTS: usize = 500;
+const MAX_CATALOG_DOCUMENTS: usize = 20_000;
 const MAX_DOC_CHARS: usize = 24_000;
 const MAX_TOTAL_CHARS: usize = 220_000;
 
@@ -88,6 +93,18 @@ pub(crate) fn collect_project_documents_with_options(
     let candidates = discover_document_candidates(workspace, options.catalog_only, &mut warnings);
     let mut documents = Vec::new();
     let mut total_chars = 0usize;
+    let mut index = if options.catalog_only {
+        match ProjectDocumentIndex::open(workspace) {
+            Ok(index) => Some(index),
+            Err(error) => {
+                warnings.push(format!("持久文档索引暂不可用，已降级为完整扫描：{error}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
+    let mut seen_paths = HashSet::new();
 
     let document_limit = if options.catalog_only {
         MAX_CATALOG_DOCUMENTS
@@ -96,9 +113,34 @@ pub(crate) fn collect_project_documents_with_options(
     };
     for path in candidates.into_iter().take(document_limit) {
         let relative = relative_path(workspace, &path);
-        match read_document_snapshot(workspace, &path, total_chars, options.catalog_only) {
+        seen_paths.insert(relative.clone());
+        let file_size = fs::metadata(&path)
+            .map(|metadata| metadata.len())
+            .unwrap_or_default();
+        let modified_at_ms = file_modified_millis(&path);
+        let cached = index
+            .as_ref()
+            .and_then(|value| {
+                value
+                    .cached_document(&relative, file_size, modified_at_ms)
+                    .ok()
+            })
+            .flatten()
+            .map(|mut document| {
+                document.content.clear();
+                document.truncated = false;
+                (document, 0)
+            });
+        match cached.map(Ok).unwrap_or_else(|| {
+            read_document_snapshot(workspace, &path, total_chars, options.catalog_only)
+        }) {
             Ok((document, used_chars)) => {
                 total_chars += used_chars;
+                if let Some(index) = index.as_mut() {
+                    if let Err(error) = index.observe_document(&document, modified_at_ms) {
+                        warnings.push(format!("无法更新 {} 的增量索引：{error}", relative));
+                    }
+                }
                 documents.push(document);
                 if !options.catalog_only && total_chars >= MAX_TOTAL_CHARS {
                     warnings.push(format!(
@@ -125,9 +167,22 @@ pub(crate) fn collect_project_documents_with_options(
             document.truncated = false;
         }
     }
+    if let Some(index) = index.as_mut() {
+        if let Err(error) = index.finish_scan(&seen_paths) {
+            warnings.push(format!("无法完成文档删除事件对账：{error}"));
+        }
+    }
     let source = snapshot_source(&documents);
-
-    Ok(build_snapshot(workspace_path, source, documents, warnings))
+    let mut snapshot = build_snapshot(workspace_path, source, documents, warnings);
+    if let Some(index) = index.as_ref() {
+        match enrich_catalog(workspace, &snapshot.documents, index) {
+            Ok(analysis) => snapshot.analysis = analysis,
+            Err(error) => snapshot
+                .warnings
+                .push(format!("文档健康分析暂不可用：{error}")),
+        }
+    }
+    Ok(snapshot)
 }
 
 fn seed_default_documents_if_requested(
@@ -165,6 +220,21 @@ fn discover_document_candidates(
     );
     for (dir, priority, depth) in DOC_DIRS {
         collect_markdown_dir(&workspace.join(dir), *priority, *depth, &mut candidates);
+    }
+    if catalog_only {
+        for entry in WalkBuilder::new(workspace)
+            .hidden(false)
+            .git_ignore(true)
+            .filter_entry(|entry| !entry.path().is_dir() || !should_skip_dir(entry.path()))
+            .build()
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
+            .filter(|entry| is_markdown_file(entry.path()))
+            .take(MAX_CATALOG_DOCUMENTS + 1)
+        {
+            let relative = relative_path(workspace, entry.path());
+            candidates.push((root_priority(&relative), entry.into_path()));
+        }
     }
 
     candidates.sort_by_key(|(priority, path)| (*priority, relative_path(workspace, path)));
@@ -316,6 +386,7 @@ pub(crate) fn build_snapshot(
         generated_at_ms: now_millis(),
         documents,
         warnings,
+        analysis: serde_json::Value::Null,
     }
 }
 

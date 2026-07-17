@@ -17,6 +17,7 @@ const NON_DOCUMENT_PATHSPECS: &[&str] = &[
     ":(exclude,icase,glob)**/*.mdx",
     ":(exclude,glob).elon/document-sections.json",
     ":(exclude,glob).elon/document-organization-suggestions.json",
+    ":(exclude,glob).elon/knowledge-federation.json",
 ];
 
 pub(crate) fn commit_document_baseline(workspace: &Path) -> Result<String> {

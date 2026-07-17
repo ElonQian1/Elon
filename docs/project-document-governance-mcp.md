@@ -13,6 +13,7 @@
 - `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖、文档关系和最近 100 条结构操作审计，不移动实际文件。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
+- `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块”的知识节点；每个节点有独立范围、owner、项目类型和健康度，最多 256 个节点、六层。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
 
 因此同一份项目可以在网页端按 OneNote 分区浏览，同时保留适合 Git、IDE 和所有 AI 供应商读取的普通目录结构。
@@ -30,7 +31,7 @@ Content-Type: application/json
 {"projectRoot":"D:\\path\\to\\git-worktree"}
 ```
 
-bootstrap 只接受现存 Git 工作区，返回：
+普通项目传 `projectRoot`。个人笔记或非 Git 内容传 `{"vaultId":"user-or-notebook-id"}`；平台会在本机数据目录建立不可见的托管 Git 知识库，用户无需理解 Git，但每次编辑仍有版本和恢复能力。两者必须且只能提供一个。bootstrap 返回：
 
 - `mcp.configPath`：通用默认配置；`mcp.configPaths` 还提供 Codex、Copilot、Claude、Gemini 的会话配置；
 - `mcp.sessionId`：项目绑定会话；
@@ -55,7 +56,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_analyze`
 
-第一步调用。它扫描最多 500 份候选 Markdown，但不返回正文；默认每页 80 份，最大 200 份。输出包含：
+第一步调用。它尊重 `.gitignore` 扫描最多 20000 份候选 Markdown，但不返回正文；默认每页 80 份，最大 200 份。大型项目可传 `scope_id` 只分析某个联邦节点。输出包含：
 
 - `catalog_revision`；
 - 路径、标题、大小、哈希和标题层级；
@@ -63,7 +64,13 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 - 自动治理分区、知识架构健康度、用户覆盖和现有建议；
 - 全量读取估算、默认读取估算和预计避免 token。
 
-`classification_model_tokens` 固定为 `0`，表示预分类没有调用模型，不表示后续 AI 判断不消耗 token。`knowledge_architecture` 还返回项目类型推断、完整度分数、基础文档覆盖、过期/歧义/重复标题、缺失文档类型和推荐主题。
+`classification_model_tokens` 固定为 `0`，表示预分类没有调用模型，不表示后续 AI 判断不消耗 token。`document_health` 是服务端统一真源，包含 `architecture`、`quality`、`maintenance` 和 `federation`；PC 网页端与 MCP 不再各算一套分数。
+
+目录索引保存到工作区外的 SQLite，不污染项目 Git。文件大小和修改时间未变化时复用目录与质量事实；创建、修改、删除形成持久事件。已访问工作区每 60 秒后台重扫，并异步复查外链。
+
+### `project_docs_get_issues`
+
+分页读取确定性质量问题及最小证据，可按类型筛选。当前覆盖本地链接/标题锚点、缓存的外部链接、孤立文档、缺少 owner、缺少复查日期、复查逾期、显式 `implementation_refs` 不存在或实现晚于复查日期。程序先定位证据，只有需要语义判断时才让 AI 按需读取正文和源码。
 
 ### `project_docs_get_status`
 
@@ -124,6 +131,10 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 AI 只能执行建议文件中列出的 operation id，不能借文档整理修改代码或 push。修改正文、批量修复引用、归档和删除尚未进入低 token 分类操作 schema；未来即使开放，也必须纳入同一整理前/后 Git 事务。
 
+### `project_docs_get_history` / `project_docs_restore_version`
+
+仅用于平台托管知识库。前者最多返回 100 个自动 Git 版本；后者只能恢复当前历史中的祖先提交，并把恢复动作写成一个新的提交，因此恢复本身也可撤销。普通项目使用其自己的 Git 工作流，不开放这两个托管库工具。
+
 ## 4. 网页端共享逻辑
 
 PC 网页端通过以下云端 API 应用虚拟分区：
@@ -136,7 +147,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示从建议生成、虚拟分区应用到实体文件应用的每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台。页面按项目保存三档权限，默认选中“AI 自动整理（可信且可恢复）”。实体操作通过 `/api/project-docs/organization/apply-files` 交给本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
-知识首页允许用户固定项目模板。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义；命令包含新建父/子分区、重命名与外观、改变父级、同级拖放或置顶/上移/下移/置底、合并、设置入口、批量主题/治理归类、固定、推荐和 AI 定向整理。最多允许四层主题；改变父级必须拒绝循环和第五层。
+知识首页允许用户固定项目模板。“文档健康”分区展示服务端统一的结构分、质量问题、维护事件和联邦节点；“AI 整理建议”分区继续只展示建议及应用状态。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义；命令包含新建父/子分区、重命名与外观、改变父级、同级拖放或置顶/上移/下移/置底、合并、设置入口、批量主题/治理归类、固定、推荐和 AI 定向整理。
 
 功能地图使用确定性树布局展示同一主题层级，支持展开/折叠、缩放/平移、缩略图、功能或文档搜索以及“覆盖良好/待补齐/文档空白”筛选。选择节点后，详情区显示推断或配置的入口、最多八份对应 Markdown 和六类覆盖缺口；打开文档仍进入普通编辑器。节点级 AI 按钮只把节点名称、目录路径和缺口范围写入整理任务 Prompt，由通用 MCP 完成后续分析与建议，不为凑齐指标自动生成重复文档。
 
@@ -146,7 +157,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 ## 5. 安全和失败原则
 
-- MCP 会话绑定 canonical Git 工作区，URL 使用高熵短期令牌，默认两小时过期。
+- MCP 会话绑定 canonical Git 工作区或平台创建的托管 Git 知识库，URL 使用高熵短期令牌，默认两小时过期。
 - 配置和会话文件位于系统临时目录；启动器只接受 loopback URL。
 - 会话先在 staging 目录完整写入，再原子发布；并发清理跳过创建中目录，损坏会话也有宽限期，不会删除另一代理刚创建的会话。
 - Markdown 读取继续经过工作区边界、符号链接、UTF-8 和 2 MiB 上限检查。
@@ -156,7 +167,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、授权模式、revision 冲突、幂等应用、安全重命名/移动、禁止覆盖、四层主题边界、手工排序/固定元数据与审计、自动授权阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
+Rust 单元测试覆盖：元数据目录不泄露正文、增量索引和事件去重、链接/孤立/owner/复查/实现证据、联邦范围与循环拒绝、托管 Git 自动版本和恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。
 
 发布前至少运行：
 

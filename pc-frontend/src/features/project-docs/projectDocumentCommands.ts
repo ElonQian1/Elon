@@ -442,7 +442,11 @@ function normalizeSectionOrders(manifest: DocumentSectionManifest) {
 }
 
 function emptyKnowledgeMetadata(): DocumentKnowledgeMetadata {
-  return { doc_type: '', audience: [], owner: '', version: '', related: [], supersedes: [], order: 999_999, pinned: false }
+  return {
+    id: '', doc_type: '', audience: [], owner: '', owners: [], reviewed_at: '',
+    review_interval_days: 180, implementation_refs: [], version: '', related: [], supersedes: [],
+    order: 999_999, pinned: false,
+  }
 }
 
 function setDocumentOrders(

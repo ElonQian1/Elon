@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "root",
+      "label": "一龙平台知识根",
+      "scope_path": "",
+      "profile": "software-platform",
+      "owner": "项目维护者"
+    },
+    {
+      "id": "server",
+      "label": "服务端与 Windows 节点",
+      "parent_id": "root",
+      "scope_path": "server",
+      "profile": "software-api",
+      "owner": "平台后端"
+    },
+    {
+      "id": "pc-web",
+      "label": "PC Web 工作台",
+      "parent_id": "root",
+      "scope_path": "pc-frontend",
+      "profile": "software-platform",
+      "owner": "PC 客户端"
+    },
+    {
+      "id": "android",
+      "label": "Android 客户端",
+      "parent_id": "root",
+      "scope_path": "android",
+      "profile": "software-platform",
+      "owner": "Android 客户端"
+    },
+    {
+      "id": "fb2",
+      "label": "fb2 AI 中心",
+      "parent_id": "root",
+      "scope_path": "docs/fb2-ai-center",
+      "profile": "software-api",
+      "owner": "fb2 项目维护者"
+    }
+  ]
+}

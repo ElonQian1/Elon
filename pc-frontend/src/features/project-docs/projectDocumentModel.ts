@@ -44,6 +44,93 @@ export interface DocumentCatalog {
     writable: boolean
   }
   budget: DocumentBudget
+  analysis?: DocumentHealthAnalysis
+}
+
+export interface DocumentHealthIssue {
+  fingerprint: string
+  type: string
+  severity: 'error' | 'warning' | 'info'
+  path: string
+  message: string
+  evidence: string
+  suggested_action: string
+  confidence: number
+}
+
+export interface DocumentHealthAnalysis {
+  version: number
+  source: 'server'
+  overall: { score: number; status: 'healthy' | 'review' | 'needs_attention' }
+  architecture: {
+    profile: string
+    profile_label: string
+    profile_source: 'manifest' | 'metadata'
+    score: number
+    status: 'healthy' | 'needs_attention' | 'needs_structure'
+    topic_assigned_documents: number
+    topic_unassigned_documents: number
+    ambiguous_documents: number
+    outdated_documents: number
+    duplicate_titles: number
+    home_configured: boolean
+    foundation_coverage: Array<{ doc_type: string; label: string; covered: boolean }>
+    missing_document_types: string[]
+    findings: string[]
+  }
+  quality: {
+    summary: {
+      score: number
+      status: string
+      total_issues: number
+      errors: number
+      warnings: number
+      info: number
+      broken_links: number
+      orphan_documents: number
+      missing_owners: number
+      missing_review_dates: number
+      overdue_reviews: number
+      implementation_conflicts: number
+      external_links_checked: number
+      external_links_pending: number
+    }
+    issues: DocumentHealthIssue[]
+    returned_issues: number
+    total_issues: number
+    issue_types: string[]
+  }
+  maintenance: {
+    index_version: number
+    durable_queue: boolean
+    poll_interval_seconds: number
+    changed_documents: number
+    pending_events: number
+    processed_events: number
+    last_indexed_at_ms: number
+  }
+  federation: {
+    enabled: boolean
+    source: 'manifest' | 'metadata'
+    root_id: string
+    node_count: number
+    aggregated_score: number
+    unhealthy_nodes: number
+    max_depth: number
+    nodes: Array<{
+      id: string
+      label: string
+      parent_id: string
+      scope_path: string
+      profile: string
+      owner: string
+      document_count: number
+      direct_children: number
+      score: number
+      status: string
+      home_configured: boolean
+    }>
+  }
 }
 
 export interface DocumentFile {

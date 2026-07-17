@@ -22,9 +22,14 @@ export interface DocumentKnowledgeHome {
 }
 
 export interface DocumentKnowledgeMetadata {
+  id: string
   doc_type: string
   audience: string[]
   owner: string
+  owners: string[]
+  reviewed_at: string
+  review_interval_days: number
+  implementation_refs: string[]
   version: string
   related: string[]
   supersedes: string[]
@@ -332,12 +337,13 @@ export function buildOrganizationPrompt(
   return `<elon-project-docs-task version="1">\n请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
     `运行 ID：${operationId || '由 MCP 会话生成'}。权限模式：${authorizationMode}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；当前项目类型：${manifest.profile}；现有主题分区：${customSections}。\n` +
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
-    '① project_docs_analyze 获取 classification_model_tokens=0 的完整紧凑目录；' +
-    '② 仅对仍无法根据路径、标题和 headings 判断的少量文档调用 project_docs_read；' +
-    '③ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
+    '① project_docs_analyze 获取 classification_model_tokens=0 的紧凑目录和 document_health；大型仓库先按 federation 选择 scope_id；' +
+    '② project_docs_get_issues 获取链接、孤立文档、owner、复查周期和实现引用的程序证据；' +
+    '③ 仅对仍需语义判断的少量文档调用 project_docs_read；' +
+    '④ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
     `④ 保存后按当前权限继续；${authorizationInstruction}` +
-    '先根据 analyze 返回的 knowledge_architecture 判断项目类型和缺失基础文档；建议必须同时考虑面向人的主题知识树与面向 AI 的治理属性。' +
-    '可提出 proposed_profile、层级 proposed_sections、proposed_home、document_metadata（类型、读者、关系、替代关系）；不要把 required/on-demand 等治理状态当成主题目录。' +
+    '先根据 analyze 返回的 document_health 判断项目类型、质量问题、联邦节点和缺失基础文档；建议必须同时考虑面向人的主题知识树与面向 AI 的治理属性。' +
+    '可提出 proposed_profile、层级 proposed_sections、proposed_home、document_metadata（类型、owner、复查日期、实现引用、关系、替代关系）；不要把 required/on-demand 等治理状态当成主题目录。' +
     '如发现命名含糊或路径放错，可在 file_operations 中提出结构化 rename/move；source_revision 必须使用 analyze 返回的 content_hash。' +
     `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
     'git_backed_full 会自动完成整理前和整理后两次仅文档 Git 提交；任何模式都不得越界、操作非 Markdown、修改代码或自动 push。' +
@@ -390,9 +396,15 @@ function sanitizeKnowledgeMetadata(value: unknown): DocumentKnowledgeMetadata | 
   if (!value || typeof value !== 'object') return null
   const candidate = value as Partial<DocumentKnowledgeMetadata>
   return {
+    id: String(candidate.id ?? '').trim().slice(0, 120),
     doc_type: String(candidate.doc_type ?? '').trim().slice(0, 64),
     audience: stringArray(candidate.audience, 12).map((entry) => entry.slice(0, 80)),
     owner: String(candidate.owner ?? '').trim().slice(0, 80),
+    owners: stringArray(candidate.owners, 12).map((entry) => entry.slice(0, 80)),
+    reviewed_at: /^\d{4}-\d{2}-\d{2}$/.test(String(candidate.reviewed_at ?? ''))
+      ? String(candidate.reviewed_at) : '',
+    review_interval_days: Math.min(3650, Math.max(1, Math.floor(Number(candidate.review_interval_days) || 180))),
+    implementation_refs: stringArray(candidate.implementation_refs, 32).map((entry) => entry.slice(0, 500)),
     version: String(candidate.version ?? '').trim().slice(0, 40),
     related: stringArray(candidate.related, 24).map(normalizedPath).filter(Boolean),
     supersedes: stringArray(candidate.supersedes, 24).map(normalizedPath).filter(Boolean),

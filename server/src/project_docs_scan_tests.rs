@@ -148,12 +148,25 @@ fn project_docs_catalog_classifies_without_returning_bodies() {
         },
     )
     .unwrap();
+    let unchanged = collect_project_documents_with_options(
+        &root,
+        ProjectDocumentScanOptions {
+            seed_missing_defaults: false,
+            catalog_only: true,
+        },
+    )
+    .unwrap();
     let _ = fs::remove_dir_all(&root);
 
     assert!(snapshot
         .documents
         .iter()
         .all(|document| document.content.is_empty()));
+    assert_eq!(snapshot.analysis["source"], "server");
+    assert!(snapshot.analysis["quality"]["summary"]["total_issues"]
+        .as_u64()
+        .is_some());
+    assert_eq!(unchanged.analysis["maintenance"]["changed_documents"], 0);
     let agents = snapshot
         .documents
         .iter()

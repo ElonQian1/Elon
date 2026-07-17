@@ -14,6 +14,7 @@ import ProjectDocumentCommandMenu, {
 import type { ProjectCapabilityNode } from './projectDocumentCapabilityGraph'
 import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
+import ProjectDocumentHealthCenter from './ProjectDocumentHealthCenter'
 import ProjectDocumentEditorPane, {
   AUTOMATIC_DOCUMENT_SECTION,
   type ProjectDocumentViewMode,
@@ -27,8 +28,10 @@ import {
   analyzeKnowledgeArchitecture,
   buildKnowledgeSections,
   CAPABILITY_MAP_SECTION,
+  DOCUMENT_HEALTH_SECTION,
   KNOWLEDGE_HOME_SECTION,
   knowledgeSectionCounts,
+  serverArchitectureHealth,
   topicSectionForDocument,
   type DocumentNavigationMode,
 } from './projectDocumentArchitecture'
@@ -109,10 +112,9 @@ export default function ProjectDocumentsWorkspace({
     .filter((section) => !section.custom), [organization.manifest])
   const knowledgeSections = useMemo(() => buildKnowledgeSections(catalog, organization.manifest), [catalog, organization.manifest])
   const baseSections = navigationMode === 'knowledge' ? knowledgeSections : governanceSections
-  const architectureHealth = useMemo(
-    () => analyzeKnowledgeArchitecture(catalog, organization.manifest),
-    [catalog, organization.manifest],
-  )
+  const architectureHealth = useMemo(() => serverArchitectureHealth(
+    catalog, analyzeKnowledgeArchitecture(catalog, organization.manifest),
+  ), [catalog, organization.manifest])
 
   const loadCatalog = useCallback(async () => {
     setCatalogLoading(true)
@@ -201,6 +203,7 @@ export default function ProjectDocumentsWorkspace({
         + organization.suggestions.assignments.length
         + organization.suggestions.file_operations.filter((operation) => operation.status === 'proposed').length || 1
       : 0
+    counts[DOCUMENT_HEALTH_SECTION] = catalog?.analysis?.quality.summary.total_issues ?? 0
     return counts
   }, [catalog, governanceCounts, knowledgeSections, navigationMode, organization.manifest, organization.suggestions])
   const sections = useMemo(() => navigationMode === 'knowledge'
@@ -650,6 +653,9 @@ export default function ProjectDocumentsWorkspace({
             canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
             onOpenSection={setActiveSection} onAiOrganize={organizeCapability} />
         </Suspense>
+      ) : activeSection === DOCUMENT_HEALTH_SECTION ? (
+        <ProjectDocumentHealthCenter analysis={catalog?.analysis} onRefresh={loadCatalog}
+          onOpenSuggestions={() => setActiveSection('suggestions')} />
       ) : activeSection === 'suggestions' ? (
         <ProjectDocumentSuggestions
           suggestions={organization.suggestions}

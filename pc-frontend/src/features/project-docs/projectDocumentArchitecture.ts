@@ -10,6 +10,7 @@ export type DocumentNavigationMode = 'knowledge' | 'governance'
 
 export const KNOWLEDGE_HOME_SECTION = 'knowledge-home'
 export const CAPABILITY_MAP_SECTION = 'capability-map'
+export const DOCUMENT_HEALTH_SECTION = 'document-health'
 
 export interface KnowledgeFoundation {
   id: string
@@ -180,9 +181,37 @@ export function buildKnowledgeSections(catalog: DocumentCatalog | null, manifest
   return [
     { key: KNOWLEDGE_HOME_SECTION, label: '知识首页', detail: '项目地图、推荐阅读与完整度', color: '#9b73ed', virtual: true, order: -100 },
     { key: CAPABILITY_MAP_SECTION, label: '功能地图', detail: '功能、子能力与对应文档覆盖', color: '#58a8df', virtual: true, order: -90 },
+    { key: DOCUMENT_HEALTH_SECTION, label: '文档健康', detail: '质量问题、维护事件与子项目节点', color: '#55b6a3', virtual: true, order: -80 },
     ...flattenSectionTree(topics),
     SUGGESTIONS_SECTION,
   ]
+}
+
+export function serverArchitectureHealth(
+  catalog: DocumentCatalog | null,
+  fallback: KnowledgeArchitectureHealth,
+): KnowledgeArchitectureHealth {
+  const health = catalog?.analysis?.architecture
+  if (!health || !Number.isFinite(health.score)) return fallback
+  return {
+    profile: health.profile,
+    profileLabel: health.profile_label,
+    profileSource: health.profile_source,
+    score: health.score,
+    status: health.status,
+    foundations: health.foundation_coverage.map((item) => ({
+      id: item.doc_type, label: item.label, covered: item.covered,
+    })),
+    missingDocumentTypes: health.missing_document_types,
+    topicAssigned: health.topic_assigned_documents,
+    topicUnassigned: health.topic_unassigned_documents,
+    topicAutomatic: health.topic_unassigned_documents,
+    ambiguous: health.ambiguous_documents,
+    outdated: health.outdated_documents,
+    duplicateTitles: health.duplicate_titles,
+    homeConfigured: health.home_configured,
+    findings: health.findings,
+  }
 }
 
 export function topicSectionForDocument(

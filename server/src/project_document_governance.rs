@@ -60,14 +60,24 @@ pub(crate) struct DocumentKnowledgeHome {
     pub start_here: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct DocumentKnowledgeMetadata {
+    #[serde(default)]
+    pub id: String,
     #[serde(default)]
     pub doc_type: String,
     #[serde(default)]
     pub audience: Vec<String>,
     #[serde(default)]
     pub owner: String,
+    #[serde(default)]
+    pub owners: Vec<String>,
+    #[serde(default)]
+    pub reviewed_at: String,
+    #[serde(default = "default_review_interval_days")]
+    pub review_interval_days: u16,
+    #[serde(default)]
+    pub implementation_refs: Vec<String>,
     #[serde(default)]
     pub version: String,
     #[serde(default)]
@@ -78,6 +88,26 @@ pub(crate) struct DocumentKnowledgeMetadata {
     pub order: i32,
     #[serde(default)]
     pub pinned: bool,
+}
+
+impl Default for DocumentKnowledgeMetadata {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            doc_type: String::new(),
+            audience: Vec::new(),
+            owner: String::new(),
+            owners: Vec::new(),
+            reviewed_at: String::new(),
+            review_interval_days: default_review_interval_days(),
+            implementation_refs: Vec::new(),
+            version: String::new(),
+            related: Vec::new(),
+            supersedes: Vec::new(),
+            order: 0,
+            pinned: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -580,8 +610,18 @@ fn sanitize_home(mut home: DocumentKnowledgeHome) -> Result<DocumentKnowledgeHom
 fn sanitize_knowledge_metadata(
     mut metadata: DocumentKnowledgeMetadata,
 ) -> Result<DocumentKnowledgeMetadata> {
+    metadata.id = truncate_chars(metadata.id.trim(), 120);
     metadata.doc_type = truncate_chars(metadata.doc_type.trim(), 64);
     metadata.owner = truncate_chars(metadata.owner.trim(), 80);
+    metadata.owners = bounded_strings(metadata.owners, 12, 80);
+    metadata.reviewed_at = truncate_chars(metadata.reviewed_at.trim(), 10);
+    if !metadata.reviewed_at.is_empty()
+        && chrono::NaiveDate::parse_from_str(&metadata.reviewed_at, "%Y-%m-%d").is_err()
+    {
+        bail!("reviewed_at 必须使用 YYYY-MM-DD：{}", metadata.reviewed_at);
+    }
+    metadata.review_interval_days = metadata.review_interval_days.clamp(1, 3_650);
+    metadata.implementation_refs = bounded_strings(metadata.implementation_refs, 32, 500);
     metadata.version = truncate_chars(metadata.version.trim(), 40);
     metadata.audience = bounded_strings(metadata.audience, 12, 80);
     metadata.related = metadata
@@ -714,6 +754,10 @@ fn truncate_chars(value: &str, limit: usize) -> String {
 
 fn schema_version() -> u8 {
     1
+}
+
+fn default_review_interval_days() -> u16 {
+    180
 }
 
 fn default_section_color() -> String {

@@ -282,6 +282,10 @@
       "doc_type": "overview",
       "audience": ["开发者", "AI 代理", "项目管理者"],
       "owner": "项目维护者",
+      "owners": ["平台文档组"],
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:docs/README.md"],
       "version": "2026-07",
       "related": ["AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md"],
       "supersedes": []
@@ -290,6 +294,9 @@
       "doc_type": "architecture",
       "audience": ["开发者", "AI 代理"],
       "owner": "项目维护者",
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:server/src/main.rs", "file:server/src/node_agent_main.rs"],
       "version": "",
       "related": ["docs/system-architecture.md", "AI_INDEX.md"],
       "supersedes": []
@@ -298,6 +305,9 @@
       "doc_type": "api-reference",
       "audience": ["开发者", "AI 代理"],
       "owner": "项目维护者",
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:server/src/main.rs"],
       "version": "",
       "related": ["AI_ARCHITECTURE.md"],
       "supersedes": []
@@ -306,6 +316,9 @@
       "doc_type": "operations",
       "audience": ["AI 代理", "开发者"],
       "owner": "项目维护者",
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:scripts/finish-ai-task.ps1"],
       "version": "",
       "related": ["AGENTS.md"],
       "supersedes": []
@@ -314,8 +327,33 @@
       "doc_type": "client-guides",
       "audience": ["开发者", "AI 供应商"],
       "owner": "项目维护者",
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 60,
+      "implementation_refs": ["file:server/src/node_agent_project_docs_mcp.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
       "version": "2",
       "related": ["docs/pc-frontend-migration.md"],
+      "supersedes": []
+    },
+    "AGENTS.md": {
+      "id": "ai-work-entry",
+      "doc_type": "router",
+      "audience": ["AI 代理"],
+      "owner": "项目维护者",
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 30,
+      "implementation_refs": ["file:.github/copilot-instructions.md"],
+      "related": [".github/copilot-instructions.md", "CODEX.md"],
+      "supersedes": []
+    },
+    ".github/copilot-instructions.md": {
+      "id": "shared-ai-contract",
+      "doc_type": "policy",
+      "audience": ["AI 代理", "开发者"],
+      "owner": "项目维护者",
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 30,
+      "implementation_refs": ["file:scripts/ai-task-preflight.ps1", "file:scripts/finish-ai-task.ps1"],
+      "related": ["AGENTS.md"],
       "supersedes": []
     }
   }

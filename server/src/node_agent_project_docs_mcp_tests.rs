@@ -3,7 +3,8 @@ use std::sync::Arc;
 use std::{fs, path::PathBuf, process::Command};
 
 use crate::node_agent_project_docs_mcp::{
-    authorize_session, descriptor_for_project, handle_request, test_transport_routes, McpRequest,
+    authorize_session, descriptor_for_project, descriptor_for_vault, handle_request,
+    test_transport_routes, McpRequest,
 };
 
 fn workspace() -> PathBuf {
@@ -98,12 +99,15 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         names,
         vec![
             "project_docs_analyze",
+            "project_docs_get_issues",
             "project_docs_get_status",
             "project_docs_read",
             "project_docs_get_suggestions",
             "project_docs_save_suggestions",
             "project_docs_apply_suggestions",
-            "project_docs_apply_file_operations"
+            "project_docs_apply_file_operations",
+            "project_docs_get_history",
+            "project_docs_restore_version"
         ]
     );
     let save_schema = listed["result"]["tools"]
@@ -139,6 +143,25 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         analyzed["result"]["structuredContent"]["knowledge_architecture"]
             .get("score")
             .is_some()
+    );
+    assert_eq!(
+        analyzed["result"]["structuredContent"]["document_health"]["source"],
+        "server"
+    );
+    let issues = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":22,"method":"tools/call",
+            "params":{"name":"project_docs_get_issues","arguments":{"limit":20}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(
+        issues["result"]["structuredContent"]["returned"]
+            .as_u64()
+            .unwrap()
+            > 0
     );
     assert!(analyzed.get("error").is_none());
     let catalog_revision = analyzed["result"]["structuredContent"]["catalog_revision"]
@@ -254,6 +277,29 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert!(root.join("AI_AGENT.md").is_file());
     assert!(!root.join("AGENTS.md").exists());
     fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn managed_vault_descriptor_exposes_version_tools_without_a_user_git_workspace() {
+    let vault_id = format!("mcp-test-{}", uuid::Uuid::new_v4().simple());
+    let descriptor = descriptor_for_vault(&vault_id, 7799).unwrap();
+    assert_eq!(descriptor["managedVaultId"], vault_id);
+    let workspace = PathBuf::from(descriptor["projectRoot"].as_str().unwrap());
+    assert!(workspace.join(".git").is_dir());
+    let history = handle_request(
+        &workspace,
+        request(json!({
+            "jsonrpc":"2.0","id":40,"method":"tools/call",
+            "params":{"name":"project_docs_get_history","arguments":{}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(!history["result"]["structuredContent"]["versions"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    fs::remove_dir_all(workspace).unwrap();
 }
 
 #[test]

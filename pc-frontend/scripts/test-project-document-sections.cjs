@@ -128,13 +128,14 @@ assert(prompt.includes('.elon/document-organization-suggestions.json'))
 assert(prompt.includes('classification_model_tokens=0'))
 assert(prompt.includes('project_docs_analyze'))
 assert(prompt.includes('project_docs_get_status'))
+assert(prompt.includes('project_docs_get_issues'))
 assert(prompt.includes('权限模式：git_backed_full'))
 assert(prompt.includes('authorization_mode=git_backed_full'))
 assert(prompt.includes('git_baseline_commit'))
 assert(prompt.includes('git_result_commit'))
 assert(prompt.includes('project_docs_apply_file_operations'))
 assert(prompt.includes('source_revision'))
-assert(prompt.includes('knowledge_architecture'))
+assert(prompt.includes('document_health'))
 assert(prompt.includes('主题知识树'))
 assert(prompt.includes('不得越界、操作非 Markdown、修改代码或自动 push'))
 assert(prompt.length < 3000, '整理任务 Prompt 不应内嵌完整文档目录')
@@ -146,6 +147,8 @@ const architectureSource = fs.readFileSync(path.join(
 assert(architectureSource.includes("DocumentNavigationMode = 'knowledge' | 'governance'"))
 assert(architectureSource.includes("key: 'software-platform'"))
 assert(architectureSource.includes('analyzeKnowledgeArchitecture'))
+assert(architectureSource.includes('serverArchitectureHealth'))
+assert(architectureSource.includes("DOCUMENT_HEALTH_SECTION = 'document-health'"))
 assert(architectureSource.includes('topicSectionForDocument'))
 assert(architectureSource.includes('const topics = [...templateSections, ...customSections]'))
 assert(architectureSource.includes("CAPABILITY_MAP_SECTION = 'capability-map'"))
@@ -241,6 +244,13 @@ const capabilityInspectorSource = fs.readFileSync(path.join(
 ), 'utf8')
 assert(capabilityInspectorSource.includes('对应 Markdown'))
 assert(capabilityInspectorSource.includes('让 AI 补齐此功能'))
+assert(workspaceSource.includes('<ProjectDocumentHealthCenter'))
+const healthCenterSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentHealthCenter.tsx',
+), 'utf8')
+assert(healthCenterSource.includes('服务端统一真源'))
+assert(healthCenterSource.includes('联邦知识架构'))
+assert(healthCenterSource.includes('持续维护'))
 
 const fileOperationsSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFileOperations.tsx',

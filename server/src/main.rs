@@ -156,13 +156,23 @@ mod project_docs;
 mod project_docs_channel;
 mod project_docs_scan;
 mod project_docs_snapshot;
+mod project_document_analysis_model;
+mod project_document_architecture;
 mod project_document_authorization;
+mod project_document_federation;
 mod project_document_file_operation_model;
 mod project_document_files;
 mod project_document_gateway;
+mod project_document_git_transaction;
 mod project_document_governance;
+mod project_document_governance_service;
+mod project_document_index;
+mod project_document_maintenance;
 mod project_document_organization_api;
 mod project_document_policy;
+mod project_document_quality;
+mod project_document_quality_rules;
+mod project_document_vault;
 mod project_downloads;
 mod project_events;
 mod project_execution_mode;
@@ -288,6 +298,7 @@ async fn main() -> Result<()> {
     billing_lifecycle::spawn_reservation_janitor(state.clone());
     billing_monitor::spawn_reconciliation_monitor(state.clone());
     project_workspace_health_monitor::spawn_project_workspace_health_monitor(state.clone());
+    project_document_maintenance::spawn_maintenance_worker();
     // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
     pc_relay_client::spawn_if_configured();
 

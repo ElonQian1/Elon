@@ -8,6 +8,7 @@ const MAX_DOCUMENT_BYTES: usize = 2 * 1024 * 1024;
 const PROJECT_DOCUMENT_CONFIG_PATHS: &[&str] = &[
     ".elon/document-sections.json",
     ".elon/document-organization-suggestions.json",
+    ".elon/knowledge-federation.json",
 ];
 
 #[derive(Debug)]
@@ -60,13 +61,14 @@ pub(crate) fn write_project_document_file(
     let (target, relative) = resolve_markdown_target(workspace, document_path, true)
         .map_err(|error| write_error(error.to_string(), false))?;
 
-    let current_revision = if target.is_file() {
+    let current_content = if target.is_file() {
         let current = std::fs::read_to_string(&target)
             .map_err(|error| write_error(format!("无法读取当前文档：{error}"), false))?;
-        Some(revision(&current))
+        Some(current)
     } else {
         None
     };
+    let current_revision = current_content.as_deref().map(revision);
     if let Some(expected) = expected_revision.filter(|value| !value.trim().is_empty()) {
         if current_revision.as_deref() != Some(expected) {
             return Err(write_error("文档已被其他会话修改，请刷新后合并更改", true));
@@ -75,6 +77,23 @@ pub(crate) fn write_project_document_file(
 
     crate::node_agent_atomic_file::write(&target, content.as_bytes())
         .map_err(|error| write_error(error.to_string(), false))?;
+    if let Err(error) = crate::project_document_vault::checkpoint_after_write(workspace, &relative)
+    {
+        let rollback = match current_content {
+            Some(previous) => crate::node_agent_atomic_file::write(&target, previous.as_bytes()),
+            None => std::fs::remove_file(&target).map_err(Into::into),
+        };
+        return Err(write_error(
+            format!(
+                "托管知识库自动保存失败：{error}{}",
+                rollback
+                    .err()
+                    .map(|rollback| format!("；回滚也失败：{rollback}"))
+                    .unwrap_or_default()
+            ),
+            false,
+        ));
+    }
     Ok(ProjectDocumentFile {
         path: relative,
         content: content.to_string(),
@@ -122,6 +141,20 @@ pub(crate) fn move_project_document_file(
             false,
         )
     })?;
+    if let Err(error) =
+        crate::project_document_vault::checkpoint_after_write(workspace, &target_relative)
+    {
+        let rollback = std::fs::rename(&target, &source).err();
+        return Err(write_error(
+            format!(
+                "托管知识库自动保存失败：{error}{}",
+                rollback
+                    .map(|rollback| format!("；文件移动回滚也失败：{rollback}"))
+                    .unwrap_or_default()
+            ),
+            false,
+        ));
+    }
     Ok(ProjectDocumentFile {
         path: target_relative,
         content: current.content,

@@ -40,6 +40,8 @@ AI 首轮只根据路径和元数据形成分类、冲突和迁移建议，不�
 - 项目模板可选软件平台、API/SDK、产品、研究、运维或个人知识库；模板是起点，不要求所有项目采用同一分区。路径和标题能确定主题时由程序自动归类，关键入口再显式固定。
 - 个人按名称、数量、路径或权威性的查看排序只保存在浏览器；手工分区顺序、文档固定/顺序、入口和归类才写共享清单并记入审计。改变父级必须拒绝循环和第五层，治理覆盖不能突破真实路径权威上限。
 - `.elon/document-organization-suggestions.json` 保存 AI 的结构化整理建议；AI 整理任务只可写这一份建议文件。
+- 大型仓库可用 `.elon/knowledge-federation.json` 声明项目根、子项目和模块节点；先选择命中任务的 `scope_id`，再在该节点内分页。
+- 当前入口和高权威文档应维护 `owner`/`owners`、`reviewed_at`、`review_interval_days`；用显式 `implementation_refs` 让程序先定位实现证据。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - 默认 `git_backed_full`：先提交整理前原始文档，再自动应用新分区、虚拟归类及结构化建议中的项目内 Markdown 重命名/移动，最后提交整理结果。
 - 用户可切换 `review_all`（逐项审核）或 `suggestions_only`（只生成建议）；所有 AI 供应商使用同名模式。
@@ -48,8 +50,11 @@ AI 首轮只根据路径和元数据形成分类、冲突和迁移建议，不�
 
 ## 供应商无关 MCP 顺序
 
-1. `project_docs_analyze` 只读路径和元数据，并返回零模型 token 的 `knowledge_architecture` 健康诊断。
-2. 只对歧义、冲突或缺失入口调用 `project_docs_read`，不得全库读取正文。
-3. `project_docs_save_suggestions` 保存项目类型、首页、层级主题、文档关系、归类和实体操作建议。
-4. 默认 `git_backed_full` 继续应用建议与文件操作，并确认整理前、整理后两个 Git commit；`review_all` 等用户确认，`suggestions_only` 禁止应用。
-5. MCP 不可用时仍使用相同两份 `.elon` JSON，不建立供应商私有真源。
+1. `project_docs_analyze` 只读路径和元数据，并返回零模型 token 的服务端统一 `document_health`；大型项目优先传 `scope_id`。
+2. `project_docs_get_issues` 按页返回链接、孤立文档、owner/复查和实现引用问题；发现问题不需要先读正文。
+3. 只对歧义、冲突或缺失入口调用 `project_docs_read`，不得全库读取正文。
+4. `project_docs_save_suggestions` 保存项目类型、首页、层级主题、文档关系、归类和实体操作建议。
+5. 默认 `git_backed_full` 继续应用建议与文件操作，并确认整理前、整理后两个 Git commit；`review_all` 等用户确认，`suggestions_only` 禁止应用。
+6. MCP 不可用时仍使用相同两份 `.elon` JSON，不建立供应商私有真源。
+
+个人笔记等非 Git 场景由平台用 `vaultId` 创建隐藏托管 Git 库；AI 可通过历史与恢复工具操作版本，用户无需理解 Git。

@@ -46,6 +46,8 @@ applyTo: "**/*.md"
 - PC 工作台的“知识架构”用于项目地图、层级主题和推荐阅读；“治理视图”用于必须、按需、当前、草稿、证据、归档和等待整理。用户和 AI 都可新增主题或子主题，删除父主题时其子树一并移除，但不删除 Markdown。
 - 个人查看排序（例如按名称、数量、路径或权威性）不得写入共享清单；项目共同的手工分区顺序、文档固定/顺序、入口和归类才写清单并进入 `audit_log`。改变父级必须拒绝循环和第五层；治理覆盖不得突破真实路径权威上限。
 - `.elon/document-organization-suggestions.json` 是 AI 整理建议的结构化产物；AI 整理任务只可写这一份建议文件。
+- 大型仓库可用 `.elon/knowledge-federation.json` 声明项目根、子项目和模块节点；先选择命中任务的 `scope_id`，再在该节点内分页，不能用大仓库规模作为全量读取正文的理由。
+- 当前入口和高权威文档应在 `document_metadata` 维护 `owner`/`owners`、`reviewed_at`、`review_interval_days`；需要核对实现时使用显式 `implementation_refs`（`file:`、`route:`、`symbol:`），程序先定位证据，AI 再按需语义复核。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - 文档整理默认使用 `git_backed_full`：先创建整理前仅文档 Git 提交，再自动创建虚拟分区、应用归类及执行结构化建议中选定的 Markdown 重命名/移动，最后创建整理后仅文档提交。
 - 用户可切换 `review_all`（逐项审核）或 `suggestions_only`（只生成建议）；所有供应商必须使用同名模式，不能另建私有权限语义。
@@ -55,11 +57,13 @@ applyTo: "**/*.md"
 
 ## 供应商无关 MCP 顺序
 
-- 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据、`knowledge_architecture` 健康度与缺口，`classification_model_tokens=0`。
+- 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据以及服务端统一 `document_health`，`classification_model_tokens=0`。大型仓库优先传 `scope_id`。
+- 调用 `project_docs_get_issues` 获取失效链接、孤立文档、owner/复查缺口和实现引用证据；不要为发现这些问题先读全库正文。
 - 诊断或观察整理运行时调用 `project_docs_get_status`；它返回阶段、revision、读取数、token 估算、错误代码和修复建议，不读取 Markdown。
 - 只对 `ambiguous` 或当前任务命中的路径调用 `project_docs_read`，不得借 MCP 全量读取 Markdown。
 - 模型完成判断后携带当前 `authorization_mode` 调用 `project_docs_save_suggestions`；该工具只写建议 JSON，并校验目录 revision、真实路径和结构上限。
 - `git_backed_full` 下继续调用 `project_docs_apply_suggestions`；如有实体操作，把返回的 `git_baseline_commit` 传给 `project_docs_apply_file_operations` 并执行全部 proposed operation id。成功必须同时确认整理前和整理后提交，不需要 `reviewed` 或 `allow_*`。
 - `review_all` 下保存建议后停止，只有用户确认才传 `reviewed=true` 和实体操作对应的 `allow_rename`/`allow_move`；`suggestions_only` 下不得调用任何 apply 工具。
 - MCP 不可用时遵循同一顺序和两份 `.elon` JSON 契约，不得改用供应商私有文档作为第二真源。
+- 个人笔记等非 Git 场景由平台使用 `vaultId` 创建隐藏托管 Git 库；用户仍通过普通文档界面操作，AI 可用 `project_docs_get_history` 和 `project_docs_restore_version` 查看或恢复历史。
 - 传输、短期会话和工具契约见 `docs/project-document-governance-mcp.md`；只有接入或诊断 MCP 时才读取。

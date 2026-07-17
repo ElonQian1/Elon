@@ -1,13 +1,13 @@
 //! Local workspace service shared by the project-document MCP tools.
 
 use anyhow::{anyhow, bail, Context, Result};
-use homecli_proto::{ProjectDocumentEntry, ProjectDocumentsSnapshot};
-use serde::Serialize;
+use homecli_proto::ProjectDocumentsSnapshot;
 use serde_json::{json, Value};
 use std::{collections::HashSet, path::Path};
 
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
+    project_document_analysis_model::{compact_document, document_in_scope, federation_scope_path},
     project_document_architecture::analyze_knowledge_architecture,
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{
@@ -15,10 +15,11 @@ use crate::{
     },
     project_document_git_transaction::{commit_document_baseline, commit_document_result},
     project_document_governance::{
-        apply_suggestions, effective_section, parse_manifest, parse_suggestions, to_pretty_json,
+        apply_suggestions, parse_manifest, parse_suggestions, to_pretty_json,
         validate_ready_suggestions, DocumentOrganizationSuggestions, DocumentSectionManifest,
         SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
+    project_document_vault::{current_version, is_managed_vault},
 };
 
 const DEFAULT_PAGE_SIZE: usize = 80;
@@ -34,38 +35,39 @@ pub(crate) struct GovernanceFile<T> {
     pub revision: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct CompactDocument<'a> {
-    path: &'a str,
-    title: &'a str,
-    size_bytes: u64,
-    role: &'a str,
-    lifecycle: &'a str,
-    authority: &'a str,
-    scope: &'a str,
-    default_retrieval: bool,
-    ambiguous: bool,
-    confidence: &'a str,
-    reason: &'a str,
-    token_estimate: u64,
-    content_hash: &'a str,
-    headings: &'a [String],
-    section: String,
-}
-
 pub(crate) fn analyze_workspace(
     workspace: &Path,
     offset: usize,
     limit: usize,
     ambiguous_only: bool,
 ) -> Result<Value> {
+    analyze_workspace_scoped(workspace, offset, limit, ambiguous_only, None)
+}
+
+pub(crate) fn analyze_workspace_scoped(
+    workspace: &Path,
+    offset: usize,
+    limit: usize,
+    ambiguous_only: bool,
+    scope_id: Option<&str>,
+) -> Result<Value> {
     let snapshot = catalog(workspace)?;
     let manifest = load_manifest(workspace)?;
     let suggestions = load_suggestions(workspace)?;
     let limit = limit.clamp(1, MAX_PAGE_SIZE);
-    let candidates = snapshot
+    let scope_path = federation_scope_path(&snapshot.analysis, scope_id)?;
+    let scoped_catalog = snapshot
         .documents
         .iter()
+        .filter(|document| {
+            scope_path
+                .as_deref()
+                .is_none_or(|scope| document_in_scope(&document.path, scope))
+        })
+        .collect::<Vec<_>>();
+    let candidates = scoped_catalog
+        .iter()
+        .copied()
         .filter(|document| !ambiguous_only || document.metadata.ambiguous)
         .collect::<Vec<_>>();
     let documents = candidates
@@ -74,29 +76,42 @@ pub(crate) fn analyze_workspace(
         .take(limit)
         .map(|document| compact_document(document, &manifest.value))
         .collect::<Vec<_>>();
-    let full_tokens = snapshot
-        .documents
+    let full_tokens = scoped_catalog
         .iter()
         .map(|document| document.metadata.token_estimate)
         .sum::<u64>();
-    let default_tokens = snapshot
-        .documents
+    let default_tokens = scoped_catalog
         .iter()
         .filter(|document| document.metadata.default_retrieval)
         .map(|document| document.metadata.token_estimate)
         .sum::<u64>();
-    let ambiguous_documents = snapshot
-        .documents
+    let ambiguous_documents = scoped_catalog
         .iter()
         .filter(|document| document.metadata.ambiguous)
         .count();
-    let excluded_by_default = snapshot
-        .documents
+    let excluded_by_default = scoped_catalog
         .iter()
         .filter(|document| !document.metadata.default_retrieval)
         .count();
-    let knowledge_architecture =
-        analyze_knowledge_architecture(&snapshot.documents, &manifest.value);
+    let scoped_documents = scoped_catalog.iter().copied().cloned().collect::<Vec<_>>();
+    let knowledge_architecture = if scope_id.is_some() {
+        serde_json::to_value(analyze_knowledge_architecture(
+            &scoped_documents,
+            &manifest.value,
+        ))?
+    } else {
+        snapshot
+            .analysis
+            .get("architecture")
+            .cloned()
+            .unwrap_or_else(|| {
+                serde_json::to_value(analyze_knowledge_architecture(
+                    &snapshot.documents,
+                    &manifest.value,
+                ))
+                .unwrap_or(Value::Null)
+            })
+    };
     Ok(json!({
         "workspace": snapshot.workspace_path,
         "catalog_revision": snapshot.revision,
@@ -118,6 +133,8 @@ pub(crate) fn analyze_workspace(
             "excluded_by_default": excluded_by_default,
         },
         "knowledge_architecture": knowledge_architecture,
+        "document_health": snapshot.analysis,
+        "scope": {"id": scope_id, "path": scope_path},
         "documents": documents,
         "manifest": manifest.value,
         "manifest_revision": manifest.revision,
@@ -303,11 +320,17 @@ pub(crate) fn apply_saved_suggestions(
         operation.status
             == crate::project_document_governance::SuggestedFileOperationStatus::Proposed
     });
-    let git_baseline_commit = if authorization.mode == DocumentAutomationMode::GitBackedFull {
-        Some(commit_document_baseline(workspace)?)
-    } else {
-        None
-    };
+    let managed_git =
+        authorization.mode == DocumentAutomationMode::GitBackedFull && is_managed_vault(workspace);
+    let managed_pre_organization_commit = managed_git
+        .then(|| current_version(workspace))
+        .transpose()?;
+    let project_git_baseline =
+        if authorization.mode == DocumentAutomationMode::GitBackedFull && !managed_git {
+            Some(commit_document_baseline(workspace)?)
+        } else {
+            None
+        };
     let manifest_content = to_pretty_json(&result.manifest)?;
     let manifest_revision = if manifest_already_applied {
         manifest.revision
@@ -331,13 +354,25 @@ pub(crate) fn apply_saved_suggestions(
         expected_suggestions_revision,
     )
     .map_err(|error| anyhow!(error.message))?;
-    let git_result_commit = if !pending_file_operations {
-        git_baseline_commit
+    let managed_after_apply = managed_git
+        .then(|| current_version(workspace))
+        .transpose()?;
+    let git_baseline_commit = if managed_git && pending_file_operations {
+        managed_after_apply.clone()
+    } else {
+        managed_pre_organization_commit
+            .clone()
+            .or(project_git_baseline.clone())
+    };
+    let git_result_commit = if pending_file_operations {
+        None
+    } else if managed_git {
+        managed_after_apply
+    } else {
+        project_git_baseline
             .as_deref()
             .map(|baseline| commit_document_result(workspace, baseline))
             .transpose()?
-    } else {
-        None
     };
     let git_document_transaction_complete = git_result_commit.is_some();
     Ok(json!({
@@ -353,6 +388,7 @@ pub(crate) fn apply_saved_suggestions(
         "authorization_mode": authorization.mode,
         "auto_authorized": authorization.auto_authorized,
         "git_baseline_commit": git_baseline_commit,
+        "git_pre_organization_commit": managed_pre_organization_commit,
         "git_result_commit": git_result_commit,
         "git_document_transaction_complete": git_document_transaction_complete,
         "markdown_changed": false,
@@ -414,29 +450,6 @@ fn verify_file_revision(label: &str, current: Option<&str>, expected: Option<&st
         (None, None) => Ok(()),
         (Some(_), None) => bail!("{label}已存在，必须先分析并传入当前 revision"),
         _ => bail!("{label}已被其他会话修改，请重新分析后合并"),
-    }
-}
-
-fn compact_document<'a>(
-    document: &'a ProjectDocumentEntry,
-    manifest: &DocumentSectionManifest,
-) -> CompactDocument<'a> {
-    CompactDocument {
-        path: &document.path,
-        title: &document.title,
-        size_bytes: document.byte_len,
-        role: &document.metadata.role,
-        lifecycle: &document.metadata.lifecycle,
-        authority: &document.metadata.authority,
-        scope: &document.metadata.scope,
-        default_retrieval: document.metadata.default_retrieval,
-        ambiguous: document.metadata.ambiguous,
-        confidence: &document.metadata.confidence,
-        reason: &document.metadata.reason,
-        token_estimate: document.metadata.token_estimate,
-        content_hash: &document.metadata.content_hash,
-        headings: &document.metadata.headings,
-        section: effective_section(document, manifest),
     }
 }
 

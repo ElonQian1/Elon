@@ -22,6 +22,7 @@ use crate::{
         DocumentSectionManifest, SuggestedFileOperation, SuggestedFileOperationKind,
         SuggestedFileOperationStatus, SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
+    project_document_vault::{contains_version, current_version, is_managed_vault},
 };
 
 pub(crate) struct ApplyFileOperationsRequest<'a> {
@@ -107,34 +108,50 @@ pub(crate) fn apply_file_operations(
         .iter()
         .filter(|operation| operation.status != SuggestedFileOperationStatus::Applied)
         .collect::<Vec<_>>();
-    let git_baseline_commit =
-        if authorization.mode == DocumentAutomationMode::GitBackedFull && !pending.is_empty() {
-            let replaying_partial_result = pending
-                .iter()
-                .any(|operation| operation_target_matches(workspace, operation));
-            let baseline = if let Some(expected) = request.git_baseline_commit {
-                let head = current_document_head(workspace)?;
-                if head != expected {
+    let managed_git =
+        authorization.mode == DocumentAutomationMode::GitBackedFull && is_managed_vault(workspace);
+    let git_baseline_commit = if authorization.mode == DocumentAutomationMode::GitBackedFull
+        && !pending.is_empty()
+    {
+        let replaying_partial_result = pending
+            .iter()
+            .any(|operation| operation_target_matches(workspace, operation));
+        let current_head = if managed_git {
+            current_version(workspace)?
+        } else {
+            current_document_head(workspace)?
+        };
+        let baseline = if let Some(expected) = request.git_baseline_commit {
+            let head = current_head;
+            if head != expected {
+                if managed_git && replaying_partial_result && contains_version(workspace, expected)?
+                {
+                    expected.to_string()
+                } else {
                     bail!("整理前 Git 基线已变化，请重新开始文档整理");
                 }
-                head
-            } else if replaying_partial_result {
-                current_document_head(workspace)?
             } else {
-                commit_document_baseline(workspace)?
-            };
-            for operation in &pending {
-                verify_document_baseline(
-                    workspace,
-                    &baseline,
-                    &operation.source_path,
-                    &operation.source_revision,
-                )?;
+                head
             }
-            Some(baseline)
+        } else if replaying_partial_result {
+            current_head
+        } else if managed_git {
+            current_head
         } else {
-            None
+            commit_document_baseline(workspace)?
         };
+        for operation in &pending {
+            verify_document_baseline(
+                workspace,
+                &baseline,
+                &operation.source_path,
+                &operation.source_revision,
+            )?;
+        }
+        Some(baseline)
+    } else {
+        None
+    };
     let mut results = Vec::new();
     for operation in &selected {
         let already_applied = operation.status == SuggestedFileOperationStatus::Applied
@@ -187,10 +204,14 @@ pub(crate) fn apply_file_operations(
         request.expected_suggestions_revision,
     )
     .map_err(|error| anyhow!(error.message))?;
-    let git_result_commit = git_baseline_commit
-        .as_deref()
-        .map(|baseline| commit_document_result(workspace, baseline))
-        .transpose()?;
+    let git_result_commit = if managed_git && git_baseline_commit.is_some() {
+        Some(current_version(workspace)?)
+    } else {
+        git_baseline_commit
+            .as_deref()
+            .map(|baseline| commit_document_result(workspace, baseline))
+            .transpose()?
+    };
     let git_document_transaction_complete = git_result_commit.is_some();
     let updated_catalog = catalog(workspace)?;
     Ok(json!({
@@ -382,3 +403,7 @@ fn verify_file_revision(label: &str, current: Option<&str>, expected: Option<&st
         _ => bail!("{label}已被其他会话修改，请刷新后重新审核"),
     }
 }
+
+#[cfg(test)]
+#[path = "project_document_file_operations_tests.rs"]
+mod tests;

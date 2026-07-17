@@ -76,4 +76,6 @@ pub struct ProjectDocumentsSnapshot {
     pub documents: Vec<ProjectDocumentEntry>,
     #[serde(default)]
     pub warnings: Vec<String>,
+    #[serde(default)]
+    pub analysis: serde_json::Value,
 }

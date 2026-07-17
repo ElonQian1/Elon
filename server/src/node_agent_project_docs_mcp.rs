@@ -28,7 +28,10 @@ const INVALID_SESSION_GRACE_SECONDS: u64 = 5 * 60;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct BootstrapRequest {
-    project_root: String,
+    #[serde(default)]
+    project_root: Option<String>,
+    #[serde(default)]
+    vault_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,6 +55,8 @@ struct ProjectDocsMcpSession {
     id: String,
     token: String,
     project_root: String,
+    #[serde(default)]
+    managed_vault_id: Option<String>,
     created_at: u64,
     expires_at: u64,
 }
@@ -70,6 +75,19 @@ pub(crate) fn test_transport_routes() -> Router {
 
 pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Result<Value> {
     let root = validate_project_root(project_root)?;
+    create_descriptor(&root, None, host_port)
+}
+
+pub(crate) fn descriptor_for_vault(vault_id: &str, host_port: u16) -> Result<Value> {
+    let vault = crate::project_document_vault::resolve_or_create(vault_id)?;
+    create_descriptor(&vault.workspace, Some(vault.vault_id), host_port)
+}
+
+fn create_descriptor(
+    root: &Path,
+    managed_vault_id: Option<String>,
+    host_port: u16,
+) -> Result<Value> {
     let _guard = session_create_lock();
     cleanup_expired_sessions();
     let now = unix_seconds();
@@ -81,6 +99,7 @@ pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Resu
             uuid::Uuid::new_v4().simple()
         ),
         project_root: root.to_string_lossy().to_string(),
+        managed_vault_id,
         created_at: now,
         expires_at: now.saturating_add(SESSION_TTL_SECONDS),
     };
@@ -130,9 +149,10 @@ pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Resu
         "sessionId": session.id,
         "operationId": operation_id,
         "projectRoot": session.project_root,
+        "managedVaultId": session.managed_vault_id,
         "expiresAt": session.expires_at,
         "protocolVersion": MCP_PROTOCOL_VERSION,
-        "purpose": "低 token 分析项目文档权威性，按需读取，并把 AI 建议与用户审核应用分离。",
+        "purpose": "低 token 分析项目文档权威性、质量与联邦节点；支持项目 Git 工作区和平台托管版本的个人知识库。",
     }))
 }
 
@@ -179,7 +199,7 @@ pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Opt
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
-            "instructions": "先调用 project_docs_analyze。目录预分类不读取正文且 classification_model_tokens=0；仅用 project_docs_read 按需读 ambiguous 或任务相关文档。AI 用 project_docs_save_suggestions 写结构化建议。authorization_mode 默认 git_backed_full：apply_suggestions 先提交整理前文档基线；有实体操作时把返回的 git_baseline_commit 传给 apply_file_operations，完成重命名/移动和整理后提交。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
+            "instructions": "先调用 project_docs_analyze；大型项目按 federation 选择 scope_id。目录预分类不读取正文且 classification_model_tokens=0；用 project_docs_get_issues 取确定性证据，仅用 project_docs_read 按需读需要语义判断的文档。AI 用 project_docs_save_suggestions 写结构化建议。authorization_mode 默认 git_backed_full：apply_suggestions 先提交整理前文档基线；有实体操作时把返回的 git_baseline_commit 传给 apply_file_operations，完成重命名/移动和整理后提交。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。托管知识库可读取历史并恢复版本。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
@@ -199,7 +219,12 @@ pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Opt
 
 async fn bootstrap_handler(Json(request): Json<BootstrapRequest>) -> Response {
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
-    match descriptor_for_project(&request.project_root, host_port) {
+    let descriptor = match (request.project_root.as_deref(), request.vault_id.as_deref()) {
+        (Some(project_root), None) => descriptor_for_project(project_root, host_port),
+        (None, Some(vault_id)) => descriptor_for_vault(vault_id, host_port),
+        _ => Err(anyhow!("必须且只能提供 projectRoot 或 vaultId")),
+    };
+    match descriptor {
         Ok(mcp) => Json(json!({ "ok": true, "mcp": mcp })).into_response(),
         Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
     }

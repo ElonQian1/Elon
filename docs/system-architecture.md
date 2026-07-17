@@ -168,6 +168,8 @@ PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --js
 
 Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP MCP。`project_docs_analyze` 复用路径权威性分类器并保持零模型 token，同时生成项目类型、基础文档覆盖、过期/冲突信号和推荐主题；`project_docs_read` 只为歧义或缺失入口按需读取。保存和应用均使用 revision 防并发覆盖，默认由整理前/整理后两个仅文档 Git 提交保护。云端网页 API 通过 PC 节点文件网关调用同一 Rust 内核，因此网页端和任何支持 MCP 的 AI 供应商不会各自维护一套规则。详细契约按需读取 `docs/project-document-governance-mcp.md`。
 
+持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查链接、孤立文档、owner、复查周期和显式实现引用；服务端把架构、质量、维护和联邦节点合并为目录快照中的 `analysis`，它是 PC 与 MCP 的统一健康真源。大型仓库通过 `.elon/knowledge-federation.json` 分层；个人笔记通过 `vaultId` 映射到平台数据目录中的托管 Git 知识库，每次保存自动提交且可恢复，用户界面不暴露 Git 复杂度。
+
 ## 3. 代码仓库结构（目标结构）
 
 ```

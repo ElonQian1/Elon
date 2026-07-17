@@ -127,6 +127,7 @@ pub async fn get_project_document_catalog(
         "generated_at_ms": snapshot.generated_at_ms,
         "documents": snapshot.documents.into_iter().map(ProjectDocument::from).collect::<Vec<_>>(),
         "warnings": snapshot.warnings,
+        "analysis": snapshot.analysis,
         "can_edit": writable,
         "access": {
             "mode": access_mode,

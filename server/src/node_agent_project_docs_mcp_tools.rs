@@ -8,7 +8,7 @@ use crate::{
     project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
     project_document_governance::DocumentOrganizationSuggestions,
     project_document_governance_service::{
-        analyze_workspace, apply_saved_suggestions, default_page_size, default_read_chars,
+        analyze_workspace_scoped, apply_saved_suggestions, default_page_size, default_read_chars,
         get_suggestions, read_documents, save_suggestions,
     },
     project_document_observability::{get_status, record_tool_failure, record_tool_success},
@@ -22,6 +22,8 @@ struct AnalyzeArguments {
     limit: usize,
     #[serde(default)]
     ambiguous_only: bool,
+    #[serde(default)]
+    scope_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -77,7 +79,7 @@ struct ApplyFileOperationsArguments {
 }
 
 pub(crate) fn tool_definitions() -> Vec<Value> {
-    vec![
+    let mut definitions = vec![
         tool(
             "project_docs_analyze",
             "零模型 token 扫描当前 Git 项目的文档路径、标题、哈希、标题层级、生命周期与权威性，并返回项目类型推断、知识架构完整度、缺失基础文档、紧凑目录、虚拟分区和现有 AI 建议。文档治理任务第一步调用；不会读取正文或修改文件。",
@@ -87,6 +89,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "offset":{"type":"integer","minimum":0,"default":0},
                     "limit":{"type":"integer","minimum":1,"maximum":200,"default":80},
                     "ambiguous_only":{"type":"boolean","default":false}
+                    ,"scope_id":{"type":"string","description":"可选联邦知识节点 id；大型项目只返回该节点目录。"}
                 }
             }),
         ),
@@ -161,7 +164,13 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 }
             }),
         ),
-    ]
+    ];
+    definitions.insert(
+        1,
+        crate::node_agent_project_docs_mcp_knowledge_tools::issue_definition(),
+    );
+    definitions.extend(crate::node_agent_project_docs_mcp_knowledge_tools::history_definitions());
+    definitions
 }
 
 pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
@@ -181,7 +190,13 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
             }
             "project_docs_analyze" => {
                 let input: AnalyzeArguments = decode(arguments, name)?;
-                analyze_workspace(workspace, input.offset, input.limit, input.ambiguous_only)
+                analyze_workspace_scoped(
+                    workspace,
+                    input.offset,
+                    input.limit,
+                    input.ambiguous_only,
+                    input.scope_id.as_deref(),
+                )
             }
             "project_docs_read" => {
                 let input: ReadArguments = decode(arguments, name)?;
@@ -236,7 +251,10 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                     },
                 )
             }
-            _ => Err(anyhow::anyhow!("未知项目文档 MCP 工具：{name}")),
+            _ => crate::node_agent_project_docs_mcp_knowledge_tools::try_call(
+                workspace, name, arguments,
+            )?
+            .ok_or_else(|| anyhow::anyhow!("未知项目文档 MCP 工具：{name}")),
         }
     })();
     let value = match result {
@@ -360,8 +378,13 @@ fn knowledge_metadata_schema() -> Value {
         "type":"object",
         "properties":{
             "doc_type":{"type":"string","maxLength":64},
+            "id":{"type":"string","maxLength":120},
             "audience":{"type":"array","maxItems":12,"items":{"type":"string","maxLength":80}},
             "owner":{"type":"string","maxLength":80},
+            "owners":{"type":"array","maxItems":12,"items":{"type":"string","maxLength":80}},
+            "reviewed_at":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+            "review_interval_days":{"type":"integer","minimum":1,"maximum":3650,"default":180},
+            "implementation_refs":{"type":"array","maxItems":32,"items":{"type":"string","maxLength":500}},
             "version":{"type":"string","maxLength":40},
             "related":{"type":"array","maxItems":24,"items":{"type":"string"}},
             "supersedes":{"type":"array","maxItems":24,"items":{"type":"string"}}
