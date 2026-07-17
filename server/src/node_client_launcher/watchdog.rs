@@ -68,6 +68,17 @@ pub(crate) fn run_loop(install_dir: &Path) -> Result<()> {
         bail!("缺少客户端守护程序：{}", client.display());
     }
 
+    #[cfg(windows)]
+    if !watchdog_elected(install_dir) {
+        log_file::record_event(
+            install_dir,
+            "watchdog_duplicate_skipped",
+            true,
+            "another watchdog process won the single-instance election",
+        );
+        return Ok(());
+    }
+
     let interval = watchdog_interval();
     let mut state = WatchdogState::default();
     log_file::record_event(
@@ -204,6 +215,50 @@ fn watchdog_running(install_dir: &Path) -> bool {
         return false;
     };
     output.status.success() && String::from_utf8_lossy(&output.stdout).contains("running")
+}
+
+#[cfg(windows)]
+fn watchdog_elected(install_dir: &Path) -> bool {
+    let script = watchdog_election_script(&paths::client_exe(install_dir), std::process::id());
+    let mut command = launcher_command::powershell_hidden_command(&script);
+    let Ok(output) = launcher_command::output_hidden(&mut command) else {
+        // Availability wins if WMI/CIM is temporarily unavailable. A later
+        // launcher start can run the election again; exiting here would leave
+        // the node without any watchdog.
+        return true;
+    };
+    !output.status.success() || String::from_utf8_lossy(&output.stdout).contains("elected")
+}
+
+#[cfg(windows)]
+pub(super) fn watchdog_election_script(client: &Path, current_pid: u32) -> String {
+    format!(
+        r#"
+$target = [System.IO.Path]::GetFullPath('{client}')
+$currentPid = {current_pid}
+$targets = Get-CimInstance Win32_Process | Where-Object {{
+  $line = if ($_.CommandLine) {{ [string]$_.CommandLine }} else {{ '' }}
+  $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
+  $exeMatch = $false
+  if ($exe) {{
+    try {{
+      $exeMatch = [System.IO.Path]::GetFullPath($exe).Equals($target, [StringComparison]::OrdinalIgnoreCase)
+    }} catch {{
+      $exeMatch = $false
+    }}
+  }}
+  ($line -match '--watchdog') -and $exeMatch
+}}
+$winner = $targets | Sort-Object -Property ProcessId | Select-Object -First 1
+if ($winner -and ([uint32]$winner.ProcessId -eq [uint32]$currentPid)) {{
+  Write-Output 'elected'
+}} else {{
+  Write-Output 'duplicate'
+}}
+"#,
+        client = launcher_command::ps_single_quote(&client.to_string_lossy()),
+        current_pid = current_pid
+    )
 }
 
 #[cfg(windows)]

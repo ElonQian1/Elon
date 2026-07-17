@@ -127,7 +127,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -Task
 - `Resume`：从父任务恢复原始 prompt，角色为 `resume_original`。
 - `SelfTest`：不连接节点，仅校验脚本的契约构造。
 
-等待动作最多 55 秒，桌面端应分段等待并保持过程更新。设置 `ELON_NODE_ADMIN_URL` 可覆盖默认探测地址，但地址仍必须受节点 Origin 白名单信任。
+等待动作最多 55 秒，桌面端应分段等待并保持过程更新。`Wait` 会在窗口内重试节点短暂重启，并只读取小事件窗口；完整日志由 `Inspect` 获取，监督证据摘要仍由节点扫描完整 journal。设置 `ELON_NODE_ADMIN_URL` 可覆盖默认探测地址，但地址仍必须受节点 Origin 白名单信任。Windows 客户端 watchdog 使用同安装路径下的单实例选举，更新或修复并发启动时只保留一个守护者，避免互相重启运行时。
 
 ## 阻塞恢复顺序
 

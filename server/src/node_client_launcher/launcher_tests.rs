@@ -112,6 +112,19 @@ fn watchdog_query_matches_same_client_and_skips_current_pid() {
 
 #[cfg(windows)]
 #[test]
+fn watchdog_election_keeps_only_lowest_pid_for_same_client() {
+    let script =
+        super::watchdog::watchdog_election_script(Path::new(r"C:\ElonNode\一龙开发平台.exe"), 1234);
+
+    assert!(script.contains("--watchdog"));
+    assert!(script.contains("Sort-Object -Property ProcessId"));
+    assert!(script.contains("winner.ProcessId"));
+    assert!(script.contains("elected"));
+    assert!(!script.contains("--agent-runtime"));
+}
+
+#[cfg(windows)]
+#[test]
 fn watchdog_stop_terminates_only_other_watchdog_processes() {
     let script =
         super::watchdog::watchdog_stop_script(Path::new(r"C:\ElonNode\一龙开发平台.exe"), 1234);

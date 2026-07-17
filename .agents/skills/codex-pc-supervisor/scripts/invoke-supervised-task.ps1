@@ -41,6 +41,7 @@ function Convert-ToJsonResult {
 }
 
 function Get-NodeConnection {
+    param([int]$RetrySeconds = 0)
     $candidateUrls = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_ADMIN_URL)) {
         $candidateUrls.Add($env:ELON_NODE_ADMIN_URL.TrimEnd('/'))
@@ -49,28 +50,32 @@ function Get-NodeConnection {
         $candidateUrls.Add("http://127.0.0.1:$port")
     }
 
-    foreach ($candidateUrl in ($candidateUrls | Select-Object -Unique)) {
-        try {
-            $statusHeaders = @{ Origin = $candidateUrl }
-            $status = Invoke-RestMethod -Method Get -Uri "$candidateUrl/api/status" `
-                -Headers $statusHeaders -TimeoutSec 2 -UseBasicParsing
-            $token = [string](Get-ObjectField $status 'local_admin_token')
-            $header = [string](Get-ObjectField $status 'local_admin_token_header')
-            $version = [string](Get-ObjectField $status 'version')
-            if (-not [string]::IsNullOrWhiteSpace($token) -and
-                $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
-                -not [string]::IsNullOrWhiteSpace($version)) {
-                return [pscustomobject]@{
-                    BaseUrl = $candidateUrl
-                    Header = $header
-                    Token = $token
-                    Version = $version
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    do {
+        foreach ($candidateUrl in ($candidateUrls | Select-Object -Unique)) {
+            try {
+                $statusHeaders = @{ Origin = $candidateUrl }
+                $status = Invoke-RestMethod -Method Get -Uri "$candidateUrl/api/status" `
+                    -Headers $statusHeaders -TimeoutSec 2 -UseBasicParsing
+                $token = [string](Get-ObjectField $status 'local_admin_token')
+                $header = [string](Get-ObjectField $status 'local_admin_token_header')
+                $version = [string](Get-ObjectField $status 'version')
+                if (-not [string]::IsNullOrWhiteSpace($token) -and
+                    $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
+                    -not [string]::IsNullOrWhiteSpace($version)) {
+                    return [pscustomobject]@{
+                        BaseUrl = $candidateUrl
+                        Header = $header
+                        Token = $token
+                        Version = $version
+                    }
                 }
+            } catch {
+                continue
             }
-        } catch {
-            continue
         }
-    }
+        if ($timer.Elapsed.TotalSeconds -lt $RetrySeconds) { Start-Sleep -Seconds 2 }
+    } while ($timer.Elapsed.TotalSeconds -lt $RetrySeconds)
     throw 'No authorized Yilong PC node found on 127.0.0.1 ports 7799-7819.'
 }
 
@@ -139,11 +144,17 @@ function New-SupervisedTaskBody {
     }
 }
 
-function Get-TaskDetail {
-    param([object]$Connection, [string]$RequestedTaskId)
+function Get-TaskDetailPath {
+    param([string]$RequestedTaskId, [int]$Limit = 1000)
     if ([string]::IsNullOrWhiteSpace($RequestedTaskId)) { throw "$Action requires TaskId." }
     $encodedTaskId = [uri]::EscapeDataString($RequestedTaskId.Trim())
-    Invoke-NodeApi $Connection 'Get' "/api/local-tasks/$encodedTaskId?limit=1000"
+    return "/api/local-tasks/${encodedTaskId}?limit=$Limit"
+}
+
+function Get-TaskDetail {
+    param([object]$Connection, [string]$RequestedTaskId, [int]$Limit = 1000)
+    $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit
+    Invoke-NodeApi $Connection 'Get' $detailPath
 }
 
 function Get-RecordFromDetail {
@@ -181,21 +192,27 @@ function Submit-Body {
 if ($Action -eq 'SelfTest') {
     $testBody = New-SupervisedTaskBody 'self-test' 'C:\self-test-workspace' 'Verify supervision' `
         'requirement' '' '' @('Task completes', 'Evidence is inspectable') 'after_task_or_unblock'
+    $testDetailPath = Get-TaskDetailPath 'local-test?id'
     if ($testBody.supervision.acceptance_criteria.Count -ne 2 -or
         $testBody.supervision.task_role -ne 'requirement' -or
-        $script:SupervisionProtocol -ne 'elon.desktop_pc_supervision.v1') {
+        $script:SupervisionProtocol -ne 'elon.desktop_pc_supervision.v1' -or
+        $testDetailPath -ne '/api/local-tasks/local-test%3Fid?limit=1000') {
         throw 'Supervised request construction self-test failed.'
     }
     Convert-ToJsonResult ([ordered]@{
         ok = $true
         action = 'SelfTest'
         protocol = $script:SupervisionProtocol
-        checks = @('request_contract', 'acceptance_criteria', 'executor_role')
+        checks = @('request_contract', 'acceptance_criteria', 'executor_role', 'task_detail_path')
     })
     exit 0
 }
 
-$nodeConnection = Get-NodeConnection
+$nodeConnection = if ($Action -eq 'Wait') {
+    Get-NodeConnection -RetrySeconds $WaitSeconds
+} else {
+    Get-NodeConnection
+}
 
 switch ($Action) {
     'Probe' {
@@ -222,10 +239,16 @@ switch ($Action) {
         $detail = $null
         $status = ''
         do {
-            $detail = Get-TaskDetail $nodeConnection $TaskId
-            $record = Get-RecordFromDetail $detail
-            $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
-            if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
+            try {
+                # Poll only a small event window. The node computes the
+                # supervision evidence summary from the complete journal.
+                $detail = Get-TaskDetail $nodeConnection $TaskId 25
+                $record = Get-RecordFromDetail $detail
+                $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
+                if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
+            } catch {
+                if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) { throw }
+            }
             Start-Sleep -Seconds 2
         } while ($timer.Elapsed.TotalSeconds -lt $WaitSeconds)
         Convert-ToJsonResult ([ordered]@{

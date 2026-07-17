@@ -15,7 +15,7 @@ If the current request contains `<elon-pc-executor>`, stop using this skill. Wor
 
 1. Inspect the project read-only and turn the request into concrete acceptance criteria.
 2. Submit the requirement with `scripts/invoke-supervised-task.ps1 -Action Submit`. Always pass the absolute workspace path, original user request, criteria, and a stable project ID.
-3. Save the returned `task_id`. Use `-Action Wait -TaskId ...` in windows no longer than 55 seconds. Continue until the task is terminal or needs a user tool approval.
+3. Save the returned `task_id`. Use `-Action Wait -TaskId ...` in windows no longer than 55 seconds. `Wait` retries transient node restarts and polls a small journal window; use `Inspect` when full event history is needed. Continue until the task is terminal or needs a user tool approval.
 4. Independently inspect the journal, diff, tests, commit, published artifact, and project finish report. A successful executor message alone is not acceptance evidence.
 5. Record a verdict with `-Action Review`:
    - `accepted`: all acceptance criteria and project finish rules passed.
