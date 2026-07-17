@@ -28,6 +28,16 @@ export interface DocumentKnowledgeMetadata {
   version: string
   related: string[]
   supersedes: string[]
+  order: number
+  pinned: boolean
+}
+
+export interface DocumentOrganizationAuditEntry {
+  id: string
+  action: string
+  target: string
+  summary: string
+  at: string
 }
 
 export interface DocumentSectionManifest {
@@ -38,6 +48,7 @@ export interface DocumentSectionManifest {
   assignments: Record<string, string>
   governance_overrides: Record<string, string>
   document_metadata: Record<string, DocumentKnowledgeMetadata>
+  audit_log: DocumentOrganizationAuditEntry[]
 }
 
 export interface DocumentSection {
@@ -99,6 +110,7 @@ export const EMPTY_SECTION_MANIFEST: DocumentSectionManifest = {
   assignments: {},
   governance_overrides: {},
   document_metadata: {},
+  audit_log: [],
 }
 
 export const SYSTEM_DOCUMENT_SECTIONS: DocumentSection[] = [
@@ -211,6 +223,7 @@ export function parseSectionManifest(content: string): DocumentSectionManifest {
       assignments,
       governance_overrides: governanceOverrides,
       document_metadata: documentMetadata,
+      audit_log: sanitizeAuditLog(value.audit_log),
     }
   } catch {
     return cloneEmptyManifest()
@@ -383,7 +396,27 @@ function sanitizeKnowledgeMetadata(value: unknown): DocumentKnowledgeMetadata | 
     version: String(candidate.version ?? '').trim().slice(0, 40),
     related: stringArray(candidate.related, 24).map(normalizedPath).filter(Boolean),
     supersedes: stringArray(candidate.supersedes, 24).map(normalizedPath).filter(Boolean),
+    order: Math.min(999999, Math.max(0, Math.floor(Number(candidate.order) || 0))),
+    pinned: candidate.pinned === true,
   }
+}
+
+function sanitizeAuditLog(value: unknown): DocumentOrganizationAuditEntry[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(-100).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const candidate = entry as Partial<DocumentOrganizationAuditEntry>
+    const id = String(candidate.id ?? '').trim().slice(0, 80)
+    const action = String(candidate.action ?? '').trim().slice(0, 64)
+    if (!id || !action) return []
+    return [{
+      id,
+      action,
+      target: String(candidate.target ?? '').trim().slice(0, 500),
+      summary: String(candidate.summary ?? '').trim().slice(0, 500),
+      at: String(candidate.at ?? '').trim().slice(0, 40),
+    }]
+  })
 }
 
 function sanitizeKnowledgeMetadataMap(value: unknown) {
@@ -432,5 +465,6 @@ function cloneEmptyManifest(): DocumentSectionManifest {
     assignments: {},
     governance_overrides: {},
     document_metadata: {},
+    audit_log: [],
   }
 }

@@ -4,6 +4,12 @@ import { api, type ApiError } from '../../api/client'
 import { nodeApi } from '../node/localNodeApi'
 import type { DocumentFile } from './projectDocumentModel'
 import {
+  assignDocuments,
+  createSectionInManifest,
+  recordManifestChange,
+  removeSectionTree,
+} from './projectDocumentCommands'
+import {
   newDocumentOrganizationOperationId,
   organizationTraceStorageKey,
   parseDocumentOrganizationTrace,
@@ -13,8 +19,6 @@ import {
   type DocumentOrganizationTrackingRuntime,
 } from './projectDocumentOrganizationStatus'
 import {
-  createCustomSection,
-  customSectionKey,
   EMPTY_SECTION_MANIFEST,
   ORGANIZATION_SUGGESTIONS_PATH,
   parseOrganizationSuggestions,
@@ -75,6 +79,9 @@ export function useProjectDocumentOrganization(
   const [error, setError] = useState('')
   const [trace, setTrace] = useState<DocumentOrganizationTrace | null>(null)
   const [trackingError, setTrackingError] = useState('')
+  const [undoStack, setUndoStack] = useState<Array<{ manifest: DocumentSectionManifest; label: string }>>([])
+
+  useEffect(() => setUndoStack([]), [projectId])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -92,6 +99,7 @@ export function useProjectDocumentOrganization(
         assignments: {},
         governance_overrides: {},
         document_metadata: {},
+        audit_log: [],
       },
       revision: manifest?.revision,
     })
@@ -190,66 +198,67 @@ export function useProjectDocumentOrganization(
     }
   }, [trackingAvailable, trackingRequest])
 
-  const saveManifest = useCallback(async (value: DocumentSectionManifest) => {
+  const saveManifest = useCallback(async (value: DocumentSectionManifest, undoLabel = '更新项目知识架构') => {
     const saved = await writeJsonFile(projectId, SECTION_CONFIG_PATH, value, manifestFile.revision)
+    setUndoStack((current) => [...current, { manifest: manifestFile.value, label: undoLabel }].slice(-20))
     setManifestFile({ value, revision: saved.revision })
     return value
-  }, [manifestFile.revision, projectId])
+  }, [manifestFile.revision, manifestFile.value, projectId])
 
-  const addSection = useCallback(async (label: string, parentId = '') => {
-    const section = createCustomSection(label, manifestFile.value.sections, parentId)
-    await saveManifest({
-      ...manifestFile.value,
-      sections: [...manifestFile.value.sections, section],
-    })
-    return customSectionKey(section.id)
+  const applyManifest = useCallback(async (value: DocumentSectionManifest, undoLabel?: string) => {
+    const label = undoLabel ?? value.audit_log[value.audit_log.length - 1]?.summary ?? '更新项目知识架构'
+    return saveManifest(value, label)
+  }, [saveManifest])
+
+  const undoLastChange = useCallback(async () => {
+    const previous = undoStack[undoStack.length - 1]
+    if (!previous) return null
+    const restored = recordManifestChange(
+      { ...previous.manifest, audit_log: manifestFile.value.audit_log },
+      'history.undo',
+      SECTION_CONFIG_PATH,
+      `撤销：${previous.label}`,
+    )
+    const saved = await writeJsonFile(projectId, SECTION_CONFIG_PATH, restored, manifestFile.revision)
+    setManifestFile({ value: restored, revision: saved.revision })
+    setUndoStack((current) => current.slice(0, -1))
+    return restored
+  }, [manifestFile.revision, projectId, undoStack])
+
+  const addSection = useCallback(async (
+    label: string,
+    parentId = '',
+    appearance?: { detail?: string; color?: string; icon?: string },
+  ) => {
+    const created = createSectionInManifest(manifestFile.value, label, parentId, appearance)
+    await saveManifest(created.manifest, created.manifest.audit_log[created.manifest.audit_log.length - 1]?.summary)
+    return created.key
   }, [manifestFile.value, saveManifest])
 
   const removeSection = useCallback(async (sectionKey: string) => {
-    const id = sectionKey.replace(/^custom:/, '')
-    const removedIds = new Set([id])
-    let changed = true
-    while (changed) {
-      changed = false
-      manifestFile.value.sections.forEach((section) => {
-        if (removedIds.has(section.parent_id) && !removedIds.has(section.id)) {
-          removedIds.add(section.id)
-          changed = true
-        }
-      })
-    }
-    const assignments = Object.fromEntries(
-      Object.entries(manifestFile.value.assignments).filter(([, assigned]) => !removedIds.has(assigned.replace(/^custom:/, ''))),
-    )
-    await saveManifest({
-      ...manifestFile.value,
-      sections: manifestFile.value.sections.filter((section) => !removedIds.has(section.id)),
-      assignments,
-    })
-  }, [manifestFile.value, saveManifest])
+    await applyManifest(removeSectionTree(manifestFile.value, sectionKey))
+  }, [applyManifest, manifestFile.value])
 
   const assignDocument = useCallback(async (
     path: string,
     sectionKey: string,
     facet: 'knowledge' | 'governance',
   ) => {
-    const normalized = normalizePath(path)
-    const field = facet === 'knowledge' ? 'assignments' : 'governance_overrides'
-    const assignments = { ...manifestFile.value[field] }
-    if (sectionKey) assignments[normalized] = sectionKey
-    else delete assignments[normalized]
-    const nextManifest = {
-      ...manifestFile.value,
-      [field]: assignments,
-    }
-    await saveManifest(nextManifest)
+    const nextManifest = assignDocuments(manifestFile.value, [path], sectionKey, facet)
+    await applyManifest(nextManifest)
     return nextManifest
-  }, [manifestFile.value, saveManifest])
+  }, [applyManifest, manifestFile.value])
 
-  const setProfile = useCallback(async (profile: string) => saveManifest({
+  const assignManyDocuments = useCallback(async (
+    paths: string[],
+    sectionKey: string,
+    facet: 'knowledge' | 'governance',
+  ) => applyManifest(assignDocuments(manifestFile.value, paths, sectionKey, facet)), [applyManifest, manifestFile.value])
+
+  const setProfile = useCallback(async (profile: string) => saveManifest(recordManifestChange({
     ...manifestFile.value,
     profile,
-  }), [manifestFile.value, saveManifest])
+  }, 'profile.set', profile, `切换项目知识模板为 ${profile}`), '切换项目知识模板'), [manifestFile.value, saveManifest])
 
   const applySuggestions = useCallback(async (
     catalogRevision: string,
@@ -353,9 +362,14 @@ export function useProjectDocumentOrganization(
     startRun,
     markDispatched,
     markFailed,
+    applyManifest,
+    undoLastChange,
+    canUndo: undoStack.length > 0,
+    lastUndoLabel: undoStack[undoStack.length - 1]?.label ?? '',
     addSection,
     removeSection,
     assignDocument,
+    assignManyDocuments,
     setProfile,
     applySuggestions,
     applyFileOperations,
@@ -405,10 +419,6 @@ async function writeJsonFile(
 
 function documentFileUrl(projectId: string, path: string) {
   return `/api/projects/${encodeURIComponent(projectId)}/docs/file?path=${encodeURIComponent(path)}`
-}
-
-function normalizePath(path: string) {
-  return path.trim().replace(/\\/g, '/')
 }
 
 function errorMessage(error: unknown, fallback: string) {

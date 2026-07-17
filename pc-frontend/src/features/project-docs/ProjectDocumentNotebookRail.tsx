@@ -1,7 +1,11 @@
-import { ArrowLeft, BookOpen, FolderPlus, LibraryBig, ShieldCheck, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowUpDown, BookOpen, Ellipsis, FolderPlus, LibraryBig, ShieldCheck, Undo2 } from 'lucide-react'
+import { useState } from 'react'
 
 import { formatNumber, type DocumentBudget } from './projectDocumentModel'
 import type { DocumentNavigationMode } from './projectDocumentArchitecture'
+import type { ProjectDocumentMenuPoint } from './useProjectDocumentMenuTrigger'
+import { menuPointForButton, useProjectDocumentMenuTrigger } from './useProjectDocumentMenuTrigger'
+import type { ProjectDocumentMenuTarget } from './ProjectDocumentCommandMenu'
 import type { DocumentSection } from './projectDocumentSections'
 import styles from './ProjectDocumentsWorkspace.module.css'
 
@@ -17,7 +21,10 @@ interface Props {
   onNavigationModeChange: (mode: DocumentNavigationMode) => void
   onSelect: (section: string) => void
   onCreate: () => void
-  onRemove: (section: DocumentSection) => void
+  onOpenMenu: (target: ProjectDocumentMenuTarget, point: ProjectDocumentMenuPoint) => void
+  onMoveBefore: (sectionKey: string, beforeSectionKey: string) => void
+  onUndo: () => void
+  canUndo: boolean
 }
 
 export default function ProjectDocumentNotebookRail({
@@ -32,10 +39,16 @@ export default function ProjectDocumentNotebookRail({
   onNavigationModeChange,
   onSelect,
   onCreate,
-  onRemove,
+  onOpenMenu,
+  onMoveBefore,
+  onUndo,
+  canUndo,
 }: Props) {
+  const [dragging, setDragging] = useState('')
+  const trigger = useProjectDocumentMenuTrigger(onOpenMenu)
+  const railTrigger = trigger({ kind: 'rail' })
   return (
-    <aside className={styles.notebookRail}>
+    <aside className={styles.notebookRail} onContextMenu={railTrigger.onContextMenu}>
       <button className={styles.backButton} type="button" onClick={onBack}>
         <ArrowLeft size={17} aria-hidden="true" />
         <span>返回项目频道</span>
@@ -56,6 +69,17 @@ export default function ProjectDocumentNotebookRail({
         >
           <FolderPlus size={16} aria-hidden="true" />
         </button>
+        <button
+          className={styles.addSectionButton}
+          type="button"
+          title="分区排序与更多操作"
+          onClick={(event) => onOpenMenu({ kind: 'rail' }, menuPointForButton(event.currentTarget))}
+        >
+          <ArrowUpDown size={15} aria-hidden="true" />
+        </button>
+        <button className={styles.addSectionButton} type="button" title="撤销上一次架构操作" disabled={!canUndo} onClick={onUndo}>
+          <Undo2 size={15} aria-hidden="true" />
+        </button>
       </div>
 
       <div className={styles.navigationMode} role="tablist" aria-label="文档浏览方式">
@@ -68,8 +92,29 @@ export default function ProjectDocumentNotebookRail({
       </div>
 
       <div className={styles.sectionList}>
-        {sections.map((section) => (
-          <div className={styles.sectionRow} key={section.key} style={{ paddingLeft: `${Math.min(section.depth ?? 0, 3) * 13}px` }}>
+        {sections.map((section) => {
+          const target: ProjectDocumentMenuTarget = { kind: 'section', section }
+          const sectionTrigger = trigger(target)
+          const dragged = sections.find((item) => item.key === dragging)
+          const canDrop = !!dragged?.custom && !!section.custom && dragged.parentId === section.parentId && dragged.key !== section.key
+          return (
+          <div
+            className={styles.sectionRow}
+            key={section.key}
+            style={{ paddingLeft: `${Math.min(section.depth ?? 0, 3) * 13}px` }}
+            draggable={!!section.custom && navigationMode === 'knowledge'}
+            data-dragging={dragging === section.key || undefined}
+            data-drop-target={canDrop || undefined}
+            onDragStart={() => setDragging(section.key)}
+            onDragEnd={() => setDragging('')}
+            onDragOver={(event) => { if (canDrop) event.preventDefault() }}
+            onDrop={(event) => {
+              event.preventDefault()
+              if (canDrop) onMoveBefore(dragging, section.key)
+              setDragging('')
+            }}
+            {...sectionTrigger}
+          >
             <button
               className={[styles.sectionButton, activeSection === section.key ? styles.sectionActive : ''].join(' ')}
               type="button"
@@ -82,18 +127,16 @@ export default function ProjectDocumentNotebookRail({
               </span>
               <em>{counts[section.key] ?? 0}</em>
             </button>
-            {section.custom && canEdit && navigationMode === 'knowledge' && (
-              <button
-                className={styles.removeSectionButton}
-                type="button"
-                title={`删除分区 ${section.label}`}
-                onClick={() => onRemove(section)}
-              >
-                <Trash2 size={12} aria-hidden="true" />
-              </button>
-            )}
+            <button
+              className={styles.sectionMoreButton}
+              type="button"
+              title={`更多操作：${section.label}`}
+              onClick={(event) => { event.stopPropagation(); onOpenMenu(target, menuPointForButton(event.currentTarget)) }}
+            >
+              <Ellipsis size={14} aria-hidden="true" />
+            </button>
           </div>
-        ))}
+        )})}
       </div>
 
       {budget && (

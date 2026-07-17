@@ -14,6 +14,8 @@ new Function('module', 'exports', 'require', output)(loaded, loaded.exports, req
 const {
   buildDocumentSections,
   buildOrganizationPrompt,
+  createCustomSection,
+  customSectionKey,
   parseOrganizationSuggestions,
   parseSectionManifest,
   sectionForDocument,
@@ -46,11 +48,16 @@ const manifest = parseSectionManifest(JSON.stringify({
   sections: [{ id: 'research', label: '研究', detail: '研究笔记', color: '#123456' }],
   assignments: { 'docs/research.md': 'custom:research', 'docs/discussion.md': 'drafts' },
   governance_overrides: { 'docs/unknown.md': 'on-demand' },
+  document_metadata: { 'docs/research.md': { order: 7, pinned: true } },
+  audit_log: [{ id: 'one', action: 'test', target: 'docs/research.md', summary: '测试审计', at: '2026-07-17T00:00:00Z' }],
 }))
 assert.equal(manifest.assignments['docs/research.md'], 'custom:research')
 assert.equal(manifest.assignments['docs/discussion.md'], undefined)
 assert.equal(manifest.governance_overrides['docs/discussion.md'], 'drafts', '旧清单的治理归类应自动迁移')
 assert.equal(manifest.governance_overrides['docs/unknown.md'], 'on-demand')
+assert.equal(manifest.document_metadata['docs/research.md'].order, 7)
+assert.equal(manifest.document_metadata['docs/research.md'].pinned, true)
+assert.equal(manifest.audit_log[0].action, 'test')
 const documents = [
   document('AGENTS.md', 'router'),
   document('.github/agents/reviewer.agent.md', 'agent_definition'),
@@ -146,8 +153,12 @@ const workspaceSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsWorkspace.tsx',
 ), 'utf8')
 assert(!workspaceSource.includes('markSuggestionsRequested'), '启动 AI 前不得在主工作区预写建议占位文件')
-assert(workspaceSource.includes('onStartAiOrganize(buildOrganizationPrompt'))
-assert(workspaceSource.includes('ProjectDocumentAccessNotice'))
+assert(workspaceSource.includes('const basePrompt = buildOrganizationPrompt'))
+assert(workspaceSource.includes('await onStartAiOrganize(scopeInstruction'))
+const editorPaneSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentEditorPane.tsx',
+), 'utf8')
+assert(editorPaneSource.includes('ProjectDocumentAccessNotice'))
 assert(workspaceSource.includes('applyFileOperations'))
 assert(workspaceSource.includes('organization.trace?.catalog_revision'))
 
@@ -192,5 +203,108 @@ const channelSource = fs.readFileSync(path.join(
 ), 'utf8')
 assert(channelSource.includes('/organization/start') === false, '状态 API 应封装在 organization hook 中')
 assert(!channelSource.includes('await projectStore.selectChannel(aiChannel.id)'), '发起整理后应停留在文档工作台观察进度')
+
+const commandSourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentCommands.ts')
+const commandOutput = ts.transpileModule(fs.readFileSync(commandSourcePath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText
+const commandLoaded = { exports: {} }
+new Function('module', 'exports', 'require', commandOutput)(
+  commandLoaded,
+  commandLoaded.exports,
+  (request) => request === './projectDocumentSections' ? loaded.exports : require(request),
+)
+const commands = commandLoaded.exports
+
+let commandManifest = parseSectionManifest(JSON.stringify({
+  version: 1,
+  sections: [
+    createCustomSection('产品', [], ''),
+    createCustomSection('接口', [{ ...createCustomSection('产品', [], ''), id: '产品' }], ''),
+  ],
+  assignments: { 'docs/research.md': 'custom:产品' },
+}))
+const productKey = customSectionKey(commandManifest.sections[0].id)
+const apiKey = customSectionKey(commandManifest.sections[1].id)
+commandManifest = commands.updateSectionDefinition(commandManifest, apiKey, { parent_id: commandManifest.sections[0].id })
+assert.equal(commandManifest.sections[1].parent_id, commandManifest.sections[0].id)
+assert.throws(() => commands.updateSectionDefinition(commandManifest, productKey, { parent_id: commandManifest.sections[1].id }), /子分区/)
+
+const levelOne = createCustomSection('一级', [], '')
+const levelTwo = createCustomSection('二级', [levelOne], levelOne.id)
+const levelThree = createCustomSection('三级', [levelOne, levelTwo], levelTwo.id)
+const levelFour = createCustomSection('四级', [levelOne, levelTwo, levelThree], levelThree.id)
+const detached = createCustomSection('待移动', [levelOne, levelTwo, levelThree, levelFour], '')
+const depthManifest = parseSectionManifest(JSON.stringify({
+  version: 1,
+  sections: [levelOne, levelTwo, levelThree, levelFour, detached],
+}))
+assert.doesNotThrow(() => commands.updateSectionDefinition(
+  depthManifest,
+  customSectionKey(levelFour.id),
+  { parent_id: levelThree.id },
+))
+assert.throws(() => commands.updateSectionDefinition(
+  depthManifest,
+  customSectionKey(detached.id),
+  { parent_id: levelFour.id },
+), /最多支持四层/)
+assert.throws(() => commands.createSectionInManifest(depthManifest, '第五级', levelFour.id), /最多支持四层/)
+
+commandManifest = commands.assignDocuments(commandManifest, ['docs/unknown.md'], apiKey, 'knowledge')
+commandManifest = commands.assignDocuments(commandManifest, ['docs/unknown.md'], 'current', 'governance')
+assert.equal(commandManifest.assignments['docs/unknown.md'], apiKey)
+assert.equal(commandManifest.governance_overrides['docs/unknown.md'], 'current')
+commandManifest = commands.setRecommendedDocuments(commandManifest, ['docs/unknown.md'], true)
+commandManifest = commands.pinDocuments(commandManifest, ['docs/unknown.md'], true)
+assert(commandManifest.home.start_here.includes('docs/unknown.md'))
+assert.equal(commandManifest.document_metadata['docs/unknown.md'].pinned, true)
+assert(commandManifest.audit_log.length >= 5)
+
+const ordered = commands.sortDocuments(documents, commandManifest, 'manual')
+assert.equal(ordered[0].path, 'docs/unknown.md', '固定文档必须显示在顶部')
+let manualDocumentManifest = parseSectionManifest(JSON.stringify({ version: 1 }))
+manualDocumentManifest = commands.reorderDocument(
+  manualDocumentManifest,
+  ['AGENTS.md', 'README.md'],
+  'README.md',
+  'top',
+)
+assert.deepEqual(
+  commands.sortDocuments(documents.filter((entry) => ['AGENTS.md', 'README.md'].includes(entry.path)), manualDocumentManifest, 'manual')
+    .map((entry) => entry.path),
+  ['README.md', 'AGENTS.md'],
+)
+const authorityDocuments = [
+  { ...documents[4], metadata: { ...documents[4].metadata, authority: 'historical' } },
+  { ...documents[2], metadata: { ...documents[2].metadata, authority: 'informative' } },
+  { ...documents[0], metadata: { ...documents[0].metadata, authority: 'repository_routing' } },
+]
+assert.deepEqual(commands.sortDocuments(authorityDocuments, parseSectionManifest('{}'), 'authority')
+  .map((entry) => entry.metadata.authority), ['repository_routing', 'informative', 'historical'])
+const hierarchy = commands.sortHierarchicalSections(buildDocumentSections(commandManifest).filter((section) => section.custom), 'manual', {})
+assert.equal(hierarchy.find((section) => section.key === apiKey).depth, 1)
+commandManifest = commands.mergeSections(commandManifest, apiKey, productKey)
+assert.equal(commandManifest.assignments['docs/unknown.md'], productKey)
+assert(!commandManifest.sections.some((section) => customSectionKey(section.id) === apiKey))
+
+const notebookSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentNotebookRail.tsx',
+), 'utf8')
+assert(notebookSource.includes('onContextMenu'))
+assert(notebookSource.includes('menuPointForButton'))
+assert(notebookSource.includes('draggable='))
+const pageListSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentPageList.tsx',
+), 'utf8')
+assert(pageListSource.includes('onMoveBefore'))
+assert(pageListSource.includes('data-drop-target'))
+const commandMenuSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentCommandMenu.tsx',
+), 'utf8')
+assert(commandMenuSource.includes('Shift+F10'))
+assert(commandMenuSource.includes('让 AI 评估提权'))
+assert(commandMenuSource.includes('不突破真实路径的权威上限'))
+assert(commandMenuSource.includes("'ArrowDown', 'ArrowUp', 'Home', 'End'"))
 
 console.log('project document section model tests passed')

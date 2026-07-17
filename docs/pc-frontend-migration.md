@@ -2,7 +2,7 @@
 
 > 本文记录 `/pc` PC 工作台从原生静态 HTML/CSS/JS 迁移到 `Vite + React + TypeScript` 的路线、边界和模块状态。硬规则见 `.github/instructions/pc-frontend-migration.instructions.md`。
 >
-> 最后状态校准：2026-07-14
+> 最后状态校准：2026-07-17
 
 ## 当前判断
 
@@ -43,7 +43,7 @@ server/src/
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
 | Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
-| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 知识架构） | 🔴 高 | `src/features/project-docs/` | ✅ 已实现知识首页、推荐阅读、软件平台/API/产品/研究/运维/个人知识模板、最多四层主题树与独立治理视图；用户可建父/子分区、固定项目模板和分别覆盖主题/治理属性；完整度、过期、歧义、重复标题与缺失类型由程序零模型 token 诊断；AI 建议、目录/正文/应用/Git 阶段可观测；默认整理前/后双提交，可执行安全 Markdown rename/move，不夹带代码、不自动 push；网页与供应商无关 MCP 共用 Rust 内核 |
+| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 知识架构） | 🔴 高 | `src/features/project-docs/` | ✅ 已实现知识首页、推荐阅读、软件平台/API/产品/研究/运维/个人知识模板、最多四层主题树与独立治理视图；右键、`⋯`、`Shift+F10` 与触摸长按共用命令菜单，支持分区外观、层级、同级拖放/排序、合并、入口页、文档固定/推荐、批量主题与治理归类、AI 定向整理和会话内撤销；个人查看排序留在浏览器，项目共同顺序和操作审计写共享清单；完整度、过期、歧义、重复标题与缺失类型由程序零模型 token 诊断；AI 建议、目录/正文/应用/Git 阶段可观测；默认整理前/后双提交，可执行安全 Markdown rename/move，不夹带代码、不自动 push；网页与供应商无关 MCP 共用 Rust 内核 |
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |

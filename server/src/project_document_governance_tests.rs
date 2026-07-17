@@ -76,6 +76,49 @@ fn legacy_assignments_are_split_into_topic_and_governance_facets() {
 }
 
 #[test]
+fn manual_management_metadata_and_audit_are_preserved_safely() {
+    let manifest = parse_manifest(Some(
+        r##"{
+          "version": 1,
+          "document_metadata": {
+            "docs/api.md": {"order": 2000000, "pinned": true}
+          },
+          "audit_log": [{
+            "id":"menu-1","action":"document.assign_governance",
+            "target":"docs/api.md","summary":"标记为当前知识","at":"2026-07-17T00:00:00Z"
+          }]
+        }"##,
+    ))
+    .unwrap();
+    let metadata = &manifest.document_metadata["docs/api.md"];
+    assert!(metadata.pinned);
+    assert_eq!(metadata.order, 999_999);
+    assert_eq!(manifest.audit_log.len(), 1);
+    assert_eq!(manifest.audit_log[0].action, "document.assign_governance");
+}
+
+#[test]
+fn section_tree_accepts_four_levels_and_rejects_a_fifth() {
+    let four_levels = r##"{
+      "version": 1,
+      "sections": [
+        {"id":"l1","label":"一级","parent_id":""},
+        {"id":"l2","label":"二级","parent_id":"l1"},
+        {"id":"l3","label":"三级","parent_id":"l2"},
+        {"id":"l4","label":"四级","parent_id":"l3"}
+      ]
+    }"##;
+    assert!(parse_manifest(Some(four_levels)).is_ok());
+
+    let five_levels = four_levels.replace(
+        "{\"id\":\"l4\",\"label\":\"四级\",\"parent_id\":\"l3\"}",
+        "{\"id\":\"l4\",\"label\":\"四级\",\"parent_id\":\"l3\"},\n        {\"id\":\"l5\",\"label\":\"五级\",\"parent_id\":\"l4\"}",
+    );
+    let error = parse_manifest(Some(&five_levels)).unwrap_err();
+    assert!(error.to_string().contains("最多支持 4 层"));
+}
+
+#[test]
 fn trusted_file_operations_are_default_safe_and_preserve_content() {
     let root = workspace("file-operations");
     let original = fs::read_to_string(root.join("docs/archive/old.md")).unwrap();

@@ -74,6 +74,24 @@ pub(crate) struct DocumentKnowledgeMetadata {
     pub related: Vec<String>,
     #[serde(default)]
     pub supersedes: Vec<String>,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default)]
+    pub pinned: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentOrganizationAuditEntry {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub action: String,
+    #[serde(default)]
+    pub target: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -92,6 +110,8 @@ pub(crate) struct DocumentSectionManifest {
     pub governance_overrides: BTreeMap<String, String>,
     #[serde(default)]
     pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
+    #[serde(default)]
+    pub audit_log: Vec<DocumentOrganizationAuditEntry>,
 }
 
 impl Default for DocumentSectionManifest {
@@ -104,6 +124,7 @@ impl Default for DocumentSectionManifest {
             assignments: BTreeMap::new(),
             governance_overrides: BTreeMap::new(),
             document_metadata: BTreeMap::new(),
+            audit_log: Vec::new(),
         }
     }
 }
@@ -199,6 +220,7 @@ pub(crate) fn normalize_manifest(
         || manifest.assignments.len() > 5_000
         || manifest.governance_overrides.len() > 5_000
         || manifest.document_metadata.len() > 5_000
+        || manifest.audit_log.len() > 100
     {
         bail!("项目文档分区配置超过安全上限");
     }
@@ -246,6 +268,15 @@ pub(crate) fn normalize_manifest(
             ))
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
+    manifest.audit_log = manifest
+        .audit_log
+        .into_iter()
+        .rev()
+        .take(100)
+        .map(sanitize_audit_entry)
+        .filter(|entry| !entry.id.is_empty() && !entry.action.is_empty())
+        .collect::<Vec<_>>();
+    manifest.audit_log.reverse();
     Ok(manifest)
 }
 
@@ -500,19 +531,20 @@ fn validate_section_tree(sections: &[CustomDocumentSection]) -> Result<()> {
         }
         let mut cursor = section.id.as_str();
         let mut visited = HashSet::new();
-        for _ in 0..=4 {
+        let mut depth = 0usize;
+        loop {
             if !visited.insert(cursor) {
                 bail!("知识分区层级存在循环：{}", section.id);
             }
             let parent = parents.get(cursor).copied().unwrap_or_default();
             if parent.is_empty() {
-                cursor = "";
                 break;
             }
+            depth += 1;
+            if depth >= 4 {
+                bail!("知识分区层级最多支持 4 层：{}", section.id);
+            }
             cursor = parent;
-        }
-        if !cursor.is_empty() {
-            bail!("知识分区层级最多支持 4 层：{}", section.id);
         }
     }
     Ok(())
@@ -568,7 +600,19 @@ fn sanitize_knowledge_metadata(
     metadata.related.dedup();
     metadata.supersedes.sort();
     metadata.supersedes.dedup();
+    metadata.order = metadata.order.clamp(0, 999_999);
     Ok(metadata)
+}
+
+fn sanitize_audit_entry(
+    mut entry: DocumentOrganizationAuditEntry,
+) -> DocumentOrganizationAuditEntry {
+    entry.id = truncate_chars(entry.id.trim(), 80);
+    entry.action = truncate_chars(entry.action.trim(), 64);
+    entry.target = truncate_chars(entry.target.trim(), 500);
+    entry.summary = truncate_chars(entry.summary.trim(), 500);
+    entry.at = truncate_chars(entry.at.trim(), 40);
+    entry
 }
 
 fn validate_suggested_paths(

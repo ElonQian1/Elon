@@ -35,9 +35,10 @@ AI 首轮只根据路径和元数据形成分类、冲突和迁移建议，不�
 
 ## 分区和 AI 建议
 
-- `.elon/document-sections.json` 保存所有 AI 供应商共享的项目知识架构：项目类型 `profile`、知识首页 `home`、最多四层主题 `sections`、主题固定项 `assignments`、治理覆盖 `governance_overrides` 和文档关系 `document_metadata`；不改变文件实际路径。
+- `.elon/document-sections.json` 保存所有 AI 供应商共享的项目知识架构：项目类型 `profile`、知识首页 `home`、最多四层主题 `sections`、主题固定项 `assignments`、治理覆盖 `governance_overrides`、文档关系/共享顺序/固定状态 `document_metadata` 和最近 100 条结构操作 `audit_log`；不改变文件实际路径。
 - 主题知识树回答“讲什么”，治理视图回答“能否作为当前事实”。两条轴必须分离；主题位置不能提高路径权威性。PC 工作台分别展示“知识架构”和“治理视图”。
 - 项目模板可选软件平台、API/SDK、产品、研究、运维或个人知识库；模板是起点，不要求所有项目采用同一分区。路径和标题能确定主题时由程序自动归类，关键入口再显式固定。
+- 个人按名称、数量、路径或权威性的查看排序只保存在浏览器；手工分区顺序、文档固定/顺序、入口和归类才写共享清单并记入审计。改变父级必须拒绝循环和第五层，治理覆盖不能突破真实路径权威上限。
 - `.elon/document-organization-suggestions.json` 保存 AI 的结构化整理建议；AI 整理任务只可写这一份建议文件。
 - 发起整理任务前不得在基线工作区预创建建议占位文件；建议 JSON 只能由隔离 AI 任务产出并进入正常 Git 收尾。
 - 默认 `git_backed_full`：先提交整理前原始文档，再自动应用新分区、虚拟归类及结构化建议中的项目内 Markdown 重命名/移动，最后提交整理结果。

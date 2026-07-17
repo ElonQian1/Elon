@@ -1,14 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bot, FilePlus2, FileText, FolderTree, RefreshCw, Save, Search, Sparkles } from 'lucide-react'
+import { ArrowUpDown, FilePlus2, RefreshCw, Search, Sparkles } from 'lucide-react'
 
 import { api } from '../../api/client'
-import MarkdownContent from '../markdown/MarkdownContent'
-import ProjectDocumentAccessNotice from './ProjectDocumentAccessNotice'
 import ProjectDocumentArchitectureHealth from './ProjectDocumentArchitectureHealth'
+import ProjectDocumentCommandDialog, {
+  type ProjectDocumentDialogResult,
+  type ProjectDocumentDialogState,
+} from './ProjectDocumentCommandDialog'
+import ProjectDocumentCommandMenu, {
+  type ProjectDocumentCommandId,
+  type ProjectDocumentMenuTarget,
+} from './ProjectDocumentCommandMenu'
 import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
+import ProjectDocumentEditorPane, {
+  AUTOMATIC_DOCUMENT_SECTION,
+  type ProjectDocumentViewMode,
+} from './ProjectDocumentEditorPane'
 import ProjectDocumentKnowledgeHome from './ProjectDocumentKnowledgeHome'
 import ProjectDocumentNotebookRail from './ProjectDocumentNotebookRail'
+import ProjectDocumentPageList from './ProjectDocumentPageList'
 import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import {
@@ -20,21 +31,33 @@ import {
   type DocumentNavigationMode,
 } from './projectDocumentArchitecture'
 import {
-  formatNumber,
-  lifecycleLabel,
-  roleLabel,
-  type DocumentCatalog,
-  type DocumentFile,
-} from './projectDocumentModel'
+  loadDocumentViewPreferences,
+  mergeSections,
+  pinDocuments,
+  reorderDocument,
+  reorderDocumentBefore,
+  reorderSection,
+  reorderSectionBefore,
+  setKnowledgeEntrypoint,
+  setRecommendedDocuments,
+  saveDocumentViewPreferences,
+  sortDocuments,
+  sortHierarchicalSections,
+  updateSectionDefinition,
+  type ProjectDocumentViewPreferences,
+} from './projectDocumentCommands'
+import { type DocumentCatalog, type DocumentFile } from './projectDocumentModel'
 import {
   buildDocumentSections,
   buildOrganizationPrompt,
+  customSectionKey,
   governanceSectionForDocument,
   sectionForDocument,
   type DocumentSection,
 } from './projectDocumentSections'
 import styles from './ProjectDocumentsWorkspace.module.css'
 import { useProjectDocumentOrganization } from './useProjectDocumentOrganization'
+import { menuPointForButton, type ProjectDocumentMenuPoint } from './useProjectDocumentMenuTrigger'
 
 interface Props {
   projectId: string
@@ -44,9 +67,6 @@ interface Props {
   onStartAiOrganize: (prompt: string) => Promise<{ task_id?: string } | null>
   canStartAi: boolean
 }
-
-type ViewMode = 'edit' | 'preview' | 'split'
-const AUTOMATIC_SECTION = '__automatic__'
 
 export default function ProjectDocumentsWorkspace({
   projectId,
@@ -69,16 +89,22 @@ export default function ProjectDocumentsWorkspace({
   const [documentError, setDocumentError] = useState('')
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [message, setMessage] = useState('')
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [viewMode, setViewMode] = useState<ProjectDocumentViewMode>('split')
   const [organizing, setOrganizing] = useState(false)
   const [applyingSuggestions, setApplyingSuggestions] = useState(false)
   const [applyingFileOperations, setApplyingFileOperations] = useState(false)
+  const [commandBusy, setCommandBusy] = useState(false)
+  const [menuTarget, setMenuTarget] = useState<ProjectDocumentMenuTarget | null>(null)
+  const [menuPoint, setMenuPoint] = useState<ProjectDocumentMenuPoint>({ x: 0, y: 0 })
+  const [dialogState, setDialogState] = useState<ProjectDocumentDialogState | null>(null)
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set())
+  const [viewPreferences, setViewPreferences] = useState<ProjectDocumentViewPreferences>(() => loadDocumentViewPreferences(projectId))
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const automationPolicy = useProjectDocumentAutomationPolicy(projectId)
   const governanceSections = useMemo(() => buildDocumentSections(organization.manifest)
     .filter((section) => !section.custom), [organization.manifest])
   const knowledgeSections = useMemo(() => buildKnowledgeSections(catalog, organization.manifest), [catalog, organization.manifest])
-  const sections = navigationMode === 'knowledge' ? knowledgeSections : governanceSections
+  const baseSections = navigationMode === 'knowledge' ? knowledgeSections : governanceSections
   const architectureHealth = useMemo(
     () => analyzeKnowledgeArchitecture(catalog, organization.manifest),
     [catalog, organization.manifest],
@@ -101,6 +127,8 @@ export default function ProjectDocumentsWorkspace({
   }, [projectId])
 
   useEffect(() => { loadCatalog() }, [loadCatalog])
+  useEffect(() => setViewPreferences(loadDocumentViewPreferences(projectId)), [projectId])
+  useEffect(() => saveDocumentViewPreferences(projectId, viewPreferences), [projectId, viewPreferences])
 
   const selectedEntry = useMemo(
     () => catalog?.documents.find((entry) => entry.path === selectedPath),
@@ -115,7 +143,7 @@ export default function ProjectDocumentsWorkspace({
       ? topicSectionForDocument(selectedEntry, catalog, { ...organization.manifest, assignments })
       : governanceSectionForDocument(selectedEntry, { ...organization.manifest, governance_overrides: assignments })
   }, [catalog, navigationMode, organization.manifest, selectedEntry])
-  const automaticSectionLabel = sections.find((section) => section.key === automaticSectionKey)?.label ?? '等待整理'
+  const automaticSectionLabel = baseSections.find((section) => section.key === automaticSectionKey)?.label ?? '等待整理'
   const assignmentSections = navigationMode === 'knowledge'
     ? knowledgeSections.filter((section) => section.custom)
     : governanceSections.filter((section) => !section.virtual)
@@ -123,8 +151,8 @@ export default function ProjectDocumentsWorkspace({
     ? organization.manifest[navigationMode === 'knowledge' ? 'assignments' : 'governance_overrides'][normalizeDocumentPath(selectedEntry.path)]
     : undefined
   const selectedAssignment = assignmentSections.some((section) => section.key === persistedAssignment)
-    ? persistedAssignment
-    : AUTOMATIC_SECTION
+    ? persistedAssignment!
+    : AUTOMATIC_DOCUMENT_SECTION
   const dirty = !!document && draft !== document.content
 
   const openDocument = useCallback(async (path: string) => {
@@ -171,19 +199,31 @@ export default function ProjectDocumentsWorkspace({
       : 0
     return counts
   }, [catalog, governanceCounts, knowledgeSections, navigationMode, organization.manifest, organization.suggestions])
+  const sections = useMemo(() => navigationMode === 'knowledge'
+    ? sortHierarchicalSections(baseSections, viewPreferences.sectionSort, sectionCounts)
+    : baseSections, [baseSections, navigationMode, sectionCounts, viewPreferences.sectionSort])
 
   const activeSectionDefinition = sections.find((section) => section.key === activeSection) ?? sections[0]
+  const sectionDocuments = useMemo(() => (catalog?.documents ?? [])
+    .filter((entry) => (navigationMode === 'knowledge'
+      ? topicSectionForDocument(entry, catalog, organization.manifest)
+      : governanceSectionForDocument(entry, organization.manifest)) === activeSection),
+  [activeSection, catalog, navigationMode, organization.manifest])
   const visibleDocuments = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
-    return (catalog?.documents ?? [])
-      .filter((entry) => (navigationMode === 'knowledge'
-        ? topicSectionForDocument(entry, catalog, organization.manifest)
-        : governanceSectionForDocument(entry, organization.manifest)) === activeSection)
+    const documents = sectionDocuments
       .filter((entry) => !normalizedQuery
         || entry.title.toLowerCase().includes(normalizedQuery)
         || entry.path.toLowerCase().includes(normalizedQuery))
-      .sort((left, right) => left.path.localeCompare(right.path, 'zh-CN'))
-  }, [activeSection, catalog, navigationMode, organization.manifest, query])
+    return sortDocuments(documents, organization.manifest, viewPreferences.documentSort)
+  }, [organization.manifest, query, sectionDocuments, viewPreferences.documentSort])
+
+  useEffect(() => setSelectedPaths(new Set()), [activeSection, navigationMode])
+
+  const openCommandMenu = useCallback((target: ProjectDocumentMenuTarget, point: ProjectDocumentMenuPoint) => {
+    setMenuTarget(target)
+    setMenuPoint(point)
+  }, [])
 
   function changeNavigationMode(mode: DocumentNavigationMode) {
     setNavigationMode(mode)
@@ -242,33 +282,8 @@ export default function ProjectDocumentsWorkspace({
     }
   }
 
-  async function createSection() {
-    const label = window.prompt('新分区名称')?.trim()
-    if (!label) return
-    let parentId = ''
-    if (organization.manifest.sections.length) {
-      const choices = organization.manifest.sections.map((section) => `${section.label} (${section.id})`).join('\n')
-      const requestedParent = window.prompt(`父分区（可留空创建一级分区）\n${choices}`, '')
-      if (requestedParent === null) return
-      const normalizedParent = requestedParent.trim().toLowerCase()
-      if (normalizedParent) {
-        const parent = organization.manifest.sections.find((section) => (
-          section.id.toLowerCase() === normalizedParent || section.label.toLowerCase() === normalizedParent
-        ))
-        if (!parent) {
-          setMessage('没有找到指定父分区；请填写括号内 id 或完整分区名称。')
-          return
-        }
-        parentId = parent.id
-      }
-    }
-    try {
-      const key = await organization.addSection(label, parentId)
-      setNavigationMode('knowledge')
-      setActiveSection(key)
-    } catch (error) {
-      setMessage(errorMessage(error, '新建分区失败'))
-    }
+  function createSection(parentId = '') {
+    setDialogState({ mode: 'create-section', title: parentId ? '新建子分区' : '新建一级分区', parentId })
   }
 
   async function removeSection(section: DocumentSection) {
@@ -286,14 +301,14 @@ export default function ProjectDocumentsWorkspace({
     try {
       const nextManifest = await organization.assignDocument(
         selectedEntry.path,
-        sectionKey === AUTOMATIC_SECTION ? '' : sectionKey,
+        sectionKey === AUTOMATIC_DOCUMENT_SECTION ? '' : sectionKey,
         navigationMode,
       )
       const nextSection = navigationMode === 'knowledge'
         ? topicSectionForDocument(selectedEntry, catalog, nextManifest)
         : sectionForDocument(selectedEntry, nextManifest)
       setActiveSection(nextSection)
-      setMessage(sectionKey === AUTOMATIC_SECTION
+      setMessage(sectionKey === AUTOMATIC_DOCUMENT_SECTION
         ? '已恢复按路径和元数据自动分类。'
         : navigationMode === 'knowledge'
           ? '主题归类已保存；治理属性和真实文件路径均未改变。'
@@ -303,20 +318,23 @@ export default function ProjectDocumentsWorkspace({
     }
   }
 
-  async function startAiOrganize() {
+  async function startAiOrganize(scopeInstruction = '') {
     if (!catalog || !canStartAi) return
     setOrganizing(true)
     setMessage('')
     let operationId: string | undefined
     try {
       operationId = await organization.startRun()
-      const response = await onStartAiOrganize(buildOrganizationPrompt(
+      const basePrompt = buildOrganizationPrompt(
         projectName,
         catalog,
         organization.manifest,
         operationId,
         automationPolicy.mode,
-      ))
+      )
+      const response = await onStartAiOrganize(scopeInstruction
+        ? `${basePrompt}\n\n本次菜单范围：${scopeInstruction}`
+        : basePrompt)
       await organization.markDispatched(operationId, response?.task_id)
       setMessage(operationId
         ? 'AI 整理任务已发起；可在“AI 整理建议”分区观察 MCP 每一步。'
@@ -372,6 +390,201 @@ export default function ProjectDocumentsWorkspace({
     }
   }
 
+  async function executeCommand(command: ProjectDocumentCommandId, target: ProjectDocumentMenuTarget) {
+    setMessage('')
+    if (command.startsWith('section-sort:')) {
+      setViewPreferences((current) => ({ ...current, sectionSort: command.split(':')[1] as ProjectDocumentViewPreferences['sectionSort'] }))
+      return
+    }
+    if (command.startsWith('document-sort:')) {
+      setViewPreferences((current) => ({ ...current, documentSort: command.split(':')[1] as ProjectDocumentViewPreferences['documentSort'] }))
+      return
+    }
+    if (command === 'undo') {
+      try {
+        const restored = await organization.undoLastChange()
+        if (restored) setMessage('已撤销上一次知识架构操作；撤销记录已写入项目审计。')
+      } catch (error) {
+        setMessage(errorMessage(error, '撤销失败'))
+      }
+      return
+    }
+    if (command === 'new-root') { createSection(); return }
+
+    if (target.kind === 'section') {
+      const section = target.section
+      const stored = organization.manifest.sections.find((item) => customSectionKey(item.id) === section.key)
+      if (command === 'open') { setActiveSection(section.key); return }
+      if (command === 'new-child') { createSection(stored?.id ?? ''); return }
+      if (command === 'new-sibling') { createSection(stored?.parent_id ?? ''); return }
+      if (!stored) {
+        if (command === 'ai-section') await startAiOrganize(`只整理知识主题“${section.label}”（${section.key}）；优先检查其中歧义、重复和缺少入口的文档。`)
+        else setMessage('模板分区由项目类型维护；如需自定义，请新建项目分区。')
+        return
+      }
+      if (command === 'edit-section') setDialogState({ mode: 'edit-section', title: '重命名与外观', section: stored })
+      else if (command === 'move-parent') setDialogState({ mode: 'move-parent', title: `更改“${stored.label}”的父分区`, section: stored })
+      else if (command === 'merge-section') setDialogState({ mode: 'merge-section', title: `合并“${stored.label}”`, section: stored })
+      else if (['move-top', 'move-up', 'move-down', 'move-bottom'].includes(command)) {
+        try {
+          await organization.applyManifest(reorderSection(
+            organization.manifest,
+            section.key,
+            command.replace('move-', '') as 'top' | 'up' | 'down' | 'bottom',
+          ))
+          setViewPreferences((current) => ({ ...current, sectionSort: 'manual' }))
+        } catch (error) { setMessage(errorMessage(error, '调整分区顺序失败')) }
+      } else if (command === 'section-entrypoint') {
+        if (!selectedPath) setMessage('请先打开一篇文档，再把它设置为分区入口。')
+        else try {
+          await organization.applyManifest(setKnowledgeEntrypoint(organization.manifest, selectedPath, section.key))
+          setMessage(`已将 ${selectedPath} 设为“${section.label}”入口。`)
+        } catch (error) { setMessage(errorMessage(error, '设置分区入口失败')) }
+      } else if (command === 'ai-section') {
+        await startAiOrganize(`只整理知识主题“${section.label}”（${section.key}）；优先检查其中歧义、重复和缺少入口的文档。`)
+      } else if (command === 'delete-section') {
+        await removeSection(section)
+      }
+      return
+    }
+
+    if (target.kind !== 'document') return
+    const entry = target.document
+    if (command === 'open') chooseDocument(entry.path)
+    else if (command === 'edit') { chooseDocument(entry.path); setViewMode('edit') }
+    else if (command === 'read') { chooseDocument(entry.path); setViewMode('preview') }
+    else if (command === 'toggle-selection') toggleDocumentSelection(entry.path)
+    else if (command === 'copy-path' || command === 'copy-link') {
+      const text = command === 'copy-path' ? entry.path : `[${entry.title}](${entry.path.replace(/ /g, '%20')})`
+      try { await navigator.clipboard.writeText(text); setMessage('已复制到剪贴板。') }
+      catch { setMessage('浏览器未允许写入剪贴板。') }
+    } else if (command === 'assign-topic') {
+      setDialogState({ mode: 'assign-topic', title: `移动“${entry.title}”到知识主题`, paths: [entry.path], current: organization.manifest.assignments[normalizeDocumentPath(entry.path)] })
+    } else if (command === 'assign-governance') {
+      setDialogState({ mode: 'assign-governance', title: `调整“${entry.title}”的治理属性`, paths: [entry.path], current: organization.manifest.governance_overrides[normalizeDocumentPath(entry.path)] })
+    } else if (command === 'restore-automatic') {
+      await organization.assignManyDocuments([entry.path], '', navigationMode)
+      setMessage('已恢复当前浏览轴的自动分类。')
+    } else if (['move-top', 'move-up', 'move-down', 'move-bottom'].includes(command)) {
+      await organization.applyManifest(reorderDocument(
+        organization.manifest,
+        sortDocuments(sectionDocuments, organization.manifest, 'manual').map((document) => document.path),
+        entry.path,
+        command.replace('move-', '') as 'top' | 'up' | 'down' | 'bottom',
+      ))
+      setViewPreferences((current) => ({ ...current, documentSort: 'manual' }))
+    } else if (command === 'pin' || command === 'unpin') {
+      await organization.applyManifest(pinDocuments(organization.manifest, [entry.path], command === 'pin'))
+    } else if (command === 'recommend' || command === 'unrecommend') {
+      await organization.applyManifest(setRecommendedDocuments(organization.manifest, [entry.path], command === 'recommend'))
+    } else if (command === 'home-entrypoint') {
+      await organization.applyManifest(setKnowledgeEntrypoint(organization.manifest, entry.path))
+      setMessage(`已将 ${entry.path} 设为知识首页入口。`)
+    } else if (command === 'section-entrypoint') {
+      try {
+        await organization.applyManifest(setKnowledgeEntrypoint(organization.manifest, entry.path, activeSection))
+        setMessage(`已将 ${entry.path} 设为当前主题入口。`)
+      } catch (error) { setMessage(errorMessage(error, '设置主题入口失败')) }
+    } else if (command === 'ai-document') {
+      await startAiOrganize(`只整理文档 ${entry.path}；判断主题、治理属性、关系和入口价值，除非确有歧义不要读取其它正文。`)
+    } else if (command === 'ai-governance') {
+      await startAiOrganize(`评估文档 ${entry.path} 是否应提权。必须先检查真实路径的权威上限、同级冲突、替代关系和 default_retrieval；不能用虚拟分区绕过路径上限。`)
+    } else if (command === 'ai-file-name') {
+      await startAiOrganize(`只评估文档 ${entry.path} 的文件名和真实路径；如确有价值，用带 source_revision 的 file_operations 建议安全 rename/move。`)
+    }
+  }
+
+  async function submitCommandDialog(result: ProjectDocumentDialogResult) {
+    const state = dialogState
+    if (!state) return
+    setCommandBusy(true)
+    setMessage('')
+    try {
+      if (result.mode === 'create-section') {
+        const key = await organization.addSection(result.label ?? '', result.parentId ?? '', {
+          detail: result.detail, color: result.color, icon: result.icon,
+        })
+        setNavigationMode('knowledge')
+        setActiveSection(key)
+      } else if (result.mode === 'edit-section' && state.mode === 'edit-section') {
+        await organization.applyManifest(updateSectionDefinition(organization.manifest, customSectionKey(state.section.id), {
+          label: result.label, detail: result.detail, color: result.color, icon: result.icon,
+        }))
+      } else if (result.mode === 'move-parent' && state.mode === 'move-parent') {
+        await organization.applyManifest(updateSectionDefinition(organization.manifest, customSectionKey(state.section.id), {
+          parent_id: result.parentId ?? '',
+        }))
+      } else if (result.mode === 'merge-section' && state.mode === 'merge-section' && result.targetSectionKey) {
+        await organization.applyManifest(mergeSections(organization.manifest, customSectionKey(state.section.id), result.targetSectionKey))
+        if (activeSection === customSectionKey(state.section.id)) setActiveSection(result.targetSectionKey)
+      } else if ((result.mode === 'assign-topic' || result.mode === 'assign-governance') && result.targetSectionKey) {
+        await organization.assignManyDocuments(
+          result.paths ?? [],
+          result.targetSectionKey,
+          result.mode === 'assign-topic' ? 'knowledge' : 'governance',
+        )
+        setMessage(result.mode === 'assign-topic'
+          ? '知识主题已更新；治理权威性和真实文件路径未改变。'
+          : '治理显示已更新；没有突破真实路径的权威上限。')
+      }
+      setDialogState(null)
+    } catch (error) {
+      setMessage(errorMessage(error, '保存项目文档操作失败'))
+    } finally {
+      setCommandBusy(false)
+    }
+  }
+
+  function toggleDocumentSelection(path: string) {
+    setSelectedPaths((current) => {
+      const next = new Set(current)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }
+
+  async function applyBatchAssignment(sectionKey: string) {
+    setCommandBusy(true)
+    try {
+      await organization.assignManyDocuments([...selectedPaths], sectionKey, navigationMode)
+      setSelectedPaths(new Set())
+      setMessage(`已批量更新 ${selectedPaths.size} 份文档；真实路径和正文未改变。`)
+    } catch (error) { setMessage(errorMessage(error, '批量归类失败')) }
+    finally { setCommandBusy(false) }
+  }
+
+  async function applyBatchManifest(action: 'pin' | 'recommend' | 'automatic') {
+    const paths = [...selectedPaths]
+    setCommandBusy(true)
+    try {
+      if (action === 'pin') await organization.applyManifest(pinDocuments(organization.manifest, paths, true))
+      else if (action === 'recommend') await organization.applyManifest(setRecommendedDocuments(organization.manifest, paths, true))
+      else await organization.assignManyDocuments(paths, '', navigationMode)
+      setMessage(`已批量处理 ${paths.length} 份文档。`)
+    } catch (error) { setMessage(errorMessage(error, '批量操作失败')) }
+    finally { setCommandBusy(false) }
+  }
+
+  async function moveSectionBefore(sourceKey: string, targetKey: string) {
+    try {
+      await organization.applyManifest(reorderSectionBefore(organization.manifest, sourceKey, targetKey))
+      setViewPreferences((current) => ({ ...current, sectionSort: 'manual' }))
+    } catch (error) { setMessage(errorMessage(error, '拖动排序失败')) }
+  }
+
+  async function moveDocumentBefore(sourcePath: string, targetPath: string) {
+    try {
+      await organization.applyManifest(reorderDocumentBefore(
+        organization.manifest,
+        sortDocuments(sectionDocuments, organization.manifest, 'manual').map((document) => document.path),
+        sourcePath,
+        targetPath,
+      ))
+      setViewPreferences((current) => ({ ...current, documentSort: 'manual' }))
+    } catch (error) { setMessage(errorMessage(error, '拖动文档排序失败')) }
+  }
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -396,8 +609,11 @@ export default function ProjectDocumentsWorkspace({
         onBack={onBack}
         onNavigationModeChange={changeNavigationMode}
         onSelect={setActiveSection}
-        onCreate={createSection}
-        onRemove={removeSection}
+        onCreate={() => createSection()}
+        onOpenMenu={openCommandMenu}
+        onMoveBefore={moveSectionBefore}
+        onUndo={() => { void executeCommand('undo', { kind: 'rail' }) }}
+        canUndo={organization.canUndo}
       />
 
       {activeSection === KNOWLEDGE_HOME_SECTION ? (
@@ -441,6 +657,9 @@ export default function ProjectDocumentsWorkspace({
               <button type="button" title="刷新目录" onClick={loadCatalog} disabled={catalogLoading}>
                 <RefreshCw size={15} className={catalogLoading ? styles.spinning : ''} aria-hidden="true" />
               </button>
+              <button type="button" title="文档排序" onClick={(event) => openCommandMenu({ kind: 'page-list' }, menuPointForButton(event.currentTarget))}>
+                <ArrowUpDown size={15} aria-hidden="true" />
+              </button>
               <button type="button" title="新建 Inbox 笔记" onClick={createNote} disabled={!catalog?.can_edit}>
                 <FilePlus2 size={16} aria-hidden="true" />
               </button>
@@ -463,99 +682,81 @@ export default function ProjectDocumentsWorkspace({
                 onOpenSuggestions={() => setActiveSection('suggestions')}
               />
             )}
-            <div className={styles.pageList}>
-              {catalogError && <div className={styles.errorBox}>{catalogError}</div>}
-              {!catalogLoading && !catalogError && visibleDocuments.length === 0 && <div className={styles.emptyList}>这个分区还没有文档</div>}
-              {visibleDocuments.map((entry) => (
-                <button
-                  className={[styles.pageButton, selectedPath === entry.path ? styles.pageActive : ''].join(' ')}
-                  key={entry.path}
-                  type="button"
-                  onClick={() => chooseDocument(entry.path)}
-                >
-                  <span className={styles.pageTitle}><FileText size={14} aria-hidden="true" />{entry.title}</span>
-                  <span className={styles.pagePath}>{entry.path}</span>
-                  <span className={styles.pageMeta}>
-                    <em>{roleLabel(entry.metadata.role)}</em>
-                    <small>{formatNumber(entry.metadata.token_estimate)} token</small>
-                    {entry.source === 'platform_default' && <b>平台模板</b>}
-                    {entry.metadata.default_retrieval && <b>AI 必读</b>}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <button className={styles.organizeButton} type="button" disabled={!catalog || !canStartAi || organizing} onClick={startAiOrganize}>
+            <ProjectDocumentPageList
+              documents={visibleDocuments}
+              manifest={organization.manifest}
+              navigationMode={navigationMode}
+              assignmentSections={navigationMode === 'knowledge'
+                ? knowledgeSections.filter((section) => section.custom)
+                : governanceSections.filter((section) => !section.virtual)}
+              selectedPath={selectedPath}
+              selectedPaths={selectedPaths}
+              loading={catalogLoading}
+              error={catalogError}
+              commandBusy={commandBusy}
+              canEdit={!!catalog?.can_edit}
+              onChoose={chooseDocument}
+              onToggleSelection={toggleDocumentSelection}
+              onOpenMenu={openCommandMenu}
+              onBatchAssign={applyBatchAssignment}
+              onBatchAction={(action) => { void applyBatchManifest(action) }}
+              onBatchAi={(paths) => {
+                const listed = paths.slice(0, 40).join(', ')
+                void startAiOrganize(`只整理用户批量选择的 ${paths.length} 份文档：${listed}${paths.length > 40 ? '；其余路径由目录中的当前分区范围限定' : ''}。`)
+              }}
+              onClearSelection={() => setSelectedPaths(new Set())}
+              onMoveBefore={moveDocumentBefore}
+            />
+            <button className={styles.organizeButton} type="button" disabled={!catalog || !canStartAi || organizing} onClick={() => { void startAiOrganize() }}>
               <Sparkles size={16} aria-hidden="true" />
               <span>{organizing ? '正在创建整理任务…' : '让当前 AI 生成整理建议'}</span>
             </button>
           </aside>
 
-          <main className={styles.documentPane}>
-            <header className={styles.documentHeader}>
-              <div className={styles.documentIdentity}>
-                <FolderTree size={18} aria-hidden="true" />
-                <span><strong>{selectedEntry?.title ?? '选择一篇文档'}</strong><small>{selectedEntry?.path ?? catalog?.workspace ?? ''}</small></span>
-              </div>
-              <div className={styles.viewModes}>
-                {(['edit', 'preview', 'split'] as ViewMode[]).map((mode) => (
-                  <button className={viewMode === mode ? styles.modeActive : ''} key={mode} type="button" onClick={() => setViewMode(mode)}>
-                    {mode === 'edit' ? '编辑' : mode === 'preview' ? '阅读' : '分栏'}
-                  </button>
-                ))}
-              </div>
-              <button className={styles.saveButton} type="button" onClick={saveDocument} disabled={!dirty || !document?.can_edit || saveState === 'saving'}>
-                <Save size={15} aria-hidden="true" />
-                {saveState === 'saving' ? '保存中' : saveState === 'saved' ? '已保存' : '保存'}
-              </button>
-            </header>
-
-            <ProjectDocumentAccessNotice
-              access={catalog?.access}
-              warnings={[...(catalog?.warnings ?? []), ...(document?.warnings ?? [])]}
-              onRetry={loadCatalog}
-            />
-
-            {selectedEntry && (
-              <div className={styles.authorityStrip}>
-                <span>{roleLabel(selectedEntry.metadata.role)}</span>
-                <span>{lifecycleLabel(selectedEntry.metadata.lifecycle)}</span>
-                <span>{selectedEntry.metadata.authority || 'unknown'}</span>
-                <select
-                  aria-label="文档分区"
-                  value={selectedAssignment}
-                  disabled={!catalog?.can_edit}
-                  onChange={(event) => assignSelectedDocument(event.target.value)}
-                >
-                  <option value={AUTOMATIC_SECTION}>
-                    自动：{automaticSectionLabel}
-                  </option>
-                  {assignmentSections.map((section) => (
-                    <option key={section.key} value={section.key}>{section.label}</option>
-                  ))}
-                </select>
-                <small>{selectedEntry.metadata.reason}</small>
-              </div>
-            )}
-            {message && <div className={styles.messageBar}>{message}</div>}
-
-            <div className={[styles.editorBody, styles[`view_${viewMode}`]].join(' ')}>
-              {documentLoading ? <div className={styles.documentEmpty}>正在按需读取这一篇文档…</div> : document ? (
-                <>
-                  {viewMode !== 'preview' && <textarea className={styles.editor} value={draft} onChange={(event) => { setDraft(event.target.value); setSaveState('idle') }} readOnly={!document.can_edit} spellCheck={false} aria-label="Markdown 编辑器" />}
-                  {viewMode !== 'edit' && <article className={styles.preview}><MarkdownContent content={draft || '（文档为空）'} /></article>}
-                </>
-              ) : documentError ? (
-                <ProjectDocumentAccessNotice error={documentError} path={selectedPath} onRetry={() => openDocument(selectedPath)} />
-              ) : (
-                <div className={styles.documentEmpty}>
-                  <Bot size={30} aria-hidden="true" /><strong>从左侧选择一篇文档</strong>
-                  <span>程序只会在你打开时读取正文，目录扫描不会把全部 Markdown 送给 AI。</span>
-                </div>
-              )}
-            </div>
-          </main>
+          <ProjectDocumentEditorPane
+            catalog={catalog}
+            document={document}
+            selectedEntry={selectedEntry}
+            selectedPath={selectedPath}
+            selectedAssignment={selectedAssignment}
+            automaticSectionLabel={automaticSectionLabel}
+            assignmentSections={assignmentSections}
+            viewMode={viewMode}
+            draft={draft}
+            dirty={dirty}
+            loading={documentLoading}
+            error={documentError}
+            message={message}
+            saveState={saveState}
+            onViewModeChange={setViewMode}
+            onSave={saveDocument}
+            onAssignmentChange={assignSelectedDocument}
+            onDraftChange={(content) => { setDraft(content); setSaveState('idle') }}
+            onRetryCatalog={loadCatalog}
+            onRetryDocument={() => openDocument(selectedPath)}
+          />
         </>
       )}
+      <ProjectDocumentCommandMenu
+        target={menuTarget}
+        point={menuPoint}
+        canEdit={!!catalog?.can_edit}
+        canUndo={organization.canUndo}
+        navigationMode={navigationMode}
+        sectionSort={viewPreferences.sectionSort}
+        documentSort={viewPreferences.documentSort}
+        onCommand={(command, target) => {
+          void executeCommand(command, target).catch((error) => setMessage(errorMessage(error, '执行项目文档操作失败')))
+        }}
+        onClose={() => setMenuTarget(null)}
+      />
+      <ProjectDocumentCommandDialog
+        state={dialogState}
+        manifest={organization.manifest}
+        busy={commandBusy}
+        onSubmit={(result) => { void submitCommandDialog(result) }}
+        onClose={() => setDialogState(null)}
+      />
     </div>
   )
 }

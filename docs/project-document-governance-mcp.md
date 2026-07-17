@@ -9,7 +9,7 @@
 - Git 工作区中的 Markdown 和路径是内容真源。
 - 路径决定文档权威性上限；正文只能降低自身生命周期，不能越过路径上限。
 - PC 网页端“知识架构”按项目主题浏览，“治理视图”根据 `role`、`lifecycle`、`authority` 和 `ambiguous` 判断权威性；两者是正交维度。
-- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖和文档关系，不移动实际文件。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
+- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖、文档关系和最近 100 条结构操作审计，不移动实际文件。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
@@ -135,7 +135,11 @@ POST /api/projects/:project_id/docs/organization/apply
 
 本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示从建议生成、虚拟分区应用到实体文件应用的每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台。页面按项目保存三档权限，默认选中“AI 自动整理（可信且可恢复）”。实体操作通过 `/api/project-docs/organization/apply-files` 交给本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
-知识首页允许用户固定项目模板；手工新建一级/子分区、删除主题子树和单篇主题/治理归类仍写 `.elon/document-sections.json`，不会自动创建或删除实际目录。AI 可以提出新的项目模板、首页、分区、缺失文档和关系建议；是否自动应用由统一权限模式决定。
+知识首页允许用户固定项目模板。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义；命令包含新建父/子分区、重命名与外观、改变父级、同级拖放或置顶/上移/下移/置底、合并、设置入口、批量主题/治理归类、固定、推荐和 AI 定向整理。最多允许四层主题；改变父级必须拒绝循环和第五层。
+
+显示排序和项目结构分开保存：按名称、数量、路径或权威性的个人查看偏好只留在浏览器；手工分区顺序、文档固定/顺序、入口和归类属于项目共同知识架构，写 `.elon/document-sections.json`。其中 `document_metadata.order` 与 `document_metadata.pinned` 保存共享文档顺序，`audit_log` 保存最近 100 条结构操作。前端对清单写入使用 revision 防并发覆盖，并提供最多 20 步会话内撤销；Git 仍是跨会话恢复和 AI 实体整理的最终历史。
+
+手工新建分区、删除主题子树和主题/治理归类只修改虚拟知识架构，不会自动创建、移动或删除实际目录与 Markdown。治理覆盖只是检索与工作台标记，不能突破真实路径权威上限。AI 可以提出新的项目模板、首页、分区、缺失文档和关系建议；是否自动应用由统一权限模式决定。
 
 ## 5. 安全和失败原则
 
@@ -149,7 +153,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、三档授权、revision 冲突、幂等应用、安全重命名/移动、禁止覆盖、自动授权阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
+Rust 单元测试覆盖：元数据目录不泄露正文、分页与字符预算、路径越界、虚构建议路径、授权模式、revision 冲突、幂等应用、安全重命名/移动、禁止覆盖、四层主题边界、手工排序/固定元数据与审计、自动授权阶段观测、失败恢复、终态不可回退、短期会话鉴权、并发会话创建、`tools/list` 和直接 `tools/call`。
 
 发布前至少运行：
 
