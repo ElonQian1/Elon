@@ -56,6 +56,15 @@ export interface DocumentHealthIssue {
   evidence: string
   suggested_action: string
   confidence: number
+  workflow?: {
+    status: 'open' | 'assigned' | 'snoozed' | 'ignored' | 'resolved'
+    owner: string
+    due_at: string
+    reason: string
+    snoozed_until: string
+    updated_at_ms: number
+  }
+  context?: { primary_topic: string; secondary_topics: string[]; scope_id: string }
 }
 
 export interface DocumentHealthAnalysis {
@@ -101,6 +110,20 @@ export interface DocumentHealthAnalysis {
     total_issues: number
     issue_types: string[]
   }
+  governance_workflow?: {
+    version: number
+    summary: { open: number; assigned: number; snoozed: number; ignored: number; resolved: number; actionable: number; overdue: number }
+    issues: DocumentHealthIssue[]
+    returned_issues: number
+    total_issues: number
+    filters: { types: string[]; severities: string[]; owners: string[]; topics: string[]; scopes: string[]; statuses: string[] }
+    trend: Array<{ created_at_ms: number; overall_score: number; architecture_score: number; quality_score: number; federation_score: number; issue_count: number; actionable_count: number }>
+    score_explanation: {
+      formula: string
+      overall: number
+      components: Array<{ key: string; label: string; score: number; weight: number; contribution: number }>
+    }
+  }
   maintenance: {
     index_version: number
     durable_queue: boolean
@@ -125,6 +148,8 @@ export interface DocumentHealthAnalysis {
       scope_path: string
       profile: string
       owner: string
+      include_globs?: string[]
+      exclude_globs?: string[]
       document_count: number
       direct_children: number
       score: number

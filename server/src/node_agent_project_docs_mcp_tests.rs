@@ -110,7 +110,10 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_save_suggestions",
             "project_docs_apply_suggestions",
             "project_docs_apply_file_operations",
+            "project_docs_update_issue",
+            "project_docs_get_health_history",
             "project_docs_get_history",
+            "project_docs_get_version_diff",
             "project_docs_restore_version"
         ]
     );
@@ -125,6 +128,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert!(suggestion_properties.get("proposed_profile").is_some());
     assert!(suggestion_properties.get("proposed_home").is_some());
     assert!(suggestion_properties.get("document_metadata").is_some());
+    assert!(suggestion_properties.get("governance_facets").is_some());
     assert!(suggestion_properties
         .get("proposed_knowledge_graph")
         .is_some());
@@ -170,6 +174,37 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             .unwrap()
             > 0
     );
+    let fingerprint = issues["result"]["structuredContent"]["issues"][0]["fingerprint"]
+        .as_str()
+        .unwrap();
+    let assigned = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":221,"method":"tools/call",
+            "params":{"name":"project_docs_update_issue","arguments":{
+                "fingerprint":fingerprint,"status":"assigned","owner":"docs-team","due_at":"2026-08-01"
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        assigned["result"]["structuredContent"]["workflow"]["status"],
+        "assigned"
+    );
+    let trend = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":222,"method":"tools/call",
+            "params":{"name":"project_docs_get_health_history","arguments":{"limit":10}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(!trend["result"]["structuredContent"]["trend"]
+        .as_array()
+        .unwrap()
+        .is_empty());
     assert!(analyzed.get("error").is_none());
     let map = handle_request(
         &root,

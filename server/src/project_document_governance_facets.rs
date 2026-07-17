@@ -1,0 +1,441 @@
+//! Independent governance facets and cross-document relations.
+
+use anyhow::{bail, Result};
+use homecli_proto::ProjectDocumentEntry;
+use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashSet};
+
+use crate::project_document_file_operation_model::normalize_document_path;
+
+const RETRIEVAL_VALUES: &[&str] = &["required", "on_demand", "excluded"];
+const LIFECYCLE_VALUES: &[&str] = &[
+    "active",
+    "accepted",
+    "draft",
+    "deprecated",
+    "superseded",
+    "archived",
+    "unclassified",
+];
+const AUTHORITY_VALUES: &[&str] = &[
+    "binding",
+    "authoritative",
+    "guidance",
+    "evidence",
+    "proposal",
+    "non_authoritative",
+    "unknown",
+];
+const RELATION_VALUES: &[&str] = &[
+    "related",
+    "supports",
+    "depends_on",
+    "implements",
+    "evidence_for",
+    "supersedes",
+    "replaced_by",
+    "see_also",
+];
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentGovernanceFacets {
+    #[serde(default)]
+    pub retrieval: String,
+    #[serde(default)]
+    pub lifecycle: String,
+    #[serde(default)]
+    pub authority: String,
+    #[serde(default)]
+    pub document_type: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentRelation {
+    #[serde(default)]
+    pub relation: String,
+    #[serde(default)]
+    pub target: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DocumentKnowledgeMetadata {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub doc_type: String,
+    #[serde(default)]
+    pub audience: Vec<String>,
+    #[serde(default)]
+    pub owner: String,
+    #[serde(default)]
+    pub owners: Vec<String>,
+    #[serde(default)]
+    pub reviewed_at: String,
+    #[serde(default = "default_review_interval_days")]
+    pub review_interval_days: u16,
+    #[serde(default)]
+    pub implementation_refs: Vec<String>,
+    #[serde(default)]
+    pub version: String,
+    #[serde(default)]
+    pub related: Vec<String>,
+    #[serde(default)]
+    pub supersedes: Vec<String>,
+    #[serde(default)]
+    pub relations: Vec<DocumentRelation>,
+    #[serde(default)]
+    pub order: i32,
+    #[serde(default)]
+    pub pinned: bool,
+}
+
+impl Default for DocumentKnowledgeMetadata {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            doc_type: String::new(),
+            audience: Vec::new(),
+            owner: String::new(),
+            owners: Vec::new(),
+            reviewed_at: String::new(),
+            review_interval_days: default_review_interval_days(),
+            implementation_refs: Vec::new(),
+            version: String::new(),
+            related: Vec::new(),
+            supersedes: Vec::new(),
+            relations: Vec::new(),
+            order: 0,
+            pinned: false,
+        }
+    }
+}
+
+pub(crate) fn normalize_governance_facets(
+    values: BTreeMap<String, DocumentGovernanceFacets>,
+) -> Result<BTreeMap<String, DocumentGovernanceFacets>> {
+    values
+        .into_iter()
+        .map(|(path, facets)| Ok((normalize_document_path(&path)?, sanitize_facets(facets)?)))
+        .collect()
+}
+
+pub(crate) fn normalize_secondary_assignments(
+    values: BTreeMap<String, Vec<String>>,
+    valid_keys: &HashSet<String>,
+) -> Result<BTreeMap<String, Vec<String>>> {
+    values
+        .into_iter()
+        .map(|(path, topics)| {
+            normalize_document_path(&path).map(|path| {
+                let mut topics = topics
+                    .into_iter()
+                    .map(|topic| topic.trim().to_string())
+                    .filter(|topic| valid_keys.contains(topic) && topic.starts_with("custom:"))
+                    .take(12)
+                    .collect::<Vec<_>>();
+                topics.sort();
+                topics.dedup();
+                (path, topics)
+            })
+        })
+        .collect::<Result<BTreeMap<_, _>>>()
+        .map(|values| {
+            values
+                .into_iter()
+                .filter(|(_, topics)| !topics.is_empty())
+                .collect()
+        })
+}
+
+pub(crate) fn sanitize_knowledge_metadata(
+    mut metadata: DocumentKnowledgeMetadata,
+) -> Result<DocumentKnowledgeMetadata> {
+    metadata.id = truncate(metadata.id.trim(), 120);
+    metadata.doc_type = type_identifier(&metadata.doc_type, 64);
+    metadata.audience = bounded(metadata.audience, 12, 80);
+    metadata.owner = truncate(metadata.owner.trim(), 80);
+    metadata.owners = bounded(metadata.owners, 12, 80);
+    metadata.reviewed_at = valid_date(&metadata.reviewed_at);
+    metadata.review_interval_days = metadata.review_interval_days.clamp(1, 3650);
+    metadata.implementation_refs = bounded(metadata.implementation_refs, 32, 500);
+    metadata.version = truncate(metadata.version.trim(), 40);
+    metadata.related = normalize_paths(metadata.related, 24)?;
+    metadata.supersedes = normalize_paths(metadata.supersedes, 24)?;
+    metadata.relations = normalize_relations(metadata.relations)?;
+    for path in &metadata.related {
+        add_relation(&mut metadata.relations, "related", path);
+    }
+    for path in &metadata.supersedes {
+        add_relation(&mut metadata.relations, "supersedes", path);
+    }
+    metadata.order = metadata.order.clamp(0, 999_999);
+    Ok(metadata)
+}
+
+pub(crate) fn effective_facets(
+    document: &ProjectDocumentEntry,
+    configured: Option<&DocumentGovernanceFacets>,
+) -> DocumentGovernanceFacets {
+    let base = inferred_facets(document);
+    let Some(configured) = configured else {
+        return base;
+    };
+    DocumentGovernanceFacets {
+        retrieval: clamp_retrieval(&base, &configured.retrieval),
+        lifecycle: clamp_lifecycle(&base.lifecycle, &configured.lifecycle),
+        authority: clamp_authority(&base.authority, &configured.authority),
+        document_type: if configured.document_type.trim().is_empty() {
+            base.document_type
+        } else {
+            identifier(&configured.document_type, 64)
+        },
+    }
+}
+
+pub(crate) fn quick_view(facets: &DocumentGovernanceFacets) -> &'static str {
+    match facets.retrieval.as_str() {
+        "required" => return "required",
+        "on_demand"
+            if matches!(
+                facets.document_type.as_str(),
+                "instruction" | "project_guide" | "provider_adapter" | "guide"
+            ) =>
+        {
+            return "on-demand"
+        }
+        _ => {}
+    }
+    match facets.document_type.as_str() {
+        "agent_definition" | "prompt_template" | "skill" => "customizations",
+        "decision" => "decisions",
+        "status" | "report" => "evidence",
+        "discussion" | "note" => "drafts",
+        "archive" => "archive",
+        _ if facets.lifecycle == "archived" => "archive",
+        _ if matches!(facets.lifecycle.as_str(), "draft" | "unclassified") => "drafts",
+        _ if facets.authority == "unknown" => "unclassified",
+        _ if facets.lifecycle == "active" || facets.lifecycle == "accepted" => "current",
+        _ => "unclassified",
+    }
+}
+
+fn sanitize_facets(mut facets: DocumentGovernanceFacets) -> Result<DocumentGovernanceFacets> {
+    facets.retrieval = enum_value(&facets.retrieval, RETRIEVAL_VALUES, "检索策略")?;
+    facets.lifecycle = enum_value(&facets.lifecycle, LIFECYCLE_VALUES, "生命周期")?;
+    facets.authority = enum_value(&facets.authority, AUTHORITY_VALUES, "权威性")?;
+    facets.document_type = identifier(&facets.document_type, 64);
+    Ok(facets)
+}
+
+fn inferred_facets(document: &ProjectDocumentEntry) -> DocumentGovernanceFacets {
+    let role = document.metadata.role.as_str();
+    let lifecycle = document.metadata.lifecycle.trim();
+    let excluded = matches!(
+        lifecycle,
+        "draft" | "deprecated" | "superseded" | "archived" | "unclassified"
+    ) || matches!(
+        role,
+        "archive" | "discussion" | "note" | "status" | "report"
+    );
+    DocumentGovernanceFacets {
+        retrieval: if matches!(role, "policy" | "router") {
+            "required"
+        } else if excluded {
+            "excluded"
+        } else {
+            "on_demand"
+        }
+        .to_string(),
+        lifecycle: if lifecycle.is_empty() {
+            "unclassified"
+        } else {
+            lifecycle
+        }
+        .to_string(),
+        authority: authority_level(&document.metadata.authority).to_string(),
+        document_type: identifier(role, 64),
+    }
+}
+
+fn clamp_retrieval(base: &DocumentGovernanceFacets, requested: &str) -> String {
+    if requested.is_empty() {
+        return base.retrieval.clone();
+    }
+    if base.retrieval == "excluded" || requested == "required" && base.retrieval != "required" {
+        base.retrieval.clone()
+    } else {
+        requested.to_string()
+    }
+}
+
+fn clamp_lifecycle(base: &str, requested: &str) -> String {
+    if requested.is_empty() {
+        return base.to_string();
+    }
+    if matches!(
+        base,
+        "draft" | "deprecated" | "superseded" | "archived" | "unclassified"
+    ) && matches!(requested, "active" | "accepted")
+    {
+        base.to_string()
+    } else {
+        requested.to_string()
+    }
+}
+
+fn clamp_authority(base: &str, requested: &str) -> String {
+    if requested.is_empty() {
+        return base.to_string();
+    }
+    let rank = |value: &str| match value {
+        "binding" => 6,
+        "authoritative" => 5,
+        "guidance" => 4,
+        "evidence" => 3,
+        "proposal" => 2,
+        "non_authoritative" => 1,
+        _ => 0,
+    };
+    if rank(requested) > rank(base) {
+        base.to_string()
+    } else {
+        requested.to_string()
+    }
+}
+
+fn authority_level(value: &str) -> &'static str {
+    match value {
+        "repository_policy" | "repository_routing" | "domain_policy" => "binding",
+        "normative" | "approved" | "operational" | "decision_record" => "authoritative",
+        "evidence" => "evidence",
+        "proposal" => "proposal",
+        "historical" | "customization" => "non_authoritative",
+        "provider_routing" | "project_guidance" | "informative" => "guidance",
+        _ => "unknown",
+    }
+}
+
+fn normalize_relations(values: Vec<DocumentRelation>) -> Result<Vec<DocumentRelation>> {
+    let mut output = Vec::new();
+    for relation in values.into_iter().take(48) {
+        let kind = identifier(&relation.relation, 40);
+        if !RELATION_VALUES.contains(&kind.as_str()) {
+            bail!("未知文档关系：{kind}")
+        }
+        let target = normalize_document_path(&relation.target)?;
+        add_relation(&mut output, &kind, &target);
+    }
+    Ok(output)
+}
+
+fn add_relation(output: &mut Vec<DocumentRelation>, relation: &str, target: &str) {
+    if !output
+        .iter()
+        .any(|item| item.relation == relation && item.target.eq_ignore_ascii_case(target))
+    {
+        output.push(DocumentRelation {
+            relation: relation.to_string(),
+            target: target.to_string(),
+        });
+    }
+}
+
+fn normalize_paths(values: Vec<String>, limit: usize) -> Result<Vec<String>> {
+    let mut values = values
+        .into_iter()
+        .take(limit)
+        .map(|value| normalize_document_path(&value))
+        .collect::<Result<Vec<_>>>()?;
+    values.sort();
+    values.dedup();
+    Ok(values)
+}
+
+fn enum_value(value: &str, allowed: &[&str], label: &str) -> Result<String> {
+    let value = identifier(value, 64);
+    if value.is_empty() || allowed.contains(&value.as_str()) {
+        Ok(value)
+    } else {
+        bail!("未知{label}：{value}")
+    }
+}
+
+fn identifier(value: &str, limit: usize) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .replace('-', "_")
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .take(limit)
+        .collect()
+}
+
+fn type_identifier(value: &str, limit: usize) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter(|ch| ch.is_ascii_alphanumeric() || matches!(*ch, '_' | '-'))
+        .take(limit)
+        .collect()
+}
+
+fn bounded(values: Vec<String>, count: usize, chars: usize) -> Vec<String> {
+    values
+        .into_iter()
+        .take(count)
+        .map(|value| truncate(value.trim(), chars))
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+fn valid_date(value: &str) -> String {
+    let value = value.trim();
+    (value.len() == 10
+        && value.as_bytes().get(4) == Some(&b'-')
+        && value.as_bytes().get(7) == Some(&b'-'))
+    .then(|| value.to_string())
+    .unwrap_or_default()
+}
+
+fn truncate(value: &str, limit: usize) -> String {
+    value.chars().take(limit).collect()
+}
+fn default_review_interval_days() -> u16 {
+    180
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use homecli_proto::ProjectDocumentMetadata;
+
+    #[test]
+    fn path_ceiling_prevents_virtual_promotion() {
+        let document = ProjectDocumentEntry {
+            path: "docs/archive/old.md".into(),
+            title: "Old".into(),
+            content: String::new(),
+            truncated: false,
+            byte_len: 0,
+            source: "workspace".into(),
+            metadata: ProjectDocumentMetadata {
+                role: "archive".into(),
+                lifecycle: "archived".into(),
+                authority: "historical".into(),
+                ..Default::default()
+            },
+        };
+        let requested = DocumentGovernanceFacets {
+            retrieval: "required".into(),
+            lifecycle: "active".into(),
+            authority: "binding".into(),
+            document_type: "spec".into(),
+        };
+        let effective = effective_facets(&document, Some(&requested));
+        assert_eq!(effective.retrieval, "excluded");
+        assert_eq!(effective.lifecycle, "archived");
+        assert_eq!(effective.authority, "non_authoritative");
+    }
+}

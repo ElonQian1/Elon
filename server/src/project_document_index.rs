@@ -25,7 +25,7 @@ pub(crate) struct DocumentMaintenanceState {
 }
 
 pub(crate) struct ProjectDocumentIndex {
-    conn: Connection,
+    pub(crate) conn: Connection,
     run_id: String,
     changed_documents: usize,
 }
@@ -40,6 +40,7 @@ impl ProjectDocumentIndex {
         let conn = Connection::open(&database)
             .with_context(|| format!("打开文档索引失败：{}", database.display()))?;
         initialize_schema(&conn)?;
+        crate::project_document_issue_workflow::initialize_schema(&conn)?;
         Ok(Self {
             conn,
             run_id: format!("{}-{}", now_millis(), uuid::Uuid::new_v4().simple()),

@@ -145,33 +145,23 @@
       "entrypoint": "docs/fb2-ai-center/README.md"
     },
     {
-      "id": "decisions",
-      "label": "决策记录",
-      "detail": "已接受决定、取舍和原因",
-      "color": "#C884DD",
+      "id": "external-tools",
+      "label": "工具与外部生态",
+      "detail": "CLI、模型、语音与第三方工具集成；权威性由治理维度单独表达",
+      "color": "#D49A5B",
       "parent_id": "",
       "order": 90,
-      "icon": "milestone",
+      "icon": "wrench",
       "entrypoint": ""
     },
     {
-      "id": "workbench",
-      "label": "工作区",
-      "detail": "草稿、讨论、证据和等待提升的材料",
-      "color": "#C58C55",
+      "id": "unassigned-topic",
+      "label": "未归主题",
+      "detail": "尚未确定主要业务主题；不代表文档权威性或生命周期",
+      "color": "#8A91A3",
       "parent_id": "",
       "order": 100,
-      "icon": "notebook-pen",
-      "entrypoint": ""
-    },
-    {
-      "id": "tool-reference",
-      "label": "工具参考（非权威）",
-      "detail": "CLI、模型、语音与外部工具笔记；默认不作为项目事实",
-      "color": "#D49A5B",
-      "parent_id": "workbench",
-      "order": 10,
-      "icon": "wrench",
+      "icon": "circle-help",
       "entrypoint": ""
     }
   ],
@@ -225,15 +215,48 @@
     "docs/fb2-ai-center/voice-sdk.md": "custom:fb2-project",
     "docs/fb2-business-context-pack.md": "custom:fb2-project",
     "docs/fb2-chat-voice-kit-integration.md": "custom:fb2-project",
-    "docs/api测试/hy3 api key.md": "custom:tool-reference",
-    "docs/asr+tts.md": "custom:tool-reference",
-    "docs/cli codex剩余用量查询.md": "custom:tool-reference",
-    "docs/cli会话问题/Codex cli图片识别.md": "custom:tool-reference",
-    "docs/cli会话问题/copilot cli会话ID.md": "custom:tool-reference",
-    "docs/cli会话问题/copilot cli图片识别.md": "custom:tool-reference",
-    "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:tool-reference",
-    "docs/cli会话问题/纯Codex cli图片会话.md": "custom:tool-reference",
-    "docs/小米语音开启.md": "custom:tool-reference"
+    "docs/api测试/hy3 api key.md": "custom:external-tools",
+    "docs/asr+tts.md": "custom:external-tools",
+    "docs/cli codex剩余用量查询.md": "custom:external-tools",
+    "docs/cli会话问题/Codex cli图片识别.md": "custom:external-tools",
+    "docs/cli会话问题/copilot cli会话ID.md": "custom:external-tools",
+    "docs/cli会话问题/copilot cli图片识别.md": "custom:external-tools",
+    "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
+    "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
+    "docs/小米语音开启.md": "custom:external-tools"
+  },
+  "secondary_assignments": {
+    "AGENTS.md": ["custom:operations"],
+    "AI_ARCHITECTURE.md": ["custom:backend-api", "custom:ai-context"],
+    "docs/system-architecture.md": ["custom:backend-api", "custom:project-system"],
+    "docs/project-document-governance-mcp.md": ["custom:project-system", "custom:ai-context"],
+    "docs/pc-frontend-migration.md": ["custom:project-system"],
+    "docs/node-agent-upgrade-compatibility.md": ["custom:operations"],
+    "docs/ai-agent-workflow.md": ["custom:ai-context"],
+    "docs/codex-vault-sharing-runbook.md": ["custom:operations"],
+    "docs/fb2-ai-center/README.md": ["custom:backend-api"]
+  },
+  "governance_facets": {
+    ".github/copilot-instructions.md": { "retrieval": "required", "lifecycle": "active", "authority": "binding", "document_type": "policy" },
+    "AGENTS.md": { "retrieval": "required", "lifecycle": "active", "authority": "binding", "document_type": "router" },
+    "CODEX.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "provider_adapter" },
+    "AI_PROJECT.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "project_guide" },
+    "AI_ARCHITECTURE.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "architecture" },
+    "AI_INDEX.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "api_reference" },
+    "docs/README.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "overview" },
+    "docs/system-architecture.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "architecture" },
+    "docs/project-document-governance-mcp.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "guide" },
+    "docs/pc-frontend-migration.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "guide" },
+    "docs/node-agent-upgrade-compatibility.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "runbook" },
+    "docs/android-setup.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "guide" },
+    "docs/user-project-system.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "architecture" },
+    "docs/ai-agent-workflow.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "runbook" },
+    "docs/windows-client-defender.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "security_guide" },
+    "docs/fb2-ai-center/README.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "subproject_overview" },
+    "docs/fb2-ai-center/PLAN.md": { "retrieval": "excluded", "lifecycle": "draft", "authority": "proposal", "document_type": "plan" },
+    "docs/fb2-ai-center/PROGRESS.md": { "retrieval": "excluded", "lifecycle": "active", "authority": "evidence", "document_type": "status" },
+    "docs/api测试/hy3 api key.md": { "retrieval": "excluded", "lifecycle": "unclassified", "authority": "non_authoritative", "document_type": "note" },
+    "docs/符号索引讨论/向量数据库rag相关.md": { "retrieval": "excluded", "lifecycle": "draft", "authority": "proposal", "document_type": "discussion" }
   },
   "governance_overrides": {
     "docs/APP 颜色规范.md": "current",
@@ -288,7 +311,26 @@
       "implementation_refs": ["file:docs/README.md"],
       "version": "2026-07",
       "related": ["AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md"],
-      "supersedes": []
+      "supersedes": [],
+      "relations": [
+        { "relation": "see_also", "target": "AI_PROJECT.md" },
+        { "relation": "see_also", "target": "AI_ARCHITECTURE.md" },
+        { "relation": "see_also", "target": "AI_INDEX.md" }
+      ]
+    },
+    "AI_PROJECT.md": {
+      "doc_type": "overview",
+      "audience": ["开发者", "AI 代理"],
+      "owner": "项目维护者",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:server/src/main.rs", "file:pc-frontend/src/App.tsx"],
+      "related": ["docs/README.md", "AI_ARCHITECTURE.md"],
+      "supersedes": [],
+      "relations": [
+        { "relation": "see_also", "target": "docs/README.md" },
+        { "relation": "depends_on", "target": "AI_ARCHITECTURE.md" }
+      ]
     },
     "AI_ARCHITECTURE.md": {
       "doc_type": "architecture",
@@ -299,7 +341,11 @@
       "implementation_refs": ["file:server/src/main.rs", "file:server/src/node_agent_main.rs"],
       "version": "",
       "related": ["docs/system-architecture.md", "AI_INDEX.md"],
-      "supersedes": []
+      "supersedes": [],
+      "relations": [
+        { "relation": "supports", "target": "docs/system-architecture.md" },
+        { "relation": "see_also", "target": "AI_INDEX.md" }
+      ]
     },
     "AI_INDEX.md": {
       "doc_type": "api-reference",
@@ -310,7 +356,62 @@
       "implementation_refs": ["file:server/src/main.rs"],
       "version": "",
       "related": ["AI_ARCHITECTURE.md"],
+      "supersedes": [],
+      "relations": [{ "relation": "depends_on", "target": "AI_ARCHITECTURE.md" }]
+    },
+    "docs/system-architecture.md": {
+      "doc_type": "architecture",
+      "audience": ["开发者", "AI 代理"],
+      "owner": "平台后端",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:server/src/main.rs", "file:server/src/node_agent_main.rs", "file:pc-frontend/src/App.tsx"],
+      "related": ["AI_ARCHITECTURE.md", "AI_INDEX.md"],
+      "supersedes": [],
+      "relations": [{ "relation": "evidence_for", "target": "AI_ARCHITECTURE.md" }]
+    },
+    "docs/pc-frontend-migration.md": {
+      "doc_type": "client-guides",
+      "audience": ["前端开发者", "AI 代理"],
+      "owner": "PC 客户端",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:pc-frontend/src/App.tsx", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
+      "related": ["docs/project-document-governance-mcp.md"],
+      "supersedes": [],
+      "relations": [{ "relation": "implements", "target": "docs/project-document-governance-mcp.md" }]
+    },
+    "docs/node-agent-upgrade-compatibility.md": {
+      "doc_type": "client-guides",
+      "audience": ["节点开发者", "运维人员"],
+      "owner": "平台后端",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 60,
+      "implementation_refs": ["file:server/src/node_agent_main.rs", "file:server/src/node_agent_client_maintenance.rs"],
+      "related": ["docs/pc-node-offline-resilience.md", "docs/ai-agent-workflow.md"],
+      "supersedes": [],
+      "relations": [{ "relation": "depends_on", "target": "docs/ai-agent-workflow.md" }]
+    },
+    "docs/android-setup.md": {
+      "doc_type": "client-guides",
+      "audience": ["Android 开发者", "AI 代理"],
+      "owner": "Android 客户端",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"],
+      "related": ["docs/android-real-renderer-ui-workflow.md", "docs/Design.md"],
       "supersedes": []
+    },
+    "docs/user-project-system.md": {
+      "doc_type": "architecture",
+      "audience": ["产品开发者", "AI 代理"],
+      "owner": "项目系统",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:server/src/project_space.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
+      "related": ["docs/project-store-architecture.md", "docs/project-document-governance-mcp.md"],
+      "supersedes": [],
+      "relations": [{ "relation": "supports", "target": "docs/project-document-governance-mcp.md" }]
     },
     "docs/ai-agent-workflow.md": {
       "doc_type": "operations",
@@ -321,7 +422,8 @@
       "implementation_refs": ["file:scripts/finish-ai-task.ps1"],
       "version": "",
       "related": ["AGENTS.md"],
-      "supersedes": []
+      "supersedes": [],
+      "relations": [{ "relation": "implements", "target": ".github/copilot-instructions.md" }]
     },
     "docs/project-document-governance-mcp.md": {
       "doc_type": "client-guides",
@@ -329,10 +431,35 @@
       "owner": "项目维护者",
       "reviewed_at": "2026-07-17",
       "review_interval_days": 60,
-      "implementation_refs": ["file:server/src/node_agent_project_docs_mcp.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
-      "version": "2",
+      "implementation_refs": ["file:server/src/node_agent_project_docs_mcp.rs", "file:server/src/project_document_governance_facets.rs", "file:server/src/project_document_issue_workflow.rs", "file:server/src/project_document_versioning.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
+      "version": "3",
       "related": ["docs/pc-frontend-migration.md"],
+      "supersedes": [],
+      "relations": [
+        { "relation": "implements", "target": ".github/instructions/document-authority.instructions.md" },
+        { "relation": "see_also", "target": "docs/pc-frontend-migration.md" }
+      ]
+    },
+    "docs/windows-client-defender.md": {
+      "doc_type": "client-guides",
+      "audience": ["Windows 用户", "运维人员"],
+      "owner": "平台安全",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": ["file:server/src/node_agent_main.rs"],
+      "related": ["docs/codex-vault-sharing-runbook.md"],
       "supersedes": []
+    },
+    "docs/fb2-ai-center/README.md": {
+      "doc_type": "overview",
+      "audience": ["fb2 开发者", "平台开发者"],
+      "owner": "fb2 项目维护者",
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 60,
+      "implementation_refs": ["file:server/src/external_app_api.rs"],
+      "related": ["docs/fb2-ai-center/contracts.md", "docs/fb2-ai-center/handoff.md"],
+      "supersedes": [],
+      "relations": [{ "relation": "depends_on", "target": "docs/fb2-ai-center/contracts.md" }]
     },
     "AGENTS.md": {
       "id": "ai-work-entry",
@@ -343,7 +470,8 @@
       "review_interval_days": 30,
       "implementation_refs": ["file:.github/copilot-instructions.md"],
       "related": [".github/copilot-instructions.md", "CODEX.md"],
-      "supersedes": []
+      "supersedes": [],
+      "relations": [{ "relation": "depends_on", "target": ".github/copilot-instructions.md" }]
     },
     ".github/copilot-instructions.md": {
       "id": "shared-ai-contract",
@@ -354,7 +482,8 @@
       "review_interval_days": 30,
       "implementation_refs": ["file:scripts/ai-task-preflight.ps1", "file:scripts/finish-ai-task.ps1"],
       "related": ["AGENTS.md"],
-      "supersedes": []
+      "supersedes": [],
+      "relations": [{ "relation": "supports", "target": "AGENTS.md" }]
     }
   },
   "knowledge_graph": {

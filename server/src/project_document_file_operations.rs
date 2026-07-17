@@ -275,8 +275,14 @@ fn remap_manifest_document_path(
     source_path: &str,
     target_path: &str,
 ) {
-    remap_string_map_key(&mut manifest.assignments, source_path, target_path);
-    remap_string_map_key(&mut manifest.governance_overrides, source_path, target_path);
+    remap_map_key(&mut manifest.assignments, source_path, target_path);
+    remap_map_key(
+        &mut manifest.secondary_assignments,
+        source_path,
+        target_path,
+    );
+    remap_map_key(&mut manifest.governance_overrides, source_path, target_path);
+    remap_map_key(&mut manifest.governance_facets, source_path, target_path);
     replace_path(&mut manifest.home.entrypoint, source_path, target_path);
     replace_paths(&mut manifest.home.start_here, source_path, target_path);
     for section in &mut manifest.sections {
@@ -292,6 +298,9 @@ fn remap_manifest_document_path(
     for metadata in manifest.document_metadata.values_mut() {
         replace_paths(&mut metadata.related, source_path, target_path);
         replace_paths(&mut metadata.supersedes, source_path, target_path);
+        for relation in &mut metadata.relations {
+            replace_path(&mut relation.target, source_path, target_path);
+        }
     }
 }
 
@@ -310,6 +319,7 @@ fn remap_suggestion_document_path(
     for section in &mut suggestions.proposed_sections {
         replace_path(&mut section.entrypoint, source_path, target_path);
     }
+    remap_map_key(&mut suggestions.governance_facets, source_path, target_path);
     if let Some(source_key) = matching_key(&suggestions.document_metadata, source_path) {
         if let Some(metadata) = suggestions.document_metadata.remove(&source_key) {
             suggestions
@@ -320,11 +330,14 @@ fn remap_suggestion_document_path(
     for metadata in suggestions.document_metadata.values_mut() {
         replace_paths(&mut metadata.related, source_path, target_path);
         replace_paths(&mut metadata.supersedes, source_path, target_path);
+        for relation in &mut metadata.relations {
+            replace_path(&mut relation.target, source_path, target_path);
+        }
     }
 }
 
-fn remap_string_map_key(
-    values: &mut std::collections::BTreeMap<String, String>,
+fn remap_map_key<T>(
+    values: &mut std::collections::BTreeMap<String, T>,
     source_path: &str,
     target_path: &str,
 ) {

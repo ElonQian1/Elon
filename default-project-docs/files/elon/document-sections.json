@@ -3,7 +3,7 @@
   "profile": "auto",
   "home": {
     "title": "项目知识库",
-    "summary": "从项目总览开始，按主题理解架构、参考资料、操作指南和决策；文档权威性在治理视图中单独判断。",
+    "summary": "从项目总览开始，按业务主题理解架构、参考资料和操作指南；检索、生命周期、权威性和文档类型在治理总览中分别判断。",
     "entrypoint": "docs/project-readme.md",
     "start_here": [
       "docs/project-readme.md",
@@ -17,8 +17,8 @@
     { "id": "architecture", "label": "架构与设计", "detail": "总体结构、模块边界和关键数据流", "color": "#5F8FE3", "parent_id": "", "order": 20, "icon": "blocks", "entrypoint": "AI_ARCHITECTURE.md" },
     { "id": "reference", "label": "参考资料", "detail": "代码、接口、数据模型和项目索引", "color": "#4FA9B8", "parent_id": "", "order": 30, "icon": "book-key", "entrypoint": "AI_INDEX.md" },
     { "id": "guides", "label": "指南与操作", "detail": "面向任务的开发和操作步骤", "color": "#5FBC88", "parent_id": "", "order": 40, "icon": "route", "entrypoint": "AI_TASK_TEMPLATE.md" },
-    { "id": "decisions", "label": "决策记录", "detail": "已接受决策及其原因", "color": "#C884DD", "parent_id": "", "order": 50, "icon": "milestone", "entrypoint": "" },
-    { "id": "workbench", "label": "工作区", "detail": "草稿、讨论、证据和待整理材料", "color": "#C58C55", "parent_id": "", "order": 90, "icon": "notebook-pen", "entrypoint": "" }
+    { "id": "external-resources", "label": "外部资料与生态", "detail": "第三方服务、工具和来源资料", "color": "#C58C55", "parent_id": "", "order": 50, "icon": "wrench", "entrypoint": "" },
+    { "id": "unassigned-topic", "label": "未归主题", "detail": "尚未确定主要业务主题；不代表文档权威性", "color": "#8A91A3", "parent_id": "", "order": 90, "icon": "circle-help", "entrypoint": "" }
   ],
   "assignments": {
     "AI_PROJECT.md": "custom:overview",
@@ -27,6 +27,8 @@
     "AI_INDEX.md": "custom:reference",
     "AI_TASK_TEMPLATE.md": "custom:guides"
   },
+  "secondary_assignments": {},
+  "governance_facets": {},
   "governance_overrides": {},
   "document_metadata": {
     "docs/project-readme.md": { "doc_type": "overview", "audience": ["项目成员"], "owner": "", "version": "", "related": ["AI_PROJECT.md"], "supersedes": [] },

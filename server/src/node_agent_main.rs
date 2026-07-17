@@ -171,10 +171,13 @@ mod project_document_git_transaction;
 #[cfg(test)]
 mod project_document_git_transaction_tests;
 mod project_document_governance;
+mod project_document_governance_api;
+mod project_document_governance_facets;
 mod project_document_governance_service;
 #[cfg(test)]
 mod project_document_governance_tests;
 mod project_document_index;
+mod project_document_issue_workflow;
 mod project_document_knowledge_graph;
 mod project_document_knowledge_graph_model;
 mod project_document_knowledge_graph_service;
@@ -186,6 +189,7 @@ mod project_document_policy;
 mod project_document_quality;
 mod project_document_quality_rules;
 mod project_document_vault;
+mod project_document_versioning;
 mod project_git_worktree_audit;
 mod project_landing;
 mod project_workspace_inspect;

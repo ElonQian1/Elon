@@ -20,6 +20,7 @@ import {
 import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
 import ProjectDocumentHealthCenter from './ProjectDocumentHealthCenter'
+import ProjectDocumentGovernanceOverview from './ProjectDocumentGovernanceOverview'
 import ProjectDocumentEditorPane, {
   AUTOMATIC_DOCUMENT_SECTION,
   type ProjectDocumentViewMode,
@@ -31,7 +32,6 @@ import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import {
   analyzeKnowledgeArchitecture,
-  buildKnowledgeSections,
   CAPABILITY_MAP_SECTION,
   DOCUMENT_HEALTH_SECTION,
   KNOWLEDGE_HOME_SECTION,
@@ -48,25 +48,27 @@ import {
   reorderDocumentBefore,
   reorderSection,
   reorderSectionBefore,
+  setGovernanceFacets,
   setKnowledgeEntrypoint,
   setRecommendedDocuments,
+  setSecondaryTopics,
   saveDocumentViewPreferences,
   sortDocuments,
-  sortHierarchicalSections,
   updateSectionDefinition,
   type ProjectDocumentViewPreferences,
 } from './projectDocumentCommands'
 import { type DocumentCatalog, type DocumentFile } from './projectDocumentModel'
 import {
-  buildDocumentSections,
   buildOrganizationPrompt,
   customSectionKey,
+  GOVERNANCE_OVERVIEW_SECTION,
   governanceSectionForDocument,
   sectionForDocument,
   type DocumentSection,
 } from './projectDocumentSections'
 import styles from './ProjectDocumentsWorkspace.module.css'
 import { useProjectDocumentOrganization } from './useProjectDocumentOrganization'
+import { useProjectDocumentNavigation } from './useProjectDocumentNavigation'
 import { menuPointForButton, type ProjectDocumentMenuPoint } from './useProjectDocumentMenuTrigger'
 
 const ProjectDocumentCapabilityMap = lazy(() => import('./ProjectDocumentCapabilityMap'))
@@ -113,10 +115,6 @@ export default function ProjectDocumentsWorkspace({
   const [viewPreferences, setViewPreferences] = useState<ProjectDocumentViewPreferences>(() => loadDocumentViewPreferences(projectId))
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const automationPolicy = useProjectDocumentAutomationPolicy(projectId)
-  const governanceSections = useMemo(() => buildDocumentSections(organization.manifest)
-    .filter((section) => !section.custom), [organization.manifest])
-  const knowledgeSections = useMemo(() => buildKnowledgeSections(catalog, organization.manifest), [catalog, organization.manifest])
-  const baseSections = navigationMode === 'knowledge' ? knowledgeSections : governanceSections
   const architectureHealth = useMemo(() => serverArchitectureHealth(
     catalog, analyzeKnowledgeArchitecture(catalog, organization.manifest),
   ), [catalog, organization.manifest])
@@ -140,6 +138,14 @@ export default function ProjectDocumentsWorkspace({
   useEffect(() => { loadCatalog() }, [loadCatalog])
   useEffect(() => setViewPreferences(loadDocumentViewPreferences(projectId)), [projectId])
   useEffect(() => saveDocumentViewPreferences(projectId, viewPreferences), [projectId, viewPreferences])
+
+  const {
+    governanceSections, knowledgeSections, baseSections, governanceCounts, sectionCounts,
+    sections, activeSectionDefinition, sectionDocuments, visibleDocuments,
+  } = useProjectDocumentNavigation({
+    catalog, manifest: organization.manifest, suggestions: organization.suggestions,
+    navigationMode, activeSection, query, viewPreferences,
+  })
 
   const selectedEntry = useMemo(
     () => catalog?.documents.find((entry) => entry.path === selectedPath),
@@ -191,45 +197,6 @@ export default function ProjectDocumentsWorkspace({
     if (selectedPath) openDocument(selectedPath)
   }, [openDocument, selectedPath])
 
-  const governanceCounts = useMemo(() => {
-    const counts = Object.fromEntries(governanceSections.map((section) => [section.key, 0])) as Record<string, number>
-    for (const entry of catalog?.documents ?? []) {
-      const section = governanceSectionForDocument(entry, organization.manifest)
-      counts[section] = (counts[section] ?? 0) + 1
-    }
-    return counts
-  }, [catalog, governanceSections, organization.manifest])
-  const sectionCounts = useMemo(() => {
-    const counts = navigationMode === 'knowledge'
-      ? knowledgeSectionCounts(catalog, organization.manifest, knowledgeSections)
-      : { ...governanceCounts }
-    counts.suggestions = organization.suggestions
-      ? organization.suggestions.proposed_sections.length
-        + organization.suggestions.assignments.length
-        + organization.suggestions.file_operations.filter((operation) => operation.status === 'proposed').length || 1
-      : 0
-    counts[DOCUMENT_HEALTH_SECTION] = catalog?.analysis?.quality.summary.total_issues ?? 0
-    return counts
-  }, [catalog, governanceCounts, knowledgeSections, navigationMode, organization.manifest, organization.suggestions])
-  const sections = useMemo(() => navigationMode === 'knowledge'
-    ? sortHierarchicalSections(baseSections, viewPreferences.sectionSort, sectionCounts)
-    : baseSections, [baseSections, navigationMode, sectionCounts, viewPreferences.sectionSort])
-
-  const activeSectionDefinition = sections.find((section) => section.key === activeSection) ?? sections[0]
-  const sectionDocuments = useMemo(() => (catalog?.documents ?? [])
-    .filter((entry) => (navigationMode === 'knowledge'
-      ? topicSectionForDocument(entry, catalog, organization.manifest)
-      : governanceSectionForDocument(entry, organization.manifest)) === activeSection),
-  [activeSection, catalog, navigationMode, organization.manifest])
-  const visibleDocuments = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
-    const documents = sectionDocuments
-      .filter((entry) => !normalizedQuery
-        || entry.title.toLowerCase().includes(normalizedQuery)
-        || entry.path.toLowerCase().includes(normalizedQuery))
-    return sortDocuments(documents, organization.manifest, viewPreferences.documentSort)
-  }, [organization.manifest, query, sectionDocuments, viewPreferences.documentSort])
-
   useEffect(() => setSelectedPaths(new Set()), [activeSection, navigationMode])
 
   const openCommandMenu = useCallback((target: ProjectDocumentMenuTarget, point: ProjectDocumentMenuPoint) => {
@@ -239,7 +206,7 @@ export default function ProjectDocumentsWorkspace({
 
   function changeNavigationMode(mode: DocumentNavigationMode) {
     setNavigationMode(mode)
-    setActiveSection(mode === 'knowledge' ? KNOWLEDGE_HOME_SECTION : 'required')
+    setActiveSection(mode === 'knowledge' ? KNOWLEDGE_HOME_SECTION : GOVERNANCE_OVERVIEW_SECTION.key)
   }
 
   function openDocumentFromHome(path: string) {
@@ -247,6 +214,14 @@ export default function ProjectDocumentsWorkspace({
     if (!entry) return
     setNavigationMode('knowledge')
     setActiveSection(topicSectionForDocument(entry, catalog, organization.manifest))
+    chooseDocument(path)
+  }
+
+  function openDocumentFromGovernance(path: string) {
+    const entry = catalog?.documents.find((document) => document.path === path)
+    if (!entry) return
+    setNavigationMode('governance')
+    setActiveSection(governanceSectionForDocument(entry, organization.manifest))
     chooseDocument(path)
   }
 
@@ -300,6 +275,14 @@ export default function ProjectDocumentsWorkspace({
     } catch (error) {
       setMessage(errorMessage(error, '新建笔记失败'))
     }
+  }
+
+  async function saveGovernance(path: string, facets: Parameters<typeof setGovernanceFacets>[2], secondaryTopics: string[]) {
+    let next = setGovernanceFacets(organization.manifest, path, facets)
+    next = setSecondaryTopics(next, path, secondaryTopics)
+    await organization.applyManifest(next)
+    setMessage('多维治理属性和副主题已保存；路径权威上限仍由程序强制保护。')
+    await loadCatalog()
   }
 
   function createSection(parentId = '') {
@@ -658,8 +641,11 @@ export default function ProjectDocumentsWorkspace({
             onOpenSection={setActiveSection} onAiOrganize={organizeCapability} onAiReview={reviewKnowledgeMap} />
         </Suspense>
       ) : activeSection === DOCUMENT_HEALTH_SECTION ? (
-        <ProjectDocumentHealthCenter analysis={catalog?.analysis} onRefresh={loadCatalog}
-          onOpenSuggestions={() => setActiveSection('suggestions')} />
+        <ProjectDocumentHealthCenter analysis={catalog?.analysis} runtime={organizationTracking} onRefresh={loadCatalog}
+          onOpenSuggestions={() => setActiveSection('suggestions')} onRunAi={(instruction) => { void startAiOrganize(instruction) }} />
+      ) : activeSection === GOVERNANCE_OVERVIEW_SECTION.key ? (
+        <ProjectDocumentGovernanceOverview catalog={catalog} manifest={organization.manifest}
+          canEdit={!!catalog?.can_edit} onOpenDocument={openDocumentFromGovernance} onSave={saveGovernance} />
       ) : activeSection === 'suggestions' ? (
         <ProjectDocumentSuggestions
           suggestions={organization.suggestions}

@@ -7,7 +7,7 @@ use std::{collections::HashSet, path::Path};
 
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
-    project_document_analysis_model::{compact_document, document_in_scope, federation_scope_path},
+    project_document_analysis_model::{compact_document, document_in_scope, federation_scope},
     project_document_architecture::analyze_knowledge_architecture,
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{
@@ -55,13 +55,13 @@ pub(crate) fn analyze_workspace_scoped(
     let manifest = load_manifest(workspace)?;
     let suggestions = load_suggestions(workspace)?;
     let limit = limit.clamp(1, MAX_PAGE_SIZE);
-    let scope_path = federation_scope_path(&snapshot.analysis, scope_id)?;
+    let scope = federation_scope(&snapshot.analysis, scope_id)?;
     let scoped_catalog = snapshot
         .documents
         .iter()
         .filter(|document| {
-            scope_path
-                .as_deref()
+            scope
+                .as_ref()
                 .is_none_or(|scope| document_in_scope(&document.path, scope))
         })
         .collect::<Vec<_>>();
@@ -134,7 +134,7 @@ pub(crate) fn analyze_workspace_scoped(
         },
         "knowledge_architecture": knowledge_architecture,
         "document_health": snapshot.analysis,
-        "scope": {"id": scope_id, "path": scope_path},
+        "scope": {"id": scope_id, "definition": scope},
         "documents": documents,
         "manifest": manifest.value,
         "manifest_revision": manifest.revision,
