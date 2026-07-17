@@ -50,6 +50,13 @@
 6. 推送到远端主线、Android 版本 claim、APK 发布、服务器部署、PC 前端 `pc-next-dist` 发布、数据库任务状态落库必须串行；如果项目不能创建 worktree，退回项目级共享工作区串行执行。
 7. 一龙自项目与普通 GitHub / `local_path` 项目遵守同一套规则，不允许隐藏特殊流程。
 
+### UI 平台进化分流（Codex Desktop）
+
+1. UI 业务交付和 UI MCP/Renderer 平台进化是两种完成状态：`businessDeliveryReady` 表示用户要求的 UI 已写回源码、无补丁构建和视觉验收通过；`completionReady` 表示连平台缺口也已经闭环。非阻塞平台缺口不得把前者降级为失败。
+2. UI 业务会话发现平台缺口后只创建 `BUSINESS_THREAD` handoff，不在原会话升级、发布或长时间等待。`DELIVERY_NON_BLOCKING` 先按业务类型提交、push、发布并统一收尾，再由 Codex Desktop 在同一项目创建用户可见的独立 Worktree 任务；`DELIVERY_BLOCKING` 则暂停原任务并立即创建该任务。
+3. 后台任务用 handoff 参数重建 `EVOLUTION_THREAD` 工件，完成平台源码修改、测试、提交、发布、复检和原任务通知。长期进化不能藏在原任务的子代理中，原任务也不等待后台任务结束。
+4. 真机 Renderer/设备租约、节点发布和节点重启属于共享串行资源。后台进化优先级低于前台 UI：存在前台任务时必须无占用等待；设备授权失败时停止并请求人工处理，不得靠 debug 包名或重复安装循环绕过。
+
 ---
 
 ## 后端与 Codex CLI 协作边界
