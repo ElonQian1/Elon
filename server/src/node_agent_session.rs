@@ -167,7 +167,7 @@ pub(super) async fn run_session(
         node_agent_lifecycle::runtime_report(runtime, true, true, "正在注册云端会话").await;
     out_tx.send(ws_text(&AgentToServer::Register {
         agent_id: creds.agent_id.clone(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
+        version: crate::node_agent_release_identity::current(),
         proto_version: PROTO_VERSION,
         capabilities: vec![
             CAP_PROJECT_BUILD_CACHE_V1.to_string(),

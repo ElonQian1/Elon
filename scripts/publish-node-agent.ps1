@@ -29,6 +29,7 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
 . (Join-Path $PSScriptRoot "local-env.ps1")
+. (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
@@ -306,7 +307,8 @@ function Wait-NodePublicDevHandshake {
     param(
         [string]$Token,
         [bool]$UseRemoteToken,
-        [int]$TimeoutSec
+        [int]$TimeoutSec,
+        [Parameter(Mandatory = $true)][string]$TargetReleaseIdentity
     )
 
     if ($SkipHandshakeWait) {
@@ -325,37 +327,46 @@ function Wait-NodePublicDevHandshake {
         try {
             $status = Invoke-NodePublicDevHandshakeStatus -Token $Token -UseRemoteToken $UseRemoteToken
             if ($null -eq $status -or $null -eq $status.public_dev_handshake) {
-                Write-Host "  服务器暂未返回公开开发握手诊断，跳过等待。" -ForegroundColor DarkYellow
-                return
+                throw "服务器未返回公开开发握手诊断，无法确认目标构建已生效。"
             }
             $report = $status.public_dev_handshake
             $lastReport = $report
             $summary = $report.summary
-            Write-Host ("  握手状态：ready {0}/{1}，online {2}，pending-online {3}，offline {4}" -f `
+            $onlineNodes = @($report.nodes | Where-Object {
+                $_.public_dev_enabled -and $_.online
+            })
+            $targetReadyNodes = @($onlineNodes | Where-Object {
+                Test-NodeAgentPublishHandshakeReady `
+                    -Node $_ `
+                    -TargetReleaseIdentity $TargetReleaseIdentity
+            })
+            Write-Host ("  目标构建握手：ready {0}/{1}，平台握手 ready {2}/{3}，offline {4}" -f `
+                $targetReadyNodes.Count, `
+                $onlineNodes.Count, `
                 $summary.ready_public_dev, `
                 $summary.public_dev_enabled, `
-                $summary.online_public_dev, `
-                $summary.pending_online_public_dev, `
                 $summary.offline_public_dev) -ForegroundColor DarkGray
 
-            $pending = @($report.nodes | Where-Object {
-                $_.public_dev_enabled -and $_.online -and -not $_.public_dev_handshake_ready
+            $pending = @($onlineNodes | Where-Object {
+                -not (Test-NodeAgentPublishHandshakeReady `
+                    -Node $_ `
+                    -TargetReleaseIdentity $TargetReleaseIdentity)
             })
             if ($pending.Count -eq 0) {
-                Write-Host "  在线公开开发节点握手已就绪。" -ForegroundColor Green
+                Write-Host "  在线公开开发节点均已运行目标构建并完成握手。" -ForegroundColor Green
                 return
             }
 
             $sample = @($pending | Select-Object -First 5 | ForEach-Object {
                 $owner = if ($_.owner_nickname) { $_.owner_nickname } elseif ($_.owner_account) { $_.owner_account } else { $_.owner_user_id }
-                "$($_.display_name)/$owner/$($_.public_dev_handshake_status)"
+                $reported = if ($_.agent_version) { $_.agent_version } else { "unknown-build" }
+                "$($_.display_name)/$owner/$($_.public_dev_handshake_status)/$reported"
             })
             if ($sample.Count -gt 0) {
                 Write-Host ("  待握手节点：" + ($sample -join "；")) -ForegroundColor DarkYellow
             }
         } catch {
-            Write-Host "  公开开发握手诊断接口暂不可用：$($_.Exception.Message)" -ForegroundColor DarkYellow
-            return
+            throw "公开开发握手诊断失败：$($_.Exception.Message)"
         }
 
         if ((Get-Date) -ge $deadline) { break }
@@ -364,13 +375,17 @@ function Wait-NodePublicDevHandshake {
 
     if ($null -ne $lastReport) {
         $pending = @($lastReport.nodes | Where-Object {
-            $_.public_dev_enabled -and $_.online -and -not $_.public_dev_handshake_ready
+            $_.public_dev_enabled -and $_.online -and -not (
+                Test-NodeAgentPublishHandshakeReady `
+                    -Node $_ `
+                    -TargetReleaseIdentity $TargetReleaseIdentity
+            )
         })
         if ($pending.Count -gt 0) {
-            Write-Host "  公开开发握手等待超时，仍有 $($pending.Count) 个在线节点未就绪；请查看 PC 节点页或 admin 诊断接口。" -ForegroundColor Yellow
+            throw "公开开发握手等待超时，仍有 $($pending.Count) 个在线节点未运行目标构建或未完成握手；请查看 PC 节点页或 admin 诊断接口。"
         }
     } else {
-        Write-Host "  公开开发握手等待超时，未拿到诊断报告。" -ForegroundColor Yellow
+        throw "公开开发握手等待超时，未拿到诊断报告。"
     }
 }
 
@@ -504,15 +519,18 @@ if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
 if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
 $GitSha = Assert-NodeAgentPublishHeadCurrent -Phase "发布开始"
+$ReleaseIdentity = Get-NodeAgentReleaseIdentity -Version $PackageVersion -GitSha $GitSha
 $ReleaseChangelog = Resolve-NodeAgentChangelog -Explicit $Changelog -Sha $GitSha
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
+Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
 if (-not [string]::IsNullOrWhiteSpace($ReleaseChangelog)) {
     Write-Host "  更新内容: $ReleaseChangelog" -ForegroundColor DarkGray
 }
 
 # ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
 Write-Host "[1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
+$PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
 try {
     # musl 交叉编译需要 C 工具链（ring 依赖 gcc）；用 cargo-zigbuild 提供 zig cc，
     # 与 publish-server.ps1 同方案，避免缺少 x86_64-linux-musl-gcc 时编译失败。
@@ -526,10 +544,16 @@ try {
     # 强制通用 CPU，避免全局 target-cpu=native 产出服务器/他人机器无法运行的指令
     $unitSeparator = [char]0x1f
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
+    $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
     cargo zigbuild --manifest-path $ServerManifest --release --bin $Bin --target x86_64-unknown-linux-musl
     if ($LASTEXITCODE -ne 0) { throw "Linux 编译失败" }
 } finally {
     Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+    if ($null -eq $PreviousNodeAgentGitSha) {
+        Remove-Item Env:\ELON_NODE_AGENT_GIT_SHA -ErrorAction SilentlyContinue
+    } else {
+        $env:ELON_NODE_AGENT_GIT_SHA = $PreviousNodeAgentGitSha
+    }
 }
 
 $LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
@@ -538,15 +562,22 @@ $LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLo
 
 # ── 2. 编译 Windows 版本 ─────────────────────────────────────────────────────
 Write-Host "[2/5] 编译 Windows 版本..." -ForegroundColor Yellow
+$PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
 try {
     # 强制通用 CPU，避免全局 target-cpu=native 产出用户机器无法运行的指令。
     $unitSeparator = [char]0x1f
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
+    $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
     Write-Host "  Windows release rustflags: -C target-cpu=x86-64" -ForegroundColor DarkGray
     cargo build --manifest-path $ServerManifest --release --bin $Bin
     if ($LASTEXITCODE -ne 0) { throw "Windows 编译失败" }
 } finally {
     Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+    if ($null -eq $PreviousNodeAgentGitSha) {
+        Remove-Item Env:\ELON_NODE_AGENT_GIT_SHA -ErrorAction SilentlyContinue
+    } else {
+        $env:ELON_NODE_AGENT_GIT_SHA = $PreviousNodeAgentGitSha
+    }
 }
 
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
@@ -726,7 +757,8 @@ if (-not $SkipBroadcast) {
     Wait-NodePublicDevHandshake `
         -Token $BroadcastAdminToken `
         -UseRemoteToken $UseRemoteAdminToken `
-        -TimeoutSec $HandshakeWaitSec
+        -TimeoutSec $HandshakeWaitSec `
+        -TargetReleaseIdentity $ReleaseIdentity
 }
 
 Write-Host ""

@@ -117,6 +117,7 @@ mod node_agent_project_profile_node;
 mod node_agent_project_profile_python;
 mod node_agent_proxy;
 mod node_agent_registration;
+mod node_agent_release_identity;
 mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
@@ -365,12 +366,12 @@ async fn run_agent_runtime() -> Result<()> {
     match &creds {
         Some(c) => info!(
             "🚀 elon-node-agent {} 启动 (agent_id: {})",
-            env!("CARGO_PKG_VERSION"),
+            node_agent_release_identity::current(),
             c.agent_id
         ),
         None => info!(
             "🚀 elon-node-agent {} 启动（未登录，请打开管理页 http://127.0.0.1:7799/ 登录）",
-            env!("CARGO_PKG_VERSION")
+            node_agent_release_identity::current()
         ),
     }
     info!("   云端: {}", cfg.cloud_url);

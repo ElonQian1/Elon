@@ -54,6 +54,7 @@ pub(super) async fn admin_status(
         });
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
+        "release_identity": super::node_agent_release_identity::current(),
         "local_admin_token_header": super::node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
         "lifecycle_report_schema_version": 1,
         "task_journal_supported": true,
