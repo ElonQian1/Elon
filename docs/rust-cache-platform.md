@@ -139,7 +139,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -A
 
 平台检测到 `--release` 或 `--profile release` 时设置 `CARGO_INCREMENTAL=0`。这是为了避免 release incremental 无限积累，也让更多库 crate 可以进入 sccache。
 
-开发 profile 可以继续使用 incremental；sccache 会复用可缓存的非 incremental 编译。`SCCACHE_BASEDIRS` 同时剥离当前 workspace 根和项目根，而不是它们的共同父目录；这样不同 checkout/worktree 的绝对根不会进入缓存键，相同编译输入才能跨目录命中。
+开发 profile 可以继续使用 incremental；sccache 会复用可缓存的非 incremental 编译。平台从 workspace 注册表生成 `config/sccache-config`，其中的 `basedirs` 同时包含仍存在的 workspace 根、项目根、build-dir 和最终 target-dir，而不是它们的共同父目录；这样源码绝对根和每个分区特有的 `--out-dir` 都不会进入缓存键，相同编译输入才能跨目录命中。
+
+sccache 是常驻客户端/服务器模型，配置变化必须由服务器重新加载。平台只在没有 Cargo/rustc 写入者时重启；并发构建期间只标记延迟，下一次空闲构建再同步。安装激活会写入当前 Windows 用户的 `SCCACHE_CONF`、`SCCACHE_DIR`、`SCCACHE_CACHE_SIZE`，所以服务器空闲退出后也会从托管配置自动启动。
 
 ## 旧缓存迁移
 

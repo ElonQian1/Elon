@@ -43,6 +43,25 @@ function Write-RustCacheRegistry {
     return $path
 }
 
+function Enter-RustCacheRegistryLock {
+    param(
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $lockPath = Join-Path $CacheRoot "state\registry.lock"
+    New-Item -ItemType Directory -Force -Path (Split-Path $lockPath -Parent) | Out-Null
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        try {
+            return [System.IO.File]::Open($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+        } catch [System.IO.IOException] {
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    throw "Timed out waiting for Rust cache registry lock: $lockPath"
+}
+
 function Update-RustCacheRegistry {
     param(
         [Parameter(Mandatory)][string]$CacheRoot,
@@ -57,30 +76,33 @@ function Update-RustCacheRegistry {
         [bool]$Registered
     )
 
-    $registry = Read-RustCacheRegistry -CacheRoot $CacheRoot
-    $items = @($registry.workspaces)
-    $existing = $items | Where-Object { $_.workspace_hash -eq $WorkspaceHash -and $_.domain -eq $Domain } | Select-Object -First 1
-    $values = [ordered]@{
-        project_id = $ProjectId
-        project_root = $ProjectRoot
-        workspace_root = $WorkspaceRoot
-        workspace_hash = $WorkspaceHash
-        domain = $Domain
-        toolchain_epoch = $ToolchainEpoch
-        build_dir = $BuildDir
-        target_dir = $TargetDir
-        registered = $Registered
-        last_seen_utc = [DateTime]::UtcNow.ToString("o")
-    }
-    if ($existing) {
-        foreach ($key in $values.Keys) {
-            $existing.$key = $values[$key]
+    $lock = Enter-RustCacheRegistryLock -CacheRoot $CacheRoot
+    try {
+        $registry = Read-RustCacheRegistry -CacheRoot $CacheRoot
+        $items = @($registry.workspaces)
+        $existing = $items | Where-Object { $_.workspace_hash -eq $WorkspaceHash -and $_.domain -eq $Domain } | Select-Object -First 1
+        $values = [ordered]@{
+            project_id = $ProjectId
+            project_root = $ProjectRoot
+            workspace_root = $WorkspaceRoot
+            workspace_hash = $WorkspaceHash
+            domain = $Domain
+            toolchain_epoch = $ToolchainEpoch
+            build_dir = $BuildDir
+            target_dir = $TargetDir
+            registered = $Registered
+            last_seen_utc = [DateTime]::UtcNow.ToString("o")
         }
-    } else {
-        $items += [pscustomobject]$values
+        if ($existing) {
+            foreach ($key in $values.Keys) { $existing.$key = $values[$key] }
+        } else {
+            $items += [pscustomobject]$values
+        }
+        $registry.workspaces = @($items | Sort-Object project_id, domain, workspace_hash)
+        Write-RustCacheRegistry -CacheRoot $CacheRoot -Registry $registry | Out-Null
+    } finally {
+        if ($lock) { $lock.Dispose() }
     }
-    $registry.workspaces = @($items | Sort-Object project_id, domain, workspace_hash)
-    Write-RustCacheRegistry -CacheRoot $CacheRoot -Registry $registry | Out-Null
 }
 
-Export-ModuleMember -Function Get-RustCacheRegistryPath, Read-RustCacheRegistry, Write-RustCacheRegistry, Update-RustCacheRegistry
+Export-ModuleMember -Function Get-RustCacheRegistryPath, Read-RustCacheRegistry, Write-RustCacheRegistry, Enter-RustCacheRegistryLock, Update-RustCacheRegistry

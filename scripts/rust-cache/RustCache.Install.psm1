@@ -1,5 +1,6 @@
 Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
 
 function ConvertTo-RustCacheTomlPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -90,52 +91,45 @@ function Restart-RustCacheSccacheServer {
 
     $sccache = Get-Command sccache -ErrorAction SilentlyContinue
     if (-not $sccache) { return $null }
-    $expectedCacheDir = Join-Path $CacheRoot "sccache"
-    $currentStats = @(& $sccache.Source --show-stats 2>&1)
-    $currentLocation = $currentStats | Where-Object { $_ -match '^Cache location\s+' } | Select-Object -First 1
-    $normalizedCurrentLocation = if ($currentLocation) { ([string]$currentLocation).Replace("\\", "\") } else { "" }
-    if ($normalizedCurrentLocation -like "*$expectedCacheDir*") {
-        return [pscustomobject]@{ path = $sccache.Source; cache_dir = $expectedCacheDir; max_cache_size = $MaxCacheSize; location = $currentLocation; restarted = $false }
+    $result = Sync-RustCacheSccacheConfiguration -CacheRoot $CacheRoot -ConfigureProcessEnvironment -ForceRestart
+    $normalizedLocation = if ($result.location) { ([string]$result.location).Replace("\\", "\") } else { "" }
+    if (-not $result.location -or $normalizedLocation -notlike "*$($result.cache_dir)*") {
+        throw "sccache server did not bind the managed cache directory. Reported: $($result.location)"
     }
-    $activeBuilds = @(Get-Process -Name cargo, rustc -ErrorAction SilentlyContinue)
-    if ($activeBuilds.Count -gt 0) {
-        $summary = ($activeBuilds | ForEach-Object { "$($_.ProcessName):$($_.Id)" }) -join ", "
-        throw "Refusing to restart sccache while Cargo/rustc processes are active: $summary"
+    return [pscustomobject]@{
+        path = $sccache.Source
+        cache_dir = $result.cache_dir
+        max_cache_size = $MaxCacheSize
+        config_path = $result.config_path
+        base_directories = $result.base_directories
+        base_directory_status = $result.base_directory_status
+        location = $result.location
+        restarted = $result.restarted
     }
+}
 
-    $names = @("SCCACHE_DIR", "SCCACHE_CACHE_SIZE")
-    $snapshot = @{}
-    foreach ($name in $names) {
-        $snapshot[$name] = [pscustomobject]@{
-            exists = Test-Path "Env:$name"
-            value = [Environment]::GetEnvironmentVariable($name, "Process")
-        }
+function Set-RustCacheUserEnvironment {
+    param(
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [Parameter(Mandatory)][string]$MaxCacheSize,
+        [switch]$Apply
+    )
+
+    $values = [ordered]@{
+        ELON_RUST_CACHE_ROOT = [System.IO.Path]::GetFullPath($CacheRoot)
+        SCCACHE_DIR = Join-Path ([System.IO.Path]::GetFullPath($CacheRoot)) "sccache"
+        SCCACHE_CACHE_SIZE = $MaxCacheSize
+        SCCACHE_CONF = Get-RustCacheSccacheConfigPath -CacheRoot $CacheRoot
     }
-    try {
-        $env:SCCACHE_DIR = Join-Path $CacheRoot "sccache"
-        $env:SCCACHE_CACHE_SIZE = $MaxCacheSize
-        New-Item -ItemType Directory -Force -Path $env:SCCACHE_DIR | Out-Null
-        & $sccache.Source --stop-server *> $null
-        & $sccache.Source --start-server | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            throw "sccache server failed to start with SCCACHE_DIR=$env:SCCACHE_DIR"
+    if ($Apply -and $env:OS -eq "Windows_NT") {
+        foreach ($name in $values.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $values[$name], "User")
+            [Environment]::SetEnvironmentVariable($name, $values[$name], "Process")
         }
-        $stats = @(& $sccache.Source --show-stats 2>&1)
-        $location = $stats | Where-Object { $_ -match '^Cache location\s+' } | Select-Object -First 1
-        $normalizedLocation = if ($location) { ([string]$location).Replace("\\", "\") } else { "" }
-        if (-not $location -or $normalizedLocation -notlike "*$env:SCCACHE_DIR*") {
-            throw "sccache server did not bind the managed cache directory. Reported: $location"
-        }
-        return [pscustomobject]@{ path = $sccache.Source; cache_dir = $env:SCCACHE_DIR; max_cache_size = $MaxCacheSize; location = $location; restarted = $true }
-    } finally {
-        foreach ($name in $names) {
-            if ($snapshot[$name].exists) {
-                [Environment]::SetEnvironmentVariable($name, $snapshot[$name].value, "Process")
-            } else {
-                Remove-Item "Env:$name" -ErrorAction SilentlyContinue
-            }
-        }
+        [Environment]::SetEnvironmentVariable("ELON_DEV_CARGO_TARGET_DIR", $null, "User")
+        Remove-Item Env:ELON_DEV_CARGO_TARGET_DIR -ErrorAction SilentlyContinue
     }
+    [pscustomobject]@{ applied = [bool]$Apply; values = [pscustomobject]$values; cleared_legacy_target = [bool]$Apply }
 }
 
 function Install-RustCachePlatform {
@@ -169,12 +163,16 @@ function Install-RustCachePlatform {
     $includeContent = Get-RustCacheCargoIncludeContent -CacheRoot $root -SccachePath $(if ($sccache) { $sccache.Source } else { $null })
     Set-Content -LiteralPath $includePath -Value $includeContent -Encoding UTF8 -NoNewline
 
+    $sccacheConfig = Sync-RustCacheSccacheConfiguration -CacheRoot $root
+
     New-Item -ItemType Directory -Force -Path (Join-Path $root "sccache") | Out-Null
     $sccacheServer = $null
     if ($ConfigureSccacheServer -and $sccache) {
         $policy = Get-RustCachePolicy -CacheRoot $root
         $sccacheServer = Restart-RustCacheSccacheServer -CacheRoot $root -MaxCacheSize ([string]$policy.sccache_max_size)
     }
+
+    $userEnvironment = Set-RustCacheUserEnvironment -CacheRoot $root -MaxCacheSize ([string](Get-RustCachePolicy -CacheRoot $root).sccache_max_size) -Apply:$ActivateCargoConfig
 
     $activation = $null
     if ($ActivateCargoConfig) {
@@ -189,9 +187,11 @@ function Install-RustCachePlatform {
         entry_path = Join-Path $platformRoot "rust-cache.ps1"
         cargo_include_path = $includePath
         sccache_path = if ($sccache) { $sccache.Source } else { $null }
+        sccache_config_path = $sccacheConfig.config_path
         sccache_server = $sccacheServer
+        user_environment = $userEnvironment
         cargo_activation = $activation
     }
 }
 
-Export-ModuleMember -Function ConvertTo-RustCacheTomlPath, Get-RustCacheCargoIncludeContent, Set-RustCacheParentCargoConfig, Restart-RustCacheSccacheServer, Install-RustCachePlatform
+Export-ModuleMember -Function ConvertTo-RustCacheTomlPath, Get-RustCacheCargoIncludeContent, Set-RustCacheParentCargoConfig, Restart-RustCacheSccacheServer, Set-RustCacheUserEnvironment, Install-RustCachePlatform

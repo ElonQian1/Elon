@@ -1,6 +1,7 @@
 Import-Module "$PSScriptRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$PSScriptRoot\RustCache.Registry.psm1" -Force -DisableNameChecking
+Import-Module "$PSScriptRoot\RustCache.Sccache.psm1" -DisableNameChecking
 
 function Resolve-RustCacheWorkspaceRoot {
     param(
@@ -225,17 +226,15 @@ function Set-RustCacheBuildEnvironment {
     if ($context.release) {
         $env:CARGO_INCREMENTAL = "0"
     }
+    Update-RustCacheRegistry -CacheRoot $context.cache_root -ProjectId $context.project_id -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root -WorkspaceHash $context.workspace_hash -Domain $context.domain -ToolchainEpoch $context.toolchain_epoch -BuildDir $context.build_dir -TargetDir $context.target_dir -Registered $context.registered
     $sccache = if ($DisableSccache) { $null } else { Get-Command sccache -ErrorAction SilentlyContinue }
     if ($sccache) {
-        $policy = Get-RustCachePolicy -CacheRoot $context.cache_root
-        $env:SCCACHE_DIR = Join-Path $context.cache_root "sccache"
-        $env:SCCACHE_CACHE_SIZE = [string]$policy.sccache_max_size
-        New-Item -ItemType Directory -Force -Path $env:SCCACHE_DIR | Out-Null
+        $sync = Sync-RustCacheSccacheConfiguration -CacheRoot $context.cache_root -AdditionalBaseDirs @($context.build_dir, $context.target_dir, $context.workspace_root, $context.project_root) -ConfigureProcessEnvironment -RestartIfChanged
+        if ($sync.restart_pending) {
+            Write-Warning "sccache base-directory configuration changed but restart is deferred while another Cargo/rustc process is active."
+        }
         if ([string]::IsNullOrWhiteSpace($env:RUSTC_WRAPPER)) {
             $env:RUSTC_WRAPPER = $sccache.Source
-        }
-        if ([string]::IsNullOrWhiteSpace($env:SCCACHE_BASEDIRS)) {
-            $env:SCCACHE_BASEDIRS = Get-RustCacheSccacheBaseDirs -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root
         }
     }
     $marker = [ordered]@{
@@ -247,7 +246,6 @@ function Set-RustCacheBuildEnvironment {
         pid = $PID
     }
     $marker | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $context.build_dir ".last-used.json") -Encoding UTF8
-    Update-RustCacheRegistry -CacheRoot $context.cache_root -ProjectId $context.project_id -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root -WorkspaceHash $context.workspace_hash -Domain $context.domain -ToolchainEpoch $context.toolchain_epoch -BuildDir $context.build_dir -TargetDir $context.target_dir -Registered $context.registered
     return $context
 }
 
@@ -268,7 +266,8 @@ function Invoke-RustCacheCargo {
     $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch
     New-Item -ItemType Directory -Force -Path $context.build_dir | Out-Null
     $lockPath = $null
-    $envNames = @("CARGO_BUILD_BUILD_DIR", "CARGO_TARGET_DIR", "CARGO_INCREMENTAL", "RUSTC_WRAPPER", "SCCACHE_DIR", "SCCACHE_BASEDIRS", "SCCACHE_CACHE_SIZE")
+    $locationPushed = $false
+    $envNames = @("CARGO_BUILD_BUILD_DIR", "CARGO_TARGET_DIR", "CARGO_INCREMENTAL", "RUSTC_WRAPPER", "SCCACHE_DIR", "SCCACHE_CONF", "SCCACHE_CACHE_SIZE")
     $environment = Save-RustCacheEnvironment -Names $envNames
     try {
         if (-not $NoLock) {
@@ -290,8 +289,11 @@ function Invoke-RustCacheCargo {
             Write-Warning "sccache is unavailable or disabled; Cargo will still use the isolated build-dir."
         }
         Write-Host "$CargoCommand $($CargoArgs -join ' ')"
+        Push-Location -LiteralPath $context.project_root
+        $locationPushed = $true
         & $CargoCommand @CargoArgs
     } finally {
+        if ($locationPushed) { Pop-Location }
         Exit-RustCacheLock -LockPath $lockPath
         Restore-RustCacheEnvironment -Snapshot $environment
     }

@@ -8,6 +8,7 @@ Import-Module "$ModulesRoot\RustCache.Inventory.psm1" -Force -DisableNameCheckin
 Import-Module "$ModulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
+Import-Module "$ModulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 
 $script:Assertions = 0
 function Assert-True {
@@ -52,6 +53,9 @@ try {
     $baseDirs = Get-RustCacheSccacheBaseDirs -ProjectRoot $nestedContext.project_root -WorkspaceRoot $nestedContext.workspace_root
     $expectedBaseDirs = "{0}{1}{2}" -f $nestedContext.workspace_root, [System.IO.Path]::PathSeparator, $nestedContext.project_root
     Assert-Equal $expectedBaseDirs $baseDirs "sccache should strip checkout-specific workspace and project roots"
+    $sccacheConfig = Get-RustCacheSccacheConfigContent -BaseDirs @($ProjectRoot, $UnknownRoot)
+    Assert-True ($sccacheConfig -match '^# Generated' -and $sccacheConfig -match 'basedirs = \[') "sccache config should be generated from registered roots"
+    Assert-True ($sccacheConfig -match [regex]::Escape($ProjectRoot.Replace('\', '/'))) "sccache config should normalize project paths"
 
     $release = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test"
     Assert-True $release.release "release invocation should be detected"
@@ -63,6 +67,7 @@ try {
 set CARGO_BUILD_BUILD_DIR>%RUST_CACHE_TEST_ENV%
 set CARGO_TARGET_DIR>>%RUST_CACHE_TEST_ENV%
 set CARGO_INCREMENTAL>>%RUST_CACHE_TEST_ENV%
+echo CARGO_CWD=%CD%>>%RUST_CACHE_TEST_ENV%
 exit /b 0
 "@ | Set-Content -LiteralPath $FakeCargo -Encoding ASCII
     $env:RUST_CACHE_TEST_ENV = $EnvironmentCapture
@@ -72,6 +77,7 @@ exit /b 0
     Assert-True ($captured -match 'CARGO_BUILD_BUILD_DIR=.*test-project\\release-host') "Cargo should receive the managed build-dir"
     Assert-True ($captured -match 'CARGO_TARGET_DIR=.*registered-project\\target') "Cargo should receive the local target-dir"
     Assert-True ($captured -match 'CARGO_INCREMENTAL=0') "release should force incremental off"
+    Assert-True ($captured -match "CARGO_CWD=$([regex]::Escape($ProjectRoot))") "Cargo should execute from the declared project root"
     Assert-True ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_BUILD_DIR)) "Cargo environment should be restored after execution"
 
     $staleBuildDir = Join-Path $CacheRoot "build\rustc-test\test-project\stale\0123456789abcdef"
@@ -121,6 +127,7 @@ retry = 3
     $install = Install-RustCachePlatform -SourceScriptsRoot $PSScriptRoot -CacheRoot (Join-Path $TempRoot "installed") -RepoRoot $ProjectRoot
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
+    Assert-True (Test-Path -LiteralPath $install.sccache_config_path) "installer should generate managed sccache config"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path
     Assert-True ($include -match 'build-dir = .*quarantine/.+workspace-path-hash') "fallback Cargo route should use workspace quarantine"
     $bashAdapter = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "cargo-dev.sh")

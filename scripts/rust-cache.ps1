@@ -36,6 +36,7 @@ Import-Module "$modulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Policy.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Inventory.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
+Import-Module "$modulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$modulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 # Nested module imports are scoped to their owning module. Re-import the two
