@@ -7,6 +7,20 @@ $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $policyFile = Join-Path $repoRoot ".ai\workspace-policy.txt"
 
+$checkSource = Get-Content -Raw -LiteralPath $checkScript
+$serverGateStart = $checkSource.IndexOf('if ($Kind -eq "Server" -or $Kind -eq "PcFrontend")')
+$serverHealthStart = $checkSource.IndexOf('    try {', $serverGateStart)
+if ($serverGateStart -lt 0 -or $serverHealthStart -lt 0) {
+    throw "Server/PcFrontend completion gate could not be located."
+}
+$serverPushGate = $checkSource.Substring($serverGateStart, $serverHealthStart - $serverGateStart)
+if (-not $serverPushGate.Contains('git merge-base --is-ancestor $head $originMain')) {
+    throw "Server/PcFrontend completion must accept a task HEAD already contained in a newer origin/main."
+}
+if ($serverPushGate.Contains('$head -ne $originMain')) {
+    throw "Server/PcFrontend completion must not chase unrelated commits that landed after deployment."
+}
+
 function Invoke-Git {
     param(
         [string]$Path,

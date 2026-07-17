@@ -421,8 +421,9 @@ if ($Kind -eq "DocsOnly") {
 }
 
 if ($Kind -eq "Server" -or $Kind -eq "PcFrontend") {
-    if ($head -ne $originMain) {
-        Stop-Check "$Kind task is not complete: HEAD is not pushed to origin/main."
+    git merge-base --is-ancestor $head $originMain | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Stop-Check "$Kind task is not complete: local HEAD is not contained in origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
     }
 
     try {
