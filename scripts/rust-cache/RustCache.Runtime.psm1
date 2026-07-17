@@ -234,7 +234,8 @@ function Set-RustCacheBuildEnvironment {
             Write-Warning "sccache base-directory configuration changed but restart is deferred while another Cargo/rustc process is active."
         }
         if ([string]::IsNullOrWhiteSpace($env:RUSTC_WRAPPER)) {
-            $env:RUSTC_WRAPPER = $sccache.Source
+            $managedWrapper = Get-RustCacheSccacheWrapperPath -CacheRoot $context.cache_root
+            $env:RUSTC_WRAPPER = if (Test-Path -LiteralPath $managedWrapper) { $managedWrapper } else { $sccache.Source }
         }
     }
     $marker = [ordered]@{

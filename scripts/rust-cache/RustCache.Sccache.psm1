@@ -12,6 +12,11 @@ function Get-RustCacheSccacheConfigPath {
     Join-Path $CacheRoot "config\sccache-config"
 }
 
+function Get-RustCacheSccacheWrapperPath {
+    param([Parameter(Mandatory)][string]$CacheRoot)
+    Join-Path $CacheRoot "platform\rustc-sccache-wrapper.cmd"
+}
+
 function Get-RustCacheSccacheBaseDirectories {
     param(
         [Parameter(Mandatory)][string]$CacheRoot,
@@ -165,4 +170,4 @@ function Sync-RustCacheSccacheConfiguration {
     }
 }
 
-Export-ModuleMember -Function ConvertTo-RustCacheSccacheConfigPath, Get-RustCacheSccacheConfigPath, Get-RustCacheSccacheBaseDirectories, Get-RustCacheSccacheConfigContent, Enter-RustCacheSccacheConfigLock, Get-RustCacheTextSha256, Sync-RustCacheSccacheConfiguration
+Export-ModuleMember -Function ConvertTo-RustCacheSccacheConfigPath, Get-RustCacheSccacheConfigPath, Get-RustCacheSccacheWrapperPath, Get-RustCacheSccacheBaseDirectories, Get-RustCacheSccacheConfigContent, Enter-RustCacheSccacheConfigLock, Get-RustCacheTextSha256, Sync-RustCacheSccacheConfiguration

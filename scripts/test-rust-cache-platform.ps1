@@ -131,8 +131,13 @@ retry = 3
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
     Assert-True (Test-Path -LiteralPath $install.sccache_config_path) "installer should generate managed sccache config"
+    Assert-True (Test-Path -LiteralPath $install.sccache_wrapper_path) "installer should generate the managed sccache wrapper"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path
     Assert-True ($include -match 'build-dir = .*quarantine/.+workspace-path-hash') "fallback Cargo route should use workspace quarantine"
+    Assert-True ($include -match [regex]::Escape($install.sccache_wrapper_path.Replace('\', '/'))) "Cargo include should select the managed sccache wrapper"
+    $sccacheWrapper = Get-Content -Raw -LiteralPath $install.sccache_wrapper_path
+    Assert-True ($sccacheWrapper -match 'set "CARGO_BUILD_BUILD_DIR="' -and $sccacheWrapper -match 'set "CARGO_TARGET_DIR="') "sccache wrapper should remove Cargo-only routing variables"
+    Assert-True ($sccacheWrapper -match 'SCCACHE_CONF=' -and $sccacheWrapper -match 'sccache\.exe" %\*') "sccache wrapper should pin managed configuration and forward compiler arguments"
     $bashAdapter = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "cargo-dev.sh")
     Assert-True ($bashAdapter -match 'powershell\.exe' -and $bashAdapter -match 'ps_script=.*cargo-dev\.ps1') "Git Bash should delegate to the PowerShell cache platform on Windows"
     Assert-True ($bashAdapter -notmatch 'ELON_DEV_CARGO_TARGET_DIR') "Git Bash must not route back to the retired shared target"
