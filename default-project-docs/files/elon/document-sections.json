@@ -33,5 +33,6 @@
     "AI_ARCHITECTURE.md": { "doc_type": "architecture", "audience": ["开发者", "AI 代理"], "owner": "", "version": "", "related": ["AI_INDEX.md"], "supersedes": [] },
     "AI_INDEX.md": { "doc_type": "reference", "audience": ["开发者", "AI 代理"], "owner": "", "version": "", "related": ["AI_ARCHITECTURE.md"], "supersedes": [] }
   },
-  "audit_log": []
+  "audit_log": [],
+  "knowledge_graph": { "nodes": [], "edges": [] }
 }

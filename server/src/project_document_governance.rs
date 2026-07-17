@@ -11,6 +11,10 @@ use crate::project_document_file_operation_model::{
 pub(crate) use crate::project_document_file_operation_model::{
     SuggestedFileOperation, SuggestedFileOperationKind, SuggestedFileOperationStatus,
 };
+use crate::project_document_knowledge_graph_model::{
+    merge_graph_config, normalize_graph_config, validate_graph_document_paths,
+    ProjectKnowledgeGraphConfig,
+};
 
 pub(crate) const SECTION_CONFIG_PATH: &str = ".elon/document-sections.json";
 pub(crate) const SUGGESTIONS_CONFIG_PATH: &str = ".elon/document-organization-suggestions.json";
@@ -142,6 +146,8 @@ pub(crate) struct DocumentSectionManifest {
     pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
     #[serde(default)]
     pub audit_log: Vec<DocumentOrganizationAuditEntry>,
+    #[serde(default)]
+    pub knowledge_graph: ProjectKnowledgeGraphConfig,
 }
 
 impl Default for DocumentSectionManifest {
@@ -155,6 +161,7 @@ impl Default for DocumentSectionManifest {
             governance_overrides: BTreeMap::new(),
             document_metadata: BTreeMap::new(),
             audit_log: Vec::new(),
+            knowledge_graph: ProjectKnowledgeGraphConfig::default(),
         }
     }
 }
@@ -209,6 +216,8 @@ pub(crate) struct DocumentOrganizationSuggestions {
     pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
     #[serde(default)]
     pub file_operations: Vec<SuggestedFileOperation>,
+    #[serde(default)]
+    pub proposed_knowledge_graph: ProjectKnowledgeGraphConfig,
     #[serde(default)]
     pub documents_read: u64,
     #[serde(default)]
@@ -307,6 +316,7 @@ pub(crate) fn normalize_manifest(
         .filter(|entry| !entry.id.is_empty() && !entry.action.is_empty())
         .collect::<Vec<_>>();
     manifest.audit_log.reverse();
+    manifest.knowledge_graph = normalize_graph_config(manifest.knowledge_graph)?;
     Ok(manifest)
 }
 
@@ -361,6 +371,8 @@ pub(crate) fn normalize_suggestions(
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
     suggestions.file_operations = normalize_file_operations(suggestions.file_operations)?;
+    suggestions.proposed_knowledge_graph =
+        normalize_graph_config(suggestions.proposed_knowledge_graph)?;
     Ok(suggestions)
 }
 
@@ -384,6 +396,7 @@ pub(crate) fn validate_ready_suggestions(
         }
     }
     validate_suggested_paths(&suggestions, &known_paths)?;
+    validate_graph_document_paths(&suggestions.proposed_knowledge_graph, &known_paths)?;
     validate_file_operations(&suggestions.file_operations, documents, &known_paths)?;
     Ok(suggestions)
 }
@@ -425,6 +438,10 @@ pub(crate) fn apply_suggestions(
     manifest
         .document_metadata
         .extend(suggestions.document_metadata.clone());
+    manifest.knowledge_graph = merge_graph_config(
+        manifest.knowledge_graph,
+        suggestions.proposed_knowledge_graph.clone(),
+    )?;
     manifest.sections = sections.into_values().collect();
     let valid_keys = valid_section_keys(&manifest.sections);
     let mut applied = 0usize;

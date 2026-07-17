@@ -3,13 +3,24 @@ const fs = require('node:fs')
 const path = require('node:path')
 const ts = require('typescript')
 
+const graphModelPath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentKnowledgeGraphModel.ts')
+const graphModelOutput = ts.transpileModule(fs.readFileSync(graphModelPath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const graphModelLoaded = { exports: {} }
+new Function('module', 'exports', 'require', graphModelOutput)(graphModelLoaded, graphModelLoaded.exports, require)
+
 const sourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentSections.ts')
 const source = fs.readFileSync(sourcePath, 'utf8')
 const output = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText
 const loaded = { exports: {} }
-new Function('module', 'exports', 'require', output)(loaded, loaded.exports, require)
+new Function('module', 'exports', 'require', output)(
+  loaded,
+  loaded.exports,
+  (request) => request === './projectDocumentKnowledgeGraphModel' ? graphModelLoaded.exports : require(request),
+)
 
 const {
   buildDocumentSections,
@@ -49,6 +60,9 @@ const manifest = parseSectionManifest(JSON.stringify({
   assignments: { 'docs/research.md': 'custom:research', 'docs/discussion.md': 'drafts' },
   governance_overrides: { 'docs/unknown.md': 'on-demand' },
   document_metadata: { 'docs/research.md': { order: 7, pinned: true } },
+  knowledge_graph: { nodes: [{
+    id: 'cap-research', view: 'capabilities', label: '研究能力', document_paths: ['docs/research.md'],
+  }], edges: [] },
   audit_log: [{ id: 'one', action: 'test', target: 'docs/research.md', summary: '测试审计', at: '2026-07-17T00:00:00Z' }],
 }))
 assert.equal(manifest.assignments['docs/research.md'], 'custom:research')
@@ -58,6 +72,7 @@ assert.equal(manifest.governance_overrides['docs/unknown.md'], 'on-demand')
 assert.equal(manifest.document_metadata['docs/research.md'].order, 7)
 assert.equal(manifest.document_metadata['docs/research.md'].pinned, true)
 assert.equal(manifest.audit_log[0].action, 'test')
+assert.equal(manifest.knowledge_graph.nodes[0].id, 'cap-research')
 const documents = [
   document('AGENTS.md', 'router'),
   document('.github/agents/reviewer.agent.md', 'agent_definition'),
@@ -91,6 +106,10 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
     id: 'rename-unknown', kind: 'rename', source_path: 'docs/unknown.md',
     target_path: 'docs/unknown-topic.md', source_revision: 'abc', reason: '名称更可检索',
   }],
+  proposed_knowledge_graph: {
+    nodes: [{ id: 'cap-api', view: 'capabilities', label: 'API 能力', document_paths: ['docs/unknown.md'] }],
+    edges: [],
+  },
   documents_read: 1,
   estimated_tokens_used: 20,
 }))
@@ -98,6 +117,7 @@ assert.equal(suggestions.status, 'ready')
 assert.equal(suggestions.assignments.length, 1)
 assert.equal(suggestions.file_operations.length, 1)
 assert.equal(suggestions.file_operations[0].status, 'proposed')
+assert.equal(suggestions.proposed_knowledge_graph.nodes[0].id, 'cap-api')
 
 const boundedSuggestions = parseOrganizationSuggestions(JSON.stringify({
   status: 'ready',
@@ -129,6 +149,10 @@ assert(prompt.includes('classification_model_tokens=0'))
 assert(prompt.includes('project_docs_analyze'))
 assert(prompt.includes('project_docs_get_status'))
 assert(prompt.includes('project_docs_get_issues'))
+assert(prompt.includes('project_docs_get_map'))
+assert(prompt.includes('project_docs_review_map'))
+assert(prompt.includes('project_docs_plan_context'))
+assert(prompt.includes('proposed_knowledge_graph'))
 assert(prompt.includes('权限模式：git_backed_full'))
 assert(prompt.includes('authorization_mode=git_backed_full'))
 assert(prompt.includes('git_baseline_commit'))
@@ -180,23 +204,38 @@ new Function('module', 'exports', 'require', capabilityGraphOutput)(
   },
 )
 
-const capabilityManifest = parseSectionManifest(JSON.stringify({
-  version: 1,
-  profile: 'software-platform',
-  home: { title: '测试知识库', summary: '测试', entrypoint: 'README.md', start_here: [] },
-  sections: [
-    { id: 'product-capabilities', label: '产品能力', detail: '用户可见功能', color: '#4477aa', order: 10, entrypoint: 'README.md' },
-    { id: 'knowledge', label: '知识管理', detail: '文档整理能力', color: '#55aa88', order: 10, parent_id: 'product-capabilities' },
+const mapNode = (id, label, parentId, depth, documentPaths, entrypoint = '') => ({
+  id, view: 'capabilities', kind: 'capability', label, detail: label, color: '#4477aa',
+  parent_id: parentId, section_id: '', depth, child_count: id === 'cap-parent' ? 1 : 0,
+  order: 10, document_count: documentPaths.length, document_paths: documentPaths,
+  entrypoint, entrypoint_source: entrypoint ? 'configured' : 'missing',
+  coverage: [{ key: 'overview', label: '入口', covered: !!entrypoint, count: entrypoint ? 1 : 0 }],
+  missing_coverage: entrypoint ? [] : ['入口'], documentation_status: documentPaths.length ? 'documented' : 'undocumented',
+  implementation_refs: [{ reference: 'file:src/main.rs', verification: 'exists' }],
+  implementation_status: 'verified', source: 'manifest', tags: [],
+})
+const capabilityMap = {
+  version: 1, view: 'capabilities', title: '产品功能图', source: 'manifest', root_id: 'map-capabilities-root',
+  nodes: [
+    { ...mapNode('map-capabilities-root', '测试知识库', '', 0, documents.map((item) => item.path), 'README.md'), kind: 'project', child_count: 1 },
+    mapNode('cap-parent', '产品能力', 'map-capabilities-root', 1, ['README.md'], 'README.md'),
+    mapNode('cap-child', '知识管理', 'cap-parent', 2, ['docs/research.md']),
+    mapNode('cap-gap', '空白能力', 'map-capabilities-root', 1, []),
   ],
-  assignments: {
-    'README.md': 'custom:product-capabilities',
-    'docs/research.md': 'custom:knowledge',
-  },
-}))
-const capabilityGraph = capabilityGraphLoaded.exports.buildCapabilityGraph('测试项目', catalog, capabilityManifest)
+  edges: [
+    { id: 'root-parent', source: 'map-capabilities-root', target: 'cap-parent', relation: 'contains', label: '', configured: true },
+    { id: 'parent-child', source: 'cap-parent', target: 'cap-child', relation: 'contains', label: '', configured: true },
+    { id: 'root-gap', source: 'map-capabilities-root', target: 'cap-gap', relation: 'contains', label: '', configured: true },
+  ],
+  stats: { nodes: 3, configured_nodes: 3, documented: 2, partial: 0, undocumented: 1, implementation_verified: 3, implementation_declared: 0, implementation_missing: 0 },
+  diagnostics: { structural_score: 92, status: 'healthy', findings: [] },
+  budget: { classification_model_tokens: 0, markdown_bodies_read: 0, metadata_only: true },
+}
+const capabilityCatalog = { ...catalog, analysis: { knowledge_maps: { capabilities: capabilityMap } } }
+const capabilityGraph = capabilityGraphLoaded.exports.buildCapabilityGraph('测试项目', capabilityCatalog, 'capabilities')
 const capabilityRoot = capabilityGraph.nodes.find((node) => node.isRoot)
-const capabilityParent = capabilityGraph.nodes.find((node) => node.id === 'custom:product-capabilities')
-const capabilityChild = capabilityGraph.nodes.find((node) => node.id === 'custom:knowledge')
+const capabilityParent = capabilityGraph.nodes.find((node) => node.id === 'cap-parent')
+const capabilityChild = capabilityGraph.nodes.find((node) => node.id === 'cap-child')
 assert.equal(capabilityRoot.documentCount, documents.length)
 assert.equal(capabilityParent.entrypoint, 'README.md')
 assert.equal(capabilityParent.entrypointSource, 'configured')
@@ -228,7 +267,7 @@ assert(editorPaneSource.includes('ProjectDocumentAccessNotice'))
 assert(workspaceSource.includes('applyFileOperations'))
 assert(workspaceSource.includes('organization.trace?.catalog_revision'))
 assert(workspaceSource.includes('ProjectDocumentCapabilityMap'))
-assert(workspaceSource.includes('只评估功能节点'))
+assert(workspaceSource.includes('knowledgeNodeReviewInstruction'))
 
 const capabilityMapSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentCapabilityMap.tsx',
@@ -236,14 +275,17 @@ const capabilityMapSource = fs.readFileSync(path.join(
 assert(capabilityMapSource.includes('ReactFlow'))
 assert(capabilityMapSource.includes('MiniMap'))
 assert(capabilityMapSource.includes('Controls'))
-assert(capabilityMapSource.includes('搜索功能或文档'))
+assert(capabilityMapSource.includes('搜索节点、文档或实现证据'))
+assert(capabilityMapSource.includes('ProjectDocumentKnowledgeMapTabs'))
+assert(capabilityMapSource.includes('与 AI 评审此图'))
 assert(!capabilityMapSource.includes('/docs/file'), '功能图只能消费目录元数据，不应自行读取 Markdown 正文')
 
 const capabilityInspectorSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentCapabilityInspector.tsx',
 ), 'utf8')
 assert(capabilityInspectorSource.includes('对应 Markdown'))
-assert(capabilityInspectorSource.includes('让 AI 补齐此功能'))
+assert(capabilityInspectorSource.includes('实现证据'))
+assert(capabilityInspectorSource.includes('与 AI 讨论此节点'))
 assert(workspaceSource.includes('<ProjectDocumentHealthCenter'))
 const healthCenterSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentHealthCenter.tsx',

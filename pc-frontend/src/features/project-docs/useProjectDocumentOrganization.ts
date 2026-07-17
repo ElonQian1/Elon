@@ -91,16 +91,7 @@ export function useProjectDocumentOrganization(
       readJsonFile(projectId, ORGANIZATION_SUGGESTIONS_PATH),
     ])
     setManifestFile({
-      value: manifest ? parseSectionManifest(manifest.content) : {
-        version: 1,
-        profile: 'auto',
-        home: { title: '', summary: '', entrypoint: '', start_here: [] },
-        sections: [],
-        assignments: {},
-        governance_overrides: {},
-        document_metadata: {},
-        audit_log: [],
-      },
+      value: manifest ? parseSectionManifest(manifest.content) : parseSectionManifest(''),
       revision: manifest?.revision,
     })
     setSuggestionsFile({

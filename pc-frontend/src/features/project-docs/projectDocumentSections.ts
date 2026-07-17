@@ -1,4 +1,9 @@
 import type { DocumentCatalog, ProjectDocumentEntry } from './projectDocumentModel'
+import {
+  EMPTY_KNOWLEDGE_GRAPH,
+  sanitizeKnowledgeGraphConfig,
+  type ProjectKnowledgeGraphConfig,
+} from './projectDocumentKnowledgeGraphModel'
 
 export const SECTION_CONFIG_PATH = '.elon/document-sections.json'
 export const ORGANIZATION_SUGGESTIONS_PATH = '.elon/document-organization-suggestions.json'
@@ -54,6 +59,7 @@ export interface DocumentSectionManifest {
   governance_overrides: Record<string, string>
   document_metadata: Record<string, DocumentKnowledgeMetadata>
   audit_log: DocumentOrganizationAuditEntry[]
+  knowledge_graph: ProjectKnowledgeGraphConfig
 }
 
 export interface DocumentSection {
@@ -103,6 +109,7 @@ export interface DocumentOrganizationSuggestions {
   missing_document_types: string[]
   document_metadata: Record<string, DocumentKnowledgeMetadata>
   file_operations: SuggestedFileOperation[]
+  proposed_knowledge_graph: ProjectKnowledgeGraphConfig
   documents_read: number
   estimated_tokens_used: number
 }
@@ -116,6 +123,7 @@ export const EMPTY_SECTION_MANIFEST: DocumentSectionManifest = {
   governance_overrides: {},
   document_metadata: {},
   audit_log: [],
+  knowledge_graph: EMPTY_KNOWLEDGE_GRAPH,
 }
 
 export const SYSTEM_DOCUMENT_SECTIONS: DocumentSection[] = [
@@ -229,6 +237,7 @@ export function parseSectionManifest(content: string): DocumentSectionManifest {
       governance_overrides: governanceOverrides,
       document_metadata: documentMetadata,
       audit_log: sanitizeAuditLog(value.audit_log),
+      knowledge_graph: sanitizeKnowledgeGraphConfig(value.knowledge_graph),
     }
   } catch {
     return cloneEmptyManifest()
@@ -289,6 +298,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       missing_document_types: stringArray(value.missing_document_types, 100).map((entry) => entry.slice(0, 120)),
       document_metadata: sanitizeKnowledgeMetadataMap(value.document_metadata),
       file_operations: fileOperations,
+      proposed_knowledge_graph: sanitizeKnowledgeGraphConfig(value.proposed_knowledge_graph),
       documents_read: safeNonNegativeNumber(value.documents_read),
       estimated_tokens_used: safeNonNegativeNumber(value.estimated_tokens_used),
     }
@@ -338,12 +348,13 @@ export function buildOrganizationPrompt(
     `运行 ID：${operationId || '由 MCP 会话生成'}。权限模式：${authorizationMode}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；当前项目类型：${manifest.profile}；现有主题分区：${customSections}。\n` +
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
     '① project_docs_analyze 获取 classification_model_tokens=0 的紧凑目录和 document_health；大型仓库先按 federation 选择 scope_id；' +
-    '② project_docs_get_issues 获取链接、孤立文档、owner、复查周期和实现引用的程序证据；' +
-    '③ 仅对仍需语义判断的少量文档调用 project_docs_read；' +
+    '② project_docs_get_map 获取 overview 后只查询任务命中的 capabilities、architecture 或 topics 局部图；需要判断结构时调用 project_docs_review_map，单节点用 project_docs_get_node；' +
+    '③ project_docs_get_issues 获取链接、孤立文档、owner、复查周期和实现引用的程序证据；先用 project_docs_plan_context 规划阅读，再仅对仍需语义判断的少量文档调用 project_docs_read；' +
     '④ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
     `④ 保存后按当前权限继续；${authorizationInstruction}` +
     '先根据 analyze 返回的 document_health 判断项目类型、质量问题、联邦节点和缺失基础文档；建议必须同时考虑面向人的主题知识树与面向 AI 的治理属性。' +
-    '可提出 proposed_profile、层级 proposed_sections、proposed_home、document_metadata（类型、owner、复查日期、实现引用、关系、替代关系）；不要把 required/on-demand 等治理状态当成主题目录。' +
+    '可提出 proposed_profile、层级 proposed_sections、proposed_home、document_metadata（类型、owner、复查日期、实现引用、关系、替代关系）以及 proposed_knowledge_graph；不要把 required/on-demand 等治理状态当成主题目录。' +
+    '图谱必须区分用户功能 capabilities、技术组件 architecture、文档主题 topics 和治理状态；有文档只证明覆盖，不能冒充功能已实现，功能和组件必须提供 file:/route:/symbol:/test: 证据。' +
     '如发现命名含糊或路径放错，可在 file_operations 中提出结构化 rename/move；source_revision 必须使用 analyze 返回的 content_hash。' +
     `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
     'git_backed_full 会自动完成整理前和整理后两次仅文档 Git 提交；任何模式都不得越界、操作非 Markdown、修改代码或自动 push。' +
@@ -478,5 +489,6 @@ function cloneEmptyManifest(): DocumentSectionManifest {
     governance_overrides: {},
     document_metadata: {},
     audit_log: [],
+    knowledge_graph: { nodes: [], edges: [] },
   }
 }

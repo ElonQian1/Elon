@@ -322,6 +322,7 @@ pub(super) async fn run_relay_session(
                             crate::project_docs_scan::ProjectDocumentScanOptions {
                                 seed_missing_defaults: seed_defaults,
                                 catalog_only,
+                                include_analysis: true,
                             },
                         ) {
                             Ok(snapshot) => {

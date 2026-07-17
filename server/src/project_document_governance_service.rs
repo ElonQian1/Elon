@@ -401,6 +401,7 @@ fn catalog(workspace: &Path) -> Result<ProjectDocumentsSnapshot> {
         ProjectDocumentScanOptions {
             seed_missing_defaults: false,
             catalog_only: true,
+            include_analysis: true,
         },
     )
 }

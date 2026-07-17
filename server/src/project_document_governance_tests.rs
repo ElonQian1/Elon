@@ -13,6 +13,9 @@ use crate::{
     project_document_governance_service::{
         analyze_workspace, apply_saved_suggestions, read_documents, save_suggestions,
     },
+    project_document_knowledge_graph_model::{
+        ProjectKnowledgeGraphConfig, ProjectKnowledgeNodeConfig,
+    },
 };
 
 fn workspace(label: &str) -> PathBuf {
@@ -52,6 +55,21 @@ fn ready_suggestions() -> DocumentOrganizationSuggestions {
         conflicts: Vec::new(),
         move_suggestions: Vec::new(),
         file_operations: Vec::new(),
+        proposed_knowledge_graph: ProjectKnowledgeGraphConfig {
+            nodes: vec![ProjectKnowledgeNodeConfig {
+                id: "cap-doc-history".to_string(),
+                view: "capabilities".to_string(),
+                kind: "capability".to_string(),
+                label: "文档历史".to_string(),
+                detail: "通过 Git 保护整理前后版本".to_string(),
+                color: "#7f8fb3".to_string(),
+                entrypoint: "AGENTS.md".to_string(),
+                document_paths: vec!["AGENTS.md".to_string()],
+                implementation_refs: vec!["file:AGENTS.md".to_string()],
+                ..ProjectKnowledgeNodeConfig::default()
+            }],
+            edges: Vec::new(),
+        },
         documents_read: 0,
         estimated_tokens_used: 0,
         ..DocumentOrganizationSuggestions::default()
@@ -343,6 +361,10 @@ fn review_apply_is_revision_safe_and_idempotent() {
     assert_eq!(
         applied["manifest"]["assignments"]["docs/archive/old.md"],
         "custom:legacy-notes"
+    );
+    assert_eq!(
+        applied["manifest"]["knowledge_graph"]["nodes"][0]["id"],
+        "cap-doc-history"
     );
     let restored_ready = write_project_document_file(
         &root,

@@ -382,6 +382,7 @@ fn catalog(workspace: &Path) -> Result<homecli_proto::ProjectDocumentsSnapshot> 
         ProjectDocumentScanOptions {
             seed_missing_defaults: false,
             catalog_only: true,
+            include_analysis: true,
         },
     )
 }

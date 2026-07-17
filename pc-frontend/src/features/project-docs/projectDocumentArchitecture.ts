@@ -180,7 +180,7 @@ export function buildKnowledgeSections(catalog: DocumentCatalog | null, manifest
   const topics = [...templateSections, ...customSections]
   return [
     { key: KNOWLEDGE_HOME_SECTION, label: '知识首页', detail: '项目地图、推荐阅读与完整度', color: '#9b73ed', virtual: true, order: -100 },
-    { key: CAPABILITY_MAP_SECTION, label: '功能地图', detail: '功能、子能力与对应文档覆盖', color: '#58a8df', virtual: true, order: -90 },
+    { key: CAPABILITY_MAP_SECTION, label: '项目图谱', detail: '产品功能、技术架构、文档主题与证据', color: '#58a8df', virtual: true, order: -90 },
     { key: DOCUMENT_HEALTH_SECTION, label: '文档健康', detail: '质量问题、维护事件与子项目节点', color: '#55b6a3', virtual: true, order: -80 },
     ...flattenSectionTree(topics),
     SUGGESTIONS_SECTION,

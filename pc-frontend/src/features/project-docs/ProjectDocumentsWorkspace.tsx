@@ -12,6 +12,11 @@ import ProjectDocumentCommandMenu, {
   type ProjectDocumentMenuTarget,
 } from './ProjectDocumentCommandMenu'
 import type { ProjectCapabilityNode } from './projectDocumentCapabilityGraph'
+import type { ProjectKnowledgeMapView } from './projectDocumentKnowledgeGraphModel'
+import {
+  knowledgeMapReviewInstruction,
+  knowledgeNodeReviewInstruction,
+} from './projectDocumentKnowledgeMapPrompts'
 import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
 import ProjectDocumentHealthCenter from './ProjectDocumentHealthCenter'
@@ -246,12 +251,11 @@ export default function ProjectDocumentsWorkspace({
   }
 
   function organizeCapability(node: ProjectCapabilityNode) {
-    const paths = node.documents.slice(0, 40).map((entry) => entry.path).join(', ')
-    void startAiOrganize(
-      `只评估功能节点“${node.label}”的文档覆盖。当前对应 ${node.documentCount} 份文档` +
-      `${paths ? `：${paths}` : '，尚无对应文档'}。优先补齐入口、需求、设计、参考、操作和证据中的真实缺口；` +
-      '复用现有权威文档，不得为了填满指标创建重复文档。',
-    )
+    void startAiOrganize(knowledgeNodeReviewInstruction(node))
+  }
+
+  function reviewKnowledgeMap(view: ProjectKnowledgeMapView) {
+    void startAiOrganize(knowledgeMapReviewInstruction(view))
   }
 
   function chooseDocument(path: string) {
@@ -648,10 +652,10 @@ export default function ProjectDocumentsWorkspace({
           })}
         />
       ) : activeSection === CAPABILITY_MAP_SECTION ? (
-        <Suspense fallback={<div className={styles.capabilityLoading}>正在生成项目功能地图…</div>}>
-          <ProjectDocumentCapabilityMap projectName={projectName} catalog={catalog} manifest={organization.manifest}
+        <Suspense fallback={<div className={styles.capabilityLoading}>正在加载统一项目知识图谱…</div>}>
+          <ProjectDocumentCapabilityMap projectName={projectName} catalog={catalog}
             canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
-            onOpenSection={setActiveSection} onAiOrganize={organizeCapability} />
+            onOpenSection={setActiveSection} onAiOrganize={organizeCapability} onAiReview={reviewKnowledgeMap} />
         </Suspense>
       ) : activeSection === DOCUMENT_HEALTH_SECTION ? (
         <ProjectDocumentHealthCenter analysis={catalog?.analysis} onRefresh={loadCatalog}

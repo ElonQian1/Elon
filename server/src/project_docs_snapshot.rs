@@ -163,5 +163,6 @@ fn scan_options(seed_missing_defaults: bool, catalog_only: bool) -> ProjectDocum
     ProjectDocumentScanOptions {
         seed_missing_defaults,
         catalog_only,
+        include_analysis: true,
     }
 }

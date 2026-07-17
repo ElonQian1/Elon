@@ -109,6 +109,8 @@ PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
 
 ```text
 AI_PROJECT / AI_INDEX / AGENTS
+  -> project_docs_get_map / project_docs_get_node / project_docs_plan_context
+  -> 按需读取少量权威 Markdown
   -> context compiler
   -> repo map + chunks
   -> rust-analyzer / semantic facts
@@ -120,12 +122,15 @@ AI_PROJECT / AI_INDEX / AGENTS
 
 各层职责：
 
-- 文档层：说明项目是什么、规则是什么、入口在哪里。
+- 文档治理层：路径和元数据说明规则、权威性、生命周期与推荐入口。
+- 项目图谱层：同一 Rust 模型分别描述产品功能、技术架构和文档主题；节点连接 Markdown 与 `file:/test:/route:/symbol:` 实现证据，AI 先取局部图再决定读什么。
 - repo map 层：压缩仓库结构、重要文件、目录摘要。
 - 符号层：记录函数、类型、trait、模块、调用/引用/包含关系。
 - chunk 层：为全文搜索和向量召回提供代码片段。
 - 向量层：补充自然语言语义召回；当前默认 `local-hash-v1`。
 - 验证层：生成 patch plan、dry run、review、verification、repair context。
+
+项目图谱不替代符号索引，也不把“存在文档”当成“实现完成”。图谱负责给人和 AI 一个稳定的项目导航与声明关系；context compiler、符号索引和测试负责核验代码事实。PC 网页端与所有供应商的 Streamable HTTP MCP 消费同一后端图谱，图级或节点级评审把结构变更写入 `proposed_knowledge_graph`，经 revision、权限模式和 Git 文档事务后才成为共享事实。
 
 ## 关键模块边界
 

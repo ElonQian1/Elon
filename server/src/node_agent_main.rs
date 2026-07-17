@@ -105,6 +105,7 @@ mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
 mod node_agent_project_data_policy;
 mod node_agent_project_docs_mcp;
+mod node_agent_project_docs_mcp_graph_tools;
 mod node_agent_project_docs_mcp_knowledge_tools;
 mod node_agent_project_docs_mcp_tools;
 mod node_agent_project_documents;
@@ -174,6 +175,10 @@ mod project_document_governance_service;
 #[cfg(test)]
 mod project_document_governance_tests;
 mod project_document_index;
+mod project_document_knowledge_graph;
+mod project_document_knowledge_graph_model;
+mod project_document_knowledge_graph_service;
+mod project_document_knowledge_graph_templates;
 mod project_document_maintenance;
 mod project_document_observability;
 mod project_document_observability_api;

@@ -1,0 +1,358 @@
+//! Bounded, metadata-only graph queries for MCP consumers.
+
+use anyhow::{anyhow, bail, Result};
+use homecli_proto::ProjectDocumentsSnapshot;
+use serde_json::{json, Value};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::Path,
+};
+
+use crate::{
+    project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
+    project_document_analysis_model::compact_document,
+    project_document_governance::{parse_manifest, DocumentSectionManifest, SECTION_CONFIG_PATH},
+    project_document_knowledge_graph::{build_knowledge_maps, build_map},
+    project_document_knowledge_graph_model::{
+        ProjectKnowledgeMap, ProjectKnowledgeMapEdge, ProjectKnowledgeMapNode,
+    },
+};
+
+pub(crate) fn get_map(
+    workspace: &Path,
+    view: &str,
+    root_id: Option<&str>,
+    depth: usize,
+    query: Option<&str>,
+    max_nodes: usize,
+) -> Result<Value> {
+    let (snapshot, manifest) = load(workspace)?;
+    if view == "overview" {
+        let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
+        let views = [maps.capabilities, maps.architecture, maps.topics]
+            .into_iter()
+            .map(|map| {
+                json!({
+                    "view": map.view, "title": map.title, "source": map.source,
+                    "stats": map.stats, "diagnostics": map.diagnostics,
+                    "root_id": map.root_id,
+                })
+            })
+            .collect::<Vec<_>>();
+        return Ok(json!({
+            "catalog_revision": snapshot.revision,
+            "views": views,
+            "budget": {"classification_model_tokens":0,"markdown_bodies_read":0,"metadata_only":true}
+        }));
+    }
+    ensure_view(view)?;
+    let map = build_map(workspace, &snapshot.documents, &manifest, view);
+    let (nodes, edges, truncated) = select_map(
+        &map,
+        root_id,
+        depth.clamp(1, 6),
+        query,
+        max_nodes.clamp(1, 200),
+    )?;
+    Ok(json!({
+        "catalog_revision": snapshot.revision,
+        "view": map.view,
+        "title": map.title,
+        "source": map.source,
+        "root_id": map.root_id,
+        "nodes": nodes,
+        "edges": edges,
+        "stats": map.stats,
+        "diagnostics": map.diagnostics,
+        "selection": {"root_id":root_id,"depth":depth.clamp(1,6),"query":query,"max_nodes":max_nodes.clamp(1,200),"truncated":truncated},
+        "budget": map.budget,
+    }))
+}
+
+pub(crate) fn get_node(workspace: &Path, node_id: &str) -> Result<Value> {
+    let (snapshot, manifest) = load(workspace)?;
+    let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
+    let maps = [maps.capabilities, maps.architecture, maps.topics];
+    let (map, node) = maps
+        .iter()
+        .find_map(|map| {
+            map.nodes
+                .iter()
+                .find(|node| node.id == node_id)
+                .map(|node| (map, node))
+        })
+        .ok_or_else(|| anyhow!("未知知识图谱节点：{node_id}"))?;
+    let linked_paths = node
+        .document_paths
+        .iter()
+        .map(|path| normalize(path))
+        .collect::<HashSet<_>>();
+    let documents = snapshot
+        .documents
+        .iter()
+        .filter(|document| linked_paths.contains(&normalize(&document.path)))
+        .take(24)
+        .map(|document| compact_document(document, &manifest))
+        .collect::<Vec<_>>();
+    let relations = map
+        .edges
+        .iter()
+        .filter(|edge| edge.source == node.id || edge.target == node.id)
+        .collect::<Vec<_>>();
+    let findings = map
+        .diagnostics
+        .findings
+        .iter()
+        .filter(|finding| finding.node_id == node.id)
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "catalog_revision": snapshot.revision,
+        "view": map.view,
+        "node": node,
+        "relations": relations,
+        "documents": documents,
+        "findings": findings,
+        "recommended_next": [
+            "先核对 entrypoint 和 implementation_refs；不要读取未关联文档正文。",
+            "需要语义判断时，只用 project_docs_read 读取这里返回的少量 document path。",
+            "结构改进写入 proposed_knowledge_graph，内容整理继续使用现有主题与治理建议。"
+        ],
+        "budget": {"classification_model_tokens":0,"markdown_bodies_read":0,"metadata_only":true}
+    }))
+}
+
+pub(crate) fn review_map(workspace: &Path, view: &str) -> Result<Value> {
+    ensure_view(view)?;
+    let (snapshot, manifest) = load(workspace)?;
+    let map = build_map(workspace, &snapshot.documents, &manifest, view);
+    let review_questions = match view {
+        "architecture" => vec![
+            "组件边界是否与真实进程、部署单元和数据流一致？",
+            "每个关键组件是否有源码、路由、数据或测试证据？",
+            "配置的依赖关系是否遗漏关键调用或把主题误当成组件？",
+        ],
+        "topics" => vec![
+            "主题是否只回答文档讲什么，而没有暗中改变权威性？",
+            "每个核心主题是否有唯一入口和推荐阅读顺序？",
+            "讨论、证据和历史材料是否仍由治理轴正确降权？",
+        ],
+        _ => vec![
+            "节点是否代表用户可感知能力，而不是文档类别或代码目录？",
+            "父子关系是否表达能力分解，每项是否有文档和实现证据？",
+            "功能缺口与文档缺口是否被分开陈述，避免把有文档当成已实现？",
+        ],
+    };
+    Ok(json!({
+        "catalog_revision": snapshot.revision,
+        "view": view,
+        "source": map.source,
+        "stats": map.stats,
+        "diagnostics": map.diagnostics,
+        "review_questions": review_questions,
+        "decision_rules": [
+            "主题、功能、技术组件和治理状态是四个正交维度，不能互相替代。",
+            "Markdown 是内容真源；图谱只保存稳定节点以及文档/实现引用。",
+            "有文档只证明文档覆盖；实现状态必须由 file:/route:/symbol:/test: 证据单独说明。",
+            "AI 只能提出 proposed_knowledge_graph，应用继续受 revision、权限模式和 Git 事务保护。"
+        ],
+        "suggestion_target": ".elon/document-organization-suggestions.json#proposed_knowledge_graph",
+        "budget": {"classification_model_tokens":0,"markdown_bodies_read":0,"metadata_only":true}
+    }))
+}
+
+pub(crate) fn plan_context(
+    workspace: &Path,
+    query: &str,
+    node_id: Option<&str>,
+    max_tokens: u64,
+    max_documents: usize,
+) -> Result<Value> {
+    let query = query.trim();
+    if query.is_empty() && node_id.is_none() {
+        bail!("project_docs_plan_context 必须提供 query 或 node_id");
+    }
+    let (snapshot, manifest) = load(workspace)?;
+    let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
+    let all_maps = [maps.capabilities, maps.architecture, maps.topics];
+    let query_lower = query.to_ascii_lowercase();
+    let matched_nodes = all_maps
+        .iter()
+        .flat_map(|map| map.nodes.iter())
+        .filter(|node| {
+            node_id.is_some_and(|id| id == node.id)
+                || (!query_lower.is_empty()
+                    && format!("{} {} {}", node.label, node.detail, node.tags.join(" "))
+                        .to_ascii_lowercase()
+                        .contains(&query_lower))
+        })
+        .collect::<Vec<_>>();
+    if let Some(id) = node_id {
+        if !matched_nodes.iter().any(|node| node.id == id) {
+            bail!("未知知识图谱节点：{id}");
+        }
+    }
+    let linked = matched_nodes
+        .iter()
+        .flat_map(|node| node.document_paths.iter())
+        .map(|path| normalize(path))
+        .collect::<HashSet<_>>();
+    let max_tokens = max_tokens.clamp(200, 12_000);
+    let max_documents = max_documents.clamp(1, 24);
+    let mut candidates = snapshot
+        .documents
+        .iter()
+        .map(|document| {
+            let text = format!(
+                "{} {} {}",
+                document.path,
+                document.title,
+                document.metadata.headings.join(" ")
+            )
+            .to_ascii_lowercase();
+            let score = usize::from(linked.contains(&normalize(&document.path))) * 100
+                + usize::from(!query_lower.is_empty() && text.contains(&query_lower)) * 40
+                + usize::from(document.metadata.default_retrieval) * 10
+                + usize::from(!document.metadata.ambiguous) * 3;
+            (score, document)
+        })
+        .filter(|(score, _)| *score > 0)
+        .collect::<Vec<_>>();
+    candidates.sort_by(|(left_score, left), (right_score, right)| {
+        right_score.cmp(left_score).then(left.path.cmp(&right.path))
+    });
+    let mut selected = Vec::new();
+    let mut used_tokens = 0u64;
+    for (score, document) in candidates {
+        let tokens = document.metadata.token_estimate.max(1);
+        if selected.len() >= max_documents
+            || (!selected.is_empty() && used_tokens.saturating_add(tokens) > max_tokens)
+        {
+            continue;
+        }
+        used_tokens = used_tokens.saturating_add(tokens);
+        selected.push(json!({"score":score,"document":compact_document(document, &manifest)}));
+    }
+    Ok(json!({
+        "catalog_revision": snapshot.revision,
+        "query": query,
+        "node_id": node_id,
+        "matched_nodes": matched_nodes.iter().map(|node| json!({"id":node.id,"view":node.view,"label":node.label,"status":node.documentation_status})).collect::<Vec<_>>(),
+        "documents": selected,
+        "budget": {"max_tokens":max_tokens,"estimated_tokens_selected":used_tokens,"max_documents":max_documents,"documents_selected":selected.len(),"classification_model_tokens":0,"markdown_bodies_read":0},
+        "read_instruction": "按顺序只读取当前任务真正需要的文档；先读标题层级，仍有歧义再调用 project_docs_read。"
+    }))
+}
+
+fn load(workspace: &Path) -> Result<(ProjectDocumentsSnapshot, DocumentSectionManifest)> {
+    let snapshot = collect_project_documents_with_options(
+        workspace,
+        ProjectDocumentScanOptions {
+            seed_missing_defaults: false,
+            catalog_only: true,
+            include_analysis: false,
+        },
+    )?;
+    let manifest = fs::read_to_string(workspace.join(SECTION_CONFIG_PATH)).ok();
+    Ok((snapshot, parse_manifest(manifest.as_deref())?))
+}
+
+fn select_map<'a>(
+    map: &'a ProjectKnowledgeMap,
+    root_id: Option<&str>,
+    depth: usize,
+    query: Option<&str>,
+    max_nodes: usize,
+) -> Result<(
+    Vec<&'a ProjectKnowledgeMapNode>,
+    Vec<&'a ProjectKnowledgeMapEdge>,
+    bool,
+)> {
+    let root = root_id.unwrap_or(&map.root_id);
+    if !map.nodes.iter().any(|node| node.id == root) {
+        bail!("当前视图不存在 root_id：{root}");
+    }
+    let query = query.unwrap_or_default().trim().to_ascii_lowercase();
+    let by_id = map
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect::<HashMap<_, _>>();
+    let mut selected = HashSet::new();
+    if !query.is_empty() {
+        for node in map.nodes.iter().filter(|node| {
+            format!(
+                "{} {} {} {}",
+                node.label,
+                node.detail,
+                node.tags.join(" "),
+                node.document_paths.join(" ")
+            )
+            .to_ascii_lowercase()
+            .contains(&query)
+        }) {
+            let mut cursor = Some(node.id.as_str());
+            while let Some(id) = cursor {
+                selected.insert(id.to_string());
+                cursor = by_id.get(id).and_then(|item| {
+                    (!item.parent_id.is_empty()).then_some(item.parent_id.as_str())
+                });
+            }
+        }
+    } else {
+        let children =
+            map.nodes
+                .iter()
+                .fold(HashMap::<&str, Vec<&str>>::new(), |mut output, node| {
+                    output
+                        .entry(node.parent_id.as_str())
+                        .or_default()
+                        .push(node.id.as_str());
+                    output
+                });
+        let mut queue = vec![(root, 0usize)];
+        while let Some((id, level)) = queue.pop() {
+            selected.insert(id.to_string());
+            if level < depth {
+                queue.extend(
+                    children
+                        .get(id)
+                        .into_iter()
+                        .flatten()
+                        .map(|child| (*child, level + 1)),
+                );
+            }
+        }
+    }
+    let mut nodes = map
+        .nodes
+        .iter()
+        .filter(|node| selected.contains(&node.id))
+        .collect::<Vec<_>>();
+    let truncated = nodes.len() > max_nodes;
+    nodes.truncate(max_nodes);
+    let visible = nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .collect::<HashSet<_>>();
+    let edges = map
+        .edges
+        .iter()
+        .filter(|edge| {
+            visible.contains(edge.source.as_str()) && visible.contains(edge.target.as_str())
+        })
+        .collect::<Vec<_>>();
+    Ok((nodes, edges, truncated))
+}
+
+fn ensure_view(view: &str) -> Result<()> {
+    if matches!(view, "capabilities" | "architecture" | "topics") {
+        Ok(())
+    } else {
+        bail!("view 只支持 overview、capabilities、architecture 或 topics")
+    }
+}
+
+fn normalize(value: &str) -> String {
+    value.trim().replace('\\', "/").to_ascii_lowercase()
+}

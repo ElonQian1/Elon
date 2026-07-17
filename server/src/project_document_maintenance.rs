@@ -17,6 +17,7 @@ use crate::{
     project_document_federation::analyze_federation,
     project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
     project_document_index::ProjectDocumentIndex,
+    project_document_knowledge_graph::build_knowledge_maps,
     project_document_quality::{analyze_document_quality, compact_report},
 };
 
@@ -38,6 +39,7 @@ pub(crate) fn enrich_catalog(
             .collect::<serde_json::Result<Vec<_>>>()?,
     )?;
     let architecture = analyze_knowledge_architecture(documents, &manifest);
+    let knowledge_maps = build_knowledge_maps(workspace, documents, &manifest);
     let federation = analyze_federation(workspace, documents, &manifest)?;
     let maintenance = index.complete_analysis()?;
     let overall_score = weighted_score(
@@ -53,6 +55,7 @@ pub(crate) fn enrich_catalog(
             "status": health_status(overall_score),
         },
         "architecture": architecture,
+        "knowledge_maps": knowledge_maps,
         "quality": compact_report(&quality, 40),
         "maintenance": maintenance,
         "federation": federation,
@@ -123,6 +126,7 @@ fn refresh_workspace(workspace: &Path) -> Result<()> {
         ProjectDocumentScanOptions {
             seed_missing_defaults: false,
             catalog_only: true,
+            include_analysis: true,
         },
     )?;
     let index = ProjectDocumentIndex::open(workspace)?;

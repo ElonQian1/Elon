@@ -9,8 +9,8 @@
 - Git 工作区中的 Markdown 和路径是内容真源。
 - 路径决定文档权威性上限；正文只能降低自身生命周期，不能越过路径上限。
 - PC 网页端“知识架构”按项目主题浏览，“治理视图”根据 `role`、`lifecycle`、`authority` 和 `ambiguous` 判断权威性；两者是正交维度。
-- PC 网页端“功能地图”是知识架构的派生视图：根节点表示项目，主题和子主题表示能力域，节点汇总入口、需求、设计、参考、操作和证据覆盖。它只消费目录标题、路径、headings、治理元数据和 `.elon/document-sections.json`，不会为了画图读取 Markdown 正文，也不保存另一份能力清单。
-- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖、文档关系和最近 100 条结构操作审计，不移动实际文件。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
+- PC 网页端“项目图谱”包含三张正交视图：产品功能图回答“用户能做什么”，技术架构图回答“系统怎样实现”，文档主题图回答“文档讲什么”。治理视图继续单独回答“能否作为当前事实”。网页和 MCP 都消费 Rust 后端生成的同一图谱，前端不再从主题树自行猜测功能。
+- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖、文档关系、`knowledge_graph` 节点/关系/文档引用/实现证据和最近 100 条结构操作审计，不移动实际文件、不复制 Markdown 正文。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
 - `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块”的知识节点；每个节点有独立范围、owner、项目类型和健康度，最多 256 个节点、六层。
@@ -68,6 +68,21 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 目录索引保存到工作区外的 SQLite，不污染项目 Git。文件大小和修改时间未变化时复用目录与质量事实；创建、修改、删除形成持久事件。已访问工作区每 60 秒后台重扫，并异步复查外链。
 
+### `project_docs_get_map` / `project_docs_get_node` / `project_docs_review_map`
+
+这组工具让 AI 不依赖网页点击就能真实理解和评估项目图谱：
+
+- `project_docs_get_map(view=overview)` 先返回三张图的来源、结构分、节点统计和根节点；再按任务只查询 `capabilities`、`architecture` 或 `topics`，可用 `root_id`、`depth`、`query`、`max_nodes` 限定局部图。
+- `project_docs_get_node` 返回单节点的入口、文档路径、六类文档覆盖、实现证据、相邻关系和确定性缺口，不读取正文。
+- `project_docs_review_map` 按视图给出结构诊断和评审问题。产品功能不能由文档类别代替，技术组件应与真实进程/部署单元/数据流一致，主题位置不得改变权威性。
+
+图谱响应始终包含 `classification_model_tokens=0`、`markdown_bodies_read=0`。有文档只证明覆盖，不能据此声称功能已经实现；实现状态单独由 `file:`、`test:` 的存在性和 `route:`、`symbol:` 等声明证据表达。
+图谱查询复用目录增量索引，但不会为每次节点讨论重复执行链接、owner、复查周期和联邦等完整健康分析；完整健康仍由 `project_docs_analyze` 和 PC 目录快照维护。
+
+### `project_docs_plan_context`
+
+根据自然语言任务或 `node_id`，在 `max_tokens` 与 `max_documents` 预算内返回推荐阅读顺序、权威元数据和估算 token。它不返回正文；AI 只有在目录、图谱和标题层级仍不足以判断时，才对计划中的少量路径调用 `project_docs_read`。
+
 ### `project_docs_get_issues`
 
 分页读取确定性质量问题及最小证据，可按类型筛选。当前覆盖本地链接/标题锚点、缓存的外部链接、孤立文档、缺少 owner、缺少复查日期、复查逾期、显式 `implementation_refs` 不存在或实现晚于复查日期。孤立判断同时识别 Markdown 链接和反引号路径引用；Agent、Prompt、Skill 等按任务加载的定制资产不强制进入项目知识地图。程序先定位证据，只有需要语义判断时才让 AI 按需读取正文和源码。
@@ -112,7 +127,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_apply_suggestions`
 
-工具把建议的项目类型、知识首页、层级主题、文档关系和归类合并到知识架构清单，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
+工具把建议的项目类型、知识首页、层级主题、文档关系、`proposed_knowledge_graph` 和归类合并到知识架构清单，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
 
 - catalog、manifest 和 suggestions revision 必须一致；
 - 重复调用是幂等的；
@@ -149,7 +164,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 知识首页允许用户固定项目模板。“文档健康”分区展示服务端统一的结构分、质量问题、维护事件和联邦节点；“AI 整理建议”分区继续只展示建议及应用状态。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义；命令包含新建父/子分区、重命名与外观、改变父级、同级拖放或置顶/上移/下移/置底、合并、设置入口、批量主题/治理归类、固定、推荐和 AI 定向整理。
 
-功能地图使用确定性树布局展示同一主题层级，支持展开/折叠、缩放/平移、缩略图、功能或文档搜索以及“覆盖良好/待补齐/文档空白”筛选。选择节点后，详情区显示推断或配置的入口、最多八份对应 Markdown 和六类覆盖缺口；打开文档仍进入普通编辑器。节点级 AI 按钮只把节点名称、目录路径和缺口范围写入整理任务 Prompt，由通用 MCP 完成后续分析与建议，不为凑齐指标自动生成重复文档。
+项目图谱使用确定性树/关系布局，顶部切换产品功能、技术架构和文档主题。默认只展开一级以保持节点可读，支持展开/折叠、缩放/平移、缩略图、节点/文档/实现证据搜索和文档覆盖筛选。详情区把“Markdown 覆盖”和“实现证据”分开显示；`topics` 节点可回到对应 OneNote 分区。图级“与 AI 评审此图”和节点级“与 AI 讨论此节点”会在同一整理任务中要求代理直接调用图谱 MCP，并把确认有价值的变更写入 `proposed_knowledge_graph`，不靠页面点击，也不为凑指标生成重复文档。
 
 显示排序和项目结构分开保存：按名称、数量、路径或权威性的个人查看偏好只留在浏览器；手工分区顺序、文档固定/顺序、入口和归类属于项目共同知识架构，写 `.elon/document-sections.json`。其中 `document_metadata.order` 与 `document_metadata.pinned` 保存共享文档顺序，`audit_log` 保存最近 100 条结构操作。前端对清单写入使用 revision 防并发覆盖，并提供最多 20 步会话内撤销；Git 仍是跨会话恢复和 AI 实体整理的最终历史。
 
@@ -167,7 +182,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：元数据目录不泄露正文、增量索引和事件去重、链接/孤立/owner/复查/实现证据、联邦范围与循环拒绝、托管 Git 自动版本和恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。
+Rust 单元测试覆盖：元数据目录不泄露正文、功能/架构/主题分离、图谱层级循环和无效关系拒绝、局部图与 token 阅读计划、增量索引和事件去重、链接/孤立/owner/复查/实现证据、联邦范围、托管 Git 自动版本和恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。
 
 发布前至少运行：
 

@@ -3,6 +3,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react'
 
 import {
   capabilityStatusLabel,
+  implementationStatusLabel,
   type ProjectCapabilityNode,
 } from './projectDocumentCapabilityGraph'
 import styles from './ProjectDocumentCapabilityMap.module.css'
@@ -49,7 +50,8 @@ export default function ProjectDocumentCapabilityNode({ data, selected }: NodePr
         <span className={styles.coverageDots} aria-label={`已覆盖 ${node.coverage.filter((item) => item.covered).length} 类文档`}>
           {node.coverage.map((item) => <i key={item.key} data-covered={item.covered || undefined} title={`${item.label}：${item.count}`} />)}
         </span>
-        {node.childCount > 0 && <em>{node.childCount} 个子能力</em>}
+        {node.childCount > 0 && <em>{node.childCount} 个子节点</em>}
+        {!node.isRoot && node.view !== 'topics' && <em data-implementation={node.implementationStatus}>{implementationStatusLabel(node.implementationStatus)}</em>}
       </footer>
       {node.childCount > 0 && <Handle className={styles.nodeHandle} type="source" position={Position.Right} />}
     </article>

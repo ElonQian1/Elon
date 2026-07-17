@@ -55,6 +55,9 @@ const DOC_DIRS: &[(&str, usize, usize)] = &[
 pub(crate) struct ProjectDocumentScanOptions {
     pub seed_missing_defaults: bool,
     pub catalog_only: bool,
+    /// Run full quality, maintenance and federation analysis. Metadata-only
+    /// consumers such as bounded graph queries deliberately disable this.
+    pub include_analysis: bool,
 }
 
 impl Default for ProjectDocumentScanOptions {
@@ -62,6 +65,7 @@ impl Default for ProjectDocumentScanOptions {
         Self {
             seed_missing_defaults: false,
             catalog_only: false,
+            include_analysis: true,
         }
     }
 }
@@ -174,12 +178,14 @@ pub(crate) fn collect_project_documents_with_options(
     }
     let source = snapshot_source(&documents);
     let mut snapshot = build_snapshot(workspace_path, source, documents, warnings);
-    if let Some(index) = index.as_ref() {
-        match enrich_catalog(workspace, &snapshot.documents, index) {
-            Ok(analysis) => snapshot.analysis = analysis,
-            Err(error) => snapshot
-                .warnings
-                .push(format!("文档健康分析暂不可用：{error}")),
+    if options.include_analysis {
+        if let Some(index) = index.as_ref() {
+            match enrich_catalog(workspace, &snapshot.documents, index) {
+                Ok(analysis) => snapshot.analysis = analysis,
+                Err(error) => snapshot
+                    .warnings
+                    .push(format!("文档健康分析暂不可用：{error}")),
+            }
         }
     }
     Ok(snapshot)

@@ -100,6 +100,10 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         vec![
             "project_docs_analyze",
             "project_docs_get_issues",
+            "project_docs_get_map",
+            "project_docs_get_node",
+            "project_docs_review_map",
+            "project_docs_plan_context",
             "project_docs_get_status",
             "project_docs_read",
             "project_docs_get_suggestions",
@@ -121,6 +125,9 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert!(suggestion_properties.get("proposed_profile").is_some());
     assert!(suggestion_properties.get("proposed_home").is_some());
     assert!(suggestion_properties.get("document_metadata").is_some());
+    assert!(suggestion_properties
+        .get("proposed_knowledge_graph")
+        .is_some());
     assert!(
         suggestion_properties["proposed_sections"]["items"]["properties"]
             .get("parent_id")
@@ -164,6 +171,48 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             > 0
     );
     assert!(analyzed.get("error").is_none());
+    let map = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":23,"method":"tools/call",
+            "params":{"name":"project_docs_get_map","arguments":{"view":"capabilities","depth":1,"max_nodes":20}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        map["result"]["structuredContent"]["budget"]["markdown_bodies_read"],
+        0
+    );
+    let root_node_id = map["result"]["structuredContent"]["root_id"]
+        .as_str()
+        .unwrap();
+    let node = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":24,"method":"tools/call",
+            "params":{"name":"project_docs_get_node","arguments":{"node_id":root_node_id}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        node["result"]["structuredContent"]["budget"]["markdown_bodies_read"],
+        0
+    );
+    let planned = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":25,"method":"tools/call",
+            "params":{"name":"project_docs_plan_context","arguments":{"query":"Agent","max_tokens":500}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        planned["result"]["structuredContent"]["budget"]["markdown_bodies_read"],
+        0
+    );
     let catalog_revision = analyzed["result"]["structuredContent"]["catalog_revision"]
         .as_str()
         .unwrap();

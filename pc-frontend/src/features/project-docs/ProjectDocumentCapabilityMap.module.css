@@ -1,10 +1,16 @@
-.mapShell { grid-column: 2 / 4; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; overflow: hidden; background: radial-gradient(circle at 20% 0, rgba(88, 119, 170, .12), transparent 35%), #17191d; }
-.mapToolbar { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 9px 14px; border-bottom: 1px solid rgba(255, 255, 255, .075); background: rgba(24, 26, 31, .94); }
+.mapShell { grid-column: 2 / 4; display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-width: 0; min-height: 0; overflow: hidden; background: radial-gradient(circle at 20% 0, rgba(88, 119, 170, .12), transparent 35%), #17191d; }
+.mapToolbar { display: flex; align-items: center; gap: 9px; min-height: 58px; padding: 8px 12px; border-bottom: 1px solid rgba(255, 255, 255, .075); background: rgba(24, 26, 31, .94); }
 .mapTitle { display: flex; align-items: center; gap: 9px; min-width: 200px; }
 .mapTitle > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: #cbb8ef; background: rgba(123, 82, 194, .23); }
 .mapTitle strong, .mapTitle small { display: block; }
 .mapTitle strong { color: #eeeaf4; font-size: 12px; }
 .mapTitle small { margin-top: 3px; color: #858b96; font-size: 8px; }
+.mapTabs { display: flex; gap: 3px; padding: 3px; border: 1px solid rgba(255, 255, 255, .065); border-radius: 8px; background: #202329; }
+.mapTabs button { display: flex; align-items: center; gap: 5px; min-height: 31px; padding: 4px 7px; border-radius: 6px; color: #858c98; }
+.mapTabs button:hover, .mapTabs button[data-active="true"] { color: #e9ebef; background: rgba(126, 91, 188, .19); }
+.mapTabs strong, .mapTabs small { display: block; white-space: nowrap; }
+.mapTabs strong { font-size: 8px; }
+.mapTabs small { margin-top: 1px; color: #727986; font-size: 6px; }
 .statusSummary { display: flex; gap: 5px; }
 .statusSummary button { display: flex; align-items: center; gap: 5px; height: 29px; padding: 0 8px; border: 1px solid transparent; border-radius: 7px; color: #9da2ad; background: rgba(255, 255, 255, .035); font-size: 8px; }
 .statusSummary button:hover, .statusSummary button[data-active="true"] { border-color: rgba(255, 255, 255, .12); color: #e7e9ee; background: rgba(255, 255, 255, .07); }
@@ -13,12 +19,21 @@
 .statusSummary button[data-status="partial"] i { background: #dfad58; }
 .statusSummary button[data-status="gap"] i { background: #df747d; }
 .statusSummary b { color: #dfe2e8; font-size: 9px; }
-.mapSearch { display: flex; flex: 1; align-items: center; gap: 7px; max-width: 230px; height: 31px; margin-left: auto; padding: 0 9px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 7px; color: #737986; background: #22252b; }
+.mapSearch { display: flex; flex: 1; align-items: center; gap: 7px; min-width: 120px; max-width: 230px; height: 31px; margin-left: auto; padding: 0 9px; border: 1px solid rgba(255, 255, 255, .07); border-radius: 7px; color: #737986; background: #22252b; }
 .mapSearch:focus-within { border-color: rgba(139, 100, 205, .48); }
 .mapSearch input { min-width: 0; width: 100%; color: #d9dce3; background: transparent; font-size: 9px; outline: 0; }
 .mapActions { display: flex; gap: 3px; }
 .mapActions button { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; color: #9298a4; }
 .mapActions button:hover { color: #fff; background: rgba(255, 255, 255, .07); }
+.aiReviewButton { display: flex; align-items: center; gap: 5px; min-height: 31px; padding: 0 10px; border-radius: 7px; color: #f2eaff; background: #7045ba; font-size: 8px; font-weight: 700; white-space: nowrap; }
+.aiReviewButton:hover:not(:disabled) { background: #8050ce; }
+.aiReviewButton:disabled { opacity: .45; }
+.mapDiagnostic { display: flex; align-items: center; gap: 12px; min-height: 33px; padding: 6px 14px; border-bottom: 1px solid rgba(255, 255, 255, .06); color: #9ba1ac; background: rgba(29, 32, 38, .92); font-size: 8px; }
+.mapDiagnostic strong { color: #81d3a7; }
+.mapDiagnostic[data-status="review"] strong { color: #e1b15e; }
+.mapDiagnostic[data-status="needs_structure"] strong, .mapDiagnostic[data-status="unavailable"] strong { color: #e68188; }
+.mapDiagnostic span { flex: 1; }
+.mapDiagnostic em { color: #777e89; font-style: normal; }
 .mapContent { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-width: 0; min-height: 0; }
 .canvas { position: relative; min-width: 0; min-height: 0; border-right: 1px solid rgba(255, 255, 255, .07); }
 .canvas :global(.react-flow__pane) { cursor: grab; }
@@ -43,6 +58,9 @@
 .capabilityNode > p { height: 27px; margin: 9px 0; overflow: hidden; color: #9298a4; font-size: 8px; line-height: 1.55; }
 .capabilityNode footer { display: flex; align-items: center; gap: 8px; color: #9ca2ad; font-size: 8px; }
 .capabilityNode footer em { margin-left: auto; color: #8d93a0; font-style: normal; }
+.capabilityNode footer em[data-implementation] { margin-left: 0; }
+.capabilityNode footer em[data-implementation="verified"] { color: #71c89a; }
+.capabilityNode footer em[data-implementation="missing"] { color: #df7d84; }
 .coverageDots { display: flex; gap: 3px; }
 .coverageDots i { width: 5px; height: 5px; border-radius: 50%; background: #4b4f58; }
 .coverageDots i[data-covered="true"] { background: var(--node-color); }
@@ -74,6 +92,8 @@
 .entryPanel > p, .documentList > p { margin: 0; color: #858b96; font-size: 8px; }
 .entryPanel > small { display: block; margin-top: 6px; color: #737985; font-size: 7px; line-height: 1.45; }
 .documentList { display: grid; gap: 4px; }
+.documentList article { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px; border-radius: 6px; color: #cdd0d7; background: rgba(255, 255, 255, .025); }
+.documentList article > span { min-width: 0; }
 .documentList button { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 7px; border-radius: 6px; color: #cdd0d7; text-align: left; }
 .documentList button:hover { background: rgba(255, 255, 255, .045); }
 .documentList button > span { flex: 1; min-width: 0; }
@@ -87,5 +107,6 @@
 .inspectorActions .aiCapabilityButton { color: #f1eaff; background: #7045ba; font-weight: 700; }
 .inspectorActions .aiCapabilityButton:hover:not(:disabled) { background: #7f50ce; }
 .inspectorActions button:disabled { opacity: .45; }
-@media (max-width: 1000px) { .statusSummary { display: none; } .mapContent { grid-template-columns: minmax(0, 1fr) 260px; } }
-@media (max-width: 820px) { .mapShell { grid-column: 2; } .mapContent { grid-template-columns: 1fr; } .inspector { display: none; } .mapTitle small { display: none; } }
+@media (max-width: 1180px) { .statusSummary { display: none; } .mapTabs small { display: none; } .mapContent { grid-template-columns: minmax(0, 1fr) 280px; } }
+@media (max-width: 900px) { .mapSearch { display: none; } .mapContent { grid-template-columns: minmax(0, 1fr) 250px; } }
+@media (max-width: 820px) { .mapShell { grid-column: 2; } .mapContent { grid-template-columns: 1fr; } .inspector { display: none; } .mapTitle small { display: none; } .mapTitle { min-width: 0; } .aiReviewButton { padding: 0 7px; } }

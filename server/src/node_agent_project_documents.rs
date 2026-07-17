@@ -17,6 +17,7 @@ pub(crate) fn spawn_catalog_response(
             project_docs_scan::ProjectDocumentScanOptions {
                 seed_missing_defaults: seed_defaults,
                 catalog_only,
+                include_analysis: true,
             },
         ) {
             Ok(snapshot) => AgentToServer::ProjectDocumentsRead { req_id, snapshot },

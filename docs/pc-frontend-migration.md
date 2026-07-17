@@ -43,7 +43,7 @@ server/src/
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
 | Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
-| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 知识架构） | 🔴 高 | `src/features/project-docs/` | ✅ 已实现知识首页、推荐阅读、软件平台/API/产品/研究/运维/个人知识模板、最多四层主题树、交互式功能地图与独立治理视图；功能地图用 React Flow 从现有目录元数据和主题清单派生能力树，支持缩放、平移、展开折叠、搜索、覆盖状态筛选、节点详情、打开对应 Markdown 和 AI 定向补齐，不全文读取文档也不建立第二真源；右键、`⋯`、`Shift+F10` 与触摸长按共用命令菜单，支持分区外观、层级、同级拖放/排序、合并、入口页、文档固定/推荐、批量主题与治理归类、AI 定向整理和会话内撤销；个人查看排序留在浏览器，项目共同顺序和操作审计写共享清单；完整度、过期、歧义、重复标题与缺失类型由程序零模型 token 诊断；AI 建议、目录/正文/应用/Git 阶段可观测；默认整理前/后双提交，可执行安全 Markdown rename/move，不夹带代码、不自动 push；网页与供应商无关 MCP 共用 Rust 内核 |
+| OneNote 式项目文档工作区（按需读写、Markdown 编辑/预览、低 token 项目图谱） | 🔴 高 | `src/features/project-docs/` | ✅ 已实现知识首页、最多四层主题树与独立治理视图；项目图谱以 Rust 后端机器契约分别展示产品功能、技术架构和文档主题，文档覆盖与 `file:/test:/route:/symbol:` 实现证据分开，支持缩放、展开、搜索、局部详情、图级 AI 评审与节点级 AI 讨论；网页和供应商无关 MCP 共用同一事实来源，目录/图谱阶段零模型 token、零正文读取。右键、`⋯`、`Shift+F10` 与触摸长按共用分区命令，个人排序留在浏览器，共享结构和审计写清单；AI 建议可包含 `proposed_knowledge_graph`，默认整理前/后双提交，可安全 rename/move Markdown，不夹带代码、不自动 push |
 | 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
 | 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |

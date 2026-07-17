@@ -47,6 +47,8 @@ export default function ProjectDocumentSuggestions({
     + (suggestions?.assignments.length ?? 0)
     + Object.keys(suggestions?.document_metadata ?? {}).length
     + (suggestions?.proposed_home ? 1 : 0)
+    + (suggestions?.proposed_knowledge_graph.nodes.length ?? 0)
+    + (suggestions?.proposed_knowledge_graph.edges.length ?? 0)
   return (
     <main className={styles.suggestionsPane}>
       <header className={styles.suggestionsHeader}>
@@ -151,9 +153,27 @@ export default function ProjectDocumentSuggestions({
                 <article><span>知识首页</span><strong>{suggestions.proposed_home?.title || '沿用当前设置'}</strong></article>
                 <article><span>文档关系</span><strong>{Object.keys(suggestions.document_metadata).length} 份</strong></article>
                 <article><span>基础文档缺口</span><strong>{suggestions.missing_document_types.length} 类</strong></article>
+                <article><span>图谱变更</span><strong>{suggestions.proposed_knowledge_graph.nodes.length} 节点 / {suggestions.proposed_knowledge_graph.edges.length} 关系</strong></article>
               </div>
               {!!suggestions.architecture_findings.length && <ul>{suggestions.architecture_findings.map((finding) => <li key={finding}>{finding}</li>)}</ul>}
             </section>
+
+            {!!suggestions.proposed_knowledge_graph.nodes.length && (
+              <section>
+                <h3>建议项目图谱 <em>{suggestions.proposed_knowledge_graph.nodes.length}</em></h3>
+                <div className={styles.proposedSections}>
+                  {suggestions.proposed_knowledge_graph.nodes.map((node) => (
+                    <article key={node.id}>
+                      <i style={{ background: node.color }} />
+                      <strong>{node.label}</strong>
+                      <span>{node.detail}</span>
+                      <code>{node.view} · {node.parent_id ? `${node.parent_id} / ` : ''}{node.id}</code>
+                    </article>
+                  ))}
+                </div>
+                <p className={styles.safetyNote}>图谱只保存节点和证据引用，不复制 Markdown 正文；应用后网页与 MCP 同时生效。</p>
+              </section>
+            )}
 
             <section>
               <h3>建议主题知识树 <em>{suggestions.proposed_sections.length}</em></h3>

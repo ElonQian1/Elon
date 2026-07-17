@@ -91,6 +91,7 @@ fn project_docs_can_seed_missing_default_docs() {
         ProjectDocumentScanOptions {
             seed_missing_defaults: true,
             catalog_only: false,
+            include_analysis: true,
         },
     )
     .unwrap();
@@ -145,6 +146,7 @@ fn project_docs_catalog_classifies_without_returning_bodies() {
         ProjectDocumentScanOptions {
             seed_missing_defaults: false,
             catalog_only: true,
+            include_analysis: true,
         },
     )
     .unwrap();
@@ -153,6 +155,7 @@ fn project_docs_catalog_classifies_without_returning_bodies() {
         ProjectDocumentScanOptions {
             seed_missing_defaults: false,
             catalog_only: true,
+            include_analysis: true,
         },
     )
     .unwrap();

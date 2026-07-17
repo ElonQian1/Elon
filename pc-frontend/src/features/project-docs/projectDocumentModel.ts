@@ -78,6 +78,7 @@ export interface DocumentHealthAnalysis {
     missing_document_types: string[]
     findings: string[]
   }
+  knowledge_maps?: ProjectKnowledgeMaps
   quality: {
     summary: {
       score: number
@@ -164,3 +165,4 @@ export function lifecycleLabel(lifecycle: string) {
 export function formatNumber(value: number) {
   return new Intl.NumberFormat('zh-CN').format(Number(value) || 0)
 }
+import type { ProjectKnowledgeMaps } from './projectDocumentKnowledgeGraphModel'

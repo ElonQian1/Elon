@@ -169,6 +169,10 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         1,
         crate::node_agent_project_docs_mcp_knowledge_tools::issue_definition(),
     );
+    definitions.splice(
+        2..2,
+        crate::node_agent_project_docs_mcp_graph_tools::definitions(),
+    );
     definitions.extend(crate::node_agent_project_docs_mcp_knowledge_tools::history_definitions());
     definitions
 }
@@ -251,9 +255,16 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                     },
                 )
             }
-            _ => crate::node_agent_project_docs_mcp_knowledge_tools::try_call(
-                workspace, name, arguments,
+            _ => crate::node_agent_project_docs_mcp_graph_tools::try_call(
+                workspace,
+                name,
+                arguments.clone(),
             )?
+            .or(
+                crate::node_agent_project_docs_mcp_knowledge_tools::try_call(
+                    workspace, name, arguments,
+                )?,
+            )
             .ok_or_else(|| anyhow::anyhow!("未知项目文档 MCP 工具：{name}")),
         }
     })();
@@ -355,6 +366,7 @@ fn suggestions_schema() -> Value {
                     }
                 }
             },
+            "proposed_knowledge_graph":crate::node_agent_project_docs_mcp_graph_tools::proposal_schema(),
             "documents_read":{"type":"integer","minimum":0},
             "estimated_tokens_used":{"type":"integer","minimum":0}
         }

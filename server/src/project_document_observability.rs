@@ -184,6 +184,24 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
                     );
                 }
             }
+            "project_docs_get_map"
+            | "project_docs_get_node"
+            | "project_docs_review_map"
+            | "project_docs_plan_context"
+                if can_advance_work(&trace) =>
+            {
+                advance(
+                    &mut trace,
+                    "knowledge_map_inspected",
+                    "running",
+                    "项目知识图谱已检查",
+                    "只读取图谱、目录和实现引用元数据，没有读取 Markdown 正文。",
+                )
+            }
+            "project_docs_get_map"
+            | "project_docs_get_node"
+            | "project_docs_review_map"
+            | "project_docs_plan_context" => {}
             "project_docs_get_suggestions" if can_advance_work(&trace) => advance(
                 &mut trace,
                 "suggestions_checked",
@@ -286,6 +304,12 @@ pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::
     let recovery = match tool {
         "project_docs_analyze" => "确认项目目录存在且是 Git 工作区，然后重新分析。",
         "project_docs_read" => "重新 analyze 获取最新目录 revision，只读取目录中存在的路径。",
+        "project_docs_get_map"
+        | "project_docs_get_node"
+        | "project_docs_review_map"
+        | "project_docs_plan_context" => {
+            "重新获取 overview 图，确认 view、node_id 和 token 预算后重试。"
+        }
         "project_docs_save_suggestions" => {
             "重新 analyze，合并最新建议 revision，并移除不存在的路径或未知分区。"
         }

@@ -199,7 +199,7 @@ pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Opt
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
-            "instructions": "先调用 project_docs_analyze；大型项目按 federation 选择 scope_id。目录预分类不读取正文且 classification_model_tokens=0；用 project_docs_get_issues 取确定性证据，仅用 project_docs_read 按需读需要语义判断的文档。AI 用 project_docs_save_suggestions 写结构化建议。authorization_mode 默认 git_backed_full：apply_suggestions 先提交整理前文档基线；有实体操作时把返回的 git_baseline_commit 传给 apply_file_operations，完成重命名/移动和整理后提交。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。托管知识库可读取历史并恢复版本。"
+            "instructions": "先调用 project_docs_analyze；需要理解项目时用 project_docs_get_map 获取功能、技术架构或主题局部图，用 project_docs_get_node 查看单节点证据，用 project_docs_plan_context 在 token 预算内规划阅读；讨论图是否合理时调用 project_docs_review_map。大型项目按 federation 选择 scope_id。目录与图谱预分类不读取正文且 classification_model_tokens=0；用 project_docs_get_issues 取确定性证据，仅用 project_docs_read 按需读需要语义判断的文档。AI 用 project_docs_save_suggestions 写结构化建议，图谱变更写 proposed_knowledge_graph。authorization_mode 默认 git_backed_full：apply_suggestions 先提交整理前文档基线；有实体操作时把返回的 git_baseline_commit 传给 apply_file_operations，完成重命名/移动和整理后提交。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
