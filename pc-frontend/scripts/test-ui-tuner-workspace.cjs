@@ -413,7 +413,17 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/inspector/UiDesignGateway.tsx'),
     'utf8',
   )
-  assert.match(gatewaySource, /建立可编辑草稿/)
+  assert.match(gatewaySource, /正在自动准备 · 无需选择模式/)
+  assert.match(gatewaySource, /你不需要配置 Runtime、草稿或源码绑定/)
+  assert.doesNotMatch(gatewaySource, /连接 LIVE Runtime/)
+  assert.doesNotMatch(gatewaySource, /让 AI 建立绑定/)
+  const automaticSetupSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/inspector/useAutomaticDesignSetup.ts'),
+    'utf8',
+  )
+  assert.match(automaticSetupSource, /onPrepareRuntime\(\)/)
+  assert.match(automaticSetupSource, /onUseDraft\(\)/)
+  assert.match(inspectorSource, /useAutomaticDesignSetup\(/)
   const sourceInspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewInspector.tsx'),
     'utf8',

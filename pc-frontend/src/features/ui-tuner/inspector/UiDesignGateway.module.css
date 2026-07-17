@@ -1,16 +1,39 @@
 .gateway {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   margin: 10px;
-  padding: 14px;
-  border: 1px solid #765726;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #2b2114, #17191d 62%);
+  padding: 16px;
+  border: 1px solid #32455f;
+  border-radius: 14px;
+  background: linear-gradient(150deg, #182438, #17191d 68%);
   color: #edf4fc;
 }
 
+.heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+
+.heading > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.spinner {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  border: 2px solid #3f5572;
+  border-top-color: #7dd3fc;
+  border-radius: 50%;
+  animation: setup-spin .9s linear infinite;
+}
+
 .gateway .eyebrow {
-  color: #fbbf24;
+  color: #7dd3fc;
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .06em;
@@ -19,15 +42,36 @@
 .gateway strong { font-size: 14px; }
 .gateway p, .gateway small { margin: 0; color: #aab6c6; font-size: 11px; line-height: 1.55; }
 
-.gateway button {
-  min-height: 34px;
-  border: 1px solid #3b4758;
-  border-radius: 8px;
-  background: #1d2735;
-  color: #e7eef8;
-  font-weight: 700;
+.steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #7f8da1;
+  font-size: 11px;
 }
 
-.gateway .primary { border-color: #e5e7eb; background: #f8fafc; color: #111827; }
-.gateway .secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.gateway button:disabled { opacity: .4; }
+.steps li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #465164;
+  vertical-align: 1px;
+}
+
+.steps .done { color: #9de0bd; }
+.steps .done::before { background: #34d399; }
+.steps .active { color: #d9efff; }
+.steps .active::before { background: #38bdf8; box-shadow: 0 0 0 4px rgb(56 189 248 / 12%); }
+
+@keyframes setup-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}

@@ -16,6 +16,7 @@ import type { LivePatchOperation, LiveUiScope } from './live/liveUiApi'
 import type { RuntimeDraftStatus } from './live/runtimeDraftModel'
 import { UiDesignGateway } from './inspector/UiDesignGateway'
 import { UiInspectorTabs, type UiInspectorTab } from './inspector/UiInspectorTabs'
+import { useAutomaticDesignSetup } from './inspector/useAutomaticDesignSetup'
 import styles from './UiTunerPage.module.css'
 
 const MIN_SIZE = 24
@@ -98,6 +99,18 @@ export function UiTunerInspector({
   const [showExportJson, setShowExportJson] = useState(false)
   const androidReadOnly = Boolean(tunerDoc.runtimeSnapshot) && !runtimeEditable
   const supportsTypography = selected?.kind === 'text' || selected?.kind === 'button'
+  const automaticSetupKey = tunerDoc.runtimeSnapshot
+    ? `${tunerDoc.runtimeSnapshot.deviceId}:${tunerDoc.runtimeSnapshot.packageName ?? ''}:${tunerDoc.runtimeSnapshot.capturedAt}`
+    : ''
+  useAutomaticDesignSetup({
+    enabled: activeTab === 'design' && androidReadOnly,
+    setupKey: automaticSetupKey,
+    runtimeReady: livePrepareReady,
+    runtimeBusy: livePrepareBusy,
+    runtimeError: livePrepareError,
+    onPrepareRuntime: onPrepareLiveRuntime,
+    onUseDraft: onSwitchToDraft,
+  })
   return (
     <aside className={styles.inspector}>
       <UiInspectorTabs value={activeTab} onChange={setActiveTab} />
@@ -106,12 +119,8 @@ export function UiTunerInspector({
           <SelectedDesignSection selected={selected} onUpdateElement={onUpdateElement} readOnly={androidReadOnly} />
           {androidReadOnly ? (
             <UiDesignGateway
-              title="先在可编辑草稿里即时设计，或连接 Runtime 直接改真机"
-              detail="普通 APK 真帧没有通用样式反射接口；直接改右侧数值不会可靠改变这张真实截图。"
-              onCreateDraft={onSwitchToDraft}
-              onConnectLive={onPrepareLiveRuntime}
-              onOpenAi={() => setActiveTab('ai')}
-              liveDisabled={!livePrepareReady || livePrepareBusy}
+              runtimeReady={livePrepareReady}
+              runtimeBusy={livePrepareBusy}
             />
           ) : runtimeEditable ? (
             <LiveDesignPanel
@@ -438,7 +447,7 @@ function SelectedDesignSection({
         <span>文本</span>
         <textarea disabled={readOnly} value={selected.text} onChange={(event) => onUpdateElement(selected.id, { text: event.currentTarget.value })} />
       </label>}
-      {readOnly && <small>当前数值来自 Android 捕获，仅用于识别组件；请选择下方一种可编辑方式。</small>}
+      {readOnly && <small>当前数值来自 Android 捕获；系统正在自动准备可编辑样式，无需手动选择技术方式。</small>}
     </section>
   )
 }
