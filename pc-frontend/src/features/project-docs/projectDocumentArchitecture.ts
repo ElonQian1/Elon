@@ -9,6 +9,7 @@ import {
 export type DocumentNavigationMode = 'knowledge' | 'governance'
 
 export const KNOWLEDGE_HOME_SECTION = 'knowledge-home'
+export const CAPABILITY_MAP_SECTION = 'capability-map'
 
 export interface KnowledgeFoundation {
   id: string
@@ -178,6 +179,7 @@ export function buildKnowledgeSections(catalog: DocumentCatalog | null, manifest
   const topics = [...templateSections, ...customSections]
   return [
     { key: KNOWLEDGE_HOME_SECTION, label: '知识首页', detail: '项目地图、推荐阅读与完整度', color: '#9b73ed', virtual: true, order: -100 },
+    { key: CAPABILITY_MAP_SECTION, label: '功能地图', detail: '功能、子能力与对应文档覆盖', color: '#58a8df', virtual: true, order: -90 },
     ...flattenSectionTree(topics),
     SUGGESTIONS_SECTION,
   ]
@@ -250,6 +252,9 @@ export function knowledgeSectionCounts(
     const section = topicSectionForDocument(document, catalog, manifest)
     counts[section] = (counts[section] ?? 0) + 1
   }
+  counts[CAPABILITY_MAP_SECTION] = sections.filter((section) =>
+    ![KNOWLEDGE_HOME_SECTION, CAPABILITY_MAP_SECTION, SUGGESTIONS_SECTION.key].includes(section.key),
+  ).length
   return counts
 }
 

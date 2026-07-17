@@ -148,6 +148,69 @@ assert(architectureSource.includes("key: 'software-platform'"))
 assert(architectureSource.includes('analyzeKnowledgeArchitecture'))
 assert(architectureSource.includes('topicSectionForDocument'))
 assert(architectureSource.includes('const topics = [...templateSections, ...customSections]'))
+assert(architectureSource.includes("CAPABILITY_MAP_SECTION = 'capability-map'"))
+
+const architectureOutput = ts.transpileModule(architectureSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const architectureLoaded = { exports: {} }
+new Function('module', 'exports', 'require', architectureOutput)(
+  architectureLoaded,
+  architectureLoaded.exports,
+  (request) => request === './projectDocumentSections' ? loaded.exports : require(request),
+)
+
+const capabilityGraphSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentCapabilityGraph.ts',
+), 'utf8')
+const capabilityGraphOutput = ts.transpileModule(capabilityGraphSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const capabilityGraphLoaded = { exports: {} }
+new Function('module', 'exports', 'require', capabilityGraphOutput)(
+  capabilityGraphLoaded,
+  capabilityGraphLoaded.exports,
+  (request) => {
+    if (request === './projectDocumentArchitecture') return architectureLoaded.exports
+    if (request === './projectDocumentSections') return loaded.exports
+    return require(request)
+  },
+)
+
+const capabilityManifest = parseSectionManifest(JSON.stringify({
+  version: 1,
+  profile: 'software-platform',
+  home: { title: '测试知识库', summary: '测试', entrypoint: 'README.md', start_here: [] },
+  sections: [
+    { id: 'product-capabilities', label: '产品能力', detail: '用户可见功能', color: '#4477aa', order: 10, entrypoint: 'README.md' },
+    { id: 'knowledge', label: '知识管理', detail: '文档整理能力', color: '#55aa88', order: 10, parent_id: 'product-capabilities' },
+  ],
+  assignments: {
+    'README.md': 'custom:product-capabilities',
+    'docs/research.md': 'custom:knowledge',
+  },
+}))
+const capabilityGraph = capabilityGraphLoaded.exports.buildCapabilityGraph('测试项目', catalog, capabilityManifest)
+const capabilityRoot = capabilityGraph.nodes.find((node) => node.isRoot)
+const capabilityParent = capabilityGraph.nodes.find((node) => node.id === 'custom:product-capabilities')
+const capabilityChild = capabilityGraph.nodes.find((node) => node.id === 'custom:knowledge')
+assert.equal(capabilityRoot.documentCount, documents.length)
+assert.equal(capabilityParent.entrypoint, 'README.md')
+assert.equal(capabilityParent.entrypointSource, 'configured')
+assert.equal(capabilityParent.childCount, 1)
+assert.equal(capabilityChild.parentId, capabilityParent.id)
+assert(capabilityChild.depth > capabilityParent.depth)
+assert(capabilityGraph.nodes.some((node) => node.status === 'gap'), '无对应文档的能力应显示文档空白')
+const collapsedGraph = capabilityGraphLoaded.exports.selectCapabilityGraph(
+  capabilityGraph,
+  new Set([capabilityParent.id]),
+)
+assert(!collapsedGraph.nodes.some((node) => node.id === capabilityChild.id), '收起能力后应隐藏后代')
+const searchedGraph = capabilityGraphLoaded.exports.selectCapabilityGraph(capabilityGraph, new Set(), 'research')
+assert(searchedGraph.nodes.some((node) => node.id === capabilityChild.id))
+assert(searchedGraph.nodes.some((node) => node.id === capabilityParent.id), '搜索结果应保留祖先链')
+const capabilityPositions = capabilityGraphLoaded.exports.layoutCapabilityGraph(searchedGraph.nodes)
+assert(capabilityPositions.get(capabilityChild.id).x > capabilityPositions.get(capabilityParent.id).x)
 
 const workspaceSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsWorkspace.tsx',
@@ -161,6 +224,23 @@ const editorPaneSource = fs.readFileSync(path.join(
 assert(editorPaneSource.includes('ProjectDocumentAccessNotice'))
 assert(workspaceSource.includes('applyFileOperations'))
 assert(workspaceSource.includes('organization.trace?.catalog_revision'))
+assert(workspaceSource.includes('ProjectDocumentCapabilityMap'))
+assert(workspaceSource.includes('只评估功能节点'))
+
+const capabilityMapSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentCapabilityMap.tsx',
+), 'utf8')
+assert(capabilityMapSource.includes('ReactFlow'))
+assert(capabilityMapSource.includes('MiniMap'))
+assert(capabilityMapSource.includes('Controls'))
+assert(capabilityMapSource.includes('搜索功能或文档'))
+assert(!capabilityMapSource.includes('/docs/file'), '功能图只能消费目录元数据，不应自行读取 Markdown 正文')
+
+const capabilityInspectorSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentCapabilityInspector.tsx',
+), 'utf8')
+assert(capabilityInspectorSource.includes('对应 Markdown'))
+assert(capabilityInspectorSource.includes('让 AI 补齐此功能'))
 
 const fileOperationsSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFileOperations.tsx',

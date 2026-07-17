@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { ArrowUpDown, FilePlus2, RefreshCw, Search, Sparkles } from 'lucide-react'
 
 import { api } from '../../api/client'
@@ -11,6 +11,7 @@ import ProjectDocumentCommandMenu, {
   type ProjectDocumentCommandId,
   type ProjectDocumentMenuTarget,
 } from './ProjectDocumentCommandMenu'
+import type { ProjectCapabilityNode } from './projectDocumentCapabilityGraph'
 import { useProjectDocumentAutomationPolicy } from './projectDocumentAutomationPolicy'
 import ProjectDocumentHealthSummary from './ProjectDocumentHealthSummary'
 import ProjectDocumentEditorPane, {
@@ -25,6 +26,7 @@ import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrgan
 import {
   analyzeKnowledgeArchitecture,
   buildKnowledgeSections,
+  CAPABILITY_MAP_SECTION,
   KNOWLEDGE_HOME_SECTION,
   knowledgeSectionCounts,
   topicSectionForDocument,
@@ -58,6 +60,8 @@ import {
 import styles from './ProjectDocumentsWorkspace.module.css'
 import { useProjectDocumentOrganization } from './useProjectDocumentOrganization'
 import { menuPointForButton, type ProjectDocumentMenuPoint } from './useProjectDocumentMenuTrigger'
+
+const ProjectDocumentCapabilityMap = lazy(() => import('./ProjectDocumentCapabilityMap'))
 
 interface Props {
   projectId: string
@@ -236,6 +240,15 @@ export default function ProjectDocumentsWorkspace({
     setNavigationMode('knowledge')
     setActiveSection(topicSectionForDocument(entry, catalog, organization.manifest))
     chooseDocument(path)
+  }
+
+  function organizeCapability(node: ProjectCapabilityNode) {
+    const paths = node.documents.slice(0, 40).map((entry) => entry.path).join(', ')
+    void startAiOrganize(
+      `只评估功能节点“${node.label}”的文档覆盖。当前对应 ${node.documentCount} 份文档` +
+      `${paths ? `：${paths}` : '，尚无对应文档'}。优先补齐入口、需求、设计、参考、操作和证据中的真实缺口；` +
+      '复用现有权威文档，不得为了填满指标创建重复文档。',
+    )
   }
 
   function chooseDocument(path: string) {
@@ -631,6 +644,12 @@ export default function ProjectDocumentsWorkspace({
             setMessage(errorMessage(error, '保存项目知识模板失败'))
           })}
         />
+      ) : activeSection === CAPABILITY_MAP_SECTION ? (
+        <Suspense fallback={<div className={styles.capabilityLoading}>正在生成项目功能地图…</div>}>
+          <ProjectDocumentCapabilityMap projectName={projectName} catalog={catalog} manifest={organization.manifest}
+            canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
+            onOpenSection={setActiveSection} onAiOrganize={organizeCapability} />
+        </Suspense>
       ) : activeSection === 'suggestions' ? (
         <ProjectDocumentSuggestions
           suggestions={organization.suggestions}

@@ -9,6 +9,7 @@
 - Git 工作区中的 Markdown 和路径是内容真源。
 - 路径决定文档权威性上限；正文只能降低自身生命周期，不能越过路径上限。
 - PC 网页端“知识架构”按项目主题浏览，“治理视图”根据 `role`、`lifecycle`、`authority` 和 `ambiguous` 判断权威性；两者是正交维度。
+- PC 网页端“功能地图”是知识架构的派生视图：根节点表示项目，主题和子主题表示能力域，节点汇总入口、需求、设计、参考、操作和证据覆盖。它只消费目录标题、路径、headings、治理元数据和 `.elon/document-sections.json`，不会为了画图读取 Markdown 正文，也不保存另一份能力清单。
 - `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖、文档关系和最近 100 条结构操作审计，不移动实际文件。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
@@ -136,6 +137,8 @@ POST /api/projects/:project_id/docs/organization/apply
 本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示从建议生成、虚拟分区应用到实体文件应用的每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台。页面按项目保存三档权限，默认选中“AI 自动整理（可信且可恢复）”。实体操作通过 `/api/project-docs/organization/apply-files` 交给本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
 知识首页允许用户固定项目模板。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义；命令包含新建父/子分区、重命名与外观、改变父级、同级拖放或置顶/上移/下移/置底、合并、设置入口、批量主题/治理归类、固定、推荐和 AI 定向整理。最多允许四层主题；改变父级必须拒绝循环和第五层。
+
+功能地图使用确定性树布局展示同一主题层级，支持展开/折叠、缩放/平移、缩略图、功能或文档搜索以及“覆盖良好/待补齐/文档空白”筛选。选择节点后，详情区显示推断或配置的入口、最多八份对应 Markdown 和六类覆盖缺口；打开文档仍进入普通编辑器。节点级 AI 按钮只把节点名称、目录路径和缺口范围写入整理任务 Prompt，由通用 MCP 完成后续分析与建议，不为凑齐指标自动生成重复文档。
 
 显示排序和项目结构分开保存：按名称、数量、路径或权威性的个人查看偏好只留在浏览器；手工分区顺序、文档固定/顺序、入口和归类属于项目共同知识架构，写 `.elon/document-sections.json`。其中 `document_metadata.order` 与 `document_metadata.pinned` 保存共享文档顺序，`audit_log` 保存最近 100 条结构操作。前端对清单写入使用 revision 防并发覆盖，并提供最多 20 步会话内撤销；Git 仍是跨会话恢复和 AI 实体整理的最终历史。
 

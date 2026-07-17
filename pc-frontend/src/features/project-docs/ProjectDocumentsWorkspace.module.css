@@ -7,6 +7,7 @@
   color: var(--text);
   background: #121316;
 }
+.capabilityLoading { grid-column: 2 / 4; display: grid; place-items: center; color: #9da3af; background: #17191d; font-size: 11px; }
 
 .notebookRail,
 .pageRail {
