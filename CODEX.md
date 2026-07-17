@@ -1,6 +1,6 @@
 ﻿# CODEX Project Entry
 
-Last updated: 2026-07-14
+Last updated: 2026-07-18
 
 Codex-specific overlay. All shared rules live in `copilot-instructions.md` — do not duplicate them here.
 
@@ -12,6 +12,7 @@ By the time you read this, you have already read `AGENTS.md` → `.github/copilo
 |---|---|
 | Server runtime prompt or APK-triggered Codex CLI behavior | `server/src/ai_cli_prompts.rs`, `server/src/ai_cli_tests.rs` |
 | Source-size preflight behavior | `server/src/source_hygiene.rs` |
+| Desktop supervisor -> local PC executor workflow | `.agents/skills/codex-pc-supervisor/SKILL.md`, `docs/codex-desktop-pc-supervision.md` |
 
 ## Script Output Priority
 
@@ -21,3 +22,4 @@ When a script prints `NEXT=`, `EDIT_ROOT=`, `FINISH_COMMAND_*=`, `FINALIZABLE=`,
 
 - **Prewarm** 只做预热，不读文件、不改代码、不构建、不部署。
 - **Stale session**：`codex resume` 失败时标记 stale，带旧 `codex://threads/<thread_id>` URI 和最近后端消息重试一次（不冷启动）。
+- **Executor guard**：请求含 `<elon-pc-executor>` 时，本轮已经是 PC 节点执行者；直接完成项目任务，不得再次派发到本机节点。

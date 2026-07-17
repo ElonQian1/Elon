@@ -96,6 +96,7 @@ mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
 mod node_agent_local_task_store;
+mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;

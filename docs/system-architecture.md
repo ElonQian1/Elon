@@ -130,6 +130,14 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 当前边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`pipe_sidecar + pipe + JSON` 已补齐基础生命周期管理、稳定运行句柄、恢复契约和 Codex JSON 输出回放；后续继续增强前端恢复入口和多 CLI 统一管理，不替代 Codex CLI 本身能力。
 
+#### 2.4.1 Codex Desktop -> PC 本机监督协议
+
+本机任务 API 可选接受 `supervision`，协议版本为 `elon.desktop_pc_supervision.v1`。契约记录 `task_role`、父/根任务、验收条件和改进策略；node-agent 把契约及桌面验收作为 append-only journal 事件保存，不改变旧任务的数据库结构，也不影响未传 `supervision` 的调用方。
+
+节点返回的 `supervision.evidence` 是确定性摘要，包括事件数、工具调用/结果、失败工具、文件变更事件、文件名和是否看到终态事件。桌面端仍需结合 Git、测试和发布事实做独立判断，然后调用 `/api/local-tasks/:task_id/supervision/review` 写入 `accepted`、`needs_follow_up`、`blocked_capability` 或 `rejected`。PC 工作台的任务详情展示契约、证据和最新结论。
+
+`task_role` 形成可追溯任务树：`requirement` 是原需求，`capability_repair` 是阻塞能力修复，`resume_original` 是修复后的原任务续跑，`post_task_improvement` 是任务完成后的非阻塞增强。节点给执行 CLI 注入防递归标记，避免桌面监督与本机执行相互重复派发。完整安全边界、API 示例和日常流程见 `docs/codex-desktop-pc-supervision.md`。
+
 服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
 
 当前 Route A 任务恢复闭环分为四段：

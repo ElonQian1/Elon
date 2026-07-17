@@ -49,11 +49,26 @@ try {
     approval_state: {
       approvals: [{ approval_id: 'approval-1', tool: 'run_command', actionable: true }],
     },
+    supervision: {
+      protocol: 'elon.desktop_pc_supervision.v1',
+      enabled: true,
+      contract: {
+        protocol: 'elon.desktop_pc_supervision.v1',
+        supervisor: 'codex_desktop',
+        task_role: 'requirement',
+        acceptance_criteria: ['测试通过', '监督验收'],
+        improvement_policy: 'after_task_or_unblock',
+      },
+      evidence: { event_count: 8, tool_calls: 2, tool_results: 2, changed_files: ['server/src/main.rs'] },
+    },
   })
   assert.strictEqual(detail.task.id, 'local-1')
   assert.strictEqual(detail.task.final_reply, '已完成本机任务')
   assert.strictEqual(detail.task.token_usage.total_tokens, 17)
   assert.strictEqual(detail.approvals[0].actionable, true)
+  assert.strictEqual(detail.supervision.enabled, true)
+  assert.strictEqual(detail.supervision.contract.acceptance_criteria.length, 2)
+  assert.strictEqual(detail.supervision.evidence.tool_calls, 2)
 
   const merged = model.mergeLocalTaskEvents(detail.events, [
     detail.events[1],
@@ -70,6 +85,7 @@ try {
   const railSource = readSource('src/features/shell/ServerRail.tsx')
   const apiSource = readSource('src/features/local-tasks/localTaskApi.ts')
   const pageSource = readSource('src/features/local-tasks/LocalTasksPage.tsx')
+  const supervisionSource = readSource('src/features/local-tasks/LocalTaskSupervisionPanel.tsx')
   assert.ok(!bannerSource.includes('window.location.replace'), 'cloud recovery must not force navigation')
   assert.ok(bannerSource.includes('返回云端工作台'), 'cloud recovery must expose an explicit return action')
   assert.ok(shellSource.includes('useNotifications(!localMode)'), 'local mode must disable cloud websocket notifications')
@@ -80,6 +96,8 @@ try {
   assert.ok(apiSource.includes('/cancel`'), 'local task cancel endpoint must be explicit')
   assert.ok(apiSource.includes('/tool-approvals/'), 'local tool approvals must use the task-local endpoint')
   assert.ok(pageSource.includes('ensureLocalFullAccessGrant'), 'local task creation must explicitly confirm and persist workspace access')
+  assert.ok(supervisionSource.includes('桌面监督闭环'), 'supervised tasks must expose their evidence and verdict in the PC workbench')
+  assert.ok(supervisionSource.includes('PC 本机节点负责执行'), 'the PC workbench must explain the executor and supervisor roles')
 
   console.log('pc-frontend local-task tests passed')
 } finally {

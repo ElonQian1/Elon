@@ -2,7 +2,7 @@
 
 > 本文记录 `/pc` PC 工作台从原生静态 HTML/CSS/JS 迁移到 `Vite + React + TypeScript` 的路线、边界和模块状态。硬规则见 `.github/instructions/pc-frontend-migration.instructions.md`。
 >
-> 最后状态校准：2026-07-17
+> 最后状态校准：2026-07-18
 
 ## 当前判断
 
@@ -49,6 +49,7 @@ server/src/
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |
 | 消息附件上传（图片/文件） | 🟡 中 | `src/features/conversation/AttachmentButton.tsx` | ✅ P1.4 完成：支持不限扩展名选择、整会话区拖放、粘贴、多附件预览，并随 AI 任务发送结构化 attachments |
 | 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | 🟡 P1.7 已补过程覆盖诊断、当前卡点阶段、结构化命令/文件/测试过程卡、侧栏心跳陈旧提示、运行中停止入口、恢复控制面、项目级多任务现场总览；task_done 细化仍继续 |
+| 本机任务桌面监督证据 | 🔴 高 | `src/features/local-tasks/` | ✅ 识别 `elon.desktop_pc_supervision.v1`，展示执行/监督分工、验收条件、工具与文件证据、失败次数和最新桌面验收结论；普通本机任务保持兼容 |
 
 ### 阶段 P2 — 项目管理
 

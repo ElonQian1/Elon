@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex PC 监督器"
+  short_description: "让 PC 节点执行，Codex 桌面端监督、验收、改进并续跑"
+  default_prompt: "Use $codex-pc-supervisor to send this coding task to my Yilong PC node, supervise the evidence, review the result, and improve or resume it when needed."

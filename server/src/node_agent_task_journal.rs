@@ -478,7 +478,7 @@ impl TaskJournal {
         Ok(())
     }
 
-    fn append_event(&self, event: serde_json::Value) -> Result<()> {
+    pub(crate) fn append_event(&self, event: serde_json::Value) -> Result<()> {
         self.ensure_dir()?;
         let path = self.events_path();
         let mut file = OpenOptions::new()
@@ -519,7 +519,7 @@ impl TaskJournal {
         ))
     }
 
-    fn events_path(&self) -> PathBuf {
+    pub(crate) fn events_path(&self) -> PathBuf {
         self.dir.join("events.jsonl")
     }
 

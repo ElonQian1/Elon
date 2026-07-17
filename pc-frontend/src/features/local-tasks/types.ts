@@ -10,6 +10,16 @@ export interface LocalTaskCreateInput {
   workspace_path: string
   prompt: string
   runtime_permission: LocalTaskRuntimePermission
+  supervision?: LocalTaskSupervisionInput
+}
+
+export interface LocalTaskSupervisionInput {
+  supervisor?: string
+  task_role?: 'requirement' | 'capability_repair' | 'resume_original' | 'post_task_improvement'
+  parent_task_id?: string
+  root_task_id?: string
+  acceptance_criteria?: string[]
+  improvement_policy?: 'after_task_or_unblock' | 'after_task_only' | 'observe_only'
 }
 
 export interface LocalFullAccessGrant {
@@ -64,12 +74,50 @@ export interface LocalTaskApproval {
   checkpoint?: unknown
 }
 
+export interface LocalTaskSupervisionContract {
+  protocol: string
+  supervisor: string
+  task_role: string
+  parent_task_id?: string
+  root_task_id?: string
+  acceptance_criteria: string[]
+  improvement_policy: string
+}
+
+export interface LocalTaskSupervisionReview {
+  protocol: string
+  verdict: string
+  summary: string
+  improvements: string[]
+  reviewed_by: string
+  reviewed_at_ms?: number
+}
+
+export interface LocalTaskSupervisionEvidence {
+  event_count: number
+  tool_calls: number
+  tool_results: number
+  failed_tools: number
+  file_change_events: number
+  changed_files: string[]
+  terminal_event_seen: boolean
+}
+
+export interface LocalTaskSupervisionState {
+  protocol: string
+  enabled: boolean
+  contract?: LocalTaskSupervisionContract
+  review?: LocalTaskSupervisionReview
+  evidence: LocalTaskSupervisionEvidence
+}
+
 export interface LocalTaskDetail {
   task: LocalTaskRecord
   events: LocalTaskEvent[]
   approvals: LocalTaskApproval[]
   last_event_seq: number
   has_more: boolean
+  supervision: LocalTaskSupervisionState
 }
 
 export interface LocalTaskStatusView {

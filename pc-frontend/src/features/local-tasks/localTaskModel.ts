@@ -3,6 +3,7 @@ import type {
   LocalTaskDetail,
   LocalTaskEvent,
   LocalTaskRecord,
+  LocalTaskSupervisionState,
   LocalTaskStatusView,
   LocalTaskTokenUsage,
 } from './types'
@@ -46,6 +47,45 @@ export function normalizeLocalTaskDetail(payload: unknown): LocalTaskDetail {
     approvals,
     last_event_seq: lastSeq,
     has_more: Boolean(root.has_more),
+    supervision: normalizeSupervisionState(root.supervision),
+  }
+}
+
+export function normalizeSupervisionState(payload: unknown): LocalTaskSupervisionState {
+  const root = objectValue(payload)
+  const contractRoot = objectValue(root.contract)
+  const reviewRoot = objectValue(root.review)
+  const evidenceRoot = objectValue(root.evidence)
+  const enabled = Boolean(root.enabled)
+  return {
+    protocol: textValue(root.protocol) || 'elon.desktop_pc_supervision.v1',
+    enabled,
+    contract: enabled ? {
+      protocol: textValue(contractRoot.protocol),
+      supervisor: textValue(contractRoot.supervisor),
+      task_role: textValue(contractRoot.task_role),
+      parent_task_id: textValue(contractRoot.parent_task_id) || undefined,
+      root_task_id: textValue(contractRoot.root_task_id) || undefined,
+      acceptance_criteria: textArray(contractRoot.acceptance_criteria),
+      improvement_policy: textValue(contractRoot.improvement_policy),
+    } : undefined,
+    review: Object.keys(reviewRoot).length ? {
+      protocol: textValue(reviewRoot.protocol),
+      verdict: textValue(reviewRoot.verdict),
+      summary: textValue(reviewRoot.summary),
+      improvements: textArray(reviewRoot.improvements),
+      reviewed_by: textValue(reviewRoot.reviewed_by),
+      reviewed_at_ms: timestampValue(reviewRoot.reviewed_at_ms),
+    } : undefined,
+    evidence: {
+      event_count: numberValue(evidenceRoot.event_count) ?? 0,
+      tool_calls: numberValue(evidenceRoot.tool_calls) ?? 0,
+      tool_results: numberValue(evidenceRoot.tool_results) ?? 0,
+      failed_tools: numberValue(evidenceRoot.failed_tools) ?? 0,
+      file_change_events: numberValue(evidenceRoot.file_change_events) ?? 0,
+      changed_files: textArray(evidenceRoot.changed_files),
+      terminal_event_seen: Boolean(evidenceRoot.terminal_event_seen),
+    },
   }
 }
 
@@ -120,6 +160,7 @@ export function mergeLocalTaskDetail(
     task: mergeTaskRecord(current.task, incoming.task),
     events: mergeLocalTaskEvents(current.events, incoming.events),
     last_event_seq: Math.max(current.last_event_seq, incoming.last_event_seq),
+    supervision: incoming.supervision.enabled ? incoming.supervision : current.supervision,
   }
 }
 
@@ -267,6 +308,10 @@ function objectValue(value: unknown): JsonObject {
 
 function arrayValue(value: unknown): unknown[] {
   return Array.isArray(value) ? value : []
+}
+
+function textArray(value: unknown): string[] {
+  return arrayValue(value).map(textValue).filter(Boolean)
 }
 
 function textValue(value: unknown): string {

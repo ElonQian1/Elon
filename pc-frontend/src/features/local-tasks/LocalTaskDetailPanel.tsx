@@ -10,6 +10,7 @@ import type {
   LocalTaskEvent,
 } from './types'
 import styles from './LocalTasksPage.module.css'
+import LocalTaskSupervisionPanel from './LocalTaskSupervisionPanel'
 
 interface Props {
   detail: LocalTaskDetail | null
@@ -81,6 +82,8 @@ export default function LocalTaskDetailPanel({
             <div><dt>会话</dt><dd>{task.conversation_id || '-'}</dd></div>
           </dl>
         </section>
+
+        <LocalTaskSupervisionPanel supervision={detail.supervision} />
 
         {detail.approvals.length > 0 && (
           <section className={styles.infoCard}>

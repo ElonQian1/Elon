@@ -48,6 +48,8 @@ struct CreateLocalTaskRequest {
     prompt: String,
     #[serde(default)]
     runtime_permission: Option<String>,
+    #[serde(default)]
+    supervision: Option<crate::node_agent_local_task_supervision::SupervisionContractInput>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -64,6 +66,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/local-tasks/:task_id/tool-approvals/:approval_id/decision",
             post(decide_approval),
         )
+        .merge(crate::node_agent_local_task_supervision::routes())
 }
 
 async fn list_tasks(
@@ -136,6 +139,13 @@ async fn get_task(
         true,
         task_status,
     );
+    let supervision = match crate::node_agent_local_task_supervision::load_supervision_state(
+        &runtime.task_journal,
+        &record.task_id,
+    ) {
+        Ok(supervision) => supervision,
+        Err(error) => return internal_error(error),
+    };
     Json(json!({
         "ok": true,
         "record": record,
@@ -143,6 +153,7 @@ async fn get_task(
         "last_event_seq": snapshot.last_event_seq,
         "has_more": snapshot.has_more,
         "approval_state": approval_state,
+        "supervision": supervision,
     }))
     .into_response()
 }
@@ -196,6 +207,15 @@ async fn create_task(
     if prompt.chars().count() > MAX_LOCAL_PROMPT_CHARS {
         return json_error(StatusCode::PAYLOAD_TOO_LARGE, "本机任务内容过长。");
     }
+    let supervision = match request.supervision {
+        Some(input) => match crate::node_agent_local_task_supervision::normalize_contract(input) {
+            Ok(contract) => Some(contract),
+            Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+        },
+        None => None,
+    };
+    let executor_prompt =
+        crate::node_agent_local_task_supervision::executor_prompt(prompt, supervision.as_ref());
     let runtime_permission = request
         .runtime_permission
         .as_deref()
@@ -235,6 +255,16 @@ async fn create_task(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
+    if let Some(contract) = supervision.as_ref() {
+        if let Err(error) = crate::node_agent_local_task_supervision::record_supervision_event(
+            &runtime.task_journal,
+            &task_id,
+            "supervision_contract",
+            crate::node_agent_local_task_supervision::contract_payload(contract),
+        ) {
+            return internal_error(error);
+        }
+    }
     let record = match runtime.local_tasks.create(LocalTaskStart {
         task_id: &task_id,
         owner_user_id: &creds.owner_user_id,
@@ -251,7 +281,6 @@ async fn create_task(
         Ok(record) => record,
         Err(error) => return internal_error(error),
     };
-
     let (out_tx, out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
     spawn_local_output_consumer(
         runtime.clone(),
@@ -277,7 +306,7 @@ async fn create_task(
             cloud_control_deadline: None,
             cloud_control_issued_at: None,
             cloud_control_ttl_ms: None,
-            prompt: prompt.to_string(),
+            prompt: executor_prompt,
             completion_context: crate::node_agent_cli_done::CliCompletionContext::local_offline(
                 CliCompletionProducerIdentity {
                     owner_user_id: creds.owner_user_id.clone(),
@@ -304,6 +333,7 @@ async fn create_task(
             "status": "running",
             "sync_state": "local_only",
             "record": record,
+            "supervision": supervision,
         })),
     )
         .into_response()

@@ -210,6 +210,22 @@
 .sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sectionHeading h3 { margin: 0; }
 .sectionHeading span { color: var(--text-muted); font-size: 10px; }
+.sectionHeading h3 { display: flex; align-items: center; gap: 6px; }
+
+.supervisionCard { border: 1px solid rgba(88,197,139,.28); border-radius: 8px; background: linear-gradient(135deg, rgba(88,197,139,.08), #24272b 45%); padding: 12px 14px; }
+.supervisionCard[data-verdict="blocked_capability"],
+.supervisionCard[data-verdict="rejected"] { border-color: rgba(223,92,92,.35); }
+.supervisionIntro { margin: 8px 0 10px; color: var(--text-muted); font-size: 11px; line-height: 1.55; }
+.supervisionMeta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; border-radius: 6px; background: var(--line-soft); }
+.supervisionMeta div { min-width: 0; display: flex; flex-direction: column; gap: 3px; background: #202328; padding: 8px; }
+.supervisionMeta dt { color: var(--text-muted); font-size: 9px; }
+.supervisionMeta dd { margin: 0; overflow: hidden; color: var(--text-soft); font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.supervisionColumns { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
+.supervisionColumns > div, .supervisionReview { border-radius: 6px; background: rgba(0,0,0,.14); padding: 9px; }
+.supervisionColumns strong, .supervisionReview strong { color: var(--text-soft); font-size: 10px; }
+.supervisionColumns p, .supervisionReview p { margin: 5px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.supervisionColumns ul, .supervisionReview ul { margin: 5px 0 0; padding-left: 16px; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
+.supervisionReview { margin-top: 9px; border-left: 2px solid #58c58b; }
 
 .approvalList,
 .eventList { display: flex; flex-direction: column; gap: 7px; }
@@ -256,4 +272,5 @@
   .detailScroll { overflow: visible; }
   .header { align-items: flex-start; flex-direction: column; }
   .headerActions { width: 100%; justify-content: space-between; }
+  .supervisionMeta, .supervisionColumns { grid-template-columns: 1fr 1fr; }
 }

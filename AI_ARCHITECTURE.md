@@ -55,6 +55,25 @@ Android APK / Web UI
 
 当前 PC 项目会话默认值是 `route_a`。前端“直连 CLI”开关会把本轮请求强制成 `route_a`，并传入本机 `localNodeId` 与项目 `workspacePath`；当前主实现是 Codex CLI，后续可在同一 Route A 下接入 Copilot / Claude / Gemini 等本机 CLI。
 
+### Codex 桌面监督与 PC 执行闭环
+
+Codex 桌面端讨论本项目并需要实际改动时，可以通过仓库级 `codex-pc-supervisor` Skill 把需求交给本机 `/api/local-tasks`。PC 节点启动 Codex CLI，在项目隔离 worktree 内修改、验证、提交、发布和收尾；桌面端保留监督者角色，独立检查 journal、diff、测试、产物与 `FINALIZABLE`，再写入验收结论。协议和操作手册见 `docs/codex-desktop-pc-supervision.md`。
+
+```text
+用户 <-> Codex Desktop（拆解 / 监督 / 验收）
+                    |
+                    v  elon.desktop_pc_supervision.v1
+         一龙 PC 本机节点 -> Codex CLI -> 项目 worktree
+                    |                    |
+                    +--- journal / diff / tests / publish ---+
+                    ^                                      |
+                    +--------- 桌面端独立复核 <-------------+
+```
+
+闭环有两条但共享同一审计链：任务闭环负责完成需求；能力闭环只在平台能力阻断原任务时先派发 `capability_repair`，修复验收后再以 `resume_original` 续跑。非阻塞改进使用 `post_task_improvement`，必须排在用户任务之后。执行提示带 `<elon-pc-executor>` 防递归；看到该标记的 CLI 必须直接工作，不能把任务再次派回节点。
+
+这是可版本化、可回滚、可审计的系统级迭代，不是模型自行训练。桌面端监督不扩大用户授权，也不能用“执行者声称成功”代替独立证据；本机节点不可用时不得静默改为桌面端写代码。
+
 并发边界要分两层看：不同 PC 节点、不同项目工作区可以并行；同一 PC 节点上的外部 CLI 也可以并行，但必须受“PC 节点 + CLI”的容量槽位限制，不能无限并发。`route_a` / `route_c3` 这类路线依赖本机 Codex、Claude、Copilot 登录态和 sidecar；同一台电脑上的 CLI 进程还会共享缓存、系统资源、项目路径、Git/Cargo 产物和模型服务限流。多个会话无上限压上去时容易出现“只有等待状态、没有公开输出、最后超时失败”。因此后端必须按节点硬件、用户配置和运行状态限制同节点 CLI 并发槽位，前端必须把“节点槽位已满 / 排队等待时长 / 已获得节点执行权 / 已派发到 CLI / CLI 输出中”展示出来。
 
 当前容量策略是保守自动估算：未知硬件默认 1 个槽；较强工作站可自动提升到 2-4 个槽；`ELON_PC_NODE_CLI_MAX_PARALLEL` 可显式指定本机 CLI 并发槽位，`ELON_PC_NODE_CLI_HARD_MAX_PARALLEL` 控制服务端硬上限。后续可以继续把 CPU/内存/显存、当前活跃 CLI 数、失败率和平均首包时间纳入动态降档。
