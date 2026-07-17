@@ -125,6 +125,10 @@ $ownerFiles = @(
     "server/src/ws_transport.rs",
     "server/src/ws_client_transport.rs",
     "server/src/realtime_metrics.rs",
+    "server/src/realtime_metrics/admin.rs",
+    "server/src/realtime_metrics/catalog.rs",
+    "server/src/realtime_metrics/counters.rs",
+    "server/src/realtime_metrics_tests.rs",
     "server/src/realtime_diagnostics_catalog.snapshot.json",
     "server/src/router/admin_routes.rs",
     "server/src/store/realtime_close_events.rs",
@@ -134,14 +138,19 @@ $ownerFiles = @(
     "docs/realtime-operations-runbook.md"
 )
 
+$metricsSource = Read-TextFile (Join-Path $repoRoot "server\src\realtime_metrics.rs")
+$metricsCatalogSource = Read-TextFile (Join-Path $repoRoot "server\src\realtime_metrics\catalog.rs")
+$metricsAdminSource = Read-TextFile (Join-Path $repoRoot "server\src\realtime_metrics\admin.rs")
+$metricsTestsSource = Read-TextFile (Join-Path $repoRoot "server\src\realtime_metrics_tests.rs")
+
 foreach ($label in $channelLabels) {
     Assert-Contains -Label "Realtime ownership doc" -Text $ownership -Needle $label
-    Assert-Source-Contains -SourcePath (Join-Path $repoRoot "server\src\realtime_metrics.rs") -Needle "`"$label`""
+    Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $metricsCatalogSource -Needle "`"$label`""
 }
 
 foreach ($variant in $channelVariants) {
     Assert-Contains -Label "Realtime ownership doc" -Text $ownership -Needle $variant
-    Assert-Source-Contains -SourcePath (Join-Path $repoRoot "server\src\realtime_metrics.rs") -Needle ($variant -replace "RealtimeChannel::", "")
+    Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $metricsCatalogSource -Needle ($variant -replace "RealtimeChannel::", "")
 }
 
 foreach ($reason in $allCloseReasons) {
@@ -189,14 +198,16 @@ Assert-Contains -Label "Realtime ownership doc" -Text $ownership -Needle "WS"
 Assert-Contains -Label "Realtime ownership doc" -Text $ownership -Needle "/api/admin/realtime/diagnostics"
 Assert-Contains -Label "Realtime ownership doc" -Text $ownership -Needle "realtime_diagnostics_catalog()"
 
-$metricsSource = Read-TextFile (Join-Path $repoRoot "server\src\realtime_metrics.rs")
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "pub fn realtime_diagnostics_catalog"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "pub async fn admin_diagnostics"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "alert_bucket"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "first_check"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "RealtimeDiagnosticsCatalog"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "realtime_diagnostics_catalog_matches_snapshot"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "realtime_diagnostics_catalog.snapshot.json"
+Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "mod catalog"
+Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "pub use catalog::realtime_diagnostics_catalog"
+Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "pub use admin::{admin_close_metrics, admin_diagnostics}"
+Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $metricsCatalogSource -Needle "pub fn realtime_diagnostics_catalog"
+Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $metricsCatalogSource -Needle "alert_bucket"
+Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $metricsCatalogSource -Needle "first_check"
+Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $metricsCatalogSource -Needle "RealtimeDiagnosticsCatalog"
+Assert-Contains -Label "realtime_metrics/admin.rs" -Text $metricsAdminSource -Needle "pub async fn admin_diagnostics"
+Assert-Contains -Label "realtime_metrics_tests.rs" -Text $metricsTestsSource -Needle "realtime_diagnostics_catalog_matches_snapshot"
+Assert-Contains -Label "realtime_metrics_tests.rs" -Text $metricsTestsSource -Needle "realtime_diagnostics_catalog.snapshot.json"
 
 $diagnosticsSnapshotSource = Read-TextFile (Join-Path $repoRoot "server\src\realtime_diagnostics_catalog.snapshot.json")
 Assert-Contains -Label "realtime_diagnostics_catalog.snapshot.json" -Text $diagnosticsSnapshotSource -Needle '"channels"'

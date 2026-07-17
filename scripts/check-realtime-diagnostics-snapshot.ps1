@@ -1,5 +1,7 @@
 param(
     [string]$MetricsPath = "server\src\realtime_metrics.rs",
+    [string]$CatalogPath = "server\src\realtime_metrics\catalog.rs",
+    [string]$TestsPath = "server\src\realtime_metrics_tests.rs",
     [string]$SnapshotPath = "server\src\realtime_diagnostics_catalog.snapshot.json",
     [int]$CargoLockTimeoutSeconds = 120,
     [switch]$SkipCargoTest
@@ -59,14 +61,21 @@ $repoRoot = Get-RepoRoot
 Set-Location $repoRoot
 
 $metricsFullPath = Join-Path $repoRoot $MetricsPath
+$catalogFullPath = Join-Path $repoRoot $CatalogPath
+$testsFullPath = Join-Path $repoRoot $TestsPath
 $snapshotFullPath = Join-Path $repoRoot $SnapshotPath
 
 $metricsSource = Read-TextFile $metricsFullPath
+$catalogSource = Read-TextFile $catalogFullPath
+$testsSource = Read-TextFile $testsFullPath
 $snapshotSource = Read-TextFile $snapshotFullPath
 
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "realtime_diagnostics_catalog_matches_snapshot"
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle 'include_str!("realtime_diagnostics_catalog.snapshot.json")'
-Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "Diagnostics catalog changes must update server/src/realtime_diagnostics_catalog.snapshot.json and the snapshot test."
+Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "mod catalog"
+Assert-Contains -Label "realtime_metrics.rs" -Text $metricsSource -Needle "pub use catalog::realtime_diagnostics_catalog"
+Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $catalogSource -Needle "pub fn realtime_diagnostics_catalog"
+Assert-Contains -Label "realtime_metrics/catalog.rs" -Text $catalogSource -Needle "Diagnostics catalog changes must update server/src/realtime_diagnostics_catalog.snapshot.json and the snapshot test."
+Assert-Contains -Label "realtime_metrics_tests.rs" -Text $testsSource -Needle "realtime_diagnostics_catalog_matches_snapshot"
+Assert-Contains -Label "realtime_metrics_tests.rs" -Text $testsSource -Needle 'include_str!("realtime_diagnostics_catalog.snapshot.json")'
 
 try {
     $snapshot = $snapshotSource | ConvertFrom-Json

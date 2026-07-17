@@ -58,7 +58,11 @@
 
 | 模块 | Owner 责任 |
 | --- | --- |
-| `server/src/realtime_metrics.rs` | `RealtimeChannel` 标签、内存计数、管理 API payload、未来 Prometheus/OpenTelemetry 适配点 |
+| `server/src/realtime_metrics.rs` | Realtime 模块门面，稳定导出计数、诊断目录和管理 API，避免业务入口依赖内部文件布局 |
+| `server/src/realtime_metrics/counters.rs` | `RealtimeChannel` 标签、进程内关闭计数和持久化账本写入适配点 |
+| `server/src/realtime_metrics/catalog.rs` | Channel/close reason 诊断目录、告警 bucket、first check 和变更规则 |
+| `server/src/realtime_metrics/admin.rs` | 管理 API payload 组装和管理员鉴权 |
+| `server/src/realtime_metrics_tests.rs` | 计数、诊断目录和 snapshot 契约测试，隔离全局计数测试锁 |
 | `server/src/realtime_diagnostics_catalog.snapshot.json` | `realtime_diagnostics_catalog()` 的静态 JSON 契约快照，锁住 diagnostics API 字段、数组结构、alert bucket 和 first check |
 | `server/src/router/admin_routes.rs` | Realtime 管理 API 路由挂载，包括 `/api/admin/realtime/close-metrics` 和 `/api/admin/realtime/diagnostics` |
 | `server/src/store/realtime_close_events.rs` | SQLite close event ledger、30 天保留、窗口统计、Realtime 告警写入、Realtime/Billing 告警隔离，并从 `realtime_diagnostics_catalog()` 派生告警计数分类和 detail 的 first check |
