@@ -10,6 +10,7 @@ use crate::node_agent_android_inspector::{
 use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify_apk::select_fresh_debug_apk;
+use super::fit_run::workspace_fingerprint;
 use super::frame::{capture_runtime_frame_image, RuntimeFrameImage};
 use super::preview::{open_preview, PreviewOpenRequest};
 use super::protocol::LiveUiNode;
@@ -346,6 +347,20 @@ async fn build_and_verify_with_mode(
         target_path.is_some(),
     ));
     let source_parity_verified = verification_gate.source_parity == VerificationGateState::Passed;
+    let runtime_build_id = runtime_view.runtime_build_id.clone();
+    if source_parity_verified {
+        if let Some(source_revision) =
+            workspace_fingerprint(project_root.to_string_lossy().as_ref())?
+        {
+            session
+                .record_source_proof(
+                    source_revision,
+                    runtime_build_id.clone(),
+                    source_parity_diff.visual_loss,
+                )
+                .await;
+        }
+    }
     let status = verification_gate.status;
     let message = if mode == BuildVerificationMode::RuntimePreparation {
         "Debug Runtime 已构建、安装并连接，节点树已经就绪；首次准备不执行 Live→源码一致性验收。"
@@ -369,7 +384,7 @@ async fn build_and_verify_with_mode(
         build_duration_ms,
         install_output: install_output.trim().to_string(),
         runtime_connected: runtime_view.connected,
-        runtime_build_id: runtime_view.runtime_build_id,
+        runtime_build_id,
         node_count: runtime_view.node_count,
         screenshot_width,
         screenshot_height,

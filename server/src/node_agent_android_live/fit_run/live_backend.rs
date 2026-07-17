@@ -21,7 +21,8 @@ use crate::node_agent_android_live::broker::LiveUiBroker;
 use crate::node_agent_android_live::build_verify::build_and_verify;
 use crate::node_agent_android_live::fit_learning::top_k_for_run;
 use crate::node_agent_android_live::protocol::{
-    LivePatchOperation, LivePatchTarget, LiveStylePatch, LiveUiNode,
+    LivePatchOperation, LivePatchTarget, LiveSessionView, LiveSourceProofView, LiveStylePatch,
+    LiveUiNode,
 };
 use crate::node_agent_android_live::source_commit::{
     build_source_commit_plan_for_patches, commit_source_plan, SourceCommitRequest,
@@ -189,6 +190,16 @@ impl LiveFitRunBackend {
         let started = Instant::now();
         self.ensure_target_identity(&run).await?;
         let session = self.broker.session(&run.session_id).await?;
+        let source_revision = workspace_fingerprint(&run.project_root)?;
+        let session_view = session.view().await;
+        if let Some(candidate) =
+            fresh_runtime_source_candidate(&run, &session_view, source_revision.as_deref())
+        {
+            return Ok(FitSourceVerifyResult {
+                candidate,
+                duration_ms: elapsed_ms(started),
+            });
+        }
         let already_source_backed = run.current.as_ref().is_some_and(|candidate| {
             candidate.source_parity_verified && candidate.score.passes(&run.thresholds)
         });
@@ -348,6 +359,38 @@ impl LiveFitRunBackend {
             operations,
         }))
     }
+}
+
+pub(super) fn fresh_runtime_source_candidate(
+    run: &FitRunDocument,
+    session: &LiveSessionView,
+    workspace_revision: Option<&str>,
+) -> Option<super::model::FitCandidate> {
+    let best = run.best.as_ref()?;
+    let proof: &LiveSourceProofView = session.source_proof.as_ref()?;
+    let workspace_revision = workspace_revision?;
+    let runtime_build_matches = proof.runtime_build_id == session.runtime_build_id
+        && session.runtime_build_id == run.runtime_build_id;
+    let source_revision_matches = proof.source_revision == workspace_revision
+        && run.source_revision.as_deref() == Some(workspace_revision);
+    if !session.connected
+        || session.history_count != 0
+        || session.redo_count != 0
+        || !best.operations.is_empty()
+        || !runtime_build_matches
+        || !source_revision_matches
+        || proof.source_parity_loss > run.thresholds.max_source_parity_loss
+        || !best.score.passes(&run.thresholds)
+    {
+        return None;
+    }
+    let mut candidate = best.clone();
+    candidate.trial_id = new_trial_id("fresh-runtime-source");
+    candidate.runtime_build_id = session.runtime_build_id.clone();
+    candidate.source_revision = Some(workspace_revision.to_string());
+    candidate.source_parity_loss = Some(proof.source_parity_loss);
+    candidate.source_parity_verified = true;
+    Some(candidate)
 }
 
 fn prior_seed_deltas(

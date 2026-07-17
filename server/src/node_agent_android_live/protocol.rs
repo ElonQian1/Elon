@@ -35,8 +35,18 @@ pub(crate) struct LiveSessionView {
     pub node_count: usize,
     pub history_count: usize,
     pub redo_count: usize,
+    pub source_proof: Option<LiveSourceProofView>,
     pub last_seen_at: Option<String>,
     pub last_error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LiveSourceProofView {
+    pub source_revision: String,
+    pub runtime_build_id: Option<String>,
+    pub source_parity_loss: f64,
+    pub verified_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

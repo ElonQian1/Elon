@@ -10,8 +10,8 @@ use serde_json::{json, Value};
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 
 use super::protocol::{
-    LivePatchOperation, LivePropertyValue, LiveSessionView, LiveStylePatch, LiveUiNode,
-    RuntimeWelcome, PROTOCOL_VERSION,
+    LivePatchOperation, LivePropertyValue, LiveSessionView, LiveSourceProofView, LiveStylePatch,
+    LiveUiNode, RuntimeWelcome, PROTOCOL_VERSION,
 };
 
 const PATCH_ACK_TIMEOUT: Duration = Duration::from_secs(5);
@@ -52,6 +52,7 @@ struct LiveSessionState {
     nodes: Vec<LiveUiNode>,
     history: Vec<PatchJournalEntry>,
     future: Vec<PatchJournalEntry>,
+    source_proof: Option<LiveSourceProofView>,
     last_seen_at: Option<String>,
     last_error: Option<String>,
 }
@@ -381,7 +382,22 @@ impl LiveUiSession {
         state.nodes.clear();
         state.history.clear();
         state.future.clear();
+        state.source_proof = None;
         state.last_error = None;
+    }
+
+    pub(crate) async fn record_source_proof(
+        &self,
+        source_revision: String,
+        runtime_build_id: Option<String>,
+        source_parity_loss: f64,
+    ) {
+        self.state.write().await.source_proof = Some(LiveSourceProofView {
+            source_revision,
+            runtime_build_id,
+            source_parity_loss,
+            verified_at: Utc::now().to_rfc3339(),
+        });
     }
 
     pub(crate) async fn commit_snapshot(&self) -> LiveCommitSnapshot {
@@ -413,6 +429,7 @@ impl LiveUiSession {
             node_count: state.nodes.len(),
             history_count: state.history.len(),
             redo_count: state.future.len(),
+            source_proof: state.source_proof.clone(),
             last_seen_at: state.last_seen_at.clone(),
             last_error: state.last_error.clone(),
         }
@@ -533,6 +550,7 @@ impl LiveUiSession {
                     state.history.remove(0);
                 }
                 state.future.clear();
+                state.source_proof = None;
             }
         }
         Ok(ack)
