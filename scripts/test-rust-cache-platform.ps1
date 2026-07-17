@@ -56,6 +56,9 @@ try {
     $sccacheConfig = Get-RustCacheSccacheConfigContent -BaseDirs @($ProjectRoot, $UnknownRoot)
     Assert-True ($sccacheConfig -match '^# Generated' -and $sccacheConfig -match 'basedirs = \[') "sccache config should be generated from registered roots"
     Assert-True ($sccacheConfig -match [regex]::Escape($ProjectRoot.Replace('\', '/'))) "sccache config should normalize project paths"
+    $pendingSccache = Sync-RustCacheSccacheConfiguration -CacheRoot $CacheRoot -AdditionalBaseDirs @($ProjectRoot, $UnknownRoot)
+    Assert-True $pendingSccache.restart_pending "a changed sccache config should remain pending until a server reload is requested"
+    Assert-True (Test-Path -LiteralPath $pendingSccache.state_path) "sccache pending state should be durable"
 
     $release = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test"
     Assert-True $release.release "release invocation should be detected"
