@@ -27,6 +27,10 @@ export function useAutomaticDesignSetup({
 }: AutomaticDesignSetupOptions) {
   const runtimeAttemptRef = useRef('')
   const draftFallbackRef = useRef('')
+  const prepareRuntimeRef = useRef(onPrepareRuntime)
+  const useDraftRef = useRef(onUseDraft)
+  prepareRuntimeRef.current = onPrepareRuntime
+  useDraftRef.current = onUseDraft
 
   useEffect(() => {
     if (!enabled || !setupKey || runtimeBusy) return undefined
@@ -34,7 +38,7 @@ export function useAutomaticDesignSetup({
     if (runtimeError) {
       if (draftFallbackRef.current !== setupKey) {
         draftFallbackRef.current = setupKey
-        onUseDraft()
+        useDraftRef.current()
       }
       return undefined
     }
@@ -42,7 +46,7 @@ export function useAutomaticDesignSetup({
     if (runtimeReady) {
       if (runtimeAttemptRef.current !== setupKey) {
         runtimeAttemptRef.current = setupKey
-        onPrepareRuntime()
+        prepareRuntimeRef.current()
       }
       return undefined
     }
@@ -50,14 +54,12 @@ export function useAutomaticDesignSetup({
     const fallbackTimer = window.setTimeout(() => {
       if (draftFallbackRef.current === setupKey) return
       draftFallbackRef.current = setupKey
-      onUseDraft()
+      useDraftRef.current()
     }, DRAFT_FALLBACK_DELAY_MS)
 
     return () => window.clearTimeout(fallbackTimer)
   }, [
     enabled,
-    onPrepareRuntime,
-    onUseDraft,
     runtimeBusy,
     runtimeError,
     runtimeReady,

@@ -421,8 +421,8 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/inspector/useAutomaticDesignSetup.ts'),
     'utf8',
   )
-  assert.match(automaticSetupSource, /onPrepareRuntime\(\)/)
-  assert.match(automaticSetupSource, /onUseDraft\(\)/)
+  assert.match(automaticSetupSource, /prepareRuntimeRef\.current\(\)/)
+  assert.match(automaticSetupSource, /useDraftRef\.current\(\)/)
   assert.match(inspectorSource, /useAutomaticDesignSetup\(/)
   const sourceInspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewInspector.tsx'),
