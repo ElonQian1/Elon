@@ -1,12 +1,28 @@
 # Android 真渲染与双端样式工作流
 
-本项目的 UI Tuner 采用三层渲染策略，优先级不可颠倒：
+本项目的 UI Tuner 采用四层渲染策略，优先级不可颠倒：
 
 1. **真实 Android Renderer**：优先使用 Compose Preview / Layoutlib、Preview Host 或已运行 APK 的真帧，作为视觉权威结果。
-2. **React 数字孪生**：仅在页面无法 Preview、Android 正在重连或需要零延迟草稿时使用；它可以即时编辑，但不是最终验收结果。
-3. **真帧校准**：任何数字孪生草稿都要回到 Android 构建结果校准；清空 Runtime Patch 后仍一致，才算完成。
+2. **项目真实 PWA 交互草稿**：项目同时维护移动网页时，PC 直接加载真实 `/web` DOM。设计师可以切换“选择组件 / 操作页面”，临时样式直接作用于真实 PWA 组件。
+3. **React 通用数字孪生**：只在项目没有 PWA、页面无法 Preview、Android 正在重连或需要零延迟草稿时使用；它可以即时编辑，但不是最终验收结果。
+4. **真帧校准**：任何 PWA 或数字孪生草稿都要回到 Android 构建结果校准；清空 Runtime Patch 后仍一致，才算完成。
 
 PC 画布中的绿色或透明几何框只允许承担点选命中，不得覆盖真实像素或伪装成组件外观。
+
+## PWA 交互草稿发现与安全边界
+
+一龙自身项目会自动发现 `server/src/assets/web_page.html`，并使用 `/web?ui_tuner_preview=1`。其他同时拥有移动网页的项目，可以在项目中声明：
+
+```json
+// .elon/ui-pwa-preview.json
+{
+  "url": "/mobile-preview?ui_tuner_preview=1"
+}
+```
+
+当前只接受同源相对 URL。PWA 设计桥只在 `ui_tuner_preview=1` 时启用；普通手机访问 `/web` 不注册点选和样式消息。PC 与 PWA 的 `postMessage` 双方都校验来源、协议版本和同源关系，样式修改只作用于当前设计会话。
+
+PWA 点选后，工作台按稳定 `data-ui-node`、DOM `id`、无障碍名称和短文本匹配 Android 源码节点。匹配失败时必须明确显示“尚未建立跨端绑定”，不得把不确定节点静默写回 Android 源码。
 
 ## APK 与 PWA 共用一份 Token
 
@@ -70,6 +86,7 @@ FitRun 的接受与拒绝结果会写入项目级学习真源：
 |---|---|---:|---:|
 | Android Layoutlib / Compose Preview | 可以稳定 Preview 的 Composable | 是 | 写回后重新渲染 |
 | Preview Host / 真机 Runtime | 依赖 DI、导航、真实状态的页面 | 是 | 支持 Runtime Patch |
+| 项目真实 PWA | APK/PWA 双端项目的低延迟交互设计 | 否 | 是，真实 DOM 即时更新 |
 | React 数字孪生 | 无 Preview、断线、草稿设计 | 否 | 是，PC 本地立即更新 |
 
 React 数字孪生不是“另写一个网页冒充 APK”。它消费统一 UI IR、节点几何、绑定和 Token，并由真实 Android 截图持续校准。对于无法从 Android 反射出的圆角、字体、阴影和 Modifier 顺序，必须由组件适配器显式声明，不能凭 XML 猜测。
