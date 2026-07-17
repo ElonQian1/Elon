@@ -1,12 +1,14 @@
 import { AlertTriangle, Eye, MonitorSmartphone } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { PwaInteractivePreviewSurface } from './PwaInteractivePreviewSurface'
 import { SourcePreviewNode } from './SourcePreviewNode'
-import type { ComposePreviewRender, SourcePreviewDocument, SourcePreviewFidelity, SourcePreviewMode } from './types'
+import type { ComposePreviewRender, SourcePreviewDocument, SourcePreviewFidelity, SourcePreviewMode, SourceRendererCapabilities } from './types'
 import styles from './SourcePreview.module.css'
 
 interface Props {
   document: SourcePreviewDocument | null
   androidRender: ComposePreviewRender | null
+  pwaPreview: SourceRendererCapabilities['pwaPreview'] | null
   selectedKey: string | null
   zoom: number
   loading: boolean
@@ -25,11 +27,12 @@ const UNKNOWN_FIDELITY: SourcePreviewFidelity = {
   issues: ['当前 PC 节点尚未提供可还原度评估，为避免误导，暂不默认展示浏览器模拟画面'],
 }
 
-export function SourceDrivenPreviewSurface({ document, androidRender, selectedKey, zoom, loading, error, onSelect, onModeChange }: Props) {
+export function SourceDrivenPreviewSurface({ document, androidRender, pwaPreview, selectedKey, zoom, loading, error, onSelect, onModeChange }: Props) {
   const [showAdvancedDraft, setShowAdvancedDraft] = useState(false)
   useEffect(() => setShowAdvancedDraft(false), [document?.sourceRevision])
   const fidelity = document?.fidelity ?? UNKNOWN_FIDELITY
-  const blockUnreliableDraft = Boolean(document && !androidRender && !fidelity.safeForDefaultPreview && !showAdvancedDraft)
+  const usePwaPreview = Boolean(document && !androidRender && pwaPreview?.available && pwaPreview.url)
+  const blockUnreliableDraft = Boolean(document && !androidRender && !usePwaPreview && !fidelity.safeForDefaultPreview && !showAdvancedDraft)
   return (
     <div className={styles.surfaceScroller}>
       {loading && <div className={styles.emptyState}>正在解析 Android 源码…</div>}
@@ -39,6 +42,9 @@ export function SourceDrivenPreviewSurface({ document, androidRender, selectedKe
         <div className={styles.rendererTruthBadge}>Android Layoutlib · 真实 Preview</div>
         <img src={androidRender.dataUrl} alt={`${androidRender.composable} Android 真实预览`} />
       </div>}
+      {usePwaPreview && document && pwaPreview?.url && (
+        <PwaInteractivePreviewSurface url={pwaPreview.url} document={document} selectedKey={selectedKey} zoom={zoom} onSelect={onSelect} />
+      )}
       {blockUnreliableDraft && document && (
         <section className={styles.fidelityGate} data-testid="source-preview-fidelity-gate">
           <div className={styles.fidelityIcon}><AlertTriangle size={26} /></div>
@@ -65,7 +71,7 @@ export function SourceDrivenPreviewSurface({ document, androidRender, selectedKe
           <small>结构草图只用于定位节点和尝试参数，不代表 APK 的字体、位置、圆角或运行时内容。</small>
         </section>
       )}
-      {!androidRender && document && !blockUnreliableDraft && (
+      {!androidRender && !usePwaPreview && document && !blockUnreliableDraft && (
         <div className={styles.deviceViewport} style={{ width: document.canvas.width * zoom, height: document.canvas.height * zoom }}>
           <div
             className={styles.rendererDraftBadge}

@@ -14,6 +14,8 @@ export function SourcePreviewModeBar(props: Props) {
   const savedLabel = props.saveState === 'saved' ? '源码已保存' : props.saveState === 'saving' ? '正在写回…' : props.saveState === 'error' ? '保存失败' : '动态预览'
   const backendLabel = props.renderer.render
     ? 'Android Layoutlib'
+    : props.renderer.capabilities?.pwaPreview.available
+      ? 'PWA 交互草稿'
     : props.document?.fidelity?.safeForDefaultPreview
       ? '本地可编辑草稿'
       : '结构草图 · 非外观预览'
@@ -25,7 +27,7 @@ export function SourcePreviewModeBar(props: Props) {
         {props.document && <select value={props.document.selectedLayout} onChange={(event) => props.onLoad(event.target.value)}>{props.document.layoutFiles.map((file) => { const parts = file.split('/'); return <option key={file} value={file}>{parts[parts.length - 1]}</option> })}</select>}
         <button onClick={() => props.onLoad()} disabled={props.loading}>{props.loading ? <LoaderCircle className={styles.spin} size={15} /> : <Code2 size={15} />}加载源码</button>
         {props.renderer.capabilities?.composePreviews.length ? <select aria-label="Compose Preview" value={props.renderer.selectedPreviewId} onChange={(event) => { void props.renderer.rerender(props.projectRoot, event.target.value) }}>{props.renderer.capabilities.composePreviews.map((preview) => <option key={preview.id} value={preview.id}>{preview.composable}</option>)}</select> : null}
-        <span className={styles.rendererBackend} title={props.renderer.error || props.renderer.capabilities?.layoutlib.detail}>{backendLabel}</span>
+        <span className={styles.rendererBackend} title={props.renderer.error || props.renderer.capabilities?.pwaPreview.detail || props.renderer.capabilities?.layoutlib.detail}>{backendLabel}</span>
         {props.renderer.render && <button type="button" onClick={props.renderer.beginLocalDraft}><Code2 size={15} />继续编辑草稿</button>}
         {props.renderer.capabilities?.layoutlib.available && <button onClick={() => { void props.renderer.rerender(props.projectRoot) }} disabled={props.renderer.rendering || props.hasPending}>{props.renderer.rendering ? <LoaderCircle className={styles.spin} size={15} /> : <MonitorSmartphone size={15} />}校准真帧</button>}
         <span className={`${styles.saveState} ${styles[`state_${props.saveState}`]}`}>{savedLabel}</span>

@@ -440,6 +440,7 @@ try {
   )
   assert.match(sourceModeBarSource, /继续编辑草稿/)
   assert.match(sourceModeBarSource, /结构草图 · 非外观预览/)
+  assert.match(sourceModeBarSource, /PWA 交互草稿/)
   const sourceSurfaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourceDrivenPreviewSurface.tsx'),
     'utf8',
@@ -450,6 +451,16 @@ try {
   assert.match(sourceSurfaceSource, /高级：查看结构草图/)
   assert.match(sourceSurfaceSource, /UNKNOWN_FIDELITY/)
   assert.match(sourceSurfaceSource, /!fidelity\.safeForDefaultPreview/)
+  assert.match(sourceSurfaceSource, /PwaInteractivePreviewSurface/)
+  assert.match(sourceSurfaceSource, /pwaPreview\?\.available/)
+  const pwaSurfaceSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'),
+    'utf8',
+  )
+  assert.match(pwaSurfaceSource, /真实 PWA 页面 · Android 最终校准/)
+  assert.match(pwaSurfaceSource, /选择组件/)
+  assert.match(pwaSurfaceSource, /操作页面/)
+  assert.match(pwaSurfaceSource, /apply-style/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',
