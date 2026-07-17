@@ -101,6 +101,19 @@ try {
     '已收尾的 task worktree 路径应自动回退主项目，避免草稿入口永久卡死',
   )
 
+  const pwaMappingOutput = compile(
+    'src/features/ui-tuner/source-preview/pwaNodeMapping.ts',
+    'source-preview/pwaNodeMapping.js',
+  )
+  const { matchPwaSourceNode } = require(pwaMappingOutput)
+  const mappedPassword = matchPwaSourceNode({
+    key: 'root', name: 'ScrollView', resourceId: '', style: { text: '', contentDescription: '' }, children: [
+      { key: 'password', name: 'loginPasswordInput', resourceId: '@+id/loginPasswordInput', style: { text: '', contentDescription: '' }, children: [] },
+      { key: 'account', name: 'loginAccountInput', resourceId: '@+id/loginAccountInput', style: { text: '', contentDescription: '' }, children: [] },
+    ],
+  }, { key: '', uiNode: '', id: 'passwordInput', ariaLabel: '', role: '', text: '', tag: 'INPUT', classNames: [] })
+  assert.equal(mappedPassword?.key, 'password', 'PWA passwordInput 应安全映射 Android loginPasswordInput')
+
   const selectionOutput = compile(
     'src/features/ui-tuner/workspace/uiWorkspaceSelection.ts',
     'workspace/uiWorkspaceSelection.js',

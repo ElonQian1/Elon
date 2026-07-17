@@ -1,23 +1,13 @@
 import { MousePointer2, RefreshCw, Smartphone } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { findSourceNode, flattenSourceTree } from './sourcePreviewTree'
+import { matchPwaSourceNode, type PwaIdentity } from './pwaNodeMapping'
+import { findSourceNode } from './sourcePreviewTree'
 import type { SourcePreviewDocument, SourcePreviewNode } from './types'
 import styles from './SourcePreview.module.css'
 
 const BRIDGE_SOURCE = 'elon-pwa-design-bridge'
 const PARENT_SOURCE = 'elon-pc-ui-tuner'
 const PROTOCOL_VERSION = 1
-
-interface PwaIdentity {
-  key: string
-  uiNode: string
-  id: string
-  ariaLabel: string
-  role: string
-  text: string
-  tag: string
-  classNames: string[]
-}
 
 interface PwaSelection {
   identity: PwaIdentity
@@ -30,36 +20,6 @@ interface Props {
   selectedKey: string | null
   zoom: number
   onSelect: (key: string) => void
-}
-
-function normalize(value: string | undefined): string {
-  return String(value || '')
-    .replace(/^@\+?id\//, '')
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/gi, '')
-    .toLowerCase()
-}
-
-function scoreNode(node: SourcePreviewNode, identity: PwaIdentity): number {
-  const resourceId = normalize(node.resourceId)
-  const name = normalize(node.name)
-  const text = normalize(node.style.text)
-  const description = normalize(node.style.contentDescription)
-  const identities = [identity.uiNode, identity.id, identity.ariaLabel, identity.key].map(normalize).filter(Boolean)
-  let score = 0
-  if (resourceId && identities.includes(resourceId)) score = Math.max(score, 120)
-  if (name && identities.includes(name)) score = Math.max(score, 105)
-  if (description && normalize(identity.ariaLabel) === description) score = Math.max(score, 100)
-  if (text && normalize(identity.text) === text) score = Math.max(score, 95)
-  if (text.length >= 2 && normalize(identity.text).includes(text)) score = Math.max(score, 70)
-  if (identity.classNames.some((className) => normalize(className) === resourceId || normalize(className) === name)) score = Math.max(score, 65)
-  return score
-}
-
-function matchSourceNode(root: SourcePreviewNode, identity: PwaIdentity): SourcePreviewNode | null {
-  const ranked = flattenSourceTree(root)
-    .map((node) => ({ node, score: scoreNode(node, identity) }))
-    .sort((left, right) => right.score - left.score)
-  return ranked[0]?.score >= 65 ? ranked[0].node : null
 }
 
 function pwaUrl(value: string): string {
@@ -89,6 +49,7 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
   const [ready, setReady] = useState(false)
   const [mode, setMode] = useState<'select' | 'interact'>('select')
   const [selection, setSelection] = useState<PwaSelection | null>(null)
+  const [mappedNodeKey, setMappedNodeKey] = useState<string | null>(null)
   const [unboundLabel, setUnboundLabel] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const selectedNode = useMemo(() => findSourceNode(document.root, selectedKey), [document.root, selectedKey])
@@ -112,11 +73,13 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
       if (message.type === 'selection' && message.payload?.node) {
         const nextSelection = message.payload.node
         setSelection(nextSelection)
-        const match = matchSourceNode(document.root, nextSelection.identity)
+        const match = matchPwaSourceNode(document.root, nextSelection.identity)
         if (match) {
           setUnboundLabel('')
+          setMappedNodeKey(match.key)
           onSelect(match.key)
         } else {
+          setMappedNodeKey(null)
           setUnboundLabel(nextSelection.identity.ariaLabel || nextSelection.identity.text || nextSelection.identity.id || nextSelection.identity.tag)
         }
       }
@@ -130,9 +93,9 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
   }, [mode, ready])
 
   useEffect(() => {
-    if (!ready || !selection || !selectedNode) return
+    if (!ready || !selection || !selectedNode || mappedNodeKey !== selectedNode.key) return
     post('apply-style', { text: selectedNode.style.text, style: previewStyle(selectedNode) })
-  }, [document.root, ready, selectedNode, selection])
+  }, [document.root, mappedNodeKey, ready, selectedNode, selection])
 
   return (
     <div className={styles.pwaPreviewWorkspace} data-testid="pwa-interactive-preview">
@@ -142,7 +105,7 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
           <button className={mode === 'select' ? styles.activePwaMode : ''} type="button" onClick={() => setMode('select')}><MousePointer2 size={14} />选择组件</button>
           <button className={mode === 'interact' ? styles.activePwaMode : ''} type="button" onClick={() => setMode('interact')}><Smartphone size={14} />操作页面</button>
         </div>
-        <button type="button" title="重新载入 PWA 草稿" onClick={() => { setReady(false); setSelection(null); setReloadKey((value) => value + 1) }}><RefreshCw size={14} /></button>
+        <button type="button" title="重新载入 PWA 草稿" onClick={() => { setReady(false); setSelection(null); setMappedNodeKey(null); setReloadKey((value) => value + 1) }}><RefreshCw size={14} /></button>
       </div>
       {unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{unboundLabel}”，但它还没有匹配到 Android 节点；可继续操作页面，或让 AI 建立跨端绑定。</div>}
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>
