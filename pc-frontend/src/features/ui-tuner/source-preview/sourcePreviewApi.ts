@@ -19,7 +19,11 @@ export async function loadSourcePreview(projectRoot: string, layoutFile?: string
       }, 15000)
     } catch (error) {
       lastError = error
-      if (!String(error).includes('没有找到 src/main/res/layout')) throw error
+      const message = String(error)
+      const canTryAnotherRoot = message.includes('没有找到 src/main/res/layout')
+        || message.includes('请选择有效的本机 Android 项目目录')
+        || message.includes('无法解析项目目录')
+      if (!canTryAnotherRoot) throw error
     }
   }
   throw lastError

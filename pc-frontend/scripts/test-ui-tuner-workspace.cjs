@@ -86,6 +86,20 @@ try {
     ],
     '仓库根应自动下探常见 Android app 模块，避免切到草稿后误报没有 XML',
   )
+  assert.deepEqual(
+    androidProjectRootCandidates('D:\\projects\\elon-task-20260718-014941-19416-daa8ba21'),
+    [
+      'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21',
+      'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21\\android\\app',
+      'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21\\android',
+      'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21\\app',
+      'D:\\projects\\elon',
+      'D:\\projects\\elon\\android\\app',
+      'D:\\projects\\elon\\android',
+      'D:\\projects\\elon\\app',
+    ],
+    '已收尾的 task worktree 路径应自动回退主项目，避免草稿入口永久卡死',
+  )
 
   const selectionOutput = compile(
     'src/features/ui-tuner/workspace/uiWorkspaceSelection.ts',
