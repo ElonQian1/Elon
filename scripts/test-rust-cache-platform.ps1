@@ -123,6 +123,9 @@ retry = 3
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path
     Assert-True ($include -match 'build-dir = .*quarantine/.+workspace-path-hash') "fallback Cargo route should use workspace quarantine"
+    $bashAdapter = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "cargo-dev.sh")
+    Assert-True ($bashAdapter -match 'powershell\.exe' -and $bashAdapter -match 'ps_script=.*cargo-dev\.ps1') "Git Bash should delegate to the PowerShell cache platform on Windows"
+    Assert-True ($bashAdapter -notmatch 'ELON_DEV_CARGO_TARGET_DIR') "Git Bash must not route back to the retired shared target"
     $installedEntry = $install.entry_path
     $legacyTarget = Join-Path $TempRoot "legacy-target"
     New-Item -ItemType Directory -Force -Path $legacyTarget | Out-Null

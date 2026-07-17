@@ -1,49 +1,62 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-target_dir_arg=""
+target_dir=""
+domain="dev-windows-msvc"
 no_lock=0
+disable_sccache=0
+skip_cache_gc=0
 lock_timeout_seconds=3600
 
 usage() {
   cat >&2 <<'EOF'
-Usage: scripts/cargo-dev.sh [--target-dir <path>] [--no-lock] [--lock-timeout-seconds <seconds>] <cargo-args...>
+Usage: scripts/cargo-dev.sh [platform-options] <cargo-args...>
 
-Examples:
-  bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
-  bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
+Platform options:
+  --target-dir <path>             Override the final-artifact directory.
+  --domain <name>                 Select a compatibility domain.
+  --no-lock                       Do not lock the managed build partition.
+  --disable-sccache               Run without the compiler object cache.
+  --skip-cache-gc                 Skip the preflight disk-watermark check.
+  --lock-timeout-seconds <value>  Partition-lock timeout (default: 3600).
+
+On Windows/Git Bash this is a thin adapter to cargo-dev.ps1 so every shell uses
+the same machine-wide Rust cache policy. Other hosts keep Cargo's workspace-local
+target directory and use sccache when it is available.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target-dir)
-      shift
-      if [[ $# -eq 0 ]]; then
-        usage
-        exit 2
-      fi
-      target_dir_arg="$1"
-      shift
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      target_dir="$2"
+      shift 2
+      ;;
+    --domain)
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      domain="$2"
+      shift 2
       ;;
     --no-lock)
       no_lock=1
       shift
       ;;
+    --disable-sccache)
+      disable_sccache=1
+      shift
+      ;;
+    --skip-cache-gc)
+      skip_cache_gc=1
+      shift
+      ;;
     --lock-timeout-seconds)
-      shift
-      if [[ $# -eq 0 ]]; then
-        usage
-        exit 2
-      fi
-      lock_timeout_seconds="$1"
-      shift
+      [[ $# -ge 2 ]] || { usage; exit 2; }
+      lock_timeout_seconds="$2"
+      shift 2
       ;;
     --)
       shift
-      break
-      ;;
-    -*)
       break
       ;;
     *)
@@ -52,118 +65,44 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ $# -eq 0 ]]; then
-  usage
-  exit 2
-fi
+[[ $# -gt 0 ]] || { usage; exit 2; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel 2>/dev/null || true)"
-if [[ -z "$repo_root" ]]; then
-  echo "Current directory is not inside a Git repository." >&2
-  exit 1
-fi
+repo_root="$(git -C "$script_dir" rev-parse --show-toplevel 2>/dev/null || true)"
+[[ -n "$repo_root" ]] || { echo "cargo-dev.sh is not inside a Git repository." >&2; exit 1; }
 
-import_local_env_file() {
-  local env_file="$1"
-  [[ -f "$env_file" ]] || return 0
-
-  local line name value first last
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    line="${line#"${line%%[![:space:]]*}"}"
-    line="${line%"${line##*[![:space:]]}"}"
-    [[ -z "$line" || "$line" == \#* ]] && continue
-    [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)[[:space:]]*=[[:space:]]*(.*)$ ]] || continue
-    name="${BASH_REMATCH[1]}"
-    value="${BASH_REMATCH[2]}"
-    value="${value#"${value%%[![:space:]]*}"}"
-    value="${value%"${value##*[![:space:]]}"}"
-    if [[ ${#value} -ge 2 ]]; then
-      first="${value:0:1}"
-      last="${value: -1}"
-      if [[ ("$first" == '"' && "$last" == '"') || ("$first" == "'" && "$last" == "'") ]]; then
-        value="${value:1:${#value}-2}"
-      fi
-    fi
-    if [[ -z "${!name:-}" ]]; then
-      export "$name=$value"
-    fi
-  done < "$env_file"
-}
-
-import_local_env_file "$repo_root/.env.local"
-
-normalize_target_dir() {
-  local path="$1"
-  if [[ "$path" =~ ^[A-Za-z]:[\\/].* ]] && command -v cygpath >/dev/null 2>&1; then
-    cygpath -u "$path"
-    return
+if command -v powershell.exe >/dev/null 2>&1 && command -v cygpath >/dev/null 2>&1; then
+  ps_script="$(cygpath -w "$script_dir/cargo-dev.ps1")"
+  ps_args=(-NoProfile -ExecutionPolicy Bypass -File "$ps_script" -Domain "$domain" -LockTimeoutSeconds "$lock_timeout_seconds")
+  if [[ -n "$target_dir" ]]; then
+    ps_args+=(-TargetDir "$(cygpath -w "$target_dir")")
   fi
-  printf '%s\n' "$path"
-}
-
-if [[ -n "$target_dir_arg" ]]; then
-  target_dir="$target_dir_arg"
-  target_source="--target-dir"
-elif [[ -n "${ELON_DEV_CARGO_TARGET_DIR:-}" ]]; then
-  target_dir="$ELON_DEV_CARGO_TARGET_DIR"
-  target_source="ELON_DEV_CARGO_TARGET_DIR"
-elif [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
-  target_dir="$CARGO_TARGET_DIR"
-  target_source="CARGO_TARGET_DIR"
-elif [[ -n "${LOCALAPPDATA:-}" ]] && command -v cygpath >/dev/null 2>&1; then
-  target_dir="$(cygpath -u "$LOCALAPPDATA")/Elon/build-target/elon-dev-cargo"
-  target_source="default LOCALAPPDATA"
-else
-  target_dir="${XDG_CACHE_HOME:-$HOME/.cache}/elon/build/elon-dev-cargo"
-  target_source="default XDG cache"
+  [[ "$no_lock" -eq 0 ]] || ps_args+=(-NoLock)
+  [[ "$disable_sccache" -eq 0 ]] || ps_args+=(-DisableSccache)
+  [[ "$skip_cache_gc" -eq 0 ]] || ps_args+=(-SkipCacheGc)
+  powershell.exe "${ps_args[@]}" "$@"
+  exit $?
 fi
 
-target_dir="$(normalize_target_dir "$target_dir")"
-
-case "$target_dir" in
-  /*) ;;
-  *)
-    echo "$target_source must be an absolute path, current value: $target_dir" >&2
-    exit 1
-    ;;
-esac
-
-mkdir -p "$target_dir"
-
-lock_dir="$target_dir/.cargo-dev.lockdir"
-release_lock() {
-  if [[ "$no_lock" -eq 0 && -d "$lock_dir" && -f "$lock_dir/owner" ]]; then
-    local owner_pid
-    owner_pid="$(sed -n 's/^pid=//p' "$lock_dir/owner" 2>/dev/null | head -n 1 || true)"
-    if [[ "$owner_pid" == "$$" ]]; then
-      rm -rf "$lock_dir"
-    fi
+# Non-Windows fallback: do not create another machine-wide target pool. Cargo's
+# normal workspace target remains the final-artifact owner, while sccache may
+# still share cacheable compiler objects on that host.
+if [[ -n "$target_dir" ]]; then
+  case "$target_dir" in
+    /*) export CARGO_TARGET_DIR="$target_dir" ;;
+    *) echo "--target-dir must be absolute: $target_dir" >&2; exit 1 ;;
+  esac
+fi
+if [[ "$disable_sccache" -eq 0 ]] && command -v sccache >/dev/null 2>&1; then
+  export RUSTC_WRAPPER="$(command -v sccache)"
+  export SCCACHE_BASEDIRS="$repo_root"
+fi
+for arg in "$@"; do
+  if [[ "$arg" == "--release" || "$arg" == "--profile=release" ]]; then
+    export CARGO_INCREMENTAL=0
+    break
   fi
-}
-trap release_lock EXIT INT TERM
+done
 
-if [[ "$no_lock" -eq 0 ]]; then
-  echo "Waiting for Cargo dev target lock: $lock_dir"
-  deadline=$((SECONDS + lock_timeout_seconds))
-  while ! mkdir "$lock_dir" 2>/dev/null; do
-    if (( SECONDS >= deadline )); then
-      echo "Timed out waiting for Cargo dev target lock: $lock_dir" >&2
-      if [[ -f "$lock_dir/owner" ]]; then
-        cat "$lock_dir/owner" >&2 || true
-      fi
-      exit 1
-    fi
-    sleep 2
-  done
-  {
-    echo "pid=$$"
-    date -u '+started_utc=%Y-%m-%dT%H:%M:%SZ'
-  } > "$lock_dir/owner"
-fi
-
-export CARGO_TARGET_DIR="$target_dir"
-echo "CARGO_TARGET_DIR=$CARGO_TARGET_DIR"
 echo "cargo $*"
 cargo "$@"
-exit $?
