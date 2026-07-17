@@ -101,6 +101,10 @@ try {
     '已收尾的 task worktree 路径应自动回退主项目，避免草稿入口永久卡死',
   )
 
+  compile(
+    'src/features/ui-tuner/source-preview/sourcePreviewTree.ts',
+    'source-preview/sourcePreviewTree.js',
+  )
   const pwaMappingOutput = compile(
     'src/features/ui-tuner/source-preview/pwaNodeMapping.ts',
     'source-preview/pwaNodeMapping.js',
