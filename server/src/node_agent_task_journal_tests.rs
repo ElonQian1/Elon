@@ -139,9 +139,17 @@ fn preserves_explicit_terminal_outcome_from_generic_cleanup() {
     journal
         .record_finished_with_outcome("req-1", "canceled", Some("用户已停止 PC CLI 任务"))
         .expect("terminal outcome should persist");
+    let registry_before_cleanup =
+        fs::read(dir.join("registry.json")).expect("terminal registry should read");
+    std::thread::sleep(std::time::Duration::from_millis(20));
     journal
         .record_finished("req-1")
         .expect("generic cleanup should not overwrite terminal status");
+    assert_eq!(
+        fs::read(dir.join("registry.json")).expect("registry should read after generic cleanup"),
+        registry_before_cleanup,
+        "idempotent terminal cleanup must not rewrite the registry"
+    );
 
     let registry = journal
         .read_registry_for_test()
