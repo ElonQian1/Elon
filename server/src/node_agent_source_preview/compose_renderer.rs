@@ -38,6 +38,7 @@ pub(crate) struct RendererCapabilities {
     recommended_backend: String,
     layoutlib: LayoutlibCapability,
     preview_host: PreviewHostCapability,
+    pwa_preview: PwaPreviewCapability,
     react_twin: ReactTwinCapability,
     compose_previews: Vec<ComposePreviewEntry>,
 }
@@ -54,6 +55,14 @@ struct LayoutlibCapability {
 #[serde(rename_all = "camelCase")]
 struct PreviewHostCapability {
     available_after_debug_build: bool,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PwaPreviewCapability {
+    available: bool,
+    url: Option<String>,
     detail: String,
 }
 
@@ -89,8 +98,11 @@ pub(crate) fn capabilities(project_root: &str) -> Result<RendererCapabilities> {
     let root = canonical_project_root(project_root)?;
     let command = locate_android_cli();
     let compose_previews = discover_compose_previews(&root)?;
+    let pwa_preview_url = discover_pwa_preview_url(&root);
     let recommended_backend = if command.is_some() && !compose_previews.is_empty() {
         "android_layoutlib"
+    } else if pwa_preview_url.is_some() {
+        "pwa_interactive"
     } else if !compose_previews.is_empty() {
         "android_preview_host"
     } else {
@@ -114,6 +126,16 @@ pub(crate) fn capabilities(project_root: &str) -> Result<RendererCapabilities> {
             detail: "不能由 Layoutlib 渲染的页面，使用现有 Debug Preview Host/模拟器作为权威画面"
                 .to_string(),
         },
+        pwa_preview: PwaPreviewCapability {
+            available: pwa_preview_url.is_some(),
+            url: pwa_preview_url,
+            detail: if root.join("server/src/assets/web_page.html").is_file() {
+                "已发现与 APK 同步维护的移动 PWA；可作为可交互即时草稿，最终仍由 Android 真帧校准"
+                    .to_string()
+            } else {
+                "未发现项目 PWA 预览入口；可在 .elon/ui-pwa-preview.json 中声明同源 url".to_string()
+            },
+        },
         react_twin: ReactTwinCapability {
             available: true,
             authoritative: false,
@@ -122,6 +144,30 @@ pub(crate) fn capabilities(project_root: &str) -> Result<RendererCapabilities> {
         },
         compose_previews,
     })
+}
+
+fn discover_pwa_preview_url(root: &Path) -> Option<String> {
+    let config = root.join(".elon").join("ui-pwa-preview.json");
+    if let Ok(source) = fs::read_to_string(config) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&source) {
+            if let Some(url) = value.get("url").and_then(|item| item.as_str()) {
+                let url = url.trim();
+                if is_safe_pwa_preview_url(url) {
+                    return Some(url.to_string());
+                }
+            }
+        }
+    }
+    root.join("server/src/assets/web_page.html")
+        .is_file()
+        .then(|| "/web?ui_tuner_preview=1".to_string())
+}
+
+fn is_safe_pwa_preview_url(value: &str) -> bool {
+    value.starts_with('/')
+        && !value.starts_with("//")
+        && !value.contains('\n')
+        && !value.contains('\r')
 }
 
 pub(crate) async fn render_compose_preview(
@@ -343,5 +389,12 @@ mod tests {
     fn rejects_unsafe_composable_name() {
         assert!(validate_composable("CheckoutPreview").is_ok());
         assert!(validate_composable("CheckoutPreview; rm -rf").is_err());
+    }
+
+    #[test]
+    fn pwa_preview_url_must_stay_on_the_current_origin() {
+        assert!(is_safe_pwa_preview_url("/web?ui_tuner_preview=1"));
+        assert!(!is_safe_pwa_preview_url("https://example.com/web"));
+        assert!(!is_safe_pwa_preview_url("//example.com/web"));
     }
 }
