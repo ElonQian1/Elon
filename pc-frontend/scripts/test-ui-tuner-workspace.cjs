@@ -426,6 +426,17 @@ try {
     'utf8',
   )
   assert.match(sourceModeBarSource, /继续编辑草稿/)
+  assert.match(sourceModeBarSource, /结构草图 · 非外观预览/)
+  const sourceSurfaceSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourceDrivenPreviewSurface.tsx'),
+    'utf8',
+  )
+  assert.match(sourceSurfaceSource, /source-preview-fidelity-gate/)
+  assert.match(sourceSurfaceSource, /这不是你的真实页面/)
+  assert.match(sourceSurfaceSource, /查看 Android 真帧/)
+  assert.match(sourceSurfaceSource, /高级：查看结构草图/)
+  assert.match(sourceSurfaceSource, /UNKNOWN_FIDELITY/)
+  assert.match(sourceSurfaceSource, /!fidelity\.safeForDefaultPreview/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',

@@ -42,8 +42,19 @@ export interface SourcePreviewDocument {
     sourceOfTruth: 'android_source'
     calibrationRequired: true
   }
+  fidelity?: SourcePreviewFidelity
   canvas: { width: number; height: number; background: string }
   root: SourcePreviewNode
+}
+
+export interface SourcePreviewFidelity {
+  score: number
+  level: 'high' | 'medium' | 'low'
+  safeForDefaultPreview: boolean
+  totalNodes: number
+  unsupportedNodes: number
+  dynamicNodes: number
+  issues: string[]
 }
 export interface SourcePreviewNode {
   key: string
