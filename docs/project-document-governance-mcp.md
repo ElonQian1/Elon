@@ -70,7 +70,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 ### `project_docs_get_issues`
 
-分页读取确定性质量问题及最小证据，可按类型筛选。当前覆盖本地链接/标题锚点、缓存的外部链接、孤立文档、缺少 owner、缺少复查日期、复查逾期、显式 `implementation_refs` 不存在或实现晚于复查日期。程序先定位证据，只有需要语义判断时才让 AI 按需读取正文和源码。
+分页读取确定性质量问题及最小证据，可按类型筛选。当前覆盖本地链接/标题锚点、缓存的外部链接、孤立文档、缺少 owner、缺少复查日期、复查逾期、显式 `implementation_refs` 不存在或实现晚于复查日期。孤立判断同时识别 Markdown 链接和反引号路径引用；Agent、Prompt、Skill 等按任务加载的定制资产不强制进入项目知识地图。程序先定位证据，只有需要语义判断时才让 AI 按需读取正文和源码。
 
 ### `project_docs_get_status`
 

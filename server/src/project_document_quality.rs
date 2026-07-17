@@ -85,6 +85,15 @@ pub(crate) fn analyze_document_quality(
             continue;
         };
         external_urls.extend(document_facts.external_links.iter().cloned());
+        for mention in &document_facts.document_mentions {
+            let direct_key = normalize(mention).to_ascii_lowercase();
+            let relative_key = resolve_link_target(&path, mention).0.to_ascii_lowercase();
+            if let Some(target_document) =
+                known.get(&direct_key).or_else(|| known.get(&relative_key))
+            {
+                *inbound.entry(normalize(&target_document.path)).or_default() += 1;
+            }
+        }
         for raw_target in &document_facts.local_links {
             let (target_path, anchor) = resolve_link_target(&path, raw_target);
             let target_key = target_path.to_ascii_lowercase();

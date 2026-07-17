@@ -19,10 +19,16 @@ use crate::{
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(super) struct DocumentQualityFacts {
+    #[serde(default)]
+    pub(super) schema_version: u8,
     pub(super) local_links: Vec<String>,
+    #[serde(default)]
+    pub(super) document_mentions: Vec<String>,
     pub(super) anchors: Vec<String>,
     pub(super) external_links: Vec<String>,
 }
+
+const QUALITY_FACTS_SCHEMA_VERSION: u8 = 2;
 
 pub(super) fn load_facts(
     workspace: &Path,
@@ -32,11 +38,17 @@ pub(super) fn load_facts(
     if let Some(value) =
         index.cached_quality_facts(&document.path, &document.metadata.content_hash)?
     {
-        return serde_json::from_value(value).context("解析文档质量事实失败");
+        let facts: DocumentQualityFacts =
+            serde_json::from_value(value).context("解析文档质量事实失败")?;
+        if facts.schema_version == QUALITY_FACTS_SCHEMA_VERSION {
+            return Ok(facts);
+        }
     }
     let content = fs::read_to_string(workspace.join(&document.path)).unwrap_or_default();
     let facts = DocumentQualityFacts {
+        schema_version: QUALITY_FACTS_SCHEMA_VERSION,
         local_links: markdown_links(&content, false),
+        document_mentions: inline_document_mentions(&content),
         external_links: markdown_links(&content, true),
         anchors: document
             .metadata
@@ -130,7 +142,14 @@ pub(super) fn eligible_for_orphan_check(document: &ProjectDocumentEntry) -> bool
         "draft" | "archived" | "superseded"
     ) && !matches!(
         document.metadata.role.as_str(),
-        "report" | "status" | "archive" | "discussion" | "note"
+        "report"
+            | "status"
+            | "archive"
+            | "discussion"
+            | "note"
+            | "agent_definition"
+            | "prompt_template"
+            | "skill"
     )
 }
 
@@ -172,6 +191,27 @@ fn markdown_links(content: &str, external: bool) -> Vec<String> {
     links.sort();
     links.dedup();
     links
+}
+
+fn inline_document_mentions(content: &str) -> Vec<String> {
+    let mut mentions = Vec::new();
+    let mut rest = content;
+    while let Some(start) = rest.find('`') {
+        rest = &rest[start + 1..];
+        let Some(end) = rest.find('`') else { break };
+        let raw = rest[..end].trim().trim_matches('<').trim_matches('>');
+        let target = raw.split('#').next().unwrap_or_default().trim();
+        if !target.is_empty()
+            && !target.contains(['\r', '\n', '*', '$'])
+            && target.to_ascii_lowercase().ends_with(".md")
+        {
+            mentions.push(target.replace('\\', "/"));
+        }
+        rest = &rest[end + 1..];
+    }
+    mentions.sort();
+    mentions.dedup();
+    mentions
 }
 
 fn normalize_relative_path(path: &Path) -> String {

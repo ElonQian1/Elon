@@ -13,16 +13,33 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     fs::create_dir_all(root.join("docs")).unwrap();
     fs::write(
         root.join("README.md"),
-        "# Home\n\n[Guide](docs/guide.md#missing) [Gone](docs/gone.md)\n",
+        "# Home\n\n[Guide](docs/guide.md#missing) [Gone](docs/gone.md)\n\n按需读取 `docs/routed.md`。\n",
     )
     .unwrap();
     fs::write(root.join("docs/guide.md"), "# Guide\n\nUseful.\n").unwrap();
     fs::write(root.join("docs/orphan.md"), "# Orphan\n\nHidden.\n").unwrap();
+    fs::write(root.join("docs/routed.md"), "# Routed\n\nRouted.\n").unwrap();
+    fs::create_dir_all(root.join(".github/agents")).unwrap();
+    fs::write(root.join(".github/agents/example.agent.md"), "# Agent\n").unwrap();
 
     let documents = vec![
         entry("README.md", "Home", "router", true, vec!["Home"]),
         entry("docs/guide.md", "Guide", "spec", false, vec!["Guide"]),
         entry("docs/orphan.md", "Orphan", "spec", false, vec!["Orphan"]),
+        entry(
+            "docs/routed.md",
+            "Routed",
+            "domain_policy",
+            false,
+            vec!["Routed"],
+        ),
+        entry(
+            ".github/agents/example.agent.md",
+            "Agent",
+            "agent_definition",
+            false,
+            vec!["Agent"],
+        ),
     ];
     let mut manifest = DocumentSectionManifest {
         home: DocumentKnowledgeHome {
@@ -56,6 +73,13 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     assert!(kinds.contains(&"missing_owner"));
     assert!(kinds.contains(&"missing_review_date"));
     assert!(kinds.contains(&"implementation_conflict"));
+    assert!(!report.issues.iter().any(|issue| {
+        issue.issue_type == "orphan_document"
+            && matches!(
+                issue.path.as_str(),
+                "docs/routed.md" | ".github/agents/example.agent.md"
+            )
+    }));
     assert_eq!(report.summary.status, "needs_attention");
     drop(index);
     fs::remove_dir_all(root).unwrap();

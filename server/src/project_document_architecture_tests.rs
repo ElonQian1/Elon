@@ -88,9 +88,15 @@ fn repository_self_project_is_scanned_with_zero_model_tokens() {
         analysis["document_health"]["maintenance"]["durable_queue"],
         true
     );
-    assert!(
-        analysis["document_health"]["quality"]["summary"]["total_issues"]
-            .as_u64()
-            .is_some()
-    );
+    let quality = &analysis["document_health"]["quality"];
+    assert_eq!(quality["summary"]["errors"], 0);
+    assert_eq!(quality["summary"]["warnings"], 0);
+    assert!(quality["summary"]["orphan_documents"].as_u64().unwrap() <= 2);
+    assert!(!quality["issues"].as_array().unwrap().iter().any(|issue| {
+        let path = issue["path"].as_str().unwrap_or_default();
+        path.starts_with(".github/agents/")
+            || path.starts_with(".github/prompts/")
+            || path.starts_with(".github/skills/")
+            || matches!(path, "AI_RULES.md" | "AI_TASK_TEMPLATE.md" | "CODEX.md")
+    }));
 }
