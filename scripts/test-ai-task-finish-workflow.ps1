@@ -7,6 +7,15 @@ $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $policyFile = Join-Path $repoRoot ".ai\workspace-policy.txt"
 
+$finishSource = Get-Content -Raw -LiteralPath $finishScript
+if (-not $finishSource.Contains('worktree", "unlock"')) {
+    throw "PowerShell finish must unlock its completed managed worktree before removal."
+}
+$finishShellSource = Get-Content -Raw -LiteralPath (Join-Path $repoRoot "scripts\finish-ai-task.sh")
+if (-not $finishShellSource.Contains('worktree unlock "$task_root"')) {
+    throw "Shell finish must unlock its completed managed worktree before removal."
+}
+
 $checkSource = Get-Content -Raw -LiteralPath $checkScript
 $serverGateStart = $checkSource.IndexOf('if ($Kind -eq "Server" -or $Kind -eq "PcFrontend")')
 $serverHealthStart = $checkSource.IndexOf('    try {', $serverGateStart)
@@ -134,6 +143,7 @@ try {
     # Global cleanup can run from another concurrent task immediately after a
     # new worktree is created. Both recent clean worktrees must survive that
     # scan even though their branches are already ancestors of origin/main.
+    Invoke-Git $mainRepo @("worktree", "lock", "--reason", "active workflow fixture", $peerWorktree) | Out-Null
     Push-Location -LiteralPath $mainRepo
     try {
         $oldPreference = $ErrorActionPreference
@@ -228,7 +238,7 @@ try {
         $oldPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         try {
-            $platformCleanupOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1") -Apply -MinAgeMinutes 0 -ExcludePath $peerWorktree 2>&1
+            $platformCleanupOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1") -Apply -MinAgeMinutes 0 2>&1
             $platformCleanupExitCode = $LASTEXITCODE
         } finally {
             $ErrorActionPreference = $oldPreference
@@ -239,10 +249,11 @@ try {
     $platformCleanupText = (($platformCleanupOutput | ForEach-Object { [string]$_ }) -join "`n").Trim()
     if ($platformCleanupExitCode -ne 0) { throw "Platform-session cleanup fixture failed.`n$platformCleanupText" }
     Assert-Contains $platformCleanupText "ai/session/elon-self/cleanup-session" "Cleanup must include merged clean platform session worktrees."
+    Assert-Contains $platformCleanupText "active workflow fixture" "Cleanup must preserve locked active task worktrees."
     $registeredAfterPlatformCleanup = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if ($registeredAfterPlatformCleanup.Contains("branch refs/heads/ai/session/elon-self/cleanup-session")) { throw "Platform session worktree is still registered after cleanup.`n$platformCleanupText" }
     if ($registeredAfterPlatformCleanup.Contains($platformSessionWorktree)) { throw "Platform session path is still registered after cleanup.`n$platformCleanupText" }
-    if (-not $registeredAfterPlatformCleanup.Contains("branch refs/heads/codex/peer-fixture")) { throw "Explicitly excluded peer worktree was removed by platform cleanup." }
+    if (-not $registeredAfterPlatformCleanup.Contains("branch refs/heads/codex/peer-fixture")) { throw "Locked peer worktree was removed by platform cleanup." }
 
     Write-Host "PASS ai-task-finish workflow guard"
 } finally {

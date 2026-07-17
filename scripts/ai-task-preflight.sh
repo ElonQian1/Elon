@@ -110,6 +110,14 @@ is_pc_conversation_worktree() {
     [[ "$branch" =~ ^ai/session/[^/]+/[^/]+$ ]]
 }
 
+lock_ai_task_worktree() {
+  local repo_path="$1" worktree_path="$2" output
+  if ! output="$(git -C "$repo_path" worktree lock --reason "active Codex task; finish-ai-task unlocks" "$worktree_path" 2>&1)"; then
+    [[ "$output" == *"already locked"* ]] || { echo "Unable to lock active task worktree: $output" >&2; exit 1; }
+  fi
+  echo "WORKTREE_LOCKED=true"
+}
+
 sync_local_main_baseline() {
   if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
     echo "MAIN_BASELINE_SYNC=skipped_no_origin_main"
@@ -240,6 +248,7 @@ if [[ "$create_worktree" -eq 1 && "$needs_worktree" -eq 1 ]]; then
   worktree_path="$worktree_parent/$leaf"
 
   git worktree add -b "$new_branch" "$worktree_path" origin/main
+  lock_ai_task_worktree "$repo_root" "$worktree_path"
   echo "WORKTREE_CREATED=true"
   echo "WORKTREE_BRANCH=$new_branch"
   echo "WORKTREE_PATH=$worktree_path"
@@ -257,6 +266,9 @@ elif [[ "$pc_conversation_worktree" -eq 1 ]]; then
   echo "NEXT=PC conversation worktree is already isolated; use the current workspace for direct edits."
   write_ai_workflow_guard "$repo_root" "pc_conversation_worktree_ok"
 else
+  if [[ "$branch" == codex/* ]]; then
+    lock_ai_task_worktree "$repo_root" "$repo_root"
+  fi
   echo "WORKTREE_CREATED=false"
   echo "NEXT=Workspace is already isolated and current enough for direct edits."
   write_ai_workflow_guard "$repo_root" "current_worktree_ok"

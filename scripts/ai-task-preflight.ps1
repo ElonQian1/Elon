@@ -203,6 +203,24 @@ function Test-PcConversationWorktree {
     return $isConversationPath -or $isSessionBranch
 }
 
+function Lock-AiTaskWorktree {
+    param([string]$RepoPath, [string]$WorktreePath)
+
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = @(& git -C $RepoPath worktree lock --reason "active Codex task; finish-ai-task unlocks" $WorktreePath 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldPreference
+    }
+    $text = ($output -join "`n")
+    if ($exitCode -ne 0 -and $text -notmatch "already locked") {
+        throw "Unable to lock active task worktree: $text"
+    }
+    Write-Host "WORKTREE_LOCKED=true"
+}
+
 $repoRoot = GitOutput @("rev-parse", "--show-toplevel")
 Set-Location -LiteralPath $repoRoot
 
@@ -276,6 +294,7 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     if ($LASTEXITCODE -ne 0) {
         throw "git worktree add failed"
     }
+    Lock-AiTaskWorktree -RepoPath $repoRoot -WorktreePath $worktreePath
 
     Write-Host "WORKTREE_CREATED=true"
     Write-Host "WORKTREE_BRANCH=$newBranch"
@@ -294,6 +313,9 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     Write-Host "NEXT=PC conversation worktree is already isolated; use the current workspace for direct edits."
     Write-AiWorkflowGuard -EditRoot $repoRoot -State "pc_conversation_worktree_ok"
 } else {
+    if ($branch -like "codex/*") {
+        Lock-AiTaskWorktree -RepoPath $repoRoot -WorktreePath $repoRoot
+    }
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Workspace is already isolated and current enough for direct edits."
     Write-AiWorkflowGuard -EditRoot $repoRoot -State "current_worktree_ok"

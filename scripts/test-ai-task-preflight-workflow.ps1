@@ -56,6 +56,8 @@ Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight
 Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
 Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
 Assert-Contains $preflightContent "AUTO_CLEANUP=skipped_created_worktree" "PowerShell preflight must not clean up the worktree it just created."
+Assert-Contains $preflightContent "worktree lock --reason" "PowerShell preflight must lock active Codex task worktrees."
+Assert-Contains $preflightShContent "worktree lock --reason" "Shell preflight must lock active Codex task worktrees."
 Assert-Contains $preflightContent "function Test-PcConversationWorktree" "PowerShell preflight must detect platform-created PC conversation worktrees."
 Assert-Contains $preflightShContent "is_pc_conversation_worktree()" "Shell preflight must detect platform-created PC conversation worktrees."
 Assert-Contains $preflightContent "PC_CONVERSATION_WORKTREE=true" "PowerShell preflight must expose when the current workspace is already a PC conversation worktree."
@@ -68,6 +70,8 @@ Assert-Contains $cleanupContent "Test-PlatformSessionWorktree" "PowerShell clean
 Assert-Contains $cleanupContent "ai/session/*" "PowerShell cleanup must include platform session branches in safe cleanup candidates."
 Assert-Contains $cleanupShContent "is_platform_session_worktree" "Shell cleanup must recognize platform conversation worktrees."
 Assert-Contains $cleanupShContent "--min-age-minutes" "Shell cleanup must support the same recent-worktree protection knob."
+Assert-Contains $cleanupContent '"locked"' "PowerShell cleanup must preserve Git-locked active worktrees."
+Assert-Contains $cleanupShContent "locked)" "Shell cleanup must preserve Git-locked active worktrees."
 
 function Assert-DocumentContains {
     param(

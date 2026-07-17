@@ -1,6 +1,6 @@
 # 一龙项目 AI 共享契约
 
-最后更新：2026-07-14
+最后更新：2026-07-18
 
 > 本文件是 Codex、Codex CLI、Copilot、Copilot CLI 等代理的共享权威规则。
 > 它只保留每轮都必须知道的不变量；任务专项细节由 `AGENTS.md` 路由按需读取。
@@ -30,6 +30,8 @@
 | `WF-REPORT` | 只有收尾输出 `FINALIZABLE=true` 才能正常宣告完成。最终回复必须分别报告 `BUSINESS_STATUS`、`LOCAL_MAIN_STATUS`、`TASK_WORKTREE_STATUS` 和未跟踪文件告警。 |
 
 预检输出的 `NEXT=`、`EDIT_ROOT=`、`FINISH_COMMAND_*=`，以及收尾输出的 `FINALIZABLE=`，优先级高于文档示例。
+
+预检会用 Git worktree lock 标记活跃的 `codex/*` 任务；全局清理不得回收 locked worktree，统一收尾在定向删除前负责 unlock。这样长时间构建/发布不会因超过年龄保护而被并发清理。
 
 ### 平台会话 worktree 例外
 

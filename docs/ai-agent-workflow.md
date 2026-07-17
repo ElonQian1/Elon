@@ -17,7 +17,7 @@
 
 1. 任何写任务先执行 `WF-START`，并切到预检脚本输出的 `EDIT_ROOT`；它是本轮唯一允许编辑、格式化、测试和提交的目录。
 2. 如果存在 `AGENTS.md`、`CODEX.md` 或 `README.md`，先读轻量入口；`.github/instructions/*.md` 和 `docs/` 只在当前任务需要时读取。
-3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 rebase。`origin/main` 在编码或构建期间前进是并行常态，不是自动 rebase、重跑验证或重新发布的条件。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
+3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建并加 Git lock 的任务 worktree 开始，防止长构建期间被并发清理。当前任务自己的提交完成后第一时间 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 rebase。`origin/main` 在编码或构建期间前进是并行常态，不是自动 rebase、重跑验证或重新发布的条件。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. 任务最后执行 `WF-FINISH`。统一收尾会验证远端、快进主基线、审计未跟踪文件并回收已合并 worktree；不要再手工拼接这些步骤。

@@ -353,6 +353,10 @@ try {
         $taskWorktreeStatus = "skipped_by_option"
     } elseif ($isManagedTaskWorktree) {
         Set-Location -LiteralPath $mainPath
+        $unlock = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "unlock", $taskRoot)
+        if ($unlock.ExitCode -ne 0 -and $unlock.Text -notmatch "not locked") {
+            throw "Unable to unlock completed task worktree: $($unlock.Text)"
+        }
         $remove = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "remove", $taskRoot)
 
         $remaining = @(Get-GitWorktreeEntries -RepoPath $mainPath | Where-Object {

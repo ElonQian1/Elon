@@ -172,6 +172,7 @@ foreach ($line in (& git worktree list --porcelain)) {
         "worktree" { $current["Path"] = $kv[1] }
         "HEAD"     { $current["Head"] = $kv[1] }
         "branch"   { $current["Branch"] = ($kv[1] -replace "^refs/heads/","") }
+        "locked"   { $current["Locked"] = if ($kv.Count -gt 1) { $kv[1] } else { "locked" } }
         "bare"     { $current["Bare"] = $true }
         "detached" { $current["Detached"] = $true }
     }
@@ -208,6 +209,10 @@ foreach ($wt in $taskWorktrees) {
     if ($normalized -ieq $currentWorktree) { $reasons += "当前正在使用" }
     if ($keepSet.ContainsKey($wt.Path))    { $reasons += "在 -KeepLast 保留范围内" }
     if ($excludeSet.ContainsKey($normalized)) { $reasons += "在 -ExcludePath 保护范围内" }
+    $lockedProperty = $wt.PSObject.Properties["Locked"]
+    if ($lockedProperty -and $lockedProperty.Value) {
+        $reasons += "Git worktree 已锁定: $($lockedProperty.Value)"
+    }
 
     if ($MinAgeMinutes -gt 0 -and (Test-Path -LiteralPath $wt.Path)) {
         $createdUtc = (Get-Item -LiteralPath $wt.Path -Force).CreationTimeUtc

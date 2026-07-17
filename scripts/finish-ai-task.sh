@@ -175,6 +175,9 @@ elif [[ "$skip_worktree_cleanup" -eq 1 ]]; then
   task_worktree_status="skipped_by_option"
 elif [[ "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
   cd "$main_path"
+  if ! unlock_output="$(git -C "$main_path" worktree unlock "$task_root" 2>&1)"; then
+    [[ "$unlock_output" == *"not locked"* ]] || finish_error "Unable to unlock completed task worktree: $unlock_output"
+  fi
   remove_output="$(git -C "$main_path" worktree remove "$task_root" 2>&1)" || true
   if git -C "$main_path" worktree list --porcelain | grep -Fq "worktree $task_root"; then
     task_worktree_status="cleanup_failed"

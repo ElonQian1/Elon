@@ -113,16 +113,16 @@ is_worktree_registered() {
 
 # 解析 worktree（采集任务命名、codex/* 分支和平台会话）
 mapfile -t lines < <(git worktree list --porcelain)
-declare -a wt_paths wt_branches
-path=""; branch=""
+declare -a wt_paths wt_branches wt_locks
+path=""; branch=""; lock_reason=""
 flush() {
   if [[ -n "$path" ]]; then
     leaf="$(basename "$path")"
     if [[ "$leaf" =~ ^${repo_leaf}-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?(-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?)?$ || "$branch" == codex/* ]] || is_platform_session_worktree "$path" "$branch"; then
-      wt_paths+=("$path"); wt_branches+=("$branch")
+      wt_paths+=("$path"); wt_branches+=("$branch"); wt_locks+=("$lock_reason")
     fi
   fi
-  path=""; branch=""
+  path=""; branch=""; lock_reason=""
 }
 for line in "${lines[@]}"; do
   if [[ -z "$line" ]]; then flush; continue; fi
@@ -130,6 +130,7 @@ for line in "${lines[@]}"; do
   case "$key" in
     worktree) path="$val" ;;
     branch)   branch="${val#refs/heads/}" ;;
+    locked)   lock_reason="${val:-locked}" ;;
   esac
 done
 flush
@@ -156,6 +157,7 @@ for i in "${!wt_paths[@]}"; do
   [[ "${wt%/}" == "${current_wt%/}" ]] && reasons+=("当前正在使用")
   [[ -n "${keep_set[$wt]:-}" ]] && reasons+=("在 --keep-last 保留范围内")
   [[ -n "${exclude_set[$wt]:-}" ]] && reasons+=("在 --exclude-path 保护范围内")
+  [[ -n "${wt_locks[$i]:-}" ]] && reasons+=("Git worktree 已锁定: ${wt_locks[$i]}")
 
   if [[ "$MIN_AGE_MINUTES" -gt 0 && -d "$wt" ]]; then
     created_epoch="$(path_mtime_epoch "$wt")"
