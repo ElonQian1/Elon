@@ -15,6 +15,7 @@ use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
     project_document_architecture::analyze_knowledge_architecture,
     project_document_federation::analyze_federation,
+    project_document_files::content_revision,
     project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
     project_document_index::ProjectDocumentIndex,
     project_document_knowledge_graph::build_knowledge_maps,
@@ -29,7 +30,7 @@ pub(crate) fn enrich_catalog(
     index: &ProjectDocumentIndex,
 ) -> Result<Value> {
     register_workspace(workspace);
-    let manifest = load_manifest(workspace)?;
+    let (manifest, manifest_revision) = load_manifest(workspace)?;
     let quality = analyze_document_quality(workspace, documents, &manifest, index)?;
     index.replace_issues(
         &quality
@@ -40,6 +41,12 @@ pub(crate) fn enrich_catalog(
     )?;
     let architecture = analyze_knowledge_architecture(documents, &manifest);
     let knowledge_maps = build_knowledge_maps(workspace, documents, &manifest);
+    let knowledge_map_revision = content_revision(&serde_json::to_string(&knowledge_maps)?);
+    let canonical_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.to_path_buf())
+        .to_string_lossy()
+        .to_string();
     let federation = analyze_federation(workspace, documents, &manifest)?;
     let maintenance = index.complete_analysis()?;
     let overall_score = weighted_score(
@@ -56,6 +63,12 @@ pub(crate) fn enrich_catalog(
         },
         "architecture": architecture,
         "knowledge_maps": knowledge_maps,
+        "identity": {
+            "workspace": workspace.to_string_lossy(),
+            "canonical_workspace": canonical_workspace,
+            "manifest_revision": manifest_revision,
+            "knowledge_map_revision": knowledge_map_revision,
+        },
         "quality": compact_report(&quality, 40),
         "maintenance": maintenance,
         "federation": federation,
@@ -94,10 +107,16 @@ pub(crate) fn spawn_maintenance_worker() {
 
 fn load_manifest(
     workspace: &Path,
-) -> Result<crate::project_document_governance::DocumentSectionManifest> {
+) -> Result<(
+    crate::project_document_governance::DocumentSectionManifest,
+    Option<String>,
+)> {
     let path = workspace.join(SECTION_CONFIG_PATH);
     let content = fs::read_to_string(path).ok();
-    parse_manifest(content.as_deref())
+    Ok((
+        parse_manifest(content.as_deref())?,
+        content.as_deref().map(content_revision),
+    ))
 }
 
 fn register_workspace(workspace: &Path) {

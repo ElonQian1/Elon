@@ -2,6 +2,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use homecli_proto::ProjectDocumentsSnapshot;
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     collections::{HashMap, HashSet},
@@ -12,10 +13,11 @@ use std::{
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
     project_document_analysis_model::compact_document,
+    project_document_files::content_revision,
     project_document_governance::{parse_manifest, DocumentSectionManifest, SECTION_CONFIG_PATH},
-    project_document_knowledge_graph::{build_knowledge_maps, build_map},
+    project_document_knowledge_graph::build_knowledge_maps,
     project_document_knowledge_graph_model::{
-        ProjectKnowledgeMap, ProjectKnowledgeMapEdge, ProjectKnowledgeMapNode,
+        ProjectKnowledgeMap, ProjectKnowledgeMapEdge, ProjectKnowledgeMapNode, ProjectKnowledgeMaps,
     },
 };
 
@@ -27,10 +29,11 @@ pub(crate) fn get_map(
     query: Option<&str>,
     max_nodes: usize,
 ) -> Result<Value> {
-    let (snapshot, manifest) = load(workspace)?;
+    let (snapshot, manifest, manifest_revision) = load(workspace)?;
+    let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
+    let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
     if view == "overview" {
-        let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
-        let views = [maps.capabilities, maps.architecture, maps.topics]
+        let views = [&maps.capabilities, &maps.architecture, &maps.topics]
             .into_iter()
             .map(|map| {
                 json!({
@@ -42,14 +45,15 @@ pub(crate) fn get_map(
             .collect::<Vec<_>>();
         return Ok(json!({
             "catalog_revision": snapshot.revision,
+            "identity": identity,
             "views": views,
             "budget": {"classification_model_tokens":0,"markdown_bodies_read":0,"metadata_only":true}
         }));
     }
     ensure_view(view)?;
-    let map = build_map(workspace, &snapshot.documents, &manifest, view);
+    let map = map_for_view(&maps, view);
     let (nodes, edges, truncated) = select_map(
-        &map,
+        map,
         root_id,
         depth.clamp(1, 6),
         query,
@@ -57,6 +61,7 @@ pub(crate) fn get_map(
     )?;
     Ok(json!({
         "catalog_revision": snapshot.revision,
+        "identity": identity,
         "view": map.view,
         "title": map.title,
         "source": map.source,
@@ -71,11 +76,12 @@ pub(crate) fn get_map(
 }
 
 pub(crate) fn get_node(workspace: &Path, node_id: &str) -> Result<Value> {
-    let (snapshot, manifest) = load(workspace)?;
+    let (snapshot, manifest, manifest_revision) = load(workspace)?;
     let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
-    let maps = [maps.capabilities, maps.architecture, maps.topics];
-    let (map, node) = maps
-        .iter()
+    let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
+    let map_views = [&maps.capabilities, &maps.architecture, &maps.topics];
+    let (map, node) = map_views
+        .into_iter()
         .find_map(|map| {
             map.nodes
                 .iter()
@@ -108,6 +114,7 @@ pub(crate) fn get_node(workspace: &Path, node_id: &str) -> Result<Value> {
         .collect::<Vec<_>>();
     Ok(json!({
         "catalog_revision": snapshot.revision,
+        "identity": identity,
         "view": map.view,
         "node": node,
         "relations": relations,
@@ -124,8 +131,10 @@ pub(crate) fn get_node(workspace: &Path, node_id: &str) -> Result<Value> {
 
 pub(crate) fn review_map(workspace: &Path, view: &str) -> Result<Value> {
     ensure_view(view)?;
-    let (snapshot, manifest) = load(workspace)?;
-    let map = build_map(workspace, &snapshot.documents, &manifest, view);
+    let (snapshot, manifest, manifest_revision) = load(workspace)?;
+    let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
+    let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
+    let map = map_for_view(&maps, view);
     let review_questions = match view {
         "architecture" => vec![
             "组件边界是否与真实进程、部署单元和数据流一致？",
@@ -145,6 +154,7 @@ pub(crate) fn review_map(workspace: &Path, view: &str) -> Result<Value> {
     };
     Ok(json!({
         "catalog_revision": snapshot.revision,
+        "identity": identity,
         "view": view,
         "source": map.source,
         "stats": map.stats,
@@ -172,9 +182,10 @@ pub(crate) fn plan_context(
     if query.is_empty() && node_id.is_none() {
         bail!("project_docs_plan_context 必须提供 query 或 node_id");
     }
-    let (snapshot, manifest) = load(workspace)?;
+    let (snapshot, manifest, manifest_revision) = load(workspace)?;
     let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
-    let all_maps = [maps.capabilities, maps.architecture, maps.topics];
+    let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
+    let all_maps = [&maps.capabilities, &maps.architecture, &maps.topics];
     let query_lower = query.to_ascii_lowercase();
     let matched_nodes = all_maps
         .iter()
@@ -235,6 +246,7 @@ pub(crate) fn plan_context(
     }
     Ok(json!({
         "catalog_revision": snapshot.revision,
+        "identity": identity,
         "query": query,
         "node_id": node_id,
         "matched_nodes": matched_nodes.iter().map(|node| json!({"id":node.id,"view":node.view,"label":node.label,"status":node.documentation_status})).collect::<Vec<_>>(),
@@ -244,7 +256,13 @@ pub(crate) fn plan_context(
     }))
 }
 
-fn load(workspace: &Path) -> Result<(ProjectDocumentsSnapshot, DocumentSectionManifest)> {
+fn load(
+    workspace: &Path,
+) -> Result<(
+    ProjectDocumentsSnapshot,
+    DocumentSectionManifest,
+    Option<String>,
+)> {
     let snapshot = collect_project_documents_with_options(
         workspace,
         ProjectDocumentScanOptions {
@@ -254,7 +272,39 @@ fn load(workspace: &Path) -> Result<(ProjectDocumentsSnapshot, DocumentSectionMa
         },
     )?;
     let manifest = fs::read_to_string(workspace.join(SECTION_CONFIG_PATH)).ok();
-    Ok((snapshot, parse_manifest(manifest.as_deref())?))
+    let manifest_revision = manifest.as_deref().map(content_revision);
+    Ok((
+        snapshot,
+        parse_manifest(manifest.as_deref())?,
+        manifest_revision,
+    ))
+}
+
+fn graph_identity<T: Serialize>(
+    workspace: &Path,
+    snapshot: &ProjectDocumentsSnapshot,
+    manifest_revision: Option<&str>,
+    maps: &T,
+) -> Result<Value> {
+    let canonical_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.to_path_buf())
+        .to_string_lossy()
+        .to_string();
+    Ok(json!({
+        "workspace": snapshot.workspace_path,
+        "canonical_workspace": canonical_workspace,
+        "manifest_revision": manifest_revision,
+        "knowledge_map_revision": content_revision(&serde_json::to_string(maps)?),
+    }))
+}
+
+fn map_for_view<'a>(maps: &'a ProjectKnowledgeMaps, view: &str) -> &'a ProjectKnowledgeMap {
+    match view {
+        "architecture" => &maps.architecture,
+        "topics" => &maps.topics,
+        _ => &maps.capabilities,
+    }
 }
 
 fn select_map<'a>(

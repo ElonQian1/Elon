@@ -73,6 +73,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 这组工具让 AI 不依赖网页点击就能真实理解和评估项目图谱：
 
 - `project_docs_get_map(view=overview)` 先返回三张图的来源、结构分、节点统计和根节点；再按任务只查询 `capabilities`、`architecture` 或 `topics`，可用 `root_id`、`depth`、`query`、`max_nodes` 限定局部图。
+- 图谱响应的 `identity` 同时返回工作区、规范化工作区、manifest revision 和 knowledge-map revision。PC 页面必须用这些字段识别旧目录快照或错误工作区；项目已有正式节点却收到 `profile_template` 时，应报告数据一致性异常并刷新，不能把模板当作项目事实。
 - `project_docs_get_node` 返回单节点的入口、文档路径、六类文档覆盖、实现证据、相邻关系和确定性缺口，不读取正文。
 - `project_docs_review_map` 按视图给出结构诊断和评审问题。产品功能不能由文档类别代替，技术组件应与真实进程/部署单元/数据流一致，主题位置不得改变权威性。
 

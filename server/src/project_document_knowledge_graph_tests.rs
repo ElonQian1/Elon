@@ -172,6 +172,12 @@ fn mcp_graph_queries_are_bounded_and_do_not_read_bodies() {
     let map = get_map(&root, "capabilities", None, 2, None, 10).unwrap();
     assert_eq!(map["budget"]["markdown_bodies_read"], 0);
     assert_eq!(map["nodes"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        map["identity"]["canonical_workspace"],
+        root.canonicalize().unwrap().to_string_lossy().as_ref()
+    );
+    assert!(map["identity"]["manifest_revision"].is_string());
+    assert!(map["identity"]["knowledge_map_revision"].is_string());
 
     let node = get_node(&root, "cap-api").unwrap();
     assert_eq!(node["documents"][0]["path"], "docs/API.md");
@@ -181,6 +187,10 @@ fn mcp_graph_queries_are_bounded_and_do_not_read_bodies() {
     assert_eq!(
         review["suggestion_target"],
         ".elon/document-organization-suggestions.json#proposed_knowledge_graph"
+    );
+    assert_eq!(
+        review["identity"]["knowledge_map_revision"],
+        map["identity"]["knowledge_map_revision"]
     );
 
     let plan = plan_context(&root, "健康检查", Some("cap-api"), 1_000, 4).unwrap();

@@ -343,6 +343,7 @@ export function useProjectDocumentOrganization(
 
   return {
     manifest: manifestFile.value,
+    manifestRevision: manifestFile.revision,
     suggestions: suggestionsFile.value,
     loading,
     error,

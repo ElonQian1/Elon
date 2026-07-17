@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Expand, Focus, Network, Search, Shrink, Sparkles } from 'lucide-react'
+import { Expand, Focus, Network, RefreshCw, Search, Shrink, Sparkles } from 'lucide-react'
 import {
   Background,
   BackgroundVariant,
@@ -25,12 +25,21 @@ import {
   type ProjectCapabilityNode,
 } from './projectDocumentCapabilityGraph'
 import type { DocumentCatalog } from './projectDocumentModel'
+import {
+  diagnoseProjectDocumentGraphConsistency,
+  shortGraphRevision,
+} from './projectDocumentGraphConsistency'
 import type { ProjectKnowledgeMapView } from './projectDocumentKnowledgeGraphModel'
+import type { DocumentSectionManifest } from './projectDocumentSections'
 import styles from './ProjectDocumentCapabilityMap.module.css'
 
 interface Props {
   projectName: string
   catalog: DocumentCatalog | null
+  manifest: DocumentSectionManifest
+  manifestRevision?: string
+  expectedWorkspace: string
+  onRefresh: () => Promise<void>
   canStartAi: boolean
   organizing: boolean
   onOpenDocument: (path: string) => void
@@ -52,6 +61,10 @@ export default function ProjectDocumentCapabilityMap(props: Props) {
 function ProjectDocumentCapabilityMapSurface({
   projectName,
   catalog,
+  manifest,
+  manifestRevision,
+  expectedWorkspace,
+  onRefresh,
   canStartAi,
   organizing,
   onOpenDocument,
@@ -61,6 +74,12 @@ function ProjectDocumentCapabilityMapSurface({
 }: Props) {
   const [view, setView] = useState<ProjectKnowledgeMapView>('capabilities')
   const graph = useMemo(() => buildCapabilityGraph(projectName, catalog, view), [catalog, projectName, view])
+  const configuredNodes = view === 'topics'
+    ? manifest.sections.length
+    : manifest.knowledge_graph.nodes.filter((node) => node.view === view).length
+  const consistency = diagnoseProjectDocumentGraphConsistency({
+    catalog, graph, expectedWorkspace, expectedManifestRevision: manifestRevision, configuredNodes,
+  })
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<CapabilityStatus | 'all'>('all')
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(() => defaultCollapsed(graph))
@@ -143,10 +162,19 @@ function ProjectDocumentCapabilityMapSurface({
         </button>
       </header>
 
-      <section className={styles.mapDiagnostic} data-status={graph.diagnosticStatus}>
+      <section className={styles.mapDiagnostic} data-status={graph.diagnosticStatus} data-consistency={consistency.status}>
         <strong>结构分 {graph.structuralScore}</strong>
-        <span>{graph.source === 'manifest' ? '项目已固化' : graph.source === 'profile_template' ? '当前为模板推导，建议与 AI 核对后固化' : '节点尚未返回统一图谱，请刷新或升级 Windows 节点'}</span>
+        <span>{consistency.message}</span>
+        <small className={styles.mapIdentity} title={catalog?.analysis?.identity?.canonical_workspace || catalog?.workspace}>
+          {graph.source === 'manifest' ? '清单' : graph.source === 'profile_template' ? '模板' : '不可用'} ·
+          目录 {shortGraphRevision(catalog?.revision)} ·
+          清单 {shortGraphRevision(catalog?.analysis?.identity?.manifest_revision)} ·
+          图谱 {shortGraphRevision(catalog?.analysis?.identity?.knowledge_map_revision)}
+        </small>
         <em>{graph.findings.length} 条确定性发现</em>
+        <button className={styles.refreshMapButton} type="button" onClick={() => { void onRefresh() }} title="重新扫描项目目录与图谱">
+          <RefreshCw size={12} />刷新
+        </button>
       </section>
 
       <div className={styles.mapContent}>

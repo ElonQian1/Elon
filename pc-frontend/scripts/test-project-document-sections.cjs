@@ -254,12 +254,52 @@ assert(searchedGraph.nodes.some((node) => node.id === capabilityParent.id), '搜
 const capabilityPositions = capabilityGraphLoaded.exports.layoutCapabilityGraph(searchedGraph.nodes)
 assert(capabilityPositions.get(capabilityChild.id).x > capabilityPositions.get(capabilityParent.id).x)
 
+const consistencySourcePath = path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentGraphConsistency.ts',
+)
+const consistencyOutput = ts.transpileModule(fs.readFileSync(consistencySourcePath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const consistencyLoaded = { exports: {} }
+new Function('module', 'exports', 'require', consistencyOutput)(consistencyLoaded, consistencyLoaded.exports, require)
+const diagnoseConsistency = consistencyLoaded.exports.diagnoseProjectDocumentGraphConsistency
+const identifiedCatalog = {
+  ...capabilityCatalog,
+  workspace: 'D:\\repo',
+  analysis: {
+    ...capabilityCatalog.analysis,
+    identity: {
+      workspace: 'D:\\repo', canonical_workspace: 'D:\\repo',
+      manifest_revision: 'manifest-new', knowledge_map_revision: 'graph-new',
+    },
+  },
+}
+assert.equal(diagnoseConsistency({
+  catalog: identifiedCatalog, graph: capabilityGraph, expectedWorkspace: '\\\\?\\D:\\repo',
+  expectedManifestRevision: 'manifest-new', configuredNodes: 3,
+}).status, 'current')
+assert.equal(diagnoseConsistency({
+  catalog: identifiedCatalog, graph: capabilityGraph, expectedWorkspace: 'D:\\repo',
+  expectedManifestRevision: 'manifest-next', configuredNodes: 3,
+}).status, 'stale')
+assert.equal(diagnoseConsistency({
+  catalog: identifiedCatalog, graph: { ...capabilityGraph, source: 'profile_template' },
+  expectedWorkspace: 'D:\\repo', expectedManifestRevision: 'manifest-new', configuredNodes: 3,
+}).status, 'unexpected_template')
+assert.equal(diagnoseConsistency({
+  catalog: identifiedCatalog, graph: capabilityGraph, expectedWorkspace: 'D:\\other',
+  expectedManifestRevision: 'manifest-new', configuredNodes: 3,
+}).status, 'workspace_mismatch')
+
 const workspaceSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsWorkspace.tsx',
 ), 'utf8')
 assert(!workspaceSource.includes('markSuggestionsRequested'), '启动 AI 前不得在主工作区预写建议占位文件')
 assert(workspaceSource.includes('const basePrompt = buildOrganizationPrompt'))
 assert(workspaceSource.includes('await onStartAiOrganize(scopeInstruction'))
+assert(workspaceSource.includes('useProjectDocumentGraphFreshness'))
+assert(workspaceSource.includes('await organization.applySuggestions'))
+assert(workspaceSource.includes('expectedWorkspace={organizationTracking.projectRoot}'))
 const editorPaneSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentEditorPane.tsx',
 ), 'utf8')
@@ -278,6 +318,8 @@ assert(capabilityMapSource.includes('Controls'))
 assert(capabilityMapSource.includes('搜索节点、文档或实现证据'))
 assert(capabilityMapSource.includes('ProjectDocumentKnowledgeMapTabs'))
 assert(capabilityMapSource.includes('与 AI 评审此图'))
+assert(capabilityMapSource.includes('data-consistency={consistency.status}'))
+assert(capabilityMapSource.includes('knowledge_map_revision'))
 assert(!capabilityMapSource.includes('/docs/file'), '功能图只能消费目录元数据，不应自行读取 Markdown 正文')
 
 const capabilityInspectorSource = fs.readFileSync(path.join(

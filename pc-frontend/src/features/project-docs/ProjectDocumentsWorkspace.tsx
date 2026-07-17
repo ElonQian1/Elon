@@ -67,6 +67,8 @@ import {
 } from './projectDocumentSections'
 import styles from './ProjectDocumentsWorkspace.module.css'
 import { useProjectDocumentOrganization } from './useProjectDocumentOrganization'
+import { useProjectDocumentGraphFreshness } from './useProjectDocumentGraphFreshness'
+import { normalizeProjectDocumentPath as normalizeDocumentPath, projectDocumentErrorMessage as errorMessage } from './projectDocumentWorkspaceHelpers'
 import { menuPointForButton, type ProjectDocumentMenuPoint } from './useProjectDocumentMenuTrigger'
 
 const ProjectDocumentCapabilityMap = lazy(() => import('./ProjectDocumentCapabilityMap'))
@@ -136,6 +138,9 @@ export default function ProjectDocumentsWorkspace({
       setCatalogLoading(false)
     }
   }, [projectId])
+
+  useProjectDocumentGraphFreshness({ catalogManifestRevision: catalog?.analysis?.identity?.manifest_revision,
+    expectedManifestRevision: organization.manifestRevision, refresh: loadCatalog })
 
   useEffect(() => { loadCatalog() }, [loadCatalog])
   useEffect(() => setViewPreferences(loadDocumentViewPreferences(projectId)), [projectId])
@@ -372,6 +377,7 @@ export default function ProjectDocumentsWorkspace({
     setApplyingSuggestions(true)
     try {
       const result = await organization.applySuggestions(catalog.revision, automationPolicy.mode)
+      await loadCatalog()
       setMessage(result?.git_result_commit
         ? `AI 分区建议已应用；Git 已保存整理前 ${result.git_baseline_commit?.slice(0, 8)} 和整理后 ${result.git_result_commit.slice(0, 8)} 两个提交。`
         : result?.git_baseline_commit
@@ -653,7 +659,8 @@ export default function ProjectDocumentsWorkspace({
         />
       ) : activeSection === CAPABILITY_MAP_SECTION ? (
         <Suspense fallback={<div className={styles.capabilityLoading}>正在加载统一项目知识图谱…</div>}>
-          <ProjectDocumentCapabilityMap projectName={projectName} catalog={catalog}
+          <ProjectDocumentCapabilityMap projectName={projectName} catalog={catalog} manifest={organization.manifest}
+            manifestRevision={organization.manifestRevision} expectedWorkspace={organizationTracking.projectRoot} onRefresh={loadCatalog}
             canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
             onOpenSection={setActiveSection} onAiOrganize={organizeCapability} onAiReview={reviewKnowledgeMap} />
         </Suspense>
@@ -788,12 +795,4 @@ export default function ProjectDocumentsWorkspace({
       />
     </div>
   )
-}
-
-function errorMessage(error: unknown, fallback: string) {
-  return (error as { message?: string })?.message ?? fallback
-}
-
-function normalizeDocumentPath(path: string) {
-  return path.trim().replace(/\\/g, '/')
 }

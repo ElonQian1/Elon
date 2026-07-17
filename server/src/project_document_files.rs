@@ -43,7 +43,7 @@ pub(crate) fn read_project_document_file(
     let content = String::from_utf8(bytes).context("项目文档不是 UTF-8 文本")?;
     Ok(ProjectDocumentFile {
         path: relative,
-        revision: revision(&content),
+        revision: content_revision(&content),
         byte_len: content.len() as u64,
         content,
     })
@@ -68,7 +68,7 @@ pub(crate) fn write_project_document_file(
     } else {
         None
     };
-    let current_revision = current_content.as_deref().map(revision);
+    let current_revision = current_content.as_deref().map(content_revision);
     if let Some(expected) = expected_revision.filter(|value| !value.trim().is_empty()) {
         if current_revision.as_deref() != Some(expected) {
             return Err(write_error("文档已被其他会话修改，请刷新后合并更改", true));
@@ -97,7 +97,7 @@ pub(crate) fn write_project_document_file(
     Ok(ProjectDocumentFile {
         path: relative,
         content: content.to_string(),
-        revision: revision(content),
+        revision: content_revision(content),
         byte_len: content.len() as u64,
     })
 }
@@ -242,7 +242,7 @@ fn resolve_markdown_target(
     Ok((target, normalized))
 }
 
-fn revision(content: &str) -> String {
+pub(crate) fn content_revision(content: &str) -> String {
     format!("{:x}", Sha256::digest(content.as_bytes()))
 }
 

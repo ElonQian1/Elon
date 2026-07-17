@@ -155,6 +155,10 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         analyzed["result"]["structuredContent"]["document_health"]["source"],
         "server"
     );
+    assert!(
+        analyzed["result"]["structuredContent"]["document_health"]["identity"]["manifest_revision"]
+            .is_null()
+    );
     let issues = handle_request(
         &root,
         request(json!({
@@ -184,6 +188,8 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         map["result"]["structuredContent"]["budget"]["markdown_bodies_read"],
         0
     );
+    assert!(map["result"]["structuredContent"]["identity"]["canonical_workspace"].is_string());
+    assert!(map["result"]["structuredContent"]["identity"]["knowledge_map_revision"].is_string());
     let root_node_id = map["result"]["structuredContent"]["root_id"]
         .as_str()
         .unwrap();

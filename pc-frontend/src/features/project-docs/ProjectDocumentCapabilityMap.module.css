@@ -32,8 +32,13 @@
 .mapDiagnostic strong { color: #81d3a7; }
 .mapDiagnostic[data-status="review"] strong { color: #e1b15e; }
 .mapDiagnostic[data-status="needs_structure"] strong, .mapDiagnostic[data-status="unavailable"] strong { color: #e68188; }
+.mapDiagnostic[data-consistency="stale"], .mapDiagnostic[data-consistency="workspace_mismatch"], .mapDiagnostic[data-consistency="unexpected_template"] { color: #f1c7ca; background: rgba(116, 39, 48, .32); }
+.mapDiagnostic[data-consistency="stale"] strong, .mapDiagnostic[data-consistency="workspace_mismatch"] strong, .mapDiagnostic[data-consistency="unexpected_template"] strong { color: #f08b93; }
 .mapDiagnostic span { flex: 1; }
+.mapIdentity { overflow: hidden; max-width: 340px; color: #777e89; font: 7px ui-monospace, Consolas, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .mapDiagnostic em { color: #777e89; font-style: normal; }
+.refreshMapButton { display: flex; align-items: center; gap: 4px; padding: 4px 7px; border-radius: 5px; color: #bfc4cd; background: rgba(255, 255, 255, .06); }
+.refreshMapButton:hover { color: #fff; background: rgba(255, 255, 255, .1); }
 .mapContent { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-width: 0; min-height: 0; }
 .canvas { position: relative; min-width: 0; min-height: 0; border-right: 1px solid rgba(255, 255, 255, .07); }
 .canvas :global(.react-flow__pane) { cursor: grab; }

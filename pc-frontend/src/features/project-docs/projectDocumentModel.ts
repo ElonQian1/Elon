@@ -33,6 +33,7 @@ export interface DocumentCatalog {
   project_id: string
   workspace: string
   revision: string
+  generated_at_ms?: number
   source: string
   documents: ProjectDocumentEntry[]
   warnings: string[]
@@ -61,6 +62,12 @@ export interface DocumentHealthIssue {
 export interface DocumentHealthAnalysis {
   version: number
   source: 'server'
+  identity?: {
+    workspace: string
+    canonical_workspace: string
+    manifest_revision?: string
+    knowledge_map_revision: string
+  }
   overall: { score: number; status: 'healthy' | 'review' | 'needs_attention' }
   architecture: {
     profile: string
