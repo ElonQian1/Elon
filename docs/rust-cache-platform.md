@@ -143,7 +143,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 gc -A
 
 sccache 是常驻客户端/服务器模型，配置变化必须由服务器重新加载。平台只在没有 Cargo/rustc 写入者时重启；并发构建期间会把配置哈希和 pending 状态写入 `state/sccache-sync.json`，以后每次平台构建都重试，直到空闲窗口完成加载。安装器不会把 pending 报告成成功。安装激活还会写入当前 Windows 用户的 `SCCACHE_CONF`、`SCCACHE_DIR`、`SCCACHE_CACHE_SIZE`，所以服务器空闲退出后也会从托管配置自动启动。
 
-sccache 会把所有 `CARGO_*` 环境变量计入 Rust 缓存键。平台生成 `platform/rustc-sccache-wrapper.cmd`：Cargo 仍先读取真实的 `CARGO_BUILD_BUILD_DIR` / `CARGO_TARGET_DIR` 完成路由，但 wrapper 在启动 rustc/sccache 前移除这两个仅用于目录选择的变量，避免每个隔离分区人为制造不同缓存键。其他会影响编译结果的 Cargo 环境变量不会被移除。
+sccache 会把所有 `CARGO_*` 环境变量计入 Rust 缓存键。平台用当前 Rust toolchain 生成原生 `platform/rustc-sccache-wrapper.exe`：Cargo 仍先读取真实的 `CARGO_BUILD_BUILD_DIR` / `CARGO_TARGET_DIR` 完成路由，但 wrapper 在启动 rustc/sccache 前移除这两个仅用于目录选择的变量，避免每个隔离分区人为制造不同缓存键。其他会影响编译结果的 Cargo 环境变量不会被移除。这里必须使用原生可执行文件，不能使用 `.cmd`，否则大型 Windows crate 的 rustc 参数会撞上批处理命令行长度上限。
 
 ## 旧缓存迁移
 

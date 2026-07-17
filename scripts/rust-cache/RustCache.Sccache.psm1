@@ -14,7 +14,7 @@ function Get-RustCacheSccacheConfigPath {
 
 function Get-RustCacheSccacheWrapperPath {
     param([Parameter(Mandatory)][string]$CacheRoot)
-    Join-Path $CacheRoot "platform\rustc-sccache-wrapper.cmd"
+    Join-Path $CacheRoot "platform\rustc-sccache-wrapper.exe"
 }
 
 function Get-RustCacheSccacheBaseDirectories {

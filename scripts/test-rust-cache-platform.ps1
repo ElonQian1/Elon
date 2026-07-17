@@ -135,9 +135,11 @@ retry = 3
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path
     Assert-True ($include -match 'build-dir = .*quarantine/.+workspace-path-hash') "fallback Cargo route should use workspace quarantine"
     Assert-True ($include -match [regex]::Escape($install.sccache_wrapper_path.Replace('\', '/'))) "Cargo include should select the managed sccache wrapper"
-    $sccacheWrapper = Get-Content -Raw -LiteralPath $install.sccache_wrapper_path
-    Assert-True ($sccacheWrapper -match 'set "CARGO_BUILD_BUILD_DIR="' -and $sccacheWrapper -match 'set "CARGO_TARGET_DIR="') "sccache wrapper should remove Cargo-only routing variables"
-    Assert-True ($sccacheWrapper -match 'SCCACHE_CONF=' -and $sccacheWrapper -match 'sccache\.exe" %\*') "sccache wrapper should pin managed configuration and forward compiler arguments"
+    $wrapperHeader = [System.IO.File]::ReadAllBytes($install.sccache_wrapper_path)
+    Assert-True ($wrapperHeader.Length -gt 2 -and $wrapperHeader[0] -eq 0x4d -and $wrapperHeader[1] -eq 0x5a) "sccache wrapper should be a native Windows executable"
+    $wrapperSource = Get-Content -Raw -LiteralPath (Join-Path $ModulesRoot "native\rustc_sccache_wrapper.rs")
+    Assert-True ($wrapperSource -match 'env_remove\("CARGO_BUILD_BUILD_DIR"\)' -and $wrapperSource -match 'env_remove\("CARGO_TARGET_DIR"\)') "sccache wrapper should remove Cargo-only routing variables"
+    Assert-True ($wrapperSource -match '\.args\(args\)' -and $wrapperSource -match 'SCCACHE_CONF') "sccache wrapper should pin managed configuration and forward compiler arguments"
     $bashAdapter = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot "cargo-dev.sh")
     Assert-True ($bashAdapter -match 'powershell\.exe' -and $bashAdapter -match 'ps_script=.*cargo-dev\.ps1') "Git Bash should delegate to the PowerShell cache platform on Windows"
     Assert-True ($bashAdapter -notmatch 'ELON_DEV_CARGO_TARGET_DIR') "Git Bash must not route back to the retired shared target"
