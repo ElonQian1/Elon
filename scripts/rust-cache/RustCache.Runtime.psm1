@@ -191,6 +191,22 @@ function Restore-RustCacheEnvironment {
     }
 }
 
+function Get-RustCacheSccacheBaseDirs {
+    param(
+        [Parameter(Mandatory)][string]$ProjectRoot,
+        [Parameter(Mandatory)][string]$WorkspaceRoot
+    )
+
+    $paths = New-Object System.Collections.Generic.List[string]
+    foreach ($candidate in @($WorkspaceRoot, $ProjectRoot)) {
+        $fullPath = [System.IO.Path]::GetFullPath($candidate).TrimEnd('\', '/')
+        if (-not ($paths | Where-Object { $_ -ieq $fullPath })) {
+            $paths.Add($fullPath)
+        }
+    }
+    return $paths -join [System.IO.Path]::PathSeparator
+}
+
 function Set-RustCacheBuildEnvironment {
     param(
         [Parameter(Mandatory)][string]$ProjectRoot,
@@ -219,7 +235,7 @@ function Set-RustCacheBuildEnvironment {
             $env:RUSTC_WRAPPER = $sccache.Source
         }
         if ([string]::IsNullOrWhiteSpace($env:SCCACHE_BASEDIRS)) {
-            $env:SCCACHE_BASEDIRS = Split-Path $context.project_root -Parent
+            $env:SCCACHE_BASEDIRS = Get-RustCacheSccacheBaseDirs -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root
         }
     }
     $marker = [ordered]@{
@@ -281,4 +297,4 @@ function Invoke-RustCacheCargo {
     }
 }
 
-Export-ModuleMember -Function Resolve-RustCacheWorkspaceRoot, Test-RustCacheReleaseInvocation, Resolve-RustCacheInvocation, Get-RustCacheLockOwner, Test-RustCacheOwnerProcessAlive, Enter-RustCacheLock, Exit-RustCacheLock, Set-RustCacheBuildEnvironment, Invoke-RustCacheCargo
+Export-ModuleMember -Function Resolve-RustCacheWorkspaceRoot, Test-RustCacheReleaseInvocation, Resolve-RustCacheInvocation, Get-RustCacheLockOwner, Test-RustCacheOwnerProcessAlive, Enter-RustCacheLock, Exit-RustCacheLock, Get-RustCacheSccacheBaseDirs, Set-RustCacheBuildEnvironment, Invoke-RustCacheCargo
