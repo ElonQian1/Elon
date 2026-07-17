@@ -147,7 +147,7 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
       {unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{unboundLabel}”，但它还没有匹配到 Android 节点；可继续操作页面，或让 AI 建立跨端绑定。</div>}
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>
         <div className={styles.pwaDraftBadge}>真实 PWA 页面 · Android 最终校准</div>
-        <iframe key={reloadKey} ref={iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url)} title="移动 PWA 交互草稿" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} onLoad={() => setReady(false)} />
+        <iframe key={reloadKey} ref={iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url)} title="移动 PWA 交互草稿" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} />
       </div>
     </div>
   )
