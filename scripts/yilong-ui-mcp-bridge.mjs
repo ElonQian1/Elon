@@ -269,7 +269,7 @@ function localInitialize(id) {
       capabilities: { tools: { listChanged: true } },
       serverInfo: { name: 'yilong-ui-bootstrap', version: '1.1.0' },
       instructions:
-        '一龙 UI 节点当前未连接。先调用 ui_bridge_reconnect；连接后客户端会刷新完整工具列表。若客户端未刷新，使用 ui_bridge_proxy 调用 ui_check_capabilities、ui_report_capability_gap 和其他 yilong_ui_live 工具。不要静默退化为全仓搜索或手工 ADB。',
+        '一龙 UI 节点当前未连接。先调用 ui_bridge_reconnect；连接后客户端会刷新完整工具列表。若客户端未刷新，使用 ui_bridge_proxy 调用 ui_check_capabilities、ui_report_capability_gap 和其他 yilong_ui_live 工具。若客户端连 bridge 工具也不可调用，只能使用 UTF-8 arguments file 配合 scripts/call-yilong-ui-mcp.mjs；禁止经 Windows PowerShell 5.1 文本管道传 JSON。不要静默退化为全仓搜索或手工 ADB。',
     },
   }
 }

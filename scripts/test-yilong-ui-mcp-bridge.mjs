@@ -10,6 +10,7 @@ import readline from 'node:readline'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 const bridgePath = path.join(repoRoot, 'scripts', 'yilong-ui-mcp-bridge.mjs')
+const oneShotPath = path.join(repoRoot, 'scripts', 'call-yilong-ui-mcp.mjs')
 const tempRoot = await mkdtemp(path.join(os.tmpdir(), 'yilong-ui-bridge-test-'))
 const bridges = []
 let server
@@ -86,17 +87,72 @@ try {
   assert.equal(proxied.result.structuredContent.tool, 'ui_check_capabilities')
   assert.equal(proxied.result.structuredContent.arguments.taskId, 'task_1')
 
+  const unicodeArgumentsPath = path.join(tempRoot, '中文参数.json')
+  const unicodeArguments = {
+    request: '首页顶部栏与聊天页对齐',
+    attachments: [{ displayName: '当前批注截图', intent: 'ANNOTATED_CHANGE_REQUEST' }],
+  }
+  await writeFile(unicodeArgumentsPath, `\uFEFF${JSON.stringify(unicodeArguments)}`, 'utf8')
+  const oneShot = await runOneShot(adminUrl, unicodeArgumentsPath)
+  assert.equal(oneShot.tool, 'ui_import_desktop_task')
+  assert.deepEqual(oneShot.arguments, unicodeArguments)
+
   const scannedClient = startBridge('', port)
   bridges.push(scannedClient.child)
   scannedClient.send({ jsonrpc: '2.0', id: 7, method: 'initialize', params: {} })
   const scannedInitialize = await scannedClient.next((message) => message.id === 7)
   assert.equal(scannedInitialize.result.serverInfo.name, 'fake-yilong-ui-live')
 
-  process.stdout.write('PASS: offline bootstrap, port discovery, runtime recovery, tool refresh, and proxy fallback\n')
+  process.stdout.write(
+    'PASS: offline bootstrap, port discovery, runtime recovery, tool refresh, proxy fallback, and UTF-8 one-shot calls\n',
+  )
 } finally {
   for (const bridge of bridges) if (!bridge.killed) bridge.kill()
   if (server) await close(server)
   await rm(tempRoot, { recursive: true, force: true })
+}
+
+function runOneShot(adminUrl, argumentsPath) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      process.execPath,
+      [
+        oneShotPath,
+        '--name',
+        'ui_import_desktop_task',
+        '--arguments-file',
+        argumentsPath,
+        '--workspace-root',
+        repoRoot,
+        '--timeout-ms',
+        '5000',
+      ],
+      {
+        cwd: repoRoot,
+        env: {
+          ...process.env,
+          ELON_NODE_ADMIN_URL: adminUrl,
+          ELON_UI_MCP_AUTOSTART: '0',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    )
+    const stdout = []
+    const stderr = []
+    child.stdout.on('data', (chunk) => stdout.push(chunk))
+    child.stderr.on('data', (chunk) => stderr.push(chunk))
+    child.once('error', reject)
+    child.once('exit', (code) => {
+      const output = Buffer.concat(stdout).toString('utf8').trim()
+      const error = Buffer.concat(stderr).toString('utf8').trim()
+      if (code !== 0) return reject(new Error(`one-shot exited ${code}: ${error}`))
+      try {
+        resolve(JSON.parse(output))
+      } catch (parseError) {
+        reject(new Error(`invalid one-shot JSON: ${output}; ${parseError}`))
+      }
+    })
+  })
 }
 
 function startBridge(adminUrl, scanPort = null) {
