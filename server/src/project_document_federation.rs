@@ -27,6 +27,10 @@ pub(crate) struct KnowledgeNode {
     #[serde(default)]
     pub owner: String,
     #[serde(default)]
+    pub include_globs: Vec<String>,
+    #[serde(default)]
+    pub exclude_globs: Vec<String>,
+    #[serde(default)]
     pub home: DocumentKnowledgeHome,
 }
 
@@ -55,6 +59,8 @@ pub(crate) struct KnowledgeNodeHealth {
     pub scope_path: String,
     pub profile: String,
     pub owner: String,
+    pub include_globs: Vec<String>,
+    pub exclude_globs: Vec<String>,
     pub document_count: usize,
     pub direct_children: usize,
     pub score: u8,
@@ -91,7 +97,7 @@ pub(crate) fn analyze_federation(
         });
     let mut health = Vec::new();
     for node in &nodes {
-        let scoped = documents_for_scope(documents, &node.scope_path);
+        let scoped = documents_for_scope(documents, node);
         let mut node_manifest = root_manifest.clone();
         if !node.profile.is_empty() && node.profile != "auto" {
             node_manifest.profile = node.profile.clone();
@@ -107,6 +113,8 @@ pub(crate) fn analyze_federation(
             scope_path: node.scope_path.clone(),
             profile: architecture.profile,
             owner: node.owner.clone(),
+            include_globs: node.include_globs.clone(),
+            exclude_globs: node.exclude_globs.clone(),
             document_count: scoped.len(),
             direct_children: child_counts.get(&node.id).copied().unwrap_or_default(),
             score: architecture.score,
@@ -114,12 +122,20 @@ pub(crate) fn analyze_federation(
             home_configured: architecture.home_configured,
         });
     }
-    let total_documents = health.iter().map(|node| node.document_count).sum::<usize>();
+    let scoring_nodes = health
+        .iter()
+        .filter(|node| node.direct_children == 0)
+        .collect::<Vec<_>>();
+    let total_documents = scoring_nodes
+        .iter()
+        .map(|node| node.document_count)
+        .sum::<usize>();
     let aggregated_score = if total_documents == 0 {
         100
     } else {
         (health
             .iter()
+            .filter(|node| node.direct_children == 0)
             .map(|node| usize::from(node.score) * node.document_count)
             .sum::<usize>()
             / total_documents) as u8
@@ -162,7 +178,14 @@ pub(crate) fn documents_for_node<'a>(
         .ok_or_else(|| anyhow::anyhow!("未知知识节点：{scope_id}"))?;
     Ok(documents
         .iter()
-        .filter(|document| in_scope(&document.path, &node.scope_path))
+        .filter(|document| {
+            path_matches_scope(
+                &document.path,
+                &node.scope_path,
+                &node.include_globs,
+                &node.exclude_globs,
+            )
+        })
         .collect())
 }
 
@@ -250,6 +273,8 @@ fn normalized_nodes(mut nodes: Vec<KnowledgeNode>) -> Result<Vec<KnowledgeNode>>
         node.scope_path = normalize(&node.scope_path).trim_matches('/').to_string();
         node.label = node.label.trim().chars().take(80).collect();
         node.owner = node.owner.trim().chars().take(80).collect();
+        node.include_globs = normalize_globs(std::mem::take(&mut node.include_globs));
+        node.exclude_globs = normalize_globs(std::mem::take(&mut node.exclude_globs));
         if node.label.is_empty() {
             bail!("联邦知识节点必须包含 label");
         }
@@ -291,19 +316,89 @@ fn node_depth(node: &KnowledgeNode, nodes: &[KnowledgeNode]) -> usize {
 
 fn documents_for_scope(
     documents: &[ProjectDocumentEntry],
-    scope: &str,
+    node: &KnowledgeNode,
 ) -> Vec<ProjectDocumentEntry> {
     documents
         .iter()
-        .filter(|document| in_scope(&document.path, scope))
+        .filter(|document| {
+            path_matches_scope(
+                &document.path,
+                &node.scope_path,
+                &node.include_globs,
+                &node.exclude_globs,
+            )
+        })
         .cloned()
         .collect()
 }
 
-fn in_scope(path: &str, scope: &str) -> bool {
+pub(crate) fn path_matches_scope(
+    path: &str,
+    scope: &str,
+    includes: &[String],
+    excludes: &[String],
+) -> bool {
     let path = normalize(path).to_ascii_lowercase();
     let scope = normalize(scope).trim_matches('/').to_ascii_lowercase();
-    scope.is_empty() || path == scope || path.starts_with(&format!("{scope}/"))
+    let scoped = scope.is_empty() || path == scope || path.starts_with(&format!("{scope}/"));
+    let explicit = includes
+        .iter()
+        .any(|pattern| wildcard_match(pattern, &path));
+    let included = if includes.is_empty() {
+        scoped
+    } else if scope.is_empty() {
+        explicit
+    } else {
+        scoped || explicit
+    };
+    included
+        && !excludes
+            .iter()
+            .any(|pattern| wildcard_match(pattern, &path))
+}
+
+pub(crate) fn health_node_matches_path(node: &KnowledgeNodeHealth, path: &str) -> bool {
+    path_matches_scope(
+        path,
+        &node.scope_path,
+        &node.include_globs,
+        &node.exclude_globs,
+    )
+}
+
+fn normalize_globs(values: Vec<String>) -> Vec<String> {
+    let mut output = values
+        .into_iter()
+        .take(32)
+        .map(|value| normalize(&value).trim().to_ascii_lowercase())
+        .filter(|value| !value.is_empty() && value.len() <= 240 && !value.contains(".."))
+        .collect::<Vec<_>>();
+    output.sort();
+    output.dedup();
+    output
+}
+
+fn wildcard_match(pattern: &str, value: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let value = value.as_bytes();
+    let mut previous = vec![false; value.len() + 1];
+    previous[0] = true;
+    for token in pattern {
+        let mut current = vec![false; value.len() + 1];
+        if *token == b'*' {
+            current[0] = previous[0];
+            for index in 1..=value.len() {
+                current[index] = current[index - 1] || previous[index];
+            }
+        } else {
+            for index in 1..=value.len() {
+                current[index] = previous[index - 1]
+                    && (*token == b'?' || token.eq_ignore_ascii_case(&value[index - 1]));
+            }
+        }
+        previous = current;
+    }
+    previous[value.len()]
 }
 
 fn module_marker(workspace: &Path, scope: &str) -> bool {

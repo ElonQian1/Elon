@@ -1,6 +1,6 @@
 # 项目文档治理 MCP
 
-最后更新：2026-07-17
+最后更新：2026-07-18
 
 本文是接入或诊断项目文档治理 MCP 时才读取的按需手册。日常文档任务先遵循 `.github/instructions/document-authority.instructions.md`，不要把本文复制到 Codex、Claude、Gemini 或 Copilot 的私有桥接文件。
 
@@ -8,12 +8,12 @@
 
 - Git 工作区中的 Markdown 和路径是内容真源。
 - 路径决定文档权威性上限；正文只能降低自身生命周期，不能越过路径上限。
-- PC 网页端“知识架构”按项目主题浏览，“治理视图”根据 `role`、`lifecycle`、`authority` 和 `ambiguous` 判断权威性；两者是正交维度。
+- PC 网页端“知识架构”按业务主题浏览；一个文档有一个主主题和最多 12 个副主题。治理总览把 `retrieval`、`lifecycle`、`authority`、`document_type` 四个维度分开保存和交叉筛选，旧的单选治理分区只是兼容快捷投影。
 - PC 网页端“项目图谱”包含三张正交视图：产品功能图回答“用户能做什么”，技术架构图回答“系统怎样实现”，文档主题图回答“文档讲什么”。治理视图继续单独回答“能否作为当前事实”。网页和 MCP 都消费 Rust 后端生成的同一图谱，前端不再从主题树自行猜测功能。
-- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主题固定项、治理覆盖、文档关系、`knowledge_graph` 节点/关系/文档引用/实现证据和最近 100 条结构操作审计，不移动实际文件、不复制 Markdown 正文。`assignments` 与 `governance_overrides` 分开，避免设置主题时覆盖权威性状态。
+- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主主题 `assignments`、副主题 `secondary_assignments`、四维 `governance_facets`、兼容 `governance_overrides`、有类型的文档语义关系、`knowledge_graph` 节点/关系/文档引用/实现证据和最近 100 条结构操作审计，不移动实际文件、不复制 Markdown 正文。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
-- `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块”的知识节点；每个节点有独立范围、owner、项目类型和健康度，最多 256 个节点、六层。
+- `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块”的知识节点；每个节点可用 `scope_path` 表示主目录、`include_globs` 纳入目录外的模块文档、`exclude_globs` 排除局部材料，并有独立 owner、项目类型、知识首页和健康度，最多 256 个节点、六层。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
 
 因此同一份项目可以在网页端按 OneNote 分区浏览，同时保留适合 Git、IDE 和所有 AI 供应商读取的普通目录结构。
@@ -64,7 +64,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 - 自动治理分区、知识架构健康度、用户覆盖和现有建议；
 - 全量读取估算、默认读取估算和预计避免 token。
 
-`classification_model_tokens` 固定为 `0`，表示预分类没有调用模型，不表示后续 AI 判断不消耗 token。`document_health` 是服务端统一真源，包含 `architecture`、`quality`、`maintenance` 和 `federation`；PC 网页端与 MCP 不再各算一套分数。
+`classification_model_tokens` 固定为 `0`，表示预分类没有调用模型，不表示后续 AI 判断不消耗 token。`document_health` 是服务端统一真源，包含 `architecture`、`quality`、`maintenance`、`federation` 和 `governance_workflow`；后者提供问题状态、负责人、期限、筛选项、健康趋势和评分组成。PC 网页端与 MCP 不再各算一套分数。
 
 目录索引保存到工作区外的 SQLite，不污染项目 Git。文件大小和修改时间未变化时复用目录与质量事实；创建、修改、删除形成持久事件。已访问工作区每 60 秒后台重扫，并异步复查外链。
 
@@ -84,9 +84,13 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 根据自然语言任务或 `node_id`，在 `max_tokens` 与 `max_documents` 预算内返回推荐阅读顺序、权威元数据和估算 token。它不返回正文；AI 只有在目录、图谱和标题层级仍不足以判断时，才对计划中的少量路径调用 `project_docs_read`。
 
-### `project_docs_get_issues`
+### `project_docs_get_issues` / `project_docs_update_issue` / `project_docs_get_health_history`
 
-分页读取确定性质量问题及最小证据，可按类型筛选。当前覆盖本地链接/标题锚点、缓存的外部链接、孤立文档、缺少 owner、缺少复查日期、复查逾期、显式 `implementation_refs` 不存在或实现晚于复查日期。孤立判断同时识别 Markdown 链接和反引号路径引用；Agent、Prompt、Skill 等按任务加载的定制资产不强制进入项目知识地图。程序先定位证据，只有需要语义判断时才让 AI 按需读取正文和源码。
+`project_docs_get_issues` 分页读取确定性质量问题及最小证据，可按类型、严重度、处理状态和负责人筛选。当前覆盖本地链接/标题锚点、缓存的外部链接、孤立文档、缺少 owner、缺少复查日期、复查逾期、显式 `implementation_refs` 不存在或实现晚于复查日期。孤立判断同时识别 Markdown 链接和反引号路径引用；Agent、Prompt、Skill 等按任务加载的定制资产不强制进入项目知识地图。
+
+`project_docs_update_issue` 把问题设为 `open`、`assigned`、`snoozed`、`ignored` 或 `resolved`。分派必须填写 owner；忽略和延期必须填写 reason；延期还必须填写 `snoozed_until`。恢复日期到期后自动回到待处理。状态保存在工作区外的 SQLite，不污染 Git，但会在下一次分析时与当前问题 fingerprint 对齐。
+
+`project_docs_get_health_history` 返回最近 365 个有变化的健康快照。总分公式和每个组件的权重、得分、贡献都随分析返回，避免用户只看到一个不可解释分数。AI 处理健康问题时应让用户选中明确问题，再把 fingerprint 作为范围，不扩张为全库改写。
 
 ### `project_docs_get_status`
 
@@ -147,9 +151,9 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 AI 只能执行建议文件中列出的 operation id，不能借文档整理修改代码或 push。修改正文、批量修复引用、归档和删除尚未进入低 token 分类操作 schema；未来即使开放，也必须纳入同一整理前/后 Git 事务。
 
-### `project_docs_get_history` / `project_docs_restore_version`
+### `project_docs_get_history` / `project_docs_get_version_diff` / `project_docs_restore_version`
 
-仅用于平台托管知识库。前者最多返回 100 个自动 Git 版本；后者只能恢复当前历史中的祖先提交，并把恢复动作写成一个新的提交，因此恢复本身也可撤销。普通项目使用其自己的 Git 工作流，不开放这两个托管库工具。
+这组工具同时支持普通 Git 项目和平台托管知识库。历史最多返回 100 个与 Markdown 或 `.elon` 清单相关的提交；差异最多返回 60000 字符，并只展示文档路径。托管知识库可恢复任意当前祖先快照；普通项目只有“完全由文档组成、不是 merge、工作区 clean”的祖先提交可一键恢复。恢复始终创建新提交，不重写历史；混合代码提交明确拒绝，防止文档回滚夹带代码回退。
 
 ## 4. 网页端共享逻辑
 
@@ -163,7 +167,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 本机路线还通过 loopback 管理端点创建并轮询整理运行。页面展示从建议生成、虚拟分区应用到实体文件应用的每个 MCP 阶段、token、revision 和失败恢复建议；发起整理后停留在文档工作台。页面按项目保存三档权限，默认选中“AI 自动整理（可信且可恢复）”。实体操作通过 `/api/project-docs/organization/apply-files` 交给本机节点在 canonical Git 工作区执行相同 Rust 安全门禁。
 
-知识首页允许用户固定项目模板。“文档健康”分区展示服务端统一的结构分、质量问题、维护事件和联邦节点；“AI 整理建议”分区继续只展示建议及应用状态。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义；命令包含新建父/子分区、重命名与外观、改变父级、同级拖放或置顶/上移/下移/置底、合并、设置入口、批量主题/治理归类、固定、推荐和 AI 定向整理。
+知识首页允许用户固定项目模板。治理模式先进入“治理总览”，可按四个维度交叉筛选并编辑副主题；旧的必须/按需/当前等分区保留为快捷视图。“文档健康”分区展示服务端统一的结构分、质量问题、维护事件和联邦节点，并允许筛选、分派、设期限、填写忽略/延期原因、选择问题让 AI 定向建议、查看趋势、评分解释、版本差异和安全恢复；“AI 整理建议”分区继续只展示建议及应用状态。右键、每项 `⋯`、键盘 `Shift+F10` 和触摸长按调用同一套命令定义，不建立桌面端专属语义。
 
 项目图谱使用确定性树/关系布局，顶部切换产品功能、技术架构和文档主题。默认只展开一级以保持节点可读，支持展开/折叠、缩放/平移、缩略图、节点/文档/实现证据搜索和文档覆盖筛选。详情区把“Markdown 覆盖”和“实现证据”分开显示；`topics` 节点可回到对应 OneNote 分区。图级“与 AI 评审此图”和节点级“与 AI 讨论此节点”会在同一整理任务中要求代理直接调用图谱 MCP，并把确认有价值的变更写入 `proposed_knowledge_graph`，不靠页面点击，也不为凑指标生成重复文档。
 
@@ -183,7 +187,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：元数据目录不泄露正文、功能/架构/主题分离、图谱层级循环和无效关系拒绝、局部图与 token 阅读计划、增量索引和事件去重、链接/孤立/owner/复查/实现证据、联邦范围、托管 Git 自动版本和恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。
+Rust 单元测试覆盖：元数据目录不泄露正文、多维治理与副主题、功能/架构/主题分离、图谱层级循环和无效关系拒绝、局部图与 token 阅读计划、增量索引和事件去重、链接/孤立/owner/复查/实现证据、问题处理状态与趋势、联邦 glob 范围、普通项目和托管库的版本差异/恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。
 
 发布前至少运行：
 

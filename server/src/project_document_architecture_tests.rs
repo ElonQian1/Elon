@@ -83,7 +83,13 @@ fn repository_self_project_is_scanned_with_zero_model_tokens() {
     assert_eq!(health["topic_unassigned_documents"], 0);
     assert!(health["score"].as_u64().unwrap() >= 85);
     assert_eq!(analysis["document_health"]["source"], "server");
-    assert_eq!(analysis["document_health"]["federation"]["node_count"], 5);
+    assert_eq!(analysis["document_health"]["federation"]["node_count"], 11);
+    assert!(
+        analysis["document_health"]["federation"]["max_depth"]
+            .as_u64()
+            .unwrap()
+            >= 2
+    );
     assert_eq!(
         analysis["document_health"]["maintenance"]["durable_queue"],
         true

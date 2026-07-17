@@ -55,6 +55,32 @@ fn cyclic_nodes_are_rejected() {
     assert!(normalized_nodes(nodes).is_err());
 }
 
+#[test]
+fn include_globs_support_docs_outside_a_modules_primary_scope() {
+    let node = KnowledgeNode {
+        id: "server".to_string(),
+        label: "Server".to_string(),
+        scope_path: "server".to_string(),
+        include_globs: vec!["docs/server-*.md".to_string()],
+        exclude_globs: vec!["docs/server-secret.md".to_string()],
+        ..KnowledgeNode::default()
+    };
+    let documents = vec![
+        entry("server/README.md"),
+        entry("docs/server-api.md"),
+        entry("docs/server-secret.md"),
+        entry("docs/client.md"),
+    ];
+    let scoped = documents_for_scope(&documents, &node);
+    assert_eq!(scoped.len(), 2);
+    assert!(scoped
+        .iter()
+        .any(|document| document.path == "server/README.md"));
+    assert!(scoped
+        .iter()
+        .any(|document| document.path == "docs/server-api.md"));
+}
+
 fn entry(path: &str) -> ProjectDocumentEntry {
     ProjectDocumentEntry {
         path: path.to_string(),

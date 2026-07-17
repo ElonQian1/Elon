@@ -338,7 +338,8 @@ fn suggestions_schema() -> Value {
                     "properties":{
                         "path":{"type":"string"},
                         "section_id":{"type":"string","maxLength":64},
-                        "reason":{"type":"string","maxLength":500}
+                        "reason":{"type":"string","maxLength":500},
+                        "secondary":{"type":"boolean","default":false,"description":"true 表示副主题；false 表示唯一主主题"}
                     }
                 }
             },
@@ -349,6 +350,17 @@ fn suggestions_schema() -> Value {
             "document_metadata":{
                 "type":"object","maxProperties":500,
                 "additionalProperties":knowledge_metadata_schema()
+            },
+            "governance_facets":{
+                "type":"object","maxProperties":500,
+                "additionalProperties":{
+                    "type":"object","properties":{
+                        "retrieval":{"type":"string","enum":["required","on_demand","excluded"]},
+                        "lifecycle":{"type":"string","enum":["active","accepted","draft","deprecated","superseded","archived","unclassified"]},
+                        "authority":{"type":"string","enum":["binding","authoritative","guidance","evidence","proposal","non_authoritative","unknown"]},
+                        "document_type":{"type":"string","maxLength":64}
+                    }
+                }
             },
             "file_operations":{
                 "type":"array","maxItems":100,
@@ -399,7 +411,11 @@ fn knowledge_metadata_schema() -> Value {
             "implementation_refs":{"type":"array","maxItems":32,"items":{"type":"string","maxLength":500}},
             "version":{"type":"string","maxLength":40},
             "related":{"type":"array","maxItems":24,"items":{"type":"string"}},
-            "supersedes":{"type":"array","maxItems":24,"items":{"type":"string"}}
+            "supersedes":{"type":"array","maxItems":24,"items":{"type":"string"}},
+            "relations":{"type":"array","maxItems":48,"items":{"type":"object","required":["relation","target"],"properties":{
+                "relation":{"type":"string","enum":["related","supports","depends_on","implements","evidence_for","supersedes","replaced_by","see_also"]},
+                "target":{"type":"string"}
+            }}}
         }
     })
 }

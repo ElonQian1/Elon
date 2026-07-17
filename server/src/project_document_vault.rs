@@ -151,7 +151,7 @@ fn create_vault(workspace: &Path, vault_id: &str) -> Result<()> {
     )?;
     fs::write(
         workspace.join(".elon/document-sections.json"),
-        "{\n  \"version\": 1,\n  \"profile\": \"personal-knowledge\",\n  \"home\": {\n    \"title\": \"我的知识库\",\n    \"summary\": \"由一龙持续维护并自动保存历史版本的个人知识库。\",\n    \"entrypoint\": \"README.md\",\n    \"start_here\": [\"README.md\"]\n  },\n  \"sections\": [],\n  \"assignments\": {},\n  \"governance_overrides\": {},\n  \"document_metadata\": {},\n  \"audit_log\": []\n}\n",
+        "{\n  \"version\": 1,\n  \"profile\": \"personal-knowledge\",\n  \"home\": {\n    \"title\": \"我的知识库\",\n    \"summary\": \"由一龙持续维护并自动保存历史版本的个人知识库。\",\n    \"entrypoint\": \"README.md\",\n    \"start_here\": [\"README.md\"]\n  },\n  \"sections\": [],\n  \"assignments\": {},\n  \"secondary_assignments\": {},\n  \"governance_facets\": {},\n  \"governance_overrides\": {},\n  \"document_metadata\": {},\n  \"audit_log\": []\n}\n",
     )?;
     git(workspace, &["add", "-A", "--", "."])?;
     git(

@@ -11,6 +11,13 @@ use crate::project_document_file_operation_model::{
 pub(crate) use crate::project_document_file_operation_model::{
     SuggestedFileOperation, SuggestedFileOperationKind, SuggestedFileOperationStatus,
 };
+use crate::project_document_governance_facets::{
+    effective_facets, normalize_governance_facets, normalize_secondary_assignments, quick_view,
+    sanitize_knowledge_metadata,
+};
+pub(crate) use crate::project_document_governance_facets::{
+    DocumentGovernanceFacets, DocumentKnowledgeMetadata,
+};
 use crate::project_document_knowledge_graph_model::{
     merge_graph_config, normalize_graph_config, validate_graph_document_paths,
     ProjectKnowledgeGraphConfig,
@@ -64,56 +71,6 @@ pub(crate) struct DocumentKnowledgeHome {
     pub start_here: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(crate) struct DocumentKnowledgeMetadata {
-    #[serde(default)]
-    pub id: String,
-    #[serde(default)]
-    pub doc_type: String,
-    #[serde(default)]
-    pub audience: Vec<String>,
-    #[serde(default)]
-    pub owner: String,
-    #[serde(default)]
-    pub owners: Vec<String>,
-    #[serde(default)]
-    pub reviewed_at: String,
-    #[serde(default = "default_review_interval_days")]
-    pub review_interval_days: u16,
-    #[serde(default)]
-    pub implementation_refs: Vec<String>,
-    #[serde(default)]
-    pub version: String,
-    #[serde(default)]
-    pub related: Vec<String>,
-    #[serde(default)]
-    pub supersedes: Vec<String>,
-    #[serde(default)]
-    pub order: i32,
-    #[serde(default)]
-    pub pinned: bool,
-}
-
-impl Default for DocumentKnowledgeMetadata {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            doc_type: String::new(),
-            audience: Vec::new(),
-            owner: String::new(),
-            owners: Vec::new(),
-            reviewed_at: String::new(),
-            review_interval_days: default_review_interval_days(),
-            implementation_refs: Vec::new(),
-            version: String::new(),
-            related: Vec::new(),
-            supersedes: Vec::new(),
-            order: 0,
-            pinned: false,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct DocumentOrganizationAuditEntry {
     #[serde(default)]
@@ -141,7 +98,11 @@ pub(crate) struct DocumentSectionManifest {
     #[serde(default)]
     pub assignments: BTreeMap<String, String>,
     #[serde(default)]
+    pub secondary_assignments: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
     pub governance_overrides: BTreeMap<String, String>,
+    #[serde(default)]
+    pub governance_facets: BTreeMap<String, DocumentGovernanceFacets>,
     #[serde(default)]
     pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
     #[serde(default)]
@@ -158,7 +119,9 @@ impl Default for DocumentSectionManifest {
             home: DocumentKnowledgeHome::default(),
             sections: Vec::new(),
             assignments: BTreeMap::new(),
+            secondary_assignments: BTreeMap::new(),
             governance_overrides: BTreeMap::new(),
+            governance_facets: BTreeMap::new(),
             document_metadata: BTreeMap::new(),
             audit_log: Vec::new(),
             knowledge_graph: ProjectKnowledgeGraphConfig::default(),
@@ -172,6 +135,8 @@ pub(crate) struct SuggestedAssignment {
     pub section_id: String,
     #[serde(default)]
     pub reason: String,
+    #[serde(default)]
+    pub secondary: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -215,6 +180,8 @@ pub(crate) struct DocumentOrganizationSuggestions {
     #[serde(default)]
     pub document_metadata: BTreeMap<String, DocumentKnowledgeMetadata>,
     #[serde(default)]
+    pub governance_facets: BTreeMap<String, DocumentGovernanceFacets>,
+    #[serde(default)]
     pub file_operations: Vec<SuggestedFileOperation>,
     #[serde(default)]
     pub proposed_knowledge_graph: ProjectKnowledgeGraphConfig,
@@ -257,7 +224,9 @@ pub(crate) fn normalize_manifest(
     }
     if manifest.sections.len() > 64
         || manifest.assignments.len() > 5_000
+        || manifest.secondary_assignments.len() > 5_000
         || manifest.governance_overrides.len() > 5_000
+        || manifest.governance_facets.len() > 5_000
         || manifest.document_metadata.len() > 5_000
         || manifest.audit_log.len() > 100
     {
@@ -296,7 +265,18 @@ pub(crate) fn normalize_manifest(
         }
     }
     manifest.assignments = assignments;
+    manifest.secondary_assignments =
+        normalize_secondary_assignments(manifest.secondary_assignments, &valid_keys)?;
+    for (path, topics) in &mut manifest.secondary_assignments {
+        if let Some(primary) = manifest.assignments.get(path) {
+            topics.retain(|topic| topic != primary);
+        }
+    }
+    manifest
+        .secondary_assignments
+        .retain(|_, topics| !topics.is_empty());
     manifest.governance_overrides = governance_overrides;
+    manifest.governance_facets = normalize_governance_facets(manifest.governance_facets)?;
     manifest.document_metadata = manifest
         .document_metadata
         .into_iter()
@@ -333,6 +313,7 @@ pub(crate) fn normalize_suggestions(
         || suggestions.architecture_findings.len() > 100
         || suggestions.missing_document_types.len() > 100
         || suggestions.document_metadata.len() > MAX_SUGGESTED_ASSIGNMENTS
+        || suggestions.governance_facets.len() > MAX_SUGGESTED_ASSIGNMENTS
         || suggestions.file_operations.len() > MAX_SUGGESTED_FILE_OPERATIONS
     {
         bail!("AI 文档整理建议超过安全上限");
@@ -351,6 +332,7 @@ pub(crate) fn normalize_suggestions(
                 path: normalize_document_path(&item.path)?,
                 section_id: truncate_chars(item.section_id.trim(), 64),
                 reason: truncate_chars(item.reason.trim(), 500),
+                secondary: item.secondary,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -370,6 +352,7 @@ pub(crate) fn normalize_suggestions(
             ))
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
+    suggestions.governance_facets = normalize_governance_facets(suggestions.governance_facets)?;
     suggestions.file_operations = normalize_file_operations(suggestions.file_operations)?;
     suggestions.proposed_knowledge_graph =
         normalize_graph_config(suggestions.proposed_knowledge_graph)?;
@@ -438,6 +421,9 @@ pub(crate) fn apply_suggestions(
     manifest
         .document_metadata
         .extend(suggestions.document_metadata.clone());
+    manifest
+        .governance_facets
+        .extend(suggestions.governance_facets.clone());
     manifest.knowledge_graph = merge_graph_config(
         manifest.knowledge_graph,
         suggestions.proposed_knowledge_graph.clone(),
@@ -451,20 +437,37 @@ pub(crate) fn apply_suggestions(
         if known_paths.contains(&assignment.path.to_ascii_lowercase())
             && valid_keys.contains(&section)
         {
-            if SYSTEM_SECTION_KEYS.contains(&section.as_str()) {
+            if assignment.secondary
+                && section.starts_with("custom:")
+                && manifest.assignments.get(&assignment.path) != Some(&section)
+            {
+                let topics = manifest
+                    .secondary_assignments
+                    .entry(assignment.path.clone())
+                    .or_default();
+                if !topics.contains(&section) {
+                    topics.push(section);
+                }
+            } else if SYSTEM_SECTION_KEYS.contains(&section.as_str()) {
                 manifest
                     .governance_overrides
                     .insert(assignment.path.clone(), section);
             } else {
                 manifest
                     .assignments
-                    .insert(assignment.path.clone(), section);
+                    .insert(assignment.path.clone(), section.clone());
+                if let Some(topics) = manifest.secondary_assignments.get_mut(&assignment.path) {
+                    topics.retain(|topic| topic != &section);
+                }
             }
             applied += 1;
         } else {
             skipped += 1;
         }
     }
+    manifest
+        .secondary_assignments
+        .retain(|_, topics| !topics.is_empty());
     suggestions.status = OrganizationStatus::Applied;
     Ok(ApplySuggestionsResult {
         manifest,
@@ -476,40 +479,7 @@ pub(crate) fn apply_suggestions(
 }
 
 pub(crate) fn automatic_section(document: &ProjectDocumentEntry) -> &'static str {
-    let metadata = &document.metadata;
-    if metadata.lifecycle == "archived" || metadata.role == "archive" {
-        "archive"
-    } else if matches!(metadata.role.as_str(), "policy" | "router") {
-        "required"
-    } else if matches!(
-        metadata.role.as_str(),
-        "agent_definition" | "prompt_template" | "skill"
-    ) {
-        "customizations"
-    } else if matches!(
-        metadata.role.as_str(),
-        "instruction" | "project_guide" | "provider_adapter" | "guide"
-    ) {
-        "on-demand"
-    } else if matches!(
-        metadata.role.as_str(),
-        "spec" | "architecture" | "requirement" | "runbook"
-    ) && metadata.lifecycle == "active"
-    {
-        "current"
-    } else if metadata.role == "decision" {
-        "decisions"
-    } else if matches!(metadata.role.as_str(), "status" | "report") {
-        "evidence"
-    } else if metadata.ambiguous || metadata.lifecycle == "unclassified" {
-        "unclassified"
-    } else if metadata.lifecycle == "draft"
-        || matches!(metadata.role.as_str(), "discussion" | "note")
-    {
-        "drafts"
-    } else {
-        "unclassified"
-    }
+    quick_view(&effective_facets(document, None))
 }
 
 pub(crate) fn effective_section(
@@ -624,43 +594,6 @@ fn sanitize_home(mut home: DocumentKnowledgeHome) -> Result<DocumentKnowledgeHom
     Ok(home)
 }
 
-fn sanitize_knowledge_metadata(
-    mut metadata: DocumentKnowledgeMetadata,
-) -> Result<DocumentKnowledgeMetadata> {
-    metadata.id = truncate_chars(metadata.id.trim(), 120);
-    metadata.doc_type = truncate_chars(metadata.doc_type.trim(), 64);
-    metadata.owner = truncate_chars(metadata.owner.trim(), 80);
-    metadata.owners = bounded_strings(metadata.owners, 12, 80);
-    metadata.reviewed_at = truncate_chars(metadata.reviewed_at.trim(), 10);
-    if !metadata.reviewed_at.is_empty()
-        && chrono::NaiveDate::parse_from_str(&metadata.reviewed_at, "%Y-%m-%d").is_err()
-    {
-        bail!("reviewed_at 必须使用 YYYY-MM-DD：{}", metadata.reviewed_at);
-    }
-    metadata.review_interval_days = metadata.review_interval_days.clamp(1, 3_650);
-    metadata.implementation_refs = bounded_strings(metadata.implementation_refs, 32, 500);
-    metadata.version = truncate_chars(metadata.version.trim(), 40);
-    metadata.audience = bounded_strings(metadata.audience, 12, 80);
-    metadata.related = metadata
-        .related
-        .into_iter()
-        .take(24)
-        .map(|path| normalize_document_path(&path))
-        .collect::<Result<Vec<_>>>()?;
-    metadata.supersedes = metadata
-        .supersedes
-        .into_iter()
-        .take(24)
-        .map(|path| normalize_document_path(&path))
-        .collect::<Result<Vec<_>>>()?;
-    metadata.related.sort();
-    metadata.related.dedup();
-    metadata.supersedes.sort();
-    metadata.supersedes.dedup();
-    metadata.order = metadata.order.clamp(0, 999_999);
-    Ok(metadata)
-}
-
 fn sanitize_audit_entry(
     mut entry: DocumentOrganizationAuditEntry,
 ) -> DocumentOrganizationAuditEntry {
@@ -693,9 +626,17 @@ fn validate_suggested_paths(
     }
     for (path, metadata) in &suggestions.document_metadata {
         validate(path)?;
-        for related in metadata.related.iter().chain(&metadata.supersedes) {
+        for related in metadata
+            .related
+            .iter()
+            .chain(&metadata.supersedes)
+            .chain(metadata.relations.iter().map(|relation| &relation.target))
+        {
             validate(related)?;
         }
+    }
+    for path in suggestions.governance_facets.keys() {
+        validate(path)?;
     }
     Ok(())
 }
@@ -771,10 +712,6 @@ fn truncate_chars(value: &str, limit: usize) -> String {
 
 fn schema_version() -> u8 {
     1
-}
-
-fn default_review_interval_days() -> u16 {
-    180
 }
 
 fn default_section_color() -> String {

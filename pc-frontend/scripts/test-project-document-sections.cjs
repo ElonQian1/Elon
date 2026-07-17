@@ -10,6 +10,13 @@ const graphModelOutput = ts.transpileModule(fs.readFileSync(graphModelPath, 'utf
 const graphModelLoaded = { exports: {} }
 new Function('module', 'exports', 'require', graphModelOutput)(graphModelLoaded, graphModelLoaded.exports, require)
 
+const governancePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentGovernance.ts')
+const governanceOutput = ts.transpileModule(fs.readFileSync(governancePath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const governanceLoaded = { exports: {} }
+new Function('module', 'exports', 'require', governanceOutput)(governanceLoaded, governanceLoaded.exports, require)
+
 const sourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentSections.ts')
 const source = fs.readFileSync(sourcePath, 'utf8')
 const output = ts.transpileModule(source, {
@@ -19,7 +26,11 @@ const loaded = { exports: {} }
 new Function('module', 'exports', 'require', output)(
   loaded,
   loaded.exports,
-  (request) => request === './projectDocumentKnowledgeGraphModel' ? graphModelLoaded.exports : require(request),
+  (request) => {
+    if (request === './projectDocumentKnowledgeGraphModel') return graphModelLoaded.exports
+    if (request === './projectDocumentGovernance') return governanceLoaded.exports
+    return require(request)
+  },
 )
 
 const {
@@ -56,8 +67,13 @@ function document(pathName, role, lifecycle = 'active', ambiguous = false) {
 
 const manifest = parseSectionManifest(JSON.stringify({
   version: 1,
-  sections: [{ id: 'research', label: '研究', detail: '研究笔记', color: '#123456' }],
+  sections: [
+    { id: 'research', label: '研究', detail: '研究笔记', color: '#123456' },
+    { id: 'operations', label: '运维', detail: '运行手册', color: '#456789' },
+  ],
   assignments: { 'docs/research.md': 'custom:research', 'docs/discussion.md': 'drafts' },
+  secondary_assignments: { 'docs/research.md': ['custom:operations', 'custom:research'] },
+  governance_facets: { 'docs/research.md': { retrieval: 'excluded', lifecycle: 'draft', authority: 'proposal', document_type: 'discussion' } },
   governance_overrides: { 'docs/unknown.md': 'on-demand' },
   document_metadata: { 'docs/research.md': { order: 7, pinned: true } },
   knowledge_graph: { nodes: [{
@@ -69,6 +85,8 @@ assert.equal(manifest.assignments['docs/research.md'], 'custom:research')
 assert.equal(manifest.assignments['docs/discussion.md'], undefined)
 assert.equal(manifest.governance_overrides['docs/discussion.md'], 'drafts', '旧清单的治理归类应自动迁移')
 assert.equal(manifest.governance_overrides['docs/unknown.md'], 'on-demand')
+assert.deepEqual(manifest.secondary_assignments['docs/research.md'], ['custom:operations'])
+assert.equal(manifest.governance_facets['docs/research.md'].authority, 'proposal')
 assert.equal(manifest.document_metadata['docs/research.md'].order, 7)
 assert.equal(manifest.document_metadata['docs/research.md'].pinned, true)
 assert.equal(manifest.audit_log[0].action, 'test')
@@ -100,6 +118,7 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
   summary: 'ok',
   proposed_sections: [{ id: 'api', label: 'API', detail: '接口', color: '#abcdef' }],
   assignments: [{ path: 'docs/unknown.md', section_id: 'custom:api', reason: '归类' }],
+  governance_facets: { 'docs/unknown.md': { retrieval: 'excluded', lifecycle: 'draft', authority: 'proposal', document_type: 'discussion' } },
   conflicts: [],
   move_suggestions: [],
   file_operations: [{
@@ -115,6 +134,8 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
 }))
 assert.equal(suggestions.status, 'ready')
 assert.equal(suggestions.assignments.length, 1)
+assert.equal(suggestions.assignments[0].secondary, false)
+assert.equal(suggestions.governance_facets['docs/unknown.md'].lifecycle, 'draft')
 assert.equal(suggestions.file_operations.length, 1)
 assert.equal(suggestions.file_operations[0].status, 'proposed')
 assert.equal(suggestions.proposed_knowledge_graph.nodes[0].id, 'cap-api')
@@ -149,6 +170,8 @@ assert(prompt.includes('classification_model_tokens=0'))
 assert(prompt.includes('project_docs_analyze'))
 assert(prompt.includes('project_docs_get_status'))
 assert(prompt.includes('project_docs_get_issues'))
+assert(prompt.includes('project_docs_update_issue'))
+assert(prompt.includes('project_docs_get_health_history'))
 assert(prompt.includes('project_docs_get_map'))
 assert(prompt.includes('project_docs_review_map'))
 assert(prompt.includes('project_docs_plan_context'))
@@ -161,6 +184,7 @@ assert(prompt.includes('project_docs_apply_file_operations'))
 assert(prompt.includes('source_revision'))
 assert(prompt.includes('document_health'))
 assert(prompt.includes('主题知识树'))
+assert(prompt.includes('governance_facets'))
 assert(prompt.includes('不得越界、操作非 Markdown、修改代码或自动 push'))
 assert(prompt.length < 3000, '整理任务 Prompt 不应内嵌完整文档目录')
 assert(!prompt.includes('# Reviewer'))
@@ -174,6 +198,9 @@ assert(architectureSource.includes('analyzeKnowledgeArchitecture'))
 assert(architectureSource.includes('serverArchitectureHealth'))
 assert(architectureSource.includes("DOCUMENT_HEALTH_SECTION = 'document-health'"))
 assert(architectureSource.includes('topicSectionForDocument'))
+assert(architectureSource.includes('topicSectionsForDocument'))
+assert(architectureSource.includes("id: 'unassigned-topic'"))
+assert(!architectureSource.includes('sharedWorkspace'))
 assert(architectureSource.includes('const topics = [...templateSections, ...customSections]'))
 assert(architectureSource.includes("CAPABILITY_MAP_SECTION = 'capability-map'"))
 
@@ -329,12 +356,15 @@ assert(capabilityInspectorSource.includes('对应 Markdown'))
 assert(capabilityInspectorSource.includes('实现证据'))
 assert(capabilityInspectorSource.includes('与 AI 讨论此节点'))
 assert(workspaceSource.includes('<ProjectDocumentHealthCenter'))
+assert(workspaceSource.includes('<ProjectDocumentGovernanceOverview'))
 const healthCenterSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentHealthCenter.tsx',
 ), 'utf8')
 assert(healthCenterSource.includes('服务端统一真源'))
 assert(healthCenterSource.includes('联邦知识架构'))
 assert(healthCenterSource.includes('持续维护'))
+assert(healthCenterSource.includes('让 AI 处理选中的'))
+assert(healthCenterSource.includes('ProjectDocumentVersionHistory'))
 
 const fileOperationsSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFileOperations.tsx',
@@ -429,6 +459,12 @@ commandManifest = commands.assignDocuments(commandManifest, ['docs/unknown.md'],
 commandManifest = commands.assignDocuments(commandManifest, ['docs/unknown.md'], 'current', 'governance')
 assert.equal(commandManifest.assignments['docs/unknown.md'], apiKey)
 assert.equal(commandManifest.governance_overrides['docs/unknown.md'], 'current')
+commandManifest = commands.setSecondaryTopics(commandManifest, 'docs/unknown.md', [productKey])
+commandManifest = commands.setGovernanceFacets(commandManifest, 'docs/unknown.md', {
+  retrieval: 'on_demand', lifecycle: 'active', authority: 'guidance', document_type: 'guide',
+})
+assert.deepEqual(commandManifest.secondary_assignments['docs/unknown.md'], [productKey])
+assert.equal(commandManifest.governance_facets['docs/unknown.md'].document_type, 'guide')
 commandManifest = commands.setRecommendedDocuments(commandManifest, ['docs/unknown.md'], true)
 commandManifest = commands.pinDocuments(commandManifest, ['docs/unknown.md'], true)
 assert(commandManifest.home.start_here.includes('docs/unknown.md'))

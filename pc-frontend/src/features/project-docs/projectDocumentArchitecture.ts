@@ -53,9 +53,8 @@ interface ProfileTemplate {
   sections: TemplateSection[]
 }
 
-const sharedWorkspace: TemplateSection[] = [
-  { id: 'decisions', label: '决策记录', detail: '已接受决定及其原因', color: '#c884dd', aliases: ['decision', 'adr', '决策'] },
-  { id: 'workbench', label: '工作区', detail: '草稿、讨论、证据和待整理材料', color: '#c58c55', aliases: ['draft', 'discussion', 'report', 'inbox', '草稿', '讨论', '证据'] },
+const sharedUnassigned: TemplateSection[] = [
+  { id: 'unassigned-topic', label: '未归主题', detail: '尚未确定主要业务主题；不代表文档权威性', color: '#8a91a3', aliases: [] },
 ]
 
 const profiles: ProfileTemplate[] = [
@@ -71,7 +70,8 @@ const profiles: ProfileTemplate[] = [
       { id: 'project-system', label: '用户与项目系统', detail: '用户、项目、Git 工作区和协作流程', color: '#d18b62', aliases: ['user-project', 'project-store', 'workspace', '用户', '项目系统'] },
       { id: 'operations', label: '发布与运维', detail: '构建、发布、部署、升级和故障处理', color: '#d0a34f', aliases: ['deploy', 'release', 'runbook', 'setup', 'upgrade', '发布', '运维', '故障'] },
       { id: 'security', label: '安全与权限', detail: '权限、密钥、隐私和安全边界', color: '#d06e75', aliases: ['security', 'permission', 'secret', 'vault', '安全', '权限', '密钥'] },
-      ...sharedWorkspace,
+      { id: 'external-tools', label: '工具与外部生态', detail: 'CLI、模型、语音与第三方工具集成', color: '#c58c55', aliases: ['tool', 'cli', 'model', 'voice', 'vscode', '工具', '模型', '语音'] },
+      ...sharedUnassigned,
     ],
   },
   {
@@ -86,7 +86,7 @@ const profiles: ProfileTemplate[] = [
       { id: 'data-model', label: '数据模型', detail: '实体、字段、Schema 和关系', color: '#5aaf9a', aliases: ['data-model', 'schema', 'database', '数据模型'] },
       { id: 'guides', label: '开发指南', detail: '面向任务的使用方法', color: '#7ca86c', aliases: ['guide', 'how-to', '指南'] },
       { id: 'operations', label: '部署运维', detail: '部署、监控和故障恢复', color: '#d0a34f', aliases: ['deploy', 'runbook', 'monitor', '运维'] },
-      ...sharedWorkspace,
+      ...sharedUnassigned,
     ],
   },
   {
@@ -99,7 +99,7 @@ const profiles: ProfileTemplate[] = [
       { id: 'processes', label: '业务流程', detail: '规则、流程和状态', color: '#4fa9b8', aliases: ['process', 'workflow', '流程'] },
       { id: 'roadmap', label: '路线图', detail: '阶段、优先级和交付计划', color: '#d0a34f', aliases: ['roadmap', 'plan', '路线图', '计划'] },
       { id: 'metrics', label: '指标与复盘', detail: '指标、反馈和结果', color: '#d18b62', aliases: ['metric', 'analytics', '指标', '复盘'] },
-      ...sharedWorkspace,
+      ...sharedUnassigned,
     ],
   },
   {
@@ -111,7 +111,7 @@ const profiles: ProfileTemplate[] = [
       { id: 'methods', label: '方法', detail: '研究设计、方法和假设', color: '#4fa9b8', aliases: ['method', 'hypothesis', '方法', '假设'] },
       { id: 'experiments', label: '实验与数据', detail: '实验记录、数据集和分析', color: '#5fbc88', aliases: ['experiment', 'dataset', '实验', '数据'] },
       { id: 'results', label: '结果与结论', detail: '发现、限制和结论', color: '#d0a34f', aliases: ['result', 'conclusion', '结果', '结论'] },
-      ...sharedWorkspace,
+      ...sharedUnassigned,
     ],
   },
   {
@@ -123,7 +123,7 @@ const profiles: ProfileTemplate[] = [
       { id: 'monitoring', label: '监控与告警', detail: '指标、仪表盘和告警规则', color: '#4fa9b8', aliases: ['monitor', 'alert', '监控', '告警'] },
       { id: 'incidents', label: '事故与恢复', detail: '事故记录、恢复和复盘', color: '#d06e75', aliases: ['incident', 'recovery', '故障', '恢复', '事故'] },
       { id: 'security', label: '安全与权限', detail: '访问、密钥和审计', color: '#d0a34f', aliases: ['security', 'permission', '安全', '权限'] },
-      ...sharedWorkspace,
+      ...sharedUnassigned,
     ],
   },
   {
@@ -134,7 +134,7 @@ const profiles: ProfileTemplate[] = [
       { id: 'topics', label: '核心主题', detail: '长期维护的主题知识', color: '#5f8fe3', aliases: ['topic', '主题'] },
       { id: 'guides', label: '方法与指南', detail: '可复用的方法和步骤', color: '#5fbc88', aliases: ['guide', 'method', '方法', '指南'] },
       { id: 'sources', label: '来源与参考', detail: '引用、摘录和外部资料', color: '#4fa9b8', aliases: ['source', 'reference', '来源', '参考'] },
-      ...sharedWorkspace,
+      ...sharedUnassigned,
     ],
   },
 ]
@@ -230,6 +230,18 @@ export function topicSectionForDocument(
   return matchingCustom ? customSectionKey(matchingCustom.id) : `topic:${inferred.id}`
 }
 
+export function topicSectionsForDocument(
+  document: ProjectDocumentEntry,
+  catalog: DocumentCatalog | null,
+  manifest: DocumentSectionManifest,
+) {
+  const primary = topicSectionForDocument(document, catalog, manifest)
+  const valid = new Set(manifest.sections.map((section) => customSectionKey(section.id)))
+  const secondary = (manifest.secondary_assignments[normalizePath(document.path)] ?? [])
+    .filter((topic) => valid.has(topic) && topic !== primary)
+  return [...new Set([primary, ...secondary])]
+}
+
 export function analyzeKnowledgeArchitecture(catalog: DocumentCatalog | null, manifest: DocumentSectionManifest): KnowledgeArchitectureHealth {
   const documents = catalog?.documents ?? []
   const { template, source } = resolveKnowledgeProfile(catalog, manifest)
@@ -278,8 +290,9 @@ export function knowledgeSectionCounts(
 ) {
   const counts = Object.fromEntries(sections.map((section) => [section.key, 0])) as Record<string, number>
   for (const document of catalog?.documents ?? []) {
-    const section = topicSectionForDocument(document, catalog, manifest)
-    counts[section] = (counts[section] ?? 0) + 1
+    topicSectionsForDocument(document, catalog, manifest).forEach((section) => {
+      counts[section] = (counts[section] ?? 0) + 1
+    })
   }
   counts[CAPABILITY_MAP_SECTION] = sections.filter((section) =>
     ![KNOWLEDGE_HOME_SECTION, CAPABILITY_MAP_SECTION, SUGGESTIONS_SECTION.key].includes(section.key),
@@ -303,15 +316,13 @@ function inferTopic(document: ProjectDocumentEntry, template: ProfileTemplate) {
     score: section.aliases.reduce((total, alias) => total + (searchable.includes(alias.toLowerCase()) ? 2 : 0), 0)
       + roleTopicScore(document.metadata.role, section.id),
   })).sort((left, right) => right.score - left.score)
-  return scored[0]?.score > 0 ? scored[0].section : template.sections.find((section) => section.id === 'workbench') ?? template.sections[0]
+  return scored[0]?.score > 0 ? scored[0].section : template.sections.find((section) => section.id === 'unassigned-topic') ?? template.sections[0]
 }
 
 function roleTopicScore(role: string, sectionId: string) {
   if (role === 'architecture' && sectionId === 'architecture') return 5
   if (role === 'requirement' && sectionId === 'requirements') return 5
   if (role === 'runbook' && ['operations', 'runbooks'].includes(sectionId)) return 5
-  if (role === 'decision' && sectionId === 'decisions') return 5
-  if (['discussion', 'note', 'status', 'report'].includes(role) && sectionId === 'workbench') return 3
   if (['policy', 'router', 'agent_definition', 'prompt_template', 'skill'].includes(role) && sectionId === 'ai-context') return 4
   return 0
 }

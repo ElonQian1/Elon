@@ -4,6 +4,15 @@ import {
   sanitizeKnowledgeGraphConfig,
   type ProjectKnowledgeGraphConfig,
 } from './projectDocumentKnowledgeGraphModel'
+import {
+  effectiveGovernanceFacets,
+  governanceQuickView,
+  sanitizeDocumentRelations,
+  sanitizeGovernanceFacetsMap,
+  sanitizeSecondaryAssignments,
+  type DocumentGovernanceFacets,
+  type DocumentRelation,
+} from './projectDocumentGovernance'
 
 export const SECTION_CONFIG_PATH = '.elon/document-sections.json'
 export const ORGANIZATION_SUGGESTIONS_PATH = '.elon/document-organization-suggestions.json'
@@ -38,6 +47,7 @@ export interface DocumentKnowledgeMetadata {
   version: string
   related: string[]
   supersedes: string[]
+  relations: DocumentRelation[]
   order: number
   pinned: boolean
 }
@@ -56,7 +66,9 @@ export interface DocumentSectionManifest {
   home: DocumentKnowledgeHome
   sections: CustomDocumentSection[]
   assignments: Record<string, string>
+  secondary_assignments: Record<string, string[]>
   governance_overrides: Record<string, string>
+  governance_facets: Record<string, DocumentGovernanceFacets>
   document_metadata: Record<string, DocumentKnowledgeMetadata>
   audit_log: DocumentOrganizationAuditEntry[]
   knowledge_graph: ProjectKnowledgeGraphConfig
@@ -81,6 +93,7 @@ export interface SuggestedAssignment {
   path: string
   section_id: string
   reason: string
+  secondary: boolean
 }
 
 export interface SuggestedFileOperation {
@@ -108,6 +121,7 @@ export interface DocumentOrganizationSuggestions {
   architecture_findings: string[]
   missing_document_types: string[]
   document_metadata: Record<string, DocumentKnowledgeMetadata>
+  governance_facets: Record<string, DocumentGovernanceFacets>
   file_operations: SuggestedFileOperation[]
   proposed_knowledge_graph: ProjectKnowledgeGraphConfig
   documents_read: number
@@ -120,7 +134,9 @@ export const EMPTY_SECTION_MANIFEST: DocumentSectionManifest = {
   home: { title: '', summary: '', entrypoint: '', start_here: [] },
   sections: [],
   assignments: {},
+  secondary_assignments: {},
   governance_overrides: {},
+  governance_facets: {},
   document_metadata: {},
   audit_log: [],
   knowledge_graph: EMPTY_KNOWLEDGE_GRAPH,
@@ -146,6 +162,11 @@ export const SUGGESTIONS_SECTION: DocumentSection = {
   virtual: true,
 }
 
+export const GOVERNANCE_OVERVIEW_SECTION: DocumentSection = {
+  key: 'governance-overview', label: '治理总览', detail: '按检索、生命周期、权威性和类型交叉筛选',
+  color: '#69b9a7', virtual: true,
+}
+
 export function buildDocumentSections(manifest: DocumentSectionManifest): DocumentSection[] {
   const custom = [...manifest.sections].sort((left, right) => left.order - right.order || left.label.localeCompare(right.label, 'zh-CN')).map((section) => ({
     key: customSectionKey(section.id),
@@ -158,14 +179,17 @@ export function buildDocumentSections(manifest: DocumentSectionManifest): Docume
     icon: section.icon,
     entrypoint: section.entrypoint,
   }))
-  return [...SYSTEM_DOCUMENT_SECTIONS, ...custom, SUGGESTIONS_SECTION]
+  return [GOVERNANCE_OVERVIEW_SECTION, ...SYSTEM_DOCUMENT_SECTIONS, ...custom, SUGGESTIONS_SECTION]
 }
 
 export function governanceSectionForDocument(
   document: ProjectDocumentEntry,
   manifest: DocumentSectionManifest,
 ): string {
-  const assigned = manifest.governance_overrides[normalizedPath(document.path)]
+  const path = normalizedPath(document.path)
+  const configured = manifest.governance_facets[path]
+  if (configured) return governanceQuickView(effectiveGovernanceFacets(document, configured))
+  const assigned = manifest.governance_overrides[path]
   if (assigned && SYSTEM_DOCUMENT_SECTIONS.some((section) => section.key === assigned)) return assigned
   return automaticGovernanceSection(document)
 }
@@ -180,17 +204,7 @@ export function sectionForDocument(
 }
 
 function automaticGovernanceSection(document: ProjectDocumentEntry): string {
-  const { role, lifecycle, ambiguous } = document.metadata
-  if (lifecycle === 'archived' || role === 'archive') return 'archive'
-  if (['policy', 'router'].includes(role)) return 'required'
-  if (['agent_definition', 'prompt_template', 'skill'].includes(role)) return 'customizations'
-  if (['instruction', 'project_guide', 'provider_adapter', 'guide'].includes(role)) return 'on-demand'
-  if (['spec', 'architecture', 'requirement', 'runbook'].includes(role) && lifecycle === 'active') return 'current'
-  if (role === 'decision') return 'decisions'
-  if (['status', 'report'].includes(role)) return 'evidence'
-  if (ambiguous || lifecycle === 'unclassified') return 'unclassified'
-  if (lifecycle === 'draft' || ['discussion', 'note'].includes(role)) return 'drafts'
-  return 'unclassified'
+  return governanceQuickView(effectiveGovernanceFacets(document))
 }
 
 export function parseSectionManifest(content: string): DocumentSectionManifest {
@@ -212,6 +226,12 @@ export function parseSectionManifest(content: string): DocumentSectionManifest {
         else if (governanceSectionKeys.has(section)) governanceOverrides[normalized] = section
       }
     }
+    const secondaryAssignments = sanitizeSecondaryAssignments(value.secondary_assignments, customSectionKeys)
+    Object.entries(secondaryAssignments).forEach(([path, topics]) => {
+      secondaryAssignments[path] = topics.filter((topic) => topic !== assignments[path])
+      if (!secondaryAssignments[path].length) delete secondaryAssignments[path]
+    })
+    const governanceFacets = sanitizeGovernanceFacetsMap(value.governance_facets)
     if (value.governance_overrides && typeof value.governance_overrides === 'object') {
       for (const [path, section] of Object.entries(value.governance_overrides)) {
         const normalized = normalizedPath(path)
@@ -234,7 +254,9 @@ export function parseSectionManifest(content: string): DocumentSectionManifest {
       home: sanitizeKnowledgeHome(value.home),
       sections,
       assignments,
+      secondary_assignments: secondaryAssignments,
       governance_overrides: governanceOverrides,
+      governance_facets: governanceFacets,
       document_metadata: documentMetadata,
       audit_log: sanitizeAuditLog(value.audit_log),
       knowledge_graph: sanitizeKnowledgeGraphConfig(value.knowledge_graph),
@@ -261,7 +283,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
         const path = normalizedPath(candidate.path ?? '')
         const sectionId = String(candidate.section_id ?? '').trim()
         if (!path || !sectionId) return []
-        return [{ path, section_id: sectionId, reason: String(candidate.reason ?? '').slice(0, 500) }]
+        return [{ path, section_id: sectionId, reason: String(candidate.reason ?? '').slice(0, 500), secondary: candidate.secondary === true }]
       })
       : []
     const fileOperations = Array.isArray(value.file_operations)
@@ -297,6 +319,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       architecture_findings: stringArray(value.architecture_findings, 100),
       missing_document_types: stringArray(value.missing_document_types, 100).map((entry) => entry.slice(0, 120)),
       document_metadata: sanitizeKnowledgeMetadataMap(value.document_metadata),
+      governance_facets: sanitizeGovernanceFacetsMap(value.governance_facets),
       file_operations: fileOperations,
       proposed_knowledge_graph: sanitizeKnowledgeGraphConfig(value.proposed_knowledge_graph),
       documents_read: safeNonNegativeNumber(value.documents_read),
@@ -349,11 +372,11 @@ export function buildOrganizationPrompt(
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
     '① project_docs_analyze 获取 classification_model_tokens=0 的紧凑目录和 document_health；大型仓库先按 federation 选择 scope_id；' +
     '② project_docs_get_map 获取 overview 后只查询任务命中的 capabilities、architecture 或 topics 局部图；需要判断结构时调用 project_docs_review_map，单节点用 project_docs_get_node；' +
-    '③ project_docs_get_issues 获取链接、孤立文档、owner、复查周期和实现引用的程序证据；先用 project_docs_plan_context 规划阅读，再仅对仍需语义判断的少量文档调用 project_docs_read；' +
+    '③ project_docs_get_issues 按状态/严重度/负责人获取程序证据；既有问题用 project_docs_update_issue，趋势用 project_docs_get_health_history；先 project_docs_plan_context，再只 read 少量歧义文档；' +
     '④ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
     `④ 保存后按当前权限继续；${authorizationInstruction}` +
     '先根据 analyze 返回的 document_health 判断项目类型、质量问题、联邦节点和缺失基础文档；建议必须同时考虑面向人的主题知识树与面向 AI 的治理属性。' +
-    '可提出 proposed_profile、层级 proposed_sections、proposed_home、document_metadata（类型、owner、复查日期、实现引用、关系、替代关系）以及 proposed_knowledge_graph；不要把 required/on-demand 等治理状态当成主题目录。' +
+    '可提出 profile、home、层级 sections、一个主主题和多个 secondary assignments、四维 governance_facets、typed relations、metadata 和 proposed_knowledge_graph；不要把治理状态当主题目录。' +
     '图谱必须区分用户功能 capabilities、技术组件 architecture、文档主题 topics 和治理状态；有文档只证明覆盖，不能冒充功能已实现，功能和组件必须提供 file:/route:/symbol:/test: 证据。' +
     '如发现命名含糊或路径放错，可在 file_operations 中提出结构化 rename/move；source_revision 必须使用 analyze 返回的 content_hash。' +
     `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
@@ -419,6 +442,7 @@ function sanitizeKnowledgeMetadata(value: unknown): DocumentKnowledgeMetadata | 
     version: String(candidate.version ?? '').trim().slice(0, 40),
     related: stringArray(candidate.related, 24).map(normalizedPath).filter(Boolean),
     supersedes: stringArray(candidate.supersedes, 24).map(normalizedPath).filter(Boolean),
+    relations: sanitizeDocumentRelations(candidate.relations),
     order: Math.min(999999, Math.max(0, Math.floor(Number(candidate.order) || 0))),
     pinned: candidate.pinned === true,
   }
@@ -486,7 +510,9 @@ function cloneEmptyManifest(): DocumentSectionManifest {
     home: { title: '', summary: '', entrypoint: '', start_here: [] },
     sections: [],
     assignments: {},
+    secondary_assignments: {},
     governance_overrides: {},
+    governance_facets: {},
     document_metadata: {},
     audit_log: [],
     knowledge_graph: { nodes: [], edges: [] },

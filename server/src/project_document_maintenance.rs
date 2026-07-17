@@ -18,6 +18,7 @@ use crate::{
     project_document_files::content_revision,
     project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
     project_document_index::ProjectDocumentIndex,
+    project_document_issue_workflow::{list_filtered, synchronize},
     project_document_knowledge_graph::build_knowledge_maps,
     project_document_quality::{analyze_document_quality, compact_report},
 };
@@ -32,13 +33,6 @@ pub(crate) fn enrich_catalog(
     register_workspace(workspace);
     let (manifest, manifest_revision) = load_manifest(workspace)?;
     let quality = analyze_document_quality(workspace, documents, &manifest, index)?;
-    index.replace_issues(
-        &quality
-            .issues
-            .iter()
-            .map(serde_json::to_value)
-            .collect::<serde_json::Result<Vec<_>>>()?,
-    )?;
     let architecture = analyze_knowledge_architecture(documents, &manifest);
     let knowledge_maps = build_knowledge_maps(workspace, documents, &manifest);
     let knowledge_map_revision = content_revision(&serde_json::to_string(&knowledge_maps)?);
@@ -54,6 +48,22 @@ pub(crate) fn enrich_catalog(
         quality.summary.score,
         federation.aggregated_score,
     );
+    let governance_workflow = synchronize(
+        index,
+        quality
+            .issues
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<serde_json::Result<Vec<_>>>()?,
+        &manifest,
+        &federation,
+        (
+            overall_score,
+            architecture.score,
+            quality.summary.score,
+            federation.aggregated_score,
+        ),
+    )?;
     Ok(json!({
         "version": 1,
         "source": "server",
@@ -70,21 +80,30 @@ pub(crate) fn enrich_catalog(
             "knowledge_map_revision": knowledge_map_revision,
         },
         "quality": compact_report(&quality, 40),
+        "governance_workflow": governance_workflow,
         "maintenance": maintenance,
         "federation": federation,
     }))
 }
 
-pub(crate) fn list_issues(
+pub(crate) fn list_governed_issues(
     workspace: &Path,
     issue_types: &[String],
+    statuses: &[String],
+    severities: &[String],
+    owner: &str,
     offset: usize,
     limit: usize,
 ) -> Result<Vec<Value>> {
-    ProjectDocumentIndex::open(workspace)?.list_issues(
+    let index = ProjectDocumentIndex::open(workspace)?;
+    list_filtered(
+        &index,
         issue_types,
-        offset.min(100_000),
-        limit.clamp(1, 200),
+        statuses,
+        severities,
+        owner,
+        offset,
+        limit,
     )
 }
 

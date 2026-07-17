@@ -51,6 +51,7 @@ fn ready_suggestions() -> DocumentOrganizationSuggestions {
             path: "docs/archive/old.md".to_string(),
             section_id: "custom:legacy-notes".to_string(),
             reason: "路径和 frontmatter 都表明它是历史资料。".to_string(),
+            secondary: false,
         }],
         conflicts: Vec::new(),
         move_suggestions: Vec::new(),
@@ -91,6 +92,44 @@ fn legacy_assignments_are_split_into_topic_and_governance_facets() {
     assert_eq!(manifest.governance_overrides["docs/api.md"], "current");
     assert_eq!(manifest.governance_overrides["docs/draft.md"], "drafts");
     assert!(!manifest.assignments.contains_key("docs/draft.md"));
+}
+
+#[test]
+fn multidimensional_governance_secondary_topics_and_relations_round_trip() {
+    let manifest = parse_manifest(Some(
+        r##"{
+          "version": 1,
+          "sections": [
+            {"id":"api","label":"API"},
+            {"id":"operations","label":"Operations"}
+          ],
+          "assignments": {"docs/api.md":"custom:api"},
+          "secondary_assignments": {"docs/api.md":["custom:operations"]},
+          "governance_facets": {
+            "docs/api.md": {"retrieval":"on_demand","lifecycle":"active","authority":"authoritative","document_type":"api_reference"}
+          },
+          "document_metadata": {
+            "docs/api.md": {"doc_type":"api-reference","relations":[{"relation":"implements","target":"docs/spec.md"}]}
+          }
+        }"##,
+    ))
+    .unwrap();
+    assert_eq!(
+        manifest.secondary_assignments["docs/api.md"],
+        vec!["custom:operations"]
+    );
+    assert_eq!(
+        manifest.governance_facets["docs/api.md"].authority,
+        "authoritative"
+    );
+    assert_eq!(
+        manifest.document_metadata["docs/api.md"].doc_type,
+        "api-reference"
+    );
+    assert_eq!(
+        manifest.document_metadata["docs/api.md"].relations[0].relation,
+        "implements"
+    );
 }
 
 #[test]

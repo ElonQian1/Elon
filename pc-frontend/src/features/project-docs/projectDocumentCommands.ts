@@ -1,4 +1,5 @@
 import type { ProjectDocumentEntry } from './projectDocumentModel'
+import type { DocumentGovernanceFacets } from './projectDocumentGovernance'
 import {
   createCustomSection,
   customSectionKey,
@@ -177,6 +178,9 @@ export function mergeSections(manifest: DocumentSectionManifest, sourceKey: stri
   const assignments = Object.fromEntries(Object.entries(manifest.assignments).map(([path, section]) => (
     [path, section === sourceKeyNormalized ? targetKeyNormalized : section]
   )))
+  const secondaryAssignments = Object.fromEntries(Object.entries(manifest.secondary_assignments).map(([path, topics]) => [
+    path, [...new Set(topics.map((topic) => topic === sourceKeyNormalized ? targetKeyNormalized : topic))],
+  ]))
   const sections = manifest.sections
     .filter((section) => section.id !== sourceId)
     .map((section) => section.parent_id === sourceId ? { ...section, parent_id: targetId } : section)
@@ -184,7 +188,7 @@ export function mergeSections(manifest: DocumentSectionManifest, sourceKey: stri
       ? { ...section, entrypoint: source.entrypoint }
       : section)
   validateSectionTree(sections)
-  return recordManifestChange(normalizeSectionOrders({ ...manifest, sections, assignments }),
+  return recordManifestChange(normalizeSectionOrders({ ...manifest, sections, assignments, secondary_assignments: secondaryAssignments }),
     'section.merge', sourceKey, `将“${source.label}”合并到“${target.label}”`)
 }
 
@@ -205,10 +209,14 @@ export function removeSectionTree(manifest: DocumentSectionManifest, sectionKey:
   }
   const assignments = Object.fromEntries(Object.entries(manifest.assignments)
     .filter(([, section]) => !removed.has(customId(section))))
+  const secondaryAssignments = Object.fromEntries(Object.entries(manifest.secondary_assignments)
+    .map(([path, topics]) => [path, topics.filter((topic) => !removed.has(customId(topic)))])
+    .filter(([, topics]) => (topics as string[]).length > 0))
   return recordManifestChange({
     ...manifest,
     sections: manifest.sections.filter((section) => !removed.has(section.id)),
     assignments,
+    secondary_assignments: secondaryAssignments,
   }, 'section.delete_tree', sectionKey, `删除分区“${root.label}”及其 ${removed.size - 1} 个子分区；Markdown 未删除`)
 }
 
@@ -226,14 +234,47 @@ export function assignDocuments(
     if (!valid) throw new Error('目标分区不存在')
   }
   const assignments = { ...manifest[field] }
+  const secondaryAssignments = { ...manifest.secondary_assignments }
+  const governanceFacets = { ...manifest.governance_facets }
   paths.map(normalizePath).filter(Boolean).forEach((path) => {
     if (sectionKey) assignments[path] = sectionKey
     else delete assignments[path]
+    if (facet === 'knowledge' && sectionKey) {
+      const remaining = (secondaryAssignments[path] ?? []).filter((topic) => topic !== sectionKey)
+      if (remaining.length) secondaryAssignments[path] = remaining
+      else delete secondaryAssignments[path]
+    }
+    if (facet === 'governance') delete governanceFacets[path]
   })
   const label = sectionKey || '自动分类'
-  return recordManifestChange({ ...manifest, [field]: assignments },
+  return recordManifestChange({ ...manifest, [field]: assignments, secondary_assignments: secondaryAssignments, governance_facets: governanceFacets },
     facet === 'knowledge' ? 'document.assign_topic' : 'document.assign_governance',
     paths.join(','), `${paths.length} 份文档调整为“${label}”；真实路径与正文未改变`)
+}
+
+export function setSecondaryTopics(manifest: DocumentSectionManifest, path: string, topics: string[]) {
+  const normalized = normalizePath(path)
+  const primary = manifest.assignments[normalized]
+  const valid = new Set(manifest.sections.map((section) => customSectionKey(section.id)))
+  const secondary = [...new Set(topics.filter((topic) => valid.has(topic) && topic !== primary))].slice(0, 12)
+  const values = { ...manifest.secondary_assignments }
+  if (secondary.length) values[normalized] = secondary
+  else delete values[normalized]
+  return recordManifestChange({ ...manifest, secondary_assignments: values },
+    'document.assign_secondary_topics', normalized, `更新 ${normalized} 的 ${secondary.length} 个副主题`)
+}
+
+export function setGovernanceFacets(
+  manifest: DocumentSectionManifest,
+  path: string,
+  facets: DocumentGovernanceFacets,
+) {
+  const normalized = normalizePath(path)
+  const values = { ...manifest.governance_facets, [normalized]: facets }
+  const legacy = { ...manifest.governance_overrides }
+  delete legacy[normalized]
+  return recordManifestChange({ ...manifest, governance_facets: values, governance_overrides: legacy },
+    'document.set_governance_facets', normalized, `更新 ${normalized} 的多维治理属性`)
 }
 
 export function setRecommendedDocuments(manifest: DocumentSectionManifest, paths: string[], enabled: boolean) {
@@ -444,7 +485,7 @@ function normalizeSectionOrders(manifest: DocumentSectionManifest) {
 function emptyKnowledgeMetadata(): DocumentKnowledgeMetadata {
   return {
     id: '', doc_type: '', audience: [], owner: '', owners: [], reviewed_at: '',
-    review_interval_days: 180, implementation_refs: [], version: '', related: [], supersedes: [],
+    review_interval_days: 180, implementation_refs: [], version: '', related: [], supersedes: [], relations: [],
     order: 999_999, pinned: false,
   }
 }

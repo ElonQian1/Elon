@@ -172,11 +172,11 @@ PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --js
 
 ### 2.5 项目文档治理与 MCP
 
-项目真实目录和 Markdown 始终是内容真源。PC 网页端把知识呈现为四条正交轴：产品功能回答“用户能做什么”，技术架构回答“系统怎样实现”，OneNote 式主题树回答“文档讲什么”，治理视图回答“能否作为当前事实”。`.elon/document-sections.json` 保存知识首页、主题树、主题固定项、治理覆盖、文档关系以及功能/技术节点和实现证据；它不等于实际移动文件。AI 建议单独保存在 `.elon/document-organization-suggestions.json`，按统一权限模式应用。
+项目真实目录和 Markdown 始终是内容真源。PC 网页端把知识呈现为四条正交轴：产品功能回答“用户能做什么”，技术架构回答“系统怎样实现”，OneNote 式主题树回答“文档讲什么”，治理总览分别回答“是否读取、是否当前、能否作为事实、是什么类型”。`.elon/document-sections.json` 保存知识首页、主/副主题、四维治理、有类型的文档关系以及功能/技术节点和实现证据；旧的治理分区只作为快捷投影，它不等于实际移动文件。AI 建议单独保存在 `.elon/document-organization-suggestions.json`，按统一权限模式应用。
 
-Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP MCP。`project_docs_analyze` 复用路径权威性分类器并保持零模型 token；`project_docs_get_map`、`project_docs_get_node` 和 `project_docs_plan_context` 让 AI 先取得受节点数和 token 预算限制的图谱与阅读计划，`project_docs_read` 只为歧义或缺失入口按需读取。图谱与 PC 页面由 Rust 后端生成同一份机器契约；文档覆盖和实现证据分别计算，不能由前者推断后者。保存和应用均使用 revision 防并发覆盖，默认由整理前/整理后两个仅文档 Git 提交保护。详细契约按需读取 `docs/project-document-governance-mcp.md`。
+Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP MCP。`project_docs_analyze` 复用路径权威性分类器并保持零模型 token；图谱和阅读计划工具限制节点数与 token，正文仍只为歧义或缺失入口按需读取。问题工作流工具支持筛选、分派、期限、原因化忽略/延期和趋势；版本工具同时支持普通 Git 项目与托管知识库的文档差异和新提交式恢复。图谱与 PC 页面由 Rust 后端生成同一份机器契约；文档覆盖和实现证据分别计算，不能由前者推断后者。保存和应用均使用 revision 防并发覆盖，默认由整理前/整理后两个仅文档 Git 提交保护。详细契约按需读取 `docs/project-document-governance-mcp.md`。
 
-持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查链接、孤立文档、owner、复查周期和显式实现引用；服务端把架构、质量、维护和联邦节点合并为目录快照中的 `analysis`，它是 PC 与 MCP 的统一健康真源。大型仓库通过 `.elon/knowledge-federation.json` 分层；个人笔记通过 `vaultId` 映射到平台数据目录中的托管 Git 知识库，每次保存自动提交且可恢复，用户界面不暴露 Git 复杂度。
+持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查链接、孤立文档、owner、复查周期和显式实现引用；问题状态与健康快照同样位于工作区外。服务端把架构、质量、维护、问题工作流和联邦节点合并为目录快照中的 `analysis`，并返回可解释评分组成。大型仓库通过 `.elon/knowledge-federation.json` 的路径与 glob 分层；个人笔记通过 `vaultId` 映射到托管 Git 知识库，每次保存自动提交且可恢复，用户界面不暴露 Git 复杂度。
 
 ## 3. 代码仓库结构（目标结构）
 

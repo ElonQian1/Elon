@@ -6,31 +6,103 @@
       "label": "一龙平台知识根",
       "scope_path": "",
       "profile": "software-platform",
-      "owner": "项目维护者"
+      "owner": "项目维护者",
+      "home": {
+        "title": "一龙项目知识中心",
+        "summary": "平台级知识入口；向下联邦到服务端、PC、节点、Android 和独立子项目。",
+        "entrypoint": "docs/README.md",
+        "start_here": ["docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md"]
+      }
+    },
+    {
+      "id": "platform-core",
+      "label": "平台总览与核心架构",
+      "parent_id": "root",
+      "scope_path": "",
+      "profile": "software-platform",
+      "owner": "项目维护者",
+      "include_globs": ["docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md", "docs/system-architecture.md"],
+      "home": { "entrypoint": "docs/README.md", "start_here": ["AI_PROJECT.md", "AI_ARCHITECTURE.md"] }
     },
     {
       "id": "server",
-      "label": "服务端与 Windows 节点",
+      "label": "服务端",
       "parent_id": "root",
-      "scope_path": "server",
+      "scope_path": "",
       "profile": "software-api",
-      "owner": "平台后端"
+      "owner": "平台后端",
+      "include_globs": ["AI_INDEX.md", "docs/system-architecture.md", "docs/intent-routing.md", "docs/route-c-sdk-mvp.md", "docs/project-document-governance-mcp.md"],
+      "home": { "entrypoint": "docs/system-architecture.md", "start_here": ["AI_INDEX.md"] }
+    },
+    {
+      "id": "document-platform",
+      "label": "项目文档治理模块",
+      "parent_id": "server",
+      "scope_path": "",
+      "profile": "software-api",
+      "owner": "项目知识平台",
+      "include_globs": ["docs/project-document-governance-mcp.md", ".github/instructions/document-authority.instructions.md"],
+      "home": { "entrypoint": "docs/project-document-governance-mcp.md", "start_here": [".github/instructions/document-authority.instructions.md"] }
+    },
+    {
+      "id": "ai-runtime",
+      "label": "AI 运行与上下文模块",
+      "parent_id": "server",
+      "scope_path": "",
+      "profile": "software-platform",
+      "owner": "AI 平台",
+      "include_globs": ["AGENTS.md", "AI_RULES.md", "AI_TASK_TEMPLATE.md", "CODEX.md", ".github/copilot-instructions.md", "docs/ai-agent-workflow.md", "docs/ai-to-ai-*.md", "docs/记忆系统.md"],
+      "home": { "entrypoint": "AGENTS.md", "start_here": ["AI_ARCHITECTURE.md", "AI_TASK_TEMPLATE.md"] }
+    },
+    {
+      "id": "project-system",
+      "label": "用户与项目系统",
+      "parent_id": "root",
+      "scope_path": "",
+      "profile": "product",
+      "owner": "项目系统",
+      "include_globs": ["docs/user-project-system.md", "docs/project-store-architecture.md", "docs/project-landing-manifest.md", "docs/群体ai开发/*"],
+      "home": { "entrypoint": "docs/user-project-system.md", "start_here": ["docs/project-store-architecture.md"] }
     },
     {
       "id": "pc-web",
       "label": "PC Web 工作台",
       "parent_id": "root",
-      "scope_path": "pc-frontend",
+      "scope_path": "",
       "profile": "software-platform",
-      "owner": "PC 客户端"
+      "owner": "PC 客户端",
+      "include_globs": ["docs/pc-*.md", "docs/project-document-governance-mcp.md"],
+      "home": { "entrypoint": "docs/pc-frontend-migration.md", "start_here": ["docs/project-document-governance-mcp.md"] }
+    },
+    {
+      "id": "pc-document-workbench",
+      "label": "PC 文档工作台",
+      "parent_id": "pc-web",
+      "scope_path": "",
+      "profile": "software-platform",
+      "owner": "项目知识平台",
+      "include_globs": ["docs/pc-frontend-migration.md", "docs/project-document-governance-mcp.md"],
+      "home": { "entrypoint": "docs/project-document-governance-mcp.md" }
+    },
+    {
+      "id": "windows-node",
+      "label": "Windows 节点",
+      "parent_id": "root",
+      "scope_path": "",
+      "profile": "operations",
+      "owner": "平台后端",
+      "include_globs": ["docs/node-agent-*.md", "docs/pc-node-*.md", "docs/win-node-*.md", "docs/windows-client-*.md", "docs/codex-vault-*.md"],
+      "home": { "entrypoint": "docs/node-agent-upgrade-compatibility.md", "start_here": ["docs/pc-node-offline-resilience.md"] }
     },
     {
       "id": "android",
       "label": "Android 客户端",
       "parent_id": "root",
-      "scope_path": "android",
+      "scope_path": "",
       "profile": "software-platform",
-      "owner": "Android 客户端"
+      "owner": "Android 客户端",
+      "include_globs": ["docs/android-*.md", "docs/shared-android-*.md", "docs/Design.md", "docs/APP 颜色规范.md", "docs/app-version-memory.md"],
+      "home": { "entrypoint": "docs/android-setup.md", "start_here": ["docs/Design.md", "docs/android-real-renderer-ui-workflow.md"] }
     },
     {
       "id": "fb2",
@@ -38,7 +110,9 @@
       "parent_id": "root",
       "scope_path": "docs/fb2-ai-center",
       "profile": "software-api",
-      "owner": "fb2 项目维护者"
+      "owner": "fb2 项目维护者",
+      "include_globs": ["docs/fb2-*.md"],
+      "home": { "entrypoint": "docs/fb2-ai-center/README.md", "start_here": ["docs/fb2-ai-center/contracts.md", "docs/fb2-ai-center/handoff.md"] }
     }
   ]
 }
