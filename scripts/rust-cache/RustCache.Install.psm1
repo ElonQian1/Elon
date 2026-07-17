@@ -92,6 +92,9 @@ function Restart-RustCacheSccacheServer {
     $sccache = Get-Command sccache -ErrorAction SilentlyContinue
     if (-not $sccache) { return $null }
     $result = Sync-RustCacheSccacheConfiguration -CacheRoot $CacheRoot -ConfigureProcessEnvironment -ForceRestart
+    if ($result.restart_pending) {
+        throw "Refusing to report sccache activation while Cargo/rustc is active. Managed configuration remains pending: $($result.state_path)"
+    }
     $normalizedLocation = if ($result.location) { ([string]$result.location).Replace("\\", "\") } else { "" }
     if (-not $result.location -or $normalizedLocation -notlike "*$($result.cache_dir)*") {
         throw "sccache server did not bind the managed cache directory. Reported: $($result.location)"
@@ -103,6 +106,8 @@ function Restart-RustCacheSccacheServer {
         config_path = $result.config_path
         base_directories = $result.base_directories
         base_directory_status = $result.base_directory_status
+        configuration_loaded = $result.configuration_loaded
+        state_path = $result.state_path
         location = $result.location
         restarted = $result.restarted
     }

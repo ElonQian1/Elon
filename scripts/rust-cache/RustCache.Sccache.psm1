@@ -66,6 +66,15 @@ function Enter-RustCacheSccacheConfigLock {
     throw "Timed out waiting for sccache configuration lock: $lockPath"
 }
 
+function Get-RustCacheTextSha256 {
+    param([Parameter(Mandatory)][string]$Value)
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try { $hash = $algorithm.ComputeHash($bytes) } finally { $algorithm.Dispose() }
+    return ([System.BitConverter]::ToString($hash)).Replace("-", "").ToLowerInvariant()
+}
+
 function Sync-RustCacheSccacheConfiguration {
     param(
         [Parameter(Mandatory)][string]$CacheRoot,
@@ -82,6 +91,11 @@ function Sync-RustCacheSccacheConfiguration {
     $configPath = Get-RustCacheSccacheConfigPath -CacheRoot $root
     $baseDirs = @(Get-RustCacheSccacheBaseDirectories -CacheRoot $root -AdditionalBaseDirs $AdditionalBaseDirs)
     $content = Get-RustCacheSccacheConfigContent -BaseDirs $baseDirs
+    $configHash = Get-RustCacheTextSha256 -Value $content
+    $statePath = Join-Path $root "state\sccache-sync.json"
+    $previousState = if (Test-Path -LiteralPath $statePath) {
+        try { Get-Content -Raw -LiteralPath $statePath -Encoding UTF8 | ConvertFrom-Json } catch { $null }
+    } else { $null }
     $previous = if (Test-Path -LiteralPath $configPath) { Get-Content -Raw -LiteralPath $configPath -Encoding UTF8 } else { $null }
     $changed = $previous -cne $content
     if ($changed) {
@@ -97,7 +111,8 @@ function Sync-RustCacheSccacheConfiguration {
         $env:SCCACHE_CACHE_SIZE = [string]$policy.sccache_max_size
     }
     $sccache = if ($ConfigureProcessEnvironment -or $RestartIfChanged -or $ForceRestart) { Get-Command sccache -ErrorAction SilentlyContinue } else { $null }
-    $shouldRestart = $sccache -and ($ForceRestart -or ($RestartIfChanged -and $changed))
+    $pendingBefore = $previousState -and ([bool]$previousState.restart_pending -or [string]$previousState.loaded_config_sha256 -ne $configHash)
+    $shouldRestart = $sccache -and ($ForceRestart -or ($RestartIfChanged -and ($changed -or $pendingBefore)))
     $pending = $false
     $restarted = $false
     if ($shouldRestart) {
@@ -115,6 +130,21 @@ function Sync-RustCacheSccacheConfiguration {
     $stats = if ($sccache) { @(& $sccache.Source --show-stats 2>&1) } else { @() }
     $location = $stats | Where-Object { $_ -match '^Cache location\s+' } | Select-Object -First 1
     $baseDirStatus = $stats | Where-Object { $_ -match '^Base directories\s+' } | Select-Object -First 1
+    $loadedHash = if ($restarted) { $configHash } elseif ($previousState) { [string]$previousState.loaded_config_sha256 } else { $null }
+    if ($changed -and -not $restarted) { $pending = $true }
+    if ($RestartIfChanged -or $ForceRestart -or $changed) {
+        $state = [ordered]@{
+            schema_version = 1
+            updated_utc = [DateTime]::UtcNow.ToString("o")
+            config_sha256 = $configHash
+            loaded_config_sha256 = $loadedHash
+            restart_pending = [bool]$pending
+            base_directory_count = $baseDirs.Count
+            base_directory_status = $baseDirStatus
+        }
+        New-Item -ItemType Directory -Force -Path (Split-Path $statePath -Parent) | Out-Null
+        $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding UTF8
+    }
     return [pscustomobject]@{
         config_path = $configPath
         cache_dir = $cacheDir
@@ -123,6 +153,10 @@ function Sync-RustCacheSccacheConfiguration {
         changed = $changed
         restarted = $restarted
         restart_pending = $pending
+        configuration_loaded = (-not $pending -and $loadedHash -eq $configHash)
+        config_sha256 = $configHash
+        loaded_config_sha256 = $loadedHash
+        state_path = $statePath
         location = $location
         base_directory_status = $baseDirStatus
     }
@@ -131,4 +165,4 @@ function Sync-RustCacheSccacheConfiguration {
     }
 }
 
-Export-ModuleMember -Function ConvertTo-RustCacheSccacheConfigPath, Get-RustCacheSccacheConfigPath, Get-RustCacheSccacheBaseDirectories, Get-RustCacheSccacheConfigContent, Enter-RustCacheSccacheConfigLock, Sync-RustCacheSccacheConfiguration
+Export-ModuleMember -Function ConvertTo-RustCacheSccacheConfigPath, Get-RustCacheSccacheConfigPath, Get-RustCacheSccacheBaseDirectories, Get-RustCacheSccacheConfigContent, Enter-RustCacheSccacheConfigLock, Get-RustCacheTextSha256, Sync-RustCacheSccacheConfiguration
