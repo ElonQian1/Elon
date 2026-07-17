@@ -10671,6 +10671,8 @@ if ('serviceWorker' in navigator) {
   const PROTOCOL_VERSION = 1;
   const originalInlineStyles = new Map();
   let selectedElement = null;
+  let hoveredElement = null;
+  let hoverFrame = 0;
   let selecting = true;
 
   document.body.classList.add('ui-tuner-preview-active', 'ui-tuner-preview-selecting');
@@ -10684,7 +10686,15 @@ if ('serviceWorker' in navigator) {
   }
 
   function compactText(element) {
-    return String(element.innerText || element.textContent || '')
+    const directText = Array.from(element.childNodes || [])
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent || '')
+      .join(' ');
+    const accessibleText = element.getAttribute('aria-label')
+      || element.getAttribute('title')
+      || element.getAttribute('placeholder')
+      || directText;
+    return String(accessibleText || '')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 160);
@@ -10708,22 +10718,11 @@ if ('serviceWorker' in navigator) {
     };
   }
 
-  function snapshotOf(element) {
-    const rect = element.getBoundingClientRect();
-    const style = window.getComputedStyle(element);
+  function snapshotOf(element, knownRect) {
+    const rect = knownRect || element.getBoundingClientRect();
     return {
       identity: identityOf(element),
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-      style: {
-        color: style.color,
-        backgroundColor: style.backgroundColor,
-        borderRadius: style.borderRadius,
-        fontSize: style.fontSize,
-        fontWeight: style.fontWeight,
-        opacity: style.opacity,
-        padding: style.padding,
-        margin: style.margin,
-      },
     };
   }
 
@@ -10733,24 +10732,34 @@ if ('serviceWorker' in navigator) {
       || target.closest('header,nav,main,section,article,div,span');
   }
 
-  function drawSelection(element) {
+  function drawSelection(element, knownRect) {
     if (!element || !element.isConnected) {
       selection.style.display = 'none';
       return;
     }
-    const rect = element.getBoundingClientRect();
+    const rect = knownRect || element.getBoundingClientRect();
     selection.style.display = rect.width > 0 && rect.height > 0 ? 'block' : 'none';
     selection.style.left = rect.left + 'px';
     selection.style.top = rect.top + 'px';
     selection.style.width = rect.width + 'px';
     selection.style.height = rect.height + 'px';
-    selection.style.borderRadius = window.getComputedStyle(element).borderRadius || '4px';
   }
 
   function selectElement(element, reason) {
+    const rect = element.getBoundingClientRect();
     selectedElement = element;
-    drawSelection(element);
-    post('selection', { reason: reason || 'pointer', node: snapshotOf(element) });
+    hoveredElement = element;
+    drawSelection(element, rect);
+    post('selection', { reason: reason || 'pointer', node: snapshotOf(element, rect) });
+  }
+
+  function scheduleHoverSelection(element) {
+    hoveredElement = element;
+    if (hoverFrame) return;
+    hoverFrame = window.requestAnimationFrame(() => {
+      hoverFrame = 0;
+      if (selecting && hoveredElement) drawSelection(hoveredElement);
+    });
   }
 
   function cssDimension(value) {
@@ -10806,10 +10815,10 @@ if ('serviceWorker' in navigator) {
   document.addEventListener('pointerover', (event) => {
     if (!selecting) return;
     const target = findDesignTarget(event.target);
-    if (target) drawSelection(target);
+    if (target && target !== hoveredElement) scheduleHoverSelection(target);
   }, true);
   document.addEventListener('pointerout', () => {
-    if (selecting) drawSelection(selectedElement);
+    if (selecting) scheduleHoverSelection(selectedElement);
   }, true);
   document.addEventListener('click', (event) => {
     if (!selecting) return;
@@ -10817,6 +10826,10 @@ if ('serviceWorker' in navigator) {
     if (!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
+    if (hoverFrame) {
+      window.cancelAnimationFrame(hoverFrame);
+      hoverFrame = 0;
+    }
     selectElement(target, 'click');
   }, true);
   window.addEventListener('scroll', () => drawSelection(selectedElement), true);

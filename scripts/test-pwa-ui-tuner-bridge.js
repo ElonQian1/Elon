@@ -11,5 +11,7 @@ assert.ok(mobileWeb.includes("event.origin !== window.location.origin"), 'PWA de
 assert.ok(mobileWeb.includes("message.type === 'set-mode'"), 'PWA should switch between component selection and normal interaction');
 assert.ok(mobileWeb.includes("message.type === 'apply-style'"), 'PWA should apply immediate local style previews');
 assert.ok(mobileWeb.includes("message.type === 'reset-styles'"), 'PWA should reset ephemeral preview styles');
+assert.ok(mobileWeb.includes('window.requestAnimationFrame'), 'PWA selection hover should be limited to one layout update per frame');
+assert.ok(!mobileWeb.includes("String(element.innerText || element.textContent || '')"), 'PWA selection must not read a large container innerText on every click');
 
 console.log('PWA UI tuner bridge tests passed');
