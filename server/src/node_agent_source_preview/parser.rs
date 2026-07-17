@@ -43,6 +43,7 @@ pub(crate) fn load_document(
         fs::read_to_string(&path).with_context(|| format!("读取布局失败: {}", path.display()))?;
     let resources = AndroidResources::load(&path)?;
     let root_node = parse_layout(&content, &selected, &resources)?;
+    let fidelity = preview_fidelity(&root_node);
     let revision = hex::encode(Sha256::digest(content.as_bytes()));
     Ok(SourcePreviewDocument {
         ok: true,
@@ -58,6 +59,7 @@ pub(crate) fn load_document(
             source_of_truth: "android_source".into(),
             calibration_required: true,
         },
+        fidelity,
         canvas: PreviewCanvas {
             width: 393.0,
             height: 852.0,
@@ -65,6 +67,136 @@ pub(crate) fn load_document(
         },
         root: root_node,
     })
+}
+
+#[derive(Default)]
+struct FidelityStats {
+    total: u32,
+    unsupported: u32,
+    dynamic: u32,
+    complex_stacks: u32,
+    partial_resource_semantics: u32,
+}
+
+fn preview_fidelity(root: &PreviewNode) -> PreviewFidelity {
+    let mut stats = FidelityStats::default();
+    collect_fidelity_stats(root, &mut stats);
+
+    let mut score = 100_i32;
+    score -= (stats.unsupported.min(12) * 4) as i32;
+    score -= (stats.dynamic.min(6) * 8) as i32;
+    score -= (stats.complex_stacks.min(5) * 5) as i32;
+    score -= (stats.partial_resource_semantics.min(5) * 3) as i32;
+    if stats.total > 100 {
+        score -= 20;
+    } else if stats.total > 50 {
+        score -= 12;
+    } else if stats.total > 30 {
+        score -= 6;
+    }
+    let score = score.clamp(0, 100) as u8;
+    let safe_for_default_preview =
+        score >= 75 && stats.dynamic == 0 && stats.unsupported <= 1 && stats.complex_stacks <= 1;
+    let level = if safe_for_default_preview {
+        "high"
+    } else if score >= 55 {
+        "medium"
+    } else {
+        "low"
+    };
+
+    let mut issues = Vec::new();
+    if stats.dynamic > 0 {
+        issues.push(format!(
+            "检测到 {} 个列表、include 或自定义运行时节点，静态 XML 不包含其真实内容",
+            stats.dynamic
+        ));
+    }
+    if stats.unsupported > 0 {
+        issues.push(format!(
+            "检测到 {} 个 React 草稿无法完整模拟的 Android 控件",
+            stats.unsupported
+        ));
+    }
+    if stats.complex_stacks > 0 {
+        issues.push(format!(
+            "检测到 {} 个复杂叠放容器，缺少 Android 测量、约束和层级语义",
+            stats.complex_stacks
+        ));
+    }
+    if stats.partial_resource_semantics > 0 {
+        issues.push("页面使用 Theme、Style、约束或状态资源，浏览器只能读取其中一部分".into());
+    }
+    if stats.total > 50 {
+        issues.push(format!(
+            "布局包含 {} 个节点，疑似承载多个页面状态，不适合直接当成单页设计稿",
+            stats.total
+        ));
+    }
+    if issues.is_empty() {
+        issues.push("仅使用基础 XML 控件，可作为本地草稿；最终仍需 Android 真帧校准".into());
+    }
+
+    PreviewFidelity {
+        score,
+        level: level.into(),
+        safe_for_default_preview,
+        total_nodes: stats.total,
+        unsupported_nodes: stats.unsupported,
+        dynamic_nodes: stats.dynamic,
+        issues,
+    }
+}
+
+fn collect_fidelity_stats(node: &PreviewNode, stats: &mut FidelityStats) {
+    stats.total += 1;
+    let simple = node.tag.rsplit('.').next().unwrap_or(&node.tag);
+    let is_dynamic = matches!(simple, "include" | "merge" | "fragment")
+        || simple.contains("Recycler")
+        || simple.contains("ListView")
+        || simple.contains("GridView")
+        || simple.contains("ViewPager")
+        || simple.contains("WebView")
+        || simple.contains("ComposeView")
+        || simple.contains("SwipeRefresh");
+    let supported = matches!(
+        simple,
+        "LinearLayout"
+            | "FrameLayout"
+            | "ScrollView"
+            | "HorizontalScrollView"
+            | "TextView"
+            | "Button"
+            | "ImageButton"
+            | "ImageView"
+            | "EditText"
+            | "Space"
+            | "View"
+    );
+    let custom_view = node.tag.contains('.')
+        && !node.tag.starts_with("android.widget.")
+        && !node.tag.starts_with("android.view.");
+    if is_dynamic {
+        stats.dynamic += 1;
+    }
+    if !supported || custom_view {
+        stats.unsupported += 1;
+    }
+    if node.layout.mode == "stack" && node.children.len() > 2 {
+        stats.complex_stacks += 1;
+    }
+    if node.source.attributes.iter().any(|(key, value)| {
+        key == "style"
+            || key.contains("layout_constraint")
+            || key.contains("srcCompat")
+            || value.starts_with("?attr/")
+            || value.starts_with("@style/")
+    }) {
+        stats.partial_resource_semantics += 1;
+    }
+    for child in &node.children {
+        collect_fidelity_stats(child, stats);
+    }
 }
 
 pub(crate) fn canonical_project_root(raw: &str) -> Result<PathBuf> {
@@ -360,5 +492,34 @@ mod tests {
         assert_eq!(document.root.children.len(), 2);
         assert_eq!(document.root.children[0].style.text, "动态设计标题");
         assert_eq!(document.root.children[1].style.border_radius, 14.0);
+        assert!(document.fidelity.safe_for_default_preview);
+        assert_eq!(document.fidelity.level, "high");
+    }
+
+    #[test]
+    fn blocks_dynamic_android_shell_from_default_react_preview() {
+        let xml = r#"
+            <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android">
+                <androidx.recyclerview.widget.RecyclerView android:layout_width="match_parent" android:layout_height="match_parent" />
+                <include layout="@layout/page_tabs" />
+                <com.example.CustomStatusView android:layout_width="match_parent" android:layout_height="48dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content">
+                    <TextView android:text="标题" />
+                    <TextView android:text="说明" />
+                    <TextView android:text="状态" />
+                </LinearLayout>
+            </FrameLayout>
+        "#;
+        let root = parse_layout(
+            xml,
+            "app/src/main/res/layout/activity_main.xml",
+            &AndroidResources::default(),
+        )
+        .unwrap();
+        let fidelity = preview_fidelity(&root);
+        assert!(!fidelity.safe_for_default_preview);
+        assert!(fidelity.dynamic_nodes >= 2);
+        assert!(fidelity.unsupported_nodes >= 3);
+        assert!(!fidelity.issues.is_empty());
     }
 }

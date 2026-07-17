@@ -31,8 +31,21 @@ pub(crate) struct SourcePreviewDocument {
     pub selected_layout: String,
     pub source_revision: String,
     pub rendering: PreviewRendering,
+    pub fidelity: PreviewFidelity,
     pub canvas: PreviewCanvas,
     pub root: PreviewNode,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PreviewFidelity {
+    pub score: u8,
+    pub level: String,
+    pub safe_for_default_preview: bool,
+    pub total_nodes: u32,
+    pub unsupported_nodes: u32,
+    pub dynamic_nodes: u32,
+    pub issues: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
