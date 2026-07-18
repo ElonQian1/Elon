@@ -323,7 +323,7 @@ try {
     'utf8',
   )
   assert.match(previewSurfaceSource, /当前画面：\{route\.screenTitle/)
-  assert.match(bridgeSource, /document\.querySelector\('\.page\.active\[id\]'\)/)
+  assert.match(bridgeSource, /document\.querySelectorAll\('\.page\.active\[id\]'\)/)
   assert.match(bridgeSource, /document\.querySelector\('#topTitle'\)/)
   assert.match(bridgeSource, /getAttribute\('data-ui-screen'\)/)
   assert.match(bridgeSource, /if \(signature === lastRouteSignature\) return;/, '相同 screen route 必须去重')

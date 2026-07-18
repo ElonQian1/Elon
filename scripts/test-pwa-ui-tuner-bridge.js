@@ -36,6 +36,12 @@ assert.ok(bridge.includes("message.type === 'set-session-auth'"), 'preview shoul
 assert.ok(bridge.includes("CustomEvent('elon:ui-tuner-session-auth'"), 'session auth must stay in page memory');
 assert.ok(!bridge.includes("localStorage.setItem('lodex_token'"), 'preview bridge must not persist the PC token');
 assert.ok(bridge.includes("post('route-changed'"), 'PWA should report route changes without parent reloads');
+assert.ok(bridge.includes("getAttribute('data-ui-screen')"), 'PWA should prefer an explicit screen identity when the app supplies one');
+assert.ok(bridge.includes("document.querySelectorAll('.page.active[id]')"), 'PWA should fall back to the active page id without depending on DOM order');
+assert.ok(bridge.includes("document.querySelector('#topTitle')"), 'PWA should distinguish active screens by their stable visible title');
+assert.ok(bridge.includes('new MutationObserver'), 'PWA should watch semantic screen changes without reloading');
+assert.match(bridge, /attributeFilter:\s*\[[^\]]*'class'[^\]]*'aria-hidden'[^\]]*'data-ui-screen'[^\]]*\]/, 'screen observer should watch semantic state attributes');
+assert.doesNotMatch(bridge.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] || '', /['"]style['"]/, 'screen observer must never subscribe to inline style changes');
 assert.ok(mobileWeb.includes("pageParams.get('ui_tuner_preview') === '1'"), 'session auth listener must be preview-scoped');
 assert.ok(designSession.includes("useState<'select' | 'interact'>('interact')"), 'PC PWA canvas must default to real interaction');
 assert.ok(designSession.includes("context.post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
@@ -61,10 +67,15 @@ assert.ok(draftContract.includes("kind: 'elon.pwa.manual_style_draft'"), 'PC sho
 assert.ok(draftContract.includes('originalStyle: PwaOriginalStyleSnapshot'), 'draft elements should retain their original style snapshot');
 assert.ok(draftContract.includes('confidenceScore: number'), 'draft identities should retain mapping confidence');
 assert.ok(draftContract.includes("params.delete('ui_tuner_preview')"), 'draft route identity should ignore the preview-only query flag');
+assert.ok(draftContract.includes('screenKey?: string'), 'draft schema v2 should accept an optional real screen identity');
+assert.ok(draftContract.includes("route.screenKey || 'screen:unidentified'"), 'draft storage keys should include the real screen identity');
 assert.ok(designSessionModel.includes('readPwaDesignDraft(project, route)'), 'PC reload should restore the matching project, route, and viewport draft');
 assert.ok(designSessionModel.includes('PWA_DESIGN_TRANSACTION_IDLE_MS = 450'), 'continuous controls should be grouped into editing transactions');
 assert.ok(designSessionModel.includes('pastDrafts') && designSessionModel.includes('futureDrafts'), 'manual draft editing should support undo and redo');
 assert.ok(designSession.includes("model.update('page:clear'"), 'clearing the current page should remain undoable');
+assert.ok(designSession.includes("draft.route.screenKey || 'screen:unidentified'"), 'bridge draft keys should include screenKey');
+assert.ok(designSession.includes("normalized.screenKey || 'screen:unidentified'"), 'PWA session route keys should include screenKey');
+assert.ok(previewSurface.includes('当前画面：'), 'PC should show the user-readable current screen title');
 for (const property of ['width', 'height', 'paddingTop', 'marginTop', 'borderRadius', 'fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'opacity']) {
   assert.ok(styleInspector.includes(`'${property}'`), `manual style panel should expose ${property}`);
 }
@@ -86,6 +97,7 @@ class FakeClassList {
   constructor() { this.values = new Set(); }
   add(...values) { values.forEach((value) => this.values.add(value)); }
   filter(callback) { return Array.from(this.values).filter(callback); }
+  contains(value) { return this.values.has(value); }
   [Symbol.iterator]() { return this.values[Symbol.iterator](); }
   toggle(value, enabled) {
     if (enabled) this.values.add(value);
@@ -130,6 +142,10 @@ class FakeElement {
   }
   matches() { return false; }
   getBoundingClientRect() { return { left: 12, top: 24, width: 180, height: 48 }; }
+  querySelectorAll(selector) {
+    if (selector !== '[data-ui-screen]') return [];
+    return this.children.filter((child) => child.getAttribute('data-ui-screen'));
+  }
 }
 
 function runBridgeBehavior() {
@@ -138,11 +154,24 @@ function runBridgeBehavior() {
   const windowListeners = new Map();
   const documentListeners = new Map();
   const authEvents = [];
+  const pendingTimers = new Map();
+  let nextTimer = 1;
+  let screenObserver = null;
+  const documentElement = new FakeElement('html');
   const body = new FakeElement('body');
   const title = new FakeElement('h1', 'topTitle');
-  title.childNodes.push({ nodeType: 3, textContent: '一龙项目' });
+  title.childNodes.push({ nodeType: 3, textContent: '好友' });
   body.appendChild(title);
+  const chatPage = new FakeElement('div', 'chatPage');
+  chatPage.classList.add('page', 'active');
+  const projectPage = new FakeElement('div', 'projectPage');
+  projectPage.classList.add('page');
+  body.appendChild(chatPage);
+  body.appendChild(projectPage);
+  const setTitle = (value) => { title.childNodes = [{ nodeType: 3, textContent: value }]; };
   const document = {
+    title: '一龙',
+    documentElement,
     body,
     styleSheets: [],
     createElement: (tagName) => new FakeElement(tagName),
@@ -151,8 +180,21 @@ function runBridgeBehavior() {
       listeners.push(listener);
       documentListeners.set(type, listeners);
     },
-    querySelectorAll: (selector) => selector === '#topTitle' ? [title] : [],
-    querySelector: (selector) => selector === '#topTitle' ? title : null,
+    querySelectorAll: (selector) => {
+      if (selector === '#topTitle') return [title];
+      if (selector === '.page.active[id]') return [chatPage, projectPage].filter((page) => page.classList.contains('active'));
+      if (selector === '[data-ui-screen].active, [data-ui-screen][aria-hidden="false"]') {
+        return [chatPage, projectPage].filter((page) => (
+          page.getAttribute('data-ui-screen')
+          && (page.classList.contains('active') || page.getAttribute('aria-hidden') === 'false')
+        ));
+      }
+      return [];
+    },
+    querySelector: (selector) => {
+      if (selector === '#topTitle') return title;
+      return null;
+    },
   };
   const computedStyle = {
     width: '180px', height: '48px', paddingTop: '0px', paddingRight: '0px',
@@ -178,6 +220,12 @@ function runBridgeBehavior() {
       windowListeners.set(type, listeners);
     },
     dispatchEvent: (event) => authEvents.push(event),
+    setTimeout: (callback) => {
+      const timer = nextTimer++;
+      pendingTimers.set(timer, callback);
+      return timer;
+    },
+    clearTimeout: (timer) => pendingTimers.delete(timer),
   };
   const history = {
     pushState() {},
@@ -186,10 +234,21 @@ function runBridgeBehavior() {
   class FakeCustomEvent {
     constructor(type, options) { this.type = type; this.detail = options.detail; }
   }
+  class FakeMutationObserver {
+    constructor(callback) { this.callback = callback; screenObserver = this; }
+    observe(target, options) { this.target = target; this.options = options; }
+    disconnect() {}
+  }
+  const flushTimers = () => {
+    const callbacks = Array.from(pendingTimers.values());
+    pendingTimers.clear();
+    callbacks.forEach((callback) => callback());
+  };
   const context = {
     window, document, history, URLSearchParams,
     Node: { TEXT_NODE: 3 }, Element: FakeElement,
     CSS: { escape: (value) => value }, CustomEvent: FakeCustomEvent,
+    MutationObserver: FakeMutationObserver,
   };
   vm.runInNewContext(bridge, context);
 
@@ -197,6 +256,10 @@ function runBridgeBehavior() {
   assert.equal(documentListeners.get('click').length, 1, 'bridge should install exactly one selection listener');
   assert.equal(posted.filter((message) => message.type === 'ready').length, 1, 'bridge should emit one ready event');
   assert.equal(posted.filter((message) => message.type === 'route-changed').length, 1, 'bridge should emit one initial route event');
+  assert.equal(posted.find((message) => message.type === 'route-changed').payload.screenKey, 'page:chatPage|title:好友');
+  assert.equal(screenObserver.target, body, 'screen observer should watch the rendered PWA body');
+  assert.ok(screenObserver.options.characterData, 'screen observer should watch visible title text');
+  assert.ok(!screenObserver.options.attributeFilter.includes('style'), 'screen observer should exclude style mutations');
 
   let interactionPrevented = false;
   documentListeners.get('click')[0]({
@@ -227,6 +290,7 @@ function runBridgeBehavior() {
   assert.equal(title.style.getPropertyValue('font-size'), '22px', 'font size must update synchronously on the real DOM');
   assert.equal(posted.length, messagesBeforeStyle + 1, 'one style command should produce one acknowledgement without a message loop');
   assert.equal(posted.at(-1).type, 'style-applied');
+  assert.equal(posted.filter((message) => message.type === 'route-changed').length, 1, 'editing inline style must not emit a screen change');
 
   const draft = {
     draftKey: 'project-1|/web|||390x844', revision: 7,
@@ -239,6 +303,37 @@ function runBridgeBehavior() {
   assert.equal(posted.at(-1).payload.revision, 7, 'the acknowledgement should preserve the applied revision');
   command('apply-draft', draft);
   assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 1, 'a repeated draft revision must not apply or acknowledge twice');
+
+  const routeCountBeforeScreenSwitch = posted.filter((message) => message.type === 'route-changed').length;
+  chatPage.classList.toggle('active', false);
+  projectPage.classList.toggle('active', true);
+  setTitle('一龙项目');
+  screenObserver.callback([{ type: 'attributes', attributeName: 'class' }]);
+  screenObserver.callback([{ type: 'characterData' }]);
+  flushTimers();
+  let routeMessages = posted.filter((message) => message.type === 'route-changed');
+  assert.equal(routeMessages.length, routeCountBeforeScreenSwitch + 1, 'one real screen switch should be debounced into one route message');
+  assert.equal(routeMessages.at(-1).payload.screenKey, 'page:projectPage|title:一龙项目');
+  assert.equal(routeMessages.at(-1).payload.screenTitle, '一龙项目');
+
+  screenObserver.callback([{ type: 'attributes', attributeName: 'class' }]);
+  flushTimers();
+  routeMessages = posted.filter((message) => message.type === 'route-changed');
+  assert.equal(routeMessages.length, routeCountBeforeScreenSwitch + 1, 'an unchanged screen signature must not emit repeatedly');
+
+  setTitle('演示项目');
+  screenObserver.callback([{ type: 'characterData' }]);
+  flushTimers();
+  routeMessages = posted.filter((message) => message.type === 'route-changed');
+  assert.equal(routeMessages.at(-1).payload.screenKey, 'page:projectPage|title:演示项目', 'different project titles on projectPage should produce isolated screen keys');
+
+  projectPage.setAttribute('data-ui-screen', 'Project:Stable-42');
+  projectPage.setAttribute('data-ui-screen-title', '稳定项目画面');
+  screenObserver.callback([{ type: 'attributes', attributeName: 'data-ui-screen' }]);
+  flushTimers();
+  routeMessages = posted.filter((message) => message.type === 'route-changed');
+  assert.equal(routeMessages.at(-1).payload.screenKey, 'data-ui-screen:project:stable-42', 'explicit data-ui-screen should override the page/title fallback');
+  assert.equal(routeMessages.at(-1).payload.screenTitle, '稳定项目画面');
 }
 
 runAuthBootstrap();

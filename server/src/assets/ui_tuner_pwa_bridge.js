@@ -57,20 +57,42 @@
     return normalizedScreenText(value, 160).toLowerCase();
   }
 
+  function stableElement(elements, identity) {
+    return Array.from(elements || [])
+      .filter((element) => element && normalizedScreenText(identity(element), 160))
+      .sort((left, right) => {
+        const leftKey = normalizedScreenText(identity(left), 160);
+        const rightKey = normalizedScreenText(identity(right), 160);
+        return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+      })[0] || null;
+  }
+
+  function activePageElement() {
+    return stableElement(document.querySelectorAll('.page.active[id]'), (element) => element.id);
+  }
+
   function explicitScreenElement(activePage) {
-    const activeChild = activePage && typeof activePage.querySelector === 'function'
-      ? activePage.querySelector('[data-ui-screen]')
-      : null;
+    if (activePage && normalizedScreenText(activePage.getAttribute('data-ui-screen'), 160)) return activePage;
     const activeParent = activePage && typeof activePage.closest === 'function'
       ? activePage.closest('[data-ui-screen]')
       : null;
-    const statefulExplicit = document.querySelector('[data-ui-screen].active, [data-ui-screen][aria-hidden="false"]');
-    return [activePage, activeChild, activeParent, statefulExplicit, document.body, document.documentElement]
+    if (activeParent && normalizedScreenText(activeParent.getAttribute('data-ui-screen'), 160)) return activeParent;
+    const activeChildren = activePage && typeof activePage.querySelectorAll === 'function'
+      ? activePage.querySelectorAll('[data-ui-screen]')
+      : [];
+    const scopedExplicit = stableElement(activeChildren, (element) => element.getAttribute('data-ui-screen'));
+    if (scopedExplicit) return scopedExplicit;
+    const statefulExplicit = stableElement(
+      document.querySelectorAll('[data-ui-screen].active, [data-ui-screen][aria-hidden="false"]'),
+      (element) => element.getAttribute('data-ui-screen'),
+    );
+    if (statefulExplicit) return statefulExplicit;
+    return [document.body, document.documentElement]
       .find((element) => element && normalizedScreenText(element.getAttribute('data-ui-screen'), 160)) || null;
   }
 
   function screenIdentity() {
-    const activePage = document.querySelector('.page.active[id]');
+    const activePage = activePageElement();
     const topTitle = document.querySelector('#topTitle');
     const visibleTitle = normalizedScreenText(topTitle && compactText(topTitle), 160);
     const explicit = explicitScreenElement(activePage);
