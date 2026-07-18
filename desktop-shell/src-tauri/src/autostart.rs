@@ -42,7 +42,7 @@ $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = $target
 $link.WorkingDirectory = Split-Path -Parent $target
-$link.IconLocation = $target
+$link.IconLocation = "$target,0"
 $link.Description = '开机自动启动一龙工作台'
 $link.Save()
 "#,

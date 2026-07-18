@@ -136,7 +136,7 @@ foreach ($item in $items) {{
   $link.TargetPath = if ($item.Target -eq 'uninstall') {{ $uninstall }} else {{ $client }}
   $link.Arguments = $item.Arguments
   $link.WorkingDirectory = $workdir
-  $link.IconLocation = $link.TargetPath
+  $link.IconLocation = "$($link.TargetPath),0"
   $link.Description = $item.Description
   $link.Save()
 }}
@@ -244,33 +244,52 @@ pub(crate) fn create_desktop_shortcut(install_dir: &Path) -> Result<()> {
     let _ = install_dir;
     #[cfg(windows)]
     {
-        let target = paths::client_exe(install_dir);
-        let workdir = install_dir.to_path_buf();
-        let script = format!(
-            r#"
+        write_desktop_shortcut(install_dir, true)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn refresh_existing_desktop_shortcut(install_dir: &Path) -> Result<()> {
+    #[cfg(not(windows))]
+    let _ = install_dir;
+    #[cfg(windows)]
+    {
+        write_desktop_shortcut(install_dir, false)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn write_desktop_shortcut(install_dir: &Path, create_if_missing: bool) -> Result<()> {
+    let target = paths::client_exe(install_dir);
+    let workdir = install_dir.to_path_buf();
+    let script = format!(
+        r#"
 $desktop = [Environment]::GetFolderPath('Desktop')
 if (-not (Test-Path -LiteralPath $desktop)) {{
   New-Item -ItemType Directory -Force -Path $desktop | Out-Null
 }}
 $shortcut = Join-Path $desktop '{}.lnk'
+if (-not {} -and -not (Test-Path -LiteralPath $shortcut)) {{ exit 0 }}
 $target = '{}'
 $workdir = '{}'
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = $target
 $link.WorkingDirectory = $workdir
-$link.IconLocation = $target
+$link.IconLocation = "$target,0"
+$link.Description = '打开一龙开发平台'
 $link.Save()
 "#,
-            launcher_command::ps_single_quote(APP_NAME),
-            launcher_command::ps_single_quote(&target.to_string_lossy()),
-            launcher_command::ps_single_quote(&workdir.to_string_lossy())
-        );
-        let mut cmd = launcher_command::powershell_hidden_command(&script);
-        let status = launcher_command::status_hidden(&mut cmd).context("无法创建桌面快捷方式")?;
-        if !status.success() {
-            anyhow::bail!("创建桌面快捷方式失败");
-        }
+        launcher_command::ps_single_quote(APP_NAME),
+        if create_if_missing { "$true" } else { "$false" },
+        launcher_command::ps_single_quote(&target.to_string_lossy()),
+        launcher_command::ps_single_quote(&workdir.to_string_lossy())
+    );
+    let mut cmd = launcher_command::powershell_hidden_command(&script);
+    let status = launcher_command::status_hidden(&mut cmd).context("无法刷新桌面快捷方式")?;
+    if !status.success() {
+        anyhow::bail!("刷新桌面快捷方式失败");
     }
     Ok(())
 }
@@ -346,7 +365,7 @@ $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = $client
 $link.Arguments = '{}'
 $link.WorkingDirectory = $workdir
-$link.IconLocation = $client
+$link.IconLocation = "$client,0"
 $link.Description = '登录 Windows 后启动一龙开发平台后台守护'
 $link.Save()
 "#,
@@ -508,6 +527,17 @@ mod tests {
         assert!(source.contains("create_autostart_startup_shortcut"));
         assert!(source.contains("remove_autostart_startup_shortcut"));
         assert!(source.contains("登录 Windows 后启动一龙开发平台后台守护"));
+    }
+
+    #[test]
+    fn shortcuts_and_protocol_use_installed_brand_executables() {
+        let source = include_str!("windows_integration.rs");
+
+        assert!(source.contains("$link.IconLocation = \"$($link.TargetPath),0\""));
+        assert!(source.contains("$link.IconLocation = \"$target,0\""));
+        assert!(source.contains("$link.IconLocation = \"$client,0\""));
+        assert!(source.contains("format!(\"\\\"{}\\\",0\", client.display())"));
+        assert!(source.contains("refresh_existing_desktop_shortcut"));
     }
 }
 

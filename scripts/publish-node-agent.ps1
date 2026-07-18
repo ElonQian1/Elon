@@ -45,6 +45,7 @@ $ServerManifest = Join-Path $ServerDir "Cargo.toml"
 $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir = Join-Path $PcFrontendDir "dist"
 $DesktopShellManifest = Join-Path $RepoRoot "desktop-shell\src-tauri\Cargo.toml"
+$BrandIcon = Join-Path $RepoRoot "desktop-shell\src-tauri\icons\icon.ico"
 
 Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
 
@@ -518,7 +519,8 @@ foreach ($requiredPath in @(
     (Join-Path $RepoRoot "default-project-docs\files"),
     (Join-Path $RepoRoot "scripts\setup-node-env.ps1"),
     (Join-Path $ServerDir "src\node_agent_admin.html"),
-    $DesktopShellManifest
+    $DesktopShellManifest,
+    $BrandIcon
 )) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
         throw "发布目录不完整，缺少必要文件：$requiredPath。请在完整仓库 worktree 中运行。"
@@ -606,6 +608,7 @@ try {
 
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
+Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin -ExpectedIconPath $BrandIcon | Out-Null
 $WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerInvariant()
 
 # ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
@@ -656,8 +659,12 @@ if ($RipgrepExe) {
 }
 New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-Null
 try {
-    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "一龙开发平台.exe") -Force
-    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "卸载一龙开发平台.exe") -Force
+    $PackageClient = Join-Path $PackageRoot "一龙开发平台.exe"
+    $PackageUninstall = Join-Path $PackageRoot "卸载一龙开发平台.exe"
+    Copy-Item -LiteralPath $WinBin -Destination $PackageClient -Force
+    Copy-Item -LiteralPath $WinBin -Destination $PackageUninstall -Force
+    Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageClient -ExpectedIconPath $BrandIcon | Out-Null
+    Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageUninstall -ExpectedIconPath $BrandIcon | Out-Null
     Copy-Item -LiteralPath $DesktopShellBin -Destination (Join-Path $PackageInternal "elon-desktop.exe") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force

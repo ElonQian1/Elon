@@ -57,6 +57,9 @@ pub(crate) fn ensure_installed() -> Result<PathBuf> {
     let install_dir = paths::install_dir()?;
     if install_layout_ready(&install_dir) && paths::is_running_from_install_dir(&install_dir) {
         cleanup_legacy_files(&install_dir)?;
+        if let Err(error) = windows_integration::refresh_existing_desktop_shortcut(&install_dir) {
+            eprintln!("警告：刷新已有桌面快捷方式失败：{error:#}");
+        }
         if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
             eprintln!("警告：创建开始菜单入口失败：{error:#}");
         }

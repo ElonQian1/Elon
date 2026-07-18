@@ -159,19 +159,43 @@ fn repair_autostart_on_runtime_start() {
     let Ok(install_dir) = paths::install_dir() else {
         return;
     };
-    match windows_integration::repair_existing_autostart(&install_dir) {
-        Ok(()) => log_file::record_event(
-            &install_dir,
-            "autostart_runtime_repair",
-            true,
-            "checked existing autostart marker on runtime start",
+    if !paths::client_exe(&install_dir).exists() {
+        return;
+    }
+
+    let repairs = [
+        (
+            "desktop_shortcut",
+            windows_integration::refresh_existing_desktop_shortcut(&install_dir),
         ),
-        Err(error) => log_file::record_event(
-            &install_dir,
-            "autostart_runtime_repair",
-            false,
-            &format!("failed to repair existing autostart marker: {error:#}"),
+        (
+            "start_menu_shortcuts",
+            windows_integration::create_start_menu_shortcuts(&install_dir),
         ),
+        (
+            "autostart",
+            windows_integration::repair_existing_autostart(&install_dir),
+        ),
+        (
+            "url_protocol",
+            windows_integration::register_url_protocol(&install_dir),
+        ),
+    ];
+    for (target, result) in repairs {
+        match result {
+            Ok(()) => log_file::record_event(
+                &install_dir,
+                "windows_integration_runtime_repair",
+                true,
+                &format!("refreshed {target} on runtime start"),
+            ),
+            Err(error) => log_file::record_event(
+                &install_dir,
+                "windows_integration_runtime_repair",
+                false,
+                &format!("failed to refresh {target} on runtime start: {error:#}"),
+            ),
+        }
     }
 }
 

@@ -68,12 +68,15 @@ fn scheduled_update_paths_do_not_open_browser_tabs() {
 }
 
 #[test]
-fn runtime_start_checks_existing_autostart_marker() {
+fn runtime_start_refreshes_existing_windows_icon_integrations() {
     let source = include_str!("mod.rs");
 
     assert!(source.contains("repair_autostart_on_runtime_start"));
+    assert!(source.contains("refresh_existing_desktop_shortcut"));
+    assert!(source.contains("create_start_menu_shortcuts"));
     assert!(source.contains("repair_existing_autostart"));
-    assert!(source.contains("checked existing autostart marker on runtime start"));
+    assert!(source.contains("register_url_protocol"));
+    assert!(source.contains("windows_integration_runtime_repair"));
 }
 
 #[test]
