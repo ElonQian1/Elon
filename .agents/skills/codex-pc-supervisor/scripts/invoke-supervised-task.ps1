@@ -34,6 +34,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $script:SupervisionProtocol = 'elon.desktop_pc_supervision.v1'
 $script:LastNodeAdminUrl = ''
+$script:CachedNodeAdminUrl = ''
 $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $script:Utf8NoBomStrict = [System.Text.UTF8Encoding]::new($false, $true)
 $OutputEncoding = $script:Utf8NoBom
@@ -229,7 +230,10 @@ function Get-CachedNodeUrl {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
     try {
         $url = ([System.IO.File]::ReadAllText($path, $script:Utf8NoBomStrict)).TrimEnd('/')
-        if ($url -match '^http://127\.0\.0\.1:(7799|78(?:0[0-9]|1[0-9]))$') { return $url }
+        if ($url -match '^http://127\.0\.0\.1:(7799|78(?:0[0-9]|1[0-9]))$') {
+            $script:CachedNodeAdminUrl = $url
+            return $url
+        }
     } catch {}
     return ''
 }
@@ -237,10 +241,12 @@ function Get-CachedNodeUrl {
 function Save-CachedNodeUrl {
     param([string]$Url)
     if ($Url -notmatch '^http://127\.0\.0\.1:(7799|78(?:0[0-9]|1[0-9]))$') { return }
+    if ($script:CachedNodeAdminUrl -eq $Url) { return }
     try {
         $path = Get-NodeUrlCachePath
         [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($path)) | Out-Null
         [System.IO.File]::WriteAllText($path, $Url, $script:Utf8NoBom)
+        $script:CachedNodeAdminUrl = $Url
     } catch {}
 }
 

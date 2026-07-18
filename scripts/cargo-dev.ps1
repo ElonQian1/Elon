@@ -66,4 +66,13 @@ Import-Module (Join-Path $RepoRoot "scripts\rust-cache\RustCache.Inventory.psm1"
 Import-Module $modulePath -Force -DisableNameChecking
 Invoke-RustCachePreflightGc -CacheRoot $CacheRoot -RepoRoot $RepoRoot -Skip:$SkipCacheGc | Out-Null
 Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -NoLock:$NoLock -DisableSccache:$DisableSccache -LockTimeoutSeconds $LockTimeoutSeconds -CargoArgs $CargoArgs
-exit $LASTEXITCODE
+$cargoExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+if ($cargoExitCode -ne 0) {
+    # `exit` only leaves this script when cargo-dev.ps1 is invoked from another
+    # PowerShell script. Mark the host as well so nested CI/agent callers cannot
+    # finish with process exit code 0 after Cargo failed.
+    $host.SetShouldExit($cargoExitCode)
+    Write-Error "Cargo failed with exit code $cargoExitCode." -ErrorAction Continue
+    exit $cargoExitCode
+}
+exit 0
