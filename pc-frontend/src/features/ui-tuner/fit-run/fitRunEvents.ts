@@ -43,6 +43,7 @@ interface FitRunCodexRequestDetail extends FitRunCodexRequest {
 export interface FitRunCodexSettledDetail {
   taskId: string
   succeeded: boolean
+  error?: string
   settledAt?: string
 }
 

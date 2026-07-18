@@ -130,6 +130,8 @@ export function PwaStyleInspector({ session }: Props) {
         >
           <Bot size={16} />{session.syncState.phase === 'BUILD_VERIFYING'
             ? '正在构建并核验真实源码…'
+            : session.syncState.phase === 'AI_WRITING'
+              ? 'AI 正在写回源码…'
             : session.writebackPlan.requiresCodex
               ? '让 AI 建立绑定并验证 APK 与 PWA'
               : '写回源码并验证 APK 与 PWA'}

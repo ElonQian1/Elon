@@ -2,6 +2,7 @@ import type { PwaDesignDraft, PwaStyleProperty } from './pwaDesignDraft'
 
 export type PwaVerificationPhase =
   | 'LIVE_PREVIEW'
+  | 'AI_WRITING'
   | 'SOURCE_SAVED'
   | 'BUILD_VERIFYING'
   | 'BUILD_VERIFIED'
@@ -72,6 +73,23 @@ export interface PwaVerificationState {
 
 export function livePwaVerificationState(message = '真实 PWA 可正常使用；样式修改仍是临时预览'): PwaVerificationState {
   return { phase: 'LIVE_PREVIEW', message, mismatches: [] }
+}
+
+export function pwaAiWritingState(
+  previous: PwaVerificationState,
+  taskId: string,
+  message = 'AI 正在补充未绑定属性或结构修改；临时草稿会一直保留',
+): PwaVerificationState {
+  return {
+    ...previous,
+    phase: 'AI_WRITING',
+    message,
+    taskId,
+    evidence: undefined,
+    mismatches: [],
+    build: undefined,
+    snapshot: undefined,
+  }
 }
 
 export function pwaSourceSavedState(

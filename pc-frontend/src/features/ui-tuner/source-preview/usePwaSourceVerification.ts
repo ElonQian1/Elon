@@ -3,6 +3,7 @@ import { verifyPwaSourceBuild } from './sourcePreviewApi'
 import {
   completePwaVerification,
   livePwaVerificationState,
+  pwaAiWritingState,
   pwaBuildVerifyingState,
   pwaSourceSavedState,
   pwaVerifyFailedState,
@@ -67,6 +68,12 @@ export function usePwaSourceVerification({
     clearTimeout()
     pendingRef.current = evidence ? { evidence, snapshotRequested: false } : null
     update(pwaSourceSavedState(stateRef.current, evidence, message, taskId))
+  }, [clearTimeout, update])
+
+  const markAiWriting = useCallback((taskId: string, message?: string) => {
+    clearTimeout()
+    pendingRef.current = null
+    update(pwaAiWritingState(stateRef.current, taskId, message))
   }, [clearTimeout, update])
 
   const start = useCallback(async (evidence?: PwaSourceSavedEvidence) => {
@@ -139,6 +146,7 @@ export function usePwaSourceVerification({
   return {
     state,
     markLive,
+    markAiWriting,
     markSourceSaved,
     fail,
     start,

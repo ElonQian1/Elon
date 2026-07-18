@@ -209,13 +209,13 @@ export function usePwaDesignSession({
   useEffect(() => listenForFitRunCodexSettled((detail) => {
     if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
     if (detail.succeeded) {
-      verification.markSourceSaved(undefined, 'AI 已完成未绑定/结构修改；需刷新源码绑定并重新取得 changed files 后验证')
-      setSaveLabel('AI 写回任务已结束，但尚未通过真实构建与画面验证')
+      verification.markLive('AI 任务已完成；尚未取得 changed files 与源码哈希，因此不会误报“源码已保存”')
+      setSaveLabel('AI 任务已结束；草稿仍保留，等待刷新源码证据后再做真实构建验证')
     } else {
-      verification.fail('跨端 Codex 写回失败；草稿已保留，可修正后重试')
+      verification.fail(`跨端 Codex 写回失败：${detail.error || '任务未完成'}；草稿已保留，可直接重试`)
     }
     syncTaskIdRef.current = ''
-  }), [verification.fail, verification.markSourceSaved])
+  }), [verification.fail, verification.markLive])
 
   const bridgeContextRef = useRef({ model, onSelect, post, project, root, syncDraft, verification })
   bridgeContextRef.current = { model, onSelect, post, project, root, syncDraft, verification }
@@ -426,13 +426,13 @@ export function usePwaDesignSession({
         reason: plan.codexReasons.join('；'),
       })
       syncTaskIdRef.current = taskId
-      verification.markSourceSaved(undefined, androidResult.applied || pwaResult.applied
-        ? `确定性部分已保存 ${androidResult.applied + pwaResult.applied} 个绑定；AI 只补未绑定属性或结构修改`
-        : '已进入现有 AI 会话，只处理未绑定属性或结构修改', taskId)
+      verification.markAiWriting(taskId, androidResult.applied || pwaResult.applied
+        ? `确定性部分已保存 ${androidResult.applied + pwaResult.applied} 个绑定；AI 正在补未绑定属性或结构修改`
+        : 'AI 正在处理未绑定属性或结构修改；草稿仍保留，当前不算源码已保存')
     } catch (error) {
       verification.fail(error instanceof Error ? error.message : '跨端同步任务启动失败')
     }
-  }, [applyDraftState, model, root, selection, setMode, verification.fail, verification.markLive, verification.markSourceSaved, verification.start])
+  }, [applyDraftState, model, root, selection, setMode, verification.fail, verification.markAiWriting, verification.markLive, verification.markSourceSaved, verification.start])
 
   const copyCliPackage = useCallback(async () => {
     const current = model.draft

@@ -35,6 +35,7 @@ import {
 } from './fit-run/fitRunEvents'
 import { useFitRunStore } from './fit-run/fitRunStore'
 import { TERMINAL_FIT_RUN_PHASES } from './fit-run/types'
+import { loadAiTaskSettlement } from './fit-run/taskSettlement'
 import panelStyles from './UiTunerPanels.module.css'
 
 interface UiTunerProjectSessionPanelProps {
@@ -87,6 +88,7 @@ export function UiTunerProjectSessionPanel({
   const [fitRunTask, setFitRunTask] = useState<FitRunTaskRef | null>(null)
   const [fitRunStarting, setFitRunStarting] = useState(false)
   const fitRunStartingRef = useRef(false)
+  const headlessSettledTaskRef = useRef('')
   const activeFitRun = useFitRunStore((state) => state.run)
   const startSessionRef = useRef<(
     mode: UiTunerConversationMode,
@@ -215,6 +217,35 @@ export function UiTunerProjectSessionPanel({
     const timer = window.setInterval(() => { void refreshWorkspace(false) }, 4_000)
     return () => window.clearInterval(timer)
   }, [refreshWorkspace, selectedSession])
+
+  useEffect(() => {
+    const taskId = clean(trackedFitRunTask?.taskId)
+    const projectId = clean(activeProject?.id)
+    const channelId = clean(aiChannel?.id)
+    if (!headless || !taskId || !projectId || !channelId || headlessSettledTaskRef.current === taskId) return
+    let canceled = false
+    let timer = 0
+    const poll = async () => {
+      try {
+        const settlement = await loadAiTaskSettlement(projectId, channelId, taskId)
+        if (canceled) return
+        if (settlement) {
+          headlessSettledTaskRef.current = taskId
+          notifyFitRunCodexSettled(settlement)
+          setFitRunTask((current) => current?.taskId === taskId ? null : current)
+          return
+        }
+      } catch {
+        // The server task may not be queryable for a short time immediately after launch.
+      }
+      if (!canceled) timer = window.setTimeout(poll, 4_000)
+    }
+    void poll()
+    return () => {
+      canceled = true
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [activeProject?.id, aiChannel?.id, headless, trackedFitRunTask?.taskId])
 
   async function startSession(
     mode: UiTunerConversationMode,
