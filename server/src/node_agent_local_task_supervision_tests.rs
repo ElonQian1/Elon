@@ -220,3 +220,30 @@ fn resume_requires_explicit_current_protocol() {
     .expect("current protocol should admit resume");
     assert_eq!(current.protocol, SUPERVISION_PROTOCOL);
 }
+
+#[test]
+fn post_task_improvement_requires_explicit_protocol_parent_and_root() {
+    let missing_protocol = normalize_contract(SupervisionContractInput {
+        protocol: None,
+        supervisor: None,
+        task_role: Some("post_task_improvement".to_string()),
+        parent_task_id: Some("local-parent".to_string()),
+        root_task_id: Some("local-root".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: Some("after_task_only".to_string()),
+    })
+    .expect_err("self evolution must not infer its security protocol");
+    assert!(missing_protocol.contains("必须显式携带 supervision.protocol"));
+
+    let missing_root = normalize_contract(SupervisionContractInput {
+        protocol: Some(SUPERVISION_PROTOCOL.to_string()),
+        supervisor: None,
+        task_role: Some("post_task_improvement".to_string()),
+        parent_task_id: Some("local-parent".to_string()),
+        root_task_id: None,
+        acceptance_criteria: Vec::new(),
+        improvement_policy: Some("after_task_only".to_string()),
+    })
+    .expect_err("self evolution must carry its exact root identity");
+    assert!(missing_root.contains("parent_task_id 和 root_task_id"));
+}

@@ -134,6 +134,7 @@ mod node_agent_restart_drain;
 mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
+mod node_agent_self_evolution;
 mod node_agent_server_runtime;
 mod node_agent_session;
 mod node_agent_session_cancel;
@@ -431,6 +432,7 @@ async fn run_agent_runtime() -> Result<()> {
         warn!(%error, "记录节点更新 runtime-online 阶段失败");
     }
     runtime.spawn_lifecycle_heartbeat();
+    node_agent_self_evolution::spawn_scheduler(runtime.clone());
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
     project_document_maintenance::spawn_maintenance_worker();

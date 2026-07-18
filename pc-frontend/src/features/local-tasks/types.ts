@@ -194,3 +194,55 @@ export interface LocalTaskStatusView {
 }
 
 export type LocalTaskApprovalDecision = 'approve' | 'deny'
+
+export interface SelfEvolutionItem {
+  logical_id: string
+  root_task_id: string
+  parent_task_id: string
+  project_id: string
+  conversation_id: string
+  workspace_path: string
+  prompt: string
+  status: string
+  active_task_id?: string
+  generation: number
+  pause_reason?: string
+  review_verdict?: string
+  review_note?: string
+  created_at_ms?: number
+  updated_at_ms?: number
+}
+
+export interface SelfEvolutionGates {
+  foreground_task_ids: string[]
+  publish_active: boolean
+  publish_status: string
+  publish_owner?: string
+  publish_waiter_count: number
+  update_active: boolean
+  resource_pressure: boolean
+  checked_at_ms?: number
+}
+
+export interface SelfEvolutionQueue {
+  items: SelfEvolutionItem[]
+  gates: SelfEvolutionGates
+}
+
+export interface GlobalPublishLeaseEntry {
+  token: string
+  kind: string
+  sha: string
+  builderLabel: string
+  requestedAt?: number
+  leaseExpiresAt?: number
+}
+
+export interface GlobalPublishStatus {
+  owner?: GlobalPublishLeaseEntry
+  waiters: GlobalPublishLeaseEntry[]
+  waiterCount: number
+  queuePolicy: string
+  coalescingKey: string
+  immutableReleaseSha: boolean
+}

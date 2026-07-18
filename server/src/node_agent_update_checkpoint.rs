@@ -86,10 +86,23 @@ fn checkpoint_active_update_transactions(
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
     for task in local_tasks.list_update_candidates()? {
+        let contract = load_supervision_contract(journal, &task.task_id)?;
+        if contract.as_ref().is_some_and(|contract| {
+            contract.protocol == SUPERVISION_PROTOCOL
+                && contract.task_role == "post_task_improvement"
+        }) {
+            let audit = homecli_proto::CancelRequestAudit::now(
+                "node_agent",
+                "self_evolution_scheduler",
+                "yield_for_node_update",
+            );
+            let _ = sidecars.record_cancel_command_with_audit(&task.task_id, &audit);
+            continue;
+        }
         decision
             .active_foreground_task_ids
             .push(task.task_id.clone());
-        let Some(contract) = load_supervision_contract(journal, &task.task_id)? else {
+        let Some(contract) = contract else {
             continue;
         };
         if contract.protocol != SUPERVISION_PROTOCOL {

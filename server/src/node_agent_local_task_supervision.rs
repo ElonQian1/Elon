@@ -160,9 +160,13 @@ pub(crate) fn normalize_contract(
             "post_task_improvement",
         ],
     )?;
-    if task_role == "resume_original" && requested_protocol != Some(SUPERVISION_PROTOCOL) {
+    if matches!(
+        task_role.as_str(),
+        "resume_original" | "post_task_improvement"
+    ) && requested_protocol != Some(SUPERVISION_PROTOCOL)
+    {
         return Err(format!(
-            "resume_original 必须显式携带 supervision.protocol={SUPERVISION_PROTOCOL}。"
+            "{task_role} 必须显式携带 supervision.protocol={SUPERVISION_PROTOCOL}。"
         ));
     }
     let improvement_policy = clean_enum(
@@ -175,6 +179,10 @@ pub(crate) fn normalize_contract(
     )?;
     let parent_task_id = clean_optional_id(input.parent_task_id.as_deref(), "parent_task_id")?;
     let root_task_id = clean_optional_id(input.root_task_id.as_deref(), "root_task_id")?;
+    if task_role == "post_task_improvement" && (parent_task_id.is_none() || root_task_id.is_none())
+    {
+        return Err("post_task_improvement 必须携带 parent_task_id 和 root_task_id。".to_string());
+    }
     let acceptance_criteria = clean_list(
         input.acceptance_criteria,
         MAX_CRITERIA,
@@ -388,6 +396,46 @@ async fn review_task(
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
+}
+
+pub(crate) fn record_system_review(
+    runtime: &NodeRuntime,
+    task_id: &str,
+    verdict: &str,
+    summary: &str,
+) -> anyhow::Result<()> {
+    let task = runtime
+        .local_tasks
+        .get(task_id)?
+        .context("reviewed local task was not found")?;
+    let contract = load_supervision_state(&runtime.task_journal, task_id)?.contract;
+    let review = SupervisionReview {
+        protocol: SUPERVISION_PROTOCOL.to_string(),
+        verdict: verdict.to_string(),
+        summary: summary.trim().to_string(),
+        improvements: Vec::new(),
+        reviewed_by: "codex_desktop".to_string(),
+        reviewed_at_ms: now_ms(),
+    };
+    record_supervision_event(
+        &runtime.task_journal,
+        task_id,
+        "supervision_review",
+        serde_json::to_value(&review)?,
+    )?;
+    runtime.update_recovery.record_final_review(
+        task_id,
+        crate::node_agent_update_recovery::UpdateRecoveryReview {
+            verdict: review.verdict.clone(),
+            summary: review.summary.clone(),
+            reviewed_by: review.reviewed_by.clone(),
+            reviewed_at_ms: review.reviewed_at_ms,
+        },
+    )?;
+    if verdict == "accepted" {
+        release_accepted_worktree_lease(runtime, &task, contract.as_ref(), task_id)?;
+    }
+    Ok(())
 }
 
 fn release_accepted_worktree_lease(

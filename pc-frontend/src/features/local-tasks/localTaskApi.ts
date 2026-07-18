@@ -5,6 +5,7 @@ import type {
   LocalTaskApprovalDecision,
   LocalTaskCreateInput,
 } from './types'
+import { api } from '../../api/client'
 
 const LOCAL_TASKS_PATH = '/api/local-tasks'
 
@@ -60,6 +61,38 @@ export function decideLocalTaskApproval(
       method: 'POST',
       body: JSON.stringify({ decision }),
     },
+  )
+}
+
+export function listSelfEvolution(): Promise<unknown> {
+  return nodeApi(safeNodeAdminUrl(), '/api/self-evolution')
+}
+
+export function pauseSelfEvolution(logicalId: string): Promise<unknown> {
+  return selfEvolutionAction(logicalId, 'pause')
+}
+
+export function resumeSelfEvolution(logicalId: string): Promise<unknown> {
+  return selfEvolutionAction(logicalId, 'resume')
+}
+
+export function reviewSelfEvolution(logicalId: string, verdict: 'approve' | 'reject'): Promise<unknown> {
+  return nodeApi(
+    safeNodeAdminUrl(),
+    `/api/self-evolution/${encodeURIComponent(logicalId)}/review`,
+    { method: 'POST', body: JSON.stringify({ verdict }) },
+  )
+}
+
+export function getGlobalPublishStatus(): Promise<unknown> {
+  return api.get('/api/release/status')
+}
+
+function selfEvolutionAction(logicalId: string, action: 'pause' | 'resume'): Promise<unknown> {
+  return nodeApi(
+    safeNodeAdminUrl(),
+    `/api/self-evolution/${encodeURIComponent(logicalId)}/${action}`,
+    { method: 'POST' },
   )
 }
 

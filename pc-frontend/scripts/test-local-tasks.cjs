@@ -20,6 +20,7 @@ require.extensions['.ts'] = function loadTsModule(module, filename) {
 
 try {
   const model = require(path.join(pcRoot, 'src', 'features', 'local-tasks', 'localTaskModel.ts'))
+  const operations = require(path.join(pcRoot, 'src', 'features', 'local-tasks', 'localOperationsModel.ts'))
   const taskTitle = require(path.join(pcRoot, 'src', 'lib', 'taskTitle.ts'))
 
   assert.strictEqual(taskTitle.readableTaskTitle(' 请修复登录按钮错位，并补充测试。 '), '修复登录按钮错位，并补充测试')
@@ -148,6 +149,23 @@ try {
   assert.strictEqual(model.syncStateLabel('pending'), '待云端恢复后同步')
   assert.strictEqual(model.syncStateLabel('retrying'), '同步重试中')
 
+  const evolution = operations.normalizeSelfEvolutionQueue({
+    items: [{ logical_id: 'evolution-1', root_task_id: 'root-1', parent_task_id: 'parent-1', project_id: 'project-1', conversation_id: 'self-evolution-1', status: 'paused', generation: 2, pause_reason: 'global_publish' }],
+    gates: { publish_active: true, publish_owner: 'server:builder-a', publish_waiter_count: 2 },
+  })
+  assert.strictEqual(evolution.items[0].generation, 2)
+  assert.strictEqual(evolution.items[0].pause_reason, 'global_publish')
+  assert.strictEqual(evolution.gates.publish_active, true)
+  assert.strictEqual(evolution.gates.publish_waiter_count, 2)
+  const publish = operations.normalizeGlobalPublishStatus({ globalPublish: {
+    owner: { token: 'owner-token', kind: 'server', sha: 'abcdef123456', builderLabel: 'builder-a' },
+    waiters: [{ token: 'waiter-token', kind: 'apk', sha: 'fedcba654321', builderLabel: 'builder-b' }],
+    waiterCount: 1, queuePolicy: 'fifo', coalescingKey: 'kind+sha', immutableReleaseSha: true,
+  } })
+  assert.strictEqual(publish.owner.kind, 'server')
+  assert.strictEqual(publish.waiters[0].kind, 'apk')
+  assert.strictEqual(publish.immutableReleaseSha, true)
+
   const bannerSource = readSource('src/features/shell/LocalModeBanner.tsx')
   const shellSource = readSource('src/features/shell/Shell.tsx')
   const appSource = readSource('src/App.tsx')
@@ -157,6 +175,7 @@ try {
   const detailSource = readSource('src/features/local-tasks/LocalTaskDetailPanel.tsx')
   const supervisionSource = readSource('src/features/local-tasks/LocalTaskSupervisionPanel.tsx')
   const recoverySource = readSource('src/features/local-tasks/LocalTaskUpdateRecoveryPanel.tsx')
+  const operationsSource = readSource('src/features/local-tasks/LocalOperationsPanel.tsx')
   assert.ok(!bannerSource.includes('window.location.replace'), 'cloud recovery must not force navigation')
   assert.ok(bannerSource.includes('返回云端工作台'), 'cloud recovery must expose an explicit return action')
   assert.ok(shellSource.includes('useNotifications(!localMode)'), 'local mode must disable cloud websocket notifications')
@@ -177,6 +196,10 @@ try {
   assert.ok(recoverySource.includes('更新恢复全过程'), 'update recovery stages must be visible in the PC workbench')
   assert.ok(recoverySource.includes('remote v1 字段已保留'), 'unverified remote recovery must be visibly fail-closed')
   assert.ok(recoverySource.includes('sidecar_output_offset'), 'the durable sidecar replay cursor must be visible')
+  assert.ok(recoverySource.includes('无需手动 Resume'), 'automatic update recovery must state that manual Resume is unnecessary')
+  assert.ok(operationsSource.includes('低优先自进化'), 'self evolution queue must be visible')
+  assert.ok(operationsSource.includes('全局发布租约'), 'global publish owner and waiters must be visible')
+  assert.ok(operationsSource.includes('待审查'), 'self evolution review state must be visible')
 
   console.log('pc-frontend local-task tests passed')
 } finally {

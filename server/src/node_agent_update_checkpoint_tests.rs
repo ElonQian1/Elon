@@ -70,3 +70,60 @@ fn legacy_active_task_without_supervision_checkpoint_defers_update() {
     assert!(!decision.install_may_proceed());
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn low_priority_post_task_improvement_yields_without_blocking_update() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-evolution-yield-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let local_tasks =
+        crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+    local_tasks
+        .create(LocalTaskStart {
+            task_id: "evolution-active",
+            owner_user_id: "owner",
+            agent_id: "agent",
+            install_id: "install",
+            project_id: "project",
+            channel_id: None,
+            conversation_id: "self-evolution",
+            workspace_path: root.to_string_lossy().as_ref(),
+            prompt: "improve after user task",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    let journal = crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
+    let contract = crate::node_agent_local_task_supervision::SupervisionContract {
+        protocol: SUPERVISION_PROTOCOL.to_string(),
+        supervisor: "codex_desktop".to_string(),
+        task_role: "post_task_improvement".to_string(),
+        parent_task_id: Some("user-task".to_string()),
+        root_task_id: Some("root-task".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: "after_task_only".to_string(),
+    };
+    crate::node_agent_local_task_supervision::record_supervision_event(
+        &journal,
+        "evolution-active",
+        "supervision_contract",
+        crate::node_agent_local_task_supervision::contract_payload(&contract),
+    )
+    .unwrap();
+
+    let decision = checkpoint_active_update_transactions(
+        &UpdateRecoveryStore::new(root.join("recovery.json")),
+        &local_tasks,
+        &journal,
+        &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
+        "old",
+        "new",
+    )
+    .unwrap();
+    assert!(decision.active_foreground_task_ids.is_empty());
+    assert!(decision.checkpointed_task_ids.is_empty());
+    assert!(decision.install_may_proceed());
+    let _ = std::fs::remove_dir_all(root);
+}

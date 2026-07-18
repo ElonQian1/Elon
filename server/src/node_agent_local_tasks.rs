@@ -78,6 +78,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             post(decide_approval),
         )
         .merge(crate::node_agent_local_task_supervision::routes())
+        .merge(crate::node_agent_self_evolution::routes())
         .merge(crate::node_agent_update_recovery_api::routes())
 }
 
@@ -260,6 +261,44 @@ async fn create_task(
             "离线本机任务首版只允许已显式授权的 full_access 工作目录。",
         );
     }
+    if supervision
+        .as_ref()
+        .is_some_and(|contract| contract.task_role == "post_task_improvement")
+    {
+        let contract = supervision.expect("post-task improvement contract checked");
+        return match crate::node_agent_self_evolution::enqueue(
+            &runtime,
+            &creds,
+            crate::node_agent_self_evolution::SelfEvolutionEnqueue {
+                project_id: project_id.to_string(),
+                channel_id: request
+                    .channel_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(ToOwned::to_owned),
+                workspace_path: workspace_path.to_string(),
+                prompt: prompt.to_string(),
+                runtime_permission: runtime_permission.to_string(),
+                contract,
+            },
+        )
+        .await
+        {
+            Ok(item) => (
+                StatusCode::ACCEPTED,
+                Json(json!({
+                    "ok": true,
+                    "task_id": item.logical_id,
+                    "status": item.status,
+                    "sync_state": "local_only",
+                    "self_evolution": item,
+                })),
+            )
+                .into_response(),
+            Err(error) => json_error(error.status, error.message),
+        };
+    }
     let resume_workspace =
         match crate::node_agent_local_task_resume_routes::resolve_supervised_resume_workspace(
             &runtime,
@@ -346,53 +385,14 @@ async fn create_task(
         Ok(record) => record,
         Err(error) => return internal_error(error),
     };
-    let (out_tx, out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
-    spawn_local_output_consumer(
+    dispatch_local_task_record(
         runtime.clone(),
-        creds.owner_user_id.clone(),
-        task_id.clone(),
-        out_rx,
-    );
-    spawn_cli_task(
-        runtime.clone(),
-        out_tx,
-        CliTaskDispatchRequest {
-            req_id: task_id.clone(),
-            cli: "codex".to_string(),
-            extra_args: Vec::new(),
-            cwd: Some(execution_workspace_path),
-            project_context: Some(CliProjectContext {
-                project_id: project_id.to_string(),
-                conversation_id: conversation_id.clone(),
-                runtime_permission: Some(runtime_permission.to_string()),
-            }),
-            codex_credential_binding: None,
-            requires_cloud_control: false,
-            cloud_control_deadline: None,
-            cloud_control_issued_at: None,
-            cloud_control_ttl_ms: None,
-            prompt: executor_prompt,
-            completion_context: crate::node_agent_cli_done::CliCompletionContext::local_offline(
-                CliCompletionProducerIdentity {
-                    owner_user_id: creds.owner_user_id.clone(),
-                    agent_id: creds.agent_id.clone(),
-                    install_id: runtime.install_id.clone(),
-                },
-                CliProjectContext {
-                    project_id: project_id.to_string(),
-                    conversation_id,
-                    runtime_permission: Some(runtime_permission.to_string()),
-                },
-                channel_id,
-                prompt.to_string(),
-                supervision
-                    .as_ref()
-                    .map(|contract| contract.protocol.clone()),
-            ),
-            inherited_workspace: resume_workspace.map(|workspace| workspace.inherited_workspace),
-            allow_codex_auth_switch: false,
-            frozen_codex_home: Some(frozen_codex_home),
-        },
+        &record,
+        executor_prompt,
+        execution_workspace_path,
+        supervision.as_ref(),
+        resume_workspace.map(|workspace| workspace.inherited_workspace),
+        frozen_codex_home,
     );
     (
         StatusCode::ACCEPTED,
@@ -407,6 +407,63 @@ async fn create_task(
         })),
     )
         .into_response()
+}
+
+pub(crate) fn dispatch_local_task_record(
+    runtime: Arc<NodeRuntime>,
+    record: &crate::node_agent_local_task_store::LocalTaskRecord,
+    executor_prompt: String,
+    execution_workspace_path: String,
+    supervision: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
+    inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
+    frozen_codex_home: crate::node_agent_codex_child_env::FrozenCodexHome,
+) {
+    let (out_tx, out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
+    spawn_local_output_consumer(
+        runtime.clone(),
+        record.owner_user_id.clone(),
+        record.task_id.clone(),
+        out_rx,
+    );
+    spawn_cli_task(
+        runtime.clone(),
+        out_tx,
+        CliTaskDispatchRequest {
+            req_id: record.task_id.clone(),
+            cli: "codex".to_string(),
+            extra_args: Vec::new(),
+            cwd: Some(execution_workspace_path),
+            project_context: Some(CliProjectContext {
+                project_id: record.project_id.clone(),
+                conversation_id: record.conversation_id.clone(),
+                runtime_permission: Some(record.runtime_permission.clone()),
+            }),
+            codex_credential_binding: None,
+            requires_cloud_control: false,
+            cloud_control_deadline: None,
+            cloud_control_issued_at: None,
+            cloud_control_ttl_ms: None,
+            prompt: executor_prompt,
+            completion_context: crate::node_agent_cli_done::CliCompletionContext::local_offline(
+                CliCompletionProducerIdentity {
+                    owner_user_id: record.owner_user_id.clone(),
+                    agent_id: record.agent_id.clone(),
+                    install_id: record.install_id.clone(),
+                },
+                CliProjectContext {
+                    project_id: record.project_id.clone(),
+                    conversation_id: record.conversation_id.clone(),
+                    runtime_permission: Some(record.runtime_permission.clone()),
+                },
+                record.channel_id.clone(),
+                record.prompt.clone(),
+                supervision.map(|contract| contract.protocol.clone()),
+            ),
+            inherited_workspace,
+            allow_codex_auth_switch: false,
+            frozen_codex_home: Some(frozen_codex_home),
+        },
+    );
 }
 
 async fn cancel_task(

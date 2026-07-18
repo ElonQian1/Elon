@@ -141,6 +141,30 @@ fn local_current_protocol_recovers_while_remote_and_capability_drift_fail_closed
 }
 
 #[test]
+fn remote_v1_identity_capability_lease_and_disconnect_fixture_stays_fail_closed() {
+    let local = UpdateRecoveryReceipt::planned("update-remote-fixture", "root", "task");
+    let mut remote = local.clone();
+    remote.transport = crate::node_agent_update_recovery::RecoveryTransport::remote_v1();
+    remote.transport.capabilities = local.transport.capabilities.clone();
+    remote.transport.replay_from_cursor = true;
+    remote.transport.lease_id = Some("remote-lease".to_string());
+    remote.transport.lease_expires_at_ms = Some(u128::MAX);
+    assert!(!remote.allows_local_reconcile(), "remote identity cannot borrow the local recovery authority even with capabilities and a live lease");
+
+    remote.transport.lease_expires_at_ms = Some(1);
+    assert!(
+        !remote.allows_local_reconcile(),
+        "expired remote lease fails closed"
+    );
+    remote.transport.lease_id = None;
+    remote.transport.lease_expires_at_ms = None;
+    assert!(
+        !remote.allows_local_reconcile(),
+        "disconnected remote transport without a lease fails closed"
+    );
+}
+
+#[test]
 fn release_and_task_identity_drift_fail_closed() {
     let expected = crate::node_agent_update_recovery::ReleaseIdentity {
         version: "0.3.70".to_string(),

@@ -24,6 +24,9 @@ export default function LocalTaskUpdateRecoveryPanel({
           <p className={styles.supervisionIntro}>
             节点以持久 receipt、journal 游标、sidecar 游标和 completion event 作为同一恢复事实源。
           </p>
+          <p className={styles.autoRecoveryStatus} data-resumed={['resumed', 'verified'].includes(recovery.state)}>
+            {automaticRecoveryLabel(recovery)}
+          </p>
           <dl className={styles.recoveryMeta}>
             <Item label="旧 runtime" value={releaseLabel(recovery.from_version, recovery.from_git_sha)} />
             <Item label="新 runtime" value={releaseLabel(recovery.to_version, recovery.to_git_sha)} />
@@ -54,6 +57,14 @@ export default function LocalTaskUpdateRecoveryPanel({
       )}
     </section>
   )
+}
+
+function automaticRecoveryLabel(recovery: LocalTaskUpdateRecovery): string {
+  if (recovery.state === 'verified') return '自动恢复已闭环：新 release 上的任务已继续增长游标并写入可靠终态，无需手动 Resume。'
+  if (recovery.state === 'resumed') return '自动恢复已接管：任务正在新 release 上继续运行，无需手动 Resume。'
+  if (['runtime_online', 'reattaching', 'resume_created'].includes(recovery.state)) return '新 runtime 已在线，节点正在自动重连或创建幂等续跑代次。'
+  if (['downloaded', 'checkpoint_saved', 'applying'].includes(recovery.state)) return '更新事务已保存现场；重启后将从 receipt 与游标自动续跑。'
+  return '更新恢复保持 fail-closed；仅在身份、能力、工作区和 lease 证据完整时自动继续。'
 }
 
 function Item({ label, value }: { label: string; value: string }) {

@@ -6,13 +6,20 @@ import { readableTaskTitle } from '../../lib/taskTitle'
 import { ensureLocalFullAccessGrant } from '../conversation/localPcRuntime'
 import LocalTaskCreateForm from './LocalTaskCreateForm'
 import LocalTaskDetailPanel from './LocalTaskDetailPanel'
+import LocalOperationsPanel from './LocalOperationsPanel'
 import {
   cancelLocalTask,
   createLocalTask,
   decideLocalTaskApproval,
   getLocalTask,
+  getGlobalPublishStatus,
   listLocalTasks,
+  listSelfEvolution,
+  pauseSelfEvolution,
+  resumeSelfEvolution,
+  reviewSelfEvolution,
 } from './localTaskApi'
+import { normalizeGlobalPublishStatus, normalizeSelfEvolutionQueue } from './localOperationsModel'
 import {
   localTaskStatus,
   mergeLocalTaskDetail,
@@ -28,11 +35,23 @@ import type {
   LocalTaskCreateInput,
   LocalTaskDetail,
   LocalTaskRecord,
+  GlobalPublishStatus,
+  SelfEvolutionQueue,
 } from './types'
 import styles from './LocalTasksPage.module.css'
 
 const LIST_POLL_MS = 5_000
 const DETAIL_POLL_MS = 1_600
+const EMPTY_EVOLUTION: SelfEvolutionQueue = {
+  items: [],
+  gates: {
+    foreground_task_ids: [], publish_active: false, publish_status: '', publish_waiter_count: 0,
+    update_active: false, resource_pressure: false,
+  },
+}
+const EMPTY_PUBLISH: GlobalPublishStatus = {
+  waiters: [], waiterCount: 0, queuePolicy: 'fifo', coalescingKey: 'kind+sha', immutableReleaseSha: true,
+}
 
 export default function LocalTasksPage() {
   const [tasks, setTasks] = useState<LocalTaskRecord[]>([])
@@ -47,6 +66,8 @@ export default function LocalTasksPage() {
   const [error, setError] = useState('')
   const [detailError, setDetailError] = useState('')
   const [notice, setNotice] = useState('')
+  const [evolution, setEvolution] = useState<SelfEvolutionQueue>(EMPTY_EVOLUTION)
+  const [publish, setPublish] = useState<GlobalPublishStatus>(EMPTY_PUBLISH)
 
   const refreshList = useCallback(async (quiet = false) => {
     if (!quiet) setListLoading(true)
@@ -66,11 +87,30 @@ export default function LocalTasksPage() {
     }
   }, [])
 
+  const refreshOperations = useCallback(async () => {
+    const [evolutionResult, publishResult] = await Promise.allSettled([
+      listSelfEvolution(),
+      getGlobalPublishStatus(),
+    ])
+    if (evolutionResult.status === 'fulfilled') {
+      setEvolution(normalizeSelfEvolutionQueue(evolutionResult.value))
+    }
+    if (publishResult.status === 'fulfilled') {
+      setPublish(normalizeGlobalPublishStatus(publishResult.value))
+    }
+  }, [])
+
   useEffect(() => {
     void refreshList()
     const timer = window.setInterval(() => void refreshList(true), LIST_POLL_MS)
     return () => window.clearInterval(timer)
   }, [refreshList])
+
+  useEffect(() => {
+    void refreshOperations()
+    const timer = window.setInterval(() => void refreshOperations(), LIST_POLL_MS)
+    return () => window.clearInterval(timer)
+  }, [refreshOperations])
 
   useEffect(() => {
     if (!selectedId) {
@@ -175,6 +215,27 @@ export default function LocalTasksPage() {
     }
   }
 
+  async function handleEvolutionAction(
+    logicalId: string,
+    action: 'pause' | 'resume' | 'approve' | 'reject',
+  ) {
+    if (actionKey) return
+    setActionKey(`evolution:${logicalId}:${action}`)
+    setError('')
+    try {
+      if (action === 'pause') await pauseSelfEvolution(logicalId)
+      else if (action === 'resume') await resumeSelfEvolution(logicalId)
+      else await reviewSelfEvolution(logicalId, action)
+      setNotice(action === 'pause' ? '自进化正在保存现场并让路。' : action === 'resume' ? '自进化已回到低优先队列。' : action === 'approve' ? '自进化审查已通过。' : '已退回自进化结果，等待下一代继续。')
+      await refreshOperations()
+      await refreshList(true)
+    } catch (err) {
+      setError(errorMessage(err, '自进化队列操作失败。'))
+    } finally {
+      setActionKey('')
+    }
+  }
+
   return (
     <div className={styles.page}>
       <header className={styles.header}>
@@ -208,6 +269,13 @@ export default function LocalTasksPage() {
         <div className={styles.errorNotice}>本机节点连接暂时中断，当前显示上次成功读取的任务列表。</div>
       )}
       {notice && <div className={styles.successNotice}>{notice}</div>}
+
+      <LocalOperationsPanel
+        evolution={evolution}
+        publish={publish}
+        actionKey={actionKey}
+        onAction={handleEvolutionAction}
+      />
 
       <div className={styles.workspace}>
         <aside className={styles.sidebar}>
