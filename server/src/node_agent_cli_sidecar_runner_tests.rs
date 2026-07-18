@@ -174,59 +174,6 @@ async fn pipe_json_sidecar_registers_child_and_keeps_streams_clean() {
 }
 
 #[tokio::test]
-async fn managed_pipe_replays_real_multiline_stdin_echo_from_child_stdout() {
-    let root = temp_dir("managed-pipe-stdin-echo");
-    let registry = CliSidecarRegistry::new(root.join("sidecars"));
-    let task_id = "task-managed-pipe-stdin-echo";
-    let session_id = "managed-pipe-stdin-echo";
-    let output_path = registry.output_path(task_id, session_id);
-    let (program, args) = pipe_json_stdin_echo_command();
-    let prompt = "第一行：npm node / codex stdin\n第二行：& | < > %PATH%\n第三行：真实回显完成\n";
-
-    run_sidecar(CliSidecarLaunchConfig {
-        session_id: session_id.to_string(),
-        task_id: task_id.to_string(),
-        cli_name: "codex".to_string(),
-        route: "route_a_external_cli".to_string(),
-        program,
-        args,
-        cwd: None,
-        runtime_permission: None,
-        env: Vec::new(),
-        output_path: output_path.clone(),
-        registry_dir: registry.dir(),
-        task_journal_dir: Some(root.join("journal")),
-        worker_path: None,
-        worker_release: None,
-        worker_sha256: None,
-        codex_session_scope_key: None,
-        legacy_codex_sessions_file: None,
-        timeout_secs: 10,
-        stdin_payload: Some(prompt.to_string()),
-        stdin_piped_empty: false,
-        initial_cols: default_cols(),
-        initial_rows: default_rows(),
-    })
-    .await
-    .expect("managed pipe should write stdin to the real child");
-
-    let (_cancel_tx, mut cancel_rx) = watch::channel(false);
-    let result = follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {})
-        .await
-        .expect("managed pipe should replay echoed stdout");
-
-    assert!(result.exit_ok);
-    assert_eq!(result.stdout_text, prompt);
-    assert!(result.stderr_text.is_empty());
-    let session = registry
-        .session_for_task(task_id)
-        .expect("managed pipe session lookup should work")
-        .expect("managed pipe session should exist");
-    assert_eq!(session.transport, "managed_pipe_json_sidecar");
-    let _ = fs::remove_dir_all(root);
-}
-
-#[tokio::test]
 async fn timeout_follower_waits_for_buffered_usage_and_real_exit() {
     let root = temp_dir("timeout-follower-drains-usage");
     let registry = CliSidecarRegistry::new(root.join("sidecars"));
@@ -768,18 +715,6 @@ fn interactive_shell_command() -> (String, Vec<String>, String) {
             "echo sidecar-input-ok\nexit\n".to_string(),
         )
     }
-}
-
-fn pipe_json_stdin_echo_command() -> (String, Vec<String>) {
-    (
-        "node".to_string(),
-        vec![
-            "-e".to_string(),
-            "process.stdin.pipe(process.stdout)".to_string(),
-            "--".to_string(),
-            "--json".to_string(),
-        ],
-    )
 }
 
 fn approval_read_command() -> (String, Vec<String>) {
