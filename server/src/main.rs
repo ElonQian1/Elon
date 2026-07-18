@@ -109,6 +109,7 @@ mod message_recall_migration;
 mod node_agent_atomic_file;
 mod node_agent_cli_security;
 mod node_agent_downloads;
+mod node_agent_supervision_worktree_lease;
 mod node_api;
 mod node_compute_admin;
 mod node_exec_api;
