@@ -27,10 +27,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
 . (Join-Path $PSScriptRoot "local-env.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
+. (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
@@ -50,6 +50,9 @@ $PublishLockPath = Join-Path `
     ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) `
     "Elon\locks\node-agent-publish-v1.lock"
 $PublishLock = Enter-NodeAgentPublishLock -Path $PublishLockPath
+$script:NodeReleaseToken = $null
+$script:NodeReleaseOwned = $false
+$script:NodeReleaseFinished = $false
 
 try {
     Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
@@ -521,6 +524,14 @@ if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
 $GitSha = Assert-NodeAgentPublishHeadCurrent -Phase "发布开始"
 $ReleaseIdentity = Get-NodeAgentReleaseIdentity -Version $PackageVersion -GitSha $GitSha
 $ReleaseChangelog = Resolve-NodeAgentChangelog -Explicit $Changelog -Sha $GitSha
+$nodeBuilderId = "$env:COMPUTERNAME-$env:USERNAME"
+if ([string]::IsNullOrWhiteSpace($nodeBuilderId) -or $nodeBuilderId -eq '-') {
+    $nodeBuilderId = "unknown-node-builder-$([Guid]::NewGuid().ToString('N').Substring(0, 8))" }
+$nodeClaim = Enter-ElonNodeAgentPublishLease -ReleaseApiBase "$BaseUrl/api/release" `
+    -Sha $GitSha -VersionName $PackageVersion -BuilderId $nodeBuilderId
+if (-not $nodeClaim) { return }
+$script:NodeReleaseToken = [string]$nodeClaim.token
+$script:NodeReleaseOwned = $true
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
@@ -672,7 +683,10 @@ $WindowsClientSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WindowsClie
 
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
 Write-Host "[3/5] 上传到服务器..." -ForegroundColor Yellow
-Assert-NodeAgentPublishHeadCurrent -Phase "上传前" | Out-Null
+$currentReleaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
+if ($currentReleaseSha -ne $GitSha) {
+    throw "上传前当前 worktree HEAD 已改变：claim=$GitSha, current=$currentReleaseSha。不可替换固定发布 SHA。"
+}
 ssh -o ProxyCommand=none $Server "mkdir -p $RemoteDir"
 scp -o ProxyCommand=none $LinuxBin "${Server}:${RemoteDir}/${Bin}"
 ssh -o ProxyCommand=none $Server "chmod +x ${RemoteDir}/${Bin}"
@@ -772,6 +786,15 @@ Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
+Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken `
+    -Success $true -Sha $GitSha -VersionName $PackageVersion
+$script:NodeReleaseFinished = $true
+} catch {
+    try { if ($script:NodeReleaseOwned -and -not $script:NodeReleaseFinished) {
+            Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+                -Token $script:NodeReleaseToken -Success $false -ErrorMessage ($_ | Out-String)
+        } } catch {}
+    throw
 } finally {
     Exit-NodeAgentPublishLock -Lock $PublishLock
 }

@@ -96,17 +96,6 @@ else:
 PY
 }
 
-release_post() {
-  local endpoint="$1"
-  local payload="$2"
-  local url="${RELEASE_API_BASE:?release api base not set}/$endpoint"
-  curl --noproxy '*' -sS --fail --max-time 30 \
-    -H 'Content-Type: application/json' \
-    -X POST \
-    -d "$payload" \
-    "$url"
-}
-
 git_fetch_hint() {
   local output="${1:-}"
   if [[ "$output" =~ (Could\ not\ resolve\ host|Name\ or\ service\ not\ known|Temporary\ failure\ in\ name\ resolution) ]]; then
@@ -367,6 +356,7 @@ restore_release_rustflags() {
 # ── 路径推导（兼容任意 PC、任意路径）──────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
+. "$SCRIPT_DIR/release-publish-lease.sh"
 if [ -z "$REPO_ROOT" ]; then
   echo -e "${RED}❌ 当前目录不在 git 仓库中${NC}" >&2; exit 1
 fi
@@ -532,8 +522,14 @@ if ! CLAIM_JSON=$(release_post claim "$CLAIM_PAYLOAD"); then
   echo -e "${RED}❌ /api/release/claim 失败，未开始编译。${NC}" >&2
   exit 1
 fi
+CLAIM_JSON=$(enter_global_publish_lease "$CLAIM_JSON" server "$RELEASE_API_BASE") || exit 1
+[ -n "$CLAIM_JSON" ] || exit 0
 
 CLAIM_ACTION=$(json_field "$CLAIM_JSON" action)
+if [ "$CLAIM_ACTION" = "coalesced" ] || { [ "$CLAIM_ACTION" = "finished" ] && [ "$(json_field "$CLAIM_JSON" tokenStatus.success)" = "true" ]; }; then
+  echo -e "${GREEN}   同一 SHA 已发布完成，本次请求已合并，无需重复构建。${NC}"
+  exit 0
+fi
 RELEASE_TOKEN=$(json_field "$CLAIM_JSON" token)
 ASSIGNED_VERSION=$(json_field "$CLAIM_JSON" assignedVersionName)
 IN_FLIGHT_COUNT=$(json_field "$CLAIM_JSON" inFlightCount)

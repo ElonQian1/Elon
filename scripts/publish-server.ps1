@@ -72,6 +72,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
@@ -605,9 +606,8 @@ try {
     Write-Error "❌ /api/release/claim 失败：$_"
 }
 
-if (-not $claim -or $claim.action -ne 'build') {
-    Write-Error "❌ release/claim 返回非预期响应：$($claim | ConvertTo-Json -Compress)"
-}
+$claim = Enter-ElonGlobalPublishLease -Claim $claim -Kind 'server' -ReleaseApiBase $ReleaseApiBase
+if (-not $claim) { exit 0 }
 
 $script:ReleaseToken = [string]$claim.token
 $AssignedVersion     = [string]$claim.assignedVersionName

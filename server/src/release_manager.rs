@@ -14,7 +14,7 @@ use tokio::sync::Mutex;
 use crate::types::AppState;
 
 /// 最长 lease 时长（秒）。客户端要求再长也截到这里。
-pub(crate) const MAX_LEASE_SECS: i64 = 3600; // 1 h
+pub(crate) const MAX_LEASE_SECS: i64 = 14_400; // 4 h; node-agent cross builds can be lengthy
 
 // ===== 持久化结构 =====
 
@@ -34,6 +34,49 @@ pub struct InFlightBuilder {
     pub claimed_at: i64,
     pub last_heartbeat: i64,
     pub lease_expires_at: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishLeaseEntry {
+    pub token: String,
+    pub kind: String,
+    pub sha: String,
+    pub builder_id: String,
+    pub builder_label: String,
+    pub requested_at: i64,
+    pub last_heartbeat: i64,
+    pub lease_expires_at: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishCompletion {
+    pub token: String,
+    pub kind: String,
+    pub sha: String,
+    pub success: bool,
+    pub coalesced: bool,
+    pub finished_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_message: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalPublishState {
+    #[serde(default)]
+    pub owner: Option<PublishLeaseEntry>,
+    #[serde(default)]
+    pub waiters: Vec<PublishLeaseEntry>,
+    #[serde(default)]
+    pub completed: Vec<PublishCompletion>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum PublishAdmission {
+    Owner,
+    Waiter { queue_position: usize },
 }
 
 /// 一次已完成发布的快照。
@@ -72,6 +115,10 @@ pub(crate) struct ReleaseStateFile {
     pub(crate) server: LaneState,
     #[serde(default)]
     pub(crate) apk: LaneState,
+    #[serde(default)]
+    pub(crate) node_agent: LaneState,
+    #[serde(default)]
+    pub(crate) global_publish: GlobalPublishState,
 }
 
 // ===== 全局 Manager =====
@@ -116,16 +163,28 @@ pub(crate) fn manager(state: &AppState) -> Arc<ReleaseManager> {
 
 // ===== 内部辅助 =====
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Lane {
     Server,
     Apk,
+    NodeAgent,
+}
+
+impl Lane {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            Self::Server => "server",
+            Self::Apk => "apk",
+            Self::NodeAgent => "node_agent",
+        }
+    }
 }
 
 pub(crate) fn parse_kind(s: &str) -> Result<Lane, (StatusCode, Json<Value>)> {
     match s {
         "server" => Ok(Lane::Server),
         "apk" => Ok(Lane::Apk),
+        "node_agent" => Ok(Lane::NodeAgent),
         other => Err(err(
             StatusCode::BAD_REQUEST,
             "bad-kind",
@@ -138,6 +197,7 @@ pub(crate) fn lane(state: &ReleaseStateFile, k: Lane) -> &LaneState {
     match k {
         Lane::Server => &state.server,
         Lane::Apk => &state.apk,
+        Lane::NodeAgent => &state.node_agent,
     }
 }
 
@@ -145,11 +205,124 @@ pub(crate) fn lane_mut(state: &mut ReleaseStateFile, k: Lane) -> &mut LaneState 
     match k {
         Lane::Server => &mut state.server,
         Lane::Apk => &mut state.apk,
+        Lane::NodeAgent => &mut state.node_agent,
     }
 }
 
 pub(crate) fn sweep_expired(lane: &mut LaneState, now: i64) {
     lane.in_flight.retain(|b| b.lease_expires_at > now);
+}
+
+pub(crate) fn sweep_global_expired(state: &mut ReleaseStateFile, now: i64) {
+    let owner_expired = state
+        .global_publish
+        .owner
+        .as_ref()
+        .is_some_and(|owner| owner.lease_expires_at <= now);
+    if owner_expired {
+        if let Some(owner) = state.global_publish.owner.take() {
+            remove_publish_token_from_lanes(state, &owner.token);
+            state.global_publish.completed.push(PublishCompletion {
+                token: owner.token,
+                kind: owner.kind,
+                sha: owner.sha,
+                success: false,
+                coalesced: false,
+                finished_at: now,
+                error_message: Some("publish owner lease expired".to_string()),
+            });
+        }
+    }
+    let expired_waiters = state
+        .global_publish
+        .waiters
+        .iter()
+        .filter(|waiter| waiter.lease_expires_at <= now)
+        .map(|waiter| waiter.token.clone())
+        .collect::<Vec<_>>();
+    state
+        .global_publish
+        .waiters
+        .retain(|waiter| waiter.lease_expires_at > now);
+    for token in expired_waiters {
+        remove_publish_token_from_lanes(state, &token);
+    }
+    if state.global_publish.owner.is_none() && !state.global_publish.waiters.is_empty() {
+        state.global_publish.owner = Some(state.global_publish.waiters.remove(0));
+    }
+    if state.global_publish.completed.len() > 200 {
+        let keep_from = state.global_publish.completed.len() - 200;
+        state.global_publish.completed.drain(..keep_from);
+    }
+}
+
+pub(crate) fn enqueue_global_publish(
+    state: &mut ReleaseStateFile,
+    entry: PublishLeaseEntry,
+) -> PublishAdmission {
+    if state.global_publish.owner.is_none() {
+        state.global_publish.owner = Some(entry);
+        PublishAdmission::Owner
+    } else {
+        state.global_publish.waiters.push(entry);
+        PublishAdmission::Waiter {
+            queue_position: state.global_publish.waiters.len(),
+        }
+    }
+}
+
+pub(crate) fn finish_global_publish(
+    state: &mut ReleaseStateFile,
+    owner: &PublishLeaseEntry,
+    success: bool,
+    error_message: Option<String>,
+    now: i64,
+) -> Vec<String> {
+    state.global_publish.owner = None;
+    state.global_publish.completed.push(PublishCompletion {
+        token: owner.token.clone(),
+        kind: owner.kind.clone(),
+        sha: owner.sha.clone(),
+        success,
+        coalesced: false,
+        finished_at: now,
+        error_message,
+    });
+
+    let mut coalesced_tokens = Vec::new();
+    if success {
+        state.global_publish.waiters.retain(|waiter| {
+            let same_release = waiter.kind == owner.kind && waiter.sha == owner.sha;
+            if same_release {
+                coalesced_tokens.push(waiter.token.clone());
+            }
+            !same_release
+        });
+        for token in &coalesced_tokens {
+            remove_publish_token_from_lanes(state, token);
+            state.global_publish.completed.push(PublishCompletion {
+                token: token.clone(),
+                kind: owner.kind.clone(),
+                sha: owner.sha.clone(),
+                success: true,
+                coalesced: true,
+                finished_at: now,
+                error_message: None,
+            });
+        }
+    }
+    if state.global_publish.owner.is_none() && !state.global_publish.waiters.is_empty() {
+        state.global_publish.owner = Some(state.global_publish.waiters.remove(0));
+    }
+    coalesced_tokens
+}
+
+fn remove_publish_token_from_lanes(state: &mut ReleaseStateFile, token: &str) {
+    for kind in [Lane::Server, Lane::Apk, Lane::NodeAgent] {
+        lane_mut(state, kind)
+            .in_flight
+            .retain(|item| item.token != token);
+    }
 }
 
 pub(crate) fn clamp_lease(secs: i64) -> i64 {
@@ -208,5 +381,98 @@ pub(crate) fn bump_semver(base: &str, kind: &str) -> String {
         "major" => format!("{}.0.0", a + 1),
         "minor" => format!("{}.{}.0", a, b + 1),
         _ => format!("{}.{}.{}", a, b, c + 1),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::{Arc, Mutex as StdMutex};
+
+    fn lease(token: &str, kind: &str, sha: &str, expires: i64) -> PublishLeaseEntry {
+        PublishLeaseEntry {
+            token: token.to_string(),
+            kind: kind.to_string(),
+            sha: sha.to_string(),
+            builder_id: token.to_string(),
+            builder_label: token.to_string(),
+            requested_at: 1,
+            last_heartbeat: 1,
+            lease_expires_at: expires,
+        }
+    }
+
+    #[test]
+    fn global_publish_is_fifo_under_concurrent_claims() {
+        let state = Arc::new(StdMutex::new(ReleaseStateFile::default()));
+        let mut joins = Vec::new();
+        for index in 0..8 {
+            let state = state.clone();
+            joins.push(std::thread::spawn(move || {
+                let mut guard = state.lock().expect("publish test state");
+                enqueue_global_publish(
+                    &mut guard,
+                    lease(
+                        &format!("token-{index}"),
+                        "server",
+                        &format!("sha-{index}"),
+                        100,
+                    ),
+                )
+            }));
+        }
+        for join in joins {
+            join.join().expect("claim thread");
+        }
+        let guard = state.lock().expect("publish test state");
+        assert!(guard.global_publish.owner.is_some());
+        assert_eq!(guard.global_publish.waiters.len(), 7);
+        let requested = guard
+            .global_publish
+            .owner
+            .iter()
+            .chain(guard.global_publish.waiters.iter())
+            .map(|item| item.token.clone())
+            .collect::<Vec<_>>();
+        assert_eq!(requested.len(), 8);
+        let unique = requested.iter().collect::<std::collections::HashSet<_>>();
+        assert_eq!(unique.len(), 8);
+    }
+
+    #[test]
+    fn same_sha_waiters_coalesce_and_next_distinct_sha_is_promoted() {
+        let mut state = ReleaseStateFile::default();
+        let owner = lease("owner", "node_agent", "sha-a", 100);
+        assert_eq!(
+            enqueue_global_publish(&mut state, owner.clone()),
+            PublishAdmission::Owner
+        );
+        enqueue_global_publish(&mut state, lease("same", "node_agent", "sha-a", 100));
+        enqueue_global_publish(&mut state, lease("next", "apk", "sha-b", 100));
+
+        let coalesced = finish_global_publish(&mut state, &owner, true, None, 10);
+
+        assert_eq!(coalesced, vec!["same"]);
+        assert_eq!(state.global_publish.owner.as_ref().unwrap().token, "next");
+        assert!(state
+            .global_publish
+            .completed
+            .iter()
+            .any(|item| item.token == "same" && item.coalesced));
+    }
+
+    #[test]
+    fn expired_owner_yields_to_first_live_waiter() {
+        let mut state = ReleaseStateFile::default();
+        state.global_publish.owner = Some(lease("expired", "server", "sha-a", 10));
+        state.global_publish.waiters = vec![
+            lease("first", "apk", "sha-b", 100),
+            lease("second", "node_agent", "sha-c", 100),
+        ];
+
+        sweep_global_expired(&mut state, 11);
+
+        assert_eq!(state.global_publish.owner.as_ref().unwrap().token, "first");
+        assert_eq!(state.global_publish.waiters[0].token, "second");
     }
 }

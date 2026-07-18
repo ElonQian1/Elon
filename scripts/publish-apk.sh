@@ -69,6 +69,7 @@ is_local_apk_deploy() {
 # ── 路径推导 ──────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+. "$SCRIPT_DIR/release-publish-lease.sh"
 ANDROID_DIR="$REPO_ROOT/android"
 GRADLE_PATH="$ANDROID_DIR/app/build.gradle"
 APK_DIR="$ANDROID_DIR/app/build/outputs/apk/release"
@@ -537,24 +538,22 @@ echo -e "${GRAY}   服务器 APK 版本基线: v${CLAIM_BASE_NAME} (build ${CLAI
 BUILDER_ID="${HOSTNAME:-unknown}-${USER:-unknown}"
 BUILDER_LABEL="publish-apk.sh @ $BUILDER_ID"
 
-CLAIM_BODY=$(python3 -c "import json; print(json.dumps({
-  'kind': 'apk',
-  'sha': '$BUILD_BASE_SHA',
-  'builderId': '$BUILDER_ID',
-  'builderLabel': '$BUILDER_LABEL',
-  'bump': 'patch',
-  'currentVersionName': '$CLAIM_BASE_NAME',
-  'currentVersionCode': $CLAIM_BASE_CODE
-}))")
-
+CLAIM_BODY=$(python3 -c "import json; print(json.dumps({'kind':'apk','sha':'$BUILD_BASE_SHA',
+  'builderId':'$BUILDER_ID','builderLabel':'$BUILDER_LABEL','bump':'patch','currentVersionName':'$CLAIM_BASE_NAME','currentVersionCode':$CLAIM_BASE_CODE}))")
 CLAIM_RESP=$(call_release_api "claim" "$CLAIM_BODY") || {
   echo -e "${RED}❌ /api/release/claim 失败${NC}" >&2; exit 1
 }
+CLAIM_RESP=$(enter_global_publish_lease "$CLAIM_RESP" apk "$RELEASE_API_BASE") || exit 1
+[[ -n "$CLAIM_RESP" ]] || exit 0
+CLAIM_ACTION=$(json_get "$CLAIM_RESP" action)
+if [[ "$CLAIM_ACTION" == "coalesced" || "$CLAIM_ACTION" == "finished" ]]; then
+  echo -e "${GREEN}   同一 SHA 已发布完成，本次请求已合并，无需重复构建。${NC}"
+  exit 0
+fi
 
 RELEASE_TOKEN=$(json_get "$CLAIM_RESP" "token")
 NEW_CODE=$(json_get_int "$CLAIM_RESP" "assignedVersionCode")
 NEW_NAME=$(json_get "$CLAIM_RESP" "assignedVersionName")
-
 if [[ -z "$RELEASE_TOKEN" || -z "$NEW_NAME" || "$NEW_CODE" -le 0 ]]; then
   echo -e "${RED}❌ release/claim 未返回有效的版本号: $CLAIM_RESP${NC}" >&2; exit 1
 fi
