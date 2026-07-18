@@ -7,24 +7,40 @@ import {
 } from '../workspace/uiWorkspaceSelection'
 import { SourceUiDesignProgress } from '../workspace/UiDesignProgressBar'
 import { SourceDrivenPreviewSurface } from './SourceDrivenPreviewSurface'
+import { PwaStyleInspector } from './PwaStyleInspector'
 import { SourcePreviewInspector } from './SourcePreviewInspector'
 import { SourcePreviewModeBar } from './SourcePreviewModeBar'
 import { SourcePreviewTreePanel } from './SourcePreviewTreePanel'
 import { useSourcePreviewSession } from './useSourcePreviewSession'
+import { usePwaDesignSession } from './usePwaDesignSession'
 import type { SourcePreviewMode } from './types'
 
 interface Props {
   initialProjectRoot: string
+  projectId: string
   active?: boolean
   onModeChange: (mode: SourcePreviewMode) => void
   selectionHint?: UiWorkspaceSelectionHint | null
   onSelectionHintChange?: (hint: UiWorkspaceSelectionHint) => void
 }
 
-export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onModeChange, selectionHint, onSelectionHintChange }: Props) {
+export function SourcePreviewWorkspace({ initialProjectRoot, projectId, active = true, onModeChange, selectionHint, onSelectionHintChange }: Props) {
   const rememberedRoot = window.localStorage.getItem('elon.uiTuner.sourceProjectRoot') ?? ''
   const session = useSourcePreviewSession(initialProjectRoot || rememberedRoot)
   const [zoom, setZoom] = useState(.82)
+  const pwaDesign = usePwaDesignSession({
+    projectId,
+    workspaceIdentity: session.projectRoot,
+    sourceRevision: session.document?.sourceRevision ?? '',
+    root: session.document?.root ?? null,
+    onSelect: session.setSelectedKey,
+  })
+  const pwaPreviewActive = Boolean(
+    session.document
+    && !session.renderer.render
+    && session.renderer.capabilities?.pwaPreview.available
+    && session.renderer.capabilities.pwaPreview.url,
+  )
   const autoLoaded = useRef(false)
   useEffect(() => {
     if (!autoLoaded.current && session.projectRoot) {
@@ -51,9 +67,11 @@ export function SourcePreviewWorkspace({ initialProjectRoot, active = true, onMo
           renderer={session.renderer}
         />
         <SourceUiDesignProgress hasDocument={Boolean(session.document)} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} />
-        <SourceDrivenPreviewSurface document={session.document} androidRender={session.renderer.render} pwaPreview={session.renderer.capabilities?.pwaPreview ?? null} selectedKey={session.selectedKey} zoom={zoom} loading={session.loading || session.renderer.rendering} error={session.error || session.renderer.error} onSelect={session.setSelectedKey} onModeChange={onModeChange} />
+        <SourceDrivenPreviewSurface document={session.document} androidRender={session.renderer.render} pwaPreview={session.renderer.capabilities?.pwaPreview ?? null} selectedKey={session.selectedKey} zoom={zoom} loading={session.loading || session.renderer.rendering} error={session.error || session.renderer.error} onSelect={session.setSelectedKey} onModeChange={onModeChange} pwaDesign={pwaDesign} />
       </section>
-      <SourcePreviewInspector node={session.selected} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} onChange={(patch) => { session.renderer.beginLocalDraft(); session.apply(patch) }} onSave={() => { void session.commit() }} onModeChange={onModeChange} />
+      {pwaPreviewActive
+        ? <PwaStyleInspector session={pwaDesign} />
+        : <SourcePreviewInspector node={session.selected} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} onChange={(patch) => { session.renderer.beginLocalDraft(); session.apply(patch) }} onSave={() => { void session.commit() }} onModeChange={onModeChange} />}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { PwaInteractivePreviewSurface } from './PwaInteractivePreviewSurface'
 import { SourcePreviewNode } from './SourcePreviewNode'
 import type { ComposePreviewRender, SourcePreviewDocument, SourcePreviewFidelity, SourcePreviewMode, SourceRendererCapabilities } from './types'
+import type { PwaDesignSession } from './usePwaDesignSession'
 import styles from './SourcePreview.module.css'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   error: string
   onSelect: (key: string) => void
   onModeChange: (mode: SourcePreviewMode) => void
+  pwaDesign: PwaDesignSession
 }
 
 const UNKNOWN_FIDELITY: SourcePreviewFidelity = {
@@ -27,7 +29,7 @@ const UNKNOWN_FIDELITY: SourcePreviewFidelity = {
   issues: ['当前 PC 节点尚未提供可还原度评估，为避免误导，暂不默认展示浏览器模拟画面'],
 }
 
-export function SourceDrivenPreviewSurface({ document, androidRender, pwaPreview, selectedKey, zoom, loading, error, onSelect, onModeChange }: Props) {
+export function SourceDrivenPreviewSurface({ document, androidRender, pwaPreview, selectedKey, zoom, loading, error, onSelect, onModeChange, pwaDesign }: Props) {
   const [showAdvancedDraft, setShowAdvancedDraft] = useState(false)
   useEffect(() => setShowAdvancedDraft(false), [document?.sourceRevision])
   const fidelity = document?.fidelity ?? UNKNOWN_FIDELITY
@@ -43,7 +45,7 @@ export function SourceDrivenPreviewSurface({ document, androidRender, pwaPreview
         <img src={androidRender.dataUrl} alt={`${androidRender.composable} Android 真实预览`} />
       </div>}
       {usePwaPreview && document && pwaPreview?.url && (
-        <PwaInteractivePreviewSurface url={pwaPreview.url} document={document} selectedKey={selectedKey} zoom={zoom} onSelect={onSelect} />
+        <PwaInteractivePreviewSurface url={pwaPreview.url} document={document} zoom={zoom} design={pwaDesign} />
       )}
       {blockUnreliableDraft && document && (
         <section className={styles.fidelityGate} data-testid="source-preview-fidelity-gate">

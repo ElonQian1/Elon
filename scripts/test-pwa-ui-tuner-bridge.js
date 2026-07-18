@@ -7,6 +7,8 @@ const mobileWeb = fs.readFileSync(path.join(repoRoot, 'server/src/assets/web_pag
 const bridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_bridge.js'), 'utf8');
 const previewSurface = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'), 'utf8');
 const draftContract = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/pwaDesignDraft.ts'), 'utf8');
+const designSession = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/usePwaDesignSession.ts'), 'utf8');
+const styleInspector = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'), 'utf8');
 
 assert.ok(mobileWeb.includes('__UI_TUNER_PWA_BRIDGE_JS__'), 'mobile page should embed the isolated PWA design bridge');
 assert.ok(bridge.includes("params.get('ui_tuner_preview') !== '1'"), 'normal PWA pages must not activate the design bridge');
@@ -27,14 +29,22 @@ assert.ok(bridge.includes("CustomEvent('elon:ui-tuner-session-auth'"), 'session 
 assert.ok(!bridge.includes("localStorage.setItem('lodex_token'"), 'preview bridge must not persist the PC token');
 assert.ok(bridge.includes("post('route-changed'"), 'PWA should report route changes without parent reloads');
 assert.ok(mobileWeb.includes("pageParams.get('ui_tuner_preview') === '1'"), 'session auth listener must be preview-scoped');
-assert.ok(previewSurface.includes("useState<'select' | 'interact'>('interact')"), 'PC PWA canvas must default to real interaction');
-assert.ok(previewSurface.includes("post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
+assert.ok(designSession.includes("useState<'select' | 'interact'>('interact')"), 'PC PWA canvas must default to real interaction');
+assert.ok(designSession.includes("post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
 assert.ok(previewSurface.includes('key={reloadKey}'), 'iframe reloads must remain explicit and independent of design mode');
+assert.ok(previewSurface.includes('开始设计/修改页面'), 'manual design mode should have one clear Chinese entry point');
 assert.ok(!bridge.includes("document.addEventListener('pointerover'"), 'PWA selection must not recalculate layout on every mouse hover');
 assert.ok(!bridge.includes("String(element.innerText || element.textContent || '')"), 'PWA selection must not read a large container innerText on every click');
 assert.ok(draftContract.includes("kind: 'elon.pwa.manual_style_draft'"), 'PC should persist a typed manual PWA draft contract');
 assert.ok(draftContract.includes('originalStyle: PwaOriginalStyleSnapshot'), 'draft elements should retain their original style snapshot');
 assert.ok(draftContract.includes('confidenceScore: number'), 'draft identities should retain mapping confidence');
 assert.ok(draftContract.includes("params.delete('ui_tuner_preview')"), 'draft route identity should ignore the preview-only query flag');
+assert.ok(designSession.includes('readPwaDesignDraft(project, nextRoute)'), 'PC reload should restore the matching project, route, and viewport draft');
+assert.ok(designSession.includes('TRANSACTION_IDLE_MS = 450'), 'continuous controls should be grouped into editing transactions');
+assert.ok(designSession.includes('pastRef') && designSession.includes('futureRef'), 'manual draft editing should support undo and redo');
+assert.ok(designSession.includes("beginTransaction('page:clear')"), 'clearing the current page should remain undoable');
+for (const property of ['width', 'height', 'paddingTop', 'marginTop', 'borderRadius', 'fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'opacity']) {
+  assert.ok(styleInspector.includes(`'${property}'`), `manual style panel should expose ${property}`);
+}
 
 console.log('PWA UI tuner bridge tests passed');

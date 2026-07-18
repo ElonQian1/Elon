@@ -616,6 +616,7 @@ export default function UiTunerPage() {
     <SourcePreviewWorkspace
       active={workspaceMode === 'source'}
       initialProjectRoot={effectiveProjectRoot}
+      projectId={activeProjectId}
       onModeChange={changeWorkspaceMode}
       selectionHint={workspaceSelection.sourceHint}
       onSelectionHintChange={workspaceSelection.onSourceSelection}
