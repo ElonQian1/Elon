@@ -26,6 +26,15 @@ function revisedDraft(draft: PwaDesignDraft, elements: PwaDesignDraft['elements'
   }
 }
 
+function restoredDraft(snapshot: PwaDesignDraft, current: PwaDesignDraft): PwaDesignDraft {
+  return {
+    ...snapshot,
+    revision: current.revision + 1,
+    createdAt: current.createdAt,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
 function persistDraft(draft: PwaDesignDraft): void {
   if (Object.keys(draft.elements).length) savePwaDesignDraft(draft)
   else removePwaDesignDraft(draft)
@@ -62,8 +71,10 @@ export class PwaDesignSessionModel {
   update(transactionKey: string, updateElements: DraftElementsUpdater): PwaDesignDraft | null {
     const current = this.currentDraft
     if (!current) return null
+    const elements = updateElements(current.elements)
+    if (elements === current.elements) return null
     this.beginTransaction(transactionKey, current)
-    return this.replace(revisedDraft(current, updateElements(current.elements)))
+    return this.replace(revisedDraft(current, elements))
   }
 
   replace(draft: PwaDesignDraft, persist = true): PwaDesignDraft {
@@ -78,7 +89,7 @@ export class PwaDesignSessionModel {
     const current = this.currentDraft
     if (!previous || !current) return null
     this.futureDrafts = [...this.futureDrafts, current].slice(-PWA_DESIGN_HISTORY_LIMIT)
-    return this.replace(previous)
+    return this.replace(restoredDraft(previous, current))
   }
 
   redo(): PwaDesignDraft | null {
@@ -87,7 +98,7 @@ export class PwaDesignSessionModel {
     const current = this.currentDraft
     if (!next || !current) return null
     this.pastDrafts = [...this.pastDrafts, current].slice(-PWA_DESIGN_HISTORY_LIMIT)
-    return this.replace(next)
+    return this.replace(restoredDraft(next, current))
   }
 
   save(): PwaDesignDraft | null {

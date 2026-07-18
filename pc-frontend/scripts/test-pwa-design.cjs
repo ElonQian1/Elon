@@ -25,6 +25,8 @@ function compile(relativeSource, relativeOutput) {
 const storage = new Map()
 global.window = {
   location: { origin: 'https://elon.example' },
+  setTimeout: (callback, delay) => setTimeout(callback, delay),
+  clearTimeout: (timer) => clearTimeout(timer),
   localStorage: {
     getItem: (key) => storage.get(key) ?? null,
     setItem: (key, value) => storage.set(key, value),
@@ -102,6 +104,51 @@ try {
   assert.equal(migrated.schemaVersion, 2)
   assert.equal(migrated.elements['id:payButton'].afterStyle.height, '48px')
   assert.equal(migrated.elements['id:payButton'].binding.needsBinding, true)
+  const payElement = migrated.elements['id:payButton']
+
+  const modelOutput = compile(
+    'src/features/ui-tuner/source-preview/pwaDesignSessionModel.ts',
+    'source-preview/pwaDesignSessionModel.js',
+  )
+  const { PwaDesignSessionModel } = require(modelOutput)
+  const modelRoute = {
+    ...route,
+    path: '/web/project/1/session-model',
+    href: 'https://elon.example/web/project/1/session-model?tab=design#details',
+  }
+  const model = new PwaDesignSessionModel()
+  const initialSession = model.restore(project, modelRoute)
+  assert.equal(initialSession.restored, false)
+  assert.equal(initialSession.draft.revision, 0)
+
+  const edited = model.update('id:payButton:height', (elements) => ({
+    ...elements,
+    'id:payButton': {
+      ...payElement,
+      styleDiff: { height: '52px' },
+      afterStyle: { ...payElement.afterStyle, height: '52px' },
+    },
+  }))
+  assert.equal(edited.revision, 1, 'one property write should advance the draft revision exactly once')
+  assert.equal(edited.elements['id:payButton'].styleDiff.height, '52px')
+  assert.equal(readPwaDesignDraft(project, modelRoute).revision, 1, 'property writes should persist immediately')
+
+  const reloadedModel = new PwaDesignSessionModel()
+  const reloaded = reloadedModel.restore(project, modelRoute)
+  assert.equal(reloaded.restored, true, 'reload should recover the route-scoped draft')
+  assert.equal(reloaded.draft.revision, 1)
+  assert.equal(reloaded.draft.elements['id:payButton'].styleDiff.height, '52px')
+
+  const undone = model.undo()
+  assert.equal(undone.revision, 2, 'undo should create a new monotonic draft revision')
+  assert.deepEqual(undone.elements, {})
+  assert.equal(model.canRedo, true)
+  const redone = model.redo()
+  assert.equal(redone.revision, 3, 'redo should create a new monotonic draft revision')
+  assert.equal(redone.elements['id:payButton'].styleDiff.height, '52px')
+  assert.equal(readPwaDesignDraft(project, modelRoute).revision, 3, 'redo should persist the restored property')
+  model.dispose()
+  reloadedModel.dispose()
 
   const cliPackage = buildPwaDraftCliPackage(migrated)
   assert.equal(cliPackage.kind, 'elon_ui_tuner_pwa_cli_package')
@@ -121,7 +168,6 @@ try {
     'source-preview/pwaDesignWriteback.js',
   )
   const { planPwaDesignWriteback } = require(writebackOutput)
-  const payElement = migrated.elements['id:payButton']
   const boundDraft = {
     ...migrated,
     elements: {

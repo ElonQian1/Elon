@@ -82,6 +82,16 @@ function bridgeElements(draft: PwaDesignDraft) {
   }))
 }
 
+function bridgeDraftKey(draft: PwaDesignDraft): string {
+  return [
+    draft.project.id,
+    draft.route.path,
+    draft.route.search,
+    draft.route.hash,
+    `${draft.viewport.width}x${draft.viewport.height}`,
+  ].join('|')
+}
+
 export interface PwaSyncState {
   phase: 'idle' | 'starting' | 'running' | 'completed' | 'failed'
   message: string
@@ -141,7 +151,11 @@ export function usePwaDesignSession({
   }, [])
 
   const syncDraft = useCallback((value: PwaDesignDraft | null) => {
-    post('apply-draft', { elements: value ? bridgeElements(value) : [] })
+    post('apply-draft', value ? {
+      draftKey: bridgeDraftKey(value),
+      revision: value.revision,
+      elements: bridgeElements(value),
+    } : { draftKey: '', revision: 0, elements: [] })
   }, [post])
 
   const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
@@ -166,6 +180,9 @@ export function usePwaDesignSession({
     syncTaskIdRef.current = ''
   }), [])
 
+  const bridgeContextRef = useRef({ model, onSelect, post, project, root, syncDraft })
+  bridgeContextRef.current = { model, onSelect, post, project, root, syncDraft }
+
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return
@@ -176,12 +193,14 @@ export function usePwaDesignSession({
         payload?: Partial<PwaRouteState> & { node?: PwaSelection }
       }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
+      const context = bridgeContextRef.current
       if (message.type === 'ready') {
         setReady(true)
         const token = getAuthToken()
-        if (token) post('set-session-auth', { token })
-        post('set-mode', { mode: modeRef.current })
-        if (model.draft) syncDraft(model.draft)
+        if (token) context.post('set-session-auth', { token })
+        context.post('set-mode', { mode: modeRef.current })
+        if (context.model.draft) context.syncDraft(context.model.draft)
+        return
       }
       if (message.type === 'route-changed' && message.payload?.path && message.payload.viewport) {
         const normalized = normalizePwaRoute(message.payload as PwaRouteState)
@@ -190,25 +209,26 @@ export function usePwaDesignSession({
         routeRef.current = nextRoute
         setRoute(nextRoute)
         if (changed) {
-          const { draft: restored, restored: didRestore } = model.restore(project, nextRoute)
+          const { draft: restored, restored: didRestore } = context.model.restore(context.project, nextRoute)
           setDraft(restored)
           setHistoryVersion((value) => value + 1)
           setSelection(null)
           setMappedNodeKey(null)
           setUnboundLabel('')
           setSaveLabel(didRestore && Object.keys(restored.elements).length ? `已恢复本页草稿 · r${restored.revision}` : '本页暂无样式草稿')
-          syncDraft(restored)
+          context.syncDraft(restored)
         }
+        return
       }
       if (message.type === 'selection' && message.payload?.node) {
         const nextSelection = message.payload.node
         setSelection(nextSelection)
-        if (root) {
-          const match = matchPwaSourceNode(root, nextSelection.identity)
+        if (context.root) {
+          const match = matchPwaSourceNode(context.root, nextSelection.identity)
           if (match) {
             setUnboundLabel('')
             setMappedNodeKey(match.key)
-            onSelect(match.key)
+            context.onSelect(match.key)
             return
           }
         }
@@ -218,7 +238,7 @@ export function usePwaDesignSession({
     }
     window.addEventListener('message', receive)
     return () => window.removeEventListener('message', receive)
-  }, [model, onSelect, post, project, root, syncDraft])
+  }, [])
 
   const setMode = useCallback((nextMode: 'select' | 'interact') => {
     modeRef.current = nextMode

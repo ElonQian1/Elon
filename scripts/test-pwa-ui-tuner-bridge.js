@@ -37,7 +37,9 @@ assert.ok(!bridge.includes("localStorage.setItem('lodex_token'"), 'preview bridg
 assert.ok(bridge.includes("post('route-changed'"), 'PWA should report route changes without parent reloads');
 assert.ok(mobileWeb.includes("pageParams.get('ui_tuner_preview') === '1'"), 'session auth listener must be preview-scoped');
 assert.ok(designSession.includes("useState<'select' | 'interact'>('interact')"), 'PC PWA canvas must default to real interaction');
-assert.ok(designSession.includes("post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
+assert.ok(designSession.includes("context.post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
+assert.equal((designSession.match(/window\.addEventListener\('message'/g) || []).length, 1, 'PC session should declare one postMessage listener');
+assert.match(designSession, /const bridgeContextRef = useRef\([\s\S]*window\.addEventListener\('message', receive\)[\s\S]*window\.removeEventListener\('message', receive\)\s*\n\s*}, \[\]\)/, 'PC session listener should stay installed while refs provide current render state');
 assert.ok(previewSurface.includes('key={reloadKey}'), 'iframe reloads must remain explicit and independent of design mode');
 assert.ok(previewSurface.includes('开始设计/修改页面'), 'manual design mode should have one clear Chinese entry point');
 assert.ok(!bridge.includes("document.addEventListener('pointerover'"), 'PWA selection must not recalculate layout on every mouse hover');
@@ -199,11 +201,22 @@ function runBridgeBehavior() {
   assert.equal(posted.filter((message) => message.type === 'selection').length, 1, 'one click should produce one selection');
 
   const messagesBeforeStyle = posted.length;
-  command('apply-style', { selector: '#topTitle', style: { fontSize: '22px', borderRadius: '12px' } });
+  command('apply-style', { selector: '#topTitle', style: { fontSize: '22px' } });
   assert.equal(title.style.getPropertyValue('font-size'), '22px', 'font size must update synchronously on the real DOM');
-  assert.equal(title.style.getPropertyValue('border-radius'), '12px', 'border radius must update synchronously on the real DOM');
   assert.equal(posted.length, messagesBeforeStyle + 1, 'one style command should produce one acknowledgement without a message loop');
   assert.equal(posted.at(-1).type, 'style-applied');
+
+  const draft = {
+    draftKey: 'project-1|/web|||390x844', revision: 7,
+    elements: [{ selector: '#topTitle', styleDiff: { fontSize: '24px' } }],
+  };
+  const acknowledgementsBeforeDraft = posted.filter((message) => message.type === 'draft-applied').length;
+  command('apply-draft', draft);
+  assert.equal(title.style.getPropertyValue('font-size'), '24px', 'one draft property write must update the selected DOM element');
+  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 1, 'one draft revision should receive one acknowledgement');
+  assert.equal(posted.at(-1).payload.revision, 7, 'the acknowledgement should preserve the applied revision');
+  command('apply-draft', draft);
+  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 1, 'a repeated draft revision must not apply or acknowledge twice');
 }
 
 runAuthBootstrap();

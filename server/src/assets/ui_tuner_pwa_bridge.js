@@ -10,6 +10,7 @@
   let selectedElement = null;
   let selecting = false;
   let acceptedSessionToken = '';
+  let appliedDraftRevision = '';
   const editableProperties = [
     'width', 'height',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
@@ -327,11 +328,18 @@
   }
 
   function applyDraft(payload) {
+    const draftKey = String(payload && payload.draftKey || '');
+    const revision = Number(payload && payload.revision);
+    const revisionKey = draftKey && Number.isInteger(revision) && revision >= 0
+      ? draftKey + '@' + revision
+      : '';
+    if (revisionKey && revisionKey === appliedDraftRevision) return;
     resetStyles(false);
     const elements = payload && Array.isArray(payload.elements) ? payload.elements : [];
     elements.forEach((entry) => applyStyle({ selector: entry.selector, style: entry.styleDiff || {} }, false));
     drawSelection(selectedElement);
-    post('draft-applied', { appliedCount: elements.length });
+    appliedDraftRevision = revisionKey;
+    post('draft-applied', { appliedCount: elements.length, draftKey, revision });
   }
 
   document.addEventListener('click', (event) => {
