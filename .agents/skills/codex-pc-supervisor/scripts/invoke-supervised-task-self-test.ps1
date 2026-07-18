@@ -85,6 +85,18 @@ function Invoke-SupervisionSelfTest {
     $recycledParent.resume_workspace_status.derivation = 'platform_receipt_commit_rebuild_available'
     $recycledParent.resume_workspace_status.requires_recreation = $true
     $recycledResumeBody = New-ResumeTaskBody $recycledParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $recoveryReadyParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
+    $recoveryReadyParent.resume_workspace_status.derivation = 'workspace_status_git_recovery_ready_legacy_branch_ref'
+    $recoveryReadyParent.resume_workspace_status.requires_recreation = $true
+    $recoveryReadyResumeBody = New-ResumeTaskBody $recoveryReadyParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $occupiedRecoveryReadyParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $recoveryReadyParent) 'application/json'
+    $occupiedRecoveryReadyParent.resume_workspace_status.occupied = $true
+    $occupiedRecoveryReadyRejected = $false
+    try {
+        $null = New-ResumeTaskBody $occupiedRecoveryReadyParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    } catch {
+        $occupiedRecoveryReadyRejected = $true
+    }
     $unsafeParent = [ordered]@{
         record = [ordered]@{
             task_id = 'local-running-task'
@@ -161,6 +173,8 @@ function Invoke-SupervisionSelfTest {
         resume_root = $resumeBody.supervision.root_task_id -eq 'local-root-task'
         resume_legacy_started_cwd = $legacyResumeBody.supervision.task_role -eq 'resume_original'
         resume_receipt_rebuild = $recycledResumeBody.supervision.task_role -eq 'resume_original'
+        resume_git_recovery_ready = $recoveryReadyResumeBody.supervision.task_role -eq 'resume_original'
+        resume_git_recovery_occupied_guard = $occupiedRecoveryReadyRejected
         resume_guard = $unsafeResumeRejected
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
@@ -186,7 +200,8 @@ function Invoke-SupervisionSelfTest {
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
-            'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'task_detail_path', 'cloud_projects_path',
+            'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
+            'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
             'inspect_wait_active_runtime', 'criteria_json_array', 'criteria_utf8_file'
         )
     })

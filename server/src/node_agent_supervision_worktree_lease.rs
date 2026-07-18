@@ -11,11 +11,20 @@ use anyhow::{bail, Context, Result};
 use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 
 const LEASE_PREFIX: &str = "elon-supervision:";
+pub(crate) const TRANSITIONAL_ACTIVE_TASK_LOCK_REASON: &str =
+    "active PC CLI task; Resume or successful finalization unlocks";
 
 pub(crate) fn acquire(base: &Path, active: &Path, root_task_id: &str) -> Result<()> {
     let expected = lease_reason(root_task_id)?;
     match worktree_lock_reason(base, active)? {
         Some(reason) if reason == expected => return Ok(()),
+        Some(reason) if reason == TRANSITIONAL_ACTIVE_TASK_LOCK_REASON => {
+            // The workspace provisioner locks a newly-created conversation worktree
+            // before the supervision contract is available. Upgrade that exact
+            // transitional lock to the task-identity lease below; all other lock
+            // reasons remain fail-closed.
+            run_git(base, &["worktree", "unlock", &path_arg(active)])?;
+        }
         Some(reason) => bail!("worktree is already locked by another lease: {reason}"),
         None => {}
     }
@@ -165,6 +174,39 @@ mod tests {
         assert!(release(&base, &active, "root-2").is_err());
         release(&base, &active, "root-1").unwrap();
         assert_eq!(worktree_lock_reason(&base, &active).unwrap(), None);
+
+        git(
+            &base,
+            &[
+                "worktree",
+                "lock",
+                "--reason",
+                TRANSITIONAL_ACTIVE_TASK_LOCK_REASON,
+                &path_arg(&active),
+            ],
+        );
+        acquire(&base, &active, "root-2").unwrap();
+        assert_eq!(
+            worktree_lock_reason(&base, &active).unwrap().as_deref(),
+            Some("elon-supervision:root-2")
+        );
+        release(&base, &active, "root-2").unwrap();
+
+        git(
+            &base,
+            &[
+                "worktree",
+                "lock",
+                "--reason",
+                "foreign-owner",
+                &path_arg(&active),
+            ],
+        );
+        assert!(acquire(&base, &active, "root-3").is_err());
+        assert_eq!(
+            worktree_lock_reason(&base, &active).unwrap().as_deref(),
+            Some("foreign-owner")
+        );
         let _ = fs::remove_dir_all(temp);
     }
 

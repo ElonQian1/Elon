@@ -451,7 +451,8 @@ function Assert-SafeResumeParentDetail {
     $allowedDerivations = @(
         'workspace_status',
         'legacy_started_cwd_git_registry',
-        'platform_receipt_commit_rebuild_available'
+        'platform_receipt_commit_rebuild_available',
+        'workspace_status_git_recovery_ready_legacy_branch_ref'
     )
     if ((Get-ObjectField $resumeStatus 'eligible') -ne $true -or
         $allowedDerivations -notcontains $derivation -or
