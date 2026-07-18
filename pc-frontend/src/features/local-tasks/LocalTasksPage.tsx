@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { HardDrive, RefreshCw, WifiOff } from 'lucide-react'
 import { isLocalWorkbench } from '../../api/runtime'
 import { safeNodeAdminUrl } from '../../lib/utils'
+import { readableTaskTitle } from '../../lib/taskTitle'
 import { ensureLocalFullAccessGrant } from '../conversation/localPcRuntime'
 import LocalTaskCreateForm from './LocalTaskCreateForm'
 import LocalTaskDetailPanel from './LocalTaskDetailPanel'
@@ -253,7 +254,7 @@ function TaskListItem({
   return (
     <button className={styles.taskItem} data-selected={selected} type="button" onClick={onSelect}>
       <div>
-        <strong>{task.prompt || task.conversation_id || task.id}</strong>
+        <strong>{readableTaskTitle(task.prompt, task.conversation_id || task.id)}</strong>
         <span>{task.workspace_path || '本机工作目录'}</span>
       </div>
       <div className={styles.taskItemMeta}>

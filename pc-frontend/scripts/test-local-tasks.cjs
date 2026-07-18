@@ -20,6 +20,18 @@ require.extensions['.ts'] = function loadTsModule(module, filename) {
 
 try {
   const model = require(path.join(pcRoot, 'src', 'features', 'local-tasks', 'localTaskModel.ts'))
+  const taskTitle = require(path.join(pcRoot, 'src', 'lib', 'taskTitle.ts'))
+
+  assert.strictEqual(taskTitle.readableTaskTitle(' 请修复登录按钮错位，并补充测试。 '), '修复登录按钮错位，并补充测试')
+  assert.strictEqual(taskTitle.readableTaskTitle('codex://threads/019-test\n请完善本机任务标题'), '完善本机任务标题')
+  assert.strictEqual(taskTitle.readableTaskTitle(`
+<elon-pc-executor version="1">监督协议</elon-pc-executor>
+<user-request>
+用户原始需求：“用户希望的是，有适合人阅读且可区分的任务标题。”
+桌面监督分析结论：不需要 Goal 模式。
+</user-request>`), '适合人阅读且可区分的任务标题')
+  assert.strictEqual(taskTitle.readableTaskTitle('codex://threads/019-test\n请继续完成上述任务并运行统一收尾'), '本机 Codex 任务')
+  assert.strictEqual(taskTitle.readableTaskTitle('修复'.repeat(40)).length, 34)
 
   const tasks = model.normalizeLocalTaskList({
     records: [{

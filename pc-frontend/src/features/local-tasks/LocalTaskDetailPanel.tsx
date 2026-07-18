@@ -1,4 +1,5 @@
 import { AlertTriangle, Check, CircleStop, Clock3, ShieldQuestion, X } from 'lucide-react'
+import { readableTaskTitle } from '../../lib/taskTitle'
 import {
   localTaskStatus,
   syncStateLabel,
@@ -47,7 +48,7 @@ export default function LocalTaskDetailPanel({
             <span className={styles.statusBadge} data-tone={status.tone}>{status.label}</span>
             <span className={styles.syncBadge}>{syncStateLabel(task.sync_state)}</span>
           </div>
-          <h2>{task.prompt || '本机 Codex 任务'}</h2>
+          <h2>{readableTaskTitle(task.prompt)}</h2>
           <code>{task.id}</code>
         </div>
         {task.can_cancel && !status.terminal && (

@@ -1,5 +1,6 @@
 import { api } from '../../api/client'
 import { clean } from '../../lib/utils'
+import { readableTaskTitle } from '../../lib/taskTitle'
 import type {
   Channel,
   ChannelMessagesResponse,
@@ -11,9 +12,7 @@ import { presenceLabel } from './memberUtils'
 import { recoverySnapshotPhase } from './taskRecoverySnapshotModel'
 
 export function titleFromMessage(message: string): string {
-  const title = message.replace(/\s+/g, ' ').trim()
-  if (!title) return '新会话'
-  return title.length > 24 ? `${title.slice(0, 24)}...` : title
+  return readableTaskTitle(message, '新会话')
 }
 
 export function mergeProjectRecords(listedProject?: Project, spaceProject?: Project | null): Project | undefined {

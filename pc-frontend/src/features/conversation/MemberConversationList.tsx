@@ -15,6 +15,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTime } from '../../lib/utils'
 import { displayMessageContentOrAttachment } from '../../lib/messageDisplay'
+import { LOCAL_TASK_PLACEHOLDER_TITLE, readableTaskTitle } from '../../lib/taskTitle'
 import type { MemberConversationEntry } from './memberConversationApi'
 import { buildMemberConversationDeepLink, copyTextToClipboard } from './memberConversationLinks'
 import {
@@ -412,6 +413,9 @@ function conversationScope(conversations: MemberConversationEntry[]) {
 }
 
 function conversationDisplayTitle(conversation: MemberConversationEntry): string {
+  if (conversation.title === LOCAL_TASK_PLACEHOLDER_TITLE) {
+    return readableTaskTitle(conversation.last_message, '本机 Codex 任务')
+  }
   const raw = displayMessageContentOrAttachment(conversation.title || conversation.last_message)
   if (!raw) return '新会话'
 
