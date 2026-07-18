@@ -111,6 +111,8 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
             }
             _ = tokio::time::sleep_until(total_deadline), if !timed_out => {
                 timed_out = true;
+                canceled = true;
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
                 let _ = pty.kill();
                 append_output(
                     &config.output_path,
@@ -122,6 +124,8 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
             }
             _ = tokio::time::sleep_until(idle_deadline), if runtime_policy.progress_aware && !timed_out => {
                 timed_out = true;
+                canceled = true;
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
                 let _ = pty.kill();
                 append_output(
                     &config.output_path,
@@ -334,6 +338,7 @@ pub(super) fn consume_mailbox(
         match command.command.as_str() {
             "cancel" => {
                 *canceled = true;
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(pty.child_pid());
                 let _ = pty.kill();
                 let _ = registry.touch_session(&config.session_id, Some("cancel_requested"), None);
             }

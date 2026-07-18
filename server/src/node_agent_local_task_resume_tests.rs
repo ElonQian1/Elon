@@ -39,6 +39,7 @@ impl ResumeFixture {
                 "HEAD",
             ],
         );
+        let git_head = git_output(&active, &["rev-parse", "--verify", "HEAD^{commit}"]);
 
         let parent = LocalTaskRecord {
             task_id: "local-parent".to_string(),
@@ -69,6 +70,7 @@ impl ResumeFixture {
                 "active_workspace_path": active.to_string_lossy(),
                 "isolated": true,
                 "branch": "ai/session/project-a/conversation-a",
+                "git_head": git_head,
                 "prepare_status": "prepared",
                 "merge_status": "skipped"
             })),
@@ -228,6 +230,86 @@ fn resume_rejects_active_parent_task() {
     assert!(error.to_string().contains("父任务仍在运行"));
 }
 
+#[test]
+fn locked_worktree_survives_cleanup_while_a_spawned_process_is_alive() {
+    let fixture = ResumeFixture::new();
+    crate::pc_workspace_provisioner::lock_conversation_worktree(&fixture.base, &fixture.active)
+        .expect("lock active worktree");
+    let mut child = spawn_waiting_process(&fixture.active);
+
+    let output = git_command()
+        .args([
+            "worktree",
+            "remove",
+            "--force",
+            fixture.active.to_string_lossy().as_ref(),
+        ])
+        .current_dir(&fixture.base)
+        .output()
+        .expect("cleanup command should start");
+    assert!(
+        !output.status.success(),
+        "single-force cleanup must honor lock"
+    );
+    assert!(recovery::is_git_worktree(&fixture.active));
+
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+#[test]
+fn orphaned_worktree_resume_rebuilds_metadata_and_preserves_user_files() {
+    let fixture = ResumeFixture::new();
+    std::fs::write(fixture.active.join("README.md"), "uncommitted edit\n")
+        .expect("write tracked edit");
+    std::fs::write(
+        fixture.active.join("publish-alive.txt"),
+        "do not overwrite\n",
+    )
+    .expect("write untracked evidence");
+
+    let parked = fixture.root.join("parked-active");
+    std::fs::rename(&fixture.active, &parked).expect("park active directory");
+    run_git(&fixture.base, &["worktree", "prune", "--expire", "now"]);
+    std::fs::rename(&parked, &fixture.active).expect("restore orphaned directory");
+    assert!(!recovery::is_git_worktree(&fixture.active));
+
+    let inspected = inspect_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("read-only inspection should recognize recoverable metadata loss");
+    assert!(inspected
+        .derivation
+        .contains("recovery_ready_recorded_head"));
+    assert!(!recovery::is_git_worktree(&fixture.active));
+
+    let resolved = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("Resume should rebuild the recorded worktree");
+    assert!(resolved.derivation.contains("git_rebuilt_recorded_head"));
+    assert!(recovery::is_git_worktree(&fixture.active));
+    assert_eq!(
+        std::fs::read_to_string(fixture.active.join("README.md")).unwrap(),
+        "uncommitted edit\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(fixture.active.join("publish-alive.txt")).unwrap(),
+        "do not overwrite\n"
+    );
+    let status = git_output(&fixture.active, &["status", "--short"]);
+    assert!(status.contains("README.md"));
+    assert!(status.contains("publish-alive.txt"));
+}
+
 fn run_git(cwd: &Path, args: &[&str]) {
     let output = git_command()
         .args(args)
@@ -241,4 +323,38 @@ fn run_git(cwd: &Path, args: &[&str]) {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+}
+
+fn git_output(cwd: &Path, args: &[&str]) -> String {
+    let output = git_command()
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .expect("git should start");
+    assert!(
+        output.status.success(),
+        "git {:?} failed: stdout={} stderr={}",
+        args,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+#[cfg(windows)]
+fn spawn_waiting_process(cwd: &Path) -> std::process::Child {
+    std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-Command", "Start-Sleep -Seconds 30"])
+        .current_dir(cwd)
+        .spawn()
+        .expect("spawn waiting Windows process")
+}
+
+#[cfg(not(windows))]
+fn spawn_waiting_process(cwd: &Path) -> std::process::Child {
+    std::process::Command::new("sh")
+        .args(["-c", "sleep 30"])
+        .current_dir(cwd)
+        .spawn()
+        .expect("spawn waiting Unix process")
 }

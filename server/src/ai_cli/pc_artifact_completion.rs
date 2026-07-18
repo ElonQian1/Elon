@@ -35,6 +35,7 @@ mod tests {
             active_workspace_path: "D:/project-worktree".into(),
             isolated: true,
             branch: Some("ai/session/project/conversation".into()),
+            git_head: None,
             prepare_status: "prepared".into(),
             merge_status: Some("merged".into()),
             merge_message: Some("conversation branch had no new commits".into()),

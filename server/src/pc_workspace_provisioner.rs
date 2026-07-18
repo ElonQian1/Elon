@@ -297,6 +297,7 @@ pub fn prepare_conversation_workspace_in(
     let _ = git_fetch_origin(&base_workspace);
     let _ = run_git_dynamic(&base_workspace, &["worktree", "prune"]);
     if is_git_work_tree(&worktree_path) {
+        lock_conversation_worktree(&base_workspace, &worktree_path)?;
         return Ok(ConversationWorkspaceResult {
             base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
             workspace_path: git_path_arg(&worktree_path),
@@ -321,6 +322,7 @@ pub fn prepare_conversation_workspace_in(
             ));
         }
     }
+    lock_conversation_worktree(&base_workspace, &worktree_path)?;
 
     Ok(ConversationWorkspaceResult {
         base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
@@ -457,7 +459,8 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     }
 
     let (before, after) = merge_conversation_branch_into_base(&base_workspace, branch)?;
-    let _ = run_git_dynamic(
+    unlock_conversation_worktree(&base_workspace, &active_workspace)?;
+    if let Err(error) = run_git_dynamic(
         &base_workspace,
         &[
             "worktree",
@@ -465,7 +468,12 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
             "--force",
             git_path_arg(&active_workspace).as_str(),
         ],
-    );
+    ) {
+        let _ = lock_conversation_worktree(&base_workspace, &active_workspace);
+        return Err(error).context(
+            "conversation branch landed, but active worktree cleanup was deferred and re-locked",
+        );
+    }
     let _ = run_git_dynamic(&base_workspace, &["branch", "-d", branch]);
 
     if before == after {
@@ -479,6 +487,24 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     } else {
         Ok(format!("conversation branch merged: {}", short_sha(&after)))
     }
+}
+
+pub(crate) fn conversation_workspace_git_head(
+    workspace: &ConversationWorkspaceResult,
+) -> Option<String> {
+    let active_workspace = git_path_buf(&PathBuf::from(&workspace.workspace_path));
+    git_output(
+        &active_workspace,
+        &["rev-parse", "--verify", "HEAD^{commit}"],
+    )
+    .ok()
+}
+
+pub(crate) fn lock_conversation_worktree(
+    base_workspace: &Path,
+    worktree_path: &Path,
+) -> Result<()> {
+    lock_registered_conversation_worktree(base_workspace, worktree_path)
 }
 
 pub fn conversation_workspace_head_landed(workspace: &ConversationWorkspaceResult) -> Result<bool> {

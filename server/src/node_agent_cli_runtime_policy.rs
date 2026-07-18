@@ -96,9 +96,13 @@ fn parse_bounded(value: Option<&str>, default: u64, min: u64, max: u64) -> u64 {
         .unwrap_or(default)
 }
 
-pub(crate) fn terminate_process_tree(pid: Option<u32>) {
+/// Terminate the whole executor process tree before the direct child handle is
+/// killed or dropped. Waiting for the platform command is important on
+/// Windows: killing the parent first reparents descendants and makes a later
+/// `taskkill /T` unable to discover publish/build grandchildren.
+pub(crate) fn terminate_process_tree(pid: Option<u32>) -> bool {
     let Some(pid) = pid else {
-        return;
+        return true;
     };
     #[cfg(windows)]
     {
@@ -111,16 +115,17 @@ pub(crate) fn terminate_process_tree(pid: Option<u32>) {
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .creation_flags(CREATE_NO_WINDOW);
-        let _ = command.spawn();
+        return command.status().is_ok_and(|status| status.success());
     }
     #[cfg(unix)]
     {
-        let _ = std::process::Command::new("kill")
+        return std::process::Command::new("kill")
             .args(["-TERM", &format!("-{pid}")])
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
-            .spawn();
+            .status()
+            .is_ok_and(|status| status.success());
     }
 }
 
@@ -159,5 +164,78 @@ mod tests {
             DEFAULT_SUPERVISED_CODEX_IDLE_TIMEOUT_SECS
         );
         assert!(policy.total_timeout_secs <= MAX_SUPERVISED_CODEX_TIMEOUT_SECS);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn timeout_termination_waits_for_executor_grandchildren() {
+        use std::os::windows::process::CommandExt as _;
+
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let root = std::env::temp_dir().join(format!(
+            "elon_process_tree_test_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).expect("create process tree fixture");
+        let pid_file = root.join("grandchild.pid");
+        let script_file = root.join("spawn-grandchild.ps1");
+        let escaped_pid_file = pid_file.to_string_lossy().replace('\'', "''");
+        std::fs::write(
+            &script_file,
+            format!(
+                "$grand = Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 30' -WindowStyle Hidden -PassThru\nSet-Content -LiteralPath '{escaped_pid_file}' -Value $grand.Id\nStart-Sleep -Seconds 30\n"
+            ),
+        )
+        .expect("write process tree fixture");
+        let mut parent = std::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                script_file.to_string_lossy().as_ref(),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .expect("spawn executor parent");
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !pid_file.exists() && std::time::Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        let grandchild_pid: u32 = std::fs::read_to_string(&pid_file)
+            .expect("grandchild pid should be recorded")
+            .trim()
+            .parse()
+            .expect("grandchild pid should be numeric");
+
+        assert!(terminate_process_tree(Some(parent.id())));
+        let _ = parent.wait();
+        assert!(wait_until_process_exits(grandchild_pid));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[cfg(windows)]
+    fn wait_until_process_exits(pid: u32) -> bool {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            let running = std::process::Command::new("powershell.exe")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    &format!(
+                        "if (Get-Process -Id {pid} -ErrorAction SilentlyContinue) {{ exit 0 }} else {{ exit 1 }}"
+                    ),
+                ])
+                .status()
+                .is_ok_and(|status| status.success());
+            if !running {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
     }
 }

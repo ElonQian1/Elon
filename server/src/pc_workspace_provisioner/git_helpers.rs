@@ -232,6 +232,68 @@ pub(super) fn worktree_clean(repo: &Path) -> Result<bool> {
         .is_empty())
 }
 
+pub(super) fn lock_registered_conversation_worktree(
+    base_workspace: &Path,
+    worktree_path: &Path,
+) -> Result<()> {
+    let path_arg = git_path_arg(worktree_path);
+    match run_git_dynamic(
+        base_workspace,
+        &[
+            "worktree",
+            "lock",
+            "--reason",
+            "active PC CLI task; Resume or successful finalization unlocks",
+            path_arg.as_str(),
+        ],
+    ) {
+        Ok(()) => Ok(()),
+        Err(_) if conversation_worktree_is_locked(base_workspace, worktree_path)? => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+pub(super) fn unlock_conversation_worktree(
+    base_workspace: &Path,
+    worktree_path: &Path,
+) -> Result<()> {
+    if !conversation_worktree_is_locked(base_workspace, worktree_path)? {
+        return Ok(());
+    }
+    let path_arg = git_path_arg(worktree_path);
+    run_git_dynamic(base_workspace, &["worktree", "unlock", path_arg.as_str()])
+}
+
+fn conversation_worktree_is_locked(base_workspace: &Path, worktree_path: &Path) -> Result<bool> {
+    let target =
+        std::fs::canonicalize(worktree_path).unwrap_or_else(|_| worktree_path.to_path_buf());
+    let list = git_output(base_workspace, &["worktree", "list", "--porcelain"])?;
+    let mut path_matches = false;
+    for line in list.lines().chain(std::iter::once("")) {
+        if line.is_empty() {
+            if path_matches {
+                return Ok(false);
+            }
+            path_matches = false;
+        } else if let Some(path) = line.strip_prefix("worktree ") {
+            let registered = std::fs::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path));
+            path_matches = same_worktree_path(&registered, &target);
+        } else if path_matches && line.starts_with("locked") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn same_worktree_path(left: &Path, right: &Path) -> bool {
+    if cfg!(windows) {
+        left.to_string_lossy()
+            .eq_ignore_ascii_case(&right.to_string_lossy())
+    } else {
+        left == right
+    }
+}
+
 pub(super) fn ensure_conversation_workspace_committed(repo: &Path) -> Result<Option<String>> {
     if worktree_clean(repo)? {
         return Ok(None);

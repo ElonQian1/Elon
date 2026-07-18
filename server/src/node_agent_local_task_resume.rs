@@ -16,6 +16,9 @@ use crate::{
     pc_workspace_provisioner::ConversationWorkspaceResult,
 };
 
+#[path = "node_agent_local_task_resume_recovery.rs"]
+mod recovery;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ResumeWorkspaceMode {
     Inspect,
@@ -40,12 +43,13 @@ pub(crate) fn resolve_resume_workspace(
     receipt: Option<&crate::node_agent_update_recovery::UpdateRecoveryReceipt>,
     mode: ResumeWorkspaceMode,
 ) -> Result<ResolvedResumeWorkspace> {
-    match validate_resume_workspace(
+    match resolve_existing_resume_workspace(
         contract,
         parent,
         journal_record,
         requested_project_id,
         requested_workspace_path,
+        mode == ResumeWorkspaceMode::Acquire,
     ) {
         Ok(workspace) => Ok(workspace),
         Err(existing_error) => {
@@ -72,6 +76,41 @@ pub(crate) fn validate_resume_workspace(
     requested_project_id: &str,
     requested_workspace_path: &str,
 ) -> Result<ResolvedResumeWorkspace> {
+    resolve_existing_resume_workspace(
+        contract,
+        parent,
+        journal_record,
+        requested_project_id,
+        requested_workspace_path,
+        true,
+    )
+}
+
+pub(crate) fn inspect_resume_workspace(
+    contract: &SupervisionContract,
+    parent: &LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
+    requested_project_id: &str,
+    requested_workspace_path: &str,
+) -> Result<ResolvedResumeWorkspace> {
+    resolve_existing_resume_workspace(
+        contract,
+        parent,
+        journal_record,
+        requested_project_id,
+        requested_workspace_path,
+        false,
+    )
+}
+
+fn resolve_existing_resume_workspace(
+    contract: &SupervisionContract,
+    parent: &LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
+    requested_project_id: &str,
+    requested_workspace_path: &str,
+    repair_missing_git_metadata: bool,
+) -> Result<ResolvedResumeWorkspace> {
     if contract.protocol != SUPERVISION_PROTOCOL || contract.task_role != "resume_original" {
         bail!("只有当前监督协议的 resume_original 可以继承父任务工作区。");
     }
@@ -93,7 +132,7 @@ pub(crate) fn validate_resume_workspace(
     let conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
     let expected_branch = format!("ai/session/{project_part}/{conversation_part}");
     let authorized_base = canonical_directory(Path::new(&parent.workspace_path), "父任务授权根")?;
-    let (recorded_base, active, status_branch, derivation) =
+    let (recorded_base, active, status_branch, recorded_head, mut derivation) =
         if let Some(status) = parent.workspace_status.as_ref() {
             if status.get("isolated").and_then(serde_json::Value::as_bool) != Some(true) {
                 bail!("父任务工作区不是平台生成的隔离 worktree。");
@@ -110,6 +149,12 @@ pub(crate) fn validate_resume_workspace(
                 canonical_directory(Path::new(status_base), "父任务记录的基础工作区")?,
                 canonical_directory(Path::new(status_active), "父任务隔离 worktree")?,
                 status_branch.to_string(),
+                status
+                    .get("git_head")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(str::to_string),
                 "workspace_status".to_string(),
             )
         } else {
@@ -126,6 +171,7 @@ pub(crate) fn validate_resume_workspace(
                 authorized_base.clone(),
                 canonical_directory(Path::new(started_cwd), "父任务 started.cwd")?,
                 expected_branch.clone(),
+                None,
                 "legacy_started_cwd_git_registry".to_string(),
             )
         };
@@ -145,8 +191,38 @@ pub(crate) fn validate_resume_workspace(
     if status_branch != expected_branch {
         bail!("父任务隔离分支不符合平台生成规则。");
     }
-    let git_head = validate_git_worktree_identity(&authorized_base, &active, &expected_branch)?;
+    let git_head = match validate_git_worktree_identity(&authorized_base, &active, &expected_branch)
+    {
+        Ok(head) => {
+            if recorded_head
+                .as_deref()
+                .is_some_and(|recorded| !recorded.eq_ignore_ascii_case(&head))
+            {
+                bail!("父任务记录的 git_head 与活动 worktree 当前 HEAD 不一致。");
+            }
+            head
+        }
+        Err(identity_error) if !recovery::is_git_worktree(&active) => {
+            let recovered = recovery::inspect_or_repair(
+                &authorized_base,
+                &active,
+                &expected_branch,
+                recorded_head.as_deref(),
+                repair_missing_git_metadata,
+            )
+            .with_context(|| {
+                format!(
+                    "父任务活动目录缺少 Git worktree 注册；自动恢复校验失败（原始错误: {identity_error:#}）"
+                )
+            })?;
+            derivation = recovered.derivation;
+            recovered.git_head
+        }
+        Err(error) => return Err(error),
+    };
 
+    let requires_recreation =
+        !repair_missing_git_metadata && derivation.contains("_recovery_ready_");
     Ok(ResolvedResumeWorkspace {
         authorized_workspace_path: display_path(&authorized_base),
         inherited_workspace: ConversationWorkspaceResult {
@@ -157,7 +233,7 @@ pub(crate) fn validate_resume_workspace(
         },
         derivation,
         git_head,
-        requires_recreation: false,
+        requires_recreation,
     })
 }
 

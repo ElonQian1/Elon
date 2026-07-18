@@ -17,6 +17,10 @@ pub struct CliWorkspaceStatus {
     pub isolated: bool,
     #[serde(default)]
     pub branch: Option<String>,
+    /// Full commit recorded while the isolated worktree is still healthy.
+    /// Resume uses this durable identity if Git registration is later lost.
+    #[serde(default)]
+    pub git_head: Option<String>,
     pub prepare_status: String,
     #[serde(default)]
     pub merge_status: Option<String>,

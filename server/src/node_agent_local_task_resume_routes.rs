@@ -103,7 +103,9 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     .await
     .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
 
-    if !resolved.requires_recreation
+    let recorded_workspace_exists =
+        FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
+    if recorded_workspace_exists
         && !runtime
             .active_cli_prompt_views_for_workspace(FsPath::new(
                 &resolved.inherited_workspace.workspace_path,
@@ -116,7 +118,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             "父任务隔离 worktree 已被活跃任务占用，已拒绝续跑。",
         ));
     }
-    if !resolved.requires_recreation
+    if recorded_workspace_exists
         && live_sidecar_occupies_workspace(runtime, &resolved.inherited_workspace.workspace_path)
             .map_err(internal_error)?
     {
@@ -173,14 +175,16 @@ pub(crate) async fn inspect_resume_workspace_status(
         crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     ) {
         Ok(resolved) => {
-            let prompt_occupied = !resolved.requires_recreation
+            let recorded_workspace_exists =
+                FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
+            let prompt_occupied = recorded_workspace_exists
                 && !runtime
                     .active_cli_prompt_views_for_workspace(FsPath::new(
                         &resolved.inherited_workspace.workspace_path,
                     ))
                     .await
                     .is_empty();
-            let sidecar_occupied = !resolved.requires_recreation
+            let sidecar_occupied = recorded_workspace_exists
                 && live_sidecar_occupies_workspace(
                     runtime,
                     &resolved.inherited_workspace.workspace_path,
@@ -194,6 +198,7 @@ pub(crate) async fn inspect_resume_workspace_status(
                 "branch": resolved.inherited_workspace.branch,
                 "git_head": resolved.git_head,
                 "occupied": prompt_occupied || sidecar_occupied,
+                "recovery_required": resolved.requires_recreation,
                 "requires_recreation": resolved.requires_recreation,
             })
         }

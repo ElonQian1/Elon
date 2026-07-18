@@ -360,6 +360,7 @@ pub fn cli_workspace_status(
         active_workspace_path: workspace.workspace_path.clone(),
         isolated: workspace.isolated,
         branch: workspace.branch.clone(),
+        git_head: pc_workspace_provisioner::conversation_workspace_git_head(workspace),
         prepare_status: "prepared".into(),
         merge_status: Some(merge_status.into()),
         merge_message: merge_message.map(ToOwned::to_owned),

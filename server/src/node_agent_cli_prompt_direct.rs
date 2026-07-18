@@ -341,14 +341,19 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                     &mut stderr_text,
                 ).await;
                 journal_aggregate.flush(&task_journal, &req_id);
-                let (done, combined_output) = cli_done_message_from_output(
-                    req_id,
+                let (exit_ok, error, workspace_status) = finalize_cli_prompt_workspace(
                     false,
                     Some(message),
+                    conversation_workspace,
+                );
+                let (done, combined_output) = cli_done_message_from_output(
+                    req_id,
+                    exit_ok,
+                    error,
                     &stdout_text,
                     &stderr_text,
                     cli_model_from_args(cli_name, &extra_args),
-                    None,
+                    workspace_status,
                     latest_codex_session_id(cli_name, &codex_plan, &task_journal),
                 );
                 if let Err(error) = persist_and_send_cli_done(

@@ -508,6 +508,7 @@ mod tests {
                 active_workspace_path: "D:\\repo-worktree".to_string(),
                 isolated: true,
                 branch: Some("ai/session/project-a/conversation-a".to_string()),
+                git_head: Some("0123456789012345678901234567890123456789".to_string()),
                 prepare_status: "prepared".to_string(),
                 merge_status: Some("merged".to_string()),
                 merge_message: None,

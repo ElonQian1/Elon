@@ -169,6 +169,7 @@ fn completion_fixture() -> CliCompletionEnvelope {
             active_workspace_path: "D:\\repo-worktree".to_string(),
             isolated: true,
             branch: Some("ai/session/project-a/conversation-a".to_string()),
+            git_head: Some("0123456789012345678901234567890123456789".to_string()),
             prepare_status: "prepared".to_string(),
             merge_status: Some("merged".to_string()),
             merge_message: Some("fast-forwarded main".to_string()),
@@ -219,6 +220,13 @@ fn cli_completion_replay_round_trips_all_terminal_fields() {
                     .as_ref()
                     .and_then(|status| status.merge_status.as_deref()),
                 Some("merged")
+            );
+            assert_eq!(
+                completion
+                    .workspace_status
+                    .as_ref()
+                    .and_then(|status| status.git_head.as_deref()),
+                Some("0123456789012345678901234567890123456789")
             );
         }
         other => panic!("expected completion replay, got {other:?}"),

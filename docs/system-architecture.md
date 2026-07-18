@@ -140,7 +140,9 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 受监督的本机 Codex 任务需要覆盖真实项目构建、发布和统一收尾，不能沿用普通 full-access 任务固定的 1200 秒总时限。pipe sidecar 与 direct-pipe 回退路径统一使用默认 21600 秒总时限、900 秒进展空闲时限和 15 秒 heartbeat；三个值分别由 `ELON_SUPERVISED_CODEX_TIMEOUT_SECS`（1201–86400）、`ELON_SUPERVISED_CODEX_IDLE_TIMEOUT_SECS`（30–7200）、`ELON_SUPERVISED_CODEX_HEARTBEAT_SECS`（1–60）约束配置。输出/命令/文件刷新进展，节点 heartbeat 只证明运行时存活，不掩盖真正空闲。未带监督协议的 Codex 任务仍为 1200/300 秒，其它 CLI 仍为 180 秒；取消、进程树回收、审批、云控截止时间和终态持久化不放宽。
 
-`resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
+`resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支、终态记录的 `git_head` 和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。若活动目录仍在但 Git 注册被外部清理破坏，只读检查先报告 `recovery_required`，节点在占用门禁后以 `git worktree add --no-checkout` 重建元数据，再原样移回用户文件；提交或分支漂移时拒绝猜测。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
+
+节点创建或复用隔离会话 worktree 后立即写 Git worktree lock；失败、取消、超时和恢复等待阶段保持锁定，防止通用清理过早注销现场。Windows 超时/取消先同步等待 `taskkill /T /F` 回收完整执行器进程树，再结束直接子进程；成功合并并推送后才解锁和移除 worktree。终态 `workspace_status` 持久化基础路径、活动路径、分支和完整 `git_head`，为注册丢失后的确定性重建提供身份。
 
 服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
 

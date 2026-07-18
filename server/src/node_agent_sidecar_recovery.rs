@@ -373,6 +373,10 @@ fn recovered_workspace_status(
             Path::new(active),
             &["branch", "--show-current"],
         ),
+        git_head: crate::node_agent_update_checkpoint::git_output(
+            Path::new(active),
+            &["rev-parse", "--verify", "HEAD^{commit}"],
+        ),
         prepare_status: "recovered_from_sidecar".to_string(),
         merge_status: Some("preserved".to_string()),
         merge_message: Some("节点更新后保留原工作区并补写终态".to_string()),
