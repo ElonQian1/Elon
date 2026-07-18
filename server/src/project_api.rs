@@ -70,6 +70,9 @@ pub struct UpdateProfileRequest {
 #[derive(Deserialize, Default)]
 pub struct ListMyProjectsQuery {
     pub include_system: Option<bool>,
+    /// 可选：按指定 PC 节点解析用户在该节点上的工作区绑定。
+    /// 不传时保持历史行为，返回该用户最近更新的 PC 绑定。
+    pub node_id: Option<String>,
 }
 
 pub async fn update_profile(
@@ -107,18 +110,26 @@ pub async fn list_my_projects(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    match state.store.list_projects_for_user(&user.id) {
-        Ok(projects) => {
+    let requested_node_id = clean_optional_string(query.node_id.as_deref());
+    let projects_result = match requested_node_id.as_deref() {
+        Some(node_id) => state
+            .store
+            .list_projects_for_user_on_node(&user.id, node_id),
+        None => state.store.list_projects_for_user(&user.id),
+    };
+
+    match projects_result {
+        Ok(mut projects) => {
             let include_system = query.include_system.unwrap_or(false);
-            let projects = if include_system {
-                projects
-            } else {
-                projects
-                    .into_iter()
-                    .filter(|project| !is_system_project_source_type(&project.source_type))
-                    .collect()
-            };
-            Json(serde_json::json!({ "projects": projects })).into_response()
+            if !include_system {
+                projects.retain(|project| !is_system_project_source_type(&project.source_type));
+            }
+
+            Json(serde_json::json!({
+                "projects": projects,
+                "requested_node_id": requested_node_id,
+            }))
+            .into_response()
         }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }

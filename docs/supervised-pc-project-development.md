@@ -222,9 +222,28 @@ platform_improvement_candidates:
 2. 远程开发者在开始任务时读取本文的当前版本或 commit-pinned 链接。
 3. 目标项目在自己的 `AGENTS.md` 或等价入口放置下面的最小规则，并指向本文。
 
-当前 BB64A 协作采用第 2 种：由用户把本文交给 BB64A 开发者及其 Codex 桌面端手工阅读。它不要求先改 BB64A 仓库，也不依赖一龙自动注入；每次新任务或新开发者接手时，用户应再次给出本文或固定到某次提交的链接，避免只靠聊天记忆。
+BB64A 或其它外部项目首次接入时可以先采用第 2 种；稳定使用后应升级为第 1 或第 3 种。目标仓库的相对规则入口和平台注入的协议版本才是长期事实来源，不应要求用户在每次新任务中反复粘贴某台电脑上的绝对文档路径，也不能只靠聊天记忆。
 
-### 6.1 手工交接指令
+### 6.1 不同开发者路径与本机直读
+
+项目身份与本地目录是两层数据：
+
+- 项目 ID、仓库 URL 和默认分支用于识别“这是同一个项目”。
+- `project_pc_workspace_bindings` 按用户、PC 节点和项目保存各自的本地目录。同一个 BB64A 可以在甲开发者机器上位于 `D:\work\bb64a`，在乙开发者机器上位于其它路径。
+- 任务派发必须使用目标节点自己的绑定，不能把最近一次由其它节点更新的绝对路径当成所有机器的公共路径。
+- 协议文档应通过仓库内相对入口、commit-pinned 链接或平台合同版本引用；只有当前机器确实需要直接读取平台仓库文件时，才使用该机器自己的绝对路径。
+
+Codex Desktop 无需打开浏览器即可查询当前登录账号及当前 PC 节点的项目绑定：
+
+```powershell
+$helper = '.agents\skills\codex-pc-supervisor\scripts\invoke-supervised-task.ps1'
+powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Projects `
+  -ProjectFilterId '<project-id>'
+```
+
+该命令只访问 `127.0.0.1` 的受保护本地接口；NodeAgent 再使用 `direct_reqwest_no_proxy` 读取一龙云端，并携带当前节点 ID 解析本机绑定。响应不包含登录 token。这样既不依赖浏览器登录态，也不会因浏览器代理无法访问一龙云端而失败。
+
+### 6.2 手工交接指令
 
 用户可以把下面这段话与本文一起交给 BB64A 或其它项目的开发者/Codex 桌面端：
 

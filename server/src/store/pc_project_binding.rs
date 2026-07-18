@@ -378,6 +378,32 @@ impl Store {
             .optional()
             .map_err(Into::into)
     }
+
+    /// 返回用户项目，并把 PC 工作区字段解析为指定节点自己的绑定。
+    /// 未绑定到该节点的项目会保留在列表中，但 PC 节点与路径字段为空。
+    pub fn list_projects_for_user_on_node(
+        &self,
+        user_id: &str,
+        node_id: &str,
+    ) -> Result<Vec<ProjectSummary>> {
+        let node_id = node_id.trim();
+        if node_id.is_empty() {
+            return self.list_projects_for_user(user_id);
+        }
+
+        let mut projects = self.list_projects_for_user(user_id)?;
+        for project in &mut projects {
+            project.workspace_path = None;
+            project.node_id = None;
+            if let Some(binding) =
+                self.get_project_pc_workspace_binding(user_id, &project.id, node_id)?
+            {
+                project.workspace_path = Some(binding.workspace_path);
+                project.node_id = Some(binding.node_id);
+            }
+        }
+        Ok(projects)
+    }
 }
 
 pub(super) fn apply_user_pc_workspace_binding_to_summary(

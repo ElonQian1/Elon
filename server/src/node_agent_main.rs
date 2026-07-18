@@ -70,6 +70,7 @@ mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
 mod node_agent_cloud_net;
+mod node_agent_cloud_projects;
 mod node_agent_codex_approval;
 mod node_agent_codex_auth_switch;
 mod node_agent_codex_child_env;

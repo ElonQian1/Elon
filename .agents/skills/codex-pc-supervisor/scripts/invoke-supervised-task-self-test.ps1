@@ -90,6 +90,7 @@ function Invoke-SupervisionSelfTest {
         $unsafeResumeRejected = $true
     }
     $testDetailPath = Get-TaskDetailPath 'local-test?id'
+    $testProjectsPath = Get-CloudProjectsPath $true
     $criteriaJson = ConvertFrom-Utf8Base64 'WyLmnaHku7bkuIAiLCLmnaHku7bkuowiXQ=='
     $jsonCriteria = @(Resolve-AcceptanceCriteria @() $criteriaJson '')
     $criteriaFile = Join-Path ([System.IO.Path]::GetTempPath()) "elon-supervision-criteria-$([guid]::NewGuid().ToString('N')).json"
@@ -126,6 +127,7 @@ function Invoke-SupervisionSelfTest {
         resume_guard = $unsafeResumeRejected
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
+        cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         criteria_json = $jsonCriteria.Count -eq 2 -and
             $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')
         criteria_file = $fileCriteria.Count -eq 3 -and
@@ -143,7 +145,8 @@ function Invoke-SupervisionSelfTest {
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
-            'resume_legacy_started_cwd', 'task_detail_path', 'criteria_json_array', 'criteria_utf8_file'
+            'resume_legacy_started_cwd', 'task_detail_path', 'cloud_projects_path',
+            'criteria_json_array', 'criteria_utf8_file'
         )
     })
 }

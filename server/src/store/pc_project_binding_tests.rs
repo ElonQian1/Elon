@@ -71,3 +71,61 @@ fn editor_binding_overlays_only_the_editors_workspace() {
         Some("D:/owner/project")
     );
 }
+
+#[test]
+fn project_list_resolves_the_requested_nodes_own_workspace() {
+    let store = temp_store();
+    let owner = store
+        .create_user("node-owner@example.com", "secret1", None, None)
+        .expect("owner should be created");
+    let project = store
+        .create_project(&owner.id, "Portable PC Project", None, None)
+        .expect("project should be created")
+        .project;
+
+    store
+        .bind_project_to_pc_workspace(
+            &owner.id,
+            &project.id,
+            "D:/developer-a/project",
+            "node-a",
+            Some("head-a"),
+            Some("git@example.com:owner/project.git"),
+            Some("main"),
+        )
+        .expect("node-a workspace should bind");
+    store
+        .bind_project_to_pc_workspace(
+            &owner.id,
+            &project.id,
+            "E:/developer-b/project",
+            "node-b",
+            Some("head-b"),
+            Some("git@example.com:owner/project.git"),
+            Some("main"),
+        )
+        .expect("node-b workspace should bind");
+
+    let node_a_projects = store
+        .list_projects_for_user_on_node(&owner.id, "node-a")
+        .expect("node-a list should resolve");
+    let node_a_project = node_a_projects
+        .iter()
+        .find(|candidate| candidate.id == project.id)
+        .expect("project should remain listed");
+    assert_eq!(node_a_project.node_id.as_deref(), Some("node-a"));
+    assert_eq!(
+        node_a_project.workspace_path.as_deref(),
+        Some("D:/developer-a/project")
+    );
+
+    let unbound_projects = store
+        .list_projects_for_user_on_node(&owner.id, "node-c")
+        .expect("unbound node list should resolve");
+    let unbound_project = unbound_projects
+        .iter()
+        .find(|candidate| candidate.id == project.id)
+        .expect("unbound project should remain listed");
+    assert_eq!(unbound_project.node_id, None);
+    assert_eq!(unbound_project.workspace_path, None);
+}

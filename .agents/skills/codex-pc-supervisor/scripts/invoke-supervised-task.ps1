@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Probe', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
+    [ValidateSet('Probe', 'Projects', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
     [string]$Action,
     [string]$ProjectId = 'elon-project',
     [string]$WorkspacePath,
@@ -20,6 +20,8 @@ param(
     [string]$ImprovementPolicy = 'after_task_or_unblock',
     [string]$ParentTaskId,
     [string]$RootTaskId,
+    [string]$ProjectFilterId = '',
+    [switch]$IncludeSystemProjects,
     [switch]$BlockingImprovement,
     [ValidateRange(1, 55)]
     [int]$WaitSeconds = 55,
@@ -311,6 +313,12 @@ function Invoke-NodeApi {
         -Headers $requestHeaders -Body $Body -TimeoutSec 15
 }
 
+function Get-CloudProjectsPath {
+    param([bool]$IncludeSystem)
+    if ($IncludeSystem) { return '/api/cloud-projects?include_system=true' }
+    return '/api/cloud-projects'
+}
+
 function New-SupervisedTaskBody {
     param(
         [string]$BodyProjectId,
@@ -540,6 +548,24 @@ switch ($Action) {
             ok = $true; action = 'Probe'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; node_version = $nodeConnection.Version
             probe_ms = $nodeConnection.ProbeMs; cache_contains_token = $false
+        })
+    }
+    'Projects' {
+        $projectsPath = Get-CloudProjectsPath ([bool]$IncludeSystemProjects)
+        $response = Invoke-NodeApi $nodeConnection 'Get' $projectsPath
+        $projects = @(Get-ObjectField $response 'projects')
+        if (-not [string]::IsNullOrWhiteSpace($ProjectFilterId)) {
+            $requestedProjectId = $ProjectFilterId.Trim()
+            $projects = @($projects | Where-Object {
+                [string](Get-ObjectField $_ 'id') -eq $requestedProjectId
+            })
+        }
+        Convert-ToJsonResult ([ordered]@{
+            ok = $true; action = 'Projects'; protocol = $script:SupervisionProtocol
+            node_url = $nodeConnection.BaseUrl; node_version = $nodeConnection.Version
+            node_id = Get-ObjectField $response 'node_id'
+            transport = Get-ObjectField $response 'transport'
+            projects = $projects
         })
     }
     'Submit' {

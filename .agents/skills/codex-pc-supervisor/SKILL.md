@@ -27,6 +27,7 @@ If the current request contains `<elon-pc-executor>`, stop using this skill. Wor
 
 The PowerShell helper tries `ELON_NODE_ADMIN_URL`, the current/recent successful token-free URL, and the 7799 fast path before scanning 7800–7819. It obtains the loopback-only admin token afresh without printing or caching it and returns stable JSON. Set `ELON_NODE_ADMIN_URL` only when the node uses another trusted local URL.
 Use `-Action Probe` to verify local connectivity and version without creating a task.
+Use `-Action Projects` to read the logged-in account's projects and this PC node's workspace bindings without opening a browser. The node calls the Yilong cloud with its direct no-proxy client; `-ProjectFilterId` narrows the result and `-IncludeSystemProjects` includes system projects. Never infer another developer's path from the top-level cloud project record.
 
 For multiple acceptance criteria passed through an outer `powershell -File`, prefer `-AcceptanceCriteriaJson '["one","two"]'` or a UTF-8 JSON file via `-AcceptanceCriteriaFile`. The legacy `-AcceptanceCriteria` array remains compatible.
 
@@ -51,6 +52,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Wait -TaskId
 
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Inspect `
   -TaskId 'local-...' -Since 40 -Limit 25 -Compact
+
+powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Projects `
+  -ProjectFilterId 'project-id'
 
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review `
   -TaskId 'local-...' -Verdict accepted -Summary 'diff、测试和发布均已验收'
