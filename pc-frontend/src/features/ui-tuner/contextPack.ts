@@ -119,6 +119,23 @@ export interface UiTunerCodexContextPack {
     acceptance: string[]
   }
   closurePriorityIds: string[]
+  pwaDesign?: {
+    artifactVersion: string
+    sourceRevision: string
+    route: { path: string; search: string; hash: string }
+    viewport: { width: number; height: number }
+    changes: unknown[]
+    compactSourceBundle: Array<Record<string, unknown>>
+    visualReferences: Record<string, string | undefined>
+    writebackPlan: unknown
+    deterministicResult: unknown
+    contextPolicy: {
+      fullRepositoryIncluded: false
+      fullDomIncluded: false
+      screenshotsEmbeddedAsBase64: false
+    }
+    capabilities: { PWA_CODE_GENERATION: true }
+  }
 }
 
 interface Rect {

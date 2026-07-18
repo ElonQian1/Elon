@@ -108,6 +108,80 @@ try {
   assert.equal(cliPackage.capabilities.PWA_CODE_GENERATION, true)
   assert.equal(JSON.stringify(cliPackage).includes('base64,'), false, 'CLI 包不得内嵌截图 Base64')
 
+  compile(
+    'src/features/ui-tuner/source-preview/sourcePreviewTree.ts',
+    'source-preview/sourcePreviewTree.js',
+  )
+  fs.writeFileSync(
+    path.join(temporaryDirectory, 'source-preview/sourcePreviewApi.js'),
+    'exports.commitSourcePreview = async () => ({ ok: true, sourceRevision: "next" })',
+  )
+  const writebackOutput = compile(
+    'src/features/ui-tuner/source-preview/pwaDesignWriteback.ts',
+    'source-preview/pwaDesignWriteback.js',
+  )
+  const { planPwaDesignWriteback } = require(writebackOutput)
+  const payElement = migrated.elements['id:payButton']
+  const boundDraft = {
+    ...migrated,
+    elements: {
+      'id:payButton': {
+        ...payElement,
+        binding: {
+          status: 'CANDIDATE', bindingConfidence: 'high', needsBinding: true,
+          pwaCandidates: [{ platform: 'pwa', stableKey: 'id:payButton', confidence: .95, reason: '稳定 id' }],
+          androidCandidates: [{
+            platform: 'android', stableKey: 'android/pay', file: 'app/src/main/res/layout/pay.xml',
+            resourceId: '@+id/payButton', confidence: 1, reason: 'resourceId 精确匹配',
+          }],
+        },
+      },
+    },
+  }
+  const androidRoot = {
+    key: 'android/root', name: 'Root', resourceId: '', source: { layoutFile: 'app/src/main/res/layout/pay.xml', attributes: {}, startTagStart: 0, startTagEnd: 20 }, children: [{
+      key: 'android/pay', name: 'payButton', resourceId: '@+id/payButton',
+      source: { layoutFile: 'app/src/main/res/layout/pay.xml', attributes: { 'android:id': '@+id/payButton' }, startTagStart: 40, startTagEnd: 100 },
+      children: [],
+    }],
+  }
+  const plan = planPwaDesignWriteback(boundDraft, androidRoot)
+  assert.equal(plan.strategy, 'DETERMINISTIC_THEN_CODEX')
+  assert.equal(plan.targets.android, 'DETERMINISTIC')
+  assert.equal(plan.targets.pwa, 'CODEX_REQUIRED')
+  assert.deepEqual(plan.deterministic[0].changes, { height: '48dp', borderRadius: '12dp' })
+
+  const contextOutput = compile(
+    'src/features/ui-tuner/source-preview/pwaDesignContext.ts',
+    'source-preview/pwaDesignContext.js',
+  )
+  const { buildPwaDesignContextPack } = require(contextOutput)
+  const contextPack = buildPwaDesignContextPack({
+    draft: boundDraft,
+    root: androidRoot,
+    selection: null,
+    plan,
+    deterministicResult: { applied: 1, sourceRevision: 'next', changedFiles: ['app/src/main/res/layout/pay.xml'] },
+  })
+  assert.equal(contextPack.kind, 'elon_ui_tuner_codex_context')
+  assert.equal(contextPack.pwaDesign.capabilities.PWA_CODE_GENERATION, true)
+  assert.equal(contextPack.pwaDesign.contextPolicy.fullRepositoryIncluded, false)
+  assert.equal(contextPack.pwaDesign.contextPolicy.fullDomIncluded, false)
+  assert.ok(contextPack.pwaDesign.compactSourceBundle.length <= 16)
+  assert.equal(JSON.stringify(contextPack).includes('base64,'), false, '低 Token Context Pack 只能引用截图路径')
+
+  const inspectorSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'),
+    'utf8',
+  )
+  assert.match(inspectorSource, /让 AI 同步到 APK 与 PWA/)
+  assert.match(inspectorSource, /data-testid="pwa-cross-platform-sync"/)
+  assert.match(inspectorSource, /\['starting', 'running'\]\.includes\(session\.syncState\.phase\)/)
+  assert.match(inspectorSource, /确定性写回优先/)
+  assert.match(inspectorSource, /需要 AI 建立绑定/)
+  assert.match(inspectorSource, /PWA 目标/)
+  assert.match(inspectorSource, /APK 目标/)
+
   console.log('pwa design artifact: all assertions passed')
 } finally {
   delete global.window

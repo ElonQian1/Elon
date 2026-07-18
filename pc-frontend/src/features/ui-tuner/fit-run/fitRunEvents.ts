@@ -6,6 +6,8 @@ export interface FitRunCodexRequest {
   handoffId: string
   handoffPath?: string
   reason: string
+  handoffKind?: 'FIT_RUN' | 'PWA_DRAFT'
+  contextPack?: UiTunerCodexContextPack
 }
 
 interface FitRunCodexRequestDetail extends FitRunCodexRequest {
@@ -152,3 +154,4 @@ function writeLaunches(items: FitRunCodexLaunchRecord[]) {
     // The in-memory launch lock remains active when storage is unavailable.
   }
 }
+import type { UiTunerCodexContextPack } from '../contextPack'

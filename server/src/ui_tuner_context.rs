@@ -64,7 +64,7 @@ fn validate_context_artifact(artifact: &ProjectModuleContextArtifact) -> Result<
     }
     if !supported_payload_version(&payload) {
         return Err(anyhow!(
-            "当前只支持 ui-tuner Context Artifact payload v1/v2/v3"
+            "当前只支持 ui-tuner Context Artifact payload v1/v2/v3/v4"
         ));
     }
     Ok(())
@@ -73,7 +73,7 @@ fn validate_context_artifact(artifact: &ProjectModuleContextArtifact) -> Result<
 fn supported_payload_version(payload: &serde_json::Value) -> bool {
     matches!(
         payload.get("version").and_then(|value| value.as_i64()),
-        Some(1 | 2 | 3)
+        Some(1 | 2 | 3 | 4)
     )
 }
 
@@ -232,8 +232,11 @@ mod tests {
         assert!(supported_payload_version(
             &serde_json::json!({ "version": 3 })
         ));
-        assert!(!supported_payload_version(
+        assert!(supported_payload_version(
             &serde_json::json!({ "version": 4 })
+        ));
+        assert!(!supported_payload_version(
+            &serde_json::json!({ "version": 5 })
         ));
     }
 }

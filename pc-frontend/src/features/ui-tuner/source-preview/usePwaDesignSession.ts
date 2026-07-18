@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { getAuthToken } from '../../../api/client'
+import { listenForFitRunCodexSettled, requestCodexForFitRun } from '../fit-run/fitRunEvents'
+import { buildPwaDesignContextPack } from './pwaDesignContext'
+import {
+  applyDeterministicAndroidWriteback,
+  planPwaDesignWriteback,
+  type PwaDeterministicWritebackResult,
+} from './pwaDesignWriteback'
 import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
   createPwaDesignDraft,
@@ -7,6 +14,7 @@ import {
   readPwaDesignDraft,
   removePwaDesignDraft,
   savePwaDesignDraft,
+  stringifyPwaDraftCliPackage,
   type PwaDesignDraft,
   type PwaDomContextNode,
   type PwaElementIdentity,
@@ -57,6 +65,8 @@ export interface PwaDesignSession {
   canUndo: boolean
   canRedo: boolean
   saveLabel: string
+  syncState: PwaSyncState
+  writebackPlan: ReturnType<typeof planPwaDesignWriteback>
   setMode: (mode: 'select' | 'interact') => void
   updateStyle: (property: PwaStyleProperty, value: string) => void
   resetCurrent: () => void
@@ -64,6 +74,9 @@ export interface PwaDesignSession {
   undo: () => void
   redo: () => void
   saveNow: () => void
+  syncNow: () => Promise<void>
+  copyCliPackage: () => Promise<void>
+  downloadCliPackage: () => void
   prepareReload: () => void
 }
 
@@ -81,6 +94,12 @@ function bridgeElements(draft: PwaDesignDraft) {
     selector: element.identity.selector,
     styleDiff: element.styleDiff,
   }))
+}
+
+export interface PwaSyncState {
+  phase: 'idle' | 'starting' | 'running' | 'completed' | 'failed'
+  message: string
+  taskId?: string
 }
 
 function draftEntry(draft: PwaDesignDraft, identity: PwaElementIdentity) {
@@ -113,12 +132,14 @@ export function usePwaDesignSession({
   const [unboundLabel, setUnboundLabel] = useState('')
   const [historyVersion, setHistoryVersion] = useState(0)
   const [saveLabel, setSaveLabel] = useState('等待进入真实页面')
+  const [syncState, setSyncState] = useState<PwaSyncState>({ phase: 'idle', message: '等待草稿' })
   const draftRef = useRef<PwaDesignDraft | null>(null)
   const routeRef = useRef<PwaRouteState | null>(null)
   const modeRef = useRef(modeState)
   const pastRef = useRef<PwaDesignDraft[]>([])
   const futureRef = useRef<PwaDesignDraft[]>([])
   const transactionRef = useRef<{ key: string; timer: number } | null>(null)
+  const syncTaskIdRef = useRef('')
   const project = useMemo(() => ({
     id: projectId || workspaceIdentity || 'unknown-project',
     workspaceIdentity: workspaceIdentity || projectId || 'unknown-workspace',
@@ -180,6 +201,15 @@ export function usePwaDesignSession({
   }, [closeTransaction])
 
   useEffect(() => () => closeTransaction(), [closeTransaction])
+
+  useEffect(() => listenForFitRunCodexSettled((detail) => {
+    if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
+    setSyncState(detail.succeeded
+      ? { phase: 'completed', taskId: detail.taskId, message: 'PWA 与 APK 同步任务已完成' }
+      : { phase: 'failed', taskId: detail.taskId, message: '跨端 Codex 写回失败，可保留草稿后重试' })
+    if (detail.succeeded) setSaveLabel('跨端草稿已写回源码')
+    syncTaskIdRef.current = ''
+  }), [])
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
@@ -327,6 +357,88 @@ export function usePwaDesignSession({
     setSaveLabel(Object.keys(current.elements).length ? `草稿已保存 · r${current.revision}` : '本页暂无样式草稿')
   }, [persist])
 
+  const writebackPlan = useMemo(() => planPwaDesignWriteback(draft, root), [draft, root])
+
+  const syncNow = useCallback(async () => {
+    const current = draftRef.current
+    if (!current || !Object.keys(current.elements).length) return
+    persist(current)
+    setSyncState({ phase: 'starting', message: '正在保存草稿并执行确定性写回…' })
+    let deterministicResult: PwaDeterministicWritebackResult = {
+      applied: 0,
+      sourceRevision: current.project.sourceRevision,
+      changedFiles: [] as string[],
+    }
+    try {
+      deterministicResult = await applyDeterministicAndroidWriteback({
+        draft: current,
+        root,
+        projectRoot: current.project.workspaceIdentity,
+        sourceRevision: current.project.sourceRevision,
+      })
+    } catch (error) {
+      deterministicResult.error = error instanceof Error ? error.message : '确定性 Android 写回失败'
+    }
+    const latest = deterministicResult.applied ? {
+      ...current,
+      project: { ...current.project, sourceRevision: deterministicResult.sourceRevision },
+      updatedAt: new Date().toISOString(),
+    } : current
+    if (latest !== current) applyDraftState(latest, false)
+    const plan = planPwaDesignWriteback(latest, root)
+    if (deterministicResult.error) plan.codexReasons.push(`确定性写回需 Codex 接管：${deterministicResult.error}`)
+    const contextPack = buildPwaDesignContextPack({
+      draft: latest,
+      root,
+      selection,
+      plan,
+      deterministicResult,
+    })
+    try {
+      const handoffId = `pwa_${Date.now()}`
+      const { taskId } = await requestCodexForFitRun({
+        runId: `pwa:${latest.project.id}:${latest.revision}`,
+        handoffId,
+        handoffKind: 'PWA_DRAFT',
+        contextPack,
+        reason: plan.codexReasons.join('；'),
+      })
+      syncTaskIdRef.current = taskId
+      setSyncState({
+        phase: 'running', taskId,
+        message: deterministicResult.applied
+          ? `Android 已确定性写回 ${deterministicResult.applied} 个节点，Codex 正在补齐 PWA/复杂修改`
+          : '已进入现有 Codex 会话，正在建立来源绑定并写回双端源码',
+      })
+    } catch (error) {
+      setSyncState({ phase: 'failed', message: error instanceof Error ? error.message : '跨端同步任务启动失败' })
+    }
+  }, [applyDraftState, persist, root, selection])
+
+  const copyCliPackage = useCallback(async () => {
+    const current = draftRef.current
+    if (!current) return
+    try {
+      await navigator.clipboard.writeText(stringifyPwaDraftCliPackage(current))
+      setSaveLabel('CLI 包已复制 · 不含整仓库或 Base64 截图')
+    } catch {
+      setSaveLabel('浏览器禁止复制，请改用下载 CLI 包')
+    }
+  }, [])
+
+  const downloadCliPackage = useCallback(() => {
+    const current = draftRef.current
+    if (!current) return
+    const blob = new Blob([stringifyPwaDraftCliPackage(current)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `pwa-design-${current.project.id || 'project'}-r${current.revision}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+    setSaveLabel('CLI 包已下载')
+  }, [])
+
   const prepareReload = useCallback(() => {
     setReady(false)
     setSelection(null)
@@ -346,6 +458,8 @@ export function usePwaDesignSession({
     canUndo: pastRef.current.length > 0 && historyVersion >= 0,
     canRedo: futureRef.current.length > 0 && historyVersion >= 0,
     saveLabel,
+    syncState,
+    writebackPlan,
     setMode,
     updateStyle,
     resetCurrent,
@@ -353,6 +467,9 @@ export function usePwaDesignSession({
     undo,
     redo,
     saveNow,
+    syncNow,
+    copyCliPackage,
+    downloadCliPackage,
     prepareReload,
   }
 }

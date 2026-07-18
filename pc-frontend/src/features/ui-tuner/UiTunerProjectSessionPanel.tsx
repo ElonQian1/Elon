@@ -49,10 +49,13 @@ interface FitRunTaskRef {
   runId: string
   handoffId: string
   taskId: string
+  kind?: 'FIT_RUN' | 'PWA_DRAFT'
 }
 
 interface SessionStartOptions {
   fitRun?: Pick<FitRunTaskRef, 'runId' | 'handoffId'>
+  handoffKind?: 'FIT_RUN' | 'PWA_DRAFT'
+  contextPack?: UiTunerCodexContextPack
 }
 
 export function UiTunerProjectSessionPanel({
@@ -246,12 +249,13 @@ export function UiTunerProjectSessionPanel({
     setStatus(mode === 'fork' ? '正在从最新稳定检查点分叉…' : '正在发送到持续项目会话…')
     try {
       const taskIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
+      const activePack = options?.contextPack ?? pack
       const session = mode === 'fork'
         ? await forkUiTunerConversation({
             projectId: activeProject.id,
             conversationId: source.conversationId,
-            title: `微调画布 · ${pack.selectedElement?.name || pack.screen.canvasName}`.slice(0, 80),
-            selectedElementName: pack.selectedElement?.name,
+            title: `微调画布 · ${activePack.selectedElement?.name || activePack.screen.canvasName}`.slice(0, 80),
+            selectedElementName: activePack.selectedElement?.name,
           })
         : source
       await selectChannel(aiChannel.id)
@@ -267,7 +271,7 @@ export function UiTunerProjectSessionPanel({
         projectId: activeProject.id,
         conversationId: session.conversationId,
         userIntent: taskIntent,
-        pack,
+        pack: activePack,
       })
       const agent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, CODEX_ROUTE)
       const response = await sendMessage(
@@ -293,8 +297,10 @@ export function UiTunerProjectSessionPanel({
           : [{ ...session, taskId, status: 'running' }, ...previous.sessions],
       } : previous)
       if (options?.fitRun) {
-        setFitRunTask({ ...options.fitRun, taskId })
-        setStatus('FitRun 已交给持续项目 Codex CLI 会话；构建验收由 FitRun 统一调度')
+        setFitRunTask({ ...options.fitRun, taskId, kind: options.handoffKind })
+        setStatus(options.handoffKind === 'PWA_DRAFT'
+          ? '跨端草稿已进入持续项目 Codex CLI 会话'
+          : 'FitRun 已交给持续项目 Codex CLI 会话；构建验收由 FitRun 统一调度')
       } else {
         setConversationOpen(true)
         setVerificationTaskId(taskId)
@@ -318,10 +324,18 @@ export function UiTunerProjectSessionPanel({
     }
     const artifact = request.handoffPath
       ? `先读取 FitRun handoff：${request.handoffPath}`
-      : '先通过 yilong-ui-live MCP 读取当前 FitRun handoff'
-    const taskIntent = [
-      `继续设计稿自动拟合任务 ${request.runId}。`,
+      : request.handoffKind === 'PWA_DRAFT'
+        ? '本轮低 Token 跨端草稿已随现有 Context Artifact 提交'
+        : '先通过 yilong-ui-live MCP 读取当前 FitRun handoff'
+    const taskIntent = request.handoffKind === 'PWA_DRAFT' ? [
+      `继续跨端 PWA 设计草稿 ${request.runId}。`,
       artifact,
+      `路由原因：${request.reason}`,
+      '只读取 Context Artifact 的草稿 diff、局部 DOM、compactSourceBundle、相关裁剪与视觉差异。',
+      '跳过 deterministicResult 已完成的写回；只补 PWA 来源绑定、结构调整或复杂 TSX/Kotlin。',
+      'PWA Runtime DOM 仅是临时证据，最终必须写回源码并同时说明 PWA/APK 两端结果。',
+    ].join('\n') : [
+      `继续设计稿自动拟合任务 ${request.runId}。`, artifact,
       `平台期原因：${request.reason}`,
       '只读取 handoff 指向的目标裁剪、当前裁剪、节点子树和局部源码。',
       '优先修正布局结构或 Source Binding；不要用临时 translation 冒充可写回布局。',
@@ -331,6 +345,8 @@ export function UiTunerProjectSessionPanel({
     setFitRunStarting(true)
     void startSessionRef.current('continue', taskIntent, {
       fitRun: { runId: request.runId, handoffId: request.handoffId },
+      handoffKind: request.handoffKind,
+      contextPack: request.contextPack,
     }).then((session) => {
       if (!session?.taskId) throw new Error('Codex 任务未返回 taskId')
       request.resolve({ taskId: session.taskId })

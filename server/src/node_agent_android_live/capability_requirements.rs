@@ -98,10 +98,14 @@ fn derive_capabilities(task: Option<&Value>, profile: Option<&Value>) -> (Vec<St
             "capabilities": ["CROSS_PLATFORM_STYLE_WRITEBACK"],
         }));
     }
-    if mode == "CREATE_NEW" && request_requires_pwa_generation(request) {
+    if request_requires_pwa_generation(request) {
         required.push("PWA_CODE_GENERATION");
         reasons.push(json!({
-            "reason": "TASK_REQUESTS_NEW_PWA_SCREEN",
+            "reason": if mode == "CREATE_NEW" {
+                "TASK_REQUESTS_NEW_PWA_SCREEN"
+            } else {
+                "TASK_REQUESTS_PWA_SOURCE_WRITEBACK"
+            },
             "capabilities": ["PWA_CODE_GENERATION"],
         }));
     }
@@ -178,6 +182,13 @@ fn request_requires_pwa_generation(request: &str) -> bool {
         || normalized.contains("创建pwa")
         || normalized.contains("create pwa")
         || normalized.contains("new pwa")
+        || normalized.contains("pwa_code_generation")
+        || normalized.contains("pwa code generation")
+        || normalized.contains("pwa源码")
+        || normalized.contains("pwa 源码")
+        || normalized.contains("写回pwa")
+        || normalized.contains("写回 pwa")
+        || normalized.contains("同步到 apk 与 pwa")
 }
 
 fn string_array(value: &Value, field: &str, min: usize, max: usize) -> Result<Vec<String>> {
@@ -274,5 +285,22 @@ mod tests {
 
         assert!(derived.contains(&"PWA_CODE_GENERATION".to_string()));
         assert!(derived.contains(&"CROSS_PLATFORM_STYLE_WRITEBACK".to_string()));
+    }
+
+    #[test]
+    fn existing_pwa_source_writeback_exposes_code_generation_capability() {
+        let task = json!({
+            "task": {"task": {
+                "mode":"EXTEND_EXISTING",
+                "request":"把真实 DOM 草稿写回 PWA 源码，并同步到 APK 与 PWA"
+            }}
+        });
+        let (derived, reasons) = derive_capabilities(Some(&task), None);
+
+        assert!(derived.contains(&"PWA_CODE_GENERATION".to_string()));
+        assert!(reasons.iter().any(|reason| {
+            reason.get("reason").and_then(|value| value.as_str())
+                == Some("TASK_REQUESTS_PWA_SOURCE_WRITEBACK")
+        }));
     }
 }

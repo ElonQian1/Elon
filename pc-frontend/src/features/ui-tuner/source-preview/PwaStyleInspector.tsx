@@ -1,4 +1,4 @@
-import { Redo2, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
+import { Bot, Copy, Download, Redo2, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import type { PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import styles from './SourcePreview.module.css'
@@ -77,6 +77,12 @@ function confidenceLabel(selection: PwaSelection): string {
   return 'DOM 路径'
 }
 
+function bindingLabel(status?: 'BOUND' | 'CANDIDATE' | 'NEEDS_AI') {
+  if (status === 'BOUND') return '双端来源已绑定'
+  if (status === 'CANDIDATE') return '已有双端来源候选'
+  return '需要 AI 建立绑定'
+}
+
 export function PwaStyleInspector({ session }: Props) {
   const selectedDraft = session.selection
     ? Object.values(session.draft?.elements ?? {}).find((element) => (
@@ -102,6 +108,27 @@ export function PwaStyleInspector({ session }: Props) {
       </div>
       <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
 
+      <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
+        <div className={styles.pwaSyncTargets}>
+          <span>PWA 目标</span><span>APK 目标</span>
+          <strong>{session.writebackPlan.strategy === 'DETERMINISTIC_THEN_CODEX' ? '确定性写回优先' : '需要 Codex'}</strong>
+        </div>
+        <button
+          type="button"
+          className={styles.pwaPrimarySync}
+          data-testid="pwa-cross-platform-sync"
+          disabled={!elementCount || ['starting', 'running'].includes(session.syncState.phase)}
+          onClick={() => { void session.syncNow() }}
+        >
+          <Bot size={16} />让 AI 同步到 APK 与 PWA
+        </button>
+        <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
+        <div className={styles.pwaArtifactActions}>
+          <button type="button" disabled={!elementCount} onClick={() => { void session.copyCliPackage() }}><Copy size={13} />复制 CLI 包</button>
+          <button type="button" disabled={!elementCount} onClick={session.downloadCliPackage}><Download size={13} />下载草稿</button>
+        </div>
+      </section>
+
       {!session.selection && (
         <div className={styles.pwaInspectorEmpty}>
           <strong>{session.mode === 'interact' ? '先在左侧正常使用 PWA' : '请点击页面中的真实元素'}</strong>
@@ -113,7 +140,12 @@ export function PwaStyleInspector({ session }: Props) {
         <section className={styles.pwaSelectedIdentity}>
           <div><strong>{session.selection.identity.ariaLabel || session.selection.identity.text || session.selection.identity.id || session.selection.identity.tag}</strong><span className={`${styles.pwaConfidence} ${styles[`pwaConfidence_${session.selection.identity.confidence}`]}`}>{confidenceLabel(session.selection)}</span></div>
           <code title={session.selection.identity.selector}>{session.selection.identity.selector}</code>
-          {session.selection.identity.needsBinding && <p>此元素尚未显式绑定源码；草稿保留可解释 selector，并标记为下一阶段待绑定。</p>}
+          <div className={styles.pwaBindingSummary}>
+            <span>{bindingLabel(selectedDraft?.binding.status)}</span>
+            <span>置信度：{selectedDraft?.binding.bindingConfidence ?? session.selection.identity.confidence}</span>
+          </div>
+          <p>PWA 候选 {selectedDraft?.binding.pwaCandidates.length ?? 0} 个 · Android 候选 {selectedDraft?.binding.androidCandidates.length ?? 0} 个</p>
+          {(selectedDraft?.binding.needsBinding ?? session.selection.identity.needsBinding) && <p>需要 AI 建立绑定；selector 只作为本次 Runtime 定位证据，不会成为长期源码身份。</p>}
         </section>
 
         <section className={styles.pwaStyleSection}>
