@@ -41,7 +41,11 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
         </div>
         <button type="button" title="重新载入 PWA（已保存草稿会自动恢复）" onClick={() => { design.prepareReload(); setReloadKey((value) => value + 1) }}><RefreshCw size={14} /></button>
       </div>
-      {route && <div className={styles.pwaRouteStatus}>当前真实页面：<code>{route.path}{route.search}{route.hash}</code> · {route.viewport.width}×{route.viewport.height}</div>}
+      {route && <div className={styles.pwaRouteStatus}>
+        当前画面：{route.screenTitle || '未识别画面'}
+        {route.screenKey && <> · <code>{route.screenKey}</code></>}
+        {' · '}{route.path}{route.search}{route.hash} · {route.viewport.width}×{route.viewport.height}
+      </div>}
       {design.mode === 'select' && design.unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{design.unboundLabel}”；当前用可解释 DOM 路径保存，尚未假定它已绑定 Android 源码。</div>}
       <div className={styles.pwaDraftBadge}>真实 PWA 页面 · 手工草稿</div>
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>

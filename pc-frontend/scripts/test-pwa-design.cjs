@@ -56,6 +56,8 @@ try {
     hash: '#details',
     href: 'https://elon.example/web/project/1?tab=design#details',
     title: '真实项目页',
+    screenKey: 'page:projectPage|title:真实项目页',
+    screenTitle: '真实项目页',
     viewport: { width: 390.4, height: 844.2 },
   }
   const draft = createPwaDesignDraft(project, route)
@@ -65,6 +67,8 @@ try {
   assert.deepEqual(draft.viewport, { width: 390, height: 844 })
   assert.equal(draft.pageSource.kind, 'authenticated-pwa')
   assert.equal(draft.pageSource.origin, 'https://elon.example')
+  assert.equal(draft.route.screenKey, route.screenKey)
+  assert.equal(draft.route.screenTitle, route.screenTitle)
   assert.ok(draft.createdAt && draft.updatedAt)
 
   savePwaDesignDraft(draft)
@@ -106,11 +110,93 @@ try {
   assert.equal(migrated.elements['id:payButton'].binding.needsBinding, true)
   const payElement = migrated.elements['id:payButton']
 
+  const sameWebRoute = {
+    path: '/web', search: '?ui_tuner_preview=1', hash: '',
+    href: 'https://elon.example/web?ui_tuner_preview=1',
+    viewport: { width: 390, height: 844 },
+  }
+  const homeRoute = {
+    ...sameWebRoute,
+    screenKey: 'page:chatPage|title:好友',
+    screenTitle: '好友',
+  }
+  const projectARoute = {
+    ...sameWebRoute,
+    screenKey: 'page:projectPage|title:一龙项目',
+    screenTitle: '一龙项目',
+  }
+  const projectBRoute = {
+    ...sameWebRoute,
+    screenKey: 'page:projectPage|title:演示项目',
+    screenTitle: '演示项目',
+  }
+  assert.notEqual(
+    pwaDraftStorageKey(project, homeRoute),
+    pwaDraftStorageKey(project, projectARoute),
+    '同 /web、同 viewport 的不同 screenKey 必须使用不同 storage key',
+  )
+  assert.notEqual(
+    pwaDraftStorageKey(project, projectARoute),
+    pwaDraftStorageKey(project, projectBRoute),
+    '同 projectPage 的不同项目标题必须隔离草稿',
+  )
+
+  const legacyWithoutScreen = {
+    ...draft,
+    route: { path: '/web', search: '', hash: '' },
+  }
+  storage.set(pwaDraftStorageKey(project, homeRoute), JSON.stringify(legacyWithoutScreen))
+  assert.equal(
+    readPwaDesignDraft(project, homeRoute),
+    null,
+    '缺少 screenKey 的旧 schema v2 草稿不得静默应用到已识别画面',
+  )
+  storage.delete(pwaDraftStorageKey(project, homeRoute))
+
   const modelOutput = compile(
     'src/features/ui-tuner/source-preview/pwaDesignSessionModel.ts',
     'source-preview/pwaDesignSessionModel.js',
   )
   const { PwaDesignSessionModel } = require(modelOutput)
+  const isolatedModel = new PwaDesignSessionModel()
+  const homeSession = isolatedModel.restore(project, homeRoute)
+  assert.equal(homeSession.restored, false)
+  isolatedModel.update('id:payButton:home', (elements) => ({
+    ...elements,
+    'id:payButton': {
+      ...payElement,
+      styleDiff: { height: '51px' },
+      afterStyle: { ...payElement.afterStyle, height: '51px' },
+    },
+  }))
+  const projectASession = isolatedModel.restore(project, projectARoute)
+  assert.equal(projectASession.restored, false, '首页草稿不得应用到项目页')
+  assert.deepEqual(projectASession.draft.elements, {})
+  isolatedModel.update('id:payButton:project-a', (elements) => ({
+    ...elements,
+    'id:payButton': {
+      ...payElement,
+      styleDiff: { height: '61px' },
+      afterStyle: { ...payElement.afterStyle, height: '61px' },
+    },
+  }))
+  assert.deepEqual(
+    isolatedModel.restore(project, projectBRoute).draft.elements,
+    {},
+    '项目标题不同，即使都是 projectPage 也不得复用草稿',
+  )
+  assert.equal(
+    isolatedModel.restore(project, homeRoute).draft.elements['id:payButton'].styleDiff.height,
+    '51px',
+    '返回原 screenKey 必须恢复首页草稿',
+  )
+  assert.equal(
+    isolatedModel.restore(project, projectARoute).draft.elements['id:payButton'].styleDiff.height,
+    '61px',
+    '返回原项目 screenKey 必须恢复项目草稿',
+  )
+  isolatedModel.dispose()
+
   const modelRoute = {
     ...route,
     path: '/web/project/1/session-model',
@@ -232,6 +318,21 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'),
     'utf8',
   )
+  const bridgeSource = fs.readFileSync(
+    path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
+    'utf8',
+  )
+  assert.match(previewSurfaceSource, /当前画面：\{route\.screenTitle/)
+  assert.match(bridgeSource, /document\.querySelector\('\.page\.active\[id\]'\)/)
+  assert.match(bridgeSource, /document\.querySelector\('#topTitle'\)/)
+  assert.match(bridgeSource, /getAttribute\('data-ui-screen'\)/)
+  assert.match(bridgeSource, /if \(signature === lastRouteSignature\) return;/, '相同 screen route 必须去重')
+  assert.match(bridgeSource, /window\.setTimeout\(\(\) => \{[\s\S]*?postRoute\(reason\);[\s\S]*?\}, 80\);/, '画面 Mutation 必须防抖')
+  const observerAttributeFilter = bridgeSource.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] ?? ''
+  assert.match(observerAttributeFilter, /'class'/)
+  assert.match(observerAttributeFilter, /'aria-hidden'/)
+  assert.match(observerAttributeFilter, /'data-ui-screen'/)
+  assert.doesNotMatch(observerAttributeFilter, /['"]style['"]/, '样式预览不得触发 route-changed')
   const previewSurfaceCss = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreview.module.css'),
     'utf8',

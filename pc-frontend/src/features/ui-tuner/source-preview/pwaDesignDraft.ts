@@ -104,7 +104,13 @@ export interface PwaDesignDraft {
     href?: string
     title?: string
   }
-  route: { path: string; search: string; hash: string }
+  route: {
+    path: string
+    search: string
+    hash: string
+    screenKey?: string
+    screenTitle?: string
+  }
   viewport: { width: number; height: number }
   scope: 'route'
   visualReferences: PwaVisualReferences
@@ -118,6 +124,8 @@ export interface PwaRouteIdentity {
   path: string
   search: string
   hash: string
+  screenKey?: string
+  screenTitle?: string
   href?: string
   title?: string
   viewport: { width: number; height: number }
@@ -145,11 +153,22 @@ function normalizedSearch(search: string): string {
   return value ? `?${value}` : ''
 }
 
+function normalizedScreenValue(value: string | undefined, maxLength: number): string | undefined {
+  const normalized = String(value || '').replace(/\s+/g, ' ').trim().slice(0, maxLength)
+  return normalized || undefined
+}
+
+function hasIdentifiedScreen(route: Pick<PwaRouteIdentity, 'screenKey'>): boolean {
+  return Boolean(route.screenKey && route.screenKey !== 'screen:unidentified')
+}
+
 export function normalizePwaRoute(route: PwaRouteIdentity): PwaRouteIdentity {
   return {
     path: route.path || '/web',
     search: normalizedSearch(route.search || ''),
     hash: route.hash || '',
+    screenKey: normalizedScreenValue(route.screenKey, 240),
+    screenTitle: normalizedScreenValue(route.screenTitle, 160),
     href: route.href,
     title: route.title,
     viewport: {
@@ -195,9 +214,15 @@ export function createPwaDesignDraft(
       origin,
       entryPath: route.path,
       href: route.href,
-      title: route.title,
+      title: route.screenTitle || route.title,
     },
-    route: { path: route.path, search: route.search, hash: route.hash },
+    route: {
+      path: route.path,
+      search: route.search,
+      hash: route.hash,
+      screenKey: route.screenKey,
+      screenTitle: route.screenTitle,
+    },
     viewport: route.viewport,
     scope: 'route',
     visualReferences: {},
@@ -216,6 +241,7 @@ export function pwaDraftStorageKey(project: PwaDesignDraft['project'], routeInpu
     route.path,
     route.search,
     route.hash,
+    route.screenKey || 'screen:unidentified',
     `${route.viewport.width}x${route.viewport.height}`,
   ].join('|'))
 }
@@ -236,15 +262,19 @@ export function readPwaDesignDraft(
   project: PwaDesignDraft['project'],
   route: PwaRouteIdentity,
 ): PwaDesignDraft | null {
+  const normalizedRoute = normalizePwaRoute(route)
+  if (!hasIdentifiedScreen(normalizedRoute)) return null
   try {
-    const value = window.localStorage.getItem(pwaDraftStorageKey(project, route))
-    return value ? parsePwaDesignDraft(value) : null
+    const value = window.localStorage.getItem(pwaDraftStorageKey(project, normalizedRoute))
+    const draft = value ? parsePwaDesignDraft(value) : null
+    return draft?.route.screenKey === normalizedRoute.screenKey ? draft : null
   } catch {
     return null
   }
 }
 
 export function savePwaDesignDraft(draft: PwaDesignDraft): void {
+  if (!hasIdentifiedScreen(draft.route)) return
   try {
     window.localStorage.setItem(pwaDraftStorageKey(draft.project, {
       ...draft.route,
@@ -256,6 +286,7 @@ export function savePwaDesignDraft(draft: PwaDesignDraft): void {
 }
 
 export function removePwaDesignDraft(draft: PwaDesignDraft): void {
+  if (!hasIdentifiedScreen(draft.route)) return
   try {
     window.localStorage.removeItem(pwaDraftStorageKey(draft.project, {
       ...draft.route,

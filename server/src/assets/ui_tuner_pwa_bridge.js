@@ -11,6 +11,8 @@
   let selecting = false;
   let acceptedSessionToken = '';
   let appliedDraftRevision = '';
+  let routeDebounceTimer = 0;
+  let lastRouteSignature = '';
   const editableProperties = [
     'width', 'height',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
@@ -42,6 +44,62 @@
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 160);
+  }
+
+  function normalizedScreenText(value, maxLength) {
+    return String(value || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, maxLength);
+  }
+
+  function screenKeyPart(value) {
+    return normalizedScreenText(value, 160).toLowerCase();
+  }
+
+  function explicitScreenElement(activePage) {
+    const activeChild = activePage && typeof activePage.querySelector === 'function'
+      ? activePage.querySelector('[data-ui-screen]')
+      : null;
+    const activeParent = activePage && typeof activePage.closest === 'function'
+      ? activePage.closest('[data-ui-screen]')
+      : null;
+    const statefulExplicit = document.querySelector('[data-ui-screen].active, [data-ui-screen][aria-hidden="false"]');
+    return [activePage, activeChild, activeParent, statefulExplicit, document.body, document.documentElement]
+      .find((element) => element && normalizedScreenText(element.getAttribute('data-ui-screen'), 160)) || null;
+  }
+
+  function screenIdentity() {
+    const activePage = document.querySelector('.page.active[id]');
+    const topTitle = document.querySelector('#topTitle');
+    const visibleTitle = normalizedScreenText(topTitle && compactText(topTitle), 160);
+    const explicit = explicitScreenElement(activePage);
+    if (explicit) {
+      const explicitKey = screenKeyPart(explicit.getAttribute('data-ui-screen'));
+      const explicitTitle = normalizedScreenText(
+        explicit.getAttribute('data-ui-screen-title')
+          || explicit.getAttribute('aria-label')
+          || explicit.getAttribute('title')
+          || visibleTitle
+          || explicit.getAttribute('data-ui-screen'),
+        160,
+      );
+      return { screenKey: 'data-ui-screen:' + explicitKey, screenTitle: explicitTitle };
+    }
+    if (activePage && activePage.id) {
+      const title = visibleTitle
+        || normalizedScreenText(activePage.getAttribute('data-title') || activePage.getAttribute('aria-label'), 160)
+        || normalizedScreenText(document.title, 160)
+        || activePage.id;
+      return {
+        screenKey: 'page:' + activePage.id + '|title:' + (screenKeyPart(title) || 'untitled'),
+        screenTitle: title,
+      };
+    }
+    return {
+      screenKey: 'screen:unidentified',
+      screenTitle: visibleTitle || normalizedScreenText(document.title, 160) || '未识别画面',
+    };
   }
 
   function attributeSelector(name, value) {
@@ -214,6 +272,7 @@
   }
 
   function routeState(reason) {
+    const screen = screenIdentity();
     return {
       reason,
       href: window.location.href,
@@ -221,13 +280,30 @@
       search: window.location.search,
       hash: window.location.hash,
       title: document.title,
+      screenKey: screen.screenKey,
+      screenTitle: screen.screenTitle,
       viewport: { width: window.innerWidth, height: window.innerHeight },
       scroll: { x: window.scrollX, y: window.scrollY },
     };
   }
 
   function postRoute(reason) {
-    post('route-changed', routeState(reason));
+    const state = routeState(reason);
+    const signature = [
+      state.path, state.search, state.hash, state.screenKey,
+      state.viewport.width + 'x' + state.viewport.height,
+    ].join('|');
+    if (signature === lastRouteSignature) return;
+    lastRouteSignature = signature;
+    post('route-changed', state);
+  }
+
+  function scheduleRoute(reason) {
+    if (routeDebounceTimer) window.clearTimeout(routeDebounceTimer);
+    routeDebounceTimer = window.setTimeout(() => {
+      routeDebounceTimer = 0;
+      postRoute(reason);
+    }, 80);
   }
 
   function findDesignTarget(target) {
@@ -351,7 +427,10 @@
     selectElement(target, 'click');
   }, true);
   window.addEventListener('scroll', () => drawSelection(selectedElement), true);
-  window.addEventListener('resize', () => drawSelection(selectedElement));
+  window.addEventListener('resize', () => {
+    drawSelection(selectedElement);
+    scheduleRoute('resize');
+  });
   window.addEventListener('hashchange', () => postRoute('hashchange'));
   window.addEventListener('popstate', () => postRoute('popstate'));
   ['pushState', 'replaceState'].forEach((method) => {
@@ -362,6 +441,17 @@
       return result;
     };
   });
+
+  if (typeof MutationObserver === 'function') {
+    const screenObserver = new MutationObserver(() => scheduleRoute('screen-mutation'));
+    screenObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['class', 'aria-hidden', 'data-ui-screen', 'data-ui-screen-title', 'id'],
+    });
+  }
 
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;

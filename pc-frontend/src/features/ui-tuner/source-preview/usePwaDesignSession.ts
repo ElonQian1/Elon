@@ -88,6 +88,7 @@ function bridgeDraftKey(draft: PwaDesignDraft): string {
     draft.route.path,
     draft.route.search,
     draft.route.hash,
+    draft.route.screenKey || 'screen:unidentified',
     `${draft.viewport.width}x${draft.viewport.height}`,
   ].join('|')
 }
@@ -108,7 +109,7 @@ function draftEntry(draft: PwaDesignDraft, identity: PwaElementIdentity) {
 
 function routeKey(route: PwaRouteIdentity): string {
   const normalized = normalizePwaRoute(route)
-  return `${normalized.path}${normalized.search}${normalized.hash}@${normalized.viewport.width}x${normalized.viewport.height}`
+  return `${normalized.path}${normalized.search}${normalized.hash}#${normalized.screenKey || 'screen:unidentified'}@${normalized.viewport.width}x${normalized.viewport.height}`
 }
 
 export function usePwaDesignSession({
