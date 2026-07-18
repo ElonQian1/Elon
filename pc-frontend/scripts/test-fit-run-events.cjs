@@ -33,10 +33,29 @@ windowTarget.localStorage = {
 global.window = windowTarget
 global.CustomEvent = TestCustomEvent
 
-const { listenForFitRunCodexRequests, requestCodexForFitRun } = require(outputFile)
+const { listenForFitRunCodexRequests, requestCodexForFitRun, resolveFitRunWorkspace } = require(outputFile)
 const request = { runId: 'run-1', handoffId: 'handoff-1', reason: '测试 AI 接力' }
 
 ;(async () => {
+  assert.deepEqual(
+    resolveFitRunWorkspace({}, 'D:\\project'),
+    { workspacePath: 'D:\\project', isOverride: false },
+  )
+  assert.deepEqual(
+    resolveFitRunWorkspace({
+      workspacePath: 'D:/project-worktree',
+      contextPack: { screen: { sourceRoot: 'd:\\project-worktree\\' } },
+    }, 'D:\\project'),
+    { workspacePath: 'D:/project-worktree', isOverride: true },
+  )
+  assert.throws(
+    () => resolveFitRunWorkspace({
+      workspacePath: 'D:\\wrong-project',
+      contextPack: { screen: { sourceRoot: 'D:\\expected-project' } },
+    }, 'D:\\project'),
+    /目录与 AI Context Artifact 不一致/,
+  )
+
   await assert.rejects(
     requestCodexForFitRun(request, 100),
     /AI 项目会话入口未就绪/,

@@ -5,9 +5,33 @@ export interface FitRunCodexRequest {
   runId: string
   handoffId: string
   handoffPath?: string
+  workspacePath?: string
   reason: string
   handoffKind?: 'FIT_RUN' | 'PWA_DRAFT'
   contextPack?: UiTunerCodexContextPack
+}
+
+export interface FitRunWorkspaceResolution {
+  workspacePath: string
+  isOverride: boolean
+}
+
+export function resolveFitRunWorkspace(
+  request: Pick<FitRunCodexRequest, 'workspacePath' | 'contextPack'>,
+  defaultWorkspacePath: string,
+): FitRunWorkspaceResolution {
+  const fallback = defaultWorkspacePath.trim()
+  const requested = request.workspacePath?.trim() ?? ''
+  if (!requested) return { workspacePath: fallback, isOverride: false }
+
+  const artifactSourceRoot = request.contextPack?.screen.sourceRoot?.trim() ?? ''
+  if (!artifactSourceRoot || normalizeWorkspacePath(artifactSourceRoot) !== normalizeWorkspacePath(requested)) {
+    throw new Error('PWA 草稿源码目录与 AI Context Artifact 不一致，已阻止写入错误工作区')
+  }
+  return {
+    workspacePath: requested,
+    isOverride: !fallback || normalizeWorkspacePath(requested) !== normalizeWorkspacePath(fallback),
+  }
 }
 
 interface FitRunCodexRequestDetail extends FitRunCodexRequest {
@@ -183,5 +207,9 @@ function writeLaunches(items: FitRunCodexLaunchRecord[]) {
   } catch {
     // The in-memory launch lock remains active when storage is unavailable.
   }
+}
+
+function normalizeWorkspacePath(value: string) {
+  return value.trim().replace(/\//g, '\\').replace(/\\+$/, '').toLocaleLowerCase('en-US')
 }
 import type { UiTunerCodexContextPack } from '../contextPack'

@@ -31,6 +31,7 @@ import {
   listenForFitRunCodexRequests,
   notifyFitRunCodexSettled,
   readFitRunCodexLaunch,
+  resolveFitRunWorkspace,
 } from './fit-run/fitRunEvents'
 import { useFitRunStore } from './fit-run/fitRunStore'
 import { TERMINAL_FIT_RUN_PHASES } from './fit-run/types'
@@ -57,6 +58,7 @@ interface SessionStartOptions {
   fitRun?: Pick<FitRunTaskRef, 'runId' | 'handoffId'>
   handoffKind?: 'FIT_RUN' | 'PWA_DRAFT'
   contextPack?: UiTunerCodexContextPack
+  workspacePathOverride?: string
 }
 
 export function UiTunerProjectSessionPanel({
@@ -232,10 +234,6 @@ export function UiTunerProjectSessionPanel({
       setStatus('请先选择一个有 AI 开发频道的自项目')
       return null
     }
-    if (!localNodeReady || !workspacePath) {
-      setStatus(!workspacePath ? '自项目缺少本机工作区路径' : localNodeStatusText)
-      return null
-    }
     if (!channelAllowsAiStart(aiChannel)) {
       setStatus('当前角色不能在这个频道发起 AI 开发')
       return null
@@ -256,6 +254,14 @@ export function UiTunerProjectSessionPanel({
         setStatus('当前 UI 草稿缺少 AI Context Artifact，无法启动源码接力')
         return null
       }
+      const executionWorkspace = resolveFitRunWorkspace({
+        workspacePath: options?.workspacePathOverride,
+        contextPack: activePack,
+      }, workspacePath)
+      if (!localNodeReady || !executionWorkspace.workspacePath) {
+        setStatus(!executionWorkspace.workspacePath ? '当前 UI 草稿缺少本机源码目录' : localNodeStatusText)
+        return null
+      }
       const session = mode === 'fork'
         ? await forkUiTunerConversation({
             projectId: activeProject.id,
@@ -269,8 +275,8 @@ export function UiTunerProjectSessionPanel({
         adminUrl: nodeAdminUrl,
         projectId: activeProject.id,
         projectName: activeProject.name,
-        workspacePath,
-        runtimePermission: activeProject.runtime_permission,
+        workspacePath: executionWorkspace.workspacePath,
+        runtimePermission: executionWorkspace.isOverride ? 'full_access' : activeProject.runtime_permission,
         useLocalRouteA: true,
       })
       const artifact = await createUiTunerContextArtifact({
@@ -287,7 +293,7 @@ export function UiTunerProjectSessionPanel({
         session.conversationId,
         session.title,
         localNodeId,
-        workspacePath,
+        executionWorkspace.workspacePath,
         aiChannel.id,
         true,
         undefined,
@@ -353,6 +359,7 @@ export function UiTunerProjectSessionPanel({
       fitRun: { runId: request.runId, handoffId: request.handoffId },
       handoffKind: request.handoffKind,
       contextPack: request.contextPack,
+      workspacePathOverride: request.workspacePath,
     }).then((session) => {
       if (!session?.taskId) throw new Error('Codex 任务未返回 taskId')
       request.resolve({ taskId: session.taskId })

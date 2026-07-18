@@ -421,6 +421,7 @@ export function usePwaDesignSession({
         runId: `pwa:${latest.project.id}:${latest.revision}`,
         handoffId,
         handoffKind: 'PWA_DRAFT',
+        workspacePath: latest.project.workspaceIdentity,
         contextPack,
         reason: plan.codexReasons.join('；'),
       })
