@@ -311,6 +311,34 @@
     }, {});
   }
 
+  function matchingStyleSelectors(element) {
+    const selectors = [];
+    function visitRules(rules) {
+      Array.from(rules || []).forEach((rule) => {
+        if (selectors.length >= 16) return;
+        if (rule.cssRules) {
+          visitRules(rule.cssRules);
+          return;
+        }
+        if (!rule.selectorText || !rule.style) return;
+        try {
+          const hasEditableStyle = editableProperties.some((property) => (
+            rule.style.getPropertyValue(kebabCase(property))
+          ));
+          if (hasEditableStyle && element.matches(rule.selectorText) && !selectors.includes(rule.selectorText)) {
+            selectors.push(rule.selectorText);
+          }
+        } catch (_) {
+          // Ignore cross-origin or unsupported selectors; they cannot be written back safely.
+        }
+      });
+    }
+    Array.from(document.styleSheets || []).forEach((sheet) => {
+      try { visitRules(sheet.cssRules); } catch (_) { /* Cross-origin sheets are not inspected. */ }
+    });
+    return selectors;
+  }
+
   function snapshotOf(element, knownRect) {
     const rect = knownRect || element.getBoundingClientRect();
     const computed = window.getComputedStyle(element);
@@ -323,6 +351,7 @@
         inlineStyle: element.getAttribute('style'),
       },
       domContext: localDomContext(element),
+      sourceSelectors: matchingStyleSelectors(element),
       sourceBinding: explicitStyleBinding(element),
     };
   }

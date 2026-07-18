@@ -28,7 +28,7 @@ function normalize(value: string | undefined): string {
 
 function isStableAffixMatch(left: string, right: string): boolean {
   return Math.min(left.length, right.length) >= 8
-    && (left.endsWith(right) || right.endsWith(left))
+    && (left.endsWith(right) || right.endsWith(left) || left.startsWith(right) || right.startsWith(left))
 }
 
 function scoreNode(node: SourcePreviewNode, identity: PwaIdentity): number {

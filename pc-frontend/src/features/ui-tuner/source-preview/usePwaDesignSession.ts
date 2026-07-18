@@ -38,6 +38,7 @@ export interface PwaSelection {
   rect: { left: number; top: number; width: number; height: number }
   originalStyle: PwaOriginalStyleSnapshot
   domContext: PwaDomContextNode[]
+  sourceSelectors: string[]
   sourceBinding?: PwaExplicitStyleBinding
 }
 

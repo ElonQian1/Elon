@@ -163,7 +163,7 @@ class FakeElement {
     if (selector.includes('[id]') && this.id) return this;
     return null;
   }
-  matches() { return false; }
+  matches(selector) { return selector === '.page-title' && this.id === 'topTitle'; }
   getBoundingClientRect() { return { left: 12, top: 24, width: 180, height: 48 }; }
   querySelectorAll(selector) {
     if (selector !== '[data-ui-screen]') return [];
@@ -232,6 +232,12 @@ function runBridgeBehavior() {
       return null;
     },
   };
+  document.styleSheets.push({
+    cssRules: [{
+      selectorText: '.page-title',
+      style: { getPropertyValue: (property) => property === 'font-size' ? '18px' : '' },
+    }],
+  });
   const computedStyle = {
     width: '180px', height: '48px', paddingTop: '0px', paddingRight: '0px',
     paddingBottom: '0px', paddingLeft: '0px', marginTop: '0px', marginRight: '0px',
@@ -351,6 +357,11 @@ function runBridgeBehavior() {
   const titleBinding = posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceBinding;
   assert.equal(titleBinding.sourceFile, 'src/styles/title.css', 'selection should carry the explicit safe source file');
   assert.deepEqual(titleBinding.propertyMap, { fontSize: 'font-size', color: 'color' });
+  assert.deepEqual(
+    posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceSelectors,
+    ['.page-title'],
+    'selection should expose the actual matching CSS rule for local deterministic resolution',
+  );
 
   const messagesBeforeStyle = posted.length;
   command('apply-style', { selector: '#topTitle', style: { fontSize: '22px' } });
