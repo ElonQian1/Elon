@@ -1,0 +1,66 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+const ts = require('typescript')
+
+const projectRoot = path.resolve(__dirname, '..')
+const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'elon-fit-run-events-'))
+const sourceFile = path.join(projectRoot, 'src/features/ui-tuner/fit-run/fitRunEvents.ts')
+const outputFile = path.join(temporaryDirectory, 'fitRunEvents.js')
+const compiled = ts.transpileModule(fs.readFileSync(sourceFile, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  fileName: sourceFile,
+})
+fs.writeFileSync(outputFile, compiled.outputText)
+
+class TestCustomEvent extends Event {
+  constructor(type, init) {
+    super(type)
+    this.detail = init?.detail
+  }
+}
+
+const storage = new Map()
+const windowTarget = new EventTarget()
+windowTarget.setTimeout = setTimeout
+windowTarget.clearTimeout = clearTimeout
+windowTarget.localStorage = {
+  getItem: (key) => storage.get(key) ?? null,
+  setItem: (key, value) => storage.set(key, value),
+  removeItem: (key) => storage.delete(key),
+}
+global.window = windowTarget
+global.CustomEvent = TestCustomEvent
+
+const { listenForFitRunCodexRequests, requestCodexForFitRun } = require(outputFile)
+const request = { runId: 'run-1', handoffId: 'handoff-1', reason: '测试 AI 接力' }
+
+;(async () => {
+  await assert.rejects(
+    requestCodexForFitRun(request, 100),
+    /AI 项目会话入口未就绪/,
+    '没有常驻桥接器时必须立即失败，不能无限等待',
+  )
+
+  const disposeSuccess = listenForFitRunCodexRequests((detail) => {
+    detail.resolve({ taskId: 'task-1' })
+  })
+  assert.deepEqual(await requestCodexForFitRun(request, 100), { taskId: 'task-1' })
+  disposeSuccess()
+
+  const disposeTimeout = listenForFitRunCodexRequests(() => undefined)
+  await assert.rejects(
+    requestCodexForFitRun(request, 10),
+    /AI 项目会话启动超时/,
+    '桥接器已接管但没有返回 taskId 时必须超时恢复',
+  )
+  disposeTimeout()
+
+  console.log('fit-run Codex event bridge tests passed')
+})().finally(() => {
+  fs.rmSync(temporaryDirectory, { recursive: true, force: true })
+}).catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

@@ -13,6 +13,7 @@ export interface FitRunCodexRequest {
 interface FitRunCodexRequestDetail extends FitRunCodexRequest {
   resolve: (value: { taskId: string }) => void
   reject: (error: Error) => void
+  markHandled: () => void
 }
 
 export interface FitRunCodexSettledDetail {
@@ -32,21 +33,50 @@ export interface FitRunCodexLaunchRecord {
   createdAt: string
 }
 
-export function requestCodexForFitRun(request: FitRunCodexRequest) {
+export function requestCodexForFitRun(request: FitRunCodexRequest, timeoutMs = 30_000) {
   return new Promise<{ taskId: string }>((resolve, reject) => {
+    let handled = false
+    let settled = false
+    const finish = (callback: () => void) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      callback()
+    }
+    const timeout = window.setTimeout(() => {
+      finish(() => reject(new Error(handled
+        ? 'AI 项目会话启动超时，请确认本机节点在线后重试；草稿仍已保留'
+        : '当前页面的 AI 项目会话入口未就绪，请刷新页面或重新选择项目后重试；草稿仍已保留')))
+    }, timeoutMs)
     window.dispatchEvent(new CustomEvent<FitRunCodexRequestDetail>(
       FIT_RUN_CODEX_REQUEST_EVENT,
-      { detail: { ...request, resolve, reject } },
+      { detail: {
+        ...request,
+        markHandled: () => { handled = true },
+        resolve: (value) => finish(() => resolve(value)),
+        reject: (error) => finish(() => reject(error)),
+      } },
     ))
+    Promise.resolve().then(() => {
+      if (!handled) finish(() => reject(new Error(
+        '当前页面的 AI 项目会话入口未就绪，请刷新页面或重新选择项目后重试；草稿仍已保留',
+      )))
+    })
   })
 }
 
 export function listenForFitRunCodexRequests(
   listener: (detail: FitRunCodexRequestDetail) => void,
 ) {
-  const handler = (event: Event) => listener(
-    (event as CustomEvent<FitRunCodexRequestDetail>).detail,
-  )
+  const handler = (event: Event) => {
+    const detail = (event as CustomEvent<FitRunCodexRequestDetail>).detail
+    detail.markHandled()
+    try {
+      listener(detail)
+    } catch (error) {
+      detail.reject(error instanceof Error ? error : new Error('AI 项目会话接力失败'))
+    }
+  }
   window.addEventListener(FIT_RUN_CODEX_REQUEST_EVENT, handler)
   return () => window.removeEventListener(FIT_RUN_CODEX_REQUEST_EVENT, handler)
 }

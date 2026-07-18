@@ -6,6 +6,7 @@ import {
   type UiWorkspaceSelectionHint,
 } from '../workspace/uiWorkspaceSelection'
 import { SourceUiDesignProgress } from '../workspace/UiDesignProgressBar'
+import { UiTunerProjectSessionPanel } from '../UiTunerProjectSessionPanel'
 import { SourceDrivenPreviewSurface } from './SourceDrivenPreviewSurface'
 import { PwaStyleInspector } from './PwaStyleInspector'
 import { SourcePreviewInspector } from './SourcePreviewInspector'
@@ -57,6 +58,15 @@ export function SourcePreviewWorkspace({ initialProjectRoot, projectId, active =
   }, [onSelectionHintChange, session.selected])
   return (
     <div className={pageStyles.page} style={{ display: active ? 'grid' : 'none' }}>
+      {active && pwaPreviewActive && (
+        <UiTunerProjectSessionPanel
+          headless
+          pack={null}
+          intent="把当前 PWA 真实交互草稿低 Token 写回 APK 与 PWA 源码，并完成双端验证。"
+          onMutationTaskStarted={() => undefined}
+          onTaskSettled={() => undefined}
+        />
+      )}
       <SourcePreviewTreePanel root={session.document?.root ?? null} selectedKey={session.selectedKey} onSelect={session.setSelectedKey} />
       <section className={pageStyles.stage}>
         <SourcePreviewModeBar

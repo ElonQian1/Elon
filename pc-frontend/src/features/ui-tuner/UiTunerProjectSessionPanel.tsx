@@ -37,10 +37,11 @@ import { TERMINAL_FIT_RUN_PHASES } from './fit-run/types'
 import panelStyles from './UiTunerPanels.module.css'
 
 interface UiTunerProjectSessionPanelProps {
-  pack: UiTunerCodexContextPack
+  pack: UiTunerCodexContextPack | null
   intent: string
   onMutationTaskStarted: (pack: UiTunerCodexContextPack) => Promise<void> | void
   onTaskSettled: () => void
+  headless?: boolean
 }
 
 const CODEX_ROUTE: RuntimeRoute = 'route_a'
@@ -63,6 +64,7 @@ export function UiTunerProjectSessionPanel({
   intent,
   onMutationTaskStarted,
   onTaskSettled,
+  headless = false,
 }: UiTunerProjectSessionPanelProps) {
   const [nodeAdminUrl, setNodeAdminUrl] = useState(uiTunerNodeAdminUrl)
   const user = useAuthStore((state) => state.user)
@@ -250,6 +252,10 @@ export function UiTunerProjectSessionPanel({
     try {
       const taskIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
       const activePack = options?.contextPack ?? pack
+      if (!activePack) {
+        setStatus('当前 UI 草稿缺少 AI Context Artifact，无法启动源码接力')
+        return null
+      }
       const session = mode === 'fork'
         ? await forkUiTunerConversation({
             projectId: activeProject.id,
@@ -304,7 +310,7 @@ export function UiTunerProjectSessionPanel({
       } else {
         setConversationOpen(true)
         setVerificationTaskId(taskId)
-        await onMutationTaskStarted(pack)
+        await onMutationTaskStarted(activePack)
         setStatus('已进入持续项目 Codex CLI 会话')
       }
       window.setTimeout(() => { void refreshWorkspace(false) }, 600)
@@ -372,6 +378,8 @@ export function UiTunerProjectSessionPanel({
       setStatus((error as { message?: string }).message ?? '记忆审核失败')
     }
   }
+
+  if (headless || !pack) return null
 
   return (
     <div className={panelStyles.projectSessionPanel}>

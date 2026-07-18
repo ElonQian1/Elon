@@ -366,7 +366,9 @@ export function usePwaDesignSession({
     if (!current || !Object.keys(current.elements).length) return
     model.save()
     setMode('interact')
-    verification.markLive('正在保存草稿并执行确定性源码写回…')
+    verification.markLive(writebackPlan.requiresCodex
+      ? '正在保存草稿；确定性绑定先写回，未绑定属性随后交给 AI…'
+      : '正在保存草稿并执行确定性源码写回…')
     const androidResult = await applyDeterministicAndroidWriteback({
       draft: current,
       root,

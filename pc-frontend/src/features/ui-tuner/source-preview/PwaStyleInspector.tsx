@@ -128,7 +128,11 @@ export function PwaStyleInspector({ session }: Props) {
           disabled={!elementCount || session.syncState.phase === 'BUILD_VERIFYING' || Boolean(session.syncState.taskId)}
           onClick={() => { void session.syncNow() }}
         >
-          <Bot size={16} />{session.syncState.phase === 'BUILD_VERIFYING' ? '正在构建并核验真实源码…' : '写回源码并验证 APK 与 PWA'}
+          <Bot size={16} />{session.syncState.phase === 'BUILD_VERIFYING'
+            ? '正在构建并核验真实源码…'
+            : session.writebackPlan.requiresCodex
+              ? '让 AI 建立绑定并验证 APK 与 PWA'
+              : '写回源码并验证 APK 与 PWA'}
         </button>
         <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
         {session.syncState.mismatches.length > 0 && <ul>
