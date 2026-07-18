@@ -45,7 +45,7 @@
 - 最近三个已发布版本的 `node.json` fixture：缺字段、空字段、未知字段、旧 workspace/storage、自定义路径、损坏显式配置。
 - 缓存 fixture：环境变量共享 target、`.env.local`、Windows 默认开发/发布目录、项目祖先 `shared`、仓库内部 target。
 - 空盘、低空间、只有 C 盘、项目在 D/E 盘、名称占用、junction、脏 worktree、未 push 提交和多项目绑定。
-- 更新中断、原子写失败、EXE 重启和重复迁移；任何失败都不能丢失身份、绑定或覆盖项目。
+- 更新中断、原子写失败、EXE 重启和重复迁移；原子写还要覆盖并发 writer、临时文件名冲突、Windows 目标文件短时占用、低空间/磁盘写满、主文件损坏与备份恢复。任何失败都不能丢失身份、绑定、task journal、sidecar 输出或覆盖项目，持续损坏必须保留完整 IO/Win32 错误链并显式失败。
 - 活跃监督任务的延期更新、排空完成后重启、排空期间异常重启恢复；`/api/status.restart_recovery` 必须能区分 `draining`、`restart_scheduled`、`runtime_online`、`resume_required`、`failed`。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。
 - 外部项目、托管项目、只读任务、普通写任务和真实构建分别验证路径与环境策略。

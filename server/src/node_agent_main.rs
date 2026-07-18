@@ -60,6 +60,8 @@ mod node_agent_cli_sidecar;
 mod node_agent_cli_sidecar_admin;
 mod node_agent_cli_sidecar_io;
 #[cfg(test)]
+mod node_agent_cli_sidecar_persistence_tests;
+#[cfg(test)]
 mod node_agent_cli_sidecar_progress_tests;
 mod node_agent_cli_sidecar_runner;
 #[cfg(test)]

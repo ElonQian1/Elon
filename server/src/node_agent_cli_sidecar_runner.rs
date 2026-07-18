@@ -5,14 +5,14 @@ mod pipe_sidecar_runner;
 #[path = "node_agent_cli_sidecar_worker_monitor.rs"]
 mod worker_monitor;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
     process::Stdio,
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::watch;
 
@@ -32,6 +32,9 @@ use crate::{
 use pipe_sidecar_runner::run_pipe_json_sidecar;
 
 pub(crate) const SIDECAR_POLL_MS: u64 = 250;
+const OUTPUT_CURSOR_CHECKPOINT_INTERVAL: Duration = Duration::from_secs(2);
+const OUTPUT_CURSOR_CHECKPOINT_BYTES: u64 = 256 * 1024;
+const OUTPUT_CURSOR_CHECKPOINT_RECORDS: u64 = 128;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct CliSidecarLaunchConfig {
@@ -244,26 +247,87 @@ pub(crate) async fn follow_sidecar_output(
     cancel_rx: &mut watch::Receiver<bool>,
     on_event: impl FnMut(CliSidecarOutputEvent),
 ) -> Result<CliSidecarRunResult> {
-    follow_sidecar_output_from(
+    let mut pending_cursor = CliSidecarReplayCursor::default();
+    let mut persisted_cursor = CliSidecarReplayCursor::default();
+    let mut last_attempt_cursor = CliSidecarReplayCursor::default();
+    let mut last_attempt_at = None;
+    let mut persistence_error = None;
+    let mut result = follow_sidecar_output_from_with_batch(
         registry,
         task_id,
         output_path,
         CliSidecarReplayCursor::default(),
         cancel_rx,
         on_event,
-        |cursor| {
-            if let Some(session) = registry.session_for_task(task_id)? {
-                registry.record_output_cursor(
-                    task_id,
-                    &session.session_id,
-                    cursor.offset,
-                    cursor.sequence,
-                )?;
+        |_, cursor| {
+            pending_cursor = cursor;
+            let now = Instant::now();
+            let recently_attempted = last_attempt_at.is_some_and(|instant: Instant| {
+                instant.elapsed() < OUTPUT_CURSOR_CHECKPOINT_INTERVAL
+            });
+            let bytes_since_attempt = cursor.offset.saturating_sub(last_attempt_cursor.offset);
+            let records_since_attempt =
+                cursor.sequence.saturating_sub(last_attempt_cursor.sequence);
+            if recently_attempted
+                && bytes_since_attempt < OUTPUT_CURSOR_CHECKPOINT_BYTES
+                && records_since_attempt < OUTPUT_CURSOR_CHECKPOINT_RECORDS
+            {
+                return Ok(());
+            }
+            last_attempt_at = Some(now);
+            last_attempt_cursor = cursor;
+            match persist_output_cursor(registry, task_id, cursor) {
+                Ok(()) => {
+                    persisted_cursor = cursor;
+                    persistence_error = None;
+                }
+                Err(error) => {
+                    let detail = format!("{error:#}");
+                    tracing::warn!(
+                        %task_id,
+                        cursor_offset = cursor.offset,
+                        cursor_sequence = cursor.sequence,
+                        error = %detail,
+                        "sidecar sessions 游标持久化失败，输出跟随继续并保留 JSONL"
+                    );
+                    persistence_error = Some(detail);
+                }
             }
             Ok(())
         },
     )
-    .await
+    .await?;
+
+    if pending_cursor != CliSidecarReplayCursor::default()
+        && (pending_cursor != persisted_cursor || persistence_error.is_some())
+    {
+        match persist_output_cursor(registry, task_id, pending_cursor) {
+            Ok(()) => persistence_error = None,
+            Err(error) => persistence_error = Some(format!("{error:#}")),
+        }
+    }
+    if let Some(error) = persistence_error {
+        let message = format!(
+            "sidecar 输出已跟随到终态，但 sessions 游标持续持久化失败；task journal、工作树与 sidecar JSONL 均已保留，可在修复后重放恢复: {error}"
+        );
+        result.terminal_error = Some(match result.terminal_error.take() {
+            Some(terminal) => format!("{terminal}; {message}"),
+            None => message,
+        });
+    }
+    Ok(result)
+}
+
+fn persist_output_cursor(
+    registry: &CliSidecarRegistry,
+    task_id: &str,
+    cursor: CliSidecarReplayCursor,
+) -> Result<()> {
+    if registry.record_task_output_cursor(task_id, cursor.offset, cursor.sequence)? {
+        Ok(())
+    } else {
+        bail!("sidecar sessions 中找不到正在跟随的任务 {task_id}，拒绝伪造游标持久化成功")
+    }
 }
 
 pub(crate) async fn follow_sidecar_output_from(
@@ -272,7 +336,7 @@ pub(crate) async fn follow_sidecar_output_from(
     output_path: &Path,
     initial_cursor: CliSidecarReplayCursor,
     cancel_rx: &mut watch::Receiver<bool>,
-    mut on_event: impl FnMut(CliSidecarOutputEvent),
+    on_event: impl FnMut(CliSidecarOutputEvent),
     mut on_cursor: impl FnMut(CliSidecarReplayCursor) -> Result<()>,
 ) -> Result<CliSidecarRunResult> {
     follow_sidecar_output_from_with_batch(
@@ -318,15 +382,7 @@ pub(crate) async fn follow_sidecar_output_from_with_batch(
                 .position(|record| record.record_type == "exit")
                 .unwrap_or(records.len());
             if durable_count == records.len() {
-                if let Err(error) = persist_batch(&records, cursor) {
-                    tracing::warn!(
-                        task_id,
-                        offset = cursor.offset,
-                        sequence = cursor.sequence,
-                        %error,
-                        "sidecar output checkpoint persistence failed; continuing output follow"
-                    );
-                }
+                persist_batch(&records, cursor)?;
             } else if durable_count > 0 {
                 let mut durable_offset = batch_start.offset;
                 let durable_records =
@@ -337,15 +393,7 @@ pub(crate) async fn follow_sidecar_output_from_with_batch(
                         .sequence
                         .saturating_add(durable_records.len() as u64),
                 };
-                if let Err(error) = persist_batch(&durable_records, durable_cursor) {
-                    tracing::warn!(
-                        task_id,
-                        offset = durable_cursor.offset,
-                        sequence = durable_cursor.sequence,
-                        %error,
-                        "sidecar output checkpoint persistence failed before terminal record; continuing output follow"
-                    );
-                }
+                persist_batch(&durable_records, durable_cursor)?;
             }
         }
         for record in records {
@@ -607,7 +655,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn replay_checkpoint_failures_do_not_hide_stdout_or_real_exit_result() {
+    async fn recovery_checkpoint_failures_do_not_claim_cursor_or_exit_success() {
         let root = std::env::temp_dir().join(format!(
             "elon-sidecar-checkpoint-failure-{}",
             uuid::Uuid::new_v4().simple()
@@ -628,7 +676,7 @@ mod tests {
             append_output(&exit_output, CliSidecarOutputRecord::exit(true, false)).unwrap();
         });
         let (_cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
-        let result = super::follow_sidecar_output_from_with_batch(
+        let error = super::follow_sidecar_output_from_with_batch(
             &registry,
             "full-batch-task",
             &output,
@@ -638,9 +686,8 @@ mod tests {
             |_, _| Err(anyhow::anyhow!("injected persistent checkpoint failure")),
         )
         .await
-        .unwrap();
-        assert!(result.exit_ok);
-        assert_eq!(result.stdout_text, "full batch survived\n");
+        .expect_err("recovery checkpoint failure must remain fail-closed");
+        assert!(format!("{error:#}").contains("injected persistent checkpoint failure"));
 
         let output = root.join("exit-prefix-output.jsonl");
         append_output(
@@ -651,7 +698,7 @@ mod tests {
         append_output(&output, CliSidecarOutputRecord::exit(true, false)).unwrap();
         let (_cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
         let mut persist_attempts = 0;
-        let result = super::follow_sidecar_output_from_with_batch(
+        let error = super::follow_sidecar_output_from_with_batch(
             &registry,
             "exit-prefix-task",
             &output,
@@ -668,10 +715,9 @@ mod tests {
             },
         )
         .await
-        .unwrap();
+        .expect_err("terminal-prefix checkpoint failure must remain fail-closed");
         assert_eq!(persist_attempts, 1);
-        assert!(result.exit_ok);
-        assert_eq!(result.stdout_text, "exit prefix survived\n");
+        assert!(format!("{error:#}").contains("injected first checkpoint failure"));
 
         let _ = std::fs::remove_dir_all(root);
     }

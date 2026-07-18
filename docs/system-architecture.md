@@ -130,7 +130,7 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 当前边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`pipe_sidecar + pipe + JSON` 已补齐基础生命周期管理、稳定运行句柄、恢复契约和 Codex JSON 输出回放；后续继续增强前端恢复入口和多 CLI 统一管理，不替代 Codex CLI 本身能力。
 
-sidecar `sessions.json` 使用进程间互斥和同目录临时文件原子替换，更新时保留最近有效备份；主文件损坏会在锁内从备份回退并原子重建，避免节点进程与版本化 worker 并发写丢记录。父节点同时监视 worker：worker 若在生成终端输出前异常退出，会补写失败终态，让本机任务快速进入可恢复的 failed/resume_required 链路，不会永久停在 running/recovering。
+sidecar `sessions.json` 使用进程间互斥和同目录唯一临时文件原子替换，更新时保留最近有效备份；临时文件只有在本进程成功独占创建后才允许清理，Windows `MoveFileExW` 的短时 sharing/lock、空间压力和资源压力错误会有界退避重试，写后还要重新读取校验。主文件损坏会在锁内从备份回退并原子重建；主文件与备份同时持续损坏时显式失败，不能伪造成空 registry。实时输出跟随只把 sessions 游标视为可重放检查点并限频写入：单次写入失败会保留 task journal、隔离工作树和 sidecar JSONL，继续排空到真实 CLI 终态并重试；终态时仍无法持久化才报告可恢复的明确失败，不在 CLI 仍执行时提前杀死监督任务。父节点同时监视 worker：worker 若在生成终端输出前异常退出，会补写失败终态，让本机任务快速进入可恢复的 failed/resume_required 链路，不会永久停在 running/recovering。
 
 #### 2.4.1 Codex Desktop -> PC 本机监督协议
 

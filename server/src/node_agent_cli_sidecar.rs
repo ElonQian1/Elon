@@ -126,9 +126,9 @@ impl CliSidecarRegistry {
             return Ok(false);
         }
         with_task_journal_io_lock(|| {
-            registry_io::update(&self.dir, |sessions| {
+            registry_io::update_if(&self.dir, |sessions| {
                 let Some(session) = sessions.get_mut(session_id) else {
-                    return Ok(false);
+                    return Ok((false, false));
                 };
                 if let Some(state) = state.map(str::trim).filter(|value| !value.is_empty()) {
                     session.state = state.to_string();
@@ -137,7 +137,7 @@ impl CliSidecarRegistry {
                     session.child_pid = child_pid;
                 }
                 session.last_seen_at_ms = now_ms();
-                Ok(true)
+                Ok((true, true))
             })
         })
     }
@@ -148,7 +148,7 @@ impl CliSidecarRegistry {
             return Ok(false);
         }
         with_task_journal_io_lock(|| {
-            registry_io::update(&self.dir, |sessions| {
+            registry_io::update_if(&self.dir, |sessions| {
                 let Some((_, session)) = sessions
                     .iter_mut()
                     .filter(|(_, session)| session.task_id == task_id)
@@ -158,11 +158,11 @@ impl CliSidecarRegistry {
                             .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
                     })
                 else {
-                    return Ok(false);
+                    return Ok((false, false));
                 };
                 session.state = state.to_string();
                 session.last_seen_at_ms = now_ms();
-                Ok(true)
+                Ok((true, true))
             })
         })
     }
@@ -175,17 +175,51 @@ impl CliSidecarRegistry {
         sequence: u64,
     ) -> Result<bool> {
         with_task_journal_io_lock(|| {
-            registry_io::update(&self.dir, |sessions| {
+            registry_io::update_if(&self.dir, |sessions| {
                 let Some(session) = sessions.get_mut(session_id) else {
-                    return Ok(false);
+                    return Ok((false, false));
                 };
                 if session.task_id != task_id {
-                    return Ok(false);
+                    return Ok((false, false));
                 }
                 session.output_offset = session.output_offset.max(offset);
                 session.output_sequence = session.output_sequence.max(sequence);
                 session.last_seen_at_ms = now_ms();
-                Ok(true)
+                Ok((true, true))
+            })
+        })
+    }
+
+    /// Checkpoints the newest session for a task in one registry transaction.
+    /// The live follower already owns the task/output binding, so it does not
+    /// need a separate read transaction merely to rediscover the session id.
+    pub(crate) fn record_task_output_cursor(
+        &self,
+        task_id: &str,
+        offset: u64,
+        sequence: u64,
+    ) -> Result<bool> {
+        let task_id = task_id.trim();
+        if task_id.is_empty() {
+            return Ok(false);
+        }
+        with_task_journal_io_lock(|| {
+            registry_io::update_if(&self.dir, |sessions| {
+                let Some((_, session)) = sessions
+                    .iter_mut()
+                    .filter(|(_, session)| session.task_id == task_id)
+                    .max_by(|(_, left), (_, right)| {
+                        left.last_seen_at_ms
+                            .cmp(&right.last_seen_at_ms)
+                            .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
+                    })
+                else {
+                    return Ok((false, false));
+                };
+                session.output_offset = session.output_offset.max(offset);
+                session.output_sequence = session.output_sequence.max(sequence);
+                session.last_seen_at_ms = now_ms();
+                Ok((true, true))
             })
         })
     }

@@ -186,7 +186,7 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
     let mut result = match result {
         Ok(result) => result,
         Err(error) => {
-            let message = format!("sidecar 输出跟随失败: {error}");
+            let message = format!("sidecar 输出跟随失败: {error:#}");
             let done = AgentToServer::CliDone {
                 req_id,
                 exit_ok: false,
