@@ -428,7 +428,7 @@ pub(super) async fn run_relay_session(
                 };
                 let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
-            ServerToAgent::Cancel { task_id } => {
+            ServerToAgent::Cancel { task_id, .. } => {
                 let abort = running_cli_tasks.lock().await.remove(&task_id);
                 if let Some(abort) = abort {
                     warn!("[relay-client] 收到取消请求，终止 CLI 任务: {task_id}");

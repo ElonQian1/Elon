@@ -147,6 +147,11 @@ impl CliPromptCancelHandle {
         self.cmd_tx
             .send(ServerToAgent::Cancel {
                 task_id: self.req_id.clone(),
+                audit: homecli_proto::CancelRequestAudit::now(
+                    "server",
+                    "cancel_handle",
+                    "caller_requested",
+                ),
             })
             .is_ok()
     }
@@ -179,6 +184,11 @@ impl AgentManager {
             cmd_tx
                 .send(ServerToAgent::Cancel {
                     task_id: req_id.to_string(),
+                    audit: homecli_proto::CancelRequestAudit::now(
+                        "server",
+                        "agent_manager",
+                        "authorization_revoked",
+                    ),
                 })
                 .is_ok()
         })
@@ -423,6 +433,11 @@ impl AgentManager {
                 if deadline_pending.lock().await.contains_key(&deadline_req_id) {
                     let _ = deadline_cmd_tx.send(ServerToAgent::Cancel {
                         task_id: deadline_req_id,
+                        audit: homecli_proto::CancelRequestAudit::now(
+                            "server",
+                            "cloud_control_deadline",
+                            "authorization_deadline_reached",
+                        ),
                     });
                 }
             });

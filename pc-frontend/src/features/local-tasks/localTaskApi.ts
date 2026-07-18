@@ -41,7 +41,10 @@ export function cancelLocalTask(taskId: string): Promise<unknown> {
   return nodeApi(
     safeNodeAdminUrl(),
     `${LOCAL_TASKS_PATH}/${encodeURIComponent(taskId)}/cancel`,
-    { method: 'POST' },
+    {
+      method: 'POST',
+      body: JSON.stringify({ source: 'pc_ui', reason: 'user_stop_button' }),
+    },
   )
 }
 

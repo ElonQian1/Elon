@@ -1,19 +1,17 @@
 use serde::{Deserialize, Serialize};
-
 mod project_workspace;
 pub use project_workspace::*;
-
 mod cli_durable_types;
 pub use cli_durable_types::{
     CliCodexCredentialBinding, CliCompletionEnvelope, CliCompletionProducerIdentity,
 };
-
 mod android_device_host;
 pub use android_device_host::{AndroidDeviceHostRequest, CAP_ANDROID_DEVICE_HOST_V1};
+mod cancel;
+pub use cancel::CancelRequestAudit;
 pub const PROTO_VERSION: u32 = 7;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
-
 mod project_workspace_status;
 pub use project_workspace_status::{
     ProjectGitWorktreeAudit, ProjectGitWorktreeEntry, ProjectWorkspaceInspectStatus,
@@ -206,6 +204,8 @@ pub enum ServerToAgent {
     },
     Cancel {
         task_id: String,
+        #[serde(flatten)]
+        audit: CancelRequestAudit,
     },
     ToolApprovalDecision {
         req_id: String,

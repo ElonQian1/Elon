@@ -54,6 +54,13 @@ export interface LocalTaskRecord {
   can_cancel: boolean
 }
 
+export interface LocalTaskCancelAudit {
+  requested_by: string
+  source: string
+  reason: string
+  requested_at_ms?: number
+}
+
 export interface LocalTaskEvent {
   seq: number
   type: string
@@ -175,6 +182,7 @@ export interface LocalTaskDetail {
   has_more: boolean
   supervision: LocalTaskSupervisionState
   runtime: LocalTaskRuntimeState
+  cancel_audit?: LocalTaskCancelAudit
   update_recovery?: LocalTaskUpdateRecovery
   resume_workspace_status?: LocalTaskResumeWorkspaceStatus
 }

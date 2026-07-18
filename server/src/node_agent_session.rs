@@ -506,8 +506,8 @@ pub(super) async fn run_session(
                                 },
                             );
                         }
-                        ServerToAgent::Cancel { task_id } => {
-                            match crate::node_agent_session_cancel::apply(runtime, &task_id).await? {
+                        ServerToAgent::Cancel { task_id, audit } => {
+                            match crate::node_agent_session_cancel::apply(runtime, &task_id, &audit).await? {
                                 true => info!("🛑 已请求取消 CLI prompt: {}", task_id),
                                 false => warn!("🛑 已保存启动前取消墓碑: {}", task_id),
                             }

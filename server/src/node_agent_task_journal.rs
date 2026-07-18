@@ -1,5 +1,7 @@
 // server/src/node_agent_task_journal.rs
 
+#[path = "node_agent_task_journal_cancel.rs"]
+mod cancel;
 #[path = "node_agent_cancel_tombstones.rs"]
 mod cancel_tombstones;
 #[path = "node_agent_task_journal_recovery.rs"]
@@ -293,45 +295,6 @@ impl TaskJournal {
                 record.updated_at_ms = now;
             }
             self.save_registry(&registry)
-        })
-    }
-
-    pub(crate) fn record_cancel_requested(&self, req_id: &str) -> Result<()> {
-        with_task_journal_io_lock(|| {
-            let now = now_ms();
-            let mut registry = self.load_registry()?;
-            let mut current_status = None;
-            let mut ignored = false;
-            let mut registry_changed = false;
-            if let Some(record) = registry.get_mut(req_id) {
-                if is_terminal_status(&record.status) {
-                    ignored = true;
-                    current_status = Some(record.status.clone());
-                } else {
-                    record.status = "cancel_requested".to_string();
-                    record.phase = "finalizing".to_string();
-                    record.updated_at_ms = now;
-                    record.cancel_requested_at_ms = Some(now);
-                    current_status = Some(record.status.clone());
-                    registry_changed = true;
-                }
-            }
-            if registry_changed {
-                self.save_registry(&registry)?;
-            }
-            let mut event = json!({
-                "type": "cancel_requested",
-                "req_id": req_id,
-                "at_ms": now
-            });
-            if let Some(status) = current_status {
-                event["status"] = Value::String(status);
-            }
-            if ignored {
-                event["ignored"] = Value::Bool(true);
-                event["reason"] = Value::String("task_already_terminal".to_string());
-            }
-            self.append_event(event)
         })
     }
 

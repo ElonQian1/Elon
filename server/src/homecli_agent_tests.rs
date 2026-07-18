@@ -97,7 +97,24 @@ fn cli_prompt_cancel_handle_sends_cancel_for_req_id() {
 
     assert!(handle.cancel());
     match cmd_rx.try_recv() {
-        Ok(ServerToAgent::Cancel { task_id }) => assert_eq!(task_id, "req-123"),
+        Ok(ServerToAgent::Cancel { task_id, audit }) => {
+            assert_eq!(task_id, "req-123");
+            assert_eq!(audit.source.as_deref(), Some("cancel_handle"));
+        }
+        other => panic!("expected cancel message, got {other:?}"),
+    }
+}
+
+#[test]
+fn legacy_cancel_json_defaults_missing_audit_fields() {
+    let message: ServerToAgent =
+        serde_json::from_str(r#"{"type":"cancel","task_id":"legacy-task"}"#)
+            .expect("legacy cancel must remain compatible");
+    match message {
+        ServerToAgent::Cancel { task_id, audit } => {
+            assert_eq!(task_id, "legacy-task");
+            assert_eq!(audit, homecli_proto::CancelRequestAudit::default());
+        }
         other => panic!("expected cancel message, got {other:?}"),
     }
 }
@@ -116,7 +133,10 @@ async fn manager_sends_best_effort_cancel_to_exact_online_agent() {
             .await
     );
     match cmd_rx.try_recv() {
-        Ok(ServerToAgent::Cancel { task_id }) => assert_eq!(task_id, "revoked-request"),
+        Ok(ServerToAgent::Cancel { task_id, audit }) => {
+            assert_eq!(task_id, "revoked-request");
+            assert_eq!(audit.reason.as_deref(), Some("authorization_revoked"));
+        }
         other => panic!("expected manager cancel message, got {other:?}"),
     }
     assert!(
@@ -256,7 +276,10 @@ async fn cloud_dispatch_sends_best_effort_cancel_at_frozen_server_deadline() {
         .await
         .expect("server deadline cancel should arrive")
     {
-        Some(ServerToAgent::Cancel { task_id }) => assert_eq!(task_id, "req-server-deadline"),
+        Some(ServerToAgent::Cancel { task_id, audit }) => {
+            assert_eq!(task_id, "req-server-deadline");
+            assert_eq!(audit.source.as_deref(), Some("cloud_control_deadline"));
+        }
         other => panic!("expected server deadline cancel, got {other:?}"),
     }
 }

@@ -127,6 +127,18 @@ try {
   assert.strictEqual(detail.update_recovery.sidecar_output_offset, 58)
   assert.strictEqual(detail.resume_workspace_status.eligible, true)
 
+  const canceled = model.normalizeLocalTaskDetail({
+    record: { req_id: 'local-cancel', status: 'cancel_requested' },
+    events: [{ seq: 1, event: {
+      type: 'cancel_requested', requested_by: 'owner-1', source: 'pc_ui',
+      reason: 'user_stop_button', requested_at_ms: 1720000002000,
+    } }],
+  })
+  assert.strictEqual(canceled.cancel_audit.requested_by, 'owner-1')
+  assert.strictEqual(canceled.cancel_audit.source, 'pc_ui')
+  assert.strictEqual(canceled.cancel_audit.reason, 'user_stop_button')
+  assert.strictEqual(canceled.cancel_audit.requested_at_ms, 1720000002000)
+
   const merged = model.mergeLocalTaskEvents(detail.events, [
     detail.events[1],
     model.normalizeLocalTaskEvent({ seq: 3, event: { type: 'done', message: 'done' } }),
@@ -153,11 +165,13 @@ try {
   assert.ok(railSource.includes('localMode ? [LOCAL_TASK_ITEM] : RAIL_ITEMS'), 'local mode must hide cloud-only navigation')
   assert.ok(apiSource.includes("'/api/local-tasks'"), 'local tasks must use the node-local endpoint')
   assert.ok(apiSource.includes('/cancel`'), 'local task cancel endpoint must be explicit')
+  assert.ok(apiSource.includes("source: 'pc_ui'"), 'local cancel must submit its audit source')
   assert.ok(apiSource.includes('/tool-approvals/'), 'local tool approvals must use the task-local endpoint')
   assert.ok(pageSource.includes('ensureLocalFullAccessGrant'), 'local task creation must explicitly confirm and persist workspace access')
   assert.ok(detailSource.includes('当前阶段'), 'local task details must expose the live runtime phase')
   assert.ok(detailSource.includes('current_command'), 'local task details must expose the redacted current command')
   assert.ok(detailSource.includes('idle_duration'), 'local task details must expose progress-aware idle duration')
+  assert.ok(detailSource.includes('cancel-audit'), 'local task details must expose cancel audit provenance')
   assert.ok(supervisionSource.includes('桌面监督闭环'), 'supervised tasks must expose their evidence and verdict in the PC workbench')
   assert.ok(supervisionSource.includes('PC 本机节点负责执行'), 'the PC workbench must explain the executor and supervisor roles')
   assert.ok(recoverySource.includes('更新恢复全过程'), 'update recovery stages must be visible in the PC workbench')

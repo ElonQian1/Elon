@@ -17,7 +17,15 @@ fn records_started_cancel_and_finished_events() {
         })
         .expect("started event should persist");
     journal
-        .record_cancel_requested("req-1")
+        .record_cancel_requested_with_audit(
+            "req-1",
+            &homecli_proto::CancelRequestAudit {
+                requested_by: Some("owner-1".to_string()),
+                source: Some("pc_ui".to_string()),
+                reason: Some("user_stop_button".to_string()),
+                requested_at_ms: Some(1234),
+            },
+        )
         .expect("cancel event should persist");
     journal
         .record_finished("req-1")
@@ -37,6 +45,10 @@ fn records_started_cancel_and_finished_events() {
     let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
     assert!(events.contains(r#""type":"started""#));
     assert!(events.contains(r#""type":"cancel_requested""#));
+    assert!(events.contains(r#""requested_by":"owner-1""#));
+    assert!(events.contains(r#""source":"pc_ui""#));
+    assert!(events.contains(r#""reason":"user_stop_button""#));
+    assert!(events.contains(r#""requested_at_ms":1234"#));
     assert!(events.contains(r#""type":"finished""#));
     let _ = fs::remove_dir_all(dir);
 }

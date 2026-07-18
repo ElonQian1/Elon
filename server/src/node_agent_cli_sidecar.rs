@@ -1,6 +1,7 @@
 // server/src/node_agent_cli_sidecar.rs
 
 use anyhow::{Context, Result};
+use homecli_proto::CancelRequestAudit;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -85,6 +86,14 @@ pub(crate) struct CliSidecarCommandRecord {
     pub cols: Option<u16>,
     #[serde(default)]
     pub rows: Option<u16>,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub reason: Option<String>,
+    #[serde(default)]
+    pub requested_at_ms: Option<u128>,
     pub at_ms: u128,
 }
 
@@ -229,13 +238,21 @@ impl CliSidecarRegistry {
     }
 
     pub(crate) fn record_cancel_command(&self, task_id: &str) -> Result<bool> {
+        self.record_cancel_command_with_audit(task_id, &CancelRequestAudit::default())
+    }
+
+    pub(crate) fn record_cancel_command_with_audit(
+        &self,
+        task_id: &str,
+        audit: &CancelRequestAudit,
+    ) -> Result<bool> {
         let Some(session) = self.session_for_task(task_id)? else {
             return Ok(false);
         };
         if !session.can_cancel_at(now_ms()) {
             return Ok(false);
         }
-        self.append_sidecar_command(task_id, "cancel", None, None, None, None, None)
+        self.append_sidecar_command(task_id, "cancel", None, None, None, None, None, Some(audit))
     }
 
     pub(crate) fn record_tool_approval_decision(
@@ -261,6 +278,7 @@ impl CliSidecarRegistry {
             None,
             None,
             None,
+            None,
         )
     }
 
@@ -280,6 +298,7 @@ impl CliSidecarRegistry {
             None,
             None,
             Some(text),
+            None,
             None,
             None,
         )
@@ -305,6 +324,7 @@ impl CliSidecarRegistry {
             None,
             Some(cols),
             Some(rows),
+            None,
         )
     }
 
@@ -317,6 +337,7 @@ impl CliSidecarRegistry {
         text: Option<&str>,
         cols: Option<u16>,
         rows: Option<u16>,
+        cancel_audit: Option<&CancelRequestAudit>,
     ) -> Result<bool> {
         let task_id = task_id.trim();
         if task_id.is_empty() {
@@ -333,6 +354,10 @@ impl CliSidecarRegistry {
             text: text.map(str::to_string),
             cols,
             rows,
+            requested_by: cancel_audit.and_then(|audit| audit.requested_by.clone()),
+            source: cancel_audit.and_then(|audit| audit.source.clone()),
+            reason: cancel_audit.and_then(|audit| audit.reason.clone()),
+            requested_at_ms: cancel_audit.and_then(|audit| audit.requested_at_ms),
             at_ms: now_ms(),
         };
         let mut file = OpenOptions::new()

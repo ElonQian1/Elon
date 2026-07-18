@@ -1,5 +1,6 @@
 import type {
   LocalTaskApproval,
+  LocalTaskCancelAudit,
   LocalTaskDetail,
   LocalTaskEvent,
   LocalTaskRecord,
@@ -52,6 +53,7 @@ export function normalizeLocalTaskDetail(payload: unknown): LocalTaskDetail {
     has_more: Boolean(root.has_more),
     supervision: normalizeSupervisionState(root.supervision),
     runtime: normalizeRuntimeState(root.runtime),
+    cancel_audit: cancelAuditFromEvents(events),
     update_recovery: normalizeUpdateRecovery(root.update_recovery),
     resume_workspace_status: normalizeResumeWorkspaceStatus(root.resume_workspace_status),
   }
@@ -242,8 +244,21 @@ export function mergeLocalTaskDetail(
     events: mergeLocalTaskEvents(current.events, incoming.events),
     last_event_seq: Math.max(current.last_event_seq, incoming.last_event_seq),
     supervision: incoming.supervision.enabled ? incoming.supervision : current.supervision,
+    cancel_audit: incoming.cancel_audit ?? current.cancel_audit,
     update_recovery: incoming.update_recovery ?? current.update_recovery,
     resume_workspace_status: incoming.resume_workspace_status ?? current.resume_workspace_status,
+  }
+}
+
+function cancelAuditFromEvents(events: LocalTaskEvent[]): LocalTaskCancelAudit | undefined {
+  const event = [...events].reverse().find((item) => item.type === 'cancel_requested')
+  if (!event) return undefined
+  const raw = objectValue(event.raw.event ?? event.raw)
+  return {
+    requested_by: textValue(raw.requested_by),
+    source: textValue(raw.source),
+    reason: textValue(raw.reason),
+    requested_at_ms: timestampValue(raw.requested_at_ms ?? raw.at_ms),
   }
 }
 

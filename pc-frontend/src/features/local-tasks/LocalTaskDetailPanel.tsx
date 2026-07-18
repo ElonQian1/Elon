@@ -107,6 +107,18 @@ export default function LocalTaskDetailPanel({
           resumeWorkspace={detail.resume_workspace_status}
         />
 
+        {detail.cancel_audit && (
+          <section className={styles.infoCard} data-testid="cancel-audit">
+            <h3>取消来源</h3>
+            <dl className={styles.taskMeta}>
+              <div><dt>请求者</dt><dd>{detail.cancel_audit.requested_by || '-'}</dd></div>
+              <div><dt>入口</dt><dd>{detail.cancel_audit.source || 'legacy'}</dd></div>
+              <div><dt>原因</dt><dd>{detail.cancel_audit.reason || '-'}</dd></div>
+              <div><dt>时间</dt><dd>{formatTime(detail.cancel_audit.requested_at_ms)}</dd></div>
+            </dl>
+          </section>
+        )}
+
         {detail.approvals.length > 0 && (
           <section className={styles.infoCard}>
             <h3>工具审批</h3>

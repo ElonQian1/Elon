@@ -155,7 +155,12 @@ async fn cancel_task_journal(
             .into_response();
     }
 
-    if runtime.cancel_cli_prompt(&task_id).await {
+    let audit = homecli_proto::CancelRequestAudit::now(
+        "local_admin",
+        "task_journal_api",
+        "operator_requested",
+    );
+    if runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await {
         return Json(LocalTaskCancelResponse {
             ok: true,
             task_id,

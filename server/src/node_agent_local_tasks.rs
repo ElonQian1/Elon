@@ -10,7 +10,8 @@ use axum::{
     Json, Router,
 };
 use homecli_proto::{
-    AgentToServer, CliCompletionEnvelope, CliCompletionProducerIdentity, CliProjectContext,
+    AgentToServer, CancelRequestAudit, CliCompletionEnvelope, CliCompletionProducerIdentity,
+    CliProjectContext,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -55,6 +56,16 @@ struct CreateLocalTaskRequest {
 #[derive(Debug, Deserialize)]
 struct ApprovalDecisionRequest {
     decision: String,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CancelLocalTaskRequest {
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
+    requested_at_ms: Option<u128>,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -401,6 +412,7 @@ async fn create_task(
 async fn cancel_task(
     State(runtime): State<Arc<NodeRuntime>>,
     Path(task_id): Path<String>,
+    request: Option<Json<CancelLocalTaskRequest>>,
 ) -> Response {
     let creds = match bound_credentials(&runtime).await {
         Ok(creds) => creds,
@@ -423,7 +435,19 @@ async fn cancel_task(
         }))
         .into_response();
     }
-    if !runtime.cancel_cli_prompt(&record.task_id).await {
+    let request = request.map(|Json(value)| value).unwrap_or_default();
+    let mut audit = CancelRequestAudit::now(
+        creds.owner_user_id.clone(),
+        request.source.as_deref().unwrap_or("pc_ui"),
+        request.reason.as_deref().unwrap_or("user_requested"),
+    );
+    if request.requested_at_ms.is_some() {
+        audit.requested_at_ms = request.requested_at_ms;
+    }
+    if !runtime
+        .cancel_cli_prompt_with_audit(&record.task_id, &audit)
+        .await
+    {
         return json_error(
             StatusCode::CONFLICT,
             "任务记录仍在运行，但当前进程没有可停止的控制句柄。",
@@ -436,6 +460,7 @@ async fn cancel_task(
         "ok": true,
         "task_id": record.task_id,
         "status": "cancel_requested",
+        "cancel": audit,
     }))
     .into_response()
 }

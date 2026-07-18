@@ -30,13 +30,25 @@ fn sidecar_session_survives_registry_reload_and_accepts_recovered_approval() {
         .record_tool_approval_decision("task-1", "tap_1_1", "approve")
         .expect("sidecar command should persist"));
     assert!(CliSidecarRegistry::new(&dir)
-        .record_cancel_command("task-1")
+        .record_cancel_command_with_audit(
+            "task-1",
+            &homecli_proto::CancelRequestAudit {
+                requested_by: Some("owner-1".to_string()),
+                source: Some("pc_ui".to_string()),
+                reason: Some("user_stop_button".to_string()),
+                requested_at_ms: Some(5678),
+            },
+        )
         .expect("sidecar cancel command should persist"));
     let commands =
         fs::read_to_string(dir.join("commands-task-1.jsonl")).expect("mailbox should exist");
     assert!(commands.contains(r#""command":"tool_approval_decision""#));
     assert!(commands.contains(r#""approval_id":"tap_1_1""#));
     assert!(commands.contains(r#""command":"cancel""#));
+    assert!(commands.contains(r#""requested_by":"owner-1""#));
+    assert!(commands.contains(r#""source":"pc_ui""#));
+    assert!(commands.contains(r#""reason":"user_stop_button""#));
+    assert!(commands.contains(r#""requested_at_ms":5678"#));
     let _ = fs::remove_dir_all(dir);
 }
 

@@ -281,6 +281,15 @@ impl NodeRuntime {
     }
 
     pub(crate) async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
+        self.cancel_cli_prompt_with_audit(req_id, &homecli_proto::CancelRequestAudit::default())
+            .await
+    }
+
+    pub(crate) async fn cancel_cli_prompt_with_audit(
+        &self,
+        req_id: &str,
+        audit: &homecli_proto::CancelRequestAudit,
+    ) -> bool {
         let canceled = self
             .active_cli_prompts
             .cancel_tx(req_id)
@@ -288,14 +297,23 @@ impl NodeRuntime {
             .map(|cancel_tx| cancel_tx.send(true).is_ok())
             .unwrap_or(false);
         if canceled {
-            if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
+            if let Err(error) = self
+                .task_journal
+                .record_cancel_requested_with_audit(req_id, audit)
+            {
                 warn!("PC 任务 journal 写入取消事件失败: {error}");
             }
             return true;
         }
-        match self.cli_sidecars.record_cancel_command(req_id) {
+        match self
+            .cli_sidecars
+            .record_cancel_command_with_audit(req_id, audit)
+        {
             Ok(true) => {
-                if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
+                if let Err(error) = self
+                    .task_journal
+                    .record_cancel_requested_with_audit(req_id, audit)
+                {
                     warn!("PC sidecar 任务 journal 写入取消事件失败: {error}");
                 }
                 true
