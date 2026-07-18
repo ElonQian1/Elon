@@ -275,6 +275,40 @@ pub async fn bind_existing_pc_workspace(
     Ok((rebound, status))
 }
 
+pub async fn inspect_transient_pc_workspace(
+    state: &AppState,
+    user_id: &str,
+    node_id: &str,
+    workspace_path: &str,
+) -> Result<(String, ProjectWorkspaceInspectStatus), (StatusCode, String)> {
+    let target_node =
+        project_workspace_provision::resolve_pc_project_node(state, user_id, Some(node_id)).await?;
+    let status = match state
+        .agent_manager
+        .dispatch_project_workspace_inspect(&target_node, workspace_path.to_string())
+        .await
+    {
+        Ok(AgentToServer::ProjectWorkspaceInspected { status, .. }) => status,
+        Ok(AgentToServer::ProjectWorkspaceInspectError { message, .. }) => {
+            return Err((StatusCode::BAD_REQUEST, message))
+        }
+        Ok(other) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("PC 节点返回了非预期临时工作区检查结果: {other:?}"),
+            ))
+        }
+        Err(error) => return Err((StatusCode::SERVICE_UNAVAILABLE, error.to_string())),
+    };
+    if !workspace_usable_for_binding(&status) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            workspace_binding_problem(&status).to_string(),
+        ));
+    }
+    Ok((target_node, status))
+}
+
 #[allow(clippy::too_many_arguments)]
 fn persist_project_workspace_binding(
     state: &AppState,

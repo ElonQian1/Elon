@@ -52,6 +52,8 @@ pub struct StartChannelAiTaskRequest {
         alias = "workspacePath"
     )]
     pub local_workspace_path: Option<String>,
+    #[serde(default, alias = "transientWorkspace", alias = "temporaryWorkspace")]
+    pub transient_workspace: Option<bool>,
     #[serde(default, alias = "directPcCli", alias = "pcDirectCli")]
     pub direct_pc_cli: Option<bool>,
     #[serde(default, alias = "moduleKey")]
@@ -446,6 +448,19 @@ async fn start_channel_ai_task_response(
     if module_key.is_some_and(|value| value != crate::store::UI_TUNER_MODULE_KEY) {
         return json_error(StatusCode::BAD_REQUEST, "当前不支持这个项目模块上下文");
     }
+    let transient_workspace = req.transient_workspace.unwrap_or(false);
+    if transient_workspace && module_key != Some(crate::store::UI_TUNER_MODULE_KEY) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "临时源码目录只允许由 ui-tuner Context Artifact 发起",
+        );
+    }
+    if transient_workspace && !should_auto_bind_local_node(runtime_route) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "临时源码目录必须通过本机 PC CLI 路由执行",
+        );
+    }
     if should_auto_bind_local_node(runtime_route) {
         if let (Some(node_id), Some(workspace_path)) = (
             req.local_node_id
@@ -457,7 +472,23 @@ async fn start_channel_ai_task_response(
                 .map(str::trim)
                 .filter(|v| !v.is_empty()),
         ) {
-            if project.node_id.as_deref() != Some(node_id)
+            if transient_workspace {
+                match project_workspace_recovery::inspect_transient_pc_workspace(
+                    &state,
+                    &user_id,
+                    node_id,
+                    workspace_path,
+                )
+                .await
+                {
+                    Ok((resolved_node, status)) => {
+                        project.node_id = Some(resolved_node);
+                        project.workspace_path = Some(status.workspace_path);
+                        project.runtime_permission = "full_access".to_string();
+                    }
+                    Err((status, message)) => return json_error(status, message),
+                }
+            } else if project.node_id.as_deref() != Some(node_id)
                 || project.workspace_path.as_deref() != Some(workspace_path)
             {
                 match project_workspace_recovery::bind_existing_pc_workspace(
@@ -615,6 +646,7 @@ async fn start_channel_ai_task_response(
         "ai_task",
     );
 
+    let execution_workspace_path = project.workspace_path.clone();
     spawn_channel_ai_task(ChannelAiTask {
         state: state.clone(),
         user_id,
@@ -638,6 +670,8 @@ async fn start_channel_ai_task_response(
         "trace_id": trace_id,
         "conversation_id": conversation_id,
         "source_task_id": source_task_id,
+        "execution_workspace_path": execution_workspace_path,
+        "transient_workspace": transient_workspace,
         "message": task_message,
     }))
     .into_response()

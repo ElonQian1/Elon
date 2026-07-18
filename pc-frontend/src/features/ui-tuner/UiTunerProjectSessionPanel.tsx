@@ -328,7 +328,11 @@ export function UiTunerProjectSessionPanel({
         aiChannel.id,
         true,
         undefined,
-        { moduleKey: 'ui-tuner', contextArtifactId: artifact.id },
+        {
+          moduleKey: 'ui-tuner',
+          contextArtifactId: artifact.id,
+          transientWorkspace: executionWorkspace.isOverride,
+        },
       )
       const taskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
       setActiveSessionId(session.id)
