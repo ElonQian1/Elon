@@ -42,6 +42,13 @@ function Test-ElonNodeAgentLeaseBootstrapFallback {
         -and $Message.Contains('node_agent')
 }
 
+function Get-ElonReleaseBatchId {
+    param([Parameter(Mandatory)][string]$Sha)
+    $configured = [string]$env:ELON_RELEASE_BATCH_ID
+    if (-not [string]::IsNullOrWhiteSpace($configured)) { return $configured.Trim() }
+    return "release-$($Sha.Trim())"
+}
+
 function Wait-ElonGlobalPublishLease {
     param(
         [Parameter(Mandatory)][object]$Claim,
@@ -55,6 +62,7 @@ function Wait-ElonGlobalPublishLease {
         Start-Sleep -Seconds 5
         Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body @{
             kind = $Kind; token = [string]$Claim.token; leaseSecs = $LeaseSecs
+            batchId = [string]$Claim.batchId; stage = [string]$Claim.stage; stageStatus = 'queued'
         } | Out-Null
         $escapedToken = [Uri]::EscapeDataString([string]$Claim.token)
         $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken"
@@ -104,6 +112,7 @@ function Enter-ElonNodeAgentPublishLease {
             kind = 'node_agent'; sha = $Sha; builderId = $BuilderId
             builderLabel = "publish-node-agent.ps1 @ $BuilderId"
             currentVersionName = $VersionName; leaseSecs = 14400
+            batchId = Get-ElonReleaseBatchId -Sha $Sha; stage = 'windows_node'
         }
     } catch {
         if (-not (Test-ElonNodeAgentLeaseBootstrapFallback -Message $_.Exception.Message)) { throw }
@@ -116,6 +125,23 @@ function Enter-ElonNodeAgentPublishLease {
     }
     return Enter-ElonGlobalPublishLease -Claim $claim -Kind 'node_agent' `
         -ReleaseApiBase $ReleaseApiBase -LeaseSecs 14400
+}
+
+function Update-ElonReleaseStage {
+    param(
+        [Parameter(Mandatory)][string]$ReleaseApiBase,
+        [Parameter(Mandatory)][string]$Kind,
+        [Parameter(Mandatory)][string]$Token,
+        [Parameter(Mandatory)][string]$BatchId,
+        [Parameter(Mandatory)][string]$Stage,
+        [ValidateSet('queued','running','succeeded','failed')][string]$Status = 'running',
+        [int]$LeaseSecs = 14400
+    )
+    if ([string]::IsNullOrWhiteSpace($Token)) { return }
+    Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body @{
+        kind = $Kind; token = $Token; leaseSecs = $LeaseSecs
+        batchId = $BatchId; stage = $Stage; stageStatus = $Status
+    } | Out-Null
 }
 
 function Complete-ElonReleaseLease {

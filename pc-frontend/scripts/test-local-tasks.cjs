@@ -133,12 +133,14 @@ try {
     events: [{ seq: 1, event: {
       type: 'cancel_requested', requested_by: 'owner-1', source: 'pc_ui',
       reason: 'user_stop_button', requested_at_ms: 1720000002000,
+      interruption_source: 'supervisor_intervention',
     } }],
   })
   assert.strictEqual(canceled.cancel_audit.requested_by, 'owner-1')
   assert.strictEqual(canceled.cancel_audit.source, 'pc_ui')
   assert.strictEqual(canceled.cancel_audit.reason, 'user_stop_button')
   assert.strictEqual(canceled.cancel_audit.requested_at_ms, 1720000002000)
+  assert.strictEqual(canceled.cancel_audit.interruption_source, 'supervisor_intervention')
 
   const merged = model.mergeLocalTaskEvents(detail.events, [
     detail.events[1],
@@ -150,21 +152,27 @@ try {
   assert.strictEqual(model.syncStateLabel('retrying'), '同步重试中')
 
   const evolution = operations.normalizeSelfEvolutionQueue({
-    items: [{ logical_id: 'evolution-1', root_task_id: 'root-1', parent_task_id: 'parent-1', project_id: 'project-1', conversation_id: 'self-evolution-1', status: 'paused', generation: 2, pause_reason: 'global_publish' }],
+    items: [{ logical_id: 'evolution-1', root_task_id: 'root-1', parent_task_id: 'parent-1', project_id: 'project-1', conversation_id: 'self-evolution-1', status: 'paused', generation: 2, pause_reason: 'global_publish', execution_worktree: 'D:\\worktrees\\self-evolution-1', execution_isolated: true, yield_reason: 'global_publish', interruption_source: 'supervisor_intervention', reviewed_by: 'pc_operator:owner-1', review_source: 'local_pc_ui', retry_count: 1, max_retries: 3 }],
     gates: { publish_active: true, publish_owner: 'server:builder-a', publish_waiter_count: 2 },
   })
   assert.strictEqual(evolution.items[0].generation, 2)
   assert.strictEqual(evolution.items[0].pause_reason, 'global_publish')
+  assert.strictEqual(evolution.items[0].execution_isolated, true)
+  assert.strictEqual(evolution.items[0].interruption_source, 'supervisor_intervention')
+  assert.strictEqual(evolution.items[0].review_source, 'local_pc_ui')
   assert.strictEqual(evolution.gates.publish_active, true)
   assert.strictEqual(evolution.gates.publish_waiter_count, 2)
-  const publish = operations.normalizeGlobalPublishStatus({ globalPublish: {
-    owner: { token: 'owner-token', kind: 'server', sha: 'abcdef123456', builderLabel: 'builder-a' },
-    waiters: [{ token: 'waiter-token', kind: 'apk', sha: 'fedcba654321', builderLabel: 'builder-b' }],
+  const publish = operations.normalizeGlobalPublishStatus({ stateHealth: 'healthy', globalPublish: {
+    owner: { kind: 'server', sha: 'abcdef123456', batchId: 'release-abcdef123456', stage: 'server', builderLabel: 'builder-a' },
+    waiters: [{ kind: 'apk', sha: 'fedcba654321', batchId: 'release-fedcba654321', stage: 'android_apk', builderLabel: 'builder-b' }],
     waiterCount: 1, queuePolicy: 'fifo', coalescingKey: 'kind+sha', immutableReleaseSha: true,
-  } })
+  }, releaseBatches: [{ batchId: 'release-abcdef123456', sha: 'abcdef123456', status: 'in_progress', updatedAt: 1720000003000, stages: [{ stage: 'server', kind: 'server', status: 'running', builderId: 'builder-a', attempt: 2 }] }] })
   assert.strictEqual(publish.owner.kind, 'server')
+  assert.strictEqual(publish.owner.batchId, 'release-abcdef123456')
   assert.strictEqual(publish.waiters[0].kind, 'apk')
   assert.strictEqual(publish.immutableReleaseSha, true)
+  assert.strictEqual(publish.stateHealth, 'healthy')
+  assert.strictEqual(publish.batches[0].stages[0].attempt, 2)
 
   const bannerSource = readSource('src/features/shell/LocalModeBanner.tsx')
   const shellSource = readSource('src/features/shell/Shell.tsx')
@@ -200,6 +208,8 @@ try {
   assert.ok(operationsSource.includes('低优先自进化'), 'self evolution queue must be visible')
   assert.ok(operationsSource.includes('全局发布租约'), 'global publish owner and waiters must be visible')
   assert.ok(operationsSource.includes('待审查'), 'self evolution review state must be visible')
+  assert.ok(operationsSource.includes('releaseStatus'), 'release batch stages must be visible')
+  assert.ok(operationsSource.includes('review_source'), 'self evolution review provenance must be visible')
 
   console.log('pc-frontend local-task tests passed')
 } finally {

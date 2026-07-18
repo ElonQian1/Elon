@@ -66,36 +66,6 @@ is_local_server_deploy() {
   [ -d "$REMOTE_DIR" ] && [ -d "$REMOTE_DIR/server" ] && [ -w "$REMOTE_DIR" ] && command -v systemctl >/dev/null 2>&1
 }
 
-json_field() {
-  local json="$1"
-  local field="$2"
-  JSON_INPUT="$json" python3 - "$field" <<'PY'
-import json
-import os
-import sys
-
-try:
-    data = json.loads(os.environ.get("JSON_INPUT", ""))
-except Exception:
-    print("")
-    sys.exit(0)
-
-value = data
-for part in sys.argv[1].split("."):
-    if isinstance(value, dict):
-        value = value.get(part)
-    else:
-        value = None
-        break
-if value is None:
-    print("")
-elif isinstance(value, bool):
-    print("true" if value else "false")
-else:
-    print(value)
-PY
-}
-
 git_fetch_hint() {
   local output="${1:-}"
   if [[ "$output" =~ (Could\ not\ resolve\ host|Name\ or\ service\ not\ known|Temporary\ failure\ in\ name\ resolution) ]]; then
@@ -357,6 +327,7 @@ restore_release_rustflags() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
 . "$SCRIPT_DIR/release-publish-lease.sh"
+json_field() { elon_release_json_field "$1" "$2"; }
 if [ -z "$REPO_ROOT" ]; then
   echo -e "${RED}❌ 当前目录不在 git 仓库中${NC}" >&2; exit 1
 fi
@@ -501,17 +472,20 @@ BUILDER_HOST="${HOSTNAME:-$(hostname 2>/dev/null || echo unknown-host)}"
 BUILDER_USER="${USER:-${LOGNAME:-unknown-user}}"
 BUILDER_ID="$BUILDER_HOST-$BUILDER_USER"
 BUILDER_LABEL="publish-server.sh @ $BUILDER_ID"
-CLAIM_PAYLOAD=$(python3 - "$SHA_BIG" "$BUILDER_ID" "$BUILDER_LABEL" "$CLAIM_CURRENT_VERSION" <<'PY'
+RELEASE_BATCH_ID=$(elon_release_batch_id "$SHA_BIG")
+CLAIM_PAYLOAD=$(python3 - "$SHA_BIG" "$BUILDER_ID" "$BUILDER_LABEL" "$CLAIM_CURRENT_VERSION" "$RELEASE_BATCH_ID" <<'PY'
 import json
 import sys
 
-sha, builder_id, builder_label, current_version = sys.argv[1:5]
+sha, builder_id, builder_label, current_version, batch_id = sys.argv[1:6]
 payload = {
     "kind": "server",
     "sha": sha,
     "builderId": builder_id,
     "builderLabel": builder_label,
     "bump": "patch",
+    "batchId": batch_id,
+    "stage": "server",
 }
 if current_version:
     payload["currentVersionName"] = current_version
@@ -660,10 +634,12 @@ upload_static_dist() {
   local local_dir="$1"
   local remote_dir="$2"
   local label="$3"
+  local required="${4:-0}"
   local staging_dir="${remote_dir}-staging-$SHA"
 
   if [ -z "$local_dir" ] || [ ! -f "$local_dir/index.html" ]; then
     echo -e "${YELLOW}3.5⃣  ⚠️  $label 不存在，跳过上传${NC}"
+    [ "$required" -eq 1 ] && return 1
     return 0
   fi
 
@@ -678,18 +654,21 @@ upload_static_dist() {
     # shellcheck disable=SC2086
     if ! ssh $SSH_OPTS "$SERVER" "mkdir -p '$staging_dir'"; then
       echo -e "${YELLOW}   ⚠️  $label staging 目录创建失败（不中止后端部署）${NC}"
+      [ "$required" -eq 1 ] && return 1
       return 0
     fi
     if ! scp $SSH_OPTS -r "$local_dir/." "${SERVER}:${staging_dir}"; then
       # shellcheck disable=SC2086
       ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
       echo -e "${YELLOW}   ⚠️  $label 上传失败（不中止后端部署）${NC}"
+      [ "$required" -eq 1 ] && return 1
       return 0
     fi
     if ! ssh $SSH_OPTS "$SERVER" "rm -rf '$remote_dir' && mv '$staging_dir' '$remote_dir'"; then
       # shellcheck disable=SC2086
       ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
       echo -e "${YELLOW}   ⚠️  $label 目录替换失败（staging 已清理）${NC}"
+      [ "$required" -eq 1 ] && return 1
       return 0
     fi
   fi
@@ -767,9 +746,10 @@ JS
 }
 
 if [ -f "$PC_FRONTEND_DIR/package.json" ]; then
+  update_release_stage server "$RELEASE_TOKEN" "$RELEASE_BATCH_ID" pc_frontend running
   if ! command -v npm >/dev/null 2>&1; then
-    echo -e "${YELLOW}3.5⃣  ⚠️  npm 不在 PATH，跳过新版 PC 前端构建${NC}"
-    PC_DIST_DIR=""
+    echo -e "${RED}3.5⃣  ❌ npm 不在 PATH，统一发布批次失败关闭${NC}"
+    exit 1
   elif [ "$SKIP_BUILD" -eq 1 ] && [ -f "$PC_DIST_DIR/index.html" ]; then
     echo -e "${YELLOW}3.5⃣  ⏩ 跳过新版 PC 前端构建（--skip-build），使用已有 dist${NC}"
   elif ! (
@@ -787,17 +767,19 @@ if [ -f "$PC_FRONTEND_DIR/package.json" ]; then
         node_modules/.bin/tsc --noEmit
         node_modules/.bin/vite build
       ); then
-        echo -e "${YELLOW}   ⚠️  新版 PC 前端构建失败（不中止后端部署）${NC}"
-        PC_DIST_DIR=""
+        echo -e "${RED}   ❌ 新版 PC 前端构建失败，统一发布批次失败关闭${NC}"
+        exit 1
       fi
     else
-      echo -e "${YELLOW}   ⚠️  新版 PC 前端构建失败（不中止后端部署）${NC}"
-      PC_DIST_DIR=""
+      echo -e "${RED}   ❌ 新版 PC 前端构建失败，统一发布批次失败关闭${NC}"
+      exit 1
     fi
   fi
-  upload_static_dist "$PC_DIST_DIR" "$REMOTE_PC_DIST" "新版 PC 前端 dist"
+  upload_static_dist "$PC_DIST_DIR" "$REMOTE_PC_DIST" "新版 PC 前端 dist" 1
+  update_release_stage server "$RELEASE_TOKEN" "$RELEASE_BATCH_ID" pc_frontend succeeded
 else
-  echo -e "${GRAY}3.5⃣  ℹ️  pc-frontend/ 不存在，跳过新版 PC 前端构建${NC}"
+  echo -e "${RED}3.5⃣  ❌ pc-frontend/ 不存在，统一发布批次失败关闭${NC}"
+  exit 1
 fi
 
 echo -e "${YELLOW}3.5⃣  生成旧版 PC 对照快照（${PC_LEGACY_BASE_COMMIT:0:8}）...${NC}"

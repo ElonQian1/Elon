@@ -29,7 +29,14 @@ use crate::release_manager::{
     manager, max_semver, now_secs, parse_kind, semver_ge, sweep_expired, sweep_global_expired,
     InFlightBuilder, Lane, LaneState, LastRelease, PublishAdmission, PublishLeaseEntry,
 };
+
+#[path = "release_claim_support.rs"]
+mod support;
 use crate::types::AppState;
+use support::{
+    claim_response_for_existing, ensure_manager_healthy, persist_error, public_in_flight,
+    publish_token_status, validate_finish_identity,
+};
 
 // ===== 调参常量 =====
 
@@ -55,6 +62,8 @@ pub struct ClaimRequest {
     pub current_version_name: Option<String>,
     pub current_version_code: Option<i64>,
     pub lease_secs: Option<i64>,
+    pub batch_id: Option<String>,
+    pub stage: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -64,6 +73,8 @@ pub struct ClaimResponse {
     pub kind: String,
     pub token: String,
     pub sha: String,
+    pub batch_id: String,
+    pub stage: String,
     pub assigned_version_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assigned_version_code: Option<i64>,
@@ -82,6 +93,8 @@ pub struct ClaimResponse {
 pub struct PublicPublishLeaseEntry {
     pub kind: String,
     pub sha: String,
+    pub batch_id: String,
+    pub stage: String,
     pub builder_id: String,
     pub builder_label: String,
     pub requested_at: i64,
@@ -94,6 +107,8 @@ impl From<&PublishLeaseEntry> for PublicPublishLeaseEntry {
         Self {
             kind: value.kind.clone(),
             sha: value.sha.clone(),
+            batch_id: value.batch_id.clone(),
+            stage: value.stage.clone(),
             builder_id: value.builder_id.clone(),
             builder_label: value.builder_label.clone(),
             requested_at: value.requested_at,
@@ -109,6 +124,9 @@ pub struct HeartbeatRequest {
     pub kind: String,
     pub token: String,
     pub lease_secs: Option<i64>,
+    pub batch_id: Option<String>,
+    pub stage: Option<String>,
+    pub stage_status: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -152,6 +170,7 @@ pub async fn claim_handler(
 ) -> Result<Json<ClaimResponse>, (StatusCode, Json<Value>)> {
     let kind = parse_kind(&req.kind)?;
     let mgr = manager(&state);
+    ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
     let now = now_secs();
 
@@ -167,6 +186,29 @@ pub async fn claim_handler(
     }));
 
     let kind_name = kind.as_str();
+    let batch_id = req
+        .batch_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| crate::release_batch::default_batch_id(&req.sha));
+    let stage = req
+        .stage
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| crate::release_batch::default_stage(kind_name).to_string());
+    crate::release_batch::validate_batch_identity(&guard, &batch_id, &req.sha).map_err(
+        |message| {
+            err(
+                StatusCode::CONFLICT,
+                "immutable-batch-sha-mismatch",
+                message,
+            )
+        },
+    )?;
     if let Some(completion) = guard.global_publish.completed.iter().rev().find(|item| {
         item.success
             && item.kind == kind_name
@@ -182,6 +224,8 @@ pub async fn claim_handler(
             kind: kind_name.to_string(),
             token: String::new(),
             sha: completion.sha.clone(),
+            batch_id: batch_id.clone(),
+            stage: stage.clone(),
             assigned_version_name: lane_ref
                 .last_release
                 .as_ref()
@@ -208,7 +252,11 @@ pub async fn claim_handler(
     }
 
     if let Some(existing) = guard.global_publish.owner.as_ref().filter(|item| {
-        item.kind == kind_name && item.sha == req.sha && item.builder_id == req.builder_id
+        item.kind == kind_name
+            && item.sha == req.sha
+            && item.batch_id == batch_id
+            && item.stage == stage
+            && item.builder_id == req.builder_id
     }) {
         return Ok(Json(claim_response_for_existing(
             &guard, kind, existing, "build", 0,
@@ -221,7 +269,11 @@ pub async fn claim_handler(
             .iter()
             .enumerate()
             .find(|(_, item)| {
-                item.kind == kind_name && item.sha == req.sha && item.builder_id == req.builder_id
+                item.kind == kind_name
+                    && item.sha == req.sha
+                    && item.batch_id == batch_id
+                    && item.stage == stage
+                    && item.builder_id == req.builder_id
             })
     {
         return Ok(Json(claim_response_for_existing(
@@ -285,6 +337,8 @@ pub async fn claim_handler(
         builder_id: req.builder_id.clone(),
         builder_label: builder_label.clone(),
         sha: req.sha.clone(),
+        batch_id: batch_id.clone(),
+        stage: stage.clone(),
         assigned_version_name: assigned_version_name.clone(),
         assigned_version_code,
         claimed_at: now,
@@ -297,6 +351,8 @@ pub async fn claim_handler(
         token: token.clone(),
         kind: kind_name.to_string(),
         sha: req.sha.clone(),
+        batch_id: batch_id.clone(),
+        stage: stage.clone(),
         builder_id: req.builder_id.clone(),
         builder_label,
         requested_at: now,
@@ -307,6 +363,31 @@ pub async fn claim_handler(
         PublishAdmission::Owner => ("build", 0),
         PublishAdmission::Waiter { queue_position } => ("wait", queue_position),
     };
+    if let Some(lease) = guard
+        .global_publish
+        .owner
+        .as_ref()
+        .filter(|lease| lease.token == token)
+        .or_else(|| {
+            guard
+                .global_publish
+                .waiters
+                .iter()
+                .find(|lease| lease.token == token)
+        })
+        .cloned()
+    {
+        crate::release_batch::record_claim(
+            &mut guard,
+            &lease,
+            if action == "build" {
+                "running"
+            } else {
+                "queued"
+            },
+            now,
+        );
+    }
     let in_flight_count =
         usize::from(guard.global_publish.owner.is_some()) + guard.global_publish.waiters.len();
 
@@ -315,6 +396,8 @@ pub async fn claim_handler(
         kind: kind_name.to_string(),
         token,
         sha: req.sha,
+        batch_id,
+        stage,
         assigned_version_name,
         assigned_version_code,
         claimed_at: now,
@@ -330,7 +413,7 @@ pub async fn claim_handler(
         waiter_count: guard.global_publish.waiters.len(),
     };
 
-    mgr.persist(&guard).await;
+    mgr.persist(&guard).await.map_err(persist_error)?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -341,6 +424,7 @@ pub async fn heartbeat_handler(
 ) -> Result<Json<HeartbeatResponse>, (StatusCode, Json<Value>)> {
     let kind = parse_kind(&req.kind)?;
     let mgr = manager(&state);
+    ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
     let now = now_secs();
 
@@ -378,6 +462,45 @@ pub async fn heartbeat_handler(
             "lease expired or unknown token",
         ));
     }
+    let lease_entry = guard
+        .global_publish
+        .owner
+        .as_ref()
+        .filter(|item| item.token == req.token)
+        .or_else(|| {
+            guard
+                .global_publish
+                .waiters
+                .iter()
+                .find(|item| item.token == req.token)
+        })
+        .cloned()
+        .ok_or_else(|| err(StatusCode::GONE, "token-not-active", "lease disappeared"))?;
+    if req
+        .batch_id
+        .as_deref()
+        .is_some_and(|batch| batch.trim() != lease_entry.batch_id)
+    {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "batch-mismatch",
+            "heartbeat batch does not own token",
+        ));
+    }
+    let stage = req.stage.as_deref().unwrap_or(&lease_entry.stage);
+    crate::release_batch::record_stage(
+        &mut guard,
+        &lease_entry.batch_id,
+        &lease_entry.sha,
+        &lease_entry.kind,
+        stage,
+        &lease_entry.builder_id,
+        &lease_entry.builder_label,
+        req.stage_status.as_deref().unwrap_or("running"),
+        new_expiry,
+        None,
+        now,
+    );
     if let Some(item) = lane_mut(&mut guard, kind)
         .in_flight
         .iter_mut()
@@ -392,7 +515,7 @@ pub async fn heartbeat_handler(
         ok: true,
         lease_expires_at,
     };
-    mgr.persist(&guard).await;
+    mgr.persist(&guard).await.map_err(persist_error)?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -403,6 +526,7 @@ pub async fn finish_handler(
 ) -> Result<Json<FinishResponse>, (StatusCode, Json<Value>)> {
     let kind = parse_kind(&req.kind)?;
     let mgr = manager(&state);
+    ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
     let now = now_secs();
     for lane_kind in [Lane::Server, Lane::Apk, Lane::NodeAgent] {
@@ -472,6 +596,19 @@ pub async fn finish_handler(
                 lane_mut_ref.last_published_version_code = Some(new_c);
             }
         }
+        crate::release_batch::record_stage(
+            &mut guard,
+            &owner.batch_id,
+            &owner.sha,
+            &owner.kind,
+            &owner.stage,
+            &owner.builder_id,
+            &owner.builder_label,
+            if req.success { "succeeded" } else { "failed" },
+            owner.lease_expires_at,
+            req.error_message.clone(),
+            now,
+        );
         finish_global_publish(
             &mut guard,
             &owner,
@@ -485,7 +622,7 @@ pub async fn finish_handler(
     };
 
     let resp = FinishResponse { ok: true, recorded };
-    mgr.persist(&guard).await;
+    mgr.persist(&guard).await.map_err(persist_error)?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -493,15 +630,15 @@ pub async fn finish_handler(
 pub async fn status_handler(
     State(state): State<Arc<AppState>>,
     Query(q): Query<StatusQuery>,
-) -> Json<Value> {
+) -> Result<Json<Value>, (StatusCode, Json<Value>)> {
     let mgr = manager(&state);
+    ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
     let now = now_secs();
     sweep_expired(&mut guard.server, now);
     sweep_expired(&mut guard.apk, now);
     sweep_expired(&mut guard.node_agent, now);
     sweep_global_expired(&mut guard, now);
-    // 不需要 persist：sweep 只是清掉过期 in_flight，下一次 claim 会持久化
 
     let render = |lane: &LaneState, name: &str| -> Value {
         json!({
@@ -524,6 +661,7 @@ pub async fn status_handler(
         "queuePolicy": "fifo",
         "coalescingKey": "kind+sha",
         "immutableReleaseSha": true,
+        "batchIdentity": "batchId+sha",
     });
     let body = match q.kind.as_deref() {
         Some("server") => render(&guard.server, "server"),
@@ -535,155 +673,14 @@ pub async fn status_handler(
             "nodeAgent": render(&guard.node_agent, "node_agent"),
             "globalPublish": global,
             "tokenStatus": token_status,
+            "releaseBatches": guard.release_batches,
+            "stateHealth": "healthy",
             "now": now,
         }),
     };
+    mgr.persist(&guard).await.map_err(persist_error)?;
     drop(guard);
-    Json(body)
-}
-
-fn claim_response_for_existing(
-    state: &crate::release_manager::ReleaseStateFile,
-    kind: Lane,
-    lease: &PublishLeaseEntry,
-    action: &str,
-    queue_position: usize,
-) -> ClaimResponse {
-    let build = lane(state, kind)
-        .in_flight
-        .iter()
-        .find(|item| item.token == lease.token);
-    ClaimResponse {
-        action: action.to_string(),
-        kind: kind.as_str().to_string(),
-        token: lease.token.clone(),
-        sha: lease.sha.clone(),
-        assigned_version_name: build
-            .map(|item| item.assigned_version_name.clone())
-            .unwrap_or_default(),
-        assigned_version_code: build.and_then(|item| item.assigned_version_code),
-        claimed_at: lease.requested_at,
-        lease_expires_at: lease.lease_expires_at,
-        in_flight_count: usize::from(state.global_publish.owner.is_some())
-            + state.global_publish.waiters.len(),
-        queue_position,
-        coalesced: false,
-        owner: state
-            .global_publish
-            .owner
-            .as_ref()
-            .map(PublicPublishLeaseEntry::from),
-        waiter_count: state.global_publish.waiters.len(),
-    }
-}
-
-fn publish_token_status(state: &crate::release_manager::ReleaseStateFile, token: &str) -> Value {
-    if let Some(owner) = state
-        .global_publish
-        .owner
-        .as_ref()
-        .filter(|owner| owner.token == token)
-    {
-        let kind = parse_kind(&owner.kind).ok();
-        let build = kind.and_then(|kind| {
-            lane(state, kind)
-                .in_flight
-                .iter()
-                .find(|item| item.token == token)
-        });
-        return json!({
-            "action": "build",
-            "token": token,
-            "kind": owner.kind,
-            "sha": owner.sha,
-            "assignedVersionName": build.map(|item| item.assigned_version_name.clone()),
-            "assignedVersionCode": build.and_then(|item| item.assigned_version_code),
-            "queuePosition": 0,
-        });
-    }
-    if let Some((index, waiter)) = state
-        .global_publish
-        .waiters
-        .iter()
-        .enumerate()
-        .find(|(_, waiter)| waiter.token == token)
-    {
-        return json!({
-            "action": "wait",
-            "token": token,
-            "kind": waiter.kind,
-            "sha": waiter.sha,
-            "queuePosition": index + 1,
-            "owner": state.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
-        });
-    }
-    if let Some(completion) = state
-        .global_publish
-        .completed
-        .iter()
-        .rev()
-        .find(|completion| completion.token == token)
-    {
-        return json!({
-            "action": if completion.success && completion.coalesced { "coalesced" } else { "finished" },
-            "token": token,
-            "kind": completion.kind,
-            "sha": completion.sha,
-            "success": completion.success,
-            "coalesced": completion.coalesced,
-            "errorMessage": completion.error_message,
-        });
-    }
-    json!({"action": "unknown", "token": token})
-}
-
-fn public_in_flight(item: &InFlightBuilder) -> Value {
-    json!({
-        "builderId": item.builder_id,
-        "builderLabel": item.builder_label,
-        "sha": item.sha,
-        "assignedVersionName": item.assigned_version_name,
-        "assignedVersionCode": item.assigned_version_code,
-        "claimedAt": item.claimed_at,
-        "lastHeartbeat": item.last_heartbeat,
-        "leaseExpiresAt": item.lease_expires_at,
-    })
-}
-
-fn validate_finish_identity<'a>(
-    build: &InFlightBuilder,
-    request: &FinishRequest,
-) -> Result<(), (&'a str, &'a str)> {
-    if request
-        .sha
-        .as_deref()
-        .is_some_and(|sha| sha.trim() != build.sha)
-    {
-        return Err((
-            "immutable-sha-mismatch",
-            "finish sha must match the immutable sha captured by claim",
-        ));
-    }
-    if request
-        .version_name
-        .as_deref()
-        .is_some_and(|version| version.trim() != build.assigned_version_name)
-    {
-        return Err((
-            "immutable-version-mismatch",
-            "finish version must match the version captured by claim",
-        ));
-    }
-    if request
-        .version_code
-        .is_some_and(|version| Some(version) != build.assigned_version_code)
-    {
-        return Err((
-            "immutable-version-code-mismatch",
-            "finish version code must match the version captured by claim",
-        ));
-    }
-    Ok(())
+    Ok(Json(body))
 }
 
 #[cfg(test)]
@@ -696,6 +693,8 @@ mod tests {
             builder_id: "builder".to_string(),
             builder_label: "builder".to_string(),
             sha: "fixed-sha".to_string(),
+            batch_id: "release-fixed-sha".to_string(),
+            stage: "android_apk".to_string(),
             assigned_version_name: "1.2.3".to_string(),
             assigned_version_code: Some(123),
             claimed_at: 1,
@@ -750,6 +749,8 @@ mod tests {
             token: "secret-lease-token".to_string(),
             kind: "server".to_string(),
             sha: "fixed-sha".to_string(),
+            batch_id: "release-fixed-sha".to_string(),
+            stage: "server".to_string(),
             builder_id: "builder".to_string(),
             builder_label: "builder".to_string(),
             requested_at: 1,

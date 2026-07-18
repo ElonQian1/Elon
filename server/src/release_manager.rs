@@ -12,6 +12,7 @@ use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use crate::types::AppState;
+use anyhow::{Context, Result};
 
 /// 最长 lease 时长（秒）。客户端要求再长也截到这里。
 pub(crate) const MAX_LEASE_SECS: i64 = 14_400; // 4 h; node-agent cross builds can be lengthy
@@ -26,6 +27,10 @@ pub struct InFlightBuilder {
     pub builder_id: String,
     pub builder_label: String,
     pub sha: String,
+    #[serde(default)]
+    pub batch_id: String,
+    #[serde(default)]
+    pub stage: String,
     /// 服务器分配给这次构建的版本号
     pub assigned_version_name: String,
     /// APK 通道使用；server 通道为 None
@@ -42,6 +47,10 @@ pub struct PublishLeaseEntry {
     pub token: String,
     pub kind: String,
     pub sha: String,
+    #[serde(default)]
+    pub batch_id: String,
+    #[serde(default)]
+    pub stage: String,
     pub builder_id: String,
     pub builder_label: String,
     pub requested_at: i64,
@@ -119,6 +128,8 @@ pub(crate) struct ReleaseStateFile {
     pub(crate) node_agent: LaneState,
     #[serde(default)]
     pub(crate) global_publish: GlobalPublishState,
+    #[serde(default)]
+    pub(crate) release_batches: Vec<crate::release_batch::ReleaseBatchLedger>,
 }
 
 // ===== 全局 Manager =====
@@ -126,30 +137,46 @@ pub(crate) struct ReleaseStateFile {
 pub struct ReleaseManager {
     pub(crate) inner: Mutex<ReleaseStateFile>,
     path: PathBuf,
+    load_error: Option<String>,
 }
 
 impl ReleaseManager {
     pub(crate) fn load_or_init(data_dir: &Path) -> Arc<Self> {
         let path = data_dir.join("release-state.json");
-        let state = std::fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str::<ReleaseStateFile>(&s).ok())
-            .unwrap_or_default();
+        let (state, load_error) = if path.exists() {
+            match std::fs::read_to_string(&path)
+                .with_context(|| format!("read {}", path.display()))
+                .and_then(|text| {
+                    serde_json::from_str::<ReleaseStateFile>(&text)
+                        .with_context(|| format!("parse {}", path.display()))
+                }) {
+                Ok(state) => (state, None),
+                Err(error) => (ReleaseStateFile::default(), Some(error.to_string())),
+            }
+        } else {
+            (ReleaseStateFile::default(), None)
+        };
         Arc::new(Self {
             inner: Mutex::new(state),
             path,
+            load_error,
         })
     }
 
-    pub(crate) async fn persist(&self, state: &ReleaseStateFile) {
-        let json = match serde_json::to_string_pretty(state) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-        let tmp = self.path.with_extension("json.tmp");
-        if std::fs::write(&tmp, json).is_ok() {
-            let _ = std::fs::rename(&tmp, &self.path);
+    pub(crate) fn health_error(&self) -> Option<&str> {
+        self.load_error.as_deref()
+    }
+
+    pub(crate) async fn persist(&self, state: &ReleaseStateFile) -> Result<()> {
+        if let Some(error) = self.load_error.as_deref() {
+            anyhow::bail!("release state failed closed: {error}");
         }
+        let json = serde_json::to_string_pretty(state).context("serialize release state")?;
+        let tmp = self.path.with_extension("json.tmp");
+        std::fs::write(&tmp, json).with_context(|| format!("write {}", tmp.display()))?;
+        std::fs::rename(&tmp, &self.path)
+            .with_context(|| format!("replace {}", self.path.display()))?;
+        Ok(())
     }
 }
 
@@ -221,6 +248,7 @@ pub(crate) fn sweep_global_expired(state: &mut ReleaseStateFile, now: i64) {
         .is_some_and(|owner| owner.lease_expires_at <= now);
     if owner_expired {
         if let Some(owner) = state.global_publish.owner.take() {
+            crate::release_batch::expire_stage(state, &owner, now);
             remove_publish_token_from_lanes(state, &owner.token);
             state.global_publish.completed.push(PublishCompletion {
                 token: owner.token,
@@ -394,6 +422,8 @@ mod tests {
             token: token.to_string(),
             kind: kind.to_string(),
             sha: sha.to_string(),
+            batch_id: crate::release_batch::default_batch_id(sha),
+            stage: crate::release_batch::default_stage(kind).to_string(),
             builder_id: token.to_string(),
             builder_label: token.to_string(),
             requested_at: 1,
@@ -464,7 +494,9 @@ mod tests {
     #[test]
     fn expired_owner_yields_to_first_live_waiter() {
         let mut state = ReleaseStateFile::default();
-        state.global_publish.owner = Some(lease("expired", "server", "sha-a", 10));
+        let expired = lease("expired", "server", "sha-a", 10);
+        crate::release_batch::record_claim(&mut state, &expired, "running", 1);
+        state.global_publish.owner = Some(expired);
         state.global_publish.waiters = vec![
             lease("first", "apk", "sha-b", 100),
             lease("second", "node_agent", "sha-c", 100),
@@ -474,5 +506,24 @@ mod tests {
 
         assert_eq!(state.global_publish.owner.as_ref().unwrap().token, "first");
         assert_eq!(state.global_publish.waiters[0].token, "second");
+        assert_eq!(state.release_batches[0].status, "failed_closed");
+        assert_eq!(state.release_batches[0].stages[0].status, "expired");
+    }
+
+    #[test]
+    fn corrupt_release_state_fails_closed_instead_of_resetting() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-release-corrupt-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("release-state.json"), b"{broken").unwrap();
+
+        let manager = ReleaseManager::load_or_init(&root);
+
+        assert!(manager.health_error().is_some());
+        let state = manager.inner.try_lock().unwrap();
+        assert!(state.global_publish.owner.is_none());
     }
 }

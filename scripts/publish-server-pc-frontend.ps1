@@ -15,6 +15,43 @@ function Invoke-LoggedCmd {
     }
 }
 
+function Publish-StaticDist {
+    param(
+        [string]$LocalDir,
+        [string]$RemoteDir,
+        [string]$Label,
+        [switch]$Required
+    )
+    if (-not $LocalDir -or -not (Test-Path (Join-Path $LocalDir "index.html"))) {
+        Write-Host "3.5⃣  ⚠️  $Label 不存在，跳过上传" -ForegroundColor Yellow
+        if ($Required) { throw "$Label 不存在，发布批次失败关闭" }
+        return $false
+    }
+
+    Write-Host "3.5⃣  上传 $Label 到服务器 $RemoteDir ..." -ForegroundColor Yellow
+    $stagingDist = "$RemoteDir-staging-$Sha"
+    ssh @SshOpts $Server "mkdir -p '$stagingDist'" 2>&1 | Out-Null
+    scp @SshOpts -r "$LocalDir/." "${Server}:${stagingDist}"
+    if ($LASTEXITCODE -ne 0) {
+        ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
+        Write-Host "   ⚠️  $Label 上传失败（不中止后端部署）" -ForegroundColor Yellow
+        if ($Required) { throw "$Label 上传失败，发布批次失败关闭" }
+        return $false
+    }
+
+    $swapScript = "rm -rf '$RemoteDir' && mv '$stagingDist' '$RemoteDir'"
+    ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ✅ $Label 上传并替换完成 → $RemoteDir" -ForegroundColor Green
+        return $true
+    }
+
+    ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
+    Write-Host "   ⚠️  $Label 目录替换失败（staging 已清理）" -ForegroundColor Yellow
+    if ($Required) { throw "$Label 目录替换失败，发布批次失败关闭" }
+    return $false
+}
+
 function Invoke-PcFrontendLocalBuild {
     param([string]$FrontendDir)
     $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"

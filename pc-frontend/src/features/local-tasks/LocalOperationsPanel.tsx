@@ -11,6 +11,7 @@ interface Props {
 
 export default function LocalOperationsPanel({ evolution, publish, actionKey, onAction }: Props) {
   const activeItems = evolution.items.filter((item) => item.status !== 'completed')
+  const latestBatch = [...publish.batches].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0]
   return (
     <section className={styles.operationsStrip} aria-label="后台调度状态">
       <article className={styles.operationCard} data-active={activeItems.length > 0}>
@@ -26,6 +27,10 @@ export default function LocalOperationsPanel({ evolution, publish, actionKey, on
                 <strong>{item.project_id} · 第 {item.generation || 0} 代</strong>
                 <span>{evolutionStatus(item.status)}{item.pause_reason ? ` · ${pauseReason(item.pause_reason)}` : ''}</span>
                 <code>{item.active_task_id || item.logical_id}</code>
+                <span>{item.execution_isolated ? '独立 worktree' : '工作区待分配'} · {item.execution_worktree ? compactPath(item.execution_worktree) : '-'}</span>
+                {item.yield_reason && <span>让路：{pauseReason(item.yield_reason)} · {interruptionLabel(item.interruption_source)}</span>}
+                {item.reviewed_by && <span>审查：{item.reviewed_by} · {item.review_source || '未知来源'}</span>}
+                {item.status === 'retry_wait' && <span>自动重试 {item.retry_count}/{item.max_retries} · {item.last_error || '等待配额恢复'}</span>}
               </div>
               <div className={styles.operationActions}>
                 {matches(item.status, 'running', 'starting') && (
@@ -33,7 +38,7 @@ export default function LocalOperationsPanel({ evolution, publish, actionKey, on
                     <CirclePause size={13} />暂停
                   </button>
                 )}
-                {matches(item.status, 'paused', 'failed') && (
+                {matches(item.status, 'paused', 'failed', 'retry_wait') && (
                   <button type="button" onClick={() => onAction(item.logical_id, 'resume')} disabled={Boolean(actionKey)}>
                     <CirclePlay size={13} />继续
                   </button>
@@ -65,15 +70,27 @@ export default function LocalOperationsPanel({ evolution, publish, actionKey, on
           <div className={styles.publishOwner}>
             <strong>{publish.owner.kind} · {publish.owner.builderLabel || '未知 builder'}</strong>
             <code>{shortSha(publish.owner.sha)}</code>
+            <span>{publish.owner.batchId || 'legacy batch'} · {publish.owner.stage || 'unknown stage'}</span>
             <span>{publish.waiterCount} 个 waiter</span>
           </div>
         ) : <span className={styles.operationEmpty}>没有 owner；下一位 waiter 将按请求顺序获得租约。</span>}
         {publish.waiters.length > 0 && (
           <ol className={styles.publishWaiters}>
             {publish.waiters.slice(0, 3).map((waiter, index) => (
-              <li key={waiter.token}><span>#{index + 1} {waiter.kind}</span><code>{shortSha(waiter.sha)}</code><em>{waiter.builderLabel}</em></li>
+              <li key={`${waiter.kind}:${waiter.sha}:${waiter.builderId}:${index}`}><span>#{index + 1} {waiter.kind}</span><code>{shortSha(waiter.sha)}</code><em>{waiter.builderLabel}</em></li>
             ))}
           </ol>
+        )}
+        {latestBatch && (
+          <div className={styles.operationItems} data-status={latestBatch.status}>
+            <div className={styles.operationItem}>
+              <div>
+                <strong>{latestBatch.batchId} · {releaseStatus(latestBatch.status)}</strong>
+                <code>{shortSha(latestBatch.sha)}</code>
+                <span>{latestBatch.stages.map((stage) => `${stage.stage}:${releaseStatus(stage.status)}#${stage.attempt}`).join(' · ')}</span>
+              </div>
+            </div>
+          </div>
         )}
       </article>
     </section>
@@ -94,8 +111,20 @@ function evolutionStatus(status: string): string {
   return ({
     queued: '排队中', starting: '正在启动', running: '低优先运行中',
     pause_requested: '正在保存现场并让路', paused: '已暂停，等待自动恢复',
-    review_required: '待审查', completed: '审查通过', failed: '执行失败',
+    review_required: '待审查', completed: '审查通过', failed: '执行失败', retry_wait: '等待自动重试',
   } as Record<string, string>)[status] || status
+}
+
+function interruptionLabel(source: string | undefined): string {
+  return ({
+    supervisor_intervention: '监督让路', node_restart: '节点重启', updater_apply: '更新器应用',
+  } as Record<string, string>)[source || ''] || '来源待确认'
+}
+
+function compactPath(value: string): string {
+  const normalized = value.replace(/\\/g, '/')
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.slice(-2).join('/')
 }
 
 function pauseReason(reason: string): string {
@@ -112,4 +141,11 @@ function matches(value: string, ...states: string[]): boolean {
 
 function shortSha(value: string): string {
   return value ? value.slice(0, 12) : '-'
+}
+
+function releaseStatus(value: string): string {
+  return ({
+    queued: '排队', running: '运行中', succeeded: '成功', failed: '失败', expired: '租约过期',
+    unknown: '未知（拒绝继续）', in_progress: '发布中', failed_closed: '失败关闭',
+  } as Record<string, string>)[value] || value
 }

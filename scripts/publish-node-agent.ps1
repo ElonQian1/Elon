@@ -31,6 +31,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "local-env.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
+. (Join-Path $PSScriptRoot "node-agent-publish-http.ps1")
 
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
@@ -53,6 +54,8 @@ $PublishLock = Enter-NodeAgentPublishLock -Path $PublishLockPath
 $script:NodeReleaseToken = $null
 $script:NodeReleaseOwned = $false
 $script:NodeReleaseFinished = $false
+$script:NodeReleaseBatchId = ''
+$script:NodeReleaseActiveStage = 'windows_node'
 
 try {
     Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
@@ -101,55 +104,6 @@ function Resolve-NodeAgentAdminToken {
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_ADMIN_TOKEN)) { return $env:ELON_ADMIN_TOKEN }
     if (-not [string]::IsNullOrWhiteSpace($env:ADMIN_TOKEN)) { return $env:ADMIN_TOKEN }
     return ""
-}
-
-function Invoke-NoProxyJson {
-    param(
-        [Parameter(Mandatory = $true)][string]$Uri,
-        [string]$Method = "Get",
-        [hashtable]$Headers = @{},
-        [string]$Body = "",
-        [int]$TimeoutSec = 15
-    )
-
-    $irmCommand = Get-Command Invoke-RestMethod -ErrorAction Stop
-    $params = @{
-        Uri = $Uri
-        Method = $Method
-        TimeoutSec = $TimeoutSec
-    }
-    if ($Headers.Count -gt 0) { $params["Headers"] = $Headers }
-    if (-not [string]::IsNullOrWhiteSpace($Body)) {
-        $params["Body"] = $Body
-        $params["ContentType"] = "application/json"
-    }
-    if ($irmCommand.Parameters.ContainsKey("NoProxy")) {
-        $params["NoProxy"] = $true
-        return Invoke-RestMethod @params
-    }
-
-    $curl = Get-Command "curl.exe" -ErrorAction SilentlyContinue
-    if ($curl) {
-        $curlArgs = @(
-            "--noproxy", "*",
-            "--silent", "--show-error", "--fail",
-            "--max-time", [string]$TimeoutSec,
-            "-X", $Method
-        )
-        foreach ($key in $Headers.Keys) {
-            $curlArgs += @("-H", "${key}: $($Headers[$key])")
-        }
-        if (-not [string]::IsNullOrWhiteSpace($Body)) {
-            $curlArgs += @("-H", "Content-Type: application/json", "--data", $Body)
-        }
-        $curlArgs += $Uri
-        $raw = & $curl.Source @curlArgs
-        if ($LASTEXITCODE -ne 0) { throw "curl.exe 请求失败：$Uri" }
-        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
-        return $raw | ConvertFrom-Json
-    }
-
-    return Invoke-RestMethod @params
 }
 
 function Invoke-RemoteBash {
@@ -522,6 +476,7 @@ if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
 if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
 $GitSha = Assert-NodeAgentPublishHeadCurrent -Phase "发布开始"
+$script:NodeReleaseBatchId = Get-ElonReleaseBatchId -Sha $GitSha
 $ReleaseIdentity = Get-NodeAgentReleaseIdentity -Version $PackageVersion -GitSha $GitSha
 $ReleaseChangelog = Resolve-NodeAgentChangelog -Explicit $Changelog -Sha $GitSha
 $nodeBuilderId = "$env:COMPUTERNAME-$env:USERNAME"
@@ -532,6 +487,9 @@ $nodeClaim = Enter-ElonNodeAgentPublishLease -ReleaseApiBase "$BaseUrl/api/relea
 if (-not $nodeClaim) { return }
 $script:NodeReleaseToken = [string]$nodeClaim.token
 $script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeReleaseToken)
+if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
+    $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
+}
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
@@ -609,7 +567,12 @@ try {
 $DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
 if (-not (Test-Path $DesktopShellBin)) { throw "elon-desktop 二进制不存在：$DesktopShellBin" }
 
+$script:NodeReleaseActiveStage = 'pc_frontend_bundle'
+Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'running'
 Invoke-NodeAgentPcFrontendBuild
+Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
@@ -683,6 +646,9 @@ $WindowsClientSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WindowsClie
 
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
 Write-Host "[3/5] 上传到服务器..." -ForegroundColor Yellow
+$script:NodeReleaseActiveStage = 'artifact_upload'
+Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'running'
 $currentReleaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
 if ($currentReleaseSha -ne $GitSha) {
     throw "上传前当前 worktree HEAD 已改变：claim=$GitSha, current=$currentReleaseSha。不可替换固定发布 SHA。"
@@ -697,6 +663,8 @@ if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
     scp -o ProxyCommand=none $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
     if ($LASTEXITCODE -ne 0) { throw "上传 ripgrep 绿色包失败" }
 }
+Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
@@ -747,6 +715,9 @@ Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 
 # ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
 Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
+$script:NodeReleaseActiveStage = 'target_handshake'
+Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'running'
 if ($SkipBroadcast) {
     Write-Host "  已按 -SkipBroadcast 跳过在线节点推送；离线/重启客户端仍会通过版本接口自动更新。" -ForegroundColor Yellow
 } elseif (-not [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
@@ -779,6 +750,8 @@ if (-not $SkipBroadcast) {
         -TimeoutSec $HandshakeWaitSec `
         -TargetReleaseIdentity $ReleaseIdentity
 }
+Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'succeeded'
 
 Write-Host ""
 Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green
@@ -790,6 +763,9 @@ if ($script:NodeReleaseOwned) { Complete-ElonReleaseLease -ReleaseApiBase "$Base
 $script:NodeReleaseFinished = $true
 } catch {
     try { if ($script:NodeReleaseOwned -and -not $script:NodeReleaseFinished) {
+            Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
+                -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId `
+                -Stage $script:NodeReleaseActiveStage -Status 'failed'
             Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
                 -Token $script:NodeReleaseToken -Success $false -ErrorMessage ($_ | Out-String)
         } } catch {}

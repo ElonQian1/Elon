@@ -1,6 +1,8 @@
 import type {
   GlobalPublishLeaseEntry,
   GlobalPublishStatus,
+  ReleaseBatchLedger,
+  ReleaseBatchStage,
   SelfEvolutionGates,
   SelfEvolutionItem,
   SelfEvolutionQueue,
@@ -27,6 +29,9 @@ export function normalizeGlobalPublishStatus(payload: unknown): GlobalPublishSta
     queuePolicy: textValue(global.queuePolicy) || 'fifo',
     coalescingKey: textValue(global.coalescingKey) || 'kind+sha',
     immutableReleaseSha: global.immutableReleaseSha !== false,
+    batchIdentity: textValue(global.batchIdentity) || 'batchId+sha',
+    stateHealth: textValue(root.stateHealth) || 'unavailable',
+    batches: arrayValue(root.releaseBatches).map(normalizeBatch).filter((batch) => batch.batchId),
   }
 }
 
@@ -39,13 +44,25 @@ function normalizeSelfEvolutionItem(payload: unknown): SelfEvolutionItem {
     project_id: textValue(item.project_id),
     conversation_id: textValue(item.conversation_id),
     workspace_path: textValue(item.workspace_path),
+    execution_worktree: textValue(item.execution_worktree) || undefined,
+    execution_branch: textValue(item.execution_branch) || undefined,
+    execution_isolated: Boolean(item.execution_isolated),
     prompt: textValue(item.prompt),
     status: textValue(item.status),
     active_task_id: textValue(item.active_task_id) || undefined,
     generation: numberValue(item.generation),
     pause_reason: textValue(item.pause_reason) || undefined,
+    yield_reason: textValue(item.yield_reason) || undefined,
+    interruption_source: interruptionSource(item.interruption_source),
     review_verdict: textValue(item.review_verdict) || undefined,
     review_note: textValue(item.review_note) || undefined,
+    reviewed_by: textValue(item.reviewed_by) || undefined,
+    review_source: textValue(item.review_source) || undefined,
+    reviewed_at_ms: optionalNumber(item.reviewed_at_ms),
+    retry_count: numberValue(item.retry_count),
+    max_retries: numberValue(item.max_retries),
+    next_retry_at_ms: optionalNumber(item.next_retry_at_ms),
+    last_error: textValue(item.last_error) || undefined,
     created_at_ms: optionalNumber(item.created_at_ms),
     updated_at_ms: optionalNumber(item.updated_at_ms),
   }
@@ -66,16 +83,55 @@ function normalizeGates(gates: JsonObject): SelfEvolutionGates {
 
 function normalizeLease(payload: unknown): GlobalPublishLeaseEntry | undefined {
   const lease = objectValue(payload)
-  const token = textValue(lease.token)
-  if (!token) return undefined
+  const kind = textValue(lease.kind)
+  const sha = textValue(lease.sha)
+  if (!kind || !sha) return undefined
   return {
-    token,
-    kind: textValue(lease.kind),
-    sha: textValue(lease.sha),
+    kind,
+    sha,
+    batchId: textValue(lease.batchId),
+    stage: textValue(lease.stage),
+    builderId: textValue(lease.builderId),
     builderLabel: textValue(lease.builderLabel),
     requestedAt: optionalNumber(lease.requestedAt),
     leaseExpiresAt: optionalNumber(lease.leaseExpiresAt),
   }
+}
+
+function normalizeBatch(payload: unknown): ReleaseBatchLedger {
+  const batch = objectValue(payload)
+  return {
+    batchId: textValue(batch.batchId),
+    sha: textValue(batch.sha),
+    status: textValue(batch.status) || 'unknown',
+    createdAt: optionalNumber(batch.createdAt),
+    updatedAt: optionalNumber(batch.updatedAt),
+    stages: arrayValue(batch.stages).map(normalizeBatchStage).filter((stage) => stage.stage),
+  }
+}
+
+function normalizeBatchStage(payload: unknown): ReleaseBatchStage {
+  const stage = objectValue(payload)
+  return {
+    stage: textValue(stage.stage),
+    kind: textValue(stage.kind),
+    status: textValue(stage.status) || 'unknown',
+    builderId: textValue(stage.builderId),
+    builderLabel: textValue(stage.builderLabel),
+    attempt: numberValue(stage.attempt),
+    requestedAt: optionalNumber(stage.requestedAt),
+    lastHeartbeat: optionalNumber(stage.lastHeartbeat),
+    leaseExpiresAt: optionalNumber(stage.leaseExpiresAt),
+    completedAt: optionalNumber(stage.completedAt),
+    errorMessage: textValue(stage.errorMessage) || undefined,
+  }
+}
+
+function interruptionSource(value: unknown): SelfEvolutionItem['interruption_source'] {
+  const source = textValue(value)
+  return source === 'supervisor_intervention' || source === 'node_restart' || source === 'updater_apply'
+    ? source
+    : undefined
 }
 
 function objectValue(value: unknown): JsonObject {

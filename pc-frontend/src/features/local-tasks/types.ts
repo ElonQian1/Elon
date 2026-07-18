@@ -58,6 +58,7 @@ export interface LocalTaskCancelAudit {
   requested_by: string
   source: string
   reason: string
+  interruption_source?: 'supervisor_intervention' | 'node_restart' | 'updater_apply'
   requested_at_ms?: number
 }
 
@@ -202,13 +203,25 @@ export interface SelfEvolutionItem {
   project_id: string
   conversation_id: string
   workspace_path: string
+  execution_worktree?: string
+  execution_branch?: string
+  execution_isolated: boolean
   prompt: string
   status: string
   active_task_id?: string
   generation: number
   pause_reason?: string
+  yield_reason?: string
+  interruption_source?: 'supervisor_intervention' | 'node_restart' | 'updater_apply'
   review_verdict?: string
   review_note?: string
+  reviewed_by?: string
+  review_source?: string
+  reviewed_at_ms?: number
+  retry_count: number
+  max_retries: number
+  next_retry_at_ms?: number
+  last_error?: string
   created_at_ms?: number
   updated_at_ms?: number
 }
@@ -230,12 +243,37 @@ export interface SelfEvolutionQueue {
 }
 
 export interface GlobalPublishLeaseEntry {
-  token: string
   kind: string
   sha: string
+  batchId: string
+  stage: string
+  builderId: string
   builderLabel: string
   requestedAt?: number
   leaseExpiresAt?: number
+}
+
+export interface ReleaseBatchStage {
+  stage: string
+  kind: string
+  status: string
+  builderId: string
+  builderLabel: string
+  attempt: number
+  requestedAt?: number
+  lastHeartbeat?: number
+  leaseExpiresAt?: number
+  completedAt?: number
+  errorMessage?: string
+}
+
+export interface ReleaseBatchLedger {
+  batchId: string
+  sha: string
+  status: string
+  createdAt?: number
+  updatedAt?: number
+  stages: ReleaseBatchStage[]
 }
 
 export interface GlobalPublishStatus {
@@ -245,4 +283,7 @@ export interface GlobalPublishStatus {
   queuePolicy: string
   coalescingKey: string
   immutableReleaseSha: boolean
+  batchIdentity: string
+  stateHealth: string
+  batches: ReleaseBatchLedger[]
 }

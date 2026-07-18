@@ -51,6 +51,7 @@ const EMPTY_EVOLUTION: SelfEvolutionQueue = {
 }
 const EMPTY_PUBLISH: GlobalPublishStatus = {
   waiters: [], waiterCount: 0, queuePolicy: 'fifo', coalescingKey: 'kind+sha', immutableReleaseSha: true,
+  batchIdentity: 'batchId+sha', stateHealth: 'unavailable', batches: [],
 }
 
 export default function LocalTasksPage() {

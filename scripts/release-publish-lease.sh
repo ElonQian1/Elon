@@ -35,15 +35,17 @@ PY
 }
 
 wait_global_publish_lease() {
-  local claim_json="$1" kind="$2" base="$3" action token position heartbeat status_json success
+  local claim_json="$1" kind="$2" base="$3" action token position heartbeat status_json success batch_id stage
   action=$(elon_release_json_field "$claim_json" action)
   [[ "$action" == "coalesced" ]] && { printf '%s\n' "$claim_json"; return 0; }
   token=$(elon_release_json_field "$claim_json" token)
+  batch_id=$(elon_release_json_field "$claim_json" batchId)
+  stage=$(elon_release_json_field "$claim_json" stage)
   while [[ "$action" == "wait" ]]; do
     position=$(elon_release_json_field "$claim_json" queuePosition)
     echo "   global publish lease waiting (FIFO ${position:-0}); heartbeat active" >&2
     sleep 5
-    heartbeat=$(printf '{"kind":"%s","token":"%s","leaseSecs":3600}' "$kind" "$token")
+    heartbeat=$(printf '{"kind":"%s","token":"%s","leaseSecs":3600,"batchId":"%s","stage":"%s","stageStatus":"queued"}' "$kind" "$token" "$batch_id" "$stage")
     elon_release_post "$base" "$heartbeat" heartbeat >/dev/null
     status_json=$(curl --noproxy '*' -sS --fail --max-time 20 "$base/status?token=$token")
     action=$(elon_release_json_field "$status_json" tokenStatus.action)
@@ -59,6 +61,19 @@ wait_global_publish_lease() {
     esac
   done
   printf '%s\n' "$claim_json"
+}
+
+elon_release_batch_id() {
+  local sha="$1"
+  [[ -n "${ELON_RELEASE_BATCH_ID:-}" ]] && { printf '%s\n' "$ELON_RELEASE_BATCH_ID"; return; }
+  printf 'release-%s\n' "$sha"
+}
+
+update_release_stage() {
+  local kind="$1" token="$2" batch_id="$3" stage="$4" status="$5" payload
+  [[ -n "$token" ]] || return 0
+  payload=$(printf '{"kind":"%s","token":"%s","leaseSecs":14400,"batchId":"%s","stage":"%s","stageStatus":"%s"}' "$kind" "$token" "$batch_id" "$stage" "$status")
+  elon_release_post "$RELEASE_API_BASE" "$payload" heartbeat >/dev/null
 }
 
 enter_global_publish_lease() {

@@ -592,6 +592,7 @@ if ([string]::IsNullOrWhiteSpace($builderId) -or $builderId -eq "-") {
     $builderId = "unknown-builder-" + ([Guid]::NewGuid().ToString().Substring(0,8))
 }
 $builderLabel = "publish-server.ps1 @ $builderId"
+$script:ReleaseBatchId = Get-ElonReleaseBatchId -Sha $ShaBig
 
 try {
     $claim = Invoke-ReleaseApi -Endpoint 'claim' -Body (@{
@@ -601,6 +602,8 @@ try {
         builderLabel      = $builderLabel
         bump              = 'patch'
         currentVersionName = $ClaimCurrentVersion
+        batchId            = $script:ReleaseBatchId
+        stage              = 'server'
     })
 } catch {
     Write-Error "❌ /api/release/claim 失败：$_"
@@ -879,38 +882,9 @@ function Export-PcLegacyDist {
     return $OutDir
 }
 
-function Publish-StaticDist {
-    param(
-        [string]$LocalDir,
-        [string]$RemoteDir,
-        [string]$Label
-    )
-    if (-not $LocalDir -or -not (Test-Path (Join-Path $LocalDir "index.html"))) {
-        Write-Host "3.5⃣  ⚠️  $Label 不存在，跳过上传" -ForegroundColor Yellow
-        return
-    }
-
-    Write-Host "3.5⃣  上传 $Label 到服务器 $RemoteDir ..." -ForegroundColor Yellow
-    $stagingDist = "$RemoteDir-staging-$Sha"
-    ssh @SshOpts $Server "mkdir -p '$stagingDist'" 2>&1 | Out-Null
-    scp @SshOpts -r "$LocalDir/." "${Server}:${stagingDist}"
-    if ($LASTEXITCODE -ne 0) {
-        ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
-        Write-Host "   ⚠️  $Label 上传失败（不中止后端部署）" -ForegroundColor Yellow
-        return
-    }
-
-    $swapScript = "rm -rf '$RemoteDir' && mv '$stagingDist' '$RemoteDir'"
-    ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "   ✅ $Label 上传并替换完成 → $RemoteDir" -ForegroundColor Green
-    } else {
-        ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
-        Write-Host "   ⚠️  $Label 目录替换失败（staging 已清理）" -ForegroundColor Yellow
-    }
-}
-
 if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
+    Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
+        -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'pc_frontend' -Status 'running'
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Host "3.5⃣  ⚠️  npm 不在 PATH，跳过前端构建（/pc 将使用现有 dist 或返回 404）" -ForegroundColor Yellow
     } elseif ($SkipBuild -and (Test-Path (Join-Path $PcDistDir "index.html"))) {
@@ -959,9 +933,13 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
         }
     }
 
-    Publish-StaticDist -LocalDir $PcDistDir -RemoteDir $RemotePcDist -Label "新版 PC 前端 dist"
+    $pcPublished = Publish-StaticDist -LocalDir $PcDistDir -RemoteDir $RemotePcDist `
+        -Label "新版 PC 前端 dist" -Required
+    if (-not $pcPublished) { throw '新版 PC 前端发布未完成' }
+    Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
+        -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'pc_frontend' -Status 'succeeded'
 } else {
-    Write-Host "3.5⃣  ℹ️  pc-frontend/ 不存在，跳过前端构建" -ForegroundColor DarkGray
+    throw 'pc-frontend/ 不存在，统一发布批次失败关闭'
 }
 
 try {
