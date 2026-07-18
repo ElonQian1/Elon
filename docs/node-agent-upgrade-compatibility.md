@@ -23,8 +23,11 @@
 5. 自动准备遵守“先校验、再持久化、最后发布内存状态”；失败保留旧状态并继续外部项目。
 6. 外部项目、共享缓存和 Git 现场不得被自动认领、移动、清理或改写。
 7. 服务器按任务类型判断能力：已有项目 CLI/Exec 保持向后兼容；只有显式新建/清理托管 workspace 协议可要求新 capability。
-8. 更新或重启不得静默中断活跃本机监督任务：默认持久化检查点并 drain 到安全终态；意外重启必须保留 journal/worktree，显示 `resume_required` 和一键 Resume 动作。检查点、URL 缓存与状态 API 都不得持久化 admin token。
+8. 更新或重启不得静默中断活跃本机监督任务：默认持久化检查点并 drain 到安全终态。新进程把 recovery v1 回执、restart checkpoint 和任务 journal 按单调状态合并；安全任务必须自动回到 `running`，继续增长原 journal 游标并正常终止，不需要手动 Resume。只有身份、租约、工作区或恢复事务无法闭合时才显示 `resume_required` 和一键 Resume；已经确认的 `resumed` 或任务终态不得被旧 checkpoint 回写覆盖。检查点、URL 缓存与状态 API 都不得持久化 admin token。
 9. 受监督 worktree 的唯一权威 Git lease 是 `elon-supervision:<root_task_id>`：prepare、恢复、任务完成、合并和发布都不得用通用锁抢占、提前解锁或删除；只有 root identity 匹配的 Desktop `accepted` review 才释放，随后 cleanup 才可回收。超时或取消先同步回收执行器后代进程。可信且独占的脏 worktree 可原位 Resume，staged、unstaged、untracked 全部保留；resume-of-resume 只有在父任务为当前协议的 `resume_original`、父子 root identity 一致且继承分支/路径/Git 身份仍吻合时才复用原现场。若目录保留但 Git 注册丢失，只能按节点终态记录的基础仓库、分支、`git_head` 和 root identity 重建且不得覆盖用户文件。
+10. 多代同 root 续跑必须继承同一份已验证的基础仓库、平台路径、分支、Git 身份和 root lease。旧项目别名先映射为节点当前项目绑定再做授权比较；映射只消除历史命名差异，不能放宽跨项目、跨 root、身份漂移、脏而不可信或并发占用拒绝。
+11. `post_task_improvement` 必须与用户任务解耦：父任务先终止并释放执行资源，改进进入独立低优先 task/conversation/worktree；前台、发布、更新或构建压力出现时自动 pause/yield，门禁解除后自动 resume，完成后等待 Desktop 审查。
+12. 取消事件向后兼容地保留 `requested_by`、`source`、`reason`、`requested_at_ms` 四元组，并贯穿 sidecar、journal、API 和 PC UI；升级读取旧记录不得因缺少新字段而失败。
 
 ## 配置与缓存迁移合同
 
@@ -47,6 +50,12 @@
 - 空盘、低空间、只有 C 盘、项目在 D/E 盘、名称占用、junction、脏 worktree、未 push 提交和多项目绑定。
 - 更新中断、原子写失败、EXE 重启和重复迁移；原子写还要覆盖并发 writer、临时文件名冲突、Windows 目标文件短时占用、低空间/磁盘写满、主文件损坏与备份恢复。任何失败都不能丢失身份、绑定、task journal、sidecar 输出或覆盖项目，持续损坏必须保留完整 IO/Win32 错误链并显式失败。
 - 活跃监督任务的延期更新、排空完成后重启、排空期间异常重启恢复；`/api/status.restart_recovery` 必须能区分 `draining`、`restart_scheduled`、`runtime_online`、`resume_required`、`failed`。
+- 两个 recovery v1 回执已到 `resumed` 后，旧 restart checkpoint 不得把任务降级回 `resume_required`；真实更新 fixture 必须证明新 release 上任务为 `running`、journal 游标继续增长并正常终止，全程无需人工 Resume。
+- 同 root 多代续跑、旧项目别名、跨项目/跨 root、脏而不可信现场和并发占用 fixture；仅前两类安全继承，后四类显式拒绝。
+- 全局 publish lease 并发 fixture：owner/FIFO waiters 可观察，相同 kind + SHA coalescing，release SHA claim 后不可变，排队期间 `main` 前进不会改写待发布 SHA 或造成饿死。
+- 取消四元组的新旧 sidecar/journal/API fixture，以及 PC UI 的更新恢复、自进化队列/暂停/审查、发布 owner/waiters 和取消来源测试。
+- 低优先自进化在前台任务、发布、更新和构建压力下 pause/yield，门禁解除后自动 resume；必须证明它不占原用户会话/worktree。
+- 远程监督 v1 的身份、能力、live lease 和断线恢复 fail-closed fixture；本地可信任务优先，远程证据缺失不得降级绕过。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。
 - 外部项目、托管项目、只读任务、普通写任务和真实构建分别验证路径与环境策略。
 - 超容量建议、项目数建议和无法读取磁盘空间时仍可派单；无自动压力清理。
