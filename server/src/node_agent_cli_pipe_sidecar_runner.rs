@@ -56,11 +56,13 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
         .args(&config.args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .stdin(if config.stdin_piped_empty {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        });
+        .stdin(
+            if config.stdin_payload.is_some() || config.stdin_piped_empty {
+                Stdio::piped()
+            } else {
+                Stdio::null()
+            },
+        );
     if let Some(cwd) = config.cwd.as_deref() {
         command.current_dir(cwd);
     }
@@ -85,8 +87,20 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
             return Err(anyhow::anyhow!(message));
         }
     };
-    if config.stdin_piped_empty {
-        drop(child.stdin.take());
+    if let Err(error) = crate::node_agent_cli_prompt_runner::write_and_close_cli_stdin(
+        &mut child,
+        config.stdin_payload.as_deref(),
+    )
+    .await
+    {
+        let message = format!(
+            "无法写入并关闭 pipe sidecar CLI {} stdin: {error}",
+            config.cli_name
+        );
+        let _ = child.start_kill();
+        let _ = registry.mark_task_terminal(&config.task_id, "failed");
+        append_output(&config.output_path, CliSidecarOutputRecord::error(message))?;
+        return Ok(());
     }
 
     let child_pid = child.id();

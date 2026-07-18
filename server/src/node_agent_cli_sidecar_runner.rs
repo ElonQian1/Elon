@@ -59,6 +59,8 @@ pub(crate) struct CliSidecarLaunchConfig {
     pub legacy_codex_sessions_file: Option<PathBuf>,
     pub timeout_secs: u64,
     #[serde(default)]
+    pub stdin_payload: Option<String>,
+    #[serde(default)]
     pub stdin_piped_empty: bool,
     #[serde(default = "default_cols")]
     pub initial_cols: u16,
@@ -293,11 +295,22 @@ pub(crate) async fn follow_sidecar_output(
     }
 }
 
-pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
+pub(crate) async fn run_sidecar(mut config: CliSidecarLaunchConfig) -> Result<()> {
     if should_use_pipe_json_sidecar(&config) {
         return run_pipe_json_sidecar(config).await;
     }
+    restore_prompt_arg_for_pty(&mut config);
     run_pty_sidecar(config).await
+}
+
+fn restore_prompt_arg_for_pty(config: &mut CliSidecarLaunchConfig) {
+    if config.cli_name.trim().eq_ignore_ascii_case("codex")
+        && config.args.last().is_some_and(|arg| arg == "-")
+    {
+        if let (Some(prompt), Some(last)) = (config.stdin_payload.take(), config.args.last_mut()) {
+            *last = prompt;
+        }
+    }
 }
 
 #[path = "node_agent_cli_sidecar_runner_impl.rs"]
@@ -368,6 +381,7 @@ mod tests {
             codex_session_scope_key: None,
             legacy_codex_sessions_file: None,
             timeout_secs: 10,
+            stdin_payload: None,
             stdin_piped_empty: false,
             initial_cols: crate::node_agent_cli_pty::default_cols(),
             initial_rows: crate::node_agent_cli_pty::default_rows(),
@@ -388,5 +402,37 @@ mod tests {
         assert!(!super::should_use_pipe_json_sidecar_from(
             &config, true, false
         ));
+    }
+
+    #[test]
+    fn pty_fallback_keeps_legacy_codex_prompt_argument() {
+        let prompt = "监督第一行\n第二行 & | < >".to_string();
+        let mut config = super::CliSidecarLaunchConfig {
+            session_id: "sidecar-test".to_string(),
+            task_id: "task-test".to_string(),
+            cli_name: "codex".to_string(),
+            route: "route_a_external_cli".to_string(),
+            program: "codex".to_string(),
+            args: vec!["exec".to_string(), "--json".to_string(), "-".to_string()],
+            cwd: None,
+            runtime_permission: None,
+            env: Vec::new(),
+            output_path: std::path::PathBuf::from("output.jsonl"),
+            registry_dir: std::path::PathBuf::from("registry"),
+            task_journal_dir: None,
+            worker_path: None,
+            worker_release: None,
+            worker_sha256: None,
+            codex_session_scope_key: None,
+            legacy_codex_sessions_file: None,
+            timeout_secs: 10,
+            stdin_payload: Some(prompt.clone()),
+            stdin_piped_empty: false,
+            initial_cols: crate::node_agent_cli_pty::default_cols(),
+            initial_rows: crate::node_agent_cli_pty::default_rows(),
+        };
+        super::restore_prompt_arg_for_pty(&mut config);
+        assert_eq!(config.args.last(), Some(&prompt));
+        assert!(config.stdin_payload.is_none());
     }
 }

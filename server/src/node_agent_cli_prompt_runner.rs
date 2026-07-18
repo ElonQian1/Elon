@@ -26,6 +26,110 @@ use crate::pc_workspace_provisioner;
 pub(crate) const SUPERVISED_CODEX_TIMEOUT_ENV: &str = "ELON_SUPERVISED_CODEX_TIMEOUT_SECS";
 pub(crate) const DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS: u64 = 3600;
 const MAX_SUPERVISED_CODEX_TIMEOUT_SECS: u64 = 24 * 60 * 60;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CliPromptDelivery {
+    pub(crate) args: Vec<String>,
+    pub(crate) stdin_payload: Option<String>,
+    pub(crate) stdin_piped_empty: bool,
+}
+
+pub(crate) fn cli_prompt_delivery(cli_name: &str, prompt: &str) -> CliPromptDelivery {
+    match cli_name {
+        "codex" => CliPromptDelivery {
+            args: vec!["-".to_string()],
+            stdin_payload: Some(prompt.to_string()),
+            stdin_piped_empty: false,
+        },
+        "copilot" | "claude" | "gemini" => CliPromptDelivery {
+            args: vec!["-p".to_string(), prompt.to_string()],
+            stdin_payload: None,
+            stdin_piped_empty: true,
+        },
+        _ => CliPromptDelivery {
+            args: vec![prompt.to_string()],
+            stdin_payload: None,
+            stdin_piped_empty: false,
+        },
+    }
+}
+
+pub(crate) fn codex_exec_args(
+    session_id: Option<&str>,
+    last_message_path: Option<&std::path::Path>,
+    full_access: bool,
+    read_only: bool,
+    extra_args: &[String],
+    prompt_args: &[String],
+) -> Vec<String> {
+    let mut args = vec!["exec".to_string()];
+    if let Some(session_id) = session_id {
+        args.extend(["resume".to_string(), "--json".to_string()]);
+        if let Some(path) = last_message_path {
+            args.push("--output-last-message".to_string());
+            args.push(path.to_string_lossy().to_string());
+        }
+        if full_access {
+            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
+        } else {
+            args.push("--skip-git-repo-check".to_string());
+        }
+        args.push(session_id.to_string());
+    } else {
+        args.push("--json".to_string());
+        if let Some(path) = last_message_path {
+            args.push("--output-last-message".to_string());
+            args.push(path.to_string_lossy().to_string());
+        }
+        if full_access {
+            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
+        } else {
+            args.push("--sandbox".to_string());
+            args.push(if read_only {
+                "read-only".to_string()
+            } else {
+                "workspace-write".to_string()
+            });
+            args.push("--skip-git-repo-check".to_string());
+        }
+    }
+    args.extend(
+        extra_args
+            .iter()
+            .filter(|arg| {
+                !arg.starts_with("--session-id=")
+                    && !arg.starts_with("--codex-model=")
+                    && !arg.starts_with("--codex-effort=")
+                    && (full_access || arg.as_str() != "--dangerously-bypass-approvals-and-sandbox")
+            })
+            .cloned(),
+    );
+    args.extend(prompt_args.iter().cloned());
+    args
+}
+
+pub(crate) async fn write_and_close_cli_stdin(
+    child: &mut tokio::process::Child,
+    payload: Option<&str>,
+) -> std::io::Result<()> {
+    use tokio::io::AsyncWriteExt;
+
+    let Some(mut stdin) = child.stdin.take() else {
+        return if payload.is_some() {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "CLI stdin was not piped",
+            ))
+        } else {
+            Ok(())
+        };
+    };
+    if let Some(payload) = payload {
+        stdin.write_all(payload.as_bytes()).await?;
+    }
+    stdin.shutdown().await
+}
+
 pub(crate) fn ws_text(msg: &AgentToServer) -> Message {
     Message::Text(serde_json::to_string(msg).unwrap_or_default())
 }
@@ -396,6 +500,11 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
             sidecar_env.push((name, value));
         }
     }
+    let CliPromptDelivery {
+        args: prompt_args,
+        stdin_payload,
+        stdin_piped_empty,
+    } = cli_prompt_delivery(cli_name, &prompt);
     if cli_name == "codex" {
         if let Some(args) = crate::node_agent_cli_mcp::codex_mcp_config_args_for_runtime(
             &prompt,
@@ -423,82 +532,26 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
                 );
             }
         }
-        push_tracked_arg(&mut cmd, &mut sidecar_args, "exec");
-        if let Some(ref real_sid) = codex_plan.session_id {
-            push_tracked_arg(&mut cmd, &mut sidecar_args, "resume");
-            push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
-            if let Some(path) = codex_last_message_path.as_ref() {
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--output-last-message");
-                push_tracked_arg(
-                    &mut cmd,
-                    &mut sidecar_args,
-                    path.to_string_lossy().to_string(),
-                );
-            }
-            if full_access {
-                push_tracked_arg(
-                    &mut cmd,
-                    &mut sidecar_args,
-                    "--dangerously-bypass-approvals-and-sandbox",
-                );
-            } else {
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
-            }
-            push_tracked_arg(&mut cmd, &mut sidecar_args, real_sid);
-        } else {
-            push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
-            if let Some(path) = codex_last_message_path.as_ref() {
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--output-last-message");
-                push_tracked_arg(
-                    &mut cmd,
-                    &mut sidecar_args,
-                    path.to_string_lossy().to_string(),
-                );
-            }
-            if full_access {
-                push_tracked_arg(
-                    &mut cmd,
-                    &mut sidecar_args,
-                    "--dangerously-bypass-approvals-and-sandbox",
-                );
-            } else if cli_prompt_read_only(runtime_permission.as_deref()) {
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--sandbox");
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "read-only");
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
-            } else {
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--sandbox");
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "workspace-write");
-                push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
-            }
+        for arg in codex_exec_args(
+            codex_plan.session_id.as_deref(),
+            codex_last_message_path.as_deref(),
+            full_access,
+            cli_prompt_read_only(runtime_permission.as_deref()),
+            &extra_args,
+            &prompt_args,
+        ) {
+            push_tracked_arg(&mut cmd, &mut sidecar_args, arg);
         }
-        for a in &extra_args {
-            if !a.starts_with("--session-id=")
-                && !a.starts_with("--codex-model=")
-                && !a.starts_with("--codex-effort=")
-                && (full_access || a != "--dangerously-bypass-approvals-and-sandbox")
-            {
-                push_tracked_arg(&mut cmd, &mut sidecar_args, a);
-            }
-        }
-    } else if cli_name == "copilot" {
-        if full_access {
+    } else {
+        if cli_name == "copilot" && full_access {
             push_tracked_arg(&mut cmd, &mut sidecar_args, "--allow-all");
         }
         for a in &extra_args {
             push_tracked_arg(&mut cmd, &mut sidecar_args, a);
         }
-    } else {
-        for a in &extra_args {
-            push_tracked_arg(&mut cmd, &mut sidecar_args, a);
+        for arg in prompt_args {
+            push_tracked_arg(&mut cmd, &mut sidecar_args, arg);
         }
-    }
-    if cli_name == "codex" {
-        push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
-    } else if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
-        push_tracked_arg(&mut cmd, &mut sidecar_args, "-p");
-        push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
-    } else {
-        push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
     }
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
@@ -572,10 +625,9 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         cmd.env("CODEX_HOME", &home);
         sidecar_env.push(("CODEX_HOME".to_string(), home));
     }
-    let stdin_piped_empty = cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini";
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .stdin(if stdin_piped_empty {
+        .stdin(if stdin_payload.is_some() || stdin_piped_empty {
             std::process::Stdio::piped()
         } else {
             std::process::Stdio::null()
@@ -603,6 +655,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         task_journal,
         cwd,
         prompt,
+        stdin_payload,
         server_runtime_config,
         approval_state,
         completion_context,

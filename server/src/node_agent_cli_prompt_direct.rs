@@ -37,6 +37,7 @@ pub(crate) struct CliDirectRunContext {
     pub task_journal: crate::node_agent_task_journal::TaskJournal,
     pub cwd: Option<String>,
     pub prompt: String,
+    pub stdin_payload: Option<String>,
     pub server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     pub approval_state: crate::node_agent_tool_approval::ToolApprovalState,
     pub completion_context: CliCompletionContext,
@@ -64,6 +65,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         task_journal,
         cwd,
         prompt,
+        stdin_payload,
         server_runtime_config,
         approval_state,
         completion_context,
@@ -107,6 +109,20 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             return;
         }
     };
+    let stdin_error = match crate::node_agent_cli_prompt_runner::write_and_close_cli_stdin(
+        &mut child,
+        stdin_payload.as_deref(),
+    )
+    .await
+    {
+        Ok(()) => None,
+        Err(error) => {
+            let message = format!("无法写入并关闭 {cli_name} stdin: {error}");
+            warn!("{message}");
+            let _ = child.start_kill();
+            Some(message)
+        }
+    };
     if let Some(pid) = child.id() {
         runtime.set_cli_prompt_os_pid(&req_id, Some(pid)).await;
         if let Err(error) = task_journal.record_process_started(&req_id, pid) {
@@ -142,7 +158,9 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         });
     }
     let mut stdout_text = String::new();
-    let mut stderr_text = String::new();
+    let mut stderr_text = stdin_error
+        .map(|message| format!("{message}\n"))
+        .unwrap_or_default();
     let mut stdout_done = false;
     let mut stderr_done = false;
 
