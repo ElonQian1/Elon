@@ -31,6 +31,7 @@ try {
 桌面监督分析结论：不需要 Goal 模式。
 </user-request>`), '适合人阅读且可区分的任务标题')
   assert.strictEqual(taskTitle.readableTaskTitle('codex://threads/019-test\n请继续完成上述任务并运行统一收尾'), '本机 Codex 任务')
+  assert.strictEqual(taskTitle.readableTaskTitle(''), '本机 Codex 任务')
   assert.strictEqual(taskTitle.readableTaskTitle('修复'.repeat(40)).length, 34)
 
   const tasks = model.normalizeLocalTaskList({

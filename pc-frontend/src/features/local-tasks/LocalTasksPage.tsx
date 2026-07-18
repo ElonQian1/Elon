@@ -254,7 +254,7 @@ function TaskListItem({
   return (
     <button className={styles.taskItem} data-selected={selected} type="button" onClick={onSelect}>
       <div>
-        <strong>{readableTaskTitle(task.prompt, task.conversation_id || task.id)}</strong>
+        <strong>{readableTaskTitle(task.prompt)}</strong>
         <span>{task.workspace_path || '本机工作目录'}</span>
       </div>
       <div className={styles.taskItemMeta}>

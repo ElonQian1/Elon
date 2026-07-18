@@ -227,6 +227,7 @@ supervision_contract={"protocol":"elon.desktop_pc_supervision.v1"}
 
     #[test]
     fn metadata_only_input_has_stable_fallback_and_long_titles_are_bounded() {
+        assert_eq!(readable_task_title(""), LOCAL_TASK_FALLBACK_TITLE);
         assert_eq!(
             readable_task_title("codex://threads/019-test\n请继续完成上述任务并运行统一收尾"),
             LOCAL_TASK_FALLBACK_TITLE
