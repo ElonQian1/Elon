@@ -9,6 +9,13 @@
   const originalInlineStyles = new Map();
   let selectedElement = null;
   let selecting = false;
+  const editableProperties = [
+    'width', 'height',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+    'borderRadius', 'fontSize', 'fontWeight', 'lineHeight',
+    'color', 'backgroundColor', 'opacity',
+  ];
 
   document.body.classList.add('ui-tuner-preview-active');
   const selection = document.createElement('div');
@@ -35,14 +42,72 @@
       .slice(0, 160);
   }
 
+  function attributeSelector(name, value) {
+    return '[' + name + '=' + JSON.stringify(String(value)) + ']';
+  }
+
+  function uniqueSelector(selector) {
+    try {
+      return document.querySelectorAll(selector).length === 1;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function domPath(element) {
+    const parts = [];
+    let current = element;
+    while (current && current !== document.body && parts.length < 12) {
+      const tag = current.tagName.toLowerCase();
+      const siblings = current.parentElement
+        ? Array.from(current.parentElement.children).filter((candidate) => candidate.tagName === current.tagName)
+        : [];
+      const position = siblings.length > 1 ? ':nth-of-type(' + (siblings.indexOf(current) + 1) + ')' : '';
+      parts.unshift(tag + position);
+      current = current.parentElement;
+    }
+    return 'body' + (parts.length ? ' > ' + parts.join(' > ') : '');
+  }
+
+  function selectorIdentity(element) {
+    const uiNode = element.getAttribute('data-ui-node') || '';
+    if (uiNode) {
+      const selector = attributeSelector('data-ui-node', uiNode);
+      if (uniqueSelector(selector)) return { selector, strategy: 'data-ui-node', confidence: 'high', confidenceScore: 1, needsBinding: false };
+    }
+    if (element.id) {
+      const selector = '#' + CSS.escape(element.id);
+      if (uniqueSelector(selector)) return { selector, strategy: 'id', confidence: 'high', confidenceScore: .95, needsBinding: false };
+    }
+    const stableAttributes = ['data-testid', 'data-component', 'data-source-node'];
+    for (const name of stableAttributes) {
+      const value = element.getAttribute(name);
+      if (!value) continue;
+      const selector = attributeSelector(name, value);
+      if (uniqueSelector(selector)) return { selector, strategy: 'data-attribute', confidence: 'medium', confidenceScore: .78, needsBinding: true };
+    }
+    const ariaLabel = element.getAttribute('aria-label') || '';
+    if (ariaLabel) {
+      const selector = element.tagName.toLowerCase() + attributeSelector('aria-label', ariaLabel);
+      if (uniqueSelector(selector)) return { selector, strategy: 'aria-label', confidence: 'medium', confidenceScore: .7, needsBinding: true };
+    }
+    return { selector: domPath(element), strategy: 'dom-path', confidence: 'low', confidenceScore: .4, needsBinding: true };
+  }
+
   function identityOf(element) {
     const uiNode = element.getAttribute('data-ui-node') || '';
     const id = element.id || '';
     const ariaLabel = element.getAttribute('aria-label') || '';
     const role = element.getAttribute('role') || '';
     const text = compactText(element);
+    const selector = selectorIdentity(element);
     return {
-      key: uiNode || id || ariaLabel || [element.tagName.toLowerCase(), role, text.slice(0, 48)].filter(Boolean).join(':'),
+      key: selector.selector,
+      selector: selector.selector,
+      strategy: selector.strategy,
+      confidence: selector.confidence,
+      confidenceScore: selector.confidenceScore,
+      needsBinding: selector.needsBinding,
       uiNode,
       id,
       ariaLabel,
@@ -53,34 +118,55 @@
     };
   }
 
+  function kebabCase(property) {
+    return property.replace(/[A-Z]/g, (match) => '-' + match.toLowerCase());
+  }
+
+  function authoredValue(element, property) {
+    const cssProperty = kebabCase(property);
+    const inlineValue = element.style.getPropertyValue(cssProperty);
+    if (inlineValue) return inlineValue;
+    let matchedValue = '';
+    function visitRules(rules) {
+      Array.from(rules || []).forEach((rule) => {
+        if (rule.cssRules) {
+          visitRules(rule.cssRules);
+          return;
+        }
+        if (!rule.selectorText || !rule.style) return;
+        try {
+          if (element.matches(rule.selectorText) && rule.style.getPropertyValue(cssProperty)) {
+            matchedValue = rule.style.getPropertyValue(cssProperty);
+          }
+        } catch (_) {
+          // Ignore unsupported selectors in authored stylesheets.
+        }
+      });
+    }
+    Array.from(document.styleSheets || []).forEach((sheet) => {
+      try { visitRules(sheet.cssRules); } catch (_) { /* Cross-origin sheets are not inspected. */ }
+    });
+    return matchedValue;
+  }
+
+  function styleValues(element, computed, authored) {
+    return editableProperties.reduce((result, property) => {
+      const value = authored ? authoredValue(element, property) : computed[property];
+      if (value !== undefined && value !== '') result[property] = String(value);
+      return result;
+    }, {});
+  }
+
   function snapshotOf(element, knownRect) {
     const rect = knownRect || element.getBoundingClientRect();
     const computed = window.getComputedStyle(element);
     return {
       identity: identityOf(element),
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-      baseStyle: {
-        width: computed.width,
-        height: computed.height,
-        borderRadius: computed.borderRadius,
-        fontSize: computed.fontSize,
-        fontWeight: computed.fontWeight,
-        lineHeight: computed.lineHeight,
-        color: computed.color,
-        backgroundColor: computed.backgroundColor,
-        padding: {
-          start: computed.paddingInlineStart,
-          top: computed.paddingTop,
-          end: computed.paddingInlineEnd,
-          bottom: computed.paddingBottom,
-        },
-        margin: {
-          start: computed.marginInlineStart,
-          top: computed.marginTop,
-          end: computed.marginInlineEnd,
-          bottom: computed.marginBottom,
-        },
-        opacity: computed.opacity,
+      originalStyle: {
+        computed: styleValues(element, computed, false),
+        authored: styleValues(element, computed, true),
+        inlineStyle: element.getAttribute('style'),
       },
     };
   }
@@ -143,31 +229,39 @@
     if (!originalInlineStyles.has(element)) originalInlineStyles.set(element, element.getAttribute('style'));
   }
 
-  function applyStyle(payload) {
-    if (!selectedElement || !selectedElement.isConnected || !payload || !payload.style) return;
-    const element = selectedElement;
-    const style = payload.style;
-    rememberInlineStyles(element);
-    const direct = ['color', 'backgroundColor', 'borderRadius', 'fontSize', 'fontWeight', 'opacity'];
-    direct.forEach((property) => {
-      if (style[property] !== undefined) element.style[property] = property === 'fontSize' || property === 'borderRadius'
-        ? cssDimension(style[property])
-        : String(style[property]);
-    });
-    ['width', 'height'].forEach((property) => {
-      if (style[property] !== undefined) element.style[property] = cssDimension(style[property]);
-    });
-    ['padding', 'margin'].forEach((group) => {
-      const edges = style[group];
-      if (!edges) return;
-      element.style[group] = [edges.top, edges.end, edges.bottom, edges.start].map(cssDimension).join(' ');
-    });
-    if (payload.text !== undefined && element.children.length === 0) element.textContent = String(payload.text);
-    drawSelection(element);
-    post('style-applied', { node: snapshotOf(element) });
+  function resolveTarget(payload) {
+    if (payload && payload.selector) {
+      try { return document.querySelector(payload.selector); } catch (_) { return null; }
+    }
+    return selectedElement && selectedElement.isConnected ? selectedElement : null;
   }
 
-  function resetStyles() {
+  function styleValue(property, value) {
+    if (['width', 'height', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+      'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'borderRadius', 'fontSize'].includes(property)) {
+      return cssDimension(value);
+    }
+    if (property === 'lineHeight' && /^-?\d+(\.\d+)?(dp|sp)$/.test(String(value).trim())) return cssDimension(value);
+    return String(value).trim();
+  }
+
+  function applyStyle(payload, notify) {
+    if (!payload || !payload.style) return;
+    const element = resolveTarget(payload);
+    if (!element || element === selection) return;
+    const style = payload.style;
+    rememberInlineStyles(element);
+    editableProperties.forEach((property) => {
+      if (style[property] === undefined) return;
+      const cssProperty = kebabCase(property);
+      if (style[property] === null || style[property] === '') element.style.removeProperty(cssProperty);
+      else element.style.setProperty(cssProperty, styleValue(property, style[property]));
+    });
+    if (element === selectedElement) drawSelection(element);
+    if (notify !== false) post('style-applied', { node: snapshotOf(element) });
+  }
+
+  function resetStyles(notify) {
     originalInlineStyles.forEach((original, element) => {
       if (!element.isConnected) return;
       if (original === null) element.removeAttribute('style');
@@ -175,7 +269,28 @@
     });
     originalInlineStyles.clear();
     drawSelection(selectedElement);
-    post('styles-reset', {});
+    if (notify !== false) post('styles-reset', {});
+  }
+
+  function resetElement(payload) {
+    const element = resolveTarget(payload);
+    if (!element) return;
+    if (originalInlineStyles.has(element)) {
+      const original = originalInlineStyles.get(element);
+      if (original === null) element.removeAttribute('style');
+      else element.setAttribute('style', original);
+      originalInlineStyles.delete(element);
+    }
+    drawSelection(selectedElement);
+    post('element-reset', { node: snapshotOf(element) });
+  }
+
+  function applyDraft(payload) {
+    resetStyles(false);
+    const elements = payload && Array.isArray(payload.elements) ? payload.elements : [];
+    elements.forEach((entry) => applyStyle({ selector: entry.selector, style: entry.styleDiff || {} }, false));
+    drawSelection(selectedElement);
+    post('draft-applied', { appliedCount: elements.length });
   }
 
   document.addEventListener('click', (event) => {
@@ -216,9 +331,13 @@
       }));
       post('session-auth-accepted', {});
     } else if (message.type === 'apply-style') {
-      applyStyle(message.payload);
+      applyStyle(message.payload, true);
+    } else if (message.type === 'apply-draft') {
+      applyDraft(message.payload);
+    } else if (message.type === 'reset-element') {
+      resetElement(message.payload);
     } else if (message.type === 'reset-styles') {
-      resetStyles();
+      resetStyles(true);
     }
   });
 

@@ -6,6 +6,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const mobileWeb = fs.readFileSync(path.join(repoRoot, 'server/src/assets/web_page.html'), 'utf8');
 const bridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_bridge.js'), 'utf8');
 const previewSurface = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'), 'utf8');
+const draftContract = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/pwaDesignDraft.ts'), 'utf8');
 
 assert.ok(mobileWeb.includes('__UI_TUNER_PWA_BRIDGE_JS__'), 'mobile page should embed the isolated PWA design bridge');
 assert.ok(bridge.includes("params.get('ui_tuner_preview') !== '1'"), 'normal PWA pages must not activate the design bridge');
@@ -14,6 +15,11 @@ assert.ok(bridge.includes("event.origin !== window.location.origin"), 'PWA desig
 assert.ok(bridge.includes("message.type === 'set-mode'"), 'PWA should switch between component selection and normal interaction');
 assert.ok(bridge.includes("message.type === 'apply-style'"), 'PWA should apply immediate local style previews');
 assert.ok(bridge.includes("message.type === 'reset-styles'"), 'PWA should reset ephemeral preview styles');
+assert.ok(bridge.includes("message.type === 'reset-element'"), 'PWA should reset the selected real DOM element');
+assert.ok(bridge.includes("message.type === 'apply-draft'"), 'PWA should restore structured page drafts');
+assert.ok(bridge.includes("strategy: 'dom-path'"), 'unbound DOM elements should expose an explainable path identity');
+assert.ok(bridge.includes('needsBinding: true'), 'generated identities must not pretend to be source bindings');
+assert.ok(bridge.includes("'lineHeight'"), 'PWA should support the first manual typography property set');
 assert.ok(bridge.includes('let selecting = false'), 'PWA design bridge must default to real interaction');
 assert.ok(bridge.includes("mode: 'interact'"), 'PWA ready event must report interaction mode');
 assert.ok(bridge.includes("message.type === 'set-session-auth'"), 'preview should accept an ephemeral same-origin session bridge');
@@ -26,5 +32,9 @@ assert.ok(previewSurface.includes("post('set-session-auth', { token })"), 'PC sh
 assert.ok(previewSurface.includes('key={reloadKey}'), 'iframe reloads must remain explicit and independent of design mode');
 assert.ok(!bridge.includes("document.addEventListener('pointerover'"), 'PWA selection must not recalculate layout on every mouse hover');
 assert.ok(!bridge.includes("String(element.innerText || element.textContent || '')"), 'PWA selection must not read a large container innerText on every click');
+assert.ok(draftContract.includes("kind: 'elon.pwa.manual_style_draft'"), 'PC should persist a typed manual PWA draft contract');
+assert.ok(draftContract.includes('originalStyle: PwaOriginalStyleSnapshot'), 'draft elements should retain their original style snapshot');
+assert.ok(draftContract.includes('confidenceScore: number'), 'draft identities should retain mapping confidence');
+assert.ok(draftContract.includes("params.delete('ui_tuner_preview')"), 'draft route identity should ignore the preview-only query flag');
 
 console.log('PWA UI tuner bridge tests passed');
