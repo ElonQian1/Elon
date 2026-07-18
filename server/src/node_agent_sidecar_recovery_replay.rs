@@ -54,6 +54,7 @@ pub(crate) fn persist_batch_before_cursor(
         if journal.events_path().exists() {
             OpenOptions::new()
                 .read(true)
+                .write(true)
                 .open(journal.events_path())
                 .with_context(|| format!("open persisted journal for {task_id}"))?
                 .sync_all()
@@ -127,6 +128,9 @@ fn merge_journal_sidecar(journal: &str, sidecar: &str) -> String {
     if sidecar.starts_with(journal) || sidecar.starts_with(journal_prefix) {
         return sidecar.to_string();
     }
+    if journal_prefix_matches_sidecar(journal_prefix, sidecar) {
+        return sidecar.to_string();
+    }
     let max_overlap = journal_prefix.len().min(sidecar.len());
     for bytes in (1..=max_overlap).rev() {
         if journal_prefix.is_char_boundary(journal_prefix.len() - bytes)
@@ -141,6 +145,21 @@ fn merge_journal_sidecar(journal: &str, sidecar: &str) -> String {
     }
     let separator = if journal.ends_with('\n') { "" } else { "\n" };
     format!("{journal}{separator}{sidecar}")
+}
+
+fn journal_prefix_matches_sidecar(journal: &str, sidecar: &str) -> bool {
+    let mut sidecar = sidecar.chars();
+    let mut current = sidecar.next();
+    for journal_char in journal.chars() {
+        if matches!(journal_char, '\r' | '\n') && current != Some(journal_char) {
+            continue;
+        }
+        if current != Some(journal_char) {
+            return false;
+        }
+        current = sidecar.next();
+    }
+    true
 }
 
 #[cfg(test)]
@@ -207,7 +226,7 @@ mod tests {
     fn partial_journal_prefix_keeps_later_final_reply_from_full_sidecar() {
         let temp = test_root("partial-final");
         let journal = TaskJournal::new(temp.join("journal"));
-        let first = CliSidecarOutputRecord::chunk("stdout", "working\n");
+        let first = CliSidecarOutputRecord::chunk("stdout", "working");
         persist_batch_before_cursor(
             &journal,
             "task-1",
@@ -224,14 +243,14 @@ mod tests {
         append_output(&output, first).unwrap();
         append_output(
             &output,
-            CliSidecarOutputRecord::chunk("stdout", "final reply\n"),
+            CliSidecarOutputRecord::chunk("stdout", " final reply\n"),
         )
         .unwrap();
 
         let (stdout, stderr) =
             recovered_completion_output(&journal, "task-1", &output, 200_000).unwrap();
 
-        assert_eq!(stdout, "working\nfinal reply\n");
+        assert_eq!(stdout, "working final reply\n");
         assert!(stderr.is_empty());
         let _ = fs::remove_dir_all(temp);
     }
