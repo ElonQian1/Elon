@@ -9,6 +9,7 @@ const authBootstrap = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_
 const bridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_bridge.js'), 'utf8');
 const previewSurface = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'), 'utf8');
 const draftContract = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/pwaDesignDraft.ts'), 'utf8');
+const designSessionModel = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/pwaDesignSessionModel.ts'), 'utf8');
 const designSession = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/usePwaDesignSession.ts'), 'utf8');
 const styleInspector = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'), 'utf8');
 
@@ -45,10 +46,10 @@ assert.ok(draftContract.includes("kind: 'elon.pwa.manual_style_draft'"), 'PC sho
 assert.ok(draftContract.includes('originalStyle: PwaOriginalStyleSnapshot'), 'draft elements should retain their original style snapshot');
 assert.ok(draftContract.includes('confidenceScore: number'), 'draft identities should retain mapping confidence');
 assert.ok(draftContract.includes("params.delete('ui_tuner_preview')"), 'draft route identity should ignore the preview-only query flag');
-assert.ok(designSession.includes('readPwaDesignDraft(project, nextRoute)'), 'PC reload should restore the matching project, route, and viewport draft');
-assert.ok(designSession.includes('TRANSACTION_IDLE_MS = 450'), 'continuous controls should be grouped into editing transactions');
-assert.ok(designSession.includes('pastRef') && designSession.includes('futureRef'), 'manual draft editing should support undo and redo');
-assert.ok(designSession.includes("beginTransaction('page:clear')"), 'clearing the current page should remain undoable');
+assert.ok(designSessionModel.includes('readPwaDesignDraft(project, route)'), 'PC reload should restore the matching project, route, and viewport draft');
+assert.ok(designSessionModel.includes('PWA_DESIGN_TRANSACTION_IDLE_MS = 450'), 'continuous controls should be grouped into editing transactions');
+assert.ok(designSessionModel.includes('pastDrafts') && designSessionModel.includes('futureDrafts'), 'manual draft editing should support undo and redo');
+assert.ok(designSession.includes("model.update('page:clear'"), 'clearing the current page should remain undoable');
 for (const property of ['width', 'height', 'paddingTop', 'marginTop', 'borderRadius', 'fontSize', 'fontWeight', 'lineHeight', 'color', 'backgroundColor', 'opacity']) {
   assert.ok(styleInspector.includes(`'${property}'`), `manual style panel should expose ${property}`);
 }

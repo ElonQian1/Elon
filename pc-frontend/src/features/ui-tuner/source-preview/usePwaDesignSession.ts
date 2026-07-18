@@ -9,11 +9,7 @@ import {
 } from './pwaDesignWriteback'
 import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
-  createPwaDesignDraft,
   normalizePwaRoute,
-  readPwaDesignDraft,
-  removePwaDesignDraft,
-  savePwaDesignDraft,
   stringifyPwaDraftCliPackage,
   type PwaDesignDraft,
   type PwaDomContextNode,
@@ -24,13 +20,12 @@ import {
   resolvedPwaAfterStyle,
   stablePwaIdentityKey,
 } from './pwaDesignDraft'
+import { PwaDesignSessionModel } from './pwaDesignSessionModel'
 import type { SourcePreviewNode } from './types'
 
 const BRIDGE_SOURCE = 'elon-pwa-design-bridge'
 const PARENT_SOURCE = 'elon-pc-ui-tuner'
 const PROTOCOL_VERSION = 1
-const HISTORY_LIMIT = 60
-const TRANSACTION_IDLE_MS = 450
 
 export interface PwaSelection {
   identity: PwaElementIdentity
@@ -80,15 +75,6 @@ export interface PwaDesignSession {
   prepareReload: () => void
 }
 
-function touchDraft(draft: PwaDesignDraft, elements: PwaDesignDraft['elements']): PwaDesignDraft {
-  return {
-    ...draft,
-    elements,
-    revision: draft.revision + 1,
-    updatedAt: new Date().toISOString(),
-  }
-}
-
 function bridgeElements(draft: PwaDesignDraft) {
   return Object.values(draft.elements).map((element) => ({
     selector: element.identity.selector,
@@ -133,13 +119,12 @@ export function usePwaDesignSession({
   const [historyVersion, setHistoryVersion] = useState(0)
   const [saveLabel, setSaveLabel] = useState('等待进入真实页面')
   const [syncState, setSyncState] = useState<PwaSyncState>({ phase: 'idle', message: '等待草稿' })
-  const draftRef = useRef<PwaDesignDraft | null>(null)
   const routeRef = useRef<PwaRouteState | null>(null)
   const modeRef = useRef(modeState)
-  const pastRef = useRef<PwaDesignDraft[]>([])
-  const futureRef = useRef<PwaDesignDraft[]>([])
-  const transactionRef = useRef<{ key: string; timer: number } | null>(null)
   const syncTaskIdRef = useRef('')
+  const modelRef = useRef<PwaDesignSessionModel | null>(null)
+  if (!modelRef.current) modelRef.current = new PwaDesignSessionModel()
+  const model = modelRef.current
   const project = useMemo(() => ({
     id: projectId || workspaceIdentity || 'unknown-project',
     workspaceIdentity: workspaceIdentity || projectId || 'unknown-workspace',
@@ -159,48 +144,18 @@ export function usePwaDesignSession({
     post('apply-draft', { elements: value ? bridgeElements(value) : [] })
   }, [post])
 
-  const persist = useCallback((value: PwaDesignDraft) => {
+  const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
+    setDraft(value)
+    if (sync) syncDraft(value)
     if (Object.keys(value.elements).length) {
-      savePwaDesignDraft(value)
       setSaveLabel(`已自动保存 · r${value.revision}`)
     } else {
-      removePwaDesignDraft(value)
       setSaveLabel('本页暂无样式草稿')
     }
-  }, [])
+    setHistoryVersion((version) => version + 1)
+  }, [syncDraft])
 
-  const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
-    draftRef.current = value
-    setDraft(value)
-    persist(value)
-    if (sync) syncDraft(value)
-  }, [persist, syncDraft])
-
-  const closeTransaction = useCallback(() => {
-    const transaction = transactionRef.current
-    if (transaction) window.clearTimeout(transaction.timer)
-    transactionRef.current = null
-  }, [])
-
-  const beginTransaction = useCallback((key: string) => {
-    const current = draftRef.current
-    if (!current) return
-    const active = transactionRef.current
-    if (!active || active.key !== key) {
-      closeTransaction()
-      pastRef.current = [...pastRef.current, current].slice(-HISTORY_LIMIT)
-      futureRef.current = []
-      setHistoryVersion((value) => value + 1)
-    } else {
-      window.clearTimeout(active.timer)
-    }
-    transactionRef.current = {
-      key,
-      timer: window.setTimeout(() => { transactionRef.current = null }, TRANSACTION_IDLE_MS),
-    }
-  }, [closeTransaction])
-
-  useEffect(() => () => closeTransaction(), [closeTransaction])
+  useEffect(() => () => model.dispose(), [model])
 
   useEffect(() => listenForFitRunCodexSettled((detail) => {
     if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
@@ -226,7 +181,7 @@ export function usePwaDesignSession({
         const token = getAuthToken()
         if (token) post('set-session-auth', { token })
         post('set-mode', { mode: modeRef.current })
-        if (draftRef.current) syncDraft(draftRef.current)
+        if (model.draft) syncDraft(model.draft)
       }
       if (message.type === 'route-changed' && message.payload?.path && message.payload.viewport) {
         const normalized = normalizePwaRoute(message.payload as PwaRouteState)
@@ -235,17 +190,13 @@ export function usePwaDesignSession({
         routeRef.current = nextRoute
         setRoute(nextRoute)
         if (changed) {
-          closeTransaction()
-          const restored = readPwaDesignDraft(project, nextRoute) ?? createPwaDesignDraft(project, nextRoute)
-          draftRef.current = restored
+          const { draft: restored, restored: didRestore } = model.restore(project, nextRoute)
           setDraft(restored)
-          pastRef.current = []
-          futureRef.current = []
           setHistoryVersion((value) => value + 1)
           setSelection(null)
           setMappedNodeKey(null)
           setUnboundLabel('')
-          setSaveLabel(Object.keys(restored.elements).length ? `已恢复本页草稿 · r${restored.revision}` : '本页暂无样式草稿')
+          setSaveLabel(didRestore && Object.keys(restored.elements).length ? `已恢复本页草稿 · r${restored.revision}` : '本页暂无样式草稿')
           syncDraft(restored)
         }
       }
@@ -267,7 +218,7 @@ export function usePwaDesignSession({
     }
     window.addEventListener('message', receive)
     return () => window.removeEventListener('message', receive)
-  }, [closeTransaction, onSelect, post, project, root, syncDraft])
+  }, [model, onSelect, post, project, root, syncDraft])
 
   const setMode = useCallback((nextMode: 'select' | 'interact') => {
     modeRef.current = nextMode
@@ -276,10 +227,9 @@ export function usePwaDesignSession({
   }, [post])
 
   const updateStyle = useCallback((property: PwaStyleProperty, input: string) => {
-    const current = draftRef.current
+    const current = model.draft
     if (!current || !selection) return
     const stableKey = stablePwaIdentityKey(selection.identity)
-    beginTransaction(`${stableKey}:${property}`)
     const found = draftEntry(current, selection.identity)
     const existing = found?.element
     const originalStyle = existing?.originalStyle ?? selection.originalStyle
@@ -309,60 +259,50 @@ export function usePwaDesignSession({
     } else {
       if (found) delete elements[found.key]
     }
-    applyDraftState(touchDraft(current, elements))
-  }, [applyDraftState, beginTransaction, root, selection])
+    const next = model.update(`${stableKey}:${property}`, () => elements)
+    if (next) applyDraftState(next)
+  }, [applyDraftState, model, root, selection])
 
   const resetCurrent = useCallback(() => {
-    const current = draftRef.current
+    const current = model.draft
     if (!current || !selection) return
     const found = draftEntry(current, selection.identity)
     if (!found) return
-    beginTransaction(`${found.key}:reset`)
     const elements = { ...current.elements }
     delete elements[found.key]
-    applyDraftState(touchDraft(current, elements))
-  }, [applyDraftState, beginTransaction, selection])
+    const next = model.update(`${found.key}:reset`, () => elements)
+    if (next) applyDraftState(next)
+  }, [applyDraftState, model, selection])
 
   const clearPage = useCallback(() => {
-    const current = draftRef.current
+    const current = model.draft
     if (!current || !Object.keys(current.elements).length) return
-    beginTransaction('page:clear')
-    applyDraftState(touchDraft(current, {}))
-  }, [applyDraftState, beginTransaction])
+    const next = model.update('page:clear', () => ({}))
+    if (next) applyDraftState(next)
+  }, [applyDraftState, model])
 
   const undo = useCallback(() => {
-    closeTransaction()
-    const previous = pastRef.current.pop()
-    const current = draftRef.current
-    if (!previous || !current) return
-    futureRef.current = [...futureRef.current, current].slice(-HISTORY_LIMIT)
-    setHistoryVersion((value) => value + 1)
-    applyDraftState(previous)
-  }, [applyDraftState, closeTransaction])
+    const previous = model.undo()
+    if (previous) applyDraftState(previous)
+  }, [applyDraftState, model])
 
   const redo = useCallback(() => {
-    closeTransaction()
-    const next = futureRef.current.pop()
-    const current = draftRef.current
-    if (!next || !current) return
-    pastRef.current = [...pastRef.current, current].slice(-HISTORY_LIMIT)
-    setHistoryVersion((value) => value + 1)
-    applyDraftState(next)
-  }, [applyDraftState, closeTransaction])
+    const next = model.redo()
+    if (next) applyDraftState(next)
+  }, [applyDraftState, model])
 
   const saveNow = useCallback(() => {
-    const current = draftRef.current
+    const current = model.save()
     if (!current) return
-    persist(current)
     setSaveLabel(Object.keys(current.elements).length ? `草稿已保存 · r${current.revision}` : '本页暂无样式草稿')
-  }, [persist])
+  }, [model])
 
   const writebackPlan = useMemo(() => planPwaDesignWriteback(draft, root), [draft, root])
 
   const syncNow = useCallback(async () => {
-    const current = draftRef.current
+    const current = model.draft
     if (!current || !Object.keys(current.elements).length) return
-    persist(current)
+    model.save()
     setSyncState({ phase: 'starting', message: '正在保存草稿并执行确定性写回…' })
     let deterministicResult: PwaDeterministicWritebackResult = {
       applied: 0,
@@ -384,7 +324,7 @@ export function usePwaDesignSession({
       project: { ...current.project, sourceRevision: deterministicResult.sourceRevision },
       updatedAt: new Date().toISOString(),
     } : current
-    if (latest !== current) applyDraftState(latest, false)
+    if (latest !== current) applyDraftState(model.replace(latest), false)
     const plan = planPwaDesignWriteback(latest, root)
     if (deterministicResult.error) plan.codexReasons.push(`确定性写回需 Codex 接管：${deterministicResult.error}`)
     const contextPack = buildPwaDesignContextPack({
@@ -413,10 +353,10 @@ export function usePwaDesignSession({
     } catch (error) {
       setSyncState({ phase: 'failed', message: error instanceof Error ? error.message : '跨端同步任务启动失败' })
     }
-  }, [applyDraftState, persist, root, selection])
+  }, [applyDraftState, model, root, selection])
 
   const copyCliPackage = useCallback(async () => {
-    const current = draftRef.current
+    const current = model.draft
     if (!current) return
     try {
       await navigator.clipboard.writeText(stringifyPwaDraftCliPackage(current))
@@ -424,10 +364,10 @@ export function usePwaDesignSession({
     } catch {
       setSaveLabel('浏览器禁止复制，请改用下载 CLI 包')
     }
-  }, [])
+  }, [model])
 
   const downloadCliPackage = useCallback(() => {
-    const current = draftRef.current
+    const current = model.draft
     if (!current) return
     const blob = new Blob([stringifyPwaDraftCliPackage(current)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -437,7 +377,7 @@ export function usePwaDesignSession({
     anchor.click()
     URL.revokeObjectURL(url)
     setSaveLabel('CLI 包已下载')
-  }, [])
+  }, [model])
 
   const prepareReload = useCallback(() => {
     setReady(false)
@@ -455,8 +395,8 @@ export function usePwaDesignSession({
     draft,
     mappedNodeKey,
     unboundLabel,
-    canUndo: pastRef.current.length > 0 && historyVersion >= 0,
-    canRedo: futureRef.current.length > 0 && historyVersion >= 0,
+    canUndo: model.canUndo && historyVersion >= 0,
+    canRedo: model.canRedo && historyVersion >= 0,
     saveLabel,
     syncState,
     writebackPlan,
