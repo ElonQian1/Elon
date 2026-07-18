@@ -3,9 +3,13 @@ use super::{
         capabilities, render_compose_preview, ComposeRenderRequest, RendererCapabilitiesRequest,
     },
     parser::load_document,
+    pwa_resolver::resolve_pwa_style_binding,
     pwa_verifier::{verify_pwa_source, VerifyPwaSourceRequest},
     pwa_writer::{commit_pwa_style, PwaCommitErrorKind},
-    types::{CommitPreviewRequest, CommitPwaStyleRequest, LoadPreviewRequest},
+    types::{
+        CommitPreviewRequest, CommitPwaStyleRequest, LoadPreviewRequest,
+        ResolvePwaStyleBindingRequest,
+    },
     writer::commit_changes,
 };
 use crate::NodeRuntime;
@@ -36,9 +40,23 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             post(commit_pwa_style_handler),
         )
         .route(
+            "/api/source-preview/resolve-pwa-style-binding",
+            post(resolve_pwa_style_binding_handler),
+        )
+        .route(
             "/api/source-preview/verify-pwa-source",
             post(verify_pwa_source_handler),
         )
+}
+
+async fn resolve_pwa_style_binding_handler(
+    State(_runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<ResolvePwaStyleBindingRequest>,
+) -> Response {
+    match resolve_pwa_style_binding(&req) {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
+    }
 }
 
 async fn renderer_capabilities_handler(

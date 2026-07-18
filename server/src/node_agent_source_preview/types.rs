@@ -64,6 +64,22 @@ pub(crate) struct CommitPwaStyleResponse {
     pub changed_files: Vec<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ResolvePwaStyleBindingRequest {
+    pub project_root: String,
+    pub selectors: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ResolvePwaStyleBindingResponse {
+    pub ok: bool,
+    pub binding: Option<PwaExplicitStyleBinding>,
+    pub candidate_count: usize,
+    pub detail: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SourcePreviewDocument {

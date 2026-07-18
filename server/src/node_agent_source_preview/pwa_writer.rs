@@ -238,7 +238,10 @@ fn validate_extension(
         .to_ascii_lowercase();
     let allowed = match kind {
         PwaStyleBindingKind::CssRule => {
-            matches!(extension.as_str(), "css" | "scss" | "sass" | "less")
+            matches!(
+                extension.as_str(),
+                "css" | "scss" | "sass" | "less" | "html" | "htm"
+            )
         }
         PwaStyleBindingKind::StyleObject => matches!(
             extension.as_str(),
