@@ -124,7 +124,7 @@ fn same_path(left: &Path, right: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, process::Command};
+    use std::fs;
     use uuid::Uuid;
 
     use super::*;
@@ -169,11 +169,7 @@ mod tests {
     }
 
     fn git(cwd: &Path, args: &[&str]) {
-        let output = Command::new("git")
-            .args(args)
-            .current_dir(cwd)
-            .output()
-            .unwrap();
+        let output = git_command().args(args).current_dir(cwd).output().unwrap();
         assert!(
             output.status.success(),
             "git {args:?} failed: {}",

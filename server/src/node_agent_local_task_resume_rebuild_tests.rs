@@ -1,10 +1,11 @@
-use std::{fs, path::Path, process::Command};
+use std::{fs, path::Path};
 
 use serde_json::json;
 use uuid::Uuid;
 
 use super::*;
 use crate::{
+    git_command_error::git_command,
     node_agent_local_task_resume::{resolve_resume_workspace, ResumeWorkspaceMode},
     node_agent_update_recovery::{RecoveryTransport, WorkspaceGitFingerprint},
 };
@@ -267,21 +268,13 @@ fn path(path: &Path) -> &str {
 }
 
 fn output(cwd: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .unwrap();
+    let output = git_command().args(args).current_dir(cwd).output().unwrap();
     assert!(output.status.success(), "git {args:?} failed");
     String::from_utf8_lossy(&output.stdout).trim().to_string()
 }
 
 fn git(cwd: &Path, args: &[&str]) {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .unwrap();
+    let output = git_command().args(args).current_dir(cwd).output().unwrap();
     assert!(
         output.status.success(),
         "git {args:?} failed: {}",
