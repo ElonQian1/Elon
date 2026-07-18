@@ -488,10 +488,10 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'),
     'utf8',
   )
-  assert.match(pwaSurfaceSource, /真实 PWA 页面 · Android 最终校准/)
-  assert.match(pwaSurfaceSource, /选择组件/)
-  assert.match(pwaSurfaceSource, /操作页面/)
-  assert.match(pwaSurfaceSource, /apply-style/)
+  assert.match(pwaSurfaceSource, /真实 PWA 页面 · 手工草稿/)
+  assert.match(pwaSurfaceSource, /开始设计\/修改页面/)
+  assert.match(pwaSurfaceSource, /正常使用/)
+  assert.match(pwaSurfaceSource, /pwaDeviceFrame/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',
