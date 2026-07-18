@@ -267,9 +267,9 @@ fn stress_late_cancel_requests_never_reopen_terminal_tasks() {
     assert!(sample.events.iter().any(|event| {
         event.event.get("type").and_then(Value::as_str) == Some("cancel_requested")
             && event.event.get("ignored").and_then(Value::as_bool) == Some(true)
-            && event.event.get("reason").and_then(Value::as_str) == Some("task_already_terminal")
+            && event.event.get("ignored_reason").and_then(Value::as_str)
+                == Some("task_already_terminal")
     }));
-
     let _ = fs::remove_dir_all(dir);
 }
 

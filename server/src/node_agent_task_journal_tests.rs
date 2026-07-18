@@ -1,5 +1,6 @@
 use super::*;
 
+use homecli_proto::CancelRequestAudit;
 use std::{fs, path::PathBuf};
 
 #[test]
@@ -165,7 +166,15 @@ fn late_cancel_after_terminal_is_audit_only() {
         .record_finished_with_outcome("req-1", "done", None)
         .expect("terminal outcome should persist");
     journal
-        .record_cancel_requested("req-1")
+        .record_cancel_requested_with_audit(
+            "req-1",
+            &CancelRequestAudit {
+                requested_by: Some("owner-1".to_string()),
+                source: Some("pc_ui".to_string()),
+                reason: Some("user_requested".to_string()),
+                requested_at_ms: Some(4321),
+            },
+        )
         .expect("late cancel should remain auditable");
 
     let registry = journal
@@ -178,7 +187,11 @@ fn late_cancel_after_terminal_is_audit_only() {
     let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
     assert_eq!(events.matches(r#""type":"cancel_requested""#).count(), 1);
     assert!(events.contains(r#""ignored":true"#));
-    assert!(events.contains(r#""reason":"task_already_terminal""#));
+    assert!(events.contains(r#""requested_by":"owner-1""#));
+    assert!(events.contains(r#""source":"pc_ui""#));
+    assert!(events.contains(r#""reason":"user_requested""#));
+    assert!(events.contains(r#""requested_at_ms":4321"#));
+    assert!(events.contains(r#""ignored_reason":"task_already_terminal""#));
     let _ = fs::remove_dir_all(dir);
 }
 
