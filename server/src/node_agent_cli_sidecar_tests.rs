@@ -1,4 +1,4 @@
-use super::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord};
+use super::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord, SIDECAR_SESSIONS_READ_ATTEMPTS};
 use std::{fs, path::PathBuf};
 
 #[test]
@@ -125,6 +125,75 @@ fn pipe_json_sidecar_can_cancel_without_terminal_attach() {
     let commands =
         fs::read_to_string(dir.join("commands-task-pipe-1.jsonl")).expect("mailbox should exist");
     assert!(commands.contains(r#""command":"cancel""#));
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn transient_invalid_sessions_json_is_retried_until_registry_recovers() {
+    let dir = unique_test_dir("transient-invalid-json");
+    let _ = fs::remove_dir_all(&dir);
+    let registry = CliSidecarRegistry::new(&dir);
+    registry
+        .upsert_session(CliSidecarSessionRecord::managed_pipe_json(
+            "sidecar-retry-1",
+            "task-retry-1",
+            "codex",
+            "route_a_external_cli",
+            None,
+            None,
+            None,
+            None,
+            now_ms(),
+        ))
+        .expect("valid sidecar session should persist");
+
+    let sessions_path = dir.join("sessions.json");
+    let valid_json = fs::read(&sessions_path).expect("valid sessions JSON should load");
+    fs::write(&sessions_path, b"{\"sidecar-retry-1\":")
+        .expect("test should simulate a half-written sessions file");
+
+    let mut retries = 0;
+    let sessions = registry
+        .load_sessions_with_retry(|_| {
+            retries += 1;
+            if retries == 1 {
+                fs::write(&sessions_path, &valid_json)
+                    .expect("concurrent writer should restore valid sessions JSON");
+            }
+        })
+        .expect("transient invalid JSON should recover within the retry bound");
+
+    assert_eq!(retries, 1);
+    assert_eq!(
+        sessions
+            .get("sidecar-retry-1")
+            .map(|session| session.task_id.as_str()),
+        Some("task-retry-1")
+    );
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn persistently_invalid_sessions_json_reports_after_bounded_retries() {
+    let dir = unique_test_dir("persistent-invalid-json");
+    let _ = fs::remove_dir_all(&dir);
+    fs::create_dir_all(&dir).expect("test registry directory should exist");
+    fs::write(dir.join("sessions.json"), b"{\"broken\":")
+        .expect("test should persist invalid sessions JSON");
+
+    let registry = CliSidecarRegistry::new(&dir);
+    let mut retries = 0;
+    let error = registry
+        .load_sessions_with_retry(|_| retries += 1)
+        .expect_err("persistent corruption must not be swallowed");
+    let detail = format!("{error:#}");
+
+    assert_eq!(retries, SIDECAR_SESSIONS_READ_ATTEMPTS - 1);
+    assert!(detail.contains(&format!(
+        "{} 次有界尝试后仍失败",
+        SIDECAR_SESSIONS_READ_ATTEMPTS
+    )));
+    assert!(detail.contains("解析"));
     let _ = fs::remove_dir_all(dir);
 }
 

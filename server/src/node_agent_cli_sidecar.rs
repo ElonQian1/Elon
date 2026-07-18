@@ -7,13 +7,16 @@ use std::{
     collections::BTreeMap,
     fs::{self, OpenOptions},
     io::Write,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
+    path::{Path, PathBuf},
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
 
 const SIDECAR_STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
+const SIDECAR_SESSIONS_READ_ATTEMPTS: usize = 8;
+const SIDECAR_SESSIONS_READ_RETRY_DELAY: Duration = Duration::from_millis(25);
 
 #[derive(Clone, Debug)]
 pub(crate) struct CliSidecarRegistry {
@@ -335,18 +338,44 @@ impl CliSidecarRegistry {
     }
 
     fn load_sessions(&self) -> Result<BTreeMap<String, CliSidecarSessionRecord>> {
+        self.load_sessions_with_retry(|_| thread::sleep(SIDECAR_SESSIONS_READ_RETRY_DELAY))
+    }
+
+    fn load_sessions_with_retry(
+        &self,
+        mut wait_before_retry: impl FnMut(usize),
+    ) -> Result<BTreeMap<String, CliSidecarSessionRecord>> {
         let path = self.sessions_path();
         if !path.exists() {
             return Ok(BTreeMap::new());
         }
-        let text = fs::read_to_string(&path).with_context(|| format!("读取 {:?}", path))?;
-        serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))
+
+        let mut last_error = None;
+        for attempt in 1..=SIDECAR_SESSIONS_READ_ATTEMPTS {
+            match read_sessions_once(&path) {
+                Ok(sessions) => return Ok(sessions),
+                Err(error) => last_error = Some(error),
+            }
+            if attempt < SIDECAR_SESSIONS_READ_ATTEMPTS {
+                wait_before_retry(attempt);
+            }
+        }
+
+        Err(last_error.expect("sidecar sessions read must record the final error")).with_context(
+            || {
+                format!(
+                    "读取 sidecar sessions {:?} 在 {} 次有界尝试后仍失败",
+                    path, SIDECAR_SESSIONS_READ_ATTEMPTS
+                )
+            },
+        )
     }
 
     fn save_sessions(&self, sessions: &BTreeMap<String, CliSidecarSessionRecord>) -> Result<()> {
         self.ensure_dir()?;
         let path = self.sessions_path();
-        fs::write(&path, serde_json::to_string_pretty(sessions)?)
+        let payload = serde_json::to_vec_pretty(sessions)?;
+        crate::node_agent_atomic_file::write(&path, &payload)
             .with_context(|| format!("写入 {:?}", path))
     }
 
@@ -378,6 +407,11 @@ impl CliSidecarRegistry {
     pub(crate) fn dir(&self) -> PathBuf {
         self.dir.clone()
     }
+}
+
+fn read_sessions_once(path: &Path) -> Result<BTreeMap<String, CliSidecarSessionRecord>> {
+    let text = fs::read_to_string(path).with_context(|| format!("读取 {:?}", path))?;
+    serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))
 }
 
 impl CliSidecarSessionRecord {
