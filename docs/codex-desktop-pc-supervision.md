@@ -80,7 +80,24 @@
       "failed_tools": 0,
       "file_change_events": 2,
       "changed_files": ["server/src/example.rs"],
+      "command_exit_codes": [{"command": "cargo test", "exit_code": 0}],
+      "failure_summaries": [],
+      "agent_messages": 1,
       "terminal_event_seen": true
+    }
+  },
+  "runtime": {
+    "phase": "verification",
+    "current_command": "cargo test --bin elon-pc-node",
+    "last_progress": 1784361600000,
+    "heartbeat": 1784361605000,
+    "idle_duration": 5,
+    "timeout_policy": {
+      "mode": "progress_aware",
+      "total_timeout_secs": 21600,
+      "idle_timeout_secs": 900,
+      "heartbeat_secs": 15,
+      "progress_aware": true
     }
   }
 }
@@ -110,26 +127,31 @@
 
 ## 桌面端操作入口
 
-仓库级 Skill 位于 `.agents/skills/codex-pc-supervisor/`。辅助脚本兼容 Windows PowerShell 5.1，自动探测 `127.0.0.1:7799-7819`，只从受信 loopback Origin 获取 admin token，输出中不包含 token。
+仓库级 Skill 位于 `.agents/skills/codex-pc-supervisor/`。辅助脚本兼容 Windows PowerShell 5.1 和 pwsh 7。节点发现依次尝试显式 URL、当前进程/最近成功的无 token URL、7799 快路径，只有失败才扫描 7800–7819；每次都从受信 Origin 重新取得 admin token，缓存和输出均不包含 token。
 
 ```powershell
 $helper = '.agents\skills\codex-pc-supervisor\scripts\invoke-supervised-task.ps1'
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Probe
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Submit -ProjectId elon-self -WorkspacePath 'D:\projects\elon' -Prompt '需求' -AcceptanceCriteria '测试通过','发布通过'
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Wait -TaskId 'local-...' -WaitSeconds 55
+powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Inspect -TaskId 'local-...' -Since 40 -Limit 25 -Compact
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -TaskId 'local-...' -Verdict accepted -Summary '独立验收通过'
 ```
 
 其他动作：
 
-- `Inspect`：读取任务、journal、审批和监督状态。
+- `Inspect`：读取任务、journal、审批、运行时和监督状态；`-Since`、`-Limit` 做增量窗口，`-Compact` 只返回有界摘要和证据。
 - `Improve`：从父任务继承项目/工作区并创建能力改进；加 `-BlockingImprovement` 时角色为 `capability_repair`。
 - `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。helper 先做只读门禁，节点再以本机任务记录和 Git 身份做权威校验；不能用参数指定任意 worktree。
-- `SelfTest`：不连接节点，仅校验脚本的契约构造。
+- `SelfTest`：不连接节点，校验 PS5.1/PS7 UTF-8、旧数组以及 JSON/UTF-8 文件多条件构造。
 
-等待动作最多 55 秒，桌面端应分段等待并保持过程更新。`Wait` 会在窗口内重试节点短暂重启，并只读取小事件窗口；完整日志由 `Inspect` 获取，监督证据摘要仍由节点扫描完整 journal。设置 `ELON_NODE_ADMIN_URL` 可覆盖默认探测地址，但地址仍必须受节点 Origin 白名单信任。Windows 客户端 watchdog 使用同安装路径下的单实例选举，更新或修复并发启动时只保留一个守护者，避免互相重启运行时。
+等待动作最多 55 秒，桌面端应分段等待并保持过程更新。`Wait` 在一次调用内从 `Since` 游标前进，不重复轮询旧窗口，并返回 `next_cursor` 供下一次调用续读；缺省窗口为 25，`Inspect` 缺省为 200。监督证据摘要仍由节点扫描完整 journal。验收条件经过外层 `powershell -File` 时，优先使用 `-AcceptanceCriteriaJson '["条件一","条件二"]'` 或 `-AcceptanceCriteriaFile criteria.json`，避免数组被宿主展平误绑定；旧 `-AcceptanceCriteria` 保持兼容。设置 `ELON_NODE_ADMIN_URL` 可覆盖默认探测地址，但地址仍必须受节点 Origin 白名单信任。
 
-带 `elon.desktop_pc_supervision.v1` 的本机 Codex 任务，pipe sidecar 与 direct-pipe 回退路径默认允许运行 3600 秒，不会在普通 full-access 的 1200 秒门槛被硬杀。需要更长构建窗口时，在节点进程设置 `ELON_SUPERVISED_CODEX_TIMEOUT_SECS`；有效范围为 3600–86400 秒。该变量只影响当前监督协议的 Codex 任务，普通本机任务、其它 CLI、取消、工具审批、云控授权截止时间和终态落盘保持原行为。
+带 `elon.desktop_pc_supervision.v1` 的本机 Codex 任务使用“可配置总时限 + 进展感知空闲时限”：总时限默认 21600 秒、范围 1201–86400 秒，空闲时限默认 900 秒、范围 30–7200 秒，心跳默认 15 秒、范围 1–60 秒。分别用 `ELON_SUPERVISED_CODEX_TIMEOUT_SECS`、`ELON_SUPERVISED_CODEX_IDLE_TIMEOUT_SECS`、`ELON_SUPERVISED_CODEX_HEARTBEAT_SECS` 配置。Codex 输出、命令和文件事件刷新进展；纯推理时节点仍写明确 heartbeat，但节点自己的 heartbeat 不冒充模型进展，因此真正无进展仍会空闲超时。普通任务仍使用原固定时限，取消和进程树回收不放宽。
+
+Codex JSON 的 `item.started/item.completed` 会以有界 `codex_item` 写入 journal：`command_execution` 保留脱敏命令、退出码和输出首尾摘要，`file_change` 保留文件路径，`agent_message` 只保留有界文本。非结构化 stdout/stderr 整体聚合为每流一个 `cli_output_summary`，记录原始行数/字节数、首尾、保留行数和 `truncated`，避免一次高输出 `rg` 生成数百 journal 事件。PC 任务详情显示 phase、脱敏 current command、最近进展、heartbeat、idle duration 和 timeout policy。
+
+节点更新默认先检查活跃监督任务：有任务时写 `elon.local_supervision_restart.v1` 检查点并排空，安全终态后自动更新；无任务才立即应用。计划重启后检查点转为 `runtime_online`。若排空期间发生非计划重启，任务和 worktree 保留为 `resume_required`，`/api/status` 与维护 API 返回不含 token 的 `resume_actions`，用户可一键 `Resume`，不会静默变成 `interrupted`。
 
 ## 阻塞恢复顺序
 

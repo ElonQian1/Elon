@@ -5,7 +5,7 @@ use crate::node_agent_cli_done::{
     cli_done_message_from_output, latest_codex_session_id, persist_and_send_cli_done,
     CliCompletionContext,
 };
-use crate::node_agent_cli_prompt_runner::{cli_done_error, cli_prompt_timeout_secs, ws_text};
+use crate::node_agent_cli_prompt_runner::{cli_done_error, cli_runtime_policy, ws_text};
 use crate::node_agent_cli_runner::*;
 use crate::node_agent_codex_session::CodexSessionPlan;
 use crate::node_agent_runtime::NodeRuntime;
@@ -73,11 +73,12 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
     } = ctx;
     let cli_name = cli_name_owned.as_str();
     let bin = bin_owned.as_str();
-    let timeout_secs = cli_prompt_timeout_secs(
+    let runtime_policy = cli_runtime_policy(
         cli_name,
         runtime_permission.as_deref(),
         completion_context.is_desktop_supervised(),
     );
+    let _ = task_journal.configure_runtime_policy(&req_id, &runtime_policy);
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -163,6 +164,14 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         .unwrap_or_default();
     let mut stdout_done = false;
     let mut stderr_done = false;
+    let mut journal_aggregate =
+        crate::node_agent_cli_output_aggregate::CliOutputJournalAggregate::default();
+    let started_at = tokio::time::Instant::now();
+    let mut last_progress_at = started_at;
+    let mut heartbeat = tokio::time::interval(std::time::Duration::from_secs(
+        runtime_policy.heartbeat_secs.max(1),
+    ));
+    let mut watchdog = tokio::time::interval(std::time::Duration::from_secs(1));
 
     while !stdout_done || !stderr_done {
         tokio::select! {
@@ -186,7 +195,26 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                             continue;
                         }
                     }
-                    send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &(l + "\n"));
+                    let text = l + "\n";
+                    if cli_name == "codex" {
+                        let observation = journal_aggregate.observe(
+                            &task_journal,
+                            &req_id,
+                            "stdout",
+                            &text,
+                        );
+                        if observation.progress {
+                            last_progress_at = tokio::time::Instant::now();
+                            let _ = task_journal.record_runtime_progress(
+                                &req_id,
+                                observation.phase.as_deref().unwrap_or("reasoning"),
+                                observation.current_command.as_deref(),
+                            );
+                        }
+                        send_cli_chunk_message(&out_tx, &req_id, &text);
+                    } else {
+                        send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &text);
+                    }
                 }
                 Ok(None) => { stdout_done = true; }
                 Err(e) => {
@@ -218,7 +246,21 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                         }
                         if !l.trim().is_empty() {
                             info!("[codex stderr] {}", l);
-                            let _ = task_journal.record_cli_chunk(&req_id, "stderr", &(l + "\n"));
+                            let text = l + "\n";
+                            let observation = journal_aggregate.observe(
+                                &task_journal,
+                                &req_id,
+                                "stderr",
+                                &text,
+                            );
+                            if observation.progress {
+                                last_progress_at = tokio::time::Instant::now();
+                                let _ = task_journal.record_runtime_progress(
+                                    &req_id,
+                                    observation.phase.as_deref().unwrap_or("reasoning"),
+                                    observation.current_command.as_deref(),
+                                );
+                            }
                         }
                     } else {
                         send_cli_chunk(&out_tx, &task_journal, &req_id, "stderr", &(l + "\n"));
@@ -229,6 +271,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             changed = cancel_rx.changed() => {
                 if changed.is_ok() && *cancel_rx.borrow() {
                     warn!("[{}] CLI 收到取消请求，强杀进程", cli_name);
+                    crate::node_agent_cli_runtime_policy::terminate_process_tree(child.id());
                     let _ = child.kill().await;
                     drain_killed_child_output(
                         &mut stdout_lines,
@@ -239,6 +282,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                         &mut stderr_text,
                     ).await;
                     let message = "用户已停止 PC CLI 任务".to_string();
+                    journal_aggregate.flush(&task_journal, &req_id);
                     let (exit_ok, error, workspace_status) =
                         finalize_cli_prompt_workspace(false, Some(message), conversation_workspace);
                     let (done, combined_output) = cli_done_message_from_output(
@@ -264,8 +308,29 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                     return;
                 }
             },
-            _ = tokio::time::sleep(std::time::Duration::from_secs(timeout_secs)) => {
-                warn!("[{}] CLI 执行超时，强杀进程", cli_name);
+            _ = heartbeat.tick() => {
+                let _ = task_journal.record_runtime_heartbeat(&req_id);
+            },
+            _ = watchdog.tick() => {
+                let total_expired = started_at.elapsed().as_secs() >= runtime_policy.total_timeout_secs;
+                let idle_expired = runtime_policy.progress_aware
+                    && last_progress_at.elapsed().as_secs() >= runtime_policy.idle_timeout_secs;
+                if !total_expired && !idle_expired {
+                    continue;
+                }
+                let message = if idle_expired {
+                    format!(
+                        "{} 空闲超时（连续{}秒没有输出、命令或文件进展），已强制终止",
+                        cli_name, runtime_policy.idle_timeout_secs
+                    )
+                } else {
+                    format!(
+                        "{} 达到可配置总时限（{}秒），已强制终止",
+                        cli_name, runtime_policy.total_timeout_secs
+                    )
+                };
+                warn!("[{}] {}", cli_name, message);
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(child.id());
                 let _ = child.kill().await;
                 drain_killed_child_output(
                     &mut stdout_lines,
@@ -275,8 +340,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                     &mut stdout_text,
                     &mut stderr_text,
                 ).await;
-                let message = format!("{} 执行超时（超过{}秒），已强制终止",
-                    cli_name, timeout_secs);
+                journal_aggregate.flush(&task_journal, &req_id);
                 let (done, combined_output) = cli_done_message_from_output(
                     req_id,
                     false,
@@ -301,6 +365,8 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             },
         }
     }
+
+    journal_aggregate.flush(&task_journal, &req_id);
 
     let exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
     if cli_name == "codex" && !contains_codex_reply_marker(&stdout_text) {

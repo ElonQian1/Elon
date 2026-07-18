@@ -32,6 +32,7 @@ pub(super) fn status_payload() -> Value {
         "client_care_summary": "普通用户日常只需要运行一龙开发平台.exe；需要移除时运行卸载一龙开发平台.exe。运行日志、任务记录、诊断、更新和卸载都集中在本面板。",
         "autostart": autostart_status_payload(),
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
+        "restart_recovery": crate::node_agent_restart_drain::status_payload(),
     });
 
     with_install_status(payload)

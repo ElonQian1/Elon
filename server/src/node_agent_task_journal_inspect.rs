@@ -65,6 +65,11 @@ pub(crate) async fn inspect_cli_task_journal(
                 resume.can_approve_tools(),
                 task_status,
             );
+            let mut runtime_status =
+                crate::node_agent_task_journal::runtime_status_payload(snapshot.record.as_ref());
+            if approval_state.actionable_count > 0 {
+                runtime_status["phase"] = serde_json::Value::String("approval".to_string());
+            }
             let snapshot_task_id = snapshot.task_id.clone();
             let payload = serde_json::json!({
                 "ok": true,
@@ -77,6 +82,7 @@ pub(crate) async fn inspect_cli_task_journal(
                 "attach": attach,
                 "resume": resume,
                 "approval_state": approval_state,
+                "runtime": runtime_status,
             });
             AgentToServer::CliTaskJournalSnapshot {
                 req_id,

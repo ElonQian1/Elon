@@ -222,7 +222,7 @@ impl LocalTaskStore {
                 AND (?18 IS NULL OR agent_id = ?18)
                 AND (?19 IS NULL OR install_id = ?19)
                 AND (completion_event_id IS NULL OR completion_event_id = ?12)
-                AND status IN ('running','recovering','canceled','done','failed')",
+                AND status IN ('running','recovering','canceled','done','failed','resume_required')",
             params![
                 if completion.exit_ok { "done" } else { "failed" },
                 completion.error,
@@ -249,8 +249,8 @@ impl LocalTaskStore {
     }
 
     /// A process restart drops all in-memory child handles. Tasks with no pending
-    /// durable terminal event cannot be resumed safely, so make that state explicit
-    /// instead of leaving the local UI stuck on `running` forever.
+    /// durable terminal event lose the process handle, so preserve an explicit
+    /// one-click resume state instead of leaving the local UI stuck on `running`.
     pub(crate) fn interrupt_lingering_running(
         &self,
         durable_req_ids: &HashSet<String>,
@@ -274,8 +274,8 @@ impl LocalTaskStore {
             }
             changed += tx.execute(
                 "UPDATE local_tasks
-                    SET status = 'interrupted',
-                        error = '节点进程已重启，且没有可恢复的完成记录；请重新发起任务',
+                    SET status = 'resume_required',
+                        error = '节点进程重启后需要继续：工作区与 journal 已保留，请点击 Resume 让 Codex 检查现场后续跑',
                         sync_state = 'local_only',
                         finished_at_ms = ?1
                   WHERE task_id = ?2

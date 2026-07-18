@@ -66,20 +66,16 @@ impl ActiveCliPromptRegistry {
         req_id: &str,
         pending_approvals: Vec<PendingToolApprovalView>,
     ) -> Option<ActiveCliPromptView> {
-        let mut prompts = self.prompts.write().await;
-        let handle = prompts.get_mut(req_id)?;
-        handle.touch();
+        let prompts = self.prompts.read().await;
+        let handle = prompts.get(req_id)?;
         Some(handle.view(pending_approvals))
     }
 
     pub(crate) async fn views_without_approvals(&self) -> Vec<ActiveCliPromptView> {
-        let mut prompts = self.prompts.write().await;
+        let prompts = self.prompts.read().await;
         prompts
-            .values_mut()
-            .map(|handle| {
-                handle.touch();
-                handle.view(Vec::new())
-            })
+            .values()
+            .map(|handle| handle.view(Vec::new()))
             .collect()
     }
 

@@ -134,11 +134,11 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 本机任务 API 可选接受 `supervision`，协议版本为 `elon.desktop_pc_supervision.v1`。契约记录 `task_role`、父/根任务、验收条件和改进策略；node-agent 把契约及桌面验收作为 append-only journal 事件保存，不改变旧任务的数据库结构，也不影响未传 `supervision` 的调用方。
 
-节点返回的 `supervision.evidence` 是确定性摘要，包括事件数、工具调用/结果、失败工具、文件变更事件、文件名和是否看到终态事件。桌面端仍需结合 Git、测试和发布事实做独立判断，然后调用 `/api/local-tasks/:task_id/supervision/review` 写入 `accepted`、`needs_follow_up`、`blocked_capability` 或 `rejected`。PC 工作台的任务详情展示契约、证据和最新结论。
+节点从 Codex JSON `item.started/item.completed` 的 `command_execution`、`file_change`、`agent_message` 生成确定性 `supervision.evidence`，包括工具调用/结果、失败工具、命令退出码与失败摘要、文件变更、agent message 和终态。高输出 stdout/stderr 按流聚合，只保存原始行/字节计数、首尾和截断标记，不让一次 `rg` 膨胀成数百 journal 事件。桌面端仍需结合 Git、测试和发布事实做独立判断，然后调用 `/api/local-tasks/:task_id/supervision/review` 写入结论。PC 工作台同时展示 phase、脱敏 current command、last progress、heartbeat、idle duration 和 timeout policy。
 
 `task_role` 形成可追溯任务树：`requirement` 是原需求，`capability_repair` 是阻塞能力修复，`resume_original` 是修复后的原任务续跑，`post_task_improvement` 是任务完成后的非阻塞增强。节点给执行 CLI 注入防递归标记，避免桌面监督与本机执行相互重复派发。完整安全边界、API 示例和日常流程见 `docs/codex-desktop-pc-supervision.md`。
 
-受监督的本机 Codex 任务需要覆盖真实项目构建、发布和统一收尾，不能沿用普通 full-access 任务固定的 1200 秒总时限。节点只在执行上下文冻结了当前 `elon.desktop_pc_supervision.v1` 协议时，把 pipe sidecar 和 direct-pipe 回退路径的总时限提高到默认 3600 秒；`ELON_SUPERVISED_CODEX_TIMEOUT_SECS` 可在 3600–86400 秒范围内调高。未带监督协议的 Codex 任务仍为 1200/300 秒，其它 CLI 仍为 180 秒；取消、审批、云控绝对授权截止时间和终态持久化不因该上限变化而放宽。
+受监督的本机 Codex 任务需要覆盖真实项目构建、发布和统一收尾，不能沿用普通 full-access 任务固定的 1200 秒总时限。pipe sidecar 与 direct-pipe 回退路径统一使用默认 21600 秒总时限、900 秒进展空闲时限和 15 秒 heartbeat；三个值分别由 `ELON_SUPERVISED_CODEX_TIMEOUT_SECS`（1201–86400）、`ELON_SUPERVISED_CODEX_IDLE_TIMEOUT_SECS`（30–7200）、`ELON_SUPERVISED_CODEX_HEARTBEAT_SECS`（1–60）约束配置。输出/命令/文件刷新进展，节点 heartbeat 只证明运行时存活，不掩盖真正空闲。未带监督协议的 Codex 任务仍为 1200/300 秒，其它 CLI 仍为 180 秒；取消、进程树回收、审批、云控截止时间和终态持久化不放宽。
 
 `resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
 
@@ -160,13 +160,13 @@ Win 端启动和更新的产品闭环如下：
 1. PC 网页端只负责提示和触发：节点未运行时展示“启动 Win 端 / 下载 / 节点设置”；节点已运行但版本落后时展示“Win 端可更新 / 下载新版 / 节点设置”。
 2. 浏览器通过 `elon-node://open` 拉起本机 Win 端；如果协议未注册或本机未安装，用户走标准下载地址 `/api/node-agent/download/windows-client`。
 3. 节点设置页读取 `/api/node-agent/version` 和本机 `/api/client-maintenance`，用服务器版本、包大小、本机安装状态判断“未知 / 最新 / 可更新”。
-4. 用户点击“更新并重启 Win 端”时，网页端只调用本机 `/api/client-maintenance/update`；真正下载、替换、重启由 Win 端维护层执行，网页端轮询 `/api/status` 确认节点重新上线。
+4. 用户点击“更新并重启 Win 端”或云端广播更新时，节点先检测活跃监督任务。有任务则持久化 `elon.local_supervision_restart.v1` 并 drain 到安全终态，无任务才下载替换；计划重启恢复为 `runtime_online`，意外重启留下 `resume_required` 与无 token 的 Resume 动作。网页端轮询 `/api/status.restart_recovery` 确认排空、重启和恢复状态。
 5. 服务器更新频繁时，网页端不能把“服务端有新版本”误报成任务失败；任务页继续展示当前 CLI 公开过程，节点/设置页单独提示客户端版本维护。长期目标是在 Win 端启动时主动比对服务器版本并提示/自动维护，但用户可见入口仍保持在节点设置页。
 
 ```
 PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --json
-    → stdout JSONL 事件流
-    → 服务端解析 tool_call / tool_result / usage / final_reply
+    → stdout JSONL item.started / item.completed 事件流
+    → 节点解析 command_execution / file_change / agent_message / usage / final_reply
     → PC 网页端任务过程卡片
 ```
 

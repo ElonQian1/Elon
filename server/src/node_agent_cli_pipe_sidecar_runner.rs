@@ -12,7 +12,7 @@ use crate::{
     node_agent_cli_sidecar::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord},
     node_agent_cli_sidecar_io::{append_output, read_new_commands, CliSidecarOutputRecord},
     node_agent_cli_sidecar_runner::{
-        hide_tokio_command_window, CliSidecarLaunchConfig, SIDECAR_HEARTBEAT_SECS, SIDECAR_POLL_MS,
+        hide_tokio_command_window, CliSidecarLaunchConfig, SIDECAR_POLL_MS,
     },
     node_agent_codex_session,
     node_agent_task_journal::TaskJournal,
@@ -133,16 +133,23 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
     let mut child_exit_observed_at = None;
     let mut canceled = false;
     let mut timed_out = false;
-    let mut heartbeat = tokio::time::interval(Duration::from_secs(SIDECAR_HEARTBEAT_SECS));
+    let runtime_policy = config.runtime_policy.clone().unwrap_or_else(|| {
+        crate::node_agent_cli_runtime_policy::CliRuntimePolicy::fixed(config.timeout_secs.max(1))
+    });
+    let mut heartbeat =
+        tokio::time::interval(Duration::from_secs(runtime_policy.heartbeat_secs.max(1)));
     let mut mailbox = tokio::time::interval(Duration::from_millis(SIDECAR_POLL_MS));
-    let timeout = tokio::time::sleep(Duration::from_secs(config.timeout_secs.max(1)));
-    tokio::pin!(timeout);
+    let total_deadline =
+        tokio::time::Instant::now() + Duration::from_secs(runtime_policy.total_timeout_secs.max(1));
+    let mut idle_deadline =
+        tokio::time::Instant::now() + Duration::from_secs(runtime_policy.idle_timeout_secs.max(1));
 
     let success = loop {
         tokio::select! {
             _ = heartbeat.tick() => {
                 let state = if canceled { "cancel_requested" } else { "running" };
                 let _ = registry.touch_session(&config.session_id, Some(state), child_pid);
+                append_output(&config.output_path, CliSidecarOutputRecord::heartbeat())?;
             }
             _ = mailbox.tick() => {
                 consume_pipe_mailbox(
@@ -160,21 +167,38 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
                     }
                 }
             }
-            _ = &mut timeout, if !timed_out => {
+            _ = tokio::time::sleep_until(total_deadline), if !timed_out => {
                 timed_out = true;
-                canceled = true;
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
                 let _ = child.start_kill();
                 append_output(
                     &config.output_path,
                     CliSidecarOutputRecord::error(format!(
-                        "{} pipe sidecar 执行超时（超过 {} 秒）",
-                        config.cli_name, config.timeout_secs
+                        "{} pipe sidecar 达到总时限（{} 秒）",
+                        config.cli_name, runtime_policy.total_timeout_secs
+                    )),
+                )?;
+            }
+            _ = tokio::time::sleep_until(idle_deadline), if runtime_policy.progress_aware && !timed_out => {
+                timed_out = true;
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
+                let _ = child.start_kill();
+                append_output(
+                    &config.output_path,
+                    CliSidecarOutputRecord::error(format!(
+                        "{} pipe sidecar 空闲超时（连续 {} 秒没有输出、命令或文件进展）",
+                        config.cli_name, runtime_policy.idle_timeout_secs
                     )),
                 )?;
             }
             event = pipe_rx.recv() => {
                 match event {
                     Some(PipeReadEvent::Chunk(stream, text)) => {
+                        let observation = crate::node_agent_cli_output_aggregate::progress_observation(&text);
+                        if observation.progress {
+                            idle_deadline = tokio::time::Instant::now()
+                                + Duration::from_secs(runtime_policy.idle_timeout_secs.max(1));
+                        }
                         write_pipe_chunk(&config, &task_journal, stream, &text)?;
                     }
                     Some(PipeReadEvent::Closed("stdout")) => stdout_closed = true,
@@ -201,7 +225,9 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
         }
     };
 
-    let state = if canceled {
+    let state = if timed_out {
+        "failed"
+    } else if canceled {
         "canceled"
     } else if success {
         "finished"
@@ -269,7 +295,6 @@ fn write_pipe_chunk(
         &config.output_path,
         CliSidecarOutputRecord::chunk(stream, &visible_text),
     )?;
-    let _ = task_journal.record_cli_chunk(&config.task_id, stream, &visible_text);
     Ok(())
 }
 
@@ -296,6 +321,7 @@ fn consume_pipe_mailbox(
         }
         if command.command.as_str() == "cancel" {
             *canceled = true;
+            crate::node_agent_cli_runtime_policy::terminate_process_tree(child.id());
             let _ = child.start_kill();
             let _ = registry.touch_session(&config.session_id, Some("cancel_requested"), None);
         }

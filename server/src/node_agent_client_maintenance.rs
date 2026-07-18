@@ -1,9 +1,10 @@
 // server/src/node_agent_client_maintenance.rs
 
-use axum::{http::StatusCode, Json};
+use axum::{extract::State, http::StatusCode, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 #[cfg(windows)]
 use std::process::{Command, Stdio};
@@ -81,17 +82,13 @@ pub(crate) async fn open_target_handler(
     }
 }
 
-pub(crate) async fn update_handler() -> (StatusCode, Json<Value>) {
-    match spawn_client_action(ClientAction::Update) {
-        Ok(()) => {
+pub(crate) async fn update_handler(
+    State(runtime): State<Arc<crate::NodeRuntime>>,
+) -> (StatusCode, Json<Value>) {
+    match crate::node_agent_restart_drain::schedule_update(runtime, "local_admin", None).await {
+        Ok(payload) => {
             record_maintenance_event("update", true, "scheduled");
-            (
-                StatusCode::OK,
-                Json(json!({
-                    "ok": true,
-                    "message": "Win 端正在更新升级；如需替换重启，通信临时中断，会自动恢复。"
-                })),
-            )
+            (StatusCode::OK, Json(payload))
         }
         Err(error) => {
             record_maintenance_event("update", false, &error);

@@ -100,7 +100,7 @@ fn parent_is_terminal(parent: &LocalTaskRecord) -> bool {
     parent.finished_at_ms.is_some()
         && matches!(
             parent.status.as_str(),
-            "done" | "failed" | "canceled" | "interrupted"
+            "done" | "failed" | "canceled" | "interrupted" | "resume_required"
         )
 }
 

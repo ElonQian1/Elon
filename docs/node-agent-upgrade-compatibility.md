@@ -1,6 +1,6 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-07-15
+最后更新：2026-07-18
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
@@ -23,6 +23,7 @@
 5. 自动准备遵守“先校验、再持久化、最后发布内存状态”；失败保留旧状态并继续外部项目。
 6. 外部项目、共享缓存和 Git 现场不得被自动认领、移动、清理或改写。
 7. 服务器按任务类型判断能力：已有项目 CLI/Exec 保持向后兼容；只有显式新建/清理托管 workspace 协议可要求新 capability。
+8. 更新或重启不得静默中断活跃本机监督任务：默认持久化检查点并 drain 到安全终态；意外重启必须保留 journal/worktree，显示 `resume_required` 和一键 Resume 动作。检查点、URL 缓存与状态 API 都不得持久化 admin token。
 
 ## 配置与缓存迁移合同
 
@@ -44,6 +45,7 @@
 - 缓存 fixture：环境变量共享 target、`.env.local`、Windows 默认开发/发布目录、项目祖先 `shared`、仓库内部 target。
 - 空盘、低空间、只有 C 盘、项目在 D/E 盘、名称占用、junction、脏 worktree、未 push 提交和多项目绑定。
 - 更新中断、原子写失败、EXE 重启和重复迁移；任何失败都不能丢失身份、绑定或覆盖项目。
+- 活跃监督任务的延期更新、排空完成后重启、排空期间异常重启恢复；`/api/status.restart_recovery` 必须能区分 `draining`、`restart_scheduled`、`runtime_online`、`resume_required`、`failed`。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。
 - 外部项目、托管项目、只读任务、普通写任务和真实构建分别验证路径与环境策略。
 - 超容量建议、项目数建议和无法读取磁盘空间时仍可派单；无自动压力清理。

@@ -28,7 +28,9 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use evidence::{collect_changed_files, tool_result_failed};
+use evidence::{
+    codex_failure_summary, codex_item_failed, collect_changed_files, tool_result_failed,
+};
 use validation::{clean_enum, clean_id, clean_list, clean_optional_id};
 
 use crate::{
@@ -105,6 +107,9 @@ struct SupervisionEvidence {
     failed_tools: usize,
     file_change_events: usize,
     changed_files: Vec<String>,
+    command_exit_codes: Vec<Value>,
+    failure_summaries: Vec<String>,
+    agent_messages: usize,
     terminal_event_seen: bool,
 }
 
@@ -382,7 +387,7 @@ fn observe_event(
                 .cloned()
                 .and_then(|value| serde_json::from_value(value).ok());
         }
-        "finished" | "done" | "failed" | "canceled" | "interrupted" => {
+        "finished" | "done" | "failed" | "canceled" | "interrupted" | "resume_required" => {
             evidence.terminal_event_seen = true;
         }
         _ => {}
@@ -408,6 +413,55 @@ fn observe_event(
             }
             collect_changed_files(tool_event, changed_files);
         }
+        "codex_item" => {
+            observe_codex_item(tool_event, evidence, changed_files);
+        }
+        _ => {}
+    }
+}
+
+fn observe_codex_item(
+    event: &Value,
+    evidence: &mut SupervisionEvidence,
+    changed_files: &mut BTreeSet<String>,
+) {
+    let lifecycle = event.get("lifecycle").and_then(Value::as_str).unwrap_or("");
+    let item = event.get("item").unwrap_or(event);
+    match item.get("type").and_then(Value::as_str).unwrap_or("") {
+        "command_execution" => match lifecycle {
+            "started" => evidence.tool_calls += 1,
+            "completed" => {
+                evidence.tool_results += 1;
+                if let Some(exit_code) = item.get("exit_code").and_then(Value::as_i64) {
+                    evidence.command_exit_codes.push(json!({
+                        "command": item.get("command").and_then(Value::as_str).unwrap_or("command"),
+                        "exit_code": exit_code,
+                    }));
+                }
+                if codex_item_failed(item) {
+                    evidence.failed_tools += 1;
+                    if let Some(summary) = codex_failure_summary(item) {
+                        evidence.failure_summaries.push(summary);
+                    }
+                }
+            }
+            _ => {}
+        },
+        "file_change" => {
+            if lifecycle == "started" {
+                evidence.tool_calls += 1;
+            } else if lifecycle == "completed" {
+                evidence.tool_results += 1;
+                evidence.file_change_events += 1;
+                if codex_item_failed(item) {
+                    evidence.failed_tools += 1;
+                }
+            }
+            collect_changed_files(item, changed_files);
+        }
+        "agent_message" if lifecycle == "completed" => {
+            evidence.agent_messages += 1;
+        }
         _ => {}
     }
 }
@@ -419,6 +473,8 @@ fn finish_state(
     changed_files: BTreeSet<String>,
 ) -> SupervisionState {
     evidence.changed_files = changed_files.into_iter().take(50).collect();
+    evidence.command_exit_codes.truncate(100);
+    evidence.failure_summaries.truncate(20);
     SupervisionState {
         protocol: SUPERVISION_PROTOCOL,
         enabled: contract.is_some(),

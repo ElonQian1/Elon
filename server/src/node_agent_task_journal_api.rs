@@ -44,6 +44,7 @@ struct LocalTaskJournalResponse {
     attach: TaskAttachState,
     resume: TaskResumeContract,
     approval_state: TaskApprovalStateSnapshot,
+    runtime: serde_json::Value,
 }
 
 #[derive(Debug, Serialize)]
@@ -115,6 +116,11 @@ async fn get_task_journal(
                 resume.can_approve_tools(),
                 task_status,
             );
+            let mut runtime_status =
+                crate::node_agent_task_journal::runtime_status_payload(snapshot.record.as_ref());
+            if approval_state.actionable_count > 0 {
+                runtime_status["phase"] = serde_json::Value::String("approval".to_string());
+            }
             Json(LocalTaskJournalResponse {
                 ok: true,
                 task_id: snapshot.task_id,
@@ -125,6 +131,7 @@ async fn get_task_journal(
                 attach,
                 resume,
                 approval_state,
+                runtime: runtime_status,
             })
             .into_response()
         }

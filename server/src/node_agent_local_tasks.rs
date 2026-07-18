@@ -140,6 +140,11 @@ async fn get_task(
         true,
         task_status,
     );
+    let mut runtime_status =
+        crate::node_agent_task_journal::runtime_status_payload(snapshot.record.as_ref());
+    if approval_state.actionable_count > 0 {
+        runtime_status["phase"] = serde_json::Value::String("approval".to_string());
+    }
     let supervision = match crate::node_agent_local_task_supervision::load_supervision_state(
         &runtime.task_journal,
         &record.task_id,
@@ -154,6 +159,7 @@ async fn get_task(
         "last_event_seq": snapshot.last_event_seq,
         "has_more": snapshot.has_more,
         "approval_state": approval_state,
+        "runtime": runtime_status,
         "supervision": supervision,
     }))
     .into_response()

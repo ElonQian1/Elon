@@ -100,7 +100,25 @@ export interface LocalTaskSupervisionEvidence {
   failed_tools: number
   file_change_events: number
   changed_files: string[]
+  command_exit_codes: Array<{ command: string; exit_code: number }>
+  failure_summaries: string[]
+  agent_messages: number
   terminal_event_seen: boolean
+}
+
+export interface LocalTaskRuntimeState {
+  phase: string
+  current_command: string
+  last_progress?: number
+  heartbeat?: number
+  idle_duration: number
+  timeout_policy: {
+    mode: string
+    total_timeout_secs: number
+    idle_timeout_secs: number
+    heartbeat_secs: number
+    progress_aware: boolean
+  }
 }
 
 export interface LocalTaskSupervisionState {
@@ -118,6 +136,7 @@ export interface LocalTaskDetail {
   last_event_seq: number
   has_more: boolean
   supervision: LocalTaskSupervisionState
+  runtime: LocalTaskRuntimeState
 }
 
 export interface LocalTaskStatusView {

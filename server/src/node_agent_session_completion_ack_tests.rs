@@ -260,17 +260,17 @@ fn startup_interrupts_only_running_tasks_without_durable_completion() {
             .status,
         "running"
     );
-    let interrupted = local_tasks
+    let resume_required = local_tasks
         .get_for_owner(OWNER, &orphaned.req_id)
         .unwrap()
         .unwrap();
-    assert_eq!(interrupted.status, "interrupted");
-    assert_eq!(interrupted.sync_state, "local_only");
-    assert!(interrupted
+    assert_eq!(resume_required.status, "resume_required");
+    assert_eq!(resume_required.sync_state, "local_only");
+    assert!(resume_required
         .error
         .as_deref()
-        .is_some_and(|error| error.contains("请重新发起")));
-    assert!(interrupted.finished_at_ms.is_some());
+        .is_some_and(|error| error.contains("Resume")));
+    assert!(resume_required.finished_at_ms.is_some());
     let _ = fs::remove_dir_all(root);
 }
 

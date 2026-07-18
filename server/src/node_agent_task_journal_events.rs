@@ -29,6 +29,7 @@ pub(crate) fn normalize_finish_status(status: &str, error: Option<&str>) -> &'st
         "failed" | "failure" | "error" | "errored" => "failed",
         "canceled" | "cancelled" | "cancel" | "stopped" => "canceled",
         "interrupted" => "interrupted",
+        "resume_required" => "resume_required",
         "finished" if looks_canceled(error) => "canceled",
         "finished" if has_error(error) => "failed",
         "finished" => "finished",
@@ -48,7 +49,13 @@ pub(crate) fn normalize_finish_error(error: Option<&str>) -> Option<String> {
 pub(crate) fn is_terminal_status(status: &str) -> bool {
     matches!(
         status.trim().to_ascii_lowercase().as_str(),
-        "finished" | "done" | "failed" | "canceled" | "cancelled" | "interrupted"
+        "finished"
+            | "done"
+            | "failed"
+            | "canceled"
+            | "cancelled"
+            | "interrupted"
+            | "resume_required"
     )
 }
 

@@ -3,6 +3,7 @@ import type {
   LocalTaskDetail,
   LocalTaskEvent,
   LocalTaskRecord,
+  LocalTaskRuntimeState,
   LocalTaskSupervisionState,
   LocalTaskStatusView,
   LocalTaskTokenUsage,
@@ -12,7 +13,7 @@ type JsonObject = Record<string, unknown>
 
 const TERMINAL_STATUSES = new Set([
   'done', 'finished', 'success', 'succeeded', 'failed', 'error',
-  'canceled', 'cancelled', 'interrupted',
+  'canceled', 'cancelled', 'interrupted', 'resume_required',
 ])
 
 export function normalizeLocalTaskList(payload: unknown): LocalTaskRecord[] {
@@ -48,6 +49,7 @@ export function normalizeLocalTaskDetail(payload: unknown): LocalTaskDetail {
     last_event_seq: lastSeq,
     has_more: Boolean(root.has_more),
     supervision: normalizeSupervisionState(root.supervision),
+    runtime: normalizeRuntimeState(root.runtime),
   }
 }
 
@@ -84,7 +86,32 @@ export function normalizeSupervisionState(payload: unknown): LocalTaskSupervisio
       failed_tools: numberValue(evidenceRoot.failed_tools) ?? 0,
       file_change_events: numberValue(evidenceRoot.file_change_events) ?? 0,
       changed_files: textArray(evidenceRoot.changed_files),
+      command_exit_codes: arrayValue(evidenceRoot.command_exit_codes).map((item) => {
+        const entry = objectValue(item)
+        return { command: textValue(entry.command), exit_code: numberValue(entry.exit_code) ?? 0 }
+      }),
+      failure_summaries: textArray(evidenceRoot.failure_summaries),
+      agent_messages: numberValue(evidenceRoot.agent_messages) ?? 0,
       terminal_event_seen: Boolean(evidenceRoot.terminal_event_seen),
+    },
+  }
+}
+
+export function normalizeRuntimeState(payload: unknown): LocalTaskRuntimeState {
+  const root = objectValue(payload)
+  const policy = objectValue(root.timeout_policy)
+  return {
+    phase: textValue(root.phase) || 'reasoning',
+    current_command: textValue(root.current_command),
+    last_progress: timestampValue(root.last_progress),
+    heartbeat: timestampValue(root.heartbeat),
+    idle_duration: numberValue(root.idle_duration) ?? 0,
+    timeout_policy: {
+      mode: textValue(policy.mode) || 'fixed_total',
+      total_timeout_secs: numberValue(policy.total_timeout_secs) ?? 0,
+      idle_timeout_secs: numberValue(policy.idle_timeout_secs) ?? 0,
+      heartbeat_secs: numberValue(policy.heartbeat_secs) ?? 0,
+      progress_aware: Boolean(policy.progress_aware),
     },
   }
 }
@@ -191,6 +218,7 @@ export function localTaskStatus(status: string): LocalTaskStatusView {
     case 'canceled':
     case 'cancelled':
     case 'interrupted': return { label: '已停止', tone: 'muted', terminal: true }
+    case 'resume_required': return { label: '可继续', tone: 'warning', terminal: true }
     default: return { label: status || '未知', tone: 'muted', terminal: false }
   }
 }

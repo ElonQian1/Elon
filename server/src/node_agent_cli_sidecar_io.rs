@@ -28,6 +28,8 @@ pub(crate) struct CliSidecarOutputRecord {
     pub(crate) canceled: Option<bool>,
     #[serde(default)]
     pub(crate) error: Option<String>,
+    #[serde(default)]
+    pub(crate) runtime: Option<serde_json::Value>,
     pub(crate) at_ms: u128,
 }
 
@@ -42,6 +44,7 @@ impl CliSidecarOutputRecord {
             success: None,
             canceled: None,
             error: None,
+            runtime: None,
             at_ms: now_ms(),
         }
     }
@@ -56,6 +59,7 @@ impl CliSidecarOutputRecord {
             success: None,
             canceled: None,
             error: None,
+            runtime: None,
             at_ms: now_ms(),
         }
     }
@@ -70,6 +74,7 @@ impl CliSidecarOutputRecord {
             success: Some(success),
             canceled: Some(canceled),
             error: None,
+            runtime: None,
             at_ms: now_ms(),
         }
     }
@@ -84,6 +89,22 @@ impl CliSidecarOutputRecord {
             success: Some(false),
             canceled: Some(false),
             error: Some(error),
+            runtime: None,
+            at_ms: now_ms(),
+        }
+    }
+
+    pub(crate) fn heartbeat() -> Self {
+        Self {
+            record_type: "runtime".to_string(),
+            stream: None,
+            text: None,
+            child_pid: None,
+            exit_code: None,
+            success: None,
+            canceled: None,
+            error: None,
+            runtime: Some(serde_json::json!({ "heartbeat": true })),
             at_ms: now_ms(),
         }
     }

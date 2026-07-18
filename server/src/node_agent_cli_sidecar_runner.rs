@@ -61,6 +61,8 @@ pub(crate) struct CliSidecarLaunchConfig {
     #[serde(default)]
     pub stdin_payload: Option<String>,
     #[serde(default)]
+    pub runtime_policy: Option<crate::node_agent_cli_runtime_policy::CliRuntimePolicy>,
+    #[serde(default)]
     pub stdin_piped_empty: bool,
     #[serde(default = "default_cols")]
     pub initial_cols: u16,
@@ -79,6 +81,7 @@ pub(crate) enum CliSidecarOutputEvent {
     Stdout(String),
     Stderr(String),
     ChildStarted(u32),
+    Heartbeat,
 }
 
 #[derive(Debug, Clone)]
@@ -271,6 +274,17 @@ pub(crate) async fn follow_sidecar_output(
                         canceled = record.canceled.unwrap_or(false);
                     }
                 }
+                "runtime" => {
+                    if record
+                        .runtime
+                        .as_ref()
+                        .and_then(|value| value.get("heartbeat"))
+                        .and_then(serde_json::Value::as_bool)
+                        == Some(true)
+                    {
+                        on_event(CliSidecarOutputEvent::Heartbeat);
+                    }
+                }
                 _ => {}
             }
         }
@@ -382,6 +396,7 @@ mod tests {
             legacy_codex_sessions_file: None,
             timeout_secs: 10,
             stdin_payload: None,
+            runtime_policy: None,
             stdin_piped_empty: false,
             initial_cols: crate::node_agent_cli_pty::default_cols(),
             initial_rows: crate::node_agent_cli_pty::default_rows(),
@@ -427,6 +442,7 @@ mod tests {
             legacy_codex_sessions_file: None,
             timeout_secs: 10,
             stdin_payload: Some(prompt.clone()),
+            runtime_policy: None,
             stdin_piped_empty: false,
             initial_cols: crate::node_agent_cli_pty::default_cols(),
             initial_rows: crate::node_agent_cli_pty::default_rows(),

@@ -42,7 +42,9 @@ mod node_agent_build_runtime;
 mod node_agent_cache_advisor;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
+mod node_agent_cli_output_aggregate;
 mod node_agent_cli_probe;
+mod node_agent_cli_runtime_policy;
 mod node_agent_completion_outbox;
 mod node_agent_source_preview;
 use node_agent_cli_probe::{
@@ -120,6 +122,7 @@ mod node_agent_project_profile_python;
 mod node_agent_proxy;
 mod node_agent_registration;
 mod node_agent_release_identity;
+mod node_agent_restart_drain;
 mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
@@ -404,6 +407,7 @@ async fn run_agent_runtime() -> Result<()> {
     }
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
+    node_agent_restart_drain::recover_checkpoint_after_startup();
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);

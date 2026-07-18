@@ -61,6 +61,17 @@ try {
     approval_state: {
       approvals: [{ approval_id: 'approval-1', tool: 'run_command', actionable: true }],
     },
+    runtime: {
+      phase: 'verification',
+      current_command: 'cargo test --bin elon-pc-node',
+      last_progress: 1720000000000,
+      heartbeat: 1720000001000,
+      idle_duration: 3,
+      timeout_policy: {
+        mode: 'progress_aware', total_timeout_secs: 21600, idle_timeout_secs: 900,
+        heartbeat_secs: 15, progress_aware: true,
+      },
+    },
     supervision: {
       protocol: 'elon.desktop_pc_supervision.v1',
       enabled: true,
@@ -71,7 +82,10 @@ try {
         acceptance_criteria: ['测试通过', '监督验收'],
         improvement_policy: 'after_task_or_unblock',
       },
-      evidence: { event_count: 8, tool_calls: 2, tool_results: 2, changed_files: ['server/src/main.rs'] },
+      evidence: {
+        event_count: 8, tool_calls: 2, tool_results: 2, changed_files: ['server/src/main.rs'],
+        command_exit_codes: [{ command: 'cargo test', exit_code: 0 }], agent_messages: 1,
+      },
     },
   })
   assert.strictEqual(detail.task.id, 'local-1')
@@ -81,6 +95,11 @@ try {
   assert.strictEqual(detail.supervision.enabled, true)
   assert.strictEqual(detail.supervision.contract.acceptance_criteria.length, 2)
   assert.strictEqual(detail.supervision.evidence.tool_calls, 2)
+  assert.strictEqual(detail.supervision.evidence.command_exit_codes[0].exit_code, 0)
+  assert.strictEqual(detail.supervision.evidence.agent_messages, 1)
+  assert.strictEqual(detail.runtime.phase, 'verification')
+  assert.strictEqual(detail.runtime.current_command, 'cargo test --bin elon-pc-node')
+  assert.strictEqual(detail.runtime.timeout_policy.idle_timeout_secs, 900)
 
   const merged = model.mergeLocalTaskEvents(detail.events, [
     detail.events[1],
@@ -97,6 +116,7 @@ try {
   const railSource = readSource('src/features/shell/ServerRail.tsx')
   const apiSource = readSource('src/features/local-tasks/localTaskApi.ts')
   const pageSource = readSource('src/features/local-tasks/LocalTasksPage.tsx')
+  const detailSource = readSource('src/features/local-tasks/LocalTaskDetailPanel.tsx')
   const supervisionSource = readSource('src/features/local-tasks/LocalTaskSupervisionPanel.tsx')
   assert.ok(!bannerSource.includes('window.location.replace'), 'cloud recovery must not force navigation')
   assert.ok(bannerSource.includes('返回云端工作台'), 'cloud recovery must expose an explicit return action')
@@ -108,6 +128,9 @@ try {
   assert.ok(apiSource.includes('/cancel`'), 'local task cancel endpoint must be explicit')
   assert.ok(apiSource.includes('/tool-approvals/'), 'local tool approvals must use the task-local endpoint')
   assert.ok(pageSource.includes('ensureLocalFullAccessGrant'), 'local task creation must explicitly confirm and persist workspace access')
+  assert.ok(detailSource.includes('当前阶段'), 'local task details must expose the live runtime phase')
+  assert.ok(detailSource.includes('current_command'), 'local task details must expose the redacted current command')
+  assert.ok(detailSource.includes('idle_duration'), 'local task details must expose progress-aware idle duration')
   assert.ok(supervisionSource.includes('桌面监督闭环'), 'supervised tasks must expose their evidence and verdict in the PC workbench')
   assert.ok(supervisionSource.includes('PC 本机节点负责执行'), 'the PC workbench must explain the executor and supervisor roles')
 

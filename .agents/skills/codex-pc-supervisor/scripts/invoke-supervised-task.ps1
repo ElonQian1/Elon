@@ -7,6 +7,8 @@ param(
     [string]$WorkspacePath,
     [string]$Prompt,
     [string[]]$AcceptanceCriteria = @(),
+    [string]$AcceptanceCriteriaJson = '',
+    [string]$AcceptanceCriteriaFile = '',
     [string]$TaskId,
     [ValidateSet('observing', 'accepted', 'needs_follow_up', 'blocked_capability', 'rejected')]
     [string]$Verdict = 'observing',
@@ -20,12 +22,18 @@ param(
     [string]$RootTaskId,
     [switch]$BlockingImprovement,
     [ValidateRange(1, 55)]
-    [int]$WaitSeconds = 55
+    [int]$WaitSeconds = 55,
+    [ValidateRange(-1, 2147483647)]
+    [int]$Since = -1,
+    [ValidateRange(1, 200)]
+    [int]$Limit = 200,
+    [switch]$Compact
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $script:SupervisionProtocol = 'elon.desktop_pc_supervision.v1'
+$script:LastNodeAdminUrl = ''
 $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $script:Utf8NoBomStrict = [System.Text.UTF8Encoding]::new($false, $true)
 $OutputEncoding = $script:Utf8NoBom
@@ -113,6 +121,48 @@ function Convert-JsonResponseBytes {
     return $text | ConvertFrom-Json
 }
 
+function Resolve-AcceptanceCriteria {
+    param(
+        [string[]]$LegacyCriteria,
+        [string]$CriteriaJson,
+        [string]$CriteriaFile
+    )
+    $sources = 0
+    if (@($LegacyCriteria | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0) { $sources++ }
+    if (-not [string]::IsNullOrWhiteSpace($CriteriaJson)) { $sources++ }
+    if (-not [string]::IsNullOrWhiteSpace($CriteriaFile)) { $sources++ }
+    if ($sources -gt 1) {
+        throw 'Use only one of AcceptanceCriteria, AcceptanceCriteriaJson, or AcceptanceCriteriaFile.'
+    }
+
+    $parsed = $null
+    if (-not [string]::IsNullOrWhiteSpace($CriteriaFile)) {
+        $fullPath = [System.IO.Path]::GetFullPath($CriteriaFile)
+        if (-not (Test-Path -LiteralPath $fullPath -PathType Leaf)) {
+            throw "AcceptanceCriteriaFile does not exist: $fullPath"
+        }
+        $info = Get-Item -LiteralPath $fullPath
+        if ($info.Length -gt 262144) { throw 'AcceptanceCriteriaFile exceeds 256 KiB.' }
+        [byte[]]$bytes = [System.IO.File]::ReadAllBytes($fullPath)
+        $text = Convert-ResponseBytesToText $bytes 'application/json; charset=utf-8'
+        $parsed = $text | ConvertFrom-Json
+    } elseif (-not [string]::IsNullOrWhiteSpace($CriteriaJson)) {
+        $parsed = $CriteriaJson | ConvertFrom-Json
+    } else {
+        return [string[]]@($LegacyCriteria | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+    }
+
+    $criteriaValue = $parsed
+    $property = $parsed.PSObject.Properties['acceptance_criteria']
+    if ($null -ne $property) { $criteriaValue = $property.Value }
+    $items = @($criteriaValue | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+    if ($items.Count -gt 20) { throw 'Acceptance criteria cannot contain more than 20 items.' }
+    foreach ($item in $items) {
+        if ($item.Length -gt 2000) { throw 'An acceptance criterion exceeds 2000 characters.' }
+    }
+    return [string[]]$items
+}
+
 function Invoke-Utf8JsonRequest {
     param(
         [string]$Method,
@@ -165,13 +215,48 @@ function Invoke-Utf8JsonRequest {
     }
 }
 
+function Get-NodeUrlCachePath {
+    $root = if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        Join-Path $env:LOCALAPPDATA 'ElonNode'
+    } else {
+        Join-Path ([System.IO.Path]::GetTempPath()) 'ElonNode'
+    }
+    return Join-Path $root 'supervisor-node-url.txt'
+}
+
+function Get-CachedNodeUrl {
+    $path = Get-NodeUrlCachePath
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
+    try {
+        $url = ([System.IO.File]::ReadAllText($path, $script:Utf8NoBomStrict)).TrimEnd('/')
+        if ($url -match '^http://127\.0\.0\.1:(7799|78(?:0[0-9]|1[0-9]))$') { return $url }
+    } catch {}
+    return ''
+}
+
+function Save-CachedNodeUrl {
+    param([string]$Url)
+    if ($Url -notmatch '^http://127\.0\.0\.1:(7799|78(?:0[0-9]|1[0-9]))$') { return }
+    try {
+        $path = Get-NodeUrlCachePath
+        [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($path)) | Out-Null
+        [System.IO.File]::WriteAllText($path, $Url, $script:Utf8NoBom)
+    } catch {}
+}
+
 function Get-NodeConnection {
     param([int]$RetrySeconds = 0)
     $candidateUrls = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_ADMIN_URL)) {
         $candidateUrls.Add($env:ELON_NODE_ADMIN_URL.TrimEnd('/'))
     }
-    foreach ($port in 7799..7819) {
+    if (-not [string]::IsNullOrWhiteSpace($script:LastNodeAdminUrl)) {
+        $candidateUrls.Add($script:LastNodeAdminUrl)
+    }
+    $cachedUrl = Get-CachedNodeUrl
+    if (-not [string]::IsNullOrWhiteSpace($cachedUrl)) { $candidateUrls.Add($cachedUrl) }
+    $candidateUrls.Add('http://127.0.0.1:7799')
+    foreach ($port in 7800..7819) {
         $candidateUrls.Add("http://127.0.0.1:$port")
     }
 
@@ -188,11 +273,14 @@ function Get-NodeConnection {
                 if (-not [string]::IsNullOrWhiteSpace($token) -and
                     $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
                     -not [string]::IsNullOrWhiteSpace($version)) {
+                    $script:LastNodeAdminUrl = $candidateUrl
+                    Save-CachedNodeUrl $candidateUrl
                     return [pscustomobject]@{
                         BaseUrl = $candidateUrl
                         Header = $header
                         Token = $token
                         Version = $version
+                        ProbeMs = $timer.ElapsedMilliseconds
                     }
                 }
             } catch {
@@ -261,16 +349,48 @@ function New-SupervisedTaskBody {
 }
 
 function Get-TaskDetailPath {
-    param([string]$RequestedTaskId, [int]$Limit = 1000)
+    param([string]$RequestedTaskId, [int]$Limit = 200, [int]$Since = -1)
     if ([string]::IsNullOrWhiteSpace($RequestedTaskId)) { throw "$Action requires TaskId." }
     $encodedTaskId = [uri]::EscapeDataString($RequestedTaskId.Trim())
+    if ($Since -ge 0) {
+        return "/api/local-tasks/${encodedTaskId}?since=$Since&limit=$Limit"
+    }
     return "/api/local-tasks/${encodedTaskId}?limit=$Limit"
 }
 
 function Get-TaskDetail {
-    param([object]$Connection, [string]$RequestedTaskId, [int]$Limit = 1000)
-    $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit
+    param([object]$Connection, [string]$RequestedTaskId, [int]$Limit = 200, [int]$Since = -1)
+    $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit $Since
     Invoke-NodeApi $Connection 'Get' $detailPath
+}
+
+function Convert-ToCompactTaskDetail {
+    param([object]$Detail)
+    $record = Get-RecordFromDetail $Detail
+    $supervision = Get-ObjectField $Detail 'supervision'
+    $events = @((Get-ObjectField $Detail 'events') | ForEach-Object {
+        $event = Get-ObjectField $_ 'event'
+        [ordered]@{
+            seq = Get-ObjectField $_ 'seq'
+            type = Get-ObjectField $event 'type'
+            phase = Get-ObjectField $event 'phase'
+            lifecycle = Get-ObjectField $event 'lifecycle'
+        }
+    })
+    return [ordered]@{
+        record = [ordered]@{
+            task_id = Get-ObjectField $record 'task_id'
+            status = Get-ObjectField $record 'status'
+            error = Get-ObjectField $record 'error'
+            finished_at_ms = Get-ObjectField $record 'finished_at_ms'
+        }
+        runtime = Get-ObjectField $Detail 'runtime'
+        approval_state = Get-ObjectField $Detail 'approval_state'
+        evidence = Get-ObjectField $supervision 'evidence'
+        events = $events
+        last_event_seq = Get-ObjectField $Detail 'last_event_seq'
+        has_more = Get-ObjectField $Detail 'has_more'
+    }
 }
 
 function Get-RecordFromDetail {
@@ -301,7 +421,7 @@ function Assert-SafeResumeParentDetail {
         throw 'Resume task detail does not match the requested parent task.'
     }
     $status = ([string](Get-ObjectField $record 'status')).Trim().ToLowerInvariant()
-    $terminalStatuses = @('done', 'failed', 'canceled', 'interrupted')
+    $terminalStatuses = @('done', 'failed', 'canceled', 'interrupted', 'resume_required')
     if ($terminalStatuses -notcontains $status -or $null -eq (Get-ObjectField $record 'finished_at_ms')) {
         throw 'Resume requires a parent task with a reliable terminal status.'
     }
@@ -389,114 +509,11 @@ function Submit-Body {
     })
 }
 
-if ($Action -eq 'SelfTest') {
-    $testWorkspace = 'C:\一龙项目\中文工作区'
-    $testPrompt = '检查监督链路，保持中文路径完整'
-    $testCriteria = @('提交与检查保留中文', '等待与验收摘要无乱码')
-    $testSummary = '独立复核：路径、提示和验收条件完整'
-    $testBody = New-SupervisedTaskBody '中文项目' $testWorkspace $testPrompt `
-        'requirement' '' '' $testCriteria 'after_task_or_unblock'
-    [byte[]]$requestBytes = Convert-ToUtf8JsonBytes $testBody
-    $requestRoundTrip = Convert-JsonResponseBytes $requestBytes 'application/json'
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-self-test.ps1')
+if ($Action -eq 'SelfTest') { Invoke-SupervisionSelfTest; exit 0 }
 
-    $parentJson = [ordered]@{
-        record = [ordered]@{
-            task_id = 'local-parent-task'
-            project_id = '中文项目'
-            workspace_path = $testWorkspace
-            prompt = $testPrompt
-            status = 'failed'
-            finished_at_ms = 2
-            workspace_status = [ordered]@{
-                isolated = $true
-                base_workspace_path = $testWorkspace
-                active_workspace_path = 'C:\conversation-worktrees\中文项目\中文会话'
-                branch = 'ai/session/中文项目/中文会话'
-            }
-        }
-        supervision = [ordered]@{
-            enabled = $true
-            protocol = $script:SupervisionProtocol
-            contract = [ordered]@{
-                protocol = $script:SupervisionProtocol
-                root_task_id = 'local-root-task'
-            }
-        }
-    }
-    [byte[]]$responseBytes = Convert-ToUtf8JsonBytes $parentJson
-    $decodedParent = Convert-JsonResponseBytes $responseBytes 'application/json; charset=utf-8'
-    $invalidUtf8Rejected = $false
-    try {
-        $null = Convert-JsonResponseBytes ([byte[]](0xC3, 0x28)) 'application/json; charset=utf-8'
-    } catch [System.Text.DecoderFallbackException] {
-        $invalidUtf8Rejected = $true
-    } catch {
-        if ($_.Exception.Message -eq 'Node response is not valid in its declared/default UTF-8 encoding.') {
-            $invalidUtf8Rejected = $true
-        } else {
-            throw
-        }
-    }
-    $reviewBody = New-SupervisionReviewBody 'accepted' $testSummary @('后续继续观察中文日志')
-    [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
-    $reviewRoundTrip = Convert-JsonResponseBytes $reviewBytes 'application/json'
-    $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' '修复中文继承路径' `
-        $testCriteria $true
-    $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
-    $unsafeParent = [ordered]@{
-        record = [ordered]@{
-            task_id = 'local-running-task'
-            project_id = '中文项目'
-            workspace_path = $testWorkspace
-            prompt = $testPrompt
-            status = 'running'
-            workspace_status = [ordered]@{ isolated = $false }
-        }
-        supervision = [ordered]@{ enabled = $false }
-    }
-    $unsafeResumeRejected = $false
-    try {
-        $null = New-ResumeTaskBody $unsafeParent 'local-running-task' $testCriteria 'after_task_or_unblock'
-    } catch {
-        $unsafeResumeRejected = $true
-    }
-    $testDetailPath = Get-TaskDetailPath 'local-test?id'
-    if ($testBody.supervision.acceptance_criteria.Count -ne 2 -or
-        $testBody.supervision.task_role -ne 'requirement' -or
-        $requestRoundTrip.workspace_path -cne $testWorkspace -or
-        $requestRoundTrip.prompt -cne $testPrompt -or
-        $requestRoundTrip.supervision.acceptance_criteria[0] -cne $testCriteria[0] -or
-        $decodedParent.record.workspace_path -cne $testWorkspace -or
-        -not $invalidUtf8Rejected -or
-        $reviewRoundTrip.summary -cne $testSummary -or
-        $improvementBody.workspace_path -cne $testWorkspace -or
-        $improvementBody.supervision.task_role -ne 'capability_repair' -or
-        $improvementBody.supervision.parent_task_id -ne 'local-parent-task' -or
-        $improvementBody.supervision.root_task_id -ne 'local-root-task' -or
-        $resumeBody.workspace_path -cne $testWorkspace -or
-        $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -lt 0 -or
-        $resumeBody.supervision.task_role -ne 'resume_original' -or
-        $resumeBody.supervision.protocol -ne $script:SupervisionProtocol -or
-        $resumeBody.supervision.parent_task_id -ne 'local-parent-task' -or
-        $resumeBody.supervision.root_task_id -ne 'local-root-task' -or
-        -not $unsafeResumeRejected -or
-        $script:SupervisionProtocol -ne 'elon.desktop_pc_supervision.v1' -or
-        $testDetailPath -ne '/api/local-tasks/local-test%3Fid?limit=1000') {
-        throw 'Supervised request construction self-test failed.'
-    }
-    Convert-ToJsonResult ([ordered]@{
-        ok = $true
-        action = 'SelfTest'
-        protocol = $script:SupervisionProtocol
-        checks = @(
-            'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
-            'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
-            'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
-            'task_detail_path'
-        )
-    })
-    exit 0
-}
+$resolvedAcceptanceCriteria = @(Resolve-AcceptanceCriteria `
+    $AcceptanceCriteria $AcceptanceCriteriaJson $AcceptanceCriteriaFile)
 
 $nodeConnection = if ($Action -eq 'Wait') {
     Get-NodeConnection -RetrySeconds $WaitSeconds
@@ -509,41 +526,53 @@ switch ($Action) {
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Probe'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; node_version = $nodeConnection.Version
+            probe_ms = $nodeConnection.ProbeMs; cache_contains_token = $false
         })
     }
     'Submit' {
         $submitBody = New-SupervisedTaskBody $ProjectId $WorkspacePath $Prompt $TaskRole `
-            $ParentTaskId $RootTaskId $AcceptanceCriteria $ImprovementPolicy
+            $ParentTaskId $RootTaskId $resolvedAcceptanceCriteria $ImprovementPolicy
         Submit-Body $nodeConnection $submitBody 'Submit'
     }
     'Inspect' {
-        $detail = Get-TaskDetail $nodeConnection $TaskId
+        $detail = Get-TaskDetail $nodeConnection $TaskId $Limit $Since
+        $nextCursor = [int](Get-ObjectField $detail 'last_event_seq')
+        $resultDetail = if ($Compact) { Convert-ToCompactTaskDetail $detail } else { $detail }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Inspect'; protocol = $script:SupervisionProtocol
-            node_url = $nodeConnection.BaseUrl; task_id = $TaskId; detail = $detail
+            node_url = $nodeConnection.BaseUrl; task_id = $TaskId
+            since = $Since; limit = $Limit; next_cursor = $nextCursor; detail = $resultDetail
         })
     }
     'Wait' {
-        $terminalStatuses = @('done', 'finished', 'success', 'succeeded', 'failed', 'error', 'canceled', 'cancelled', 'interrupted')
+        $terminalStatuses = @('done', 'finished', 'success', 'succeeded', 'failed', 'error', 'canceled', 'cancelled', 'interrupted', 'resume_required')
         $timer = [System.Diagnostics.Stopwatch]::StartNew()
         $detail = $null
         $status = ''
+        $cursor = if ($Since -ge 0) { $Since } else { 0 }
+        $waitLimit = if ($PSBoundParameters.ContainsKey('Limit')) { $Limit } else { 25 }
         do {
             try {
                 # Poll only a small event window. The node computes the
                 # supervision evidence summary from the complete journal.
-                $detail = Get-TaskDetail $nodeConnection $TaskId 25
+                $detail = Get-TaskDetail $nodeConnection $TaskId $waitLimit $cursor
                 $record = Get-RecordFromDetail $detail
                 $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
+                $returnedCursor = [int](Get-ObjectField $detail 'last_event_seq')
+                if ($returnedCursor -gt $cursor) { $cursor = $returnedCursor }
                 if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
+                if ((Get-ObjectField $detail 'has_more') -eq $true) { continue }
             } catch {
                 if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) { throw }
             }
             Start-Sleep -Seconds 2
         } while ($timer.Elapsed.TotalSeconds -lt $WaitSeconds)
+        $resultDetail = if ($Compact) { Convert-ToCompactTaskDetail $detail } else { $detail }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Wait'; protocol = $script:SupervisionProtocol
-            node_url = $nodeConnection.BaseUrl; task_id = $TaskId; status = $status; detail = $detail
+            node_url = $nodeConnection.BaseUrl; task_id = $TaskId; status = $status
+            since = $(if ($Since -ge 0) { $Since } else { 0 }); limit = $waitLimit
+            next_cursor = $cursor; detail = $resultDetail
         })
     }
     'Review' {
@@ -559,12 +588,12 @@ switch ($Action) {
     'Improve' {
         $parentDetail = Get-TaskDetail $nodeConnection $TaskId
         $improvementBody = New-ImprovementTaskBody $parentDetail $TaskId $Prompt `
-            $AcceptanceCriteria ([bool]$BlockingImprovement)
+            $resolvedAcceptanceCriteria ([bool]$BlockingImprovement)
         Submit-Body $nodeConnection $improvementBody 'Improve'
     }
     'Resume' {
         $parentDetail = Get-TaskDetail $nodeConnection $TaskId
-        $resumeBody = New-ResumeTaskBody $parentDetail $TaskId $AcceptanceCriteria $ImprovementPolicy
+        $resumeBody = New-ResumeTaskBody $parentDetail $TaskId $resolvedAcceptanceCriteria $ImprovementPolicy
         Submit-Body $nodeConnection $resumeBody 'Resume'
     }
 }

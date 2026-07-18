@@ -600,16 +600,16 @@ pub(super) async fn run_session(
                         } => {
                             let ver = version.as_deref().unwrap_or("latest");
                             info!("⬆️  收到云端更新指令，目标版本: {}", ver);
-                            runtime.lifecycle.mark_planned_shutdown("update");
-                            let cloud_http = runtime.cloud_http_url();
+                            let runtime_for_update = runtime.clone();
                             tokio::spawn(async move {
-                                match crate::node_agent_client_maintenance::push_update_from_server(
-                                    &cloud_http,
-                                    download_url.as_deref(),
+                                match crate::node_agent_restart_drain::schedule_update(
+                                    runtime_for_update,
+                                    "cloud_broadcast",
+                                    download_url,
                                 )
                                 .await
                                 {
-                                    Ok(msg) => info!("✅ 自动更新已启动: {}", msg),
+                                    Ok(payload) => info!("✅ 自动更新已安排: {}", payload),
                                     Err(e) => warn!("⚠️  自动更新失败（需手动更新）: {}", e),
                                 }
                             });

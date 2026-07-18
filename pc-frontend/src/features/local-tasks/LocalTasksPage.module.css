@@ -194,6 +194,15 @@
 .dangerButton:hover:not(:disabled) { background: rgba(223,92,92,.16); }
 .detailScroll { min-height: 0; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 14px 18px 24px; scrollbar-width: thin; }
 
+.runtimeCard { border: 1px solid rgba(42,142,217,.28); border-radius: 8px; background: linear-gradient(135deg, rgba(42,142,217,.10), #25282e 52%); padding: 12px 14px; }
+.runtimeCard[data-phase="approval"] { border-color: rgba(232,180,93,.36); }
+.runtimeCard[data-phase="failed"] { border-color: rgba(223,92,92,.36); }
+.runtimeCard h3 { margin: 0; color: var(--text-soft); font-size: 12px; }
+.currentCommand { margin: 8px 0 0; overflow: hidden; color: #cbd0d9; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 11px; line-height: 1.5; text-overflow: ellipsis; white-space: nowrap; }
+.runtimeMeta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 10px 0 0; }
+.runtimeMeta dt { color: var(--text-muted); font-size: 9px; font-weight: 850; }
+.runtimeMeta dd { margin: 3px 0 0; color: var(--text-soft); font-size: 10px; }
+
 .summaryGrid { display: grid; grid-template-columns: repeat(6, minmax(95px, 1fr)); gap: 1px; border: 1px solid var(--line-soft); border-radius: 8px; overflow: hidden; background: var(--line-soft); }
 .summaryItem { min-width: 0; display: flex; flex-direction: column; gap: 5px; background: #27292f; padding: 10px; }
 .summaryItem span { overflow: hidden; color: var(--text-muted); font-size: 9px; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
@@ -273,4 +282,5 @@
   .header { align-items: flex-start; flex-direction: column; }
   .headerActions { width: 100%; justify-content: space-between; }
   .supervisionMeta, .supervisionColumns { grid-template-columns: 1fr 1fr; }
+  .runtimeMeta { grid-template-columns: 1fr 1fr; }
 }

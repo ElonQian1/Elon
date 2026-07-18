@@ -60,6 +60,16 @@ pub(crate) struct TaskJournalRecord {
     #[serde(default)]
     pub codex_session_updated_at_ms: Option<u128>,
     pub status: String,
+    #[serde(default = "default_runtime_phase")]
+    pub phase: String,
+    #[serde(default)]
+    pub current_command: Option<String>,
+    #[serde(default)]
+    pub last_progress_ms: Option<u128>,
+    #[serde(default)]
+    pub heartbeat_at_ms: Option<u128>,
+    #[serde(default)]
+    pub timeout_policy: Option<crate::node_agent_cli_runtime_policy::CliRuntimePolicy>,
     pub started_at_ms: u128,
     pub updated_at_ms: u128,
     pub cancel_requested_at_ms: Option<u128>,
@@ -107,6 +117,11 @@ impl TaskJournal {
                 codex_session_scope_key: None,
                 codex_session_updated_at_ms: None,
                 status: "running".to_string(),
+                phase: "reasoning".to_string(),
+                current_command: None,
+                last_progress_ms: Some(now),
+                heartbeat_at_ms: Some(now),
+                timeout_policy: None,
                 started_at_ms: now,
                 updated_at_ms: now,
                 cancel_requested_at_ms: None,
@@ -221,6 +236,57 @@ impl TaskJournal {
         })
     }
 
+    pub(crate) fn configure_runtime_policy(
+        &self,
+        req_id: &str,
+        policy: &crate::node_agent_cli_runtime_policy::CliRuntimePolicy,
+    ) -> Result<()> {
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                record.timeout_policy = Some(policy.clone());
+                record.heartbeat_at_ms = Some(now);
+                record.updated_at_ms = now;
+            }
+            self.save_registry(&registry)
+        })
+    }
+
+    pub(crate) fn record_runtime_progress(
+        &self,
+        req_id: &str,
+        phase: &str,
+        current_command: Option<&str>,
+    ) -> Result<()> {
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                record.phase = normalize_runtime_phase(phase).to_string();
+                record.current_command = current_command
+                    .map(crate::node_agent_cli_output_aggregate::sanitize_command)
+                    .filter(|command| !command.is_empty());
+                record.last_progress_ms = Some(now);
+                record.heartbeat_at_ms = Some(now);
+                record.updated_at_ms = now;
+            }
+            self.save_registry(&registry)
+        })
+    }
+
+    pub(crate) fn record_runtime_heartbeat(&self, req_id: &str) -> Result<()> {
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                record.heartbeat_at_ms = Some(now);
+                record.updated_at_ms = now;
+            }
+            self.save_registry(&registry)
+        })
+    }
+
     pub(crate) fn record_cancel_requested(&self, req_id: &str) -> Result<()> {
         with_task_journal_io_lock(|| {
             let now = now_ms();
@@ -234,6 +300,7 @@ impl TaskJournal {
                     current_status = Some(record.status.clone());
                 } else {
                     record.status = "cancel_requested".to_string();
+                    record.phase = "finalizing".to_string();
                     record.updated_at_ms = now;
                     record.cancel_requested_at_ms = Some(now);
                     current_status = Some(record.status.clone());
@@ -283,6 +350,9 @@ impl TaskJournal {
                     record.status = requested_status.to_string();
                     effective_status = record.status.clone();
                 }
+                record.phase = terminal_runtime_phase(requested_status).to_string();
+                record.current_command = None;
+                record.heartbeat_at_ms = Some(now);
                 record.updated_at_ms = now;
             }
             self.save_registry(&registry)?;
@@ -611,6 +681,50 @@ impl TaskJournal {
     fn read_registry_for_test(&self) -> Result<BTreeMap<String, TaskJournalRecord>> {
         with_task_journal_io_lock(|| self.load_registry())
     }
+}
+
+pub(crate) fn runtime_status_payload(record: Option<&TaskJournalRecord>) -> Value {
+    let Some(record) = record else {
+        return Value::Null;
+    };
+    let now = now_ms();
+    let last_progress = record.last_progress_ms.unwrap_or(record.started_at_ms);
+    let heartbeat = record.heartbeat_at_ms.unwrap_or(record.updated_at_ms);
+    json!({
+        "phase": record.phase,
+        "current_command": record.current_command,
+        "last_progress": last_progress,
+        "heartbeat": heartbeat,
+        "idle_duration": now.saturating_sub(last_progress) / 1000,
+        "timeout_policy": record.timeout_policy,
+    })
+}
+
+fn normalize_runtime_phase(phase: &str) -> &'static str {
+    match phase.trim().to_ascii_lowercase().as_str() {
+        "reasoning" => "reasoning",
+        "command" => "command",
+        "editing" => "editing",
+        "verification" => "verification",
+        "approval" => "approval",
+        "finalizing" => "finalizing",
+        "done" => "done",
+        "failed" => "failed",
+        "canceled" => "canceled",
+        _ => "reasoning",
+    }
+}
+
+fn terminal_runtime_phase(status: &str) -> &'static str {
+    match status {
+        "done" | "finished" => "done",
+        "canceled" => "canceled",
+        _ => "failed",
+    }
+}
+
+fn default_runtime_phase() -> String {
+    "reasoning".to_string()
 }
 
 #[derive(Default)]

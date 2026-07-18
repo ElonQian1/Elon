@@ -8,7 +8,7 @@ use crate::node_agent_cli_done::{
 };
 use crate::node_agent_cli_prompt_direct::CliDirectRunContext;
 use crate::node_agent_cli_prompt_runner::{
-    cli_done_error, cli_prompt_timeout_secs, run_cli_prompt, ws_text, CliPromptRun,
+    cli_done_error, cli_runtime_policy, run_cli_prompt, ws_text, CliPromptRun,
 };
 use crate::node_agent_cli_runner::*;
 use crate::{
@@ -39,6 +39,14 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
     let sidecar_registry = direct.runtime.sidecar_registry();
     let session_id = node_agent_cli_sidecar_runner::session_id_for_task(&direct.req_id);
     let output_path = sidecar_registry.output_path(&direct.req_id, &session_id);
+    let runtime_policy = cli_runtime_policy(
+        &direct.cli_name_owned,
+        direct.runtime_permission.as_deref(),
+        direct.completion_context.is_desktop_supervised(),
+    );
+    let _ = direct
+        .task_journal
+        .configure_runtime_policy(&direct.req_id, &runtime_policy);
     let launch_config = node_agent_cli_sidecar_runner::CliSidecarLaunchConfig {
         session_id,
         task_id: direct.req_id.clone(),
@@ -57,11 +65,8 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         worker_sha256: None,
         codex_session_scope_key: direct.codex_key.clone(),
         legacy_codex_sessions_file: Some(direct.codex_sessions_file.clone()),
-        timeout_secs: cli_prompt_timeout_secs(
-            &direct.cli_name_owned,
-            direct.runtime_permission.as_deref(),
-            direct.completion_context.is_desktop_supervised(),
-        ),
+        timeout_secs: runtime_policy.total_timeout_secs,
+        runtime_policy: Some(runtime_policy),
         stdin_payload: direct.stdin_payload.clone(),
         stdin_piped_empty,
         initial_cols: node_agent_cli_pty::default_cols(),
@@ -108,6 +113,8 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
             warn!("PC 任务 journal 写入 sidecar pid 失败: {error}");
         }
     }
+    let mut journal_aggregate =
+        crate::node_agent_cli_output_aggregate::CliOutputJournalAggregate::default();
     let result = node_agent_cli_sidecar_runner::follow_sidecar_output(
         &sidecar_registry,
         &req_id,
@@ -132,6 +139,15 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
                     if visible_text.is_empty() {
                         return;
                     }
+                    let observation =
+                        journal_aggregate.observe(&task_journal, &req_id, "stdout", &visible_text);
+                    if observation.progress {
+                        let _ = task_journal.record_runtime_progress(
+                            &req_id,
+                            observation.phase.as_deref().unwrap_or("reasoning"),
+                            observation.current_command.as_deref(),
+                        );
+                    }
                     send_cli_chunk_message(&out_tx, &req_id, &visible_text);
                 } else {
                     send_cli_chunk_message(&out_tx, &req_id, &text);
@@ -141,6 +157,15 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
                 if cli_name == "codex" {
                     if !text.trim().is_empty() {
                         info!("[codex stderr] {}", text.trim_end());
+                        let observation =
+                            journal_aggregate.observe(&task_journal, &req_id, "stderr", &text);
+                        if observation.progress {
+                            let _ = task_journal.record_runtime_progress(
+                                &req_id,
+                                observation.phase.as_deref().unwrap_or("reasoning"),
+                                observation.current_command.as_deref(),
+                            );
+                        }
                     }
                 } else {
                     send_cli_chunk_message(&out_tx, &req_id, &text);
@@ -151,9 +176,13 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
                     warn!("PC 任务 journal 写入 sidecar child pid 失败: {error}");
                 }
             }
+            node_agent_cli_sidecar_runner::CliSidecarOutputEvent::Heartbeat => {
+                let _ = task_journal.record_runtime_heartbeat(&req_id);
+            }
         },
     )
     .await;
+    journal_aggregate.flush(&task_journal, &req_id);
     let mut result = match result {
         Ok(result) => result,
         Err(error) => {

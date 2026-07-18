@@ -312,7 +312,13 @@ fn state_policy(status: &str) -> ApprovalStatePolicy {
 fn task_status_is_terminal(status: &str) -> bool {
     matches!(
         status.trim().to_ascii_lowercase().as_str(),
-        "finished" | "done" | "failed" | "canceled" | "cancelled" | "interrupted"
+        "finished"
+            | "done"
+            | "failed"
+            | "canceled"
+            | "cancelled"
+            | "interrupted"
+            | "resume_required"
     )
 }
 

@@ -1,0 +1,138 @@
+function Invoke-SupervisionSelfTest {
+    function ConvertFrom-Utf8Base64([string]$Value) {
+        return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
+    }
+    $testWorkspace = ConvertFrom-Utf8Base64 'Qzpc5LiA6b6Z6aG555uuXOS4reaWh+W3peS9nOWMug=='
+    $testPrompt = ConvertFrom-Utf8Base64 '5qOA5p+l55uR552j6ZO+6Lev77yM5L+d5oyB5Lit5paH6Lev5b6E5a6M5pW0'
+    $testCriteria = @(
+        ConvertFrom-Utf8Base64 '5o+Q5Lqk5LiO5qOA5p+l5L+d55WZ5Lit5paH'
+        ConvertFrom-Utf8Base64 '562J5b6F5LiO6aqM5pS25pGY6KaB5peg5Lmx56CB'
+    )
+    $testSummary = ConvertFrom-Utf8Base64 '54us56uL5aSN5qC477ya6Lev5b6E44CB5o+Q56S65ZKM6aqM5pS25p2h5Lu25a6M5pW0'
+    $testProject = ConvertFrom-Utf8Base64 '5Lit5paH6aG555uu'
+    $testBody = New-SupervisedTaskBody $testProject $testWorkspace $testPrompt `
+        'requirement' '' '' $testCriteria 'after_task_or_unblock'
+    [byte[]]$requestBytes = Convert-ToUtf8JsonBytes $testBody
+    $requestRoundTrip = Convert-JsonResponseBytes $requestBytes 'application/json'
+
+    $parentJson = [ordered]@{
+        record = [ordered]@{
+            task_id = 'local-parent-task'
+            project_id = $testProject
+            workspace_path = $testWorkspace
+            prompt = $testPrompt
+            status = 'failed'
+            finished_at_ms = 2
+            workspace_status = [ordered]@{
+                isolated = $true
+                base_workspace_path = $testWorkspace
+                active_workspace_path = ConvertFrom-Utf8Base64 'QzpcY29udmVyc2F0aW9uLXdvcmt0cmVlc1zkuK3mlofpobnnm65c5Lit5paH5Lya6K+d'
+                branch = 'ai/session/中文项目/中文会话'
+            }
+        }
+        supervision = [ordered]@{
+            enabled = $true
+            protocol = $script:SupervisionProtocol
+            contract = [ordered]@{
+                protocol = $script:SupervisionProtocol
+                root_task_id = 'local-root-task'
+            }
+        }
+    }
+    [byte[]]$responseBytes = Convert-ToUtf8JsonBytes $parentJson
+    $decodedParent = Convert-JsonResponseBytes $responseBytes 'application/json; charset=utf-8'
+    $invalidUtf8Rejected = $false
+    try {
+        $null = Convert-JsonResponseBytes ([byte[]](0xC3, 0x28)) 'application/json; charset=utf-8'
+    } catch [System.Text.DecoderFallbackException] {
+        $invalidUtf8Rejected = $true
+    } catch {
+        if ($_.Exception.Message -eq 'Node response is not valid in its declared/default UTF-8 encoding.') {
+            $invalidUtf8Rejected = $true
+        } else {
+            throw
+        }
+    }
+    $reviewBody = New-SupervisionReviewBody 'accepted' $testSummary @(
+        ConvertFrom-Utf8Base64 '5ZCO57ut57un57ut6KeC5a+f5Lit5paH5pel5b+X'
+    )
+    [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
+    $reviewRoundTrip = Convert-JsonResponseBytes $reviewBytes 'application/json'
+    $improvementPrompt = ConvertFrom-Utf8Base64 '5L+u5aSN5Lit5paH57un5om/6Lev5b6E'
+    $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' $improvementPrompt `
+        $testCriteria $true
+    $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $unsafeParent = [ordered]@{
+        record = [ordered]@{
+            task_id = 'local-running-task'
+            project_id = $testProject
+            workspace_path = $testWorkspace
+            prompt = $testPrompt
+            status = 'running'
+            workspace_status = [ordered]@{ isolated = $false }
+        }
+        supervision = [ordered]@{ enabled = $false }
+    }
+    $unsafeResumeRejected = $false
+    try {
+        $null = New-ResumeTaskBody $unsafeParent 'local-running-task' $testCriteria 'after_task_or_unblock'
+    } catch {
+        $unsafeResumeRejected = $true
+    }
+    $testDetailPath = Get-TaskDetailPath 'local-test?id'
+    $criteriaJson = ConvertFrom-Utf8Base64 'WyLmnaHku7bkuIAiLCLmnaHku7bkuowiXQ=='
+    $jsonCriteria = @(Resolve-AcceptanceCriteria @() $criteriaJson '')
+    $criteriaFile = Join-Path ([System.IO.Path]::GetTempPath()) "elon-supervision-criteria-$([guid]::NewGuid().ToString('N')).json"
+    try {
+        [System.IO.File]::WriteAllText(
+            $criteriaFile,
+            (ConvertFrom-Utf8Base64 'eyJhY2NlcHRhbmNlX2NyaXRlcmlhIjpbIuaWh+S7tuadoeS7tuS4gCIsIuaWh+S7tuadoeS7tuS6jCIsIuaWh+S7tuadoeS7tuS4iSJdfQ=='),
+            $script:Utf8NoBom
+        )
+        $fileCriteria = @(Resolve-AcceptanceCriteria @() '' $criteriaFile)
+    } finally {
+        Remove-Item -LiteralPath $criteriaFile -Force -ErrorAction SilentlyContinue
+    }
+    $checks = [ordered]@{
+        legacy_criteria = $testBody.supervision.acceptance_criteria.Count -eq 2
+        task_role = $testBody.supervision.task_role -eq 'requirement'
+        request_workspace = $requestRoundTrip.workspace_path -ceq $testWorkspace
+        request_prompt = $requestRoundTrip.prompt -ceq $testPrompt
+        request_criteria = $requestRoundTrip.supervision.acceptance_criteria[0] -ceq $testCriteria[0]
+        response_workspace = $decodedParent.record.workspace_path -ceq $testWorkspace
+        invalid_utf8 = $invalidUtf8Rejected
+        review_summary = $reviewRoundTrip.summary -ceq $testSummary
+        improve_workspace = $improvementBody.workspace_path -ceq $testWorkspace
+        improve_role = $improvementBody.supervision.task_role -eq 'capability_repair'
+        improve_parent = $improvementBody.supervision.parent_task_id -eq 'local-parent-task'
+        improve_root = $improvementBody.supervision.root_task_id -eq 'local-root-task'
+        resume_workspace = $resumeBody.workspace_path -ceq $testWorkspace
+        resume_prompt = $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -ge 0
+        resume_role = $resumeBody.supervision.task_role -eq 'resume_original'
+        resume_protocol = $resumeBody.supervision.protocol -eq $script:SupervisionProtocol
+        resume_parent = $resumeBody.supervision.parent_task_id -eq 'local-parent-task'
+        resume_root = $resumeBody.supervision.root_task_id -eq 'local-root-task'
+        resume_guard = $unsafeResumeRejected
+        protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
+        detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
+        criteria_json = $jsonCriteria.Count -eq 2 -and
+            $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')
+        criteria_file = $fileCriteria.Count -eq 3 -and
+            $fileCriteria[2] -ceq (ConvertFrom-Utf8Base64 '5paH5Lu25p2h5Lu25LiJ')
+    }
+    $failedChecks = @($checks.Keys | Where-Object { -not $checks[$_] })
+    if ($failedChecks.Count -gt 0) {
+        throw "Supervised request construction self-test failed: $($failedChecks -join ', ')"
+    }
+    Convert-ToJsonResult ([ordered]@{
+        ok = $true
+        action = 'SelfTest'
+        protocol = $script:SupervisionProtocol
+        checks = @(
+            'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
+            'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
+            'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
+            'task_detail_path', 'criteria_json_array', 'criteria_utf8_file'
+        )
+    })
+}

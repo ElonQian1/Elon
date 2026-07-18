@@ -19,7 +19,7 @@ pub(crate) struct AutostartInfo {
     pub(crate) legacy_detected: bool,
 }
 
-pub(crate) async fn push_update_from_server(
+pub(crate) async fn push_update_from_server_now(
     cloud_http_url: &str,
     download_url_override: Option<&str>,
 ) -> Result<String, String> {

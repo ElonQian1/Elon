@@ -53,6 +53,16 @@ pub(super) async fn admin_status(
         warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
         Vec::new()
     });
+    let active_task_runtime = recent_task_records
+        .iter()
+        .filter(|record| matches!(record.status.as_str(), "running" | "cancel_requested"))
+        .map(|record| {
+            serde_json::json!({
+                "task_id": record.req_id,
+                "runtime": super::node_agent_task_journal::runtime_status_payload(Some(record)),
+            })
+        })
+        .collect::<Vec<_>>();
     let sidecar_sessions = rt.cli_sidecars.latest_sessions(20).unwrap_or_else(|error| {
         warn!("PC CLI sidecar registry 读取失败，CLI 会话桥接 sidecar 状态降级为空摘要: {error}");
         Vec::new()
@@ -79,6 +89,8 @@ pub(super) async fn admin_status(
         "task_journal_supported": true,
         "task_journal_schema_version": 1,
         "active_cli_prompt_count": active_cli_prompt_count,
+        "active_task_runtime": active_task_runtime,
+        "restart_recovery": super::node_agent_restart_drain::status_payload(),
         "logged_in": creds.is_some(),
         "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
         "device_name": super::machine_label(),

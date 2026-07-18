@@ -23,9 +23,10 @@ use crate::node_agent_task_journal;
 use crate::node_agent_tool_approval;
 use crate::pc_workspace_provisioner;
 
-pub(crate) const SUPERVISED_CODEX_TIMEOUT_ENV: &str = "ELON_SUPERVISED_CODEX_TIMEOUT_SECS";
-pub(crate) const DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS: u64 = 3600;
-const MAX_SUPERVISED_CODEX_TIMEOUT_SECS: u64 = 24 * 60 * 60;
+#[allow(unused_imports)]
+pub(crate) use crate::node_agent_cli_runtime_policy::{
+    DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS, SUPERVISED_CODEX_TIMEOUT_ENV,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CliPromptDelivery {
@@ -249,12 +250,18 @@ pub(crate) fn cli_prompt_timeout_secs(
     runtime_permission: Option<&str>,
     desktop_supervised: bool,
 ) -> u64 {
-    let configured_supervised_timeout = std::env::var(SUPERVISED_CODEX_TIMEOUT_ENV).ok();
-    cli_prompt_timeout_secs_with_config(
+    cli_runtime_policy(cli_name, runtime_permission, desktop_supervised).total_timeout_secs
+}
+
+pub(crate) fn cli_runtime_policy(
+    cli_name: &str,
+    runtime_permission: Option<&str>,
+    desktop_supervised: bool,
+) -> crate::node_agent_cli_runtime_policy::CliRuntimePolicy {
+    crate::node_agent_cli_runtime_policy::policy_for(
         cli_name,
-        runtime_permission,
+        cli_prompt_full_access(runtime_permission),
         desktop_supervised,
-        configured_supervised_timeout.as_deref(),
     )
 }
 
@@ -265,13 +272,12 @@ pub(crate) fn cli_prompt_timeout_secs_with_config(
     configured_supervised_timeout: Option<&str>,
 ) -> u64 {
     if cli_name.trim().eq_ignore_ascii_case("codex") && desktop_supervised {
-        return configured_supervised_timeout
-            .and_then(|value| value.trim().parse::<u64>().ok())
-            .unwrap_or(DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS)
-            .clamp(
-                DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS,
-                MAX_SUPERVISED_CODEX_TIMEOUT_SECS,
-            );
+        return crate::node_agent_cli_runtime_policy::CliRuntimePolicy::supervised_codex_with_config(
+            configured_supervised_timeout,
+            None,
+            None,
+        )
+        .total_timeout_secs;
     }
     match cli_name.trim().to_ascii_lowercase().as_str() {
         "codex" if cli_prompt_full_access(runtime_permission) => 1200,

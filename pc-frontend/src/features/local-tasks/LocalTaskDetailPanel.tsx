@@ -65,6 +65,22 @@ export default function LocalTaskDetailPanel({
       </header>
 
       <div className={styles.detailScroll}>
+        <section className={styles.runtimeCard} data-phase={detail.runtime.phase}>
+          <div className={styles.sectionHeading}>
+            <h3>当前阶段 · {phaseLabel(detail.runtime.phase)}</h3>
+            <span>心跳 {formatTime(detail.runtime.heartbeat)}</span>
+          </div>
+          <p className={styles.currentCommand}>
+            {detail.runtime.current_command || phaseHint(detail.runtime.phase)}
+          </p>
+          <dl className={styles.runtimeMeta}>
+            <div><dt>最近进展</dt><dd>{formatTime(detail.runtime.last_progress)}</dd></div>
+            <div><dt>空闲</dt><dd>{formatDuration(detail.runtime.idle_duration)}</dd></div>
+            <div><dt>总时限</dt><dd>{formatDuration(detail.runtime.timeout_policy.total_timeout_secs)}</dd></div>
+            <div><dt>空闲策略</dt><dd>{detail.runtime.timeout_policy.progress_aware ? formatDuration(detail.runtime.timeout_policy.idle_timeout_secs) : '固定总时限'}</dd></div>
+          </dl>
+        </section>
+
         <section className={styles.summaryGrid}>
           <Summary label="运行环境" value={task.cli_name || 'codex'} />
           <Summary label="权限" value={permissionLabel(task.runtime_permission)} />
@@ -157,6 +173,29 @@ export default function LocalTaskDetailPanel({
       </div>
     </section>
   )
+}
+
+function phaseLabel(phase: string): string {
+  return ({
+    reasoning: '推理', command: '命令', editing: '文件修改', verification: '验证',
+    approval: '等待审批', finalizing: '收尾', done: '完成', failed: '失败', canceled: '已取消',
+  } as Record<string, string>)[phase] || phase || '推理'
+}
+
+function phaseHint(phase: string): string {
+  if (phase === 'reasoning') return 'Codex 正在推理；节点心跳持续更新。'
+  if (phase === 'approval') return '等待用户处理工具审批。'
+  if (phase === 'finalizing') return '正在提交、发布或执行统一收尾。'
+  return '节点正在处理当前阶段。'
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '-'
+  if (seconds < 60) return `${Math.floor(seconds)} 秒`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return minutes ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`
 }
 
 function Summary({ label, value }: { label: string; value: string }) {

@@ -161,7 +161,7 @@ impl NodeRuntime {
 
         // Any remaining `running` row has lost its in-memory child handle. Keep
         // rows that still have a durable outbox envelope recoverable, and make all
-        // other interrupted work explicit instead of displaying it as live forever.
+        // other interrupted work explicit and resumable instead of displaying it as live forever.
         let mut durable_req_ids = match self.completion_outbox.pending_req_ids() {
             Ok(req_ids) => req_ids,
             Err(error) => {
@@ -181,11 +181,11 @@ impl NodeRuntime {
             .interrupt_lingering_running(&durable_req_ids)
         {
             Ok(0) => {}
-            Ok(interrupted) => warn!(
-                interrupted,
-                "marked local tasks interrupted after node-agent restart"
+            Ok(resume_required) => warn!(
+                resume_required,
+                "marked local tasks resume-required after node-agent restart"
             ),
-            Err(error) => warn!(%error, "failed to mark lingering local tasks interrupted"),
+            Err(error) => warn!(%error, "failed to mark lingering local tasks resume-required"),
         }
     }
 

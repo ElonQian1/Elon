@@ -206,6 +206,7 @@ async fn managed_pipe_replays_real_multiline_stdin_echo_from_child_stdout() {
         legacy_codex_sessions_file: None,
         timeout_secs: 10,
         stdin_payload: Some(prompt.to_string()),
+        runtime_policy: None,
         stdin_piped_empty: false,
         initial_cols: default_cols(),
         initial_rows: default_rows(),

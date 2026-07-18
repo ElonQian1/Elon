@@ -69,6 +69,71 @@ fn state_keeps_latest_review_and_counts_evidence() {
 }
 
 #[test]
+fn codex_json_items_produce_precise_nonzero_evidence() {
+    let events = vec![
+        TaskJournalEventView {
+            seq: 1,
+            event: json!({
+                "type":"codex_item", "lifecycle":"started",
+                "item":{"id":"cmd-1","type":"command_execution","command":"cargo test"}
+            }),
+        },
+        TaskJournalEventView {
+            seq: 2,
+            event: json!({
+                "type":"codex_item", "lifecycle":"completed",
+                "item":{"id":"cmd-1","type":"command_execution","command":"cargo test","status":"completed","exit_code":0}
+            }),
+        },
+        TaskJournalEventView {
+            seq: 3,
+            event: json!({
+                "type":"codex_item", "lifecycle":"started",
+                "item":{"id":"cmd-2","type":"command_execution","command":"cargo test bad"}
+            }),
+        },
+        TaskJournalEventView {
+            seq: 4,
+            event: json!({
+                "type":"codex_item", "lifecycle":"completed",
+                "item":{"id":"cmd-2","type":"command_execution","command":"cargo test bad","status":"failed","exit_code":2,
+                    "output":{"tail":["assertion failed"]}}
+            }),
+        },
+        TaskJournalEventView {
+            seq: 5,
+            event: json!({
+                "type":"codex_item", "lifecycle":"started",
+                "item":{"id":"file-1","type":"file_change","changes":[{"path":"src/main.rs","kind":"update"}]}
+            }),
+        },
+        TaskJournalEventView {
+            seq: 6,
+            event: json!({
+                "type":"codex_item", "lifecycle":"completed",
+                "item":{"id":"file-1","type":"file_change","status":"completed","changes":[{"path":"src/main.rs","kind":"update"}]}
+            }),
+        },
+        TaskJournalEventView {
+            seq: 7,
+            event: json!({
+                "type":"codex_item", "lifecycle":"completed",
+                "item":{"id":"msg-1","type":"agent_message","text":"done"}
+            }),
+        },
+    ];
+    let state = supervision_state(&events);
+    assert_eq!(state.evidence.tool_calls, 3);
+    assert_eq!(state.evidence.tool_results, 3);
+    assert_eq!(state.evidence.failed_tools, 1);
+    assert_eq!(state.evidence.file_change_events, 1);
+    assert_eq!(state.evidence.changed_files, vec!["src/main.rs"]);
+    assert_eq!(state.evidence.command_exit_codes.len(), 2);
+    assert_eq!(state.evidence.failure_summaries.len(), 1);
+    assert_eq!(state.evidence.agent_messages, 1);
+}
+
+#[test]
 fn journal_state_reads_review_after_paginated_event_window() {
     let task_id = "local-supervision-long";
     let directory = std::env::temp_dir().join(format!(
