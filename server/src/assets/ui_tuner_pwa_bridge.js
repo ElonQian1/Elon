@@ -239,6 +239,44 @@
       .filter(Boolean);
   }
 
+  function explicitStyleBinding(element) {
+    const serialized = element.getAttribute('data-ui-style-binding') || '';
+    if (!serialized || serialized.length > 4000) return null;
+    let input;
+    try { input = JSON.parse(serialized); } catch (_) { return null; }
+    const sourceFile = String(input && input.sourceFile || '').trim().replace(/\\/g, '/');
+    const sourceRevision = String(input && input.sourceRevision || '').trim().toLowerCase();
+    const kind = String(input && input.kind || '');
+    const target = String(input && input.target || '').trim();
+    const range = input && input.range;
+    const unsafePath = !sourceFile || sourceFile.startsWith('/') || /^[a-z]:\//i.test(sourceFile)
+      || sourceFile.split('/').some((segment) => !segment || segment === '.' || segment === '..');
+    if (!input || input.version !== 1 || unsafePath || !/^[a-f0-9]{64}$/.test(sourceRevision)
+      || !['css-rule', 'style-object', 'token-json'].includes(kind)
+      || !target || target.length > 240 || !range
+      || !Number.isSafeInteger(range.start) || !Number.isSafeInteger(range.end)
+      || range.start < 0 || range.end <= range.start
+      || !input.propertyMap || typeof input.propertyMap !== 'object') return null;
+    const allowed = new Set(editableProperties);
+    const propertyMap = Object.entries(input.propertyMap).reduce((result, entry) => {
+      const property = entry[0];
+      const sourceProperty = String(entry[1] || '').trim();
+      if (allowed.has(property) && sourceProperty && sourceProperty.length <= 160
+        && /^[a-zA-Z_$][\w$.-]*$/.test(sourceProperty)) result[property] = sourceProperty;
+      return result;
+    }, {});
+    if (!Object.keys(propertyMap).length || Object.keys(propertyMap).length !== Object.keys(input.propertyMap).length) return null;
+    return {
+      version: 1,
+      sourceFile,
+      sourceRevision,
+      kind,
+      target,
+      range: { start: range.start, end: range.end },
+      propertyMap,
+    };
+  }
+
   function kebabCase(property) {
     return property.replace(/[A-Z]/g, (match) => '-' + match.toLowerCase());
   }
@@ -290,6 +328,7 @@
         inlineStyle: element.getAttribute('style'),
       },
       domContext: localDomContext(element),
+      sourceBinding: explicitStyleBinding(element),
     };
   }
 

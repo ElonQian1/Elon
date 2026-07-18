@@ -13,6 +13,30 @@ export type PwaStyleProperty =
 
 export type PwaStyleValues = Partial<Record<PwaStyleProperty, string>>
 
+export type PwaStyleBindingKind = 'css-rule' | 'style-object' | 'token-json'
+
+export interface PwaExplicitStyleBinding {
+  version: 1
+  sourceFile: string
+  sourceRevision: string
+  kind: PwaStyleBindingKind
+  target: string
+  range: { start: number; end: number }
+  propertyMap: Partial<Record<PwaStyleProperty, string>>
+}
+
+export interface PwaPropertyWritebackReceipt {
+  value: string
+  sourceFile: string
+  sourceRevision: string
+  completedAt: string
+}
+
+export interface PwaElementWritebackReceipts {
+  pwa?: Partial<Record<PwaStyleProperty, PwaPropertyWritebackReceipt>>
+  android?: Partial<Record<PwaStyleProperty, PwaPropertyWritebackReceipt>>
+}
+
 export interface PwaElementIdentity {
   key: string
   selector: string
@@ -65,6 +89,7 @@ export interface PwaSourceBinding {
   needsBinding: boolean
   pwaCandidates: PwaSourceCandidate[]
   androidCandidates: PwaSourceCandidate[]
+  pwaStyle?: PwaExplicitStyleBinding
 }
 
 export interface PwaVisualReferences {
@@ -83,6 +108,7 @@ export interface PwaDraftElement {
   scope: PwaDesignScope
   domContext: PwaDomContextNode[]
   visualReferences: PwaVisualReferences
+  writeback?: PwaElementWritebackReceipts
   revision: number
   createdAt: string
   updatedAt: string
@@ -142,6 +168,53 @@ export interface PwaDraftCliPackage {
   }
   artifact: PwaDesignDraft
   instructions: string[]
+}
+
+const PWA_STYLE_PROPERTIES = new Set<PwaStyleProperty>([
+  'width', 'height',
+  'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+  'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+  'borderRadius', 'fontSize', 'fontWeight', 'lineHeight',
+  'color', 'backgroundColor', 'opacity',
+])
+
+export function safePwaSourceFile(value: string): string | null {
+  const normalized = String(value || '').trim().replace(/\\/g, '/')
+  if (!normalized || normalized.length > 500 || normalized.startsWith('/') || /^[a-z]:\//i.test(normalized)) return null
+  const segments = normalized.split('/')
+  if (segments.some((segment) => !segment || segment === '.' || segment === '..' || segment.includes('\0'))) return null
+  return normalized
+}
+
+export function normalizePwaExplicitStyleBinding(value: unknown): PwaExplicitStyleBinding | null {
+  if (!value || typeof value !== 'object') return null
+  const input = value as Partial<PwaExplicitStyleBinding>
+  const sourceFile = safePwaSourceFile(String(input.sourceFile || ''))
+  if (input.version !== 1 || !sourceFile || !/^[a-f0-9]{64}$/i.test(String(input.sourceRevision || ''))) return null
+  if (!['css-rule', 'style-object', 'token-json'].includes(String(input.kind || ''))) return null
+  const target = String(input.target || '').trim()
+  const start = input.range?.start
+  const end = input.range?.end
+  if (!target || target.length > 240 || !Number.isSafeInteger(start) || !Number.isSafeInteger(end)
+    || (start as number) < 0 || (end as number) <= (start as number)) return null
+  if (!input.propertyMap || typeof input.propertyMap !== 'object') return null
+  const propertyMap: Partial<Record<PwaStyleProperty, string>> = {}
+  for (const [property, sourcePropertyValue] of Object.entries(input.propertyMap)) {
+    if (!PWA_STYLE_PROPERTIES.has(property as PwaStyleProperty)) return null
+    const sourceProperty = String(sourcePropertyValue || '').trim()
+    if (!sourceProperty || sourceProperty.length > 160 || !/^[a-zA-Z_$][\w$.-]*$/.test(sourceProperty)) return null
+    propertyMap[property as PwaStyleProperty] = sourceProperty
+  }
+  if (!Object.keys(propertyMap).length) return null
+  return {
+    version: 1,
+    sourceFile,
+    sourceRevision: String(input.sourceRevision).toLowerCase(),
+    kind: input.kind as PwaStyleBindingKind,
+    target,
+    range: { start: start as number, end: end as number },
+    propertyMap,
+  }
 }
 
 const STORAGE_PREFIX = 'elon.pc.pwaDesignDraft.v1:'

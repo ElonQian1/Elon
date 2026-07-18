@@ -4,8 +4,10 @@ import { listenForFitRunCodexSettled, requestCodexForFitRun } from '../fit-run/f
 import { buildPwaDesignContextPack } from './pwaDesignContext'
 import {
   applyDeterministicAndroidWriteback,
+  applyDeterministicPwaWriteback,
   planPwaDesignWriteback,
-  type PwaDeterministicWritebackResult,
+  recordDeterministicWriteback,
+  type PwaCrossPlatformWritebackResult,
 } from './pwaDesignWriteback'
 import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
@@ -14,6 +16,7 @@ import {
   type PwaDesignDraft,
   type PwaDomContextNode,
   type PwaElementIdentity,
+  type PwaExplicitStyleBinding,
   type PwaOriginalStyleSnapshot,
   type PwaRouteIdentity,
   type PwaStyleProperty,
@@ -32,6 +35,7 @@ export interface PwaSelection {
   rect: { left: number; top: number; width: number; height: number }
   originalStyle: PwaOriginalStyleSnapshot
   domContext: PwaDomContextNode[]
+  sourceBinding?: PwaExplicitStyleBinding
 }
 
 export interface PwaRouteState extends PwaRouteIdentity {
@@ -269,7 +273,7 @@ export function usePwaDesignSession({
         originalStyle,
         afterStyle: resolvedPwaAfterStyle(originalStyle, styleDiff),
         styleDiff,
-        binding: pwaSourceBinding({ ...selection.identity, key: stableKey }, root),
+        binding: pwaSourceBinding({ ...selection.identity, key: stableKey }, root, selection.sourceBinding),
         scope: existing?.scope ?? 'instance',
         domContext: selection.domContext ?? [],
         visualReferences: existing?.visualReferences ?? {},
@@ -325,29 +329,52 @@ export function usePwaDesignSession({
     if (!current || !Object.keys(current.elements).length) return
     model.save()
     setSyncState({ phase: 'starting', message: '正在保存草稿并执行确定性写回…' })
-    let deterministicResult: PwaDeterministicWritebackResult = {
-      applied: 0,
+    const androidResult = await applyDeterministicAndroidWriteback({
+      draft: current,
+      root,
+      projectRoot: current.project.workspaceIdentity,
       sourceRevision: current.project.sourceRevision,
-      changedFiles: [] as string[],
+    })
+    let deterministicResult: PwaCrossPlatformWritebackResult = {
+      android: androidResult,
+      pwa: { applied: 0, changedFiles: [], sourceRevisions: {}, completed: [] },
     }
-    try {
-      deterministicResult = await applyDeterministicAndroidWriteback({
-        draft: current,
-        root,
-        projectRoot: current.project.workspaceIdentity,
-        sourceRevision: current.project.sourceRevision,
+    let latest = recordDeterministicWriteback(current, deterministicResult)
+    if (androidResult.applied) {
+      latest = { ...latest, project: { ...latest.project, sourceRevision: androidResult.sourceRevision } }
+    }
+    if (androidResult.error) {
+      if (latest !== current) applyDraftState(model.replace(latest), false)
+      setSyncState({
+        phase: 'failed',
+        message: `APK 确定性写回已停止：${androidResult.error}。源码冲突不会交给 AI 静默覆盖。`,
       })
-    } catch (error) {
-      deterministicResult.error = error instanceof Error ? error.message : '确定性 Android 写回失败'
+      return
     }
-    const latest = deterministicResult.applied ? {
-      ...current,
-      project: { ...current.project, sourceRevision: deterministicResult.sourceRevision },
-      updatedAt: new Date().toISOString(),
-    } : current
+    const pwaResult = await applyDeterministicPwaWriteback({
+      draft: latest,
+      root,
+      projectRoot: latest.project.workspaceIdentity,
+    })
+    deterministicResult = { android: androidResult, pwa: pwaResult }
+    latest = recordDeterministicWriteback(latest, { ...deterministicResult, android: { ...androidResult, completed: [] } })
     if (latest !== current) applyDraftState(model.replace(latest), false)
+    if (pwaResult.error) {
+      setSyncState({
+        phase: 'failed',
+        message: `PWA 确定性写回已停止：${pwaResult.error}。请刷新源码绑定后重试。`,
+      })
+      return
+    }
     const plan = planPwaDesignWriteback(latest, root)
-    if (deterministicResult.error) plan.codexReasons.push(`确定性写回需 Codex 接管：${deterministicResult.error}`)
+    if (!plan.requiresCodex) {
+      setSyncState({
+        phase: 'completed',
+        message: `确定性写回完成：APK ${androidResult.applied} 个节点，PWA ${pwaResult.applied} 个绑定；无需 AI 重做。`,
+      })
+      setSaveLabel('跨端草稿已确定性写回源码')
+      return
+    }
     const contextPack = buildPwaDesignContextPack({
       draft: latest,
       root,
@@ -367,9 +394,9 @@ export function usePwaDesignSession({
       syncTaskIdRef.current = taskId
       setSyncState({
         phase: 'running', taskId,
-        message: deterministicResult.applied
-          ? `Android 已确定性写回 ${deterministicResult.applied} 个节点，Codex 正在补齐 PWA/复杂修改`
-          : '已进入现有 Codex 会话，正在建立来源绑定并写回双端源码',
+        message: androidResult.applied || pwaResult.applied
+          ? `APK/PWA 已确定性写回 ${androidResult.applied + pwaResult.applied} 个绑定，AI 只补未绑定属性或结构修改`
+          : '已进入现有 AI 会话，只处理未绑定属性或结构修改',
       })
     } catch (error) {
       setSyncState({ phase: 'failed', message: error instanceof Error ? error.message : '跨端同步任务启动失败' })

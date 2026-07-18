@@ -29,6 +29,7 @@ assert.ok(bridge.includes("message.type === 'reset-element'"), 'PWA should reset
 assert.ok(bridge.includes("message.type === 'apply-draft'"), 'PWA should restore structured page drafts');
 assert.ok(bridge.includes("strategy: 'dom-path'"), 'unbound DOM elements should expose an explainable path identity');
 assert.ok(bridge.includes('needsBinding: true'), 'generated identities must not pretend to be source bindings');
+assert.ok(bridge.includes("getAttribute('data-ui-style-binding')"), 'only an explicit DOM source binding may enable deterministic PWA writeback');
 assert.ok(bridge.includes("'lineHeight'"), 'PWA should support the first manual typography property set');
 assert.ok(bridge.includes('let selecting = false'), 'PWA design bridge must default to real interaction');
 assert.ok(bridge.includes("mode: 'interact'"), 'PWA ready event must report interaction mode');
@@ -161,6 +162,15 @@ function runBridgeBehavior() {
   const body = new FakeElement('body');
   const title = new FakeElement('h1', 'topTitle');
   title.childNodes.push({ nodeType: 3, textContent: '好友' });
+  title.setAttribute('data-ui-style-binding', JSON.stringify({
+    version: 1,
+    sourceFile: 'src/styles/title.css',
+    sourceRevision: 'a'.repeat(64),
+    kind: 'css-rule',
+    target: '.page-title',
+    range: { start: 120, end: 180 },
+    propertyMap: { fontSize: 'font-size', color: 'color' },
+  }));
   body.appendChild(title);
   const chatPage = new FakeElement('div', 'chatPage');
   chatPage.classList.add('page', 'active');
@@ -284,6 +294,9 @@ function runBridgeBehavior() {
   const click = { target: title, preventDefault() {}, stopImmediatePropagation() {} };
   documentListeners.get('click')[0](click);
   assert.equal(posted.filter((message) => message.type === 'selection').length, 1, 'the iframe top title must remain clickable and selectable in design mode');
+  const selectedBinding = posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceBinding;
+  assert.equal(selectedBinding.sourceFile, 'src/styles/title.css', 'selection should carry the explicit safe source file');
+  assert.deepEqual(selectedBinding.propertyMap, { fontSize: 'font-size', color: 'color' });
 
   const messagesBeforeStyle = posted.length;
   command('apply-style', { selector: '#topTitle', style: { fontSize: '22px' } });

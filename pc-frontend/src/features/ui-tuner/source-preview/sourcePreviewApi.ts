@@ -1,6 +1,7 @@
 import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { ComposePreviewEntry, ComposePreviewRender, SourcePreviewDocument, SourceRendererCapabilities } from './types'
+import type { PwaExplicitStyleBinding } from './pwaDesignDraft'
 import { androidProjectRootCandidates } from './sourcePreviewProjectRoot'
 
 export function sourcePreviewAdminUrl(): string {
@@ -54,6 +55,18 @@ export async function commitSourcePreview(input: {
   changes: Record<string, string>
 }): Promise<{ ok: boolean; sourceRevision: string }> {
   return nodeApi(sourcePreviewAdminUrl(), '/api/source-preview/commit', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }, 15000)
+}
+
+export async function commitPwaStylePreview(input: {
+  projectRoot: string
+  binding: PwaExplicitStyleBinding
+  sourceRevision: string
+  changes: Record<string, string>
+}): Promise<{ ok: boolean; sourceRevision: string; changedFiles: string[] }> {
+  return nodeApi(sourcePreviewAdminUrl(), '/api/source-preview/commit-pwa-style', {
     method: 'POST',
     body: JSON.stringify(input),
   }, 15000)

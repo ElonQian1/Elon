@@ -1,6 +1,9 @@
 import type { UiTunerCodexContextPack } from '../contextPack'
 import type { PwaDesignDraft } from './pwaDesignDraft'
-import type { PwaDesignWritebackPlan, PwaDeterministicWritebackResult } from './pwaDesignWriteback'
+import type {
+  PwaCrossPlatformWritebackResult,
+  PwaDesignWritebackPlan,
+} from './pwaDesignWriteback'
 import type { PwaSelection } from './usePwaDesignSession'
 import type { SourcePreviewNode } from './types'
 
@@ -9,22 +12,22 @@ export function buildPwaDesignContextPack(input: {
   root: SourcePreviewNode | null
   selection: PwaSelection | null
   plan: PwaDesignWritebackPlan
-  deterministicResult: PwaDeterministicWritebackResult
+  deterministicResult: PwaCrossPlatformWritebackResult
 }): UiTunerCodexContextPack {
-  const selected = selectedDraftElement(input.draft, input.selection)
+  const unresolvedKeys = new Set(input.plan.codexChanges.map((change) => change.elementKey))
+  const selected = selectedUnresolvedElement(input.draft, input.selection, unresolvedKeys)
+  const selectedKey = selected ? Object.entries(input.draft.elements).find(([, element]) => element === selected)?.[0] : undefined
+  const selectedStyle = Object.fromEntries(input.plan.codexChanges
+    .filter((change) => change.elementKey === selectedKey)
+    .map((change) => [change.property, change.after]))
   const androidCandidate = selected?.binding.androidCandidates[0]
-  const adjustments = Object.values(input.draft.elements).flatMap((element) => (
-    Object.entries(element.styleDiff).map(([property, after]) => ({
-      property,
-      before: element.originalStyle.authored[property as keyof typeof element.originalStyle.authored]
-        ?? element.originalStyle.computed[property as keyof typeof element.originalStyle.computed]
-        ?? '',
-      after,
-      sourceHint: element.binding.needsBinding
-        ? '先按稳定身份建立来源绑定，再写回 PWA/Android 源码'
-        : '优先使用明确绑定的样式或资源属性确定性写回',
-    }))
-  ))
+  const unresolvedFiles = compact(input.plan.codexChanges.map((change) => change.sourceFile))
+  const adjustments = input.plan.codexChanges.map((change) => ({
+    property: `${change.platform}.${change.property}`,
+    before: change.before,
+    after: change.after,
+    sourceHint: change.reason,
+  }))
   const visual = input.draft.visualReferences
   return {
     version: 4,
@@ -48,23 +51,18 @@ export function buildPwaDesignContextPack(input: {
         x: input.selection.rect.left, y: input.selection.rect.top,
         width: input.selection.rect.width, height: input.selection.rect.height,
       } : { x: 0, y: 0, width: 0, height: 0 },
-      style: selected.afterStyle,
+      style: selectedStyle,
       metrics: [],
     } : null,
     runtimeBinding: {
       resourceId: androidCandidate?.resourceId,
-      sourceFile: androidCandidate?.file,
-      sourceToken: androidCandidate?.symbol,
+      sourceFile: androidCandidate?.file || selected?.binding.pwaStyle?.sourceFile,
+      sourceToken: androidCandidate?.symbol || selected?.binding.pwaStyle?.target,
       bindingConfidence: selected?.binding.bindingConfidence,
-      bindingReason: selected?.binding.needsBinding ? '需要 AI 建立完整 PWA/Android 来源绑定' : '稳定身份与双端源码已绑定',
-      sourceCandidates: (selected?.binding.androidCandidates ?? []).map((candidate) => ({
-        file: candidate.file,
-        token: candidate.symbol,
-        confidence: candidate.confidence,
-        reason: candidate.reason,
-        componentKey: candidate.stableKey,
-        scope: selected?.scope,
-      })),
+      bindingReason: selected?.binding.pwaStyle
+        ? 'PWA 显式样式绑定已摘要；只把未映射属性交给 AI'
+        : '需要 AI 为未解决节点建立 PWA 来源绑定',
+      sourceCandidates: compactCandidates(selected),
     },
     liveRuntime: null,
     fitRun: null,
@@ -77,30 +75,24 @@ export function buildPwaDesignContextPack(input: {
     requestedAdjustments: adjustments,
     standardDraft: null,
     layerClarity: {
-      visibleCount: Object.keys(input.draft.elements).length,
-      totalCount: Object.keys(input.draft.elements).length,
+      visibleCount: unresolvedKeys.size,
+      totalCount: unresolvedKeys.size,
       hiddenCount: 0, structuralCount: 0, duplicateCount: 0,
-      sourceMappedCount: Object.values(input.draft.elements).filter((element) => !element.binding.needsBinding).length,
+      sourceMappedCount: [...unresolvedKeys].filter((key) => Boolean(input.draft.elements[key]?.binding.pwaStyle)).length,
       selectedHiddenReasons: [],
     },
     codexContract: {
-      readBeforeEdit: compact([
-        visual.targetCrop, visual.currentCrop, visual.visualDiff,
-        ...input.plan.deterministic.map((action) => action.layoutFile),
-      ]),
-      writeTargets: compact([
-        ...input.deterministicResult.changedFiles,
-        ...Object.values(input.draft.elements).flatMap((element) => element.binding.pwaCandidates.map((item) => item.file)),
-      ]),
+      readBeforeEdit: compact([visual.targetCrop, visual.currentCrop, visual.visualDiff, ...unresolvedFiles]),
+      writeTargets: unresolvedFiles,
       forbiddenShortcuts: [
         '不要读取整仓库或整棵 DOM',
-        '不要把 Runtime DOM 或 selector 当成最终源码真相',
-        '不要重复执行已完成的 Android 确定性写回',
+        '不要通过全文搜索猜测 Runtime selector 对应的源码',
+        '不要重复执行 deterministicSummary 中已完成的 APK/PWA 写回',
       ],
       acceptance: [
-        '按 stableId/testId/resourceId/source symbol/组件路径建立 PWA 来源绑定',
-        '只处理草稿 diff 和 compactSourceBundle 指向的局部源码',
-        'PWA 与 APK 两端都必须给出源码写回或明确阻塞证据',
+        '只处理 codexFallback.changes 中仍未绑定或无法确定性翻译的属性',
+        '结构修改保持在本次 screenKey 和局部组件范围内',
+        '不得覆盖 sourceRevision 冲突；冲突时返回明确阻塞证据',
       ],
     },
     closurePriorityIds: [],
@@ -109,11 +101,21 @@ export function buildPwaDesignContextPack(input: {
       sourceRevision: input.draft.project.sourceRevision,
       route: input.draft.route,
       viewport: input.draft.viewport,
-      changes: Object.values(input.draft.elements),
-      compactSourceBundle: compactSourceBundle(input.root, input.draft),
+      changes: input.plan.codexChanges,
+      compactSourceBundle: compactSourceBundle(input.root, input.plan),
+      bindingSummary: bindingSummary(input.draft, unresolvedKeys),
+      codexFallback: {
+        reasons: input.plan.codexReasons,
+        changes: input.plan.codexChanges,
+      },
+      deterministicSummary: deterministicSummary(input.deterministicResult),
       visualReferences: { ...input.draft.visualReferences },
-      writebackPlan: input.plan,
-      deterministicResult: input.deterministicResult,
+      writebackPlan: {
+        targets: input.plan.targets,
+        requiresCodex: input.plan.requiresCodex,
+        codexReasons: input.plan.codexReasons,
+      },
+      deterministicResult: deterministicSummary(input.deterministicResult),
       contextPolicy: {
         fullRepositoryIncluded: false,
         fullDomIncluded: false,
@@ -124,21 +126,61 @@ export function buildPwaDesignContextPack(input: {
   }
 }
 
-function selectedDraftElement(draft: PwaDesignDraft, selection: PwaSelection | null) {
+function selectedUnresolvedElement(
+  draft: PwaDesignDraft,
+  selection: PwaSelection | null,
+  unresolvedKeys: Set<string>,
+) {
   if (selection) {
-    const match = Object.values(draft.elements).find((element) => (
-      element.identity.key === selection.identity.key || element.identity.selector === selection.identity.selector
-    ))
+    const match = Object.entries(draft.elements).find(([key, element]) => (
+      unresolvedKeys.has(key)
+      && (element.identity.key === selection.identity.key || element.identity.selector === selection.identity.selector)
+    ))?.[1]
     if (match) return match
   }
-  return Object.values(draft.elements)[0]
+  const firstKey = unresolvedKeys.values().next().value as string | undefined
+  return firstKey ? draft.elements[firstKey] : undefined
 }
 
-function compactSourceBundle(root: SourcePreviewNode | null, draft: PwaDesignDraft) {
+function compactCandidates(element: PwaDesignDraft['elements'][string] | undefined) {
+  if (!element) return []
+  return [
+    ...element.binding.pwaCandidates.slice(0, 2),
+    ...element.binding.androidCandidates.slice(0, 2),
+  ].map((candidate) => ({
+    file: candidate.file,
+    token: candidate.symbol,
+    confidence: candidate.confidence,
+    reason: candidate.reason,
+    componentKey: candidate.stableKey,
+    scope: element.scope,
+  }))
+}
+
+function bindingSummary(draft: PwaDesignDraft, unresolvedKeys: Set<string>) {
+  return [...unresolvedKeys].slice(0, 16).map((elementKey) => {
+    const element = draft.elements[elementKey]
+    const pwa = element?.binding.pwaStyle
+    const android = element?.binding.androidCandidates[0]
+    return {
+      elementKey,
+      pwa: pwa ? {
+        sourceFile: pwa.sourceFile,
+        sourceRevision: pwa.sourceRevision,
+        kind: pwa.kind,
+        target: pwa.target,
+        mappedProperties: Object.keys(pwa.propertyMap),
+      } : null,
+      android: android ? { sourceFile: android.file, nodeKey: android.stableKey, resourceId: android.resourceId } : null,
+    }
+  })
+}
+
+function compactSourceBundle(root: SourcePreviewNode | null, plan: PwaDesignWritebackPlan) {
   if (!root) return []
-  const targetKeys = new Set(Object.values(draft.elements).flatMap((element) => (
-    element.binding.androidCandidates.slice(0, 2).map((candidate) => candidate.stableKey)
-  )))
+  const targetKeys = new Set(plan.codexChanges
+    .filter((change) => change.platform === 'android' && change.nodeKey)
+    .map((change) => change.nodeKey as string))
   const bundle: Array<Record<string, unknown>> = []
   function visit(node: SourcePreviewNode, parent: SourcePreviewNode | null) {
     if (targetKeys.has(node.key)) {
@@ -161,6 +203,21 @@ function compactSourceBundle(root: SourcePreviewNode | null, draft: PwaDesignDra
   return bundle.slice(0, 16)
 }
 
+function deterministicSummary(result: PwaCrossPlatformWritebackResult) {
+  return {
+    android: {
+      applied: result.android.applied,
+      changedFiles: result.android.changedFiles,
+      sourceRevision: result.android.sourceRevision,
+    },
+    pwa: {
+      applied: result.pwa.applied,
+      changedFiles: result.pwa.changedFiles,
+      sourceRevisions: result.pwa.sourceRevisions,
+    },
+  }
+}
+
 function compact(values: Array<string | undefined>) {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))]
+  return [...new Set(values.filter((value): value is string => Boolean(value)))].slice(0, 16)
 }

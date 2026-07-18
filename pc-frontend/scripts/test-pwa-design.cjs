@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
@@ -34,6 +35,7 @@ global.window = {
   },
 }
 
+;(async () => {
 try {
   const output = compile(
     'src/features/ui-tuner/source-preview/pwaDesignDraft.ts',
@@ -247,21 +249,43 @@ try {
   )
   fs.writeFileSync(
     path.join(temporaryDirectory, 'source-preview/sourcePreviewApi.js'),
-    'exports.commitSourcePreview = async () => ({ ok: true, sourceRevision: "next" })',
+    'exports.commitSourcePreview = async () => ({ ok: true, sourceRevision: "next" }); exports.commitPwaStylePreview = async () => ({ ok: true, sourceRevision: "0".repeat(64), changedFiles: [] })',
   )
   const writebackOutput = compile(
     'src/features/ui-tuner/source-preview/pwaDesignWriteback.ts',
     'source-preview/pwaDesignWriteback.js',
   )
-  const { planPwaDesignWriteback } = require(writebackOutput)
+  const {
+    applyDeterministicAndroidWriteback,
+    applyDeterministicPwaWriteback,
+    planPwaDesignWriteback,
+    recordDeterministicWriteback,
+  } = require(writebackOutput)
+  const fixtureRoot = path.join(temporaryDirectory, 'fixture-project')
+  const pwaSourceFile = 'src/styles/pay.css'
+  const pwaSourcePath = path.join(fixtureRoot, pwaSourceFile)
+  fs.mkdirSync(path.dirname(pwaSourcePath), { recursive: true })
+  const initialPwaSource = '.pay { height: 40px; border-radius: 6px; }\n.title { font-size: 18px; }\n'
+  fs.writeFileSync(pwaSourcePath, initialPwaSource)
+  const pwaRevision = crypto.createHash('sha256').update(initialPwaSource).digest('hex')
+  const explicitBinding = {
+    version: 1,
+    sourceFile: pwaSourceFile,
+    sourceRevision: pwaRevision,
+    kind: 'css-rule',
+    target: '.pay',
+    range: { start: 0, end: 47 },
+    propertyMap: { height: 'height', borderRadius: 'border-radius' },
+  }
   const boundDraft = {
     ...migrated,
     elements: {
       'id:payButton': {
         ...payElement,
         binding: {
-          status: 'CANDIDATE', bindingConfidence: 'high', needsBinding: true,
-          pwaCandidates: [{ platform: 'pwa', stableKey: 'id:payButton', confidence: .95, reason: '稳定 id' }],
+          status: 'BOUND', bindingConfidence: 'high', needsBinding: false,
+          pwaStyle: explicitBinding,
+          pwaCandidates: [{ platform: 'pwa', stableKey: 'id:payButton', file: pwaSourceFile, confidence: 1, reason: '显式绑定' }],
           androidCandidates: [{
             platform: 'android', stableKey: 'android/pay', file: 'app/src/main/res/layout/pay.xml',
             resourceId: '@+id/payButton', confidence: 1, reason: 'resourceId 精确匹配',
@@ -280,8 +304,173 @@ try {
   const plan = planPwaDesignWriteback(boundDraft, androidRoot)
   assert.equal(plan.strategy, 'DETERMINISTIC_THEN_CODEX')
   assert.equal(plan.targets.android, 'DETERMINISTIC')
-  assert.equal(plan.targets.pwa, 'CODEX_REQUIRED')
-  assert.deepEqual(plan.deterministic[0].changes, { height: '48dp', borderRadius: '12dp' })
+  assert.equal(plan.targets.pwa, 'DETERMINISTIC')
+  assert.equal(plan.requiresCodex, false)
+  assert.deepEqual(plan.deterministic.android[0].changes, { height: '48dp', borderRadius: '12dp' })
+  assert.deepEqual(plan.deterministic.pwa[0].changes, { height: '48px', 'border-radius': '12px' })
+
+  const androidCalls = []
+  const androidResult = await applyDeterministicAndroidWriteback({
+    draft: boundDraft,
+    root: androidRoot,
+    projectRoot: fixtureRoot,
+    sourceRevision: 'android-r0',
+    commit: async (request) => {
+      androidCalls.push(request)
+      return { ok: true, sourceRevision: `android-r${androidCalls.length}` }
+    },
+  })
+  assert.equal(androidResult.applied, 1)
+  assert.equal(androidCalls[0].sourceRevision, 'android-r0')
+  assert.deepEqual(androidResult.changedFiles, ['app/src/main/res/layout/pay.xml'])
+
+  const multiAndroidDraft = {
+    ...boundDraft,
+    elements: {
+      ...boundDraft.elements,
+      'id:title': {
+        ...payElement,
+        identity: { ...payElement.identity, key: 'id:title', id: 'title' },
+        styleDiff: { height: '44px' },
+        binding: {
+          ...boundDraft.elements['id:payButton'].binding,
+          pwaStyle: { ...explicitBinding, target: '.title', range: { start: 49, end: 74 }, propertyMap: { height: 'height' } },
+          androidCandidates: [{
+            platform: 'android', stableKey: 'android/title', file: 'app/src/main/res/layout/pay.xml',
+            resourceId: '@+id/title', confidence: 1, reason: 'resourceId 精确匹配',
+          }],
+        },
+      },
+    },
+  }
+  androidRoot.children.push({
+    key: 'android/title', name: 'title', resourceId: '@+id/title',
+    source: { layoutFile: 'app/src/main/res/layout/pay.xml', attributes: { 'android:id': '@+id/title' }, startTagStart: 140, startTagEnd: 190 },
+    children: [],
+  })
+  const orderedAndroidCalls = []
+  const orderedAndroidResult = await applyDeterministicAndroidWriteback({
+    draft: multiAndroidDraft, root: androidRoot, projectRoot: fixtureRoot, sourceRevision: 'r0',
+    commit: async (request) => {
+      orderedAndroidCalls.push(request)
+      return { ok: true, sourceRevision: `r${orderedAndroidCalls.length}` }
+    },
+  })
+  assert.deepEqual(orderedAndroidCalls.map((call) => call.nodeKey), ['android/title', 'android/pay'], 'Android 应按源码位置倒序调用')
+  assert.deepEqual(orderedAndroidCalls.map((call) => call.sourceRevision), ['r0', 'r1'], 'Android revision 必须逐步传播')
+  assert.equal(orderedAndroidResult.sourceRevision, 'r2')
+  assert.deepEqual(orderedAndroidResult.changedFiles, ['app/src/main/res/layout/pay.xml'])
+
+  const failedAndroidCalls = []
+  const failedAndroidResult = await applyDeterministicAndroidWriteback({
+    draft: multiAndroidDraft, root: androidRoot, projectRoot: fixtureRoot, sourceRevision: 'r0',
+    commit: async (request) => {
+      failedAndroidCalls.push(request)
+      if (failedAndroidCalls.length === 2) throw new Error('revision conflict')
+      return { ok: true, sourceRevision: 'r1' }
+    },
+  })
+  assert.equal(failedAndroidResult.stopped, true)
+  assert.equal(failedAndroidResult.applied, 1)
+  assert.match(failedAndroidResult.error, /revision conflict/)
+  assert.equal(failedAndroidCalls.length, 2, 'Android 失败后不得继续调用')
+
+  const pwaCalls = []
+  const fixtureCommit = async (request) => {
+    pwaCalls.push(request)
+    const target = path.resolve(request.projectRoot, request.binding.sourceFile)
+    assert.ok(target.startsWith(`${path.resolve(request.projectRoot)}${path.sep}`), 'mock 也只允许 fixture 根内文件')
+    const before = fs.readFileSync(target, 'utf8')
+    const currentRevision = crypto.createHash('sha256').update(before).digest('hex')
+    if (currentRevision !== request.sourceRevision) throw new Error('sourceRevision conflict')
+    let after = before
+    for (const [property, value] of Object.entries(request.changes)) {
+      const expression = new RegExp(`(${property.replace('-', '\\-')}\\s*:\\s*)[^;]+`)
+      assert.match(after, expression, `fixture should contain ${property}`)
+      after = after.replace(expression, `$1${value}`)
+    }
+    fs.writeFileSync(target, after)
+    const sourceRevision = crypto.createHash('sha256').update(after).digest('hex')
+    return { ok: true, sourceRevision, changedFiles: [request.binding.sourceFile] }
+  }
+  const pwaResult = await applyDeterministicPwaWriteback({
+    draft: boundDraft, root: androidRoot, projectRoot: fixtureRoot, commit: fixtureCommit,
+  })
+  assert.equal(pwaResult.applied, 1)
+  assert.deepEqual(pwaResult.changedFiles, [pwaSourceFile])
+  assert.match(fs.readFileSync(pwaSourcePath, 'utf8'), /height: 48px; border-radius: 12px/)
+
+  fs.writeFileSync(pwaSourcePath, initialPwaSource)
+  const multiPwaDraft = JSON.parse(JSON.stringify(boundDraft))
+  multiPwaDraft.elements['id:title'] = {
+    ...JSON.parse(JSON.stringify(payElement)),
+    identity: { ...payElement.identity, key: 'id:title', id: 'title' },
+    styleDiff: { fontSize: '20px' },
+    binding: {
+      ...JSON.parse(JSON.stringify(boundDraft.elements['id:payButton'].binding)),
+      pwaStyle: {
+        ...explicitBinding,
+        target: '.title',
+        range: { start: 49, end: 74 },
+        propertyMap: { fontSize: 'font-size' },
+      },
+      androidCandidates: [{
+        platform: 'android', stableKey: 'android/title', file: 'app/src/main/res/layout/pay.xml',
+        resourceId: '@+id/title', confidence: 1, reason: 'resourceId 精确匹配',
+      }],
+    },
+  }
+  const pwaCallStart = pwaCalls.length
+  const orderedPwaResult = await applyDeterministicPwaWriteback({
+    draft: multiPwaDraft, root: androidRoot, projectRoot: fixtureRoot, commit: fixtureCommit,
+  })
+  const orderedPwaCalls = pwaCalls.slice(pwaCallStart)
+  assert.deepEqual(orderedPwaCalls.map((call) => call.binding.target), ['.title', '.pay'], 'PWA 同文件写回应按 range 倒序')
+  assert.equal(orderedPwaCalls[0].sourceRevision, pwaRevision)
+  assert.equal(orderedPwaCalls[1].sourceRevision, orderedPwaResult.completed[0].sourceRevision, 'PWA revision 必须逐步传播')
+  assert.equal(orderedPwaResult.applied, 2)
+
+  fs.writeFileSync(pwaSourcePath, initialPwaSource)
+  const staleDraft = JSON.parse(JSON.stringify(boundDraft))
+  staleDraft.elements['id:payButton'].binding.pwaStyle.sourceRevision = 'f'.repeat(64)
+  const beforeConflict = fs.readFileSync(pwaSourcePath, 'utf8')
+  const conflictResult = await applyDeterministicPwaWriteback({
+    draft: staleDraft, root: androidRoot, projectRoot: fixtureRoot, commit: fixtureCommit,
+  })
+  assert.equal(conflictResult.stopped, true)
+  assert.match(conflictResult.error, /sourceRevision conflict/)
+  assert.equal(fs.readFileSync(pwaSourcePath, 'utf8'), beforeConflict, 'revision 冲突不得覆盖文件')
+
+  const traversalDraft = JSON.parse(JSON.stringify(boundDraft))
+  traversalDraft.elements['id:payButton'].binding.pwaStyle.sourceFile = '../outside.css'
+  const traversalPlan = planPwaDesignWriteback(traversalDraft, androidRoot)
+  assert.equal(traversalPlan.deterministic.pwa.length, 0, '路径越界绑定不得进入确定性计划')
+  assert.equal(traversalPlan.targets.pwa, 'CODEX_REQUIRED')
+
+  const partialDraft = JSON.parse(JSON.stringify(boundDraft))
+  partialDraft.elements['id:payButton'].binding.pwaStyle.propertyMap = { height: 'height' }
+  const deterministicCompletion = {
+    android: androidResult,
+    pwa: {
+      applied: 1,
+      changedFiles: [pwaSourceFile],
+      sourceRevisions: { [pwaSourceFile]: 'a'.repeat(64) },
+      completed: [{
+        elementKey: 'id:payButton', sourceFile: pwaSourceFile, sourceRevision: 'a'.repeat(64),
+        properties: { height: '48px' },
+      }],
+    },
+  }
+  const completedDraft = recordDeterministicWriteback(partialDraft, deterministicCompletion)
+  assert.equal(completedDraft.elements['id:payButton'].binding.pwaStyle.sourceRevision, 'a'.repeat(64), '后续编辑必须使用 PWA 最新 revision')
+  const fallbackPlan = planPwaDesignWriteback(completedDraft, androidRoot)
+  assert.equal(fallbackPlan.deterministic.android.length, 0, '已完成 Android 属性不得再次规划')
+  assert.equal(fallbackPlan.deterministic.pwa.length, 0, '已完成 PWA 属性不得再次规划')
+  assert.deepEqual(
+    fallbackPlan.codexChanges.map((change) => `${change.platform}.${change.property}`),
+    ['pwa.borderRadius'],
+    'Codex 只接收未映射的小范围属性',
+  )
 
   const contextOutput = compile(
     'src/features/ui-tuner/source-preview/pwaDesignContext.ts',
@@ -289,17 +478,23 @@ try {
   )
   const { buildPwaDesignContextPack } = require(contextOutput)
   const contextPack = buildPwaDesignContextPack({
-    draft: boundDraft,
+    draft: completedDraft,
     root: androidRoot,
     selection: null,
-    plan,
-    deterministicResult: { applied: 1, sourceRevision: 'next', changedFiles: ['app/src/main/res/layout/pay.xml'] },
+    plan: fallbackPlan,
+    deterministicResult: deterministicCompletion,
   })
   assert.equal(contextPack.kind, 'elon_ui_tuner_codex_context')
   assert.equal(contextPack.pwaDesign.capabilities.PWA_CODE_GENERATION, true)
   assert.equal(contextPack.pwaDesign.contextPolicy.fullRepositoryIncluded, false)
   assert.equal(contextPack.pwaDesign.contextPolicy.fullDomIncluded, false)
   assert.ok(contextPack.pwaDesign.compactSourceBundle.length <= 16)
+  assert.deepEqual(contextPack.requestedAdjustments.map((change) => change.property), ['pwa.borderRadius'])
+  assert.equal(contextPack.pwaDesign.changes.length, 1)
+  assert.equal(contextPack.pwaDesign.bindingSummary.length, 1)
+  assert.equal(contextPack.pwaDesign.deterministicSummary.android.applied, 1)
+  assert.equal(JSON.stringify(contextPack).includes('pwa.height'), false, '确定性完成的 PWA 属性不得再次请求 Codex')
+  assert.equal(JSON.stringify(contextPack).includes('android.height'), false, '确定性完成的 Android 属性不得再次请求 Codex')
   assert.equal(JSON.stringify(contextPack).includes('base64,'), false, '低 Token Context Pack 只能引用截图路径')
 
   const inspectorSource = fs.readFileSync(
@@ -309,10 +504,10 @@ try {
   assert.match(inspectorSource, /让 AI 同步到 APK 与 PWA/)
   assert.match(inspectorSource, /data-testid="pwa-cross-platform-sync"/)
   assert.match(inspectorSource, /\['starting', 'running'\]\.includes\(session\.syncState\.phase\)/)
-  assert.match(inspectorSource, /确定性写回优先/)
-  assert.match(inspectorSource, /需要 AI 建立绑定/)
-  assert.match(inspectorSource, /PWA 目标/)
-  assert.match(inspectorSource, /APK 目标/)
+  assert.match(inspectorSource, /确定性优先，AI 只补缺口/)
+  assert.match(inspectorSource, /需要 AI 建立绑定\/结构修改/)
+  assert.match(inspectorSource, /PWA：/)
+  assert.match(inspectorSource, /APK：/)
 
   const previewSurfaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'),
@@ -326,6 +521,7 @@ try {
   assert.match(bridgeSource, /document\.querySelectorAll\('\.page\.active\[id\]'\)/)
   assert.match(bridgeSource, /document\.querySelector\('#topTitle'\)/)
   assert.match(bridgeSource, /getAttribute\('data-ui-screen'\)/)
+  assert.match(bridgeSource, /getAttribute\('data-ui-style-binding'\)/)
   assert.match(bridgeSource, /if \(signature === lastRouteSignature\) return;/, '相同 screen route 必须去重')
   assert.match(bridgeSource, /window\.setTimeout\(\(\) => \{[\s\S]*?postRoute\(reason\);[\s\S]*?\}, 80\);/, '画面 Mutation 必须防抖')
   const observerAttributeFilter = bridgeSource.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] ?? ''
@@ -353,3 +549,7 @@ try {
   delete global.window
   fs.rmSync(temporaryDirectory, { recursive: true, force: true })
 }
+})().catch((error) => {
+  console.error(error)
+  process.exitCode = 1
+})

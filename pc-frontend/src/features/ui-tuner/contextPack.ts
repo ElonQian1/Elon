@@ -126,6 +126,12 @@ export interface UiTunerCodexContextPack {
     viewport: { width: number; height: number }
     changes: unknown[]
     compactSourceBundle: Array<Record<string, unknown>>
+    bindingSummary: Array<Record<string, unknown>>
+    codexFallback: {
+      reasons: string[]
+      changes: unknown[]
+    }
+    deterministicSummary: Record<string, unknown>
     visualReferences: Record<string, string | undefined>
     writebackPlan: unknown
     deterministicResult: unknown

@@ -1,5 +1,11 @@
 import { flattenSourceTree } from './sourcePreviewTree'
-import type { PwaElementIdentity, PwaSourceBinding, PwaSourceCandidate } from './pwaDesignDraft'
+import {
+  normalizePwaExplicitStyleBinding,
+  type PwaElementIdentity,
+  type PwaExplicitStyleBinding,
+  type PwaSourceBinding,
+  type PwaSourceCandidate,
+} from './pwaDesignDraft'
 import type { SourcePreviewNode } from './types'
 
 export interface PwaIdentity {
@@ -50,15 +56,18 @@ export function matchPwaSourceNode(root: SourcePreviewNode, identity: PwaIdentit
 export function pwaSourceBinding(
   identity: PwaElementIdentity,
   root: SourcePreviewNode | null,
+  explicitStyleBinding?: PwaExplicitStyleBinding,
 ): PwaSourceBinding {
+  const pwaStyle = normalizePwaExplicitStyleBinding(explicitStyleBinding)
   const pwaCandidates: PwaSourceCandidate[] = identity.key.startsWith('selector-evidence:') ? [] : [{
     platform: 'pwa',
     stableKey: identity.key,
+    file: pwaStyle?.sourceFile,
     symbol: identity.sourceSymbol || undefined,
     componentPath: identity.componentPath || undefined,
     resourceId: identity.resourceId || identity.id || undefined,
     confidence: identity.confidenceScore,
-    reason: '真实 DOM 稳定身份，可用于 PWA 源码符号反查',
+    reason: pwaStyle ? 'PWA 节点显式提供可校验样式源码绑定' : '真实 DOM 稳定身份，只能用于 PWA 源码符号反查',
   }]
   const androidCandidates = root ? rankPwaSourceNodes(root, identity).slice(0, 3).map(({ node, score }) => ({
     platform: 'android' as const,
@@ -70,8 +79,7 @@ export function pwaSourceBinding(
     reason: score >= 100 ? '稳定 resourceId/语义精确匹配' : '节点名称、文字或组件标识候选匹配',
   })) : []
   const androidBest = androidCandidates[0]
-  const pwaHasSourceSymbol = pwaCandidates.some((candidate) => candidate.symbol || candidate.componentPath)
-  const needsBinding = !pwaHasSourceSymbol || !androidBest?.file
+  const needsBinding = !pwaStyle || !androidBest?.file
   const bestScore = Math.min(identity.confidenceScore, androidBest?.confidence ?? 0)
   return {
     status: needsBinding ? (pwaCandidates.length || androidCandidates.length ? 'CANDIDATE' : 'NEEDS_AI') : 'BOUND',
@@ -79,6 +87,7 @@ export function pwaSourceBinding(
     needsBinding,
     pwaCandidates,
     androidCandidates,
+    pwaStyle: pwaStyle ?? undefined,
   }
 }
 

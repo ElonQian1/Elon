@@ -83,6 +83,12 @@ function bindingLabel(status?: 'BOUND' | 'CANDIDATE' | 'NEEDS_AI') {
   return '需要 AI 建立绑定'
 }
 
+function writebackTargetLabel(status: 'DETERMINISTIC' | 'DETERMINISTIC_PARTIAL' | 'CODEX_REQUIRED') {
+  if (status === 'DETERMINISTIC') return '确定性写回'
+  if (status === 'DETERMINISTIC_PARTIAL') return '部分确定性 · 部分需要 AI'
+  return '需要 AI 建立绑定/结构修改'
+}
+
 export function PwaStyleInspector({ session }: Props) {
   const selectedDraft = session.selection
     ? Object.values(session.draft?.elements ?? {}).find((element) => (
@@ -110,8 +116,9 @@ export function PwaStyleInspector({ session }: Props) {
 
       <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
         <div className={styles.pwaSyncTargets}>
-          <span>PWA 目标</span><span>APK 目标</span>
-          <strong>{session.writebackPlan.strategy === 'DETERMINISTIC_THEN_CODEX' ? '确定性写回优先' : '需要 Codex'}</strong>
+          <span>PWA：{writebackTargetLabel(session.writebackPlan.targets.pwa)}</span>
+          <span>APK：{writebackTargetLabel(session.writebackPlan.targets.android)}</span>
+          <strong>{session.writebackPlan.requiresCodex ? '确定性优先，AI 只补缺口' : '无需 AI 重做'}</strong>
         </div>
         <button
           type="button"
