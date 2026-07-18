@@ -32,6 +32,8 @@ assert.ok(bridge.includes('needsBinding: true'), 'generated identities must not 
 assert.ok(bridge.includes("getAttribute('data-ui-style-binding')"), 'only an explicit DOM source binding may enable deterministic PWA writeback');
 assert.ok(bridge.includes("'lineHeight'"), 'PWA should support the first manual typography property set');
 assert.ok(bridge.includes('let selecting = false'), 'PWA design bridge must default to real interaction');
+assert.ok(bridge.includes("document.addEventListener('click', handleDesignClick, true)"), 'design mode should install its capture listener explicitly');
+assert.ok(bridge.includes("document.removeEventListener('click', handleDesignClick, true)"), 'interaction mode should remove the design capture listener');
 assert.ok(bridge.includes("mode: 'interact'"), 'PWA ready event must report interaction mode');
 assert.ok(bridge.includes("message.type === 'set-session-auth'"), 'preview should accept an ephemeral same-origin session bridge');
 assert.ok(bridge.includes("CustomEvent('elon:ui-tuner-session-auth'"), 'session auth must stay in page memory');
@@ -97,6 +99,7 @@ function runAuthBootstrap() {
 class FakeClassList {
   constructor() { this.values = new Set(); }
   add(...values) { values.forEach((value) => this.values.add(value)); }
+  remove(...values) { values.forEach((value) => this.values.delete(value)); }
   filter(callback) { return Array.from(this.values).filter(callback); }
   contains(value) { return this.values.has(value); }
   [Symbol.iterator]() { return this.values[Symbol.iterator](); }
@@ -124,8 +127,19 @@ class FakeElement {
     this.childNodes = [];
     this.parentElement = null;
     this.isConnected = true;
+    this.listeners = new Map();
   }
   appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
+  remove() {
+    if (this.parentElement) this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+    this.parentElement = null;
+    this.isConnected = false;
+  }
+  addEventListener(type, listener) {
+    const listeners = this.listeners.get(type) || [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
   getAttribute(name) {
     if (name === 'id') return this.id || null;
     if (name === 'style') return this.attributes.get(name) ?? null;
@@ -189,6 +203,10 @@ function runBridgeBehavior() {
       const listeners = documentListeners.get(type) || [];
       listeners.push(listener);
       documentListeners.set(type, listeners);
+    },
+    removeEventListener: (type, listener) => {
+      const listeners = documentListeners.get(type) || [];
+      documentListeners.set(type, listeners.filter((candidate) => candidate !== listener));
     },
     querySelectorAll: (selector) => {
       if (selector === '#topTitle') return [title];
@@ -263,7 +281,8 @@ function runBridgeBehavior() {
   vm.runInNewContext(bridge, context);
 
   assert.equal(windowListeners.get('message').length, 1, 'bridge should install exactly one command listener');
-  assert.equal(documentListeners.get('click').length, 1, 'bridge should install exactly one selection listener');
+  assert.equal(documentListeners.get('click')?.length || 0, 0, 'normal interaction must not install a capture listener');
+  assert.equal(body.children.some((child) => child.id === 'uiTunerPreviewSelection'), false, 'normal interaction must not create a selection layer');
   assert.equal(posted.filter((message) => message.type === 'ready').length, 1, 'bridge should emit one ready event');
   assert.equal(posted.filter((message) => message.type === 'route-changed').length, 1, 'bridge should emit one initial route event');
   assert.equal(posted.find((message) => message.type === 'route-changed').payload.screenKey, 'page:chatPage|title:好友');
@@ -271,14 +290,26 @@ function runBridgeBehavior() {
   assert.ok(screenObserver.options.characterData, 'screen observer should watch visible title text');
   assert.ok(!screenObserver.options.attributeFilter.includes('style'), 'screen observer should exclude style mutations');
 
-  let interactionPrevented = false;
-  documentListeners.get('click')[0]({
-    target: title,
-    preventDefault() { interactionPrevented = true; },
-    stopImmediatePropagation() {},
-  });
-  assert.equal(interactionPrevented, false, 'the iframe top title must remain clickable in normal interaction mode');
-  assert.equal(posted.filter((message) => message.type === 'selection').length, 0, 'normal interaction must not turn a top-title click into a design selection');
+  const projectRow = new FakeElement('button', 'projectRow');
+  body.appendChild(projectRow);
+  let navigationCount = 0;
+  projectRow.addEventListener('click', () => { navigationCount += 1; });
+  const dispatchClick = (target) => {
+    let stopped = false;
+    const event = {
+      target,
+      defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopImmediatePropagation() { stopped = true; },
+    };
+    for (const listener of documentListeners.get('click') || []) listener(event);
+    if (!stopped) for (const listener of target.listeners.get('click') || []) listener(event);
+    return event;
+  };
+  const normalClick = dispatchClick(projectRow);
+  assert.equal(normalClick.defaultPrevented, false, 'normal interaction must not prevent a real project-row click');
+  assert.equal(navigationCount, 1, 'one real project-row click must navigate exactly once');
+  assert.equal(posted.filter((message) => message.type === 'selection').length, 0, 'normal interaction must not turn a project-row click into a design selection');
 
   const command = (type, payload) => windowListeners.get('message')[0]({
     origin: window.location.origin,
@@ -291,12 +322,26 @@ function runBridgeBehavior() {
   assert.equal(authEvents[0].detail.token, 'pc-session-token');
 
   command('set-mode', { mode: 'select' });
-  const click = { target: title, preventDefault() {}, stopImmediatePropagation() {} };
-  documentListeners.get('click')[0](click);
+  assert.equal(documentListeners.get('click').length, 1, 'design mode should install exactly one capture listener');
+  assert.equal(body.children.filter((child) => child.id === 'uiTunerPreviewSelection').length, 1, 'design mode should create exactly one selection layer');
+  const designClick = dispatchClick(projectRow);
+  assert.equal(designClick.defaultPrevented, true, 'design mode must prevent the real navigation click');
+  assert.equal(navigationCount, 1, 'design mode should select without navigating');
   assert.equal(posted.filter((message) => message.type === 'selection').length, 1, 'the iframe top title must remain clickable and selectable in design mode');
   const selectedBinding = posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceBinding;
-  assert.equal(selectedBinding.sourceFile, 'src/styles/title.css', 'selection should carry the explicit safe source file');
-  assert.deepEqual(selectedBinding.propertyMap, { fontSize: 'font-size', color: 'color' });
+  assert.equal(selectedBinding, null, 'an unbound project row must not invent a source binding');
+
+  command('set-mode', { mode: 'interact' });
+  assert.equal(documentListeners.get('click')?.length || 0, 0, 'exiting design must immediately remove the capture listener');
+  assert.equal(body.children.some((child) => child.id === 'uiTunerPreviewSelection'), false, 'exiting design must remove the selection layer');
+  dispatchClick(projectRow);
+  assert.equal(navigationCount, 2, 'the first click after exiting design must navigate exactly once');
+
+  command('set-mode', { mode: 'select' });
+  dispatchClick(title);
+  const titleBinding = posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceBinding;
+  assert.equal(titleBinding.sourceFile, 'src/styles/title.css', 'selection should carry the explicit safe source file');
+  assert.deepEqual(titleBinding.propertyMap, { fontSize: 'font-size', color: 'color' });
 
   const messagesBeforeStyle = posted.length;
   command('apply-style', { selector: '#topTitle', style: { fontSize: '22px' } });

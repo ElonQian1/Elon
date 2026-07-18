@@ -8,6 +8,7 @@
   const PROTOCOL_VERSION = 1;
   const originalInlineStyles = new Map();
   let selectedElement = null;
+  let selection = null;
   let selecting = false;
   let acceptedSessionToken = '';
   let appliedDraftRevision = '';
@@ -20,12 +21,6 @@
     'borderRadius', 'fontSize', 'fontWeight', 'lineHeight',
     'color', 'backgroundColor', 'opacity',
   ];
-
-  document.body.classList.add('ui-tuner-preview-active');
-  const selection = document.createElement('div');
-  selection.id = 'uiTunerPreviewSelection';
-  selection.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(selection);
 
   function post(type, payload) {
     window.parent.postMessage({ source: SOURCE, protocolVersion: PROTOCOL_VERSION, type, payload }, window.location.origin);
@@ -360,7 +355,7 @@
   }
 
   function scheduleRoute(reason) {
-    if (routeDebounceTimer) window.clearTimeout(routeDebounceTimer);
+    if (routeDebounceTimer) return;
     routeDebounceTimer = window.setTimeout(() => {
       routeDebounceTimer = 0;
       postRoute(reason);
@@ -374,6 +369,7 @@
   }
 
   function drawSelection(element, knownRect) {
+    if (!selection) return;
     if (!element || !element.isConnected) {
       selection.style.display = 'none';
       return;
@@ -479,14 +475,33 @@
     post('draft-applied', { appliedCount: elements.length, draftKey, revision });
   }
 
-  document.addEventListener('click', (event) => {
-    if (!selecting) return;
+  function handleDesignClick(event) {
     const target = findDesignTarget(event.target);
     if (!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     selectElement(target, 'click');
-  }, true);
+  }
+
+  function setSelecting(enabled) {
+    if (selecting === enabled) return;
+    selecting = enabled;
+    if (selecting) {
+      selection = document.createElement('div');
+      selection.id = 'uiTunerPreviewSelection';
+      selection.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(selection);
+      document.body.classList.add('ui-tuner-preview-active', 'ui-tuner-preview-selecting');
+      document.addEventListener('click', handleDesignClick, true);
+      drawSelection(selectedElement);
+      return;
+    }
+    document.removeEventListener('click', handleDesignClick, true);
+    if (selection) selection.remove();
+    selection = null;
+    document.body.classList.remove('ui-tuner-preview-active', 'ui-tuner-preview-selecting');
+  }
+
   window.addEventListener('scroll', () => drawSelection(selectedElement), true);
   window.addEventListener('resize', () => {
     drawSelection(selectedElement);
@@ -519,9 +534,7 @@
     const message = event.data || {};
     if (message.source !== PARENT_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return;
     if (message.type === 'set-mode') {
-      selecting = message.payload && message.payload.mode !== 'interact';
-      document.body.classList.toggle('ui-tuner-preview-selecting', selecting);
-      drawSelection(selecting ? selectedElement : null);
+      setSelecting(Boolean(message.payload && message.payload.mode !== 'interact'));
       post('mode-changed', { mode: selecting ? 'select' : 'interact' });
     } else if (message.type === 'set-session-auth') {
       const sessionToken = String(message.payload && message.payload.token || '');
