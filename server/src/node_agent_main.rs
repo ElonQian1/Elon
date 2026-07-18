@@ -59,6 +59,8 @@ mod node_agent_cli_session_bridge_capabilities;
 mod node_agent_cli_sidecar;
 mod node_agent_cli_sidecar_admin;
 mod node_agent_cli_sidecar_io;
+#[cfg(test)]
+mod node_agent_cli_sidecar_progress_tests;
 mod node_agent_cli_sidecar_runner;
 #[cfg(test)]
 mod node_agent_cli_sidecar_runner_tests;
@@ -141,6 +143,8 @@ mod node_agent_task_journal_inspect;
 mod node_agent_task_journal_lock;
 #[cfg(test)]
 mod node_agent_task_journal_recovery_tests;
+#[cfg(test)]
+mod node_agent_task_lifecycle_pressure_test_support;
 #[cfg(test)]
 mod node_agent_task_lifecycle_pressure_tests;
 mod node_agent_task_resume;
