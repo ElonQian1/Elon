@@ -194,13 +194,25 @@ fn create_or_load_local_target(
     let prompt = clean_optional(input.prompt)
         .ok_or_else(|| anyhow!("local_offline completion 缺少 prompt"))?;
     let client_request_id = format!("pc_offline:{}", input.completion_event_id);
+    let conversation_title = crate::task_title::readable_task_title(prompt);
 
     tx.execute(
         "INSERT INTO conversations (
             project_id, user_id, id, title, status, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, '本机离线任务', 'active', ?4, ?4)
-         ON CONFLICT(project_id, user_id, id) DO UPDATE SET updated_at = excluded.updated_at",
-        params![input.project_id, input.user_id, conversation_id, timestamp],
+         ) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?5)
+         ON CONFLICT(project_id, user_id, id) DO UPDATE SET
+            title = CASE
+                WHEN conversations.title = '本机离线任务' THEN excluded.title
+                ELSE conversations.title
+            END,
+            updated_at = excluded.updated_at",
+        params![
+            input.project_id,
+            input.user_id,
+            conversation_id,
+            conversation_title,
+            timestamp
+        ],
     )?;
 
     let existing_id: Option<String> = tx

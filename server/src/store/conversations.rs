@@ -126,6 +126,12 @@ impl Store {
                c.project_id,
                c.user_id,
                c.title,
+               (SELECT t0.message FROM tasks t0
+                WHERE t0.project_id = c.project_id
+                  AND t0.user_id = c.user_id
+                  AND t0.conversation_id = c.id
+                  AND t0.client_request_id LIKE 'pc_offline:%'
+                ORDER BY t0.created_at, t0.id LIMIT 1) AS local_task_prompt,
                c.status,
                (SELECT COUNT(*) FROM messages m
                 WHERE m.project_id = c.project_id
@@ -156,18 +162,23 @@ impl Store {
         )?;
         let rows = stmt
             .query_map(params![project_id, user_id, limit.clamp(1, 100)], |row| {
+                let stored_title: Option<String> = row.get(3)?;
+                let local_task_prompt: Option<String> = row.get(4)?;
                 Ok(UserConversationEntry {
                     id: row.get(0)?,
                     project_id: row.get(1)?,
                     user_id: row.get(2)?,
-                    title: row.get(3)?,
-                    status: row.get(4)?,
-                    message_count: row.get(5)?,
-                    last_message: row.get(6)?,
-                    last_message_role: row.get(7)?,
-                    last_message_at: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
+                    title: crate::task_title::local_task_conversation_title(
+                        stored_title.as_deref(),
+                        local_task_prompt.as_deref(),
+                    ),
+                    status: row.get(5)?,
+                    message_count: row.get(6)?,
+                    last_message: row.get(7)?,
+                    last_message_role: row.get(8)?,
+                    last_message_at: row.get(9)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

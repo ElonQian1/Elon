@@ -243,6 +243,7 @@ mod speech_translate;
 mod store;
 mod store_migrations;
 mod store_schema;
+mod task_title;
 mod token_usage_api;
 mod tools;
 mod tools_apk;

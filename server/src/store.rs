@@ -92,6 +92,8 @@ mod store_types_project;
 mod system_projects;
 mod task_completion_replay;
 mod task_recovery;
+#[cfg(test)]
+mod task_title_tests;
 mod tasks;
 pub(crate) mod token_usage;
 mod token_usage_stats;

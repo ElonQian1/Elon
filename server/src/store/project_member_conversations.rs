@@ -28,6 +28,12 @@ impl Store {
                c.user_id,
                COALESCE(u.nickname, u.phone, u.email, c.user_id) AS user_account,
                c.title,
+               (SELECT t0.message FROM tasks t0
+                WHERE t0.project_id = c.project_id
+                  AND t0.user_id = c.user_id
+                  AND t0.conversation_id = c.id
+                  AND t0.client_request_id LIKE 'pc_offline:%'
+                ORDER BY t0.created_at, t0.id LIMIT 1) AS local_task_prompt,
                c.status,
                COALESCE(c.is_public, 1) AS is_public,
                (SELECT COUNT(*) FROM messages m
@@ -114,22 +120,27 @@ impl Store {
                     limit.clamp(1, 100)
                 ],
                 |row| {
+                    let stored_title: Option<String> = row.get(4)?;
+                    let local_task_prompt: Option<String> = row.get(5)?;
                     Ok(ProjectMemberConversationEntry {
                         id: row.get(0)?,
                         project_id: row.get(1)?,
                         user_id: row.get(2)?,
                         user_account: row.get(3)?,
-                        title: row.get(4)?,
-                        status: row.get(5)?,
-                        is_public: row.get::<_, i64>(6)? != 0,
-                        message_count: row.get(7)?,
-                        task_count: row.get(8)?,
-                        last_message: row.get(9)?,
-                        last_message_role: row.get(10)?,
-                        last_message_at: row.get(11)?,
-                        last_task_status: row.get(12)?,
-                        created_at: row.get(13)?,
-                        updated_at: row.get(14)?,
+                        title: crate::task_title::local_task_conversation_title(
+                            stored_title.as_deref(),
+                            local_task_prompt.as_deref(),
+                        ),
+                        status: row.get(6)?,
+                        is_public: row.get::<_, i64>(7)? != 0,
+                        message_count: row.get(8)?,
+                        task_count: row.get(9)?,
+                        last_message: row.get(10)?,
+                        last_message_role: row.get(11)?,
+                        last_message_at: row.get(12)?,
+                        last_task_status: row.get(13)?,
+                        created_at: row.get(14)?,
+                        updated_at: row.get(15)?,
                     })
                 },
             )?
