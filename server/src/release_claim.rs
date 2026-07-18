@@ -73,8 +73,34 @@ pub struct ClaimResponse {
     pub queue_position: usize,
     pub coalesced: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub owner: Option<PublishLeaseEntry>,
+    pub owner: Option<PublicPublishLeaseEntry>,
     pub waiter_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicPublishLeaseEntry {
+    pub kind: String,
+    pub sha: String,
+    pub builder_id: String,
+    pub builder_label: String,
+    pub requested_at: i64,
+    pub last_heartbeat: i64,
+    pub lease_expires_at: i64,
+}
+
+impl From<&PublishLeaseEntry> for PublicPublishLeaseEntry {
+    fn from(value: &PublishLeaseEntry) -> Self {
+        Self {
+            kind: value.kind.clone(),
+            sha: value.sha.clone(),
+            builder_id: value.builder_id.clone(),
+            builder_label: value.builder_label.clone(),
+            requested_at: value.requested_at,
+            last_heartbeat: value.last_heartbeat,
+            lease_expires_at: value.lease_expires_at,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -154,7 +180,7 @@ pub async fn claim_handler(
         let response = ClaimResponse {
             action: "coalesced".to_string(),
             kind: kind_name.to_string(),
-            token: completion.token.clone(),
+            token: String::new(),
             sha: completion.sha.clone(),
             assigned_version_name: lane_ref
                 .last_release
@@ -171,7 +197,11 @@ pub async fn claim_handler(
                 + guard.global_publish.waiters.len(),
             queue_position: 0,
             coalesced: true,
-            owner: guard.global_publish.owner.clone(),
+            owner: guard
+                .global_publish
+                .owner
+                .as_ref()
+                .map(PublicPublishLeaseEntry::from),
             waiter_count: guard.global_publish.waiters.len(),
         };
         return Ok(Json(response));
@@ -292,7 +322,11 @@ pub async fn claim_handler(
         in_flight_count,
         queue_position,
         coalesced: false,
-        owner: guard.global_publish.owner.clone(),
+        owner: guard
+            .global_publish
+            .owner
+            .as_ref()
+            .map(PublicPublishLeaseEntry::from),
         waiter_count: guard.global_publish.waiters.len(),
     };
 
@@ -472,7 +506,7 @@ pub async fn status_handler(
     let render = |lane: &LaneState, name: &str| -> Value {
         json!({
             "kind": name,
-            "inFlight": lane.in_flight,
+            "inFlight": lane.in_flight.iter().map(public_in_flight).collect::<Vec<_>>(),
             "lastRelease": lane.last_release,
             "lastPublishedVersionName": lane.last_published_version_name,
             "lastPublishedVersionCode": lane.last_published_version_code,
@@ -484,8 +518,8 @@ pub async fn status_handler(
         .as_deref()
         .map(|token| publish_token_status(&guard, token));
     let global = json!({
-        "owner": guard.global_publish.owner,
-        "waiters": guard.global_publish.waiters,
+        "owner": guard.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
+        "waiters": guard.global_publish.waiters.iter().map(PublicPublishLeaseEntry::from).collect::<Vec<_>>(),
         "waiterCount": guard.global_publish.waiters.len(),
         "queuePolicy": "fifo",
         "coalescingKey": "kind+sha",
@@ -534,7 +568,11 @@ fn claim_response_for_existing(
             + state.global_publish.waiters.len(),
         queue_position,
         coalesced: false,
-        owner: state.global_publish.owner.clone(),
+        owner: state
+            .global_publish
+            .owner
+            .as_ref()
+            .map(PublicPublishLeaseEntry::from),
         waiter_count: state.global_publish.waiters.len(),
     }
 }
@@ -576,7 +614,7 @@ fn publish_token_status(state: &crate::release_manager::ReleaseStateFile, token:
             "kind": waiter.kind,
             "sha": waiter.sha,
             "queuePosition": index + 1,
-            "owner": state.global_publish.owner,
+            "owner": state.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
         });
     }
     if let Some(completion) = state
@@ -597,6 +635,19 @@ fn publish_token_status(state: &crate::release_manager::ReleaseStateFile, token:
         });
     }
     json!({"action": "unknown", "token": token})
+}
+
+fn public_in_flight(item: &InFlightBuilder) -> Value {
+    json!({
+        "builderId": item.builder_id,
+        "builderLabel": item.builder_label,
+        "sha": item.sha,
+        "assignedVersionName": item.assigned_version_name,
+        "assignedVersionCode": item.assigned_version_code,
+        "claimedAt": item.claimed_at,
+        "lastHeartbeat": item.last_heartbeat,
+        "leaseExpiresAt": item.lease_expires_at,
+    })
 }
 
 fn validate_finish_identity<'a>(
@@ -686,5 +737,28 @@ mod tests {
                 .0,
             "immutable-version-code-mismatch"
         );
+    }
+
+    #[test]
+    fn public_release_status_never_exposes_lease_tokens() {
+        let build = build();
+        let build_json = public_in_flight(&build);
+        assert!(build_json.get("token").is_none());
+        assert!(!build_json.to_string().contains("token"));
+
+        let lease = PublishLeaseEntry {
+            token: "secret-lease-token".to_string(),
+            kind: "server".to_string(),
+            sha: "fixed-sha".to_string(),
+            builder_id: "builder".to_string(),
+            builder_label: "builder".to_string(),
+            requested_at: 1,
+            last_heartbeat: 2,
+            lease_expires_at: 100,
+        };
+        let lease_json = serde_json::to_value(PublicPublishLeaseEntry::from(&lease))
+            .expect("public lease should serialize");
+        assert!(lease_json.get("token").is_none());
+        assert!(!lease_json.to_string().contains("secret-lease-token"));
     }
 }
