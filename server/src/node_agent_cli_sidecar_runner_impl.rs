@@ -9,7 +9,7 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
         .map(TaskJournal::new)
         .unwrap_or_else(TaskJournal::default);
     let started_at = now_ms();
-    registry.upsert_session(CliSidecarSessionRecord::managed_conpty(
+    let mut session = CliSidecarSessionRecord::managed_conpty(
         &config.session_id,
         &config.task_id,
         &config.cli_name,
@@ -19,7 +19,14 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
         Some(std::process::id()),
         None,
         started_at,
-    ))?;
+    );
+    session.worker_path = config
+        .worker_path
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string());
+    session.worker_release = config.worker_release.clone();
+    session.worker_sha256 = config.worker_sha256.clone();
+    registry.upsert_session(session)?;
 
     let mut pty = match CliPtyProcess::spawn(CliPtySpawnConfig {
         program: &config.program,

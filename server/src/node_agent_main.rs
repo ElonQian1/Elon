@@ -60,6 +60,7 @@ mod node_agent_cli_sidecar_io;
 mod node_agent_cli_sidecar_runner;
 #[cfg(test)]
 mod node_agent_cli_sidecar_runner_tests;
+mod node_agent_cli_worker;
 mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
@@ -396,6 +397,9 @@ async fn run_agent_runtime() -> Result<()> {
         node_data_root,
         install_id,
     ));
+    if let Err(error) = node_agent_cli_worker::cleanup_terminal_workers(&runtime.cli_sidecars) {
+        warn!(%error, "清理已终态版本化 CLI worker 失败，保留旧 worker 继续启动");
+    }
     runtime.reconcile_local_completion_outbox();
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();

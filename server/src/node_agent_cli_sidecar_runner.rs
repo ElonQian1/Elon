@@ -48,6 +48,12 @@ pub(crate) struct CliSidecarLaunchConfig {
     #[serde(default)]
     pub task_journal_dir: Option<PathBuf>,
     #[serde(default)]
+    pub worker_path: Option<PathBuf>,
+    #[serde(default)]
+    pub worker_release: Option<String>,
+    #[serde(default)]
+    pub worker_sha256: Option<String>,
+    #[serde(default)]
     pub codex_session_scope_key: Option<String>,
     #[serde(default)]
     pub legacy_codex_sessions_file: Option<PathBuf>,
@@ -168,7 +174,13 @@ pub(crate) fn session_id_for_task(task_id: &str) -> String {
     format!("sidecar-{}-{}", safe_id_fragment(task_id), now_ms())
 }
 
-pub(crate) async fn spawn_sidecar(config: CliSidecarLaunchConfig) -> Result<CliSidecarLaunch> {
+pub(crate) async fn spawn_sidecar(mut config: CliSidecarLaunchConfig) -> Result<CliSidecarLaunch> {
+    let current_exe = std::env::current_exe().context("读取当前 node-agent exe 路径")?;
+    let worker =
+        crate::node_agent_cli_worker::prepare_versioned_worker(&current_exe, &config.registry_dir)?;
+    config.worker_path = Some(worker.path.clone());
+    config.worker_release = Some(worker.release);
+    config.worker_sha256 = Some(worker.sha256);
     let config_path = config_path_for(&config.session_id);
     if let Some(parent) = config_path.parent() {
         fs::create_dir_all(parent)
@@ -183,8 +195,7 @@ pub(crate) async fn spawn_sidecar(config: CliSidecarLaunchConfig) -> Result<CliS
     fs::write(&config_path, serde_json::to_vec_pretty(&config)?)
         .with_context(|| format!("写入 sidecar config {:?}", config_path))?;
 
-    let exe = std::env::current_exe().context("读取当前 node-agent exe 路径")?;
-    let mut cmd = tokio::process::Command::new(exe);
+    let mut cmd = tokio::process::Command::new(&worker.path);
     cmd.arg("--cli-sidecar")
         .arg(&config_path)
         .stdin(Stdio::null())
@@ -351,6 +362,9 @@ mod tests {
             output_path: std::path::PathBuf::from("output.jsonl"),
             registry_dir: std::path::PathBuf::from("registry"),
             task_journal_dir: None,
+            worker_path: None,
+            worker_release: None,
+            worker_sha256: None,
             codex_session_scope_key: None,
             legacy_codex_sessions_file: None,
             timeout_secs: 10,

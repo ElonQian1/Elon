@@ -32,7 +32,7 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
         .map(TaskJournal::new)
         .unwrap_or_else(TaskJournal::default);
     let started_at = now_ms();
-    registry.upsert_session(CliSidecarSessionRecord::managed_pipe_json(
+    let mut session = CliSidecarSessionRecord::managed_pipe_json(
         &config.session_id,
         &config.task_id,
         &config.cli_name,
@@ -42,7 +42,14 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
         Some(std::process::id()),
         None,
         started_at,
-    ))?;
+    );
+    session.worker_path = config
+        .worker_path
+        .as_ref()
+        .map(|path| path.to_string_lossy().to_string());
+    session.worker_release = config.worker_release.clone();
+    session.worker_sha256 = config.worker_sha256.clone();
+    registry.upsert_session(session)?;
 
     let mut command = tokio::process::Command::new(&config.program);
     command

@@ -52,6 +52,12 @@ pub(crate) struct CliSidecarSessionRecord {
     pub sidecar_pid: Option<u32>,
     #[serde(default)]
     pub child_pid: Option<u32>,
+    #[serde(default)]
+    pub worker_path: Option<String>,
+    #[serde(default)]
+    pub worker_release: Option<String>,
+    #[serde(default)]
+    pub worker_sha256: Option<String>,
     pub started_at_ms: u128,
     pub last_seen_at_ms: u128,
     pub capabilities: CliSidecarCapabilities,
@@ -157,6 +163,10 @@ impl CliSidecarRegistry {
             sessions.truncate(limit.min(100));
             Ok(sessions)
         })
+    }
+
+    pub(crate) fn all_sessions(&self) -> Result<Vec<CliSidecarSessionRecord>> {
+        with_task_journal_io_lock(|| Ok(self.load_sessions()?.into_values().collect()))
     }
 
     pub(crate) fn session_for_task(
@@ -366,6 +376,9 @@ impl CliSidecarSessionRecord {
             endpoint,
             sidecar_pid,
             child_pid,
+            worker_path: None,
+            worker_release: None,
+            worker_sha256: None,
             started_at_ms: now_ms,
             last_seen_at_ms: now_ms,
             capabilities: CliSidecarCapabilities {
@@ -401,6 +414,9 @@ impl CliSidecarSessionRecord {
             endpoint,
             sidecar_pid,
             child_pid,
+            worker_path: None,
+            worker_release: None,
+            worker_sha256: None,
             started_at_ms: now_ms,
             last_seen_at_ms: now_ms,
             capabilities: CliSidecarCapabilities {
@@ -436,6 +452,13 @@ impl CliSidecarSessionRecord {
             "running" | "waiting_approval" | "cancel_requested"
         ) && now_ms.saturating_sub(self.last_seen_at_ms) <= SIDECAR_STALE_AFTER_MS
     }
+
+    pub(crate) fn is_terminal(&self) -> bool {
+        matches!(
+            self.state.trim().to_ascii_lowercase().as_str(),
+            "finished" | "done" | "failed" | "canceled" | "cancelled" | "timeout"
+        )
+    }
 }
 
 pub(crate) fn sidecar_status_view(session: &CliSidecarSessionRecord) -> serde_json::Value {
@@ -450,6 +473,9 @@ pub(crate) fn sidecar_status_view(session: &CliSidecarSessionRecord) -> serde_js
         "endpoint": session.endpoint,
         "sidecar_pid": session.sidecar_pid,
         "child_pid": session.child_pid,
+        "worker_path": session.worker_path,
+        "worker_release": session.worker_release,
+        "worker_sha256": session.worker_sha256,
         "started_at_ms": session.started_at_ms,
         "last_seen_at_ms": session.last_seen_at_ms,
         "live_after_restart": session.is_live_at(now),

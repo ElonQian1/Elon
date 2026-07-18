@@ -52,6 +52,9 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         output_path,
         registry_dir: sidecar_registry.dir(),
         task_journal_dir: None,
+        worker_path: None,
+        worker_release: None,
+        worker_sha256: None,
         codex_session_scope_key: direct.codex_key.clone(),
         legacy_codex_sessions_file: Some(direct.codex_sessions_file.clone()),
         timeout_secs: cli_prompt_timeout_secs(

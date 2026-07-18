@@ -16,6 +16,8 @@ fn self_replace_script_stops_on_failure_before_restart() {
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
     assert!(script.contains("_internal\\elon-desktop.exe"));
     assert!(script.contains("$matchesDesktopShell"));
+    assert!(script.contains("$matchesCliSidecar"));
+    assert!(script.contains("(-not $matchesCliSidecar)"));
     assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpExe"));
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $client"));
     assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
@@ -52,6 +54,8 @@ fn package_replace_script_updates_full_client_layout() {
     assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
     assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
+    assert!(script.contains("$matchesCliSidecar"));
+    assert!(script.contains("(-not $matchesCliSidecar)"));
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageUninstall"));
     assert!(script.contains("Copy-Item -Path (Join-Path $packageInternal '*')"));
@@ -78,6 +82,8 @@ fn package_self_update_uses_extracted_repair_entrypoint() {
     assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
     assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $installedClient"));
+    assert!(script.contains("$matchesCliSidecar"));
+    assert!(script.contains("(-not $matchesCliSidecar)"));
     assert!(script
         .contains("Start-Process -FilePath $packageClient -ArgumentList '--repair-background'"));
     assert!(script.contains("Wait-Process -Id $repair.Id -Timeout 120"));

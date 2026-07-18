@@ -514,6 +514,7 @@ function Get-ElonNodeClientProcesses {
   Get-CimInstance Win32_Process | Where-Object {
     $matchesClient = $false
     $matchesDesktopShell = $false
+    $matchesCliSidecar = ([string]$_.CommandLine) -match '(?i)--cli-(?:pipe-)?sidecar'
     if ($_.ExecutablePath) {
       try {
         $fullExecutable = [System.IO.Path]::GetFullPath($_.ExecutablePath)
@@ -521,7 +522,9 @@ function Get-ElonNodeClientProcesses {
         $matchesDesktopShell = ($fullExecutable -ieq $desktopShell)
       } catch {}
     }
-    $matchesClient -or $matchesDesktopShell -or ($_.Name -eq 'elon-node-agent.exe')
+    (-not $matchesCliSidecar) -and (
+      $matchesClient -or $matchesDesktopShell -or ($_.Name -eq 'elon-node-agent.exe')
+    )
   }
 }
 
