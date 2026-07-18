@@ -318,7 +318,15 @@ pub(crate) async fn follow_sidecar_output_from_with_batch(
                 .position(|record| record.record_type == "exit")
                 .unwrap_or(records.len());
             if durable_count == records.len() {
-                persist_batch(&records, cursor)?;
+                if let Err(error) = persist_batch(&records, cursor) {
+                    tracing::warn!(
+                        task_id,
+                        offset = cursor.offset,
+                        sequence = cursor.sequence,
+                        %error,
+                        "sidecar output checkpoint persistence failed; continuing output follow"
+                    );
+                }
             } else if durable_count > 0 {
                 let mut durable_offset = batch_start.offset;
                 let durable_records =
@@ -329,7 +337,15 @@ pub(crate) async fn follow_sidecar_output_from_with_batch(
                         .sequence
                         .saturating_add(durable_records.len() as u64),
                 };
-                persist_batch(&durable_records, durable_cursor)?;
+                if let Err(error) = persist_batch(&durable_records, durable_cursor) {
+                    tracing::warn!(
+                        task_id,
+                        offset = durable_cursor.offset,
+                        sequence = durable_cursor.sequence,
+                        %error,
+                        "sidecar output checkpoint persistence failed before terminal record; continuing output follow"
+                    );
+                }
             }
         }
         for record in records {
@@ -587,6 +603,48 @@ mod tests {
         assert_eq!(result.stdout_text, "checkpointed\n");
         assert_eq!(cursors.len(), 1);
         assert_eq!(cursors[0].sequence, 1);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[tokio::test]
+    async fn replay_continues_when_nonterminal_checkpoint_persistence_fails() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-sidecar-cursor-failure-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let output = root.join("output.jsonl");
+        append_output(
+            &output,
+            CliSidecarOutputRecord::chunk("stdout", "still-running\n"),
+        )
+        .unwrap();
+        let exit_output = output.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+            append_output(&exit_output, CliSidecarOutputRecord::exit(true, false)).unwrap();
+        });
+        let registry =
+            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("registry"));
+        let (_cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
+        let mut persist_attempts = 0usize;
+        let result = super::follow_sidecar_output_from_with_batch(
+            &registry,
+            "task",
+            &output,
+            super::CliSidecarReplayCursor::default(),
+            &mut cancel_rx,
+            |_| {},
+            |_, _| {
+                persist_attempts += 1;
+                anyhow::bail!("injected checkpoint persistence failure")
+            },
+        )
+        .await
+        .unwrap();
+        assert!(result.exit_ok);
+        assert_eq!(result.stdout_text, "still-running\n");
+        assert_eq!(persist_attempts, 1);
         let _ = std::fs::remove_dir_all(root);
     }
 }
