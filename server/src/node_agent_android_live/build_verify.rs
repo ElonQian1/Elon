@@ -3,11 +3,12 @@ use std::time::{Duration, Instant, SystemTime};
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::node_agent_android_inspector::{
-    adb_capture::launch_app, adb_command::validate_device_id,
-};
+use crate::node_agent_android_inspector::adb_command::validate_device_id;
 
-use super::adb_session::{start_runtime, stop_runtime, DEFAULT_DEVICE_PORT};
+use super::adb_session::{
+    runtime_failure_diagnostics, start_runtime, stop_runtime, RuntimeStartEvidence,
+    DEFAULT_DEVICE_PORT,
+};
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify_apk::select_fresh_debug_apk;
 use super::fit_run::workspace_fingerprint;
@@ -262,9 +263,7 @@ async fn build_and_verify_with_mode(
     }
 
     session.reset_for_redeploy().await;
-    launch_app(&session.device_id, &session.package_name).await?;
-    tokio::time::sleep(Duration::from_millis(650)).await;
-    start_runtime(&session, host_port).await?;
+    let start_evidence = start_runtime(&session, host_port).await?;
     // A connected socket with an empty tree is not a verified UI. Always wait
     // for at least one runtime node, including normal Activity verification.
     let preview = request.preview.clone();
@@ -272,27 +271,36 @@ async fn build_and_verify_with_mode(
         open_preview(&session, preview.clone()).await?;
     }
     let expected_screen_id = preview.as_ref().map(|preview| preview.screen_id.as_str());
-    let runtime_view =
-        match wait_for_runtime(broker, session_id, &session, expected_screen_id).await {
-            Ok(view) => view,
-            Err(first_error) => {
-                // Some vendor systems finish `adb install -r` before the replaced
-                // process and its debug receiver are fully ready. Re-launch and
-                // bootstrap once more instead of leaving the PC page in a false
-                // disconnected state after a successful install.
-                launch_app(&session.device_id, &session.package_name).await?;
-                tokio::time::sleep(Duration::from_millis(650)).await;
-                start_runtime(&session, host_port).await?;
-                if let Some(preview) = preview.as_ref() {
-                    open_preview(&session, preview.clone()).await?;
-                }
-                wait_for_runtime(broker, session_id, &session, expected_screen_id)
-                    .await
-                    .with_context(|| {
-                        format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}")
-                    })?
+    let runtime_view = match wait_for_runtime(
+        broker,
+        session_id,
+        &session,
+        expected_screen_id,
+        &start_evidence,
+    )
+    .await
+    {
+        Ok(view) => view,
+        Err(first_error) => {
+            // Some vendor systems finish `adb install -r` before the replaced
+            // process and its debug receiver are fully ready. Re-launch and
+            // bootstrap once more instead of leaving the PC page in a false
+            // disconnected state after a successful install.
+            let retry_evidence = start_runtime(&session, host_port).await?;
+            if let Some(preview) = preview.as_ref() {
+                open_preview(&session, preview.clone()).await?;
             }
-        };
+            wait_for_runtime(
+                broker,
+                session_id,
+                &session,
+                expected_screen_id,
+                &retry_evidence,
+            )
+            .await
+            .with_context(|| format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}"))?
+        }
+    };
     // The Activity can expose its first View tree before async data binding and
     // entrance rendering finish. Comparing that intermediate frame against a
     // stable Live preview creates false BUILD_MISMATCH results. Give the debug
@@ -459,6 +467,7 @@ async fn wait_for_runtime(
     session_id: &str,
     session: &LiveUiSession,
     expected_screen_id: Option<&str>,
+    start_evidence: &RuntimeStartEvidence,
 ) -> Result<super::protocol::LiveSessionView> {
     let started = Instant::now();
     loop {
@@ -475,15 +484,16 @@ async fn wait_for_runtime(
             return Ok(view);
         }
         if started.elapsed() > Duration::from_secs(15) {
+            let diagnostics = runtime_failure_diagnostics(session, Some(start_evidence)).await;
             if view.connected {
                 if let Some(expected_screen_id) = expected_screen_id {
                     bail!(
-                        "新 APK 已安装且 Runtime 已连接，但 Preview 场景 {expected_screen_id} 的节点树在 15 秒内没有上报"
+                        "新 APK 已安装且 Runtime 已连接，但 Preview 场景 {expected_screen_id} 的节点树在 15 秒内没有上报；{diagnostics}"
                     );
                 }
-                bail!("新 APK 已安装且 Runtime 已连接，但节点树在 15 秒内没有上报");
+                bail!("新 APK 已安装且 Runtime 已连接，但节点树在 15 秒内没有上报；{diagnostics}");
             }
-            bail!("新 APK 已安装，但 Debug Runtime 在 15 秒内没有重新连接");
+            bail!("新 APK 已安装，但 Debug Runtime 在 15 秒内没有重新连接；{diagnostics}");
         }
         tokio::time::sleep(Duration::from_millis(250)).await;
     }

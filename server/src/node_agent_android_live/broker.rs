@@ -46,6 +46,7 @@ pub(crate) struct LiveCommitSnapshot {
 #[derive(Default)]
 struct LiveSessionState {
     connected: bool,
+    runtime_stage: Option<String>,
     runtime_build_id: Option<String>,
     runtime_version: Option<String>,
     tree_revision: u64,
@@ -199,6 +200,9 @@ impl LiveUiBroker {
     ) -> Result<()> {
         let session = self.session(session_id).await?;
         if !constant_time_eq(session.token.as_bytes(), token.as_bytes()) {
+            let mut state = session.state.write().await;
+            state.runtime_stage = Some("WEBSOCKET_AUTH_REJECTED".to_string());
+            state.last_error = Some("Runtime WebSocket 会话认证失败".to_string());
             bail!("Live UI 会话令牌无效");
         }
         let (mut sink, mut stream) = socket.split();
@@ -207,6 +211,7 @@ impl LiveUiBroker {
         {
             let mut state = session.state.write().await;
             state.connected = true;
+            state.runtime_stage = Some("WEBSOCKET_AUTHORIZED".to_string());
             state.last_seen_at = Some(Utc::now().to_rfc3339());
             state.last_error = None;
         }
@@ -217,6 +222,7 @@ impl LiveUiBroker {
             accepted: true,
         })?))
         .map_err(|_| anyhow!("无法发送 Live UI welcome"))?;
+        session.record_runtime_stage("BROKER_WELCOME_SENT").await;
 
         let writer = tokio::spawn(async move {
             while let Some(message) = rx.recv().await {
@@ -263,7 +269,9 @@ impl LiveUiBroker {
             }
         };
         if cleared_current_connection {
-            session.state.write().await.connected = false;
+            let mut state = session.state.write().await;
+            state.connected = false;
+            state.runtime_stage = Some("WEBSOCKET_DISCONNECTED".to_string());
         }
         Ok(())
     }
@@ -376,6 +384,7 @@ impl LiveUiSession {
         self.pending.lock().await.clear();
         let mut state = self.state.write().await;
         state.connected = false;
+        state.runtime_stage = Some("WAITING_FOR_RUNTIME_START".to_string());
         state.runtime_build_id = None;
         state.runtime_version = None;
         state.tree_revision = state.tree_revision.saturating_add(1);
@@ -384,6 +393,14 @@ impl LiveUiSession {
         state.future.clear();
         state.source_proof = None;
         state.last_error = None;
+    }
+
+    pub(crate) async fn record_runtime_stage(&self, stage: &'static str) {
+        self.state.write().await.runtime_stage = Some(stage.to_string());
+    }
+
+    pub(crate) async fn runtime_stage(&self) -> Option<String> {
+        self.state.read().await.runtime_stage.clone()
     }
 
     pub(crate) async fn record_source_proof(
@@ -459,6 +476,7 @@ impl LiveUiSession {
                     .get("runtimeVersion")
                     .and_then(Value::as_str)
                     .map(str::to_string);
+                state.runtime_stage = Some("RUNTIME_HELLO_RECEIVED".to_string());
                 state.last_seen_at = Some(Utc::now().to_rfc3339());
             }
             "tree.snapshot" => {
@@ -471,6 +489,7 @@ impl LiveUiSession {
                     .and_then(Value::as_u64)
                     .unwrap_or(state.tree_revision + 1);
                 state.nodes = nodes;
+                state.runtime_stage = Some("TREE_SNAPSHOT_RECEIVED".to_string());
                 state.last_seen_at = Some(Utc::now().to_rfc3339());
             }
             "patch.ack" | "patch.reject" | "frame.snapshot" | "frame.reject" => {

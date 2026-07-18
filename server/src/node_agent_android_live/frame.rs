@@ -50,7 +50,13 @@ pub(crate) async fn capture_frame(session: &LiveUiSession) -> Result<LiveFrame> 
 pub(crate) async fn capture_runtime_frame_image(
     session: &LiveUiSession,
 ) -> Result<RuntimeFrameImage> {
-    let value = session.request_frame().await?;
+    let value = match session.request_frame().await {
+        Ok(value) => value,
+        Err(error) => {
+            let diagnostics = super::adb_session::runtime_failure_diagnostics(session, None).await;
+            return Err(error.context(diagnostics));
+        }
+    };
     let frame = parse_runtime_frame(&value)?;
     Ok(RuntimeFrameImage {
         bytes: decode_runtime_frame_bytes(&frame)?,

@@ -6,6 +6,11 @@ use serde::Deserialize;
 
 const CONFIG_MARKER: &str = "\"mcpConfigPath\"";
 const PROJECT_DOCS_TASK_MARKER: &str = "<elon-project-docs-task version=\"1\">";
+// ui_prepare_debug_runtime may legitimately spend 15 minutes in Gradle and
+// another 6 minutes in an OEM installer. Keep the MCP request alive across
+// that bounded operation so Codex does not report a false tool timeout while
+// the node continues installing and connecting in the background.
+const UI_TUNER_MCP_TOOL_TIMEOUT_SECS: u64 = 1_500;
 
 pub(crate) struct ProjectDocsMcpLaunchConfig {
     pub(crate) args: Vec<String>,
@@ -22,7 +27,9 @@ pub(crate) fn codex_mcp_config_args(prompt: &str) -> Option<Vec<String>> {
                 "-c".to_string(),
                 "mcp_servers.yilong_ui_live.required=false".to_string(),
                 "-c".to_string(),
-                "mcp_servers.yilong_ui_live.tool_timeout_sec=60".to_string(),
+                format!(
+                    "mcp_servers.yilong_ui_live.tool_timeout_sec={UI_TUNER_MCP_TOOL_TIMEOUT_SECS}"
+                ),
             ])
         }
         Ok(None) => None,
@@ -239,6 +246,9 @@ mod tests {
         assert!(args
             .iter()
             .any(|arg| arg.contains("mcp_servers.yilong_ui_live.url")));
+        assert!(args
+            .iter()
+            .any(|arg| arg == "mcp_servers.yilong_ui_live.tool_timeout_sec=1500"));
         fs::remove_dir_all(dir).unwrap();
     }
 
