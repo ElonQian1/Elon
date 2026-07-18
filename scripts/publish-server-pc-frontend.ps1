@@ -52,6 +52,21 @@ function Publish-StaticDist {
     return $false
 }
 
+function Write-GitTextFile {
+    param(
+        [string]$Commit,
+        [string]$GitPath,
+        [string]$Destination
+    )
+    $savedEnc = [Console]::OutputEncoding
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $content = & git -C $RepoRoot show "${Commit}:$GitPath"
+    [Console]::OutputEncoding = $savedEnc
+    if ($LASTEXITCODE -ne 0) { throw "无法从 $Commit 导出 $GitPath" }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllLines($Destination, [string[]]$content, $utf8NoBom)
+}
+
 function Invoke-PcFrontendLocalBuild {
     param([string]$FrontendDir)
     $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"

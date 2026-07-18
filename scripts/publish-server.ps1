@@ -782,23 +782,6 @@ $RemoteDataDir = "/opt/elon/data"
 $RemotePcDist  = "$RemoteDataDir/pc-next-dist"
 $RemotePcLegacyDist = "$RemoteDataDir/pc-legacy-dist"
 
-function Write-GitTextFile {
-    param(
-        [string]$Commit,
-        [string]$GitPath,
-        [string]$Destination
-    )
-    $savedEnc = [Console]::OutputEncoding
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    $content = & git -C $RepoRoot show "${Commit}:$GitPath"
-    [Console]::OutputEncoding = $savedEnc
-    if ($LASTEXITCODE -ne 0) {
-        throw "无法从 $Commit 导出 $GitPath"
-    }
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllLines($Destination, [string[]]$content, $utf8NoBom)
-}
-
 function Export-PcLegacyDist {
     param(
         [string]$Commit,
@@ -1107,6 +1090,14 @@ if ($serverVersionResp -and $serverVersionResp.ToString().Trim() -ne "") {
 } else {
     Write-Host "   ⚠️  后端版本接口无响应（手动确认：curl.exe --noproxy '*' http://43.139.149.158:8080/api/server/version）" -ForegroundColor Yellow
 }
+
+# The first deployment from a legacy release API resumes a token that did not
+# persist batch fields. Replay completed stages against the new API before
+# finish so it can safely adopt release-<immutable-sha> and close one ledger.
+Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
+    -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'pc_frontend' -Status 'succeeded'
+Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
+    -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'server' -Status 'running'
 
 # ─────────────────────────────────────────────────────────────
 # 7. 清理工作树 + finish(success=true)

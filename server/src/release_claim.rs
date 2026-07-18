@@ -34,8 +34,8 @@ use crate::release_manager::{
 mod support;
 use crate::types::AppState;
 use support::{
-    claim_response_for_existing, ensure_manager_healthy, persist_error, public_in_flight,
-    publish_token_status, validate_finish_identity,
+    adopt_legacy_batch_identity, claim_response_for_existing, ensure_manager_healthy,
+    persist_error, public_in_flight, publish_token_status, validate_finish_identity,
 };
 
 // ===== 调参常量 =====
@@ -462,7 +462,7 @@ pub async fn heartbeat_handler(
             "lease expired or unknown token",
         ));
     }
-    let lease_entry = guard
+    let mut lease_entry = guard
         .global_publish
         .owner
         .as_ref()
@@ -476,6 +476,32 @@ pub async fn heartbeat_handler(
         })
         .cloned()
         .ok_or_else(|| err(StatusCode::GONE, "token-not-active", "lease disappeared"))?;
+    if lease_entry.batch_id.is_empty() {
+        let Some(batch_id) = req
+            .batch_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        else {
+            return Err(err(
+                StatusCode::CONFLICT,
+                "legacy-batch-required",
+                "legacy publish token must adopt its deterministic release batch",
+            ));
+        };
+        if batch_id != crate::release_batch::default_batch_id(&lease_entry.sha) {
+            return Err(err(
+                StatusCode::CONFLICT,
+                "legacy-batch-migration-refused",
+                "legacy publish token may only adopt release-<immutable-sha>",
+            ));
+        }
+        crate::release_batch::validate_batch_identity(&guard, batch_id, &lease_entry.sha)
+            .map_err(|message| err(StatusCode::CONFLICT, "batch-sha-mismatch", message))?;
+        adopt_legacy_batch_identity(&mut guard, kind, &req.token, batch_id);
+        lease_entry.batch_id = batch_id.to_string();
+        lease_entry.stage = crate::release_batch::default_stage(kind.as_str()).to_string();
+    }
     if req
         .batch_id
         .as_deref()

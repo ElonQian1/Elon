@@ -58,14 +58,6 @@ LOCAL_SERVER_HTTP="http://127.0.0.1:8080"
 RELEASE_TOKEN=""
 RELEASE_FINISHED=0
 
-is_local_server_deploy() {
-  case "${ELON_DEPLOY_LOCAL:-auto}" in
-    1|true|TRUE|local|LOCAL) return 0 ;;
-    0|false|FALSE|remote|REMOTE) return 1 ;;
-  esac
-  [ -d "$REMOTE_DIR" ] && [ -d "$REMOTE_DIR/server" ] && [ -w "$REMOTE_DIR" ] && command -v systemctl >/dev/null 2>&1
-}
-
 git_fetch_hint() {
   local output="${1:-}"
   if [[ "$output" =~ (Could\ not\ resolve\ host|Name\ or\ service\ not\ known|Temporary\ failure\ in\ name\ resolution) ]]; then
@@ -327,6 +319,7 @@ restore_release_rustflags() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
 . "$SCRIPT_DIR/release-publish-lease.sh"
+. "$SCRIPT_DIR/publish-server-common.sh"
 json_field() { elon_release_json_field "$1" "$2"; }
 if [ -z "$REPO_ROOT" ]; then
   echo -e "${RED}❌ 当前目录不在 git 仓库中${NC}" >&2; exit 1
@@ -940,6 +933,12 @@ if [ "$DEPLOYED_VERSION_NAME" != "$ASSIGNED_VERSION" ] || [ "$DEPLOYED_GIT_SHA" 
   echo -e "${YELLOW}   实际 SHA: ${DEPLOYED_GIT_SHA:-unknown}${NC}" >&2
   exit 1
 fi
+
+# A legacy release API did not persist batch fields from claim. Once the new
+# server is healthy, replay completed stages so the token adopts the
+# deterministic release-<immutable-sha> batch before finish.
+update_release_stage server "$RELEASE_TOKEN" "$RELEASE_BATCH_ID" pc_frontend succeeded
+update_release_stage server "$RELEASE_TOKEN" "$RELEASE_BATCH_ID" server running
 
 # ── 7. 清理工作树（由 trap EXIT 自动执行）────────────────────
 complete_release true "$ASSIGNED_VERSION" "$SHA_BIG" ""

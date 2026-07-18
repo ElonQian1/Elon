@@ -4,9 +4,44 @@ use axum::{http::StatusCode, Json};
 use serde_json::{json, Value};
 
 use super::{
-    err, lane, parse_kind, ClaimResponse, FinishRequest, InFlightBuilder, Lane,
+    err, lane, lane_mut, parse_kind, ClaimResponse, FinishRequest, InFlightBuilder, Lane,
     PublicPublishLeaseEntry,
 };
+
+pub(super) fn adopt_legacy_batch_identity(
+    state: &mut crate::release_manager::ReleaseStateFile,
+    kind: Lane,
+    token: &str,
+    batch_id: &str,
+) {
+    let stage = crate::release_batch::default_stage(kind.as_str()).to_string();
+    if let Some(owner) = state
+        .global_publish
+        .owner
+        .as_mut()
+        .filter(|entry| entry.token == token && entry.batch_id.is_empty())
+    {
+        owner.batch_id = batch_id.to_string();
+        owner.stage = stage.clone();
+    }
+    if let Some(waiter) = state
+        .global_publish
+        .waiters
+        .iter_mut()
+        .find(|entry| entry.token == token && entry.batch_id.is_empty())
+    {
+        waiter.batch_id = batch_id.to_string();
+        waiter.stage = stage.clone();
+    }
+    if let Some(build) = lane_mut(state, kind)
+        .in_flight
+        .iter_mut()
+        .find(|entry| entry.token == token && entry.batch_id.is_empty())
+    {
+        build.batch_id = batch_id.to_string();
+        build.stage = stage;
+    }
+}
 
 pub(super) fn claim_response_for_existing(
     state: &crate::release_manager::ReleaseStateFile,
@@ -165,4 +200,48 @@ pub(super) fn validate_finish_identity<'a>(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::release_manager::{InFlightBuilder, PublishLeaseEntry};
+
+    #[test]
+    fn legacy_token_adopts_deterministic_batch_across_global_and_lane_state() {
+        let mut state = crate::release_manager::ReleaseStateFile::default();
+        state.server.in_flight.push(InFlightBuilder {
+            token: "token".into(),
+            builder_id: "builder".into(),
+            builder_label: "builder".into(),
+            sha: "fixed-sha".into(),
+            batch_id: String::new(),
+            stage: String::new(),
+            assigned_version_name: "1.2.3".into(),
+            assigned_version_code: None,
+            claimed_at: 1,
+            last_heartbeat: 1,
+            lease_expires_at: 100,
+        });
+        state.global_publish.owner = Some(PublishLeaseEntry {
+            token: "token".into(),
+            kind: "server".into(),
+            sha: "fixed-sha".into(),
+            batch_id: String::new(),
+            stage: String::new(),
+            builder_id: "builder".into(),
+            builder_label: "builder".into(),
+            requested_at: 1,
+            last_heartbeat: 1,
+            lease_expires_at: 100,
+        });
+
+        adopt_legacy_batch_identity(&mut state, Lane::Server, "token", "release-fixed-sha");
+
+        let owner = state.global_publish.owner.as_ref().unwrap();
+        assert_eq!(owner.batch_id, "release-fixed-sha");
+        assert_eq!(owner.stage, "server");
+        assert_eq!(state.server.in_flight[0].batch_id, "release-fixed-sha");
+        assert_eq!(state.server.in_flight[0].stage, "server");
+    }
 }
