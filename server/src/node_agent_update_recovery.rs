@@ -1,6 +1,7 @@
 //! Durable protocol shared by local and remote node update recovery paths.
 
 use std::{
+    collections::HashSet,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -71,6 +72,7 @@ impl UpdateRecoveryState {
             Self::ResumeCreated => matches!(
                 next,
                 Self::Resumed
+                    | Self::Reattaching
                     | Self::Verified
                     | Self::Paused
                     | Self::ApprovalRequired
@@ -80,6 +82,8 @@ impl UpdateRecoveryState {
             Self::Resumed => matches!(
                 next,
                 Self::Verified
+                    | Self::Reattaching
+                    | Self::ResumeCreated
                     | Self::Paused
                     | Self::ApprovalRequired
                     | Self::Conflict
@@ -158,6 +162,44 @@ pub(crate) struct WorkspaceGitFingerprint {
     pub(crate) git_status_clean: Option<bool>,
 }
 
+impl WorkspaceGitFingerprint {
+    pub(crate) fn has_sufficient_identity(&self) -> bool {
+        !self.workspace_path.trim().is_empty()
+            && self
+                .git_head
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+            && self
+                .git_status_sha256
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct RecoverySafetyEvidence {
+    #[serde(default)]
+    pub(crate) evidence_complete: bool,
+    #[serde(default)]
+    pub(crate) pending_approval_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) non_repeatable_action: Option<String>,
+    #[serde(default)]
+    pub(crate) journal_event_count: usize,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct UpdateRecoveryReview {
+    #[serde(default)]
+    pub(crate) verdict: String,
+    #[serde(default)]
+    pub(crate) summary: String,
+    #[serde(default)]
+    pub(crate) reviewed_by: String,
+    #[serde(default)]
+    pub(crate) reviewed_at_ms: u128,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct RecoveryPolicy {
     #[serde(default = "default_recovery_mode")]
@@ -196,6 +238,8 @@ pub(crate) struct UpdateRecoveryReceipt {
     pub(crate) protocol: String,
     pub(crate) update_id: String,
     pub(crate) root_task_id: String,
+    #[serde(default)]
+    pub(crate) parent_task_id: Option<String>,
     pub(crate) original_task_id: String,
     #[serde(default)]
     pub(crate) resume_task_id: Option<String>,
@@ -217,6 +261,12 @@ pub(crate) struct UpdateRecoveryReceipt {
     pub(crate) transport: RecoveryTransport,
     #[serde(default)]
     pub(crate) recovery_policy: RecoveryPolicy,
+    #[serde(default)]
+    pub(crate) safety: RecoverySafetyEvidence,
+    #[serde(default)]
+    pub(crate) resume_strategy: Option<String>,
+    #[serde(default)]
+    pub(crate) final_review: Option<UpdateRecoveryReview>,
     #[serde(default)]
     pub(crate) state: UpdateRecoveryState,
     #[serde(default)]
@@ -241,6 +291,7 @@ impl UpdateRecoveryReceipt {
             protocol: UPDATE_RECOVERY_PROTOCOL.to_string(),
             update_id: update_id.into(),
             root_task_id: root_task_id.into(),
+            parent_task_id: None,
             original_task_id: original_task_id.into(),
             resume_task_id: None,
             from_release: ReleaseIdentity::default(),
@@ -252,6 +303,9 @@ impl UpdateRecoveryReceipt {
             workspace: WorkspaceGitFingerprint::default(),
             transport: RecoveryTransport::local(),
             recovery_policy: RecoveryPolicy::default(),
+            safety: RecoverySafetyEvidence::default(),
+            resume_strategy: None,
+            final_review: None,
             state: UpdateRecoveryState::Planned,
             final_reason: None,
             created_at_ms: now,
@@ -260,6 +314,12 @@ impl UpdateRecoveryReceipt {
         };
         receipt.push_event(UpdateRecoveryState::Planned, Some("update planned"));
         receipt
+    }
+
+    pub(crate) fn active_task_id(&self) -> &str {
+        self.resume_task_id
+            .as_deref()
+            .unwrap_or(&self.original_task_id)
     }
 
     pub(crate) fn transition(
@@ -366,6 +426,41 @@ impl UpdateRecoveryStore {
         self.save(&ledger)
     }
 
+    pub(crate) fn insert_if_absent(
+        &self,
+        receipt: UpdateRecoveryReceipt,
+    ) -> Result<UpdateRecoveryReceipt> {
+        let mut ledger = self.load()?;
+        if let Some(current) = ledger.receipts.iter().find(|current| {
+            current.update_id == receipt.update_id
+                && current.original_task_id == receipt.original_task_id
+        }) {
+            return Ok(current.clone());
+        }
+        ledger.receipts.push(receipt.clone());
+        self.save(&ledger)?;
+        Ok(receipt)
+    }
+
+    pub(crate) fn update<R>(
+        &self,
+        update_id: &str,
+        original_task_id: &str,
+        update: impl FnOnce(&mut UpdateRecoveryReceipt) -> Result<R>,
+    ) -> Result<R> {
+        let mut ledger = self.load()?;
+        let receipt = ledger
+            .receipts
+            .iter_mut()
+            .find(|receipt| {
+                receipt.update_id == update_id && receipt.original_task_id == original_task_id
+            })
+            .context("update recovery receipt not found")?;
+        let result = update(receipt)?;
+        self.save(&ledger)?;
+        Ok(result)
+    }
+
     pub(crate) fn transition(
         &self,
         update_id: &str,
@@ -395,6 +490,17 @@ impl UpdateRecoveryStore {
             .into_iter()
             .filter(|receipt| !receipt.state.is_terminal())
             .collect())
+    }
+
+    pub(crate) fn protected_task_ids(&self) -> Result<HashSet<String>> {
+        let mut task_ids = HashSet::new();
+        for receipt in self.active()? {
+            task_ids.insert(receipt.original_task_id.clone());
+            if let Some(task_id) = receipt.resume_task_id {
+                task_ids.insert(task_id);
+            }
+        }
+        Ok(task_ids)
     }
 }
 

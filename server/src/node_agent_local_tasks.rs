@@ -553,7 +553,7 @@ async fn decide_approval(
     .into_response()
 }
 
-fn spawn_local_output_consumer(
+pub(crate) fn spawn_local_output_consumer(
     runtime: Arc<NodeRuntime>,
     owner_user_id: String,
     task_id: String,

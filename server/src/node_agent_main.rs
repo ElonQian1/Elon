@@ -151,6 +151,8 @@ mod node_agent_project_docs_mcp_tests;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_ui_design_workspace;
+mod node_agent_update_checkpoint;
+mod node_agent_update_reconcile;
 mod node_agent_update_recovery;
 mod node_agent_workspace_match;
 mod node_agent_workspace_modules;
@@ -401,6 +403,7 @@ async fn run_agent_runtime() -> Result<()> {
         warn!(%error, "清理已终态版本化 CLI worker 失败，保留旧 worker 继续启动");
     }
     runtime.reconcile_local_completion_outbox();
+    node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);

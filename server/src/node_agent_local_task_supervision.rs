@@ -189,6 +189,13 @@ pub(crate) fn normalize_contract(
     })
 }
 
+pub(crate) fn load_supervision_contract(
+    journal: &TaskJournal,
+    task_id: &str,
+) -> anyhow::Result<Option<SupervisionContract>> {
+    Ok(load_supervision_state(journal, task_id)?.contract)
+}
+
 pub(crate) fn executor_prompt(user_prompt: &str, contract: Option<&SupervisionContract>) -> String {
     let Some(contract) = contract else {
         return user_prompt.to_string();

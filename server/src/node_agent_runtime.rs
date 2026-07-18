@@ -62,6 +62,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) task_journal: node_agent_task_journal::TaskJournal,
     pub(crate) completion_outbox: node_agent_completion_outbox::CliCompletionOutbox,
     pub(crate) local_tasks: node_agent_local_task_store::LocalTaskStore,
+    pub(crate) update_recovery: crate::node_agent_update_recovery::UpdateRecoveryStore,
     pub(crate) lifecycle: node_agent_lifecycle::NodeLifecycleTracker,
     pub(crate) tool_approvals: node_agent_tool_approval::ToolApprovalState,
     pub(crate) full_access_grants: node_agent_full_access::FullAccessGrantState,
@@ -108,6 +109,7 @@ impl NodeRuntime {
             task_journal: node_agent_task_journal::TaskJournal::default(),
             completion_outbox: node_agent_completion_outbox::CliCompletionOutbox::default(),
             local_tasks: node_agent_local_task_store::LocalTaskStore::default(),
+            update_recovery: crate::node_agent_update_recovery::UpdateRecoveryStore::default(),
             lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
@@ -160,13 +162,20 @@ impl NodeRuntime {
         // Any remaining `running` row has lost its in-memory child handle. Keep
         // rows that still have a durable outbox envelope recoverable, and make all
         // other interrupted work explicit instead of displaying it as live forever.
-        let durable_req_ids = match self.completion_outbox.pending_req_ids() {
+        let mut durable_req_ids = match self.completion_outbox.pending_req_ids() {
             Ok(req_ids) => req_ids,
             Err(error) => {
                 warn!(%error, "failed to read durable completion bindings during startup repair");
                 return;
             }
         };
+        match self.update_recovery.protected_task_ids() {
+            Ok(protected) => durable_req_ids.extend(protected),
+            Err(error) => {
+                warn!(%error, "failed to read protected update recovery task ids");
+                return;
+            }
+        }
         match self
             .local_tasks
             .interrupt_lingering_running(&durable_req_ids)

@@ -82,8 +82,10 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
         "客户端程序",
     )?;
     std::fs::write(&tmp_exe, &bytes).with_context(|| format!("无法写入 {}", tmp_exe.display()))?;
-    std::fs::write(&tmp_version, remote_text)
+    std::fs::write(&tmp_version, &remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
+
+    crate::node_agent_update_checkpoint::checkpoint_downloaded_update(&version_file, &remote_text)?;
 
     process::stop_agent();
     let client = paths::client_exe(install_dir);
@@ -131,6 +133,8 @@ pub(super) fn try_update_from_client_package(
     std::fs::write(&tmp_zip, &bytes).with_context(|| format!("无法写入 {}", tmp_zip.display()))?;
     std::fs::write(&tmp_version, remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
+
+    crate::node_agent_update_checkpoint::checkpoint_downloaded_update(&version_file, remote_text)?;
 
     process::stop_agent();
     let client = paths::client_exe(install_dir);

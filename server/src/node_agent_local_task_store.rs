@@ -80,7 +80,7 @@ impl LocalTaskStore {
         let conn = self.open()?;
         let now = now_ms();
         conn.execute(
-            "INSERT INTO local_tasks (
+            "INSERT OR IGNORE INTO local_tasks (
                task_id, owner_user_id, agent_id, install_id, project_id, channel_id,
                conversation_id, workspace_path, prompt, cli, runtime_permission,
                execution_origin, billing_source, status, sync_state, started_at_ms
@@ -100,8 +100,17 @@ impl LocalTaskStore {
                 now,
             ],
         )?;
-        self.get_for_owner(start.owner_user_id, start.task_id)?
-            .context("local task inserted but not readable")
+        let record = self
+            .get_for_owner(start.owner_user_id, start.task_id)?
+            .context("local task inserted but not readable")?;
+        if record.agent_id != start.agent_id
+            || record.install_id != start.install_id
+            || record.project_id != start.project_id
+            || record.conversation_id != start.conversation_id
+        {
+            bail!("local task id already belongs to a different durable identity");
+        }
+        Ok(record)
     }
 
     pub(crate) fn finish(
@@ -213,7 +222,7 @@ impl LocalTaskStore {
                 AND (?18 IS NULL OR agent_id = ?18)
                 AND (?19 IS NULL OR install_id = ?19)
                 AND (completion_event_id IS NULL OR completion_event_id = ?12)
-                AND status IN ('running','canceled','done','failed')",
+                AND status IN ('running','recovering','canceled','done','failed')",
             params![
                 if completion.exit_ok { "done" } else { "failed" },
                 completion.error,
@@ -277,6 +286,38 @@ impl LocalTaskStore {
         }
         tx.commit()?;
         Ok(changed)
+    }
+
+    pub(crate) fn list_update_candidates(&self) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE status IN ('running','recovering') ORDER BY started_at_ms",
+            select_sql()
+        ))?;
+        let records = stmt
+            .query_map([], read_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
+    }
+
+    pub(crate) fn get(&self, task_id: &str) -> Result<Option<LocalTaskRecord>> {
+        self.open()?
+            .query_row(
+                &format!("{} WHERE task_id = ?1", select_sql()),
+                params![task_id],
+                read_record,
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub(crate) fn mark_recovering(&self, task_id: &str, reason: &str) -> Result<bool> {
+        Ok(self.open()?.execute(
+            "UPDATE local_tasks SET status = 'recovering', error = ?2
+              WHERE task_id = ?1 AND status IN ('running','recovering')",
+            params![task_id, reason],
+        )? > 0)
     }
 
     pub(crate) fn mark_canceled(&self, owner_user_id: &str, task_id: &str) -> Result<bool> {
