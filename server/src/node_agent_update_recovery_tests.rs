@@ -186,6 +186,29 @@ fn lifecycle_lookup_and_final_review_share_the_same_receipt() {
 }
 
 #[test]
+fn terminal_binding_ignores_completed_parent_after_resume_child_exists() {
+    let (root, store) = temp_store();
+    let mut receipt = UpdateRecoveryReceipt::planned("update-7", "root-7", "task-7");
+    receipt.resume_task_id = Some("resume-7".to_string());
+    store.upsert(receipt).unwrap();
+
+    assert!(!store
+        .record_terminal_binding("task-7", "old-canceled", "canceled", 10)
+        .unwrap());
+    let unchanged = store.load().unwrap().receipts.remove(0);
+    assert!(unchanged.completion_event_id.is_none());
+    assert!(unchanged.terminal_task_status.is_none());
+
+    assert!(store
+        .record_terminal_binding("resume-7", "resume-done", "done", 20)
+        .unwrap());
+    let bound = store.load().unwrap().receipts.remove(0);
+    assert_eq!(bound.completion_event_id.as_deref(), Some("resume-done"));
+    assert_eq!(bound.terminal_task_status.as_deref(), Some("done"));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn invalid_state_skip_is_rejected() {
     let mut receipt = UpdateRecoveryReceipt::planned("update-5", "root-5", "task-5");
     let error = receipt

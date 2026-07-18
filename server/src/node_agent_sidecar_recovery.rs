@@ -333,12 +333,15 @@ fn record_recovery_terminal(
     completion: &homecli_proto::CliCompletionEnvelope,
 ) -> Result<()> {
     if let Some(receipt) = runtime.update_recovery.receipt_for_task(task_id)? {
-        runtime.update_recovery.record_terminal_binding(
+        let bound = runtime.update_recovery.record_terminal_binding(
             task_id,
             &completion.event_id,
             completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
             completion.created_at_ms as u128,
         )?;
+        if !bound {
+            return Ok(());
+        }
         runtime.update_recovery.update(
             &receipt.update_id,
             &receipt.original_task_id,

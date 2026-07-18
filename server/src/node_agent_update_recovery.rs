@@ -665,10 +665,7 @@ impl UpdateRecoveryStore {
         let Some(receipt) = ledger
             .receipts
             .iter_mut()
-            .filter(|receipt| {
-                receipt.original_task_id == task_id
-                    || receipt.resume_task_id.as_deref() == Some(task_id)
-            })
+            .filter(|receipt| receipt.active_task_id() == task_id)
             .max_by_key(|receipt| receipt.updated_at_ms)
         else {
             return Ok(false);
