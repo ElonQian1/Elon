@@ -13,8 +13,67 @@ const INSTALL_TIMEOUT: Duration = Duration::from_secs(360);
 const UNINSTALL_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_OUTPUT: usize = 256 * 1024;
 const SIGNATURE_MISMATCH: &str = "INSTALL_FAILED_UPDATE_INCOMPATIBLE";
+const DEVICE_PROBE_ATTEMPTS: usize = 3;
+const INSTALL_ATTEMPTS: usize = 2;
+
+#[derive(Debug, Clone)]
+pub(super) struct InstallDebugApkEvidence {
+    pub(super) output: String,
+    pub(super) device_state: String,
+    pub(super) device_probe_attempts: usize,
+    pub(super) reconnect_output: Option<String>,
+    pub(super) install_attempts: usize,
+}
 
 pub(super) async fn install_debug_apk(
+    device_id: &str,
+    package_name: &str,
+    apk: &Path,
+    allow_debug_package_reset: bool,
+) -> Result<String> {
+    Ok(
+        install_debug_apk_with_evidence(device_id, package_name, apk, allow_debug_package_reset)
+            .await?
+            .output,
+    )
+}
+
+pub(super) async fn install_debug_apk_with_evidence(
+    device_id: &str,
+    package_name: &str,
+    apk: &Path,
+    allow_debug_package_reset: bool,
+) -> Result<InstallDebugApkEvidence> {
+    let device = ensure_device_ready(device_id).await?;
+    let mut first_error = None;
+    for attempt in 1..=INSTALL_ATTEMPTS {
+        match install_debug_apk_once(device_id, package_name, apk, allow_debug_package_reset).await
+        {
+            Ok(output) => {
+                return Ok(InstallDebugApkEvidence {
+                    output,
+                    device_state: device.state,
+                    device_probe_attempts: device.attempts,
+                    reconnect_output: device.reconnect_output,
+                    install_attempts: attempt,
+                })
+            }
+            Err(error) if attempt < INSTALL_ATTEMPTS && is_transient_adb_error(&error) => {
+                first_error = Some(error.to_string());
+                tokio::time::sleep(Duration::from_millis(900)).await;
+            }
+            Err(error) => {
+                return Err(anyhow!(
+                    "ADB 安装在 {attempt}/{INSTALL_ATTEMPTS} 次有界尝试后失败；firstError={}; finalError={error:#}",
+                    first_error.as_deref().unwrap_or("none")
+                ));
+            }
+        }
+    }
+    unreachable!("bounded install loop always returns")
+}
+
+async fn install_debug_apk_once(
     device_id: &str,
     package_name: &str,
     apk: &Path,
@@ -63,6 +122,78 @@ pub(super) async fn install_debug_apk(
     }
 }
 
+struct DeviceReadyEvidence {
+    state: String,
+    attempts: usize,
+    reconnect_output: Option<String>,
+}
+
+async fn ensure_device_ready(device_id: &str) -> Result<DeviceReadyEvidence> {
+    let mut first_error = None;
+    let mut reconnect_output = None;
+    for attempt in 1..=DEVICE_PROBE_ATTEMPTS {
+        let args = vec![
+            "-s".to_string(),
+            device_id.to_string(),
+            "get-state".to_string(),
+        ];
+        match run_adb_text(&args, Duration::from_secs(8), 16 * 1024).await {
+            Ok(output) if output.trim() == "device" => {
+                return Ok(DeviceReadyEvidence {
+                    state: "device".to_string(),
+                    attempts: attempt,
+                    reconnect_output,
+                })
+            }
+            Ok(output) => first_error = Some(format!("unexpected state: {}", output.trim())),
+            Err(error) => {
+                let detail = error.to_string();
+                if detail.to_ascii_lowercase().contains("unauthorized") {
+                    bail!(
+                        "ADB_DEVICE_UNAUTHORIZED: 设备 {device_id} 尚未授权此 PC；请在手机上确认调试授权后重试。原始错误：{detail}"
+                    );
+                }
+                first_error = Some(detail);
+            }
+        }
+        if attempt == 1 && is_tcp_device_id(device_id) {
+            let connect_args = vec!["connect".to_string(), device_id.to_string()];
+            reconnect_output = Some(
+                run_adb_text(&connect_args, Duration::from_secs(10), 64 * 1024)
+                    .await
+                    .unwrap_or_else(|error| format!("connect failed: {error:#}")),
+            );
+        }
+        if attempt < DEVICE_PROBE_ATTEMPTS {
+            tokio::time::sleep(Duration::from_millis(800)).await;
+        }
+    }
+    bail!(
+        "ADB_DEVICE_NOT_READY: 设备 {device_id} 在 {DEVICE_PROBE_ATTEMPTS} 次有界探测后仍未进入 device；reconnect={}; lastError={}",
+        reconnect_output.as_deref().unwrap_or("not-attempted"),
+        first_error.as_deref().unwrap_or("unknown")
+    )
+}
+
+fn is_tcp_device_id(device_id: &str) -> bool {
+    device_id
+        .rsplit_once(':')
+        .is_some_and(|(host, port)| !host.is_empty() && port.parse::<u16>().is_ok())
+}
+
+fn is_transient_adb_error(error: &Error) -> bool {
+    let detail = error.to_string().to_ascii_lowercase();
+    [
+        "device offline",
+        "device not found",
+        "connection reset",
+        "closed",
+        "transport error",
+    ]
+    .iter()
+    .any(|signature| detail.contains(signature))
+}
+
 fn actionable_install_error(error: Error) -> Error {
     let detail = error.to_string();
     if detail.contains("adb 命令超时") && detail.contains(" install ") {
@@ -109,7 +240,9 @@ fn require_success(output: String) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{actionable_install_error, require_success};
+    use super::{
+        actionable_install_error, is_tcp_device_id, is_transient_adb_error, require_success,
+    };
 
     #[test]
     fn install_output_requires_success_marker() {
@@ -149,5 +282,15 @@ mod tests {
         assert!(message.contains("adb 已返回失败后仍保留"));
         assert!(message.contains("点“继续”"));
         assert!(message.contains("在 PC 网页点击重试"));
+    }
+
+    #[test]
+    fn retries_only_transient_transport_failures() {
+        assert!(is_transient_adb_error(&anyhow::anyhow!("device offline")));
+        assert!(!is_transient_adb_error(&anyhow::anyhow!(
+            "INSTALL_FAILED_USER_RESTRICTED"
+        )));
+        assert!(is_tcp_device_id("192.168.31.171:5555"));
+        assert!(!is_tcp_device_id("emulator-5554"));
     }
 }

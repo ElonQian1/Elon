@@ -28,6 +28,33 @@ pub(crate) fn select_fresh_debug_apk(
     expected_application_id: &str,
     not_before: SystemTime,
 ) -> Result<PathBuf> {
+    select_debug_apk(gradle_root, expected_application_id, Some(not_before))?.ok_or_else(|| {
+        anyhow!(
+            "本次构建未产生 applicationId={} 的新 Debug APK",
+            expected_application_id
+        )
+    })
+}
+
+pub(crate) fn select_reusable_debug_apk(
+    gradle_root: &Path,
+    expected_application_id: &str,
+) -> Result<Option<PathBuf>> {
+    let Some(apk) = select_debug_apk(gradle_root, expected_application_id, None)? else {
+        return Ok(None);
+    };
+    if artifact_is_current(gradle_root, &apk)? {
+        Ok(Some(apk))
+    } else {
+        Ok(None)
+    }
+}
+
+fn select_debug_apk(
+    gradle_root: &Path,
+    expected_application_id: &str,
+    not_before: Option<SystemTime>,
+) -> Result<Option<PathBuf>> {
     let canonical_root = gradle_root
         .canonicalize()
         .context("Gradle 根目录不可访问")?;
@@ -74,27 +101,113 @@ pub(crate) fn select_fresh_debug_apk(
                 );
             }
             let modified = fs::metadata(&canonical)?.modified()?;
-            if modified < not_before {
+            if not_before.is_some_and(|not_before| modified < not_before) {
                 continue;
             }
             candidates.insert(canonical);
         }
     }
     match candidates.len() {
-        1 => Ok(candidates
-            .into_iter()
-            .next()
-            .expect("candidate count checked")),
-        0 => bail!(
+        1 => Ok(Some(
+            candidates
+                .into_iter()
+                .next()
+                .expect("candidate count checked"),
+        )),
+        0 if not_before.is_some() => bail!(
             "本次构建未产生 applicationId={} 的新 Debug APK；metadata 中发现: {:?}",
             expected_application_id,
             seen_application_ids
         ),
+        0 => Ok(None),
         count => bail!(
             "applicationId={} 对应 {count} 个新 Debug APK，无法安全选择（可能是 split APK）",
             expected_application_id
         ),
     }
+}
+
+fn artifact_is_current(gradle_root: &Path, apk: &Path) -> Result<bool> {
+    let apk_modified = fs::metadata(apk)?.modified()?;
+    let canonical_root = gradle_root
+        .canonicalize()
+        .context("Gradle 根目录不可访问")?;
+    let mut visited = 0;
+    source_inputs_not_newer(&canonical_root, 0, &mut visited, apk_modified)
+}
+
+fn source_inputs_not_newer(
+    dir: &Path,
+    depth: usize,
+    visited: &mut usize,
+    apk_modified: SystemTime,
+) -> Result<bool> {
+    if depth > 14 || *visited > MAX_SCAN_FILES {
+        return Ok(false);
+    }
+    for entry in
+        fs::read_dir(dir).with_context(|| format!("读取源码目录失败: {}", dir.display()))?
+    {
+        let entry = entry?;
+        *visited += 1;
+        let path = entry.path();
+        if path.is_dir() {
+            if !matches!(
+                entry.file_name().to_str(),
+                Some(".git" | ".gradle" | "build" | "node_modules" | "target")
+            ) && !source_inputs_not_newer(&path, depth + 1, visited, apk_modified)?
+            {
+                return Ok(false);
+            }
+        } else if is_build_input(&path) && fs::metadata(&path)?.modified()? > apk_modified {
+            return Ok(false);
+        }
+        if *visited > MAX_SCAN_FILES {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn is_build_input(path: &Path) -> bool {
+    if path
+        .components()
+        .any(|component| component.as_os_str() == "src")
+    {
+        return true;
+    }
+    let file_name = path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
+    if matches!(
+        file_name,
+        "gradle.properties" | "settings.gradle" | "settings.gradle.kts" | "libs.versions.toml"
+    ) {
+        return true;
+    }
+    matches!(
+        path.extension().and_then(|value| value.to_str()),
+        Some(
+            "kt" | "kts"
+                | "java"
+                | "xml"
+                | "gradle"
+                | "properties"
+                | "toml"
+                | "json"
+                | "png"
+                | "webp"
+                | "jpg"
+                | "jpeg"
+                | "svg"
+                | "ttf"
+                | "otf"
+                | "aar"
+                | "jar"
+                | "pro"
+        )
+    )
 }
 
 fn collect_metadata(
@@ -172,6 +285,24 @@ mod tests {
             SystemTime::now() - Duration::from_secs(5)
         )
         .is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reuses_only_apk_not_older_than_source_inputs() {
+        let root = test_root();
+        fs::create_dir_all(root.join("app/src/main")).unwrap();
+        fs::write(root.join("app/src/main/Main.kt"), "class Main").unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        write_output(&root, "app", "com.example.app", "app-debug.apk");
+        assert!(select_reusable_debug_apk(&root, "com.example.app")
+            .unwrap()
+            .is_some());
+        std::thread::sleep(Duration::from_millis(30));
+        fs::write(root.join("app/src/main/Main.kt"), "class Main2").unwrap();
+        assert!(select_reusable_debug_apk(&root, "com.example.app")
+            .unwrap()
+            .is_none());
         fs::remove_dir_all(root).unwrap();
     }
 

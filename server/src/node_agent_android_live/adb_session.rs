@@ -20,9 +20,9 @@ const MAX_DIAGNOSTIC_OUTPUT: usize = 128 * 1024;
 pub(crate) struct RuntimeStartEvidence {
     device_port: u16,
     host_port: u16,
-    app_launch: String,
-    receiver_broadcast: String,
-    reverse_list: String,
+    pub(crate) reverse_output: String,
+    pub(crate) launch_output: String,
+    pub(crate) broadcast_output: String,
 }
 
 struct RuntimeFailureSummary<'a> {
@@ -41,6 +41,13 @@ struct RuntimeFailureSummary<'a> {
 }
 
 pub(crate) async fn start_runtime(
+    session: &LiveUiSession,
+    host_port: u16,
+) -> Result<RuntimeStartEvidence> {
+    start_runtime_with_evidence(session, host_port).await
+}
+
+pub(crate) async fn start_runtime_with_evidence(
     session: &LiveUiSession,
     host_port: u16,
 ) -> Result<RuntimeStartEvidence> {
@@ -77,7 +84,7 @@ pub(crate) async fn start_runtime(
     // the runtime control broadcast. `monkey` resolves the launcher activity
     // without requiring the PC editor to know the app's concrete Activity.
     wake_device_for_user_interaction(&session.device_id).await;
-    let app_launch = run_adb_text(
+    let launch_output = run_adb_text(
         &[
             "-s".to_string(),
             session.device_id.clone(),
@@ -100,7 +107,7 @@ pub(crate) async fn start_runtime(
     session
         .record_runtime_stage("RECEIVER_BROADCAST_SENT")
         .await;
-    let receiver_broadcast = run_adb_text(
+    let broadcast_output = run_adb_text(
         &[
             "-s".to_string(),
             session.device_id.clone(),
@@ -132,16 +139,16 @@ pub(crate) async fn start_runtime(
             &session.token,
         )
     })?;
-    let safe_receiver = sanitize_diagnostic_text(&receiver_broadcast, &session.token);
+    let safe_receiver = sanitize_diagnostic_text(&broadcast_output, &session.token);
     if safe_receiver.contains("result=-1") || safe_receiver.contains("Error:") {
         bail!("启动 Android Live Runtime 失败: {}", safe_receiver.trim());
     }
     Ok(RuntimeStartEvidence {
         device_port,
         host_port,
-        app_launch: sanitize_diagnostic_text(&app_launch, &session.token),
-        receiver_broadcast: safe_receiver,
-        reverse_list: sanitize_diagnostic_text(&reverse_list, &session.token),
+        reverse_output: sanitize_diagnostic_text(&reverse_list, &session.token),
+        launch_output: sanitize_diagnostic_text(&launch_output, &session.token),
+        broadcast_output: safe_receiver,
     })
 }
 
@@ -186,8 +193,8 @@ pub(crate) async fn runtime_failure_diagnostics(
         Some(start) => (
             start.device_port,
             start.host_port,
-            compact_diagnostic(&start.app_launch),
-            compact_diagnostic(&start.receiver_broadcast),
+            compact_diagnostic(&start.launch_output),
+            compact_diagnostic(&start.broadcast_output),
         ),
         None => (
             session.device_port,
@@ -200,7 +207,7 @@ pub(crate) async fn runtime_failure_diagnostics(
         Some(start) => format!(
             "当前={}；启动时={}",
             reverse_mapping_summary(&reverse_list, device_port, host_port),
-            reverse_mapping_summary(&start.reverse_list, device_port, host_port),
+            reverse_mapping_summary(&start.reverse_output, device_port, host_port),
         ),
         None => reverse_mapping_summary(&reverse_list, device_port, host_port),
     };

@@ -12,6 +12,9 @@ use super::capability_requirements::requested_capabilities;
 
 mod handoff;
 
+#[cfg(test)]
+mod capability_contract_tests;
+
 pub(crate) use handoff::DelegatedCapabilityGap;
 
 const SCHEMA_VERSION: u32 = 1;
@@ -34,6 +37,8 @@ const SUPPORTED_CAPABILITIES: &[&str] = &[
     "RELATIONAL_LAYOUT_GEOMETRY_TRACE",
     "CROSS_PLATFORM_STYLE_WRITEBACK",
     "PWA_CODE_GENERATION",
+    "MCP_LONG_RUNNING_TOOL_COMPLETION",
+    "RESUMABLE_DEBUG_RUNTIME_PREPARATION",
 ];
 
 const KNOWN_PLATFORM_GAPS: &[&str] = &[

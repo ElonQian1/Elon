@@ -20,6 +20,7 @@ pub(crate) mod fit_run;
 mod frame;
 mod frame_artifact;
 mod mcp;
+mod mcp_runtime_preparation;
 mod mcp_tools;
 mod preview;
 mod protocol;

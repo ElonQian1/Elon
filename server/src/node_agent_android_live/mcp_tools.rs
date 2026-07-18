@@ -62,13 +62,14 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_prepare_debug_runtime",
-            "首次页面骨架编译完成后，构建并安装带 Debug Runtime 的 APK，自动优先选择模拟器并把项目 MCP 升级到 LIVE。",
+            "分阶段准备 Debug Runtime：优先复用与当前源码一致的 APK 和已有会话，后台执行构建、设备校验、安装、启动、端口映射与 Runtime 握手。返回 IN_PROGRESS 时按 retryAfterMs 重复调用读取进度；FAILED 会包含具体阶段和 ADB 证据，修正环境后可传 restart=true 有界重试。",
             json!({
                 "type":"object",
                 "properties":{
                     "basePackageName":{"type":"string","description":"可选；默认使用项目 UI Profile 预提取的 applicationId"},
                     "deviceId":{"type":"string","description":"可选；不填时优先选择在线模拟器"},
-                    "debugApplicationIdSuffix":{"type":"string","default":".uitest"}
+                    "debugApplicationIdSuffix":{"type":"string","default":".uitest"},
+                    "restart":{"type":"boolean","default":false,"description":"仅在上一轮 FAILED 或源码变化后显式启动新一轮；运行中重复调用不创建新会话"}
                 }
             }),
         ),
@@ -657,5 +658,13 @@ mod tests {
                 .unwrap()
                 .contains("UI Profile")
         );
+        assert_eq!(
+            tool["inputSchema"]["properties"]["restart"]["type"],
+            "boolean"
+        );
+        assert!(tool["description"]
+            .as_str()
+            .unwrap()
+            .contains("IN_PROGRESS"));
     }
 }

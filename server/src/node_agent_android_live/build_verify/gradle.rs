@@ -47,6 +47,7 @@ pub(super) async fn run_debug_build(
     gradle_root: &Path,
     wrapper: &Path,
     debug_application_id_suffix: Option<&str>,
+    force_rerun: bool,
 ) -> Result<()> {
     let mut command =
         if cfg!(windows) && wrapper.extension().and_then(|v| v.to_str()) == Some("bat") {
@@ -64,13 +65,17 @@ pub(super) async fn run_debug_build(
         };
     command
         .current_dir(gradle_root)
-        // Build verification must produce a fresh artifact. Otherwise a stale
-        // APK from an UP-TO-DATE task can be installed and falsely certified.
-        .args(["assembleDebug", "--no-daemon", "--rerun-tasks"])
+        .args(["assembleDebug", "--no-daemon"])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    // Source-parity certification forces every task to run. First-time Runtime
+    // preparation instead keeps Gradle incremental so a previously completed
+    // manual build can be reused without crossing the MCP timeout again.
+    if force_rerun {
+        command.arg("--rerun-tasks");
+    }
     if let Some(suffix) = debug_application_id_suffix {
         command.arg(format!("-PELON_DEBUG_APPLICATION_ID_SUFFIX={suffix}"));
     }

@@ -3,11 +3,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::broker::{LiveUiBroker, LiveUiSession};
-use super::build_verify::{
-    bootstrap_debug_runtime, build_and_verify, BuildVerifyRequest, PrepareDebugRuntimeRequest,
-};
+use super::build_verify::{build_and_verify, BuildVerifyRequest};
 use super::fit_run::{
     workspace_fingerprint, CreateFitRunRequest, FitCommand, FitEnvironment, FitRect, FitRunService,
     FitSessionContext, FitTargetPair,
@@ -107,7 +106,7 @@ pub(crate) fn cleanup_descriptor(session_id: &str) {
 }
 
 pub(crate) async fn handle_request(
-    broker: &LiveUiBroker,
+    broker: &Arc<LiveUiBroker>,
     fit_runs: &FitRunService,
     session_id: &str,
     request: McpRequest,
@@ -137,7 +136,7 @@ pub(crate) async fn handle_request(
 }
 
 async fn call_tool(
-    broker: &LiveUiBroker,
+    broker: &Arc<LiveUiBroker>,
     fit_runs: &FitRunService,
     session_id: &str,
     params: Value,
@@ -212,60 +211,8 @@ async fn call_tool(
             })
         }
         "ui_prepare_debug_runtime" => {
-            let bootstrap_session = broker.session(&session_id).await?;
-            let project_root = bootstrap_session
-                .project_root
-                .clone()
-                .ok_or_else(|| anyhow!("UI 设计会话未绑定项目目录"))?;
-            let devices =
-                crate::node_agent_android_inspector::adb_wireless::list_device_inventory().await?;
-            let device_id = arguments
-                .get("deviceId")
-                .and_then(Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-                .map(ToOwned::to_owned)
-                .or_else(|| {
-                    devices
-                        .iter()
-                        .find(|device| {
-                            device.state == "device" && device.serial.starts_with("emulator-")
-                        })
-                        .or_else(|| devices.iter().find(|device| device.state == "device"))
-                        .map(|device| device.serial.clone())
-                })
-                .ok_or_else(|| anyhow!("没有可用 Android 设备或模拟器"))?;
-            let profile = super::design_bootstrap::project_profile(&bootstrap_session)?;
-            let base_package_name = arguments
-                .get("basePackageName")
-                .and_then(Value::as_str)
-                .or_else(|| {
-                    profile
-                        .pointer("/android/applicationId")
-                        .and_then(Value::as_str)
-                })
-                .ok_or_else(|| {
-                    anyhow!("UI Profile 未识别 Android applicationId；请显式提供 basePackageName")
-                })?
-                .to_string();
-            let debug_application_id_suffix = arguments
-                .get("debugApplicationIdSuffix")
-                .and_then(Value::as_str)
-                .unwrap_or(".uitest")
-                .to_string();
-            let result = bootstrap_debug_runtime(
-                broker,
-                PrepareDebugRuntimeRequest {
-                    device_id,
-                    base_package_name,
-                    project_root,
-                    debug_application_id_suffix,
-                    lease: None,
-                },
-                crate::node_agent_admin_open::admin_port_from_env(),
-            )
-            .await?;
-            json!({ "result": result, "nextPhase": "LIVE" })
+            super::mcp_runtime_preparation::prepare_debug_runtime(broker, &session_id, &arguments)
+                .await?
         }
         "ui_bind_target_design" => {
             let session = broker.session(&session_id).await?;

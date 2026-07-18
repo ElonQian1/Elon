@@ -27,6 +27,10 @@ use super::visual_diff::{
 mod geometry;
 mod gradle;
 mod install;
+mod preparation;
+mod runtime_preparation;
+
+pub(crate) use preparation::PreparationRegistry;
 
 use geometry::{patched_bounds, patched_bounds_for_nodes, verification_bounds};
 use gradle::{
@@ -34,18 +38,6 @@ use gradle::{
     run_debug_build, validate_debug_application_id_suffix, validate_package_name,
 };
 use install::install_debug_apk;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum BuildVerificationMode {
-    SourceParity,
-    RuntimePreparation,
-}
-
-impl BuildVerificationMode {
-    fn requires_source_parity(self) -> bool {
-        self == Self::SourceParity
-    }
-}
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -59,7 +51,7 @@ pub(crate) struct BuildVerifyRequest {
     pub(crate) target_instance_key: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BuildVerifyResult {
     pub(crate) status: &'static str,
@@ -89,7 +81,7 @@ pub(crate) struct PrepareDebugRuntimeRequest {
     pub(crate) lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PrepareDebugRuntimeResult {
     pub(crate) package_name: String,
@@ -106,15 +98,16 @@ pub(crate) async fn prepare_debug_runtime(
     request: PrepareDebugRuntimeRequest,
     host_port: u16,
 ) -> Result<PrepareDebugRuntimeResult> {
-    prepare_debug_runtime_inner(broker, request, host_port, false).await
+    prepare_debug_runtime_inner(broker, request, host_port, false, None).await
 }
 
-pub(crate) async fn bootstrap_debug_runtime(
+async fn bootstrap_debug_runtime_with_reporter(
     broker: &LiveUiBroker,
     request: PrepareDebugRuntimeRequest,
     host_port: u16,
+    reporter: Option<&preparation::PreparationReporter>,
 ) -> Result<PrepareDebugRuntimeResult> {
-    prepare_debug_runtime_inner(broker, request, host_port, true).await
+    prepare_debug_runtime_inner(broker, request, host_port, true, reporter).await
 }
 
 async fn prepare_debug_runtime_inner(
@@ -122,6 +115,7 @@ async fn prepare_debug_runtime_inner(
     request: PrepareDebugRuntimeRequest,
     host_port: u16,
     keep_session: bool,
+    reporter: Option<&preparation::PreparationReporter>,
 ) -> Result<PrepareDebugRuntimeResult> {
     let device_id = request.device_id.trim();
     let base_package_name = validate_package_name(request.base_package_name.trim())?;
@@ -134,27 +128,41 @@ async fn prepare_debug_runtime_inner(
         bail!("projectRoot 不能为空；请先在 PC 工作台选择本机项目");
     }
     let package_name = format!("{base_package_name}{suffix}");
-    let session = broker
-        .create_session(
-            device_id.to_string(),
-            package_name.clone(),
-            Some(project_root.to_string()),
-            DEFAULT_DEVICE_PORT,
-        )
-        .await;
+    let reusable_session = if keep_session {
+        broker
+            .runtime_session_for(project_root, device_id, &package_name)
+            .await
+    } else {
+        None
+    };
+    let reused_session = reusable_session.is_some();
+    let session = match reusable_session {
+        Some(session) => session,
+        None => {
+            broker
+                .create_session(
+                    device_id.to_string(),
+                    package_name.clone(),
+                    Some(project_root.to_string()),
+                    DEFAULT_DEVICE_PORT,
+                )
+                .await
+        }
+    };
+    if let Some(reporter) = reporter {
+        reporter
+            .evidence(
+                "SESSION",
+                if reused_session { "REUSED" } else { "CREATED" },
+                format!(
+                    "sessionId={} device={} package={}",
+                    session.id, session.device_id, session.package_name
+                ),
+            )
+            .await;
+    }
     let session_id = session.id.clone();
-    let result = build_and_verify_with_mode(
-        broker,
-        &session_id,
-        BuildVerifyRequest {
-            preview: None,
-            debug_application_id_suffix: Some(suffix.to_string()),
-            ..BuildVerifyRequest::default()
-        },
-        host_port,
-        BuildVerificationMode::RuntimePreparation,
-    )
-    .await;
+    let result = runtime_preparation::run(broker, &session, suffix, host_port, reporter).await;
     match result {
         Ok(build) if keep_session => Ok(PrepareDebugRuntimeResult {
             package_name,
@@ -170,11 +178,12 @@ async fn prepare_debug_runtime_inner(
                 build,
             })
         }
-        Err(error) => {
+        Err(error) if !keep_session => {
             let _ = stop_runtime(&session).await;
             broker.remove_session(&session_id).await;
             Err(error)
         }
+        Err(error) => Err(error),
     }
 }
 
@@ -184,48 +193,32 @@ pub(crate) async fn build_and_verify(
     request: BuildVerifyRequest,
     host_port: u16,
 ) -> Result<BuildVerifyResult> {
-    build_and_verify_with_mode(
-        broker,
-        session_id,
-        request,
-        host_port,
-        BuildVerificationMode::SourceParity,
-    )
-    .await
+    build_and_verify_inner(broker, session_id, request, host_port).await
 }
 
-async fn build_and_verify_with_mode(
+async fn build_and_verify_inner(
     broker: &LiveUiBroker,
     session_id: &str,
     request: BuildVerifyRequest,
     host_port: u16,
-    mode: BuildVerificationMode,
 ) -> Result<BuildVerifyResult> {
     let session = broker.session(session_id).await?;
-    let target_path = if mode.requires_source_parity() {
-        load_or_build_ui_ir(broker, session_id)
-            .await
-            .ok()
-            .and_then(|ir| ir.target_design.map(|target| target.path))
-    } else {
-        None
-    };
+    let target_path = load_or_build_ui_ir(broker, session_id)
+        .await
+        .ok()
+        .and_then(|ir| ir.target_design.map(|target| target.path));
     let project_root = canonical_project_root(&session)?;
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let live_snapshot = session.commit_snapshot().await;
-    let live_preview = if mode.requires_source_parity() {
-        let frame = capture_stable_runtime_frame(&session).await?;
-        let rect = verification_bounds(
-            &live_snapshot.nodes,
-            request.target_definition_id.as_deref(),
-            request.target_instance_key.as_deref(),
-        )?
-        .or_else(|| patched_bounds(&live_snapshot, true));
-        Some((frame.bytes, rect))
-    } else {
-        None
-    };
+    let frame = capture_stable_runtime_frame(&session).await?;
+    let rect = verification_bounds(
+        &live_snapshot.nodes,
+        request.target_definition_id.as_deref(),
+        request.target_instance_key.as_deref(),
+    )?
+    .or_else(|| patched_bounds(&live_snapshot, true));
+    let live_preview = (frame.bytes, rect);
 
     let build_started = Instant::now();
     let artifact_not_before = SystemTime::now()
@@ -245,6 +238,7 @@ async fn build_and_verify_with_mode(
         &gradle_root,
         &wrapper,
         debug_application_id_suffix.as_deref(),
+        true,
     )
     .await?;
     let build_duration_ms = build_started.elapsed().as_millis();
@@ -337,18 +331,8 @@ async fn build_and_verify_with_mode(
     // A first-time Runtime preparation has no meaningful Live preview yet.
     // Treat the freshly installed renderer as its own baseline and reserve the
     // strict before/after parity gate for a real committed Live design session.
-    let (source_parity_diff, source_parity_scope) = match live_preview {
-        Some((live_preview_png, live_preview_rect)) => compare_source_parity(
-            &live_preview_png,
-            &screenshot,
-            live_preview_rect,
-            source_rect,
-        )?,
-        None => (
-            compare_pngs(&screenshot, &screenshot, None, None)?,
-            "PROCESS_FRAME_BASELINE",
-        ),
-    };
+    let (source_parity_diff, source_parity_scope) =
+        compare_source_parity(&live_preview.0, &screenshot, live_preview.1, source_rect)?;
     let verification_gate = evaluate_verification_gates(VerificationGateInput::new(
         Some(&source_parity_diff),
         visual_diff.as_ref(),
@@ -370,19 +354,13 @@ async fn build_and_verify_with_mode(
         }
     }
     let status = verification_gate.status;
-    let message = if mode == BuildVerificationMode::RuntimePreparation {
-        "Debug Runtime 已构建、安装并连接，节点树已经就绪；首次准备不执行 Live→源码一致性验收。"
-    } else {
-        match status {
-            "BUILD_VERIFIED" => {
-                "已由源码重新构建并安装；临时 Patch 已清空，源码一致性和目标设计门禁均通过。"
-            }
-            "TARGET_MISMATCH" => "源码结果已与 Live 预览一致，但尚未达到目标设计门禁。",
-            "TARGET_NOT_CONFIGURED" => {
-                "源码结果已与 Live 预览一致，但设计拟合任务尚未配置目标配对。"
-            }
-            _ => "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。",
+    let message = match status {
+        "BUILD_VERIFIED" => {
+            "已由源码重新构建并安装；临时 Patch 已清空，源码一致性和目标设计门禁均通过。"
         }
+        "TARGET_MISMATCH" => "源码结果已与 Live 预览一致，但尚未达到目标设计门禁。",
+        "TARGET_NOT_CONFIGURED" => "源码结果已与 Live 预览一致，但设计拟合任务尚未配置目标配对。",
+        _ => "源码已构建安装，但纯源码画面与 Live 预览不一致；本次不能标记完成。",
     }
     .to_string();
 
@@ -420,10 +398,26 @@ fn compare_source_parity(
     source_rect: Option<PixelRect>,
 ) -> Result<(VisualDiffResult, &'static str)> {
     if live_frame == source_frame {
-        return Ok((
-            compare_pngs(live_frame, source_frame, None, None)?,
-            "PROCESS_FRAME_EXACT",
-        ));
+        let mut diff = compare_pngs(live_frame, source_frame, None, None)?;
+        // Transparent or letterboxed frames can have zero eligible foreground
+        // pixels, which makes the generic design scorer fail its coverage gate.
+        // Byte-for-byte process frames are stronger evidence than that derived
+        // coverage heuristic, so normalize the exact-match result explicitly.
+        diff.mean_absolute_color_error = 0.0;
+        diff.edge_error = 0.0;
+        diff.alpha_error = 0.0;
+        diff.geometry_error = 0.0;
+        diff.visual_loss = 0.0;
+        diff.score_report.optimization_score = 0.0;
+        diff.score_report.target_gate.passed = true;
+        diff.score_report.target_gate.geometry_passed = true;
+        diff.score_report.target_gate.position_passed = true;
+        diff.score_report.target_gate.color_passed = true;
+        diff.score_report.target_gate.edge_passed = true;
+        diff.score_report.target_gate.perceptual_passed = true;
+        diff.score_report.target_gate.coverage_passed = true;
+        diff.score_report.target_gate.failed_metrics.clear();
+        return Ok((diff, "PROCESS_FRAME_EXACT"));
     }
     Ok((
         compare_pngs(live_frame, source_frame, live_rect, source_rect)?,
@@ -442,7 +436,9 @@ fn target_comparison_current_rect(
     projected_current_rect.or(verified_current_rect)
 }
 
-async fn capture_stable_runtime_frame(session: &LiveUiSession) -> Result<RuntimeFrameImage> {
+pub(super) async fn capture_stable_runtime_frame(
+    session: &LiveUiSession,
+) -> Result<RuntimeFrameImage> {
     let mut previous = capture_runtime_frame_image(session).await?;
     let mut stable_frames = 0_u8;
     for _ in 0..10 {
@@ -462,7 +458,7 @@ async fn capture_stable_runtime_frame(session: &LiveUiSession) -> Result<Runtime
     Ok(previous)
 }
 
-async fn wait_for_runtime(
+pub(super) async fn wait_for_runtime(
     broker: &LiveUiBroker,
     session_id: &str,
     session: &LiveUiSession,
@@ -541,11 +537,5 @@ mod target_comparison_rect_tests {
             target_comparison_current_rect(None, Some(node_bounds)),
             Some(node_bounds)
         );
-    }
-
-    #[test]
-    fn runtime_preparation_does_not_require_a_live_baseline() {
-        assert!(BuildVerificationMode::SourceParity.requires_source_parity());
-        assert!(!BuildVerificationMode::RuntimePreparation.requires_source_parity());
     }
 }

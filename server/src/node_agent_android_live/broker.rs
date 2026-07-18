@@ -21,6 +21,7 @@ const MAX_HISTORY: usize = 100;
 #[derive(Default)]
 pub(crate) struct LiveUiBroker {
     sessions: RwLock<HashMap<String, Arc<LiveUiSession>>>,
+    pub(crate) debug_runtime_preparations: super::build_verify::PreparationRegistry,
 }
 
 pub(crate) struct LiveUiSession {
@@ -152,6 +153,32 @@ impl LiveUiBroker {
                     .project_root
                     .as_deref()
                     .is_some_and(|root| canonical_or_raw(root) == expected)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        matched.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+        matched.into_iter().next()
+    }
+
+    pub(crate) async fn runtime_session_for(
+        &self,
+        project_root: &str,
+        device_id: &str,
+        package_name: &str,
+    ) -> Option<Arc<LiveUiSession>> {
+        let expected_root = canonical_or_raw(project_root);
+        let mut matched = self
+            .sessions
+            .read()
+            .await
+            .values()
+            .filter(|session| {
+                session.device_id == device_id
+                    && session.package_name == package_name
+                    && session
+                        .project_root
+                        .as_deref()
+                        .is_some_and(|root| canonical_or_raw(root) == expected_root)
             })
             .cloned()
             .collect::<Vec<_>>();
