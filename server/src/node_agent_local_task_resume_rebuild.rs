@@ -118,6 +118,8 @@ pub(crate) fn resolve_recycled_resume_workspace(
             derivation: "platform_receipt_commit_rebuild_available".to_string(),
             git_head: head.to_string(),
             requires_recreation: true,
+            lease_migration: None,
+            resume_admission: None,
         });
     }
 

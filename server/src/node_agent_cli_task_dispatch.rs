@@ -32,6 +32,8 @@ pub(crate) struct CliTaskDispatchRequest {
     /// checked against its base repo while execution/finalization reuse the
     /// exact inherited worktree.
     pub inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
+    pub resume_admission:
+        Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
     /// Offline-local work must never auto-switch into a borrowed/shared Codex slot.
     pub allow_codex_auth_switch: bool,
     /// Local work supplies this at creation time. Cloud work captures it once
@@ -83,6 +85,7 @@ async fn run_cli_task(
         prompt,
         completion_context,
         inherited_workspace,
+        resume_admission,
         allow_codex_auth_switch,
         frozen_codex_home,
     } = request;
@@ -566,6 +569,7 @@ async fn run_cli_task(
             return;
         }
     }
+    drop(resume_admission);
     if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
     {
         send_preflight_failure(

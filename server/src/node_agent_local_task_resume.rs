@@ -32,6 +32,9 @@ pub(crate) struct ResolvedResumeWorkspace {
     pub derivation: String,
     pub git_head: String,
     pub requires_recreation: bool,
+    pub lease_migration: Option<crate::node_agent_local_task_resume_lineage::LegacyLeaseMigration>,
+    pub resume_admission:
+        Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
 }
 
 pub(crate) fn resolve_resume_workspace(
@@ -247,6 +250,7 @@ fn resolve_existing_resume_workspace(
         Err(error) => return Err(error),
     };
 
+    let mut lease_migration = None;
     if recovery::is_git_worktree(&active) {
         let expected =
             crate::node_agent_supervision_worktree_lease::lease_reason(supervision_root_task_id)?;
@@ -254,11 +258,13 @@ fn resolve_existing_resume_workspace(
             &authorized_base,
             &active,
         )?;
-        anyhow::ensure!(
-            actual.as_deref() == Some(expected.as_str()),
-            "父任务 worktree root lease 身份不匹配：expected {expected}, actual {}",
-            actual.as_deref().unwrap_or("<unlocked>")
-        );
+        lease_migration = crate::node_agent_local_task_resume_lineage::assess_legacy_lease(
+            actual.as_deref(),
+            &expected,
+            contract,
+            parent,
+            parent_contract,
+        )?;
     }
 
     let requires_recreation =
@@ -275,6 +281,8 @@ fn resolve_existing_resume_workspace(
         derivation,
         git_head,
         requires_recreation,
+        lease_migration,
+        resume_admission: None,
     })
 }
 

@@ -80,6 +80,31 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     )
     .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+
+    let admission_base = resolved.authorized_workspace_path.clone();
+    let admission = tokio::task::spawn_blocking(move || {
+        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(FsPath::new(
+            &admission_base,
+        ))
+    })
+    .await
+    .map_err(|error| internal_error(anyhow::Error::from(error)))?
+    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
+        contract,
+        &parent,
+        Some(&parent_contract),
+        journal_snapshot.record.as_ref(),
+        project_id,
+        requested_workspace_path,
+        receipt.as_ref(),
+        crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
+    )
+    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
 
     let identity = crate::node_agent_full_access::FullAccessGrantIdentity::new(
         &creds.owner_user_id,
@@ -141,6 +166,9 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         )
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     }
+    commit_validated_lease_migration(&resolved, &admission)
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    resolved.resume_admission = Some(admission);
     Ok(Some(resolved))
 }
 
@@ -153,14 +181,10 @@ pub(crate) async fn inspect_resume_workspace_status(
     let Some(parent_contract) = parent_contract else {
         return json!({"eligible": false, "reason": "missing_supervision_contract"});
     };
-    let root_task_id = if parent_contract.task_role == "resume_original" {
-        parent_contract
-            .root_task_id
-            .clone()
-            .unwrap_or_else(|| parent.task_id.clone())
-    } else {
-        parent.task_id.clone()
-    };
+    let root_task_id = parent_contract
+        .root_task_id
+        .clone()
+        .unwrap_or_else(|| parent.task_id.clone());
     let contract = crate::node_agent_local_task_supervision::SupervisionContract {
         protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.to_string(),
         supervisor: "codex_desktop".to_string(),
@@ -186,6 +210,11 @@ pub(crate) async fn inspect_resume_workspace_status(
         crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     ) {
         Ok(resolved) => {
+            if let Err(error) =
+                validate_migration_lineage(runtime, parent, parent_contract, &resolved)
+            {
+                return json!({"eligible": false, "reason": error.to_string()});
+            }
             let recorded_workspace_exists =
                 FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
             let prompt_occupied = recorded_workspace_exists
@@ -211,10 +240,46 @@ pub(crate) async fn inspect_resume_workspace_status(
                 "occupied": prompt_occupied || sidecar_occupied,
                 "recovery_required": resolved.requires_recreation,
                 "requires_recreation": resolved.requires_recreation,
+                "lease_migration_required": resolved.lease_migration.is_some(),
+                "lease_migration_from": resolved.lease_migration.as_ref().map(|migration| migration.legacy_task_id.as_str()),
             })
         }
         Err(error) => json!({"eligible": false, "reason": error.to_string()}),
     }
+}
+
+fn validate_migration_lineage(
+    runtime: &NodeRuntime,
+    parent: &crate::node_agent_local_task_store::LocalTaskRecord,
+    parent_contract: &crate::node_agent_local_task_supervision::SupervisionContract,
+    resolved: &ResolvedResumeWorkspace,
+) -> anyhow::Result<()> {
+    let Some(migration) = resolved.lease_migration.as_ref() else {
+        return Ok(());
+    };
+    crate::node_agent_local_task_resume_lineage::validate_full_lineage(
+        &runtime.local_tasks,
+        &runtime.task_journal,
+        parent,
+        parent_contract,
+        migration,
+    )
+}
+
+pub(crate) fn commit_validated_lease_migration(
+    resolved: &ResolvedResumeWorkspace,
+    admission: &crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard,
+) -> anyhow::Result<()> {
+    let Some(migration) = resolved.lease_migration.as_ref() else {
+        return Ok(());
+    };
+    crate::node_agent_supervision_worktree_lease::migrate_legacy_child_lease(
+        admission,
+        FsPath::new(&resolved.authorized_workspace_path),
+        FsPath::new(&resolved.inherited_workspace.workspace_path),
+        &migration.legacy_task_id,
+        &migration.root_task_id,
+    )
 }
 
 fn live_sidecar_occupies_workspace(

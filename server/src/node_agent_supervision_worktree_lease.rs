@@ -10,21 +10,16 @@ use anyhow::{bail, Context, Result};
 
 use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 
+#[path = "node_agent_supervision_worktree_lease_transition.rs"]
+mod transition;
+pub(crate) use transition::{migrate_legacy_child_lease, ResumeAdmissionGuard};
+
 const LEASE_PREFIX: &str = "elon-supervision:";
-pub(crate) const TRANSITIONAL_ACTIVE_TASK_LOCK_REASON: &str =
-    "active PC CLI task; Resume or successful finalization unlocks";
 
 pub(crate) fn acquire(base: &Path, active: &Path, root_task_id: &str) -> Result<()> {
     let expected = lease_reason(root_task_id)?;
     match worktree_lock_reason(base, active)? {
         Some(reason) if reason == expected => return Ok(()),
-        Some(reason) if reason == TRANSITIONAL_ACTIVE_TASK_LOCK_REASON => {
-            // The workspace provisioner locks a newly-created conversation worktree
-            // before the supervision contract is available. Upgrade that exact
-            // transitional lock to the task-identity lease below; all other lock
-            // reasons remain fail-closed.
-            run_git(base, &["worktree", "unlock", &path_arg(active)])?;
-        }
         Some(reason) => bail!("worktree is already locked by another lease: {reason}"),
         None => {}
     }
@@ -181,16 +176,16 @@ mod tests {
                 "worktree",
                 "lock",
                 "--reason",
-                TRANSITIONAL_ACTIVE_TASK_LOCK_REASON,
+                "active PC CLI task; Resume or successful finalization unlocks",
                 &path_arg(&active),
             ],
         );
-        acquire(&base, &active, "root-2").unwrap();
+        assert!(acquire(&base, &active, "root-2").is_err());
         assert_eq!(
             worktree_lock_reason(&base, &active).unwrap().as_deref(),
-            Some("elon-supervision:root-2")
+            Some("active PC CLI task; Resume or successful finalization unlocks")
         );
-        release(&base, &active, "root-2").unwrap();
+        git(&base, &["worktree", "unlock", &path_arg(&active)]);
 
         git(
             &base,

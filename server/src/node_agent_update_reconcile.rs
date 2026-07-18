@@ -525,6 +525,7 @@ async fn spawn_resume_original(
             ),
             completion_context: completion_context(&resume),
             inherited_workspace,
+            resume_admission: None,
             allow_codex_auth_switch: false,
             frozen_codex_home: Some(frozen),
         },

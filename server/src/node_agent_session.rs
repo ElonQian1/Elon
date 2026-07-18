@@ -501,6 +501,7 @@ pub(super) async fn run_session(
                                     prompt,
                                     completion_context,
                                     inherited_workspace: None,
+                                    resume_admission: None,
                                     allow_codex_auth_switch: true,
                                     frozen_codex_home: None,
                                 },

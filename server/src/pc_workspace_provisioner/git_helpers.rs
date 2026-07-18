@@ -17,7 +17,7 @@ use super::{
 };
 
 pub(super) const GENERIC_CONVERSATION_WORKTREE_LEASE_REASON: &str =
-    crate::node_agent_supervision_worktree_lease::TRANSITIONAL_ACTIVE_TASK_LOCK_REASON;
+    "active PC CLI task; Resume or successful finalization unlocks";
 
 pub(super) fn completion_origin_refs(workspace: &ConversationWorkspaceResult) -> Vec<String> {
     let mut refs = Vec::new();

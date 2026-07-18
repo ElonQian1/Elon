@@ -299,7 +299,7 @@ async fn create_task(
             Err(error) => json_error(error.status, error.message),
         };
     }
-    let resume_workspace =
+    let mut resume_workspace =
         match crate::node_agent_local_task_resume_routes::resolve_supervised_resume_workspace(
             &runtime,
             &creds,
@@ -330,6 +330,8 @@ async fn create_task(
             "active_workspace_path": workspace.inherited_workspace.workspace_path.as_str(),
             "derivation": workspace.derivation.as_str(),
             "git_head": workspace.git_head.as_str(),
+            "lease_migrated_from": workspace.lease_migration.as_ref().map(|migration| migration.legacy_task_id.as_str()),
+            "lease_root_task_id": workspace.lease_migration.as_ref().map(|migration| migration.root_task_id.as_str()),
         })
     });
     let frozen_codex_home =
@@ -385,13 +387,18 @@ async fn create_task(
         Ok(record) => record,
         Err(error) => return internal_error(error),
     };
+    let resume_admission = resume_workspace
+        .as_mut()
+        .and_then(|workspace| workspace.resume_admission.take());
+    let inherited_workspace = resume_workspace.map(|workspace| workspace.inherited_workspace);
     dispatch_local_task_record(
         runtime.clone(),
         &record,
         executor_prompt,
         execution_workspace_path,
         supervision.as_ref(),
-        resume_workspace.map(|workspace| workspace.inherited_workspace),
+        inherited_workspace,
+        resume_admission,
         frozen_codex_home,
     );
     (
@@ -416,6 +423,7 @@ pub(crate) fn dispatch_local_task_record(
     execution_workspace_path: String,
     supervision: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
     inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
+    resume_admission: Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
     frozen_codex_home: crate::node_agent_codex_child_env::FrozenCodexHome,
 ) {
     let (out_tx, out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
@@ -460,6 +468,7 @@ pub(crate) fn dispatch_local_task_record(
                 supervision.map(|contract| contract.protocol.clone()),
             ),
             inherited_workspace,
+            resume_admission,
             allow_codex_auth_switch: false,
             frozen_codex_home: Some(frozen_codex_home),
         },

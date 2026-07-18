@@ -105,6 +105,7 @@ mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
 mod node_agent_local_task_resume;
+mod node_agent_local_task_resume_lineage;
 mod node_agent_local_task_resume_rebuild;
 mod node_agent_local_task_resume_routes;
 mod node_agent_local_task_store;
