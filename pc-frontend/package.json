@@ -13,6 +13,7 @@
     "test:local-tasks": "node scripts/test-local-tasks.cjs",
     "test:runtime-draft": "node scripts/test-runtime-draft-model.cjs",
     "test:ui-tuner-workspace": "node scripts/test-ui-tuner-workspace.cjs",
+    "test:pwa-design": "node scripts/test-pwa-design.cjs",
     "test:project-docs": "node scripts/test-project-document-sections.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",

@@ -96,18 +96,37 @@
 
   function identityOf(element) {
     const uiNode = element.getAttribute('data-ui-node') || '';
+    const stableId = element.getAttribute('data-stable-id') || uiNode || '';
+    const testId = element.getAttribute('data-testid') || '';
+    const resourceId = element.getAttribute('data-resource-id') || '';
+    const sourceSymbol = element.getAttribute('data-source-symbol') || element.getAttribute('data-source-node') || '';
+    const component = element.closest('[data-component]');
+    const componentPath = element.getAttribute('data-component-path') || (component && component.getAttribute('data-component')) || '';
     const id = element.id || '';
     const ariaLabel = element.getAttribute('aria-label') || '';
     const role = element.getAttribute('role') || '';
     const text = compactText(element);
     const selector = selectorIdentity(element);
+    const key = stableId ? 'stable:' + stableId
+      : testId ? 'test:' + testId
+        : resourceId ? 'resource:' + resourceId
+          : sourceSymbol ? 'symbol:' + sourceSymbol
+            : componentPath ? 'component:' + componentPath
+              : uiNode ? 'ui-node:' + uiNode
+                : id ? 'id:' + id
+                  : 'selector-evidence:' + selector.selector;
     return {
-      key: selector.selector,
+      key,
       selector: selector.selector,
       strategy: selector.strategy,
       confidence: selector.confidence,
       confidenceScore: selector.confidenceScore,
       needsBinding: selector.needsBinding,
+      stableId,
+      testId,
+      resourceId,
+      sourceSymbol,
+      componentPath,
       uiNode,
       id,
       ariaLabel,
@@ -116,6 +135,26 @@
       tag: element.tagName.toLowerCase(),
       classNames: Array.from(element.classList).filter((name) => !name.startsWith('ui-tuner-')).slice(0, 12),
     };
+  }
+
+  function contextNode(element, relation) {
+    if (!element) return null;
+    const identity = identityOf(element);
+    return {
+      stableKey: identity.key,
+      relation,
+      tag: identity.tag,
+      text: identity.text,
+      role: identity.role,
+    };
+  }
+
+  function localDomContext(element) {
+    const parent = element.parentElement;
+    const siblings = parent ? Array.from(parent.children).filter((candidate) => candidate !== element).slice(0, 4) : [];
+    return [contextNode(parent, 'parent'), contextNode(element, 'self')]
+      .concat(siblings.map((candidate) => contextNode(candidate, 'sibling')))
+      .filter(Boolean);
   }
 
   function kebabCase(property) {
@@ -168,6 +207,7 @@
         authored: styleValues(element, computed, true),
         inlineStyle: element.getAttribute('style'),
       },
+      domContext: localDomContext(element),
     };
   }
 

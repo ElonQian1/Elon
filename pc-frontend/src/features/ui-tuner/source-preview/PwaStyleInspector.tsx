@@ -48,7 +48,9 @@ function originalValue(selection: PwaSelection, property: PwaStyleProperty): str
 function fieldValue(session: PwaDesignSession, property: PwaStyleProperty): string {
   const selection = session.selection
   if (!selection) return ''
-  return session.draft?.elements[selection.identity.selector]?.styleDiff[property]
+  return Object.values(session.draft?.elements ?? {}).find((element) => (
+    element.identity.key === selection.identity.key || element.identity.selector === selection.identity.selector
+  ))?.styleDiff[property]
     ?? originalValue(selection, property)
 }
 
@@ -77,7 +79,10 @@ function confidenceLabel(selection: PwaSelection): string {
 
 export function PwaStyleInspector({ session }: Props) {
   const selectedDraft = session.selection
-    ? session.draft?.elements[session.selection.identity.selector]
+    ? Object.values(session.draft?.elements ?? {}).find((element) => (
+        element.identity.key === session.selection?.identity.key
+        || element.identity.selector === session.selection?.identity.selector
+      ))
     : null
   const elementCount = Object.keys(session.draft?.elements ?? {}).length
   return (

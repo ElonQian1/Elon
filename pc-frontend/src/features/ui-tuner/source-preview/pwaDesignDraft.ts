@@ -1,6 +1,8 @@
-export const PWA_DESIGN_DRAFT_SCHEMA_VERSION = 1 as const
+export const PWA_DESIGN_DRAFT_SCHEMA_VERSION = 2 as const
+export const PWA_DESIGN_ARTIFACT_VERSION = 'elon.pwa.cross-platform-draft.v2' as const
 
 export type PwaMappingConfidence = 'high' | 'medium' | 'low'
+export type PwaDesignScope = 'instance' | 'component' | 'route' | 'project'
 
 export type PwaStyleProperty =
   | 'width' | 'height'
@@ -18,6 +20,11 @@ export interface PwaElementIdentity {
   confidence: PwaMappingConfidence
   confidenceScore: number
   needsBinding: boolean
+  stableId: string
+  testId: string
+  resourceId: string
+  sourceSymbol: string
+  componentPath: string
   uiNode: string
   id: string
   ariaLabel: string
@@ -33,26 +40,77 @@ export interface PwaOriginalStyleSnapshot {
   inlineStyle: string | null
 }
 
+export interface PwaDomContextNode {
+  stableKey: string
+  relation: 'parent' | 'self' | 'sibling'
+  tag: string
+  text: string
+  role: string
+}
+
+export interface PwaSourceCandidate {
+  platform: 'pwa' | 'android'
+  stableKey: string
+  file?: string
+  symbol?: string
+  componentPath?: string
+  resourceId?: string
+  confidence: number
+  reason: string
+}
+
+export interface PwaSourceBinding {
+  status: 'BOUND' | 'CANDIDATE' | 'NEEDS_AI'
+  bindingConfidence: PwaMappingConfidence
+  needsBinding: boolean
+  pwaCandidates: PwaSourceCandidate[]
+  androidCandidates: PwaSourceCandidate[]
+}
+
+export interface PwaVisualReferences {
+  screenshot?: string
+  targetCrop?: string
+  currentCrop?: string
+  visualDiff?: string
+}
+
 export interface PwaDraftElement {
   identity: PwaElementIdentity
   originalStyle: PwaOriginalStyleSnapshot
+  afterStyle: PwaStyleValues
   styleDiff: PwaStyleValues
+  binding: PwaSourceBinding
+  scope: PwaDesignScope
+  domContext: PwaDomContextNode[]
+  visualReferences: PwaVisualReferences
   revision: number
+  createdAt: string
   updatedAt: string
 }
 
 export interface PwaDesignDraft {
   schemaVersion: typeof PWA_DESIGN_DRAFT_SCHEMA_VERSION
+  artifactVersion: typeof PWA_DESIGN_ARTIFACT_VERSION
   kind: 'elon.pwa.manual_style_draft'
   project: {
     id: string
     workspaceIdentity: string
     sourceRevision: string
   }
+  pageSource: {
+    kind: 'authenticated-pwa'
+    origin: string
+    entryPath: string
+    href?: string
+    title?: string
+  }
   route: { path: string; search: string; hash: string }
   viewport: { width: number; height: number }
+  scope: 'route'
+  visualReferences: PwaVisualReferences
   elements: Record<string, PwaDraftElement>
   revision: number
+  createdAt: string
   updatedAt: string
 }
 
@@ -60,7 +118,22 @@ export interface PwaRouteIdentity {
   path: string
   search: string
   hash: string
+  href?: string
+  title?: string
   viewport: { width: number; height: number }
+}
+
+export interface PwaDraftCliPackage {
+  version: 1
+  kind: 'elon_ui_tuner_pwa_cli_package'
+  generatedAt: string
+  capabilities: {
+    PWA_CODE_GENERATION: true
+    deterministicStyleWriteback: true
+    codexStructuralFallback: true
+  }
+  artifact: PwaDesignDraft
+  instructions: string[]
 }
 
 const STORAGE_PREFIX = 'elon.pc.pwaDesignDraft.v1:'
@@ -77,6 +150,8 @@ export function normalizePwaRoute(route: PwaRouteIdentity): PwaRouteIdentity {
     path: route.path || '/web',
     search: normalizedSearch(route.search || ''),
     hash: route.hash || '',
+    href: route.href,
+    title: route.title,
     viewport: {
       width: Math.max(1, Math.round(route.viewport.width)),
       height: Math.max(1, Math.round(route.viewport.height)),
@@ -84,20 +159,52 @@ export function normalizePwaRoute(route: PwaRouteIdentity): PwaRouteIdentity {
   }
 }
 
+export function stablePwaIdentityKey(identity: Partial<PwaElementIdentity>): string {
+  if (identity.stableId) return `stable:${identity.stableId}`
+  if (identity.testId) return `test:${identity.testId}`
+  if (identity.resourceId) return `resource:${identity.resourceId}`
+  if (identity.sourceSymbol) return `symbol:${identity.sourceSymbol}`
+  if (identity.componentPath) return `component:${identity.componentPath}`
+  if (identity.uiNode) return `ui-node:${identity.uiNode}`
+  if (identity.id) return `id:${identity.id}`
+  return `selector-evidence:${identity.selector || identity.key || 'unknown'}`
+}
+
+export function resolvedPwaAfterStyle(
+  original: PwaOriginalStyleSnapshot,
+  diff: PwaStyleValues,
+): PwaStyleValues {
+  return { ...original.computed, ...original.authored, ...diff }
+}
+
 export function createPwaDesignDraft(
   project: PwaDesignDraft['project'],
   routeInput: PwaRouteIdentity,
 ): PwaDesignDraft {
   const route = normalizePwaRoute(routeInput)
+  const now = new Date().toISOString()
+  let origin = ''
+  try { origin = new URL(route.href || route.path, window.location.origin).origin } catch { /* no browser origin */ }
   return {
     schemaVersion: PWA_DESIGN_DRAFT_SCHEMA_VERSION,
+    artifactVersion: PWA_DESIGN_ARTIFACT_VERSION,
     kind: 'elon.pwa.manual_style_draft',
     project,
+    pageSource: {
+      kind: 'authenticated-pwa',
+      origin,
+      entryPath: route.path,
+      href: route.href,
+      title: route.title,
+    },
     route: { path: route.path, search: route.search, hash: route.hash },
     viewport: route.viewport,
+    scope: 'route',
+    visualReferences: {},
     elements: {},
     revision: 0,
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   }
 }
 
@@ -113,14 +220,25 @@ export function pwaDraftStorageKey(project: PwaDesignDraft['project'], routeInpu
   ].join('|'))
 }
 
+export function parsePwaDesignDraft(value: string): PwaDesignDraft | null {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    if (parsed.kind !== 'elon.pwa.manual_style_draft') return null
+    if (parsed.schemaVersion === PWA_DESIGN_DRAFT_SCHEMA_VERSION) return parsed as unknown as PwaDesignDraft
+    if (parsed.schemaVersion === 1) return migrateDraftV1(parsed)
+    return null
+  } catch {
+    return null
+  }
+}
+
 export function readPwaDesignDraft(
   project: PwaDesignDraft['project'],
   route: PwaRouteIdentity,
 ): PwaDesignDraft | null {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(pwaDraftStorageKey(project, route)) || 'null') as PwaDesignDraft | null
-    if (!parsed || parsed.schemaVersion !== PWA_DESIGN_DRAFT_SCHEMA_VERSION || parsed.kind !== 'elon.pwa.manual_style_draft') return null
-    return parsed
+    const value = window.localStorage.getItem(pwaDraftStorageKey(project, route))
+    return value ? parsePwaDesignDraft(value) : null
   } catch {
     return null
   }
@@ -145,5 +263,100 @@ export function removePwaDesignDraft(draft: PwaDesignDraft): void {
     }))
   } catch {
     // Local persistence is best effort when storage is disabled.
+  }
+}
+
+export function buildPwaDraftCliPackage(draft: PwaDesignDraft): PwaDraftCliPackage {
+  return {
+    version: 1,
+    kind: 'elon_ui_tuner_pwa_cli_package',
+    generatedAt: new Date().toISOString(),
+    capabilities: {
+      PWA_CODE_GENERATION: true,
+      deterministicStyleWriteback: true,
+      codexStructuralFallback: true,
+    },
+    artifact: draft,
+    instructions: [
+      '只读取 artifact 中的样式 diff、稳定身份、局部 DOM 上下文和来源候选，不默认扫描整仓库。',
+      '先对明确绑定的 token、Style JSON、资源或属性执行确定性写回。',
+      '只有结构调整、PWA 源码未绑定或复杂 Kotlin/TSX 才交给 Codex；Runtime DOM 不是源码真相。',
+      '同时验证 PWA 与 APK 目标，并保持 sourceRevision 可追溯。',
+    ],
+  }
+}
+
+export function stringifyPwaDraftCliPackage(draft: PwaDesignDraft): string {
+  return JSON.stringify(buildPwaDraftCliPackage(draft), null, 2)
+}
+
+function migrateDraftV1(value: Record<string, unknown>): PwaDesignDraft {
+  const project = value.project as PwaDesignDraft['project']
+  const route = value.route as PwaDesignDraft['route']
+  const viewport = value.viewport as PwaDesignDraft['viewport']
+  const updatedAt = typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString()
+  const previousElements = (value.elements ?? {}) as Record<string, Partial<PwaDraftElement>>
+  const elements = Object.values(previousElements).reduce<Record<string, PwaDraftElement>>((result, item) => {
+    const identity = normalizeIdentity(item.identity ?? {})
+    const originalStyle = item.originalStyle ?? { computed: {}, authored: {}, inlineStyle: null }
+    const styleDiff = item.styleDiff ?? {}
+    const key = stablePwaIdentityKey(identity)
+    result[key] = {
+      identity: { ...identity, key },
+      originalStyle,
+      afterStyle: resolvedPwaAfterStyle(originalStyle, styleDiff),
+      styleDiff,
+      binding: defaultBinding(identity),
+      scope: 'instance',
+      domContext: [],
+      visualReferences: {},
+      revision: item.revision ?? 1,
+      createdAt: item.updatedAt ?? updatedAt,
+      updatedAt: item.updatedAt ?? updatedAt,
+    }
+    return result
+  }, {})
+  return {
+    schemaVersion: PWA_DESIGN_DRAFT_SCHEMA_VERSION,
+    artifactVersion: PWA_DESIGN_ARTIFACT_VERSION,
+    kind: 'elon.pwa.manual_style_draft',
+    project,
+    pageSource: { kind: 'authenticated-pwa', origin: '', entryPath: route.path },
+    route,
+    viewport,
+    scope: 'route',
+    visualReferences: {},
+    elements,
+    revision: typeof value.revision === 'number' ? value.revision : 0,
+    createdAt: updatedAt,
+    updatedAt,
+  }
+}
+
+function normalizeIdentity(value: Partial<PwaElementIdentity>): PwaElementIdentity {
+  const identity = {
+    key: value.key ?? '', selector: value.selector ?? '', strategy: value.strategy ?? 'dom-path',
+    confidence: value.confidence ?? 'low', confidenceScore: value.confidenceScore ?? 0.4,
+    needsBinding: value.needsBinding ?? true, stableId: value.stableId ?? '', testId: value.testId ?? '',
+    resourceId: value.resourceId ?? '', sourceSymbol: value.sourceSymbol ?? '',
+    componentPath: value.componentPath ?? '', uiNode: value.uiNode ?? '', id: value.id ?? '',
+    ariaLabel: value.ariaLabel ?? '', role: value.role ?? '', text: value.text ?? '',
+    tag: value.tag ?? '', classNames: value.classNames ?? [],
+  }
+  return { ...identity, key: stablePwaIdentityKey(identity) }
+}
+
+function defaultBinding(identity: PwaElementIdentity): PwaSourceBinding {
+  const pwaCandidates: PwaSourceCandidate[] = identity.key.startsWith('selector-evidence:') ? [] : [{
+    platform: 'pwa', stableKey: identity.key, symbol: identity.sourceSymbol || undefined,
+    componentPath: identity.componentPath || undefined, resourceId: identity.resourceId || identity.id || undefined,
+    confidence: identity.confidenceScore, reason: '从真实 DOM 稳定身份生成的 PWA 源码反查候选',
+  }]
+  return {
+    status: 'NEEDS_AI',
+    bindingConfidence: identity.confidence,
+    needsBinding: true,
+    pwaCandidates,
+    androidCandidates: [],
   }
 }

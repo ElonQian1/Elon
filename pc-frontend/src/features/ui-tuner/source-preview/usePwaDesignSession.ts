@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { getAuthToken } from '../../../api/client'
-import { matchPwaSourceNode } from './pwaNodeMapping'
+import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
   createPwaDesignDraft,
   normalizePwaRoute,
@@ -8,10 +8,13 @@ import {
   removePwaDesignDraft,
   savePwaDesignDraft,
   type PwaDesignDraft,
+  type PwaDomContextNode,
   type PwaElementIdentity,
   type PwaOriginalStyleSnapshot,
   type PwaRouteIdentity,
   type PwaStyleProperty,
+  resolvedPwaAfterStyle,
+  stablePwaIdentityKey,
 } from './pwaDesignDraft'
 import type { SourcePreviewNode } from './types'
 
@@ -25,6 +28,7 @@ export interface PwaSelection {
   identity: PwaElementIdentity
   rect: { left: number; top: number; width: number; height: number }
   originalStyle: PwaOriginalStyleSnapshot
+  domContext: PwaDomContextNode[]
 }
 
 export interface PwaRouteState extends PwaRouteIdentity {
@@ -77,6 +81,14 @@ function bridgeElements(draft: PwaDesignDraft) {
     selector: element.identity.selector,
     styleDiff: element.styleDiff,
   }))
+}
+
+function draftEntry(draft: PwaDesignDraft, identity: PwaElementIdentity) {
+  const stableKey = stablePwaIdentityKey(identity)
+  const direct = draft.elements[stableKey]
+  if (direct) return { key: stableKey, element: direct }
+  const legacy = Object.entries(draft.elements).find(([, element]) => element.identity.selector === identity.selector)
+  return legacy ? { key: legacy[0], element: legacy[1] } : null
 }
 
 function routeKey(route: PwaRouteIdentity): string {
@@ -236,9 +248,10 @@ export function usePwaDesignSession({
   const updateStyle = useCallback((property: PwaStyleProperty, input: string) => {
     const current = draftRef.current
     if (!current || !selection) return
-    const selector = selection.identity.selector
-    beginTransaction(`${selector}:${property}`)
-    const existing = current.elements[selector]
+    const stableKey = stablePwaIdentityKey(selection.identity)
+    beginTransaction(`${stableKey}:${property}`)
+    const found = draftEntry(current, selection.identity)
+    const existing = found?.element
     const originalStyle = existing?.originalStyle ?? selection.originalStyle
     const originalValue = originalStyle.authored[property] || originalStyle.computed[property] || ''
     const styleDiff = { ...(existing?.styleDiff ?? {}) }
@@ -248,28 +261,37 @@ export function usePwaDesignSession({
     const elements = { ...current.elements }
     if (Object.keys(styleDiff).length) {
       const revision = (existing?.revision ?? 0) + 1
-      elements[selector] = {
-        identity: selection.identity,
+      const now = new Date().toISOString()
+      if (found && found.key !== stableKey) delete elements[found.key]
+      elements[stableKey] = {
+        identity: { ...selection.identity, key: stableKey },
         originalStyle,
+        afterStyle: resolvedPwaAfterStyle(originalStyle, styleDiff),
         styleDiff,
+        binding: pwaSourceBinding({ ...selection.identity, key: stableKey }, root),
+        scope: existing?.scope ?? 'instance',
+        domContext: selection.domContext ?? [],
+        visualReferences: existing?.visualReferences ?? {},
         revision,
-        updatedAt: new Date().toISOString(),
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
       }
     } else {
-      delete elements[selector]
+      if (found) delete elements[found.key]
     }
     applyDraftState(touchDraft(current, elements))
-  }, [applyDraftState, beginTransaction, selection])
+  }, [applyDraftState, beginTransaction, root, selection])
 
   const resetCurrent = useCallback(() => {
     const current = draftRef.current
-    const selector = selection?.identity.selector
-    if (!current || !selector || !current.elements[selector]) return
-    beginTransaction(`${selector}:reset`)
+    if (!current || !selection) return
+    const found = draftEntry(current, selection.identity)
+    if (!found) return
+    beginTransaction(`${found.key}:reset`)
     const elements = { ...current.elements }
-    delete elements[selector]
+    delete elements[found.key]
     applyDraftState(touchDraft(current, elements))
-  }, [applyDraftState, beginTransaction, selection?.identity.selector])
+  }, [applyDraftState, beginTransaction, selection])
 
   const clearPage = useCallback(() => {
     const current = draftRef.current
