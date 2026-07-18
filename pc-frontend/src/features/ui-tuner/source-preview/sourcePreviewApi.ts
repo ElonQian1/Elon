@@ -73,6 +73,21 @@ export async function commitPwaStylePreview(input: {
   }, 15000)
 }
 
+export async function resolvePwaStyleBinding(input: {
+  projectRoot: string
+  selectors: string[]
+}): Promise<{
+  ok: boolean
+  binding?: PwaExplicitStyleBinding
+  candidateCount: number
+  detail: string
+}> {
+  return nodeApi(sourcePreviewAdminUrl(), '/api/source-preview/resolve-pwa-style-binding', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  }, 15000)
+}
+
 export async function verifyPwaSourceBuild(
   evidence: PwaSourceSavedEvidence,
 ): Promise<PwaBuildVerificationResult> {

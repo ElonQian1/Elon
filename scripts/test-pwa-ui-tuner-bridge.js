@@ -52,6 +52,7 @@ assert.doesNotMatch(bridge.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] || '', /[
 assert.ok(mobileWeb.includes("pageParams.get('ui_tuner_preview') === '1'"), 'session auth listener must be preview-scoped');
 assert.ok(designSession.includes("useState<'select' | 'interact'>('interact')"), 'PC PWA canvas must default to real interaction');
 assert.ok(designSession.includes("context.post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
+assert.ok(designSession.includes('resolvePwaStyleBinding'), 'PC should resolve matching runtime CSS selectors through the local source node');
 assert.equal((designSession.match(/window\.addEventListener\('message'/g) || []).length, 1, 'PC session should declare one postMessage listener');
 assert.match(designSession, /const bridgeContextRef = useRef\([\s\S]*window\.addEventListener\('message', receive\)[\s\S]*window\.removeEventListener\('message', receive\)\s*\n\s*}, \[\]\)/, 'PC session listener should stay installed while refs provide current render state');
 assert.ok(previewSurface.includes('key={design.reloadKey}'), 'iframe reloads must remain explicit and controlled by source verification');

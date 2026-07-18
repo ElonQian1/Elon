@@ -25,6 +25,7 @@ import {
   stablePwaIdentityKey,
 } from './pwaDesignDraft'
 import { PwaDesignSessionModel } from './pwaDesignSessionModel'
+import { resolvePwaStyleBinding } from './sourcePreviewApi'
 import { sourceSavedEvidenceFromDraft, type PwaBridgeVerificationSnapshot, type PwaVerificationState } from './pwaVerificationModel'
 import { usePwaSourceVerification } from './usePwaSourceVerification'
 import type { SourcePreviewNode } from './types'
@@ -38,7 +39,7 @@ export interface PwaSelection {
   rect: { left: number; top: number; width: number; height: number }
   originalStyle: PwaOriginalStyleSnapshot
   domContext: PwaDomContextNode[]
-  sourceSelectors: string[]
+  sourceSelectors?: string[]
   sourceBinding?: PwaExplicitStyleBinding
 }
 
@@ -134,6 +135,7 @@ export function usePwaDesignSession({
   const [historyVersion, setHistoryVersion] = useState(0)
   const [saveLabel, setSaveLabel] = useState('等待进入真实页面')
   const [reloadKey, setReloadKey] = useState(0)
+  const sourceSelectorKey = selection?.sourceSelectors?.join('\n') ?? ''
   const routeRef = useRef<PwaRouteState | null>(null)
   const modeRef = useRef(modeState)
   const syncTaskIdRef = useRef('')
@@ -217,6 +219,46 @@ export function usePwaDesignSession({
     }
     syncTaskIdRef.current = ''
   }), [verification.fail, verification.markLive])
+
+  useEffect(() => {
+    if (!selection || selection.sourceBinding || !sourceSelectorKey || !workspaceIdentity) return
+    const identityKey = stablePwaIdentityKey(selection.identity)
+    let cancelled = false
+    setSaveLabel('正在本机解析真实 PWA 样式源码…')
+    void resolvePwaStyleBinding({
+      projectRoot: workspaceIdentity,
+      selectors: selection.sourceSelectors ?? [],
+    }).then((result) => {
+      if (cancelled) return
+      if (!result.binding) {
+        setSaveLabel(result.detail || '没有唯一源码规则，保存时由 AI 按需建立绑定')
+        return
+      }
+      setSelection((current) => current && stablePwaIdentityKey(current.identity) === identityKey
+        ? { ...current, sourceBinding: result.binding }
+        : current)
+      const currentDraft = model.draft
+      if (currentDraft) {
+        const found = draftEntry(currentDraft, selection.identity)
+        if (found) {
+          const elements = {
+            ...currentDraft.elements,
+            [found.key]: {
+              ...found.element,
+              binding: pwaSourceBinding(found.element.identity, root, result.binding),
+              updatedAt: new Date().toISOString(),
+            },
+          }
+          const next = model.replace({ ...currentDraft, elements, updatedAt: new Date().toISOString() })
+          setDraft(next)
+        }
+      }
+      setSaveLabel(`已自动绑定 PWA 样式源码 · ${result.binding.sourceFile}`)
+    }).catch((error) => {
+      if (!cancelled) setSaveLabel(`本地源码解析暂不可用：${error instanceof Error ? error.message : '稍后由 AI 补充绑定'}`)
+    })
+    return () => { cancelled = true }
+  }, [model, root, selection?.identity.key, selection?.sourceBinding, sourceSelectorKey, workspaceIdentity])
 
   const bridgeContextRef = useRef({ model, onSelect, post, project, root, syncDraft, verification })
   bridgeContextRef.current = { model, onSelect, post, project, root, syncDraft, verification }
