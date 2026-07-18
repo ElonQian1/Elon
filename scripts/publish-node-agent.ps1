@@ -531,7 +531,7 @@ $nodeClaim = Enter-ElonNodeAgentPublishLease -ReleaseApiBase "$BaseUrl/api/relea
     -Sha $GitSha -VersionName $PackageVersion -BuilderId $nodeBuilderId
 if (-not $nodeClaim) { return }
 $script:NodeReleaseToken = [string]$nodeClaim.token
-$script:NodeReleaseOwned = $true
+$script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeReleaseToken)
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
@@ -786,8 +786,10 @@ Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
-Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken `
-    -Success $true -Sha $GitSha -VersionName $PackageVersion
+if ($script:NodeReleaseOwned) {
+    Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken `
+        -Success $true -Sha $GitSha -VersionName $PackageVersion
+}
 $script:NodeReleaseFinished = $true
 } catch {
     try { if ($script:NodeReleaseOwned -and -not $script:NodeReleaseFinished) {

@@ -34,6 +34,14 @@ function Invoke-ElonReleaseLeaseRequest {
     }
 }
 
+function Test-ElonNodeAgentLeaseBootstrapFallback {
+    param([Parameter(Mandatory)][string]$Message)
+
+    return $Message.Contains('release API HTTP 400:') `
+        -and $Message.Contains('"error":"bad-kind"') `
+        -and $Message.Contains('node_agent')
+}
+
 function Wait-ElonGlobalPublishLease {
     param(
         [Parameter(Mandatory)][object]$Claim,
@@ -91,10 +99,20 @@ function Enter-ElonNodeAgentPublishLease {
         [Parameter(Mandatory)][string]$VersionName,
         [Parameter(Mandatory)][string]$BuilderId
     )
-    $claim = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/claim" -Method POST -Body @{
-        kind = 'node_agent'; sha = $Sha; builderId = $BuilderId
-        builderLabel = "publish-node-agent.ps1 @ $BuilderId"
-        currentVersionName = $VersionName; leaseSecs = 14400
+    try {
+        $claim = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/claim" -Method POST -Body @{
+            kind = 'node_agent'; sha = $Sha; builderId = $BuilderId
+            builderLabel = "publish-node-agent.ps1 @ $BuilderId"
+            currentVersionName = $VersionName; leaseSecs = 14400
+        }
+    } catch {
+        if (-not (Test-ElonNodeAgentLeaseBootstrapFallback -Message $_.Exception.Message)) { throw }
+        Write-Warning 'The release API predates the node_agent lane; bootstrap with the local lock and pre-upload SHA gate. The global lease will activate after the server upgrade.'
+        return [pscustomobject]@{
+            action = 'build'
+            token = ''
+            legacyFallback = $true
+        }
     }
     return Enter-ElonGlobalPublishLease -Claim $claim -Kind 'node_agent' `
         -ReleaseApiBase $ReleaseApiBase -LeaseSecs 14400

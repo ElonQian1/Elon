@@ -4,6 +4,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
+. (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -67,6 +68,12 @@ Assert-True ($publishScript.Contains('Enter-NodeAgentPublishLock -Path $PublishL
     "The publisher must acquire the process-wide release lock before building"
 Assert-True ($publishScript.Contains('Exit-NodeAgentPublishLock -Lock $PublishLock')) `
     "The publisher must release the process-wide release lock in its finalizer"
+Assert-True (Test-ElonNodeAgentLeaseBootstrapFallback `
+    -Message 'release API HTTP 400: {"error":"bad-kind","message":"unknown kind: node_agent"}') `
+    "The first node-agent release must bootstrap against a server that predates the node_agent lane"
+Assert-True (-not (Test-ElonNodeAgentLeaseBootstrapFallback `
+    -Message 'release API HTTP 500: {"error":"internal","message":"database unavailable"}')) `
+    "Unrelated release API failures must not bypass the global lease"
 
 $lockFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-publish-lock-" + [Guid]::NewGuid().ToString("N"))
 $lockFixturePath = Join-Path $lockFixtureRoot "publish.lock"
