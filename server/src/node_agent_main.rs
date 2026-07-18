@@ -64,6 +64,7 @@ mod node_agent_cli_sidecar_progress_tests;
 mod node_agent_cli_sidecar_runner;
 #[cfg(test)]
 mod node_agent_cli_sidecar_runner_tests;
+mod node_agent_cli_supervision_lease;
 mod node_agent_cli_worker;
 mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
@@ -103,6 +104,7 @@ mod node_agent_local_admin;
 mod node_agent_local_llm;
 mod node_agent_local_task_resume;
 mod node_agent_local_task_resume_rebuild;
+mod node_agent_local_task_resume_routes;
 mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;

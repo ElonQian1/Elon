@@ -418,71 +418,21 @@ async fn run_cli_task(
             return;
         }
     };
-    if completion_context.supervision_protocol.as_deref()
-        == Some(crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL)
-    {
-        let contract = match crate::node_agent_local_task_supervision::load_supervision_contract(
-            &runtime.task_journal,
-            &req_id_for_cleanup,
-        ) {
-            Ok(Some(contract)) => contract,
-            Ok(None) => {
-                send_preflight_failure(
-                    &runtime,
-                    &completion_context,
-                    resolved_cli.name(),
-                    &out_tx,
-                    req_id,
-                    "desktop-supervised task is missing its durable supervision contract"
-                        .to_string(),
-                );
-                return;
-            }
-            Err(error) => {
-                send_preflight_failure(
-                    &runtime,
-                    &completion_context,
-                    resolved_cli.name(),
-                    &out_tx,
-                    req_id,
-                    format!("failed to load supervision contract: {error}"),
-                );
-                return;
-            }
-        };
-        if let Some(workspace) = prepared_cwd
-            .conversation_workspace
-            .as_ref()
-            .filter(|workspace| workspace.isolated)
-        {
-            let root_task_id = contract
-                .root_task_id
-                .as_deref()
-                .or(contract.parent_task_id.as_deref())
-                .unwrap_or(&req_id_for_cleanup);
-            let base = workspace
-                .base_workspace_path
-                .as_deref()
-                .map(std::path::Path::new);
-            let active = std::path::Path::new(&workspace.workspace_path);
-            let lease = base.ok_or_else(|| {
-                anyhow::anyhow!("isolated supervised worktree is missing its base repository")
-            });
-            let lease = lease.and_then(|base| {
-                crate::node_agent_supervision_worktree_lease::acquire(base, active, root_task_id)
-            });
-            if let Err(error) = lease {
-                send_preflight_failure(
-                    &runtime,
-                    &completion_context,
-                    resolved_cli.name(),
-                    &out_tx,
-                    req_id,
-                    format!("failed to persist supervision worktree lease: {error}"),
-                );
-                return;
-            }
-        }
+    if let Err(error) = crate::node_agent_cli_supervision_lease::acquire_for_task(
+        &runtime.task_journal,
+        &req_id_for_cleanup,
+        completion_context.supervision_protocol.as_deref(),
+        prepared_cwd.conversation_workspace.as_ref(),
+    ) {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            resolved_cli.name(),
+            &out_tx,
+            req_id,
+            format!("failed to persist supervision worktree lease: {error}"),
+        );
+        return;
     }
     let build_run_guard = if let Some(project_context) = prepared_cwd
         .project_context
