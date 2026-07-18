@@ -8,9 +8,9 @@
   const PROTOCOL_VERSION = 1;
   const originalInlineStyles = new Map();
   let selectedElement = null;
-  let selecting = true;
+  let selecting = false;
 
-  document.body.classList.add('ui-tuner-preview-active', 'ui-tuner-preview-selecting');
+  document.body.classList.add('ui-tuner-preview-active');
   const selection = document.createElement('div');
   selection.id = 'uiTunerPreviewSelection';
   selection.setAttribute('aria-hidden', 'true');
@@ -55,10 +55,51 @@
 
   function snapshotOf(element, knownRect) {
     const rect = knownRect || element.getBoundingClientRect();
+    const computed = window.getComputedStyle(element);
     return {
       identity: identityOf(element),
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      baseStyle: {
+        width: computed.width,
+        height: computed.height,
+        borderRadius: computed.borderRadius,
+        fontSize: computed.fontSize,
+        fontWeight: computed.fontWeight,
+        lineHeight: computed.lineHeight,
+        color: computed.color,
+        backgroundColor: computed.backgroundColor,
+        padding: {
+          start: computed.paddingInlineStart,
+          top: computed.paddingTop,
+          end: computed.paddingInlineEnd,
+          bottom: computed.paddingBottom,
+        },
+        margin: {
+          start: computed.marginInlineStart,
+          top: computed.marginTop,
+          end: computed.marginInlineEnd,
+          bottom: computed.marginBottom,
+        },
+        opacity: computed.opacity,
+      },
     };
+  }
+
+  function routeState(reason) {
+    return {
+      reason,
+      href: window.location.href,
+      path: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+      title: document.title,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      scroll: { x: window.scrollX, y: window.scrollY },
+    };
+  }
+
+  function postRoute(reason) {
+    post('route-changed', routeState(reason));
   }
 
   function findDesignTarget(target) {
@@ -147,6 +188,16 @@
   }, true);
   window.addEventListener('scroll', () => drawSelection(selectedElement), true);
   window.addEventListener('resize', () => drawSelection(selectedElement));
+  window.addEventListener('hashchange', () => postRoute('hashchange'));
+  window.addEventListener('popstate', () => postRoute('popstate'));
+  ['pushState', 'replaceState'].forEach((method) => {
+    const original = history[method];
+    history[method] = function uiTunerHistoryChange() {
+      const result = original.apply(this, arguments);
+      postRoute(method);
+      return result;
+    };
+  });
 
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;
@@ -157,6 +208,13 @@
       document.body.classList.toggle('ui-tuner-preview-selecting', selecting);
       drawSelection(selecting ? selectedElement : null);
       post('mode-changed', { mode: selecting ? 'select' : 'interact' });
+    } else if (message.type === 'set-session-auth') {
+      const sessionToken = String(message.payload && message.payload.token || '');
+      if (!sessionToken || sessionToken.length > 8192) return;
+      window.dispatchEvent(new CustomEvent('elon:ui-tuner-session-auth', {
+        detail: { token: sessionToken },
+      }));
+      post('session-auth-accepted', {});
     } else if (message.type === 'apply-style') {
       applyStyle(message.payload);
     } else if (message.type === 'reset-styles') {
@@ -167,6 +225,7 @@
   post('ready', {
     href: window.location.href,
     viewport: { width: window.innerWidth, height: window.innerHeight },
-    mode: 'select',
+    mode: 'interact',
   });
+  postRoute('ready');
 })();

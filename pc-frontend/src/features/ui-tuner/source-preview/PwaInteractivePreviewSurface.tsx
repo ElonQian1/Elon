@@ -1,5 +1,6 @@
 import { MousePointer2, RefreshCw, Smartphone } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { getAuthToken } from '../../../api/client'
 import { matchPwaSourceNode, type PwaIdentity } from './pwaNodeMapping'
 import { findSourceNode } from './sourcePreviewTree'
 import type { SourcePreviewDocument, SourcePreviewNode } from './types'
@@ -12,6 +13,15 @@ const PROTOCOL_VERSION = 1
 interface PwaSelection {
   identity: PwaIdentity
   rect: { left: number; top: number; width: number; height: number }
+}
+
+interface PwaRouteState {
+  href: string
+  path: string
+  search: string
+  hash: string
+  title: string
+  viewport: { width: number; height: number }
 }
 
 interface Props {
@@ -47,10 +57,11 @@ function previewStyle(node: SourcePreviewNode) {
 export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom, onSelect }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [ready, setReady] = useState(false)
-  const [mode, setMode] = useState<'select' | 'interact'>('select')
+  const [mode, setMode] = useState<'select' | 'interact'>('interact')
   const [selection, setSelection] = useState<PwaSelection | null>(null)
   const [mappedNodeKey, setMappedNodeKey] = useState<string | null>(null)
   const [unboundLabel, setUnboundLabel] = useState('')
+  const [route, setRoute] = useState<PwaRouteState | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const selectedNode = useMemo(() => findSourceNode(document.root, selectedKey), [document.root, selectedKey])
   const viewportWidth = Math.max(320, Math.min(430, Math.round(document.canvas.width / 3)))
@@ -64,11 +75,21 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== iframeRef.current?.contentWindow) return
-      const message = event.data as { source?: string; protocolVersion?: number; type?: string; payload?: { node?: PwaSelection } }
+      const message = event.data as {
+        source?: string
+        protocolVersion?: number
+        type?: string
+        payload?: { node?: PwaSelection } & Partial<PwaRouteState>
+      }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
       if (message.type === 'ready') {
         setReady(true)
+        const token = getAuthToken()
+        if (token) post('set-session-auth', { token })
         post('set-mode', { mode })
+      }
+      if (message.type === 'route-changed' && message.payload?.path && message.payload.viewport) {
+        setRoute(message.payload as PwaRouteState)
       }
       if (message.type === 'selection' && message.payload?.node) {
         const nextSelection = message.payload.node
@@ -99,15 +120,21 @@ export function PwaInteractivePreviewSurface({ url, document, selectedKey, zoom,
 
   return (
     <div className={styles.pwaPreviewWorkspace} data-testid="pwa-interactive-preview">
+      <div className={styles.pwaWorkflowGuide} aria-label="PWA 跨端设计步骤">
+        <span className={mode === 'interact' ? styles.activeWorkflowStep : ''}>① 正常使用并到达页面</span>
+        <span className={mode === 'select' ? styles.activeWorkflowStep : ''}>② 开始设计</span>
+        <span>③ 选择组件并调整</span><span>④ 保存跨端草稿</span><span>⑤ AI 同步 APK + PWA</span>
+      </div>
       <div className={styles.pwaPreviewToolbar}>
         <span className={ready ? styles.pwaReady : styles.pwaConnecting}><i />{ready ? 'PWA 交互草稿已连接' : '正在连接 PWA 草稿…'}</span>
         <div className={styles.pwaModeSwitch}>
-          <button className={mode === 'select' ? styles.activePwaMode : ''} type="button" onClick={() => setMode('select')}><MousePointer2 size={14} />选择组件</button>
-          <button className={mode === 'interact' ? styles.activePwaMode : ''} type="button" onClick={() => setMode('interact')}><Smartphone size={14} />操作页面</button>
+          <button className={mode === 'interact' ? styles.activePwaMode : ''} type="button" disabled={!ready} onClick={() => setMode('interact')}><Smartphone size={14} />{mode === 'select' ? '退出设计' : '正常使用'}</button>
+          <button className={mode === 'select' ? styles.activePwaMode : ''} type="button" disabled={!ready} onClick={() => setMode('select')}><MousePointer2 size={14} />开始设计</button>
         </div>
         <button type="button" title="重新载入 PWA 草稿" onClick={() => { setReady(false); setSelection(null); setMappedNodeKey(null); setReloadKey((value) => value + 1) }}><RefreshCw size={14} /></button>
       </div>
-      {unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{unboundLabel}”，但它还没有匹配到 Android 节点；可继续操作页面，或让 AI 建立跨端绑定。</div>}
+      {route && <div className={styles.pwaRouteStatus}>当前真实页面：<code>{route.path}{route.search}{route.hash}</code> · {route.viewport.width}×{route.viewport.height}</div>}
+      {mode === 'select' && unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{unboundLabel}”，但它还没有匹配到 Android 节点；可退出设计继续操作页面，或让 AI 建立跨端绑定。</div>}
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>
         <div className={styles.pwaDraftBadge}>真实 PWA 页面 · Android 最终校准</div>
         <iframe key={reloadKey} ref={iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url)} title="移动 PWA 交互草稿" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} />

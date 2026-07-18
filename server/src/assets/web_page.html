@@ -5134,6 +5134,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const TOKEN_KEY = 'lodex_token';
   const PROJECT_TASK_COMPLETION_BADGES_KEY = 'elon_project_task_completion_badges_v1';
   let token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';
+  if (pageParams.get('ui_tuner_preview') === '1' && window.parent !== window) {
+    window.addEventListener('elon:ui-tuner-session-auth', (event) => {
+      const sessionToken = String(event && event.detail && event.detail.token || '');
+      if (!sessionToken || sessionToken === token) return;
+      token = sessionToken;
+      void boot();
+    });
+  }
   let authMode = 'login';
   let currentUser = null;
   let projects = [];
