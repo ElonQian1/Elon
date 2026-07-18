@@ -6,7 +6,6 @@ use axum::{
 };
 use std::{
     path::PathBuf,
-    process::Command,
     sync::{Arc, OnceLock},
 };
 
@@ -108,7 +107,7 @@ fn git_commit_summary() -> Option<String> {
     }
 
     for dir in git_lookup_dirs() {
-        let output = Command::new("git")
+        let output = crate::git_command_error::git_command()
             .arg("-C")
             .arg(&dir)
             .args(["log", "-1", "--format=%s", sha])

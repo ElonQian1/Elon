@@ -1,4 +1,4 @@
-use std::{fs, path::Path, path::PathBuf, process::Command};
+use std::{fs, path::Path, path::PathBuf};
 
 use sha2::Digest;
 
@@ -7,7 +7,7 @@ use crate::project_document_git_transaction::{
 };
 
 fn git(root: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(root)
         .args(args)
         .output()

@@ -1,5 +1,5 @@
 use super::*;
-use std::{fs, path::Path, process::Command};
+use std::{fs, path::Path};
 
 fn repository() -> std::path::PathBuf {
     let root = std::env::temp_dir().join(format!(
@@ -17,7 +17,7 @@ fn repository() -> std::path::PathBuf {
 }
 
 fn run(root: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(root)
         .args(args)
         .output()

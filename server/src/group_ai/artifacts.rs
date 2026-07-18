@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use serde::Serialize;
 use serde_json::Value;
-use std::{path::Path, process::Command};
+use std::path::Path;
 
 use crate::{
     group_ai::types::{
@@ -209,7 +209,7 @@ fn probe_local_diff(worktree_path: Option<&str>) -> LocalDiffProbe {
 }
 
 fn git_lines(worktree_path: &str, args: &[&str]) -> Result<Vec<String>, String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(worktree_path)
         .args(args)

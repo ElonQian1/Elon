@@ -1,5 +1,4 @@
 use super::*;
-use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -100,7 +99,7 @@ fn temp_git_repo(label: &str) -> Option<PathBuf> {
 }
 
 fn git_available() -> bool {
-    Command::new("git")
+    crate::git_command_error::git_command()
         .arg("--version")
         .status()
         .map(|status| status.success())
@@ -116,7 +115,7 @@ fn run_git(cwd: &Path, args: &[&str]) {
 }
 
 fn run_git_status(cwd: &Path, args: &[&str]) -> bool {
-    Command::new("git")
+    crate::git_command_error::git_command()
         .current_dir(cwd)
         .args(args)
         .status()

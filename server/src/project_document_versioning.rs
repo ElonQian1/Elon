@@ -2,10 +2,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
-use std::{
-    path::Path,
-    process::{Command, Output},
-};
+use std::{path::Path, process::Output};
 
 use crate::project_document_vault::{is_managed_vault, restore_version as restore_vault_version};
 
@@ -126,13 +123,13 @@ pub(crate) fn restore_document_version(
     if !status.stdout.is_empty() {
         bail!("工作区存在未提交修改；请先保存或提交，再回滚文档版本")
     }
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(workspace)
         .args(["revert", "--no-edit", &commit])
         .output()
         .context("无法启动 Git 文档回滚")?;
     if !output.status.success() {
-        let _ = Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .current_dir(workspace)
             .args(["revert", "--abort"])
             .output();
@@ -206,7 +203,7 @@ fn ensure_git(workspace: &Path) -> Result<()> {
 }
 
 fn git(workspace: &Path, args: &[&str]) -> Result<Output> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(workspace)
         .args(args)
         .output()
@@ -222,7 +219,7 @@ fn git(workspace: &Path, args: &[&str]) -> Result<Output> {
 }
 
 fn git_status(workspace: &Path, args: &[&str]) -> Result<bool> {
-    Ok(Command::new("git")
+    Ok(crate::git_command_error::git_command()
         .current_dir(workspace)
         .args(args)
         .output()

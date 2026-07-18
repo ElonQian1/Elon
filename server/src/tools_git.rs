@@ -3,13 +3,12 @@
 
 use anyhow::{anyhow, Result};
 use std::path::Path;
-use std::process::Command;
 use tracing::{info, warn};
 
 /// 执行 git commit
 pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
     info!("[工具] git commit: {}", message);
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["add", "-A"])
         .current_dir(project_root)
         .output()?;
@@ -20,7 +19,7 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
         ));
     }
 
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["commit", "-m", message])
         .current_dir(project_root)
         .output()?;
@@ -40,7 +39,7 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
     if !has_origin_remote(project_root) {
         return Ok(format!("git commit 成功: {}", stdout.trim()));
     }
-    let push_output = Command::new("git")
+    let push_output = crate::git_command_error::git_command()
         .args(["push", "origin", &branch])
         .current_dir(project_root)
         .output();
@@ -60,7 +59,7 @@ pub fn git_commit(project_root: &Path, message: &str) -> Result<String> {
 }
 
 fn has_origin_remote(project_root: &Path) -> bool {
-    Command::new("git")
+    crate::git_command_error::git_command()
         .args(["remote", "get-url", "origin"])
         .current_dir(project_root)
         .output()
@@ -69,7 +68,7 @@ fn has_origin_remote(project_root: &Path) -> bool {
 }
 
 fn current_branch(project_root: &Path) -> Option<String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .current_dir(project_root)
         .output()
@@ -88,7 +87,7 @@ fn current_branch(project_root: &Path) -> Option<String> {
 /// 只获取远端 main 并汇报状态，不自动 rebase 或改写工作区。
 pub fn git_fetch_status(project_root: &Path) -> Result<String> {
     info!("[工具] git fetch origin main");
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["fetch", "origin", "main"])
         .current_dir(project_root)
         .output()?;
@@ -121,7 +120,7 @@ pub fn git_fetch_status(project_root: &Path) -> Result<String> {
 }
 
 fn git_rev_parse(project_root: &Path, rev: &str) -> Result<String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["rev-parse", rev])
         .current_dir(project_root)
         .output()?;
@@ -136,7 +135,7 @@ fn git_rev_parse(project_root: &Path, rev: &str) -> Result<String> {
 }
 
 fn git_is_ancestor(project_root: &Path, ancestor: &str, descendant: &str) -> Result<bool> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["merge-base", "--is-ancestor", ancestor, descendant])
         .current_dir(project_root)
         .output()?;
@@ -263,7 +262,7 @@ fn is_elon_self_android_dir(work_dir: &Path) -> bool {
 
 pub(crate) fn ensure_git_repo(project_root: &Path, user_id: &str) -> Result<()> {
     if !project_root.join(".git").exists() {
-        let output = Command::new("git")
+        let output = crate::git_command_error::git_command()
             .args(["init"])
             .current_dir(project_root)
             .output()?;
@@ -275,11 +274,11 @@ pub(crate) fn ensure_git_repo(project_root: &Path, user_id: &str) -> Result<()> 
         }
     }
 
-    let _ = Command::new("git")
+    let _ = crate::git_command_error::git_command()
         .args(["config", "user.email", &format!("{}@elon.app", user_id)])
         .current_dir(project_root)
         .output();
-    let _ = Command::new("git")
+    let _ = crate::git_command_error::git_command()
         .args(["config", "user.name", user_id])
         .current_dir(project_root)
         .output();

@@ -117,7 +117,7 @@ pub(crate) fn is_project_workspace(workspace: &Path) -> bool {
 }
 
 pub(crate) fn has_origin_remote(workspace: &Path) -> bool {
-    std::process::Command::new("git")
+    crate::git_command_error::git_command()
         .args(["remote", "get-url", "origin"])
         .current_dir(workspace)
         .output()

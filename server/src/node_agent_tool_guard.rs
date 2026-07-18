@@ -335,7 +335,7 @@ impl ToolGuard {
     }
 
     async fn run_git(&self, args: Vec<String>) -> Result<String> {
-        let mut child_command = Command::new("git");
+        let mut child_command = crate::git_command_error::tokio_git_command();
         child_command.args(&args);
         child_command.current_dir(&self.workspace);
         hide_command_window(&mut child_command);

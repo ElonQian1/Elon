@@ -2,12 +2,16 @@ use super::{
     git_output, prepare_project_storage_repo, validate_repo_access_token, StorageRepoRequest,
     StorageSettings,
 };
-use std::{path::PathBuf, process::Command};
+use std::path::PathBuf;
 use uuid::Uuid;
 
 #[test]
 fn prepare_repo_uses_user_scoped_url_and_token() {
-    if Command::new("git").arg("--version").output().is_err() {
+    if crate::git_command_error::git_command()
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         return;
     }
     let root = std::env::temp_dir().join(format!("elon_storage_repo_{}", Uuid::new_v4().simple()));
@@ -44,7 +48,11 @@ fn prepare_repo_uses_user_scoped_url_and_token() {
 
 #[test]
 fn prepare_repo_can_create_owner_worktree() {
-    if Command::new("git").arg("--version").output().is_err() {
+    if crate::git_command_error::git_command()
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         return;
     }
     let root = std::env::temp_dir().join(format!(

@@ -390,13 +390,13 @@ mod tests {
         let temp = temp_test_dir("git_status_diff_and_log_are_read_only_project_tools");
         init_git_repo(&temp);
         fs::write(temp.join("README.md"), "initial\n").unwrap();
-        let add = std::process::Command::new("git")
+        let add = crate::git_command_error::git_command()
             .args(["add", "README.md"])
             .current_dir(&temp)
             .status()
             .unwrap();
         assert!(add.success(), "git add should succeed");
-        let commit = std::process::Command::new("git")
+        let commit = crate::git_command_error::git_command()
             .args([
                 "-c",
                 "user.name=Elon Test",
@@ -522,7 +522,7 @@ mod tests {
     }
 
     fn init_git_repo(path: &std::path::Path) {
-        let status = std::process::Command::new("git")
+        let status = crate::git_command_error::git_command()
             .args(["init"])
             .current_dir(path)
             .status()

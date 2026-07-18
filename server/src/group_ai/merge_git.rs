@@ -11,7 +11,12 @@ pub(super) struct CommandOutcome {
 }
 
 pub(super) fn run_git(path: &Path, args: &[&str]) -> CommandOutcome {
-    match Command::new("git").arg("-C").arg(path).args(args).output() {
+    match crate::git_command_error::git_command()
+        .arg("-C")
+        .arg(path)
+        .args(args)
+        .output()
+    {
         Ok(output) => CommandOutcome {
             success: output.status.success(),
             detail: format!("git {}", args.join(" ")),

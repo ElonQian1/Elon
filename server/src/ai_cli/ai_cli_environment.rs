@@ -22,15 +22,15 @@ pub(crate) fn ensure_git(
         ));
     }
 
-    let _ = std::process::Command::new("git")
+    let _ = crate::git_command_error::git_command()
         .args(["init"])
         .current_dir(workspace)
         .output();
-    let _ = std::process::Command::new("git")
+    let _ = crate::git_command_error::git_command()
         .args(["config", "user.email", &format!("{}@elon.app", user_id)])
         .current_dir(workspace)
         .output();
-    let _ = std::process::Command::new("git")
+    let _ = crate::git_command_error::git_command()
         .args(["config", "user.name", user_id])
         .current_dir(workspace)
         .output();
@@ -39,7 +39,7 @@ pub(crate) fn ensure_git(
 }
 
 fn has_origin_remote(workspace: &Path) -> bool {
-    std::process::Command::new("git")
+    crate::git_command_error::git_command()
         .args(["remote", "get-url", "origin"])
         .current_dir(workspace)
         .output()

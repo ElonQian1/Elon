@@ -1,12 +1,13 @@
 //! Durable update checkpoints captured immediately before the Windows runtime stops.
 
-use std::{collections::HashSet, path::Path, process::Command};
+use std::{collections::HashSet, path::Path};
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::{
+    git_command_error::{git_failure_message, git_spawn_context},
     node_agent_local_task_supervision::{load_supervision_contract, SUPERVISION_PROTOCOL},
     node_agent_update_recovery::{
         ReleaseIdentity, UpdateInstallGate, UpdateRecoveryReceipt, UpdateRecoveryState,
@@ -239,16 +240,31 @@ pub(crate) fn incomplete_non_repeatable_action(
 }
 
 pub(crate) fn git_output(cwd: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git")
+    let output = match crate::git_command_error::git_command()
         .args(args)
         .current_dir(cwd)
         .output()
-        .ok()?;
-    output.status.success().then(|| {
+    {
+        Ok(output) => output,
+        Err(error) => {
+            warn!(
+                cwd = %cwd.display(),
+                command = %git_spawn_context(args),
+                %error,
+                "节点更新检查点无法启动 Git"
+            );
+            return None;
+        }
+    };
+    if !output.status.success() {
+        warn!(message = %git_failure_message(cwd, args, &output), "节点更新检查点 Git 失败");
+        return None;
+    }
+    Some(
         String::from_utf8_lossy(&output.stdout)
             .trim_end()
-            .to_string()
-    })
+            .to_string(),
+    )
 }
 
 fn stable_update_id(to_git_sha: &str) -> String {

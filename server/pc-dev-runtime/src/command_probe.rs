@@ -36,14 +36,39 @@ pub fn command_path(name: &str) -> Option<PathBuf> {
 }
 
 pub fn command_output(name: &str, args: &[&str], cwd: Option<&Path>) -> io::Result<Output> {
-    let program = command_path(name).unwrap_or_else(|| PathBuf::from(name));
-    let mut command = command_from_path(&program);
+    let mut command = if name.eq_ignore_ascii_case("git") {
+        git_command()
+    } else {
+        let program = command_path(name).unwrap_or_else(|| PathBuf::from(name));
+        command_from_path(&program)
+    };
     command.args(args);
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
     }
     command.stdin(Stdio::null());
     command.output()
+}
+
+/// Builds a product-owned, non-interactive Git subprocess.
+///
+/// Windows callers get `CREATE_NO_WINDOW`; all platforms close stdin and disable
+/// terminal/credential-manager prompts so background work fails audibly instead
+/// of opening a transient console or waiting forever for credentials.
+pub fn git_command() -> Command {
+    let program = command_path("git").unwrap_or_else(|| PathBuf::from("git"));
+    let mut command = command_from_path(&program);
+    configure_non_interactive_git_command(&mut command);
+    command
+}
+
+pub fn configure_non_interactive_git_command(command: &mut Command) {
+    command
+        .stdin(Stdio::null())
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GCM_INTERACTIVE", "Never")
+        .env("SSH_ASKPASS_REQUIRE", "never");
+    apply_hidden_window(command);
 }
 
 pub fn command_from_path(program: &Path) -> Command {

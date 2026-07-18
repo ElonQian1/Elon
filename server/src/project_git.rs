@@ -218,7 +218,7 @@ pub fn ensure_project_deploy_key(
 ) -> anyhow::Result<String> {
     std::fs::create_dir_all(workspace)?;
     if !workspace.join(".git").exists() {
-        let _ = Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .arg("init")
             .current_dir(workspace)
             .output();
@@ -260,7 +260,7 @@ pub fn configure_git_remote(
 ) -> anyhow::Result<()> {
     std::fs::create_dir_all(workspace)?;
     if !workspace.join(".git").exists() {
-        let output = Command::new("git")
+        let output = crate::git_command_error::git_command()
             .arg("init")
             .current_dir(workspace)
             .output()?;
@@ -269,7 +269,7 @@ pub fn configure_git_remote(
         }
     }
 
-    let remote_exists = Command::new("git")
+    let remote_exists = crate::git_command_error::git_command()
         .args(["remote", "get-url", "origin"])
         .current_dir(workspace)
         .output()
@@ -280,7 +280,7 @@ pub fn configure_git_remote(
     } else {
         vec!["remote", "add", "origin", repo_url]
     };
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(workspace)
         .output()?;
@@ -291,7 +291,7 @@ pub fn configure_git_remote(
         );
     }
 
-    let _ = Command::new("git")
+    let _ = crate::git_command_error::git_command()
         .args(["branch", "-M", branch])
         .current_dir(workspace)
         .output();
@@ -304,7 +304,7 @@ pub fn configure_git_remote(
 }
 
 pub fn git_output(workspace: &Path, args: &[&str]) -> anyhow::Result<String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(workspace)
         .output()?;
@@ -350,7 +350,7 @@ fn configure_deploy_key_ssh(workspace: &Path, private_key: &Path) -> anyhow::Res
         "ssh -i {} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new",
         private_key.to_string_lossy()
     );
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["config", "core.sshCommand", &ssh_command])
         .current_dir(workspace)
         .output()?;
@@ -364,7 +364,7 @@ fn configure_deploy_key_ssh(workspace: &Path, private_key: &Path) -> anyhow::Res
 }
 
 fn check_remote_access(workspace: &Path, branch: &str) -> serde_json::Value {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["ls-remote", "--heads", "origin", branch])
         .current_dir(workspace)
         .output();

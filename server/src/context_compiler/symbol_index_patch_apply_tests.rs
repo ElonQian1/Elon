@@ -1,7 +1,6 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -280,7 +279,7 @@ fn read_file(workspace: &Path, relative_path: &str) -> String {
 }
 
 fn assert_git_clean(workspace: &Path) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .args(["status", "--short"])
@@ -294,7 +293,7 @@ fn assert_git_clean(workspace: &Path) {
 }
 
 fn run_git(workspace: &Path, args: &[&str]) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .args(args)

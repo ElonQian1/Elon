@@ -6,7 +6,6 @@ use super::{
 use elon_pc_dev_runtime::safe_path_part;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use uuid::Uuid;
 
 #[test]
@@ -293,7 +292,7 @@ fn conversation_workspace_head_landed_checks_origin_main() {
 }
 
 fn run_git(repo: &Path, args: &[&str]) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(repo)
         .output()

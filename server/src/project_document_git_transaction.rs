@@ -7,7 +7,7 @@ use std::{
     fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 const NON_DOCUMENT_PATHSPECS: &[&str] = &[
@@ -286,7 +286,7 @@ fn git_output(
     index: Option<&Path>,
     stdin: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
-    let mut command = Command::new("git");
+    let mut command = crate::git_command_error::git_command();
     command
         .current_dir(workspace)
         .args(args)

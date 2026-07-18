@@ -70,4 +70,28 @@ Assert-True ($buildScript.Contains('compile_for(&["elon-pc-node"])')) `
 Assert-True ($buildScript.Contains('desktop-shell/src-tauri/icons/icon.ico')) `
     "The node client must reuse the checked-in desktop brand ICO"
 
+$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
+Assert-NodeAgentBackgroundGitLaunchPolicy -RepoRoot $repoRoot
+
+$fixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-git-gate-" + [Guid]::NewGuid().ToString("N"))
+try {
+    $fixtureSource = Join-Path $fixtureRoot "server\src"
+    New-Item -ItemType Directory -Force -Path $fixtureSource | Out-Null
+    [System.IO.File]::WriteAllText(
+        (Join-Path $fixtureSource "regression.rs"),
+        'fn regression() { let _ = std::process::Command::new("git").output(); }'
+    )
+    $blocked = $false
+    try {
+        Assert-NodeAgentBackgroundGitLaunchPolicy -RepoRoot $fixtureRoot | Out-Null
+    } catch {
+        $blocked = $_.Exception.Message.Contains('elon_pc_dev_runtime::git_command()')
+    }
+    Assert-True $blocked "The release gate must reject a newly added bare Git launch"
+} finally {
+    if (Test-Path -LiteralPath $fixtureRoot) {
+        Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+    }
+}
+
 Write-Host "NODE_AGENT_RELEASE_CONTRACT_TESTS=passed" -ForegroundColor Green

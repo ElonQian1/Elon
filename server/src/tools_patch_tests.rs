@@ -144,7 +144,7 @@ fn temp_workspace(name: &str) -> PathBuf {
 }
 
 fn init_git(workspace: &Path) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(["init"])
         .current_dir(workspace)
         .output()

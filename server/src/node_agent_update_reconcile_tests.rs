@@ -37,7 +37,7 @@ fn fingerprint_detects_git_or_workspace_drift() {
         uuid::Uuid::new_v4().simple()
     ));
     std::fs::create_dir_all(&root).unwrap();
-    let status = std::process::Command::new("git")
+    let status = crate::git_command_error::git_command()
         .arg("init")
         .current_dir(&root)
         .status();

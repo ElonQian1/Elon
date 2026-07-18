@@ -1,7 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
 
 use crate::{
     project_attachment_paths::safe_project_path_part, project_git::git_output,
@@ -124,12 +121,12 @@ pub(crate) fn merge_conversation_worktree(
     }
 
     let before = git_output(&workspace.base_workspace, &["rev-parse", "HEAD"])?;
-    let merge_output = Command::new("git")
+    let merge_output = crate::git_command_error::git_command()
         .args(["merge", "--no-ff", "--no-edit", branch])
         .current_dir(&workspace.base_workspace)
         .output()?;
     if !merge_output.status.success() {
-        let _ = Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .args(["merge", "--abort"])
             .current_dir(&workspace.base_workspace)
             .output();
@@ -158,7 +155,7 @@ pub(crate) fn merge_conversation_worktree(
     let branch_for_cleanup = branch.to_string();
     std::thread::spawn(move || {
         // 先 remove worktree（git 会取消注册并删除目录）
-        let _ = Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .args([
                 "worktree",
                 "remove",
@@ -168,7 +165,7 @@ pub(crate) fn merge_conversation_worktree(
             .current_dir(&base_for_cleanup)
             .output();
         // 删除已合并的会话分支
-        let _ = Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .args(["branch", "-d", &branch_for_cleanup])
             .current_dir(&base_for_cleanup)
             .output();
@@ -300,7 +297,7 @@ fn worktree_clean(workspace: &Path) -> anyhow::Result<bool> {
 }
 
 fn git_output_owned(workspace: &Path, args: &[String]) -> anyhow::Result<String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(workspace)
         .output()?;

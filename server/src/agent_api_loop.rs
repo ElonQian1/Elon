@@ -142,15 +142,15 @@ pub(crate) async fn run_api_inner_with_workspace(
     std::fs::create_dir_all(&workspace)?;
     // 初始化 git（如果还未初始化）
     if !workspace.join(".git").exists() {
-        let _ = std::process::Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .args(["init"])
             .current_dir(&workspace)
             .output();
-        let _ = std::process::Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .args(["config", "user.email", &format!("{}@elon.app", user_id)])
             .current_dir(&workspace)
             .output();
-        let _ = std::process::Command::new("git")
+        let _ = crate::git_command_error::git_command()
             .args(["config", "user.name", user_id])
             .current_dir(&workspace)
             .output();

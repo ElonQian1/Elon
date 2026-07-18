@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
@@ -69,7 +68,7 @@ fn hash_untracked_files(root: &Path, names: &[u8], hasher: &mut Sha256) -> Resul
 }
 
 fn git_output(root: &Path, args: &[&str]) -> Result<Option<Vec<u8>>> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(root)
         .output()
@@ -78,7 +77,22 @@ fn git_output(root: &Path, args: &[&str]) -> Result<Option<Vec<u8>>> {
 }
 
 fn git_output_required(root: &Path, args: &[&str]) -> Result<Vec<u8>> {
-    git_output(root, args)?.ok_or_else(|| anyhow::anyhow!("git {} 执行失败", args.join(" ")))
+    let output = crate::git_command_error::git_command()
+        .args(args)
+        .current_dir(root)
+        .output()
+        .with_context(|| {
+            format!(
+                "无法执行 {}",
+                crate::git_command_error::git_spawn_context(args)
+            )
+        })?;
+    if !output.status.success() {
+        bail!(crate::git_command_error::git_failure_message(
+            root, args, &output
+        ));
+    }
+    Ok(output.stdout)
 }
 
 #[cfg(test)]
@@ -109,7 +123,7 @@ mod tests {
     }
 
     fn run_git(root: &Path, args: &[&str]) {
-        assert!(Command::new("git")
+        assert!(crate::git_command_error::git_command()
             .args(args)
             .current_dir(root)
             .status()

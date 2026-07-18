@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 use std::sync::Arc;
-use std::{fs, path::PathBuf, process::Command};
+use std::{fs, path::PathBuf};
 
 use crate::node_agent_project_docs_mcp::{
     authorize_session, descriptor_for_project, descriptor_for_vault, handle_request,
@@ -14,19 +14,19 @@ fn workspace() -> PathBuf {
     ));
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("AGENTS.md"), "# Agent entry\n").unwrap();
-    assert!(Command::new("git")
+    assert!(crate::git_command_error::git_command()
         .current_dir(&root)
         .args(["init", "-q"])
         .status()
         .unwrap()
         .success());
-    assert!(Command::new("git")
+    assert!(crate::git_command_error::git_command()
         .current_dir(&root)
         .args(["add", "AGENTS.md"])
         .status()
         .unwrap()
         .success());
-    assert!(Command::new("git")
+    assert!(crate::git_command_error::git_command()
         .current_dir(&root)
         .args([
             "-c",

@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::Output,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -197,7 +197,7 @@ fn current_head(workspace: &Path) -> Result<String> {
 
 fn git(workspace: &Path, args: &[&str]) -> Result<Output> {
     fs::create_dir_all(workspace)?;
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(workspace)
         .args(args)
         .env("GIT_AUTHOR_NAME", "Yilong Knowledge Vault")
@@ -217,7 +217,7 @@ fn git(workspace: &Path, args: &[&str]) -> Result<Output> {
 }
 
 fn git_status(workspace: &Path, args: &[&str]) -> Result<bool> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(workspace)
         .args(args)
         .output()

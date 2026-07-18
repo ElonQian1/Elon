@@ -230,7 +230,7 @@ fn prepare_owner_worktree(
 }
 
 fn clone_storage_repo(bare_repo: &Path, worktree: &Path) -> Result<()> {
-    let mut command = Command::new("git");
+    let mut command = crate::git_command_error::git_command();
     command.arg("clone").arg(bare_repo).arg(worktree);
     let output = command_output(&mut command).context("failed to run git clone")?;
     if !output.status.success() {
@@ -380,7 +380,7 @@ fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
 }
 
 fn git_available() -> bool {
-    let mut command = Command::new("git");
+    let mut command = crate::git_command_error::git_command();
     command.arg("--version");
     command_output(&mut command)
         .map(|output| output.status.success())
@@ -388,7 +388,7 @@ fn git_available() -> bool {
 }
 
 fn run_git(cwd: &Path, args: &[&str]) -> Result<()> {
-    let mut command = Command::new("git");
+    let mut command = crate::git_command_error::git_command();
     command.args(args).current_dir(cwd);
     let output = command_output(&mut command).context("failed to run git")?;
     if !output.status.success() {
@@ -401,7 +401,7 @@ fn run_git(cwd: &Path, args: &[&str]) -> Result<()> {
 }
 
 fn git_output(cwd: &Path, args: &[&str]) -> Result<String> {
-    let mut command = Command::new("git");
+    let mut command = crate::git_command_error::git_command();
     command.args(args).current_dir(cwd);
     let output = command_output(&mut command).context("failed to run git")?;
     if !output.status.success() {

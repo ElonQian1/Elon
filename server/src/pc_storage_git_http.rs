@@ -8,7 +8,7 @@ use axum::{
 use std::{
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 use crate::pc_storage_repo::{self, StorageSettings};
@@ -82,7 +82,7 @@ fn run_git_http_backend(
     git_protocol: Option<String>,
     body: Vec<u8>,
 ) -> Result<Response, String> {
-    let mut command = Command::new("git");
+    let mut command = crate::git_command_error::git_command();
     command
         .arg("http-backend")
         .env("GIT_PROJECT_ROOT", git_root)

@@ -110,7 +110,7 @@ pub(super) fn run_git_apply_check(git_root: &Path, generated_diff: &str) -> Patc
         quote_path(git_root),
         quote_path(&patch_file)
     );
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(git_root)
         .args(["apply", "--check", "--whitespace=nowarn"])
@@ -143,7 +143,7 @@ pub(super) fn run_git_apply_check(git_root: &Path, generated_diff: &str) -> Patc
 }
 
 pub(super) fn run_git(workdir: &Path, args: &[&str]) -> GitRunOutput {
-    match Command::new("git")
+    match crate::git_command_error::git_command()
         .arg("-C")
         .arg(workdir)
         .args(args)

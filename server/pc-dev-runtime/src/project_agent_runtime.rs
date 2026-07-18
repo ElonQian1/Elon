@@ -1246,7 +1246,7 @@ mod tests {
         fs::write(&script_path, agent_runtime_script().unwrap()).unwrap();
         let validation_path = root.join("validate-agent-runtime.ps1");
 
-        let init = Command::new("git")
+        let init = crate::command_probe::git_command()
             .arg("init")
             .current_dir(&root)
             .output()

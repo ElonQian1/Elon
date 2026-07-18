@@ -2,9 +2,11 @@ use std::path::Path;
 use std::process::{Command, Output};
 
 pub(crate) fn git_command() -> Command {
-    let mut command = Command::new("git");
-    configure_git_command(&mut command);
-    command
+    elon_pc_dev_runtime::git_command()
+}
+
+pub(crate) fn tokio_git_command() -> tokio::process::Command {
+    tokio::process::Command::from(git_command())
 }
 
 pub(crate) fn git_spawn_context(args: &[&str]) -> String {
@@ -84,16 +86,6 @@ fn redact_credentials(value: &str) -> String {
 
     format!("{}***{}", &value[..credentials_start], &value[at_pos..])
 }
-
-#[cfg(windows)]
-fn configure_git_command(command: &mut Command) {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW);
-}
-
-#[cfg(not(windows))]
-fn configure_git_command(_command: &mut Command) {}
 
 #[cfg(test)]
 #[path = "git_command_error_tests.rs"]

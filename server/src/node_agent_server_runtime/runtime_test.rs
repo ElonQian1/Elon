@@ -927,7 +927,7 @@ mod tests {
     }
 
     fn init_git_repo(path: &std::path::Path) {
-        let status = std::process::Command::new("git")
+        let status = crate::git_command_error::git_command()
             .args(["init"])
             .current_dir(path)
             .status()

@@ -14,7 +14,10 @@ mod project_git;
 mod project_scaffold;
 mod project_workflow;
 
-pub use command_probe::{command_candidates, command_from_path, command_output, command_path};
+pub use command_probe::{
+    command_candidates, command_from_path, command_output, command_path,
+    configure_non_interactive_git_command, git_command,
+};
 pub use download_router::{download_router_doc, download_router_script, wrapper_script};
 pub use node_data_paths::{NodeDataPaths, NODE_DATA_ROOT_ENV};
 pub use paths::{

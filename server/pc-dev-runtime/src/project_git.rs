@@ -104,13 +104,16 @@ mod tests {
     use std::{
         fs,
         path::Path,
-        process::Command,
         time::{SystemTime, UNIX_EPOCH},
     };
 
     #[test]
     fn git_baseline_initializes_repo_identity_branch_and_commit() {
-        if Command::new("git").arg("--version").output().is_err() {
+        if crate::command_probe::git_command()
+            .arg("--version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let root = temp_dir("git_baseline_initializes_repo_identity_branch_and_commit");
@@ -141,7 +144,11 @@ mod tests {
 
     #[test]
     fn git_baseline_can_run_again_without_new_changes() {
-        if Command::new("git").arg("--version").output().is_err() {
+        if crate::command_probe::git_command()
+            .arg("--version")
+            .output()
+            .is_err()
+        {
             return;
         }
         let root = temp_dir("git_baseline_can_run_again_without_new_changes");
@@ -161,7 +168,7 @@ mod tests {
     }
 
     fn git_output(cwd: &Path, args: &[&str]) -> String {
-        let output = Command::new("git")
+        let output = crate::command_probe::git_command()
             .args(args)
             .current_dir(cwd)
             .output()

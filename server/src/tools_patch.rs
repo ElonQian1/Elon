@@ -7,7 +7,6 @@ use sha2::{Digest, Sha256};
 use std::{
     io::ErrorKind,
     path::{Path, PathBuf},
-    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -326,7 +325,7 @@ fn run_git_apply(project_root: &Path, patch_file: &Path, check: bool) -> Result<
         .ok_or_else(|| anyhow!("补丁临时文件路径不是有效 UTF-8"))?;
     args.push(patch_arg);
 
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(project_root)
         .output()?;

@@ -526,7 +526,7 @@ foreach ($requiredPath in @(
         throw "发布目录不完整，缺少必要文件：$requiredPath。请在完整仓库 worktree 中运行。"
     }
 }
-
+Assert-NodeAgentBackgroundGitLaunchPolicy -RepoRoot $RepoRoot
 $BroadcastAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
 $UseRemoteAdminToken = $false
 if (-not $SkipBroadcast -and [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {

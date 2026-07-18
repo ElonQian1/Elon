@@ -1,7 +1,6 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -682,7 +681,7 @@ fn write_bundle(data_dir: &Path, day: &str, stem: &str, index: SymbolIndex) -> P
 
 fn init_git_workspace(workspace: &Path) {
     fs::create_dir_all(workspace).unwrap();
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .arg("init")
@@ -699,7 +698,7 @@ fn commit_workspace(workspace: &Path) {
 }
 
 fn assert_git_clean(workspace: &Path) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .args(["status", "--short"])
@@ -713,7 +712,7 @@ fn assert_git_clean(workspace: &Path) {
 }
 
 fn run_git(workspace: &Path, args: &[&str]) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .args(args)

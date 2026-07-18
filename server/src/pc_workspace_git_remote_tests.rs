@@ -1,12 +1,15 @@
 use super::{clean_git_remote, current_branch, ensure_git_remote_workspace, git_remote_origin};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use uuid::Uuid;
 
 #[test]
 fn git_remote_workspace_clones_requested_branch() {
-    if Command::new("git").arg("--version").output().is_err() {
+    if crate::git_command_error::git_command()
+        .arg("--version")
+        .output()
+        .is_err()
+    {
         return;
     }
     let root = std::env::temp_dir().join(format!(
@@ -49,7 +52,7 @@ fn git_remote_workspace_clones_requested_branch() {
 }
 
 fn run_git(cwd: &Path, args: &[&str]) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(cwd)
         .output()
