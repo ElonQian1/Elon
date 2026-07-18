@@ -1,5 +1,13 @@
 package com.elon.app
 
+import android.graphics.drawable.Drawable
+
+internal data class ProjectBrowserSheetDependencies(
+    val projects: () -> List<AppProject>,
+    val openProject: (Int) -> Unit,
+    val selectableForeground: () -> Drawable?
+)
+
 internal data class IndexedBrowserProject(
     val index: Int,
     val project: AppProject

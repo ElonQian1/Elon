@@ -3,7 +3,6 @@ package com.elon.app
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -57,11 +56,7 @@ internal class MainNavigationController(
     private val onAgentTabSelected: () -> Unit,
     private val handleProjectSpaceInternalBack: () -> Boolean,
     private val openProjectSpacePostComposer: () -> Unit,
-    private val showCreateProjectDialog: () -> Unit,
-    private val createConversationAndOpen: () -> Unit,
-    private val projectBrowserProjects: () -> List<AppProject>,
-    private val openProjectFromBrowser: (Int) -> Unit,
-    private val selectableForeground: () -> Drawable?
+    private val showCreateProjectDialog: () -> Unit, private val createConversationAndOpen: () -> Unit, private val projectBrowserDependencies: ProjectBrowserSheetDependencies
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -77,34 +72,17 @@ internal class MainNavigationController(
     private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
-    private val projectBrowser = ProjectBrowserSheetController(
-        activity,
-        binding,
-        projectBrowserProjects,
-        openProjectFromBrowser,
-        ::dp,
-        selectableForeground
-    )
-    private val bottomNavigation = MainBottomNavigationController(
-        activity,
-        binding,
-        { selectBottomTab(it, false) },
-        {
-            projectBrowser.close(false)
-            createConversationAndOpen()
-        }
-    )
+    private val projectBrowser = ProjectBrowserSheetController(activity, binding, ::dp, projectBrowserDependencies)
+    private val bottomNavigation = MainBottomNavigationController(activity, binding, { selectBottomTab(it, false) }, { projectBrowser.close(false); createConversationAndOpen() })
     private val homeChrome = HomeChromeController(
         activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, bottomNavigation::setVisible,
         { showConversationHome(animate = false) },
-        { showProjectPlaza() },
-        projectBrowser::toggle
+        { showProjectPlaza() }, projectBrowser::toggle
     )
 
     fun setupNavigation() {
         designMetrics.apply()
-        projectBrowser.setup()
-        homeChrome.setup()
+        projectBrowser.setup(); homeChrome.setup()
         bottomNavigation.setup()
         binding.projectHomeTopTabWrap.setOnClickListener { showProjectHome() }
         binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
@@ -147,8 +125,7 @@ internal class MainNavigationController(
     }
 
     private fun hideBottomMenus() {
-        projectBrowser.close(false)
-        binding.scheduleNavigationBarChrome(activity, R.color.elon_bg_app, true)
+        projectBrowser.close(false); binding.scheduleNavigationBarChrome(activity, R.color.elon_bg_app, true)
         bottomNavigation.setVisible(false)
         binding.projectSpaceAiMenu.visibility = View.GONE
         homeChrome.hide()
@@ -212,8 +189,7 @@ internal class MainNavigationController(
 
     private fun selectBottomTab(tab: TextView, animate: Boolean) {
         if (pageTransitionRunning) return
-        projectBrowser.close(false)
-        val outgoing = currentPrimaryPage()
+        projectBrowser.close(false); val outgoing = currentPrimaryPage()
         val incoming = pageForBottomTab(tab) ?: return
         if (!animate ||
             outgoing == null ||
@@ -390,8 +366,7 @@ internal class MainNavigationController(
 
     fun navigateBackOneLevel() {
         if (pageTransitionRunning) return
-        if (projectBrowser.handleBack()) return
-        if (exitFriendLocalSearch()) return
+        if (projectBrowser.handleBack() || exitFriendLocalSearch()) return
         if (isMessageSelectionActive()) {
             clearMessageSelection()
             return

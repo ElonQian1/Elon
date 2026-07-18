@@ -2,7 +2,6 @@ package com.elon.app
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.Drawable
 import android.text.Editable
 import android.text.TextUtils
 import android.text.TextWatcher
@@ -26,10 +25,8 @@ import kotlin.math.roundToInt
 internal class ProjectBrowserSheetController(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
-    private val projects: () -> List<AppProject>,
-    private val openProject: (Int) -> Unit,
     private val dp: (Int) -> Int,
-    private val selectableForeground: () -> Drawable?
+    private val dependencies: ProjectBrowserSheetDependencies
 ) {
     private val root = binding.projectBrowserSheet
     private val groupsContainer = LinearLayout(activity).apply {
@@ -156,7 +153,7 @@ internal class ProjectBrowserSheetController(
             contentDescription = "下滑关闭项目查看"
             isClickable = true
             isFocusable = true
-            foreground = selectableForeground()
+            foreground = dependencies.selectableForeground()
             addView(ImageView(activity).apply {
                 id = R.id.projectBrowserDragHandle
                 contentDescription = "项目查看拖拽条"
@@ -237,7 +234,9 @@ internal class ProjectBrowserSheetController(
     }
 
     private fun renderProjects() {
-        val groups = runCatching { groupProjectsForBrowser(projects(), searchInput.text?.toString().orEmpty()) }
+        val groups = runCatching {
+            groupProjectsForBrowser(dependencies.projects(), searchInput.text?.toString().orEmpty())
+        }
             .getOrElse {
                 showFailure()
                 return
@@ -277,7 +276,7 @@ internal class ProjectBrowserSheetController(
             orientation = LinearLayout.HORIZONTAL
             isClickable = true
             isFocusable = true
-            foreground = selectableForeground()
+            foreground = dependencies.selectableForeground()
             contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(TextView(activity).apply {
                 gravity = Gravity.CENTER_VERTICAL
@@ -327,7 +326,7 @@ internal class ProjectBrowserSheetController(
             orientation = LinearLayout.VERTICAL
             isClickable = true
             isFocusable = true
-            foreground = selectableForeground()
+            foreground = dependencies.selectableForeground()
             contentDescription = "打开项目 ${project.title}"
             addView(ImageView(activity).apply {
                 contentDescription = "${project.title} 项目图标"
@@ -349,7 +348,7 @@ internal class ProjectBrowserSheetController(
             ).apply { topMargin = dp(7) })
             setOnClickListener {
                 close()
-                root.postDelayed({ openProject(entry.index) }, 230L)
+                root.postDelayed({ dependencies.openProject(entry.index) }, 230L)
             }
         }
     }
@@ -364,7 +363,7 @@ internal class ProjectBrowserSheetController(
         groupsContainer.addView(statusRow("项目加载失败，点此重试").apply {
             isClickable = true
             isFocusable = true
-            foreground = selectableForeground()
+            foreground = dependencies.selectableForeground()
             contentDescription = "重新加载项目"
             setOnClickListener { renderProjects() }
         })
