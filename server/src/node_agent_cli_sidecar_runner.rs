@@ -607,16 +607,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn replay_continues_when_nonterminal_checkpoint_persistence_fails() {
+    async fn replay_checkpoint_failures_do_not_hide_stdout_or_real_exit_result() {
         let root = std::env::temp_dir().join(format!(
-            "elon-sidecar-cursor-failure-{}",
+            "elon-sidecar-checkpoint-failure-{}",
             uuid::Uuid::new_v4().simple()
         ));
         std::fs::create_dir_all(&root).unwrap();
-        let output = root.join("output.jsonl");
+        let registry =
+            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("registry"));
+
+        let output = root.join("full-batch-output.jsonl");
         append_output(
             &output,
-            CliSidecarOutputRecord::chunk("stdout", "still-running\n"),
+            CliSidecarOutputRecord::chunk("stdout", "full batch survived\n"),
         )
         .unwrap();
         let exit_output = output.clone();
@@ -624,27 +627,52 @@ mod tests {
             tokio::time::sleep(std::time::Duration::from_millis(350)).await;
             append_output(&exit_output, CliSidecarOutputRecord::exit(true, false)).unwrap();
         });
-        let registry =
-            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("registry"));
         let (_cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
-        let mut persist_attempts = 0usize;
         let result = super::follow_sidecar_output_from_with_batch(
             &registry,
-            "task",
+            "full-batch-task",
+            &output,
+            super::CliSidecarReplayCursor::default(),
+            &mut cancel_rx,
+            |_| {},
+            |_, _| Err(anyhow::anyhow!("injected persistent checkpoint failure")),
+        )
+        .await
+        .unwrap();
+        assert!(result.exit_ok);
+        assert_eq!(result.stdout_text, "full batch survived\n");
+
+        let output = root.join("exit-prefix-output.jsonl");
+        append_output(
+            &output,
+            CliSidecarOutputRecord::chunk("stdout", "exit prefix survived\n"),
+        )
+        .unwrap();
+        append_output(&output, CliSidecarOutputRecord::exit(true, false)).unwrap();
+        let (_cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
+        let mut persist_attempts = 0;
+        let result = super::follow_sidecar_output_from_with_batch(
+            &registry,
+            "exit-prefix-task",
             &output,
             super::CliSidecarReplayCursor::default(),
             &mut cancel_rx,
             |_| {},
             |_, _| {
                 persist_attempts += 1;
-                anyhow::bail!("injected checkpoint persistence failure")
+                if persist_attempts == 1 {
+                    Err(anyhow::anyhow!("injected first checkpoint failure"))
+                } else {
+                    Ok(())
+                }
             },
         )
         .await
         .unwrap();
-        assert!(result.exit_ok);
-        assert_eq!(result.stdout_text, "still-running\n");
         assert_eq!(persist_attempts, 1);
+        assert!(result.exit_ok);
+        assert_eq!(result.stdout_text, "exit prefix survived\n");
+
         let _ = std::fs::remove_dir_all(root);
     }
 }
