@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="projectBrowserDragTarget" type="id" />
+    <item name="projectBrowserDragHandle" type="id" />
+    <item name="projectBrowserSearch" type="id" />
+    <item name="projectBrowserSearchVisual" type="id" />
+    <item name="projectBrowserSearchBackground" type="id" />
+    <item name="projectBrowserSearchIcon" type="id" />
+    <item name="projectBrowserSearchInput" type="id" />
+    <item name="projectBrowserGroups" type="id" />
+</resources>

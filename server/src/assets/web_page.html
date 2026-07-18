@@ -3088,6 +3088,172 @@
       transform: rotate(45deg);
     }
 
+    /* ===== 项目查看 BottomSheet ===== */
+    .project-browser-sheet {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      bottom: 0;
+      left: 50%;
+      width: 100%;
+      max-width: 720px;
+      z-index: 18;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      background: url("/assets/project_view_sheet_background.png") center / 100% 100% no-repeat;
+      overflow: hidden;
+      pointer-events: none;
+      transform: translate(-50%, 100%);
+      transition: transform 280ms cubic-bezier(.2,.8,.2,1);
+    }
+    .project-browser-sheet.active {
+      pointer-events: auto;
+      transform: translate(-50%, 0);
+    }
+    .project-browser-sheet.dragging { transition: none; }
+    .project-browser-drag {
+      width: 100%;
+      min-height: 48px;
+      flex: 0 0 48px;
+      border: 0;
+      padding: 16px 0 0;
+      background: transparent;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      cursor: grab;
+      touch-action: none;
+    }
+    .project-browser-drag img {
+      width: 77px;
+      height: 6px;
+      object-fit: fill;
+      display: block;
+    }
+    .project-browser-search {
+      position: relative;
+      height: 48px;
+      flex: 0 0 48px;
+      margin: 4px 67px 0;
+      background: url("/assets/project_view_search_field.png") center / 100% 42px no-repeat;
+    }
+    .project-browser-search img {
+      position: absolute;
+      left: 16px;
+      top: 8px;
+      width: 32px;
+      height: 32px;
+      object-fit: contain;
+    }
+    .project-browser-search input {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      outline: 0;
+      box-sizing: border-box;
+      padding: 0 48px;
+      background: transparent;
+      color: var(--ink);
+      font: inherit;
+      font-size: 16px;
+      text-align: center;
+    }
+    .project-browser-search input::placeholder { color: var(--ink-placeholder); }
+    .project-browser-body {
+      min-height: 0;
+      flex: 1;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: none;
+      padding: 24px 27px calc(var(--bottom-menu-height) + 40px + env(safe-area-inset-bottom));
+    }
+    .project-browser-body::-webkit-scrollbar { display: none; }
+    .project-browser-section + .project-browser-section { margin-top: 24px; }
+    .project-browser-heading {
+      width: 100%;
+      min-height: 48px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--ink-placeholder);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font: inherit;
+      font-size: 17px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .project-browser-heading img {
+      width: 14px;
+      height: 14px;
+      margin: 17px;
+      object-fit: contain;
+      display: block;
+    }
+    .project-browser-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .project-browser-item {
+      min-width: 0;
+      height: 101px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+    }
+    .project-browser-avatar {
+      position: relative;
+      width: 52px;
+      height: 52px;
+      flex: 0 0 52px;
+      overflow: hidden;
+      border-radius: 50%;
+    }
+    .project-browser-avatar img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .project-browser-name {
+      width: 100%;
+      margin-top: 7px;
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 30px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .project-browser-status {
+      min-height: 64px;
+      color: var(--ink-quiet);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      text-align: center;
+    }
+    button.project-browser-status {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    @media (max-width: 420px) {
+      .project-browser-search { margin-left: 52px; margin-right: 52px; }
+      .project-browser-body { padding-left: 20px; padding-right: 20px; }
+    }
+
     /* ===== Tab 栏 ===== */
     .tabs-bar {
       position: fixed;
@@ -4346,6 +4512,19 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </div>
   </form>
 
+  <section class="project-browser-sheet" id="projectBrowserSheet" role="dialog" aria-label="项目查看" aria-hidden="true">
+    <button class="project-browser-drag" id="projectBrowserDrag" type="button" aria-label="下滑关闭项目查看">
+      <img src="/assets/project_view_drag_handle.png" alt="项目查看拖拽条" />
+    </button>
+    <label class="project-browser-search" for="projectBrowserSearchInput">
+      <img src="/assets/project_view_search_icon.png" alt="搜索项目图标" />
+      <input id="projectBrowserSearchInput" type="search" placeholder="搜索项目" aria-label="搜索项目" autocomplete="off" />
+    </label>
+    <div class="project-browser-body" id="projectBrowserBody" aria-live="polite">
+      <div class="project-browser-status">正在加载项目…</div>
+    </div>
+  </section>
+
   <nav class="tabs-bar">
     <div class="tabs-panel">
       <button class="tab active" id="tabChatBtn" data-tab="chatPage" data-title="好友" type="button" aria-label="好友">
@@ -4684,6 +4863,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const tabChatBtn = $('tabChatBtn');
   const bottomMenuBtn = $('bottomMenuBtn');
   const bottomComposeBtn = $('bottomComposeBtn');
+  const projectBrowserSheet = $('projectBrowserSheet');
+  const projectBrowserDrag = $('projectBrowserDrag');
+  const projectBrowserSearchInput = $('projectBrowserSearchInput');
+  const projectBrowserBody = $('projectBrowserBody');
   const projectSpaceAiMenu = $('projectSpaceAiMenu');
   const projectSpaceAiMenuBtn = $('projectSpaceAiMenuBtn');
   const homeProjectCreateMenu = $('homeProjectCreateMenu');
@@ -4937,17 +5120,209 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     });
     document.addEventListener('click', () => homeNavMenu.classList.add('hidden'));
   }
-  if (bottomMenuBtn && homeNavMenu) {
+  let projectBrowserPersonalExpanded = true;
+  let projectBrowserJointExpanded = true;
+  let projectBrowserHistoryActive = false;
+  let projectBrowserDragStartY = 0;
+  let projectBrowserDragDistance = 0;
+  let projectBrowserSuppressClick = false;
+
+  function projectBrowserClean(value) {
+    const text = String(value == null ? '' : value).trim();
+    return text && text.toLowerCase() !== 'null' ? text : '';
+  }
+
+  function projectBrowserTitle(project) {
+    return projectBrowserClean(project.displayName || project.display_name || project.alias ||
+      project.project_alias || project.title || project.name) || '未命名项目';
+  }
+
+  function projectBrowserIcon(project) {
+    return [project.iconDataUrl, project.icon_data_url, project.iconUrl, project.icon_url,
+      project.icon, project.avatar, project.logo]
+      .find((value) => typeof value === 'string' && value.trim()) || '';
+  }
+
+  function projectBrowserIsSystem(project) {
+    const source = projectBrowserClean(project.source_type || project.sourceType).toLowerCase();
+    const key = projectBrowserClean(project.system_key || project.systemKey).toLowerCase();
+    return source === 'agent_balloon' || source === 'chat_memory' || !!key;
+  }
+
+  function projectBrowserIsJoint(project) {
+    if (projectBrowserIsSystem(project)) return false;
+    const role = projectBrowserClean(project.role).toLowerCase();
+    const memberCount = Number(project.member_count || project.memberCount || 0) || 0;
+    const truthy = (value) => value === true || value === 1 || value === '1' ||
+      String(value || '').toLowerCase() === 'true';
+    return Boolean(
+      project.isJointProject || project.is_joint_project || project.collaborationProjectId ||
+      project.collaboration_project_id || (role && role !== 'owner') ||
+      truthy(project.is_public || project.isPublic) || memberCount > 1
+    );
+  }
+
+  function projectBrowserEntries() {
+    const query = projectBrowserClean(projectBrowserSearchInput && projectBrowserSearchInput.value).toLowerCase();
+    const matching = (Array.isArray(projects) ? projects : []).map((project, index) => ({ project, index }))
+      .filter(({ project }) => {
+        if (!query) return true;
+        return [projectBrowserTitle(project), project.subtitle, project.owner_account, project.ownerAccount,
+          project.project_description, project.projectDescription, project.description]
+          .some((value) => projectBrowserClean(value).toLowerCase().includes(query));
+      });
+    const updatedAt = (entry) => Number(entry.project.updatedAt || Date.parse(entry.project.updated_at || '')) || 0;
+    return {
+      personal: matching.filter(({ project }) => !projectBrowserIsJoint(project))
+        .sort((left, right) => Number(projectBrowserIsSystem(right.project)) - Number(projectBrowserIsSystem(left.project)) || updatedAt(right) - updatedAt(left)),
+      joint: matching.filter(({ project }) => projectBrowserIsJoint(project))
+        .sort((left, right) => updatedAt(right) - updatedAt(left))
+    };
+  }
+
+  function projectBrowserGrid(entries, title) {
+    if (!entries.length) {
+      const empty = projectBrowserSearchInput && projectBrowserSearchInput.value.trim()
+        ? '没有匹配的' + title
+        : '暂无' + title;
+      return '<div class="project-browser-status">' + escapeHtml(empty) + '</div>';
+    }
+    return '<div class="project-browser-grid">' + entries.map(({ project, index }) => {
+      const titleText = projectBrowserTitle(project);
+      const icon = projectBrowserIcon(project);
+      return '<button class="project-browser-item" type="button" data-project-browser-index="' + index +
+        '" aria-label="打开项目 ' + escapeHtml(titleText) + '">' +
+        '<span class="project-browser-avatar">' +
+        '<img src="/assets/project_view_avatar_placeholder.png" alt="' + escapeHtml(titleText) + ' 项目占位图标" />' +
+        (icon ? '<img src="' + escapeHtml(icon) + '" alt="' + escapeHtml(titleText) + ' 项目图标" loading="lazy" onerror="this.remove()" />' : '') +
+        '</span><span class="project-browser-name">' + escapeHtml(titleText) + '</span></button>';
+    }).join('') + '</div>';
+  }
+
+  function projectBrowserSection(title, group, entries, expanded) {
+    return '<section class="project-browser-section">' +
+      '<button class="project-browser-heading" type="button" data-project-browser-group="' + group +
+      '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? '收起' : '展开') + title + '">' +
+      '<span>' + title + '</span><img src="/assets/project_view_chevron.png" alt="' +
+      (expanded ? '收起' : '展开') + title + '" /></button>' +
+      (expanded ? projectBrowserGrid(entries, title) : '') + '</section>';
+  }
+
+  function renderProjectBrowser() {
+    if (!projectBrowserBody) return;
+    try {
+      const grouped = projectBrowserEntries();
+      projectBrowserBody.innerHTML =
+        projectBrowserSection('个人项目', 'personal', grouped.personal, projectBrowserPersonalExpanded) +
+        projectBrowserSection('群体项目', 'joint', grouped.joint, projectBrowserJointExpanded);
+    } catch (error) {
+      projectBrowserBody.innerHTML = '<button class="project-browser-status" type="button" data-project-browser-retry>项目加载失败，点此重试</button>';
+    }
+  }
+
+  function openProjectBrowser() {
+    if (!projectBrowserSheet || projectBrowserSheet.classList.contains('active')) return;
+    if (projectBrowserBody) projectBrowserBody.innerHTML = '<div class="project-browser-status">正在加载项目…</div>';
+    projectBrowserSheet.style.removeProperty('transform');
+    projectBrowserSheet.classList.add('active');
+    projectBrowserSheet.setAttribute('aria-hidden', 'false');
+    if (bottomMenuBtn) bottomMenuBtn.classList.add('active');
+    if (!projectBrowserHistoryActive) {
+      window.history.pushState({ elonProjectBrowser: true }, '');
+      projectBrowserHistoryActive = true;
+    }
+    window.requestAnimationFrame(renderProjectBrowser);
+  }
+
+  function closeProjectBrowser(syncHistory = true) {
+    if (!projectBrowserSheet || !projectBrowserSheet.classList.contains('active')) return false;
+    projectBrowserSheet.classList.remove('dragging');
+    projectBrowserSheet.style.removeProperty('transform');
+    projectBrowserSheet.classList.remove('active');
+    projectBrowserSheet.setAttribute('aria-hidden', 'true');
+    if (bottomMenuBtn) bottomMenuBtn.classList.remove('active');
+    if (syncHistory && projectBrowserHistoryActive) {
+      projectBrowserHistoryActive = false;
+      window.history.back();
+    }
+    return true;
+  }
+
+  if (bottomMenuBtn) {
     bottomMenuBtn.addEventListener('click', (event) => {
       event.stopPropagation();
-      const opening = homeNavMenu.classList.contains('hidden');
-      homeNavMenu.classList.toggle('hidden', !opening);
-      homeNavMenu.classList.toggle('bottom-anchor', opening);
-      bottomMenuBtn.classList.toggle('active', opening);
+      if (!closeProjectBrowser()) openProjectBrowser();
     });
-    homeNavMenu.addEventListener('click', () => bottomMenuBtn.classList.remove('active'));
-    document.addEventListener('click', () => bottomMenuBtn.classList.remove('active'));
   }
+  if (projectBrowserSearchInput) {
+    projectBrowserSearchInput.addEventListener('input', renderProjectBrowser);
+  }
+  if (projectBrowserBody) {
+    projectBrowserBody.addEventListener('click', (event) => {
+      const retry = event.target.closest('[data-project-browser-retry]');
+      if (retry) {
+        renderProjectBrowser();
+        return;
+      }
+      const heading = event.target.closest('[data-project-browser-group]');
+      if (heading) {
+        if (heading.dataset.projectBrowserGroup === 'personal') {
+          projectBrowserPersonalExpanded = !projectBrowserPersonalExpanded;
+        } else {
+          projectBrowserJointExpanded = !projectBrowserJointExpanded;
+        }
+        renderProjectBrowser();
+        return;
+      }
+      const item = event.target.closest('[data-project-browser-index]');
+      if (!item) return;
+      const project = projects[Number(item.dataset.projectBrowserIndex)];
+      if (!project) return;
+      closeProjectBrowser();
+      window.setTimeout(() => {
+        clearProjectTaskCompletionBadge(project);
+        renderConversationList();
+        selectProject(project);
+      }, 230);
+    });
+  }
+  if (projectBrowserDrag) {
+    projectBrowserDrag.addEventListener('pointerdown', (event) => {
+      projectBrowserDragStartY = event.clientY;
+      projectBrowserDragDistance = 0;
+      projectBrowserSheet.classList.add('dragging');
+      projectBrowserDrag.setPointerCapture(event.pointerId);
+    });
+    projectBrowserDrag.addEventListener('pointermove', (event) => {
+      if (!projectBrowserDrag.hasPointerCapture(event.pointerId)) return;
+      projectBrowserDragDistance = Math.max(0, event.clientY - projectBrowserDragStartY);
+      projectBrowserSheet.style.transform = 'translate(-50%, ' + projectBrowserDragDistance + 'px)';
+    });
+    projectBrowserDrag.addEventListener('pointerup', (event) => {
+      projectBrowserDrag.releasePointerCapture(event.pointerId);
+      projectBrowserSheet.classList.remove('dragging');
+      projectBrowserSheet.style.removeProperty('transform');
+      projectBrowserSuppressClick = projectBrowserDragDistance >= 8;
+      if (projectBrowserDragDistance >= 72) closeProjectBrowser();
+      window.setTimeout(() => { projectBrowserSuppressClick = false; }, 0);
+    });
+    projectBrowserDrag.addEventListener('click', (event) => {
+      if (projectBrowserSuppressClick) {
+        event.preventDefault();
+        return;
+      }
+      closeProjectBrowser();
+    });
+  }
+  window.addEventListener('popstate', () => {
+    if (projectBrowserSheet && projectBrowserSheet.classList.contains('active')) {
+      projectBrowserHistoryActive = false;
+      closeProjectBrowser(false);
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && closeProjectBrowser()) event.preventDefault();
+  });
 
   const profileAvatar = $('profileAvatar');
   const profileNickname = $('profileNickname');
@@ -6128,6 +6503,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
   }
   tabs.forEach((t) => t.addEventListener('click', () => {
+    closeProjectBrowser();
     if (t.dataset.tab === 'chatPage') {
       if (socket) { try { socket.close(); } catch {} socket = null; }
       stopContactPolling();
@@ -8387,6 +8763,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
     if (currentTab === 'chatPage' && !isAnyChatActive()) renderConversationList();
     renderProjectHomePage();
+    if (projectBrowserSheet && projectBrowserSheet.classList.contains('active')) renderProjectBrowser();
   }
   function friendlyModelName(model) {
     const m = (model || '').trim();
@@ -9155,7 +9532,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     setTopAddButtonExpanded(false);
   }
   if (bottomComposeBtn) {
-    bottomComposeBtn.addEventListener('click', () => addBtn.click());
+    bottomComposeBtn.addEventListener('click', () => {
+      closeProjectBrowser();
+      addBtn.click();
+    });
   }
   addBtn.addEventListener('click', () => {
     if (currentTab === 'chatPage' && !isAnyChatActive()) {

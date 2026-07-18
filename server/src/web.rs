@@ -104,6 +104,14 @@ const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_shar
 const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
 const PLAZA_MEMBER_STAT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_member_stat.png");
 const ADD_FRIEND_SCAN_ICON_PNG: &[u8] = include_bytes!("assets/ic_add_friend_scan.png");
+const PROJECT_VIEW_SHEET_BACKGROUND_PNG: &[u8] =
+    include_bytes!("assets/project_view_sheet_background.png");
+const PROJECT_VIEW_DRAG_HANDLE_PNG: &[u8] = include_bytes!("assets/project_view_drag_handle.png");
+const PROJECT_VIEW_AVATAR_PLACEHOLDER_PNG: &[u8] =
+    include_bytes!("assets/project_view_avatar_placeholder.png");
+const PROJECT_VIEW_SEARCH_FIELD_PNG: &[u8] = include_bytes!("assets/project_view_search_field.png");
+const PROJECT_VIEW_SEARCH_ICON_PNG: &[u8] = include_bytes!("assets/project_view_search_icon.png");
+const PROJECT_VIEW_CHEVRON_PNG: &[u8] = include_bytes!("assets/project_view_chevron.png");
 const POPUP_NEW_PROJECT_PNG_B64: &str = include_str!("assets/ic_popup_new_project.b64");
 const CHAT_SIDE_MENU_HANDLE_PNG_B64: &str = include_str!("assets/ic_chat_side_menu_handle.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
@@ -425,6 +433,30 @@ pub async fn project_preview_placeholder_icon() -> impl IntoResponse {
 
 pub async fn add_friend_scan_icon() -> impl IntoResponse {
     plaza_icon_response(ADD_FRIEND_SCAN_ICON_PNG)
+}
+
+pub async fn project_view_sheet_background() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_VIEW_SHEET_BACKGROUND_PNG)
+}
+
+pub async fn project_view_drag_handle() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_VIEW_DRAG_HANDLE_PNG)
+}
+
+pub async fn project_view_avatar_placeholder() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_VIEW_AVATAR_PLACEHOLDER_PNG)
+}
+
+pub async fn project_view_search_field() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_VIEW_SEARCH_FIELD_PNG)
+}
+
+pub async fn project_view_search_icon() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_VIEW_SEARCH_ICON_PNG)
+}
+
+pub async fn project_view_chevron() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_VIEW_CHEVRON_PNG)
 }
 
 fn plaza_icon_response(bytes: &'static [u8]) -> impl IntoResponse {

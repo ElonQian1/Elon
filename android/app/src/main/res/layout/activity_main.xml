@@ -1098,6 +1098,30 @@
         </LinearLayout>
 
         <FrameLayout
+            android:id="@+id/projectBrowserSheet"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom"
+            android:layout_marginTop="10dp"
+            android:accessibilityPaneTitle="项目查看"
+            android:clickable="true"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/projectBrowserSheetBackground"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:importantForAccessibility="no"
+                android:scaleType="fitXY"
+                android:src="@drawable/project_view_sheet_background" />
+
+            <FrameLayout
+                android:id="@+id/projectBrowserSheetContent"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </FrameLayout>
+
+        <FrameLayout
             android:id="@+id/pageTabs"
             android:layout_width="match_parent"
             android:layout_height="@dimen/main_bottom_menu_outer_height"
