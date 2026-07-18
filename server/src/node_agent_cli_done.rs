@@ -7,7 +7,10 @@ use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 use uuid::Uuid;
 
-use crate::{cli_usage, node_agent_codex_session, node_agent_task_journal, NodeRuntime};
+use crate::{
+    cli_usage, node_agent_codex_session, node_agent_task_journal,
+    node_agent_task_journal_events::completion_terminal_status, NodeRuntime,
+};
 
 // Worst-case UTF-8 remains below the server inbox 1 MiB payload ceiling, leaving
 // room for workspace/error/usage metadata.
@@ -233,7 +236,7 @@ pub(crate) fn persist_and_send_cli_done(
     }
     if let Err(error) = runtime.task_journal.record_finished_with_outcome(
         req_id,
-        if *exit_ok { "done" } else { "failed" },
+        completion_terminal_status(*exit_ok, error.as_deref()),
         error.as_deref(),
     ) {
         tracing::warn!(%req_id, %error, "failed to update display task journal after durable outbox commit");

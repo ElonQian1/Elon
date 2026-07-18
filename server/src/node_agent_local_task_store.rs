@@ -11,6 +11,8 @@ use homecli_proto::CliCompletionEnvelope;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
+use crate::node_agent_task_journal_events::completion_terminal_status;
+
 #[derive(Clone, Debug)]
 pub(crate) struct LocalTaskStore {
     path: PathBuf,
@@ -195,25 +197,33 @@ impl LocalTaskStore {
             .as_ref()
             .map(serde_json::to_string)
             .transpose()?;
+        let terminal_status =
+            completion_terminal_status(completion.exit_ok, completion.error.as_deref());
         let changed = conn.execute(
             "UPDATE local_tasks
-                SET status = CASE WHEN status = 'canceled' THEN status ELSE ?1 END,
-                    error = CASE WHEN status = 'canceled' THEN error ELSE ?2 END,
-                    final_reply = ?3,
-                    model = ?4,
-                    codex_session_id = ?5,
-                    input_tokens = ?6,
-                    cached_input_tokens = ?7,
-                    output_tokens = ?8,
-                    reasoning_tokens = ?9,
-                    total_tokens = ?10,
-                    workspace_status_json = ?11,
+                SET status = CASE
+                        WHEN status IN ('done','failed','canceled') THEN status
+                        ELSE ?1
+                    END,
+                    error = CASE
+                        WHEN status IN ('done','failed','canceled') THEN error
+                        ELSE ?2
+                    END,
+                    final_reply = COALESCE(final_reply, ?3),
+                    model = COALESCE(model, ?4),
+                    codex_session_id = COALESCE(codex_session_id, ?5),
+                    input_tokens = COALESCE(input_tokens, ?6),
+                    cached_input_tokens = COALESCE(cached_input_tokens, ?7),
+                    output_tokens = COALESCE(output_tokens, ?8),
+                    reasoning_tokens = COALESCE(reasoning_tokens, ?9),
+                    total_tokens = COALESCE(total_tokens, ?10),
+                    workspace_status_json = COALESCE(workspace_status_json, ?11),
                     sync_state = CASE
                         WHEN sync_state IN ('synced','rejected') THEN sync_state
                         ELSE 'pending'
                     END,
                     completion_event_id = COALESCE(completion_event_id, ?12),
-                    finished_at_ms = ?13
+                    finished_at_ms = COALESCE(finished_at_ms, ?13)
               WHERE task_id = ?15
                 AND execution_origin = 'local_offline'
                 AND (?14 IS NULL OR owner_user_id = ?14)
@@ -222,9 +232,9 @@ impl LocalTaskStore {
                 AND (?18 IS NULL OR agent_id = ?18)
                 AND (?19 IS NULL OR install_id = ?19)
                 AND (completion_event_id IS NULL OR completion_event_id = ?12)
-                AND status IN ('running','recovering','interrupted','canceled','done','failed','resume_required')",
+                AND status IN ('running','recovering','reattaching','interrupted','canceled','done','failed','resume_required')",
             params![
-                if completion.exit_ok { "done" } else { "failed" },
+                terminal_status,
                 completion.error,
                 trim_to_option(&completion.final_output),
                 completion.model,
@@ -315,8 +325,33 @@ impl LocalTaskStore {
     pub(crate) fn mark_recovering(&self, task_id: &str, reason: &str) -> Result<bool> {
         Ok(self.open()?.execute(
             "UPDATE local_tasks SET status = 'recovering', error = ?2
-              WHERE task_id = ?1 AND status IN ('running','recovering')",
+              WHERE task_id = ?1
+                AND completion_event_id IS NULL
+                AND status IN ('running','recovering','reattaching')",
             params![task_id, reason],
+        )? > 0)
+    }
+
+    pub(crate) fn mark_recovery_running(&self, task_id: &str) -> Result<bool> {
+        Ok(self.open()?.execute(
+            "UPDATE local_tasks
+                SET status = 'running', error = NULL, finished_at_ms = NULL
+              WHERE task_id = ?1
+                AND completion_event_id IS NULL
+                AND status IN ('recovering','reattaching')",
+            params![task_id],
+        )? > 0)
+    }
+
+    pub(crate) fn mark_recovery_blocked(&self, task_id: &str, reason: &str) -> Result<bool> {
+        Ok(self.open()?.execute(
+            "UPDATE local_tasks
+                SET status = 'resume_required', error = ?2,
+                    finished_at_ms = ?3, sync_state = 'local_only'
+              WHERE task_id = ?1
+                AND completion_event_id IS NULL
+                AND status IN ('running','recovering','reattaching')",
+            params![task_id, reason, now_ms()],
         )? > 0)
     }
 
@@ -522,6 +557,140 @@ mod tests {
             now_ms()
         ));
         LocalTaskStore::new(path)
+    }
+
+    fn create_task(store: &LocalTaskStore, task_id: &str) {
+        store
+            .create(LocalTaskStart {
+                task_id,
+                owner_user_id: "usr-a",
+                agent_id: "node-a",
+                install_id: "install-a",
+                project_id: "prj-a",
+                channel_id: Some("dev"),
+                conversation_id: "conv-a",
+                workspace_path: "D:/demo",
+                prompt: "finish work",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+    }
+
+    fn completion(
+        task_id: &str,
+        event_id: &str,
+        exit_ok: bool,
+        error: Option<&str>,
+        final_output: &str,
+    ) -> CliCompletionEnvelope {
+        CliCompletionEnvelope {
+            event_id: event_id.to_string(),
+            req_id: task_id.to_string(),
+            cli: "codex".to_string(),
+            origin: crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN.to_string(),
+            producer_identity: Some(homecli_proto::CliCompletionProducerIdentity {
+                owner_user_id: "usr-a".to_string(),
+                agent_id: "node-a".to_string(),
+                install_id: "install-a".to_string(),
+            }),
+            project_context: Some(homecli_proto::CliProjectContext {
+                project_id: "prj-a".to_string(),
+                conversation_id: "conv-a".to_string(),
+                runtime_permission: Some("full_access".to_string()),
+            }),
+            channel_id: Some("dev".to_string()),
+            prompt: Some("finish work".to_string()),
+            final_output: final_output.to_string(),
+            exit_ok,
+            error: error.map(str::to_string),
+            session_id: Some("session-a".to_string()),
+            prompt_tokens: Some(4),
+            cached_input_tokens: Some(1),
+            completion_tokens: Some(2),
+            reasoning_tokens: Some(0),
+            total_tokens: Some(6),
+            model: Some("gpt-5".to_string()),
+            workspace_status: None,
+            created_at_ms: 123,
+        }
+    }
+
+    #[test]
+    fn recovering_task_atomically_returns_to_running_and_clears_update_error() {
+        let store = test_store("recovery-running");
+        create_task(&store, "local-running");
+        assert!(store
+            .mark_recovering("local-running", "节点更新完成，正在重接原 CLI 会话")
+            .unwrap());
+
+        assert!(store.mark_recovery_running("local-running").unwrap());
+        let record = store.get("local-running").unwrap().unwrap();
+        assert_eq!(record.status, "running");
+        assert!(record.error.is_none());
+        assert!(!store.mark_recovery_running("local-running").unwrap());
+    }
+
+    #[test]
+    fn recovered_cancel_and_timeout_bind_terminal_state_idempotently() {
+        let store = test_store("recovery-terminal");
+        create_task(&store, "local-canceled");
+        store
+            .mark_recovering("local-canceled", "reattaching")
+            .unwrap();
+        let canceled = completion(
+            "local-canceled",
+            "event-canceled",
+            false,
+            Some("任务在节点更新恢复期间被取消"),
+            "partial reply",
+        );
+        assert!(store.reconcile_completion(&canceled).unwrap());
+        assert!(store.reconcile_completion(&canceled).unwrap());
+        assert_eq!(
+            store.get("local-canceled").unwrap().unwrap().status,
+            "canceled"
+        );
+
+        create_task(&store, "local-timeout");
+        store
+            .mark_recovering("local-timeout", "reattaching")
+            .unwrap();
+        let timeout = completion(
+            "local-timeout",
+            "event-timeout",
+            false,
+            Some("codex pipe sidecar 执行超时（超过 3600 秒）"),
+            "timeout evidence",
+        );
+        assert!(store.reconcile_completion(&timeout).unwrap());
+        let timed_out = store.get("local-timeout").unwrap().unwrap();
+        assert_eq!(timed_out.status, "failed");
+        assert!(timed_out.error.unwrap().contains("超时"));
+    }
+
+    #[test]
+    fn late_terminal_race_never_downgrades_done_or_loses_final_reply() {
+        let store = test_store("terminal-race");
+        create_task(&store, "local-race");
+        store.mark_recovering("local-race", "reattaching").unwrap();
+        let success = completion("local-race", "event-race", true, None, "final answer");
+        assert!(store.reconcile_completion(&success).unwrap());
+
+        let mut late_failure = success;
+        late_failure.exit_ok = false;
+        late_failure.error = Some("late timeout".to_string());
+        late_failure.final_output.clear();
+        assert!(store.reconcile_completion(&late_failure).unwrap());
+        assert!(!store
+            .mark_recovering("local-race", "late recovery")
+            .unwrap());
+        assert!(!store.mark_recovery_running("local-race").unwrap());
+
+        let record = store.get("local-race").unwrap().unwrap();
+        assert_eq!(record.status, "done");
+        assert!(record.error.is_none());
+        assert_eq!(record.final_reply.as_deref(), Some("final answer"));
     }
 
     #[test]

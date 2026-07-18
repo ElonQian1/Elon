@@ -106,6 +106,29 @@ function Invoke-SupervisionSelfTest {
     $testProjectsPath = Get-CloudProjectsPath $true
     $criteriaJson = ConvertFrom-Utf8Base64 'WyLmnaHku7bkuIAiLCLmnaHku7bkuowiXQ=='
     $jsonCriteria = @(Resolve-AcceptanceCriteria @() $criteriaJson '')
+    $activeDetail = [ordered]@{
+        record = [ordered]@{
+            task_id = 'local-recovered-task'
+            status = 'running'
+            error = $null
+            finished_at_ms = $null
+        }
+        runtime = [ordered]@{
+            phase = 'verification'
+            current_command = 'cargo test --bin elon-pc-node'
+            last_progress = 1784361600000
+            heartbeat = 1784361605000
+        }
+        supervision = [ordered]@{ evidence = [ordered]@{ terminal_event_seen = $false } }
+        events = @([ordered]@{
+            seq = 42
+            event = [ordered]@{ type = 'recovery_running'; phase = 'verification' }
+        })
+        last_event_seq = 42
+        has_more = $false
+    }
+    $activeDetail = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $activeDetail) 'application/json'
+    $activeCompact = Convert-ToCompactTaskDetail $activeDetail
     $criteriaFile = Join-Path ([System.IO.Path]::GetTempPath()) "elon-supervision-criteria-$([guid]::NewGuid().ToString('N')).json"
     try {
         [System.IO.File]::WriteAllText(
@@ -142,6 +165,10 @@ function Invoke-SupervisionSelfTest {
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
+        inspect_wait_active = $activeCompact.record.status -eq 'running' -and
+            $activeCompact.runtime.phase -eq 'verification' -and
+            $activeCompact.last_event_seq -eq 42 -and
+            $activeCompact.events[0].type -eq 'recovery_running'
         criteria_json = $jsonCriteria.Count -eq 2 -and
             $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')
         criteria_file = $fileCriteria.Count -eq 3 -and
@@ -160,7 +187,7 @@ function Invoke-SupervisionSelfTest {
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'task_detail_path', 'cloud_projects_path',
-            'criteria_json_array', 'criteria_utf8_file'
+            'inspect_wait_active_runtime', 'criteria_json_array', 'criteria_utf8_file'
         )
     })
 }

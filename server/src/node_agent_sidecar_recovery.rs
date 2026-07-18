@@ -21,6 +21,7 @@ use crate::{
     node_agent_cli_sidecar_runner::CliSidecarReplayCursor,
     node_agent_local_task_store::LocalTaskRecord,
     node_agent_local_task_supervision::{load_supervision_contract, SUPERVISION_PROTOCOL},
+    node_agent_task_journal_events::completion_terminal_status,
     node_agent_update_checkpoint::{fingerprint_workspace, incomplete_non_repeatable_action},
     node_agent_update_recovery::{ReleaseIdentity, UpdateRecoveryReceipt, UpdateRecoveryState},
     NodeRuntime,
@@ -61,6 +62,13 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
     if !output_path.is_file() {
         return Ok(());
     }
+    if runtime
+        .update_recovery
+        .receipt_for_task(&task.task_id)?
+        .is_some_and(|receipt| !receipt.allows_local_reconcile())
+    {
+        return Ok(());
+    }
 
     let terminal_output = output_contains_terminal_record(output_path)?;
     let receipt = ensure_recovery_receipt(&runtime, &task, &session)?;
@@ -95,6 +103,23 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
                 records,
                 cursor,
                 |cursor| {
+                    if runtime
+                        .update_recovery
+                        .receipt_for_task(&task.task_id)?
+                        .is_some_and(|receipt| {
+                            matches!(
+                                receipt.state,
+                                UpdateRecoveryState::Reattaching | UpdateRecoveryState::Resumed
+                            )
+                        })
+                    {
+                        crate::node_agent_sidecar_recovery_replay::record_replayed_activity(
+                            &runtime.task_journal,
+                            &runtime.local_tasks,
+                            &task.task_id,
+                            records,
+                        )?;
+                    }
                     runtime.cli_sidecars.record_output_cursor(
                         &task.task_id,
                         &session_id,
@@ -295,7 +320,7 @@ async fn bind_existing_completion(runtime: &NodeRuntime, task: &LocalTaskRecord)
     runtime.local_tasks.reconcile_completion(&completion)?;
     runtime.task_journal.record_finished_with_outcome(
         &task.task_id,
-        if completion.exit_ok { "done" } else { "failed" },
+        completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
         completion.error.as_deref(),
     )?;
     record_recovery_terminal(runtime, &task.task_id, &completion)?;
@@ -311,7 +336,7 @@ fn record_recovery_terminal(
         runtime.update_recovery.record_terminal_binding(
             task_id,
             &completion.event_id,
-            if completion.exit_ok { "done" } else { "failed" },
+            completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
             completion.created_at_ms as u128,
         )?;
         runtime.update_recovery.update(

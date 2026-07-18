@@ -76,6 +76,66 @@ fn preserves_explicit_terminal_outcome_from_generic_cleanup() {
 }
 
 #[test]
+fn recovery_running_is_visible_to_inspect_and_wait_without_terminal_downgrade() {
+    let dir = unique_test_dir("recovery-running-visible");
+    let journal = TaskJournal::new(&dir);
+    journal
+        .record_started(TaskJournalStart {
+            req_id: "req-recovery",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("req-recovery"),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+
+    assert!(journal
+        .record_recovery_running(
+            "req-recovery",
+            "verification",
+            Some("cargo test --bin elon-pc-node"),
+            "sidecar_output_replayed",
+        )
+        .unwrap());
+    let active = journal.snapshot("req-recovery", 0, 20).unwrap();
+    let runtime = runtime_status_payload(active.record.as_ref());
+    assert_eq!(active.record.as_ref().unwrap().status, "running");
+    assert_eq!(runtime["phase"], "verification");
+    assert_eq!(runtime["current_command"], "cargo test --bin elon-pc-node");
+    assert!(runtime["last_progress"].as_u64().unwrap_or_default() > 0);
+    assert!(runtime["heartbeat"].as_u64().unwrap_or_default() > 0);
+    assert!(active.events.iter().any(|event| {
+        event.event["type"] == "recovery_running" && event.event["status"] == "running"
+    }));
+    let wait_cursor = active.last_event_seq;
+
+    journal
+        .record_finished_with_outcome("req-recovery", "done", None)
+        .unwrap();
+    assert!(!journal
+        .record_recovery_running("req-recovery", "reasoning", None, "late_replay",)
+        .unwrap());
+    journal
+        .record_finished_with_outcome("req-recovery", "failed", Some("late timeout"))
+        .unwrap();
+
+    let terminal = journal.snapshot("req-recovery", wait_cursor, 20).unwrap();
+    assert_eq!(terminal.record.as_ref().unwrap().status, "done");
+    assert_eq!(terminal.record.as_ref().unwrap().phase, "done");
+    assert_eq!(
+        terminal
+            .events
+            .iter()
+            .filter(|event| event.event["type"] == "finished")
+            .count(),
+        1
+    );
+    assert!(terminal.last_event_seq > wait_cursor);
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn late_cancel_after_terminal_is_audit_only() {
     let dir = unique_test_dir("late-cancel-terminal");
     let journal = TaskJournal::new(&dir);

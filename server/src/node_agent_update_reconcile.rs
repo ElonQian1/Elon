@@ -20,6 +20,7 @@ use crate::{
         load_supervision_contract, record_supervision_event, SupervisionContract,
         SUPERVISION_PROTOCOL,
     },
+    node_agent_task_journal_events::completion_terminal_status,
     node_agent_update_checkpoint::{
         file_sha256, fingerprint_workspace, git_output, incomplete_non_repeatable_action,
         same_path, stable_resume_task_id,
@@ -62,6 +63,19 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
         .local_tasks
         .get(&active_task_id)?
         .context("更新恢复目标本机任务不存在")?;
+    if let Err(error) = validate_local_recovery(&runtime, &task, &receipt).await {
+        let reason = format!("节点更新恢复已熔断：{error}");
+        runtime
+            .local_tasks
+            .mark_recovery_blocked(&active_task_id, &reason)?;
+        return set_recovery_state(
+            &runtime.update_recovery,
+            &update_id,
+            &original_task_id,
+            UpdateRecoveryState::Failed,
+            &reason,
+        );
+    }
     let snapshot = runtime.task_journal.snapshot(&active_task_id, 0, 200)?;
     let sidecar = recovery_sidecar(&runtime, &receipt, &active_task_id)?;
 
@@ -77,7 +91,7 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
     advance_runtime_online(&runtime.update_recovery, &update_id, &original_task_id)?;
 
     if let Some(sidecar) = sidecar {
-        if snapshot.approvals.pending_count > 0 {
+        let resumed = if snapshot.approvals.pending_count > 0 {
             set_recovery_state(
                 &runtime.update_recovery,
                 &update_id,
@@ -85,6 +99,7 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
                 UpdateRecoveryState::ApprovalRequired,
                 "approval pending after runtime restart",
             )?;
+            false
         } else {
             runtime
                 .update_recovery
@@ -100,10 +115,19 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
                     )?;
                     Ok(())
                 })?;
+            true
+        };
+        if resumed {
+            crate::node_agent_sidecar_recovery_replay::record_receipt_resumed(
+                &runtime.task_journal,
+                &runtime.local_tasks,
+                &active_task_id,
+            )?;
+        } else {
+            runtime
+                .local_tasks
+                .mark_recovering(&active_task_id, "节点更新后仍有审批等待处理")?;
         }
-        runtime
-            .local_tasks
-            .mark_recovering(&active_task_id, "节点更新完成，正在重接原 CLI 会话")?;
         spawn_sidecar_monitor(runtime, receipt, task, sidecar).await?;
         return Ok(());
     }
@@ -151,6 +175,63 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
         );
     }
     spawn_resume_original(runtime, receipt, task).await
+}
+
+async fn validate_local_recovery(
+    runtime: &NodeRuntime,
+    task: &LocalTaskRecord,
+    receipt: &UpdateRecoveryReceipt,
+) -> Result<()> {
+    anyhow::ensure!(
+        receipt.allows_local_reconcile(),
+        "remote v1 或恢复能力声明不匹配，保持 fail-closed"
+    );
+    let creds = runtime.creds().await.context("节点当前没有已绑定身份")?;
+    anyhow::ensure!(
+        recovery_task_identity_matches(
+            &task.owner_user_id,
+            &task.agent_id,
+            &task.install_id,
+            &creds.owner_user_id,
+            &creds.agent_id,
+            &runtime.install_id,
+        ),
+        "任务 owner/agent/install 身份不匹配"
+    );
+    anyhow::ensure!(
+        release_identity_matches(
+            &receipt.to_release,
+            &crate::node_agent_release_identity::current(),
+        ),
+        "节点发布身份与恢复回执目标不匹配"
+    );
+    Ok(())
+}
+
+fn recovery_task_identity_matches(
+    task_owner: &str,
+    task_agent: &str,
+    task_install: &str,
+    current_owner: &str,
+    current_agent: &str,
+    current_install: &str,
+) -> bool {
+    task_owner == current_owner && task_agent == current_agent && task_install == current_install
+}
+
+fn release_identity_matches(
+    expected: &crate::node_agent_update_recovery::ReleaseIdentity,
+    current: &str,
+) -> bool {
+    let current = current.trim();
+    let version_matches = expected.version.trim().is_empty()
+        || current == expected.version.trim()
+        || current.starts_with(&format!("{}+", expected.version.trim()));
+    let git_sha_matches = expected.git_sha.trim().is_empty()
+        || current
+            .rsplit_once('+')
+            .is_some_and(|(_, sha)| sha == expected.git_sha.trim());
+    version_matches && git_sha_matches
 }
 
 async fn spawn_sidecar_monitor(
@@ -206,6 +287,23 @@ async fn spawn_sidecar_monitor(
                     records,
                     cursor,
                     |cursor| {
+                        if runtime
+                            .update_recovery
+                            .receipt_for_task(&task.task_id)?
+                            .is_some_and(|receipt| {
+                                matches!(
+                                    receipt.state,
+                                    UpdateRecoveryState::Reattaching | UpdateRecoveryState::Resumed
+                                )
+                            })
+                        {
+                            crate::node_agent_sidecar_recovery_replay::record_replayed_activity(
+                                &runtime.task_journal,
+                                &runtime.local_tasks,
+                                &task.task_id,
+                                records,
+                            )?;
+                        }
                         runtime.cli_sidecars.record_output_cursor(
                             &task.task_id,
                             &session_id,
@@ -283,7 +381,7 @@ async fn spawn_sidecar_monitor(
                     let _ = runtime.update_recovery.record_terminal_binding(
                         &task.task_id,
                         &completion.event_id,
-                        if completion.exit_ok { "done" } else { "failed" },
+                        completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
                         completion.created_at_ms as u128,
                     );
                 }
@@ -476,7 +574,7 @@ fn recovery_sidecar(
     let Some(session) = runtime.cli_sidecars.session_for_task(task_id)? else {
         return Ok(None);
     };
-    if !session.is_live_at(now_ms()) {
+    if !session.can_replay_output_at(now_ms()) {
         return Ok(None);
     }
     if receipt

@@ -15,12 +15,85 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 
 use crate::{
+    node_agent_cli_output_aggregate::progress_observation,
     node_agent_cli_sidecar_io::{read_new_output_records, CliSidecarOutputRecord},
     node_agent_cli_sidecar_runner::CliSidecarReplayCursor,
+    node_agent_local_task_store::LocalTaskStore,
     node_agent_task_journal::TaskJournal,
     node_agent_task_journal_events::cli_chunk_event,
     node_agent_task_journal_lock::with_task_journal_io_lock,
 };
+
+pub(crate) fn record_receipt_resumed(
+    journal: &TaskJournal,
+    local_tasks: &LocalTaskStore,
+    task_id: &str,
+) -> Result<bool> {
+    record_recovery_running(
+        journal,
+        local_tasks,
+        task_id,
+        "reasoning",
+        None,
+        "update_receipt_resumed",
+    )
+}
+
+pub(crate) fn record_replayed_activity(
+    journal: &TaskJournal,
+    local_tasks: &LocalTaskStore,
+    task_id: &str,
+    records: &[CliSidecarOutputRecord],
+) -> Result<bool> {
+    let mut progress = None;
+    let mut heartbeat = false;
+    for record in records {
+        if record.record_type == "chunk" {
+            let observation = progress_observation(record.text.as_deref().unwrap_or_default());
+            if observation.progress {
+                progress = Some(observation);
+            }
+        } else if record.record_type == "runtime"
+            && record
+                .runtime
+                .as_ref()
+                .and_then(|value| value.get("heartbeat"))
+                .and_then(Value::as_bool)
+                == Some(true)
+        {
+            heartbeat = true;
+        }
+    }
+    if let Some(progress) = progress {
+        return record_recovery_running(
+            journal,
+            local_tasks,
+            task_id,
+            progress.phase.as_deref().unwrap_or("reasoning"),
+            progress.current_command.as_deref(),
+            "sidecar_output_replayed",
+        );
+    }
+    if heartbeat {
+        journal.record_runtime_heartbeat(task_id)?;
+    }
+    Ok(false)
+}
+
+fn record_recovery_running(
+    journal: &TaskJournal,
+    local_tasks: &LocalTaskStore,
+    task_id: &str,
+    phase: &str,
+    current_command: Option<&str>,
+    reason: &str,
+) -> Result<bool> {
+    if !journal.record_recovery_running(task_id, phase, current_command, reason)? {
+        return Ok(false);
+    }
+    let _ = local_tasks.mark_recovery_running(task_id)?;
+    Ok(true)
+}
 
 pub(crate) fn persist_batch_before_cursor(
     journal: &TaskJournal,
@@ -219,6 +292,75 @@ mod tests {
         let events = fs::read_to_string(journal.events_path()).unwrap();
         assert_eq!(events.matches("sidecar_sequence").count(), 1);
         assert!(events.contains("partial"));
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn replayed_chunk_persists_before_cursor_and_exposes_running_runtime() {
+        let temp = test_root("running-visible");
+        let journal = TaskJournal::new(temp.join("journal"));
+        let local_tasks = LocalTaskStore::new(temp.join("local-tasks.sqlite3"));
+        local_tasks
+            .create(crate::node_agent_local_task_store::LocalTaskStart {
+                task_id: "task-1",
+                owner_user_id: "owner-a",
+                agent_id: "agent-a",
+                install_id: "install-a",
+                project_id: "project-a",
+                channel_id: None,
+                conversation_id: "conversation-a",
+                workspace_path: "D:/demo",
+                prompt: "continue",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+        local_tasks
+            .mark_recovering("task-1", "节点更新完成，正在重接原 CLI 会话")
+            .unwrap();
+        journal
+            .record_started(crate::node_agent_task_journal::TaskJournalStart {
+                req_id: "task-1",
+                cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("task-1"),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("full_access"),
+            })
+            .unwrap();
+        let records = vec![CliSidecarOutputRecord::chunk(
+            "stdout",
+            r#"{"type":"item.started","item":{"type":"command_execution","command":"cargo test --bin elon-pc-node"}}"#,
+        )];
+        let cursor_observed = Cell::new(false);
+
+        persist_batch_before_cursor(
+            &journal,
+            "task-1",
+            "session-1",
+            &records,
+            CliSidecarReplayCursor {
+                offset: 20,
+                sequence: 1,
+            },
+            |_| {
+                record_replayed_activity(&journal, &local_tasks, "task-1", &records)?;
+                let snapshot = journal.snapshot("task-1", 0, 20)?;
+                assert!(snapshot.events.iter().any(|event| {
+                    event.event["sidecar_sequence"] == 1
+                        && event.event["sidecar_session_id"] == "session-1"
+                }));
+                assert_eq!(snapshot.record.as_ref().unwrap().phase, "verification");
+                let task = local_tasks.get("task-1")?.unwrap();
+                assert_eq!(task.status, "running");
+                assert!(task.error.is_none());
+                cursor_observed.set(true);
+                Ok(())
+            },
+        )
+        .unwrap();
+
+        assert!(cursor_observed.get());
         let _ = fs::remove_dir_all(temp);
     }
 

@@ -122,3 +122,48 @@ fn startup_reconcile_advances_only_forward_from_applying() {
     );
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn local_current_protocol_recovers_while_remote_and_capability_drift_fail_closed() {
+    let local = UpdateRecoveryReceipt::planned("update-local", "root", "task");
+    assert!(local.allows_local_reconcile());
+
+    let mut remote = local.clone();
+    remote.transport = crate::node_agent_update_recovery::RecoveryTransport::remote_v1();
+    assert!(!remote.allows_local_reconcile());
+
+    let mut drifted = local;
+    drifted
+        .transport
+        .capabilities
+        .retain(|capability| capability != "sidecar_reattach");
+    assert!(!drifted.allows_local_reconcile());
+}
+
+#[test]
+fn release_and_task_identity_drift_fail_closed() {
+    let expected = crate::node_agent_update_recovery::ReleaseIdentity {
+        version: "0.3.70".to_string(),
+        git_sha: "abc123".to_string(),
+    };
+    assert!(release_identity_matches(&expected, "0.3.70+abc123"));
+    assert!(!release_identity_matches(&expected, "0.3.70+def456"));
+    assert!(!release_identity_matches(&expected, "0.3.71+abc123"));
+
+    assert!(recovery_task_identity_matches(
+        "owner-a",
+        "agent-a",
+        "install-a",
+        "owner-a",
+        "agent-a",
+        "install-a",
+    ));
+    assert!(!recovery_task_identity_matches(
+        "owner-a",
+        "agent-a",
+        "install-a",
+        "owner-a",
+        "agent-other",
+        "install-a",
+    ));
+}

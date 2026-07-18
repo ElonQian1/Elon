@@ -369,6 +369,13 @@ impl UpdateRecoveryReceipt {
             .unwrap_or(&self.original_task_id)
     }
 
+    pub(crate) fn allows_local_reconcile(&self) -> bool {
+        self.protocol == UPDATE_RECOVERY_PROTOCOL
+            && self.schema_version == UPDATE_RECOVERY_SCHEMA_VERSION
+            && self.transport.allows_local_resume_rebuild()
+            && self.transport.supports("sidecar_reattach")
+    }
+
     pub(crate) fn transition(
         &mut self,
         next: UpdateRecoveryState,

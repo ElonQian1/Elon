@@ -18,7 +18,8 @@ use std::{
 use crate::{
     node_agent_task_approval_snapshot::{TaskApprovalJournalSnapshot, TaskApprovalJournalTracker},
     node_agent_task_journal_events::{
-        cli_chunk_event, is_terminal_status, normalize_finish_error, normalize_finish_status,
+        cli_chunk_event, is_completed_terminal_status, is_terminal_status, normalize_finish_error,
+        normalize_finish_status,
     },
     node_agent_task_journal_lock::with_task_journal_io_lock,
     node_agent_workspace_match::{canonical_or_original, record_cwd_matches_workspace},
@@ -263,6 +264,9 @@ impl TaskJournal {
             let now = now_ms();
             let mut registry = self.load_registry()?;
             if let Some(record) = registry.get_mut(req_id) {
+                if is_terminal_status(&record.status) {
+                    return Ok(());
+                }
                 record.phase = normalize_runtime_phase(phase).to_string();
                 record.current_command = current_command
                     .map(crate::node_agent_cli_output_aggregate::sanitize_command)
@@ -275,11 +279,62 @@ impl TaskJournal {
         })
     }
 
+    pub(crate) fn record_recovery_running(
+        &self,
+        req_id: &str,
+        phase: &str,
+        current_command: Option<&str>,
+        reason: &str,
+    ) -> Result<bool> {
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            let Some(record) = registry.get_mut(req_id) else {
+                return Ok(false);
+            };
+            if is_completed_terminal_status(&record.status)
+                || !matches!(
+                    record.status.as_str(),
+                    "running" | "recovering" | "reattaching"
+                )
+            {
+                return Ok(false);
+            }
+            record.status = "running".to_string();
+            record.phase = normalize_runtime_phase(phase).to_string();
+            record.current_command = current_command
+                .map(crate::node_agent_cli_output_aggregate::sanitize_command)
+                .filter(|command| !command.is_empty());
+            record.last_progress_ms = Some(now);
+            record.heartbeat_at_ms = Some(now);
+            record.updated_at_ms = now;
+            let effective_phase = record.phase.clone();
+            self.save_registry(&registry)?;
+            self.append_event(json!({
+                "type": "recovery_running",
+                "req_id": req_id,
+                "status": "running",
+                "phase": effective_phase,
+                "reason": reason,
+                "at_ms": now,
+            }))?;
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(self.events_path())?
+                .sync_all()?;
+            Ok(true)
+        })
+    }
+
     pub(crate) fn record_runtime_heartbeat(&self, req_id: &str) -> Result<()> {
         with_task_journal_io_lock(|| {
             let now = now_ms();
             let mut registry = self.load_registry()?;
             if let Some(record) = registry.get_mut(req_id) {
+                if is_terminal_status(&record.status) {
+                    return Ok(());
+                }
                 record.heartbeat_at_ms = Some(now);
                 record.updated_at_ms = now;
             }
@@ -340,25 +395,19 @@ impl TaskJournal {
             let now = now_ms();
             let requested_status = normalize_finish_status(status, error);
             let mut effective_status = requested_status.to_string();
-            let mut already_terminal = false;
             let mut registry = self.load_registry()?;
             if let Some(record) = registry.get_mut(req_id) {
-                if requested_status == "finished" && is_terminal_status(&record.status) {
-                    effective_status = record.status.clone();
-                    already_terminal = true;
-                } else {
-                    record.status = requested_status.to_string();
-                    effective_status = record.status.clone();
+                if is_completed_terminal_status(&record.status) {
+                    return Ok(());
                 }
-                record.phase = terminal_runtime_phase(requested_status).to_string();
+                record.status = requested_status.to_string();
+                effective_status = record.status.clone();
+                record.phase = terminal_runtime_phase(&effective_status).to_string();
                 record.current_command = None;
                 record.heartbeat_at_ms = Some(now);
                 record.updated_at_ms = now;
             }
             self.save_registry(&registry)?;
-            if already_terminal {
-                return Ok(());
-            }
 
             let mut event = json!({
                 "type": "finished",
