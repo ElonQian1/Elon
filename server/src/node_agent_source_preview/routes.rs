@@ -3,12 +3,13 @@ use super::{
         capabilities, render_compose_preview, ComposeRenderRequest, RendererCapabilitiesRequest,
     },
     parser::load_document,
-    types::{CommitPreviewRequest, LoadPreviewRequest},
+    pwa_writer::{commit_pwa_style, PwaCommitErrorKind},
+    types::{CommitPreviewRequest, CommitPwaStyleRequest, LoadPreviewRequest},
     writer::commit_changes,
 };
 use crate::NodeRuntime;
 use axum::{
-    extract::State,
+    extract::{rejection::JsonRejection, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::post,
@@ -29,6 +30,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             post(render_compose_handler),
         )
         .route("/api/source-preview/commit", post(commit_handler))
+        .route(
+            "/api/source-preview/commit-pwa-style",
+            post(commit_pwa_style_handler),
+        )
 }
 
 async fn renderer_capabilities_handler(
@@ -70,6 +75,31 @@ async fn commit_handler(
             Json(json!({ "ok": true, "sourceRevision": source_revision })).into_response()
         }
         Err(error) => error_response(StatusCode::CONFLICT, error),
+    }
+}
+
+pub(super) async fn commit_pwa_style_handler(
+    payload: Result<Json<CommitPwaStyleRequest>, JsonRejection>,
+) -> Response {
+    let Json(req) = match payload {
+        Ok(request) => request,
+        Err(error) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                anyhow::anyhow!("无效的 PWA 写回请求: {error}"),
+            );
+        }
+    };
+    match commit_pwa_style(&req) {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => {
+            let status = match error.kind() {
+                PwaCommitErrorKind::Invalid => StatusCode::BAD_REQUEST,
+                PwaCommitErrorKind::Conflict => StatusCode::CONFLICT,
+                PwaCommitErrorKind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+            };
+            error_response(status, error.into_anyhow())
+        }
     }
 }
 

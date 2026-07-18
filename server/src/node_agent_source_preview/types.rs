@@ -20,6 +20,50 @@ pub(crate) struct CommitPreviewRequest {
     pub changes: BTreeMap<String, String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum PwaStyleBindingKind {
+    CssRule,
+    StyleObject,
+    TokenJson,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PwaSourceRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PwaExplicitStyleBinding {
+    pub version: u8,
+    pub source_file: String,
+    pub source_revision: String,
+    pub kind: PwaStyleBindingKind,
+    pub target: String,
+    pub range: PwaSourceRange,
+    pub property_map: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct CommitPwaStyleRequest {
+    pub project_root: String,
+    pub binding: PwaExplicitStyleBinding,
+    pub source_revision: String,
+    pub changes: BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommitPwaStyleResponse {
+    pub ok: bool,
+    pub source_revision: String,
+    pub changed_files: Vec<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SourcePreviewDocument {
