@@ -112,6 +112,7 @@ const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
+const UI_TUNER_PWA_BRIDGE_JS: &str = include_str!("assets/ui_tuner_pwa_bridge.js");
 
 pub async fn web_page() -> impl IntoResponse {
     static HTML: OnceLock<String> = OnceLock::new();
@@ -189,6 +190,7 @@ fn build_html() -> String {
     let input_photo_png_b64 = encode_png(INPUT_PHOTO_PNG);
     let input_file_png_b64 = encode_png(INPUT_FILE_PNG);
     WEB_HTML_TEMPLATE
+        .replace("__UI_TUNER_PWA_BRIDGE_JS__", UI_TUNER_PWA_BRIDGE_JS)
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
         .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
         .replace("__TAB_PROJECT_PNG_B64__", TAB_PROJECT_PNG_B64.trim())
