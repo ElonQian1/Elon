@@ -51,6 +51,20 @@ impl RestartCheckpoint {
     }
 
     fn payload(&self) -> Value {
+        let resume_actions = if self.state == "resume_required" {
+            self.active_task_ids
+                .iter()
+                .map(|task_id| {
+                    json!({
+                        "task_id": task_id,
+                        "action": "Resume",
+                        "command": format!("invoke-supervised-task.ps1 -Action Resume -TaskId '{task_id}'"),
+                    })
+                })
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
         json!({
             "protocol": self.protocol,
             "update_id": self.update_id,
@@ -60,11 +74,7 @@ impl RestartCheckpoint {
             "updated_at_ms": self.updated_at_ms,
             "active_task_ids": self.active_task_ids,
             "message": self.message,
-            "resume_actions": self.active_task_ids.iter().map(|task_id| json!({
-                "task_id": task_id,
-                "action": "Resume",
-                "command": format!("invoke-supervised-task.ps1 -Action Resume -TaskId '{task_id}'"),
-            })).collect::<Vec<_>>(),
+            "resume_actions": resume_actions,
         })
     }
 }
@@ -141,26 +151,75 @@ pub(crate) async fn schedule_update(
     }))
 }
 
-pub(crate) fn recover_checkpoint_after_startup() {
+pub(crate) fn recover_checkpoint_after_startup(
+    update_recovery: &crate::node_agent_update_recovery::UpdateRecoveryStore,
+) {
     let Ok(Some(mut checkpoint)) = load_checkpoint() else {
         return;
     };
-    if !recover_checkpoint_state(&mut checkpoint) {
+    let recovered = checkpoint
+        .active_task_ids
+        .iter()
+        .filter_map(|task_id| {
+            update_recovery
+                .receipt_for_task(task_id)
+                .ok()
+                .flatten()
+                .filter(|receipt| auto_resume_state(receipt.state))
+                .map(|receipt| (task_id.clone(), receipt.active_task_id().to_string()))
+        })
+        .collect::<std::collections::HashMap<_, _>>();
+    if !recover_checkpoint_state(&mut checkpoint, &recovered) {
         return;
     }
     let _ = save_checkpoint(&checkpoint);
 }
 
-fn recover_checkpoint_state(checkpoint: &mut RestartCheckpoint) -> bool {
+fn auto_resume_state(state: crate::node_agent_update_recovery::UpdateRecoveryState) -> bool {
+    use crate::node_agent_update_recovery::UpdateRecoveryState;
+    matches!(
+        state,
+        UpdateRecoveryState::Reattaching
+            | UpdateRecoveryState::ResumeCreated
+            | UpdateRecoveryState::Resumed
+            | UpdateRecoveryState::Verified
+    )
+}
+
+fn recover_checkpoint_state(
+    checkpoint: &mut RestartCheckpoint,
+    recovered: &std::collections::HashMap<String, String>,
+) -> bool {
     match checkpoint.state.as_str() {
         "applying" | "restart_scheduled" => checkpoint.transition(
             "runtime_online",
             "节点已从计划更新重启恢复；没有活跃任务被静默中断。",
         ),
-        "draining" if !checkpoint.active_task_ids.is_empty() => checkpoint.transition(
-            "resume_required",
-            "节点在排空完成前发生了非计划重启；现场已保留，请使用 Resume 继续任务。",
-        ),
+        "draining" if !checkpoint.active_task_ids.is_empty() => {
+            let unresolved = checkpoint
+                .active_task_ids
+                .iter()
+                .filter(|task_id| !recovered.contains_key(*task_id))
+                .cloned()
+                .collect::<Vec<_>>();
+            if unresolved.is_empty() {
+                checkpoint.active_task_ids = checkpoint
+                    .active_task_ids
+                    .iter()
+                    .filter_map(|task_id| recovered.get(task_id).cloned())
+                    .collect();
+                checkpoint.transition(
+                    "resumed",
+                    "节点已用 update_recovery v1 回执自动接回任务；无需手动 Resume。",
+                );
+            } else {
+                checkpoint.active_task_ids = unresolved;
+                checkpoint.transition(
+                    "resume_required",
+                    "节点在排空完成前发生了非计划重启，且没有完整自动恢复回执；现场已保留，请使用 Resume 继续任务。",
+                );
+            }
+        }
         _ => return false,
     }
     true
@@ -267,7 +326,7 @@ mod tests {
             RestartCheckpoint::draining("test", vec!["local-task-1".to_string()], None);
         let payload = checkpoint.payload();
         assert_eq!(payload["state"], "draining");
-        assert_eq!(payload["resume_actions"][0]["action"], "Resume");
+        assert_eq!(payload["resume_actions"], json!([]));
         assert!(!payload.to_string().to_ascii_lowercase().contains("token"));
     }
 
@@ -275,18 +334,43 @@ mod tests {
     fn startup_recovery_distinguishes_drained_and_interrupted_updates() {
         let mut applying = RestartCheckpoint::draining("test", Vec::new(), None);
         applying.transition("applying", "ready");
-        assert!(recover_checkpoint_state(&mut applying));
+        assert!(recover_checkpoint_state(&mut applying, &Default::default()));
         assert_eq!(applying.state, "runtime_online");
 
         let mut scheduled = RestartCheckpoint::draining("test", Vec::new(), None);
         scheduled.transition("restart_scheduled", "ready");
-        assert!(recover_checkpoint_state(&mut scheduled));
+        assert!(recover_checkpoint_state(
+            &mut scheduled,
+            &Default::default()
+        ));
         assert_eq!(scheduled.state, "runtime_online");
 
         let mut interrupted =
             RestartCheckpoint::draining("test", vec!["local-task-2".to_string()], None);
-        assert!(recover_checkpoint_state(&mut interrupted));
+        assert!(recover_checkpoint_state(
+            &mut interrupted,
+            &Default::default()
+        ));
         assert_eq!(interrupted.state, "resume_required");
         assert!(interrupted.message.contains("Resume"));
+        assert_eq!(
+            interrupted.payload()["resume_actions"][0]["action"],
+            "Resume"
+        );
+    }
+
+    #[test]
+    fn startup_checkpoint_does_not_override_completed_v1_auto_resume() {
+        let mut checkpoint =
+            RestartCheckpoint::draining("test", vec!["local-original".to_string()], None);
+        let recovered = std::collections::HashMap::from([(
+            "local-original".to_string(),
+            "local-resume-generation-2".to_string(),
+        )]);
+        assert!(recover_checkpoint_state(&mut checkpoint, &recovered));
+        assert_eq!(checkpoint.state, "resumed");
+        assert_eq!(checkpoint.active_task_ids, ["local-resume-generation-2"]);
+        assert_eq!(checkpoint.payload()["resume_actions"], json!([]));
+        assert!(checkpoint.message.contains("无需手动 Resume"));
     }
 }

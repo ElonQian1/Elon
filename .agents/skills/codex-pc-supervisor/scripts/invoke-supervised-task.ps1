@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('Probe', 'Projects', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
     [string]$Action,
-    [string]$ProjectId = 'elon-project',
+    [string]$ProjectId = 'elon-self',
     [string]$WorkspacePath,
     [string]$Prompt,
     [string[]]$AcceptanceCriteria = @(),

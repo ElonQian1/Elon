@@ -102,8 +102,15 @@ function Sync-LocalMainBaseline {
                 Write-Host "MAIN_BASELINE_UNTRACKED=clean"
             }
 
-            $mergeOutput = & git -C $mainPath merge --ff-only origin/main 2>&1
-            if ($LASTEXITCODE -ne 0) {
+            $oldPreference = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            try {
+                $mergeOutput = & git -C $mainPath merge --ff-only origin/main 2>&1
+                $mergeExitCode = $LASTEXITCODE
+            } finally {
+                $ErrorActionPreference = $oldPreference
+            }
+            if ($mergeExitCode -ne 0) {
                 Write-Host "MAIN_BASELINE_SYNC=failed:${mainPath}:$($mergeOutput -join ' ')"
                 return
             }

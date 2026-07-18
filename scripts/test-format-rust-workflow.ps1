@@ -30,11 +30,9 @@ function Assert-Contains {
 }
 
 function Resolve-BashCommand {
-    $available = Get-Command bash -ErrorAction SilentlyContinue
-    if ($available) {
-        return $available.Source
-    }
-
+    # Prefer the Bash shipped with the active Git installation. WindowsApps
+    # exposes WSL's bash.exe on many machines; that binary cannot consume the
+    # Git-Bash-style C:/... script path used by this cross-platform guard.
     $gitCommand = Get-Command git -ErrorAction Stop
     $gitRoot = Split-Path (Split-Path $gitCommand.Source -Parent) -Parent
     foreach ($candidate in @(
@@ -44,6 +42,11 @@ function Resolve-BashCommand {
         if (Test-Path -LiteralPath $candidate) {
             return $candidate
         }
+    }
+
+    $available = Get-Command bash -ErrorAction SilentlyContinue
+    if ($available) {
+        return $available.Source
     }
     throw "bash is required to verify scripts/format-rust.sh."
 }

@@ -95,6 +95,35 @@ async fn grant_and_require_full_access_for_same_project_path() {
 }
 
 #[tokio::test]
+async fn historical_self_project_alias_reuses_only_the_same_builtin_project_grant() {
+    let workspace = temp_workspace("self-alias");
+    let state = FullAccessGrantState::load_from_path(grant_file("self-alias"));
+    let identity = identity("owner-1", "agent-1", "install-1");
+    state
+        .grant_project(
+            &identity,
+            "elon-project",
+            workspace.to_string_lossy().as_ref(),
+        )
+        .await
+        .expect("grant historical self-project id");
+
+    require_route_a_full_access_grant(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&context("elon-self")),
+        Some(workspace.to_string_lossy().as_ref()),
+        false,
+    )
+    .await
+    .expect("the durable self-project id should reuse the historical alias grant");
+
+    assert!(!project_ids_equivalent("project-a", "project-b"));
+}
+
+#[tokio::test]
 async fn route_a_full_access_requires_local_grant() {
     let workspace = temp_workspace("missing");
     let state = FullAccessGrantState::load_from_path(grant_file("missing"));

@@ -119,7 +119,10 @@ impl FullAccessGrantState {
             // Each bound identity keeps only one directory per project. Grants
             // belonging to another owner, node credential, or installation are
             // retained but can never authorize the current runtime.
-            grants.retain(|item| !(identity.matches(item) && item.project_id == grant.project_id));
+            grants.retain(|item| {
+                !(identity.matches(item)
+                    && project_ids_equivalent(&item.project_id, &grant.project_id))
+            });
             grants.push(grant.clone());
             grants.clone()
         };
@@ -147,7 +150,7 @@ impl FullAccessGrantState {
         let workspace_path = canonical_workspace_path(workspace_path)?;
         let granted = self.grants.read().await.iter().any(|grant| {
             identity.matches(grant)
-                && grant.project_id == project_id
+                && project_ids_equivalent(&grant.project_id, project_id)
                 && same_workspace(&grant.workspace_path, &workspace_path)
         });
         if granted {
@@ -166,6 +169,22 @@ impl FullAccessGrantState {
         let json = serde_json::to_string_pretty(&file)?;
         std::fs::write(&self.path, json)?;
         Ok(())
+    }
+}
+
+/// `elon-project` was the Desktop supervisor's original default before the
+/// self project was registered under its durable `elon-self` id. Keep this
+/// compatibility deliberately narrow: aliases may share an authorization only
+/// when they are two names for the same built-in project, never for arbitrary
+/// user projects.
+pub(crate) fn project_ids_equivalent(left: &str, right: &str) -> bool {
+    canonical_project_id(left).eq_ignore_ascii_case(canonical_project_id(right))
+}
+
+fn canonical_project_id(value: &str) -> &str {
+    match value.trim() {
+        value if value.eq_ignore_ascii_case("elon-project") => "elon-self",
+        value => value,
     }
 }
 

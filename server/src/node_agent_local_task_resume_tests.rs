@@ -199,6 +199,29 @@ fn resume_rejects_cross_project_parent() {
 }
 
 #[test]
+fn second_generation_resume_inherits_the_original_root_lease() {
+    let mut fixture = ResumeFixture::new();
+    fixture.parent.task_id = "local-resume-generation-1".to_string();
+    fixture.contract.parent_task_id = Some(fixture.parent.task_id.clone());
+    fixture.contract.root_task_id = Some("local-parent".to_string());
+    let resolved = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("a later generation under the same root must reuse the root lease");
+    assert_eq!(
+        resolved
+            .inherited_workspace
+            .supervision_root_task_id
+            .as_deref(),
+        Some("local-parent")
+    );
+}
+
+#[test]
 fn resume_rejects_forged_active_path() {
     let mut fixture = ResumeFixture::new();
     let forged = fixture.root.join("forged-worktree");

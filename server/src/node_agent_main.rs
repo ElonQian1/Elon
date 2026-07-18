@@ -421,7 +421,7 @@ async fn run_agent_runtime() -> Result<()> {
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
-    node_agent_restart_drain::recover_checkpoint_after_startup();
+    node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
     if let Err(error) = runtime
         .update_recovery
         .set_install_gate_phase("runtime_online", Some("new node runtime is online"))

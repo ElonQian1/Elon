@@ -122,7 +122,10 @@ fn resolve_existing_resume_workspace(
         bail!("resume_original 的 parent_task_id 与父任务记录不一致。");
     }
     let supervision_root_task_id = contract.root_task_id.as_deref().unwrap_or(parent_task_id);
-    if requested_project_id != parent.project_id {
+    if !crate::node_agent_full_access::project_ids_equivalent(
+        requested_project_id,
+        &parent.project_id,
+    ) {
         bail!("resume_original 不能跨项目继承父任务工作区。");
     }
     if !parent_is_terminal(parent) {
