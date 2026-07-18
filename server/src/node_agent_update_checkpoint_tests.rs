@@ -113,11 +113,39 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
     )
     .unwrap();
 
-    let decision = checkpoint_active_update_transactions(
-        &UpdateRecoveryStore::new(root.join("recovery.json")),
+    let recovery = UpdateRecoveryStore::new(root.join("recovery.json"));
+    let sidecars = crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars"));
+    let blocked = checkpoint_active_update_transactions(
+        &recovery,
         &local_tasks,
         &journal,
-        &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
+        &sidecars,
+        "old",
+        "new",
+    )
+    .expect_err("updater must fail closed before the self-evolution cancel audit is durable");
+    assert!(blocked.to_string().contains("durable sidecar audit"));
+
+    sidecars
+        .upsert_session(
+            crate::node_agent_cli_sidecar::CliSidecarSessionRecord::managed_conpty(
+                "evolution-sidecar",
+                "evolution-active",
+                "codex",
+                "route_a_external_cli",
+                Some(root.to_string_lossy().into_owned()),
+                Some("npipe://elon/evolution-sidecar".to_string()),
+                Some(100),
+                Some(200),
+                crate::node_agent_cli_sidecar::now_ms(),
+            ),
+        )
+        .unwrap();
+    let decision = checkpoint_active_update_transactions(
+        &recovery,
+        &local_tasks,
+        &journal,
+        &sidecars,
         "old",
         "new",
     )
