@@ -4,6 +4,25 @@ use axum::{extract::State, http::HeaderMap, Json};
 use std::{sync::atomic::Ordering, sync::Arc};
 use tracing::warn;
 
+pub(super) async fn admin_health() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "service": "elon-node-agent",
+        "status": "ok"
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn health_response_is_small_and_self_identifying() {
+        let response = super::admin_health().await.0;
+
+        assert_eq!(response["service"], "elon-node-agent");
+        assert_eq!(response["status"], "ok");
+        assert!(response.to_string().len() < 128);
+    }
+}
+
 pub(super) async fn admin_status(
     State(rt): State<Arc<super::NodeRuntime>>,
     headers: HeaderMap,

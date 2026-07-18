@@ -155,6 +155,18 @@ fn check_once(install_dir: &Path, client: &Path, state: &mut WatchdogState) -> R
     );
 
     if should_restart(state.consecutive_admin_failures, RESTART_AFTER_FAILURES) {
+        if active_cli_sidecar_running(install_dir) {
+            log_file::record_event(
+                install_dir,
+                "watchdog_restart_deferred_active_cli",
+                true,
+                &format!(
+                    "admin api probe failed on port {port}; active CLI sidecar keeps runtime restart deferred"
+                ),
+            );
+            state.consecutive_admin_failures = 0;
+            return Ok(());
+        }
         log_file::record_event(
             install_dir,
             "watchdog_restart_runtime",
@@ -205,6 +217,48 @@ pub(super) fn watchdog_interval_from(value: Option<&str>) -> Duration {
         .unwrap_or(DEFAULT_INTERVAL_SECS)
         .clamp(MIN_INTERVAL_SECS, MAX_INTERVAL_SECS);
     Duration::from_secs(seconds)
+}
+
+fn active_cli_sidecar_running(install_dir: &Path) -> bool {
+    #[cfg(not(windows))]
+    {
+        let _ = install_dir;
+        false
+    }
+
+    #[cfg(windows)]
+    {
+        let script = active_cli_sidecar_query_script(&paths::client_exe(install_dir));
+        let mut command = launcher_command::powershell_hidden_command(&script);
+        let Ok(output) = launcher_command::output_hidden(&mut command) else {
+            return false;
+        };
+        output.status.success() && String::from_utf8_lossy(&output.stdout).contains("running")
+    }
+}
+
+#[cfg(windows)]
+pub(super) fn active_cli_sidecar_query_script(client: &Path) -> String {
+    format!(
+        r#"
+$target = [System.IO.Path]::GetFullPath('{client}')
+$targets = Get-CimInstance Win32_Process | Where-Object {{
+  $line = if ($_.CommandLine) {{ [string]$_.CommandLine }} else {{ '' }}
+  $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
+  $exeMatch = $false
+  if ($exe) {{
+    try {{
+      $exeMatch = [System.IO.Path]::GetFullPath($exe).Equals($target, [StringComparison]::OrdinalIgnoreCase)
+    }} catch {{
+      $exeMatch = $false
+    }}
+  }}
+  ($line -match '--cli-sidecar') -and $exeMatch
+}}
+if ($targets) {{ Write-Output 'running' }}
+"#,
+        client = launcher_command::ps_single_quote(&client.to_string_lossy())
+    )
 }
 
 #[cfg(windows)]

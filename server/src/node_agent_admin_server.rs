@@ -164,6 +164,10 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .merge(node_agent_android_live::runtime_routes())
             .merge(node_agent_project_docs_mcp::routes())
             .route(
+                "/api/health",
+                axum::routing::get(node_agent_admin_status::admin_health),
+            )
+            .route(
                 "/api/status",
                 axum::routing::get(node_agent_admin_status::admin_status),
             )

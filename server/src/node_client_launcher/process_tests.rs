@@ -11,25 +11,21 @@ fn encoded_query_escapes_local_admin_url() {
 #[test]
 fn admin_health_requires_node_status_marker() {
     assert!(admin_status_response_healthy(
-        "HTTP/1.1 200 OK\r\n\r\n{\"local_admin_token_header\":\"X-Elon-Local-Admin-Token\"}"
+        "HTTP/1.1 200 OK\r\n\r\n{\"service\":\"elon-node-agent\",\"status\":\"ok\"}"
     ));
     assert!(!admin_status_response_healthy(
         "HTTP/1.1 200 OK\r\n\r\n<html>not our service</html>"
     ));
     assert!(!admin_status_response_healthy(
-        "HTTP/1.1 404 Not Found\r\n\r\n{\"local_admin_token_header\":\"x\"}"
+        "HTTP/1.1 404 Not Found\r\n\r\n{\"service\":\"elon-node-agent\"}"
     ));
 }
 
 #[test]
-fn admin_health_accepts_large_status_response() {
-    let response = format!(
-        "HTTP/1.1 200 OK\r\n\r\n{{\"padding\":\"{}\",\"local_admin_token_header\":\"x\"}}",
-        "x".repeat(8 * 1024)
-    );
-
-    assert!(response.len() < ADMIN_HEALTH_READ_LIMIT);
-    assert!(admin_status_response_healthy(&response));
+fn admin_health_rejects_the_expensive_status_payload() {
+    assert!(!admin_status_response_healthy(
+        "HTTP/1.1 200 OK\r\n\r\n{\"local_admin_token_header\":\"x\"}"
+    ));
 }
 
 #[test]

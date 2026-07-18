@@ -574,7 +574,7 @@ pub(crate) fn admin_healthy(port: u16, timeout: Duration) -> bool {
     };
     let _ = stream.set_read_timeout(Some(timeout));
     let _ = stream.set_write_timeout(Some(timeout));
-    let request = b"GET /api/status HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    let request = b"GET /api/health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
     if stream.write_all(request).is_err() {
         return false;
     }
@@ -593,8 +593,10 @@ pub(crate) fn admin_healthy(port: u16, timeout: Duration) -> bool {
 
 fn admin_status_response_healthy(response: &str) -> bool {
     let status_ok = response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200");
-    // 只把本节点的 /api/status 当作健康，避免随机占用 7799 的网页服务误判为已就绪。
-    status_ok && response.contains("\"local_admin_token_header\"")
+    // 只把本节点的轻量健康响应当作就绪，避免随机占用 7799 的网页
+    // 服务误判为节点。/api/status 会组装硬件、CLI 和 journal 摘要，不适合被
+    // watchdog 作为存活探针，否则活动任务压力会被误判为 runtime 死亡。
+    status_ok && response.contains("\"service\":\"elon-node-agent\"")
 }
 
 #[cfg(test)]

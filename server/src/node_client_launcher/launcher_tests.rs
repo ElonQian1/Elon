@@ -139,3 +139,26 @@ fn watchdog_stop_terminates_only_other_watchdog_processes() {
 fn watchdog_uses_client_exe_identity() {
     assert_eq!(super::CLIENT_EXE_NAME, "一龙开发平台.exe");
 }
+
+#[cfg(windows)]
+#[test]
+fn watchdog_detects_active_cli_sidecars_from_the_same_installation() {
+    let script = super::watchdog::active_cli_sidecar_query_script(Path::new(
+        r"C:\ElonNode\一龙开发平台.exe",
+    ));
+
+    assert!(script.contains("--cli-sidecar"));
+    assert!(script.contains("一龙开发平台.exe"));
+    assert!(script.contains("and $exeMatch"));
+    assert!(!script.contains("--agent-runtime"));
+    assert!(!script.contains("--watchdog"));
+}
+
+#[test]
+fn watchdog_defers_restart_while_cli_sidecar_is_active() {
+    let source = include_str!("watchdog.rs");
+
+    assert!(source.contains("watchdog_restart_deferred_active_cli"));
+    assert!(source.contains("active_cli_sidecar_running(install_dir)"));
+    assert!(source.contains("state.consecutive_admin_failures = 0"));
+}
