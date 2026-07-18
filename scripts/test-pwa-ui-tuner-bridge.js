@@ -16,6 +16,7 @@ assert.ok(mobileWeb.includes('__UI_TUNER_PWA_BRIDGE_JS__'), 'mobile page should 
 assert.ok(mobileWeb.indexOf('__UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__') < mobileWeb.indexOf("const TOKEN_KEY = 'lodex_token'"), 'preview auth must be inherited before the mobile app boots');
 assert.ok(authBootstrap.includes("localStorage.getItem('elon_auth')"), 'same-origin preview should inherit the current PC session synchronously');
 assert.ok(mobileWeb.includes('if (token !== bootToken) return;'), 'a stale boot must not clear a newer bridged session');
+assert.match(mobileWeb, /currentUser = data\.user;\s+syncWebSideMenuUser\(\);/, 'successful preview auth should immediately refresh the visible project sidebar account');
 assert.ok(bridge.includes("params.get('ui_tuner_preview') !== '1'"), 'normal PWA pages must not activate the design bridge');
 assert.ok(bridge.includes("const SOURCE = 'elon-pwa-design-bridge'"), 'PWA should expose its design bridge to the PC workbench');
 assert.ok(bridge.includes("event.origin !== window.location.origin"), 'PWA design bridge must reject cross-origin commands');

@@ -8364,6 +8364,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     const data = await res.json();
     if (expectedToken && expectedToken !== token) return false;
     currentUser = data.user;
+    syncWebSideMenuUser();
     const name = currentUser.nickname || currentUser.account || '用户';
     const account = currentUser.account || '';
     profileNickname.textContent = name;
