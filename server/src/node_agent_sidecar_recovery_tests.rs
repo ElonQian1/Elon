@@ -47,3 +47,23 @@ fn replay_state_advances_without_skipping_checkpoint() {
     assert_eq!(saved.state, UpdateRecoveryState::Resumed);
     let _ = std::fs::remove_file(runtime_path);
 }
+
+#[test]
+fn multi_generation_sidecar_recovery_replaces_stale_target_without_manual_resume() {
+    let mut receipt = UpdateRecoveryReceipt::planned("update-old", "root", "task");
+    receipt.to_release = ReleaseIdentity {
+        version: "0.3.69".to_string(),
+        git_sha: "old-sha".to_string(),
+    };
+    assert!(!receipt_targets_release(&receipt, "0.3.69+new-sha"));
+    assert!(receipt_targets_release(&receipt, "0.3.69+old-sha"));
+    assert!(recoverable_sidecar_task_status("resume_required"));
+    assert!(!recoverable_sidecar_task_status("done"));
+    assert_eq!(
+        release_identity("0.3.69+new-sha"),
+        ReleaseIdentity {
+            version: "0.3.69".to_string(),
+            git_sha: "new-sha".to_string(),
+        }
+    );
+}

@@ -50,10 +50,7 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         bind_existing_completion(&runtime, &task).await?;
         return Ok(());
     }
-    if !matches!(
-        task.status.as_str(),
-        "running" | "recovering" | "interrupted"
-    ) {
+    if !recoverable_sidecar_task_status(&task.status) {
         return Ok(());
     }
     let Some(output_path) = session.endpoint.as_deref().map(Path::new) else {
@@ -212,7 +209,11 @@ fn ensure_recovery_receipt(
     session: &CliSidecarSessionRecord,
 ) -> Result<Option<UpdateRecoveryReceipt>> {
     if let Some(receipt) = runtime.update_recovery.receipt_for_task(&task.task_id)? {
-        return Ok(Some(receipt));
+        if receipt_targets_release(&receipt, &crate::node_agent_release_identity::current())
+            || task.status != "resume_required"
+        {
+            return Ok(Some(receipt));
+        }
     }
     let Some(contract) = load_supervision_contract(&runtime.task_journal, &task.task_id)? else {
         return Ok(None);
@@ -227,8 +228,13 @@ fn ensure_recovery_receipt(
         .filter(|_| contract.task_role == "resume_original")
         .unwrap_or(&task.task_id);
     let root_task_id = contract.root_task_id.as_deref().unwrap_or(original_task_id);
+    let current_release = crate::node_agent_release_identity::current();
     let mut receipt = UpdateRecoveryReceipt::planned(
-        format!("legacy-sidecar-{}", session.session_id),
+        format!(
+            "legacy-sidecar-{}-{}",
+            session.session_id,
+            current_release.replace(['+', ':', '/', '\\'], "_")
+        ),
         root_task_id,
         original_task_id,
     );
@@ -236,10 +242,7 @@ fn ensure_recovery_receipt(
         receipt.resume_task_id = Some(task.task_id.clone());
     }
     receipt.parent_task_id = contract.parent_task_id;
-    receipt.from_release = ReleaseIdentity {
-        version: crate::node_agent_release_identity::current(),
-        git_sha: String::new(),
-    };
+    receipt.from_release = release_identity(&current_release);
     receipt.to_release = receipt.from_release.clone();
     receipt.codex_session_id = snapshot
         .record
@@ -281,6 +284,29 @@ fn ensure_recovery_receipt(
     )?;
     runtime.update_recovery.upsert(receipt.clone())?;
     Ok(Some(receipt))
+}
+
+fn recoverable_sidecar_task_status(status: &str) -> bool {
+    matches!(
+        status,
+        "running" | "recovering" | "interrupted" | "resume_required"
+    )
+}
+
+fn receipt_targets_release(receipt: &UpdateRecoveryReceipt, current: &str) -> bool {
+    let target = &receipt.to_release;
+    let current = release_identity(current);
+    (target.version.trim().is_empty() || target.version == current.version)
+        && (target.git_sha.trim().is_empty() || target.git_sha == current.git_sha)
+}
+
+fn release_identity(current: &str) -> ReleaseIdentity {
+    let current = current.trim();
+    let (version, git_sha) = current.rsplit_once('+').unwrap_or((current, ""));
+    ReleaseIdentity {
+        version: version.to_string(),
+        git_sha: git_sha.to_string(),
+    }
 }
 
 fn prepare_receipt_for_terminal_replay(runtime: &NodeRuntime, task_id: &str) -> Result<()> {
