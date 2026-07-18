@@ -338,7 +338,7 @@ impl LocalTaskStore {
                 SET status = 'running', error = NULL, finished_at_ms = NULL
               WHERE task_id = ?1
                 AND completion_event_id IS NULL
-                AND status IN ('recovering','reattaching')",
+                AND status IN ('recovering','reattaching','resume_required')",
             params![task_id],
         )? > 0)
     }
@@ -623,12 +623,19 @@ mod tests {
         assert!(store
             .mark_recovering("local-running", "节点更新完成，正在重接原 CLI 会话")
             .unwrap());
-
         assert!(store.mark_recovery_running("local-running").unwrap());
         let record = store.get("local-running").unwrap().unwrap();
         assert_eq!(record.status, "running");
         assert!(record.error.is_none());
         assert!(!store.mark_recovery_running("local-running").unwrap());
+        assert_eq!(
+            store.interrupt_lingering_running(&HashSet::new()).unwrap(),
+            1
+        );
+        assert!(store.mark_recovery_running("local-running").unwrap());
+        let recovered = store.get("local-running").unwrap().unwrap();
+        assert_eq!(recovered.status, "running");
+        assert!(recovered.finished_at_ms.is_none());
     }
 
     #[test]
