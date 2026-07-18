@@ -99,6 +99,7 @@ fn clean_landed_receipt_recreates_recycled_worktree() {
         &fixture.contract,
         &fixture.parent,
         None,
+        None,
         "project-a",
         path(&fixture.base),
         Some(&fixture.receipt),
@@ -124,6 +125,7 @@ fn inspect_reports_rebuild_without_mutating_path() {
         &fixture.contract,
         &fixture.parent,
         None,
+        None,
         "project-a",
         path(&fixture.active),
         Some(&fixture.receipt),
@@ -136,6 +138,44 @@ fn inspect_reports_rebuild_without_mutating_path() {
 }
 
 #[test]
+fn recycled_resume_of_resume_keeps_the_recorded_inherited_identity() {
+    let mut fixture = Fixture::new();
+    fixture.parent.conversation_id = "offline-resume-child".to_string();
+    let parent_contract = SupervisionContract {
+        protocol: SUPERVISION_PROTOCOL.to_string(),
+        supervisor: "codex_desktop".to_string(),
+        task_role: "resume_original".to_string(),
+        parent_task_id: Some("original-parent".to_string()),
+        root_task_id: Some("root-1".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: "after_task_only".to_string(),
+    };
+
+    let resolved = resolve_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&parent_contract),
+        None,
+        "project-a",
+        path(&fixture.base),
+        Some(&fixture.receipt),
+        ResumeWorkspaceMode::Inspect,
+    )
+    .expect("a trusted receipt should preserve the inherited branch across generations");
+
+    assert_eq!(
+        resolved.inherited_workspace.branch.as_deref(),
+        Some("ai/session/project-a/conversation-a")
+    );
+    assert_eq!(
+        resolved.derivation,
+        "platform_receipt_commit_rebuild_available"
+    );
+    assert!(resolved.requires_recreation);
+    assert!(!fixture.active.exists());
+}
+
+#[test]
 fn remote_v1_receipt_stays_fail_closed() {
     let mut fixture = Fixture::new();
     fixture.receipt.transport = RecoveryTransport::remote_v1();
@@ -143,6 +183,7 @@ fn remote_v1_receipt_stays_fail_closed() {
     let error = resolve_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         path(&fixture.base),
@@ -164,6 +205,7 @@ fn rebuild_rejects_dirty_evidence_arbitrary_path_and_identity_drift() {
         &fixture.contract,
         &fixture.parent,
         None,
+        None,
         "project-a",
         path(&fixture.base),
         Some(&fixture.receipt),
@@ -176,6 +218,7 @@ fn rebuild_rejects_dirty_evidence_arbitrary_path_and_identity_drift() {
         &fixture.contract,
         &fixture.parent,
         None,
+        None,
         "project-a",
         path(&fixture.root),
         Some(&fixture.receipt),
@@ -187,6 +230,7 @@ fn rebuild_rejects_dirty_evidence_arbitrary_path_and_identity_drift() {
     assert!(resolve_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         path(&fixture.base),
@@ -213,6 +257,7 @@ fn rebuild_rejects_branch_occupied_by_another_worktree() {
     let error = resolve_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         path(&fixture.base),

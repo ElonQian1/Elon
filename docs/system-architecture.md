@@ -142,7 +142,7 @@ sidecar `sessions.json` 使用进程间互斥和同目录临时文件原子替�
 
 受监督的本机 Codex 任务需要覆盖真实项目构建、发布和统一收尾，不能沿用普通 full-access 任务固定的 1200 秒总时限。pipe sidecar 与 direct-pipe 回退路径统一使用默认 21600 秒总时限、900 秒进展空闲时限和 15 秒 heartbeat；三个值分别由 `ELON_SUPERVISED_CODEX_TIMEOUT_SECS`（1201–86400）、`ELON_SUPERVISED_CODEX_IDLE_TIMEOUT_SECS`（30–7200）、`ELON_SUPERVISED_CODEX_HEARTBEAT_SECS`（1–60）约束配置。输出/命令/文件刷新进展，节点 heartbeat 只证明运行时存活，不掩盖真正空闲。未带监督协议的 Codex 任务仍为 1200/300 秒，其它 CLI 仍为 180 秒；取消、进程树回收、审批、云控截止时间和终态持久化不放宽。
 
-`resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支、终态记录的 `git_head` 和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。若活动目录仍在但 Git 注册被外部清理破坏，只读检查先报告 `recovery_required`，节点在占用门禁后以 `git worktree add --no-checkout` 重建元数据，再原样移回用户文件；提交或分支漂移时拒绝猜测。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
+`resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支、终态记录的 `git_head` 和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。父任务本身是 `resume_original` 时不会用其新生成的本机 conversation id 覆盖继承身份；只有父子监督契约的 root identity 一致，且记录分支、平台路径、Git 身份、HEAD 与 root lease 仍完整吻合，才允许 resume-of-resume 继续复用同一现场。若活动目录仍在但 Git 注册被外部清理破坏，只读检查先报告 `recovery_required`，节点在占用门禁后以 `git worktree add --no-checkout` 重建元数据，再原样移回用户文件；提交或分支漂移时拒绝猜测。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
 
 节点在创建或复用受监督隔离 worktree 时直接以 `elon-supervision:<root_task_id>` 写入唯一权威 Git lease；prepare、恢复和 merge 不先写通用锁，也不存在临时解锁窗口。失败、取消、超时、任务完成、代码合入和发布完成都保留该 lease 与目录；只有契约 root identity 匹配的 Desktop `accepted` review 才精确解锁，之后通用 cleanup 才能回收。普通非监督 conversation worktree 仍使用原通用锁，并在成功合并后解锁删除。Windows 超时/取消先同步等待 `taskkill /T /F` 回收完整执行器进程树，再结束直接子进程。终态 `workspace_status` 持久化基础路径、活动路径、分支和完整 `git_head`，为注册丢失后的确定性重建提供身份。
 

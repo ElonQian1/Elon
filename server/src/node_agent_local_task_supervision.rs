@@ -124,6 +124,12 @@ pub(crate) struct SupervisionState {
     evidence: SupervisionEvidence,
 }
 
+impl SupervisionState {
+    pub(crate) fn contract(&self) -> Option<&SupervisionContract> {
+        self.contract.as_ref()
+    }
+}
+
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new().route(
         "/api/local-tasks/:task_id/supervision/review",

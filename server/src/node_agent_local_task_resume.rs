@@ -37,6 +37,7 @@ pub(crate) struct ResolvedResumeWorkspace {
 pub(crate) fn resolve_resume_workspace(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    parent_contract: Option<&SupervisionContract>,
     journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     requested_project_id: &str,
     requested_workspace_path: &str,
@@ -46,6 +47,7 @@ pub(crate) fn resolve_resume_workspace(
     match resolve_existing_resume_workspace(
         contract,
         parent,
+        parent_contract,
         journal_record,
         requested_project_id,
         requested_workspace_path,
@@ -59,6 +61,7 @@ pub(crate) fn resolve_resume_workspace(
             crate::node_agent_local_task_resume_rebuild::resolve_recycled_resume_workspace(
                 contract,
                 parent,
+                parent_contract,
                 requested_project_id,
                 requested_workspace_path,
                 receipt,
@@ -72,6 +75,7 @@ pub(crate) fn resolve_resume_workspace(
 pub(crate) fn validate_resume_workspace(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    parent_contract: Option<&SupervisionContract>,
     journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     requested_project_id: &str,
     requested_workspace_path: &str,
@@ -79,6 +83,7 @@ pub(crate) fn validate_resume_workspace(
     resolve_existing_resume_workspace(
         contract,
         parent,
+        parent_contract,
         journal_record,
         requested_project_id,
         requested_workspace_path,
@@ -89,6 +94,7 @@ pub(crate) fn validate_resume_workspace(
 pub(crate) fn inspect_resume_workspace(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    parent_contract: Option<&SupervisionContract>,
     journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     requested_project_id: &str,
     requested_workspace_path: &str,
@@ -96,6 +102,7 @@ pub(crate) fn inspect_resume_workspace(
     resolve_existing_resume_workspace(
         contract,
         parent,
+        parent_contract,
         journal_record,
         requested_project_id,
         requested_workspace_path,
@@ -106,6 +113,7 @@ pub(crate) fn inspect_resume_workspace(
 fn resolve_existing_resume_workspace(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    parent_contract: Option<&SupervisionContract>,
     journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     requested_project_id: &str,
     requested_workspace_path: &str,
@@ -133,8 +141,8 @@ fn resolve_existing_resume_workspace(
     }
 
     let project_part = safe_path_part(&parent.project_id, "project", 80);
-    let conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
-    let expected_branch = format!("ai/session/{project_part}/{conversation_part}");
+    let parent_conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
+    let parent_expected_branch = format!("ai/session/{project_part}/{parent_conversation_part}");
     let authorized_base = canonical_directory(Path::new(&parent.workspace_path), "父任务授权根")?;
     let (recorded_base, active, status_branch, recorded_head, mut derivation) =
         if let Some(status) = parent.workspace_status.as_ref() {
@@ -174,11 +182,24 @@ fn resolve_existing_resume_workspace(
             (
                 authorized_base.clone(),
                 canonical_directory(Path::new(started_cwd), "父任务 started.cwd")?,
-                expected_branch.clone(),
+                parent_expected_branch.clone(),
                 None,
                 "legacy_started_cwd_git_registry".to_string(),
             )
         };
+    let platform_identity = recorded_platform_workspace_identity(
+        contract,
+        parent_contract,
+        parent,
+        &project_part,
+        &parent_conversation_part,
+        &status_branch,
+    )?;
+    let expected_branch = platform_identity.branch;
+    let conversation_part = platform_identity.conversation_part;
+    if platform_identity.inherited && derivation == "workspace_status" {
+        derivation = "inherited_workspace_status".to_string();
+    }
     if !same_path(&authorized_base, &recorded_base) {
         bail!("父任务 workspace_status 的基础工作区与原授权根不一致。");
     }
@@ -263,6 +284,77 @@ fn parent_is_terminal(parent: &LocalTaskRecord) -> bool {
             parent.status.as_str(),
             "done" | "failed" | "canceled" | "interrupted" | "resume_required"
         )
+}
+
+pub(crate) struct RecordedPlatformWorkspaceIdentity {
+    pub(crate) branch: String,
+    pub(crate) conversation_part: String,
+    pub(crate) inherited: bool,
+}
+
+pub(crate) fn recorded_platform_workspace_identity(
+    contract: &SupervisionContract,
+    parent_contract: Option<&SupervisionContract>,
+    parent: &LocalTaskRecord,
+    project_part: &str,
+    parent_conversation_part: &str,
+    recorded_branch: &str,
+) -> Result<RecordedPlatformWorkspaceIdentity> {
+    let parent_expected_branch = format!("ai/session/{project_part}/{parent_conversation_part}");
+    if recorded_branch == parent_expected_branch {
+        return Ok(RecordedPlatformWorkspaceIdentity {
+            branch: parent_expected_branch,
+            conversation_part: parent_conversation_part.to_string(),
+            inherited: false,
+        });
+    }
+
+    let parent_contract = parent_contract
+        .ok_or_else(|| anyhow!("父任务隔离分支不符合自身会话，且缺少可验证的继承监督契约。"))?;
+    if parent_contract.protocol != SUPERVISION_PROTOCOL
+        || parent_contract.task_role != "resume_original"
+    {
+        bail!("只有当前监督协议的 resume_original 父任务可以继续继承工作树。");
+    }
+    let _inherited_from = parent_contract
+        .parent_task_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && *value != parent.task_id.as_str())
+        .ok_or_else(|| anyhow!("父任务缺少可靠的继承来源任务身份。"))?;
+    let parent_root = parent_contract
+        .root_task_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("继承父任务缺少明确的 root_task_id。"))?;
+    let requested_root = contract
+        .root_task_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("resume-of-resume 缺少明确的 root_task_id。"))?;
+    if parent_root != requested_root {
+        bail!("resume-of-resume 的 root_task_id 与父任务继承链不一致。");
+    }
+    let prefix = format!("ai/session/{project_part}/");
+    let inherited_conversation_part = recorded_branch
+        .strip_prefix(&prefix)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("父任务记录的继承分支不属于当前项目。"))?;
+    if inherited_conversation_part.contains('/')
+        || inherited_conversation_part.contains('\\')
+        || safe_path_part(inherited_conversation_part, "conversation", 80)
+            != inherited_conversation_part
+    {
+        bail!("父任务记录的继承分支不是平台生成的单一会话分支。");
+    }
+    Ok(RecordedPlatformWorkspaceIdentity {
+        branch: recorded_branch.to_string(),
+        conversation_part: inherited_conversation_part.to_string(),
+        inherited: true,
+    })
 }
 
 fn required_status_path<'a>(status: &'a serde_json::Value, field: &str) -> Result<&'a str> {

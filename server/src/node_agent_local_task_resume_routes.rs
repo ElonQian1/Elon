@@ -48,19 +48,19 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             "父任务不属于当前节点和安装实例，已拒绝继承工作区。",
         ));
     }
-    match crate::node_agent_local_task_supervision::load_supervision_state(
+    let parent_contract = match crate::node_agent_local_task_supervision::load_supervision_contract(
         &runtime.task_journal,
         &parent.task_id,
     ) {
-        Ok(state) if state.enabled => {}
-        Ok(_) => {
+        Ok(Some(contract)) => contract,
+        Ok(None) => {
             return Err(json_error(
                 StatusCode::CONFLICT,
                 "父任务没有可验证的桌面监督契约，已拒绝继承工作区。",
             ))
         }
         Err(error) => return Err(internal_error(error)),
-    }
+    };
     let journal_snapshot = runtime
         .task_journal
         .snapshot(&parent.task_id, 0, 1)
@@ -72,6 +72,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     let mut resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
         contract,
         &parent,
+        Some(&parent_contract),
         journal_snapshot.record.as_ref(),
         project_id,
         requested_workspace_path,
@@ -131,6 +132,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
             contract,
             &parent,
+            Some(&parent_contract),
             journal_snapshot.record.as_ref(),
             project_id,
             requested_workspace_path,
@@ -146,17 +148,25 @@ pub(crate) async fn inspect_resume_workspace_status(
     runtime: &Arc<NodeRuntime>,
     parent: &crate::node_agent_local_task_store::LocalTaskRecord,
     journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
-    supervision_enabled: bool,
+    parent_contract: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
 ) -> serde_json::Value {
-    if !supervision_enabled {
+    let Some(parent_contract) = parent_contract else {
         return json!({"eligible": false, "reason": "missing_supervision_contract"});
-    }
+    };
+    let root_task_id = if parent_contract.task_role == "resume_original" {
+        parent_contract
+            .root_task_id
+            .clone()
+            .unwrap_or_else(|| parent.task_id.clone())
+    } else {
+        parent.task_id.clone()
+    };
     let contract = crate::node_agent_local_task_supervision::SupervisionContract {
         protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.to_string(),
         supervisor: "codex_desktop".to_string(),
         task_role: "resume_original".to_string(),
         parent_task_id: Some(parent.task_id.clone()),
-        root_task_id: Some(parent.task_id.clone()),
+        root_task_id: Some(root_task_id),
         acceptance_criteria: Vec::new(),
         improvement_policy: "after_task_or_unblock".to_string(),
     };
@@ -168,6 +178,7 @@ pub(crate) async fn inspect_resume_workspace_status(
     match crate::node_agent_local_task_resume::resolve_resume_workspace(
         &contract,
         parent,
+        Some(parent_contract),
         journal_record,
         &parent.project_id,
         &parent.workspace_path,

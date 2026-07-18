@@ -119,6 +119,7 @@ fn valid_resume_inherits_recorded_platform_worktree_from_base_or_active_request(
             &fixture.contract,
             &fixture.parent,
             None,
+            None,
             "project-a",
             requested.to_string_lossy().as_ref(),
         )
@@ -132,6 +133,115 @@ fn valid_resume_inherits_recorded_platform_worktree_from_base_or_active_request(
             &std::fs::canonicalize(&fixture.active).unwrap()
         ));
     }
+}
+
+#[test]
+fn resume_of_resume_reuses_the_platform_recorded_inherited_workspace() {
+    let mut fixture = ResumeFixture::new();
+    fixture.parent.conversation_id = "offline-resume-child".to_string();
+    crate::node_agent_supervision_worktree_lease::release(
+        &fixture.base,
+        &fixture.active,
+        "local-parent",
+    )
+    .unwrap();
+    crate::node_agent_supervision_worktree_lease::acquire(
+        &fixture.base,
+        &fixture.active,
+        "local-root",
+    )
+    .unwrap();
+    fixture.contract.root_task_id = Some("local-root".to_string());
+    let parent_contract = SupervisionContract {
+        protocol: SUPERVISION_PROTOCOL.to_string(),
+        supervisor: "codex_desktop".to_string(),
+        task_role: "resume_original".to_string(),
+        parent_task_id: Some("local-original".to_string()),
+        root_task_id: Some("local-root".to_string()),
+        acceptance_criteria: vec!["resume safely".to_string()],
+        improvement_policy: "after_task_or_unblock".to_string(),
+    };
+
+    let previous_error = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("the former single-generation rule should reproduce the rejection");
+    assert!(previous_error
+        .to_string()
+        .contains("缺少可验证的继承监督契约"));
+
+    let resolved = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&parent_contract),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("a recorded resume_original lineage should keep its inherited workspace eligible");
+    assert_eq!(resolved.derivation, "inherited_workspace_status");
+    assert_eq!(
+        resolved.inherited_workspace.branch.as_deref(),
+        Some("ai/session/project-a/conversation-a")
+    );
+    assert!(same_path(
+        Path::new(&resolved.inherited_workspace.workspace_path),
+        &std::fs::canonicalize(&fixture.active).unwrap()
+    ));
+}
+
+#[test]
+fn inherited_workspace_rejects_untrusted_lineage_or_root_drift() {
+    let mut fixture = ResumeFixture::new();
+    fixture.parent.conversation_id = "offline-resume-child".to_string();
+    let mut parent_contract = fixture.contract.clone();
+    parent_contract.parent_task_id = Some("local-original".to_string());
+
+    parent_contract.task_role = "requirement".to_string();
+    let role_error = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&parent_contract),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("an ordinary supervised parent must not claim inherited identity");
+    assert!(role_error.to_string().contains("resume_original 父任务"));
+
+    parent_contract.task_role = "resume_original".to_string();
+    parent_contract.root_task_id = Some("another-root".to_string());
+    let root_error = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&parent_contract),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("a different supervision root must fail closed");
+    assert!(root_error.to_string().contains("root_task_id"));
+}
+
+#[test]
+fn resume_rejects_non_isolated_workspace_status() {
+    let mut fixture = ResumeFixture::new();
+    fixture.parent.workspace_status.as_mut().unwrap()["isolated"] = json!(false);
+    let error = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("a shared workspace must never become resumable by inheritance");
+    assert!(error.to_string().contains("不是平台生成的隔离 worktree"));
 }
 
 #[test]
@@ -163,6 +273,7 @@ fn legacy_resume_derives_only_from_started_cwd_and_git_registry() {
     let resolved = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         Some(&journal),
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
@@ -176,6 +287,7 @@ fn legacy_resume_derives_only_from_started_cwd_and_git_registry() {
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         Some(&journal),
         "project-a",
         arbitrary.to_string_lossy().as_ref(),
@@ -190,6 +302,7 @@ fn resume_rejects_cross_project_parent() {
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-b",
         fixture.base.to_string_lossy().as_ref(),
@@ -207,6 +320,7 @@ fn second_generation_resume_inherits_the_original_root_lease() {
     let resolved = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
@@ -236,6 +350,7 @@ fn resume_rejects_forged_active_path() {
         &fixture.contract,
         &fixture.parent,
         None,
+        None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
     )
@@ -251,6 +366,7 @@ fn resume_rejects_active_parent_task() {
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
@@ -276,6 +392,7 @@ fn dirty_exclusive_resume_preserves_staged_unstaged_and_untracked_changes() {
     let resolved = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
@@ -321,6 +438,7 @@ fn resume_rejects_a_nonmatching_root_lease_identity() {
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
@@ -381,6 +499,7 @@ fn orphaned_worktree_resume_rebuilds_metadata_and_preserves_user_files() {
         &fixture.contract,
         &fixture.parent,
         None,
+        None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
     )
@@ -393,6 +512,7 @@ fn orphaned_worktree_resume_rebuilds_metadata_and_preserves_user_files() {
     let resolved = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),

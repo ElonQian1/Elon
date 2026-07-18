@@ -142,7 +142,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -Task
 
 - `Inspect`：读取任务、journal、审批、运行时和监督状态；`-Since`、`-Limit` 做增量窗口，`-Compact` 只返回有界摘要和证据。
 - `Improve`：从父任务继承项目/工作区并创建能力改进；加 `-BlockingImprovement` 时角色为 `capability_repair`。
-- `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。helper 先做只读门禁，节点再以本机任务记录的基础仓库、隔离路径、分支、`git_head` 和 `elon-supervision:<root_task_id>` lease 做权威校验；不能用参数指定任意 worktree。身份可信且无活跃 prompt/sidecar 占用时允许原位复用脏现场，staged、unstaged、untracked 均不覆盖、不自动提交、不丢弃。目录仍在但 Git worktree 注册丢失时，只读门禁会标记 `recovery_required`，节点在同样的独占门禁后以 root lease 原子重建元数据，再原样移回用户文件。
+- `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。helper 先做只读门禁，节点再以本机任务记录的基础仓库、隔离路径、分支、`git_head` 和 `elon-supervision:<root_task_id>` lease 做权威校验；不能用参数指定任意 worktree。父任务也是 `resume_original` 时，节点沿已验证的父监督契约继承原工作树身份，不会按续跑任务的新 conversation id 另推路径；父子 root identity 或任一 Git 身份不一致仍拒绝。身份可信且无活跃 prompt/sidecar 占用时允许原位复用脏现场，staged、unstaged、untracked 均不覆盖、不自动提交、不丢弃。目录仍在但 Git worktree 注册丢失时，只读门禁会标记 `recovery_required`，节点在同样的独占门禁后以 root lease 原子重建元数据，再原样移回用户文件。
 - `SelfTest`：不连接节点，校验 PS5.1/PS7 UTF-8、旧数组以及 JSON/UTF-8 文件多条件构造。
 
 等待动作最多 55 秒，桌面端应分段等待并保持过程更新。`Wait` 在一次调用内从 `Since` 游标前进，不重复轮询旧窗口，并返回 `next_cursor` 供下一次调用续读；缺省窗口为 25，`Inspect` 缺省为 200。监督证据摘要仍由节点扫描完整 journal。验收条件经过外层 `powershell -File` 时，优先使用 `-AcceptanceCriteriaJson '["条件一","条件二"]'` 或 `-AcceptanceCriteriaFile criteria.json`，避免数组被宿主展平误绑定；旧 `-AcceptanceCriteria` 保持兼容。设置 `ELON_NODE_ADMIN_URL` 可覆盖默认探测地址，但地址仍必须受节点 Origin 白名单信任。
@@ -172,7 +172,7 @@ Codex JSON 的 `item.started/item.completed` 会以有界 `codex_item` 写入 jo
 - 本机管理 API 继续要求动态 admin token 和受信 Origin；Skill 不打印 token。
 - 执行 prompt 带 `<elon-pc-executor>`，执行者看到后禁止重新派发，避免递归。
 - 契约使用 journal 事件持久化，没有为旧任务新增强制数据库列。
-- `resume_original` 必须指向已终止的同节点、同项目受监督父任务，并复用节点记录的隔离现场；正常现场校验 Git worktree 注册和匹配 root lease，注册丢失的现场只有在基础仓库、平台路径、分支和已记录 `git_head`（旧记录可退化为仍存在且未漂移的分支引用）全部一致时才可原位重建。可信独占的脏现场可恢复且三类 Git 修改保持不变；非法继承、root/分支/提交身份漂移和并发占用都会以冲突拒绝。
+- `resume_original` 必须指向已终止的同节点、同项目受监督父任务，并复用节点记录的隔离现场；resume-of-resume 还必须证明父任务是当前协议的 `resume_original`、父子 `root_task_id` 一致、记录分支与平台路径相互对应。正常现场校验 Git worktree 注册和匹配 root lease，注册丢失的现场只有在基础仓库、平台路径、分支和已记录 `git_head`（旧记录可退化为仍存在且未漂移的分支引用）全部一致时才可原位重建。可信独占的脏现场可恢复且三类 Git 修改保持不变；非法继承、root/分支/提交身份漂移和并发占用都会以冲突拒绝。
 - PC 工作台只在 `supervision.enabled=true` 时显示监督卡，普通本机任务不受影响。
 - 版本发布、灰度、回滚和节点兼容仍以 `docs/node-agent-upgrade-compatibility.md` 为准。
 - 任何协议升级必须新增版本号或保持向后兼容，并补 Rust、PowerShell 与 PC 前端测试。

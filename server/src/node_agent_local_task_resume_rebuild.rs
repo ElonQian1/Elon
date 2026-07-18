@@ -11,7 +11,8 @@ use elon_pc_dev_runtime::safe_path_part;
 use crate::{
     git_command_error::{git_command, git_failure_message, git_spawn_context},
     node_agent_local_task_resume::{
-        validate_resume_workspace, ResolvedResumeWorkspace, ResumeWorkspaceMode,
+        recorded_platform_workspace_identity, validate_resume_workspace, ResolvedResumeWorkspace,
+        ResumeWorkspaceMode,
     },
     node_agent_local_task_store::LocalTaskRecord,
     node_agent_local_task_supervision::{SupervisionContract, SUPERVISION_PROTOCOL},
@@ -24,6 +25,7 @@ use crate::{
 pub(crate) fn resolve_recycled_resume_workspace(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    parent_contract: Option<&SupervisionContract>,
     requested_project_id: &str,
     requested_workspace_path: &str,
     receipt: &UpdateRecoveryReceipt,
@@ -66,13 +68,17 @@ pub(crate) fn resolve_recycled_resume_workspace(
     );
 
     let project_part = safe_path_part(&parent.project_id, "project", 80);
-    let conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
-    let expected_branch = format!("ai/session/{project_part}/{conversation_part}");
-    validate_platform_path(&active, &project_part, &conversation_part)?;
-    anyhow::ensure!(
-        status_branch == expected_branch,
-        "recorded branch identity drifted"
-    );
+    let parent_conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
+    let platform_identity = recorded_platform_workspace_identity(
+        contract,
+        parent_contract,
+        parent,
+        &project_part,
+        &parent_conversation_part,
+        &status_branch,
+    )?;
+    let expected_branch = platform_identity.branch;
+    validate_platform_path(&active, &project_part, &platform_identity.conversation_part)?;
     anyhow::ensure!(
         expected_branch != "main",
         "refusing to recreate main as a resume worktree"
@@ -125,6 +131,7 @@ pub(crate) fn resolve_recycled_resume_workspace(
     let validated = validate_resume_workspace(
         contract,
         parent,
+        parent_contract,
         None,
         requested_project_id,
         requested_workspace_path,

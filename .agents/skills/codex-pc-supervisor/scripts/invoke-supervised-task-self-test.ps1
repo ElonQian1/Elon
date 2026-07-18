@@ -89,6 +89,13 @@ function Invoke-SupervisionSelfTest {
     $recoveryReadyParent.resume_workspace_status.derivation = 'workspace_status_git_recovery_ready_legacy_branch_ref'
     $recoveryReadyParent.resume_workspace_status.requires_recreation = $true
     $recoveryReadyResumeBody = New-ResumeTaskBody $recoveryReadyParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $inheritedParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
+    $inheritedParent.resume_workspace_status.derivation = 'inherited_workspace_status'
+    $inheritedResumeBody = New-ResumeTaskBody $inheritedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $recordedHeadRecoveryParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
+    $recordedHeadRecoveryParent.resume_workspace_status.derivation = 'workspace_status_git_recovery_ready_recorded_head'
+    $recordedHeadRecoveryParent.resume_workspace_status.requires_recreation = $true
+    $recordedHeadRecoveryResumeBody = New-ResumeTaskBody $recordedHeadRecoveryParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
     $occupiedRecoveryReadyParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $recoveryReadyParent) 'application/json'
     $occupiedRecoveryReadyParent.resume_workspace_status.occupied = $true
     $occupiedRecoveryReadyRejected = $false
@@ -174,6 +181,8 @@ function Invoke-SupervisionSelfTest {
         resume_legacy_started_cwd = $legacyResumeBody.supervision.task_role -eq 'resume_original'
         resume_receipt_rebuild = $recycledResumeBody.supervision.task_role -eq 'resume_original'
         resume_git_recovery_ready = $recoveryReadyResumeBody.supervision.task_role -eq 'resume_original'
+        resume_inherited_workspace = $inheritedResumeBody.supervision.task_role -eq 'resume_original'
+        resume_recorded_head_recovery = $recordedHeadRecoveryResumeBody.supervision.task_role -eq 'resume_original'
         resume_git_recovery_occupied_guard = $occupiedRecoveryReadyRejected
         resume_guard = $unsafeResumeRejected
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
@@ -201,6 +210,7 @@ function Invoke-SupervisionSelfTest {
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
+            'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
             'inspect_wait_active_runtime', 'criteria_json_array', 'criteria_utf8_file'
         )

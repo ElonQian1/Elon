@@ -161,7 +161,7 @@ async fn get_task(
             &runtime,
             &record,
             snapshot.record.as_ref(),
-            supervision.enabled,
+            supervision.contract(),
         )
         .await;
     Json(json!({
