@@ -149,6 +149,7 @@ mod node_agent_project_docs_mcp_tests;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_ui_design_workspace;
+mod node_agent_update_recovery;
 mod node_agent_workspace_match;
 mod node_agent_workspace_modules;
 mod node_agent_write_preview;
