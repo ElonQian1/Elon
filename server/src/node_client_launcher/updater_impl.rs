@@ -85,7 +85,11 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     std::fs::write(&tmp_version, &remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
 
-    crate::node_agent_update_checkpoint::checkpoint_downloaded_update(&version_file, &remote_text)?;
+    wait_for_safe_update_checkpoint(install_dir, &version_file, &remote_text)?;
+    crate::node_agent_update_recovery::UpdateRecoveryStore::default().set_install_gate_phase(
+        "applying",
+        Some("stopping old runtime after durable checkpoint"),
+    )?;
 
     process::stop_agent();
     let client = paths::client_exe(install_dir);
@@ -134,7 +138,11 @@ pub(super) fn try_update_from_client_package(
     std::fs::write(&tmp_version, remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
 
-    crate::node_agent_update_checkpoint::checkpoint_downloaded_update(&version_file, remote_text)?;
+    wait_for_safe_update_checkpoint(install_dir, &version_file, remote_text)?;
+    crate::node_agent_update_recovery::UpdateRecoveryStore::default().set_install_gate_phase(
+        "applying",
+        Some("stopping old runtime after durable checkpoint"),
+    )?;
 
     process::stop_agent();
     let client = paths::client_exe(install_dir);
@@ -144,6 +152,48 @@ pub(super) fn try_update_from_client_package(
     } else {
         replace_client_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
         Ok(false)
+    }
+}
+
+fn wait_for_safe_update_checkpoint(
+    install_dir: &Path,
+    version_file: &Path,
+    remote_text: &str,
+) -> Result<()> {
+    let max_wait_secs = env_u64(
+        "NODE_AGENT_UPDATE_DEFER_MAX_SECS",
+        24 * 60 * 60,
+        30,
+        7 * 24 * 60 * 60,
+    );
+    let started = std::time::Instant::now();
+    loop {
+        let decision = crate::node_agent_update_checkpoint::checkpoint_downloaded_update(
+            version_file,
+            remote_text,
+        )?;
+        if decision.install_may_proceed() {
+            return Ok(());
+        }
+        super::log_file::record_event(
+            install_dir,
+            "update_deferred_active_foreground",
+            true,
+            &format!(
+                "等待 {} 个无安全 checkpoint 的前台任务结束后再安装更新",
+                decision
+                    .active_foreground_task_ids
+                    .len()
+                    .saturating_sub(decision.checkpointed_task_ids.len())
+            ),
+        );
+        if started.elapsed() >= Duration::from_secs(max_wait_secs) {
+            anyhow::bail!(
+                "节点更新已安全延迟 {} 秒；前台任务仍无完整恢复检查点，保持旧 runtime 继续运行",
+                max_wait_secs
+            );
+        }
+        std::thread::sleep(Duration::from_secs(2));
     }
 }
 

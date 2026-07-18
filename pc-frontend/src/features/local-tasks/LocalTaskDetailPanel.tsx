@@ -12,6 +12,7 @@ import type {
 } from './types'
 import styles from './LocalTasksPage.module.css'
 import LocalTaskSupervisionPanel from './LocalTaskSupervisionPanel'
+import LocalTaskUpdateRecoveryPanel from './LocalTaskUpdateRecoveryPanel'
 
 interface Props {
   detail: LocalTaskDetail | null
@@ -101,6 +102,10 @@ export default function LocalTaskDetailPanel({
         </section>
 
         <LocalTaskSupervisionPanel supervision={detail.supervision} />
+        <LocalTaskUpdateRecoveryPanel
+          recovery={detail.update_recovery}
+          resumeWorkspace={detail.resume_workspace_status}
+        />
 
         {detail.approvals.length > 0 && (
           <section className={styles.infoCard}>

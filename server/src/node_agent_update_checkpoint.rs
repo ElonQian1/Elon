@@ -9,14 +9,31 @@ use tracing::info;
 use crate::{
     node_agent_local_task_supervision::{load_supervision_contract, SUPERVISION_PROTOCOL},
     node_agent_update_recovery::{
-        ReleaseIdentity, UpdateRecoveryReceipt, UpdateRecoveryState, UpdateRecoveryStore,
-        WorkspaceGitFingerprint,
+        ReleaseIdentity, UpdateInstallGate, UpdateRecoveryReceipt, UpdateRecoveryState,
+        UpdateRecoveryStore, WorkspaceGitFingerprint,
     },
 };
 
 const RECOVERY_DEADLINE_MS: u128 = 24 * 60 * 60 * 1_000;
 
-pub(crate) fn checkpoint_downloaded_update(version_file: &Path, remote_text: &str) -> Result<()> {
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct UpdateCheckpointDecision {
+    pub(crate) active_foreground_task_ids: Vec<String>,
+    pub(crate) checkpointed_task_ids: Vec<String>,
+}
+
+impl UpdateCheckpointDecision {
+    pub(crate) fn install_may_proceed(&self) -> bool {
+        self.active_foreground_task_ids
+            .iter()
+            .all(|task_id| self.checkpointed_task_ids.contains(task_id))
+    }
+}
+
+pub(crate) fn checkpoint_downloaded_update(
+    version_file: &Path,
+    remote_text: &str,
+) -> Result<UpdateCheckpointDecision> {
     let target: serde_json::Value =
         serde_json::from_str(remote_text).context("解析更新版本身份")?;
     let to_git_sha = target
@@ -26,18 +43,35 @@ pub(crate) fn checkpoint_downloaded_update(version_file: &Path, remote_text: &st
         .filter(|value| !value.is_empty())
         .context("更新版本缺少 gitSha，不能建立恢复事务")?;
     let from_git_sha = read_version_git_sha(version_file).unwrap_or_default();
-    let count = checkpoint_active_update_transactions(
-        &UpdateRecoveryStore::default(),
+    let store = UpdateRecoveryStore::default();
+    let decision = checkpoint_active_update_transactions(
+        &store,
         &crate::node_agent_local_task_store::LocalTaskStore::default(),
         &crate::node_agent_task_journal::TaskJournal::default(),
         &crate::node_agent_cli_sidecar::CliSidecarRegistry::default(),
         &from_git_sha,
         to_git_sha,
     )?;
-    if count > 0 {
-        info!(count, %to_git_sha, "已保存节点更新任务恢复检查点");
+    if !decision.checkpointed_task_ids.is_empty() {
+        info!(count = decision.checkpointed_task_ids.len(), %to_git_sha, "已保存节点更新任务恢复检查点");
     }
-    Ok(())
+    let may_proceed = decision.install_may_proceed();
+    store.update_install_gate(UpdateInstallGate {
+        phase: if may_proceed {
+            "checkpoint_saved".to_string()
+        } else {
+            "deferred_active_foreground".to_string()
+        },
+        target_git_sha: to_git_sha.to_string(),
+        active_foreground_task_ids: decision.active_foreground_task_ids.clone(),
+        safe_checkpoint_count: decision.checkpointed_task_ids.len(),
+        capability: "local_update_gate_v1".to_string(),
+        reason: (!may_proceed).then(|| {
+            "active foreground task has no complete durable recovery checkpoint".to_string()
+        }),
+        updated_at_ms: crate::node_agent_cli_sidecar::now_ms(),
+    })?;
+    Ok(decision)
 }
 
 fn checkpoint_active_update_transactions(
@@ -47,10 +81,13 @@ fn checkpoint_active_update_transactions(
     sidecars: &crate::node_agent_cli_sidecar::CliSidecarRegistry,
     from_git_sha: &str,
     to_git_sha: &str,
-) -> Result<usize> {
+) -> Result<UpdateCheckpointDecision> {
     let update_id = stable_update_id(to_git_sha);
-    let mut saved = 0;
+    let mut decision = UpdateCheckpointDecision::default();
     for task in local_tasks.list_update_candidates()? {
+        decision
+            .active_foreground_task_ids
+            .push(task.task_id.clone());
         let Some(contract) = load_supervision_contract(journal, &task.task_id)? else {
             continue;
         };
@@ -98,16 +135,26 @@ fn checkpoint_active_update_transactions(
             .record
             .as_ref()
             .and_then(|record| record.codex_session_scope_key.clone());
-        receipt.sidecar_session_id = sidecar.map(|session| session.session_id);
+        let replayable_sidecar = sidecar.as_ref().is_some_and(|session| {
+            session.can_replay_output_at(crate::node_agent_cli_sidecar::now_ms())
+        });
+        if let Some(sidecar) = sidecar {
+            receipt.sidecar_session_id = Some(sidecar.session_id);
+            receipt.sidecar_output_offset = sidecar.output_offset;
+            receipt.sidecar_output_sequence = sidecar.output_sequence;
+        }
         receipt.journal_cursor = snapshot.last_event_seq as u64;
         receipt.workspace = fingerprint_workspace(Path::new(&workspace_path));
         receipt.recovery_policy.deadline_ms =
             Some(crate::node_agent_cli_sidecar::now_ms() + RECOVERY_DEADLINE_MS);
-        receipt.safety.evidence_complete =
-            snapshot.record.is_some() && receipt.workspace.has_sufficient_identity();
         receipt.safety.pending_approval_ids = snapshot.approvals.pending_approval_ids();
         receipt.safety.non_repeatable_action = incomplete_non_repeatable_action(&snapshot.events);
         receipt.safety.journal_event_count = snapshot.last_event_seq;
+        receipt.safety.evidence_complete = snapshot.record.is_some()
+            && receipt.workspace.has_sufficient_identity()
+            && (replayable_sidecar || receipt.codex_session_id.is_some())
+            && receipt.safety.pending_approval_ids.is_empty()
+            && receipt.safety.non_repeatable_action.is_none();
         receipt.transition(UpdateRecoveryState::Downloaded, Some("update downloaded"))?;
         receipt.transition(
             UpdateRecoveryState::CheckpointSaved,
@@ -117,10 +164,12 @@ fn checkpoint_active_update_transactions(
             UpdateRecoveryState::Applying,
             Some("runtime update applying"),
         )?;
-        store.insert_if_absent(receipt)?;
-        saved += 1;
+        let saved = store.insert_if_absent(receipt)?;
+        if saved.safety.evidence_complete {
+            decision.checkpointed_task_ids.push(task.task_id);
+        }
     }
-    Ok(saved)
+    Ok(decision)
 }
 
 pub(crate) fn fingerprint_workspace(path: &Path) -> WorkspaceGitFingerprint {
@@ -241,3 +290,7 @@ fn read_version_git_sha(path: &Path) -> Option<String> {
         .and_then(serde_json::Value::as_str)
         .map(str::to_string)
 }
+
+#[cfg(test)]
+#[path = "node_agent_update_checkpoint_tests.rs"]
+mod tests;

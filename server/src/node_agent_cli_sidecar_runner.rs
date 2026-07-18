@@ -93,6 +93,12 @@ pub(crate) struct CliSidecarRunResult {
     pub terminal_error: Option<String>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct CliSidecarReplayCursor {
+    pub(crate) offset: u64,
+    pub(crate) sequence: u64,
+}
+
 pub(crate) fn sidecar_enabled() -> bool {
     !matches!(
         std::env::var("ELON_CLI_SIDECAR_DISABLED")
@@ -227,9 +233,40 @@ pub(crate) async fn follow_sidecar_output(
     task_id: &str,
     output_path: &Path,
     cancel_rx: &mut watch::Receiver<bool>,
-    mut on_event: impl FnMut(CliSidecarOutputEvent),
+    on_event: impl FnMut(CliSidecarOutputEvent),
 ) -> Result<CliSidecarRunResult> {
-    let mut offset = 0_u64;
+    follow_sidecar_output_from(
+        registry,
+        task_id,
+        output_path,
+        CliSidecarReplayCursor::default(),
+        cancel_rx,
+        on_event,
+        |cursor| {
+            if let Some(session) = registry.session_for_task(task_id)? {
+                registry.record_output_cursor(
+                    task_id,
+                    &session.session_id,
+                    cursor.offset,
+                    cursor.sequence,
+                )?;
+            }
+            Ok(())
+        },
+    )
+    .await
+}
+
+pub(crate) async fn follow_sidecar_output_from(
+    registry: &CliSidecarRegistry,
+    task_id: &str,
+    output_path: &Path,
+    initial_cursor: CliSidecarReplayCursor,
+    cancel_rx: &mut watch::Receiver<bool>,
+    mut on_event: impl FnMut(CliSidecarOutputEvent),
+    mut on_cursor: impl FnMut(CliSidecarReplayCursor) -> Result<()>,
+) -> Result<CliSidecarRunResult> {
+    let mut cursor = initial_cursor;
     let mut stdout_text = String::new();
     let mut stderr_text = String::new();
     let mut exit_ok = None;
@@ -238,7 +275,10 @@ pub(crate) async fn follow_sidecar_output(
     let mut terminal_error = None;
 
     loop {
-        for record in read_new_output_records(output_path, &mut offset)? {
+        let records = read_new_output_records(output_path, &mut cursor.offset)?;
+        cursor.sequence = cursor.sequence.saturating_add(records.len() as u64);
+        let read_records = !records.is_empty();
+        for record in records {
             match record.record_type.as_str() {
                 "chunk" => {
                     let text = record.text.unwrap_or_default();
@@ -297,6 +337,9 @@ pub(crate) async fn follow_sidecar_output(
                 terminal_error,
             });
         }
+        if read_records {
+            on_cursor(cursor)?;
+        }
 
         tokio::select! {
             changed = cancel_rx.changed() => {
@@ -344,6 +387,8 @@ pub(crate) fn hide_tokio_command_window(_command: &mut tokio::process::Command) 
 
 #[cfg(test)]
 mod tests {
+    use crate::node_agent_cli_sidecar_io::{append_output, CliSidecarOutputRecord};
+
     #[test]
     fn sidecar_uses_pipe_sidecar_for_codex_when_json_direct_stdout_is_enabled() {
         assert!(super::sidecar_enabled_for_cli_name("codex", true, true));
@@ -450,5 +495,48 @@ mod tests {
         super::restore_prompt_arg_for_pty(&mut config);
         assert_eq!(config.args.last(), Some(&prompt));
         assert!(config.stdin_payload.is_none());
+    }
+
+    #[tokio::test]
+    async fn replay_persists_nonterminal_cursor_but_replays_terminal_until_completion_commits() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-sidecar-cursor-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let output = root.join("output.jsonl");
+        append_output(
+            &output,
+            CliSidecarOutputRecord::chunk("stdout", "checkpointed\n"),
+        )
+        .unwrap();
+        let exit_output = output.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(350)).await;
+            append_output(&exit_output, CliSidecarOutputRecord::exit(true, false)).unwrap();
+        });
+        let registry =
+            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("registry"));
+        let (_cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
+        let mut cursors = Vec::new();
+        let result = super::follow_sidecar_output_from(
+            &registry,
+            "task",
+            &output,
+            super::CliSidecarReplayCursor::default(),
+            &mut cancel_rx,
+            |_| {},
+            |cursor| {
+                cursors.push(cursor);
+                Ok(())
+            },
+        )
+        .await
+        .unwrap();
+        assert!(result.exit_ok);
+        assert_eq!(result.stdout_text, "checkpointed\n");
+        assert_eq!(cursors.len(), 1);
+        assert_eq!(cursors[0].sequence, 1);
+        let _ = std::fs::remove_dir_all(root);
     }
 }

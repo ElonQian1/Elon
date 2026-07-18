@@ -81,6 +81,13 @@ pub(super) async fn admin_status(
             active_task_count: active_cli_prompt_count,
             sidecar_session_count: sidecar_sessions.len(),
         });
+    let update_recovery = rt
+        .update_recovery
+        .status_payload(20)
+        .unwrap_or_else(|error| {
+            warn!(%error, "节点更新恢复状态读取失败，管理状态降级为空摘要");
+            serde_json::json!({"protocol":"elon.node_update_recovery.v1","error":"unavailable"})
+        });
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "release_identity": super::node_agent_release_identity::current(),
@@ -105,6 +112,7 @@ pub(super) async fn admin_status(
         "connected": connected,
         "last_event": last_event,
         "lifecycle": lifecycle,
+        "update_recovery": update_recovery,
         "hardware": hardware,
         "storage": storage,
         "node_data_root": node_data_root,

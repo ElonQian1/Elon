@@ -68,6 +68,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             post(decide_approval),
         )
         .merge(crate::node_agent_local_task_supervision::routes())
+        .merge(crate::node_agent_update_recovery_api::routes())
 }
 
 async fn list_tasks(
@@ -152,6 +153,17 @@ async fn get_task(
         Ok(supervision) => supervision,
         Err(error) => return internal_error(error),
     };
+    let update_recovery = match runtime.update_recovery.receipt_for_task(&record.task_id) {
+        Ok(receipt) => receipt,
+        Err(error) => return internal_error(error),
+    };
+    let resume_workspace_status = inspect_resume_workspace_status(
+        &runtime,
+        &record,
+        snapshot.record.as_ref(),
+        supervision.enabled,
+    )
+    .await;
     Json(json!({
         "ok": true,
         "record": record,
@@ -161,6 +173,8 @@ async fn get_task(
         "approval_state": approval_state,
         "runtime": runtime_status,
         "supervision": supervision,
+        "update_recovery": update_recovery,
+        "resume_workspace_status": resume_workspace_status,
     }))
     .into_response()
 }
@@ -263,6 +277,8 @@ async fn create_task(
             "parent_task_id": supervision.as_ref().and_then(|contract| contract.parent_task_id.as_deref()),
             "authorized_workspace_path": workspace.authorized_workspace_path.as_str(),
             "active_workspace_path": workspace.inherited_workspace.workspace_path.as_str(),
+            "derivation": workspace.derivation.as_str(),
+            "git_head": workspace.git_head.as_str(),
         })
     });
     let frozen_codex_home =
@@ -433,6 +449,12 @@ async fn resolve_supervised_resume_workspace(
     let resolved = crate::node_agent_local_task_resume::validate_resume_workspace(
         contract,
         &parent,
+        runtime
+            .task_journal
+            .snapshot(&parent.task_id, 0, 1)
+            .map_err(internal_error)?
+            .record
+            .as_ref(),
         project_id,
         requested_workspace_path,
     )
@@ -473,7 +495,89 @@ async fn resolve_supervised_resume_workspace(
             "父任务隔离 worktree 已被活跃任务占用，已拒绝续跑。",
         ));
     }
+    if live_sidecar_occupies_workspace(runtime, &resolved.inherited_workspace.workspace_path)
+        .map_err(internal_error)?
+    {
+        return Err(json_error(
+            StatusCode::CONFLICT,
+            "父任务隔离 worktree 仍被存活 sidecar 占用，已拒绝续跑。",
+        ));
+    }
     Ok(Some(resolved))
+}
+
+async fn inspect_resume_workspace_status(
+    runtime: &Arc<NodeRuntime>,
+    parent: &crate::node_agent_local_task_store::LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
+    supervision_enabled: bool,
+) -> serde_json::Value {
+    if !supervision_enabled {
+        return json!({"eligible": false, "reason": "missing_supervision_contract"});
+    }
+    let contract = crate::node_agent_local_task_supervision::SupervisionContract {
+        protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.to_string(),
+        supervisor: "codex_desktop".to_string(),
+        task_role: "resume_original".to_string(),
+        parent_task_id: Some(parent.task_id.clone()),
+        root_task_id: Some(parent.task_id.clone()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: "after_task_or_unblock".to_string(),
+    };
+    match crate::node_agent_local_task_resume::validate_resume_workspace(
+        &contract,
+        parent,
+        journal_record,
+        &parent.project_id,
+        &parent.workspace_path,
+    ) {
+        Ok(resolved) => {
+            let prompt_occupied = !runtime
+                .active_cli_prompt_views_for_workspace(FsPath::new(
+                    &resolved.inherited_workspace.workspace_path,
+                ))
+                .await
+                .is_empty();
+            let sidecar_occupied = live_sidecar_occupies_workspace(
+                runtime,
+                &resolved.inherited_workspace.workspace_path,
+            )
+            .unwrap_or(true);
+            json!({
+                "eligible": !prompt_occupied && !sidecar_occupied,
+                "derivation": resolved.derivation,
+                "authorized_workspace_path": resolved.authorized_workspace_path,
+                "active_workspace_path": resolved.inherited_workspace.workspace_path,
+                "branch": resolved.inherited_workspace.branch,
+                "git_head": resolved.git_head,
+                "occupied": prompt_occupied || sidecar_occupied,
+            })
+        }
+        Err(error) => json!({"eligible": false, "reason": error.to_string()}),
+    }
+}
+
+fn live_sidecar_occupies_workspace(
+    runtime: &NodeRuntime,
+    workspace_path: &str,
+) -> anyhow::Result<bool> {
+    let expected = std::fs::canonicalize(workspace_path)?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    Ok(runtime
+        .cli_sidecars
+        .all_sessions()?
+        .into_iter()
+        .any(|session| {
+            session.is_live_at(now)
+                && session
+                    .cwd
+                    .as_deref()
+                    .and_then(|path| std::fs::canonicalize(path).ok())
+                    .is_some_and(|path| path == expected)
+        }))
 }
 
 async fn cancel_task(

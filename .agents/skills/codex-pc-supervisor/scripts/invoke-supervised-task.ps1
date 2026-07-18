@@ -443,7 +443,14 @@ function Assert-SafeResumeParentDetail {
         [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'base_workspace_path')) -or
         [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'active_workspace_path')) -or
         [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'branch'))) {
-        throw 'Resume requires a platform-recorded isolated parent worktree.'
+        $resumeStatus = Get-ObjectField $ParentDetail 'resume_workspace_status'
+        if ((Get-ObjectField $resumeStatus 'eligible') -ne $true -or
+            [string](Get-ObjectField $resumeStatus 'derivation') -ne 'legacy_started_cwd_git_registry' -or
+            [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'active_workspace_path')) -or
+            [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'branch')) -or
+            [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'git_head'))) {
+            throw 'Resume requires a node-validated isolated parent worktree.'
+        }
     }
 }
 

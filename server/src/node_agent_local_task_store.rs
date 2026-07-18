@@ -222,7 +222,7 @@ impl LocalTaskStore {
                 AND (?18 IS NULL OR agent_id = ?18)
                 AND (?19 IS NULL OR install_id = ?19)
                 AND (completion_event_id IS NULL OR completion_event_id = ?12)
-                AND status IN ('running','recovering','canceled','done','failed','resume_required')",
+                AND status IN ('running','recovering','interrupted','canceled','done','failed','resume_required')",
             params![
                 if completion.exit_ok { "done" } else { "failed" },
                 completion.error,

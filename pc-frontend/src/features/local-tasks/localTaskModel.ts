@@ -5,6 +5,8 @@ import type {
   LocalTaskRecord,
   LocalTaskRuntimeState,
   LocalTaskSupervisionState,
+  LocalTaskUpdateRecovery,
+  LocalTaskResumeWorkspaceStatus,
   LocalTaskStatusView,
   LocalTaskTokenUsage,
 } from './types'
@@ -50,6 +52,58 @@ export function normalizeLocalTaskDetail(payload: unknown): LocalTaskDetail {
     has_more: Boolean(root.has_more),
     supervision: normalizeSupervisionState(root.supervision),
     runtime: normalizeRuntimeState(root.runtime),
+    update_recovery: normalizeUpdateRecovery(root.update_recovery),
+    resume_workspace_status: normalizeResumeWorkspaceStatus(root.resume_workspace_status),
+  }
+}
+
+export function normalizeUpdateRecovery(payload: unknown): LocalTaskUpdateRecovery | undefined {
+  const root = objectValue(payload)
+  if (!Object.keys(root).length) return undefined
+  const from = objectValue(root.from_release)
+  const to = objectValue(root.to_release)
+  const transport = objectValue(root.transport)
+  const review = objectValue(root.final_review)
+  return {
+    protocol: textValue(root.protocol),
+    update_id: textValue(root.update_id),
+    state: textValue(root.state),
+    state_reason: textValue(root.state_reason ?? root.final_reason),
+    original_task_id: textValue(root.original_task_id),
+    resume_task_id: textValue(root.resume_task_id),
+    from_version: textValue(from.version),
+    from_git_sha: textValue(from.git_sha),
+    to_version: textValue(to.version),
+    to_git_sha: textValue(to.git_sha),
+    sidecar_session_id: textValue(root.sidecar_session_id),
+    sidecar_output_offset: numberValue(root.sidecar_output_offset) ?? 0,
+    sidecar_output_sequence: numberValue(root.sidecar_output_sequence) ?? 0,
+    journal_cursor: numberValue(root.journal_cursor) ?? 0,
+    transport_kind: textValue(transport.kind),
+    transport_protocol: textValue(transport.protocol),
+    capabilities: textArray(transport.capabilities),
+    replay_from_cursor: Boolean(transport.replay_from_cursor),
+    resume_strategy: textValue(root.resume_strategy),
+    completion_event_id: textValue(root.completion_event_id),
+    terminal_task_status: textValue(root.terminal_task_status),
+    terminal_finished_at_ms: timestampValue(root.terminal_finished_at_ms),
+    expected_downtime_ms: numberValue(root.expected_downtime_ms) ?? 0,
+    review_verdict: textValue(review.verdict),
+    review_summary: textValue(review.summary),
+  }
+}
+
+function normalizeResumeWorkspaceStatus(payload: unknown): LocalTaskResumeWorkspaceStatus | undefined {
+  const root = objectValue(payload)
+  if (!Object.keys(root).length) return undefined
+  return {
+    eligible: Boolean(root.eligible),
+    derivation: textValue(root.derivation),
+    active_workspace_path: textValue(root.active_workspace_path),
+    branch: textValue(root.branch),
+    git_head: textValue(root.git_head),
+    occupied: Boolean(root.occupied),
+    reason: textValue(root.reason),
   }
 }
 
@@ -188,6 +242,8 @@ export function mergeLocalTaskDetail(
     events: mergeLocalTaskEvents(current.events, incoming.events),
     last_event_seq: Math.max(current.last_event_seq, incoming.last_event_seq),
     supervision: incoming.supervision.enabled ? incoming.supervision : current.supervision,
+    update_recovery: incoming.update_recovery ?? current.update_recovery,
+    resume_workspace_status: incoming.resume_workspace_status ?? current.resume_workspace_status,
   }
 }
 

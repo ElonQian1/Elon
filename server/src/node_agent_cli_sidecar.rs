@@ -58,6 +58,10 @@ pub(crate) struct CliSidecarSessionRecord {
     pub worker_release: Option<String>,
     #[serde(default)]
     pub worker_sha256: Option<String>,
+    #[serde(default)]
+    pub output_offset: u64,
+    #[serde(default)]
+    pub output_sequence: u64,
     pub started_at_ms: u128,
     pub last_seen_at_ms: u128,
     pub capabilities: CliSidecarCapabilities,
@@ -145,6 +149,29 @@ impl CliSidecarRegistry {
                 return Ok(false);
             };
             session.state = state.to_string();
+            session.last_seen_at_ms = now_ms();
+            self.save_sessions(&sessions)?;
+            Ok(true)
+        })
+    }
+
+    pub(crate) fn record_output_cursor(
+        &self,
+        task_id: &str,
+        session_id: &str,
+        offset: u64,
+        sequence: u64,
+    ) -> Result<bool> {
+        with_task_journal_io_lock(|| {
+            let mut sessions = self.load_sessions()?;
+            let Some(session) = sessions.get_mut(session_id) else {
+                return Ok(false);
+            };
+            if session.task_id != task_id {
+                return Ok(false);
+            }
+            session.output_offset = session.output_offset.max(offset);
+            session.output_sequence = session.output_sequence.max(sequence);
             session.last_seen_at_ms = now_ms();
             self.save_sessions(&sessions)?;
             Ok(true)
@@ -379,6 +406,8 @@ impl CliSidecarSessionRecord {
             worker_path: None,
             worker_release: None,
             worker_sha256: None,
+            output_offset: 0,
+            output_sequence: 0,
             started_at_ms: now_ms,
             last_seen_at_ms: now_ms,
             capabilities: CliSidecarCapabilities {
@@ -417,6 +446,8 @@ impl CliSidecarSessionRecord {
             worker_path: None,
             worker_release: None,
             worker_sha256: None,
+            output_offset: 0,
+            output_sequence: 0,
             started_at_ms: now_ms,
             last_seen_at_ms: now_ms,
             capabilities: CliSidecarCapabilities {
@@ -476,6 +507,8 @@ pub(crate) fn sidecar_status_view(session: &CliSidecarSessionRecord) -> serde_js
         "worker_path": session.worker_path,
         "worker_release": session.worker_release,
         "worker_sha256": session.worker_sha256,
+        "output_offset": session.output_offset,
+        "output_sequence": session.output_sequence,
         "started_at_ms": session.started_at_ms,
         "last_seen_at_ms": session.last_seen_at_ms,
         "live_after_restart": session.is_live_at(now),

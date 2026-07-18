@@ -62,6 +62,16 @@ function Invoke-SupervisionSelfTest {
     $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' $improvementPrompt `
         $testCriteria $true
     $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $legacyParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
+    $legacyParent.record.workspace_status = $null
+    $legacyParent | Add-Member -NotePropertyName resume_workspace_status -NotePropertyValue ([pscustomobject][ordered]@{
+        eligible = $true
+        derivation = 'legacy_started_cwd_git_registry'
+        active_workspace_path = 'C:\conversation-worktrees\中文项目\中文会话'
+        branch = 'ai/session/中文项目/中文会话'
+        git_head = '0123456789abcdef0123456789abcdef01234567'
+    }) -Force
+    $legacyResumeBody = New-ResumeTaskBody $legacyParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
     $unsafeParent = [ordered]@{
         record = [ordered]@{
             task_id = 'local-running-task'
@@ -112,6 +122,7 @@ function Invoke-SupervisionSelfTest {
         resume_protocol = $resumeBody.supervision.protocol -eq $script:SupervisionProtocol
         resume_parent = $resumeBody.supervision.parent_task_id -eq 'local-parent-task'
         resume_root = $resumeBody.supervision.root_task_id -eq 'local-root-task'
+        resume_legacy_started_cwd = $legacyResumeBody.supervision.task_role -eq 'resume_original'
         resume_guard = $unsafeResumeRejected
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
@@ -132,7 +143,7 @@ function Invoke-SupervisionSelfTest {
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
-            'task_detail_path', 'criteria_json_array', 'criteria_utf8_file'
+            'resume_legacy_started_cwd', 'task_detail_path', 'criteria_json_array', 'criteria_utf8_file'
         )
     })
 }

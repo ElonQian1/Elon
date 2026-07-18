@@ -110,6 +110,7 @@ fn valid_resume_inherits_recorded_platform_worktree_from_base_or_active_request(
         let resolved = validate_resume_workspace(
             &fixture.contract,
             &fixture.parent,
+            None,
             "project-a",
             requested.to_string_lossy().as_ref(),
         )
@@ -126,11 +127,57 @@ fn valid_resume_inherits_recorded_platform_worktree_from_base_or_active_request(
 }
 
 #[test]
+fn legacy_resume_derives_only_from_started_cwd_and_git_registry() {
+    let mut fixture = ResumeFixture::new();
+    fixture.parent.workspace_status = None;
+    let journal = crate::node_agent_task_journal::TaskJournalRecord {
+        req_id: fixture.parent.task_id.clone(),
+        cli_name: "codex".to_string(),
+        route: Some("local_offline".to_string()),
+        run_handle_id: None,
+        cwd: Some(fixture.active.to_string_lossy().to_string()),
+        runtime_permission: Some("full_access".to_string()),
+        os_pid: None,
+        process_started_at_ms: None,
+        codex_session_id: None,
+        codex_session_scope_key: None,
+        codex_session_updated_at_ms: None,
+        status: "finished".to_string(),
+        started_at_ms: 1,
+        updated_at_ms: 2,
+        cancel_requested_at_ms: None,
+    };
+    let resolved = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&journal),
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("legacy resume should use the latest durable started.cwd");
+    assert_eq!(resolved.derivation, "legacy_started_cwd_git_registry");
+    assert!(!resolved.git_head.is_empty());
+
+    let arbitrary = fixture.root.join("arbitrary");
+    std::fs::create_dir_all(&arbitrary).unwrap();
+    let error = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&journal),
+        "project-a",
+        arbitrary.to_string_lossy().as_ref(),
+    )
+    .expect_err("caller supplied arbitrary path must remain rejected");
+    assert!(error.to_string().contains("只能引用"));
+}
+
+#[test]
 fn resume_rejects_cross_project_parent() {
     let fixture = ResumeFixture::new();
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         "project-b",
         fixture.base.to_string_lossy().as_ref(),
     )
@@ -152,6 +199,7 @@ fn resume_rejects_forged_active_path() {
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
     )
@@ -167,6 +215,7 @@ fn resume_rejects_active_parent_task() {
     let error = validate_resume_workspace(
         &fixture.contract,
         &fixture.parent,
+        None,
         "project-a",
         fixture.base.to_string_lossy().as_ref(),
     )

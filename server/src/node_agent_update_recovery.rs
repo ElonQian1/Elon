@@ -114,6 +114,14 @@ pub(crate) struct RecoveryTransport {
     pub(crate) protocol: String,
     #[serde(default)]
     pub(crate) capabilities: Vec<String>,
+    #[serde(default = "default_auth_mode")]
+    pub(crate) auth_mode: String,
+    #[serde(default)]
+    pub(crate) lease_id: Option<String>,
+    #[serde(default)]
+    pub(crate) lease_expires_at_ms: Option<u128>,
+    #[serde(default = "default_true")]
+    pub(crate) replay_from_cursor: bool,
 }
 
 impl Default for RecoveryTransport {
@@ -133,6 +141,10 @@ impl RecoveryTransport {
                 "sidecar_reattach".to_string(),
                 "resume_original".to_string(),
             ],
+            auth_mode: default_auth_mode(),
+            lease_id: None,
+            lease_expires_at_ms: None,
+            replay_from_cursor: true,
         }
     }
 
@@ -142,6 +154,10 @@ impl RecoveryTransport {
             kind: "remote_relay".to_string(),
             protocol: "elon.node.v1".to_string(),
             capabilities: Vec::new(),
+            auth_mode: "remote_transport_auth".to_string(),
+            lease_id: None,
+            lease_expires_at_ms: None,
+            replay_from_cursor: false,
         }
     }
 
@@ -256,6 +272,12 @@ pub(crate) struct UpdateRecoveryReceipt {
     #[serde(default)]
     pub(crate) journal_cursor: u64,
     #[serde(default)]
+    pub(crate) sidecar_output_offset: u64,
+    #[serde(default)]
+    pub(crate) sidecar_output_sequence: u64,
+    #[serde(default = "default_expected_downtime_ms")]
+    pub(crate) expected_downtime_ms: u64,
+    #[serde(default)]
     pub(crate) workspace: WorkspaceGitFingerprint,
     #[serde(default)]
     pub(crate) transport: RecoveryTransport,
@@ -268,7 +290,15 @@ pub(crate) struct UpdateRecoveryReceipt {
     #[serde(default)]
     pub(crate) final_review: Option<UpdateRecoveryReview>,
     #[serde(default)]
+    pub(crate) completion_event_id: Option<String>,
+    #[serde(default)]
+    pub(crate) terminal_task_status: Option<String>,
+    #[serde(default)]
+    pub(crate) terminal_finished_at_ms: Option<u128>,
+    #[serde(default)]
     pub(crate) state: UpdateRecoveryState,
+    #[serde(default)]
+    pub(crate) state_reason: Option<String>,
     #[serde(default)]
     pub(crate) final_reason: Option<String>,
     #[serde(default)]
@@ -300,13 +330,20 @@ impl UpdateRecoveryReceipt {
             codex_session_scope: None,
             sidecar_session_id: None,
             journal_cursor: 0,
+            sidecar_output_offset: 0,
+            sidecar_output_sequence: 0,
+            expected_downtime_ms: default_expected_downtime_ms(),
             workspace: WorkspaceGitFingerprint::default(),
             transport: RecoveryTransport::local(),
             recovery_policy: RecoveryPolicy::default(),
             safety: RecoverySafetyEvidence::default(),
             resume_strategy: None,
             final_review: None,
+            completion_event_id: None,
+            terminal_task_status: None,
+            terminal_finished_at_ms: None,
             state: UpdateRecoveryState::Planned,
+            state_reason: None,
             final_reason: None,
             created_at_ms: now,
             updated_at_ms: now,
@@ -338,6 +375,7 @@ impl UpdateRecoveryReceipt {
             return Ok(false);
         }
         self.state = next;
+        self.state_reason = reason.map(str::to_string);
         self.final_reason = if next.is_terminal() {
             reason.map(str::to_string)
         } else {
@@ -366,11 +404,45 @@ impl UpdateRecoveryReceipt {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct UpdateInstallGate {
+    #[serde(default = "default_install_gate_phase")]
+    pub(crate) phase: String,
+    #[serde(default)]
+    pub(crate) target_git_sha: String,
+    #[serde(default)]
+    pub(crate) active_foreground_task_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) safe_checkpoint_count: usize,
+    #[serde(default = "default_update_gate_capability")]
+    pub(crate) capability: String,
+    #[serde(default)]
+    pub(crate) reason: Option<String>,
+    #[serde(default)]
+    pub(crate) updated_at_ms: u128,
+}
+
+impl Default for UpdateInstallGate {
+    fn default() -> Self {
+        Self {
+            phase: default_install_gate_phase(),
+            target_git_sha: String::new(),
+            active_foreground_task_ids: Vec::new(),
+            safe_checkpoint_count: 0,
+            capability: default_update_gate_capability(),
+            reason: None,
+            updated_at_ms: now_ms(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct UpdateRecoveryLedger {
     #[serde(default = "default_schema_version")]
     pub(crate) schema_version: u32,
     #[serde(default = "default_protocol")]
     pub(crate) protocol: String,
+    #[serde(default)]
+    pub(crate) install_gate: UpdateInstallGate,
     #[serde(default)]
     pub(crate) receipts: Vec<UpdateRecoveryReceipt>,
 }
@@ -380,6 +452,7 @@ impl Default for UpdateRecoveryLedger {
         Self {
             schema_version: UPDATE_RECOVERY_SCHEMA_VERSION,
             protocol: UPDATE_RECOVERY_PROTOCOL.to_string(),
+            install_gate: UpdateInstallGate::default(),
             receipts: Vec::new(),
         }
     }
@@ -502,6 +575,124 @@ impl UpdateRecoveryStore {
         }
         Ok(task_ids)
     }
+
+    pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {
+        Ok(self
+            .load()?
+            .receipts
+            .into_iter()
+            .filter(|receipt| {
+                receipt.original_task_id == task_id
+                    || receipt.resume_task_id.as_deref() == Some(task_id)
+            })
+            .max_by_key(|receipt| receipt.updated_at_ms))
+    }
+
+    pub(crate) fn status_payload(&self, limit: usize) -> Result<serde_json::Value> {
+        let ledger = self.load()?;
+        let mut receipts = ledger.receipts;
+        receipts.sort_by(|left, right| right.updated_at_ms.cmp(&left.updated_at_ms));
+        receipts.truncate(limit.clamp(1, 100));
+        let active_count = receipts
+            .iter()
+            .filter(|receipt| !receipt.state.is_terminal())
+            .count();
+        Ok(serde_json::json!({
+            "schema_version": UPDATE_RECOVERY_SCHEMA_VERSION,
+            "protocol": UPDATE_RECOVERY_PROTOCOL,
+            "expected_downtime_explicit": true,
+            "cursor_replay_supported": true,
+            "install_gate": ledger.install_gate,
+            "active_count": active_count,
+            "receipts": receipts,
+        }))
+    }
+
+    pub(crate) fn update_install_gate(&self, gate: UpdateInstallGate) -> Result<()> {
+        let mut ledger = self.load()?;
+        ledger.install_gate = gate;
+        self.save(&ledger)
+    }
+
+    pub(crate) fn set_install_gate_phase(&self, phase: &str, reason: Option<&str>) -> Result<()> {
+        let mut ledger = self.load()?;
+        ledger.install_gate.phase = phase.to_string();
+        ledger.install_gate.reason = reason.map(str::to_string);
+        ledger.install_gate.updated_at_ms = now_ms();
+        self.save(&ledger)
+    }
+
+    pub(crate) fn record_sidecar_cursor(
+        &self,
+        update_id: &str,
+        original_task_id: &str,
+        offset: u64,
+        sequence: u64,
+    ) -> Result<()> {
+        self.update(update_id, original_task_id, |receipt| {
+            receipt.sidecar_output_offset = receipt.sidecar_output_offset.max(offset);
+            receipt.sidecar_output_sequence = receipt.sidecar_output_sequence.max(sequence);
+            receipt.updated_at_ms = now_ms();
+            Ok(())
+        })
+    }
+
+    pub(crate) fn record_terminal_binding(
+        &self,
+        task_id: &str,
+        event_id: &str,
+        status: &str,
+        finished_at_ms: u128,
+    ) -> Result<bool> {
+        let mut ledger = self.load()?;
+        let Some(receipt) = ledger
+            .receipts
+            .iter_mut()
+            .filter(|receipt| {
+                receipt.original_task_id == task_id
+                    || receipt.resume_task_id.as_deref() == Some(task_id)
+            })
+            .max_by_key(|receipt| receipt.updated_at_ms)
+        else {
+            return Ok(false);
+        };
+        if receipt
+            .completion_event_id
+            .as_deref()
+            .is_some_and(|current| current != event_id)
+        {
+            bail!("recovery receipt already binds a different completion event");
+        }
+        receipt.completion_event_id = Some(event_id.to_string());
+        receipt.terminal_task_status = Some(status.to_string());
+        receipt.terminal_finished_at_ms = Some(finished_at_ms);
+        receipt.updated_at_ms = now_ms();
+        self.save(&ledger)?;
+        Ok(true)
+    }
+
+    pub(crate) fn record_final_review(
+        &self,
+        task_id: &str,
+        review: UpdateRecoveryReview,
+    ) -> Result<bool> {
+        let mut ledger = self.load()?;
+        let Some(receipt) = ledger
+            .receipts
+            .iter_mut()
+            .filter(|receipt| {
+                receipt.original_task_id == task_id
+                    || receipt.resume_task_id.as_deref() == Some(task_id)
+            })
+            .max_by_key(|receipt| receipt.updated_at_ms)
+        else {
+            return Ok(false);
+        };
+        receipt.final_review = Some(review);
+        receipt.updated_at_ms = now_ms();
+        self.save(&ledger)?;
+        Ok(true)
+    }
 }
 
 fn default_protocol() -> String {
@@ -520,8 +711,24 @@ fn default_transport_protocol() -> String {
     "elon.desktop_pc_supervision.v1".to_string()
 }
 
+fn default_auth_mode() -> String {
+    "loopback_admin_token".to_string()
+}
+
+fn default_expected_downtime_ms() -> u64 {
+    45_000
+}
+
 fn default_recovery_mode() -> String {
     "prefer_sidecar_then_codex_session_then_snapshot_continue".to_string()
+}
+
+fn default_install_gate_phase() -> String {
+    "idle".to_string()
+}
+
+fn default_update_gate_capability() -> String {
+    "local_update_gate_v1".to_string()
 }
 
 fn default_true() -> bool {

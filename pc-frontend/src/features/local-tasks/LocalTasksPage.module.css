@@ -236,6 +236,20 @@
 .supervisionColumns ul, .supervisionReview ul { margin: 5px 0 0; padding-left: 16px; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
 .supervisionReview { margin-top: 9px; border-left: 2px solid #58c58b; }
 
+.recoveryCard { border: 1px solid rgba(105,169,212,.3); border-radius: 8px; background: linear-gradient(135deg, rgba(42,142,217,.09), #24272b 48%); padding: 12px 14px; }
+.recoveryCard[data-state="failed"], .recoveryCard[data-state="conflict"], .recoveryCard[data-state="timeout"] { border-color: rgba(223,92,92,.38); }
+.recoveryMeta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 9px 0 0; overflow: hidden; border-radius: 6px; background: var(--line-soft); }
+.recoveryMeta div { min-width: 0; background: #202328; padding: 8px; }
+.recoveryMeta dt { color: var(--text-muted); font-size: 9px; }
+.recoveryMeta dd { margin: 3px 0 0; overflow: hidden; color: var(--text-soft); font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+.recoveryFoot { display: flex; justify-content: space-between; gap: 12px; margin-top: 9px; color: var(--text-muted); font-size: 10px; }
+.recoveryReason { margin: 8px 0 0; color: #b8ddf8; font-size: 10px; line-height: 1.5; }
+.remoteWarning { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; color: #f0c77d; font-size: 10px; }
+.resumeCheck { display: flex; flex-direction: column; gap: 4px; margin-top: 9px; border-left: 2px solid #df5c5c; border-radius: 5px; background: rgba(0,0,0,.14); padding: 8px 10px; color: var(--text-muted); font-size: 10px; }
+.resumeCheck[data-eligible="true"] { border-left-color: #58c58b; }
+.resumeCheck strong { color: var(--text-soft); }
+.resumeCheck code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .approvalList,
 .eventList { display: flex; flex-direction: column; gap: 7px; }
 .approvalItem { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 9px; align-items: start; border: 1px solid rgba(255,255,255,.065); border-radius: 7px; background: #202227; padding: 9px; }
@@ -281,6 +295,7 @@
   .detailScroll { overflow: visible; }
   .header { align-items: flex-start; flex-direction: column; }
   .headerActions { width: 100%; justify-content: space-between; }
-  .supervisionMeta, .supervisionColumns { grid-template-columns: 1fr 1fr; }
+  .supervisionMeta, .supervisionColumns, .recoveryMeta { grid-template-columns: 1fr 1fr; }
   .runtimeMeta { grid-template-columns: 1fr 1fr; }
+  .recoveryFoot { flex-direction: column; }
 }

@@ -138,6 +138,9 @@ fn old_and_remote_protocol_defaults_remain_compatible() {
     assert_eq!(parsed.state, UpdateRecoveryState::Planned);
     assert_eq!(parsed.transport.kind, "local_loopback");
     assert!(parsed.transport.supports("event_replay"));
+    assert_eq!(parsed.transport.auth_mode, "loopback_admin_token");
+    assert!(parsed.transport.replay_from_cursor);
+    assert_eq!(parsed.expected_downtime_ms, 45_000);
 
     let remote = RecoveryTransport::remote_v1();
     assert_eq!(remote.protocol, "elon.node.v1");
@@ -146,6 +149,40 @@ fn old_and_remote_protocol_defaults_remain_compatible() {
         serde_json::from_value(serde_json::to_value(remote).expect("serialize remote transport"))
             .expect("deserialize remote transport");
     assert_eq!(round_trip.kind, "remote_relay");
+    assert_eq!(round_trip.auth_mode, "remote_transport_auth");
+    assert!(!round_trip.replay_from_cursor);
+    assert!(!round_trip.supports("update_recovery_v1"));
+}
+
+#[test]
+fn lifecycle_lookup_and_final_review_share_the_same_receipt() {
+    let (root, store) = temp_store();
+    let mut receipt = UpdateRecoveryReceipt::planned("update-6", "root-6", "task-6");
+    receipt.resume_task_id = Some("resume-6".to_string());
+    store.upsert(receipt).unwrap();
+    assert_eq!(
+        store
+            .receipt_for_task("resume-6")
+            .unwrap()
+            .unwrap()
+            .original_task_id,
+        "task-6"
+    );
+    assert!(store
+        .record_final_review(
+            "task-6",
+            UpdateRecoveryReview {
+                verdict: "accepted".to_string(),
+                summary: "reviewed".to_string(),
+                reviewed_by: "codex_desktop".to_string(),
+                reviewed_at_ms: 9,
+            },
+        )
+        .unwrap());
+    let status = store.status_payload(20).unwrap();
+    assert_eq!(status["protocol"], UPDATE_RECOVERY_PROTOCOL);
+    assert_eq!(status["receipts"][0]["final_review"]["verdict"], "accepted");
+    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]

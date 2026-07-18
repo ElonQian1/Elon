@@ -129,6 +129,44 @@ export interface LocalTaskSupervisionState {
   evidence: LocalTaskSupervisionEvidence
 }
 
+export interface LocalTaskUpdateRecovery {
+  protocol: string
+  update_id: string
+  state: string
+  state_reason: string
+  original_task_id: string
+  resume_task_id: string
+  from_version: string
+  from_git_sha: string
+  to_version: string
+  to_git_sha: string
+  sidecar_session_id: string
+  sidecar_output_offset: number
+  sidecar_output_sequence: number
+  journal_cursor: number
+  transport_kind: string
+  transport_protocol: string
+  capabilities: string[]
+  replay_from_cursor: boolean
+  resume_strategy: string
+  completion_event_id: string
+  terminal_task_status: string
+  terminal_finished_at_ms?: number
+  expected_downtime_ms: number
+  review_verdict: string
+  review_summary: string
+}
+
+export interface LocalTaskResumeWorkspaceStatus {
+  eligible: boolean
+  derivation: string
+  active_workspace_path: string
+  branch: string
+  git_head: string
+  occupied: boolean
+  reason: string
+}
+
 export interface LocalTaskDetail {
   task: LocalTaskRecord
   events: LocalTaskEvent[]
@@ -137,6 +175,8 @@ export interface LocalTaskDetail {
   has_more: boolean
   supervision: LocalTaskSupervisionState
   runtime: LocalTaskRuntimeState
+  update_recovery?: LocalTaskUpdateRecovery
+  resume_workspace_status?: LocalTaskResumeWorkspaceStatus
 }
 
 export interface LocalTaskStatusView {

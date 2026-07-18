@@ -186,12 +186,32 @@ async fn spawn_sidecar_monitor(
     let update_id = receipt.update_id.clone();
     let original_task_id = receipt.original_task_id.clone();
     tokio::spawn(async move {
-        let result = crate::node_agent_cli_sidecar_runner::follow_sidecar_output(
+        let initial_cursor = crate::node_agent_cli_sidecar_runner::CliSidecarReplayCursor {
+            offset: receipt.sidecar_output_offset,
+            sequence: receipt.sidecar_output_sequence,
+        };
+        let session_id = sidecar.session_id.clone();
+        let result = crate::node_agent_cli_sidecar_runner::follow_sidecar_output_from(
             &runtime.cli_sidecars,
             &task.task_id,
             &output_path,
+            initial_cursor,
             &mut cancel_rx,
             |_| {},
+            |cursor| {
+                runtime.cli_sidecars.record_output_cursor(
+                    &task.task_id,
+                    &session_id,
+                    cursor.offset,
+                    cursor.sequence,
+                )?;
+                runtime.update_recovery.record_sidecar_cursor(
+                    &update_id,
+                    &original_task_id,
+                    cursor.offset,
+                    cursor.sequence,
+                )
+            },
         )
         .await;
         match result {
@@ -219,11 +239,20 @@ async fn spawn_sidecar_monitor(
                     .ok()
                     .and_then(|snapshot| snapshot.record)
                     .and_then(|record| record.codex_session_id);
+                let journal_output = runtime
+                    .task_journal
+                    .completion_output(&task.task_id, 200_000)
+                    .unwrap_or_default();
+                let stdout = if journal_output.trim().is_empty() {
+                    result.stdout_text.as_str()
+                } else {
+                    journal_output.as_str()
+                };
                 let (done, output) = cli_done_message_from_output(
                     task.task_id.clone(),
                     success,
                     error,
-                    &result.stdout_text,
+                    stdout,
                     &result.stderr_text,
                     None,
                     workspace_status,
@@ -239,6 +268,14 @@ async fn spawn_sidecar_monitor(
                     done,
                     &out_tx,
                 );
+                if let Ok(completion) = persisted.as_ref() {
+                    let _ = runtime.update_recovery.record_terminal_binding(
+                        &task.task_id,
+                        &completion.event_id,
+                        if completion.exit_ok { "done" } else { "failed" },
+                        completion.created_at_ms as u128,
+                    );
+                }
                 let state = if persisted.is_ok() && success {
                     UpdateRecoveryState::Verified
                 } else {
@@ -428,6 +465,9 @@ fn recovery_sidecar(
     let Some(session) = runtime.cli_sidecars.session_for_task(task_id)? else {
         return Ok(None);
     };
+    if !session.is_live_at(now_ms()) {
+        return Ok(None);
+    }
     if receipt
         .sidecar_session_id
         .as_deref()

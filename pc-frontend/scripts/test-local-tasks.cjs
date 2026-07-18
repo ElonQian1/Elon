@@ -87,6 +87,28 @@ try {
         command_exit_codes: [{ command: 'cargo test', exit_code: 0 }], agent_messages: 1,
       },
     },
+    update_recovery: {
+      protocol: 'elon.node_update_recovery.v1',
+      update_id: 'update-1',
+      state: 'reattaching',
+      original_task_id: 'local-1',
+      from_release: { version: '0.3.69', git_sha: 'oldsha' },
+      to_release: { version: '0.3.70', git_sha: 'newsha' },
+      sidecar_session_id: 'sidecar-1',
+      journal_cursor: 15425,
+      sidecar_output_offset: 58,
+      sidecar_output_sequence: 3,
+      transport: { kind: 'local_loopback', protocol: 'elon.node.v1', capabilities: ['update_recovery_v1'], replay_from_cursor: true },
+      completion_event_id: 'completion-1',
+      terminal_task_status: 'done',
+    },
+    resume_workspace_status: {
+      eligible: true,
+      derivation: 'legacy_started_cwd_git_registry',
+      active_workspace_path: 'D:\\conversation-worktrees\\project\\conversation',
+      branch: 'ai/session/project/conversation',
+      git_head: '0123456789abcdef',
+    },
   })
   assert.strictEqual(detail.task.id, 'local-1')
   assert.strictEqual(detail.task.final_reply, '已完成本机任务')
@@ -100,6 +122,9 @@ try {
   assert.strictEqual(detail.runtime.phase, 'verification')
   assert.strictEqual(detail.runtime.current_command, 'cargo test --bin elon-pc-node')
   assert.strictEqual(detail.runtime.timeout_policy.idle_timeout_secs, 900)
+  assert.strictEqual(detail.update_recovery.state, 'reattaching')
+  assert.strictEqual(detail.update_recovery.sidecar_output_offset, 58)
+  assert.strictEqual(detail.resume_workspace_status.eligible, true)
 
   const merged = model.mergeLocalTaskEvents(detail.events, [
     detail.events[1],
@@ -118,6 +143,7 @@ try {
   const pageSource = readSource('src/features/local-tasks/LocalTasksPage.tsx')
   const detailSource = readSource('src/features/local-tasks/LocalTaskDetailPanel.tsx')
   const supervisionSource = readSource('src/features/local-tasks/LocalTaskSupervisionPanel.tsx')
+  const recoverySource = readSource('src/features/local-tasks/LocalTaskUpdateRecoveryPanel.tsx')
   assert.ok(!bannerSource.includes('window.location.replace'), 'cloud recovery must not force navigation')
   assert.ok(bannerSource.includes('返回云端工作台'), 'cloud recovery must expose an explicit return action')
   assert.ok(shellSource.includes('useNotifications(!localMode)'), 'local mode must disable cloud websocket notifications')
@@ -133,6 +159,9 @@ try {
   assert.ok(detailSource.includes('idle_duration'), 'local task details must expose progress-aware idle duration')
   assert.ok(supervisionSource.includes('桌面监督闭环'), 'supervised tasks must expose their evidence and verdict in the PC workbench')
   assert.ok(supervisionSource.includes('PC 本机节点负责执行'), 'the PC workbench must explain the executor and supervisor roles')
+  assert.ok(recoverySource.includes('更新恢复全过程'), 'update recovery stages must be visible in the PC workbench')
+  assert.ok(recoverySource.includes('remote v1 字段已保留'), 'unverified remote recovery must be visibly fail-closed')
+  assert.ok(recoverySource.includes('sidecar_output_offset'), 'the durable sidecar replay cursor must be visible')
 
   console.log('pc-frontend local-task tests passed')
 } finally {

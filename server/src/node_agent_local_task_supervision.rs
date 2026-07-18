@@ -355,6 +355,17 @@ async fn review_task(
     ) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
+    if let Err(error) = runtime.update_recovery.record_final_review(
+        task_id.trim(),
+        crate::node_agent_update_recovery::UpdateRecoveryReview {
+            verdict: review.verdict.clone(),
+            summary: review.summary.clone(),
+            reviewed_by: review.reviewed_by.clone(),
+            reviewed_at_ms: review.reviewed_at_ms,
+        },
+    ) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+    }
     match load_supervision_state(&runtime.task_journal, task_id.trim()) {
         Ok(supervision) => Json(json!({
             "ok": true,

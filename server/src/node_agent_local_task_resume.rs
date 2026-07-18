@@ -20,11 +20,14 @@ use crate::{
 pub(crate) struct ResolvedResumeWorkspace {
     pub authorized_workspace_path: String,
     pub inherited_workspace: ConversationWorkspaceResult,
+    pub derivation: String,
+    pub git_head: String,
 }
 
 pub(crate) fn validate_resume_workspace(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     requested_project_id: &str,
     requested_workspace_path: &str,
 ) -> Result<ResolvedResumeWorkspace> {
@@ -45,28 +48,49 @@ pub(crate) fn validate_resume_workspace(
         bail!("父任务仍在运行或没有可靠终态，不能继承其工作区。");
     }
 
-    let status = parent
-        .workspace_status
-        .as_ref()
-        .ok_or_else(|| anyhow!("父任务没有可恢复的 workspace_status。"))?;
-    if status.get("isolated").and_then(serde_json::Value::as_bool) != Some(true) {
-        bail!("父任务工作区不是平台生成的隔离 worktree。");
-    }
-    let status_base = required_status_path(status, "base_workspace_path")?;
-    let status_active = required_status_path(status, "active_workspace_path")?;
-    let status_branch = status
-        .get("branch")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| anyhow!("父任务 workspace_status 缺少隔离分支。"))?;
-
+    let project_part = safe_path_part(&parent.project_id, "project", 80);
+    let conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
+    let expected_branch = format!("ai/session/{project_part}/{conversation_part}");
     let authorized_base = canonical_directory(Path::new(&parent.workspace_path), "父任务授权根")?;
-    let recorded_base = canonical_directory(Path::new(status_base), "父任务记录的基础工作区")?;
+    let (recorded_base, active, status_branch, derivation) =
+        if let Some(status) = parent.workspace_status.as_ref() {
+            if status.get("isolated").and_then(serde_json::Value::as_bool) != Some(true) {
+                bail!("父任务工作区不是平台生成的隔离 worktree。");
+            }
+            let status_base = required_status_path(status, "base_workspace_path")?;
+            let status_active = required_status_path(status, "active_workspace_path")?;
+            let status_branch = status
+                .get("branch")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| anyhow!("父任务 workspace_status 缺少隔离分支。"))?;
+            (
+                canonical_directory(Path::new(status_base), "父任务记录的基础工作区")?,
+                canonical_directory(Path::new(status_active), "父任务隔离 worktree")?,
+                status_branch.to_string(),
+                "workspace_status".to_string(),
+            )
+        } else {
+            let journal = journal_record
+                .filter(|record| record.req_id == parent.task_id)
+                .ok_or_else(|| anyhow!("父任务缺少 workspace_status 和可验证的 started.cwd。"))?;
+            let started_cwd = journal
+                .cwd
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| anyhow!("父任务最新 started 记录缺少 cwd。"))?;
+            (
+                authorized_base.clone(),
+                canonical_directory(Path::new(started_cwd), "父任务 started.cwd")?,
+                expected_branch.clone(),
+                "legacy_started_cwd_git_registry".to_string(),
+            )
+        };
     if !same_path(&authorized_base, &recorded_base) {
         bail!("父任务 workspace_status 的基础工作区与原授权根不一致。");
     }
-    let active = canonical_directory(Path::new(status_active), "父任务隔离 worktree")?;
     if same_path(&authorized_base, &active) {
         bail!("父任务活动工作区不是独立 worktree。");
     }
@@ -76,14 +100,11 @@ pub(crate) fn validate_resume_workspace(
         bail!("续跑请求只能引用父任务原授权根或其已记录的隔离 worktree。");
     }
 
-    let project_part = safe_path_part(&parent.project_id, "project", 80);
-    let conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
     validate_platform_worktree_shape(&active, &project_part, &conversation_part)?;
-    let expected_branch = format!("ai/session/{project_part}/{conversation_part}");
     if status_branch != expected_branch {
         bail!("父任务隔离分支不符合平台生成规则。");
     }
-    validate_git_worktree_identity(&authorized_base, &active, &expected_branch)?;
+    let git_head = validate_git_worktree_identity(&authorized_base, &active, &expected_branch)?;
 
     Ok(ResolvedResumeWorkspace {
         authorized_workspace_path: display_path(&authorized_base),
@@ -93,6 +114,8 @@ pub(crate) fn validate_resume_workspace(
             isolated: true,
             branch: Some(expected_branch),
         },
+        derivation,
+        git_head,
     })
 }
 
@@ -151,7 +174,11 @@ fn validate_platform_worktree_shape(
     Ok(())
 }
 
-fn validate_git_worktree_identity(base: &Path, active: &Path, expected_branch: &str) -> Result<()> {
+fn validate_git_worktree_identity(
+    base: &Path,
+    active: &Path,
+    expected_branch: &str,
+) -> Result<String> {
     let base_common = git_resolved_path(base, &["rev-parse", "--git-common-dir"])?;
     let active_common = git_resolved_path(active, &["rev-parse", "--git-common-dir"])?;
     if !same_path(&base_common, &active_common) {
@@ -166,17 +193,39 @@ fn validate_git_worktree_identity(base: &Path, active: &Path, expected_branch: &
     if branch.trim() != expected_branch {
         bail!("父任务活动 worktree 当前分支与平台记录不一致。");
     }
+    if branch.trim() == "main" {
+        bail!("禁止在 main 工作区续跑父任务。");
+    }
+    let head = git_output(active, &["rev-parse", "--verify", "HEAD^{commit}"])?;
+    if head.trim().is_empty() {
+        bail!("父任务活动 worktree 缺少可验证 HEAD。");
+    }
 
     let worktree_list = git_output(base, &["worktree", "list", "--porcelain"])?;
-    let registered = worktree_list.lines().any(|line| {
-        line.strip_prefix("worktree ")
-            .and_then(|path| std::fs::canonicalize(path).ok())
-            .is_some_and(|path| same_path(&path, active))
+    let expected_ref = format!("refs/heads/{expected_branch}");
+    let registered = worktree_list.split("\n\n").any(|entry| {
+        let mut path_matches = false;
+        let mut registered_head = None;
+        let mut registered_branch = None;
+        for line in entry.lines() {
+            if let Some(path) = line.strip_prefix("worktree ") {
+                path_matches = std::fs::canonicalize(path)
+                    .ok()
+                    .is_some_and(|path| same_path(&path, active));
+            } else if let Some(value) = line.strip_prefix("HEAD ") {
+                registered_head = Some(value.trim());
+            } else if let Some(value) = line.strip_prefix("branch ") {
+                registered_branch = Some(value.trim());
+            }
+        }
+        path_matches
+            && registered_head == Some(head.trim())
+            && registered_branch == Some(expected_ref.as_str())
     });
     if !registered {
-        bail!("父任务活动路径已不在原仓库的 Git worktree 注册表中。");
+        bail!("父任务活动路径、分支或 HEAD 与 Git worktree 注册表不一致。");
     }
-    Ok(())
+    Ok(head)
 }
 
 fn git_resolved_path(cwd: &Path, args: &[&str]) -> Result<PathBuf> {

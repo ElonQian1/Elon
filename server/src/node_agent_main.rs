@@ -132,6 +132,7 @@ mod node_agent_server_runtime;
 mod node_agent_session;
 mod node_agent_session_cancel;
 mod node_agent_shared_android_devices;
+mod node_agent_sidecar_recovery;
 use node_agent_session::run_session;
 #[cfg(test)]
 mod node_agent_task_approval_cleanup_tests;
@@ -161,6 +162,8 @@ mod node_agent_ui_design_workspace;
 mod node_agent_update_checkpoint;
 mod node_agent_update_reconcile;
 mod node_agent_update_recovery;
+mod node_agent_update_recovery_api;
+mod node_agent_update_resume;
 mod node_agent_workspace_match;
 mod node_agent_workspace_modules;
 mod node_agent_write_preview;
@@ -409,9 +412,16 @@ async fn run_agent_runtime() -> Result<()> {
     if let Err(error) = node_agent_cli_worker::cleanup_terminal_workers(&runtime.cli_sidecars) {
         warn!(%error, "清理已终态版本化 CLI worker 失败，保留旧 worker 继续启动");
     }
+    node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
     node_agent_restart_drain::recover_checkpoint_after_startup();
+    if let Err(error) = runtime
+        .update_recovery
+        .set_install_gate_phase("runtime_online", Some("new node runtime is online"))
+    {
+        warn!(%error, "记录节点更新 runtime-online 阶段失败");
+    }
     runtime.spawn_lifecycle_heartbeat();
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
