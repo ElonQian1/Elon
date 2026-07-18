@@ -378,15 +378,17 @@ export function UiTunerProjectSessionPanel({
       `继续跨端 PWA 设计草稿 ${request.runId}。`,
       artifact,
       `路由原因：${request.reason}`,
-      '只读取 Context Artifact 的草稿 diff、局部 DOM、compactSourceBundle、相关裁剪与视觉差异。',
-      '跳过 deterministicResult 已完成的写回；只补 PWA 来源绑定、结构调整或复杂 TSX/Kotlin。',
+      '这是源码写回任务：在已授权工作区修改并保存必要文件。',
+      '为节省 Token，优先使用 Context Artifact 的草稿 diff、局部 DOM、compactSourceBundle、相关裁剪与视觉差异，缺少证据时再按需读取源码。',
+      '跳过 deterministicResult 已完成的写回；补充 PWA 来源绑定、结构调整或复杂 TSX/Kotlin。',
       'PWA Runtime DOM 仅是临时证据，最终必须写回源码并同时说明 PWA/APK 两端结果。',
     ].join('\n') : [
       `继续设计稿自动拟合任务 ${request.runId}。`, artifact,
       `平台期原因：${request.reason}`,
-      '只读取 handoff 指向的目标裁剪、当前裁剪、节点子树和局部源码。',
+      '这是源码修改任务：在已授权工作区修改并保存必要文件。',
+      '为节省 Token，优先使用 handoff 指向的目标裁剪、当前裁剪、节点子树和局部源码，缺少证据时再按需读取。',
       '优先修正布局结构或 Source Binding；不要用临时 translation 冒充可写回布局。',
-      '只修改并保存源码，不要自行构建、安装、截图或启动第二个验收流程；完成后由 FitRun 统一构建和评分。',
+      '修改并保存源码；不要自行构建、安装、截图或启动第二个验收流程，完成后由 FitRun 统一构建和评分。',
     ].join('\n')
     fitRunStartingRef.current = true
     setFitRunStarting(true)
