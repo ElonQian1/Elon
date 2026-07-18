@@ -3,6 +3,12 @@
 #[path = "node_agent_self_evolution_scheduler.rs"]
 mod scheduler;
 pub(crate) use scheduler::spawn_scheduler;
+#[path = "node_agent_self_evolution_support.rs"]
+mod support;
+use support::{
+    admission, default_max_retries, error_response, internal_admission, now_ms, retry_at,
+    retryable_failure, same_gate_observation, schema_version,
+};
 
 use std::{
     collections::HashSet,
@@ -18,7 +24,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use homecli_proto::CancelRequestAudit;
+use homecli_proto::{CancelRequestAudit, InterruptionSource};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -40,16 +46,42 @@ pub(crate) struct SelfEvolutionItem {
     pub channel_id: Option<String>,
     pub conversation_id: String,
     pub workspace_path: String,
+    pub execution_worktree: Option<String>,
+    pub execution_branch: Option<String>,
+    #[serde(default)]
+    pub execution_isolated: bool,
     pub prompt: String,
     pub runtime_permission: String,
     pub status: String,
     pub active_task_id: Option<String>,
     pub generation: u32,
     pub pause_reason: Option<String>,
+    pub yield_reason: Option<String>,
+    pub interruption_source: Option<InterruptionSource>,
     pub review_verdict: Option<String>,
     pub review_note: Option<String>,
+    pub reviewed_by: Option<String>,
+    pub review_source: Option<String>,
+    pub reviewed_at_ms: Option<u128>,
+    #[serde(default)]
+    pub retry_count: u32,
+    #[serde(default = "default_max_retries")]
+    pub max_retries: u32,
+    pub next_retry_at_ms: Option<u128>,
+    pub last_error: Option<String>,
+    pub pending_action: Option<PendingSelfEvolutionAction>,
     pub created_at_ms: u128,
     pub updated_at_ms: u128,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct PendingSelfEvolutionAction {
+    pub action_id: String,
+    pub action: String,
+    pub note: Option<String>,
+    pub actor: String,
+    pub source: String,
+    pub requested_at_ms: u128,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -224,6 +256,7 @@ impl SelfEvolutionCoordinator {
                     item.status.clone(),
                     item.active_task_id.clone(),
                     item.pause_reason.clone(),
+                    item.next_retry_at_ms,
                 );
                 let record = local_tasks.get(&task_id)?;
                 let Some(record) = record else {
@@ -250,10 +283,24 @@ impl SelfEvolutionCoordinator {
                     "resume_required" | "interrupted" => {
                         item.status = "paused".to_string();
                         item.pause_reason = Some("node_restart".to_string());
+                        item.yield_reason = Some("node_restart".to_string());
+                        item.interruption_source = Some(InterruptionSource::NodeRestart);
                         item.active_task_id = None;
                     }
                     "canceled" | "failed" => {
-                        item.status = "failed".to_string();
+                        let error = record
+                            .error
+                            .clone()
+                            .unwrap_or_else(|| record.status.clone());
+                        if retryable_failure(&error) && item.retry_count < item.max_retries {
+                            item.retry_count += 1;
+                            item.status = "retry_wait".to_string();
+                            item.next_retry_at_ms = Some(retry_at(item.retry_count));
+                            item.last_error = Some(error);
+                        } else {
+                            item.status = "failed".to_string();
+                            item.last_error = Some(error);
+                        }
                         item.active_task_id = None;
                     }
                     _ => {}
@@ -263,6 +310,7 @@ impl SelfEvolutionCoordinator {
                         item.status.clone(),
                         item.active_task_id.clone(),
                         item.pause_reason.clone(),
+                        item.next_retry_at_ms,
                     )
                 {
                     item.updated_at_ms = now_ms();
@@ -283,6 +331,12 @@ impl SelfEvolutionCoordinator {
                     if let Some(task_id) = item.active_task_id.clone() {
                         item.status = "pause_requested".to_string();
                         item.pause_reason = Some(reason.clone());
+                        item.yield_reason = Some(reason.clone());
+                        item.interruption_source = Some(if reason == "node_update" {
+                            InterruptionSource::UpdaterApply
+                        } else {
+                            InterruptionSource::SupervisorIntervention
+                        });
                         item.updated_at_ms = now_ms();
                         requests.push((task_id, reason.clone()));
                     }
@@ -304,16 +358,17 @@ impl SelfEvolutionCoordinator {
             {
                 return Ok(None);
             }
-            let Some(item) = state
-                .items
-                .iter_mut()
-                .find(|item| matches!(item.status.as_str(), "queued" | "paused"))
-            else {
+            let Some(item) = state.items.iter_mut().find(|item| {
+                matches!(item.status.as_str(), "queued" | "paused")
+                    || (item.status == "retry_wait"
+                        && item.next_retry_at_ms.is_some_and(|at| at <= now_ms()))
+            }) else {
                 return Ok(None);
             };
             item.generation += 1;
             item.active_task_id = Some(format!("local-{}", Uuid::new_v4()));
             item.status = "starting".to_string();
+            item.next_retry_at_ms = None;
             item.updated_at_ms = now_ms();
             Ok(Some(item.clone()))
         })
@@ -326,8 +381,15 @@ impl SelfEvolutionCoordinator {
                 .iter_mut()
                 .find(|item| item.logical_id == logical_id)
             {
-                item.status = "failed".to_string();
-                item.pause_reason = Some(format!("dispatch_failed:{reason}"));
+                item.last_error = Some(reason.to_string());
+                if retryable_failure(reason) && item.retry_count < item.max_retries {
+                    item.retry_count += 1;
+                    item.status = "retry_wait".to_string();
+                    item.next_retry_at_ms = Some(retry_at(item.retry_count));
+                } else {
+                    item.status = "failed".to_string();
+                }
+                item.pause_reason = Some("dispatch_failed".to_string());
                 item.active_task_id = None;
                 item.updated_at_ms = now_ms();
             }
@@ -335,12 +397,36 @@ impl SelfEvolutionCoordinator {
         })
     }
 
-    fn set_action(
+    fn record_execution_worktree(
+        &self,
+        logical_id: &str,
+        workspace: &crate::pc_workspace_provisioner::ConversationWorkspaceResult,
+    ) -> Result<()> {
+        if !workspace.isolated || workspace.base_workspace_path.is_none() {
+            anyhow::bail!("self evolution requires an isolated execution worktree");
+        }
+        self.mutate(|state| {
+            let item = state
+                .items
+                .iter_mut()
+                .find(|item| item.logical_id == logical_id)
+                .context("self evolution item not found")?;
+            item.execution_worktree = Some(workspace.workspace_path.clone());
+            item.execution_branch = workspace.branch.clone();
+            item.execution_isolated = true;
+            item.updated_at_ms = now_ms();
+            Ok(())
+        })
+    }
+
+    fn begin_action(
         &self,
         owner: &str,
         logical_id: &str,
         action: &str,
         note: Option<String>,
+        actor: &str,
+        source: &str,
     ) -> Result<(SelfEvolutionItem, Option<String>)> {
         self.mutate(|state| {
             let item = state
@@ -348,35 +434,89 @@ impl SelfEvolutionCoordinator {
                 .iter_mut()
                 .find(|item| item.owner_user_id == owner && item.logical_id == logical_id)
                 .context("self evolution item not found")?;
-            let mut cancel_task_id = None;
+            let valid = match action {
+                "pause" => matches!(item.status.as_str(), "running" | "starting"),
+                "resume" => matches!(item.status.as_str(), "paused" | "failed" | "retry_wait"),
+                "approve" | "reject" => item.status == "review_required",
+                _ => false,
+            };
+            if !valid {
+                if item
+                    .pending_action
+                    .as_ref()
+                    .is_some_and(|pending| pending.action == action)
+                {
+                    return Ok((item.clone(), item.active_task_id.clone()));
+                }
+                anyhow::bail!("self evolution action is not valid for current state");
+            }
+            item.pending_action = Some(PendingSelfEvolutionAction {
+                action_id: format!("evolution-action-{}", Uuid::new_v4()),
+                action: action.to_string(),
+                note,
+                actor: actor.to_string(),
+                source: source.to_string(),
+                requested_at_ms: now_ms(),
+            });
+            item.updated_at_ms = now_ms();
+            Ok((item.clone(), item.active_task_id.clone()))
+        })
+    }
+
+    fn commit_action(
+        &self,
+        owner: &str,
+        logical_id: &str,
+        action: &str,
+    ) -> Result<SelfEvolutionItem> {
+        self.mutate(|state| {
+            let item = state
+                .items
+                .iter_mut()
+                .find(|item| item.owner_user_id == owner && item.logical_id == logical_id)
+                .context("self evolution item not found")?;
+            let pending = item
+                .pending_action
+                .take()
+                .context("self evolution action has no durable intent")?;
+            if pending.action != action {
+                anyhow::bail!("self evolution pending action does not match");
+            }
             match action {
-                "pause" if matches!(item.status.as_str(), "running" | "starting") => {
+                "pause" => {
                     item.status = "pause_requested".to_string();
                     item.pause_reason = Some("manual_pause".to_string());
-                    cancel_task_id = item.active_task_id.clone();
+                    item.yield_reason = Some("manual_pause".to_string());
+                    item.interruption_source = Some(InterruptionSource::SupervisorIntervention);
                 }
-                "resume" if matches!(item.status.as_str(), "paused" | "failed") => {
+                "resume" => {
                     item.status = "queued".to_string();
                     item.pause_reason = None;
                     item.review_verdict = None;
+                    item.next_retry_at_ms = None;
                 }
-                "approve" if item.status == "review_required" => {
-                    cancel_task_id = item.active_task_id.take();
+                "approve" => {
+                    item.active_task_id = None;
                     item.status = "completed".to_string();
                     item.review_verdict = Some("approved".to_string());
-                    item.review_note = note;
+                    item.review_note = pending.note;
                 }
-                "reject" if item.status == "review_required" => {
-                    cancel_task_id = item.active_task_id.take();
+                "reject" => {
+                    item.active_task_id = None;
                     item.status = "paused".to_string();
                     item.review_verdict = Some("changes_requested".to_string());
-                    item.review_note = note;
+                    item.review_note = pending.note;
                     item.pause_reason = Some("review_changes_requested".to_string());
                 }
-                _ => anyhow::bail!("self evolution action is not valid for current state"),
+                _ => anyhow::bail!("unsupported self evolution action"),
+            }
+            if matches!(action, "approve" | "reject") {
+                item.reviewed_by = Some(pending.actor);
+                item.review_source = Some(pending.source);
+                item.reviewed_at_ms = Some(now_ms());
             }
             item.updated_at_ms = now_ms();
-            Ok((item.clone(), cancel_task_id))
+            Ok(item.clone())
         })
     }
 }
@@ -483,14 +623,27 @@ pub(crate) async fn enqueue(
         channel_id: request.channel_id,
         conversation_id: format!("self-evolution-{}", Uuid::new_v4()),
         workspace_path: parent.workspace_path,
+        execution_worktree: None,
+        execution_branch: None,
+        execution_isolated: false,
         prompt: request.prompt,
         runtime_permission: request.runtime_permission,
         status: "queued".to_string(),
         active_task_id: None,
         generation: 0,
         pause_reason: None,
+        yield_reason: None,
+        interruption_source: None,
         review_verdict: None,
         review_note: None,
+        reviewed_by: None,
+        review_source: None,
+        reviewed_at_ms: None,
+        retry_count: 0,
+        max_retries: default_max_retries(),
+        next_retry_at_ms: None,
+        last_error: None,
+        pending_action: None,
         created_at_ms: now,
         updated_at_ms: now,
     };
@@ -556,19 +709,40 @@ async fn action_response(
     let Some(creds) = runtime.creds().await else {
         return error_response(StatusCode::UNAUTHORIZED, "node has no bound owner");
     };
-    match runtime
-        .self_evolution
-        .set_action(&creds.owner_user_id, id.trim(), action, note)
-    {
+    let actor = format!("pc_operator:{}", creds.owner_user_id);
+    match runtime.self_evolution.begin_action(
+        &creds.owner_user_id,
+        id.trim(),
+        action,
+        note,
+        &actor,
+        "local_pc_ui",
+    ) {
         Ok((item, cancel_task_id)) => {
             if let Some(task_id) = cancel_task_id {
                 if action == "pause" {
-                    let audit = CancelRequestAudit::now(
-                        "node_agent",
-                        "self_evolution_scheduler",
-                        "manual_pause",
-                    );
-                    let _ = runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await;
+                    let audit =
+                        CancelRequestAudit::now("node_agent", "local_pc_ui", "manual_pause")
+                            .with_interruption_source(InterruptionSource::SupervisorIntervention);
+                    if !runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await {
+                        let terminal = runtime
+                            .local_tasks
+                            .get(&task_id)
+                            .ok()
+                            .flatten()
+                            .is_some_and(|record| {
+                                matches!(
+                                    record.status.as_str(),
+                                    "cancel_requested" | "canceled" | "failed" | "done"
+                                )
+                            });
+                        if !terminal {
+                            return error_response(
+                                StatusCode::CONFLICT,
+                                "durable pause audit/cancel failed; retry is safe",
+                            );
+                        }
+                    }
                 } else if matches!(action, "approve" | "reject") {
                     let verdict = if action == "approve" {
                         "accepted"
@@ -576,13 +750,18 @@ async fn action_response(
                         "rejected"
                     };
                     if let Err(error) =
-                        crate::node_agent_local_task_supervision::record_system_review(
+                        crate::node_agent_local_task_supervision::record_actor_review(
                             &runtime,
                             &task_id,
                             verdict,
-                            item.review_note
+                            item.pending_action
+                                .as_ref()
+                                .and_then(|pending| pending.note.as_deref())
+                                .or(item.review_note.as_deref())
                                 .as_deref()
                                 .unwrap_or("self evolution queue review"),
+                            &actor,
+                            "local_pc_ui",
                         )
                     {
                         return error_response(
@@ -592,38 +771,16 @@ async fn action_response(
                     }
                 }
             }
-            Json(json!({"ok": true, "item": item})).into_response()
+            match runtime
+                .self_evolution
+                .commit_action(&creds.owner_user_id, id.trim(), action)
+            {
+                Ok(item) => Json(json!({"ok": true, "item": item})).into_response(),
+                Err(error) => error_response(StatusCode::CONFLICT, error.to_string()),
+            }
         }
         Err(error) => error_response(StatusCode::CONFLICT, error.to_string()),
     }
-}
-
-fn admission(status: StatusCode, message: impl Into<String>) -> AdmissionError {
-    AdmissionError {
-        status,
-        message: message.into(),
-    }
-}
-fn internal_admission(error: impl ToString) -> AdmissionError {
-    admission(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
-}
-fn error_response(status: StatusCode, message: impl Into<String>) -> Response {
-    (status, Json(json!({"ok": false, "error": message.into()}))).into_response()
-}
-fn schema_version() -> u32 {
-    1
-}
-fn same_gate_observation(left: &SelfEvolutionGates, right: &SelfEvolutionGates) -> bool {
-    left.foreground_task_ids == right.foreground_task_ids
-        && left.publish_active == right.publish_active
-        && left.publish_status == right.publish_status
-        && left.publish_owner == right.publish_owner
-        && left.publish_waiter_count == right.publish_waiter_count
-        && left.update_active == right.update_active
-        && left.resource_pressure == right.resource_pressure
-}
-fn now_ms() -> u128 {
-    crate::node_agent_cli_sidecar::now_ms()
 }
 
 #[cfg(test)]

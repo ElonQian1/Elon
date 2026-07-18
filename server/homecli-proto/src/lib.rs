@@ -8,7 +8,7 @@ pub use cli_durable_types::{
 mod android_device_host;
 pub use android_device_host::{AndroidDeviceHostRequest, CAP_ANDROID_DEVICE_HOST_V1};
 mod cancel;
-pub use cancel::CancelRequestAudit;
+pub use cancel::{CancelRequestAudit, InterruptionSource};
 pub const PROTO_VERSION: u32 = 7;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";

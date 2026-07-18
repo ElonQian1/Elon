@@ -219,10 +219,10 @@ platform_improvement_candidates:
 非阻塞平台改进不得继续占用原用户任务的 task、conversation、worktree 或执行资源。原任务必须先到终态并回传用户结果；随后由节点把 `post_task_improvement` 放入持久化低优先队列，并遵守以下顺序：
 
 1. 验证当前监督协议，以及父任务已终止且 owner、node、project、root、workspace 全部一致。
-2. 为改进建立独立 task 和 conversation；同一 root 的后续代只复用该改进自己的受监督 worktree 与 root lease。
-3. 当前台用户任务、发布 owner、节点更新或构建资源压力出现时，取消后台执行器并记录 `requested_by/source/reason/requested_at_ms`，队列状态转为暂停而不是失败。
-4. 让路条件消失后自动续跑下一代；成功进入审查队列，Desktop 可以 approve、reject 或要求下一代修正。
-5. PC UI 必须同时显示改进队列、暂停原因、审查动作、更新恢复状态、发布 owner/waiters 和取消来源，不能只显示一个笼统的“运行中”。
+2. 为改进建立独立 task 和 conversation；调度前实际创建、验证并持久化该代独立 worktree/branch，不能只在模型里声称隔离。同一 root 的后续代只复用该改进自己的受监督 worktree 与 root lease。
+3. 当前台用户任务、发布 owner、节点更新或构建资源压力出现时，先持久化 action intent 与 `requested_by/source/reason/requested_at_ms/interruption_source`，再取消后台执行器；审计或取消失败时保持原状态并 fail-closed，不能从异常退出码猜测来源。
+4. 让路条件消失后自动续跑下一代；配额、限流和 credit 错误按上限与退避自动重试。成功进入审查队列，Desktop 可以 approve、reject 或要求下一代修正，审查必须保留 reviewer/provenance/time。
+5. PC UI 必须同时显示实际 worktree、改进队列、重试、让路原因、审查来源、更新恢复状态、发布 batch/owner/waiters/stages 和取消来源，不能只显示一个笼统的“运行中”。
 
 本地任务优先使用节点本地可信身份。远程 v1 只有在身份、能力、live lease 和连接连续性都成立时才能执行；缺一项即 fail-closed，不得用本地兼容路径绕过。
 

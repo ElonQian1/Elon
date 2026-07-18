@@ -66,11 +66,12 @@
 
 - 本机任务先由节点本地管理面鉴权和调度；远程 `elon.desktop_pc_supervision.v1` 任务必须同时证明节点身份、协议能力、有效 live lease 和连接连续性，任一证据缺失都 fail-closed。远程失败不能降级成未受监督的本地写任务。
 - `post_task_improvement` 只接受当前 v1 合同、已终止父任务以及完全相同的 owner、node、project、root 和 workspace 身份。它进入持久化低优先队列，使用独立 task、conversation 和平台隔离 worktree，不占用原用户任务的会话或 worktree；原用户任务先到终态并释放执行资源。
-- 前台任务、全局发布 owner、节点更新或构建资源压力出现时，后台改进写入带完整取消来源的 yield，转为暂停；门禁消失后沿同一 root 的 conversation/worktree 自动产生下一代继续。成功后进入 `review_required`，只有 Desktop approve/reject 后才结束审查；accepted review 才释放该 root 的 Git lease。
+- 前台任务、全局发布 owner、节点更新或构建资源压力出现时，后台改进先把 durable action intent 和取消审计落盘，再取消执行器并转为暂停；任一步持久化失败都拒绝改变队列状态。门禁消失后沿同一 root 的独立 conversation/worktree 自动产生下一代继续；配额、429、credit/rate-limit 错误进入有上限退避重试。成功后进入 `review_required`，只有带 reviewer、review source 和时间的 Desktop approve/reject 后才结束审查；accepted review 才释放该 root 的 Git lease。
 - 同一 root 的多代 `resume_original` 或后台改进只能继承已验证的基础仓库、平台路径、分支、Git 身份和 `elon-supervision:<root_task_id>` lease。旧项目别名先规范化为节点当前绑定再做授权比较；别名不能把跨项目、跨 root、脏而不可信或并发占用的现场变成合法继承。
 - 计划更新的安全恢复不需要用户点 `Resume`：两个 recovery v1 回执和本地 restart checkpoint 按单调状态合并，`resumed`/终态不能再被旧 `restart_recovery` 覆盖成 `resume_required`。新进程必须继续同一 journal 游标并正常终止；只有无法证明任务身份、现场独占或恢复事务完整性时才暴露 `resume_required`。
-- 取消审计统一保留 `requested_by`、`source`、`reason`、`requested_at_ms`，贯穿 sidecar、journal、本机 API 和 PC UI。读取旧记录时字段可为空或使用兼容默认值，不能因此拒绝旧任务。
-- 发布使用跨组件全局 lease：状态页显示 owner、FIFO waiters 和 coalesced waiters；相同 release kind + SHA 合并等待，不同 SHA 排队。release SHA 在 claim 时固定且不可变，等待期间不得因 `main` 前进反复改 SHA 而饿死。
+- 取消审计统一保留 `requested_by`、`source`、`reason`、`requested_at_ms`，系统让路再记录可信 `interruption_source`：`supervisor_intervention`、`node_restart` 或 `updater_apply`。审计先写 sidecar/journal 才允许实际取消，不能从 `exit=-1` 反推来源；读取旧记录时新字段可空，不能因此拒绝旧任务。
+- 发布使用跨组件全局 lease：状态页显示 owner、FIFO waiters 和 coalesced waiters；相同 release kind + SHA 合并等待，不同 SHA 排队。server、PC 前端、Windows 节点共享 `batch_id + immutable SHA`，逐阶段 heartbeat、attempt、接管、成功/失败写入持久 ledger；未知、过期、损坏状态一律 fail-closed。release SHA 在 claim 时固定且不可变，等待期间不得因 `main` 前进反复改 SHA 而饿死。
+- PC 操作审查使用 `pc_operator:<owner>` 和 `local_pc_ui`，不得冒充 `codex_desktop`；Desktop 辅助脚本必须显式发送 `codex_desktop_helper`。只有真实更新任务才要求 recovery receipt，普通监督任务不因没有更新回执而拒绝审查。
 
 ## 证据与验收
 

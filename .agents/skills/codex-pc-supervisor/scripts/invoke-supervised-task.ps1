@@ -486,6 +486,7 @@ function New-SupervisionReviewBody {
         summary = $BodySummary
         improvements = @($BodyImprovements | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
         reviewed_by = 'codex_desktop'
+        review_source = 'codex_desktop_helper'
     }
 }
 

@@ -25,6 +25,9 @@ fn records_started_cancel_and_finished_events() {
                 source: Some("pc_ui".to_string()),
                 reason: Some("user_stop_button".to_string()),
                 requested_at_ms: Some(1234),
+                interruption_source: Some(
+                    homecli_proto::InterruptionSource::SupervisorIntervention,
+                ),
             },
         )
         .expect("cancel event should persist");
@@ -173,6 +176,7 @@ fn late_cancel_after_terminal_is_audit_only() {
                 source: Some("pc_ui".to_string()),
                 reason: Some("user_requested".to_string()),
                 requested_at_ms: Some(4321),
+                interruption_source: None,
             },
         )
         .expect("late cancel should remain auditable");

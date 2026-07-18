@@ -87,6 +87,8 @@ struct SupervisionReviewRequest {
     improvements: Vec<String>,
     #[serde(default)]
     reviewed_by: Option<String>,
+    #[serde(default)]
+    review_source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -96,6 +98,8 @@ struct SupervisionReview {
     summary: String,
     improvements: Vec<String>,
     reviewed_by: String,
+    #[serde(default)]
+    review_source: String,
     reviewed_at_ms: u128,
 }
 
@@ -369,15 +373,7 @@ async fn review_task(
     ) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
-    if let Err(error) = runtime.update_recovery.record_final_review(
-        task_id.trim(),
-        crate::node_agent_update_recovery::UpdateRecoveryReview {
-            verdict: review.verdict.clone(),
-            summary: review.summary.clone(),
-            reviewed_by: review.reviewed_by.clone(),
-            reviewed_at_ms: review.reviewed_at_ms,
-        },
-    ) {
+    if let Err(error) = record_update_review_if_present(&runtime, task_id.trim(), &review) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
     if review.verdict == "accepted" {
@@ -398,11 +394,13 @@ async fn review_task(
     }
 }
 
-pub(crate) fn record_system_review(
+pub(crate) fn record_actor_review(
     runtime: &NodeRuntime,
     task_id: &str,
     verdict: &str,
     summary: &str,
+    reviewed_by: &str,
+    review_source: &str,
 ) -> anyhow::Result<()> {
     let task = runtime
         .local_tasks
@@ -414,15 +412,42 @@ pub(crate) fn record_system_review(
         verdict: verdict.to_string(),
         summary: summary.trim().to_string(),
         improvements: Vec::new(),
-        reviewed_by: "codex_desktop".to_string(),
+        reviewed_by: clean_id(reviewed_by, "reviewed_by").map_err(anyhow::Error::msg)?,
+        review_source: clean_id(review_source, "review_source").map_err(anyhow::Error::msg)?,
         reviewed_at_ms: now_ms(),
     };
-    record_supervision_event(
-        &runtime.task_journal,
-        task_id,
-        "supervision_review",
-        serde_json::to_value(&review)?,
-    )?;
+    let already_recorded = load_supervision_state(&runtime.task_journal, task_id)?
+        .review
+        .as_ref()
+        .is_some_and(|current| {
+            current.verdict == review.verdict
+                && current.summary == review.summary
+                && current.reviewed_by == review.reviewed_by
+                && current.review_source == review.review_source
+        });
+    if !already_recorded {
+        record_supervision_event(
+            &runtime.task_journal,
+            task_id,
+            "supervision_review",
+            serde_json::to_value(&review)?,
+        )?;
+        record_update_review_if_present(runtime, task_id, &review)?;
+    }
+    if verdict == "accepted" {
+        release_accepted_worktree_lease(runtime, &task, contract.as_ref(), task_id)?;
+    }
+    Ok(())
+}
+
+fn record_update_review_if_present(
+    runtime: &NodeRuntime,
+    task_id: &str,
+    review: &SupervisionReview,
+) -> anyhow::Result<()> {
+    if runtime.update_recovery.receipt_for_task(task_id)?.is_none() {
+        return Ok(());
+    }
     runtime.update_recovery.record_final_review(
         task_id,
         crate::node_agent_update_recovery::UpdateRecoveryReview {
@@ -432,9 +457,6 @@ pub(crate) fn record_system_review(
             reviewed_at_ms: review.reviewed_at_ms,
         },
     )?;
-    if verdict == "accepted" {
-        release_accepted_worktree_lease(runtime, &task, contract.as_ref(), task_id)?;
-    }
     Ok(())
 }
 
@@ -627,15 +649,24 @@ fn normalize_review(request: SupervisionReviewRequest) -> Result<SupervisionRevi
         MAX_IMPROVEMENT_CHARS,
         "improvements",
     )?;
+    let reviewed_by = clean_id(
+        request.reviewed_by.as_deref().unwrap_or("pc_operator"),
+        "reviewed_by",
+    )?;
+    let review_source = clean_id(
+        request.review_source.as_deref().unwrap_or("local_pc_api"),
+        "review_source",
+    )?;
+    if reviewed_by == DEFAULT_SUPERVISOR && review_source != "codex_desktop_helper" {
+        return Err("PC 操作者不能冒充 codex_desktop 监督者。".to_string());
+    }
     Ok(SupervisionReview {
         protocol: SUPERVISION_PROTOCOL.to_string(),
         verdict,
         summary,
         improvements,
-        reviewed_by: clean_id(
-            request.reviewed_by.as_deref().unwrap_or(DEFAULT_SUPERVISOR),
-            "reviewed_by",
-        )?,
+        reviewed_by,
+        review_source,
         reviewed_at_ms: now_ms(),
     })
 }

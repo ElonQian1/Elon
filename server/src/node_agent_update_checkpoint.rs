@@ -95,8 +95,17 @@ fn checkpoint_active_update_transactions(
                 "node_agent",
                 "self_evolution_scheduler",
                 "yield_for_node_update",
-            );
-            let _ = sidecars.record_cancel_command_with_audit(&task.task_id, &audit);
+            )
+            .with_interruption_source(homecli_proto::InterruptionSource::UpdaterApply);
+            let recorded = sidecars
+                .record_cancel_command_with_audit(&task.task_id, &audit)
+                .with_context(|| format!("persist updater cancel audit for {}", task.task_id))?;
+            if !recorded {
+                anyhow::bail!(
+                    "updater refused to interrupt self evolution {} without a durable sidecar audit",
+                    task.task_id
+                );
+            }
             continue;
         }
         decision

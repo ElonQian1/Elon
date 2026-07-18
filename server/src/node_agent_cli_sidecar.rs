@@ -1,7 +1,7 @@
 // server/src/node_agent_cli_sidecar.rs
 
 use anyhow::{Context, Result};
-use homecli_proto::CancelRequestAudit;
+use homecli_proto::{CancelRequestAudit, InterruptionSource};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -94,6 +94,8 @@ pub(crate) struct CliSidecarCommandRecord {
     pub reason: Option<String>,
     #[serde(default)]
     pub requested_at_ms: Option<u128>,
+    #[serde(default)]
+    pub interruption_source: Option<InterruptionSource>,
     pub at_ms: u128,
 }
 
@@ -392,6 +394,7 @@ impl CliSidecarRegistry {
             source: cancel_audit.and_then(|audit| audit.source.clone()),
             reason: cancel_audit.and_then(|audit| audit.reason.clone()),
             requested_at_ms: cancel_audit.and_then(|audit| audit.requested_at_ms),
+            interruption_source: cancel_audit.and_then(|audit| audit.interruption_source),
             at_ms: now_ms(),
         };
         let mut file = OpenOptions::new()

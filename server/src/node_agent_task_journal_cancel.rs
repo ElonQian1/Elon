@@ -43,6 +43,7 @@ impl TaskJournal {
                 "source": audit.source,
                 "reason": audit.reason,
                 "requested_at_ms": now,
+                "interruption_source": audit.interruption_source,
                 "at_ms": now
             });
             if let Some(status) = current_status {

@@ -292,35 +292,34 @@ impl NodeRuntime {
         req_id: &str,
         audit: &homecli_proto::CancelRequestAudit,
     ) -> bool {
-        let canceled = self
-            .active_cli_prompts
-            .cancel_tx(req_id)
-            .await
-            .map(|cancel_tx| cancel_tx.send(true).is_ok())
-            .unwrap_or(false);
-        if canceled {
-            if let Err(error) = self
-                .task_journal
-                .record_cancel_requested_with_audit(req_id, audit)
-            {
-                warn!("PC 任务 journal 写入取消事件失败: {error}");
-            }
-            return true;
+        let active_cancel = self.active_cli_prompts.cancel_tx(req_id).await;
+        let sidecar_cancelable = if active_cancel.is_none() {
+            self.cli_sidecars
+                .session_for_task(req_id)
+                .ok()
+                .flatten()
+                .is_some_and(|session| session.can_cancel_at(node_agent_cli_sidecar::now_ms()))
+        } else {
+            false
+        };
+        if active_cancel.is_none() && !sidecar_cancelable {
+            return false;
+        }
+        if let Err(error) = self
+            .task_journal
+            .record_cancel_requested_with_audit(req_id, audit)
+        {
+            warn!("PC 任务 durable cancel audit 写入失败，拒绝发送取消: {error}");
+            return false;
+        }
+        if let Some(cancel_tx) = active_cancel {
+            return cancel_tx.send(true).is_ok();
         }
         match self
             .cli_sidecars
             .record_cancel_command_with_audit(req_id, audit)
         {
-            Ok(true) => {
-                if let Err(error) = self
-                    .task_journal
-                    .record_cancel_requested_with_audit(req_id, audit)
-                {
-                    warn!("PC sidecar 任务 journal 写入取消事件失败: {error}");
-                }
-                true
-            }
-            Ok(false) => false,
+            Ok(canceled) => canceled,
             Err(error) => {
                 warn!("PC sidecar 取消命令写入失败: {error}");
                 false

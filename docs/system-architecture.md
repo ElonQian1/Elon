@@ -146,6 +146,8 @@ sidecar `sessions.json` 使用进程间互斥和同目录唯一临时文件原�
 
 节点在创建或复用受监督隔离 worktree 时直接以 `elon-supervision:<root_task_id>` 写入唯一权威 Git lease；prepare、恢复和 merge 不先写通用锁，也不存在临时解锁窗口。为兼容历史节点曾写入的监督后代任务 lease，Resume 路由会先逐代验证持久监督契约直到同一 `requirement` 根，并核对 owner、节点、安装、项目、授权基础工作区、Git 身份和独占状态；只有全部一致时，才持有仓库级跨进程准入锁并用同目录原子替换把 Git `locked` 原因迁移为 root lease，通用锁、陌生 lease 或断裂谱系一律拒绝。该准入锁持续到新任务在活跃工作区注册，避免并发 Resume 穿透。失败、取消、超时、任务完成、代码合入和发布完成都保留 root lease 与目录；只有契约 root identity 匹配的 Desktop `accepted` review 才精确解锁，之后通用 cleanup 才能回收。普通非监督 conversation worktree 仍使用原通用锁，并在成功合并后解锁删除。Windows 超时/取消先同步等待 `taskkill /T /F` 回收完整执行器进程树，再结束直接子进程。终态 `workspace_status` 持久化基础路径、活动路径、分支和完整 `git_head`，为注册丢失后的确定性重建提供身份。
 
+本机低优先自进化是独立调度域：父用户任务先终止，节点再预创建并持久化独立 task/conversation/worktree。pause/review 操作采用“先持久 action intent、再执行外部取消或审查、最后原子提交队列状态”，所以重试不会产生半状态；配额类失败进入有界退避。取消/让路事件持久化四元组和可信 `interruption_source`，审计失败即拒绝取消。发布控制面同样使用持久的 `batch_id + immutable SHA` 阶段 ledger，把 server、PC 前端、Windows 节点的 owner、waiter、heartbeat、attempt 与错误统一成可接管且 fail-closed 的事务视图。
+
 服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
 
 当前 Route A 任务恢复闭环分为四段：

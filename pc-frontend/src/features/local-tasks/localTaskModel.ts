@@ -258,8 +258,16 @@ function cancelAuditFromEvents(events: LocalTaskEvent[]): LocalTaskCancelAudit |
     requested_by: textValue(raw.requested_by),
     source: textValue(raw.source),
     reason: textValue(raw.reason),
+    interruption_source: interruptionSource(raw.interruption_source),
     requested_at_ms: timestampValue(raw.requested_at_ms ?? raw.at_ms),
   }
+}
+
+function interruptionSource(value: unknown): LocalTaskCancelAudit['interruption_source'] {
+  const source = textValue(value)
+  return source === 'supervisor_intervention' || source === 'node_restart' || source === 'updater_apply'
+    ? source
+    : undefined
 }
 
 export function taskIdFromCreateResponse(payload: unknown): string {

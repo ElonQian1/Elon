@@ -37,6 +37,9 @@ fn sidecar_session_survives_registry_reload_and_accepts_recovered_approval() {
                 source: Some("pc_ui".to_string()),
                 reason: Some("user_stop_button".to_string()),
                 requested_at_ms: Some(5678),
+                interruption_source: Some(
+                    homecli_proto::InterruptionSource::SupervisorIntervention,
+                ),
             },
         )
         .expect("sidecar cancel command should persist"));
