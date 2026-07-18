@@ -46,41 +46,15 @@ $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir = Join-Path $PcFrontendDir "dist"
 $DesktopShellManifest = Join-Path $RepoRoot "desktop-shell\src-tauri\Cargo.toml"
 $BrandIcon = Join-Path $RepoRoot "desktop-shell\src-tauri\icons\icon.ico"
+$PublishLockPath = Join-Path `
+    ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) `
+    "Elon\locks\node-agent-publish-v1.lock"
+$PublishLock = Enter-NodeAgentPublishLock -Path $PublishLockPath
 
-Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
+try {
+    Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
 
-Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan
-
-function Compress-ArchiveWithRetry {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$DestinationPath,
-        [int]$MaxAttempts = 5
-    )
-
-    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
-        try {
-            Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue
-            Compress-Archive -Path $Path -DestinationPath $DestinationPath -Force -ErrorAction Stop
-            return
-        } catch {
-            if ($attempt -ge $MaxAttempts) { throw }
-            $delayMs = 500 * $attempt
-            Write-Host "  压缩被文件占用中断，${delayMs}ms 后重试 ($attempt/$MaxAttempts)..." -ForegroundColor DarkYellow
-            Start-Sleep -Milliseconds $delayMs
-        }
-    }
-}
-
-function Write-Utf8NoBom {
-    param(
-        [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][string]$Content
-    )
-
-    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
-    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
-}
+    Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan
 
 function Resolve-NodeAgentChangelog {
     param(
@@ -798,3 +772,6 @@ Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
+} finally {
+    Exit-NodeAgentPublishLock -Lock $PublishLock
+}

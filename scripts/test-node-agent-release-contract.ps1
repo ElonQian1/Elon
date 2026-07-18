@@ -63,6 +63,29 @@ Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -Executa
     "The packaged main client must retain the brand icon"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageUninstall')) `
     "The packaged uninstall copy must retain the brand icon"
+Assert-True ($publishScript.Contains('Enter-NodeAgentPublishLock -Path $PublishLockPath')) `
+    "The publisher must acquire the process-wide release lock before building"
+Assert-True ($publishScript.Contains('Exit-NodeAgentPublishLock -Lock $PublishLock')) `
+    "The publisher must release the process-wide release lock in its finalizer"
+
+$lockFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-publish-lock-" + [Guid]::NewGuid().ToString("N"))
+$lockFixturePath = Join-Path $lockFixtureRoot "publish.lock"
+$publishLock = Enter-NodeAgentPublishLock -Path $lockFixturePath
+try {
+    Assert-True (Test-Path -LiteralPath $lockFixturePath -PathType Leaf) `
+        "The release lock must leave auditable owner metadata"
+    $concurrentBlocked = $false
+    try {
+        $concurrentLock = Enter-NodeAgentPublishLock -Path $lockFixturePath
+        Exit-NodeAgentPublishLock -Lock $concurrentLock
+    } catch {
+        $concurrentBlocked = $_.Exception.Message.Contains('拒绝并发重复发布')
+    }
+    Assert-True $concurrentBlocked "A concurrent publisher must fail before any build or upload"
+} finally {
+    Exit-NodeAgentPublishLock -Lock $publishLock
+    Remove-Item -LiteralPath $lockFixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 $buildScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\server\build.rs") -Raw
 Assert-True ($buildScript.Contains('compile_for(&["elon-pc-node"])')) `

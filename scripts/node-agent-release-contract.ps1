@@ -1,3 +1,76 @@
+function Enter-NodeAgentPublishLock {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $directory = [System.IO.Path]::GetDirectoryName($fullPath)
+    New-Item -ItemType Directory -Force -Path $directory | Out-Null
+
+    try {
+        $stream = [System.IO.File]::Open(
+            $fullPath,
+            [System.IO.FileMode]::OpenOrCreate,
+            [System.IO.FileAccess]::ReadWrite,
+            [System.IO.FileShare]::None
+        )
+    } catch [System.IO.IOException] {
+        throw "检测到另一个 PC 节点发布正在运行，已拒绝并发重复发布：$fullPath"
+    }
+
+    try {
+        $payload = [System.Text.Encoding]::UTF8.GetBytes(
+            "pid=$PID;started_at=$((Get-Date).ToString('o'))"
+        )
+        $stream.SetLength(0)
+        $stream.Write($payload, 0, $payload.Length)
+        $stream.Flush()
+        return $stream
+    } catch {
+        $stream.Dispose()
+        throw
+    }
+}
+
+function Exit-NodeAgentPublishLock {
+    param($Lock)
+
+    if ($null -ne $Lock) {
+        $Lock.Dispose()
+    }
+}
+
+function Compress-ArchiveWithRetry {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$DestinationPath,
+        [int]$MaxAttempts = 5
+    )
+
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+        try {
+            Remove-Item -LiteralPath $DestinationPath -Force -ErrorAction SilentlyContinue
+            Compress-Archive -Path $Path -DestinationPath $DestinationPath -Force -ErrorAction Stop
+            return
+        } catch {
+            if ($attempt -ge $MaxAttempts) { throw }
+            $delayMs = 500 * $attempt
+            Write-Host "  压缩被文件占用中断，${delayMs}ms 后重试 ($attempt/$MaxAttempts)..." -ForegroundColor DarkYellow
+            Start-Sleep -Milliseconds $delayMs
+        }
+    }
+}
+
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 function Get-NodeAgentReleaseIdentity {
     param(
         [Parameter(Mandatory = $true)][string]$Version,
