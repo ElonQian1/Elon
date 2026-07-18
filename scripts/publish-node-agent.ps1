@@ -786,10 +786,7 @@ Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
-if ($script:NodeReleaseOwned) {
-    Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken `
-        -Success $true -Sha $GitSha -VersionName $PackageVersion
-}
+if ($script:NodeReleaseOwned) { Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -Success $true -Sha $GitSha -VersionName $PackageVersion }
 $script:NodeReleaseFinished = $true
 } catch {
     try { if ($script:NodeReleaseOwned -and -not $script:NodeReleaseFinished) {
