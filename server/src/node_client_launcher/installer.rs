@@ -151,7 +151,7 @@ fn resolve_source_internal_dir(install_dir: &Path) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn copy_internal_files(source: &Path, internal_dir: &Path) -> Result<()> {
+pub(super) fn copy_internal_files(source: &Path, internal_dir: &Path) -> Result<()> {
     for file in INTERNAL_FILES {
         let src = source.join(file);
         if !src.exists() {
@@ -205,7 +205,7 @@ fn preserve_user_env(install_dir: &Path, internal_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn cleanup_legacy_files(install_dir: &Path) -> Result<()> {
+pub(super) fn cleanup_legacy_files(install_dir: &Path) -> Result<()> {
     for file in LEGACY_TOP_LEVEL_FILES {
         let path = install_dir.join(file);
         if path.exists() {

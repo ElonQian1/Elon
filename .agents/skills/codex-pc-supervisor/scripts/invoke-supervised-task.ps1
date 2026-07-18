@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('Probe', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
@@ -26,6 +26,10 @@ param(
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $script:SupervisionProtocol = 'elon.desktop_pc_supervision.v1'
+$script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$script:Utf8NoBomStrict = [System.Text.UTF8Encoding]::new($false, $true)
+$OutputEncoding = $script:Utf8NoBom
+try { [Console]::OutputEncoding = $script:Utf8NoBom } catch {}
 
 function Get-ObjectField {
     param([object]$InputObject, [string]$Name)
@@ -38,6 +42,127 @@ function Get-ObjectField {
 function Convert-ToJsonResult {
     param([System.Collections.IDictionary]$Value)
     $Value | ConvertTo-Json -Depth 20 -Compress
+}
+
+function Convert-ToUtf8JsonBytes {
+    param([object]$Value)
+    $json = $Value | ConvertTo-Json -Depth 20 -Compress
+    return ,([byte[]]$script:Utf8NoBomStrict.GetBytes($json))
+}
+
+function Convert-ResponseBytesToText {
+    param(
+        [byte[]]$Bytes,
+        [string]$ContentType = ''
+    )
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) { return '' }
+
+    $encoding = $null
+    $offset = 0
+    if ($Bytes.Length -ge 3 -and $Bytes[0] -eq 0xEF -and $Bytes[1] -eq 0xBB -and $Bytes[2] -eq 0xBF) {
+        $encoding = $script:Utf8NoBomStrict
+        $offset = 3
+    } elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFF -and $Bytes[1] -eq 0xFE) {
+        $encoding = [System.Text.UnicodeEncoding]::new($false, $true, $true)
+        $offset = 2
+    } elseif ($Bytes.Length -ge 2 -and $Bytes[0] -eq 0xFE -and $Bytes[1] -eq 0xFF) {
+        $encoding = [System.Text.UnicodeEncoding]::new($true, $true, $true)
+        $offset = 2
+    } elseif ($ContentType -match '(?i)charset\s*=\s*["'']?([^;\s"'']+)') {
+        try {
+            $declaredEncoding = [System.Text.Encoding]::GetEncoding($Matches[1])
+            $encoding = $declaredEncoding.Clone()
+            $encoding.DecoderFallback = [System.Text.DecoderFallback]::ExceptionFallback
+        } catch {
+            throw "Node response declares an unsupported charset: $($Matches[1])"
+        }
+    } else {
+        # RFC 8259 JSON exchanged between systems is UTF-8. Windows PowerShell
+        # 5.1 otherwise falls back to a legacy code page when charset is absent.
+        $encoding = $script:Utf8NoBomStrict
+    }
+
+    try {
+        return $encoding.GetString($Bytes, $offset, $Bytes.Length - $offset)
+    } catch [System.Text.DecoderFallbackException] {
+        throw 'Node response is not valid in its declared/default UTF-8 encoding.'
+    }
+}
+
+function Read-ResponseBytes {
+    param([System.Net.WebResponse]$Response)
+    $stream = $Response.GetResponseStream()
+    if ($null -eq $stream) { return ,([byte[]]@()) }
+    $buffer = New-Object System.IO.MemoryStream
+    try {
+        $stream.CopyTo($buffer)
+        return ,([byte[]]$buffer.ToArray())
+    } finally {
+        $stream.Dispose()
+        $buffer.Dispose()
+    }
+}
+
+function Convert-JsonResponseBytes {
+    param(
+        [byte[]]$Bytes,
+        [string]$ContentType = ''
+    )
+    $text = Convert-ResponseBytesToText $Bytes $ContentType
+    if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+    return $text | ConvertFrom-Json
+}
+
+function Invoke-Utf8JsonRequest {
+    param(
+        [string]$Method,
+        [string]$Uri,
+        [System.Collections.IDictionary]$Headers,
+        [object]$Body = $null,
+        [int]$TimeoutSec = 15
+    )
+    $request = [System.Net.HttpWebRequest]::Create($Uri)
+    $request.Method = $Method.ToUpperInvariant()
+    $request.Timeout = $TimeoutSec * 1000
+    $request.ReadWriteTimeout = $TimeoutSec * 1000
+    $request.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor `
+        [System.Net.DecompressionMethods]::Deflate
+    foreach ($name in $Headers.Keys) {
+        $request.Headers[[string]$name] = [string]$Headers[$name]
+    }
+    if ($null -ne $Body) {
+        [byte[]]$requestBytes = Convert-ToUtf8JsonBytes $Body
+        $request.ContentType = 'application/json; charset=utf-8'
+        $request.ContentLength = $requestBytes.Length
+        $requestStream = $request.GetRequestStream()
+        try {
+            $requestStream.Write($requestBytes, 0, $requestBytes.Length)
+        } finally {
+            $requestStream.Dispose()
+        }
+    }
+
+    $response = $null
+    try {
+        $response = $request.GetResponse()
+        [byte[]]$responseBytes = Read-ResponseBytes $response
+        return Convert-JsonResponseBytes $responseBytes ([string]$response.ContentType)
+    } catch [System.Net.WebException] {
+        $errorResponse = $_.Exception.Response
+        if ($null -ne $errorResponse) {
+            try {
+                [byte[]]$errorBytes = Read-ResponseBytes $errorResponse
+                $errorText = Convert-ResponseBytesToText $errorBytes ([string]$errorResponse.ContentType)
+                $statusCode = [int]([System.Net.HttpWebResponse]$errorResponse).StatusCode
+                throw "Node API returned HTTP ${statusCode}: $errorText"
+            } finally {
+                $errorResponse.Dispose()
+            }
+        }
+        throw
+    } finally {
+        if ($null -ne $response) { $response.Dispose() }
+    }
 }
 
 function Get-NodeConnection {
@@ -55,8 +180,8 @@ function Get-NodeConnection {
         foreach ($candidateUrl in ($candidateUrls | Select-Object -Unique)) {
             try {
                 $statusHeaders = @{ Origin = $candidateUrl }
-                $status = Invoke-RestMethod -Method Get -Uri "$candidateUrl/api/status" `
-                    -Headers $statusHeaders -TimeoutSec 2 -UseBasicParsing
+                $status = Invoke-Utf8JsonRequest -Method Get -Uri "$candidateUrl/api/status" `
+                    -Headers $statusHeaders -TimeoutSec 2
                 $token = [string](Get-ObjectField $status 'local_admin_token')
                 $header = [string](Get-ObjectField $status 'local_admin_token_header')
                 $version = [string](Get-ObjectField $status 'version')
@@ -88,18 +213,8 @@ function Invoke-NodeApi {
     )
     $requestHeaders = @{ Origin = $Connection.BaseUrl }
     $requestHeaders[$Connection.Header] = $Connection.Token
-    $arguments = @{
-        Method = $Method
-        Uri = "$($Connection.BaseUrl)$Path"
-        Headers = $requestHeaders
-        TimeoutSec = 15
-        UseBasicParsing = $true
-    }
-    if ($null -ne $Body) {
-        $arguments.ContentType = 'application/json; charset=utf-8'
-        $arguments.Body = $Body | ConvertTo-Json -Depth 20 -Compress
-    }
-    Invoke-RestMethod @arguments
+    Invoke-Utf8JsonRequest -Method $Method -Uri "$($Connection.BaseUrl)$Path" `
+        -Headers $requestHeaders -Body $Body -TimeoutSec 15
 }
 
 function New-SupervisedTaskBody {
@@ -174,6 +289,58 @@ function Get-RootTaskFromDetail {
     return $root
 }
 
+function New-SupervisionReviewBody {
+    param(
+        [string]$BodyVerdict,
+        [string]$BodySummary,
+        [string[]]$BodyImprovements
+    )
+    return [ordered]@{
+        verdict = $BodyVerdict
+        summary = $BodySummary
+        improvements = @($BodyImprovements | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        reviewed_by = 'codex_desktop'
+    }
+}
+
+function New-ImprovementTaskBody {
+    param(
+        [object]$ParentDetail,
+        [string]$RequestedParentTaskId,
+        [string]$ImprovementPrompt,
+        [string[]]$BodyCriteria,
+        [bool]$IsBlocking
+    )
+    if ([string]::IsNullOrWhiteSpace($ImprovementPrompt)) {
+        throw 'Improve requires a capability improvement Prompt.'
+    }
+    $parentRecord = Get-RecordFromDetail $ParentDetail
+    $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
+    $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
+    $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
+    $role = if ($IsBlocking) { 'capability_repair' } else { 'post_task_improvement' }
+    $prefix = if ($IsBlocking) { 'Repair the Yilong PC capability blocking the original task, then return verification evidence:' } else { 'Improve the Yilong PC executor after the user task is complete:' }
+    return New-SupervisedTaskBody $parentProjectId $parentWorkspace "$prefix`n$ImprovementPrompt" `
+        $role $RequestedParentTaskId $rootTask $BodyCriteria 'after_task_only'
+}
+
+function New-ResumeTaskBody {
+    param(
+        [object]$ParentDetail,
+        [string]$RequestedParentTaskId,
+        [string[]]$BodyCriteria,
+        [string]$BodyImprovementPolicy
+    )
+    $parentRecord = Get-RecordFromDetail $ParentDetail
+    $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
+    $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
+    $parentPrompt = [string](Get-ObjectField $parentRecord 'prompt')
+    $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
+    $resumePrompt = "The capability repair is complete. Resume the original task. Inspect the current workspace and prior failure evidence before repeating work:`n$parentPrompt"
+    return New-SupervisedTaskBody $parentProjectId $parentWorkspace $resumePrompt `
+        'resume_original' $RequestedParentTaskId $rootTask $BodyCriteria $BodyImprovementPolicy
+}
+
 function Submit-Body {
     param([object]$Connection, [object]$Body, [string]$ResultAction)
     $response = Invoke-NodeApi $Connection 'Post' '/api/local-tasks' $Body
@@ -190,11 +357,61 @@ function Submit-Body {
 }
 
 if ($Action -eq 'SelfTest') {
-    $testBody = New-SupervisedTaskBody 'self-test' 'C:\self-test-workspace' 'Verify supervision' `
-        'requirement' '' '' @('Task completes', 'Evidence is inspectable') 'after_task_or_unblock'
+    $testWorkspace = 'C:\一龙项目\中文工作区'
+    $testPrompt = '检查监督链路，保持中文路径完整'
+    $testCriteria = @('提交与检查保留中文', '等待与验收摘要无乱码')
+    $testSummary = '独立复核：路径、提示和验收条件完整'
+    $testBody = New-SupervisedTaskBody '中文项目' $testWorkspace $testPrompt `
+        'requirement' '' '' $testCriteria 'after_task_or_unblock'
+    [byte[]]$requestBytes = Convert-ToUtf8JsonBytes $testBody
+    $requestRoundTrip = Convert-JsonResponseBytes $requestBytes 'application/json'
+
+    $parentJson = [ordered]@{
+        record = [ordered]@{
+            project_id = '中文项目'
+            workspace_path = $testWorkspace
+            prompt = $testPrompt
+        }
+        supervision = [ordered]@{
+            contract = [ordered]@{ root_task_id = 'local-root-task' }
+        }
+    }
+    [byte[]]$responseBytes = Convert-ToUtf8JsonBytes $parentJson
+    $decodedParent = Convert-JsonResponseBytes $responseBytes 'application/json; charset=utf-8'
+    $invalidUtf8Rejected = $false
+    try {
+        $null = Convert-JsonResponseBytes ([byte[]](0xC3, 0x28)) 'application/json; charset=utf-8'
+    } catch [System.Text.DecoderFallbackException] {
+        $invalidUtf8Rejected = $true
+    } catch {
+        if ($_.Exception.Message -eq 'Node response is not valid in its declared/default UTF-8 encoding.') {
+            $invalidUtf8Rejected = $true
+        } else {
+            throw
+        }
+    }
+    $reviewBody = New-SupervisionReviewBody 'accepted' $testSummary @('后续继续观察中文日志')
+    [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
+    $reviewRoundTrip = Convert-JsonResponseBytes $reviewBytes 'application/json'
+    $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' '修复中文继承路径' `
+        $testCriteria $true
+    $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
     $testDetailPath = Get-TaskDetailPath 'local-test?id'
     if ($testBody.supervision.acceptance_criteria.Count -ne 2 -or
         $testBody.supervision.task_role -ne 'requirement' -or
+        $requestRoundTrip.workspace_path -cne $testWorkspace -or
+        $requestRoundTrip.prompt -cne $testPrompt -or
+        $requestRoundTrip.supervision.acceptance_criteria[0] -cne $testCriteria[0] -or
+        $decodedParent.record.workspace_path -cne $testWorkspace -or
+        -not $invalidUtf8Rejected -or
+        $reviewRoundTrip.summary -cne $testSummary -or
+        $improvementBody.workspace_path -cne $testWorkspace -or
+        $improvementBody.supervision.task_role -ne 'capability_repair' -or
+        $improvementBody.supervision.parent_task_id -ne 'local-parent-task' -or
+        $improvementBody.supervision.root_task_id -ne 'local-root-task' -or
+        $resumeBody.workspace_path -cne $testWorkspace -or
+        $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -lt 0 -or
+        $resumeBody.supervision.task_role -ne 'resume_original' -or
         $script:SupervisionProtocol -ne 'elon.desktop_pc_supervision.v1' -or
         $testDetailPath -ne '/api/local-tasks/local-test%3Fid?limit=1000') {
         throw 'Supervised request construction self-test failed.'
@@ -203,7 +420,11 @@ if ($Action -eq 'SelfTest') {
         ok = $true
         action = 'SelfTest'
         protocol = $script:SupervisionProtocol
-        checks = @('request_contract', 'acceptance_criteria', 'executor_role', 'task_detail_path')
+        checks = @(
+            'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
+            'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
+            'improve_inherited_path', 'resume_inherited_path', 'task_detail_path'
+        )
     })
     exit 0
 }
@@ -258,12 +479,7 @@ switch ($Action) {
     }
     'Review' {
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
-        $reviewBody = [ordered]@{
-            verdict = $Verdict
-            summary = $Summary
-            improvements = @($Improvements | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-            reviewed_by = 'codex_desktop'
-        }
+        $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
         $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/review" $reviewBody
         Convert-ToJsonResult ([ordered]@{
@@ -272,28 +488,14 @@ switch ($Action) {
         })
     }
     'Improve' {
-        if ([string]::IsNullOrWhiteSpace($Prompt)) { throw 'Improve requires a capability improvement Prompt.' }
         $parentDetail = Get-TaskDetail $nodeConnection $TaskId
-        $parentRecord = Get-RecordFromDetail $parentDetail
-        $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
-        $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
-        $rootTask = Get-RootTaskFromDetail $parentDetail $TaskId
-        $role = if ($BlockingImprovement) { 'capability_repair' } else { 'post_task_improvement' }
-        $prefix = if ($BlockingImprovement) { 'Repair the Yilong PC capability blocking the original task, then return verification evidence:' } else { 'Improve the Yilong PC executor after the user task is complete:' }
-        $improvementBody = New-SupervisedTaskBody $parentProjectId $parentWorkspace "$prefix`n$Prompt" `
-            $role $TaskId $rootTask $AcceptanceCriteria 'after_task_only'
+        $improvementBody = New-ImprovementTaskBody $parentDetail $TaskId $Prompt `
+            $AcceptanceCriteria ([bool]$BlockingImprovement)
         Submit-Body $nodeConnection $improvementBody 'Improve'
     }
     'Resume' {
         $parentDetail = Get-TaskDetail $nodeConnection $TaskId
-        $parentRecord = Get-RecordFromDetail $parentDetail
-        $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
-        $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
-        $parentPrompt = [string](Get-ObjectField $parentRecord 'prompt')
-        $rootTask = Get-RootTaskFromDetail $parentDetail $TaskId
-        $resumePrompt = "The capability repair is complete. Resume the original task. Inspect the current workspace and prior failure evidence before repeating work:`n$parentPrompt"
-        $resumeBody = New-SupervisedTaskBody $parentProjectId $parentWorkspace $resumePrompt `
-            'resume_original' $TaskId $rootTask $AcceptanceCriteria $ImprovementPolicy
+        $resumeBody = New-ResumeTaskBody $parentDetail $TaskId $AcceptanceCriteria $ImprovementPolicy
         Submit-Body $nodeConnection $resumeBody 'Resume'
     }
 }

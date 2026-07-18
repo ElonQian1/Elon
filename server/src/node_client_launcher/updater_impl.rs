@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
+    update_compat::ensure_durable_state_outside_install(install_dir, &crate::state_path())?;
     let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
     if auto_update_disabled(&env_values) {
         return Ok(false);
