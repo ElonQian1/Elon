@@ -16,6 +16,9 @@ use super::{
     CONVERSATION_MERGE_PUSH_ATTEMPTS,
 };
 
+pub(super) const GENERIC_CONVERSATION_WORKTREE_LEASE_REASON: &str =
+    "active PC CLI task; Resume or successful finalization unlocks";
+
 pub(super) fn completion_origin_refs(workspace: &ConversationWorkspaceResult) -> Vec<String> {
     let mut refs = Vec::new();
     if let Some(base_workspace_path) = workspace.base_workspace_path.as_ref() {
@@ -236,21 +239,25 @@ pub(super) fn lock_registered_conversation_worktree(
     base_workspace: &Path,
     worktree_path: &Path,
 ) -> Result<()> {
+    match crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+        base_workspace,
+        worktree_path,
+    )? {
+        Some(reason) if reason == GENERIC_CONVERSATION_WORKTREE_LEASE_REASON => return Ok(()),
+        Some(reason) => bail!("conversation worktree is owned by another lease: {reason}"),
+        None => {}
+    }
     let path_arg = git_path_arg(worktree_path);
-    match run_git_dynamic(
+    run_git_dynamic(
         base_workspace,
         &[
             "worktree",
             "lock",
             "--reason",
-            "active PC CLI task; Resume or successful finalization unlocks",
+            GENERIC_CONVERSATION_WORKTREE_LEASE_REASON,
             path_arg.as_str(),
         ],
-    ) {
-        Ok(()) => Ok(()),
-        Err(_) if conversation_worktree_is_locked(base_workspace, worktree_path)? => Ok(()),
-        Err(error) => Err(error),
-    }
+    )
 }
 
 pub(super) fn unlock_conversation_worktree(

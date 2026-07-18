@@ -130,6 +130,8 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 当前边界是：Codex CLI 自己负责项目理解、命令执行、文件修改和最终回答；一龙平台负责排队、并行、取消、重连、journal、恢复和前端过程展示。`pipe_sidecar + pipe + JSON` 已补齐基础生命周期管理、稳定运行句柄、恢复契约和 Codex JSON 输出回放；后续继续增强前端恢复入口和多 CLI 统一管理，不替代 Codex CLI 本身能力。
 
+sidecar `sessions.json` 使用进程间互斥和同目录临时文件原子替换，更新时保留最近有效备份；主文件损坏会在锁内从备份回退并原子重建，避免节点进程与版本化 worker 并发写丢记录。父节点同时监视 worker：worker 若在生成终端输出前异常退出，会补写失败终态，让本机任务快速进入可恢复的 failed/resume_required 链路，不会永久停在 running/recovering。
+
 #### 2.4.1 Codex Desktop -> PC 本机监督协议
 
 本机任务 API 可选接受 `supervision`，协议版本为 `elon.desktop_pc_supervision.v1`。契约记录 `task_role`、父/根任务、验收条件和改进策略；node-agent 把契约及桌面验收作为 append-only journal 事件保存，不改变旧任务的数据库结构，也不影响未传 `supervision` 的调用方。
@@ -142,7 +144,7 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 `resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支、终态记录的 `git_head` 和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。若活动目录仍在但 Git 注册被外部清理破坏，只读检查先报告 `recovery_required`，节点在占用门禁后以 `git worktree add --no-checkout` 重建元数据，再原样移回用户文件；提交或分支漂移时拒绝猜测。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
 
-节点创建或复用隔离会话 worktree 后立即写 Git worktree lock；失败、取消、超时和恢复等待阶段保持锁定，防止通用清理过早注销现场。Windows 超时/取消先同步等待 `taskkill /T /F` 回收完整执行器进程树，再结束直接子进程；成功合并并推送后才解锁和移除 worktree。终态 `workspace_status` 持久化基础路径、活动路径、分支和完整 `git_head`，为注册丢失后的确定性重建提供身份。
+节点在创建或复用受监督隔离 worktree 时直接以 `elon-supervision:<root_task_id>` 写入唯一权威 Git lease；prepare、恢复和 merge 不先写通用锁，也不存在临时解锁窗口。失败、取消、超时、任务完成、代码合入和发布完成都保留该 lease 与目录；只有契约 root identity 匹配的 Desktop `accepted` review 才精确解锁，之后通用 cleanup 才能回收。普通非监督 conversation worktree 仍使用原通用锁，并在成功合并后解锁删除。Windows 超时/取消先同步等待 `taskkill /T /F` 回收完整执行器进程树，再结束直接子进程。终态 `workspace_status` 持久化基础路径、活动路径、分支和完整 `git_head`，为注册丢失后的确定性重建提供身份。
 
 服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
 

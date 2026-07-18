@@ -30,6 +30,10 @@ pub(crate) fn resolve_recycled_resume_workspace(
     mode: ResumeWorkspaceMode,
 ) -> Result<ResolvedResumeWorkspace> {
     let identity = validate_receipt_identity(contract, parent, receipt)?;
+    let supervision_root_task_id = contract
+        .root_task_id
+        .as_deref()
+        .unwrap_or(parent.task_id.as_str());
     anyhow::ensure!(
         requested_project_id == parent.project_id,
         "recycled resume cannot cross projects"
@@ -103,6 +107,7 @@ pub(crate) fn resolve_recycled_resume_workspace(
                 workspace_path: display_path(&active),
                 isolated: true,
                 branch: Some(expected_branch),
+                supervision_root_task_id: Some(supervision_root_task_id.to_string()),
             },
             derivation: "platform_receipt_commit_rebuild_available".to_string(),
             git_head: head.to_string(),
@@ -110,7 +115,13 @@ pub(crate) fn resolve_recycled_resume_workspace(
         });
     }
 
-    recreate_worktree(&base, &active, &expected_branch, head)?;
+    recreate_worktree(
+        &base,
+        &active,
+        &expected_branch,
+        head,
+        supervision_root_task_id,
+    )?;
     let validated = validate_resume_workspace(
         contract,
         parent,
@@ -255,8 +266,16 @@ fn validate_unoccupied(base: &Path, active: &Path, branch: &str) -> Result<()> {
     Ok(())
 }
 
-fn recreate_worktree(base: &Path, active: &Path, branch: &str, head: &str) -> Result<()> {
+fn recreate_worktree(
+    base: &Path,
+    active: &Path,
+    branch: &str,
+    head: &str,
+    supervision_root_task_id: &str,
+) -> Result<()> {
     let branch_ref = format!("refs/heads/{branch}");
+    let reason =
+        crate::node_agent_supervision_worktree_lease::lease_reason(supervision_root_task_id)?;
     let branch_exists = git_command()
         .args(["show-ref", "--verify", "--quiet", &branch_ref])
         .current_dir(base)
@@ -268,11 +287,32 @@ fn recreate_worktree(base: &Path, active: &Path, branch: &str, head: &str) -> Re
             git_output(base, &["rev-parse", "--verify", &branch_ref])?.trim() == head,
             "recorded branch no longer points at the receipt commit"
         );
-        run_git(base, &["worktree", "add", &path_arg(active), branch])
+        run_git(
+            base,
+            &[
+                "worktree",
+                "add",
+                "--lock",
+                "--reason",
+                &reason,
+                &path_arg(active),
+                branch,
+            ],
+        )
     } else {
         run_git(
             base,
-            &["worktree", "add", "-b", branch, &path_arg(active), head],
+            &[
+                "worktree",
+                "add",
+                "--lock",
+                "--reason",
+                &reason,
+                "-b",
+                branch,
+                &path_arg(active),
+                head,
+            ],
         )
     }
 }

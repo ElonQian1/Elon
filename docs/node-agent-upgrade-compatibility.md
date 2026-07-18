@@ -24,7 +24,7 @@
 6. 外部项目、共享缓存和 Git 现场不得被自动认领、移动、清理或改写。
 7. 服务器按任务类型判断能力：已有项目 CLI/Exec 保持向后兼容；只有显式新建/清理托管 workspace 协议可要求新 capability。
 8. 更新或重启不得静默中断活跃本机监督任务：默认持久化检查点并 drain 到安全终态；意外重启必须保留 journal/worktree，显示 `resume_required` 和一键 Resume 动作。检查点、URL 缓存与状态 API 都不得持久化 admin token。
-9. 活跃监督 worktree 必须保持 Git lock，直到成功合并收尾；超时或取消先同步回收执行器后代进程。若目录保留但 Git 注册丢失，Resume 只能按节点终态记录的基础仓库、分支和 `git_head` 重建，并保留所有未提交与未跟踪文件。
+9. 受监督 worktree 的唯一权威 Git lease 是 `elon-supervision:<root_task_id>`：prepare、恢复、任务完成、合并和发布都不得用通用锁抢占、提前解锁或删除；只有 root identity 匹配的 Desktop `accepted` review 才释放，随后 cleanup 才可回收。超时或取消先同步回收执行器后代进程。可信且独占的脏 worktree 可原位 Resume，staged、unstaged、untracked 全部保留；若目录保留但 Git 注册丢失，只能按节点终态记录的基础仓库、分支、`git_head` 和 root identity 重建且不得覆盖用户文件。
 
 ## 配置与缓存迁移合同
 

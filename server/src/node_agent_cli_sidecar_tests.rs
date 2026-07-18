@@ -1,5 +1,5 @@
-use super::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord, SIDECAR_SESSIONS_READ_ATTEMPTS};
-use std::{fs, path::PathBuf};
+use super::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord};
+use std::{fs, io::Write, path::PathBuf, process::Command};
 
 #[test]
 fn sidecar_session_survives_registry_reload_and_accepts_recovered_approval() {
@@ -129,72 +129,128 @@ fn pipe_json_sidecar_can_cancel_without_terminal_attach() {
 }
 
 #[test]
-fn transient_invalid_sessions_json_is_retried_until_registry_recovers() {
-    let dir = unique_test_dir("transient-invalid-json");
+fn sidecar_registry_recovers_real_excess_tail_brace_from_valid_backup() {
+    let dir = unique_test_dir("tail-brace-recovery");
     let _ = fs::remove_dir_all(&dir);
     let registry = CliSidecarRegistry::new(&dir);
     registry
-        .upsert_session(CliSidecarSessionRecord::managed_pipe_json(
-            "sidecar-retry-1",
-            "task-retry-1",
-            "codex",
-            "route_a_external_cli",
-            None,
-            None,
-            None,
-            None,
-            now_ms(),
-        ))
-        .expect("valid sidecar session should persist");
+        .upsert_session(session("session-a", "task-a"))
+        .unwrap();
+    registry
+        .upsert_session(session("session-b", "task-b"))
+        .unwrap();
+    assert!(dir.join("sessions.json.bak").exists());
 
-    let sessions_path = dir.join("sessions.json");
-    let valid_json = fs::read(&sessions_path).expect("valid sessions JSON should load");
-    fs::write(&sessions_path, b"{\"sidecar-retry-1\":")
-        .expect("test should simulate a half-written sessions file");
+    let mut primary = fs::OpenOptions::new()
+        .append(true)
+        .open(dir.join("sessions.json"))
+        .unwrap();
+    writeln!(primary, "}}").unwrap();
+    primary.sync_all().unwrap();
+    drop(primary);
 
-    let mut retries = 0;
-    let sessions = registry
-        .load_sessions_with_retry(|_| {
-            retries += 1;
-            if retries == 1 {
-                fs::write(&sessions_path, &valid_json)
-                    .expect("concurrent writer should restore valid sessions JSON");
-            }
-        })
-        .expect("transient invalid JSON should recover within the retry bound");
-
-    assert_eq!(retries, 1);
+    let recovered = CliSidecarRegistry::new(&dir).all_sessions().unwrap();
     assert_eq!(
-        sessions
-            .get("sidecar-retry-1")
-            .map(|session| session.task_id.as_str()),
-        Some("task-retry-1")
+        recovered.len(),
+        1,
+        "backup should be the prior valid generation"
     );
+    assert_eq!(recovered[0].session_id, "session-a");
+    let rebuilt = fs::read_to_string(dir.join("sessions.json")).unwrap();
+    serde_json::from_str::<serde_json::Value>(&rebuilt)
+        .expect("primary must be rebuilt as valid JSON");
+
+    registry
+        .upsert_session(session("session-c", "task-c"))
+        .unwrap();
+    assert_eq!(registry.all_sessions().unwrap().len(), 2);
     let _ = fs::remove_dir_all(dir);
 }
 
 #[test]
-fn persistently_invalid_sessions_json_reports_after_bounded_retries() {
-    let dir = unique_test_dir("persistent-invalid-json");
+fn corrupt_sessions_without_a_valid_backup_fails_closed() {
+    let dir = unique_test_dir("corrupt-without-backup");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("test registry directory should exist");
-    fs::write(dir.join("sessions.json"), b"{\"broken\":")
-        .expect("test should persist invalid sessions JSON");
+    fs::write(dir.join("sessions.json"), b"{\"broken\":").unwrap();
+    fs::write(dir.join("sessions.json.bak"), b"{\"also-broken\":").unwrap();
 
     let registry = CliSidecarRegistry::new(&dir);
-    let mut retries = 0;
     let error = registry
-        .load_sessions_with_retry(|_| retries += 1)
-        .expect_err("persistent corruption must not be swallowed");
+        .all_sessions()
+        .expect_err("corruption without a valid backup must not be swallowed");
     let detail = format!("{error:#}");
-
-    assert_eq!(retries, SIDECAR_SESSIONS_READ_ATTEMPTS - 1);
-    assert!(detail.contains(&format!(
-        "{} 次有界尝试后仍失败",
-        SIDECAR_SESSIONS_READ_ATTEMPTS
-    )));
-    assert!(detail.contains("解析"));
+    assert!(detail.contains("主文件损坏且备份不可恢复"));
+    assert!(detail.contains("sessions.json.bak"));
     let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn sidecar_registry_cross_process_writer_stress_preserves_every_session() {
+    let dir = unique_test_dir("cross-process-writers");
+    let _ = fs::remove_dir_all(&dir);
+    let writers = 6;
+    let per_writer = 20;
+    let mut children = Vec::new();
+    for writer in 0..writers {
+        children.push(
+            Command::new(std::env::current_exe().unwrap())
+                .args(["sidecar_registry_process_writer_helper", "--nocapture"])
+                .env("ELON_SIDECAR_TEST_WRITER_DIR", &dir)
+                .env("ELON_SIDECAR_TEST_WRITER_ID", writer.to_string())
+                .env("ELON_SIDECAR_TEST_WRITER_COUNT", per_writer.to_string())
+                .spawn()
+                .expect("spawn registry writer process"),
+        );
+    }
+    for child in children {
+        let output = child.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "writer process failed: stdout={} stderr={}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let sessions = CliSidecarRegistry::new(&dir).all_sessions().unwrap();
+    assert_eq!(sessions.len(), writers * per_writer);
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn sidecar_registry_process_writer_helper() {
+    let Ok(dir) = std::env::var("ELON_SIDECAR_TEST_WRITER_DIR") else {
+        return;
+    };
+    let writer: usize = std::env::var("ELON_SIDECAR_TEST_WRITER_ID")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let count: usize = std::env::var("ELON_SIDECAR_TEST_WRITER_COUNT")
+        .unwrap()
+        .parse()
+        .unwrap();
+    let registry = CliSidecarRegistry::new(dir);
+    for index in 0..count {
+        let id = format!("writer-{writer}-session-{index}");
+        registry
+            .upsert_session(session(&id, &format!("writer-{writer}-task-{index}")))
+            .unwrap();
+    }
+}
+
+fn session(session_id: &str, task_id: &str) -> CliSidecarSessionRecord {
+    CliSidecarSessionRecord::managed_pipe_json(
+        session_id,
+        task_id,
+        "codex",
+        "route_a_external_cli",
+        None,
+        None,
+        Some(std::process::id()),
+        None,
+        now_ms(),
+    )
 }
 
 fn unique_test_dir(suffix: &str) -> PathBuf {

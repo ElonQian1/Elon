@@ -5,10 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context, Result};
 use uuid::Uuid;
 
-use crate::{
-    git_command_error::{git_command, git_failure_message, git_spawn_context},
-    pc_workspace_provisioner::lock_conversation_worktree,
-};
+use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 
 pub(super) struct MissingWorktreeRecovery {
     pub(super) git_head: String,
@@ -24,6 +21,7 @@ pub(super) fn inspect_or_repair(
     active: &Path,
     branch: &str,
     recorded_head: Option<&str>,
+    supervision_root_task_id: &str,
     repair: bool,
 ) -> Result<MissingWorktreeRecovery> {
     if is_git_worktree(active) {
@@ -32,7 +30,13 @@ pub(super) fn inspect_or_repair(
     let (git_head, head_source) = recovery_head(base, branch, recorded_head)?;
     validate_branch_recovery_identity(base, branch, &git_head)?;
     if repair {
-        rebuild_without_overwriting_files(base, active, branch, &git_head)?;
+        rebuild_without_overwriting_files(
+            base,
+            active,
+            branch,
+            &git_head,
+            supervision_root_task_id,
+        )?;
     }
     Ok(MissingWorktreeRecovery {
         git_head,
@@ -85,6 +89,7 @@ fn rebuild_without_overwriting_files(
     active: &Path,
     branch: &str,
     head: &str,
+    supervision_root_task_id: &str,
 ) -> Result<()> {
     let parent = active
         .parent()
@@ -106,10 +111,9 @@ fn rebuild_without_overwriting_files(
     })?;
 
     let attempt = (|| -> Result<()> {
-        add_metadata_only_worktree(base, active, branch, head)?;
+        add_metadata_only_worktree(base, active, branch, head, supervision_root_task_id)?;
         move_user_entries(&backup, active)?;
         validate_rebuilt_identity(base, active, branch, head)?;
-        lock_conversation_worktree(base, active)?;
         remove_stale_git_marker_and_empty_backup(&backup)?;
         Ok(())
     })();
@@ -126,13 +130,30 @@ fn rebuild_without_overwriting_files(
     Ok(())
 }
 
-fn add_metadata_only_worktree(base: &Path, active: &Path, branch: &str, head: &str) -> Result<()> {
+fn add_metadata_only_worktree(
+    base: &Path,
+    active: &Path,
+    branch: &str,
+    head: &str,
+    supervision_root_task_id: &str,
+) -> Result<()> {
     let active_arg = git_path_arg(active);
     let branch_ref = format!("refs/heads/{branch}");
+    let reason =
+        crate::node_agent_supervision_worktree_lease::lease_reason(supervision_root_task_id)?;
     if resolve_commit(base, &branch_ref).is_ok() {
         run_git(
             base,
-            &["worktree", "add", "--no-checkout", &active_arg, branch],
+            &[
+                "worktree",
+                "add",
+                "--lock",
+                "--reason",
+                &reason,
+                "--no-checkout",
+                &active_arg,
+                branch,
+            ],
         )
     } else {
         run_git(
@@ -140,6 +161,9 @@ fn add_metadata_only_worktree(base: &Path, active: &Path, branch: &str, head: &s
             &[
                 "worktree",
                 "add",
+                "--lock",
+                "--reason",
+                &reason,
                 "--no-checkout",
                 "-b",
                 branch,

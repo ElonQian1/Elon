@@ -89,6 +89,12 @@ impl ResumeFixture {
             acceptance_criteria: vec!["resume safely".to_string()],
             improvement_policy: "after_task_or_unblock".to_string(),
         };
+        crate::node_agent_supervision_worktree_lease::acquire(
+            &base,
+            &active,
+            contract.root_task_id.as_deref().unwrap(),
+        )
+        .expect("fixture should hold the supervision root lease");
         Self {
             root,
             base,
@@ -231,10 +237,78 @@ fn resume_rejects_active_parent_task() {
 }
 
 #[test]
+fn dirty_exclusive_resume_preserves_staged_unstaged_and_untracked_changes() {
+    let fixture = ResumeFixture::new();
+    std::fs::write(fixture.active.join("README.md"), "staged edit\n").unwrap();
+    run_git(&fixture.active, &["add", "README.md"]);
+    std::fs::write(
+        fixture.active.join("README.md"),
+        "staged edit plus unstaged edit\n",
+    )
+    .unwrap();
+    std::fs::write(fixture.active.join("draft.txt"), "untracked draft\n").unwrap();
+    let staged_before = git_output(&fixture.active, &["diff", "--cached"]);
+    let unstaged_before = git_output(&fixture.active, &["diff"]);
+
+    let resolved = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("trusted exclusive dirty worktree should be resumable");
+
+    assert_eq!(
+        resolved
+            .inherited_workspace
+            .supervision_root_task_id
+            .as_deref(),
+        Some("local-parent")
+    );
+    assert_eq!(
+        git_output(&fixture.active, &["diff", "--cached"]),
+        staged_before
+    );
+    assert_eq!(git_output(&fixture.active, &["diff"]), unstaged_before);
+    assert_eq!(
+        std::fs::read_to_string(fixture.active.join("draft.txt")).unwrap(),
+        "untracked draft\n"
+    );
+    let status = git_output(&fixture.active, &["status", "--short"]);
+    assert!(status.contains("MM README.md"), "{status}");
+    assert!(status.contains("?? draft.txt"), "{status}");
+}
+
+#[test]
+fn resume_rejects_a_nonmatching_root_lease_identity() {
+    let fixture = ResumeFixture::new();
+    crate::node_agent_supervision_worktree_lease::release(
+        &fixture.base,
+        &fixture.active,
+        "local-parent",
+    )
+    .unwrap();
+    crate::node_agent_supervision_worktree_lease::acquire(
+        &fixture.base,
+        &fixture.active,
+        "another-root",
+    )
+    .unwrap();
+    let error = validate_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("mismatched root lease must fail closed");
+    assert!(error.to_string().contains("root lease 身份不匹配"));
+}
+
+#[test]
 fn locked_worktree_survives_cleanup_while_a_spawned_process_is_alive() {
     let fixture = ResumeFixture::new();
-    crate::pc_workspace_provisioner::lock_conversation_worktree(&fixture.base, &fixture.active)
-        .expect("lock active worktree");
     let mut child = spawn_waiting_process(&fixture.active);
 
     let output = git_command()
@@ -268,6 +342,12 @@ fn orphaned_worktree_resume_rebuilds_metadata_and_preserves_user_files() {
     )
     .expect("write untracked evidence");
 
+    crate::node_agent_supervision_worktree_lease::release(
+        &fixture.base,
+        &fixture.active,
+        "local-parent",
+    )
+    .unwrap();
     let parked = fixture.root.join("parked-active");
     std::fs::rename(&fixture.active, &parked).expect("park active directory");
     run_git(&fixture.base, &["worktree", "prune", "--expire", "now"]);
@@ -308,6 +388,15 @@ fn orphaned_worktree_resume_rebuilds_metadata_and_preserves_user_files() {
     let status = git_output(&fixture.active, &["status", "--short"]);
     assert!(status.contains("README.md"));
     assert!(status.contains("publish-alive.txt"));
+    assert_eq!(
+        crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+            &fixture.base,
+            &fixture.active
+        )
+        .unwrap()
+        .as_deref(),
+        Some("elon-supervision:local-parent")
+    );
 }
 
 fn run_git(cwd: &Path, args: &[&str]) {

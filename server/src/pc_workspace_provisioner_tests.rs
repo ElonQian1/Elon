@@ -2,7 +2,8 @@ use super::{
     cleanup_project_workspace_in, conversation_workspace_head_landed,
     ensure_conversation_workspace_committed, git_output, git_path_arg, is_git_work_tree,
     is_retryable_push_rejection, merge_conversation_workspace, prepare_conversation_workspace_in,
-    recover_stale_conversation_worktree_path, worktree_clean,
+    prepare_conversation_workspace_in_with_supervision, recover_stale_conversation_worktree_path,
+    worktree_clean,
 };
 use elon_pc_dev_runtime::safe_path_part;
 use std::fs;
@@ -179,6 +180,7 @@ fn merge_missing_conversation_git_metadata_is_blocked_message() {
         workspace_path: active.to_string_lossy().to_string(),
         isolated: true,
         branch: Some("ai/session/project-a/conversation-a".into()),
+        supervision_root_task_id: None,
     };
     let message = merge_conversation_workspace(&workspace)
         .expect("missing git metadata should return a blocked merge message");
@@ -260,6 +262,7 @@ fn conversation_workspace_head_landed_checks_origin_main() {
         workspace_path: active.to_string_lossy().to_string(),
         isolated: true,
         branch: Some("ai/session/project-a/conversation-a".into()),
+        supervision_root_task_id: None,
     };
     assert!(
         conversation_workspace_head_landed(&landed_workspace).expect("landed probe should succeed")
@@ -285,6 +288,7 @@ fn conversation_workspace_head_landed_checks_origin_main() {
         workspace_path: unlanded.to_string_lossy().to_string(),
         isolated: true,
         branch: Some("ai/session/project-a/conversation-b".into()),
+        supervision_root_task_id: None,
     };
     assert!(!conversation_workspace_head_landed(&unlanded_workspace)
         .expect("unlanded probe should succeed"));
@@ -344,6 +348,109 @@ fn project_cleanup_preserves_supervision_leased_worktree_and_base_repo() {
     assert!(!project_dir.exists());
     assert!(!active.exists());
     let _ = fs::remove_dir_all(temp);
+}
+
+#[test]
+fn supervised_prepare_merge_review_release_and_cleanup_use_one_root_lease() {
+    let temp = std::env::temp_dir().join(format!(
+        "elon_supervision_lifecycle_{}",
+        Uuid::new_v4().simple()
+    ));
+    let project_dir = temp.join("user-a").join("project-a");
+    let base = project_dir.join("repo");
+    init_repo(&base);
+
+    let workspace = prepare_conversation_workspace_in_with_supervision(
+        &temp,
+        base.to_string_lossy().as_ref(),
+        "project-a",
+        "conversation-a",
+        Some("root-task-1"),
+    )
+    .expect("supervised prepare should acquire the authoritative root lease");
+    let active = std::path::PathBuf::from(&workspace.workspace_path);
+    assert_eq!(
+        crate::node_agent_supervision_worktree_lease::worktree_lock_reason(&base, &active)
+            .unwrap()
+            .as_deref(),
+        Some("elon-supervision:root-task-1")
+    );
+
+    fs::write(active.join("README.md"), "supervised change\n").unwrap();
+    run_git(&active, &["add", "README.md"]);
+    run_git(&active, &["commit", "-m", "supervised change"]);
+    let merge = merge_conversation_workspace(&workspace).unwrap();
+    assert!(merge.contains("retained until accepted review"));
+    assert!(
+        active.exists(),
+        "completion/merge must not delete a supervised worktree"
+    );
+    assert_eq!(
+        crate::node_agent_supervision_worktree_lease::worktree_lock_reason(&base, &active)
+            .unwrap()
+            .as_deref(),
+        Some("elon-supervision:root-task-1")
+    );
+    assert!(crate::node_agent_supervision_worktree_lease::release(
+        &base,
+        &active,
+        "different-root"
+    )
+    .is_err());
+
+    crate::node_agent_supervision_worktree_lease::release(&base, &active, "root-task-1")
+        .expect("matching accepted review should release exactly the root lease");
+    cleanup_project_workspace_in(&temp, "project-a", base.to_string_lossy().as_ref())
+        .expect("cleanup should reclaim the reviewed worktree");
+    assert!(!active.exists());
+    assert!(!project_dir.exists());
+    let _ = fs::remove_dir_all(temp);
+}
+
+#[test]
+fn ordinary_conversation_worktree_still_merges_and_cleans_immediately() {
+    let temp = std::env::temp_dir().join(format!(
+        "elon_ordinary_lifecycle_{}",
+        Uuid::new_v4().simple()
+    ));
+    let base = temp.join("base");
+    init_repo(&base);
+    let workspace = prepare_conversation_workspace_in(
+        &temp,
+        base.to_string_lossy().as_ref(),
+        "project-a",
+        "conversation-a",
+    )
+    .unwrap();
+    let active = std::path::PathBuf::from(&workspace.workspace_path);
+    assert!(workspace.supervision_root_task_id.is_none());
+    fs::write(active.join("README.md"), "ordinary change\n").unwrap();
+    run_git(&active, &["add", "README.md"]);
+    run_git(&active, &["commit", "-m", "ordinary change"]);
+
+    let merge = merge_conversation_workspace(&workspace).unwrap();
+    assert!(merge.starts_with("conversation branch merged"));
+    assert!(
+        !active.exists(),
+        "ordinary lifecycle should keep its existing cleanup behavior"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("README.md"))
+            .unwrap()
+            .replace("\r\n", "\n"),
+        "ordinary change\n"
+    );
+    let _ = fs::remove_dir_all(temp);
+}
+
+fn init_repo(repo: &Path) {
+    fs::create_dir_all(repo).expect("base should create");
+    run_git(repo, &["init"]);
+    run_git(repo, &["config", "user.email", "ai@example.test"]);
+    run_git(repo, &["config", "user.name", "AI Test"]);
+    fs::write(repo.join("README.md"), "seed\n").expect("seed should write");
+    run_git(repo, &["add", "README.md"]);
+    run_git(repo, &["commit", "-m", "seed"]);
 }
 
 fn run_git(repo: &Path, args: &[&str]) {

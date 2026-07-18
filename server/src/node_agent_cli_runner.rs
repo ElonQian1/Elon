@@ -166,6 +166,15 @@ pub fn prepare_cli_prompt_cwd_in(
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> anyhow::Result<PreparedCliPromptCwd> {
+    prepare_cli_prompt_cwd_in_with_supervision(data_paths, cwd, project_context, None)
+}
+
+pub fn prepare_cli_prompt_cwd_in_with_supervision(
+    data_paths: Option<&elon_pc_dev_runtime::NodeDataPaths>,
+    cwd: Option<String>,
+    project_context: Option<homecli_proto::CliProjectContext>,
+    supervision_root_task_id: Option<&str>,
+) -> anyhow::Result<PreparedCliPromptCwd> {
     let managed_project = project_context.is_some();
     let (base_cwd, context) = node_agent_cli_security::prepare_cli_base_cwd(cwd, project_context)?;
     let data_policy = crate::node_agent_project_data_policy::classify(data_paths, &base_cwd);
@@ -185,11 +194,12 @@ pub fn prepare_cli_prompt_cwd_in(
         elon_pc_dev_runtime::legacy_workspace_root_override()
             .unwrap_or_else(elon_pc_dev_runtime::legacy_default_workspace_root)
     };
-    let workspace = pc_workspace_provisioner::prepare_conversation_workspace_in(
+    let workspace = pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision(
         &workspace_root,
         base_cwd.to_string_lossy().as_ref(),
         &context.project_id,
         &context.conversation_id,
+        supervision_root_task_id,
     )?;
     if workspace.isolated {
         info!(

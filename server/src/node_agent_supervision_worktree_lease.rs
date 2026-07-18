@@ -67,7 +67,7 @@ pub(crate) fn is_supervision_lease(reason: &str) -> bool {
     reason.starts_with(LEASE_PREFIX)
 }
 
-fn lease_reason(root_task_id: &str) -> Result<String> {
+pub(crate) fn lease_reason(root_task_id: &str) -> Result<String> {
     let root = root_task_id.trim();
     anyhow::ensure!(!root.is_empty(), "supervision root task id is empty");
     anyhow::ensure!(

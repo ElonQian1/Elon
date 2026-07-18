@@ -375,6 +375,25 @@ async fn run_cli_task(
     // lock. A root switch can happen before this transaction or after the
     // lease is registered, never between selecting a workspace and its cache.
     let inherited_workspace_resume = inherited_workspace.is_some();
+    let supervision_root_task_id =
+        match crate::node_agent_cli_supervision_lease::root_task_id_for_task(
+            &runtime.task_journal,
+            &req_id_for_cleanup,
+            completion_context.supervision_protocol.as_deref(),
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                send_preflight_failure(
+                    &runtime,
+                    &completion_context,
+                    resolved_cli.name(),
+                    &out_tx,
+                    req_id,
+                    format!("failed to resolve supervision root lease identity: {error}"),
+                );
+                return;
+            }
+        };
     let transition = runtime.node_data_root_transition.clone().lock_owned().await;
     let data_paths = runtime.node_data_root.read().await.paths.clone();
     let prepared = tokio::task::spawn_blocking(move || {
@@ -384,10 +403,11 @@ async fn run_cli_task(
                 workspace,
                 project_context,
             ),
-            None => crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in(
+            None => crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
                 data_paths.as_ref(),
                 cwd,
                 project_context,
+                supervision_root_task_id.as_deref(),
             ),
         };
         (transition, data_paths, result)

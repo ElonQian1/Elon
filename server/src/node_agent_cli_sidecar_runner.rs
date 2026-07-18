@@ -2,6 +2,8 @@
 
 #[path = "node_agent_cli_pipe_sidecar_runner.rs"]
 mod pipe_sidecar_runner;
+#[path = "node_agent_cli_sidecar_worker_monitor.rs"]
+mod worker_monitor;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -20,7 +22,8 @@ use crate::{
     },
     node_agent_cli_sidecar::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord},
     node_agent_cli_sidecar_io::{
-        append_output, read_new_commands, read_new_output_records, CliSidecarOutputRecord,
+        append_output, read_new_commands, read_new_output_records, read_output_records_from,
+        CliSidecarOutputRecord,
     },
     node_agent_codex_approval::CodexApprovalTracker,
     node_agent_codex_session::{self, CodexSessionCapture},
@@ -213,8 +216,15 @@ pub(crate) async fn spawn_sidecar(mut config: CliSidecarLaunchConfig) -> Result<
         .stderr(Stdio::null());
     hide_tokio_command_window(&mut cmd);
     let child = cmd.spawn().context("启动 CLI sidecar 进程")?;
+    let sidecar_pid = child.id();
+    worker_monitor::spawn(
+        child,
+        CliSidecarRegistry::new(config.registry_dir.clone()),
+        config.task_id.clone(),
+        config.output_path.clone(),
+    );
     Ok(CliSidecarLaunch {
-        sidecar_pid: child.id(),
+        sidecar_pid,
         output_path: config.output_path,
     })
 }
@@ -298,11 +308,29 @@ pub(crate) async fn follow_sidecar_output_from_with_batch(
     let mut terminal_error = None;
 
     loop {
+        let batch_start = cursor;
         let records = read_new_output_records(output_path, &mut cursor.offset)?;
         cursor.sequence = cursor.sequence.saturating_add(records.len() as u64);
         let read_records = !records.is_empty();
         if read_records {
-            persist_batch(&records, cursor)?;
+            let durable_count = records
+                .iter()
+                .position(|record| record.record_type == "exit")
+                .unwrap_or(records.len());
+            if durable_count == records.len() {
+                persist_batch(&records, cursor)?;
+            } else if durable_count > 0 {
+                let mut durable_offset = batch_start.offset;
+                let durable_records =
+                    read_output_records_from(output_path, &mut durable_offset, durable_count)?;
+                let durable_cursor = CliSidecarReplayCursor {
+                    offset: durable_offset,
+                    sequence: batch_start
+                        .sequence
+                        .saturating_add(durable_records.len() as u64),
+                };
+                persist_batch(&durable_records, durable_cursor)?;
+            }
         }
         for record in records {
             match record.record_type.as_str() {

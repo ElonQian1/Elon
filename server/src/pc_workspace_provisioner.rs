@@ -49,6 +49,9 @@ pub struct ConversationWorkspaceResult {
     pub workspace_path: String,
     pub isolated: bool,
     pub branch: Option<String>,
+    /// Present only for a Desktop-supervised task. The matching Git lock is
+    /// retained through completion/merge and released by accepted review.
+    pub supervision_root_task_id: Option<String>,
 }
 
 pub fn provision_project_workspace(req: ProjectWorkspaceRequest) -> Result<ProjectWorkspaceResult> {
@@ -270,6 +273,22 @@ pub fn prepare_conversation_workspace_in(
     project_id: &str,
     conversation_id: &str,
 ) -> Result<ConversationWorkspaceResult> {
+    prepare_conversation_workspace_in_with_supervision(
+        workspace_root,
+        base_workspace_path,
+        project_id,
+        conversation_id,
+        None,
+    )
+}
+
+pub fn prepare_conversation_workspace_in_with_supervision(
+    workspace_root: &Path,
+    base_workspace_path: &str,
+    project_id: &str,
+    conversation_id: &str,
+    supervision_root_task_id: Option<&str>,
+) -> Result<ConversationWorkspaceResult> {
     let base_workspace = git_path_buf(&PathBuf::from(base_workspace_path));
     if !is_git_work_tree(&base_workspace) {
         return Ok(ConversationWorkspaceResult {
@@ -277,6 +296,7 @@ pub fn prepare_conversation_workspace_in(
             workspace_path: base_workspace.to_string_lossy().to_string(),
             isolated: false,
             branch: None,
+            supervision_root_task_id: None,
         });
     }
 
@@ -297,12 +317,17 @@ pub fn prepare_conversation_workspace_in(
     let _ = git_fetch_origin(&base_workspace);
     let _ = run_git_dynamic(&base_workspace, &["worktree", "prune"]);
     if is_git_work_tree(&worktree_path) {
-        lock_conversation_worktree(&base_workspace, &worktree_path)?;
+        acquire_conversation_worktree_lease(
+            &base_workspace,
+            &worktree_path,
+            supervision_root_task_id,
+        )?;
         return Ok(ConversationWorkspaceResult {
             base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
             workspace_path: git_path_arg(&worktree_path),
             isolated: true,
             branch: Some(branch),
+            supervision_root_task_id: supervision_root_task_id.map(ToOwned::to_owned),
         });
     }
     if worktree_path.exists() {
@@ -311,10 +336,22 @@ pub fn prepare_conversation_workspace_in(
 
     let start_ref = conversation_start_ref(&base_workspace);
     let worktree_arg = git_path_arg(&worktree_path);
-    add_conversation_worktree(&base_workspace, &worktree_arg, &branch, &start_ref)?;
+    add_conversation_worktree(
+        &base_workspace,
+        &worktree_arg,
+        &branch,
+        &start_ref,
+        supervision_root_task_id,
+    )?;
     if !is_git_work_tree(&worktree_path) {
         recover_stale_conversation_worktree_path(&base_workspace, &worktree_root, &worktree_path)?;
-        add_conversation_worktree(&base_workspace, &worktree_arg, &branch, &start_ref)?;
+        add_conversation_worktree(
+            &base_workspace,
+            &worktree_arg,
+            &branch,
+            &start_ref,
+            supervision_root_task_id,
+        )?;
         if !is_git_work_tree(&worktree_path) {
             return Err(anyhow!(
                 "conversation worktree was created but is not a git repository: {}",
@@ -322,13 +359,12 @@ pub fn prepare_conversation_workspace_in(
             ));
         }
     }
-    lock_conversation_worktree(&base_workspace, &worktree_path)?;
-
     Ok(ConversationWorkspaceResult {
         base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
         workspace_path: git_path_arg(&worktree_path),
         isolated: true,
         branch: Some(branch),
+        supervision_root_task_id: supervision_root_task_id.map(ToOwned::to_owned),
     })
 }
 
@@ -337,13 +373,36 @@ fn add_conversation_worktree(
     worktree_arg: &str,
     branch: &str,
     start_ref: &str,
+    supervision_root_task_id: Option<&str>,
 ) -> Result<()> {
+    let reason = conversation_worktree_lease_reason(supervision_root_task_id)?;
     if local_branch_exists(base_workspace, branch) {
-        run_git_dynamic(base_workspace, &["worktree", "add", worktree_arg, branch])
+        run_git_dynamic(
+            base_workspace,
+            &[
+                "worktree",
+                "add",
+                "--lock",
+                "--reason",
+                &reason,
+                worktree_arg,
+                branch,
+            ],
+        )
     } else {
         run_git_dynamic(
             base_workspace,
-            &["worktree", "add", "-b", branch, worktree_arg, start_ref],
+            &[
+                "worktree",
+                "add",
+                "--lock",
+                "--reason",
+                &reason,
+                "-b",
+                branch,
+                worktree_arg,
+                start_ref,
+            ],
         )
     }
 }
@@ -444,7 +503,12 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
             active_workspace.display()
         ));
     }
-    let saved_dirty_commit = ensure_conversation_workspace_committed(&active_workspace)?;
+    let supervised = workspace.supervision_root_task_id.is_some();
+    let saved_dirty_commit = if supervised {
+        None
+    } else {
+        ensure_conversation_workspace_committed(&active_workspace)?
+    };
     if !worktree_clean(&active_workspace)? {
         return Ok(format!(
             "conversation worktree still has uncommitted changes: {}",
@@ -459,6 +523,16 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     }
 
     let (before, after) = merge_conversation_branch_into_base(&base_workspace, branch)?;
+    if supervised {
+        return if before == after {
+            Ok("conversation branch had no new commits; supervision worktree retained until accepted review".into())
+        } else {
+            Ok(format!(
+                "conversation branch merged: {}; supervision worktree retained until accepted review",
+                short_sha(&after)
+            ))
+        };
+    }
     unlock_conversation_worktree(&base_workspace, &active_workspace)?;
     if let Err(error) = run_git_dynamic(
         &base_workspace,
@@ -505,6 +579,38 @@ pub(crate) fn lock_conversation_worktree(
     worktree_path: &Path,
 ) -> Result<()> {
     lock_registered_conversation_worktree(base_workspace, worktree_path)
+}
+
+pub(crate) fn lock_conversation_worktree_for_supervision(
+    base_workspace: &Path,
+    worktree_path: &Path,
+    root_task_id: &str,
+) -> Result<()> {
+    crate::node_agent_supervision_worktree_lease::acquire(
+        base_workspace,
+        worktree_path,
+        root_task_id,
+    )
+}
+
+fn acquire_conversation_worktree_lease(
+    base_workspace: &Path,
+    worktree_path: &Path,
+    supervision_root_task_id: Option<&str>,
+) -> Result<()> {
+    match supervision_root_task_id {
+        Some(root_task_id) => {
+            lock_conversation_worktree_for_supervision(base_workspace, worktree_path, root_task_id)
+        }
+        None => lock_conversation_worktree(base_workspace, worktree_path),
+    }
+}
+
+fn conversation_worktree_lease_reason(supervision_root_task_id: Option<&str>) -> Result<String> {
+    supervision_root_task_id.map_or_else(
+        || Ok(GENERIC_CONVERSATION_WORKTREE_LEASE_REASON.to_string()),
+        crate::node_agent_supervision_worktree_lease::lease_reason,
+    )
 }
 
 pub fn conversation_workspace_head_landed(workspace: &ConversationWorkspaceResult) -> Result<bool> {

@@ -335,7 +335,8 @@ async fn spawn_sidecar_monitor(
                         })
                     })
                 };
-                let workspace = recovered_workspace(&task, &receipt.workspace);
+                let workspace =
+                    recovered_workspace(&task, &receipt.workspace, &receipt.root_task_id);
                 let (success, error, workspace_status) =
                     crate::node_agent_cli_runner::finalize_cli_prompt_workspace(
                         success, error, workspace,
@@ -495,7 +496,8 @@ async fn spawn_resume_original(
         resume_task_id.clone(),
         out_rx,
     );
-    let inherited_workspace = recovered_workspace(&parent, &receipt.workspace);
+    let inherited_workspace =
+        recovered_workspace(&parent, &receipt.workspace, &receipt.root_task_id);
     spawn_cli_task(
         runtime,
         out_tx,
@@ -551,6 +553,7 @@ fn completion_context(task: &LocalTaskRecord) -> CliCompletionContext {
 fn recovered_workspace(
     task: &LocalTaskRecord,
     fingerprint: &WorkspaceGitFingerprint,
+    root_task_id: &str,
 ) -> Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult> {
     let active = fingerprint.workspace_path.trim();
     if active.is_empty() || same_path(Path::new(active), Path::new(&task.workspace_path)) {
@@ -562,6 +565,7 @@ fn recovered_workspace(
             workspace_path: active.to_string(),
             isolated: true,
             branch: git_output(Path::new(active), &["branch", "--show-current"]),
+            supervision_root_task_id: Some(root_task_id.to_string()),
         },
     )
 }

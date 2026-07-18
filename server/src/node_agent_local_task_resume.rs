@@ -121,6 +121,7 @@ fn resolve_existing_resume_workspace(
     if parent_task_id != parent.task_id {
         bail!("resume_original 的 parent_task_id 与父任务记录不一致。");
     }
+    let supervision_root_task_id = contract.root_task_id.as_deref().unwrap_or(parent_task_id);
     if requested_project_id != parent.project_id {
         bail!("resume_original 不能跨项目继承父任务工作区。");
     }
@@ -208,6 +209,7 @@ fn resolve_existing_resume_workspace(
                 &active,
                 &expected_branch,
                 recorded_head.as_deref(),
+                supervision_root_task_id,
                 repair_missing_git_metadata,
             )
             .with_context(|| {
@@ -221,6 +223,20 @@ fn resolve_existing_resume_workspace(
         Err(error) => return Err(error),
     };
 
+    if recovery::is_git_worktree(&active) {
+        let expected =
+            crate::node_agent_supervision_worktree_lease::lease_reason(supervision_root_task_id)?;
+        let actual = crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+            &authorized_base,
+            &active,
+        )?;
+        anyhow::ensure!(
+            actual.as_deref() == Some(expected.as_str()),
+            "父任务 worktree root lease 身份不匹配：expected {expected}, actual {}",
+            actual.as_deref().unwrap_or("<unlocked>")
+        );
+    }
+
     let requires_recreation =
         !repair_missing_git_metadata && derivation.contains("_recovery_ready_");
     Ok(ResolvedResumeWorkspace {
@@ -230,6 +246,7 @@ fn resolve_existing_resume_workspace(
             workspace_path: display_path(&active),
             isolated: true,
             branch: Some(expected_branch),
+            supervision_root_task_id: Some(supervision_root_task_id.to_string()),
         },
         derivation,
         git_head,
@@ -318,16 +335,6 @@ fn validate_git_worktree_identity(
     if head.trim().is_empty() {
         bail!("父任务活动 worktree 缺少可验证 HEAD。");
     }
-    if !git_output(
-        active,
-        &["status", "--porcelain=v1", "--untracked-files=all"],
-    )?
-    .trim()
-    .is_empty()
-    {
-        bail!("refusing to resume a dirty worktree with uncommitted changes");
-    }
-
     let worktree_list = git_output(base, &["worktree", "list", "--porcelain"])?;
     let expected_ref = format!("refs/heads/{expected_branch}");
     let registered = worktree_list.split("\n\n").any(|entry| {

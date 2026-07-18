@@ -4,19 +4,18 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    collections::BTreeMap,
     fs::{self, OpenOptions},
     io::Write,
-    path::{Path, PathBuf},
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
 
+#[path = "node_agent_cli_sidecar_registry_io.rs"]
+mod registry_io;
+
 const SIDECAR_STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
-const SIDECAR_SESSIONS_READ_ATTEMPTS: usize = 8;
-const SIDECAR_SESSIONS_READ_RETRY_DELAY: Duration = Duration::from_millis(25);
 
 #[derive(Clone, Debug)]
 pub(crate) struct CliSidecarRegistry {
@@ -100,9 +99,10 @@ impl CliSidecarRegistry {
 
     pub(crate) fn upsert_session(&self, session: CliSidecarSessionRecord) -> Result<()> {
         with_task_journal_io_lock(|| {
-            let mut sessions = self.load_sessions()?;
-            sessions.insert(session.session_id.clone(), session);
-            self.save_sessions(&sessions)
+            registry_io::update(&self.dir, |sessions| {
+                sessions.insert(session.session_id.clone(), session);
+                Ok(())
+            })
         })
     }
 
@@ -117,19 +117,19 @@ impl CliSidecarRegistry {
             return Ok(false);
         }
         with_task_journal_io_lock(|| {
-            let mut sessions = self.load_sessions()?;
-            let Some(session) = sessions.get_mut(session_id) else {
-                return Ok(false);
-            };
-            if let Some(state) = state.map(str::trim).filter(|value| !value.is_empty()) {
-                session.state = state.to_string();
-            }
-            if child_pid.is_some() {
-                session.child_pid = child_pid;
-            }
-            session.last_seen_at_ms = now_ms();
-            self.save_sessions(&sessions)?;
-            Ok(true)
+            registry_io::update(&self.dir, |sessions| {
+                let Some(session) = sessions.get_mut(session_id) else {
+                    return Ok(false);
+                };
+                if let Some(state) = state.map(str::trim).filter(|value| !value.is_empty()) {
+                    session.state = state.to_string();
+                }
+                if child_pid.is_some() {
+                    session.child_pid = child_pid;
+                }
+                session.last_seen_at_ms = now_ms();
+                Ok(true)
+            })
         })
     }
 
@@ -139,22 +139,22 @@ impl CliSidecarRegistry {
             return Ok(false);
         }
         with_task_journal_io_lock(|| {
-            let mut sessions = self.load_sessions()?;
-            let Some((_, session)) = sessions
-                .iter_mut()
-                .filter(|(_, session)| session.task_id == task_id)
-                .max_by(|(_, left), (_, right)| {
-                    left.last_seen_at_ms
-                        .cmp(&right.last_seen_at_ms)
-                        .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
-                })
-            else {
-                return Ok(false);
-            };
-            session.state = state.to_string();
-            session.last_seen_at_ms = now_ms();
-            self.save_sessions(&sessions)?;
-            Ok(true)
+            registry_io::update(&self.dir, |sessions| {
+                let Some((_, session)) = sessions
+                    .iter_mut()
+                    .filter(|(_, session)| session.task_id == task_id)
+                    .max_by(|(_, left), (_, right)| {
+                        left.last_seen_at_ms
+                            .cmp(&right.last_seen_at_ms)
+                            .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
+                    })
+                else {
+                    return Ok(false);
+                };
+                session.state = state.to_string();
+                session.last_seen_at_ms = now_ms();
+                Ok(true)
+            })
         })
     }
 
@@ -166,37 +166,43 @@ impl CliSidecarRegistry {
         sequence: u64,
     ) -> Result<bool> {
         with_task_journal_io_lock(|| {
-            let mut sessions = self.load_sessions()?;
-            let Some(session) = sessions.get_mut(session_id) else {
-                return Ok(false);
-            };
-            if session.task_id != task_id {
-                return Ok(false);
-            }
-            session.output_offset = session.output_offset.max(offset);
-            session.output_sequence = session.output_sequence.max(sequence);
-            session.last_seen_at_ms = now_ms();
-            self.save_sessions(&sessions)?;
-            Ok(true)
+            registry_io::update(&self.dir, |sessions| {
+                let Some(session) = sessions.get_mut(session_id) else {
+                    return Ok(false);
+                };
+                if session.task_id != task_id {
+                    return Ok(false);
+                }
+                session.output_offset = session.output_offset.max(offset);
+                session.output_sequence = session.output_sequence.max(sequence);
+                session.last_seen_at_ms = now_ms();
+                Ok(true)
+            })
         })
     }
 
     pub(crate) fn latest_sessions(&self, limit: usize) -> Result<Vec<CliSidecarSessionRecord>> {
         with_task_journal_io_lock(|| {
-            let mut sessions: Vec<_> = self.load_sessions()?.into_values().collect();
-            sessions.sort_by(|left, right| {
-                right
-                    .last_seen_at_ms
-                    .cmp(&left.last_seen_at_ms)
-                    .then_with(|| right.started_at_ms.cmp(&left.started_at_ms))
-            });
-            sessions.truncate(limit.min(100));
-            Ok(sessions)
+            registry_io::read(&self.dir, |stored| {
+                let mut sessions: Vec<_> = stored.values().cloned().collect();
+                sessions.sort_by(|left, right| {
+                    right
+                        .last_seen_at_ms
+                        .cmp(&left.last_seen_at_ms)
+                        .then_with(|| right.started_at_ms.cmp(&left.started_at_ms))
+                });
+                sessions.truncate(limit.min(100));
+                Ok(sessions)
+            })
         })
     }
 
     pub(crate) fn all_sessions(&self) -> Result<Vec<CliSidecarSessionRecord>> {
-        with_task_journal_io_lock(|| Ok(self.load_sessions()?.into_values().collect()))
+        with_task_journal_io_lock(|| {
+            registry_io::read(&self.dir, |sessions| {
+                Ok(sessions.values().cloned().collect())
+            })
+        })
     }
 
     pub(crate) fn session_for_task(
@@ -208,15 +214,17 @@ impl CliSidecarRegistry {
             return Ok(None);
         }
         with_task_journal_io_lock(|| {
-            Ok(self
-                .load_sessions()?
-                .into_values()
-                .filter(|session| session.task_id == task_id)
-                .max_by(|left, right| {
-                    left.last_seen_at_ms
-                        .cmp(&right.last_seen_at_ms)
-                        .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
-                }))
+            registry_io::read(&self.dir, |sessions| {
+                Ok(sessions
+                    .values()
+                    .filter(|session| session.task_id == task_id)
+                    .cloned()
+                    .max_by(|left, right| {
+                        left.last_seen_at_ms
+                            .cmp(&right.last_seen_at_ms)
+                            .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
+                    }))
+            })
         })
     }
 
@@ -337,54 +345,8 @@ impl CliSidecarRegistry {
         Ok(true)
     }
 
-    fn load_sessions(&self) -> Result<BTreeMap<String, CliSidecarSessionRecord>> {
-        self.load_sessions_with_retry(|_| thread::sleep(SIDECAR_SESSIONS_READ_RETRY_DELAY))
-    }
-
-    fn load_sessions_with_retry(
-        &self,
-        mut wait_before_retry: impl FnMut(usize),
-    ) -> Result<BTreeMap<String, CliSidecarSessionRecord>> {
-        let path = self.sessions_path();
-        if !path.exists() {
-            return Ok(BTreeMap::new());
-        }
-
-        let mut last_error = None;
-        for attempt in 1..=SIDECAR_SESSIONS_READ_ATTEMPTS {
-            match read_sessions_once(&path) {
-                Ok(sessions) => return Ok(sessions),
-                Err(error) => last_error = Some(error),
-            }
-            if attempt < SIDECAR_SESSIONS_READ_ATTEMPTS {
-                wait_before_retry(attempt);
-            }
-        }
-
-        Err(last_error.expect("sidecar sessions read must record the final error")).with_context(
-            || {
-                format!(
-                    "读取 sidecar sessions {:?} 在 {} 次有界尝试后仍失败",
-                    path, SIDECAR_SESSIONS_READ_ATTEMPTS
-                )
-            },
-        )
-    }
-
-    fn save_sessions(&self, sessions: &BTreeMap<String, CliSidecarSessionRecord>) -> Result<()> {
-        self.ensure_dir()?;
-        let path = self.sessions_path();
-        let payload = serde_json::to_vec_pretty(sessions)?;
-        crate::node_agent_atomic_file::write(&path, &payload)
-            .with_context(|| format!("写入 {:?}", path))
-    }
-
     fn ensure_dir(&self) -> Result<()> {
         fs::create_dir_all(&self.dir).with_context(|| format!("创建 {:?}", self.dir))
-    }
-
-    fn sessions_path(&self) -> PathBuf {
-        self.dir.join("sessions.json")
     }
 
     fn command_path(&self, task_id: &str) -> PathBuf {
@@ -407,11 +369,6 @@ impl CliSidecarRegistry {
     pub(crate) fn dir(&self) -> PathBuf {
         self.dir.clone()
     }
-}
-
-fn read_sessions_once(path: &Path) -> Result<BTreeMap<String, CliSidecarSessionRecord>> {
-    let text = fs::read_to_string(path).with_context(|| format!("读取 {:?}", path))?;
-    serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))
 }
 
 impl CliSidecarSessionRecord {
