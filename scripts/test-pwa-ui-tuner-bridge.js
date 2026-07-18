@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const repoRoot = path.resolve(__dirname, '..');
 const mobileWeb = fs.readFileSync(path.join(repoRoot, 'server/src/assets/web_page.html'), 'utf8');
 const authBootstrap = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_auth_bootstrap.js'), 'utf8');
+const sourceVerification = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_verification.js'), 'utf8');
 const bridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_bridge.js'), 'utf8');
 const previewSurface = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'), 'utf8');
 const previewSurfaceCss = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/SourcePreview.module.css'), 'utf8');
@@ -15,6 +16,7 @@ const designSession = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/featu
 const styleInspector = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'), 'utf8');
 
 assert.ok(mobileWeb.includes('__UI_TUNER_PWA_BRIDGE_JS__'), 'mobile page should embed the isolated PWA design bridge');
+assert.ok(mobileWeb.includes('__UI_TUNER_PWA_VERIFICATION_JS__'), 'mobile page should embed isolated real-source verification');
 assert.ok(mobileWeb.indexOf('__UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__') < mobileWeb.indexOf("const TOKEN_KEY = 'lodex_token'"), 'preview auth must be inherited before the mobile app boots');
 assert.ok(authBootstrap.includes("localStorage.getItem('elon_auth')"), 'same-origin preview should inherit the current PC session synchronously');
 assert.ok(mobileWeb.includes('if (token !== bootToken) return;'), 'a stale boot must not clear a newer bridged session');
@@ -25,6 +27,8 @@ assert.ok(bridge.includes("event.origin !== window.location.origin"), 'PWA desig
 assert.ok(bridge.includes("message.type === 'set-mode'"), 'PWA should switch between component selection and normal interaction');
 assert.ok(bridge.includes("message.type === 'apply-style'"), 'PWA should apply immediate local style previews');
 assert.ok(bridge.includes("message.type === 'reset-styles'"), 'PWA should reset ephemeral preview styles');
+assert.ok(bridge.includes("message.type === 'verify-source'"), 'PWA should verify only after clearing ephemeral preview styles');
+assert.ok(sourceVerification.includes("type: 'source-verification'"), 'real source verification should return an explicit bridge snapshot');
 assert.ok(bridge.includes("message.type === 'reset-element'"), 'PWA should reset the selected real DOM element');
 assert.ok(bridge.includes("message.type === 'apply-draft'"), 'PWA should restore structured page drafts');
 assert.ok(bridge.includes("strategy: 'dom-path'"), 'unbound DOM elements should expose an explainable path identity');
@@ -50,7 +54,8 @@ assert.ok(designSession.includes("useState<'select' | 'interact'>('interact')"),
 assert.ok(designSession.includes("context.post('set-session-auth', { token })"), 'PC should bridge the current same-origin login session');
 assert.equal((designSession.match(/window\.addEventListener\('message'/g) || []).length, 1, 'PC session should declare one postMessage listener');
 assert.match(designSession, /const bridgeContextRef = useRef\([\s\S]*window\.addEventListener\('message', receive\)[\s\S]*window\.removeEventListener\('message', receive\)\s*\n\s*}, \[\]\)/, 'PC session listener should stay installed while refs provide current render state');
-assert.ok(previewSurface.includes('key={reloadKey}'), 'iframe reloads must remain explicit and independent of design mode');
+assert.ok(previewSurface.includes('key={design.reloadKey}'), 'iframe reloads must remain explicit and controlled by source verification');
+assert.ok(previewSurface.includes("url.searchParams.set('ui_tuner_reload'"), 'source verification reload should use an explicit cache buster');
 assert.ok(previewSurface.includes('开始设计/修改页面'), 'manual design mode should have one clear Chinese entry point');
 const layoutOrder = ['pwaWorkflowGuide', 'pwaPreviewToolbar', 'pwaRouteStatus', 'pwaDraftBadge', 'pwaDeviceViewport', 'pwaDeviceFrame']
   .map((className) => previewSurface.indexOf(`styles.${className}`));
@@ -149,7 +154,10 @@ class FakeElement {
     if (name === 'id') this.id = String(value);
     this.attributes.set(name, String(value));
   }
-  removeAttribute(name) { this.attributes.delete(name); }
+  removeAttribute(name) {
+    this.attributes.delete(name);
+    if (name === 'style') this.style = new FakeStyle();
+  }
   closest(selector) {
     if (selector === '[data-component]') return null;
     if (selector.includes('[id]') && this.id) return this;
@@ -278,6 +286,7 @@ function runBridgeBehavior() {
     CSS: { escape: (value) => value }, CustomEvent: FakeCustomEvent,
     MutationObserver: FakeMutationObserver,
   };
+  vm.runInNewContext(sourceVerification, context);
   vm.runInNewContext(bridge, context);
 
   assert.equal(windowListeners.get('message').length, 1, 'bridge should install exactly one command listener');
@@ -361,6 +370,26 @@ function runBridgeBehavior() {
   assert.equal(posted.at(-1).payload.revision, 7, 'the acknowledgement should preserve the applied revision');
   command('apply-draft', draft);
   assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 1, 'a repeated draft revision must not apply or acknowledge twice');
+
+  const verificationsBefore = posted.filter((message) => message.type === 'source-verification').length;
+  command('verify-source', {
+    requestId: 'verify-title-r7',
+    checks: [{ elementKey: 'title', selector: '#topTitle', properties: ['fontSize'] }],
+  });
+  assert.equal(title.style.getPropertyValue('font-size'), '', 'real source verification must clear the temporary draft first');
+  const sourceSnapshot = posted.filter((message) => message.type === 'source-verification').at(-1);
+  assert.equal(posted.filter((message) => message.type === 'source-verification').length, verificationsBefore + 1, 'one verify command should return exactly one snapshot');
+  assert.equal(sourceSnapshot.payload.nodes[0].computed.fontSize, '18px', 'snapshot must read computed style from the source page after reset');
+  assert.deepEqual(sourceSnapshot.payload.changedFiles, [], 'snapshot must return changed-files evidence even when the page exposes no metadata');
+  assert.deepEqual(sourceSnapshot.payload.sourceRevisions, {}, 'snapshot must return source revisions even when the page exposes no metadata');
+  command('verify-source', {
+    requestId: 'verify-title-r7',
+    checks: [{ elementKey: 'title', selector: '#topTitle', properties: ['fontSize'] }],
+  });
+  assert.equal(posted.filter((message) => message.type === 'source-verification').length, verificationsBefore + 1, 'a repeated verification request must not produce a message loop');
+  command('apply-draft', draft);
+  assert.equal(title.style.getPropertyValue('font-size'), '24px', 'a failed verification can restore the same draft revision');
+  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 2, 'restoring the same draft revision should acknowledge once after reset');
 
   const routeCountBeforeScreenSwitch = posted.filter((message) => message.type === 'route-changed').length;
   chatPage.classList.toggle('active', false);

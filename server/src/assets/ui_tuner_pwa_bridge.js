@@ -443,6 +443,7 @@
       else element.setAttribute('style', original);
     });
     originalInlineStyles.clear();
+    appliedDraftRevision = '';
     drawSelection(selectedElement);
     if (notify !== false) post('styles-reset', {});
   }
@@ -553,6 +554,11 @@
       resetElement(message.payload);
     } else if (message.type === 'reset-styles') {
       resetStyles(true);
+    } else if (message.type === 'verify-source') {
+      resetStyles(false);
+      if (typeof window.__ELON_UI_TUNER_VERIFY_SOURCE__ === 'function') {
+        window.__ELON_UI_TUNER_VERIFY_SOURCE__(message.payload, routeState('source-verification'));
+      }
     }
   });
 

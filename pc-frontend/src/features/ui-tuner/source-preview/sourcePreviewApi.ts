@@ -2,6 +2,7 @@ import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { ComposePreviewEntry, ComposePreviewRender, SourcePreviewDocument, SourceRendererCapabilities } from './types'
 import type { PwaExplicitStyleBinding } from './pwaDesignDraft'
+import type { PwaBuildVerificationResult, PwaSourceSavedEvidence } from './pwaVerificationModel'
 import { androidProjectRootCandidates } from './sourcePreviewProjectRoot'
 
 export function sourcePreviewAdminUrl(): string {
@@ -70,4 +71,20 @@ export async function commitPwaStylePreview(input: {
     method: 'POST',
     body: JSON.stringify(input),
   }, 15000)
+}
+
+export async function verifyPwaSourceBuild(
+  evidence: PwaSourceSavedEvidence,
+): Promise<PwaBuildVerificationResult> {
+  return nodeApi(sourcePreviewAdminUrl(), '/api/source-preview/verify-pwa-source', {
+    method: 'POST',
+    body: JSON.stringify({
+      projectRoot: evidence.projectRoot,
+      changedFiles: evidence.changedFiles.map((sourceFile) => ({
+        sourceFile,
+        sourceRevision: evidence.sourceRevisions[sourceFile],
+      })),
+      expectedValues: evidence.expectedValues,
+    }),
+  }, 10 * 60_000)
 }

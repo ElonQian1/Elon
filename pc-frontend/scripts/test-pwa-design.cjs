@@ -472,6 +472,69 @@ try {
     'Codex 只接收未映射的小范围属性',
   )
 
+  const verificationOutput = compile(
+    'src/features/ui-tuner/source-preview/pwaVerificationModel.ts',
+    'source-preview/pwaVerificationModel.js',
+  )
+  const {
+    completePwaVerification,
+    livePwaVerificationState,
+    pwaBuildVerifyingState,
+    pwaSourceSavedState,
+    sourceSavedEvidenceFromDraft,
+  } = require(verificationOutput)
+  const evidence = sourceSavedEvidenceFromDraft(completedDraft, 'verify-r7')
+  assert.ok(evidence, '确定性回执应生成小范围 changed-files 验证证据')
+  assert.deepEqual(evidence.changedFiles, [pwaSourceFile])
+  assert.deepEqual(evidence.expectedValues, ['48px'])
+  const liveState = livePwaVerificationState()
+  assert.equal(liveState.phase, 'LIVE_PREVIEW')
+  const savedState = pwaSourceSavedState(liveState, evidence)
+  assert.equal(savedState.phase, 'SOURCE_SAVED', '源码写回成功只能进入 SOURCE_SAVED')
+  assert.notEqual(savedState.phase, 'BUILD_VERIFIED', '写回回执不得冒充真实验证')
+  const verifyingState = pwaBuildVerifyingState(savedState)
+  assert.equal(verifyingState.phase, 'BUILD_VERIFYING')
+  const buildVerified = {
+    ok: true,
+    status: 'BUILD_VERIFIED',
+    message: '构建资源通过',
+    sourceRevisions: { [pwaSourceFile]: 'a'.repeat(64) },
+    changedFiles: [pwaSourceFile],
+    buildDurationMs: 20,
+    resourceFiles: ['dist/app.css'],
+    resourceValuesVerified: 1,
+  }
+  const matchingSnapshot = {
+    requestId: evidence.requestId,
+    route: completedDraft.route,
+    changedFiles: [pwaSourceFile],
+    sourceRevisions: { [pwaSourceFile]: 'a'.repeat(64) },
+    nodes: [{
+      elementKey: 'id:payButton', selector: '#payButton', found: true,
+      computed: { height: '48px' }, authored: { height: '48px' },
+    }],
+  }
+  const verifiedState = completePwaVerification(verifyingState, buildVerified, matchingSnapshot)
+  assert.equal(verifiedState.phase, 'BUILD_VERIFIED', '构建、资源、真实源码画面逐项匹配后才可验证通过')
+
+  const mismatchState = completePwaVerification(verifyingState, buildVerified, {
+    ...matchingSnapshot,
+    nodes: [{ ...matchingSnapshot.nodes[0], computed: { height: '40px' }, authored: { height: '40px' } }],
+  })
+  assert.equal(mismatchState.phase, 'VERIFY_FAILED')
+  assert.equal(mismatchState.evidence, evidence, '画面不匹配必须保留草稿写回证据以便恢复')
+  assert.match(mismatchState.mismatches.join('\n'), /期望 48px/)
+
+  const buildFailed = completePwaVerification(verifyingState, {
+    ...buildVerified,
+    ok: false,
+    status: 'VERIFY_FAILED',
+    message: '前端构建失败',
+    resourceValuesVerified: 0,
+  }, matchingSnapshot)
+  assert.equal(buildFailed.phase, 'VERIFY_FAILED')
+  assert.equal(buildFailed.evidence, evidence, '构建失败也必须保留草稿证据')
+
   const contextOutput = compile(
     'src/features/ui-tuner/source-preview/pwaDesignContext.ts',
     'source-preview/pwaDesignContext.js',
@@ -501,9 +564,10 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'),
     'utf8',
   )
-  assert.match(inspectorSource, /让 AI 同步到 APK 与 PWA/)
+  assert.match(inspectorSource, /写回源码并验证 APK 与 PWA/)
   assert.match(inspectorSource, /data-testid="pwa-cross-platform-sync"/)
-  assert.match(inspectorSource, /\['starting', 'running'\]\.includes\(session\.syncState\.phase\)/)
+  assert.match(inspectorSource, /session\.syncState\.phase === 'BUILD_VERIFYING'/)
+  assert.match(inspectorSource, /保留草稿并重试真实验证/)
   assert.match(inspectorSource, /确定性优先，AI 只补缺口/)
   assert.match(inspectorSource, /需要 AI 建立绑定\/结构修改/)
   assert.match(inspectorSource, /PWA：/)
@@ -517,12 +581,20 @@ try {
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
   )
+  const sessionSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
+    'utf8',
+  )
   assert.match(previewSurfaceSource, /当前画面：\{route\.screenTitle/)
   assert.match(bridgeSource, /document\.querySelectorAll\('\.page\.active\[id\]'\)/)
   assert.match(bridgeSource, /document\.querySelector\('#topTitle'\)/)
   assert.match(bridgeSource, /getAttribute\('data-ui-screen'\)/)
   assert.match(bridgeSource, /getAttribute\('data-ui-style-binding'\)/)
   assert.match(bridgeSource, /if \(signature === lastRouteSignature\) return;/, '相同 screen route 必须去重')
+  assert.match(sessionSource, /verification\.markSourceSaved\(evidence/, '确定性源码写回后必须先标记 SOURCE_SAVED')
+  assert.match(sessionSource, /await verification\.start\(evidence\)/, '确定性绑定才自动运行真实验证')
+  assert.match(sessionSource, /markSourceSaved\(undefined,[\s\S]*AI 只补未绑定属性或结构修改/, 'AI fallback 不得伪造可验证的确定性回执')
+  assert.doesNotMatch(sessionSource, /phase:\s*'completed'/, '旧 completed 状态不得继续冒充验证')
   assert.match(bridgeSource, /window\.setTimeout\(\(\) => \{[\s\S]*?postRoute\(reason\);[\s\S]*?\}, 80\);/, '画面 Mutation 必须防抖')
   const observerAttributeFilter = bridgeSource.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] ?? ''
   assert.match(observerAttributeFilter, /'class'/)

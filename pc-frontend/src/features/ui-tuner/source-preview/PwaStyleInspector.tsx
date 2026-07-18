@@ -115,6 +115,7 @@ export function PwaStyleInspector({ session }: Props) {
       <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
 
       <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
+        <strong>{session.syncState.phase}</strong>
         <div className={styles.pwaSyncTargets}>
           <span>PWA：{writebackTargetLabel(session.writebackPlan.targets.pwa)}</span>
           <span>APK：{writebackTargetLabel(session.writebackPlan.targets.android)}</span>
@@ -124,12 +125,18 @@ export function PwaStyleInspector({ session }: Props) {
           type="button"
           className={styles.pwaPrimarySync}
           data-testid="pwa-cross-platform-sync"
-          disabled={!elementCount || ['starting', 'running'].includes(session.syncState.phase)}
+          disabled={!elementCount || session.syncState.phase === 'BUILD_VERIFYING' || Boolean(session.syncState.taskId)}
           onClick={() => { void session.syncNow() }}
         >
-          <Bot size={16} />让 AI 同步到 APK 与 PWA
+          <Bot size={16} />{session.syncState.phase === 'BUILD_VERIFYING' ? '正在构建并核验真实源码…' : '写回源码并验证 APK 与 PWA'}
         </button>
         <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
+        {session.syncState.mismatches.length > 0 && <ul>
+          {session.syncState.mismatches.map((mismatch) => <li key={mismatch}>{mismatch}</li>)}
+        </ul>}
+        {session.syncState.phase === 'VERIFY_FAILED' && session.syncState.evidence && (
+          <button type="button" onClick={() => { void session.retryVerification() }}>保留草稿并重试真实验证</button>
+        )}
         <div className={styles.pwaArtifactActions}>
           <button type="button" disabled={!elementCount} onClick={() => { void session.copyCliPackage() }}><Copy size={13} />复制 CLI 包</button>
           <button type="button" disabled={!elementCount} onClick={session.downloadCliPackage}><Download size={13} />下载草稿</button>

@@ -12,6 +12,7 @@ import {
 import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
   normalizePwaRoute,
+  removePwaDesignDraft,
   stringifyPwaDraftCliPackage,
   type PwaDesignDraft,
   type PwaDomContextNode,
@@ -24,6 +25,8 @@ import {
   stablePwaIdentityKey,
 } from './pwaDesignDraft'
 import { PwaDesignSessionModel } from './pwaDesignSessionModel'
+import { sourceSavedEvidenceFromDraft, type PwaBridgeVerificationSnapshot, type PwaVerificationState } from './pwaVerificationModel'
+import { usePwaSourceVerification } from './usePwaSourceVerification'
 import type { SourcePreviewNode } from './types'
 
 const BRIDGE_SOURCE = 'elon-pwa-design-bridge'
@@ -64,7 +67,8 @@ export interface PwaDesignSession {
   canUndo: boolean
   canRedo: boolean
   saveLabel: string
-  syncState: PwaSyncState
+  syncState: PwaVerificationState
+  reloadKey: number
   writebackPlan: ReturnType<typeof planPwaDesignWriteback>
   setMode: (mode: 'select' | 'interact') => void
   updateStyle: (property: PwaStyleProperty, value: string) => void
@@ -77,6 +81,7 @@ export interface PwaDesignSession {
   copyCliPackage: () => Promise<void>
   downloadCliPackage: () => void
   prepareReload: () => void
+  retryVerification: () => Promise<void>
 }
 
 function bridgeElements(draft: PwaDesignDraft) {
@@ -95,12 +100,6 @@ function bridgeDraftKey(draft: PwaDesignDraft): string {
     draft.route.screenKey || 'screen:unidentified',
     `${draft.viewport.width}x${draft.viewport.height}`,
   ].join('|')
-}
-
-export interface PwaSyncState {
-  phase: 'idle' | 'starting' | 'running' | 'completed' | 'failed'
-  message: string
-  taskId?: string
 }
 
 function draftEntry(draft: PwaDesignDraft, identity: PwaElementIdentity) {
@@ -133,7 +132,7 @@ export function usePwaDesignSession({
   const [unboundLabel, setUnboundLabel] = useState('')
   const [historyVersion, setHistoryVersion] = useState(0)
   const [saveLabel, setSaveLabel] = useState('等待进入真实页面')
-  const [syncState, setSyncState] = useState<PwaSyncState>({ phase: 'idle', message: '等待草稿' })
+  const [reloadKey, setReloadKey] = useState(0)
   const routeRef = useRef<PwaRouteState | null>(null)
   const modeRef = useRef(modeState)
   const syncTaskIdRef = useRef('')
@@ -163,6 +162,36 @@ export function usePwaDesignSession({
     } : { draftKey: '', revision: 0, elements: [] })
   }, [post])
 
+  const reloadSource = useCallback(() => {
+    modeRef.current = 'interact'
+    setModeState('interact')
+    setReady(false)
+    setSelection(null)
+    setMappedNodeKey(null)
+    setUnboundLabel('')
+    setReloadKey((value) => value + 1)
+  }, [])
+
+  const restoreDraft = useCallback(() => {
+    const current = model.draft
+    if (current) syncDraft(current)
+    setSaveLabel('真实验证未通过，临时草稿已恢复，可修改后重试')
+  }, [model, syncDraft])
+
+  const clearVerifiedDraft = useCallback(() => {
+    const current = model.draft
+    if (!current) return
+    removePwaDesignDraft(current)
+    const { draft: cleared } = model.restore(current.project, { ...current.route, viewport: current.viewport })
+    setDraft(cleared)
+    setSelection(null)
+    setMappedNodeKey(null)
+    setHistoryVersion((value) => value + 1)
+    setSaveLabel('真实源码与构建已验证，临时草稿已清除')
+  }, [model])
+
+  const verification = usePwaSourceVerification({ post, reloadSource, restoreDraft, clearVerifiedDraft })
+
   const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
     setDraft(value)
     if (sync) syncDraft(value)
@@ -172,21 +201,24 @@ export function usePwaDesignSession({
       setSaveLabel('本页暂无样式草稿')
     }
     setHistoryVersion((version) => version + 1)
-  }, [syncDraft])
+    verification.markLive('草稿已变更，当前仅为临时实时预览')
+  }, [syncDraft, verification.markLive])
 
   useEffect(() => () => model.dispose(), [model])
 
   useEffect(() => listenForFitRunCodexSettled((detail) => {
     if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
-    setSyncState(detail.succeeded
-      ? { phase: 'completed', taskId: detail.taskId, message: 'PWA 与 APK 同步任务已完成' }
-      : { phase: 'failed', taskId: detail.taskId, message: '跨端 Codex 写回失败，可保留草稿后重试' })
-    if (detail.succeeded) setSaveLabel('跨端草稿已写回源码')
+    if (detail.succeeded) {
+      verification.markSourceSaved(undefined, 'AI 已完成未绑定/结构修改；需刷新源码绑定并重新取得 changed files 后验证')
+      setSaveLabel('AI 写回任务已结束，但尚未通过真实构建与画面验证')
+    } else {
+      verification.fail('跨端 Codex 写回失败；草稿已保留，可修正后重试')
+    }
     syncTaskIdRef.current = ''
-  }), [])
+  }), [verification.fail, verification.markSourceSaved])
 
-  const bridgeContextRef = useRef({ model, onSelect, post, project, root, syncDraft })
-  bridgeContextRef.current = { model, onSelect, post, project, root, syncDraft }
+  const bridgeContextRef = useRef({ model, onSelect, post, project, root, syncDraft, verification })
+  bridgeContextRef.current = { model, onSelect, post, project, root, syncDraft, verification }
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
@@ -195,7 +227,7 @@ export function usePwaDesignSession({
         source?: string
         protocolVersion?: number
         type?: string
-        payload?: Partial<PwaRouteState> & { node?: PwaSelection }
+        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & { node?: PwaSelection }
       }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
       const context = bridgeContextRef.current
@@ -204,7 +236,7 @@ export function usePwaDesignSession({
         const token = getAuthToken()
         if (token) context.post('set-session-auth', { token })
         context.post('set-mode', { mode: modeRef.current })
-        if (context.model.draft) context.syncDraft(context.model.draft)
+        if (!context.verification.onIframeReady() && context.model.draft) context.syncDraft(context.model.draft)
         return
       }
       if (message.type === 'route-changed' && message.payload?.path && message.payload.viewport) {
@@ -221,8 +253,13 @@ export function usePwaDesignSession({
           setMappedNodeKey(null)
           setUnboundLabel('')
           setSaveLabel(didRestore && Object.keys(restored.elements).length ? `已恢复本页草稿 · r${restored.revision}` : '本页暂无样式草稿')
+          context.verification.markLive()
           context.syncDraft(restored)
         }
+        return
+      }
+      if (message.type === 'source-verification' && message.payload?.requestId) {
+        context.verification.handleSnapshot(message.payload as PwaBridgeVerificationSnapshot)
         return
       }
       if (message.type === 'selection' && message.payload?.node) {
@@ -328,7 +365,8 @@ export function usePwaDesignSession({
     const current = model.draft
     if (!current || !Object.keys(current.elements).length) return
     model.save()
-    setSyncState({ phase: 'starting', message: '正在保存草稿并执行确定性写回…' })
+    setMode('interact')
+    verification.markLive('正在保存草稿并执行确定性源码写回…')
     const androidResult = await applyDeterministicAndroidWriteback({
       draft: current,
       root,
@@ -345,10 +383,7 @@ export function usePwaDesignSession({
     }
     if (androidResult.error) {
       if (latest !== current) applyDraftState(model.replace(latest), false)
-      setSyncState({
-        phase: 'failed',
-        message: `APK 确定性写回已停止：${androidResult.error}。源码冲突不会交给 AI 静默覆盖。`,
-      })
+      verification.fail(`APK 确定性写回已停止：${androidResult.error}。源码冲突不会交给 AI 静默覆盖。`)
       return
     }
     const pwaResult = await applyDeterministicPwaWriteback({
@@ -360,19 +395,15 @@ export function usePwaDesignSession({
     latest = recordDeterministicWriteback(latest, { ...deterministicResult, android: { ...androidResult, completed: [] } })
     if (latest !== current) applyDraftState(model.replace(latest), false)
     if (pwaResult.error) {
-      setSyncState({
-        phase: 'failed',
-        message: `PWA 确定性写回已停止：${pwaResult.error}。请刷新源码绑定后重试。`,
-      })
+      verification.fail(`PWA 确定性写回已停止：${pwaResult.error}。请刷新源码绑定后重试。`)
       return
     }
     const plan = planPwaDesignWriteback(latest, root)
+    const evidence = sourceSavedEvidenceFromDraft(latest, `pwa-source-${Date.now()}`) ?? undefined
     if (!plan.requiresCodex) {
-      setSyncState({
-        phase: 'completed',
-        message: `确定性写回完成：APK ${androidResult.applied} 个节点，PWA ${pwaResult.applied} 个绑定；无需 AI 重做。`,
-      })
-      setSaveLabel('跨端草稿已确定性写回源码')
+      verification.markSourceSaved(evidence, `源码已保存：APK ${androidResult.applied} 个节点，PWA ${pwaResult.applied} 个绑定；尚未验证`)
+      setSaveLabel('源码已保存，正在准备真实构建与画面验证')
+      await verification.start(evidence)
       return
     }
     const contextPack = buildPwaDesignContextPack({
@@ -392,16 +423,13 @@ export function usePwaDesignSession({
         reason: plan.codexReasons.join('；'),
       })
       syncTaskIdRef.current = taskId
-      setSyncState({
-        phase: 'running', taskId,
-        message: androidResult.applied || pwaResult.applied
-          ? `APK/PWA 已确定性写回 ${androidResult.applied + pwaResult.applied} 个绑定，AI 只补未绑定属性或结构修改`
-          : '已进入现有 AI 会话，只处理未绑定属性或结构修改',
-      })
+      verification.markSourceSaved(undefined, androidResult.applied || pwaResult.applied
+        ? `确定性部分已保存 ${androidResult.applied + pwaResult.applied} 个绑定；AI 只补未绑定属性或结构修改`
+        : '已进入现有 AI 会话，只处理未绑定属性或结构修改', taskId)
     } catch (error) {
-      setSyncState({ phase: 'failed', message: error instanceof Error ? error.message : '跨端同步任务启动失败' })
+      verification.fail(error instanceof Error ? error.message : '跨端同步任务启动失败')
     }
-  }, [applyDraftState, model, root, selection])
+  }, [applyDraftState, model, root, selection, setMode, verification.fail, verification.markLive, verification.markSourceSaved, verification.start])
 
   const copyCliPackage = useCallback(async () => {
     const current = model.draft
@@ -428,11 +456,9 @@ export function usePwaDesignSession({
   }, [model])
 
   const prepareReload = useCallback(() => {
-    setReady(false)
-    setSelection(null)
-    setMappedNodeKey(null)
-    setUnboundLabel('')
-  }, [])
+    verification.markLive('已手动重载真实 PWA；保存的草稿会在页面连接后恢复')
+    reloadSource()
+  }, [reloadSource, verification.markLive])
 
   return {
     iframeRef,
@@ -446,7 +472,8 @@ export function usePwaDesignSession({
     canUndo: model.canUndo && historyVersion >= 0,
     canRedo: model.canRedo && historyVersion >= 0,
     saveLabel,
-    syncState,
+    syncState: verification.state,
+    reloadKey,
     writebackPlan,
     setMode,
     updateStyle,
@@ -459,5 +486,6 @@ export function usePwaDesignSession({
     copyCliPackage,
     downloadCliPackage,
     prepareReload,
+    retryVerification: verification.retry,
   }
 }

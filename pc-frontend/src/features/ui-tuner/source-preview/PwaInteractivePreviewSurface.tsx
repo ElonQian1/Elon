@@ -1,5 +1,4 @@
 import { MousePointer2, RefreshCw, Smartphone } from 'lucide-react'
-import { useState } from 'react'
 import type { SourcePreviewDocument } from './types'
 import type { PwaDesignSession } from './usePwaDesignSession'
 import styles from './SourcePreview.module.css'
@@ -11,15 +10,15 @@ interface Props {
   design: PwaDesignSession
 }
 
-function pwaUrl(value: string): string {
+function pwaUrl(value: string, reloadKey: number): string {
   const url = new URL(value, window.location.origin)
   if (url.origin !== window.location.origin) return '/web?ui_tuner_preview=1'
   url.searchParams.set('ui_tuner_preview', '1')
+  if (reloadKey) url.searchParams.set('ui_tuner_reload', String(reloadKey))
   return `${url.pathname}${url.search}${url.hash}`
 }
 
 export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Props) {
-  const [reloadKey, setReloadKey] = useState(0)
   const viewportWidth = Math.max(320, Math.min(430, Math.round(document.canvas.width / 3)))
   const viewportHeight = Math.max(640, Math.min(932, Math.round(document.canvas.height / 3)))
   const scale = Math.max(.55, Math.min(1.5, zoom))
@@ -39,7 +38,7 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
           <button className={design.mode === 'interact' ? styles.activePwaMode : ''} type="button" disabled={!design.ready} onClick={() => design.setMode('interact')}><Smartphone size={14} />{design.mode === 'select' ? '退出设计并继续使用' : '正常使用'}</button>
           <button className={design.mode === 'select' ? styles.activePwaMode : ''} type="button" disabled={!design.ready} onClick={() => design.setMode('select')}><MousePointer2 size={14} />开始设计/修改页面</button>
         </div>
-        <button type="button" title="重新载入 PWA（已保存草稿会自动恢复）" onClick={() => { design.prepareReload(); setReloadKey((value) => value + 1) }}><RefreshCw size={14} /></button>
+        <button type="button" title="重新载入 PWA（已保存草稿会自动恢复）" onClick={design.prepareReload}><RefreshCw size={14} /></button>
       </div>
       {route && <div className={styles.pwaRouteStatus}>
         当前画面：{route.screenTitle || '未识别画面'}
@@ -49,7 +48,7 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
       {design.mode === 'select' && design.unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{design.unboundLabel}”；当前用可解释 DOM 路径保存，尚未假定它已绑定 Android 源码。</div>}
       <div className={styles.pwaDraftBadge}>真实 PWA 页面 · 手工草稿</div>
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>
-        <iframe key={reloadKey} ref={design.iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url)} title="移动 PWA 真实页面" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} />
+        <iframe key={design.reloadKey} ref={design.iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url, design.reloadKey)} title="移动 PWA 真实页面" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} />
       </div>
     </div>
   )

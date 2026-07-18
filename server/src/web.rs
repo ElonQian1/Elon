@@ -121,6 +121,7 @@ const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
 const UI_TUNER_PWA_AUTH_BOOTSTRAP_JS: &str = include_str!("assets/ui_tuner_pwa_auth_bootstrap.js");
+const UI_TUNER_PWA_VERIFICATION_JS: &str = include_str!("assets/ui_tuner_pwa_verification.js");
 const UI_TUNER_PWA_BRIDGE_JS: &str = include_str!("assets/ui_tuner_pwa_bridge.js");
 
 pub async fn web_page() -> impl IntoResponse {
@@ -202,6 +203,10 @@ fn build_html() -> String {
         .replace(
             "__UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__",
             UI_TUNER_PWA_AUTH_BOOTSTRAP_JS,
+        )
+        .replace(
+            "__UI_TUNER_PWA_VERIFICATION_JS__",
+            UI_TUNER_PWA_VERIFICATION_JS,
         )
         .replace("__UI_TUNER_PWA_BRIDGE_JS__", UI_TUNER_PWA_BRIDGE_JS)
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())

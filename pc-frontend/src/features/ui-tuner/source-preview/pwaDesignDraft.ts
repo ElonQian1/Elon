@@ -222,6 +222,7 @@ const STORAGE_PREFIX = 'elon.pc.pwaDesignDraft.v1:'
 function normalizedSearch(search: string): string {
   const params = new URLSearchParams(search)
   params.delete('ui_tuner_preview')
+  params.delete('ui_tuner_reload')
   const value = params.toString()
   return value ? `?${value}` : ''
 }
