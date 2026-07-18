@@ -9,6 +9,7 @@
   const originalInlineStyles = new Map();
   let selectedElement = null;
   let selecting = false;
+  let acceptedSessionToken = '';
   const editableProperties = [
     'width', 'height',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
@@ -366,6 +367,8 @@
     } else if (message.type === 'set-session-auth') {
       const sessionToken = String(message.payload && message.payload.token || '');
       if (!sessionToken || sessionToken.length > 8192) return;
+      if (sessionToken === acceptedSessionToken) return;
+      acceptedSessionToken = sessionToken;
       window.dispatchEvent(new CustomEvent('elon:ui-tuner-session-auth', {
         detail: { token: sessionToken },
       }));

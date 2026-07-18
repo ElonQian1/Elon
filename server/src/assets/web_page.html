@@ -4648,6 +4648,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 </div>
 
 <script>
+__UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
+</script>
+<script>
 (function () {
   'use strict';
 
@@ -5133,7 +5136,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   // ====== 状态 ======
   const TOKEN_KEY = 'lodex_token';
   const PROJECT_TASK_COMPLETION_BADGES_KEY = 'elon_project_task_completion_badges_v1';
-  let token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';
+  const previewSessionToken = String(window.__ELON_UI_TUNER_PREVIEW_AUTH__?.token || '');
+  let token = previewSessionToken || localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';
   if (pageParams.get('ui_tuner_preview') === '1' && window.parent !== window) {
     window.addEventListener('elon:ui-tuner-session-auth', (event) => {
       const sessionToken = String(event && event.detail && event.detail.token || '');
@@ -8349,7 +8353,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   });
 
   // ====== 加载用户/项目 ======
-  async function loadMe() {
+  async function loadMe(expectedToken) {
     const res = await api('/api/me');
     if (res.status === 401 || res.status === 403) {
       const err = new Error('登录已过期');
@@ -8358,12 +8362,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     if (!res.ok) throw new Error('加载用户信息失败：HTTP ' + res.status);
     const data = await res.json();
+    if (expectedToken && expectedToken !== token) return false;
     currentUser = data.user;
     const name = currentUser.nickname || currentUser.account || '用户';
     const account = currentUser.account || '';
     profileNickname.textContent = name;
     profileAccount.textContent = (account && account !== name) ? '账号：' + account : '';
     profileAvatar.textContent = name.charAt(0).toUpperCase();
+    return true;
   }
   async function loadProjects() {
     const res = await api('/api/me/archive');
@@ -10444,10 +10450,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   // ====== 启动 ======
   async function boot() {
-    if (!token) { showLogin(); return; }
+    const bootToken = token;
+    if (!bootToken) { showLogin(); return; }
     try {
-      await loadMe();
+      if (!await loadMe(bootToken) || token !== bootToken) return;
     } catch (err) {
+      if (token !== bootToken) return;
       if (err && err.authFailed) {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem('elon_token');
