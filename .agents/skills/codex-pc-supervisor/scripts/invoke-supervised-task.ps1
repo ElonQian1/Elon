@@ -238,6 +238,7 @@ function New-SupervisedTaskBody {
         throw 'WorkspacePath must be absolute.'
     }
     $supervision = [ordered]@{
+        protocol = $script:SupervisionProtocol
         supervisor = 'codex_desktop'
         task_role = $BodyRole
         acceptance_criteria = @($BodyCriteria | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
@@ -289,6 +290,37 @@ function Get-RootTaskFromDetail {
     return $root
 }
 
+function Assert-SafeResumeParentDetail {
+    param([object]$ParentDetail, [string]$RequestedParentTaskId)
+    if ([string]::IsNullOrWhiteSpace($RequestedParentTaskId)) {
+        throw 'Resume requires TaskId.'
+    }
+    $record = Get-RecordFromDetail $ParentDetail
+    $recordTaskId = [string](Get-ObjectField $record 'task_id')
+    if (-not [string]::IsNullOrWhiteSpace($recordTaskId) -and $recordTaskId -ne $RequestedParentTaskId) {
+        throw 'Resume task detail does not match the requested parent task.'
+    }
+    $status = ([string](Get-ObjectField $record 'status')).Trim().ToLowerInvariant()
+    $terminalStatuses = @('done', 'failed', 'canceled', 'interrupted')
+    if ($terminalStatuses -notcontains $status -or $null -eq (Get-ObjectField $record 'finished_at_ms')) {
+        throw 'Resume requires a parent task with a reliable terminal status.'
+    }
+    $supervision = Get-ObjectField $ParentDetail 'supervision'
+    $contract = Get-ObjectField $supervision 'contract'
+    if ((Get-ObjectField $supervision 'enabled') -ne $true -or
+        [string](Get-ObjectField $supervision 'protocol') -ne $script:SupervisionProtocol -or
+        [string](Get-ObjectField $contract 'protocol') -ne $script:SupervisionProtocol) {
+        throw 'Resume requires a parent task with the current desktop supervision protocol.'
+    }
+    $workspaceStatus = Get-ObjectField $record 'workspace_status'
+    if ((Get-ObjectField $workspaceStatus 'isolated') -ne $true -or
+        [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'base_workspace_path')) -or
+        [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'active_workspace_path')) -or
+        [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'branch'))) {
+        throw 'Resume requires a platform-recorded isolated parent worktree.'
+    }
+}
+
 function New-SupervisionReviewBody {
     param(
         [string]$BodyVerdict,
@@ -331,6 +363,7 @@ function New-ResumeTaskBody {
         [string[]]$BodyCriteria,
         [string]$BodyImprovementPolicy
     )
+    Assert-SafeResumeParentDetail $ParentDetail $RequestedParentTaskId
     $parentRecord = Get-RecordFromDetail $ParentDetail
     $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
     $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
@@ -368,12 +401,26 @@ if ($Action -eq 'SelfTest') {
 
     $parentJson = [ordered]@{
         record = [ordered]@{
+            task_id = 'local-parent-task'
             project_id = '中文项目'
             workspace_path = $testWorkspace
             prompt = $testPrompt
+            status = 'failed'
+            finished_at_ms = 2
+            workspace_status = [ordered]@{
+                isolated = $true
+                base_workspace_path = $testWorkspace
+                active_workspace_path = 'C:\conversation-worktrees\中文项目\中文会话'
+                branch = 'ai/session/中文项目/中文会话'
+            }
         }
         supervision = [ordered]@{
-            contract = [ordered]@{ root_task_id = 'local-root-task' }
+            enabled = $true
+            protocol = $script:SupervisionProtocol
+            contract = [ordered]@{
+                protocol = $script:SupervisionProtocol
+                root_task_id = 'local-root-task'
+            }
         }
     }
     [byte[]]$responseBytes = Convert-ToUtf8JsonBytes $parentJson
@@ -396,6 +443,23 @@ if ($Action -eq 'SelfTest') {
     $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' '修复中文继承路径' `
         $testCriteria $true
     $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $unsafeParent = [ordered]@{
+        record = [ordered]@{
+            task_id = 'local-running-task'
+            project_id = '中文项目'
+            workspace_path = $testWorkspace
+            prompt = $testPrompt
+            status = 'running'
+            workspace_status = [ordered]@{ isolated = $false }
+        }
+        supervision = [ordered]@{ enabled = $false }
+    }
+    $unsafeResumeRejected = $false
+    try {
+        $null = New-ResumeTaskBody $unsafeParent 'local-running-task' $testCriteria 'after_task_or_unblock'
+    } catch {
+        $unsafeResumeRejected = $true
+    }
     $testDetailPath = Get-TaskDetailPath 'local-test?id'
     if ($testBody.supervision.acceptance_criteria.Count -ne 2 -or
         $testBody.supervision.task_role -ne 'requirement' -or
@@ -412,6 +476,10 @@ if ($Action -eq 'SelfTest') {
         $resumeBody.workspace_path -cne $testWorkspace -or
         $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -lt 0 -or
         $resumeBody.supervision.task_role -ne 'resume_original' -or
+        $resumeBody.supervision.protocol -ne $script:SupervisionProtocol -or
+        $resumeBody.supervision.parent_task_id -ne 'local-parent-task' -or
+        $resumeBody.supervision.root_task_id -ne 'local-root-task' -or
+        -not $unsafeResumeRejected -or
         $script:SupervisionProtocol -ne 'elon.desktop_pc_supervision.v1' -or
         $testDetailPath -ne '/api/local-tasks/local-test%3Fid?limit=1000') {
         throw 'Supervised request construction self-test failed.'
@@ -423,7 +491,8 @@ if ($Action -eq 'SelfTest') {
         checks = @(
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
-            'improve_inherited_path', 'resume_inherited_path', 'task_detail_path'
+            'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
+            'task_detail_path'
         )
     })
     exit 0

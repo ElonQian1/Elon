@@ -57,6 +57,7 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         timeout_secs: cli_prompt_timeout_secs(
             &direct.cli_name_owned,
             direct.runtime_permission.as_deref(),
+            direct.completion_context.is_desktop_supervised(),
         ),
         stdin_piped_empty,
         initial_cols: node_agent_cli_pty::default_cols(),

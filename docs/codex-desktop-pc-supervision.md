@@ -124,10 +124,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -Task
 
 - `Inspect`：读取任务、journal、审批和监督状态。
 - `Improve`：从父任务继承项目/工作区并创建能力改进；加 `-BlockingImprovement` 时角色为 `capability_repair`。
-- `Resume`：从父任务恢复原始 prompt，角色为 `resume_original`。
+- `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。helper 先做只读门禁，节点再以本机任务记录和 Git 身份做权威校验；不能用参数指定任意 worktree。
 - `SelfTest`：不连接节点，仅校验脚本的契约构造。
 
 等待动作最多 55 秒，桌面端应分段等待并保持过程更新。`Wait` 会在窗口内重试节点短暂重启，并只读取小事件窗口；完整日志由 `Inspect` 获取，监督证据摘要仍由节点扫描完整 journal。设置 `ELON_NODE_ADMIN_URL` 可覆盖默认探测地址，但地址仍必须受节点 Origin 白名单信任。Windows 客户端 watchdog 使用同安装路径下的单实例选举，更新或修复并发启动时只保留一个守护者，避免互相重启运行时。
+
+带 `elon.desktop_pc_supervision.v1` 的本机 Codex 任务，pipe sidecar 与 direct-pipe 回退路径默认允许运行 3600 秒，不会在普通 full-access 的 1200 秒门槛被硬杀。需要更长构建窗口时，在节点进程设置 `ELON_SUPERVISED_CODEX_TIMEOUT_SECS`；有效范围为 3600–86400 秒。该变量只影响当前监督协议的 Codex 任务，普通本机任务、其它 CLI、取消、工具审批、云控授权截止时间和终态落盘保持原行为。
 
 ## 阻塞恢复顺序
 
@@ -148,6 +150,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -Task
 - 本机管理 API 继续要求动态 admin token 和受信 Origin；Skill 不打印 token。
 - 执行 prompt 带 `<elon-pc-executor>`，执行者看到后禁止重新派发，避免递归。
 - 契约使用 journal 事件持久化，没有为旧任务新增强制数据库列。
+- `resume_original` 必须指向已终止的同节点、同项目受监督父任务，并复用节点记录且仍在 Git worktree 注册表中的隔离现场；非法继承和并发占用都会以冲突拒绝。
 - PC 工作台只在 `supervision.enabled=true` 时显示监督卡，普通本机任务不受影响。
 - 版本发布、灰度、回滚和节点兼容仍以 `docs/node-agent-upgrade-compatibility.md` 为准。
 - 任何协议升级必须新增版本号或保持向后兼容，并补 Rust、PowerShell 与 PC 前端测试。

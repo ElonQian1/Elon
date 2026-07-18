@@ -267,8 +267,8 @@ impl NodeRuntime {
     pub(crate) async fn try_register_cli_prompt(
         &self,
         handle: node_agent_active_task::ActiveCliPromptHandle,
-    ) -> bool {
-        self.active_cli_prompts.try_insert(handle).await
+    ) -> node_agent_active_task_registry::CliPromptRegistration {
+        self.active_cli_prompts.try_insert_with_status(handle).await
     }
 
     pub(crate) async fn cancel_cli_prompt(&self, req_id: &str) -> bool {

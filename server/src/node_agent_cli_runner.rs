@@ -205,6 +205,41 @@ pub fn prepare_cli_prompt_cwd_in(
     })
 }
 
+/// Reuse the exact isolated worktree recorded for a terminated supervised
+/// parent task. Admission validates the parent/worktree identity before this
+/// function is called; this layer keeps workspace finalization attached to the
+/// inherited worktree instead of provisioning a new conversation directory.
+pub fn prepare_inherited_cli_prompt_cwd_in(
+    data_paths: Option<&elon_pc_dev_runtime::NodeDataPaths>,
+    workspace: pc_workspace_provisioner::ConversationWorkspaceResult,
+    project_context: Option<homecli_proto::CliProjectContext>,
+) -> anyhow::Result<PreparedCliPromptCwd> {
+    if !workspace.isolated || workspace.base_workspace_path.is_none() {
+        anyhow::bail!("续跑工作区必须是带基础仓库记录的隔离 worktree");
+    }
+    let (active_cwd, context) = node_agent_cli_security::prepare_cli_base_cwd(
+        Some(workspace.workspace_path.clone()),
+        project_context,
+    )?;
+    if cli_prompt_read_only(context.runtime_permission.as_deref()) {
+        anyhow::bail!("只读任务不能继承可写的监督 worktree");
+    }
+    let base = workspace
+        .base_workspace_path
+        .as_deref()
+        .map(PathBuf::from)
+        .ok_or_else(|| anyhow::anyhow!("续跑工作区缺少基础仓库"))?;
+    let base = std::fs::canonicalize(&base)
+        .map_err(|error| anyhow::anyhow!("续跑基础仓库不可用: {} ({error})", base.display()))?;
+    let data_policy = crate::node_agent_project_data_policy::classify(data_paths, &base);
+    Ok(PreparedCliPromptCwd {
+        cwd: Some(active_cwd.to_string_lossy().to_string()),
+        conversation_workspace: Some(workspace),
+        project_context: Some(context),
+        data_policy,
+    })
+}
+
 pub fn finalize_cli_prompt_workspace(
     exit_ok: bool,
     error: Option<String>,

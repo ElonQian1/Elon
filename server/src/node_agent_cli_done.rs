@@ -23,6 +23,7 @@ pub(crate) struct CliCompletionContext {
     pub origin: String,
     pub producer_identity: CliCompletionProducerIdentity,
     pub local_owner_user_id: Option<String>,
+    pub supervision_protocol: Option<String>,
     pub project_context: Option<CliProjectContext>,
     pub channel_id: Option<String>,
     pub prompt: Option<String>,
@@ -37,6 +38,7 @@ impl CliCompletionContext {
             origin: "cloud_dispatch".to_string(),
             producer_identity,
             local_owner_user_id: None,
+            supervision_protocol: None,
             project_context,
             channel_id: None,
             prompt: None,
@@ -48,16 +50,24 @@ impl CliCompletionContext {
         project_context: CliProjectContext,
         channel_id: Option<String>,
         prompt: String,
+        supervision_protocol: Option<String>,
     ) -> Self {
         let owner_user_id = producer_identity.owner_user_id.clone();
         Self {
             origin: "local_offline".to_string(),
             producer_identity,
             local_owner_user_id: Some(owner_user_id),
+            supervision_protocol,
             project_context: Some(project_context),
             channel_id,
             prompt: Some(prompt),
         }
+    }
+
+    pub(crate) fn is_desktop_supervised(&self) -> bool {
+        self.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN
+            && self.supervision_protocol.as_deref()
+                == Some(crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL)
     }
 }
 

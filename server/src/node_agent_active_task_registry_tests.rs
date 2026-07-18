@@ -1,4 +1,4 @@
-use super::ActiveCliPromptRegistry;
+use super::{ActiveCliPromptRegistry, CliPromptRegistration};
 use crate::node_agent_active_task::ActiveCliPromptHandle;
 use tokio::sync::watch;
 
@@ -24,15 +24,17 @@ fn handle_with_rx(req_id: &str, route: &str) -> (ActiveCliPromptHandle, watch::R
 #[tokio::test]
 async fn rejects_duplicate_req_id_without_replacing_live_handle() {
     let registry = ActiveCliPromptRegistry::new();
-    assert!(
+    assert_eq!(
         registry
-            .try_insert(handle("req-1", "route_a_external_cli"))
-            .await
+            .try_insert_with_status(handle("req-1", "route_a_external_cli"))
+            .await,
+        CliPromptRegistration::Inserted
     );
-    assert!(
-        !registry
-            .try_insert(handle("req-1", "route_c_server_runtime"))
-            .await
+    assert_eq!(
+        registry
+            .try_insert_with_status(handle("req-1", "route_c_server_runtime"))
+            .await,
+        CliPromptRegistration::DuplicateReq
     );
 
     let view = registry.view("req-1", Vec::new()).await.unwrap();
@@ -44,7 +46,10 @@ async fn rejects_duplicate_req_id_without_replacing_live_handle() {
 async fn cancel_sender_and_remove_are_idempotent() {
     let registry = ActiveCliPromptRegistry::new();
     let (handle, mut cancel_rx) = handle_with_rx("req-1", "route_a_external_cli");
-    assert!(registry.try_insert(handle).await);
+    assert_eq!(
+        registry.try_insert_with_status(handle).await,
+        CliPromptRegistration::Inserted
+    );
 
     let cancel_tx = registry.cancel_tx("req-1").await.unwrap();
     assert!(cancel_tx.send(true).is_ok());
@@ -58,15 +63,17 @@ async fn cancel_sender_and_remove_are_idempotent() {
 #[tokio::test]
 async fn views_without_approvals_exposes_live_handles() {
     let registry = ActiveCliPromptRegistry::new();
-    assert!(
+    assert_eq!(
         registry
-            .try_insert(handle("req-1", "route_b_api_runtime"))
-            .await
+            .try_insert_with_status(handle("req-1", "route_b_api_runtime"))
+            .await,
+        CliPromptRegistration::Inserted
     );
-    assert!(
+    assert_eq!(
         registry
-            .try_insert(handle("req-2", "route_c_server_runtime"))
-            .await
+            .try_insert_with_status(handle("req-2", "route_c_server_runtime"))
+            .await,
+        CliPromptRegistration::Inserted
     );
 
     let mut views = registry.views_without_approvals().await;
@@ -82,15 +89,19 @@ async fn views_without_approvals_exposes_live_handles() {
 #[tokio::test]
 async fn cloud_control_selection_only_returns_marked_tasks() {
     let registry = ActiveCliPromptRegistry::new();
-    assert!(
+    assert_eq!(
         registry
-            .try_insert(handle("local", "route_a_external_cli"))
-            .await
+            .try_insert_with_status(handle("local", "route_a_external_cli"))
+            .await,
+        CliPromptRegistration::Inserted
     );
-    assert!(
+    assert_eq!(
         registry
-            .try_insert(handle("shared", "route_a_external_cli").with_requires_cloud_control(true))
-            .await
+            .try_insert_with_status(
+                handle("shared", "route_a_external_cli").with_requires_cloud_control(true),
+            )
+            .await,
+        CliPromptRegistration::Inserted
     );
 
     assert!(registry.set_requires_cloud_control("local", false).await);
@@ -110,7 +121,10 @@ async fn cloud_control_selection_only_returns_marked_tasks() {
 async fn midrun_adoption_cancels_when_disconnect_scan_won_before_the_write_lock() {
     let registry = ActiveCliPromptRegistry::new();
     let (handle, mut cancel_rx) = handle_with_rx("req-1", "route_a_external_cli");
-    assert!(registry.try_insert(handle).await);
+    assert_eq!(
+        registry.try_insert_with_status(handle).await,
+        CliPromptRegistration::Inserted
+    );
 
     // Disconnect cleanup can snapshot the registry immediately before the
     // credential switch acquires the write lock.
@@ -139,5 +153,31 @@ async fn midrun_adoption_cancels_when_disconnect_scan_won_before_the_write_lock(
     assert_eq!(
         registry.cloud_controlled_req_ids().await,
         vec!["req-1".to_string()]
+    );
+}
+
+#[tokio::test]
+async fn exclusive_resume_workspace_rejects_active_occupancy_without_affecting_normal_tasks() {
+    let registry = ActiveCliPromptRegistry::new();
+    assert_eq!(
+        registry
+            .try_insert_with_status(handle("normal-1", "route_a_external_cli"))
+            .await,
+        CliPromptRegistration::Inserted
+    );
+    assert_eq!(
+        registry
+            .try_insert_with_status(handle("normal-2", "route_a_external_cli"))
+            .await,
+        CliPromptRegistration::Inserted,
+        "ordinary submissions retain their existing concurrency semantics"
+    );
+    assert_eq!(
+        registry
+            .try_insert_with_status(
+                handle("resume", "route_a_external_cli").with_exclusive_workspace(true),
+            )
+            .await,
+        CliPromptRegistration::WorkspaceBusy
     );
 }

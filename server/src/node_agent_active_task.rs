@@ -16,6 +16,7 @@ pub(crate) struct ActiveCliPromptHandle {
     route: String,
     cwd: Option<String>,
     runtime_permission: Option<String>,
+    exclusive_workspace: bool,
     requires_cloud_control: bool,
     started_at_ms: u128,
     last_heartbeat_ms: u128,
@@ -56,6 +57,7 @@ impl ActiveCliPromptHandle {
             route: route.into(),
             cwd,
             runtime_permission,
+            exclusive_workspace: false,
             requires_cloud_control: false,
             started_at_ms: now,
             last_heartbeat_ms: now,
@@ -70,6 +72,19 @@ impl ActiveCliPromptHandle {
     pub(crate) fn with_requires_cloud_control(mut self, required: bool) -> Self {
         self.requires_cloud_control = required;
         self
+    }
+
+    pub(crate) fn with_exclusive_workspace(mut self, exclusive: bool) -> Self {
+        self.exclusive_workspace = exclusive;
+        self
+    }
+
+    pub(crate) fn cwd(&self) -> Option<&str> {
+        self.cwd.as_deref()
+    }
+
+    pub(crate) fn exclusive_workspace(&self) -> bool {
+        self.exclusive_workspace
     }
 
     pub(crate) fn requires_cloud_control(&self) -> bool {

@@ -14,6 +14,13 @@ pub(crate) struct ActiveCliPromptRegistry {
     prompts: RwLock<HashMap<String, ActiveCliPromptHandle>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CliPromptRegistration {
+    Inserted,
+    DuplicateReq,
+    WorkspaceBusy,
+}
+
 impl ActiveCliPromptRegistry {
     pub(crate) fn new() -> Self {
         Self::default()
@@ -24,13 +31,26 @@ impl ActiveCliPromptRegistry {
     }
 
     pub(crate) async fn try_insert(&self, handle: ActiveCliPromptHandle) -> bool {
+        self.try_insert_with_status(handle).await == CliPromptRegistration::Inserted
+    }
+
+    pub(crate) async fn try_insert_with_status(
+        &self,
+        handle: ActiveCliPromptHandle,
+    ) -> CliPromptRegistration {
         let mut prompts = self.prompts.write().await;
         let req_id = handle.req_id().to_string();
         if prompts.contains_key(&req_id) {
-            return false;
+            return CliPromptRegistration::DuplicateReq;
+        }
+        if prompts
+            .values()
+            .any(|active| workspaces_conflict(active, &handle))
+        {
+            return CliPromptRegistration::WorkspaceBusy;
         }
         prompts.insert(req_id, handle);
-        true
+        CliPromptRegistration::Inserted
     }
 
     pub(crate) async fn cancel_tx(&self, req_id: &str) -> Option<watch::Sender<bool>> {
@@ -105,6 +125,19 @@ impl ActiveCliPromptRegistry {
     pub(crate) async fn len(&self) -> usize {
         self.prompts.read().await.len()
     }
+}
+
+fn workspaces_conflict(left: &ActiveCliPromptHandle, right: &ActiveCliPromptHandle) -> bool {
+    if !left.exclusive_workspace() && !right.exclusive_workspace() {
+        return false;
+    }
+    let (Some(left), Some(right)) = (left.cwd(), right.cwd()) else {
+        return false;
+    };
+    let left = crate::node_agent_workspace_match::canonical_or_original(std::path::Path::new(left));
+    let right =
+        crate::node_agent_workspace_match::canonical_or_original(std::path::Path::new(right));
+    left.starts_with(&right) || right.starts_with(&left)
 }
 
 #[cfg(test)]

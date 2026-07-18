@@ -22,6 +22,10 @@ use crate::node_agent_runtime::NodeRuntime;
 use crate::node_agent_task_journal;
 use crate::node_agent_tool_approval;
 use crate::pc_workspace_provisioner;
+
+pub(crate) const SUPERVISED_CODEX_TIMEOUT_ENV: &str = "ELON_SUPERVISED_CODEX_TIMEOUT_SECS";
+pub(crate) const DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS: u64 = 3600;
+const MAX_SUPERVISED_CODEX_TIMEOUT_SECS: u64 = 24 * 60 * 60;
 pub(crate) fn ws_text(msg: &AgentToServer) -> Message {
     Message::Text(serde_json::to_string(msg).unwrap_or_default())
 }
@@ -136,7 +140,35 @@ pub(crate) fn cli_prompt_read_only(runtime_permission: Option<&str>) -> bool {
     )
 }
 
-pub(crate) fn cli_prompt_timeout_secs(cli_name: &str, runtime_permission: Option<&str>) -> u64 {
+pub(crate) fn cli_prompt_timeout_secs(
+    cli_name: &str,
+    runtime_permission: Option<&str>,
+    desktop_supervised: bool,
+) -> u64 {
+    let configured_supervised_timeout = std::env::var(SUPERVISED_CODEX_TIMEOUT_ENV).ok();
+    cli_prompt_timeout_secs_with_config(
+        cli_name,
+        runtime_permission,
+        desktop_supervised,
+        configured_supervised_timeout.as_deref(),
+    )
+}
+
+pub(crate) fn cli_prompt_timeout_secs_with_config(
+    cli_name: &str,
+    runtime_permission: Option<&str>,
+    desktop_supervised: bool,
+    configured_supervised_timeout: Option<&str>,
+) -> u64 {
+    if cli_name.trim().eq_ignore_ascii_case("codex") && desktop_supervised {
+        return configured_supervised_timeout
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .unwrap_or(DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS)
+            .clamp(
+                DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS,
+                MAX_SUPERVISED_CODEX_TIMEOUT_SECS,
+            );
+    }
     match cli_name.trim().to_ascii_lowercase().as_str() {
         "codex" if cli_prompt_full_access(runtime_permission) => 1200,
         "codex" => 300,

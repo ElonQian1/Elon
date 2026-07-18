@@ -22,7 +22,7 @@ If the current request contains `<elon-pc-executor>`, stop using this skill. Wor
    - `needs_follow_up`: the task can be corrected without changing PC platform capability.
    - `blocked_capability`: a PC node, dispatcher, recovery, or evidence capability prevents the original task.
    - `rejected`: the result is unsafe or materially wrong.
-6. For `needs_follow_up`, submit a narrow follow-up requirement. For `blocked_capability`, run `-Action Improve -BlockingImprovement`, review that repair, then run `-Action Resume` against the original task.
+6. For `needs_follow_up`, submit a narrow follow-up requirement. For `blocked_capability`, run `-Action Improve -BlockingImprovement`, review that repair, then run `-Action Resume` against the terminated original task. `Resume` fails closed unless the parent has the current supervision protocol and a platform-recorded isolated worktree; the node independently revalidates Git identity and exclusive occupancy.
 7. Queue non-blocking platform improvements with `-Action Improve` only after the user task is complete. Do not delay the requested result for optional self-improvement.
 
 The PowerShell helper discovers ports 7799–7819, obtains the loopback-only admin token without printing it, and returns stable JSON. Set `ELON_NODE_ADMIN_URL` only when the node uses another trusted local URL.

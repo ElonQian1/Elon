@@ -48,6 +48,8 @@ const MAX_IMPROVEMENT_CHARS: usize = 2_000;
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct SupervisionContractInput {
     #[serde(default)]
+    pub protocol: Option<String>,
+    #[serde(default)]
     pub supervisor: Option<String>,
     #[serde(default)]
     pub task_role: Option<String>,
@@ -127,6 +129,12 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
 pub(crate) fn normalize_contract(
     input: SupervisionContractInput,
 ) -> Result<SupervisionContract, String> {
+    let requested_protocol = input.protocol.as_deref().map(str::trim);
+    if requested_protocol.is_some_and(|protocol| protocol != SUPERVISION_PROTOCOL) {
+        return Err(format!(
+            "supervision.protocol 必须是 {SUPERVISION_PROTOCOL}。"
+        ));
+    }
     let supervisor = clean_id(
         input.supervisor.as_deref().unwrap_or(DEFAULT_SUPERVISOR),
         "supervisor",
@@ -141,6 +149,11 @@ pub(crate) fn normalize_contract(
             "post_task_improvement",
         ],
     )?;
+    if task_role == "resume_original" && requested_protocol != Some(SUPERVISION_PROTOCOL) {
+        return Err(format!(
+            "resume_original 必须显式携带 supervision.protocol={SUPERVISION_PROTOCOL}。"
+        ));
+    }
     let improvement_policy = clean_enum(
         input
             .improvement_policy

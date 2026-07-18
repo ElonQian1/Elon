@@ -43,6 +43,7 @@ pub struct ProjectWorkspaceCleanupResult {
     pub skipped_paths: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub struct ConversationWorkspaceResult {
     pub base_workspace_path: Option<String>,
     pub workspace_path: String,

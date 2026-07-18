@@ -71,6 +71,11 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
     } = ctx;
     let cli_name = cli_name_owned.as_str();
     let bin = bin_owned.as_str();
+    let timeout_secs = cli_prompt_timeout_secs(
+        cli_name,
+        runtime_permission.as_deref(),
+        completion_context.is_desktop_supervised(),
+    );
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -241,9 +246,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                     return;
                 }
             },
-            _ = tokio::time::sleep(std::time::Duration::from_secs(
-                cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref())
-            )) => {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(timeout_secs)) => {
                 warn!("[{}] CLI 执行超时，强杀进程", cli_name);
                 let _ = child.kill().await;
                 drain_killed_child_output(
@@ -254,7 +257,6 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                     &mut stdout_text,
                     &mut stderr_text,
                 ).await;
-                let timeout_secs = cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref());
                 let message = format!("{} 执行超时（超过{}秒），已强制终止",
                     cli_name, timeout_secs);
                 let (done, combined_output) = cli_done_message_from_output(

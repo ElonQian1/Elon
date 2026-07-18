@@ -138,6 +138,10 @@ Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是
 
 `task_role` 形成可追溯任务树：`requirement` 是原需求，`capability_repair` 是阻塞能力修复，`resume_original` 是修复后的原任务续跑，`post_task_improvement` 是任务完成后的非阻塞增强。节点给执行 CLI 注入防递归标记，避免桌面监督与本机执行相互重复派发。完整安全边界、API 示例和日常流程见 `docs/codex-desktop-pc-supervision.md`。
 
+受监督的本机 Codex 任务需要覆盖真实项目构建、发布和统一收尾，不能沿用普通 full-access 任务固定的 1200 秒总时限。节点只在执行上下文冻结了当前 `elon.desktop_pc_supervision.v1` 协议时，把 pipe sidecar 和 direct-pipe 回退路径的总时限提高到默认 3600 秒；`ELON_SUPERVISED_CODEX_TIMEOUT_SECS` 可在 3600–86400 秒范围内调高。未带监督协议的 Codex 任务仍为 1200/300 秒，其它 CLI 仍为 180 秒；取消、审批、云控绝对授权截止时间和终态持久化不因该上限变化而放宽。
+
+`resume_original` 只允许复用已终止父任务由节点记录的同项目隔离 worktree。节点会重新验证父任务 owner/agent/install、监督协议、项目、授权基础仓库、平台 worktree 路径形状、Git common-dir、登记分支和当前独占占用；任一信息缺失、伪造、跨项目、父任务仍活跃或 worktree 已被其它 CLI 占用时都拒绝续跑。全访问授权仍锚定父任务原基础仓库，不因复用活动 worktree 而扩大。
+
 服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。
 
 当前 Route A 任务恢复闭环分为四段：

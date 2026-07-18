@@ -1,6 +1,6 @@
 //! Localhost control plane for owner-only offline Codex tasks.
 
-use std::sync::Arc;
+use std::{path::Path as FsPath, sync::Arc};
 
 use axum::{
     extract::{Path, Query, State},
@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::{
     node_agent_cli_task_dispatch::{spawn_cli_task, CliTaskDispatchRequest},
+    node_agent_local_task_resume::ResolvedResumeWorkspace,
     node_agent_local_task_store::LocalTaskStart,
     NodeRuntime,
 };
@@ -228,6 +229,36 @@ async fn create_task(
             "离线本机任务首版只允许已显式授权的 full_access 工作目录。",
         );
     }
+    let resume_workspace = match resolve_supervised_resume_workspace(
+        &runtime,
+        &creds,
+        project_id,
+        workspace_path,
+        supervision.as_ref(),
+    )
+    .await
+    {
+        Ok(workspace) => workspace,
+        Err(response) => return response,
+    };
+    let record_workspace_path = resume_workspace
+        .as_ref()
+        .map(|workspace| workspace.authorized_workspace_path.as_str())
+        .unwrap_or(workspace_path)
+        .to_string();
+    let execution_workspace_path = resume_workspace
+        .as_ref()
+        .map(|workspace| workspace.inherited_workspace.workspace_path.as_str())
+        .unwrap_or(workspace_path)
+        .to_string();
+    let workspace_inheritance = resume_workspace.as_ref().map(|workspace| {
+        json!({
+            "inherited": true,
+            "parent_task_id": supervision.as_ref().and_then(|contract| contract.parent_task_id.as_deref()),
+            "authorized_workspace_path": workspace.authorized_workspace_path.as_str(),
+            "active_workspace_path": workspace.inherited_workspace.workspace_path.as_str(),
+        })
+    });
     let frozen_codex_home =
         match crate::node_agent_codex_child_env::FrozenCodexHome::capture_unmanaged_for_local_task()
         {
@@ -273,7 +304,7 @@ async fn create_task(
         project_id,
         channel_id: channel_id.as_deref(),
         conversation_id: &conversation_id,
-        workspace_path,
+        workspace_path: &record_workspace_path,
         prompt,
         cli: "codex",
         runtime_permission,
@@ -295,7 +326,7 @@ async fn create_task(
             req_id: task_id.clone(),
             cli: "codex".to_string(),
             extra_args: Vec::new(),
-            cwd: Some(workspace_path.to_string()),
+            cwd: Some(execution_workspace_path),
             project_context: Some(CliProjectContext {
                 project_id: project_id.to_string(),
                 conversation_id: conversation_id.clone(),
@@ -320,7 +351,11 @@ async fn create_task(
                 },
                 channel_id,
                 prompt.to_string(),
+                supervision
+                    .as_ref()
+                    .map(|contract| contract.protocol.clone()),
             ),
+            inherited_workspace: resume_workspace.map(|workspace| workspace.inherited_workspace),
             allow_codex_auth_switch: false,
             frozen_codex_home: Some(frozen_codex_home),
         },
@@ -334,9 +369,105 @@ async fn create_task(
             "sync_state": "local_only",
             "record": record,
             "supervision": supervision,
+            "workspace_inheritance": workspace_inheritance,
         })),
     )
         .into_response()
+}
+
+async fn resolve_supervised_resume_workspace(
+    runtime: &Arc<NodeRuntime>,
+    creds: &crate::Credentials,
+    project_id: &str,
+    requested_workspace_path: &str,
+    supervision: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
+) -> Result<Option<ResolvedResumeWorkspace>, Response> {
+    let Some(contract) = supervision.filter(|contract| contract.task_role == "resume_original")
+    else {
+        return Ok(None);
+    };
+    let Some(parent_task_id) = contract.parent_task_id.as_deref() else {
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "resume_original 缺少 parent_task_id。",
+        ));
+    };
+    let parent = match runtime
+        .local_tasks
+        .get_for_owner(&creds.owner_user_id, parent_task_id)
+    {
+        Ok(Some(parent)) => parent,
+        Ok(None) => {
+            return Err(json_error(
+                StatusCode::NOT_FOUND,
+                "resume_original 的父任务不存在或不属于当前账号。",
+            ))
+        }
+        Err(error) => return Err(internal_error(error)),
+    };
+    if parent.agent_id != creds.agent_id || parent.install_id != runtime.install_id {
+        return Err(json_error(
+            StatusCode::CONFLICT,
+            "父任务不属于当前节点和安装实例，已拒绝继承工作区。",
+        ));
+    }
+    match crate::node_agent_local_task_supervision::load_supervision_state(
+        &runtime.task_journal,
+        &parent.task_id,
+    ) {
+        Ok(state) if state.enabled => {}
+        Ok(_) => {
+            return Err(json_error(
+                StatusCode::CONFLICT,
+                "父任务没有可验证的桌面监督契约，已拒绝继承工作区。",
+            ))
+        }
+        Err(error) => return Err(internal_error(error)),
+    }
+    let resolved = crate::node_agent_local_task_resume::validate_resume_workspace(
+        contract,
+        &parent,
+        project_id,
+        requested_workspace_path,
+    )
+    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+
+    let identity = crate::node_agent_full_access::FullAccessGrantIdentity::new(
+        &creds.owner_user_id,
+        &creds.agent_id,
+        &runtime.install_id,
+    )
+    .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
+    let authorization_context = CliProjectContext {
+        project_id: project_id.to_string(),
+        conversation_id: parent.conversation_id.clone(),
+        runtime_permission: Some("full_access".to_string()),
+    };
+    crate::node_agent_full_access::require_route_a_full_access_grant(
+        &runtime.full_access_grants,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&authorization_context),
+        Some(&resolved.authorized_workspace_path),
+        false,
+    )
+    .await
+    .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
+
+    if !runtime
+        .active_cli_prompt_views_for_workspace(FsPath::new(
+            &resolved.inherited_workspace.workspace_path,
+        ))
+        .await
+        .is_empty()
+    {
+        return Err(json_error(
+            StatusCode::CONFLICT,
+            "父任务隔离 worktree 已被活跃任务占用，已拒绝续跑。",
+        ));
+    }
+    Ok(Some(resolved))
 }
 
 async fn cancel_task(

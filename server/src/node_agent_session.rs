@@ -500,6 +500,7 @@ pub(super) async fn run_session(
                                     cloud_control_ttl_ms,
                                     prompt,
                                     completion_context,
+                                    inherited_workspace: None,
                                     allow_codex_auth_switch: true,
                                     frozen_codex_home: None,
                                 },

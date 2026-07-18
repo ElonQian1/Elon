@@ -3,6 +3,7 @@ use super::*;
 #[test]
 fn supervised_prompt_marks_executor_and_prevents_redispatch() {
     let contract = normalize_contract(SupervisionContractInput {
+        protocol: None,
         supervisor: None,
         task_role: None,
         parent_task_id: None,
@@ -21,6 +22,7 @@ fn supervised_prompt_marks_executor_and_prevents_redispatch() {
 #[test]
 fn state_keeps_latest_review_and_counts_evidence() {
     let contract = normalize_contract(SupervisionContractInput {
+        protocol: None,
         supervisor: None,
         task_role: None,
         parent_task_id: None,
@@ -76,6 +78,7 @@ fn journal_state_reads_review_after_paginated_event_window() {
     ));
     let journal = TaskJournal::new(&directory);
     let contract = normalize_contract(SupervisionContractInput {
+        protocol: None,
         supervisor: None,
         task_role: None,
         parent_task_id: None,
@@ -112,4 +115,43 @@ fn journal_state_reads_review_after_paginated_event_window() {
     assert_eq!(state.evidence.tool_calls, 250);
     assert_eq!(state.review.unwrap().verdict, "accepted");
     std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn resume_requires_explicit_current_protocol() {
+    let missing = normalize_contract(SupervisionContractInput {
+        protocol: None,
+        supervisor: None,
+        task_role: Some("resume_original".to_string()),
+        parent_task_id: Some("local-parent".to_string()),
+        root_task_id: Some("local-parent".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: None,
+    })
+    .expect_err("resume must not infer its security protocol");
+    assert!(missing.contains("必须显式携带 supervision.protocol"));
+
+    let wrong = normalize_contract(SupervisionContractInput {
+        protocol: Some("elon.desktop_pc_supervision.v0".to_string()),
+        supervisor: None,
+        task_role: Some("resume_original".to_string()),
+        parent_task_id: Some("local-parent".to_string()),
+        root_task_id: Some("local-parent".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: None,
+    })
+    .expect_err("unknown protocol must fail closed");
+    assert!(wrong.contains("supervision.protocol 必须是"));
+
+    let current = normalize_contract(SupervisionContractInput {
+        protocol: Some(SUPERVISION_PROTOCOL.to_string()),
+        supervisor: None,
+        task_role: Some("resume_original".to_string()),
+        parent_task_id: Some("local-parent".to_string()),
+        root_task_id: Some("local-parent".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: None,
+    })
+    .expect("current protocol should admit resume");
+    assert_eq!(current.protocol, SUPERVISION_PROTOCOL);
 }

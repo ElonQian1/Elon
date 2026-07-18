@@ -28,6 +28,10 @@ pub(crate) struct CliTaskDispatchRequest {
     pub cloud_control_ttl_ms: Option<u64>,
     pub prompt: String,
     pub completion_context: CliCompletionContext,
+    /// Present only for a node-validated supervised resume. Authorization is
+    /// checked against its base repo while execution/finalization reuse the
+    /// exact inherited worktree.
+    pub inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
     /// Offline-local work must never auto-switch into a borrowed/shared Codex slot.
     pub allow_codex_auth_switch: bool,
     /// Local work supplies this at creation time. Cloud work captures it once
@@ -78,6 +82,7 @@ async fn run_cli_task(
         cloud_control_ttl_ms,
         prompt,
         completion_context,
+        inherited_workspace,
         allow_codex_auth_switch,
         frozen_codex_home,
     } = request;
@@ -320,13 +325,17 @@ async fn run_cli_task(
             return;
         }
     };
+    let authorization_cwd = inherited_workspace
+        .as_ref()
+        .and_then(|workspace| workspace.base_workspace_path.as_deref())
+        .or(cwd.as_deref());
     if let Err(error) = node_agent_full_access::require_route_a_full_access_grant(
         &runtime.full_access_grants,
         &full_access_identity,
         resolved_cli.name(),
         runtime_permission.as_deref(),
         project_context.as_ref(),
-        cwd.as_deref(),
+        authorization_cwd,
         !local_offline,
     )
     .await
@@ -365,14 +374,22 @@ async fn run_cli_task(
     // Workspace preparation and build admission share the data-root transition
     // lock. A root switch can happen before this transaction or after the
     // lease is registered, never between selecting a workspace and its cache.
+    let inherited_workspace_resume = inherited_workspace.is_some();
     let transition = runtime.node_data_root_transition.clone().lock_owned().await;
     let data_paths = runtime.node_data_root.read().await.paths.clone();
     let prepared = tokio::task::spawn_blocking(move || {
-        let result = crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in(
-            data_paths.as_ref(),
-            cwd,
-            project_context,
-        );
+        let result = match inherited_workspace {
+            Some(workspace) => crate::node_agent_cli_runner::prepare_inherited_cli_prompt_cwd_in(
+                data_paths.as_ref(),
+                workspace,
+                project_context,
+            ),
+            None => crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in(
+                data_paths.as_ref(),
+                cwd,
+                project_context,
+            ),
+        };
         (transition, data_paths, result)
     })
     .await;
@@ -485,17 +502,33 @@ async fn run_cli_task(
         runtime_permission.clone(),
         cancel_tx,
     )
-    .with_requires_cloud_control(effective_requires_cloud_control);
-    if !runtime.try_register_cli_prompt(handle).await {
-        warn!(%req_id_for_cleanup, "PC CLI task registration race lost");
-        send_cli_prompt_reattached(
-            &out_tx,
-            req_id,
-            cli,
-            prepared_cwd.cwd,
-            requested_runtime_permission,
-        );
-        return;
+    .with_requires_cloud_control(effective_requires_cloud_control)
+    .with_exclusive_workspace(inherited_workspace_resume);
+    match runtime.try_register_cli_prompt(handle).await {
+        crate::node_agent_active_task_registry::CliPromptRegistration::Inserted => {}
+        crate::node_agent_active_task_registry::CliPromptRegistration::DuplicateReq => {
+            warn!(%req_id_for_cleanup, "PC CLI duplicate task registration race lost");
+            send_cli_prompt_reattached(
+                &out_tx,
+                req_id,
+                cli,
+                prepared_cwd.cwd,
+                requested_runtime_permission,
+            );
+            return;
+        }
+        crate::node_agent_active_task_registry::CliPromptRegistration::WorkspaceBusy => {
+            warn!(%req_id_for_cleanup, "supervised resume workspace is already active");
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                "父任务隔离 worktree 已被其他活跃任务占用，已拒绝续跑。".to_string(),
+            );
+            return;
+        }
     }
     if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
     {

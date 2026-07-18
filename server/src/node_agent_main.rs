@@ -95,6 +95,7 @@ mod node_agent_instance_lock;
 mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
+mod node_agent_local_task_resume;
 mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
