@@ -71,6 +71,24 @@ function Write-Utf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
 }
 
+function ConvertFrom-NodeAgentUtf8Base64Json {
+    param(
+        [Parameter(Mandatory = $true)][string]$Value
+    )
+
+    $encoded = $Value.Trim()
+    if ([string]::IsNullOrWhiteSpace($encoded)) {
+        throw "Remote response is missing Base64 JSON."
+    }
+    try {
+        $bytes = [System.Convert]::FromBase64String($encoded)
+        $json = [System.Text.UTF8Encoding]::new($false, $true).GetString($bytes)
+        return $json | ConvertFrom-Json
+    } catch {
+        throw "Remote UTF-8 JSON response is invalid: $($_.Exception.Message)"
+    }
+}
+
 function Get-NodeAgentReleaseIdentity {
     param(
         [Parameter(Mandatory = $true)][string]$Version,

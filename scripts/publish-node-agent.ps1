@@ -220,16 +220,15 @@ if [ -z "${ADMIN_TOKEN:-}" ]; then
   echo "ADMIN_TOKEN missing on server" >&2
   exit 2
 fi
-curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' -H "Authorization: Bearer ${ADMIN_TOKEN}" -H 'Content-Type: application/json' --data '{}'
+json=$(curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' -H "Authorization: Bearer ${ADMIN_TOKEN}" -H 'Content-Type: application/json' --data '{}')
+printf '%s' "$json" | base64 | tr -d '\n'
 '@
     $raw = Invoke-RemoteBash -Script $script
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
     try {
-        return $raw | ConvertFrom-Json
+        return ConvertFrom-NodeAgentUtf8Base64Json -Value $raw
     } catch {
-        # SSH 管道回传的大响应（含中文昵称等多字节字符）在 Windows PowerShell 5.1
-        # 偶发解析失败；广播本身已在服务器端成功执行，这里降级为“数量未知”，
-        # 不能让整个发布流程在收尾一步误报失败。
+        # 广播已经在远端执行；响应解析失败不能安全重试 POST，只保留未知数量证据。
         Write-Host "  广播响应 JSON 解析失败（不影响广播本身）：$($_.Exception.Message)" -ForegroundColor DarkYellow
         return $null
     }
@@ -249,12 +248,13 @@ if [ -z "${ADMIN_TOKEN:-}" ]; then
   echo "ADMIN_TOKEN missing on server" >&2
   exit 2
 fi
-curl --noproxy '*' -fsS 'http://127.0.0.1:8080/api/admin/nodes/public-dev-handshake' -H "Authorization: Bearer ${ADMIN_TOKEN}"
+json=$(curl --noproxy '*' -fsS 'http://127.0.0.1:8080/api/admin/nodes/public-dev-handshake' -H "Authorization: Bearer ${ADMIN_TOKEN}")
+printf '%s' "$json" | base64 | tr -d '\n'
 '@
     $raw = Invoke-RemoteBash -Script $script
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
     try {
-        return $raw | ConvertFrom-Json
+        return ConvertFrom-NodeAgentUtf8Base64Json -Value $raw
     } catch {
         Write-Host "  握手诊断响应 JSON 解析失败，跳过本轮：$($_.Exception.Message)" -ForegroundColor DarkYellow
         return $null

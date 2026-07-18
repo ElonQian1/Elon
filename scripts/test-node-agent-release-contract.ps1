@@ -19,6 +19,35 @@ Assert-True ($target -eq "0.3.69+c97f4b6fd9c5c9ce0e54564663f6677b7b6b8fb2") `
 Assert-True ((Get-NodeAgentReleaseIdentity -Version "0.3.69") -eq "0.3.69") `
     "Development identity must keep the Cargo version"
 
+$unicodeOwner = -join ([char]0x94b1, [char]0x4e00, [char]0x9f99)
+$unicodeDevice = (-join ([char]0x4e00, [char]0x9f99)) + '4060'
+$unicodeHandshakeFixture = @{
+    broadcast_to = 1
+    public_dev_handshake = @{
+        nodes = @(@{
+            owner_nickname = $unicodeOwner
+            device_name = $unicodeDevice
+            public_dev_handshake_ready = $true
+        })
+    }
+} | ConvertTo-Json -Depth 6 -Compress
+$unicodeHandshakeBase64 = [Convert]::ToBase64String(
+    [Text.UTF8Encoding]::new($false).GetBytes($unicodeHandshakeFixture)
+)
+$unicodeHandshake = ConvertFrom-NodeAgentUtf8Base64Json -Value $unicodeHandshakeBase64
+Assert-True ($unicodeHandshake.broadcast_to -eq 1) `
+    "The remote UTF-8 JSON decoder must preserve numeric release evidence"
+Assert-True ($unicodeHandshake.public_dev_handshake.nodes[0].owner_nickname -eq $unicodeOwner) `
+    "The remote UTF-8 JSON decoder must preserve Chinese handshake identities on PowerShell 5.1"
+$invalidRemoteJsonRejected = $false
+try {
+    ConvertFrom-NodeAgentUtf8Base64Json -Value 'not-base64' | Out-Null
+} catch {
+    $invalidRemoteJsonRejected = $_.Exception.Message.Contains('Remote UTF-8 JSON response is invalid')
+}
+Assert-True $invalidRemoteJsonRejected `
+    "Invalid remote Base64 JSON must fail closed"
+
 $oldReadyNode = [pscustomobject]@{
     public_dev_handshake_ready = $true
     agent_version = "0.3.69"
