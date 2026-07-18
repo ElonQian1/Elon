@@ -3,6 +3,7 @@ use super::{
         capabilities, render_compose_preview, ComposeRenderRequest, RendererCapabilitiesRequest,
     },
     parser::load_document,
+    pwa_verifier::{verify_pwa_source, VerifyPwaSourceRequest},
     pwa_writer::{commit_pwa_style, PwaCommitErrorKind},
     types::{CommitPreviewRequest, CommitPwaStyleRequest, LoadPreviewRequest},
     writer::commit_changes,
@@ -33,6 +34,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/source-preview/commit-pwa-style",
             post(commit_pwa_style_handler),
+        )
+        .route(
+            "/api/source-preview/verify-pwa-source",
+            post(verify_pwa_source_handler),
         )
 }
 
@@ -100,6 +105,16 @@ pub(super) async fn commit_pwa_style_handler(
             };
             error_response(status, error.into_anyhow())
         }
+    }
+}
+
+async fn verify_pwa_source_handler(
+    State(_runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<VerifyPwaSourceRequest>,
+) -> Response {
+    match verify_pwa_source(req).await {
+        Ok(value) => Json(value).into_response(),
+        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
     }
 }
 
