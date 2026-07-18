@@ -140,6 +140,14 @@ mod tests {
     }
 
     #[test]
+    fn supervised_policy_defaults_to_six_hour_total_and_fifteen_minute_idle() {
+        let policy = CliRuntimePolicy::supervised_codex_with_config(None, None, None);
+        assert_eq!(policy.total_timeout_secs, 6 * 60 * 60);
+        assert_eq!(policy.idle_timeout_secs, 15 * 60);
+        assert!(policy.progress_aware);
+    }
+
+    #[test]
     fn invalid_values_fall_back_without_infinite_timeout() {
         let policy = CliRuntimePolicy::supervised_codex_with_config(Some("0"), Some("bad"), None);
         assert_eq!(

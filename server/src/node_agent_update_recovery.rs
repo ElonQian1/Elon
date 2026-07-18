@@ -164,6 +164,16 @@ impl RecoveryTransport {
     pub(crate) fn supports(&self, capability: &str) -> bool {
         self.capabilities.iter().any(|item| item == capability)
     }
+
+    pub(crate) fn allows_local_resume_rebuild(&self) -> bool {
+        self.kind == default_transport_kind()
+            && self.protocol == default_transport_protocol()
+            && self.auth_mode == default_auth_mode()
+            && self.replay_from_cursor
+            && self.supports("update_recovery_v1")
+            && self.supports("event_replay")
+            && self.supports("resume_original")
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]

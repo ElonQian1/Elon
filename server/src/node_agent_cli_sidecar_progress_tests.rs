@@ -40,6 +40,38 @@ async fn progress_aware_timeout_keeps_progressing_task_alive() {
 }
 
 #[tokio::test]
+async fn pty_sidecar_uses_progress_policy_instead_of_legacy_fixed_timeout() {
+    let root = temp_dir("progress-aware-pty-keeps-alive");
+    let registry = CliSidecarRegistry::new(root.join("sidecars"));
+    let task_id = "task-progress-aware-pty";
+    let output_path = registry.output_path(task_id, "sidecar-progress-aware-pty");
+    let (program, mut args) = scaled_progress_command(true);
+    args.retain(|arg| arg != "--json");
+    let mut config = scaled_pipe_config(
+        &root,
+        &registry,
+        task_id,
+        "sidecar-progress-aware-pty",
+        output_path.clone(),
+        program,
+        args,
+    );
+    // This is the old fixed deadline. A supervised PTY must ignore it in
+    // favour of runtime_policy while real output keeps arriving.
+    config.timeout_secs = 2;
+
+    run_sidecar(config).await.unwrap();
+
+    let (_cancel_tx, mut cancel_rx) = watch::channel(false);
+    let result = follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {})
+        .await
+        .unwrap();
+    assert!(result.exit_ok, "{result:?}");
+    assert!(result.stdout_text.contains("progress-3"));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[tokio::test]
 async fn heartbeat_is_visible_but_does_not_mask_true_idle_timeout() {
     let root = temp_dir("progress-aware-idle-timeout");
     let registry = CliSidecarRegistry::new(root.join("sidecars"));

@@ -329,19 +329,19 @@ async fn review_task(
             "本机节点尚未绑定账号，不能提交监督结论。",
         );
     };
-    match runtime
+    let task = match runtime
         .local_tasks
         .get_for_owner(&creds.owner_user_id, task_id.trim())
     {
-        Ok(Some(_)) => {}
+        Ok(Some(task)) => task,
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "本机任务不存在。"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
-    }
-    match load_supervision_state(&runtime.task_journal, task_id.trim()) {
-        Ok(state) if state.enabled => {}
+    };
+    let contract = match load_supervision_state(&runtime.task_journal, task_id.trim()) {
+        Ok(state) if state.enabled => state.contract,
         Ok(_) => return json_error(StatusCode::BAD_REQUEST, "该任务没有桌面监督契约。"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
-    }
+    };
     let review = match normalize_review(request) {
         Ok(review) => review,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
@@ -366,6 +366,13 @@ async fn review_task(
     ) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
+    if review.verdict == "accepted" {
+        if let Err(error) =
+            release_accepted_worktree_lease(&runtime, &task, contract.as_ref(), task_id.trim())
+        {
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        }
+    }
     match load_supervision_state(&runtime.task_journal, task_id.trim()) {
         Ok(supervision) => Json(json!({
             "ok": true,
@@ -375,6 +382,55 @@ async fn review_task(
         .into_response(),
         Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     }
+}
+
+fn release_accepted_worktree_lease(
+    runtime: &NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    contract: Option<&SupervisionContract>,
+    task_id: &str,
+) -> anyhow::Result<()> {
+    let Some(contract) = contract else {
+        return Ok(());
+    };
+    let root_task_id = contract
+        .root_task_id
+        .as_deref()
+        .or(contract.parent_task_id.as_deref())
+        .unwrap_or(task_id);
+    let status = task.workspace_status.as_ref();
+    let base = status
+        .and_then(|value| value.get("base_workspace_path"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(&task.workspace_path);
+    let journal_cwd = runtime
+        .task_journal
+        .snapshot(task_id, 0, 1)?
+        .record
+        .and_then(|record| record.cwd);
+    let receipt_workspace = runtime
+        .update_recovery
+        .receipt_for_task(task_id)?
+        .map(|receipt| receipt.workspace.workspace_path);
+    let active = status
+        .and_then(|value| value.get("active_workspace_path"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+        .or(journal_cwd)
+        .or(receipt_workspace);
+    let Some(active) = active else {
+        return Ok(());
+    };
+    let base = std::path::Path::new(base);
+    let active = std::path::Path::new(&active);
+    if !base.exists() || crate::node_agent_update_checkpoint::same_path(base, active) {
+        return Ok(());
+    }
+    crate::node_agent_supervision_worktree_lease::release(base, active, root_task_id)
 }
 
 fn observe_event(

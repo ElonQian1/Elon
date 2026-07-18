@@ -124,7 +124,15 @@ pub fn cleanup_project_workspace_in(
     let worktree_root = workspace_root
         .join("conversation-worktrees")
         .join(&project_part);
-    remove_conversation_worktrees(&repo, &worktree_root, workspace_root, &mut result)?;
+    let protected_worktree =
+        remove_conversation_worktrees(&repo, &worktree_root, workspace_root, &mut result)?;
+    if protected_worktree {
+        result.skipped_paths.push(format!(
+            "PC project cleanup deferred while a worktree lease is active: {}",
+            project_dir.display()
+        ));
+        return Ok(result);
+    }
     remove_managed_path(&project_dir, workspace_root, "PC 项目工作区", &mut result)?;
     Ok(result)
 }
@@ -151,19 +159,30 @@ fn remove_conversation_worktrees(
     worktree_root: &Path,
     root: &Path,
     result: &mut ProjectWorkspaceCleanupResult,
-) -> Result<()> {
+) -> Result<bool> {
     if !worktree_root.exists() {
         result
             .skipped_paths
             .push(format!("会话 worktree 不存在：{}", worktree_root.display()));
-        return Ok(());
+        return Ok(false);
     }
     ensure_within_root(root, worktree_root)?;
+    let mut preserved = false;
     if repo.exists() && is_git_work_tree(repo) {
         for entry in std::fs::read_dir(worktree_root)?.filter_map(|entry| entry.ok()) {
             let path = entry.path();
             if path.is_dir() {
-                let _ = run_git_dynamic(
+                if crate::node_agent_supervision_worktree_lease::worktree_lock_reason(repo, &path)?
+                    .is_some()
+                {
+                    preserved = true;
+                    result.skipped_paths.push(format!(
+                        "conversation worktree cleanup deferred by persistent lease: {}",
+                        path.display()
+                    ));
+                    continue;
+                }
+                let removed = run_git_dynamic(
                     repo,
                     &[
                         "worktree",
@@ -171,12 +190,25 @@ fn remove_conversation_worktrees(
                         "--force",
                         git_path_arg(&path).as_str(),
                     ],
-                );
+                )
+                .is_ok();
+                if !removed && path.exists() {
+                    preserved = true;
+                    result.skipped_paths.push(format!(
+                        "conversation worktree cleanup failed safely: {}",
+                        path.display()
+                    ));
+                }
             }
         }
         let _ = run_git_dynamic(repo, &["worktree", "prune"]);
     }
-    remove_managed_path(worktree_root, root, "会话 worktree", result)
+    if preserved {
+        Ok(true)
+    } else {
+        remove_managed_path(worktree_root, root, "会话 worktree", result)?;
+        Ok(false)
+    }
 }
 
 fn remove_managed_path(

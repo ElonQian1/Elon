@@ -28,7 +28,6 @@ use crate::{
 };
 use pipe_sidecar_runner::run_pipe_json_sidecar;
 
-pub(crate) const SIDECAR_HEARTBEAT_SECS: u64 = 5;
 pub(crate) const SIDECAR_POLL_MS: u64 = 250;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -266,6 +265,30 @@ pub(crate) async fn follow_sidecar_output_from(
     mut on_event: impl FnMut(CliSidecarOutputEvent),
     mut on_cursor: impl FnMut(CliSidecarReplayCursor) -> Result<()>,
 ) -> Result<CliSidecarRunResult> {
+    follow_sidecar_output_from_with_batch(
+        registry,
+        task_id,
+        output_path,
+        initial_cursor,
+        cancel_rx,
+        on_event,
+        |_, cursor| on_cursor(cursor),
+    )
+    .await
+}
+
+pub(crate) async fn follow_sidecar_output_from_with_batch(
+    registry: &CliSidecarRegistry,
+    task_id: &str,
+    output_path: &Path,
+    initial_cursor: CliSidecarReplayCursor,
+    cancel_rx: &mut watch::Receiver<bool>,
+    mut on_event: impl FnMut(CliSidecarOutputEvent),
+    mut persist_batch: impl FnMut(
+        &[crate::node_agent_cli_sidecar_io::CliSidecarOutputRecord],
+        CliSidecarReplayCursor,
+    ) -> Result<()>,
+) -> Result<CliSidecarRunResult> {
     let mut cursor = initial_cursor;
     let mut stdout_text = String::new();
     let mut stderr_text = String::new();
@@ -278,6 +301,9 @@ pub(crate) async fn follow_sidecar_output_from(
         let records = read_new_output_records(output_path, &mut cursor.offset)?;
         cursor.sequence = cursor.sequence.saturating_add(records.len() as u64);
         let read_records = !records.is_empty();
+        if read_records {
+            persist_batch(&records, cursor)?;
+        }
         for record in records {
             match record.record_type.as_str() {
                 "chunk" => {
@@ -337,10 +363,6 @@ pub(crate) async fn follow_sidecar_output_from(
                 terminal_error,
             });
         }
-        if read_records {
-            on_cursor(cursor)?;
-        }
-
         tokio::select! {
             changed = cancel_rx.changed() => {
                 if changed.is_ok() && *cancel_rx.borrow() {

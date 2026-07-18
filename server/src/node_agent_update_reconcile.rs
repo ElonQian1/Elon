@@ -191,25 +191,34 @@ async fn spawn_sidecar_monitor(
             sequence: receipt.sidecar_output_sequence,
         };
         let session_id = sidecar.session_id.clone();
-        let result = crate::node_agent_cli_sidecar_runner::follow_sidecar_output_from(
+        let result = crate::node_agent_cli_sidecar_runner::follow_sidecar_output_from_with_batch(
             &runtime.cli_sidecars,
             &task.task_id,
             &output_path,
             initial_cursor,
             &mut cancel_rx,
             |_| {},
-            |cursor| {
-                runtime.cli_sidecars.record_output_cursor(
+            |records, cursor| {
+                crate::node_agent_sidecar_recovery_replay::persist_batch_before_cursor(
+                    &runtime.task_journal,
                     &task.task_id,
                     &session_id,
-                    cursor.offset,
-                    cursor.sequence,
-                )?;
-                runtime.update_recovery.record_sidecar_cursor(
-                    &update_id,
-                    &original_task_id,
-                    cursor.offset,
-                    cursor.sequence,
+                    records,
+                    cursor,
+                    |cursor| {
+                        runtime.cli_sidecars.record_output_cursor(
+                            &task.task_id,
+                            &session_id,
+                            cursor.offset,
+                            cursor.sequence,
+                        )?;
+                        runtime.update_recovery.record_sidecar_cursor(
+                            &update_id,
+                            &original_task_id,
+                            cursor.offset,
+                            cursor.sequence,
+                        )
+                    },
                 )
             },
         )
@@ -239,21 +248,23 @@ async fn spawn_sidecar_monitor(
                     .ok()
                     .and_then(|snapshot| snapshot.record)
                     .and_then(|record| record.codex_session_id);
-                let journal_output = runtime
-                    .task_journal
-                    .completion_output(&task.task_id, 200_000)
-                    .unwrap_or_default();
-                let stdout = if journal_output.trim().is_empty() {
-                    result.stdout_text.as_str()
-                } else {
-                    journal_output.as_str()
-                };
+                let (stdout, stderr) =
+                    crate::node_agent_sidecar_recovery_replay::recovered_completion_output(
+                        &runtime.task_journal,
+                        &task.task_id,
+                        &output_path,
+                        200_000,
+                    )
+                    .unwrap_or_else(|error| {
+                        warn!(%error, task_id = %task.task_id, "failed to merge recovery transcript");
+                        (result.stdout_text.clone(), result.stderr_text.clone())
+                    });
                 let (done, output) = cli_done_message_from_output(
                     task.task_id.clone(),
                     success,
                     error,
-                    stdout,
-                    &result.stderr_text,
+                    &stdout,
+                    &stderr,
                     None,
                     workspace_status,
                     session_id,

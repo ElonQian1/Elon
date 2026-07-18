@@ -80,29 +80,38 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
     let receipt_for_cursor = runtime.update_recovery.receipt_for_task(&task.task_id)?;
     let initial_cursor = CliSidecarReplayCursor::default();
     let session_id = session.session_id.clone();
-    let result = crate::node_agent_cli_sidecar_runner::follow_sidecar_output_from(
+    let result = crate::node_agent_cli_sidecar_runner::follow_sidecar_output_from_with_batch(
         &runtime.cli_sidecars,
         &task.task_id,
         output_path,
         initial_cursor,
         &mut cancel_rx,
         |_| {},
-        |cursor| {
-            runtime.cli_sidecars.record_output_cursor(
+        |records, cursor| {
+            crate::node_agent_sidecar_recovery_replay::persist_batch_before_cursor(
+                &runtime.task_journal,
                 &task.task_id,
                 &session_id,
-                cursor.offset,
-                cursor.sequence,
-            )?;
-            if let Some(receipt) = receipt_for_cursor.as_ref() {
-                runtime.update_recovery.record_sidecar_cursor(
-                    &receipt.update_id,
-                    &receipt.original_task_id,
-                    cursor.offset,
-                    cursor.sequence,
-                )?;
-            }
-            Ok(())
+                records,
+                cursor,
+                |cursor| {
+                    runtime.cli_sidecars.record_output_cursor(
+                        &task.task_id,
+                        &session_id,
+                        cursor.offset,
+                        cursor.sequence,
+                    )?;
+                    if let Some(receipt) = receipt_for_cursor.as_ref() {
+                        runtime.update_recovery.record_sidecar_cursor(
+                            &receipt.update_id,
+                            &receipt.original_task_id,
+                            cursor.offset,
+                            cursor.sequence,
+                        )?;
+                    }
+                    Ok(())
+                },
+            )
         },
     )
     .await?;
@@ -119,21 +128,18 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
             })
         })
     };
-    let journal_output = runtime
-        .task_journal
-        .completion_output(&task.task_id, 200_000)
-        .unwrap_or_default();
-    let stdout = if journal_output.trim().is_empty() {
-        result.stdout_text
-    } else {
-        journal_output
-    };
+    let (stdout, stderr) = crate::node_agent_sidecar_recovery_replay::recovered_completion_output(
+        &runtime.task_journal,
+        &task.task_id,
+        output_path,
+        200_000,
+    )?;
     let (done, combined_output) = cli_done_message_from_output(
         task.task_id.clone(),
         exit_ok,
         error,
         &stdout,
-        &result.stderr_text,
+        &stderr,
         None,
         recovered_workspace_status(&task, &session),
         runtime

@@ -446,17 +446,27 @@ function Assert-SafeResumeParentDetail {
         [string](Get-ObjectField $contract 'protocol') -ne $script:SupervisionProtocol) {
         throw 'Resume requires a parent task with the current desktop supervision protocol.'
     }
+    $resumeStatus = Get-ObjectField $ParentDetail 'resume_workspace_status'
+    $derivation = [string](Get-ObjectField $resumeStatus 'derivation')
+    $allowedDerivations = @(
+        'workspace_status',
+        'legacy_started_cwd_git_registry',
+        'platform_receipt_commit_rebuild_available'
+    )
+    if ((Get-ObjectField $resumeStatus 'eligible') -ne $true -or
+        $allowedDerivations -notcontains $derivation -or
+        (Get-ObjectField $resumeStatus 'occupied') -eq $true -or
+        [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'active_workspace_path')) -or
+        [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'branch')) -or
+        [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'git_head'))) {
+        throw 'Resume requires the current node to validate an eligible isolated parent worktree.'
+    }
     $workspaceStatus = Get-ObjectField $record 'workspace_status'
     if ((Get-ObjectField $workspaceStatus 'isolated') -ne $true -or
         [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'base_workspace_path')) -or
         [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'active_workspace_path')) -or
         [string]::IsNullOrWhiteSpace([string](Get-ObjectField $workspaceStatus 'branch'))) {
-        $resumeStatus = Get-ObjectField $ParentDetail 'resume_workspace_status'
-        if ((Get-ObjectField $resumeStatus 'eligible') -ne $true -or
-            [string](Get-ObjectField $resumeStatus 'derivation') -ne 'legacy_started_cwd_git_registry' -or
-            [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'active_workspace_path')) -or
-            [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'branch')) -or
-            [string]::IsNullOrWhiteSpace([string](Get-ObjectField $resumeStatus 'git_head'))) {
+        if ($derivation -ne 'legacy_started_cwd_git_registry') {
             throw 'Resume requires a node-validated isolated parent worktree.'
         }
     }

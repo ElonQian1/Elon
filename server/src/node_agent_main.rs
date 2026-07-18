@@ -102,6 +102,7 @@ mod node_agent_lifecycle;
 mod node_agent_local_admin;
 mod node_agent_local_llm;
 mod node_agent_local_task_resume;
+mod node_agent_local_task_resume_rebuild;
 mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
@@ -134,6 +135,8 @@ mod node_agent_session;
 mod node_agent_session_cancel;
 mod node_agent_shared_android_devices;
 mod node_agent_sidecar_recovery;
+mod node_agent_sidecar_recovery_replay;
+mod node_agent_supervision_worktree_lease;
 use node_agent_session::run_session;
 #[cfg(test)]
 mod node_agent_task_approval_cleanup_tests;

@@ -16,12 +16,53 @@ use crate::{
     pc_workspace_provisioner::ConversationWorkspaceResult,
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ResumeWorkspaceMode {
+    Inspect,
+    Acquire,
+}
+
 #[derive(Debug)]
 pub(crate) struct ResolvedResumeWorkspace {
     pub authorized_workspace_path: String,
     pub inherited_workspace: ConversationWorkspaceResult,
     pub derivation: String,
     pub git_head: String,
+    pub requires_recreation: bool,
+}
+
+pub(crate) fn resolve_resume_workspace(
+    contract: &SupervisionContract,
+    parent: &LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
+    requested_project_id: &str,
+    requested_workspace_path: &str,
+    receipt: Option<&crate::node_agent_update_recovery::UpdateRecoveryReceipt>,
+    mode: ResumeWorkspaceMode,
+) -> Result<ResolvedResumeWorkspace> {
+    match validate_resume_workspace(
+        contract,
+        parent,
+        journal_record,
+        requested_project_id,
+        requested_workspace_path,
+    ) {
+        Ok(workspace) => Ok(workspace),
+        Err(existing_error) => {
+            let Some(receipt) = receipt else {
+                return Err(existing_error);
+            };
+            crate::node_agent_local_task_resume_rebuild::resolve_recycled_resume_workspace(
+                contract,
+                parent,
+                requested_project_id,
+                requested_workspace_path,
+                receipt,
+                mode,
+            )
+            .with_context(|| format!("existing worktree unavailable: {existing_error}"))
+        }
+    }
 }
 
 pub(crate) fn validate_resume_workspace(
@@ -116,6 +157,7 @@ pub(crate) fn validate_resume_workspace(
         },
         derivation,
         git_head,
+        requires_recreation: false,
     })
 }
 
@@ -199,6 +241,15 @@ fn validate_git_worktree_identity(
     let head = git_output(active, &["rev-parse", "--verify", "HEAD^{commit}"])?;
     if head.trim().is_empty() {
         bail!("父任务活动 worktree 缺少可验证 HEAD。");
+    }
+    if !git_output(
+        active,
+        &["status", "--porcelain=v1", "--untracked-files=all"],
+    )?
+    .trim()
+    .is_empty()
+    {
+        bail!("refusing to resume a dirty worktree with uncommitted changes");
     }
 
     let worktree_list = git_output(base, &["worktree", "list", "--porcelain"])?;

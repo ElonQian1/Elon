@@ -68,10 +68,16 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
     let mut child_exit_observed_at = None;
     let mut canceled = false;
     let mut timed_out = false;
-    let mut heartbeat = tokio::time::interval(Duration::from_secs(SIDECAR_HEARTBEAT_SECS));
+    let runtime_policy = config.runtime_policy.clone().unwrap_or_else(|| {
+        crate::node_agent_cli_runtime_policy::CliRuntimePolicy::fixed(config.timeout_secs.max(1))
+    });
+    let mut heartbeat =
+        tokio::time::interval(Duration::from_secs(runtime_policy.heartbeat_secs.max(1)));
     let mut mailbox = tokio::time::interval(Duration::from_millis(SIDECAR_POLL_MS));
-    let timeout = tokio::time::sleep(Duration::from_secs(config.timeout_secs.max(1)));
-    tokio::pin!(timeout);
+    let total_deadline =
+        tokio::time::Instant::now() + Duration::from_secs(runtime_policy.total_timeout_secs.max(1));
+    let mut idle_deadline =
+        tokio::time::Instant::now() + Duration::from_secs(runtime_policy.idle_timeout_secs.max(1));
 
     let success = loop {
         tokio::select! {
@@ -103,21 +109,43 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
                     }
                 }
             }
-            _ = &mut timeout, if !timed_out => {
+            _ = tokio::time::sleep_until(total_deadline), if !timed_out => {
                 timed_out = true;
-                canceled = true;
                 let _ = pty.kill();
                 append_output(
                     &config.output_path,
                     CliSidecarOutputRecord::error(format!(
-                        "{} sidecar 执行超时（超过 {} 秒）",
-                        config.cli_name, config.timeout_secs
+                        "{} sidecar 达到总时限（{} 秒）",
+                        config.cli_name, runtime_policy.total_timeout_secs
+                    )),
+                )?;
+            }
+            _ = tokio::time::sleep_until(idle_deadline), if runtime_policy.progress_aware && !timed_out => {
+                timed_out = true;
+                let _ = pty.kill();
+                append_output(
+                    &config.output_path,
+                    CliSidecarOutputRecord::error(format!(
+                        "{} sidecar 空闲超时（连续 {} 秒没有输出、命令或文件进展）",
+                        config.cli_name, runtime_policy.idle_timeout_secs
                     )),
                 )?;
             }
             event = pty_output_rx.recv() => {
                 match event {
                     Some(CliPtyEvent::Output(text)) => {
+                        let observation = crate::node_agent_cli_output_aggregate::progress_observation(
+                            &text.replace("\x1b[6n", ""),
+                        );
+                        if observation.progress {
+                            idle_deadline = tokio::time::Instant::now()
+                                + Duration::from_secs(runtime_policy.idle_timeout_secs.max(1));
+                            task_journal.record_runtime_progress(
+                                &config.task_id,
+                                observation.phase.as_deref().unwrap_or("reasoning"),
+                                observation.current_command.as_deref(),
+                            )?;
+                        }
                         write_pty_chunk(
                             &config,
                             &task_journal,
@@ -157,7 +185,9 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
         }
     };
 
-    let state = if canceled {
+    let state = if timed_out {
+        "failed"
+    } else if canceled {
         "canceled"
     } else if success {
         "finished"

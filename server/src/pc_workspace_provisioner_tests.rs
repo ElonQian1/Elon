@@ -1,7 +1,8 @@
 use super::{
-    conversation_workspace_head_landed, ensure_conversation_workspace_committed, git_output,
-    git_path_arg, is_git_work_tree, is_retryable_push_rejection, merge_conversation_workspace,
-    prepare_conversation_workspace_in, recover_stale_conversation_worktree_path, worktree_clean,
+    cleanup_project_workspace_in, conversation_workspace_head_landed,
+    ensure_conversation_workspace_committed, git_output, git_path_arg, is_git_work_tree,
+    is_retryable_push_rejection, merge_conversation_workspace, prepare_conversation_workspace_in,
+    recover_stale_conversation_worktree_path, worktree_clean,
 };
 use elon_pc_dev_runtime::safe_path_part;
 use std::fs;
@@ -289,6 +290,60 @@ fn conversation_workspace_head_landed_checks_origin_main() {
         .expect("unlanded probe should succeed"));
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn project_cleanup_preserves_supervision_leased_worktree_and_base_repo() {
+    let temp = std::env::temp_dir().join(format!(
+        "elon_supervision_cleanup_{}",
+        Uuid::new_v4().simple()
+    ));
+    let project_dir = temp.join("user-a").join("project-a");
+    let base = project_dir.join("repo");
+    let active = temp
+        .join("conversation-worktrees")
+        .join("project-a")
+        .join("conversation-a");
+    fs::create_dir_all(&base).expect("base should create");
+    run_git(&base, &["init"]);
+    run_git(&base, &["config", "user.email", "ai@example.test"]);
+    run_git(&base, &["config", "user.name", "AI Test"]);
+    fs::write(base.join("README.md"), "seed\n").expect("seed should write");
+    run_git(&base, &["add", "README.md"]);
+    run_git(&base, &["commit", "-m", "seed"]);
+    fs::create_dir_all(active.parent().unwrap()).expect("worktree root should create");
+    let active_arg = active.to_string_lossy().to_string();
+    run_git(
+        &base,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "ai/session/project-a/conversation-a",
+            &active_arg,
+            "HEAD",
+        ],
+    );
+    crate::node_agent_supervision_worktree_lease::acquire(&base, &active, "root-1")
+        .expect("lease should persist");
+
+    let protected =
+        cleanup_project_workspace_in(&temp, "project-a", base.to_string_lossy().as_ref())
+            .expect("cleanup should defer safely");
+    assert!(base.exists());
+    assert!(active.exists());
+    assert!(protected
+        .skipped_paths
+        .iter()
+        .any(|message| message.contains("persistent lease")));
+
+    crate::node_agent_supervision_worktree_lease::release(&base, &active, "root-1")
+        .expect("accepted review should release lease");
+    cleanup_project_workspace_in(&temp, "project-a", base.to_string_lossy().as_ref())
+        .expect("cleanup should complete after acceptance");
+    assert!(!project_dir.exists());
+    assert!(!active.exists());
+    let _ = fs::remove_dir_all(temp);
 }
 
 fn run_git(repo: &Path, args: &[&str]) {

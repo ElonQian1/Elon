@@ -446,17 +446,22 @@ async fn resolve_supervised_resume_workspace(
         }
         Err(error) => return Err(internal_error(error)),
     }
-    let resolved = crate::node_agent_local_task_resume::validate_resume_workspace(
+    let journal_snapshot = runtime
+        .task_journal
+        .snapshot(&parent.task_id, 0, 1)
+        .map_err(internal_error)?;
+    let receipt = runtime
+        .update_recovery
+        .receipt_for_task(&parent.task_id)
+        .map_err(internal_error)?;
+    let mut resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
         contract,
         &parent,
-        runtime
-            .task_journal
-            .snapshot(&parent.task_id, 0, 1)
-            .map_err(internal_error)?
-            .record
-            .as_ref(),
+        journal_snapshot.record.as_ref(),
         project_id,
         requested_workspace_path,
+        receipt.as_ref(),
+        crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     )
     .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
 
@@ -483,25 +488,39 @@ async fn resolve_supervised_resume_workspace(
     .await
     .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
 
-    if !runtime
-        .active_cli_prompt_views_for_workspace(FsPath::new(
-            &resolved.inherited_workspace.workspace_path,
-        ))
-        .await
-        .is_empty()
+    if !resolved.requires_recreation
+        && !runtime
+            .active_cli_prompt_views_for_workspace(FsPath::new(
+                &resolved.inherited_workspace.workspace_path,
+            ))
+            .await
+            .is_empty()
     {
         return Err(json_error(
             StatusCode::CONFLICT,
             "父任务隔离 worktree 已被活跃任务占用，已拒绝续跑。",
         ));
     }
-    if live_sidecar_occupies_workspace(runtime, &resolved.inherited_workspace.workspace_path)
-        .map_err(internal_error)?
+    if !resolved.requires_recreation
+        && live_sidecar_occupies_workspace(runtime, &resolved.inherited_workspace.workspace_path)
+            .map_err(internal_error)?
     {
         return Err(json_error(
             StatusCode::CONFLICT,
             "父任务隔离 worktree 仍被存活 sidecar 占用，已拒绝续跑。",
         ));
+    }
+    if resolved.requires_recreation {
+        resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
+            contract,
+            &parent,
+            journal_snapshot.record.as_ref(),
+            project_id,
+            requested_workspace_path,
+            receipt.as_ref(),
+            crate::node_agent_local_task_resume::ResumeWorkspaceMode::Acquire,
+        )
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     }
     Ok(Some(resolved))
 }
@@ -524,25 +543,34 @@ async fn inspect_resume_workspace_status(
         acceptance_criteria: Vec::new(),
         improvement_policy: "after_task_or_unblock".to_string(),
     };
-    match crate::node_agent_local_task_resume::validate_resume_workspace(
+    let receipt = runtime
+        .update_recovery
+        .receipt_for_task(&parent.task_id)
+        .ok()
+        .flatten();
+    match crate::node_agent_local_task_resume::resolve_resume_workspace(
         &contract,
         parent,
         journal_record,
         &parent.project_id,
         &parent.workspace_path,
+        receipt.as_ref(),
+        crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     ) {
         Ok(resolved) => {
-            let prompt_occupied = !runtime
-                .active_cli_prompt_views_for_workspace(FsPath::new(
+            let prompt_occupied = !resolved.requires_recreation
+                && !runtime
+                    .active_cli_prompt_views_for_workspace(FsPath::new(
+                        &resolved.inherited_workspace.workspace_path,
+                    ))
+                    .await
+                    .is_empty();
+            let sidecar_occupied = !resolved.requires_recreation
+                && live_sidecar_occupies_workspace(
+                    runtime,
                     &resolved.inherited_workspace.workspace_path,
-                ))
-                .await
-                .is_empty();
-            let sidecar_occupied = live_sidecar_occupies_workspace(
-                runtime,
-                &resolved.inherited_workspace.workspace_path,
-            )
-            .unwrap_or(true);
+                )
+                .unwrap_or(true);
             json!({
                 "eligible": !prompt_occupied && !sidecar_occupied,
                 "derivation": resolved.derivation,
@@ -551,6 +579,7 @@ async fn inspect_resume_workspace_status(
                 "branch": resolved.inherited_workspace.branch,
                 "git_head": resolved.git_head,
                 "occupied": prompt_occupied || sidecar_occupied,
+                "requires_recreation": resolved.requires_recreation,
             })
         }
         Err(error) => json!({"eligible": false, "reason": error.to_string()}),
