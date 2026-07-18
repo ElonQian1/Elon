@@ -228,6 +228,25 @@ try {
   assert.match(inspectorSource, /PWA 目标/)
   assert.match(inspectorSource, /APK 目标/)
 
+  const previewSurfaceSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'),
+    'utf8',
+  )
+  const previewSurfaceCss = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreview.module.css'),
+    'utf8',
+  )
+  assert.match(
+    previewSurfaceSource,
+    /className=\{styles\.pwaDraftBadge\}>[^<]+<\/div>\s*<div className=\{styles\.pwaDeviceViewport\}[^>]*>\s*<iframe/,
+    '设计模式与正常交互模式必须共用 badge 在外、iframe 独占 viewport 的非覆盖布局',
+  )
+  for (const className of ['pwaWorkflowGuide', 'pwaPreviewToolbar', 'pwaRouteStatus', 'pwaDraftBadge']) {
+    const rule = previewSurfaceCss.match(new RegExp(`\\.${className}\\s*\\{[^}]*\\}`))?.[0] ?? ''
+    assert.ok(rule, `${className} 必须保留明确布局规则`)
+    assert.doesNotMatch(rule, /position\s*:\s*(?:absolute|fixed|sticky)/, `${className} 不得覆盖 iframe 真实内容`)
+  }
+
   console.log('pwa design artifact: all assertions passed')
 } finally {
   delete global.window

@@ -8,6 +8,7 @@ const mobileWeb = fs.readFileSync(path.join(repoRoot, 'server/src/assets/web_pag
 const authBootstrap = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_auth_bootstrap.js'), 'utf8');
 const bridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_bridge.js'), 'utf8');
 const previewSurface = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'), 'utf8');
+const previewSurfaceCss = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/SourcePreview.module.css'), 'utf8');
 const draftContract = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/pwaDesignDraft.ts'), 'utf8');
 const designSessionModel = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/pwaDesignSessionModel.ts'), 'utf8');
 const designSession = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/usePwaDesignSession.ts'), 'utf8');
@@ -42,6 +43,18 @@ assert.equal((designSession.match(/window\.addEventListener\('message'/g) || [])
 assert.match(designSession, /const bridgeContextRef = useRef\([\s\S]*window\.addEventListener\('message', receive\)[\s\S]*window\.removeEventListener\('message', receive\)\s*\n\s*}, \[\]\)/, 'PC session listener should stay installed while refs provide current render state');
 assert.ok(previewSurface.includes('key={reloadKey}'), 'iframe reloads must remain explicit and independent of design mode');
 assert.ok(previewSurface.includes('开始设计/修改页面'), 'manual design mode should have one clear Chinese entry point');
+const layoutOrder = ['pwaWorkflowGuide', 'pwaPreviewToolbar', 'pwaRouteStatus', 'pwaDraftBadge', 'pwaDeviceViewport', 'pwaDeviceFrame']
+  .map((className) => previewSurface.indexOf(`styles.${className}`));
+assert.ok(layoutOrder.every((index) => index >= 0), 'PWA preview chrome and iframe must all remain rendered');
+assert.deepEqual([...layoutOrder].sort((left, right) => left - right), layoutOrder, 'workflow, toolbar, route, and badge must stay before the iframe viewport in normal flow');
+assert.match(previewSurface, /className=\{styles\.pwaDraftBadge\}>[^<]+<\/div>\s*<div className=\{styles\.pwaDeviceViewport\}/, 'the draft badge must be a sibling before the iframe viewport');
+assert.match(previewSurface, /className=\{styles\.pwaDeviceViewport\}[^>]*>\s*<iframe/, 'the iframe viewport must not contain overlay chrome above the real page');
+for (const className of ['pwaWorkflowGuide', 'pwaPreviewToolbar', 'pwaRouteStatus', 'pwaDraftBadge']) {
+  const rule = previewSurfaceCss.match(new RegExp(`\\.${className}\\s*\\{[^}]*\\}`))?.[0] ?? '';
+  assert.ok(rule, `${className} should keep an explicit layout rule`);
+  assert.doesNotMatch(rule, /position\s*:\s*(?:absolute|fixed|sticky)/, `${className} must not overlay the iframe`);
+  assert.doesNotMatch(rule, /(?:top|margin-top)\s*:\s*-/, `${className} must not use a negative top offset toward the iframe`);
+}
 assert.ok(!bridge.includes("document.addEventListener('pointerover'"), 'PWA selection must not recalculate layout on every mouse hover');
 assert.ok(!bridge.includes("String(element.innerText || element.textContent || '')"), 'PWA selection must not read a large container innerText on every click');
 assert.ok(draftContract.includes("kind: 'elon.pwa.manual_style_draft'"), 'PC should persist a typed manual PWA draft contract');
@@ -185,6 +198,15 @@ function runBridgeBehavior() {
   assert.equal(posted.filter((message) => message.type === 'ready').length, 1, 'bridge should emit one ready event');
   assert.equal(posted.filter((message) => message.type === 'route-changed').length, 1, 'bridge should emit one initial route event');
 
+  let interactionPrevented = false;
+  documentListeners.get('click')[0]({
+    target: title,
+    preventDefault() { interactionPrevented = true; },
+    stopImmediatePropagation() {},
+  });
+  assert.equal(interactionPrevented, false, 'the iframe top title must remain clickable in normal interaction mode');
+  assert.equal(posted.filter((message) => message.type === 'selection').length, 0, 'normal interaction must not turn a top-title click into a design selection');
+
   const command = (type, payload) => windowListeners.get('message')[0]({
     origin: window.location.origin,
     source: parent,
@@ -198,7 +220,7 @@ function runBridgeBehavior() {
   command('set-mode', { mode: 'select' });
   const click = { target: title, preventDefault() {}, stopImmediatePropagation() {} };
   documentListeners.get('click')[0](click);
-  assert.equal(posted.filter((message) => message.type === 'selection').length, 1, 'one click should produce one selection');
+  assert.equal(posted.filter((message) => message.type === 'selection').length, 1, 'the iframe top title must remain clickable and selectable in design mode');
 
   const messagesBeforeStyle = posted.length;
   command('apply-style', { selector: '#topTitle', style: { fontSize: '22px' } });

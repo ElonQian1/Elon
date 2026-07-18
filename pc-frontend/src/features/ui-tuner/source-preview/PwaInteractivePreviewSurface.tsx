@@ -43,8 +43,8 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
       </div>
       {route && <div className={styles.pwaRouteStatus}>当前真实页面：<code>{route.path}{route.search}{route.hash}</code> · {route.viewport.width}×{route.viewport.height}</div>}
       {design.mode === 'select' && design.unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{design.unboundLabel}”；当前用可解释 DOM 路径保存，尚未假定它已绑定 Android 源码。</div>}
+      <div className={styles.pwaDraftBadge}>真实 PWA 页面 · 手工草稿</div>
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>
-        <div className={styles.pwaDraftBadge}>真实 PWA 页面 · 手工草稿</div>
         <iframe key={reloadKey} ref={design.iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url)} title="移动 PWA 真实页面" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} />
       </div>
     </div>
