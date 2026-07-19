@@ -22,7 +22,7 @@ Android APK / Web UI
 1. 用户在 APK 或 Web 里通过多轮讨论表达自然语言需求。
 2. 后端识别项目、用户、会话、模型配置以及需求成熟度。
 3. 对目标仍不清晰、改动成本高或存在多个产品方向的需求，调用预言家 AI 生成低成本 demo、页面草图、用户流程和待确认问题；明确的小改动跳过该阶段。
-4. 用户确认方向后，Group AI Coordinator 生成 Matter，Skill Router 从官方或已审核 Skill 中选择能力组合，并说明选择理由、成本和风险。
+4. 用户确认方向后，Group AI Coordinator 生成 Matter，Skill Router 从平台维护的内部官方 Skill 中选择能力组合，并说明选择理由、成本和风险；Skill Registry 是内部基础设施，不是对外市场。
 5. AI CLI、API agent 或 Worker Bot 在真实 Git 隔离工作区执行任务。
 6. context compiler 为不同角色生成裁剪后的 repo map、symbol index、task pack 和验证线索。
 7. AI 修改代码后由 Reviewer / Verifier 执行最小有效验证和独立审查。

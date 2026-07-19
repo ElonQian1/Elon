@@ -220,7 +220,7 @@ ELON_NODE_WORKSPACE_ROOT/
 - Taste：不同项目成员喜欢或拒绝的实现风格、UI 风格、命名习惯、审核偏好。
 - Skill：可复用任务模板、测试清单、发布清单、项目专属 agent 指令。
 
-MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。项目内沉淀的 Skill 经过脱敏、测试、权限审计和作者确认后，才允许升级为平台 Skill；不能自动把用户私有项目经验公开到市场。
+MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。项目内沉淀的 Skill 默认只属于该项目；只有平台团队明确接管并完成脱敏、测试和权限审计后，才允许升级为内部官方 Skill。Skill 不公开上架，也不进入交易市场。
 
 ### R9. 预言家 AI 与 demo 预演
 
@@ -454,7 +454,7 @@ POST /api/project-worktrees/dispose
 - 建立 3 至 5 个官方 Skill manifest，覆盖页面原型、项目初始化、UI 实现、测试和发布检查。
 - 让总调度 AI 输出需求成熟度，并决定跳过 demo、生成 demo 或继续讨论。
 - demo 经用户确认后再创建 Matter；记录确认、打回和放弃原因。
-- Skill Router 只给出官方 Skill 建议，不开放第三方交易。
+- Skill Router 只使用平台维护的内部官方 Skill；不开放第三方提交、上架或交易。
 
 ### 阶段 1：单项目、多成员授权节点、多 Bot
 
@@ -500,13 +500,12 @@ POST /api/project-worktrees/dispose
 - 成功流程沉淀为项目 Skill。
 - 新 Bot 加入项目时自动读取项目 Taste / Skill。
 
-### 阶段 5：Skill 仓库与分发
+### 阶段 5：内部 Skill 治理与应用分发
 
 - 把验证通过的官方 Skill 升级为版本化 Skill Registry。
-- 增加安装、依赖、兼容性、安全审核、调用记录和质量评分。
-- 邀请制开放创作者提交，先审核后上架。
-- 支持按次、订阅或项目授权计费，模型/节点成本与 Skill 价值分开记录。
-- 长期将 Skill 生成的应用、模板和插件接入版本分发、更新和二次创作体系。
+- 增加内部安装、依赖、兼容性、安全审核、调用记录、质量评分和回滚能力。
+- 官方 Skill 只由平台团队维护，不接收第三方上架，不设置 Skill 价格、订阅或创作者结算。
+- 长期将 Skill 生成的应用、模板和插件接入独立的版本分发、更新和二次创作体系；分发对象不包含 Skill 本身。
 
 ## 7. 权限、安全和成本
 
