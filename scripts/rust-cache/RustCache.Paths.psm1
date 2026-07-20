@@ -61,12 +61,12 @@ function Resolve-RustCacheRoot {
     } elseif (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_DATA_ROOT)) {
         $candidate = Join-Path $env:ELON_NODE_DATA_ROOT.Trim() "cache\rust-cache-v2"
         $source = "ELON_NODE_DATA_ROOT"
-    } elseif ($persistedNodeDataRoot = Get-RustCachePersistedNodeDataRoot) {
-        $candidate = Join-Path $persistedNodeDataRoot "cache\rust-cache-v2"
-        $source = "persisted node_data_root"
     } elseif (-not [string]::IsNullOrWhiteSpace($env:RUST_SHARED_BUILD_ROOT)) {
         $candidate = Join-Path $env:RUST_SHARED_BUILD_ROOT.Trim() "rust-cache-v2"
         $source = "RUST_SHARED_BUILD_ROOT"
+    } elseif ($persistedNodeDataRoot = Get-RustCachePersistedNodeDataRoot) {
+        $candidate = Join-Path $persistedNodeDataRoot "cache\rust-cache-v2"
+        $source = "persisted node_data_root"
     } elseif (Test-Path -LiteralPath "D:\rust\shared") {
         $candidate = "D:\rust\shared\rust-cache-v2"
         $source = "D drive convention"

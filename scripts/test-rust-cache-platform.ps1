@@ -88,22 +88,37 @@ try {
         New-Item -ItemType Directory -Force -Path $nodeConfigRoot, $persistedNodeRoot | Out-Null
         '{}' | Set-Content -LiteralPath (Join-Path $persistedNodeRoot ".elon-node-data-root.json") -Encoding UTF8
         @{ node_data_root = $persistedNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        $sharedPreferred = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
+        Assert-Equal (Join-Path $env:RUST_SHARED_BUILD_ROOT "rust-cache-v2") $sharedPreferred "explicit shared build root should precede persisted node data root"
+
+        $env:RUST_SHARED_BUILD_ROOT = $null
         $persistedRoot = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
         Assert-Equal (Join-Path $persistedNodeRoot "cache\rust-cache-v2") $persistedRoot "persisted owned node data root should supply the Rust cache root"
 
+        $persistedFallback = if (Test-Path -LiteralPath "D:\rust\shared") {
+            "D:\rust\shared\rust-cache-v2"
+        } else {
+            Join-Path $env:LOCALAPPDATA "Elon\rust-cache-v2"
+        }
+
         '{broken' | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
         $damagedFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
-        Assert-Equal (Join-Path $env:RUST_SHARED_BUILD_ROOT "rust-cache-v2") $damagedFallback "damaged persisted config should use the existing fallback chain"
+        Assert-Equal $persistedFallback $damagedFallback "damaged persisted config should use the existing fallback chain"
 
         $unownedNodeRoot = Join-Path $TempRoot "unowned-node-data"
         New-Item -ItemType Directory -Force -Path $unownedNodeRoot | Out-Null
         @{ node_data_root = $unownedNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
         $unownedFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
-        Assert-Equal (Join-Path $env:RUST_SHARED_BUILD_ROOT "rust-cache-v2") $unownedFallback "persisted root without ownership marker should use the existing fallback chain"
+        Assert-Equal $persistedFallback $unownedFallback "persisted root without ownership marker should use the existing fallback chain"
+
+        $missingNodeRoot = Join-Path $TempRoot "missing-node-data"
+        @{ node_data_root = $missingNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        $missingFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
+        Assert-Equal $persistedFallback $missingFallback "absolute missing persisted root should use the existing fallback chain"
 
         @{ node_data_root = "relative-node-data" } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
         $relativeFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
-        Assert-Equal (Join-Path $env:RUST_SHARED_BUILD_ROOT "rust-cache-v2") $relativeFallback "relative persisted root should use the existing fallback chain"
+        Assert-Equal $persistedFallback $relativeFallback "relative persisted root should use the existing fallback chain"
     } finally {
         $env:ELON_RUST_CACHE_ROOT = $oldRustRoot; $env:ELON_NODE_DATA_ROOT = $oldNodeRoot
         $env:RUST_SHARED_BUILD_ROOT = $oldSharedRoot; $env:APPDATA = $oldAppData
