@@ -269,6 +269,7 @@ fn legacy_resume_derives_only_from_started_cwd_and_git_registry() {
         started_at_ms: 1,
         updated_at_ms: 2,
         cancel_requested_at_ms: None,
+        cancel_intent: None,
     };
     let resolved = validate_resume_workspace(
         &fixture.contract,

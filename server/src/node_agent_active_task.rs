@@ -40,6 +40,13 @@ pub(crate) struct ActiveCliPromptView {
     pub pending_approvals: Vec<PendingToolApprovalView>,
 }
 
+#[derive(Clone)]
+pub(crate) struct ActiveCliCancelTarget {
+    pub(crate) cancel_tx: watch::Sender<bool>,
+    pub(crate) run_handle_id: String,
+    pub(crate) started_at_ms: u128,
+}
+
 impl ActiveCliPromptHandle {
     pub(crate) fn new(
         req_id: impl Into<String>,
@@ -67,6 +74,14 @@ impl ActiveCliPromptHandle {
 
     pub(crate) fn cancel_tx(&self) -> watch::Sender<bool> {
         self.cancel_tx.clone()
+    }
+
+    pub(crate) fn cancel_target(&self) -> ActiveCliCancelTarget {
+        ActiveCliCancelTarget {
+            cancel_tx: self.cancel_tx(),
+            run_handle_id: self.req_id.clone(),
+            started_at_ms: self.started_at_ms,
+        }
     }
 
     pub(crate) fn with_requires_cloud_control(mut self, required: bool) -> Self {

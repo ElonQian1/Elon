@@ -10,6 +10,7 @@ mod cursor;
 mod recovery;
 
 use anyhow::{Context, Result};
+use homecli_proto::CancelRequestAudit;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -82,6 +83,47 @@ pub(crate) struct TaskJournalRecord {
     pub started_at_ms: u128,
     pub updated_at_ms: u128,
     pub cancel_requested_at_ms: Option<u128>,
+    #[serde(default)]
+    pub cancel_intent: Option<CancelIntentRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct CancelIntentRecord {
+    pub action_id: String,
+    pub task_id: String,
+    pub task_started_at_ms: u128,
+    #[serde(default)]
+    pub run_handle_id: Option<String>,
+    #[serde(default)]
+    pub active_started_at_ms: Option<u128>,
+    #[serde(default)]
+    pub sidecar_session_id: Option<String>,
+    pub audit: CancelRequestAudit,
+    pub created_at_ms: u128,
+    #[serde(default)]
+    pub side_effect: Option<CancelSideEffectCommit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct CancelSideEffectCommit {
+    pub target_kind: String,
+    pub target_id: String,
+    pub committed_at_ms: u128,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CancelIntentTarget {
+    pub run_handle_id: Option<String>,
+    pub active_started_at_ms: Option<u128>,
+    pub sidecar_session_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum PersistCancelIntentOutcome {
+    Pending(CancelIntentRecord),
+    Committed(CancelIntentRecord),
+    Terminal(String),
+    Missing,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -146,6 +188,7 @@ impl TaskJournal {
                 started_at_ms: now,
                 updated_at_ms: now,
                 cancel_requested_at_ms: None,
+                cancel_intent: None,
             };
             registry.insert(start.req_id.to_string(), record);
             self.save_registry(&registry)?;

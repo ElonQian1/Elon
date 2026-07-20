@@ -157,6 +157,7 @@ fn task_resume_view_uses_snapshot_continue_contract() {
         started_at_ms: 100,
         updated_at_ms: 200,
         cancel_requested_at_ms: Some(180),
+        cancel_intent: None,
     });
 
     assert_eq!(view.task_id, "req-detached");
@@ -205,6 +206,7 @@ fn task_resume_view_includes_journal_pending_approvals_without_enabling_clicks()
             started_at_ms: 100,
             updated_at_ms: 200,
             cancel_requested_at_ms: None,
+            cancel_intent: None,
         },
         Some(&approvals),
     );
@@ -345,5 +347,6 @@ fn task_record(req_id: &str, updated_at_ms: u128) -> TaskJournalRecord {
         started_at_ms: updated_at_ms.saturating_sub(10),
         updated_at_ms,
         cancel_requested_at_ms: Some(updated_at_ms.saturating_sub(1)),
+        cancel_intent: None,
     }
 }

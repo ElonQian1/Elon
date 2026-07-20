@@ -232,7 +232,7 @@ impl LocalTaskStore {
                 AND (?18 IS NULL OR agent_id = ?18)
                 AND (?19 IS NULL OR install_id = ?19)
                 AND (completion_event_id IS NULL OR completion_event_id = ?12)
-                AND status IN ('running','recovering','reattaching','interrupted','canceled','done','failed','resume_required')",
+                AND status IN ('running','recovering','reattaching','interrupted','cancel_requested','canceled','done','failed','resume_required')",
             params![
                 terminal_status,
                 completion.error,
@@ -355,15 +355,15 @@ impl LocalTaskStore {
         )? > 0)
     }
 
-    pub(crate) fn mark_canceled(&self, owner_user_id: &str, task_id: &str) -> Result<bool> {
-        let changed = self.open()?.execute(
+    pub(crate) fn mark_cancel_requested(&self, task_id: &str) -> Result<bool> {
+        Ok(self.open()?.execute(
             "UPDATE local_tasks
-                SET status = 'canceled', error = '用户已停止本机任务',
-                    finished_at_ms = ?1, sync_state = 'local_only'
-              WHERE owner_user_id = ?2 AND task_id = ?3 AND status = 'running'",
-            params![now_ms(), owner_user_id, task_id],
-        )?;
-        Ok(changed > 0)
+                SET status = 'cancel_requested', error = '取消请求已持久化，正在等待执行器确认终态',
+                    finished_at_ms = NULL, sync_state = 'local_only'
+              WHERE task_id = ?1 AND completion_event_id IS NULL
+                AND status IN ('running','recovering','reattaching','interrupted','resume_required')",
+            params![task_id],
+        )? > 0)
     }
 
     pub(crate) fn mark_synced(&self, event_id: &str) -> Result<bool> {
@@ -701,7 +701,7 @@ mod tests {
     }
 
     #[test]
-    fn local_tasks_are_partitioned_by_owner_and_terminal_is_cas() {
+    fn local_tasks_are_partitioned_and_cancel_intent_stays_nonterminal() {
         let store = test_store("partition");
         store
             .create(LocalTaskStart {
@@ -719,16 +719,11 @@ mod tests {
             })
             .unwrap();
         assert!(store.get_for_owner("usr-b", "local-1").unwrap().is_none());
-        assert!(store.mark_canceled("usr-a", "local-1").unwrap());
-        assert!(!store.mark_canceled("usr-a", "local-1").unwrap());
-        assert_eq!(
-            store
-                .get_for_owner("usr-a", "local-1")
-                .unwrap()
-                .unwrap()
-                .status,
-            "canceled"
-        );
+        assert!(store.mark_cancel_requested("local-1").unwrap());
+        assert!(!store.mark_cancel_requested("local-1").unwrap());
+        let pending = store.get_for_owner("usr-a", "local-1").unwrap().unwrap();
+        assert_eq!(pending.status, "cancel_requested");
+        assert!(pending.finished_at_ms.is_none());
     }
 
     #[test]

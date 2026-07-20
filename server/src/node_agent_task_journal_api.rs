@@ -57,14 +57,6 @@ struct LocalTaskJournalResponse {
     runtime: serde_json::Value,
 }
 
-#[derive(Debug, Serialize)]
-struct LocalTaskCancelResponse {
-    ok: bool,
-    task_id: String,
-    status: &'static str,
-    message: &'static str,
-}
-
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
         .route("/api/task-journal", get(list_task_journal))
@@ -184,37 +176,65 @@ async fn cancel_task_journal(
         "task_journal_api",
         "operator_requested",
     );
-    let signaled = runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await;
-    let durable_intent = runtime
-        .task_journal
-        .snapshot(&task_id, 0, 1)
-        .ok()
-        .and_then(|snapshot| snapshot.record)
-        .is_some_and(|record| {
-            matches!(
-                record.status.as_str(),
-                "cancel_requested" | "canceled" | "failed" | "done"
-            )
-        });
-    if signaled || durable_intent {
-        return Json(LocalTaskCancelResponse {
-            ok: true,
-            task_id,
-            status: "cancel_requested",
-            message: "已向本机运行控制句柄发送停止信号。",
-        })
-        .into_response();
-    }
-
-    (
-        StatusCode::NOT_FOUND,
-        Json(json!({
-            "ok": false,
+    match runtime
+        .cancel_cli_prompt_with_audit_result(&task_id, &audit)
+        .await
+    {
+        Ok(crate::node_agent_cancel_saga::CancelDispatchOutcome::Dispatched {
+            action_id,
+            target_kind,
+            ..
+        }) => Json(json!({
+            "ok": true,
             "task_id": task_id,
-            "error": "任务不在运行中或当前节点已没有控制句柄。",
-        })),
-    )
-        .into_response()
+            "status": "cancel_requested",
+            "action_id": action_id,
+            "side_effect": target_kind,
+            "message": "取消副作用已提交给匹配的本机执行器。",
+        }))
+        .into_response(),
+        Ok(crate::node_agent_cancel_saga::CancelDispatchOutcome::AlreadyCommitted {
+            action_id,
+        }) => Json(json!({
+            "ok": true,
+            "task_id": task_id,
+            "status": "cancel_requested",
+            "action_id": action_id,
+            "message": "取消副作用此前已提交。",
+        }))
+        .into_response(),
+        Ok(crate::node_agent_cancel_saga::CancelDispatchOutcome::Pending { action_id }) => (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "ok": false,
+                "task_id": task_id,
+                "status": "cancel_requested",
+                "action_id": action_id,
+                "recoverable": true,
+                "error": "取消意图已持久化，但匹配执行器尚未确认副作用。",
+            })),
+        )
+            .into_response(),
+        Ok(crate::node_agent_cancel_saga::CancelDispatchOutcome::Terminal { status }) => {
+            Json(json!({
+                "ok": true,
+                "task_id": task_id,
+                "status": status,
+                "message": "任务已经终结，取消重放未产生副作用。",
+            }))
+            .into_response()
+        }
+        Ok(crate::node_agent_cancel_saga::CancelDispatchOutcome::NotFound) => (
+            StatusCode::NOT_FOUND,
+            Json(json!({
+                "ok": false,
+                "task_id": task_id,
+                "error": "任务不在运行中或当前节点已没有匹配身份的控制句柄。",
+            })),
+        )
+            .into_response(),
+        Err(error) => internal_error(error),
+    }
 }
 
 fn validate_task_id(task_id: &str) -> Result<(), &'static str> {

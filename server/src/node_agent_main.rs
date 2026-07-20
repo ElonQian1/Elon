@@ -40,6 +40,7 @@ mod node_agent_api_runtime_tools;
 mod node_agent_atomic_file;
 mod node_agent_build_runtime;
 mod node_agent_cache_advisor;
+mod node_agent_cancel_saga;
 mod node_agent_cli_done;
 mod node_agent_cli_env;
 mod node_agent_cli_output_aggregate;
@@ -424,6 +425,9 @@ async fn run_agent_runtime() -> Result<()> {
     if let Err(error) = node_agent_cli_worker::cleanup_terminal_workers(&runtime.cli_sidecars) {
         warn!(%error, "清理已终态版本化 CLI worker 失败，保留旧 worker 继续启动");
     }
+    if let Err(error) = node_agent_cancel_saga::reconcile_runtime(&runtime).await {
+        warn!(%error, "启动时重放 durable cancel intent 失败，交由周期 reconcile 重试");
+    }
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
@@ -435,6 +439,7 @@ async fn run_agent_runtime() -> Result<()> {
         warn!(%error, "记录节点更新 runtime-online 阶段失败");
     }
     runtime.spawn_lifecycle_heartbeat();
+    node_agent_cancel_saga::spawn_reconciler(runtime.clone());
     node_agent_self_evolution::spawn_scheduler(runtime.clone());
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);

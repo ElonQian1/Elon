@@ -75,6 +75,8 @@ pub(crate) struct CliSidecarCommandRecord {
     #[serde(default)]
     pub command_id: Option<String>,
     pub task_id: String,
+    #[serde(default)]
+    pub target_session_id: Option<String>,
     pub command: String,
     #[serde(default)]
     pub approval_id: Option<String>,
@@ -285,10 +287,48 @@ impl CliSidecarRegistry {
         let Some(session) = self.session_for_task(task_id)? else {
             return Ok(false);
         };
-        if !session.can_cancel_at(now_ms()) {
+        self.record_cancel_command_for_session(
+            task_id,
+            &session.session_id,
+            &format!("cmd-{}", uuid::Uuid::new_v4().simple()),
+            audit,
+        )
+    }
+
+    pub(crate) fn record_cancel_command_for_session(
+        &self,
+        task_id: &str,
+        session_id: &str,
+        action_id: &str,
+        audit: &CancelRequestAudit,
+    ) -> Result<bool> {
+        let task_id = task_id.trim();
+        let session_id = session_id.trim();
+        let action_id = action_id.trim();
+        if task_id.is_empty() || session_id.is_empty() || action_id.is_empty() {
             return Ok(false);
         }
-        self.append_sidecar_command(task_id, "cancel", None, None, None, None, None, Some(audit))
+        let session = with_task_journal_io_lock(|| {
+            registry_io::read(&self.dir, |sessions| Ok(sessions.get(session_id).cloned()))
+        })?;
+        let Some(session) = session else {
+            return Ok(false);
+        };
+        if session.task_id != task_id || !session.can_cancel_at(now_ms()) {
+            return Ok(false);
+        }
+        self.append_sidecar_command(
+            task_id,
+            Some(session_id),
+            "cancel",
+            Some(action_id),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(audit),
+        )
     }
 
     pub(crate) fn record_tool_approval_decision(
@@ -308,7 +348,9 @@ impl CliSidecarRegistry {
         }
         self.append_sidecar_command(
             task_id,
+            Some(&session.session_id),
             "tool_approval_decision",
+            None,
             Some(approval_id),
             Some(decision),
             None,
@@ -330,7 +372,9 @@ impl CliSidecarRegistry {
         }
         self.append_sidecar_command(
             task_id,
+            Some(&session.session_id),
             "terminal_input",
+            None,
             None,
             None,
             Some(text),
@@ -354,7 +398,9 @@ impl CliSidecarRegistry {
         }
         self.append_sidecar_command(
             task_id,
+            Some(&session.session_id),
             "terminal_resize",
+            None,
             None,
             None,
             None,
@@ -367,7 +413,9 @@ impl CliSidecarRegistry {
     fn append_sidecar_command(
         &self,
         task_id: &str,
+        target_session_id: Option<&str>,
         command: &str,
+        command_id: Option<&str>,
         approval_id: Option<&str>,
         decision: Option<&str>,
         text: Option<&str>,
@@ -382,8 +430,11 @@ impl CliSidecarRegistry {
         self.ensure_dir()?;
         let path = self.command_path(task_id);
         let record = CliSidecarCommandRecord {
-            command_id: Some(format!("cmd-{}", uuid::Uuid::new_v4().simple())),
+            command_id: command_id
+                .map(str::to_string)
+                .or_else(|| Some(format!("cmd-{}", uuid::Uuid::new_v4().simple()))),
             task_id: task_id.to_string(),
+            target_session_id: target_session_id.map(str::to_string),
             command: command.to_string(),
             approval_id: approval_id.map(str::to_string),
             decision: decision.map(str::to_string),
@@ -404,6 +455,10 @@ impl CliSidecarRegistry {
             .with_context(|| format!("打开 sidecar command mailbox {:?}", path))?;
         writeln!(file, "{}", serde_json::to_string(&record)?)
             .with_context(|| format!("写入 sidecar command mailbox {:?}", path))?;
+        file.flush()
+            .with_context(|| format!("刷新 sidecar command mailbox {:?}", path))?;
+        file.sync_data()
+            .with_context(|| format!("同步 sidecar command mailbox {:?}", path))?;
         Ok(true)
     }
 

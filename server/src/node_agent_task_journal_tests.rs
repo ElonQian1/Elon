@@ -71,6 +71,16 @@ fn records_started_cancel_and_finished_events() {
     assert_eq!(record.run_handle_id.as_deref(), Some("req-1"));
     assert_eq!(record.cwd.as_deref(), Some("D:/demo"));
     assert!(record.cancel_requested_at_ms.is_some());
+    let intent = record
+        .cancel_intent
+        .as_ref()
+        .expect("cancel intent should remain durably auditable");
+    assert!(intent.action_id.starts_with("cancel-"));
+    assert_eq!(intent.task_id, "req-1");
+    assert_eq!(intent.run_handle_id.as_deref(), Some("req-1"));
+    assert_eq!(intent.audit.requested_by.as_deref(), Some("owner-1"));
+    assert_eq!(intent.audit.requested_at_ms, Some(1234));
+    assert!(intent.side_effect.is_none());
 
     let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
     assert!(events.contains(r#""type":"started""#));

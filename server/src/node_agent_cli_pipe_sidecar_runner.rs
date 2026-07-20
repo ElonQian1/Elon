@@ -308,6 +308,13 @@ fn consume_pipe_mailbox(
 ) -> Result<()> {
     let path = registry.command_mailbox_path(&config.task_id);
     for command in read_new_commands(&path, offset)? {
+        if command
+            .target_session_id
+            .as_deref()
+            .is_some_and(|session_id| session_id != config.session_id)
+        {
+            continue;
+        }
         let key = command.command_id.clone().unwrap_or_else(|| {
             format!(
                 "{}:{}:{}",

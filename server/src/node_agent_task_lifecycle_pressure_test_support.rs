@@ -26,5 +26,6 @@ pub(crate) fn journal_record_for_workspace(
         started_at_ms: updated_at_ms.saturating_sub(5),
         updated_at_ms,
         cancel_requested_at_ms: Some(updated_at_ms.saturating_sub(1)),
+        cancel_intent: None,
     }
 }

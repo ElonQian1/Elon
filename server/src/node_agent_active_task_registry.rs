@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use tokio::sync::{watch, RwLock};
 
 use crate::{
-    node_agent_active_task::{ActiveCliPromptHandle, ActiveCliPromptView},
+    node_agent_active_task::{ActiveCliCancelTarget, ActiveCliPromptHandle, ActiveCliPromptView},
     node_agent_tool_approval::PendingToolApprovalView,
 };
 
@@ -53,12 +53,21 @@ impl ActiveCliPromptRegistry {
         CliPromptRegistration::Inserted
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) async fn cancel_tx(&self, req_id: &str) -> Option<watch::Sender<bool>> {
         self.prompts
             .read()
             .await
             .get(req_id)
             .map(ActiveCliPromptHandle::cancel_tx)
+    }
+
+    pub(crate) async fn cancel_target(&self, req_id: &str) -> Option<ActiveCliCancelTarget> {
+        self.prompts
+            .read()
+            .await
+            .get(req_id)
+            .map(ActiveCliPromptHandle::cancel_target)
     }
 
     pub(crate) async fn view(

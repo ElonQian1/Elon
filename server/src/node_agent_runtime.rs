@@ -286,8 +286,12 @@ impl NodeRuntime {
     }
 
     pub(crate) async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
-        self.cancel_cli_prompt_with_audit(req_id, &homecli_proto::CancelRequestAudit::default())
-            .await
+        let audit = homecli_proto::CancelRequestAudit::now(
+            "node_agent",
+            "runtime",
+            "runtime_cancel_requested",
+        );
+        self.cancel_cli_prompt_with_audit(req_id, &audit).await
     }
 
     pub(crate) async fn cancel_cli_prompt_with_audit(
@@ -295,39 +299,32 @@ impl NodeRuntime {
         req_id: &str,
         audit: &homecli_proto::CancelRequestAudit,
     ) -> bool {
-        let active_cancel = self.active_cli_prompts.cancel_tx(req_id).await;
-        let sidecar_cancelable = if active_cancel.is_none() {
-            self.cli_sidecars
-                .session_for_task(req_id)
-                .ok()
-                .flatten()
-                .is_some_and(|session| session.can_cancel_at(node_agent_cli_sidecar::now_ms()))
-        } else {
-            false
-        };
-        if active_cancel.is_none() && !sidecar_cancelable {
-            return false;
-        }
-        if let Err(error) = self
-            .task_journal
-            .record_cancel_requested_with_audit(req_id, audit)
-        {
-            warn!("PC 任务 durable cancel audit 写入失败，拒绝发送取消: {error}");
-            return false;
-        }
-        if let Some(cancel_tx) = active_cancel {
-            return cancel_tx.send(true).is_ok();
-        }
         match self
-            .cli_sidecars
-            .record_cancel_command_with_audit(req_id, audit)
+            .cancel_cli_prompt_with_audit_result(req_id, audit)
+            .await
         {
-            Ok(canceled) => canceled,
+            Ok(outcome) => outcome.accepted(),
             Err(error) => {
-                warn!("PC sidecar 取消命令写入失败: {error}");
+                warn!("PC 任务 durable cancel saga 失败，拒绝确认取消: {error}");
                 false
             }
         }
+    }
+
+    pub(crate) async fn cancel_cli_prompt_with_audit_result(
+        &self,
+        req_id: &str,
+        audit: &homecli_proto::CancelRequestAudit,
+    ) -> anyhow::Result<crate::node_agent_cancel_saga::CancelDispatchOutcome> {
+        crate::node_agent_cancel_saga::request_cancel(
+            &self.active_cli_prompts,
+            &self.cli_sidecars,
+            &self.task_journal,
+            &self.local_tasks,
+            req_id,
+            audit,
+        )
+        .await
     }
 
     pub(crate) async fn adopt_cli_prompt_cloud_control(
