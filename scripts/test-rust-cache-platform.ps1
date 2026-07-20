@@ -24,6 +24,8 @@ function Assert-Equal {
 }
 
 $TempRoot = Join-Path $env:TEMP ("elon-rust-cache-test-{0}" -f [Guid]::NewGuid().ToString("N"))
+$null = New-Item -ItemType Directory -Force -Path $TempRoot
+$TempRoot = (Get-Item -LiteralPath $TempRoot -Force).FullName
 $ProjectRoot = Join-Path $TempRoot "registered-project"
 $UnknownRoot = Join-Path $TempRoot "unknown-project"
 $CacheRoot = Join-Path $TempRoot "cache"
@@ -43,7 +45,7 @@ try {
     Assert-True $context.registered "project manifest should register the project"
     Assert-Equal "test-project" $context.project_id "registered project id"
     Assert-True ($context.build_dir -like "*\build\rustc-test\test-project\dev-host\*") "registered build path should be compatibility-scoped"
-    Assert-Equal (Join-Path $ProjectRoot "target") $context.target_dir "final artifacts should remain workspace-local by default"
+    Assert-Equal (Join-Path $context.project_root "target") $context.target_dir "final artifacts should remain workspace-local by default"
 
     $unknown = Resolve-RustCacheInvocation -ProjectRoot $UnknownRoot -CacheRoot $CacheRoot -CargoArgs @("check") -ToolchainEpoch "rustc-test"
     Assert-True (-not $unknown.registered) "unknown project should not enter the registered pool"
@@ -55,7 +57,8 @@ try {
     Assert-Equal $expectedBaseDirs $baseDirs "sccache should strip checkout-specific workspace and project roots"
     $sccacheConfig = Get-RustCacheSccacheConfigContent -BaseDirs @($ProjectRoot, $UnknownRoot)
     Assert-True ($sccacheConfig -match '^# Generated' -and $sccacheConfig -match 'basedirs = \[') "sccache config should be generated from registered roots"
-    Assert-True ($sccacheConfig -match [regex]::Escape($ProjectRoot.Replace('\', '/'))) "sccache config should normalize project paths"
+    $normalizedProjectRoot = ConvertTo-RustCacheSccacheConfigPath -Path $ProjectRoot
+    Assert-True ($sccacheConfig -match [regex]::Escape($normalizedProjectRoot)) "sccache config should normalize project paths"
     $pendingSccache = Sync-RustCacheSccacheConfiguration -CacheRoot $CacheRoot -AdditionalBaseDirs @($ProjectRoot, $UnknownRoot)
     Assert-True $pendingSccache.restart_pending "a changed sccache config should remain pending until a server reload is requested"
     Assert-True (Test-Path -LiteralPath $pendingSccache.state_path) "sccache pending state should be durable"
@@ -80,7 +83,7 @@ exit /b 0
     Assert-True ($captured -match 'CARGO_BUILD_BUILD_DIR=.*test-project\\release-host') "Cargo should receive the managed build-dir"
     Assert-True ($captured -match 'CARGO_TARGET_DIR=.*registered-project\\target') "Cargo should receive the local target-dir"
     Assert-True ($captured -match 'CARGO_INCREMENTAL=0') "release should force incremental off"
-    Assert-True ($captured -match "CARGO_CWD=$([regex]::Escape($ProjectRoot))") "Cargo should execute from the declared project root"
+    Assert-True ($captured -match "CARGO_CWD=$([regex]::Escape($release.project_root))") "Cargo should execute from the declared project root"
     Assert-True ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_BUILD_DIR)) "Cargo environment should be restored after execution"
 
     $staleBuildDir = Join-Path $CacheRoot "build\rustc-test\test-project\stale\0123456789abcdef"
@@ -100,6 +103,20 @@ exit /b 0
     $oldAction = $gc.actions | Where-Object { $_.path -eq $oldPartition } | Select-Object -First 1
     Assert-Equal "would-delete" $oldAction.action "dry-run GC should select an old toolchain partition"
     Assert-True (Test-Path -LiteralPath $oldPartition) "dry-run GC must not delete files"
+    Assert-Equal 0 (Get-RustCacheDirectorySize -Path (Join-Path $CacheRoot "missing-partition")) "a concurrently removed partition should have advisory size zero"
+    $deletionPartition = Join-Path $CacheRoot "build\rustc-old\test-project\delete-host\bbbbbbbbbbbbbbbb"
+    $longSegment = "incremental-" + ("x" * 120)
+    $longLeaf = Join-Path (Join-Path $deletionPartition $longSegment) $longSegment
+    $longFsLeaf = if ($env:OS -eq "Windows_NT") { "\\?\$longLeaf" } else { $longLeaf }
+    $longFile = Join-Path $longLeaf "artifact.bin"
+    $longFsFile = if ($env:OS -eq "Windows_NT") { "\\?\$longFile" } else { $longFile }
+    [System.IO.Directory]::CreateDirectory($longFsLeaf) | Out-Null
+    [System.IO.File]::WriteAllBytes($longFsFile, [byte[]](1, 2, 3, 4))
+    Assert-True ((Get-RustCacheDirectorySize -Path $deletionPartition) -ge 0) "long-path size enumeration should remain advisory"
+    $inventoryModule = Get-Module RustCache.Inventory | Select-Object -First 1
+    Assert-True ($null -ne $inventoryModule) "inventory module should be loaded for partition removal regression"
+    & $inventoryModule { param($PartitionPath) Remove-RustCachePartition -Path $PartitionPath } $deletionPartition
+    Assert-True (-not (Test-Path -LiteralPath $deletionPartition)) "managed long-path partition removal should tolerate PowerShell traversal failures"
     $quarantineLeaf = Join-Path $CacheRoot "quarantine\ab\cdef0123456789"
     New-Item -ItemType Directory -Force -Path $quarantineLeaf | Out-Null
     Set-Content -LiteralPath (Join-Path $quarantineLeaf "artifact.bin") -Value "quarantine"
@@ -131,12 +148,17 @@ retry = 3
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
     Assert-True (Test-Path -LiteralPath $install.cargo_include_path) "installer should generate Cargo include config"
     Assert-True (Test-Path -LiteralPath $install.sccache_config_path) "installer should generate managed sccache config"
-    Assert-True (Test-Path -LiteralPath $install.sccache_wrapper_path) "installer should generate the managed sccache wrapper"
     $include = Get-Content -Raw -LiteralPath $install.cargo_include_path
     Assert-True ($include -match 'build-dir = .*quarantine/.+workspace-path-hash') "fallback Cargo route should use workspace quarantine"
-    Assert-True ($include -match [regex]::Escape($install.sccache_wrapper_path.Replace('\', '/'))) "Cargo include should select the managed sccache wrapper"
-    $wrapperHeader = [System.IO.File]::ReadAllBytes($install.sccache_wrapper_path)
-    Assert-True ($wrapperHeader.Length -gt 2 -and $wrapperHeader[0] -eq 0x4d -and $wrapperHeader[1] -eq 0x5a) "sccache wrapper should be a native Windows executable"
+    if (-not [string]::IsNullOrWhiteSpace([string]$install.sccache_path)) {
+        Assert-True (Test-Path -LiteralPath $install.sccache_wrapper_path) "installer should generate the managed sccache wrapper when sccache is available"
+        Assert-True ($include -match [regex]::Escape($install.sccache_wrapper_path.Replace('\', '/'))) "Cargo include should select the managed sccache wrapper"
+        $wrapperHeader = [System.IO.File]::ReadAllBytes($install.sccache_wrapper_path)
+        Assert-True ($wrapperHeader.Length -gt 2 -and $wrapperHeader[0] -eq 0x4d -and $wrapperHeader[1] -eq 0x5a) "sccache wrapper should be a native Windows executable"
+    } else {
+        Assert-True ([string]::IsNullOrWhiteSpace([string]$install.sccache_wrapper_path)) "missing sccache should leave the managed wrapper explicitly disabled"
+        Assert-True ($include -notmatch '^\s*rustc-wrapper\s*=') "Cargo include must not reference a missing sccache wrapper"
+    }
     $wrapperSource = Get-Content -Raw -LiteralPath (Join-Path $ModulesRoot "native\rustc_sccache_wrapper.rs")
     Assert-True ($wrapperSource -match 'env_remove\("CARGO_BUILD_BUILD_DIR"\)' -and $wrapperSource -match 'env_remove\("CARGO_TARGET_DIR"\)') "sccache wrapper should remove Cargo-only routing variables"
     Assert-True ($wrapperSource -match '\.args\(args\)' -and $wrapperSource -match 'SCCACHE_CONF') "sccache wrapper should pin managed configuration and forward compiler arguments"
