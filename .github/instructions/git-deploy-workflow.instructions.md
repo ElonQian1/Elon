@@ -38,7 +38,7 @@ git rebase origin/main
 git push origin HEAD:main
 ```
 
-兼容时保留双方逻辑。不要因远端前进追车；rebase 后复用原验证，只为冲突或命中的影响面补最小验证，不能仅因 rebase 重编译或全量测试。
+兼容时保留双方逻辑。不要追逐远端前进；rebase 后复用原验证，只为冲突或命中的影响面补最小验证，不能仅因 rebase 重编译或全量测试。
 
 ## push 输出管理
 

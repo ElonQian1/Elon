@@ -93,7 +93,6 @@ try {
   assert.strictEqual(existingGrantRequests.length, 1, 'existing grant should only read the local grant list');
 
   const missingGrantRequests = [];
-  let confirmationText = '';
   const missingGrantResult = await ensureLocalFullAccessGrant({
     adminUrl: 'http://127.0.0.1:7799/',
     projectId: 'elon-self',
@@ -104,14 +103,15 @@ try {
   }, {
     request: async (requestPath, options) => {
       missingGrantRequests.push({ requestPath, options });
-      return requestPath === '/api/full-access/grants' && !options ? { grants: [] } : { ok: true };
+      if (requestPath === '/api/full-access/grants' && !options) return { grants: [] };
+      if (requestPath === '/api/cloud-projects') return { node_id: 'node-local', projects: [
+        { id: 'elon-self', node_id: 'node-local', workspace_path: 'e:/一龙项目/' }] };
+      return { ok: true };
     },
-    confirm: (message) => { confirmationText = message; return true; },
   });
   assert.strictEqual(missingGrantResult, 'granted', 'confirmed missing grant should be persisted before dispatch');
-  assert.ok(confirmationText.includes('E:\\一龙项目') && confirmationText.includes('任意命令'), 'danger mode should confirm the exact path and risk locally');
-  assert.strictEqual(missingGrantRequests.length, 2, 'missing grant should read then write the local grant');
-  assert.deepStrictEqual(JSON.parse(missingGrantRequests[1].options.body), {
+  assert.strictEqual(missingGrantRequests.length, 3, 'missing grant should verify the cloud binding before writing the local grant');
+  assert.deepStrictEqual(JSON.parse(missingGrantRequests[2].options.body), {
     project_id: 'elon-self',
     workspace_path: 'E:\\一龙项目',
     confirm_full_access: true,
