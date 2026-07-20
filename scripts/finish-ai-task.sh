@@ -139,6 +139,9 @@ case "$kind" in
   *) finish_error "Unsupported completion kind: $kind" ;;
 esac
 business_status="complete"
+task_branch="$(git -C "$task_root" branch --show-current)"
+is_platform_managed_task=0
+[[ "$task_branch" == ai/session/* ]] && is_platform_managed_task=1
 
 main_path="$(git -C "$task_root" worktree list --porcelain | awk '
   /^worktree / { path=substr($0,10) }
@@ -148,24 +151,31 @@ main_path="$(git -C "$task_root" worktree list --porcelain | awk '
 
 clear_temporary_roots "$main_path" "main"
 main_tracked="$(git -C "$main_path" status --porcelain=v1 --untracked-files=no)"
+skip_main_sync=0
 if [[ -n "$main_tracked" ]]; then
   local_main_status="blocked_tracked_changes"
   printf 'MAIN_TRACKED_CHANGE=%s\n' "$main_tracked"
-  finish_error "The main baseline has tracked changes and cannot be fast-forwarded safely."
+  if [[ "$is_platform_managed_task" -eq 1 ]]; then
+    echo "MAIN_BASELINE_SYNC=blocked_tracked_changes:$main_path"
+    skip_main_sync=1
+  else
+    finish_error "The main baseline has tracked changes and cannot be fast-forwarded safely."
+  fi
 fi
 
-git -C "$main_path" fetch origin main || finish_error "Unable to fetch origin/main while finalizing."
-if ! merge_output="$(git -C "$main_path" merge --ff-only origin/main 2>&1)"; then
-  local_main_status="sync_failed"
-  finish_error "The main baseline could not fast-forward. Git may be protecting an untracked same-path collision: $merge_output"
+if [[ "$skip_main_sync" -eq 0 ]]; then
+  git -C "$main_path" fetch origin main || finish_error "Unable to fetch origin/main while finalizing."
+  if ! merge_output="$(git -C "$main_path" merge --ff-only origin/main 2>&1)"; then
+    local_main_status="sync_failed"
+    finish_error "The main baseline could not fast-forward. Git may be protecting an untracked same-path collision: $merge_output"
+  fi
+  main_head="$(git -C "$main_path" rev-parse HEAD)"
+  origin_head="$(git -C "$main_path" rev-parse origin/main)"
+  [[ "$main_head" == "$origin_head" ]] || finish_error "Local main is not the current fetched origin/main."
+  local_main_status="current:${main_head:0:7}"
 fi
-main_head="$(git -C "$main_path" rev-parse HEAD)"
-origin_head="$(git -C "$main_path" rev-parse origin/main)"
-[[ "$main_head" == "$origin_head" ]] || finish_error "Local main is not the current fetched origin/main."
-local_main_status="current:${main_head:0:7}"
 audit_untracked "$main_path" "MAIN_UNTRACKED_STATUS"
 
-task_branch="$(git -C "$task_root" branch --show-current)"
 task_leaf="$(basename "$task_root")"
 if [[ "$(cd "$task_root" && pwd -P)" == "$(cd "$main_path" && pwd -P)" ]]; then
   task_worktree_status="main_baseline_not_applicable"

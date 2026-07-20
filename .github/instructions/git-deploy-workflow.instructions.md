@@ -4,7 +4,7 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 
 # Git、验证与发布按需手册
 
-共享硬规则以 `.github/copilot-instructions.md` 的 `WF-*` 契约为准。本文件只补充实现细节；普通源码任务不要因为本文件而加载全部发布背景。
+共享硬规则以 `.github/copilot-instructions.md` 的 `WF-*` 契约为准。本文件只补充实现细节；普通源码任务不加载全部发布背景。
 
 ## 标准路径
 
@@ -20,7 +20,7 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 ## 本地 main 与未跟踪文件
 
 - `main` checkout 只保存已跟踪基线，不承担业务编辑。
-- 预检和收尾只因已跟踪修改阻止快进；普通未跟踪文件不会让本地 `main` 长期落后。
+- 已跟踪修改阻止 `main` 快进；`ai/session/*` 只报告 `blocked_tracked_changes`，不触碰 `main` 或阻断已完成任务。普通未跟踪文件不阻止快进。
 - 快进时如果远端新增路径与本地未跟踪文件同名，Git 会安全拒绝；脚本输出 `FINALIZABLE=false` 并报告冲突。
 - 主工作区来源不明的未跟踪文件只产生卫生告警，不由其他任务自动提交或删除。
 - 当前任务 worktree 必须完全干净才可收尾；未跟踪源码/测试会显示 `candidate_track`，生成物会显示 `candidate_temporary_or_precise_ignore`。
@@ -42,7 +42,7 @@ git push origin HEAD:main
 
 ## push 输出管理
 
-`pre-push` 里的 `cargo check --workspace` 常整段输出几十 KB 警告；直接读回对话会撑爆 token（历史事故）。push 时重定向到 `.ai-tmp/push.log`，只在失败时读尾部：
+`pre-push` Cargo 输出较大；push 时写入 `.ai-tmp/push.log`，失败只读尾部：
 
 ```powershell
 git push origin HEAD:main *> .ai-tmp/push.log

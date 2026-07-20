@@ -183,6 +183,22 @@ try {
     if ($afterMain -ne $originMain) { throw "Local main did not fast-forward to origin/main." }
     if (-not (Test-Path -LiteralPath $legacyPath)) { throw "Unknown main untracked file was deleted unexpectedly." }
 
+    # Platform-managed conversation worktrees are already isolated from the
+    # checked-out main baseline. Unknown tracked main edits must remain visible
+    # and untouched, but they must not turn a clean, pushed platform task back
+    # into an unfinished business result.
+    Add-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "unknown platform-owned main edit"
+    $platformFinishOutput = Invoke-Finish -WorktreePath $platformSessionWorktree
+    Assert-Contains $platformFinishOutput "BUSINESS_STATUS=complete" "A platform session must retain its completed business state."
+    Assert-Contains $platformFinishOutput "LOCAL_MAIN_STATUS=blocked_tracked_changes" "A platform session must report the dirty main baseline."
+    Assert-Contains $platformFinishOutput "TASK_WORKTREE_STATUS=platform_managed" "A platform session must remain platform-managed."
+    Assert-Contains $platformFinishOutput "FINALIZABLE=true" "Unknown main edits must not block a clean, pushed platform session."
+    $dirtyMainContent = Get-Content -Raw -LiteralPath (Join-Path $mainRepo "README.md")
+    if (-not $dirtyMainContent.Contains("unknown platform-owned main edit")) {
+        throw "Platform finish mutated the unknown tracked main edit."
+    }
+    Invoke-Git $mainRepo @("restore", "--source=HEAD", "--", "README.md") | Out-Null
+
     # A same-path remote addition must be left to Git's overwrite protection.
     # The finish gate reports the already-complete business state separately
     # from the blocked local-main cleanup state.

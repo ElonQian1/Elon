@@ -307,6 +307,8 @@ try {
 
     Invoke-CompletionCheck -RepoPath $taskRoot -CompletionKind $Kind
     $businessStatus = "complete"
+    $taskBranch = (Invoke-GitRequired -RepoPath $taskRoot -GitArgs @("branch", "--show-current")).Trim()
+    $isPlatformManagedTask = $taskBranch -like "ai/session/*"
 
     $entries = @(Get-GitWorktreeEntries -RepoPath $taskRoot)
     $mainWorktree = $entries | Where-Object { $_.Branch -eq "main" -and $_.Path } | Select-Object -First 1
@@ -317,29 +319,36 @@ try {
 
     Clear-DeclaredTemporaryRoots -RepoPath $mainPath -Policy $policy -Label "main"
     $mainTrackedStatus = @(Get-StatusLines -RepoPath $mainPath -TrackedOnly)
+    $skipMainSync = $false
     if ($mainTrackedStatus.Count -gt 0) {
         $localMainStatus = "blocked_tracked_changes"
         $mainTrackedStatus | ForEach-Object { Write-Host "MAIN_TRACKED_CHANGE=$_" }
-        throw "The main baseline has tracked changes and cannot be fast-forwarded safely."
+        if ($isPlatformManagedTask) {
+            Write-Host "MAIN_BASELINE_SYNC=blocked_tracked_changes:$mainPath"
+            $skipMainSync = $true
+        } else {
+            throw "The main baseline has tracked changes and cannot be fast-forwarded safely."
+        }
     }
 
-    Invoke-GitFetchWithRetry -RepoPath $mainPath
-    $merge = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("merge", "--ff-only", "origin/main")
-    if ($merge.ExitCode -ne 0) {
-        $localMainStatus = "sync_failed"
-        throw "The main baseline could not fast-forward. Git may be protecting an untracked same-path collision: $($merge.Text)"
-    }
+    if (-not $skipMainSync) {
+        Invoke-GitFetchWithRetry -RepoPath $mainPath
+        $merge = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("merge", "--ff-only", "origin/main")
+        if ($merge.ExitCode -ne 0) {
+            $localMainStatus = "sync_failed"
+            throw "The main baseline could not fast-forward. Git may be protecting an untracked same-path collision: $($merge.Text)"
+        }
 
-    $mainHead = (Invoke-GitRequired -RepoPath $mainPath -GitArgs @("rev-parse", "HEAD")).Trim()
-    $originHead = (Invoke-GitRequired -RepoPath $mainPath -GitArgs @("rev-parse", "origin/main")).Trim()
-    if ($mainHead -ne $originHead) {
-        $localMainStatus = "not_current"
-        throw "Local main is not the current fetched origin/main. main=$mainHead origin/main=$originHead"
+        $mainHead = (Invoke-GitRequired -RepoPath $mainPath -GitArgs @("rev-parse", "HEAD")).Trim()
+        $originHead = (Invoke-GitRequired -RepoPath $mainPath -GitArgs @("rev-parse", "origin/main")).Trim()
+        if ($mainHead -ne $originHead) {
+            $localMainStatus = "not_current"
+            throw "Local main is not the current fetched origin/main. main=$mainHead origin/main=$originHead"
+        }
+        $localMainStatus = "current:$($mainHead.Substring(0, 7))"
     }
-    $localMainStatus = "current:$($mainHead.Substring(0, 7))"
     $null = Write-UntrackedAudit -RepoPath $mainPath -Policy $policy -Prefix "MAIN_UNTRACKED_STATUS"
 
-    $taskBranch = (Invoke-GitRequired -RepoPath $taskRoot -GitArgs @("branch", "--show-current")).Trim()
     $taskNormalized = Normalize-PathText $taskRoot
     $mainNormalized = Normalize-PathText $mainPath
     $taskLeaf = Split-Path -Leaf $taskRoot
