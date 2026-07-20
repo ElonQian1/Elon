@@ -87,8 +87,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
 一龙仓库日常验证继续使用稳定入口，它已委托给平台：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml
 ```
+
+`--` 是包装器参数与 Cargo 参数的强制边界；边界后的 `-p`、`-F`、`-r`、`-j`、`-q`、`-v` 等短选项和值逐项原样透传。包装器自身选项必须写在边界之前。`validate-rust.ps1` 使用相同契约，并在委托 `cargo-dev.ps1` 时保留该边界。
 
 安装到机器缓存根，但不修改 Cargo 父级配置：
 

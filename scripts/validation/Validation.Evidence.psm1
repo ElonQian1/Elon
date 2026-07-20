@@ -39,19 +39,20 @@ function Invoke-ValidationCapturedProcess {
     if (-not $process.Start()) { throw "Unable to start validation process: $FilePath" }
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    if (-not $process.WaitForExit([Math]::Max(1,$TimeoutSeconds)*1000)) {
+    $timedOut = -not $process.WaitForExit([Math]::Max(1,$TimeoutSeconds)*1000)
+    if ($timedOut) {
         try { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null } catch { try { $process.Kill() } catch {} }
         if (-not $process.WaitForExit(5000)) { throw "Validation process did not terminate after timeout: $FilePath" }
-        throw "Validation process timed out after $TimeoutSeconds seconds: $FilePath"
     }
-    $stdoutText = $stdoutTask.Result; $stderrText = $stderrTask.Result
+    $stdoutText = $stdoutTask.GetAwaiter().GetResult(); $stderrText = $stderrTask.GetAwaiter().GetResult()
     [IO.File]::WriteAllText($stdoutPath, $stdoutText, (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText($stderrPath, $stderrText, (New-Object Text.UTF8Encoding($false)))
     $finished = [DateTime]::UtcNow
     $stdout = @($stdoutText -split "`r?`n")
     $stderr = @($stderrText -split "`r?`n")
     return [pscustomobject]@{
-        exit_code = [int]$process.ExitCode
+        exit_code = if ($timedOut) { 124 } else { [int]$process.ExitCode }
+        timed_out = $timedOut
         started_utc = $started.ToString("o")
         finished_utc = $finished.ToString("o")
         duration_ms = [int]($finished-$started).TotalMilliseconds

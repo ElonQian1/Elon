@@ -4,6 +4,7 @@ $Modules = Join-Path $PSScriptRoot "validation"
 Import-Module (Join-Path $Modules "Validation.Fingerprint.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $Modules "Validation.Scheduler.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $Modules "Validation.Evidence.psm1") -Force -DisableNameChecking
+Import-Module (Join-Path $Modules "Validation.Arguments.psm1") -Force -DisableNameChecking
 $script:Assertions = 0
 function Assert-True([bool]$Condition,[string]$Message) { $script:Assertions++; if (-not $Condition) { throw "ASSERT FAILED: $Message" } }
 function Assert-Equal($Expected,$Actual,[string]$Message) { $script:Assertions++; if ($Expected -ne $Actual) { throw "ASSERT FAILED: $Message expected=$Expected actual=$Actual" } }
@@ -16,6 +17,9 @@ try {
     Assert-Equal "check`n--manifest-path`nserver/Cargo.toml" (ConvertTo-ValidationCommand @("check","--manifest-path","server\Cargo.toml")) "command normalization"
     Assert-Equal "light" (Get-ValidationResourceClass @("check")) "check resource class"
     Assert-Equal "heavy" (Get-ValidationResourceClass @("test","filter")) "test resource class"
+    $shortCargoArgs=@('-p','server','-F','feature-a','-r','-j','2','-q','-v')
+    $argumentContract=Split-ValidationCargoArguments -Arguments (@('--')+$shortCargoArgs) -ValueOptions @{'-Domain'='Domain'} -SwitchOptions @()
+    Assert-Equal ($shortCargoArgs -join "`n") ($argumentContract.cargo -join "`n") "separator must preserve every short Cargo option and value"
     $SnapshotRepo = Join-Path $TempRoot "snapshot-repo"
     New-Item -ItemType Directory -Force -Path (Join-Path $SnapshotRepo "server"),(Join-Path $SnapshotRepo "docs") | Out-Null
     & git -C $SnapshotRepo init --quiet; & git -C $SnapshotRepo config user.email validation@example.invalid; & git -C $SnapshotRepo config user.name validation-test
@@ -67,6 +71,20 @@ try {
     Assert-True $lightBlocked "light must exclude an active heavy task"; Exit-ValidationResource $heavy
     $capture = Invoke-ValidationCapturedProcess -FilePath "cmd.exe" -ArgumentList @("/d","/c","echo failure-marker 1>&2 & exit /b 23") -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot "capture")
     Assert-Equal 23 $capture.exit_code "captured exit code"; Assert-True (Test-Path $capture.stderr_path) "stderr must be durable on first run"
+    $timeoutCapture = Invoke-ValidationCapturedProcess -FilePath "powershell.exe" -ArgumentList @('-NoProfile','-Command','Write-Output before-timeout; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30') -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot 'timeout-capture') -TimeoutSeconds 1
+    Assert-Equal 124 $timeoutCapture.exit_code "timeout exit code"; Assert-True $timeoutCapture.timed_out "timeout flag"
+    Assert-True ((Get-Content -Raw $timeoutCapture.stdout_path) -match 'before-timeout') "timeout must finish capturing stdout"
+    $argumentLog=Join-Path $TempRoot 'cargo-arguments.log'; $env:ELON_TEST_ARGUMENT_LOG=$argumentLog
+    '@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-argument-cargo.ps1" %*
+exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot 'cargo.cmd') -Encoding ASCII
+    'if($env:ELON_TEST_FAKE_TIMEOUT){ Write-Output fake-timeout-started; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30 }
+$args | Set-Content -LiteralPath $env:ELON_TEST_ARGUMENT_LOG -Encoding UTF8
+exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-argument-cargo.ps1') -Encoding UTF8
+    $env:PATH="$BinRoot;$originalPath"
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'cargo-dev.ps1') -BypassValidationOrchestrator -NoLock -SkipCacheGc -DisableSccache -CacheRoot $CacheRoot -- check @shortCargoArgs
+    Assert-Equal 0 $LASTEXITCODE "cargo-dev fake process contract"
+    Assert-Equal ((@('check')+$shortCargoArgs) -join "`n") (@(Get-Content $argumentLog) -join "`n") "cargo-dev separator must preserve short Cargo options"
     $Counter = Join-Path $TempRoot "counter.log"
     $readyName='Local\ElonValidationReady'+[Guid]::NewGuid().ToString('N'); $releaseName='Local\ElonValidationRelease'+[Guid]::NewGuid().ToString('N')
     $ready=New-Object Threading.EventWaitHandle($false,[Threading.EventResetMode]::ManualReset,$readyName)
@@ -109,12 +127,17 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     Assert-Equal 2 @(Get-Content $Counter).Count "different fingerprint must not be reused"
     $cargoDevText=Get-Content -Raw (Join-Path $PSScriptRoot 'cargo-dev.ps1')
     Assert-True ($cargoDevText -notmatch '\[switch\]\$Force') "cargo-dev must not intercept Cargo's --force"
-    Assert-True ($cargoDevText -match '\[switch\]\$RefreshValidationEvidence') "validator-only refresh option must remain public and unambiguous"
+    Assert-True ($cargoDevText -match "'-RefreshValidationEvidence'") "validator-only refresh option must remain public and unambiguous"
+    $validatorText=Get-Content -Raw (Join-Path $PSScriptRoot 'validate-rust.ps1')
+    Assert-True ($cargoDevText -match "\$validationArgs \+= '--'") "cargo-dev delegation must use the separator contract"
+    Assert-True ($validatorText -match "\$args \+= '--'") "validator delegation must use the separator contract"
+    Assert-True ($validatorText -match 'timed_out=\[bool\]\$result\.timed_out') "validator terminal summary must persist the timeout flag"
+    Assert-True ($validatorText -match 'Invoke-ValidationCapturedProcess[^\r\n]+-TimeoutSeconds \$WaitTimeoutSeconds') "validator must apply its bound to the captured child"
     Write-Host "PASS: validation orchestrator tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {
     @($children) | ForEach-Object { Stop-TestProcess $_ }
     if($ready){$ready.Dispose()}; if($release){$release.Set()|Out-Null;$release.Dispose()}
-    $env:PATH=$originalPath; Remove-Item Env:ELON_TEST_READY_EVENT,Env:ELON_TEST_RELEASE_EVENT,Env:ELON_TEST_COUNTER -ErrorAction SilentlyContinue
+    $env:PATH=$originalPath; Remove-Item Env:ELON_TEST_READY_EVENT,Env:ELON_TEST_RELEASE_EVENT,Env:ELON_TEST_COUNTER,Env:ELON_TEST_ARGUMENT_LOG,Env:ELON_TEST_FAKE_TIMEOUT -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
     $left=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -like "*$TempRoot*"})
     Assert-Equal 0 $left.Count "no elon-validation-test child process may remain"

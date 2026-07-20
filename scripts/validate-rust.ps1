@@ -1,19 +1,21 @@
-param(
-    [string]$CacheRoot,
-    [string]$Domain = "agent-validation",
-    [string]$TargetDir,
-    [int]$WaitTimeoutSeconds = 3600,
-    [int]$LightSlots = 2,
-    [switch]$Force,
-    [switch]$DisableSccache,
-    [switch]$SkipCheapGates,
-    [Parameter(Position=0, ValueFromRemainingArguments=$true)][string[]]$CargoArgs=@()
-)
 $ErrorActionPreference = "Stop"
-if (-not $CargoArgs.Count) { throw "Usage: validate-rust.ps1 <cargo-args...>" }
 $RepoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0) { throw "Unable to resolve repository root." }
 $Modules = Join-Path $RepoRoot "scripts\validation"
+Import-Module (Join-Path $Modules "Validation.Arguments.psm1") -Force -DisableNameChecking
+$parsed = Split-ValidationCargoArguments -Arguments $args -ValueOptions @{
+    '-CacheRoot'='CacheRoot'; '-Domain'='Domain'; '-TargetDir'='TargetDir'; '-WaitTimeoutSeconds'='WaitTimeoutSeconds'; '-LightSlots'='LightSlots'
+} -SwitchOptions @('-Force','-DisableSccache','-SkipCheapGates')
+$CacheRoot = $parsed.wrapper.CacheRoot
+$Domain = if ($parsed.wrapper.Domain) { $parsed.wrapper.Domain } else { 'agent-validation' }
+$TargetDir = $parsed.wrapper.TargetDir
+$WaitTimeoutSeconds = if ($parsed.wrapper.WaitTimeoutSeconds) { [int]$parsed.wrapper.WaitTimeoutSeconds } else { 3600 }
+$LightSlots = if ($parsed.wrapper.LightSlots) { [int]$parsed.wrapper.LightSlots } else { 2 }
+$Force = [bool]$parsed.wrapper.Force
+$DisableSccache = [bool]$parsed.wrapper.DisableSccache
+$SkipCheapGates = [bool]$parsed.wrapper.SkipCheapGates
+$CargoArgs = @($parsed.cargo)
+if (-not $CargoArgs.Count) { throw "Usage: validate-rust.ps1 [wrapper-options] -- <cargo-args...>" }
 Import-Module (Join-Path $Modules "Validation.Fingerprint.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $Modules "Validation.Scheduler.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $Modules "Validation.Evidence.psm1") -Force -DisableNameChecking
@@ -67,6 +69,7 @@ try {
     if ($DisableSccache) { $args += "-DisableSccache" }
     if ($CacheRoot) { $args += @("-CacheRoot",$CacheRoot) }
     if ($TargetDir) { $args += @("-TargetDir",$TargetDir) }
+    $args += '--'
     $args += $CargoArgs
     Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint; status="running"
@@ -74,7 +77,7 @@ try {
         fingerprint_inputs=$fingerprint.payload; started_utc=[DateTime]::UtcNow.ToString("o")
         stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
     })
-    $result = Invoke-ValidationCapturedProcess -FilePath "powershell" -ArgumentList $args -WorkingDirectory $RepoRoot -EvidenceDirectory $resultDir
+    $result = Invoke-ValidationCapturedProcess -FilePath "powershell" -ArgumentList $args -WorkingDirectory $RepoRoot -EvidenceDirectory $resultDir -TimeoutSeconds $WaitTimeoutSeconds
     $summary = [ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint
         status=if ($result.exit_code -eq 0) { "success" } else { "failed" }
@@ -83,7 +86,7 @@ try {
         started_utc=$result.started_utc; finished_utc=$result.finished_utc; duration_ms=$result.duration_ms
         stdout_path=$result.stdout_path; stderr_path=$result.stderr_path
         stdout_lines=$result.stdout_lines; stderr_lines=$result.stderr_lines
-        failures=$result.failures; tail=$result.tail
+        failures=$result.failures; tail=$result.tail; timed_out=[bool]$result.timed_out
     }
     Write-ValidationJsonAtomic -Path $summaryPath -Value $summary
     Write-Host "VALIDATION_REUSED=false"

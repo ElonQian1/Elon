@@ -8,28 +8,25 @@
     compiler object cache is shared through sccache.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml
 #>
-param(
-    [string]$TargetDir,
-    [string]$CacheRoot,
-    [string]$Domain = "dev-windows-msvc",
-    [switch]$NoLock,
-    [switch]$DisableSccache,
-    [switch]$SkipCacheGc,
-    [switch]$BypassValidationOrchestrator,
-    [switch]$RefreshValidationEvidence,
-    [switch]$SkipCheapGates,
-    [int]$LightSlots = 2,
-    [int]$WaitTimeoutSeconds = 3600,
-    [int]$LockTimeoutSeconds = 3600,
-    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
-    [string[]]$CargoArgs = @()
-)
-
 $ErrorActionPreference = "Stop"
+$argumentModule = Join-Path $PSScriptRoot "validation\Validation.Arguments.psm1"
+Import-Module $argumentModule -Force -DisableNameChecking
+$parsed = Split-ValidationCargoArguments -Arguments $args -ValueOptions @{
+    '-TargetDir'='TargetDir'; '-CacheRoot'='CacheRoot'; '-Domain'='Domain'; '-LightSlots'='LightSlots'; '-WaitTimeoutSeconds'='WaitTimeoutSeconds'; '-LockTimeoutSeconds'='LockTimeoutSeconds'
+} -SwitchOptions @('-NoLock','-DisableSccache','-SkipCacheGc','-BypassValidationOrchestrator','-RefreshValidationEvidence','-SkipCheapGates')
+$TargetDir=$parsed.wrapper.TargetDir; $CacheRoot=$parsed.wrapper.CacheRoot
+$Domain=if($parsed.wrapper.Domain){$parsed.wrapper.Domain}else{'dev-windows-msvc'}
+$LightSlots=if($parsed.wrapper.LightSlots){[int]$parsed.wrapper.LightSlots}else{2}
+$WaitTimeoutSeconds=if($parsed.wrapper.WaitTimeoutSeconds){[int]$parsed.wrapper.WaitTimeoutSeconds}else{3600}
+$LockTimeoutSeconds=if($parsed.wrapper.LockTimeoutSeconds){[int]$parsed.wrapper.LockTimeoutSeconds}else{3600}
+$NoLock=[bool]$parsed.wrapper.NoLock; $DisableSccache=[bool]$parsed.wrapper.DisableSccache
+$SkipCacheGc=[bool]$parsed.wrapper.SkipCacheGc; $BypassValidationOrchestrator=[bool]$parsed.wrapper.BypassValidationOrchestrator
+$RefreshValidationEvidence=[bool]$parsed.wrapper.RefreshValidationEvidence; $SkipCheapGates=[bool]$parsed.wrapper.SkipCheapGates
+$CargoArgs=@($parsed.cargo)
 if ($CargoArgs.Count -eq 0) {
-    Write-Error "Usage: powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 <cargo-args...>"
+    Write-Error "Usage: powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 [wrapper-options] -- <cargo-args...>"
 }
 
 $gitRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
@@ -46,6 +43,7 @@ if (-not $BypassValidationOrchestrator) {
     if ($RefreshValidationEvidence) { $validationArgs += "-Force" }
     if ($SkipCheapGates) { $validationArgs += "-SkipCheapGates" }
     $validationArgs += @("-LightSlots", $LightSlots, "-WaitTimeoutSeconds", $WaitTimeoutSeconds)
+    $validationArgs += '--'
     $validationArgs += $CargoArgs
     & (Join-Path $RepoRoot "scripts\validate-rust.ps1") @validationArgs
     exit $LASTEXITCODE
