@@ -4,7 +4,7 @@ use homecli_proto::CancelRequestAudit;
 use std::{fs, path::PathBuf};
 
 #[test]
-fn stale_cursor_resets_with_stable_sidecar_update_epoch() {
+fn stale_cursor_resets_with_stable_journal_epoch() {
     let dir = unique_test_dir("cursor-reset");
     let journal = TaskJournal::new(&dir);
     journal
@@ -25,7 +25,8 @@ fn stale_cursor_resets_with_stable_sidecar_update_epoch() {
     assert_eq!(reset.new_cursor, reset.resume_cursor);
     assert_eq!(reset.cursor_epoch, first.cursor_epoch);
     assert_eq!(reset.sidecar_update_epoch, first.sidecar_update_epoch);
-    assert!(reset.cursor_epoch.contains("run-stable"));
+    assert!(reset.cursor_epoch.starts_with("journal-"));
+    assert!(!reset.cursor_epoch.contains("run-stable"));
 }
 
 #[test]

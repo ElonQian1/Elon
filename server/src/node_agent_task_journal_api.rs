@@ -184,7 +184,19 @@ async fn cancel_task_journal(
         "task_journal_api",
         "operator_requested",
     );
-    if runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await {
+    let signaled = runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await;
+    let durable_intent = runtime
+        .task_journal
+        .snapshot(&task_id, 0, 1)
+        .ok()
+        .and_then(|snapshot| snapshot.record)
+        .is_some_and(|record| {
+            matches!(
+                record.status.as_str(),
+                "cancel_requested" | "canceled" | "failed" | "done"
+            )
+        });
+    if signaled || durable_intent {
         return Json(LocalTaskCancelResponse {
             ok: true,
             task_id,

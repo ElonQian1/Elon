@@ -26,7 +26,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use homecli_proto::{CancelRequestAudit, InterruptionSource};
+use homecli_proto::InterruptionSource;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -569,67 +569,10 @@ async fn action_response(
         &actor,
         "local_pc_ui",
     ) {
-        Ok((item, cancel_task_id)) => {
-            if let Some(task_id) = cancel_task_id {
-                if action == "pause" {
-                    let audit =
-                        CancelRequestAudit::now("node_agent", "local_pc_ui", "manual_pause")
-                            .with_interruption_source(InterruptionSource::SupervisorIntervention);
-                    if !runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await {
-                        let terminal = runtime
-                            .local_tasks
-                            .get(&task_id)
-                            .ok()
-                            .flatten()
-                            .is_some_and(|record| {
-                                matches!(
-                                    record.status.as_str(),
-                                    "cancel_requested" | "canceled" | "failed" | "done"
-                                )
-                            });
-                        if !terminal {
-                            return error_response(
-                                StatusCode::CONFLICT,
-                                "durable pause audit/cancel failed; retry is safe",
-                            );
-                        }
-                    }
-                } else if matches!(action, "approve" | "reject") {
-                    let verdict = if action == "approve" {
-                        "accepted"
-                    } else {
-                        "rejected"
-                    };
-                    if let Err(error) =
-                        crate::node_agent_local_task_supervision::record_actor_review(
-                            &runtime,
-                            &task_id,
-                            verdict,
-                            item.pending_action
-                                .as_ref()
-                                .and_then(|pending| pending.note.as_deref())
-                                .or(item.review_note.as_deref())
-                                .as_deref()
-                                .unwrap_or("self evolution queue review"),
-                            &actor,
-                            "local_pc_ui",
-                        )
-                    {
-                        return error_response(
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            error.to_string(),
-                        );
-                    }
-                }
-            }
-            match runtime
-                .self_evolution
-                .commit_action(&creds.owner_user_id, id.trim(), action)
-            {
-                Ok(item) => Json(json!({"ok": true, "item": item})).into_response(),
-                Err(error) => error_response(StatusCode::CONFLICT, error.to_string()),
-            }
-        }
+        Ok((item, _)) => match scheduler::apply_pending_action(&runtime, &item).await {
+            Ok(item) => Json(json!({"ok": true, "item": item})).into_response(),
+            Err(error) => error_response(StatusCode::CONFLICT, error.to_string()),
+        },
         Err(error) => error_response(StatusCode::CONFLICT, error.to_string()),
     }
 }

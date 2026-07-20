@@ -188,17 +188,27 @@ fn action_intent_is_durable_before_queue_transition() {
     assert_eq!(pending.status, "review_required");
     assert_eq!(pending.pending_action.as_ref().unwrap().action, "reject");
 
-    let committed = coordinator
+    let restarted = SelfEvolutionCoordinator::new(coordinator.path.clone());
+    assert_eq!(restarted.pending_actions().unwrap().len(), 1);
+    let committed = restarted
         .commit_action("owner-a", "evo-action", "reject")
         .unwrap();
     assert_eq!(committed.status, "paused");
     assert!(committed.pending_action.is_none());
+    assert_eq!(
+        restarted
+            .commit_action("owner-a", "evo-action", "reject")
+            .unwrap()
+            .status,
+        "paused"
+    );
 }
 
 #[test]
 fn supervised_provision_dispatch_record_exposes_only_isolated_execution_path() {
     let temp = std::env::temp_dir().join(format!("elon-dispatch-{}", Uuid::new_v4().simple()));
-    let base = temp.join("base");
+    let data_paths = elon_pc_dev_runtime::NodeDataPaths::new(temp.join("node-data"));
+    let base = data_paths.workspaces().join("project-a").join("base");
     std::fs::create_dir_all(&base).unwrap();
     for args in [
         vec!["init"],
@@ -221,30 +231,43 @@ fn supervised_provision_dispatch_record_exposes_only_isolated_execution_path() {
             .unwrap()
             .success());
     }
-    let workspace =
-        crate::pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision(
-            &temp,
-            base.to_string_lossy().as_ref(),
-            "project-a",
-            "conversation-dispatch",
-            Some("root-dispatch"),
-        )
-        .unwrap();
     let store = crate::node_agent_local_task_store::LocalTaskStore::new(temp.join("tasks.sqlite3"));
-    let record = store
-        .create(crate::node_agent_local_task_store::LocalTaskStart {
-            task_id: "local-dispatch",
-            owner_user_id: "owner-a",
-            agent_id: "agent-a",
-            install_id: "install-a",
-            project_id: "project-a",
-            channel_id: None,
-            conversation_id: "conversation-dispatch",
-            workspace_path: &workspace.workspace_path,
-            prompt: "verify dispatch",
-            cli: "codex",
-            runtime_permission: "full_access",
-        })
+    let journal = crate::node_agent_task_journal::TaskJournal::new(temp.join("journal"));
+    let contract = crate::node_agent_local_task_supervision::SupervisionContract {
+        protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.to_string(),
+        supervisor: "codex_desktop".to_string(),
+        task_role: "capability_repair".to_string(),
+        parent_task_id: Some("parent-dispatch".to_string()),
+        root_task_id: Some("root-dispatch".to_string()),
+        acceptance_criteria: vec!["isolated production dispatch".to_string()],
+        improvement_policy: "after_task_only".to_string(),
+    };
+    let mut dispatched_path = None;
+    let (record, workspace) =
+        crate::node_agent_local_tasks::provision_record_and_dispatch_supervised_task(
+            Some(&data_paths),
+            &store,
+            &journal,
+            crate::node_agent_local_tasks::SupervisedLocalTaskProvision {
+                task_id: "local-dispatch",
+                owner_user_id: "owner-a",
+                agent_id: "agent-a",
+                install_id: "install-a",
+                project_id: "project-a",
+                channel_id: None,
+                conversation_id: "conversation-dispatch",
+                base_workspace_path: base.to_string_lossy().as_ref(),
+                prompt: "verify dispatch",
+                runtime_permission: "full_access",
+                root_task_id: "root-dispatch",
+                contract: &contract,
+            },
+            |record, workspace| {
+                assert_eq!(record.workspace_path, workspace.workspace_path);
+                dispatched_path = Some(workspace.workspace_path.clone());
+                Ok(())
+            },
+        )
         .unwrap();
     assert!(workspace.isolated);
     assert_eq!(
@@ -252,4 +275,18 @@ fn supervised_provision_dispatch_record_exposes_only_isolated_execution_path() {
         workspace.workspace_path
     );
     assert_ne!(record.workspace_path, base.to_string_lossy());
+    assert_eq!(
+        dispatched_path.as_deref(),
+        Some(record.workspace_path.as_str())
+    );
+    let state = crate::node_agent_local_task_supervision::load_supervision_state(
+        &journal,
+        "local-dispatch",
+    )
+    .unwrap();
+    assert!(state.enabled);
+    assert_eq!(
+        state.contract().unwrap().root_task_id.as_deref(),
+        Some("root-dispatch")
+    );
 }

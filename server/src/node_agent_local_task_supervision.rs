@@ -6,6 +6,8 @@
 
 #[path = "node_agent_local_task_supervision_evidence.rs"]
 mod evidence;
+#[path = "node_agent_local_task_supervision_saga.rs"]
+mod saga;
 #[path = "node_agent_local_task_supervision_validation.rs"]
 mod validation;
 
@@ -90,6 +92,8 @@ struct SupervisionReviewRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SupervisionReview {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    action_id: Option<String>,
     protocol: String,
     verdict: String,
     summary: String,
@@ -259,7 +263,13 @@ pub(crate) fn record_supervision_event(
     payload: Value,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(
-        matches!(event_type, "supervision_contract" | "supervision_review"),
+        matches!(
+            event_type,
+            "supervision_contract"
+                | "supervision_review"
+                | "supervision_action_intent"
+                | "supervision_action_committed"
+        ),
         "unsupported supervision event type"
     );
     with_task_journal_io_lock(|| {
@@ -360,6 +370,27 @@ enum ReviewChannel {
     Desktop(HeaderMap),
 }
 
+fn resolve_review_identity(
+    channel: ReviewChannel,
+    auth: &crate::node_agent_desktop_review_auth::DesktopReviewAuth,
+    owner_user_id: &str,
+    task_id: &str,
+) -> Result<(String, String), crate::node_agent_desktop_review_auth::DesktopReviewAuthError> {
+    match channel {
+        ReviewChannel::PcOperator => Ok((
+            format!("pc_operator:{owner_user_id}"),
+            "local_pc_api".to_string(),
+        )),
+        ReviewChannel::Desktop(headers) => {
+            auth.verify_headers(&headers, owner_user_id, task_id)?;
+            Ok((
+                format!("{DEFAULT_SUPERVISOR}:{owner_user_id}"),
+                "codex_desktop_helper".to_string(),
+            ))
+        }
+    }
+}
+
 async fn review_task_as(
     runtime: Arc<NodeRuntime>,
     task_id: String,
@@ -372,6 +403,27 @@ async fn review_task_as(
             "本机节点尚未绑定账号，不能提交监督结论。",
         );
     };
+    let (reviewed_by, review_source) = match resolve_review_identity(
+        channel,
+        &runtime.desktop_review_auth,
+        &creds.owner_user_id,
+        task_id.trim(),
+    ) {
+        Ok(identity) => identity,
+        Err(error) => {
+            let (status, message) = match error {
+                crate::node_agent_desktop_review_auth::DesktopReviewAuthError::NotConfigured => (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "节点未配置 Desktop review 会话凭证。",
+                ),
+                _ => (
+                    StatusCode::UNAUTHORIZED,
+                    "Desktop review 票据缺失、失效或身份不匹配。",
+                ),
+            };
+            return json_error(status, message);
+        }
+    };
     let task = match runtime
         .local_tasks
         .get_for_owner(&creds.owner_user_id, task_id.trim())
@@ -379,32 +431,6 @@ async fn review_task_as(
         Ok(Some(task)) => task,
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "本机任务不存在。"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
-    };
-    let (reviewed_by, review_source) = match channel {
-        ReviewChannel::PcOperator => (
-            format!("pc_operator:{}", creds.owner_user_id),
-            "local_pc_api".to_string(),
-        ),
-        ReviewChannel::Desktop(headers) => {
-            if let Err(error) = runtime.desktop_review_auth.verify_headers(
-                &headers,
-                &creds.owner_user_id,
-                task_id.trim(),
-            ) {
-                let (status, message) = match error {
-                    crate::node_agent_desktop_review_auth::DesktopReviewAuthError::NotConfigured => (
-                        StatusCode::SERVICE_UNAVAILABLE,
-                        "节点未配置 Desktop review 会话凭证。",
-                    ),
-                    _ => (StatusCode::UNAUTHORIZED, "Desktop review 票据缺失、失效或身份不匹配。"),
-                };
-                return json_error(status, message);
-            }
-            (
-                format!("{DEFAULT_SUPERVISOR}:{}", creds.owner_user_id),
-                "codex_desktop_helper".to_string(),
-            )
-        }
     };
     let contract = match load_supervision_state(&runtime.task_journal, task_id.trim()) {
         Ok(state) if state.enabled => state.contract,
@@ -415,24 +441,20 @@ async fn review_task_as(
         Ok(review) => review,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
-    let payload = serde_json::to_value(&review).unwrap_or_else(|_| json!({}));
-    if let Err(error) = record_supervision_event(
-        &runtime.task_journal,
+    let action_id = match saga::begin_review_action(&runtime.task_journal, task_id.trim(), &review)
+    {
+        Ok(action_id) => action_id,
+        Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    };
+    if let Err(error) = saga::apply_review_action(
+        &runtime,
+        &task,
+        contract.as_ref(),
         task_id.trim(),
-        "supervision_review",
-        payload,
+        &action_id,
+        review,
     ) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
-    }
-    if let Err(error) = record_update_review_if_present(&runtime, task_id.trim(), &review) {
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
-    }
-    if review.verdict == "accepted" {
-        if let Err(error) =
-            release_accepted_worktree_lease(&runtime, &task, contract.as_ref(), task_id.trim())
-        {
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
-        }
     }
     match load_supervision_state(&runtime.task_journal, task_id.trim()) {
         Ok(supervision) => Json(json!({
@@ -459,6 +481,7 @@ pub(crate) fn record_actor_review(
         .context("reviewed local task was not found")?;
     let contract = load_supervision_state(&runtime.task_journal, task_id)?.contract;
     let review = SupervisionReview {
+        action_id: None,
         protocol: SUPERVISION_PROTOCOL.to_string(),
         verdict: verdict.to_string(),
         summary: summary.trim().to_string(),
@@ -467,28 +490,19 @@ pub(crate) fn record_actor_review(
         review_source: clean_id(review_source, "review_source").map_err(anyhow::Error::msg)?,
         reviewed_at_ms: now_ms(),
     };
-    let already_recorded = load_supervision_state(&runtime.task_journal, task_id)?
-        .review
-        .as_ref()
-        .is_some_and(|current| {
-            current.verdict == review.verdict
-                && current.summary == review.summary
-                && current.reviewed_by == review.reviewed_by
-                && current.review_source == review.review_source
-        });
-    if !already_recorded {
-        record_supervision_event(
-            &runtime.task_journal,
-            task_id,
-            "supervision_review",
-            serde_json::to_value(&review)?,
-        )?;
-        record_update_review_if_present(runtime, task_id, &review)?;
-    }
-    if verdict == "accepted" {
-        release_accepted_worktree_lease(runtime, &task, contract.as_ref(), task_id)?;
-    }
-    Ok(())
+    let action_id = saga::begin_review_action(&runtime.task_journal, task_id, &review)?;
+    saga::apply_review_action(
+        runtime,
+        &task,
+        contract.as_ref(),
+        task_id,
+        &action_id,
+        review,
+    )
+}
+
+pub(crate) fn reconcile_pending_review_actions(runtime: &NodeRuntime) -> anyhow::Result<()> {
+    saga::reconcile_pending_review_actions(runtime)
 }
 
 fn record_update_review_if_present(
@@ -707,6 +721,7 @@ fn normalize_review(
     let reviewed_by = clean_id(reviewed_by, "reviewed_by")?;
     let review_source = clean_id(review_source, "review_source")?;
     Ok(SupervisionReview {
+        action_id: None,
         protocol: SUPERVISION_PROTOCOL.to_string(),
         verdict,
         summary,

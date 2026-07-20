@@ -7,6 +7,21 @@ use uuid::Uuid;
 use super::{now_ms, PendingSelfEvolutionAction, SelfEvolutionCoordinator};
 
 impl SelfEvolutionCoordinator {
+    pub(super) fn pending_actions(&self) -> Result<Vec<super::SelfEvolutionItem>> {
+        if let Some(error) = self.load_error.as_ref() {
+            anyhow::bail!("self evolution queue failed closed: {error}");
+        }
+        Ok(self
+            .state
+            .lock()
+            .expect("self evolution queue lock")
+            .items
+            .iter()
+            .filter(|item| item.pending_action.is_some())
+            .cloned()
+            .collect())
+    }
+
     pub(super) fn request_gate_pauses(&self) -> Result<Vec<(String, String, String, String)>> {
         self.mutate(|state| {
             let Some(reason) = state.gates.blocker().map(str::to_string) else {
@@ -115,10 +130,25 @@ impl SelfEvolutionCoordinator {
                 .iter_mut()
                 .find(|item| item.owner_user_id == owner && item.logical_id == logical_id)
                 .context("self evolution item not found")?;
-            let pending = item
-                .pending_action
-                .take()
-                .context("self evolution action has no durable intent")?;
+            let Some(pending) = item.pending_action.take() else {
+                let committed = match action {
+                    "pause" => matches!(item.status.as_str(), "pause_requested" | "paused"),
+                    "resume" => matches!(item.status.as_str(), "queued" | "starting" | "running"),
+                    "approve" => {
+                        item.status == "completed"
+                            && item.review_verdict.as_deref() == Some("approved")
+                    }
+                    "reject" => {
+                        item.status == "paused"
+                            && item.review_verdict.as_deref() == Some("changes_requested")
+                    }
+                    _ => false,
+                };
+                if committed {
+                    return Ok(item.clone());
+                }
+                anyhow::bail!("self evolution action has no durable intent");
+            };
             if pending.action != action {
                 anyhow::bail!("self evolution pending action does not match");
             }

@@ -284,3 +284,47 @@ fn review_identity_prevents_pc_operator_from_impersonating_desktop() {
     assert_eq!(operator.reviewed_by, "pc_operator");
     assert_eq!(operator.review_source, "local_pc_api");
 }
+
+#[test]
+fn review_routes_enforce_desktop_ticket_and_server_owned_actor() {
+    use crate::node_agent_desktop_review_auth::{
+        DesktopReviewAuth, DesktopReviewAuthError, DESKTOP_REVIEW_TICKET_HEADER,
+    };
+
+    let auth = DesktopReviewAuth::for_test("desktop-route-credential-at-least-32-bytes");
+    let owner = "owner-route-a";
+    let task = "local-route-a";
+    let expires = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        + 60;
+    let ticket = auth.mint_for_test(owner, task, expires, "route-nonce-12345678");
+
+    let operator = resolve_review_identity(ReviewChannel::PcOperator, &auth, owner, task).unwrap();
+    assert_eq!(operator.0, "pc_operator:owner-route-a");
+    assert_ne!(operator.0, "codex_desktop:owner-route-a");
+    assert_eq!(
+        resolve_review_identity(ReviewChannel::Desktop(HeaderMap::new()), &auth, owner, task),
+        Err(DesktopReviewAuthError::Missing)
+    );
+
+    let mut wrong = HeaderMap::new();
+    wrong.insert(
+        DESKTOP_REVIEW_TICKET_HEADER,
+        format!("v1.{expires}.route-nonce-12345678.{}", "00".repeat(32))
+            .parse()
+            .unwrap(),
+    );
+    assert_eq!(
+        resolve_review_identity(ReviewChannel::Desktop(wrong), &auth, owner, task),
+        Err(DesktopReviewAuthError::Invalid)
+    );
+
+    let mut correct = HeaderMap::new();
+    correct.insert(DESKTOP_REVIEW_TICKET_HEADER, ticket.parse().unwrap());
+    let desktop =
+        resolve_review_identity(ReviewChannel::Desktop(correct), &auth, owner, task).unwrap();
+    assert_eq!(desktop.0, "codex_desktop:owner-route-a");
+    assert_eq!(desktop.1, "codex_desktop_helper");
+}

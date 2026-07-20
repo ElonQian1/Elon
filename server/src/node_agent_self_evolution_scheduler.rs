@@ -3,11 +3,10 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use homecli_proto::{CancelRequestAudit, CliProjectContext, InterruptionSource};
+use homecli_proto::{CancelRequestAudit, InterruptionSource};
 use serde_json::Value;
 
 use crate::{
-    node_agent_local_task_store::LocalTaskStart,
     node_agent_local_task_supervision::{SupervisionContract, SUPERVISION_PROTOCOL},
     NodeRuntime,
 };
@@ -28,6 +27,8 @@ pub(crate) fn spawn_scheduler(runtime: Arc<NodeRuntime>) {
 }
 
 async fn reconcile(runtime: &Arc<NodeRuntime>) -> Result<()> {
+    crate::node_agent_local_task_supervision::reconcile_pending_review_actions(runtime)?;
+    apply_pending_actions(runtime).await?;
     runtime
         .self_evolution
         .reconcile_records(&runtime.local_tasks)?;
@@ -58,30 +59,85 @@ async fn reconcile(runtime: &Arc<NodeRuntime>) -> Result<()> {
         resource_pressure,
         checked_at_ms: now_ms(),
     })?;
-    for (owner, logical_id, task_id, reason) in runtime.self_evolution.request_gate_pauses()? {
-        let audit = CancelRequestAudit::now(
-            "node_agent",
-            "self_evolution_scheduler",
-            format!("yield_for_{reason}"),
-        )
-        .with_interruption_source(if reason == "node_update" {
-            InterruptionSource::UpdaterApply
-        } else {
-            InterruptionSource::SupervisorIntervention
-        });
-        if !runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await {
-            anyhow::bail!("self evolution yield audit/cancel failed closed for {task_id}");
-        }
-        runtime
-            .self_evolution
-            .commit_action(&owner, &logical_id, "pause")?;
-    }
+    runtime.self_evolution.request_gate_pauses()?;
+    apply_pending_actions(runtime).await?;
     if let Some(item) = runtime.self_evolution.reserve_next()? {
         if let Err(error) = dispatch_generation(runtime, &item).await {
             runtime
                 .self_evolution
                 .mark_dispatch_failed(&item.logical_id, &error.to_string())?;
         }
+    }
+    Ok(())
+}
+
+pub(super) async fn apply_pending_action(
+    runtime: &Arc<NodeRuntime>,
+    item: &SelfEvolutionItem,
+) -> Result<SelfEvolutionItem> {
+    let pending = item
+        .pending_action
+        .as_ref()
+        .context("self evolution item has no pending action")?;
+    if pending.action == "pause" {
+        if let Some(task_id) = item.active_task_id.as_deref() {
+            let reason = pending.note.as_deref().unwrap_or("manual_pause");
+            let audit = CancelRequestAudit::now(&pending.actor, &pending.source, reason)
+                .with_interruption_source(if item.yield_reason.as_deref() == Some("node_update") {
+                    InterruptionSource::UpdaterApply
+                } else {
+                    InterruptionSource::SupervisorIntervention
+                });
+            if !runtime.cancel_cli_prompt_with_audit(task_id, &audit).await {
+                let durable = runtime
+                    .task_journal
+                    .snapshot(task_id, 0, 1)?
+                    .record
+                    .is_some_and(|record| {
+                        matches!(
+                            record.status.as_str(),
+                            "cancel_requested" | "canceled" | "failed" | "done"
+                        )
+                    })
+                    || runtime.local_tasks.get(task_id)?.is_some_and(|record| {
+                        matches!(
+                            record.status.as_str(),
+                            "cancel_requested" | "canceled" | "failed" | "done"
+                        )
+                    });
+                anyhow::ensure!(
+                    durable,
+                    "self evolution durable pause/cancel failed closed for {task_id}"
+                );
+            }
+        }
+    } else if matches!(pending.action.as_str(), "approve" | "reject") {
+        if let Some(task_id) = item.active_task_id.as_deref() {
+            crate::node_agent_local_task_supervision::record_actor_review(
+                runtime,
+                task_id,
+                if pending.action == "approve" {
+                    "accepted"
+                } else {
+                    "rejected"
+                },
+                pending
+                    .note
+                    .as_deref()
+                    .unwrap_or("self evolution queue review"),
+                &pending.actor,
+                &pending.source,
+            )?;
+        }
+    }
+    runtime
+        .self_evolution
+        .commit_action(&item.owner_user_id, &item.logical_id, &pending.action)
+}
+
+async fn apply_pending_actions(runtime: &Arc<NodeRuntime>) -> Result<()> {
+    for item in runtime.self_evolution.pending_actions()? {
+        apply_pending_action(runtime, &item).await?;
     }
     Ok(())
 }
@@ -107,64 +163,51 @@ async fn dispatch_generation(runtime: &Arc<NodeRuntime>, item: &SelfEvolutionIte
         improvement_policy: "after_task_only".to_string(),
     };
     let data_paths = runtime.node_data_root.read().await.paths.clone();
-    let prepared = crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
-        data_paths.as_ref(),
-        Some(item.workspace_path.clone()),
-        Some(CliProjectContext {
-            project_id: item.project_id.clone(),
-            conversation_id: item.conversation_id.clone(),
-            runtime_permission: Some(item.runtime_permission.clone()),
-        }),
-        Some(&item.root_task_id),
-    )?;
-    let execution_workspace = prepared
-        .conversation_workspace
-        .context("self evolution did not receive an isolated worktree")?;
-    if !execution_workspace.isolated
-        || crate::node_agent_update_checkpoint::same_path(
-            std::path::Path::new(&item.workspace_path),
-            std::path::Path::new(&execution_workspace.workspace_path),
-        )
-    {
-        anyhow::bail!("self evolution execution worktree is not isolated from the user workspace");
-    }
-    runtime
-        .self_evolution
-        .record_execution_worktree(&item.logical_id, &execution_workspace)?;
-    crate::node_agent_local_task_supervision::record_supervision_event(
-        &runtime.task_journal,
-        task_id,
-        "supervision_contract",
-        crate::node_agent_local_task_supervision::contract_payload(&contract),
-    )?;
-    let record = runtime.local_tasks.create(LocalTaskStart {
-        task_id,
-        owner_user_id: &item.owner_user_id,
-        agent_id: &item.agent_id,
-        install_id: &item.install_id,
-        project_id: &item.project_id,
-        channel_id: item.channel_id.as_deref(),
-        conversation_id: &item.conversation_id,
-        workspace_path: &execution_workspace.workspace_path,
-        prompt: &item.prompt,
-        cli: "codex",
-        runtime_permission: &item.runtime_permission,
-    })?;
     let continuation = if item.generation > 1 {
         format!("Low-priority self evolution is automatically resuming generation {} after yielding. Inspect the existing isolated worktree and durable journal before continuing; do not redo completed or non-repeatable actions.\n\n{}", item.generation, item.prompt)
     } else {
         item.prompt.clone()
     };
-    crate::node_agent_local_tasks::dispatch_local_task_record(
-        runtime.clone(),
-        &record,
-        crate::node_agent_local_task_supervision::executor_prompt(&continuation, Some(&contract)),
-        execution_workspace.workspace_path.clone(),
-        Some(&contract),
-        Some(execution_workspace),
-        None,
-        frozen,
-    );
+    let (record, execution_workspace) =
+        crate::node_agent_local_tasks::provision_record_and_dispatch_supervised_task(
+            data_paths.as_ref(),
+            &runtime.local_tasks,
+            &runtime.task_journal,
+            crate::node_agent_local_tasks::SupervisedLocalTaskProvision {
+                task_id,
+                owner_user_id: &item.owner_user_id,
+                agent_id: &item.agent_id,
+                install_id: &item.install_id,
+                project_id: &item.project_id,
+                channel_id: item.channel_id.as_deref(),
+                conversation_id: &item.conversation_id,
+                base_workspace_path: &item.workspace_path,
+                prompt: &item.prompt,
+                runtime_permission: &item.runtime_permission,
+                root_task_id: &item.root_task_id,
+                contract: &contract,
+            },
+            |record, workspace| {
+                runtime
+                    .self_evolution
+                    .record_execution_worktree(&item.logical_id, workspace)?;
+                crate::node_agent_local_tasks::dispatch_local_task_record(
+                    runtime.clone(),
+                    record,
+                    crate::node_agent_local_task_supervision::executor_prompt(
+                        &continuation,
+                        Some(&contract),
+                    ),
+                    workspace.workspace_path.clone(),
+                    Some(&contract),
+                    Some(workspace.clone()),
+                    None,
+                    frozen.clone(),
+                );
+                Ok(())
+            },
+        )?;
+    anyhow::ensure!(record.workspace_path == execution_workspace.workspace_path);
     Ok(())
 }
 
