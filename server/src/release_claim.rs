@@ -35,7 +35,8 @@ mod support;
 use crate::types::AppState;
 use support::{
     adopt_legacy_batch_identity, claim_response_for_existing, ensure_manager_healthy,
-    persist_or_restore, public_in_flight, publish_token_status, validate_finish_identity,
+    heartbeat_stage, persist_or_restore, public_in_flight, publish_token_status,
+    validate_finish_identity, validate_finish_owner,
 };
 
 // ===== 调参常量 =====
@@ -142,7 +143,9 @@ pub struct FinishRequest {
     pub kind: String,
     pub token: String,
     pub success: bool,
-    pub sha: Option<String>,
+    pub sha: String,
+    pub batch_id: String,
+    pub stage: String,
     pub version_name: Option<String>,
     pub version_code: Option<i64>,
     pub error_message: Option<String>,
@@ -504,18 +507,7 @@ pub async fn heartbeat_handler(
         lease_entry.batch_id = batch_id.to_string();
         lease_entry.stage = crate::release_batch::default_stage(kind.as_str()).to_string();
     }
-    if req
-        .batch_id
-        .as_deref()
-        .is_some_and(|batch| batch.trim() != lease_entry.batch_id)
-    {
-        return Err(err(
-            StatusCode::CONFLICT,
-            "batch-mismatch",
-            "heartbeat batch does not own token",
-        ));
-    }
-    let stage = req.stage.as_deref().unwrap_or(&lease_entry.stage);
+    let stage = heartbeat_stage(&guard, &lease_entry, &req)?;
     crate::release_batch::record_stage(
         &mut guard,
         &lease_entry.batch_id,
@@ -576,6 +568,7 @@ pub async fn finish_handler(
             "only the current global publish owner may finish this lease",
         ));
     };
+    validate_finish_owner(&owner, &req)?;
 
     let lane_mut_ref = lane_mut(&mut guard, kind);
     let pos = lane_mut_ref
@@ -740,7 +733,9 @@ mod tests {
             success: true,
             version_name: Some(version_name.to_string()),
             version_code: Some(version_code),
-            sha: Some(sha.to_string()),
+            sha: sha.to_string(),
+            batch_id: "release-fixed-sha".to_string(),
+            stage: "android_apk".to_string(),
             error_message: None,
         }
     }

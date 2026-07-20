@@ -509,10 +509,10 @@ function Complete-Release {
             kind  = 'server'
             token = $script:ReleaseToken
             success = $Success
+            sha = $ShaBig; batchId = $script:ReleaseBatchId; stage = 'server'
         }
         if ($Success) {
             if ($VersionName) { $payload.versionName = $VersionName }
-            if ($Sha)         { $payload.sha = $Sha }
         } else {
             if ($ErrorMessage) { $payload.errorMessage = $ErrorMessage }
         }

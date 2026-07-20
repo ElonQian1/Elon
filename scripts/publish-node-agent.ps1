@@ -490,6 +490,9 @@ $script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeRelease
 if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
     $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
 }
+$script:NodeReleaseHeartbeat = Start-ElonReleaseHeartbeat -ReleaseApiBase "$BaseUrl/api/release" `
+    -Kind 'node_agent' -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId `
+    -Stage 'windows_node'
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
@@ -759,7 +762,7 @@ Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
-if ($script:NodeReleaseOwned) { Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -Success $true -Sha $GitSha -VersionName $PackageVersion }
+if ($script:NodeReleaseOwned) { Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -Success $true -Sha $GitSha -BatchId $script:NodeReleaseBatchId -Stage 'windows_node' -VersionName $PackageVersion }
 $script:NodeReleaseFinished = $true
 } catch {
     try { if ($script:NodeReleaseOwned -and -not $script:NodeReleaseFinished) {
@@ -767,9 +770,11 @@ $script:NodeReleaseFinished = $true
                 -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId `
                 -Stage $script:NodeReleaseActiveStage -Status 'failed'
             Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-                -Token $script:NodeReleaseToken -Success $false -ErrorMessage ($_ | Out-String)
+                -Token $script:NodeReleaseToken -Success $false -Sha $GitSha `
+                -BatchId $script:NodeReleaseBatchId -Stage 'windows_node' -ErrorMessage ($_ | Out-String)
         } } catch {}
     throw
 } finally {
+    Stop-ElonReleaseHeartbeat -HeartbeatJob $script:NodeReleaseHeartbeat
     Exit-NodeAgentPublishLock -Lock $PublishLock
 }

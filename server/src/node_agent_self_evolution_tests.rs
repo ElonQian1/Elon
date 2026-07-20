@@ -194,3 +194,62 @@ fn action_intent_is_durable_before_queue_transition() {
     assert_eq!(committed.status, "paused");
     assert!(committed.pending_action.is_none());
 }
+
+#[test]
+fn supervised_provision_dispatch_record_exposes_only_isolated_execution_path() {
+    let temp = std::env::temp_dir().join(format!("elon-dispatch-{}", Uuid::new_v4().simple()));
+    let base = temp.join("base");
+    std::fs::create_dir_all(&base).unwrap();
+    for args in [
+        vec!["init"],
+        vec!["config", "user.email", "ai@example.test"],
+        vec!["config", "user.name", "AI Test"],
+    ] {
+        assert!(crate::git_command_error::git_command()
+            .args(args)
+            .current_dir(&base)
+            .status()
+            .unwrap()
+            .success());
+    }
+    std::fs::write(base.join("README.md"), "seed\n").unwrap();
+    for args in [vec!["add", "README.md"], vec!["commit", "-m", "seed"]] {
+        assert!(crate::git_command_error::git_command()
+            .args(args)
+            .current_dir(&base)
+            .status()
+            .unwrap()
+            .success());
+    }
+    let workspace =
+        crate::pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision(
+            &temp,
+            base.to_string_lossy().as_ref(),
+            "project-a",
+            "conversation-dispatch",
+            Some("root-dispatch"),
+        )
+        .unwrap();
+    let store = crate::node_agent_local_task_store::LocalTaskStore::new(temp.join("tasks.sqlite3"));
+    let record = store
+        .create(crate::node_agent_local_task_store::LocalTaskStart {
+            task_id: "local-dispatch",
+            owner_user_id: "owner-a",
+            agent_id: "agent-a",
+            install_id: "install-a",
+            project_id: "project-a",
+            channel_id: None,
+            conversation_id: "conversation-dispatch",
+            workspace_path: &workspace.workspace_path,
+            prompt: "verify dispatch",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    assert!(workspace.isolated);
+    assert_eq!(
+        serde_json::to_value(&record).unwrap()["workspace_path"],
+        workspace.workspace_path
+    );
+    assert_ne!(record.workspace_path, base.to_string_lossy());
+}

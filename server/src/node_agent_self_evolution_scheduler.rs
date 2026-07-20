@@ -145,7 +145,7 @@ async fn dispatch_generation(runtime: &Arc<NodeRuntime>, item: &SelfEvolutionIte
         project_id: &item.project_id,
         channel_id: item.channel_id.as_deref(),
         conversation_id: &item.conversation_id,
-        workspace_path: &item.workspace_path,
+        workspace_path: &execution_workspace.workspace_path,
         prompt: &item.prompt,
         cli: "codex",
         runtime_permission: &item.runtime_permission,

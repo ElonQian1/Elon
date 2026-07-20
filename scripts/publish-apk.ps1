@@ -136,11 +136,11 @@ function Complete-Release {
             kind  = 'apk'
             token = $script:ReleaseToken
             success = $Success
+            sha = $BuildBaseSha; batchId = [string]$claim.batchId; stage = [string]$claim.stage
         }
         if ($Success) {
             if ($VersionName) { $payload.versionName = $VersionName }
             if ($VersionCode -gt 0) { $payload.versionCode = $VersionCode }
-            if ($Sha)         { $payload.sha = $Sha }
         } else {
             if ($ErrorMessage) { $payload.errorMessage = $ErrorMessage }
         }

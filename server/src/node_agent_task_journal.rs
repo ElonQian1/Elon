@@ -94,6 +94,13 @@ pub(crate) struct TaskJournalSnapshot {
     pub events: Vec<TaskJournalEventView>,
     pub last_event_seq: usize,
     pub has_more: bool,
+    pub cursor_epoch: String,
+    pub cursor_reset: bool,
+    pub requested_cursor: usize,
+    pub old_cursor: usize,
+    pub new_cursor: usize,
+    pub resume_cursor: usize,
+    pub sidecar_update_epoch: String,
 }
 
 impl TaskJournal {
@@ -434,7 +441,23 @@ impl TaskJournal {
             // Journal 只保存本机进程状态，不写入 prompt/API key；读取时仍按 req_id 过滤，避免
             // 前端把其他任务的本机路径混进当前任务卡片。压力场景下按行流式扫描，避免把整个
             // events.jsonl 收集到内存后再过滤。
-            let event_scan = self.scan_task_events(task_id, since, event_limit)?;
+            let initial_scan = self.scan_task_events(task_id, since, event_limit)?;
+            let cursor_reset = since > initial_scan.scanned_last_seq;
+            let event_scan = if cursor_reset {
+                self.scan_task_events(task_id, 0, event_limit)?
+            } else {
+                initial_scan
+            };
+            let cursor_epoch = record
+                .as_ref()
+                .map(|record| {
+                    format!(
+                        "task-{}-{}",
+                        record.started_at_ms,
+                        record.run_handle_id.as_deref().unwrap_or("legacy")
+                    )
+                })
+                .unwrap_or_else(|| format!("task-missing-{task_id}"));
 
             Ok(TaskJournalSnapshot {
                 task_id: task_id.to_string(),
@@ -443,6 +466,13 @@ impl TaskJournal {
                 events: event_scan.events,
                 last_event_seq: event_scan.last_event_seq,
                 has_more: event_scan.has_more,
+                cursor_epoch: cursor_epoch.clone(),
+                cursor_reset,
+                requested_cursor: since,
+                old_cursor: since,
+                new_cursor: event_scan.last_event_seq,
+                resume_cursor: event_scan.last_event_seq,
+                sidecar_update_epoch: cursor_epoch,
             })
         })
     }

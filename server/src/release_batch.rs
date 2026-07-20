@@ -178,6 +178,30 @@ pub(crate) fn expire_stage(state: &mut ReleaseStateFile, owner: &PublishLeaseEnt
     );
 }
 
+pub(crate) fn validate_stage_transition(
+    state: &ReleaseStateFile,
+    batch_id: &str,
+    stage: &str,
+    next: &str,
+) -> Result<(), &'static str> {
+    if !matches!(next, "queued" | "running" | "succeeded" | "failed") {
+        return Err("stage status is not recognized");
+    }
+    let current = state
+        .release_batches
+        .iter()
+        .find(|batch| batch.batch_id == batch_id)
+        .and_then(|batch| batch.stages.iter().find(|item| item.stage == stage))
+        .map(|item| item.status.as_str());
+    match (current, next) {
+        (Some("succeeded" | "failed" | "expired"), candidate) if current != Some(candidate) => {
+            Err("terminal release stage cannot transition")
+        }
+        (Some("running"), "queued") => Err("running release stage cannot return to queued"),
+        _ => Ok(()),
+    }
+}
+
 fn normalize_status(status: &str) -> &'static str {
     match status {
         "queued" => "queued",

@@ -144,19 +144,54 @@ function Update-ElonReleaseStage {
     } | Out-Null
 }
 
+function Start-ElonReleaseHeartbeat {
+    param(
+        [Parameter(Mandatory)][string]$ReleaseApiBase,
+        [Parameter(Mandatory)][string]$Kind,
+        [Parameter(Mandatory)][string]$Token,
+        [Parameter(Mandatory)][string]$BatchId,
+        [Parameter(Mandatory)][string]$Stage,
+        [int]$IntervalSecs = 30,
+        [int]$LeaseSecs = 14400
+    )
+    if ([string]::IsNullOrWhiteSpace($Token)) { return $null }
+    $helperPath = $MyInvocation.MyCommand.Path
+    return Start-Job -ScriptBlock {
+        param($Path, $Api, $LeaseKind, $LeaseToken, $Batch, $LeaseStage, $Interval, $Lease)
+        . $Path
+        while ($true) {
+            Start-Sleep -Seconds $Interval
+            Update-ElonReleaseStage -ReleaseApiBase $Api -Kind $LeaseKind -Token $LeaseToken `
+                -BatchId $Batch -Stage $LeaseStage -Status 'running' -LeaseSecs $Lease
+        }
+    } -ArgumentList $helperPath, $ReleaseApiBase, $Kind, $Token, $BatchId, $Stage, $IntervalSecs, $LeaseSecs
+}
+
+function Stop-ElonReleaseHeartbeat {
+    param([object]$HeartbeatJob)
+    if ($null -eq $HeartbeatJob) { return }
+    Stop-Job -Job $HeartbeatJob -ErrorAction SilentlyContinue
+    Receive-Job -Job $HeartbeatJob -ErrorAction SilentlyContinue | Out-Null
+    Remove-Job -Job $HeartbeatJob -Force -ErrorAction SilentlyContinue
+}
+
 function Complete-ElonReleaseLease {
     param(
         [Parameter(Mandatory)][string]$ReleaseApiBase,
         [Parameter(Mandatory)][string]$Kind,
         [Parameter(Mandatory)][string]$Token,
         [Parameter(Mandatory)][bool]$Success,
-        [string]$Sha = '',
+        [Parameter(Mandatory)][string]$Sha,
+        [Parameter(Mandatory)][string]$BatchId,
+        [Parameter(Mandatory)][string]$Stage,
         [string]$VersionName = '',
         [string]$ErrorMessage = ''
     )
-    $body = @{ kind = $Kind; token = $Token; success = $Success }
+    $body = @{
+        kind = $Kind; token = $Token; success = $Success
+        sha = $Sha; batchId = $BatchId; stage = $Stage
+    }
     if ($Success) {
-        if ($Sha) { $body.sha = $Sha }
         if ($VersionName) { $body.versionName = $VersionName }
     } elseif ($ErrorMessage) {
         $body.errorMessage = $ErrorMessage

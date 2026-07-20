@@ -158,6 +158,7 @@ try {
   assert.strictEqual(evolution.items[0].generation, 2)
   assert.strictEqual(evolution.items[0].pause_reason, 'global_publish')
   assert.strictEqual(evolution.items[0].execution_isolated, true)
+  assert.notStrictEqual(evolution.items[0].execution_worktree, 'D:\\work\\elon', 'queue/UI must expose the isolated execution path')
   assert.strictEqual(evolution.items[0].interruption_source, 'supervisor_intervention')
   assert.strictEqual(evolution.items[0].review_source, 'local_pc_ui')
   assert.strictEqual(evolution.gates.publish_active, true)

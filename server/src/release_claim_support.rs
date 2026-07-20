@@ -5,9 +5,67 @@ use serde_json::{json, Value};
 use tokio::sync::MutexGuard;
 
 use super::{
-    err, lane, lane_mut, parse_kind, ClaimResponse, FinishRequest, InFlightBuilder, Lane,
-    PublicPublishLeaseEntry,
+    err, lane, lane_mut, parse_kind, ClaimResponse, FinishRequest, HeartbeatRequest,
+    InFlightBuilder, Lane, PublicPublishLeaseEntry,
 };
+
+pub(super) fn heartbeat_stage<'a>(
+    state: &crate::release_manager::ReleaseStateFile,
+    lease: &crate::release_manager::PublishLeaseEntry,
+    request: &'a HeartbeatRequest,
+) -> Result<&'a str, (StatusCode, Json<Value>)> {
+    if request
+        .batch_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        != Some(lease.batch_id.as_str())
+    {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "batch-mismatch",
+            "heartbeat batch does not own token",
+        ));
+    }
+    let stage = request
+        .stage
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            err(
+                StatusCode::CONFLICT,
+                "stage-required",
+                "heartbeat stage is required",
+            )
+        })?;
+    crate::release_batch::validate_stage_transition(
+        state,
+        &lease.batch_id,
+        stage,
+        request.stage_status.as_deref().unwrap_or("running"),
+    )
+    .map_err(|message| err(StatusCode::CONFLICT, "invalid-stage-transition", message))?;
+    Ok(stage)
+}
+
+pub(super) fn validate_finish_owner(
+    owner: &crate::release_manager::PublishLeaseEntry,
+    request: &FinishRequest,
+) -> Result<(), (StatusCode, Json<Value>)> {
+    if request.batch_id.trim() == owner.batch_id
+        && request.stage.trim() == owner.stage
+        && request.sha.trim() == owner.sha
+    {
+        Ok(())
+    } else {
+        Err(err(
+            StatusCode::CONFLICT,
+            "finish-identity-mismatch",
+            "finish must match owner token, batch, stage, and immutable sha",
+        ))
+    }
+}
 
 pub(super) async fn persist_or_restore(
     manager: &crate::release_manager::ReleaseManager,
@@ -183,11 +241,7 @@ pub(super) fn validate_finish_identity<'a>(
     build: &InFlightBuilder,
     request: &FinishRequest,
 ) -> Result<(), (&'a str, &'a str)> {
-    if request
-        .sha
-        .as_deref()
-        .is_some_and(|sha| sha.trim() != build.sha)
-    {
+    if request.sha.trim() != build.sha {
         return Err((
             "immutable-sha-mismatch",
             "finish sha must match the immutable sha captured by claim",
@@ -256,5 +310,27 @@ mod tests {
         assert_eq!(owner.stage, "server");
         assert_eq!(state.server.in_flight[0].batch_id, "release-fixed-sha");
         assert_eq!(state.server.in_flight[0].stage, "server");
+    }
+
+    #[tokio::test]
+    async fn persist_failure_restores_shared_release_memory() {
+        let root =
+            std::env::temp_dir().join(format!("elon-release-persist-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let manager = crate::release_manager::ReleaseManager::load_or_init(&root);
+        std::fs::remove_dir_all(&root).unwrap();
+        std::fs::write(&root, b"parent is now a file").unwrap();
+        let mut guard = manager.inner.lock().await;
+        let original = guard.clone();
+        guard.server.last_published_version_name = Some("9.9.9".to_string());
+        assert!(persist_or_restore(&manager, &mut guard, original.clone())
+            .await
+            .is_err());
+        assert_eq!(
+            guard.server.last_published_version_name,
+            original.server.last_published_version_name
+        );
+        drop(guard);
+        let _ = std::fs::remove_file(root);
     }
 }

@@ -70,7 +70,7 @@
 - 同一 root 的多代 `resume_original` 或后台改进只能继承已验证的基础仓库、平台路径、分支、Git 身份和 `elon-supervision:<root_task_id>` lease。旧项目别名先规范化为节点当前绑定再做授权比较；别名不能把跨项目、跨 root、脏而不可信或并发占用的现场变成合法继承。
 - 计划更新的安全恢复不需要用户点 `Resume`：两个 recovery v1 回执和本地 restart checkpoint 按单调状态合并，`resumed`/终态不能再被旧 `restart_recovery` 覆盖成 `resume_required`。新进程必须继续同一 journal 游标并正常终止；只有无法证明任务身份、现场独占或恢复事务完整性时才暴露 `resume_required`。
 - 取消审计统一保留 `requested_by`、`source`、`reason`、`requested_at_ms`，系统让路再记录可信 `interruption_source`：`supervisor_intervention`、`node_restart` 或 `updater_apply`。审计先写 sidecar/journal 才允许实际取消，不能从 `exit=-1` 反推来源；读取旧记录时新字段可空，不能因此拒绝旧任务。
-- 发布使用跨组件全局 lease：状态页显示 owner、FIFO waiters 和 coalesced waiters；相同 release kind + SHA 合并等待，不同 SHA 排队。server、PC 前端、Windows 节点共享 `batch_id + immutable SHA`，逐阶段 heartbeat、attempt、接管、成功/失败写入持久 ledger；未知、过期、损坏状态一律 fail-closed。release SHA 在 claim 时固定且不可变，等待期间不得因 `main` 前进反复改 SHA 而饿死。
+- 发布使用跨组件全局 lease：状态页显示 owner、FIFO waiters 和 coalesced waiters；相同 release kind + SHA 合并等待，不同 SHA 排队。server、PC 前端、Windows 节点共享 `batch_id + immutable SHA`，批次显式声明 `server / pc_frontend / windows_node` 三个预期阶段，缺少任一阶段都不会成功。逐阶段 heartbeat、attempt、接管、成功/失败写入原子持久 ledger；未知、过期、损坏状态一律 fail-closed。release SHA 在 claim 时固定且不可变，等待期间不得因 `main` 前进反复改 SHA 而饿死。
 - PC 操作审查使用 `pc_operator:<owner>` 和 `local_pc_ui`，不得冒充 `codex_desktop`；Desktop 辅助脚本必须显式发送 `codex_desktop_helper`。只有真实更新任务才要求 recovery receipt，普通监督任务不因没有更新回执而拒绝审查。
 
 ## 证据与验收
@@ -129,10 +129,13 @@
 {
   "verdict": "accepted",
   "summary": "diff、测试、发布与统一收尾均已独立复核",
-  "improvements": ["后续可缩短节点版本探测时间"],
-  "reviewed_by": "codex_desktop"
+  "improvements": ["后续可缩短节点版本探测时间"]
 }
 ```
+
+公共 review DTO 不接受 `reviewed_by` 或 `review_source`。本机 UI 路由固定注入
+`pc_operator:<owner> / local_pc_api`；Desktop helper 使用独立的 `desktop-review`
+路由，由节点注入 `codex_desktop / codex_desktop_helper`，调用方不能通过 body 冒充。
 
 可用结论为 `observing`、`accepted`、`needs_follow_up`、`blocked_capability`、`rejected`。契约和 review 都写入 append-only task journal；同一任务显示最新 review，历史仍保留。
 

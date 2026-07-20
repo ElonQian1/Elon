@@ -4,6 +4,31 @@ use homecli_proto::CancelRequestAudit;
 use std::{fs, path::PathBuf};
 
 #[test]
+fn stale_cursor_resets_with_stable_sidecar_update_epoch() {
+    let dir = unique_test_dir("cursor-reset");
+    let journal = TaskJournal::new(&dir);
+    journal
+        .record_started(TaskJournalStart {
+            req_id: "req-reset",
+            cli_name: "codex",
+            route: Some("managed_pipe_json_sidecar"),
+            run_handle_id: Some("run-stable"),
+            cwd: Some("D:/isolated"),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+    let first = journal.snapshot("req-reset", 0, 20).unwrap();
+    let reset = journal.snapshot("req-reset", 9999, 20).unwrap();
+    assert!(reset.cursor_reset);
+    assert_eq!(reset.requested_cursor, 9999);
+    assert_eq!(reset.old_cursor, 9999);
+    assert_eq!(reset.new_cursor, reset.resume_cursor);
+    assert_eq!(reset.cursor_epoch, first.cursor_epoch);
+    assert_eq!(reset.sidecar_update_epoch, first.sidecar_update_epoch);
+    assert!(reset.cursor_epoch.contains("run-stable"));
+}
+
+#[test]
 fn records_started_cancel_and_finished_events() {
     let dir = unique_test_dir("lifecycle");
     let journal = TaskJournal::new(&dir);

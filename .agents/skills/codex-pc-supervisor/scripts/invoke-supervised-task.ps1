@@ -593,6 +593,13 @@ switch ($Action) {
             ok = $true; action = 'Inspect'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId
             since = $Since; limit = $Limit; next_cursor = $nextCursor; detail = $resultDetail
+            cursor_reset = [bool](Get-ObjectField $detail 'cursor_reset')
+            requested_cursor = Get-ObjectField $detail 'requested_cursor'
+            old_cursor = Get-ObjectField $detail 'old_cursor'
+            new_cursor = Get-ObjectField $detail 'new_cursor'
+            resume_cursor = Get-ObjectField $detail 'resume_cursor'
+            cursor_epoch = Get-ObjectField $detail 'cursor_epoch'
+            sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
         })
     }
     'Wait' {
@@ -610,7 +617,9 @@ switch ($Action) {
                 $record = Get-RecordFromDetail $detail
                 $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
                 $returnedCursor = [int](Get-ObjectField $detail 'last_event_seq')
-                if ($returnedCursor -gt $cursor) { $cursor = $returnedCursor }
+                if ((Get-ObjectField $detail 'cursor_reset') -eq $true) {
+                    $cursor = [int](Get-ObjectField $detail 'resume_cursor')
+                } elseif ($returnedCursor -gt $cursor) { $cursor = $returnedCursor }
                 if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
                 if ((Get-ObjectField $detail 'has_more') -eq $true) { continue }
             } catch {
@@ -624,6 +633,13 @@ switch ($Action) {
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId; status = $status
             since = $(if ($Since -ge 0) { $Since } else { 0 }); limit = $waitLimit
             next_cursor = $cursor; detail = $resultDetail
+            cursor_reset = [bool](Get-ObjectField $detail 'cursor_reset')
+            requested_cursor = Get-ObjectField $detail 'requested_cursor'
+            old_cursor = Get-ObjectField $detail 'old_cursor'
+            new_cursor = Get-ObjectField $detail 'new_cursor'
+            resume_cursor = Get-ObjectField $detail 'resume_cursor'
+            cursor_epoch = Get-ObjectField $detail 'cursor_epoch'
+            sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
         })
     }
     'Review' {
