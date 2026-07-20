@@ -687,7 +687,9 @@ async fn run_cli_task(
         runtime: runtime.clone(),
         cancel_rx,
         out_tx,
-        codex_vault_switch_attempted: !allow_codex_auth_switch,
+        codex_auth_attempts: crate::node_agent_codex_auth_switch::CodexAuthAttemptState::new(
+            allow_codex_auth_switch,
+        ),
         completion_context,
         frozen_codex_home,
     })

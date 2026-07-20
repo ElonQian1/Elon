@@ -302,7 +302,7 @@ pub(crate) struct CliPromptRun {
     pub(crate) runtime: Arc<NodeRuntime>,
     pub(crate) cancel_rx: watch::Receiver<bool>,
     pub(crate) out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
-    pub(crate) codex_vault_switch_attempted: bool,
+    pub(crate) codex_auth_attempts: crate::node_agent_codex_auth_switch::CodexAuthAttemptState,
     pub(crate) completion_context: CliCompletionContext,
     pub(crate) frozen_codex_home: Option<node_agent_codex_child_env::FrozenCodexHome>,
 }
@@ -323,7 +323,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         runtime,
         cancel_rx,
         out_tx,
-        codex_vault_switch_attempted,
+        codex_auth_attempts,
         completion_context,
         frozen_codex_home,
     } = run;
@@ -654,7 +654,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         extra_args,
         runtime_permission,
         conversation_workspace,
-        codex_vault_switch_attempted,
+        codex_auth_attempts,
         runtime,
         out_tx,
         cancel_rx,

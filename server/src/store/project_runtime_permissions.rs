@@ -4,7 +4,6 @@ use rusqlite::{params, OptionalExtension};
 use super::{
     default_project_runtime_permission, is_system_project_source_type, new_id,
     normalize_project_runtime_permission, now, ProjectRuntimePermission, Store,
-    PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
 };
 
 impl Store {
@@ -77,7 +76,7 @@ impl Store {
                 |row| row.get(0),
             )
             .optional()?
-            .unwrap_or_else(|| PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE.to_string());
+            .unwrap_or_else(default_project_runtime_permission);
         let updated_at = now();
         tx.execute(
             "INSERT INTO project_runtime_permissions (project_id, mode, updated_by, updated_at)

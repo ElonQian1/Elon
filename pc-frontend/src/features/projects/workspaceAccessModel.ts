@@ -32,7 +32,7 @@ export function workspaceAccessStatus({
   if (matchingGrant) {
     return { tone: 'success', label: '已授权', summary: '这台电脑已确认该项目目录，可以重新发送 AI 开发任务。' }
   }
-  return { tone: 'danger', label: '等待本机确认', summary: '云端已启用完全访问，但这台电脑还没有确认当前项目目录。请使用下方按钮授权。' }
+  return { tone: 'danger', label: '等待自动授权', summary: '云端已启用完全访问；发送开发任务时会为当前账号已绑定的项目目录自动登记，也可使用下方按钮立即授权。' }
 }
 
 export function runtimePermissionLabel(value?: string | null) {

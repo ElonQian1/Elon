@@ -92,7 +92,7 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         extra_args,
         runtime_permission,
         conversation_workspace,
-        codex_vault_switch_attempted,
+        mut codex_auth_attempts,
         runtime,
         out_tx,
         mut cancel_rx,
@@ -274,7 +274,7 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
                 runtime,
                 cancel_rx,
                 out_tx,
-                codex_vault_switch_attempted,
+                codex_auth_attempts,
                 completion_context,
                 frozen_codex_home,
             }))
@@ -283,12 +283,13 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         }
     }
 
-    if !result.exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
+    if !result.exit_ok && cli_name == "codex" {
         if let Some(auth_switch) = node_agent_codex_auth_switch::try_after_failure(
             &runtime,
             &req_id,
             &result.stdout_text,
             &result.stderr_text,
+            &mut codex_auth_attempts,
         )
         .await
         {
@@ -314,7 +315,7 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
                 runtime,
                 cancel_rx,
                 out_tx,
-                codex_vault_switch_attempted: true,
+                codex_auth_attempts,
                 completion_context,
                 frozen_codex_home: Some(auth_switch.frozen_codex_home),
             }))
@@ -359,7 +360,7 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
             runtime,
             cancel_rx,
             out_tx,
-            codex_vault_switch_attempted,
+            codex_auth_attempts,
             completion_context,
             frozen_codex_home,
         }))

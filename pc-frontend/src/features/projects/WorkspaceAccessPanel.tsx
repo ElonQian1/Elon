@@ -105,22 +105,12 @@ export default function WorkspaceAccessPanel({
       throw new Error(folder.registration?.summary || '选择的目录缺少项目注册信息，无法授权')
     }
 
-    const warning = runtimePermission === 'danger_full_access'
-      ? '授权后，本机 Codex 可按当前项目设置运行任意命令，并访问项目目录之外的文件。'
-      : fullAccessRequired
-        ? '授权后，本机 Codex 可在该项目的完全访问模式下运行。'
-        : '绑定后，本机 AI 仍受项目目录写入边界限制。'
     const actionVerb = fullAccessRequired ? '授权' : '绑定'
-    const confirmed = window.confirm(
-      `确认${actionVerb}“${projectName}”使用以下本机目录？\n\n${payload.workspace_path}\n\n${warning}`,
-    )
-    if (!confirmed) {
-      setMessage(`已取消本机目录${actionVerb}。`)
-      return
-    }
 
     setBusy(source)
-    setMessage(source === 'pick' ? `正在${actionVerb}所选目录…` : `正在${actionVerb}当前目录…`)
+    setMessage(source === 'pick'
+      ? `正在为“${projectName}”${actionVerb}所选目录…`
+      : `正在为“${projectName}”${actionVerb}当前目录…`)
     setError('')
     try {
       await nodeApi(adminUrl, '/api/register-project', {
@@ -203,7 +193,7 @@ export default function WorkspaceAccessPanel({
         <div className={styles.icon}><ShieldCheck size={20} strokeWidth={1.9} aria-hidden="true" /></div>
         <div>
           <h2 id="workspace-access-title">本机目录与完全访问</h2>
-          <p>Route A 使用 Codex 前，会在这台电脑上逐项目确认目录，云端设置不能代替本机授权。</p>
+          <p>开发模式会为当前登录账号已绑定的项目目录自动登记本机授权，不再反复弹窗。</p>
         </div>
         <span className={styles.status} data-tone={status.tone}>{status.label}</span>
       </div>

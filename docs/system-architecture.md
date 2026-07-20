@@ -114,6 +114,8 @@ PC 项目会话的 AI 运行路线分为五类：
 
 项目会话默认优先 `route_a`，让本机 Codex CLI 自己读取项目规则、判断是否需要读文件、修改代码、运行命令或构建。PC 前端的“强制 Codex / 直连”开关会把本轮请求强制成 `route_a`，并传入当前本机节点和项目工作区路径。
 
+开发阶段新项目的 `runtime_permission` 默认是 `full_access`。对 Route A Codex 来说，它沿用既有 `danger_full_access` CLI 语义，启动参数会关闭 Codex sandbox/逐次审批；但节点仍要求本机 grant，并按当前登录 owner、node credential、install、project 和规范化 workspace 绑定授权。PC 前端在缺少 grant 时只会为 `/api/cloud-projects` 已证明属于当前节点且项目/目录完全匹配的绑定自动调用授权 API，继续发送 `confirm_full_access=true` 供节点审计，不使用浏览器 `window.confirm`。未登录、未绑定、节点或目录不匹配仍拒绝；显式 `project_write` 设置继续保留。
+
 Codex Pro `auth.json` 云端保险箱默认只属于账号所有者自己的备份/恢复能力：本机节点上传密文，云端只存 AES-GCM 密文，本人节点用用户 token + 节点 secret 恢复到托管临时 `CODEX_HOME`。普通 Route C3 共享仍不允许远程用户下载、恢复或复制 provider 的 `auth.json` 明文，只允许把任务派发到 provider 的 PC 节点。
 
 医疗机器人等高可用/协作场景使用 Codex 保险箱授权共享：provider 机器人必须在平台上显式授权 consumer 机器人，consumer 自己的在线节点必须用节点 secret 证明身份，云端才会下发短 TTL 租约。共享不要求一定是紧急场景，但必须是短租约、可撤销、可审计、可计费的授权行为。节点只把租约写入托管临时 `CODEX_HOME`，不覆盖默认 `~/.codex/auth.json`。租约、provider/consumer、槽位、token 账单和 provider 收益分别记录在 `codex_vault_emergency_grants`、`codex_vault_emergency_leases`、`token_usage_events` 和 `node_transactions`，计费来源统一为 `shared_codex`。表名保留 `emergency` 是历史兼容名，产品和 API 新入口使用 `sharing` 语义。

@@ -24,6 +24,17 @@ interface FullAccessGrantListResponse {
   grants?: FullAccessGrant[]
 }
 
+interface LocalCloudProject {
+  id?: string
+  node_id?: string | null
+  workspace_path?: string | null
+}
+
+interface LocalCloudProjectsResponse {
+  node_id?: string
+  projects?: LocalCloudProject[]
+}
+
 interface EnsureLocalFullAccessGrantInput {
   adminUrl: string
   projectId: string
@@ -37,7 +48,6 @@ type LocalGrantRequest = (path: string, options?: RequestInit) => Promise<unknow
 
 interface LocalFullAccessGrantDependencies {
   request?: LocalGrantRequest
-  confirm?: (message: string) => boolean
 }
 
 export type LocalFullAccessGrantResult = 'not_required' | 'already_granted' | 'granted'
@@ -99,23 +109,16 @@ export async function ensureLocalFullAccessGrant(
   ))
   if (alreadyGranted) return 'already_granted'
 
-  const dangerMode = input.runtimePermission?.trim().toLowerCase() === 'danger_full_access'
-  const permissionLabel = dangerMode ? '完整本机命令行' : '完全访问'
-  const riskSummary = dangerMode
-    ? '此模式允许本机 AI 执行任意命令，并读取或修改项目目录外的文件和系统设置。'
-    : '此模式允许本机 Codex 在执行项目任务时使用完整 CLI 权限。'
-  const projectName = input.projectName?.trim() || projectId
-  const confirmation = [
-    `项目“${projectName}”请求开启${permissionLabel}。`,
-    '',
-    `本机授权目录：${workspacePath}`,
-    '',
-    riskSummary,
-    '是否确认将这个项目授权到上述目录，并继续发送任务？',
-  ].join('\n')
-  const confirmAccess = dependencies.confirm ?? ((message) => window.confirm(message))
-  if (!confirmAccess(confirmation)) {
-    throw new Error('已取消本机完全访问授权，本轮任务未发送。')
+  const cloudProjects = await request('/api/cloud-projects') as LocalCloudProjectsResponse
+  const currentNodeId = String(cloudProjects.node_id ?? '').trim()
+  const projectIsBound = !!currentNodeId && (cloudProjects.projects ?? []).some((project) => (
+    equivalentProjectId(String(project.id ?? ''), projectId)
+    && String(project.node_id ?? '').trim() === currentNodeId
+    && normalizeLocalWorkspacePath(String(project.workspace_path ?? '')) === normalizedWorkspace
+  ))
+  if (!projectIsBound) {
+    const projectName = input.projectName?.trim() || projectId
+    throw new Error(`项目“${projectName}”尚未绑定到当前登录账号、节点和本机目录，请先在项目工作区重新选择目录。`)
   }
 
   await request('/api/full-access/grants', {
@@ -127,4 +130,11 @@ export async function ensureLocalFullAccessGrant(
     }),
   })
   return 'granted'
+}
+
+function equivalentProjectId(left: string, right: string): boolean {
+  const canonical = (value: string) => value.trim().toLowerCase() === 'elon-project'
+    ? 'elon-self'
+    : value.trim().toLowerCase()
+  return !!canonical(left) && canonical(left) === canonical(right)
 }

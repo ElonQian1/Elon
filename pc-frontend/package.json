@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test:message-flow": "node ../scripts/test-pc-frontend-message-flow.js && node ../scripts/test-pc-frontend-task-result-tone.js && node ../scripts/test-pc-frontend-task-timeline-display.js && node ../scripts/test-pc-frontend-task-progress-preview.js && node ../scripts/test-pc-frontend-task-replay.js && node ../scripts/test-pc-frontend-task-recovery-snapshot.js",
-    "test:workspace-access": "node ../scripts/test-pc-frontend-workspace-access.js",
+    "test:workspace-access": "node ../scripts/test-pc-frontend-workspace-access.js && node ../scripts/test-pc-frontend-full-access-auto-grant.js",
     "test:local-tasks": "node scripts/test-local-tasks.cjs",
     "test:runtime-draft": "node scripts/test-runtime-draft-model.cjs",
     "test:ui-tuner-workspace": "node scripts/test-ui-tuner-workspace.cjs",

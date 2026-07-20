@@ -30,7 +30,7 @@ pub(crate) struct CliDirectRunContext {
     pub extra_args: Vec<String>,
     pub runtime_permission: Option<String>,
     pub conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
-    pub codex_vault_switch_attempted: bool,
+    pub codex_auth_attempts: node_agent_codex_auth_switch::CodexAuthAttemptState,
     pub runtime: Arc<NodeRuntime>,
     pub out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
     pub cancel_rx: watch::Receiver<bool>,
@@ -58,7 +58,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         extra_args,
         runtime_permission,
         conversation_workspace,
-        codex_vault_switch_attempted,
+        mut codex_auth_attempts,
         runtime,
         out_tx,
         mut cancel_rx,
@@ -410,7 +410,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 runtime,
                 cancel_rx,
                 out_tx,
-                codex_vault_switch_attempted,
+                codex_auth_attempts,
                 completion_context,
                 frozen_codex_home,
             }))
@@ -418,12 +418,13 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             return;
         }
     }
-    if !exit_ok && cli_name == "codex" && !codex_vault_switch_attempted {
+    if !exit_ok && cli_name == "codex" {
         if let Some(auth_switch) = node_agent_codex_auth_switch::try_after_failure(
             &runtime,
             &req_id,
             &stdout_text,
             &stderr_text,
+            &mut codex_auth_attempts,
         )
         .await
         {
@@ -449,7 +450,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 runtime,
                 cancel_rx,
                 out_tx,
-                codex_vault_switch_attempted: true,
+                codex_auth_attempts,
                 completion_context,
                 frozen_codex_home: Some(auth_switch.frozen_codex_home),
             }))
@@ -493,7 +494,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
             runtime,
             cancel_rx,
             out_tx,
-            codex_vault_switch_attempted,
+            codex_auth_attempts,
             completion_context,
             frozen_codex_home,
         }))

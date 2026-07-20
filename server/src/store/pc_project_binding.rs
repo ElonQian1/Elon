@@ -207,7 +207,7 @@ impl Store {
                         (SELECT prp.mode
                            FROM project_runtime_permissions prp
                           WHERE prp.project_id = p.id),
-                        'project_write'
+                        'full_access'
                     ) AS runtime_permission,
                     p.display_name
              FROM projects p

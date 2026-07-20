@@ -172,7 +172,7 @@ pub(super) fn find_owner_project_by_name(
                         (SELECT prp.mode
                            FROM project_runtime_permissions prp
                           WHERE prp.project_id = p.id),
-                        'project_write'
+                        'full_access'
                     ) AS runtime_permission,
                     p.display_name
              FROM projects p
@@ -226,7 +226,7 @@ pub(super) fn find_owner_project_by_workspace_path(
                     (SELECT prp.mode
                        FROM project_runtime_permissions prp
                       WHERE prp.project_id = p.id),
-                    'project_write'
+                    'full_access'
                 ) AS runtime_permission,
                 p.display_name
          FROM projects p
@@ -292,7 +292,7 @@ pub(super) fn find_project_by_id_for_user(
                         (SELECT prp.mode
                            FROM project_runtime_permissions prp
                           WHERE prp.project_id = p.id),
-                        'project_write'
+                        'full_access'
                     ) AS runtime_permission,
                     p.display_name
              FROM projects p

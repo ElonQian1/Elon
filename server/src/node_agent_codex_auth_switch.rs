@@ -1,9 +1,10 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::warn;
+use tracing::{info, warn};
 
 use super::{node_agent_codex_vault, node_agent_codex_vault_emergency, NodeRuntime};
 
@@ -17,6 +18,14 @@ struct CodexAuthSwitchCandidate {
     cloud_control_deadline: Option<String>,
     cloud_control_issued_at: Option<String>,
     cloud_control_ttl_ms: Option<u64>,
+}
+
+#[derive(Debug)]
+pub(crate) struct CodexAuthAttemptState {
+    enabled: bool,
+    owner_vault_attempted: bool,
+    shared_provider_snapshot: Option<Vec<AutoSharedProvider>>,
+    attempted_shared_providers: Vec<AutoSharedProvider>,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -56,34 +65,103 @@ struct AutoSharedProvider {
     label: String,
 }
 
+impl CodexAuthAttemptState {
+    pub(crate) fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            owner_vault_attempted: false,
+            shared_provider_snapshot: None,
+            attempted_shared_providers: Vec::new(),
+        }
+    }
+
+    fn reserve_owner_vault_attempt(&mut self) -> bool {
+        if !self.enabled || self.owner_vault_attempted {
+            return false;
+        }
+        self.owner_vault_attempted = true;
+        true
+    }
+
+    fn reserve_shared_provider_attempt(&mut self, provider: &AutoSharedProvider) -> bool {
+        if !self.enabled
+            || self
+                .attempted_shared_providers
+                .iter()
+                .any(|attempted| same_shared_provider(attempted, provider))
+        {
+            return false;
+        }
+        self.attempted_shared_providers.push(provider.clone());
+        true
+    }
+
+    fn freeze_shared_provider_snapshot(
+        &mut self,
+        providers: Vec<AutoSharedProvider>,
+    ) -> Vec<AutoSharedProvider> {
+        self.shared_provider_snapshot
+            .get_or_insert(providers)
+            .clone()
+    }
+
+    fn attempt_count(&self) -> usize {
+        usize::from(self.owner_vault_attempted) + self.attempted_shared_providers.len()
+    }
+}
+
 pub(crate) async fn try_after_failure(
     runtime: &Arc<NodeRuntime>,
     req_id: &str,
     stdout_text: &str,
     stderr_text: &str,
+    attempts: &mut CodexAuthAttemptState,
 ) -> Option<CodexAuthSwitchOutcome> {
-    match node_agent_codex_vault::try_auto_switch_after_codex_failure(
-        runtime,
-        stdout_text,
-        stderr_text,
-    )
-    .await
-    {
-        Ok(Some(candidate)) => {
-            return finalize_auth_switch(
-                runtime,
-                req_id,
-                candidate.message,
-                candidate.cloud_control_deadline,
-                candidate.cloud_control_issued_at,
-                candidate.cloud_control_ttl_ms,
-            )
-            .await
-        }
-        Ok(None) => {}
-        Err(error) => warn!("Codex 保险箱自动切换检查失败: {error:#}"),
+    if !attempts.enabled {
+        return None;
     }
-    match try_shared_provider_after_failure(runtime, req_id, stdout_text, stderr_text).await {
+    let combined = format!("{stdout_text}\n{stderr_text}");
+    let classified = crate::errors::classify_ai_error(&combined);
+    if !matches!(
+        classified.category,
+        crate::errors::AiErrorCategory::Quota | crate::errors::AiErrorCategory::AuthConfig
+    ) {
+        return None;
+    }
+    if attempts.reserve_owner_vault_attempt() {
+        info!(
+            %req_id,
+            attempt = attempts.attempt_count(),
+            "尝试 Codex 自有保险箱授权候选"
+        );
+        match node_agent_codex_vault::try_auto_switch_after_codex_failure(
+            runtime,
+            stdout_text,
+            stderr_text,
+        )
+        .await
+        {
+            Ok(Some(candidate)) => {
+                return finalize_auth_switch(
+                    runtime,
+                    req_id,
+                    candidate.message,
+                    candidate.cloud_control_deadline,
+                    candidate.cloud_control_issued_at,
+                    candidate.cloud_control_ttl_ms,
+                )
+                .await
+            }
+            Ok(None) => {}
+            Err(error) => warn!(%req_id, "Codex 保险箱自动切换检查失败: {error:#}"),
+        }
+    }
+    let reason = classified
+        .operator_detail
+        .as_deref()
+        .unwrap_or(classified.code)
+        .to_string();
+    match try_shared_provider_after_failure(runtime, req_id, &reason, attempts).await {
         Ok(Some(candidate)) => {
             finalize_auth_switch(
                 runtime,
@@ -186,47 +264,46 @@ fn freeze_auth_switch_cloud_control(
 async fn try_shared_provider_after_failure(
     rt: &Arc<NodeRuntime>,
     req_id: &str,
-    stdout_text: &str,
-    stderr_text: &str,
+    reason: &str,
+    attempts: &mut CodexAuthAttemptState,
 ) -> Result<Option<CodexAuthSwitchCandidate>> {
-    let combined = format!("{stdout_text}\n{stderr_text}");
-    let classified = crate::errors::classify_ai_error(&combined);
-    if !matches!(
-        classified.category,
-        crate::errors::AiErrorCategory::Quota | crate::errors::AiErrorCategory::AuthConfig
-    ) {
-        return Ok(None);
-    }
-    let reason = classified
-        .operator_detail
-        .as_deref()
-        .unwrap_or(classified.code)
-        .to_string();
-    let provider = match auto_shared_provider(rt).await {
-        Ok(Some(provider)) => provider,
-        Ok(None) => return Ok(None),
-        Err(error) => {
-            warn!("Codex 共享授权自动切换前置检查失败: {error:#}");
-            return Ok(None);
-        }
+    let providers = if let Some(providers) = attempts.shared_provider_snapshot.clone() {
+        providers
+    } else {
+        let providers = match auto_shared_providers(rt).await {
+            Ok(providers) => providers,
+            Err(error) => {
+                warn!("Codex 共享授权自动切换前置检查失败: {error:#}");
+                return Ok(None);
+            }
+        };
+        attempts.freeze_shared_provider_snapshot(providers)
     };
-    let lease = match node_agent_codex_vault_emergency::restore_emergency_from_cloud(
-        rt,
-        node_agent_codex_vault_emergency::EmergencyRestoreRequest {
-            provider_user_id: provider.provider_user_id.clone(),
-            provider_account: provider.provider_account.clone(),
-            purpose: Some("auto_switch_to_shared_codex_after_failure".to_string()),
-            failure_reason: Some(reason),
-            compute_call_id: Some(format!("pc_agent_cli:{req_id}")),
-        },
-    )
-    .await
-    {
-        Ok(lease) => lease,
-        Err(error) => {
-            warn!("Codex 共享授权自动切换失败: {error:#}");
-            return Ok(None);
-        }
+    let runtime = Arc::clone(rt);
+    let req_id_owned = req_id.to_string();
+    let reason_owned = reason.to_string();
+    let Some((provider, lease)) =
+        restore_first_available_shared_provider(req_id, attempts, providers, move |provider| {
+            let runtime = Arc::clone(&runtime);
+            let req_id = req_id_owned.clone();
+            let reason = reason_owned.clone();
+            async move {
+                node_agent_codex_vault_emergency::restore_emergency_from_cloud(
+                    &runtime,
+                    node_agent_codex_vault_emergency::EmergencyRestoreRequest {
+                        provider_user_id: provider.provider_user_id,
+                        provider_account: provider.provider_account,
+                        purpose: Some("auto_switch_to_shared_codex_after_failure".to_string()),
+                        failure_reason: Some(reason),
+                        compute_call_id: Some(format!("pc_agent_cli:{req_id}")),
+                    },
+                )
+                .await
+            }
+        })
+        .await
+    else {
+        return Ok(None);
     };
     Ok(Some(CodexAuthSwitchCandidate {
         message: format!(
@@ -244,27 +321,84 @@ async fn try_shared_provider_after_failure(
     }))
 }
 
-async fn auto_shared_provider(rt: &Arc<NodeRuntime>) -> Result<Option<AutoSharedProvider>> {
-    if let Some(provider) = configured_auto_shared_provider() {
-        return Ok(Some(provider));
+async fn restore_first_available_shared_provider<T, F, Fut>(
+    req_id: &str,
+    attempts: &mut CodexAuthAttemptState,
+    providers: Vec<AutoSharedProvider>,
+    mut restore: F,
+) -> Option<(AutoSharedProvider, T)>
+where
+    F: FnMut(AutoSharedProvider) -> Fut,
+    Fut: Future<Output = Result<T>>,
+{
+    for provider in providers {
+        if !attempts.reserve_shared_provider_attempt(&provider) {
+            continue;
+        }
+        info!(
+            %req_id,
+            attempt = attempts.attempt_count(),
+            provider_user_id = provider.provider_user_id.as_deref().unwrap_or(""),
+            "尝试 Codex 共享授权候选"
+        );
+        match restore(provider.clone()).await {
+            Ok(restored) => return Some((provider, restored)),
+            Err(error) => warn!(
+                %req_id,
+                provider_user_id = provider.provider_user_id.as_deref().unwrap_or(""),
+                "Codex 共享授权候选恢复失败，继续下一个候选: {error:#}"
+            ),
+        }
     }
-    let creds = rt.creds().await.context("请先绑定本机节点账号")?;
+    None
+}
+
+async fn auto_shared_providers(rt: &Arc<NodeRuntime>) -> Result<Vec<AutoSharedProvider>> {
+    let configured = configured_auto_shared_provider();
+    let creds = match rt.creds().await {
+        Some(creds) => creds,
+        None if configured.is_some() => {
+            return Ok(ordered_auto_shared_providers(configured, &[], ""));
+        }
+        None => return Err(anyhow::anyhow!("请先绑定本机节点账号")),
+    };
     let owner_user_id = creds.owner_user_id.clone();
-    let token = creds
+    let token = match creds
         .user_token
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .context("本机节点缺少云端登录 token，请重新绑定")?
-        .to_string();
+    {
+        Some(token) => token.to_string(),
+        None if configured.is_some() => {
+            return Ok(ordered_auto_shared_providers(
+                configured,
+                &[],
+                &owner_user_id,
+            ));
+        }
+        None => bail!("本机节点缺少云端登录 token，请重新绑定"),
+    };
     let url = format!(
         "{}/api/me/codex-vault/sharing",
         rt.cloud_http_url().trim_end_matches('/')
     );
-    let value = cloud_get(&url, &token).await?;
+    let value = match cloud_get(&url, &token).await {
+        Ok(value) => value,
+        Err(error) if configured.is_some() => {
+            warn!("读取云端 Codex 共享授权失败，将仅尝试显式配置候选: {error:#}");
+            return Ok(ordered_auto_shared_providers(
+                configured,
+                &[],
+                &owner_user_id,
+            ));
+        }
+        Err(error) => return Err(error),
+    };
     let status: SharingStatusResponse =
         serde_json::from_value(value).context("云端共享授权状态响应格式不正确")?;
-    Ok(select_auto_shared_provider(
+    Ok(ordered_auto_shared_providers(
+        configured,
         &status.into_grants(),
         &owner_user_id,
     ))
@@ -311,10 +445,53 @@ fn select_auto_shared_provider(
     grants: &[SharingGrantSummary],
     owner_user_id: &str,
 ) -> Option<AutoSharedProvider> {
-    grants
+    ordered_auto_shared_providers(None, grants, owner_user_id)
+        .into_iter()
+        .next()
+}
+
+fn ordered_auto_shared_providers(
+    configured: Option<AutoSharedProvider>,
+    grants: &[SharingGrantSummary],
+    owner_user_id: &str,
+) -> Vec<AutoSharedProvider> {
+    let mut providers = Vec::new();
+    if let Some(provider) = configured {
+        push_unique_shared_provider(&mut providers, provider);
+    }
+    for provider in grants
         .iter()
-        .find(|grant| grant_is_auto_share_candidate(grant, owner_user_id))
-        .and_then(AutoSharedProvider::from_grant)
+        .filter(|grant| grant_is_auto_share_candidate(grant, owner_user_id))
+        .filter_map(AutoSharedProvider::from_grant)
+    {
+        push_unique_shared_provider(&mut providers, provider);
+    }
+    providers
+}
+
+fn push_unique_shared_provider(
+    providers: &mut Vec<AutoSharedProvider>,
+    provider: AutoSharedProvider,
+) {
+    if providers
+        .iter()
+        .any(|existing| same_shared_provider(existing, &provider))
+    {
+        return;
+    }
+    providers.push(provider);
+}
+
+fn same_shared_provider(left: &AutoSharedProvider, right: &AutoSharedProvider) -> bool {
+    left.provider_user_id
+        .as_deref()
+        .zip(right.provider_user_id.as_deref())
+        .is_some_and(|(left, right)| left == right)
+        || left
+            .provider_account
+            .as_deref()
+            .zip(right.provider_account.as_deref())
+            .is_some_and(|(left, right)| left.eq_ignore_ascii_case(right))
 }
 
 fn grant_is_auto_share_candidate(grant: &SharingGrantSummary, owner_user_id: &str) -> bool {
@@ -381,147 +558,5 @@ async fn cloud_get(url: &str, token: &str) -> Result<Value> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        configured_auto_shared_provider, freeze_auth_switch_cloud_control,
-        select_auto_shared_provider, AutoSharedProvider, SharingGrantSummary,
-    };
-    use std::sync::Mutex;
-
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-    #[test]
-    fn auth_switch_accepts_complete_owner_vault_cloud_window() {
-        let issued_at = chrono::Utc::now();
-        let deadline = issued_at + chrono::Duration::seconds(60);
-        let frozen = freeze_auth_switch_cloud_control(
-            Some(&deadline.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)),
-            Some(&issued_at.to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)),
-            Some(60_000),
-            None,
-        );
-
-        assert!(frozen.is_ok());
-    }
-
-    #[test]
-    fn auth_switch_rejects_owner_vault_window_with_missing_signed_fields() {
-        let deadline = chrono::Utc::now() + chrono::Duration::seconds(60);
-        let error =
-            freeze_auth_switch_cloud_control(Some(&deadline.to_rfc3339()), None, None, None)
-                .unwrap_err();
-
-        assert!(error.to_string().contains("缺少服务器签发时间"));
-    }
-
-    #[test]
-    fn auto_shared_provider_selects_incoming_active_available_grant() {
-        let grants = vec![
-            grant("provider-a", "consumer-other", true, "active"),
-            grant("provider-b", "consumer-1", true, "active")
-                .with_account("15160532860")
-                .with_nickname("全嘉"),
-        ];
-
-        let selected = select_auto_shared_provider(&grants, "consumer-1");
-
-        assert_eq!(
-            selected,
-            Some(AutoSharedProvider {
-                provider_user_id: Some("provider-b".to_string()),
-                provider_account: Some("15160532860".to_string()),
-                label: "全嘉".to_string(),
-            })
-        );
-    }
-
-    #[test]
-    fn auto_shared_provider_skips_unavailable_and_revoked_grants() {
-        let grants = vec![
-            grant("provider-a", "consumer-1", false, "active"),
-            grant("provider-b", "consumer-1", true, "revoked"),
-            grant("provider-c", "consumer-1", true, "active"),
-        ];
-
-        let selected = select_auto_shared_provider(&grants, "consumer-1");
-
-        assert_eq!(
-            selected,
-            Some(AutoSharedProvider {
-                provider_user_id: Some("provider-c".to_string()),
-                provider_account: None,
-                label: "provider-c".to_string(),
-            })
-        );
-    }
-
-    #[test]
-    fn configured_auto_shared_provider_takes_precedence() {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let old_user_id = std::env::var("ELON_CODEX_AUTO_SHARED_PROVIDER_USER_ID").ok();
-        let old_account = std::env::var("ELON_CODEX_AUTO_SHARED_PROVIDER_ACCOUNT").ok();
-        let old_generic = std::env::var("ELON_CODEX_AUTO_SHARED_PROVIDER").ok();
-        let old_node_generic = std::env::var("NODE_CODEX_AUTO_SHARED_PROVIDER").ok();
-        std::env::set_var("ELON_CODEX_AUTO_SHARED_PROVIDER_USER_ID", "usr_quanjia");
-        std::env::set_var("ELON_CODEX_AUTO_SHARED_PROVIDER_ACCOUNT", "15160532860");
-        std::env::remove_var("ELON_CODEX_AUTO_SHARED_PROVIDER");
-        std::env::remove_var("NODE_CODEX_AUTO_SHARED_PROVIDER");
-
-        let selected = configured_auto_shared_provider();
-
-        restore_env("ELON_CODEX_AUTO_SHARED_PROVIDER_USER_ID", old_user_id);
-        restore_env("ELON_CODEX_AUTO_SHARED_PROVIDER_ACCOUNT", old_account);
-        restore_env("ELON_CODEX_AUTO_SHARED_PROVIDER", old_generic);
-        restore_env("NODE_CODEX_AUTO_SHARED_PROVIDER", old_node_generic);
-
-        assert_eq!(
-            selected,
-            Some(AutoSharedProvider {
-                provider_user_id: Some("usr_quanjia".to_string()),
-                provider_account: Some("15160532860".to_string()),
-                label: "15160532860".to_string(),
-            })
-        );
-    }
-
-    fn grant(
-        provider_user_id: &str,
-        consumer_user_id: &str,
-        provider_vault_available: bool,
-        status: &str,
-    ) -> SharingGrantSummary {
-        SharingGrantSummary {
-            provider_user_id: Some(provider_user_id.to_string()),
-            consumer_user_id: Some(consumer_user_id.to_string()),
-            provider_vault_available: Some(provider_vault_available),
-            status: Some(status.to_string()),
-            ..SharingGrantSummary::default()
-        }
-    }
-
-    trait GrantTestExt {
-        fn with_account(self, account: &str) -> Self;
-        fn with_nickname(self, nickname: &str) -> Self;
-    }
-
-    impl GrantTestExt for SharingGrantSummary {
-        fn with_account(mut self, account: &str) -> Self {
-            self.provider_account = Some(account.to_string());
-            self
-        }
-
-        fn with_nickname(mut self, nickname: &str) -> Self {
-            self.provider_nickname = Some(nickname.to_string());
-            self
-        }
-    }
-
-    fn restore_env(name: &str, value: Option<String>) {
-        match value {
-            Some(value) => std::env::set_var(name, value),
-            None => std::env::remove_var(name),
-        }
-    }
-}
+#[path = "node_agent_codex_auth_switch_tests.rs"]
+mod tests;

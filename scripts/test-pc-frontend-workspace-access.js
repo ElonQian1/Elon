@@ -38,7 +38,7 @@ try {
     localNodeIsBound: true,
     hasBoundNode: true,
   });
-  assert.strictEqual(missing.label, '等待本机确认', 'full access without a local grant must remain blocked');
+  assert.strictEqual(missing.label, '等待自动授权', 'full access without a local grant should advertise automatic registration');
 
   const granted = workspaceAccessStatus({
     loadState: 'ready',
@@ -55,6 +55,7 @@ try {
     assert.ok(panelSource.includes(endpoint), `workspace access panel should call ${endpoint}`);
   }
   assert.ok(panelSource.includes('confirm_full_access: true'), 'local grant must include explicit full-access confirmation');
+  assert.ok(!panelSource.includes('window.confirm'), 'explicit folder selection must not show a duplicate confirmation');
   assert.ok(detailSource.includes('<WorkspaceAccessPanel'), 'project workspace tab should render the access panel');
 
   console.log('pc-frontend workspace-access tests passed');

@@ -144,7 +144,7 @@ export default function LocalTaskCreateForm({ busy, onCreate }: Props) {
           </label>
           <p className={styles.permissionWarning}>
             <ShieldAlert size={14} aria-hidden="true" />
-            首次使用该项目目录时会在本机弹窗确认完全访问；离线任务只使用你自己的 Codex 登录。
+            开发模式会自动授权当前账号、节点和项目已绑定的目录，不会反复弹窗；离线任务只使用你自己的 Codex 登录。
           </p>
           <button
             className={styles.primaryButton}

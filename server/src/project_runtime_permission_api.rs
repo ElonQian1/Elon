@@ -10,8 +10,9 @@ use std::sync::Arc;
 use crate::{
     project_auth::{auth_from_headers, can_manage_project_members, json_error},
     store::{
-        normalize_project_runtime_permission, PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS,
-        PROJECT_RUNTIME_PERMISSION_FULL_ACCESS, PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
+        normalize_project_runtime_permission, ProjectRuntimePermission,
+        PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS, PROJECT_RUNTIME_PERMISSION_FULL_ACCESS,
+        PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
     },
     types::AppState,
 };
@@ -44,20 +45,32 @@ pub async fn get_runtime_permission(
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
 
-    Json(serde_json::json!({
+    Json(runtime_permission_payload(
+        project_id,
+        record,
+        can_manage_project_members(&access.role),
+    ))
+    .into_response()
+}
+
+fn runtime_permission_payload(
+    project_id: String,
+    record: ProjectRuntimePermission,
+    can_manage: bool,
+) -> serde_json::Value {
+    serde_json::json!({
         "ok": true,
         "project_id": project_id,
         "mode": record.mode,
         "updated_by": record.updated_by,
         "updated_at": record.updated_at,
-        "can_manage": can_manage_project_members(&access.role),
+        "can_manage": can_manage,
         "allowed_modes": [
             PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
             PROJECT_RUNTIME_PERMISSION_FULL_ACCESS,
             PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS
         ],
-    }))
-    .into_response()
+    })
 }
 
 /// PATCH /api/projects/:id/runtime-permission
@@ -126,5 +139,31 @@ pub async fn update_runtime_permission(
             };
             json_error(status, msg)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_permission_api_outputs_full_access_default() {
+        let payload = runtime_permission_payload(
+            "project-new".to_string(),
+            ProjectRuntimePermission {
+                project_id: "project-new".to_string(),
+                mode: "full_access".to_string(),
+                updated_by: None,
+                updated_at: None,
+            },
+            true,
+        );
+
+        assert_eq!(payload["project_id"], "project-new");
+        assert_eq!(payload["mode"], "full_access");
+        assert_eq!(payload["can_manage"], true);
+        assert!(payload["allowed_modes"]
+            .as_array()
+            .is_some_and(|modes| modes.iter().any(|mode| mode == "danger_full_access")));
     }
 }
