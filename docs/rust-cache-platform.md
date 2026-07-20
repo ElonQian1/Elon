@@ -26,9 +26,13 @@
 
 1. `-CacheRoot`；
 2. `ELON_RUST_CACHE_ROOT`；
-3. `RUST_SHARED_BUILD_ROOT\rust-cache-v2`；
-4. 存在 `D:\rust\shared` 时使用 `D:\rust\shared\rust-cache-v2`；
-5. `%LOCALAPPDATA%\Elon\rust-cache-v2`。
+3. `ELON_NODE_DATA_ROOT\cache\rust-cache-v2`；
+4. `%APPDATA%\elon-node-agent\node.json` 中持久化的 `node_data_root\cache\rust-cache-v2`，但仅接受绝对路径、已存在目录且含 `.elon-node-data-root.json` 所有权标记的根；配置损坏、相对、无标记或目录不存在时安全回退；
+5. `RUST_SHARED_BUILD_ROOT\rust-cache-v2`；
+6. 存在 `D:\rust\shared` 时使用 `D:\rust\shared\rust-cache-v2`；
+7. `%LOCALAPPDATA%\Elon\rust-cache-v2`。
+
+解析只选择写入位置，不会搬迁或删除 C/D 盘旧缓存，也不会修改系统或用户环境变量。
 
 目录结构：
 

@@ -16,6 +16,36 @@ function Test-RustCacheAbsolutePath {
     return $true
 }
 
+function Get-RustCachePersistedNodeDataRoot {
+    if ([string]::IsNullOrWhiteSpace($env:APPDATA)) {
+        return $null
+    }
+
+    $configPath = Join-Path $env:APPDATA "elon-node-agent\node.json"
+    if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
+        return $null
+    }
+
+    try {
+        $config = Get-Content -Raw -LiteralPath $configPath -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $nodeDataRoot = [string]$config.node_data_root
+        if (-not (Test-RustCacheAbsolutePath $nodeDataRoot)) {
+            return $null
+        }
+
+        $fullRoot = [System.IO.Path]::GetFullPath($nodeDataRoot.Trim())
+        if (-not (Test-Path -LiteralPath $fullRoot -PathType Container)) {
+            return $null
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $fullRoot ".elon-node-data-root.json") -PathType Leaf)) {
+            return $null
+        }
+        return $fullRoot
+    } catch {
+        return $null
+    }
+}
+
 function Resolve-RustCacheRoot {
     param(
         [string]$ExplicitRoot,
@@ -31,6 +61,9 @@ function Resolve-RustCacheRoot {
     } elseif (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_DATA_ROOT)) {
         $candidate = Join-Path $env:ELON_NODE_DATA_ROOT.Trim() "cache\rust-cache-v2"
         $source = "ELON_NODE_DATA_ROOT"
+    } elseif ($persistedNodeDataRoot = Get-RustCachePersistedNodeDataRoot) {
+        $candidate = Join-Path $persistedNodeDataRoot "cache\rust-cache-v2"
+        $source = "persisted node_data_root"
     } elseif (-not [string]::IsNullOrWhiteSpace($env:RUST_SHARED_BUILD_ROOT)) {
         $candidate = Join-Path $env:RUST_SHARED_BUILD_ROOT.Trim() "rust-cache-v2"
         $source = "RUST_SHARED_BUILD_ROOT"
