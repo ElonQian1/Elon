@@ -2,11 +2,24 @@
 
 use axum::{http::StatusCode, Json};
 use serde_json::{json, Value};
+use tokio::sync::MutexGuard;
 
 use super::{
     err, lane, lane_mut, parse_kind, ClaimResponse, FinishRequest, InFlightBuilder, Lane,
     PublicPublishLeaseEntry,
 };
+
+pub(super) async fn persist_or_restore(
+    manager: &crate::release_manager::ReleaseManager,
+    guard: &mut MutexGuard<'_, crate::release_manager::ReleaseStateFile>,
+    original: crate::release_manager::ReleaseStateFile,
+) -> Result<(), (StatusCode, Json<Value>)> {
+    if let Err(error) = manager.persist(guard).await {
+        **guard = original;
+        return Err(persist_error(error));
+    }
+    Ok(())
+}
 
 pub(super) fn adopt_legacy_batch_identity(
     state: &mut crate::release_manager::ReleaseStateFile,

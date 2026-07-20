@@ -35,7 +35,7 @@ mod support;
 use crate::types::AppState;
 use support::{
     adopt_legacy_batch_identity, claim_response_for_existing, ensure_manager_healthy,
-    persist_error, public_in_flight, publish_token_status, validate_finish_identity,
+    persist_or_restore, public_in_flight, publish_token_status, validate_finish_identity,
 };
 
 // ===== 调参常量 =====
@@ -414,10 +414,7 @@ pub async fn claim_handler(
         waiter_count: guard.global_publish.waiters.len(),
     };
 
-    if let Err(error) = mgr.persist(&guard).await {
-        *guard = original;
-        return Err(persist_error(error));
-    }
+    persist_or_restore(&mgr, &mut guard, original).await?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -546,10 +543,7 @@ pub async fn heartbeat_handler(
         ok: true,
         lease_expires_at,
     };
-    if let Err(error) = mgr.persist(&guard).await {
-        *guard = original;
-        return Err(persist_error(error));
-    }
+    persist_or_restore(&mgr, &mut guard, original).await?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -657,10 +651,7 @@ pub async fn finish_handler(
     };
 
     let resp = FinishResponse { ok: true, recorded };
-    if let Err(error) = mgr.persist(&guard).await {
-        *guard = original;
-        return Err(persist_error(error));
-    }
+    persist_or_restore(&mgr, &mut guard, original).await?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -717,10 +708,7 @@ pub async fn status_handler(
             "now": now,
         }),
     };
-    if let Err(error) = mgr.persist(&guard).await {
-        *guard = original;
-        return Err(persist_error(error));
-    }
+    persist_or_restore(&mgr, &mut guard, original).await?;
     drop(guard);
     Ok(Json(body))
 }

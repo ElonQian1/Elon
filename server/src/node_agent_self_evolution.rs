@@ -7,7 +7,7 @@ pub(crate) use scheduler::spawn_scheduler;
 mod support;
 use support::{
     admission, default_max_retries, error_response, internal_admission, now_ms, retry_at,
-    retryable_failure, same_gate_observation, schema_version,
+    retryable_failure, same_gate_observation, schema_version, SelfEvolutionGates,
 };
 
 use std::{
@@ -82,42 +82,6 @@ pub(crate) struct PendingSelfEvolutionAction {
     pub actor: String,
     pub source: String,
     pub requested_at_ms: u128,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct SelfEvolutionGates {
-    #[serde(default)]
-    pub foreground_task_ids: Vec<String>,
-    #[serde(default)]
-    pub publish_active: bool,
-    #[serde(default)]
-    pub publish_status: String,
-    #[serde(default)]
-    pub publish_owner: Option<String>,
-    #[serde(default)]
-    pub publish_waiter_count: usize,
-    #[serde(default)]
-    pub update_active: bool,
-    #[serde(default)]
-    pub resource_pressure: bool,
-    #[serde(default)]
-    pub checked_at_ms: u128,
-}
-
-impl SelfEvolutionGates {
-    fn blocker(&self) -> Option<&'static str> {
-        if !self.foreground_task_ids.is_empty() {
-            Some("foreground_task")
-        } else if self.publish_active {
-            Some("global_publish")
-        } else if self.update_active {
-            Some("node_update")
-        } else if self.resource_pressure {
-            Some("resource_pressure")
-        } else {
-            None
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -283,17 +247,7 @@ impl SelfEvolutionCoordinator {
                     "resume_required" | "interrupted" => {
                         item.status = "paused".to_string();
                         let durable_source =
-                            item.pending_action.as_ref().and_then(|intent| {
-                                match (intent.action.as_str(), intent.source.as_str()) {
-                                    ("pause", "updater_apply" | "node_update") => {
-                                        Some(InterruptionSource::UpdaterApply)
-                                    }
-                                    ("pause", "local_pc_ui" | "supervisor") => {
-                                        Some(InterruptionSource::SupervisorIntervention)
-                                    }
-                                    _ => None,
-                                }
-                            });
+                            support::interruption_from_intent(item.pending_action.as_ref());
                         item.pause_reason = Some(
                             durable_source
                                 .as_ref()

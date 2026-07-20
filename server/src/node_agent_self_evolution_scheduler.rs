@@ -12,7 +12,7 @@ use crate::{
     NodeRuntime,
 };
 
-use crate::node_agent_self_evolution::{now_ms, SelfEvolutionGates, SelfEvolutionItem};
+use crate::node_agent_self_evolution::{now_ms, support::SelfEvolutionGates, SelfEvolutionItem};
 
 const LOOP_INTERVAL: Duration = Duration::from_secs(3);
 
