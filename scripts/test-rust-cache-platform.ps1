@@ -83,11 +83,15 @@ try {
 
         $env:ELON_NODE_DATA_ROOT = $null
         $env:APPDATA = Join-Path $TempRoot "appdata"
-        $persistedNodeRoot = Join-Path $TempRoot "persisted-node-data"
+        $persistedNodeRoot = Join-Path $TempRoot "持久节点缓存"
         $nodeConfigRoot = Join-Path $env:APPDATA "elon-node-agent"
         New-Item -ItemType Directory -Force -Path $nodeConfigRoot, $persistedNodeRoot | Out-Null
         '{}' | Set-Content -LiteralPath (Join-Path $persistedNodeRoot ".elon-node-data-root.json") -Encoding UTF8
-        @{ node_data_root = $persistedNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        $nodeConfigPath = Join-Path $nodeConfigRoot "node.json"
+        $nodeConfigJson = @{ node_data_root = $persistedNodeRoot } | ConvertTo-Json
+        [System.IO.File]::WriteAllText($nodeConfigPath, $nodeConfigJson, (New-Object System.Text.UTF8Encoding($false)))
+        $nodeConfigBytes = [System.IO.File]::ReadAllBytes($nodeConfigPath)
+        Assert-True (-not ($nodeConfigBytes.Length -ge 3 -and $nodeConfigBytes[0] -eq 0xEF -and $nodeConfigBytes[1] -eq 0xBB -and $nodeConfigBytes[2] -eq 0xBF)) "persisted node config fixture should be UTF-8 without BOM"
         $sharedPreferred = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
         Assert-Equal (Join-Path $env:RUST_SHARED_BUILD_ROOT "rust-cache-v2") $sharedPreferred "explicit shared build root should precede persisted node data root"
 
@@ -101,22 +105,26 @@ try {
             Join-Path $env:LOCALAPPDATA "Elon\rust-cache-v2"
         }
 
-        '{broken' | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        '{broken' | Set-Content -LiteralPath $nodeConfigPath -Encoding UTF8
         $damagedFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
         Assert-Equal $persistedFallback $damagedFallback "damaged persisted config should use the existing fallback chain"
 
+        [System.IO.File]::WriteAllBytes($nodeConfigPath, [byte[]](0x7B, 0x22, 0x78, 0x22, 0x3A, 0x22, 0xFF, 0x22, 0x7D))
+        $invalidUtf8Fallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
+        Assert-Equal $persistedFallback $invalidUtf8Fallback "invalid UTF-8 persisted config should use the existing fallback chain"
+
         $unownedNodeRoot = Join-Path $TempRoot "unowned-node-data"
         New-Item -ItemType Directory -Force -Path $unownedNodeRoot | Out-Null
-        @{ node_data_root = $unownedNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        @{ node_data_root = $unownedNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath $nodeConfigPath -Encoding UTF8
         $unownedFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
         Assert-Equal $persistedFallback $unownedFallback "persisted root without ownership marker should use the existing fallback chain"
 
         $missingNodeRoot = Join-Path $TempRoot "missing-node-data"
-        @{ node_data_root = $missingNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        @{ node_data_root = $missingNodeRoot } | ConvertTo-Json | Set-Content -LiteralPath $nodeConfigPath -Encoding UTF8
         $missingFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
         Assert-Equal $persistedFallback $missingFallback "absolute missing persisted root should use the existing fallback chain"
 
-        @{ node_data_root = "relative-node-data" } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $nodeConfigRoot "node.json") -Encoding UTF8
+        @{ node_data_root = "relative-node-data" } | ConvertTo-Json | Set-Content -LiteralPath $nodeConfigPath -Encoding UTF8
         $relativeFallback = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
         Assert-Equal $persistedFallback $relativeFallback "relative persisted root should use the existing fallback chain"
     } finally {

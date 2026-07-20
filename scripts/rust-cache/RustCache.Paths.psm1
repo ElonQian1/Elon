@@ -27,7 +27,16 @@ function Get-RustCachePersistedNodeDataRoot {
     }
 
     try {
-        $config = Get-Content -Raw -LiteralPath $configPath -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        $configBytes = [System.IO.File]::ReadAllBytes($configPath)
+        $offset = if (
+            $configBytes.Length -ge 3 -and
+            $configBytes[0] -eq 0xEF -and
+            $configBytes[1] -eq 0xBB -and
+            $configBytes[2] -eq 0xBF
+        ) { 3 } else { 0 }
+        $strictUtf8 = New-Object System.Text.UTF8Encoding($false, $true)
+        $configJson = $strictUtf8.GetString($configBytes, $offset, $configBytes.Length - $offset)
+        $config = $configJson | ConvertFrom-Json -ErrorAction Stop
         $nodeDataRoot = [string]$config.node_data_root
         if (-not (Test-RustCacheAbsolutePath $nodeDataRoot)) {
             return $null
