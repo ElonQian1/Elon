@@ -50,7 +50,12 @@ function Get-ValidationFingerprint {
     $rustc = ((& rustc -vV 2>&1) -join "`n").Trim()
     if ($LASTEXITCODE -ne 0) { throw "rustc -vV failed while creating validation fingerprint." }
     $remote = ((& git -C $RepoRoot config --get remote.origin.url 2>$null) -join "").Trim().ToLowerInvariant()
-    if ([string]::IsNullOrWhiteSpace($remote)) { $remote = 'no-origin:' + (Get-ValidationSha256 ([IO.Path]::GetFullPath($RepoRoot).ToLowerInvariant())) }
+    if ([string]::IsNullOrWhiteSpace($remote)) {
+        $commonDir=(((& git -C $RepoRoot rev-parse --git-common-dir 2>$null) -join '')).Trim()
+        if($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($commonDir)){throw 'Unable to resolve git common-dir for no-origin project identity.'}
+        if(-not [IO.Path]::IsPathRooted($commonDir)){$commonDir=Join-Path $RepoRoot $commonDir}
+        $remote = 'no-origin:' + (Get-ValidationSha256 ([IO.Path]::GetFullPath($commonDir).TrimEnd([IO.Path]::DirectorySeparatorChar,[IO.Path]::AltDirectorySeparatorChar).ToLowerInvariant()))
+    }
     $environment = [ordered]@{}
     $names = @('RUSTFLAGS','CARGO_ENCODED_RUSTFLAGS','CARGO_BUILD_TARGET') + @([Environment]::GetEnvironmentVariables('Process').Keys | ForEach-Object {[string]$_} | Where-Object { $_ -match '^CARGO_(PROFILE|TARGET)_.+' } | Sort-Object -Unique)
     foreach($name in ($names | Sort-Object -Unique)) { $value=[Environment]::GetEnvironmentVariable($name,'Process'); if($null -ne $value){$environment[$name]=Get-ValidationSha256 $value} }

@@ -36,22 +36,41 @@ function Remove-ValidationLockIfOwned {
     return $false
 }
 
+function Remove-OwnerlessValidationLockAfterGrace {
+    param([Parameter(Mandatory)][string]$LockPath,[int]$OwnerPublishGraceMilliseconds=1000)
+    if (-not (Test-Path -LiteralPath $LockPath -PathType Container) -or (Get-ValidationOwner $LockPath)) { return $false }
+    try { $age=([DateTime]::UtcNow-(Get-Item -LiteralPath $LockPath -ErrorAction Stop).LastWriteTimeUtc).TotalMilliseconds } catch { return $false }
+    if ($age -lt $OwnerPublishGraceMilliseconds) { return $false }
+    $retired="$LockPath.ownerless-$([Guid]::NewGuid().ToString('N'))"
+    try { [IO.Directory]::Move($LockPath,$retired) } catch { return $false }
+    if (Get-ValidationOwner $retired) {
+        try { [IO.Directory]::Move($retired,$LockPath) } catch {}
+        return $false
+    }
+    Remove-Item -LiteralPath $retired -Recurse -Force -ErrorAction SilentlyContinue
+    return $true
+}
+
 function Enter-ValidationLock {
-    param([Parameter(Mandatory)][string]$LockPath,[Parameter(Mandatory)][string]$Kind,[int]$TimeoutSeconds=3600,[int]$PollMilliseconds=100,[switch]$PersistWaiter)
+    param([Parameter(Mandatory)][string]$LockPath,[Parameter(Mandatory)][string]$Kind,[int]$TimeoutSeconds=3600,[int]$PollMilliseconds=100,[switch]$PersistWaiter,[int]$OwnerPublishGraceMilliseconds=1000)
     New-Item -ItemType Directory -Force -Path (Split-Path $LockPath -Parent) | Out-Null
     $started=[DateTime]::UtcNow; $deadline=$started.AddSeconds($TimeoutSeconds); $queued=$false
     $waiterId=[Guid]::NewGuid().ToString('N'); $waiterPath="$LockPath.waiters\$waiterId.json"
     try {
         while ($true) {
             $leaseId=[Guid]::NewGuid().ToString('N')
+            $candidate="$LockPath.candidate-$leaseId"
             try {
-                New-Item -ItemType Directory -Path $LockPath -ErrorAction Stop | Out-Null
                 $owner=[ordered]@{lease_id=$leaseId;pid=$PID;process_start_id=(Get-ValidationProcessIdentity);kind=$Kind;started_utc=[DateTime]::UtcNow.ToString('o');command_line=[Environment]::CommandLine}
-                $owner | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $LockPath 'owner.json') -Encoding UTF8
+                New-Item -ItemType Directory -Path $candidate -ErrorAction Stop | Out-Null
+                $owner | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $candidate 'owner.json') -Encoding UTF8
+                [IO.Directory]::Move($candidate,$LockPath)
                 return [pscustomobject]@{path=$LockPath;owner=$owner;queued=$queued;wait_ms=[int]([DateTime]::UtcNow-$started).TotalMilliseconds}
             } catch {
+                Remove-Item -LiteralPath $candidate -Recurse -Force -ErrorAction SilentlyContinue
                 $owner=Get-ValidationOwner $LockPath
                 if ($owner -and -not (Test-ValidationOwnerAlive $owner)) { [void](Remove-ValidationLockIfOwned -LockPath $LockPath -ExpectedOwner $owner); continue }
+                if (-not $owner -and (Remove-OwnerlessValidationLockAfterGrace -LockPath $LockPath -OwnerPublishGraceMilliseconds $OwnerPublishGraceMilliseconds)) { continue }
                 if (-not $queued) {
                     $queued=$true; Write-Host "VALIDATION_QUEUE=waiting kind=$Kind owner_pid=$($owner.pid) owner_lease=$($owner.lease_id)"
                     if ($PersistWaiter) {
@@ -96,4 +115,4 @@ function Enter-ValidationResource {
 }
 
 function Exit-ValidationResource { param($Lease); if($Lease){ @($Lease.leases)|ForEach-Object{Exit-ValidationLock $_} } }
-Export-ModuleMember -Function Get-ValidationProcessIdentity,Get-ValidationOwner,Test-ValidationOwnerAlive,Test-ValidationLeaseMatches,Enter-ValidationLock,Exit-ValidationLock,Get-ValidationResourceClass,Enter-ValidationResource,Exit-ValidationResource
+Export-ModuleMember -Function Get-ValidationProcessIdentity,Get-ValidationOwner,Test-ValidationOwnerAlive,Test-ValidationLeaseMatches,Remove-OwnerlessValidationLockAfterGrace,Enter-ValidationLock,Exit-ValidationLock,Get-ValidationResourceClass,Enter-ValidationResource,Exit-ValidationResource

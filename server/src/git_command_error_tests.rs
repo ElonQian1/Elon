@@ -79,16 +79,28 @@ fn credential_challenge_fails_quickly_with_auditable_stderr() {
     use std::time::Duration;
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind credential challenge server");
+    listener
+        .set_nonblocking(true)
+        .expect("make credential challenge listener bounded");
     let address = listener.local_addr().unwrap();
     let server = std::thread::spawn(move || {
-        if let Ok((mut stream, _)) = listener.accept() {
-            let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
-            let mut request = [0_u8; 4096];
-            let _ = stream.read(&mut request);
-            let _ = stream.write_all(
-                b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"elon-test\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-            );
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while std::time::Instant::now() < deadline {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+                    let mut request = [0_u8; 4096];
+                    let _ = stream.read(&mut request);
+                    let _ = stream.write_all(b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"elon-test\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                    return true;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
+                Err(_) => return false,
+            }
         }
+        false
     });
 
     let mut command = git_command();
@@ -117,10 +129,14 @@ fn credential_challenge_fails_quickly_with_auditable_stderr() {
     let output = child.wait_with_output().unwrap();
     let _ = done_tx.send(());
     let timed_out = reaper.join().expect("credential watchdog");
-    server.join().expect("credential challenge server");
+    let accepted = server.join().expect("credential challenge server");
     assert!(
         !timed_out,
         "credential challenge left background Git waiting for interaction"
+    );
+    assert!(
+        accepted,
+        "Git never connected to the bounded credential challenge server"
     );
     assert!(!output.status.success());
     assert!(

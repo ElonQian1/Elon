@@ -16,7 +16,8 @@ function Invoke-ValidationCapturedProcess {
         [Parameter(Mandatory)][string]$FilePath,
         [Parameter(Mandatory)][string[]]$ArgumentList,
         [Parameter(Mandatory)][string]$WorkingDirectory,
-        [Parameter(Mandatory)][string]$EvidenceDirectory
+        [Parameter(Mandatory)][string]$EvidenceDirectory,
+        [int]$TimeoutSeconds = 3600
     )
     New-Item -ItemType Directory -Force -Path $EvidenceDirectory | Out-Null
     $stdoutPath = Join-Path $EvidenceDirectory "stdout.log"
@@ -38,7 +39,11 @@ function Invoke-ValidationCapturedProcess {
     if (-not $process.Start()) { throw "Unable to start validation process: $FilePath" }
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
-    $process.WaitForExit()
+    if (-not $process.WaitForExit([Math]::Max(1,$TimeoutSeconds)*1000)) {
+        try { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null } catch { try { $process.Kill() } catch {} }
+        if (-not $process.WaitForExit(5000)) { throw "Validation process did not terminate after timeout: $FilePath" }
+        throw "Validation process timed out after $TimeoutSeconds seconds: $FilePath"
+    }
     $stdoutText = $stdoutTask.Result; $stderrText = $stderrTask.Result
     [IO.File]::WriteAllText($stdoutPath, $stdoutText, (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText($stderrPath, $stderrText, (New-Object Text.UTF8Encoding($false)))

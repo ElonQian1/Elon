@@ -8,6 +8,7 @@ $script:Assertions = 0
 function Assert-True([bool]$Condition,[string]$Message) { $script:Assertions++; if (-not $Condition) { throw "ASSERT FAILED: $Message" } }
 function Assert-Equal($Expected,$Actual,[string]$Message) { $script:Assertions++; if ($Expected -ne $Actual) { throw "ASSERT FAILED: $Message expected=$Expected actual=$Actual" } }
 function Stop-TestProcess($Process) { if(-not $Process){return}; try{$Process.Refresh();if(-not $Process.HasExited){& cmd.exe /d /c "taskkill /PID $($Process.Id) /T /F >nul 2>&1" | Out-Null}}catch{}finally{$Process.Dispose()} }
+function Wait-TestProcess($Process,[int]$TimeoutSeconds,[string]$Label) { if(-not $Process.WaitForExit($TimeoutSeconds*1000)){Stop-TestProcess $Process;throw "$Label did not exit within $TimeoutSeconds seconds"};$Process.Refresh() }
 $TempRoot = Join-Path $env:TEMP ("elon-validation-test-" + [Guid]::NewGuid().ToString("N"))
 $CacheRoot = Join-Path $TempRoot "cache"; $BinRoot = Join-Path $TempRoot "bin"; $originalPath = $env:PATH; $children=@()
 New-Item -ItemType Directory -Force -Path $CacheRoot,$BinRoot | Out-Null
@@ -23,6 +24,8 @@ try {
     $baseDetails = Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")
     $baseFingerprint = $baseDetails.fingerprint
     Assert-True ($baseDetails.payload.project -like 'no-origin:*') "project without origin must use safe hashed fallback"
+    $LinkedWorktree=Join-Path $TempRoot 'linked-worktree'; & git -C $SnapshotRepo worktree add --detach $LinkedWorktree HEAD --quiet
+    Assert-Equal $baseDetails.payload.project (Get-ValidationFingerprint $LinkedWorktree @('check')).payload.project "no-origin linked worktrees must share common-dir project identity"
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\adjacent.md") -Value "unrelated"
     Assert-Equal $baseFingerprint (Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")).fingerprint "unrelated docs must not invalidate Rust evidence"
     Set-Content -LiteralPath (Join-Path $SnapshotRepo 'server\lib.rs') 'pub fn staged() {}'
@@ -39,6 +42,12 @@ try {
     '{"pid":2147483000}' | Set-Content -LiteralPath (Join-Path $stale "owner.json") -Encoding UTF8
     $lease = Enter-ValidationLock -LockPath $stale -Kind "crash-recovery" -TimeoutSeconds 2
     Assert-Equal $PID ([int]$lease.owner.pid) "stale lock should be recovered"; Exit-ValidationLock $lease
+    $ownerless=Join-Path $CacheRoot 'ownerless-crash-window.lock'; New-Item -ItemType Directory -Path $ownerless|Out-Null
+    (Get-Item $ownerless).LastWriteTimeUtc=[DateTime]::UtcNow.AddSeconds(-2)
+    $ownerlessLease=Enter-ValidationLock $ownerless 'ownerless-recovery' 2 10 -OwnerPublishGraceMilliseconds 100
+    Assert-Equal $PID ([int]$ownerlessLease.owner.pid) "ownerless crash-window lock must recover after bounded grace"
+    Assert-True (Test-Path (Join-Path $ownerless 'owner.json')) "published lock must never be visible without owner metadata"
+    Exit-ValidationLock $ownerlessLease
     $reusedPid=Join-Path $CacheRoot 'reused-pid.lock'; New-Item -ItemType Directory -Force $reusedPid|Out-Null
     [ordered]@{lease_id='stale';pid=$PID;process_start_id='wrong-start'}|ConvertTo-Json|Set-Content (Join-Path $reusedPid 'owner.json')
     $fresh=Enter-ValidationLock $reusedPid 'pid-reuse' 2
@@ -84,10 +93,10 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     $children += $p2; $null = $p2.Handle
     $waiterPattern=Join-Path $CacheRoot 'validation-v1\evidence\*\.run.lock.waiters\*.json'
     $waiterDeadline=[DateTime]::UtcNow.AddSeconds(15)
-    while(-not (Get-ChildItem $waiterPattern -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $waiterDeadline){ [Threading.Thread]::Yield() | Out-Null }
+    while(-not (Get-ChildItem $waiterPattern -ErrorAction SilentlyContinue) -and [DateTime]::UtcNow -lt $waiterDeadline){ Start-Sleep -Milliseconds 20 }
     Assert-True ($null -ne (Get-ChildItem $waiterPattern -ErrorAction SilentlyContinue)) "waiter state must be durably visible before owner release"
     $release.Set() | Out-Null
-    $p1.WaitForExit(); $p2.WaitForExit(); $p1.Refresh(); $p2.Refresh()
+    Wait-TestProcess $p1 20 'first exact validation'; Wait-TestProcess $p2 20 'coalesced exact validation'
     if ($p1.ExitCode -ne 0 -or $p2.ExitCode -ne 0) {
         throw "validator subprocess failed: one=$($p1.ExitCode) two=$($p2.ExitCode)`none=$((Get-Content -Raw $stderr1))`ntwo=$((Get-Content -Raw $stderr2))"
     }
@@ -98,6 +107,9 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     Assert-Equal 1 @(Get-Content $Counter).Count "successful exact fingerprint must be reused"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $validator -CacheRoot $CacheRoot -SkipCheapGates -DisableSccache check --manifest-path server\Cargo.toml --features distinct | Out-Null
     Assert-Equal 2 @(Get-Content $Counter).Count "different fingerprint must not be reused"
+    $cargoDevText=Get-Content -Raw (Join-Path $PSScriptRoot 'cargo-dev.ps1')
+    Assert-True ($cargoDevText -notmatch '\[switch\]\$Force') "cargo-dev must not intercept Cargo's --force"
+    Assert-True ($cargoDevText -match '\[switch\]\$RefreshValidationEvidence') "validator-only refresh option must remain public and unambiguous"
     Write-Host "PASS: validation orchestrator tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {
     @($children) | ForEach-Object { Stop-TestProcess $_ }

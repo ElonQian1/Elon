@@ -18,7 +18,7 @@ param(
     [switch]$DisableSccache,
     [switch]$SkipCacheGc,
     [switch]$BypassValidationOrchestrator,
-    [switch]$Force,
+    [switch]$RefreshValidationEvidence,
     [switch]$SkipCheapGates,
     [int]$LightSlots = 2,
     [int]$WaitTimeoutSeconds = 3600,
@@ -43,7 +43,7 @@ if (-not $BypassValidationOrchestrator) {
     if ($CacheRoot) { $validationArgs += @("-CacheRoot", $CacheRoot) }
     if ($TargetDir) { $validationArgs += @("-TargetDir", $TargetDir) }
     if ($DisableSccache) { $validationArgs += "-DisableSccache" }
-    if ($Force) { $validationArgs += "-Force" }
+    if ($RefreshValidationEvidence) { $validationArgs += "-Force" }
     if ($SkipCheapGates) { $validationArgs += "-SkipCheapGates" }
     $validationArgs += @("-LightSlots", $LightSlots, "-WaitTimeoutSeconds", $WaitTimeoutSeconds)
     $validationArgs += $CargoArgs

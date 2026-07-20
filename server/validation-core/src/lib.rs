@@ -38,6 +38,25 @@ pub fn agent_validation_disables_incremental(domain: &str, release: bool) -> boo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeSet;
+
+    fn policy_values(field: &str) -> BTreeSet<String> {
+        serde_json::from_str::<serde_json::Value>(PRODUCTION_POLICY_JSON)
+            .expect("production validation policy must be valid JSON")
+            .get(field)
+            .and_then(serde_json::Value::as_array)
+            .unwrap_or_else(|| {
+                panic!("production validation policy field {field} must be an array")
+            })
+            .iter()
+            .map(|value| {
+                value
+                    .as_str()
+                    .expect("policy values must be strings")
+                    .to_owned()
+            })
+            .collect()
+    }
 
     #[test]
     fn normalization_is_worktree_path_separator_independent() {
@@ -76,17 +95,32 @@ mod tests {
 
     #[test]
     fn rust_contract_matches_the_production_consumed_policy() {
-        for verb in ["test", "build", "bench", "install", "rustc"] {
-            assert!(PRODUCTION_POLICY_JSON.contains(&format!("\"{verb}\"")));
-            assert_eq!(classify_cargo(&[verb]), ResourceClass::Heavy);
+        let rust_heavy_verbs =
+            BTreeSet::from_iter(["test", "build", "bench", "install", "rustc"].map(str::to_owned));
+        let rust_heavy_flags =
+            BTreeSet::from_iter(["--release", "--all-targets"].map(str::to_owned));
+        let rust_agent_domains =
+            BTreeSet::from_iter(["validation", "agent-validation"].map(str::to_owned));
+        assert_eq!(policy_values("heavy_verbs"), rust_heavy_verbs);
+        assert_eq!(policy_values("heavy_flags"), rust_heavy_flags);
+        assert_eq!(
+            policy_values("agent_validation_domains"),
+            rust_agent_domains
+        );
+        for verb in &rust_heavy_verbs {
+            assert_eq!(classify_cargo(&[verb.as_str()]), ResourceClass::Heavy);
         }
-        for flag in ["--release", "--all-targets"] {
-            assert!(PRODUCTION_POLICY_JSON.contains(&format!("\"{flag}\"")));
-            assert_eq!(classify_cargo(&["check", flag]), ResourceClass::Heavy);
+        for flag in &rust_heavy_flags {
+            assert_eq!(
+                classify_cargo(&["check", flag.as_str()]),
+                ResourceClass::Heavy
+            );
         }
-        for domain in ["validation", "agent-validation"] {
-            assert!(PRODUCTION_POLICY_JSON.contains(&format!("\"{domain}\"")));
-            assert!(agent_validation_disables_incremental(domain, false));
+        for domain in &rust_agent_domains {
+            assert!(agent_validation_disables_incremental(
+                domain.as_str(),
+                false
+            ));
         }
     }
 }
