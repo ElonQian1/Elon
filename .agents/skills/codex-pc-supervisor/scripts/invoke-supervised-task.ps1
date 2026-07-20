@@ -29,6 +29,7 @@ param(
     [int]$Since = -1,
     [ValidateRange(1, 200)]
     [int]$Limit = 200,
+    [string]$ExpectedCursorEpoch = '',
     [switch]$Compact
 )
 
@@ -305,12 +306,45 @@ function Invoke-NodeApi {
         [object]$Connection,
         [string]$Method,
         [string]$Path,
-        [object]$Body = $null
+        [object]$Body = $null,
+        [System.Collections.IDictionary]$ExtraHeaders = $null
     )
     $requestHeaders = @{ Origin = $Connection.BaseUrl }
     $requestHeaders[$Connection.Header] = $Connection.Token
+    if ($null -ne $ExtraHeaders) {
+        foreach ($name in $ExtraHeaders.Keys) {
+            $requestHeaders[[string]$name] = [string]$ExtraHeaders[$name]
+        }
+    }
     Invoke-Utf8JsonRequest -Method $Method -Uri "$($Connection.BaseUrl)$Path" `
         -Headers $requestHeaders -Body $Body -TimeoutSec 15
+}
+
+function New-DesktopReviewTicket {
+    param([string]$OwnerUserId, [string]$RequestedTaskId)
+    $credential = [string]$env:ELON_DESKTOP_REVIEW_CREDENTIAL
+    if ([string]::IsNullOrWhiteSpace($credential) -or $credential.Trim().Length -lt 32) {
+        throw 'Desktop review credential is unavailable; review fails closed.'
+    }
+    if ([string]::IsNullOrWhiteSpace($OwnerUserId) -or
+        $OwnerUserId.Contains("`n") -or $OwnerUserId.Contains("`r") -or
+        [string]::IsNullOrWhiteSpace($RequestedTaskId) -or
+        $RequestedTaskId.Contains("`n") -or $RequestedTaskId.Contains("`r")) {
+        throw 'Desktop review ticket identity is invalid.'
+    }
+    $expiresAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 120
+    $nonce = [guid]::NewGuid().ToString('N')
+    $message = "v1`n$OwnerUserId`n$RequestedTaskId`n$expiresAt`n$nonce"
+    [byte[]]$keyBytes = $script:Utf8NoBomStrict.GetBytes($credential.Trim())
+    [byte[]]$messageBytes = $script:Utf8NoBomStrict.GetBytes($message)
+    $hmac = [System.Security.Cryptography.HMACSHA256]::new($keyBytes)
+    try {
+        [byte[]]$digest = $hmac.ComputeHash($messageBytes)
+    } finally {
+        $hmac.Dispose()
+    }
+    $signature = -join ($digest | ForEach-Object { $_.ToString('x2') })
+    return "v1.$expiresAt.$nonce.$signature"
 }
 
 function Get-CloudProjectsPath {
@@ -363,18 +397,31 @@ function New-SupervisedTaskBody {
 }
 
 function Get-TaskDetailPath {
-    param([string]$RequestedTaskId, [int]$Limit = 200, [int]$Since = -1)
+    param(
+        [string]$RequestedTaskId,
+        [int]$Limit = 200,
+        [int]$Since = -1,
+        [string]$CursorEpoch = ''
+    )
     if ([string]::IsNullOrWhiteSpace($RequestedTaskId)) { throw "$Action requires TaskId." }
     $encodedTaskId = [uri]::EscapeDataString($RequestedTaskId.Trim())
-    if ($Since -ge 0) {
-        return "/api/local-tasks/${encodedTaskId}?since=$Since&limit=$Limit"
+    $query = @("limit=$Limit")
+    if ($Since -ge 0) { $query = @("since=$Since") + $query }
+    if (-not [string]::IsNullOrWhiteSpace($CursorEpoch)) {
+        $query += "expected_cursor_epoch=$([uri]::EscapeDataString($CursorEpoch.Trim()))"
     }
-    return "/api/local-tasks/${encodedTaskId}?limit=$Limit"
+    return "/api/local-tasks/${encodedTaskId}?$($query -join '&')"
 }
 
 function Get-TaskDetail {
-    param([object]$Connection, [string]$RequestedTaskId, [int]$Limit = 200, [int]$Since = -1)
-    $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit $Since
+    param(
+        [object]$Connection,
+        [string]$RequestedTaskId,
+        [int]$Limit = 200,
+        [int]$Since = -1,
+        [string]$CursorEpoch = ''
+    )
+    $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit $Since $CursorEpoch
     Invoke-NodeApi $Connection 'Get' $detailPath
 }
 
@@ -586,7 +633,7 @@ switch ($Action) {
         Submit-Body $nodeConnection $submitBody 'Submit'
     }
     'Inspect' {
-        $detail = Get-TaskDetail $nodeConnection $TaskId $Limit $Since
+        $detail = Get-TaskDetail $nodeConnection $TaskId $Limit $Since $ExpectedCursorEpoch
         $nextCursor = [int](Get-ObjectField $detail 'last_event_seq')
         $resultDetail = if ($Compact) { Convert-ToCompactTaskDetail $detail } else { $detail }
         Convert-ToJsonResult ([ordered]@{
@@ -599,6 +646,8 @@ switch ($Action) {
             new_cursor = Get-ObjectField $detail 'new_cursor'
             resume_cursor = Get-ObjectField $detail 'resume_cursor'
             cursor_epoch = Get-ObjectField $detail 'cursor_epoch'
+            requested_cursor_epoch = Get-ObjectField $detail 'requested_cursor_epoch'
+            previous_cursor_epoch = Get-ObjectField $detail 'previous_cursor_epoch'
             sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
         })
     }
@@ -608,18 +657,21 @@ switch ($Action) {
         $detail = $null
         $status = ''
         $cursor = if ($Since -ge 0) { $Since } else { 0 }
+        $cursorEpoch = $ExpectedCursorEpoch
         $waitLimit = if ($PSBoundParameters.ContainsKey('Limit')) { $Limit } else { 25 }
         do {
             try {
                 # Poll only a small event window. The node computes the
                 # supervision evidence summary from the complete journal.
-                $detail = Get-TaskDetail $nodeConnection $TaskId $waitLimit $cursor
+                $detail = Get-TaskDetail $nodeConnection $TaskId $waitLimit $cursor $cursorEpoch
                 $record = Get-RecordFromDetail $detail
                 $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
                 $returnedCursor = [int](Get-ObjectField $detail 'last_event_seq')
                 if ((Get-ObjectField $detail 'cursor_reset') -eq $true) {
                     $cursor = [int](Get-ObjectField $detail 'resume_cursor')
                 } elseif ($returnedCursor -gt $cursor) { $cursor = $returnedCursor }
+                $returnedEpoch = [string](Get-ObjectField $detail 'cursor_epoch')
+                if (-not [string]::IsNullOrWhiteSpace($returnedEpoch)) { $cursorEpoch = $returnedEpoch }
                 if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
                 if ((Get-ObjectField $detail 'has_more') -eq $true) { continue }
             } catch {
@@ -639,6 +691,8 @@ switch ($Action) {
             new_cursor = Get-ObjectField $detail 'new_cursor'
             resume_cursor = Get-ObjectField $detail 'resume_cursor'
             cursor_epoch = Get-ObjectField $detail 'cursor_epoch'
+            requested_cursor_epoch = Get-ObjectField $detail 'requested_cursor_epoch'
+            previous_cursor_epoch = Get-ObjectField $detail 'previous_cursor_epoch'
             sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
         })
     }
@@ -646,7 +700,12 @@ switch ($Action) {
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
         $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
-        $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/desktop-review" $reviewBody
+        $detail = Get-TaskDetail $nodeConnection $TaskId 1
+        $record = Get-RecordFromDetail $detail
+        $ownerUserId = [string](Get-ObjectField $record 'owner_user_id')
+        $ticket = New-DesktopReviewTicket $ownerUserId $TaskId.Trim()
+        $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/desktop-review" `
+            $reviewBody @{ 'x-elon-desktop-review-ticket' = $ticket }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Review'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId; verdict = $Verdict; response = $response

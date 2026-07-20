@@ -96,6 +96,7 @@ pub use node_agent_cli_runner::{prepare_cli_prompt_cwd, PreparedCliPromptCwd};
 mod node_agent_exec;
 use node_agent_exec::hide_tokio_command_window;
 pub use node_agent_exec::run_exec;
+mod node_agent_desktop_review_auth;
 mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;

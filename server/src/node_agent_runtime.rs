@@ -70,6 +70,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) live_ui: std::sync::Arc<crate::node_agent_android_live::LiveUiBroker>,
     pub(crate) ui_fit_runs: std::sync::Arc<crate::node_agent_android_live::fit_run::FitRunService>,
     pub(crate) wake: Notify,
+    pub(crate) desktop_review_auth: crate::node_agent_desktop_review_auth::DesktopReviewAuth,
     local_admin_token: String,
 }
 
@@ -118,6 +119,8 @@ impl NodeRuntime {
             live_ui,
             ui_fit_runs,
             wake: Notify::new(),
+            desktop_review_auth: crate::node_agent_desktop_review_auth::DesktopReviewAuth::from_env(
+            ),
             local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }
     }
@@ -384,8 +387,10 @@ impl NodeRuntime {
         task_id: &str,
         since: usize,
         limit: usize,
+        expected_cursor_epoch: Option<&str>,
     ) -> anyhow::Result<node_agent_task_journal::TaskJournalSnapshot> {
-        self.task_journal.snapshot(task_id, since, limit)
+        self.task_journal
+            .snapshot_with_epoch(task_id, since, limit, expected_cursor_epoch)
     }
 
     pub(crate) async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {

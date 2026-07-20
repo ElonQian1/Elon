@@ -140,7 +140,7 @@ pub(crate) async fn list_handler(
                 RECENT_TASKS_LIMIT,
                 |task_id| {
                     runtime
-                        .task_journal_snapshot(task_id, 0, 1)
+                        .task_journal_snapshot(task_id, 0, 1, None)
                         .ok()
                         .map(|snapshot| snapshot.approvals)
                 },

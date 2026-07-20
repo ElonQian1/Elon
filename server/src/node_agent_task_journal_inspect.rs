@@ -45,7 +45,7 @@ pub(crate) async fn inspect_cli_task_journal(
             None
         });
 
-    match runtime.task_journal_snapshot(&task_id, since, limit.clamp(1, 200)) {
+    match runtime.task_journal_snapshot(&task_id, since, limit.clamp(1, 200), None) {
         Ok(snapshot) => {
             let attach = crate::node_agent_task_resume::task_attach_state_with_sidecar(
                 snapshot.record.as_ref(),

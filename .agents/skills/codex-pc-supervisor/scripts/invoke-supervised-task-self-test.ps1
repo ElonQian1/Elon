@@ -122,6 +122,7 @@ function Invoke-SupervisionSelfTest {
         $unsafeResumeRejected = $true
     }
     $testDetailPath = Get-TaskDetailPath 'local-test?id'
+    $testEpochPath = Get-TaskDetailPath 'local-test?id' 25 42 'journal:a/b?c'
     $testProjectsPath = Get-CloudProjectsPath $true
     $criteriaJson = ConvertFrom-Utf8Base64 'WyLmnaHku7bkuIAiLCLmnaHku7bkuowiXQ=='
     $jsonCriteria = @(Resolve-AcceptanceCriteria @() $criteriaJson '')
@@ -148,6 +149,13 @@ function Invoke-SupervisionSelfTest {
     }
     $activeDetail = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $activeDetail) 'application/json'
     $activeCompact = Convert-ToCompactTaskDetail $activeDetail
+    $priorDesktopCredential = [Environment]::GetEnvironmentVariable('ELON_DESKTOP_REVIEW_CREDENTIAL')
+    try {
+        $env:ELON_DESKTOP_REVIEW_CREDENTIAL = 'desktop-self-test-credential-at-least-32-bytes'
+        $desktopTicket = New-DesktopReviewTicket 'owner-self-test' 'local-self-test'
+    } finally {
+        [Environment]::SetEnvironmentVariable('ELON_DESKTOP_REVIEW_CREDENTIAL', $priorDesktopCredential)
+    }
     $criteriaFile = Join-Path ([System.IO.Path]::GetTempPath()) "elon-supervision-criteria-$([guid]::NewGuid().ToString('N')).json"
     try {
         [System.IO.File]::WriteAllText(
@@ -187,6 +195,8 @@ function Invoke-SupervisionSelfTest {
         resume_guard = $unsafeResumeRejected
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
+        expected_cursor_epoch_path = $testEpochPath -eq '/api/local-tasks/local-test%3Fid?since=42&limit=25&expected_cursor_epoch=journal%3Aa%2Fb%3Fc'
+        desktop_review_ticket = $desktopTicket -match '^v1\.[0-9]+\.[0-9a-f]{32}\.[0-9a-f]{64}$'
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
@@ -212,6 +222,7 @@ function Invoke-SupervisionSelfTest {
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
+            'expected_cursor_epoch_handshake', 'desktop_review_short_lived_ticket',
             'inspect_wait_active_runtime', 'criteria_json_array', 'criteria_utf8_file'
         )
     })

@@ -36,6 +36,7 @@ struct ListQuery {
 struct DetailQuery {
     since: Option<usize>,
     limit: Option<usize>,
+    expected_cursor_epoch: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -128,10 +129,11 @@ async fn get_task(
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "本机任务不存在。"),
         Err(error) => return internal_error(error),
     };
-    let snapshot = match runtime.task_journal.snapshot(
+    let snapshot = match runtime.task_journal.snapshot_with_epoch(
         &record.task_id,
         query.since.unwrap_or(0),
         query.limit.unwrap_or(200),
+        query.expected_cursor_epoch.as_deref(),
     ) {
         Ok(snapshot) => snapshot,
         Err(error) => return internal_error(error),
@@ -183,6 +185,8 @@ async fn get_task(
         "last_event_seq": snapshot.last_event_seq,
         "has_more": snapshot.has_more,
         "cursor_epoch": snapshot.cursor_epoch,
+        "requested_cursor_epoch": snapshot.requested_cursor_epoch,
+        "previous_cursor_epoch": snapshot.previous_cursor_epoch,
         "cursor_reset": snapshot.cursor_reset,
         "requested_cursor": snapshot.requested_cursor,
         "old_cursor": snapshot.old_cursor,

@@ -345,6 +345,86 @@ fn snapshot_filters_events_by_task_and_cursor() {
 }
 
 #[test]
+fn expected_cursor_epoch_resets_after_log_replacement_even_with_more_lines() {
+    let dir = unique_test_dir("cursor-log-replacement");
+    let journal = TaskJournal::new(&dir);
+    journal
+        .record_started(TaskJournalStart {
+            req_id: "req-epoch",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("req-epoch"),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("project_write"),
+        })
+        .unwrap();
+    let before = journal.snapshot("req-epoch", 0, 20).unwrap();
+    let replacement = dir.join("replacement.jsonl");
+    std::thread::sleep(std::time::Duration::from_millis(2));
+    let lines = (0..before.last_event_seq + 10)
+        .map(|index| {
+            serde_json::json!({"type":"heartbeat", "req_id":"req-epoch", "index":index}).to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    fs::write(&replacement, format!("{lines}\n")).unwrap();
+    fs::remove_file(journal.events_path()).unwrap();
+    fs::rename(replacement, journal.events_path()).unwrap();
+
+    let after = journal
+        .snapshot_with_epoch(
+            "req-epoch",
+            before.last_event_seq,
+            200,
+            Some(&before.cursor_epoch),
+        )
+        .unwrap();
+    assert_ne!(after.cursor_epoch, before.cursor_epoch);
+    assert!(after.cursor_reset);
+    assert_eq!(after.old_cursor, before.last_event_seq);
+    assert_eq!(after.events.first().unwrap().seq, 1);
+    assert_eq!(
+        after.requested_cursor_epoch.as_deref(),
+        Some(before.cursor_epoch.as_str())
+    );
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn expected_cursor_epoch_resets_after_node_restart_without_missing_events() {
+    let dir = unique_test_dir("cursor-node-restart");
+    let first = TaskJournal::new(&dir);
+    first
+        .record_started(TaskJournalStart {
+            req_id: "req-restart",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("req-restart"),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("project_write"),
+        })
+        .unwrap();
+    let before = first.snapshot("req-restart", 0, 20).unwrap();
+    let restarted = TaskJournal::new(&dir);
+    restarted
+        .append_event(serde_json::json!({"type":"heartbeat", "req_id":"req-restart"}))
+        .unwrap();
+    let after = restarted
+        .snapshot_with_epoch(
+            "req-restart",
+            before.last_event_seq,
+            20,
+            Some(&before.cursor_epoch),
+        )
+        .unwrap();
+    assert_ne!(after.cursor_epoch, before.cursor_epoch);
+    assert!(after.cursor_reset);
+    assert_eq!(after.events.first().unwrap().seq, 1);
+    assert!(after.events.len() >= 2);
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn stress_snapshot_handles_many_interleaved_task_events() {
     let dir = unique_test_dir("stress-snapshot");
     let journal = TaskJournal::new(&dir);

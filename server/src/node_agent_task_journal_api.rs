@@ -25,6 +25,7 @@ use crate::{
 struct JournalQuery {
     since: Option<usize>,
     limit: Option<usize>,
+    expected_cursor_epoch: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -42,6 +43,8 @@ struct LocalTaskJournalResponse {
     last_event_seq: usize,
     has_more: bool,
     cursor_epoch: String,
+    requested_cursor_epoch: Option<String>,
+    previous_cursor_epoch: Option<String>,
     cursor_reset: bool,
     requested_cursor: usize,
     old_cursor: usize,
@@ -109,7 +112,12 @@ async fn get_task_journal(
             tracing::warn!("读取 CLI sidecar 会话失败: {error}");
             None
         });
-    match runtime.task_journal.snapshot(&task_id, since, limit) {
+    match runtime.task_journal.snapshot_with_epoch(
+        &task_id,
+        since,
+        limit,
+        query.expected_cursor_epoch.as_deref(),
+    ) {
         Ok(snapshot) => {
             // 本地 API 只暴露进程恢复所需的最小字段；prompt/API key 从未写入 journal。
             let attach = task_attach_state_with_sidecar(snapshot.record.as_ref(), active, sidecar);
@@ -136,6 +144,8 @@ async fn get_task_journal(
                 last_event_seq: snapshot.last_event_seq,
                 has_more: snapshot.has_more,
                 cursor_epoch: snapshot.cursor_epoch,
+                requested_cursor_epoch: snapshot.requested_cursor_epoch,
+                previous_cursor_epoch: snapshot.previous_cursor_epoch,
                 cursor_reset: snapshot.cursor_reset,
                 requested_cursor: snapshot.requested_cursor,
                 old_cursor: snapshot.old_cursor,

@@ -20,7 +20,7 @@ use std::{
 use anyhow::Context;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::post,
     Json, Router,
@@ -343,30 +343,28 @@ async fn review_task(
     Path(task_id): Path<String>,
     Json(request): Json<SupervisionReviewRequest>,
 ) -> Response {
-    review_task_as(runtime, task_id, request, "pc_operator", "local_pc_api").await
+    review_task_as(runtime, task_id, request, ReviewChannel::PcOperator).await
 }
 
 async fn desktop_review_task(
     State(runtime): State<Arc<NodeRuntime>>,
     Path(task_id): Path<String>,
+    headers: HeaderMap,
     Json(request): Json<SupervisionReviewRequest>,
 ) -> Response {
-    review_task_as(
-        runtime,
-        task_id,
-        request,
-        DEFAULT_SUPERVISOR,
-        "codex_desktop_helper",
-    )
-    .await
+    review_task_as(runtime, task_id, request, ReviewChannel::Desktop(headers)).await
+}
+
+enum ReviewChannel {
+    PcOperator,
+    Desktop(HeaderMap),
 }
 
 async fn review_task_as(
     runtime: Arc<NodeRuntime>,
     task_id: String,
     request: SupervisionReviewRequest,
-    reviewed_by: &str,
-    review_source: &str,
+    channel: ReviewChannel,
 ) -> Response {
     let Some(creds) = runtime.creds().await else {
         return json_error(
@@ -382,12 +380,38 @@ async fn review_task_as(
         Ok(None) => return json_error(StatusCode::NOT_FOUND, "本机任务不存在。"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
+    let (reviewed_by, review_source) = match channel {
+        ReviewChannel::PcOperator => (
+            format!("pc_operator:{}", creds.owner_user_id),
+            "local_pc_api".to_string(),
+        ),
+        ReviewChannel::Desktop(headers) => {
+            if let Err(error) = runtime.desktop_review_auth.verify_headers(
+                &headers,
+                &creds.owner_user_id,
+                task_id.trim(),
+            ) {
+                let (status, message) = match error {
+                    crate::node_agent_desktop_review_auth::DesktopReviewAuthError::NotConfigured => (
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "节点未配置 Desktop review 会话凭证。",
+                    ),
+                    _ => (StatusCode::UNAUTHORIZED, "Desktop review 票据缺失、失效或身份不匹配。"),
+                };
+                return json_error(status, message);
+            }
+            (
+                format!("{DEFAULT_SUPERVISOR}:{}", creds.owner_user_id),
+                "codex_desktop_helper".to_string(),
+            )
+        }
+    };
     let contract = match load_supervision_state(&runtime.task_journal, task_id.trim()) {
         Ok(state) if state.enabled => state.contract,
         Ok(_) => return json_error(StatusCode::BAD_REQUEST, "该任务没有桌面监督契约。"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
-    let review = match normalize_review(request, reviewed_by, review_source) {
+    let review = match normalize_review(request, &reviewed_by, &review_source) {
         Ok(review) => review,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
