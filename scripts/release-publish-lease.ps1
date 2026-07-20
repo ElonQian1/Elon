@@ -1,4 +1,5 @@
 Set-StrictMode -Version Latest
+$script:ReleasePublishLeaseScriptPath = $PSCommandPath
 
 function Invoke-ElonReleaseLeaseRequest {
     param(
@@ -155,7 +156,10 @@ function Start-ElonReleaseHeartbeat {
         [int]$LeaseSecs = 14400
     )
     if ([string]::IsNullOrWhiteSpace($Token)) { return $null }
-    $helperPath = $MyInvocation.MyCommand.Path
+    $helperPath = $script:ReleasePublishLeaseScriptPath
+    if ([string]::IsNullOrWhiteSpace($helperPath)) {
+        throw "无法解析 release heartbeat helper 路径"
+    }
     return Start-Job -ScriptBlock {
         param($Path, $Api, $LeaseKind, $LeaseToken, $Batch, $LeaseStage, $Interval, $Lease)
         . $Path
