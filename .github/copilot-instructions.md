@@ -25,7 +25,7 @@
 | `WF-FILES` | 有意创建的源码、测试、fixture 必须提交；一次性产物写入 `.ai-tmp/`；稳定且可重复生成的输出才添加精确 `.gitignore`；来源不明文件不提交、不忽略、不删除。 |
 | `WF-VERIFY` | 运行与风险匹配的最小验证。Rust/Cargo、格式化、Android、PC 前端等命令按 `AGENTS.md` 路由读取，不自行绕过项目脚本。 |
 | `WF-PUSH` | 只 stage 当前任务文件；提交信息用中文并包含用户标识；commit 后立即 `git push origin HEAD:main`。提交前检查未跟踪文件，防止漏交新源码或测试。 |
-| `WF-REBASE` | 只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin`、`git rebase origin/main`、解决冲突后重推。远端前进本身不触发追车。 |
+| `WF-REBASE` | 只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin`、`git rebase origin/main`、解决冲突后重推。远端前进本身不触发追车。变基不自动触发重新编译或全量测试：先审查上游差异与冲突；无冲突且未命中本任务代码、构建输入或测试基础设施时复用变基前验证，直接重推；命中时只重跑受影响的最小验证。只有发布脚本、明确项目门禁或无法限定影响面的共享底层变更要求全量验证。 |
 | `WF-FINISH` | 修改任务只能用统一收尾命令结束：Windows `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind <Kind>`；Linux/macOS `bash scripts/finish-ai-task.sh --kind <Kind>`。 |
 | `WF-REPORT` | 只有收尾输出 `FINALIZABLE=true` 才能正常宣告完成。最终回复必须分别报告 `BUSINESS_STATUS`、`LOCAL_MAIN_STATUS`、`TASK_WORKTREE_STATUS` 和未跟踪文件告警。 |
 

@@ -36,7 +36,8 @@
 3. 只有 push 被 non-fast-forward 拒绝：才 `git fetch origin` + `git rebase origin/main`，解决冲突后再 push。
 4. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
 5. 发布阶段：如果构建产物被更新的 main 超越，停止上传旧产物，汇报“代码已合并，发布交给最新主线”，而不是重跑。
-6. 收尾阶段：运行统一收尾；如果主 `main` 不能快进或 worktree 清理失败，分别报告业务状态和 `LOCAL_MAIN_STATUS` / `TASK_WORKTREE_STATUS`，不得伪造 `FINALIZABLE=true`。
+6. rebase 完成后不默认重新编译或重跑全量测试。无冲突且上游未改动本任务路径、直接依赖、构建输入或测试基础设施时复用原验证；有命中时只补受影响的最小验证。只有明确发布门禁或无法限定影响面的共享底层变化才跑全量。
+7. 收尾阶段：运行统一收尾；如果主 `main` 不能快进或 worktree 清理失败，分别报告业务状态和 `LOCAL_MAIN_STATUS` / `TASK_WORKTREE_STATUS`，不得伪造 `FINALIZABLE=true`。
 
 ---
 
