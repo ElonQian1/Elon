@@ -86,6 +86,11 @@ internal class MainNavigationDesignMetrics(
             else -> return
         }
         selection.isSelected = selected
+        if (tab === binding.tabChat) {
+            icon.setImageResource(
+                if (selected) R.drawable.ic_bottom_nav_chat_active else R.drawable.ic_bottom_nav_chat
+            )
+        }
         icon.isSelected = selected
     }
 
