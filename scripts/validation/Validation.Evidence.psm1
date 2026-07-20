@@ -18,8 +18,27 @@ function Stop-ValidationCapturedProcess {
         & $TaskkillFilePath /PID $Process.Id /T /F 2>$null | Out-Null
         $treeStopped = ($LASTEXITCODE -eq 0)
     } catch { $treeStopped = $false }
-    if (-not $treeStopped -and -not $Process.HasExited) {
-        try { $Process.Kill() } catch {}
+    if (-not $treeStopped) {
+        $rootId = [int]$Process.Id
+        $all = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+        $byParent = @{}
+        foreach ($item in $all) { $byParent[[int]$item.ParentProcessId] = @($byParent[[int]$item.ParentProcessId]) + @($item) }
+        $ordered = New-Object System.Collections.Generic.List[object]
+        $visited = New-Object 'System.Collections.Generic.HashSet[int]'
+        [void]$visited.Add($rootId)
+        function Add-ValidationDescendants([int]$ParentId) {
+            foreach ($child in @($byParent[$ParentId])) {
+                $childId = [int]$child.ProcessId
+                if (-not $visited.Add($childId)) { continue }
+                Add-ValidationDescendants -ParentId $childId
+                $ordered.Add($child)
+            }
+        }
+        Add-ValidationDescendants -ParentId $rootId
+        foreach ($child in $ordered) {
+            Stop-Process -Id ([int]$child.ProcessId) -Force -ErrorAction SilentlyContinue
+        }
+        if (-not $Process.HasExited) { $Process.Kill() }
     }
     return $treeStopped
 }
@@ -32,6 +51,7 @@ function Invoke-ValidationCapturedProcess {
         [Parameter(Mandatory)][string]$EvidenceDirectory,
         [int]$TimeoutSeconds = 3600
     )
+    if ($env:ELON_TEST_VALIDATION_CAPTURE_EXCEPTION -eq '1') { throw 'Injected validation capture exception.' }
     New-Item -ItemType Directory -Force -Path $EvidenceDirectory | Out-Null
     $stdoutPath = Join-Path $EvidenceDirectory "stdout.log"
     $stderrPath = Join-Path $EvidenceDirectory "stderr.log"

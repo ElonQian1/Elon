@@ -36,7 +36,17 @@ function Initialize-ValidationCargoLock {
     $lockPath = Join-Path (Split-Path $manifestPath -Parent) 'Cargo.lock'
     if (Test-Path -LiteralPath $lockPath) { return }
     if ($CargoArgs -contains '--locked' -or $CargoArgs -contains '--frozen') { return }
-    & cargo generate-lockfile --manifest-path $manifestPath
+    $globalArgs = New-Object System.Collections.Generic.List[string]
+    for ($i = 0; $i -lt $CargoArgs.Count; $i++) {
+        $arg = [string]$CargoArgs[$i]
+        if ($arg -eq '--offline' -or $arg -like '--config=*') {
+            $globalArgs.Add($arg)
+        } elseif ($arg -eq '--config' -and $i + 1 -lt $CargoArgs.Count) {
+            $globalArgs.Add($arg)
+            $globalArgs.Add([string]$CargoArgs[++$i])
+        }
+    }
+    & cargo @($globalArgs) generate-lockfile --manifest-path $manifestPath
     if ($LASTEXITCODE -ne 0) { throw "cargo generate-lockfile failed while stabilizing the validation fingerprint." }
 }
 

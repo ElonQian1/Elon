@@ -78,13 +78,29 @@ try {
     if ($TargetDir) { $args += @("-TargetDir",$TargetDir) }
     $args += '--'
     $args += $CargoArgs
+    $startedAt = [DateTime]::UtcNow.ToString("o")
     Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint; status="running"
         owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id; resource_class=$class; queue_wait_ms=$resourceLease.wait_ms; coalesced_waiters_path=(Join-Path $resultDir '.run.lock.waiters'); command=@($CargoArgs)
-        fingerprint_inputs=$fingerprint.payload; started_utc=[DateTime]::UtcNow.ToString("o")
+        fingerprint_inputs=$fingerprint.payload; started_utc=$startedAt
         stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
     })
-    $result = Invoke-ValidationCapturedProcess -FilePath "powershell" -ArgumentList $args -WorkingDirectory $RepoRoot -EvidenceDirectory $resultDir -TimeoutSeconds $WaitTimeoutSeconds
+    try {
+        $result = Invoke-ValidationCapturedProcess -FilePath "powershell" -ArgumentList $args -WorkingDirectory $RepoRoot -EvidenceDirectory $resultDir -TimeoutSeconds $WaitTimeoutSeconds
+    } catch {
+        $failedAt = [DateTime]::UtcNow.ToString("o")
+        Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
+            schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint; status="failed"; exit_code=1
+            resource_class=$class; owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id
+            queue_wait_ms=$resourceLease.wait_ms; command=@($CargoArgs); fingerprint_inputs=$fingerprint.payload
+            started_utc=$startedAt; finished_utc=$failedAt; duration_ms=[int](([DateTime]::Parse($failedAt)-[DateTime]::Parse($startedAt)).TotalMilliseconds); timed_out=$false
+            stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
+            stdout_lines=0; stderr_lines=0; failures=@($_.Exception.Message); tail=@($_.Exception.Message)
+        })
+        Write-Host "VALIDATION_FINGERPRINT=$($fingerprint.fingerprint)"
+        Write-Host "VALIDATION_EVIDENCE=$summaryPath"
+        throw
+    }
     $summary = [ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint
         status=if ($result.exit_code -eq 0) { "success" } else { "failed" }

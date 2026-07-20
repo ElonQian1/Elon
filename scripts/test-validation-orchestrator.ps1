@@ -24,8 +24,18 @@ try {
     $LockRepo=Join-Path $TempRoot 'lock-repo'; New-Item -ItemType Directory -Force $LockRepo,(Join-Path $LockRepo 'src')|Out-Null
     Set-Content (Join-Path $LockRepo 'Cargo.toml') "[package]`nname='lock-test'`nversion='0.1.0'`nedition='2021'"
     Set-Content (Join-Path $LockRepo 'src\lib.rs') ''
-    Initialize-ValidationCargoLock -RepoRoot $LockRepo -CargoArgs @('check','--manifest-path','Cargo.toml')
+    $lockArgumentLog=Join-Path $TempRoot 'lock-cargo-arguments.log'; $env:ELON_TEST_LOCK_ARGUMENT_LOG=$lockArgumentLog
+    '@echo off
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-lock-cargo.ps1" %*
+exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot 'cargo.cmd') -Encoding ASCII
+    '$args | Set-Content -LiteralPath $env:ELON_TEST_LOCK_ARGUMENT_LOG -Encoding UTF8
+$manifest=$args[[Array]::IndexOf($args,''--manifest-path'')+1]
+Set-Content -LiteralPath (Join-Path (Split-Path $manifest -Parent) ''Cargo.lock'') -Value ''# fake deterministic lock''
+exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -Encoding UTF8
+    $env:PATH="$BinRoot;$originalPath"
+    Initialize-ValidationCargoLock -RepoRoot $LockRepo -CargoArgs @('check','--offline','--config','net.retry=2','--config=build.jobs=1','--config','http.timeout=3','--manifest-path','Cargo.toml')
     Assert-True (Test-Path (Join-Path $LockRepo 'Cargo.lock')) "missing manifest lock must be materialized before fingerprinting"
+    Assert-Equal (@('--offline','--config','net.retry=2','--config=build.jobs=1','--config','http.timeout=3','generate-lockfile','--manifest-path',(Join-Path $LockRepo 'Cargo.toml')) -join "`n") (@(Get-Content $lockArgumentLog) -join "`n") "lock generation must preserve Cargo global network and config options"
     Remove-Item (Join-Path $LockRepo 'Cargo.lock')
     Initialize-ValidationCargoLock -RepoRoot $LockRepo -CargoArgs @('check','--manifest-path','Cargo.toml','--locked')
     Assert-True (-not (Test-Path (Join-Path $LockRepo 'Cargo.lock'))) "locked validation must preserve Cargo's missing-lock failure semantics"
@@ -83,10 +93,23 @@ try {
     $timeoutCapture = Invoke-ValidationCapturedProcess -FilePath "powershell.exe" -ArgumentList @('-NoProfile','-Command','Write-Output before-timeout; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30') -WorkingDirectory $RepoRoot -EvidenceDirectory (Join-Path $CacheRoot 'timeout-capture') -TimeoutSeconds 1
     Assert-Equal 124 $timeoutCapture.exit_code "timeout exit code"; Assert-True $timeoutCapture.timed_out "timeout flag"
     Assert-True ((Get-Content -Raw $timeoutCapture.stdout_path) -match 'before-timeout') "timeout must finish capturing stdout"
-    $fallback = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command','Start-Sleep 30') -PassThru
+    $fallbackIds=Join-Path $TempRoot 'fallback-process-ids.txt'
+    $fallback = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command',"`$child=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -PassThru; @(`$PID,`$child.Id)|Set-Content -LiteralPath '$fallbackIds'; Start-Sleep 30") -PassThru
+    $fallbackDeadline=[DateTime]::UtcNow.AddSeconds(5); while(-not (Test-Path $fallbackIds) -and [DateTime]::UtcNow -lt $fallbackDeadline){Start-Sleep -Milliseconds 20}
+    $fallbackProcessIds=@(Get-Content $fallbackIds | ForEach-Object {[int]$_})
     Stop-ValidationCapturedProcess -Process $fallback -TaskkillFilePath (Join-Path $TempRoot 'missing-taskkill.exe') | Out-Null
-    Assert-True ($fallback.WaitForExit(5000)) "failed taskkill invocation must fall back to terminating the direct child"
+    Assert-True ($fallback.WaitForExit(5000)) "failed taskkill invocation must terminate the parent"
+    Assert-True (@($fallbackProcessIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }).Count -eq 0) "failed taskkill invocation must terminate the exact descendant tree"
     $fallback.Dispose()
+    $nonzeroTaskkill=Join-Path $TempRoot 'nonzero-taskkill.cmd'; '@exit /b 7'|Set-Content -LiteralPath $nonzeroTaskkill -Encoding ASCII
+    $nonzeroIds=Join-Path $TempRoot 'nonzero-process-ids.txt'
+    $nonzero = Start-Process powershell.exe -ArgumentList @('-NoProfile','-Command',"`$child=Start-Process powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -PassThru; @(`$PID,`$child.Id)|Set-Content -LiteralPath '$nonzeroIds'; Start-Sleep 30") -PassThru
+    $nonzeroDeadline=[DateTime]::UtcNow.AddSeconds(5); while(-not (Test-Path $nonzeroIds) -and [DateTime]::UtcNow -lt $nonzeroDeadline){Start-Sleep -Milliseconds 20}
+    $nonzeroProcessIds=@(Get-Content $nonzeroIds | ForEach-Object {[int]$_})
+    Stop-ValidationCapturedProcess -Process $nonzero -TaskkillFilePath $nonzeroTaskkill | Out-Null
+    Assert-True ($nonzero.WaitForExit(5000)) "nonzero taskkill must terminate the parent"
+    Assert-True (@($nonzeroProcessIds | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }).Count -eq 0) "nonzero taskkill must terminate the exact descendant tree"
+    $nonzero.Dispose()
     $argumentLog=Join-Path $TempRoot 'cargo-arguments.log'; $env:ELON_TEST_ARGUMENT_LOG=$argumentLog
     '@echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-argument-cargo.ps1" %*
@@ -106,7 +129,7 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-argument-cargo.ps1'
     '@echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-cargo.ps1" %*
 exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot "cargo.cmd") -Encoding ASCII
-    'if($args[0] -eq ''generate-lockfile''){
+    'if($args -contains ''generate-lockfile''){
     $manifest=$args[[Array]::IndexOf($args,''--manifest-path'')+1]
     Set-Content -LiteralPath (Join-Path (Split-Path $manifest -Parent) ''Cargo.lock'') -Value ''# fake deterministic lock''
     exit 0
@@ -151,11 +174,20 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     Assert-True ($validatorText -match "\$args \+= '--'") "validator delegation must use the separator contract"
     Assert-True ($validatorText -match 'timed_out=\[bool\]\$result\.timed_out') "validator terminal summary must persist the timeout flag"
     Assert-True ($validatorText -match 'Invoke-ValidationCapturedProcess[^\r\n]+-TimeoutSeconds \$WaitTimeoutSeconds') "validator must apply its bound to the captured child"
+    $failureOut=Join-Path $TempRoot 'failure.out'; $failureErr=Join-Path $TempRoot 'failure.err'
+    $systemPowerShell=Join-Path $PSHOME 'powershell.exe'
+    $env:ELON_TEST_VALIDATION_CAPTURE_EXCEPTION='1'
+    $failureProcess=Start-Process $systemPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$validator,'-CacheRoot',$CacheRoot,'-SkipCheapGates','-DisableSccache','-Force','check','--manifest-path','server\Cargo.toml','--features','capture-exception') -PassThru -NoNewWindow -RedirectStandardOutput $failureOut -RedirectStandardError $failureErr
+    Wait-TestProcess $failureProcess 20 'capture exception validation'; Assert-True ($failureProcess.ExitCode -ne 0) "capture exception validation must fail"
+    $failureEvidence=[regex]::Match((Get-Content -Raw $failureOut),'VALIDATION_EVIDENCE=(.+)').Groups[1].Value.Trim()
+    Assert-True (Test-Path -LiteralPath $failureEvidence) "capture exception must publish its summary path"
+    Assert-Equal 'failed' ((Get-Content -Raw $failureEvidence|ConvertFrom-Json).status) "capture exception must atomically replace running with failed"
+    Assert-Equal 0 @(Get-ChildItem (Join-Path $CacheRoot 'validation-v1\evidence\*\summary.json')|ForEach-Object{Get-Content -Raw $_|ConvertFrom-Json}|Where-Object status -eq 'running').Count "capture exception must leave no running summary"
     Write-Host "PASS: validation orchestrator tests ($script:Assertions assertions)." -ForegroundColor Green
 } finally {
     @($children) | ForEach-Object { Stop-TestProcess $_ }
     if($ready){$ready.Dispose()}; if($release){$release.Set()|Out-Null;$release.Dispose()}
-    $env:PATH=$originalPath; Remove-Item Env:ELON_TEST_READY_EVENT,Env:ELON_TEST_RELEASE_EVENT,Env:ELON_TEST_COUNTER,Env:ELON_TEST_ARGUMENT_LOG,Env:ELON_TEST_FAKE_TIMEOUT -ErrorAction SilentlyContinue
+    $env:PATH=$originalPath; Remove-Item Env:ELON_TEST_READY_EVENT,Env:ELON_TEST_RELEASE_EVENT,Env:ELON_TEST_COUNTER,Env:ELON_TEST_ARGUMENT_LOG,Env:ELON_TEST_LOCK_ARGUMENT_LOG,Env:ELON_TEST_FAKE_TIMEOUT,Env:ELON_TEST_VALIDATION_CAPTURE_EXCEPTION -ErrorAction SilentlyContinue
     if (-not $RepoCargoLockExisted) { Remove-Item -LiteralPath $RepoCargoLock -Force -ErrorAction SilentlyContinue }
     Remove-Item -LiteralPath $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
     $left=@(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {$_.CommandLine -like "*$TempRoot*"})
