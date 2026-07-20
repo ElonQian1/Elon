@@ -483,11 +483,14 @@ pub async fn push_node_update(
         .data_dir
         .join("downloads")
         .join("node-agent-version.json");
-    let version = tokio::fs::read_to_string(&version_file)
+    let release = tokio::fs::read_to_string(&version_file)
         .await
         .ok()
-        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
-        .and_then(|v| v["version"].as_str().map(str::to_string));
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+    let version = release.as_ref().and_then(node_update_release_identity);
+    let git_sha = release
+        .as_ref()
+        .and_then(|value| value["gitSha"].as_str().map(str::to_string));
     let count = state
         .agent_manager
         .broadcast_update_client(version.clone(), None)
@@ -497,6 +500,7 @@ pub async fn push_node_update(
             "ok": true,
             "broadcast_to": count,
             "version": version,
+            "gitSha": git_sha,
             "message": format!("{count} 个在线节点已收到更新指令"),
             "public_dev_handshake": report,
         }))
@@ -505,9 +509,44 @@ pub async fn push_node_update(
             "ok": true,
             "broadcast_to": count,
             "version": version,
+            "gitSha": git_sha,
             "message": format!("{count} 个在线节点已收到更新指令"),
             "public_dev_handshake_error": e.to_string(),
         }))
         .into_response(),
+    }
+}
+
+fn node_update_release_identity(value: &serde_json::Value) -> Option<String> {
+    let version = value["version"].as_str()?.trim();
+    if version.is_empty() {
+        return None;
+    }
+    let git_sha = value["gitSha"].as_str().map(str::trim).unwrap_or_default();
+    Some(if git_sha.is_empty() {
+        version.to_string()
+    } else {
+        format!("{version}+{git_sha}")
+    })
+}
+
+#[cfg(test)]
+mod node_update_tests {
+    use super::node_update_release_identity;
+
+    #[test]
+    fn broadcast_target_carries_the_full_immutable_release_identity() {
+        let release = serde_json::json!({
+            "version": "0.3.69",
+            "gitSha": "b03b77295f00"
+        });
+        assert_eq!(
+            node_update_release_identity(&release).as_deref(),
+            Some("0.3.69+b03b77295f00")
+        );
+        assert_eq!(
+            node_update_release_identity(&serde_json::json!({"version":"0.3.69"})).as_deref(),
+            Some("0.3.69")
+        );
     }
 }

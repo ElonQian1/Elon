@@ -85,7 +85,8 @@ pub(crate) async fn open_target_handler(
 pub(crate) async fn update_handler(
     State(runtime): State<Arc<crate::NodeRuntime>>,
 ) -> (StatusCode, Json<Value>) {
-    match crate::node_agent_restart_drain::schedule_update(runtime, "local_admin", None).await {
+    match crate::node_agent_restart_drain::schedule_update(runtime, "local_admin", None, None).await
+    {
         Ok(payload) => {
             record_maintenance_event("update", true, "scheduled");
             (StatusCode::OK, Json(payload))

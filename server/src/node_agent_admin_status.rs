@@ -141,6 +141,12 @@ pub(super) async fn admin_status(
         },
         "models": live,
     });
+    if let Some(object) = payload.as_object_mut() {
+        object.insert(
+            "build_git_sha".to_string(),
+            serde_json::json!(super::node_agent_release_identity::git_sha()),
+        );
+    }
     if super::node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {
         if let Some(obj) = payload.as_object_mut() {
             obj.insert(

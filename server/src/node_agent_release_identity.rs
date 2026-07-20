@@ -5,6 +5,10 @@ pub(crate) fn current() -> String {
     )
 }
 
+pub(crate) fn git_sha() -> Option<&'static str> {
+    option_env!("ELON_NODE_AGENT_GIT_SHA").filter(|value| !value.trim().is_empty())
+}
+
 fn compose(version: &str, git_sha: Option<&str>) -> String {
     let version = version.trim();
     match git_sha.map(str::trim).filter(|value| !value.is_empty()) {

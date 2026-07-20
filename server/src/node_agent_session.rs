@@ -607,6 +607,7 @@ pub(super) async fn run_session(
                                     runtime_for_update,
                                     "cloud_broadcast",
                                     download_url,
+                                    version,
                                 )
                                 .await
                                 {

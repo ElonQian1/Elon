@@ -12,6 +12,8 @@ pub(super) fn status_payload() -> Value {
         "platform": std::env::consts::OS,
         "supported": cfg!(windows),
         "version": env!("CARGO_PKG_VERSION"),
+        "release_identity": crate::node_agent_release_identity::current(),
+        "build_git_sha": crate::node_agent_release_identity::git_sha(),
         "state_file": path_to_string(&paths.state_file),
         "config_dir": path_to_string(&paths.config_dir),
         "task_journal_dir": path_to_string(&paths.task_journal_dir),

@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
+. (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1")
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -81,6 +82,7 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
     "The checked-in Windows brand ICO must produce a stable 32px bitmap hash"
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+$replayHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1") -Raw
 $leaseHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "release-publish-lease.ps1") -Raw
 $serverPublishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-server.ps1") -Raw
 $apkPublishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-apk.ps1") -Raw
@@ -126,6 +128,33 @@ Assert-True (Test-ElonNodeAgentLeaseBootstrapFallback `
 Assert-True (-not (Test-ElonNodeAgentLeaseBootstrapFallback `
     -Message 'release API HTTP 500: {"error":"internal","message":"database unavailable"}')) `
     "Unrelated release API failures must not bypass the global lease"
+Assert-True ($leaseHelper.Contains('replayOnly')) `
+    "A coalesced node SHA must return an explicit replay action instead of silently ending"
+Assert-True ($replayHelper.Contains('Assert-RemoteNodeAgentReplayIdentity')) `
+    "Replay must verify immutable remote artifacts before broadcasting"
+Assert-True ($replayHelper.Contains('NODE_AGENT_REPLAY_EXE_SHA256=')) `
+    "Replay evidence must report the exact EXE SHA-256"
+Assert-True ($replayHelper.Contains('NODE_AGENT_REPLAY_CLIENT_SHA256=')) `
+    "Replay evidence must report the exact Windows client package SHA-256"
+Assert-True ($replayHelper.Contains("if ([string]`$metadata.sha256 -ne `$Identity.ExeSha256")) `
+    "Artifact mismatch must fail closed before a replay broadcast"
+$replayFixture = [pscustomobject]@{
+    Metadata = [pscustomobject]@{
+        gitSha = 'same-sha'; sha256 = ('a' * 64); windowsClientSha256 = ('b' * 64)
+    }
+    ExeSha256 = ('a' * 64)
+    ClientSha256 = ('b' * 64)
+}
+Assert-RemoteNodeAgentReplayIdentity -Identity $replayFixture -ExpectedGitSha 'same-sha'
+$staleReplayRejected = $false
+$replayFixture.Metadata.sha256 = ('c' * 64)
+try {
+    Assert-RemoteNodeAgentReplayIdentity -Identity $replayFixture -ExpectedGitSha 'same-sha'
+} catch {
+    $staleReplayRejected = $_.Exception.Message.Contains('SHA-256')
+}
+Assert-True $staleReplayRejected `
+    "A coalesced replay must reject stale server artifacts before sending the update"
 
 $lockFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-publish-lock-" + [Guid]::NewGuid().ToString("N"))
 $lockFixturePath = Join-Path $lockFixtureRoot "publish.lock"

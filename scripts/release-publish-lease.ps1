@@ -125,8 +125,17 @@ function Enter-ElonNodeAgentPublishLease {
             legacyFallback = $true
         }
     }
-    return Enter-ElonGlobalPublishLease -Claim $claim -Kind 'node_agent' `
+    $result = Wait-ElonGlobalPublishLease -Claim $claim -Kind 'node_agent' `
         -ReleaseApiBase $ReleaseApiBase -LeaseSecs 14400
+    if ($result.action -eq 'coalesced' -or ($result.action -eq 'finished' -and $result.success)) {
+        Write-Host '   Same node SHA already published; entering artifact-verified broadcast replay.' -ForegroundColor Green
+        $result | Add-Member -NotePropertyName replayOnly -NotePropertyValue $true -Force
+        return $result
+    }
+    if ($result.action -ne 'build') {
+        throw "global node publish lease was not granted: $($result | ConvertTo-Json -Compress)"
+    }
+    return $result
 }
 
 function Update-ElonReleaseStage {

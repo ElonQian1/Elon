@@ -32,6 +32,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-http.ps1")
+. (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1")
 
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
@@ -491,6 +492,14 @@ $script:NodeReleaseToken = [string]$nodeClaim.token
 $script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeReleaseToken)
 if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
     $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
+}
+if ($nodeClaim.PSObject.Properties.Name -contains 'replayOnly' -and $nodeClaim.replayOnly) {
+    Invoke-NodeAgentPublishReplay -GitSha $GitSha -PackageVersion $PackageVersion `
+        -BatchId $script:NodeReleaseBatchId -ReleaseIdentity $ReleaseIdentity `
+        -SkipBroadcast $SkipBroadcast -BroadcastAdminToken $BroadcastAdminToken `
+        -UseRemoteAdminToken $UseRemoteAdminToken -HandshakeWaitSec $HandshakeWaitSec -BaseUrl $BaseUrl
+    $script:NodeReleaseFinished = $true
+    return
 }
 $script:NodeReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Sha $GitSha -Stage 'windows_node'
 $script:NodeReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:NodeReleaseContext
