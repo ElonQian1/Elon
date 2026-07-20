@@ -1,80 +1,42 @@
 #!/usr/bin/env bash
-# pre-push 守门：防止 push 出格式漂移、编译断裂或漏 git add 新文件的 commit。
-# 启用：cd <repo>; git config core.hooksPath .githooks
-# 或运行 scripts/install-hooks.ps1 / scripts/install-hooks.sh
-#
-# 注意：版本号不再由 git 守门。
-#   后端 / APK 版本号由服务器 /api/release/claim 在编译期分配，
-#   通过 ELON_BUILD_VERSION(_NAME|_CODE) 环境变量注入产物。
-#   Cargo.toml / build.gradle 的版本号字段仅作为冷启动兜底，不再要求每次 push 递增。
-#   多 AI 并发不再因为"同时 bump 同一版本号"撞 rebase 死循环。
-
 set -e
 RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; NC='\033[0m'
-ZERO_SHA='0000000000000000000000000000000000000000'
-
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Git exports common-repository variables to hooks. In linked worktrees those
-# variables can make child scripts resolve the main checkout instead of the
-# worktree being pushed, so clear them after anchoring the actual hook path.
+# Linked-worktree hooks inherit common-repository variables; anchor to this hook.
 git_local_env_vars="$(git rev-parse --local-env-vars)"
-if [ -n "$git_local_env_vars" ]; then
-  unset $git_local_env_vars
-fi
+if [ -n "$git_local_env_vars" ]; then unset $git_local_env_vars; fi
+while read -r _local_ref _local_sha _remote_ref _remote_sha; do :; done
 
-PUSH_LINES=()
-while read -r local_ref local_sha remote_ref remote_sha; do
-  PUSH_LINES+=("$local_ref $local_sha $remote_ref $remote_sha")
-done
-
-# 1. 拦截未 add 的 Rust 源文件（漏 git add 是 56bad51 类事故根因）
 UNTRACKED_RS=$(git ls-files --others --exclude-standard | grep -E '\.rs$' || true)
 if [ -n "$UNTRACKED_RS" ]; then
-  echo -e "${RED}❌ pre-push 拒绝：检测到未 git add 的 .rs 文件：${NC}" >&2
+  echo -e "${RED}pre-push rejected: untracked Rust source files:${NC}" >&2
   echo "$UNTRACKED_RS" | sed 's/^/   /' >&2
-  echo -e "${YELLOW}   原因：新建 .rs 文件未提交会导致 mod 引用失败、远端构建断裂。${NC}" >&2
-  echo -e "${YELLOW}   解决：git add <这些文件>  然后重新 commit + push。${NC}" >&2
-  echo -e "${YELLOW}   如确认这些文件不应提交，写进 .gitignore 后再 push。${NC}" >&2
   exit 1
 fi
 
-# 2. 全仓 Rust 格式门禁：基线建立后不允许重新积累格式债
-if [ -f "scripts/format-rust.sh" ]; then
-  echo -e "${YELLOW}🔍 pre-push: scripts/format-rust.sh...${NC}"
-  if ! bash scripts/format-rust.sh 2>&1; then
-    echo -e "${RED}❌ pre-push 拒绝：Rust 全仓格式检查失败${NC}" >&2
-    echo -e "${YELLOW}   日常只格式化本次文件；如确需全量写入，使用 --apply --all 并拆出纯 style 提交。${NC}" >&2
-    exit 1
-  fi
-  echo -e "${GREEN}   ✅ Rust 全仓格式检查通过${NC}"
-fi
-
-# 3. 源文件体量守门：历史红区可存在，但不能继续变大或新增红区文件
-echo -e "${YELLOW}🔍 pre-push: scripts/check-source-size.ps1...${NC}"
 PS_CMD=""
 if command -v powershell >/dev/null 2>&1; then PS_CMD="powershell"; elif command -v pwsh >/dev/null 2>&1; then PS_CMD="pwsh"; fi
 if [ -z "$PS_CMD" ]; then
-  echo -e "${RED}❌ pre-push 拒绝：未找到 powershell/pwsh，无法运行 source-size guard${NC}" >&2
-  exit 1
-fi
-if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-size.ps1 2>&1; then
-  echo -e "${RED}❌ pre-push 拒绝：源文件体量门禁失败${NC}" >&2
+  echo -e "${RED}pre-push rejected: powershell/pwsh unavailable${NC}" >&2
   exit 1
 fi
 
-# 4. cargo check 守门（如果存在 server/Cargo.toml）
+git diff --check
+git diff --cached --check
+bash scripts/format-rust.sh
+"$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-size.ps1
+
+# Cheap gates have passed; Cargo may now reuse an exact successful fingerprint.
 if [ -f "server/Cargo.toml" ]; then
-  echo -e "${YELLOW}🔍 pre-push: scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace...${NC}"
-  if ! bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace --quiet 2>&1; then
-    echo -e "${RED}❌ pre-push 拒绝：cargo check 失败${NC}" >&2
-    echo -e "${YELLOW}   修复编译错误后再 push。${NC}" >&2
+  echo -e "${YELLOW}pre-push: managed Rust validation...${NC}"
+  if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/validate-rust.ps1 -Domain agent-validation -SkipCheapGates check --manifest-path server/Cargo.toml --workspace --quiet 2>&1; then
+    echo -e "${RED}pre-push rejected: managed cargo check failed${NC}" >&2
     exit 1
   fi
-  echo -e "${GREEN}   ✅ cargo check 通过${NC}"
 fi
 
-echo -e "${GREEN}✅ pre-push 守门通过${NC}"
+echo -e "${GREEN}pre-push gates passed${NC}"
 exit 0

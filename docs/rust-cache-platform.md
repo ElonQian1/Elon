@@ -167,8 +167,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 purge
 
 ## 验证
 
+### 受管验证证据与调度
+
+代理、Desktop cargo-dev 和 pre-push 使用 `scripts/validate-rust.ps1`。昂贵 Cargo 首次执行的完整 stdout、stderr、退出码、失败项和有界摘要写入 `<cache-root>/validation-v1/evidence/<fingerprint>/`；对话流截断不再成为重跑理由。相同成功指纹直接复用，相同运行中指纹合并等待；锁 owner PID 失效时可恢复。证据默认保留 14 天且最多 100 份，活动锁不会被回收。
+
+指纹覆盖 Git index、unstaged binary diff、untracked 文件内容、Cargo.lock、`rustc -vV`、domain 和规范化 Cargo 参数，所以可跨同项目 worktree 复用，同时 dirty/staged/untracked 或 feature/profile/target 任一变化都会隔离。轻量 check/clippy 最多两个机器槽；test/build/link/release 使用重型单槽，同 target 仍由原 build partition 锁串行。
+
+sccache 每轮明确输出 `SCCACHE_STATUS`、`SCCACHE_PATH`、命中/未命中统计或 `SCCACHE_DEGRADED_REASON`。缺失时继续必要验证，不联网安装；恢复方式是显式安装 sccache 后运行 `scripts/rust-cache.ps1 install -Apply`。`agent-validation` domain 和 release 设置 `CARGO_INCREMENTAL=0`，普通交互开发不改变 incremental。
+
+缓存根优先接受 `ELON_NODE_DATA_ROOT/cache/rust-cache-v2`。系统盘低水位时仅输出 `elon.rust_cache.migration_advice.v1` 建议，不自动移动或删除；迁移必须先设置新根、登记 legacy，再运行 `purge-legacy` dry-run，确认后才可 `-Apply`。
+
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-rust-cache-platform.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-validation-orchestrator.ps1
 ```
 
 测试覆盖注册/隔离路由、release incremental、环境恢复、陈旧锁、GC dry-run、安全路径边界和 Cargo 父配置迁移。

@@ -64,7 +64,7 @@
 
 - 不泄露或提交 `.env`、签名密钥、token、密码和本机私有路径。
 - 不回退、覆盖或夹带其他代理的改动；不能确认归属时停止处置该文件。
-- Rust 日常验证必须走带锁的 `scripts/cargo-dev.*`；发布构建走发布脚本，不能共享裸 Cargo 写入。
+- Rust/Cargo 验证必须走 `scripts/validate-rust.ps1`（Git Bash/非 Windows 由 `cargo-dev.sh` 适配）；入口先执行廉价门禁，再按精确指纹复用或运行 `cargo-dev`。发布构建走发布脚本，不能共享裸 Cargo 写入。
 - 经仓库脚本确认的全量纯 rustfmt 先独立提交；业务改动另提，不为缩小 diff 反复撤销。
 - 新建源文件目标不超过 500 行，超过 800 行必须拆分；入口文件只做组装。
 - APP UI 改动先读 `docs/Design.md`、`docs/APP 颜色规范.md`；APK UI 还要按路由检查网页同步规则。

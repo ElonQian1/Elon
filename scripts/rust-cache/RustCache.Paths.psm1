@@ -28,6 +28,9 @@ function Resolve-RustCacheRoot {
     } elseif (-not [string]::IsNullOrWhiteSpace($env:ELON_RUST_CACHE_ROOT)) {
         $candidate = $env:ELON_RUST_CACHE_ROOT.Trim()
         $source = "ELON_RUST_CACHE_ROOT"
+    } elseif (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_DATA_ROOT)) {
+        $candidate = Join-Path $env:ELON_NODE_DATA_ROOT.Trim() "cache\rust-cache-v2"
+        $source = "ELON_NODE_DATA_ROOT"
     } elseif (-not [string]::IsNullOrWhiteSpace($env:RUST_SHARED_BUILD_ROOT)) {
         $candidate = Join-Path $env:RUST_SHARED_BUILD_ROOT.Trim() "rust-cache-v2"
         $source = "RUST_SHARED_BUILD_ROOT"
@@ -55,6 +58,21 @@ function Resolve-RustCacheRoot {
     }
     New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
     return $fullPath
+}
+
+function Get-RustCacheMigrationAdvice {
+    param([Parameter(Mandatory)][string]$CacheRoot, [int]$LowWatermarkPercent=15, [string]$ManagedAlternativeRoot)
+    $full = [IO.Path]::GetFullPath($CacheRoot)
+    $drive = New-Object IO.DriveInfo ([IO.Path]::GetPathRoot($full))
+    $freePercent = if ($drive.TotalSize -gt 0) { [math]::Round(100 * $drive.AvailableFreeSpace / $drive.TotalSize, 2) } else { 0 }
+    $recommended = $freePercent -lt $LowWatermarkPercent -and -not [string]::IsNullOrWhiteSpace($ManagedAlternativeRoot)
+    return [pscustomobject]@{
+        schema="elon.rust_cache.migration_advice.v1"; current_root=$full; free_percent=$freePercent
+        low_watermark_percent=$LowWatermarkPercent; migration_recommended=$recommended
+        suggested_root=if ($recommended) { [IO.Path]::GetFullPath($ManagedAlternativeRoot) } else { $null }
+        destructive_actions_taken=$false
+        safe_command=if ($recommended) { "Set ELON_RUST_CACHE_ROOT after reviewing the destination; register legacy cache, then use purge-legacy dry-run before -Apply." } else { $null }
+    }
 }
 
 function ConvertTo-RustCacheSlug {
@@ -129,4 +147,4 @@ function Assert-RustCacheManagedPath {
     }
 }
 
-Export-ModuleMember -Function Test-RustCacheAbsolutePath, Resolve-RustCacheRoot, ConvertTo-RustCacheSlug, Get-RustCacheWorkspaceHash, Get-RustCacheToolchainEpoch, Assert-RustCacheManagedPath
+Export-ModuleMember -Function Test-RustCacheAbsolutePath, Resolve-RustCacheRoot, Get-RustCacheMigrationAdvice, ConvertTo-RustCacheSlug, Get-RustCacheWorkspaceHash, Get-RustCacheToolchainEpoch, Assert-RustCacheManagedPath

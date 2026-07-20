@@ -9,6 +9,7 @@ Import-Module "$ModulesRoot\RustCache.Legacy.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Install.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Runtime.psm1" -Force -DisableNameChecking
 Import-Module "$ModulesRoot\RustCache.Sccache.psm1" -Force -DisableNameChecking
+Import-Module "$ModulesRoot\RustCache.Paths.psm1" -Force -DisableNameChecking
 
 $script:Assertions = 0
 function Assert-True {
@@ -65,6 +66,21 @@ try {
 
     $release = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test"
     Assert-True $release.release "release invocation should be detected"
+    $missingReadiness = Get-RustCacheSccacheReadiness -Disabled
+    Assert-Equal "unavailable" $missingReadiness.status "disabled sccache must be explicit"
+    Assert-Equal "disabled_by_caller" $missingReadiness.reason "sccache degradation reason"
+    $migrationAdvice = Get-RustCacheMigrationAdvice -CacheRoot $CacheRoot -LowWatermarkPercent 101 -ManagedAlternativeRoot (Join-Path $TempRoot "managed-alternative")
+    Assert-True $migrationAdvice.migration_recommended "low-watermark advice should be structured"
+    Assert-True (-not $migrationAdvice.destructive_actions_taken) "migration advice must not move or delete caches"
+    $oldNodeRoot = $env:ELON_NODE_DATA_ROOT; $oldSharedRoot = $env:RUST_SHARED_BUILD_ROOT
+    try {
+        $env:ELON_NODE_DATA_ROOT = Join-Path $TempRoot "node-data"
+        $env:RUST_SHARED_BUILD_ROOT = Join-Path $TempRoot "older-shared"
+        $nodePreferred = Resolve-RustCacheRoot -RepoRoot $ProjectRoot
+        Assert-True ($nodePreferred -like "$($env:ELON_NODE_DATA_ROOT)*") "node unified data root should precede older shared-root convention"
+    } finally {
+        $env:ELON_NODE_DATA_ROOT = $oldNodeRoot; $env:RUST_SHARED_BUILD_ROOT = $oldSharedRoot
+    }
 
     $EnvironmentCapture = Join-Path $TempRoot "cargo-environment.txt"
     $FakeCargo = Join-Path $TempRoot "fake-cargo.cmd"
@@ -85,6 +101,9 @@ exit /b 0
     Assert-True ($captured -match 'CARGO_INCREMENTAL=0') "release should force incremental off"
     Assert-True ($captured -match "CARGO_CWD=$([regex]::Escape($release.project_root))") "Cargo should execute from the declared project root"
     Assert-True ([string]::IsNullOrWhiteSpace($env:CARGO_BUILD_BUILD_DIR)) "Cargo environment should be restored after execution"
+    Invoke-RustCacheCargo -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "agent-validation" -DisableSccache -CargoCommand $FakeCargo -ToolchainEpoch "rustc-test" -CargoArgs @("check")
+    $agentCaptured = Get-Content -Raw -LiteralPath $EnvironmentCapture
+    Assert-True ($agentCaptured -match 'CARGO_INCREMENTAL=0') "agent validation should disable incremental"
 
     $staleBuildDir = Join-Path $CacheRoot "build\rustc-test\test-project\stale\0123456789abcdef"
     $staleLock = Join-Path $staleBuildDir ".rust-cache.lockdir"

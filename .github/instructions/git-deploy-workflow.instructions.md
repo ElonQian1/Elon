@@ -67,7 +67,7 @@ Linux/macOS：
 bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
 ```
 
-不要并行裸跑多个 Cargo 命令到同一 target。测试、build、clippy 也使用 `cargo-dev.*` 对应子命令。
+验证走 `scripts/validate-rust.ps1`；细节见 `docs/rust-cache-platform.md`。
 
 ### Rust 格式化
 

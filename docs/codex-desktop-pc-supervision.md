@@ -194,3 +194,9 @@ Codex JSON 的 `item.started/item.completed` 会以有界 `codex_item` 写入 jo
 ## 成功标准
 
 一次监督任务只有同时满足下列条件才算完成：PC 执行任务到终态；桌面端拿到可复核证据；项目验证与发布规则通过；桌面端写入 `accepted`；没有未处理的阻塞能力缺口。长期质量看任务成功率、首包/总耗时、失败工具率、恢复成功率、验收驳回率和回归率，而不是“自动修改次数”。
+
+### 验证证据与 smoke 范围冻结
+
+监督任务的 acceptance criteria 在派发时冻结。Rust/Cargo 验证必须通过 `scripts/validate-rust.ps1`，journal/review 记录指纹、证据路径、owner/queue/resource class 和 reused 状态；流式输出截断时读取首次持久证据，不得仅因此重跑。pre-push 复用同一精确成功指纹。
+
+真实 smoke 若发现相邻缺陷，review 使用结构化 `needs_follow_up` 或 `blocked_capability`，记录 `scope_relation`、`directly_blocks_frozen_acceptance`、证据和建议动作。只有直接阻断冻结标准时才纳入当前修复/发布循环。平台能力修复仍以相同 `root_task_id/parent_task_id` 关联原业务 UI，并在修复后 `Resume` 原业务会话；不得拆成与业务完全分离的休眠任务。

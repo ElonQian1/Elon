@@ -20,7 +20,7 @@
 | 项目定位、架构、模块入口、任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 项目文档、笔记、权威性、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
-| Rust 验证、Cargo、格式化 | `.github/instructions/git-deploy-workflow.instructions.md` 对应章节 |
+| Rust/Cargo 验证 | Git/发布手册；入口 `scripts/validate-rust.ps1` |
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和相关源码 |

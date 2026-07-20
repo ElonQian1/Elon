@@ -29,7 +29,7 @@ exit /b 37
         '$ErrorActionPreference = "Stop"'
         ("`$env:PATH = '{0};' + `$env:PATH" -f $escapedFakeCargoBin)
         '$cargoArgs = @("check")'
-        ("& '{0}' -NoLock -SkipCacheGc -DisableSccache -CacheRoot '{1}' -TargetDir '{2}' -CargoArgs `$cargoArgs" -f $escapedCargoDev, $escapedCacheRoot, $escapedTargetDir)
+        ("& '{0}' -BypassValidationOrchestrator -NoLock -SkipCacheGc -DisableSccache -CacheRoot '{1}' -TargetDir '{2}' -CargoArgs `$cargoArgs" -f $escapedCargoDev, $escapedCacheRoot, $escapedTargetDir)
     ) | Set-Content -LiteralPath $ProbeScript -Encoding UTF8
 
     $PowerShellExe = (Get-Process -Id $PID).Path

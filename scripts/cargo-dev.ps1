@@ -17,6 +17,7 @@ param(
     [switch]$NoLock,
     [switch]$DisableSccache,
     [switch]$SkipCacheGc,
+    [switch]$BypassValidationOrchestrator,
     [int]$LockTimeoutSeconds = 3600,
     [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
     [string[]]$CargoArgs = @()
@@ -32,6 +33,16 @@ if ($LASTEXITCODE -ne 0 -or -not $gitRoot) {
     Write-Error "Current script is not inside a Git repository."
 }
 $RepoRoot = $gitRoot.Trim()
+
+if (-not $BypassValidationOrchestrator) {
+    $validationArgs = @("-Domain", $Domain)
+    if ($CacheRoot) { $validationArgs += @("-CacheRoot", $CacheRoot) }
+    if ($TargetDir) { $validationArgs += @("-TargetDir", $TargetDir) }
+    if ($DisableSccache) { $validationArgs += "-DisableSccache" }
+    $validationArgs += $CargoArgs
+    & (Join-Path $RepoRoot "scripts\validate-rust.ps1") @validationArgs
+    exit $LASTEXITCODE
+}
 
 function Import-LocalEnvFile {
     param([string]$Path)

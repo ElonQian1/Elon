@@ -17,6 +17,7 @@ If the current request contains `<elon-pc-executor>`, stop using this skill. Wor
 2. Submit the requirement with `scripts/invoke-supervised-task.ps1 -Action Submit`. Always pass the absolute workspace path, original user request, criteria, and a stable project ID.
 3. Save the returned `task_id`. Use `-Action Wait -TaskId ...` in windows no longer than 55 seconds. `Wait` retries transient node restarts, advances an event cursor, and returns `next_cursor`; pass that value back with `-Since` on the next call. Use `-Compact` for bounded summaries and `Inspect -Since ... -Limit ...` for incremental evidence. Continue until the task is terminal or needs a user tool approval.
 4. Independently inspect the journal, diff, tests, commit, published artifact, and project finish report. A successful executor message alone is not acceptance evidence.
+   For Rust/Cargo, require the managed validator fingerprint, durable evidence path, exit code, owner/queue/resource class, and reuse state. Streaming output is not primary evidence, and truncation alone must not trigger a rerun.
 5. Record a verdict with `-Action Review`:
    - `accepted`: all acceptance criteria and project finish rules passed.
    - `needs_follow_up`: the task can be corrected without changing PC platform capability.
@@ -24,6 +25,8 @@ If the current request contains `<elon-pc-executor>`, stop using this skill. Wor
    - `rejected`: the result is unsafe or materially wrong.
 6. For `needs_follow_up`, submit a narrow follow-up requirement. For `blocked_capability`, run `-Action Improve -BlockingImprovement`, review that repair, then run `-Action Resume` against the terminated original task. `Resume` fails closed unless the parent has the current supervision protocol and a platform-recorded isolated worktree; the node independently revalidates Git identity and exclusive occupancy.
 7. Queue non-blocking platform improvements with `-Action Improve` only after the user task is complete. Do not delay the requested result for optional self-improvement.
+
+Freeze the submitted acceptance criteria before real smoke. Adjacent smoke defects must be recorded as structured `needs_follow_up` or `blocked_capability` with whether they directly block that frozen scope; do not expand the current release loop otherwise. A blocking platform repair must retain the original root/parent task association and resume the original business/UI task after repair. Never turn that relationship into an unrelated sleeping improvement task.
 
 The PowerShell helper tries `ELON_NODE_ADMIN_URL`, the current/recent successful token-free URL, and the 7799 fast path before scanning 7800–7819. It obtains the loopback-only admin token afresh without printing or caching it and returns stable JSON. Set `ELON_NODE_ADMIN_URL` only when the node uses another trusted local URL.
 Use `-Action Probe` to verify local connectivity and version without creating a task.

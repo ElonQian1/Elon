@@ -223,7 +223,7 @@ function Set-RustCacheBuildEnvironment {
     New-Item -ItemType Directory -Force -Path $context.build_dir, $context.target_dir | Out-Null
     $env:CARGO_BUILD_BUILD_DIR = $context.build_dir
     $env:CARGO_TARGET_DIR = $context.target_dir
-    if ($context.release) {
+    if ($context.release -or $context.domain -match '(^|-)validation($|-)|agent-validation') {
         $env:CARGO_INCREMENTAL = "0"
     }
     Update-RustCacheRegistry -CacheRoot $context.cache_root -ProjectId $context.project_id -ProjectRoot $context.project_root -WorkspaceRoot $context.workspace_root -WorkspaceHash $context.workspace_hash -Domain $context.domain -ToolchainEpoch $context.toolchain_epoch -BuildDir $context.build_dir -TargetDir $context.target_dir -Registered $context.registered
@@ -248,6 +248,23 @@ function Set-RustCacheBuildEnvironment {
     }
     $marker | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $context.build_dir ".last-used.json") -Encoding UTF8
     return $context
+}
+
+function Get-RustCacheSccacheReadiness {
+    param([switch]$Disabled)
+    if ($Disabled) {
+        return [pscustomobject]@{ status="unavailable"; path=$null; reason="disabled_by_caller"; stats=$null }
+    }
+    $command = Get-Command sccache -ErrorAction SilentlyContinue
+    if (-not $command) {
+        return [pscustomobject]@{ status="unavailable"; path=$null; reason="not_installed; install sccache explicitly, then run scripts/rust-cache.ps1 install -Apply"; stats=$null }
+    }
+    $stats = $null
+    try {
+        $raw = (& $command.Source --show-stats --stats-format json 2>$null) -join "`n"
+        if ($LASTEXITCODE -eq 0 -and $raw) { $stats = $raw | ConvertFrom-Json }
+    } catch { }
+    return [pscustomobject]@{ status="ready"; path=$command.Source; reason=if ($stats) { $null } else { "statistics_unavailable" }; stats=$stats }
 }
 
 function Invoke-RustCacheCargo {
@@ -278,11 +295,23 @@ function Invoke-RustCacheCargo {
 
         $context = Set-RustCacheBuildEnvironment -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -DisableSccache:$DisableSccache -ToolchainEpoch $ToolchainEpoch -CargoArgs $CargoArgs
         $sccache = if ($DisableSccache) { $null } else { Get-Command sccache -ErrorAction SilentlyContinue }
+        $readiness = Get-RustCacheSccacheReadiness -Disabled:$DisableSccache
 
         Write-Host "RUST_CACHE_PROJECT=$($context.project_id)"
         Write-Host "RUST_CACHE_DOMAIN=$($context.domain)"
         Write-Host "CARGO_BUILD_BUILD_DIR=$($context.build_dir)"
         Write-Host "CARGO_TARGET_DIR=$($context.target_dir)"
+        $alternative = if ($env:ELON_NODE_DATA_ROOT) { Join-Path $env:ELON_NODE_DATA_ROOT "cache\rust-cache-v2" } else { $null }
+        $migration = Get-RustCacheMigrationAdvice -CacheRoot $context.cache_root -ManagedAlternativeRoot $alternative
+        Write-Host ("RUST_CACHE_MIGRATION_ADVICE=" + ($migration | ConvertTo-Json -Compress))
+        Write-Host "SCCACHE_STATUS=$($readiness.status)"
+        Write-Host "SCCACHE_PATH=$($readiness.path)"
+        if ($readiness.reason) { Write-Host "SCCACHE_DEGRADED_REASON=$($readiness.reason)" }
+        if ($readiness.stats) {
+            if ($null -ne $readiness.stats.cache_hits) { Write-Host "SCCACHE_CACHE_HITS=$($readiness.stats.cache_hits)" }
+            if ($null -ne $readiness.stats.cache_misses) { Write-Host "SCCACHE_CACHE_MISSES=$($readiness.stats.cache_misses)" }
+        }
+        Write-Host "CARGO_INCREMENTAL_EFFECTIVE=$env:CARGO_INCREMENTAL"
         if ($sccache) {
             Write-Host "RUSTC_WRAPPER=$env:RUSTC_WRAPPER"
             Write-Host "SCCACHE_DIR=$env:SCCACHE_DIR"
@@ -300,4 +329,4 @@ function Invoke-RustCacheCargo {
     }
 }
 
-Export-ModuleMember -Function Resolve-RustCacheWorkspaceRoot, Test-RustCacheReleaseInvocation, Resolve-RustCacheInvocation, Get-RustCacheLockOwner, Test-RustCacheOwnerProcessAlive, Enter-RustCacheLock, Exit-RustCacheLock, Get-RustCacheSccacheBaseDirs, Set-RustCacheBuildEnvironment, Invoke-RustCacheCargo
+Export-ModuleMember -Function Resolve-RustCacheWorkspaceRoot, Test-RustCacheReleaseInvocation, Resolve-RustCacheInvocation, Get-RustCacheLockOwner, Test-RustCacheOwnerProcessAlive, Enter-RustCacheLock, Exit-RustCacheLock, Get-RustCacheSccacheBaseDirs, Get-RustCacheSccacheReadiness, Set-RustCacheBuildEnvironment, Invoke-RustCacheCargo
