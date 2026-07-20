@@ -257,6 +257,8 @@ export interface ReleaseBatchStage {
   stage: string
   kind: string
   status: string
+  phase?: string
+  phaseStatus?: string
   builderId: string
   builderLabel: string
   attempt: number
@@ -270,6 +272,7 @@ export interface ReleaseBatchStage {
 export interface ReleaseBatchLedger {
   batchId: string
   sha: string
+  expectedStages: string[]
   status: string
   createdAt?: number
   updatedAt?: number

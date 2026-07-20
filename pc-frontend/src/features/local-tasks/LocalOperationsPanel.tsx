@@ -87,7 +87,7 @@ export default function LocalOperationsPanel({ evolution, publish, actionKey, on
               <div>
                 <strong>{latestBatch.batchId} · {releaseStatus(latestBatch.status)}</strong>
                 <code>{shortSha(latestBatch.sha)}</code>
-                <span>{latestBatch.stages.map((stage) => `${stage.stage}:${releaseStatus(stage.status)}#${stage.attempt}`).join(' · ')}</span>
+                <span>{latestBatch.stages.map((stage) => `${stage.stage}${stage.phase ? `/${stage.phase}` : ''}:${releaseStatus(stage.phaseStatus || stage.status)}#${stage.attempt}`).join(' · ')}</span>
               </div>
             </div>
           </div>

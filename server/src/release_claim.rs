@@ -37,8 +37,8 @@ mod support;
 use crate::types::AppState;
 pub use mutations::{finish_handler, heartbeat_handler};
 use support::{
-    adopt_legacy_batch_identity, claim_response_for_existing, ensure_manager_healthy,
-    heartbeat_stage, persist_or_restore, public_in_flight, publish_token_status,
+    adopt_legacy_batch_identity, claim_response_for_existing, commit_candidate,
+    ensure_manager_healthy, heartbeat_stage, public_in_flight, publish_token_status,
     validate_finish_identity, validate_finish_owner,
 };
 
@@ -127,10 +127,13 @@ impl From<&PublishLeaseEntry> for PublicPublishLeaseEntry {
 pub struct HeartbeatRequest {
     pub kind: String,
     pub token: String,
+    pub sha: String,
     pub lease_secs: Option<i64>,
     pub batch_id: Option<String>,
     pub stage: Option<String>,
     pub stage_status: Option<String>,
+    pub phase: Option<String>,
+    pub phase_status: Option<String>,
 }
 
 #[derive(Serialize, Debug)]
@@ -178,13 +181,13 @@ pub async fn claim_handler(
     let mgr = manager(&state);
     ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
-    let original = guard.clone();
+    let mut candidate = guard.clone();
     let now = now_secs();
 
     for lane_kind in [Lane::Server, Lane::Apk, Lane::NodeAgent] {
-        sweep_expired(lane_mut(&mut guard, lane_kind), now);
+        sweep_expired(lane_mut(&mut candidate, lane_kind), now);
     }
-    sweep_global_expired(&mut guard, now);
+    sweep_global_expired(&mut candidate, now);
 
     let lease = clamp_lease(req.lease_secs.unwrap_or(match kind {
         Lane::Server => ESTIMATED_BUILD_SECS_SERVER,
@@ -199,7 +202,9 @@ pub async fn claim_handler(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
-        .unwrap_or_else(|| crate::release_batch::default_batch_id(&req.sha));
+        .unwrap_or_else(|| {
+            crate::release_batch::default_batch_id_for_kind(kind.as_str(), &req.sha)
+        });
     let stage = req
         .stage
         .as_deref()
@@ -207,7 +212,9 @@ pub async fn claim_handler(
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
         .unwrap_or_else(|| crate::release_batch::default_stage(kind_name).to_string());
-    crate::release_batch::validate_batch_identity(&guard, &batch_id, &req.sha).map_err(
+    crate::release_batch::validate_stage_owner(kind_name, &stage)
+        .map_err(|message| err(StatusCode::CONFLICT, "stage-owner-mismatch", message))?;
+    crate::release_batch::validate_batch_identity(&candidate, &batch_id, &req.sha).map_err(
         |message| {
             err(
                 StatusCode::CONFLICT,
@@ -216,16 +223,26 @@ pub async fn claim_handler(
             )
         },
     )?;
-    if let Some(completion) = guard.global_publish.completed.iter().rev().find(|item| {
-        item.success
-            && item.kind == kind_name
-            && item.sha == req.sha
-            && lane(&guard, kind)
-                .last_release
-                .as_ref()
-                .is_some_and(|release| release.success && release.sha == req.sha)
-    }) {
-        let lane_ref = lane(&guard, kind);
+    crate::release_batch::validate_batch_stage_identity(&candidate, &batch_id, kind_name, &stage)
+        .map_err(|message| err(StatusCode::CONFLICT, "batch-stage-mismatch", message))?;
+    if let Some(completion) = candidate
+        .global_publish
+        .completed
+        .iter()
+        .rev()
+        .find(|item| {
+            item.success
+                && item.kind == kind_name
+                && item.sha == req.sha
+                && item.batch_id == batch_id
+                && item.stage == stage
+                && lane(&candidate, kind)
+                    .last_release
+                    .as_ref()
+                    .is_some_and(|release| release.success && release.sha == req.sha)
+        })
+    {
+        let lane_ref = lane(&candidate, kind);
         let response = ClaimResponse {
             action: "coalesced".to_string(),
             kind: kind_name.to_string(),
@@ -244,21 +261,21 @@ pub async fn claim_handler(
                 .and_then(|release| release.version_code),
             claimed_at: completion.finished_at,
             lease_expires_at: completion.finished_at,
-            in_flight_count: usize::from(guard.global_publish.owner.is_some())
-                + guard.global_publish.waiters.len(),
+            in_flight_count: usize::from(candidate.global_publish.owner.is_some())
+                + candidate.global_publish.waiters.len(),
             queue_position: 0,
             coalesced: true,
-            owner: guard
+            owner: candidate
                 .global_publish
                 .owner
                 .as_ref()
                 .map(PublicPublishLeaseEntry::from),
-            waiter_count: guard.global_publish.waiters.len(),
+            waiter_count: candidate.global_publish.waiters.len(),
         };
         return Ok(Json(response));
     }
 
-    if let Some(existing) = guard.global_publish.owner.as_ref().filter(|item| {
+    if let Some(existing) = candidate.global_publish.owner.as_ref().filter(|item| {
         item.kind == kind_name
             && item.sha == req.sha
             && item.batch_id == batch_id
@@ -266,11 +283,11 @@ pub async fn claim_handler(
             && item.builder_id == req.builder_id
     }) {
         return Ok(Json(claim_response_for_existing(
-            &guard, kind, existing, "build", 0,
+            &candidate, kind, existing, "build", 0,
         )));
     }
     if let Some((index, existing)) =
-        guard
+        candidate
             .global_publish
             .waiters
             .iter()
@@ -284,7 +301,7 @@ pub async fn claim_handler(
             })
     {
         return Ok(Json(claim_response_for_existing(
-            &guard,
+            &candidate,
             kind,
             existing,
             "wait",
@@ -295,7 +312,7 @@ pub async fn claim_handler(
     let bump_kind = req.bump.as_deref().unwrap_or("patch");
 
     // 计算下一个版本号：取 max(last_published, current_reported, in_flight 中最大) 然后 bump。
-    let lane_ref = lane(&guard, kind);
+    let lane_ref = lane(&candidate, kind);
     let mut candidates_name: Vec<String> = Vec::new();
     if let Some(v) = lane_ref.last_published_version_name.clone() {
         candidates_name.push(v);
@@ -307,7 +324,8 @@ pub async fn claim_handler(
         candidates_name.push(b.assigned_version_name.clone());
     }
     let base_name = max_semver(&candidates_name).unwrap_or_else(|| "0.0.0".to_string());
-    let assigned_version_name = if matches!(kind, Lane::NodeAgent) {
+    let component_stage = stage != crate::release_batch::default_stage(kind_name);
+    let assigned_version_name = if matches!(kind, Lane::NodeAgent) || component_stage {
         req.current_version_name
             .clone()
             .unwrap_or_else(|| base_name.clone())
@@ -353,7 +371,7 @@ pub async fn claim_handler(
         lease_expires_at,
     };
 
-    lane_mut(&mut guard, kind).in_flight.push(entry);
+    lane_mut(&mut candidate, kind).in_flight.push(entry);
     let lease_entry = PublishLeaseEntry {
         token: token.clone(),
         kind: kind_name.to_string(),
@@ -366,17 +384,17 @@ pub async fn claim_handler(
         last_heartbeat: now,
         lease_expires_at,
     };
-    let (action, queue_position) = match enqueue_global_publish(&mut guard, lease_entry) {
+    let (action, queue_position) = match enqueue_global_publish(&mut candidate, lease_entry) {
         PublishAdmission::Owner => ("build", 0),
         PublishAdmission::Waiter { queue_position } => ("wait", queue_position),
     };
-    if let Some(lease) = guard
+    if let Some(lease) = candidate
         .global_publish
         .owner
         .as_ref()
         .filter(|lease| lease.token == token)
         .or_else(|| {
-            guard
+            candidate
                 .global_publish
                 .waiters
                 .iter()
@@ -385,7 +403,7 @@ pub async fn claim_handler(
         .cloned()
     {
         crate::release_batch::record_claim(
-            &mut guard,
+            &mut candidate,
             &lease,
             if action == "build" {
                 "running"
@@ -395,8 +413,8 @@ pub async fn claim_handler(
             now,
         );
     }
-    let in_flight_count =
-        usize::from(guard.global_publish.owner.is_some()) + guard.global_publish.waiters.len();
+    let in_flight_count = usize::from(candidate.global_publish.owner.is_some())
+        + candidate.global_publish.waiters.len();
 
     let resp = ClaimResponse {
         action: action.to_string(),
@@ -412,15 +430,15 @@ pub async fn claim_handler(
         in_flight_count,
         queue_position,
         coalesced: false,
-        owner: guard
+        owner: candidate
             .global_publish
             .owner
             .as_ref()
             .map(PublicPublishLeaseEntry::from),
-        waiter_count: guard.global_publish.waiters.len(),
+        waiter_count: candidate.global_publish.waiters.len(),
     };
 
-    persist_or_restore(&mgr, &mut guard, original).await?;
+    commit_candidate(&mgr, &mut guard, candidate).await?;
     drop(guard);
     Ok(Json(resp))
 }
@@ -432,12 +450,12 @@ pub async fn status_handler(
     let mgr = manager(&state);
     ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
-    let original = guard.clone();
+    let mut candidate = guard.clone();
     let now = now_secs();
-    sweep_expired(&mut guard.server, now);
-    sweep_expired(&mut guard.apk, now);
-    sweep_expired(&mut guard.node_agent, now);
-    sweep_global_expired(&mut guard, now);
+    sweep_expired(&mut candidate.server, now);
+    sweep_expired(&mut candidate.apk, now);
+    sweep_expired(&mut candidate.node_agent, now);
+    sweep_global_expired(&mut candidate, now);
 
     let render = |lane: &LaneState, name: &str| -> Value {
         json!({
@@ -452,32 +470,32 @@ pub async fn status_handler(
     let token_status = q
         .token
         .as_deref()
-        .map(|token| publish_token_status(&guard, token));
+        .map(|token| publish_token_status(&candidate, token));
     let global = json!({
-        "owner": guard.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
-        "waiters": guard.global_publish.waiters.iter().map(PublicPublishLeaseEntry::from).collect::<Vec<_>>(),
-        "waiterCount": guard.global_publish.waiters.len(),
+        "owner": candidate.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
+        "waiters": candidate.global_publish.waiters.iter().map(PublicPublishLeaseEntry::from).collect::<Vec<_>>(),
+        "waiterCount": candidate.global_publish.waiters.len(),
         "queuePolicy": "fifo",
-        "coalescingKey": "kind+sha",
+        "coalescingKey": "batchId+stage+kind+sha",
         "immutableReleaseSha": true,
         "batchIdentity": "batchId+sha",
     });
     let body = match q.kind.as_deref() {
-        Some("server") => render(&guard.server, "server"),
-        Some("apk") => render(&guard.apk, "apk"),
-        Some("node_agent") => render(&guard.node_agent, "node_agent"),
+        Some("server") => render(&candidate.server, "server"),
+        Some("apk") => render(&candidate.apk, "apk"),
+        Some("node_agent") => render(&candidate.node_agent, "node_agent"),
         _ => json!({
-            "server": render(&guard.server, "server"),
-            "apk": render(&guard.apk, "apk"),
-            "nodeAgent": render(&guard.node_agent, "node_agent"),
+            "server": render(&candidate.server, "server"),
+            "apk": render(&candidate.apk, "apk"),
+            "nodeAgent": render(&candidate.node_agent, "node_agent"),
             "globalPublish": global,
             "tokenStatus": token_status,
-            "releaseBatches": guard.release_batches,
+            "releaseBatches": candidate.release_batches,
             "stateHealth": "healthy",
             "now": now,
         }),
     };
-    persist_or_restore(&mgr, &mut guard, original).await?;
+    commit_candidate(&mgr, &mut guard, candidate).await?;
     drop(guard);
     Ok(Json(body))
 }

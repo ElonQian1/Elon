@@ -73,6 +73,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
+. (Join-Path $PSScriptRoot 'local-env.ps1')
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
@@ -111,36 +112,6 @@ try {
 
 if (-not (Test-Path (Join-Path $ServerDir "Cargo.toml"))) {
     Write-Error "❌ 找不到 $ServerDir/Cargo.toml，请确认仓库结构。"
-}
-
-function Import-LocalEnvFile {
-    param([string]$Path)
-
-    if (-not (Test-Path $Path)) { return }
-
-    foreach ($line in Get-Content $Path -Encoding UTF8) {
-        $trimmed = $line.Trim()
-        if ([string]::IsNullOrWhiteSpace($trimmed) -or $trimmed.StartsWith("#")) {
-            continue
-        }
-        if ($trimmed -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$') {
-            continue
-        }
-
-        $name = $Matches[1]
-        $value = $Matches[2].Trim()
-        if ($value.Length -ge 2) {
-            $first = $value.Substring(0, 1)
-            $last = $value.Substring($value.Length - 1, 1)
-            if (($first -eq '"' -and $last -eq '"') -or ($first -eq "'" -and $last -eq "'")) {
-                $value = $value.Substring(1, $value.Length - 2)
-            }
-        }
-
-        if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name, "Process"))) {
-            [Environment]::SetEnvironmentVariable($name, $value, "Process")
-        }
-    }
 }
 
 function Resolve-BuildTargetRoot {
@@ -373,7 +344,7 @@ function Write-PublishStatus {
     Write-Host "   APK_RELEASE_STATUS=$ApkReleaseStatus" -ForegroundColor Gray
 }
 
-Import-LocalEnvFile (Join-Path $RepoRoot ".env.local")
+Import-ElonLocalEnvFile (Join-Path $RepoRoot ".env.local")
 
 # ─────────────────────────────────────────────────────────────
 # Release API helper（与服务器 /api/release/{claim,heartbeat,finish} 通讯）
@@ -495,32 +466,23 @@ function Get-ServerReleaseVersionBaseline {
 # 全局状态：claim token，脚本失败/中止时用来调 finish 释放槽位
 $script:ReleaseToken = $null
 $script:ReleaseFinished = $false
+$script:ReleaseHeartbeat = $null
+$script:ReleaseContext = $null
 
 function Complete-Release {
     param(
         [Parameter(Mandatory)] [bool]$Success,
         [string]$VersionName = '',
-        [string]$Sha = '',
         [string]$ErrorMessage = ''
     )
     if (-not $script:ReleaseToken -or $script:ReleaseFinished) { return }
-    try {
-        $payload = @{
-            kind  = 'server'
-            token = $script:ReleaseToken
-            success = $Success
-            sha = $ShaBig; batchId = $script:ReleaseBatchId; stage = 'server'
-        }
-        if ($Success) {
-            if ($VersionName) { $payload.versionName = $VersionName }
-        } else {
-            if ($ErrorMessage) { $payload.errorMessage = $ErrorMessage }
-        }
-        Invoke-ReleaseApi -Endpoint 'finish' -Body $payload | Out-Null
-        $script:ReleaseFinished = $true
-    } catch {
-        Write-Host "   ⚠️  release/finish 调用失败（不影响主流程）: $_" -ForegroundColor Yellow
+    if ($null -ne $script:ReleaseHeartbeat) {
+        Stop-ElonReleaseHeartbeat -HeartbeatJob $script:ReleaseHeartbeat
+        $script:ReleaseHeartbeat = $null
     }
+    Complete-ElonReleaseContext -Context $script:ReleaseContext -Success $Success `
+        -VersionName $VersionName -ErrorMessage $ErrorMessage
+    $script:ReleaseFinished = $true
 }
 
 if ($SkipVersionBump) {
@@ -613,6 +575,8 @@ $claim = Enter-ElonGlobalPublishLease -Claim $claim -Kind 'server' -ReleaseApiBa
 if (-not $claim) { exit 0 }
 
 $script:ReleaseToken = [string]$claim.token
+$script:ReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase $ReleaseApiBase -Kind 'server' -Token $script:ReleaseToken -Sha $ShaBig -BatchId $script:ReleaseBatchId -Stage 'server'
+$script:ReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:ReleaseContext
 $AssignedVersion     = [string]$claim.assignedVersionName
 if ([string]::IsNullOrWhiteSpace($AssignedVersion)) {
     Write-Error "❌ release/claim 未返回 assignedVersionName"
@@ -623,6 +587,7 @@ Write-Host "   ✅ 已分配版本号: v$AssignedVersion (token=$($script:Releas
 # ─────────────────────────────────────────────────────────────
 # 2. 环境检查（仅 Build 时做）
 # ─────────────────────────────────────────────────────────────
+Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'server_build' -Status 'running'
 if (-not $SkipBuild) {
     # 检查 zig
     if (-not (Get-Command "zig" -ErrorAction SilentlyContinue)) {
@@ -760,6 +725,7 @@ if (-not $SkipBuild) {
         Write-Host "   使用已有产物: $Binary" -ForegroundColor Gray
     }
 }
+Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'server_build' -Status 'succeeded'
 
 if ($SkipUpload) {
     Write-Host ""
@@ -866,8 +832,7 @@ function Export-PcLegacyDist {
 }
 
 if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
-    Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
-        -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'pc_frontend' -Status 'running'
+    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'running'
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Host "3.5⃣  ⚠️  npm 不在 PATH，跳过前端构建（/pc 将使用现有 dist 或返回 404）" -ForegroundColor Yellow
     } elseif ($SkipBuild -and (Test-Path (Join-Path $PcDistDir "index.html"))) {
@@ -919,8 +884,7 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
     $pcPublished = Publish-StaticDist -LocalDir $PcDistDir -RemoteDir $RemotePcDist `
         -Label "新版 PC 前端 dist" -Required
     if (-not $pcPublished) { throw '新版 PC 前端发布未完成' }
-    Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
-        -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'pc_frontend' -Status 'succeeded'
+    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'succeeded'
 } else {
     throw 'pc-frontend/ 不存在，统一发布批次失败关闭'
 }
@@ -1094,16 +1058,30 @@ if ($serverVersionResp -and $serverVersionResp.ToString().Trim() -ne "") {
 # The first deployment from a legacy release API resumes a token that did not
 # persist batch fields. Replay completed stages against the new API before
 # finish so it can safely adopt release-<immutable-sha> and close one ledger.
-Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
-    -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'pc_frontend' -Status 'succeeded'
-Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind 'server' `
-    -Token $script:ReleaseToken -BatchId $script:ReleaseBatchId -Stage 'server' -Status 'running'
+Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'succeeded'
+Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'deployment_verification' -Status 'succeeded'
 
 # ─────────────────────────────────────────────────────────────
 # 7. 清理工作树 + finish(success=true)
 # ─────────────────────────────────────────────────────────────
 Remove-Worktree
-Complete-Release -Success $true -VersionName $AssignedVersion -Sha $ShaBig
+Complete-Release -Success $true -VersionName $AssignedVersion
+
+# Commit the independently expected PC frontend top-level evidence after the
+# server owner releases the global lease. The long frontend work above stayed
+# visible as an internal phase of the server owner and could not steal a stage.
+$pcFrontendClaim = Invoke-ReleaseApi -Endpoint 'claim' -Body (@{
+    kind = 'server'; sha = $ShaBig; builderId = $builderId
+    builderLabel = $builderLabel; currentVersionName = $AssignedVersion
+    batchId = $script:ReleaseBatchId; stage = 'pc_frontend'
+})
+$pcFrontendClaim = Enter-ElonGlobalPublishLease -Claim $pcFrontendClaim -Kind 'server' -ReleaseApiBase $ReleaseApiBase
+if ($pcFrontendClaim) {
+    $pcFrontendContext = New-ElonReleaseStageContext -ReleaseApiBase $ReleaseApiBase -Kind 'server' -Token ([string]$pcFrontendClaim.token) -Sha $ShaBig -BatchId $script:ReleaseBatchId -Stage 'pc_frontend'
+    $pcFrontendHeartbeat = Start-ElonReleaseContextHeartbeat -Context $pcFrontendContext
+    Stop-ElonReleaseHeartbeat -HeartbeatJob $pcFrontendHeartbeat
+    Complete-ElonReleaseContext -Context $pcFrontendContext -Success $true -VersionName $AssignedVersion
+}
 
 Write-Host ""
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan

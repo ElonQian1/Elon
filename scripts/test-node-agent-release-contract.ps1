@@ -81,6 +81,29 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
     "The checked-in Windows brand ICO must produce a stable 32px bitmap hash"
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+$leaseHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "release-publish-lease.ps1") -Raw
+$serverPublishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-server.ps1") -Raw
+$apkPublishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-apk.ps1") -Raw
+Assert-True ($leaseHelper.Contains('[Parameter(Mandatory)][string]$Sha')) `
+    "Every release heartbeat must carry the immutable claim SHA"
+Assert-True ($leaseHelper.Contains('$body.phaseStatus = $Status')) `
+    "Internal release phases must not masquerade as top-level stages"
+Assert-True ($leaseHelper.Contains('release heartbeat failed closed')) `
+    "Background heartbeat failures must be visible to the foreground publisher"
+Assert-True (-not $leaseHelper.Contains('Receive-Job -Job $HeartbeatJob -ErrorAction SilentlyContinue')) `
+    "Heartbeat shutdown must not swallow background errors"
+Assert-True ($serverPublishScript.Contains("Start-ElonReleaseContextHeartbeat -Context `$script:ReleaseContext")) `
+    "The server build must hold a visible fail-closed heartbeat"
+Assert-True ($serverPublishScript.Contains("-Stage 'server'") -and `
+    $serverPublishScript.Contains("Set-ElonReleasePhase -Context `$script:ReleaseContext -Phase 'pc_frontend'")) `
+    "The PC frontend build must be an internal server phase until its own stage is committed"
+Assert-True ($apkPublishScript.Contains("-Stage 'android_apk'") -and `
+    $apkPublishScript.Contains("Set-ElonReleasePhase -Context `$script:ReleaseContext -Phase 'gradle_build'")) `
+    "The APK Gradle build must expose a visible heartbeat phase"
+Assert-True ($apkPublishScript.Contains("Set-ElonReleasePhase -Context `$script:ReleaseContext -Phase 'artifact_upload'")) `
+    "The APK upload must expose a visible heartbeat phase"
+Assert-True (-not $publishScript.Contains('-Stage $script:NodeReleaseActiveStage')) `
+    "Node internal phases must never write arbitrary top-level stages"
 Assert-True ($publishScript.Contains('[switch]$RequireAllOnlineTargetBuild')) `
     "The publisher must expose an explicit strict rollout switch"
 Assert-True ($publishScript.Contains('NODE_AGENT_TARGET_BUILD_STATUS=partial')) `

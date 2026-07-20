@@ -64,6 +64,10 @@ pub struct PublishCompletion {
     pub token: String,
     pub kind: String,
     pub sha: String,
+    #[serde(default)]
+    pub batch_id: String,
+    #[serde(default)]
+    pub stage: String,
     pub success: bool,
     pub coalesced: bool,
     pub finished_at: i64,
@@ -252,6 +256,8 @@ pub(crate) fn sweep_global_expired(state: &mut ReleaseStateFile, now: i64) {
                 token: owner.token,
                 kind: owner.kind,
                 sha: owner.sha,
+                batch_id: owner.batch_id,
+                stage: owner.stage,
                 success: false,
                 coalesced: false,
                 finished_at: now,
@@ -309,6 +315,8 @@ pub(crate) fn finish_global_publish(
         token: owner.token.clone(),
         kind: owner.kind.clone(),
         sha: owner.sha.clone(),
+        batch_id: owner.batch_id.clone(),
+        stage: owner.stage.clone(),
         success,
         coalesced: false,
         finished_at: now,
@@ -318,7 +326,10 @@ pub(crate) fn finish_global_publish(
     let mut coalesced_tokens = Vec::new();
     if success {
         state.global_publish.waiters.retain(|waiter| {
-            let same_release = waiter.kind == owner.kind && waiter.sha == owner.sha;
+            let same_release = waiter.kind == owner.kind
+                && waiter.sha == owner.sha
+                && waiter.batch_id == owner.batch_id
+                && waiter.stage == owner.stage;
             if same_release {
                 coalesced_tokens.push(waiter.token.clone());
             }
@@ -330,6 +341,8 @@ pub(crate) fn finish_global_publish(
                 token: token.clone(),
                 kind: owner.kind.clone(),
                 sha: owner.sha.clone(),
+                batch_id: owner.batch_id.clone(),
+                stage: owner.stage.clone(),
                 success: true,
                 coalesced: true,
                 finished_at: now,
@@ -420,7 +433,7 @@ mod tests {
             token: token.to_string(),
             kind: kind.to_string(),
             sha: sha.to_string(),
-            batch_id: crate::release_batch::default_batch_id(sha),
+            batch_id: crate::release_batch::default_batch_id_for_kind(kind, sha),
             stage: crate::release_batch::default_stage(kind).to_string(),
             builder_id: token.to_string(),
             builder_label: token.to_string(),

@@ -63,7 +63,8 @@ function Wait-ElonGlobalPublishLease {
         Start-Sleep -Seconds 5
         Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body @{
             kind = $Kind; token = [string]$Claim.token; leaseSecs = $LeaseSecs
-            batchId = [string]$Claim.batchId; stage = [string]$Claim.stage; stageStatus = 'queued'
+            sha = [string]$Claim.sha; batchId = [string]$Claim.batchId
+            stage = [string]$Claim.stage; stageStatus = 'queued'
         } | Out-Null
         $escapedToken = [Uri]::EscapeDataString([string]$Claim.token)
         $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken"
@@ -133,16 +134,24 @@ function Update-ElonReleaseStage {
         [Parameter(Mandatory)][string]$ReleaseApiBase,
         [Parameter(Mandatory)][string]$Kind,
         [Parameter(Mandatory)][string]$Token,
+        [Parameter(Mandatory)][string]$Sha,
         [Parameter(Mandatory)][string]$BatchId,
         [Parameter(Mandatory)][string]$Stage,
+        [string]$Phase = '',
         [ValidateSet('queued','running','succeeded','failed')][string]$Status = 'running',
         [int]$LeaseSecs = 14400
     )
     if ([string]::IsNullOrWhiteSpace($Token)) { return }
-    Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body @{
+    $stageStatus = if ([string]::IsNullOrWhiteSpace($Phase)) { $Status } else { 'running' }
+    $body = @{
         kind = $Kind; token = $Token; leaseSecs = $LeaseSecs
-        batchId = $BatchId; stage = $Stage; stageStatus = $Status
-    } | Out-Null
+        sha = $Sha; batchId = $BatchId; stage = $Stage; stageStatus = $stageStatus
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Phase)) {
+        $body.phase = $Phase
+        $body.phaseStatus = $Status
+    }
+    Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body $body | Out-Null
 }
 
 function Start-ElonReleaseHeartbeat {
@@ -150,33 +159,76 @@ function Start-ElonReleaseHeartbeat {
         [Parameter(Mandatory)][string]$ReleaseApiBase,
         [Parameter(Mandatory)][string]$Kind,
         [Parameter(Mandatory)][string]$Token,
+        [Parameter(Mandatory)][string]$Sha,
         [Parameter(Mandatory)][string]$BatchId,
         [Parameter(Mandatory)][string]$Stage,
         [int]$IntervalSecs = 30,
         [int]$LeaseSecs = 14400
     )
     if ([string]::IsNullOrWhiteSpace($Token)) { return $null }
+    # The caller observes the first heartbeat synchronously. A broken API or
+    # rejected identity must stop the long operation before it begins.
+    Update-ElonReleaseStage -ReleaseApiBase $ReleaseApiBase -Kind $Kind -Token $Token `
+        -Sha $Sha -BatchId $BatchId -Stage $Stage -Status 'running' -LeaseSecs $LeaseSecs
     $helperPath = $script:ReleasePublishLeaseScriptPath
     if ([string]::IsNullOrWhiteSpace($helperPath)) {
         throw "无法解析 release heartbeat helper 路径"
     }
     return Start-Job -ScriptBlock {
-        param($Path, $Api, $LeaseKind, $LeaseToken, $Batch, $LeaseStage, $Interval, $Lease)
+        param($Path, $Api, $LeaseKind, $LeaseToken, $ReleaseSha, $Batch, $LeaseStage, $Interval, $Lease)
         . $Path
         while ($true) {
             Start-Sleep -Seconds $Interval
             Update-ElonReleaseStage -ReleaseApiBase $Api -Kind $LeaseKind -Token $LeaseToken `
-                -BatchId $Batch -Stage $LeaseStage -Status 'running' -LeaseSecs $Lease
+                -Sha $ReleaseSha -BatchId $Batch -Stage $LeaseStage -Status 'running' -LeaseSecs $Lease
         }
-    } -ArgumentList $helperPath, $ReleaseApiBase, $Kind, $Token, $BatchId, $Stage, $IntervalSecs, $LeaseSecs
+    } -ArgumentList $helperPath, $ReleaseApiBase, $Kind, $Token, $Sha, $BatchId, $Stage, $IntervalSecs, $LeaseSecs
+}
+
+function New-ElonReleaseStageContext {
+    param(
+        [Parameter(Mandatory)][string]$ReleaseApiBase,
+        [Parameter(Mandatory)][string]$Kind,
+        [Parameter(Mandatory)][string]$Token,
+        [Parameter(Mandatory)][string]$Sha,
+        [Parameter(Mandatory)][string]$BatchId,
+        [Parameter(Mandatory)][string]$Stage
+    )
+    [pscustomobject]@{ ReleaseApiBase = $ReleaseApiBase; Kind = $Kind; Token = $Token; Sha = $Sha; BatchId = $BatchId; Stage = $Stage }
+}
+
+function Set-ElonReleasePhase {
+    param(
+        [Parameter(Mandatory)][object]$Context,
+        [Parameter(Mandatory)][string]$Phase,
+        [ValidateSet('queued','running','succeeded','failed')][string]$Status = 'running'
+    )
+    Update-ElonReleaseStage -ReleaseApiBase $Context.ReleaseApiBase -Kind $Context.Kind `
+        -Token $Context.Token -Sha $Context.Sha -BatchId $Context.BatchId `
+        -Stage $Context.Stage -Phase $Phase -Status $Status
+}
+
+function Start-ElonReleaseContextHeartbeat {
+    param([Parameter(Mandatory)][object]$Context)
+    Start-ElonReleaseHeartbeat -ReleaseApiBase $Context.ReleaseApiBase -Kind $Context.Kind `
+        -Token $Context.Token -Sha $Context.Sha -BatchId $Context.BatchId -Stage $Context.Stage
 }
 
 function Stop-ElonReleaseHeartbeat {
     param([object]$HeartbeatJob)
     if ($null -eq $HeartbeatJob) { return }
-    Stop-Job -Job $HeartbeatJob -ErrorAction SilentlyContinue
-    Receive-Job -Job $HeartbeatJob -ErrorAction SilentlyContinue | Out-Null
-    Remove-Job -Job $HeartbeatJob -Force -ErrorAction SilentlyContinue
+    $failure = $null
+    if ($HeartbeatJob.State -eq 'Failed') {
+        $failure = $HeartbeatJob.ChildJobs[0].JobStateInfo.Reason
+    }
+    try {
+        Receive-Job -Job $HeartbeatJob -Keep -ErrorAction Stop | Out-Null
+    } catch {
+        $failure = $_.Exception
+    }
+    if ($HeartbeatJob.State -eq 'Running') { Stop-Job -Job $HeartbeatJob -ErrorAction Stop }
+    Remove-Job -Job $HeartbeatJob -Force -ErrorAction Stop
+    if ($null -ne $failure) { throw "release heartbeat failed closed: $failure" }
 }
 
 function Complete-ElonReleaseLease {
@@ -189,6 +241,7 @@ function Complete-ElonReleaseLease {
         [Parameter(Mandatory)][string]$BatchId,
         [Parameter(Mandatory)][string]$Stage,
         [string]$VersionName = '',
+        [int]$VersionCode = 0,
         [string]$ErrorMessage = ''
     )
     $body = @{
@@ -197,8 +250,22 @@ function Complete-ElonReleaseLease {
     }
     if ($Success) {
         if ($VersionName) { $body.versionName = $VersionName }
+        if ($VersionCode -gt 0) { $body.versionCode = $VersionCode }
     } elseif ($ErrorMessage) {
         $body.errorMessage = $ErrorMessage
     }
     Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/finish" -Method POST -Body $body | Out-Null
+}
+
+function Complete-ElonReleaseContext {
+    param(
+        [Parameter(Mandatory)][object]$Context,
+        [Parameter(Mandatory)][bool]$Success,
+        [string]$VersionName = '',
+        [int]$VersionCode = 0,
+        [string]$ErrorMessage = ''
+    )
+    Complete-ElonReleaseLease -ReleaseApiBase $Context.ReleaseApiBase -Kind $Context.Kind `
+        -Token $Context.Token -Success $Success -Sha $Context.Sha -BatchId $Context.BatchId `
+        -Stage $Context.Stage -VersionName $VersionName -VersionCode $VersionCode -ErrorMessage $ErrorMessage
 }

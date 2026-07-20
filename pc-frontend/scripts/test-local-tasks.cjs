@@ -51,6 +51,13 @@ try {
   assert.strictEqual(model.pendingLocalTaskSyncCount(tasks), 1)
   assert.strictEqual(model.pendingSyncCountFromList({ tasks, pending_sync_count: 7 }), 7)
   assert.strictEqual(model.pendingLocalTaskSyncCount([{ ...tasks[0], sync_state: 'local_only' }]), 0)
+  const isolatedTask = model.normalizeLocalTaskList({ tasks: [{
+    task_id: 'local-supervised', project_id: 'project-a', status: 'running',
+    workspace_path: 'D:\\conversation-worktrees\\project-a\\supervised-1',
+    workspace_status: { base_workspace_path: 'D:\\projects\\project-a', active_workspace_path: 'D:\\conversation-worktrees\\project-a\\supervised-1' },
+  }] })[0]
+  assert.strictEqual(isolatedTask.workspace_path, 'D:\\conversation-worktrees\\project-a\\supervised-1', 'PC normalizer must preserve the production record execution worktree')
+  assert.notStrictEqual(isolatedTask.workspace_path, 'D:\\projects\\project-a')
 
   const detail = model.normalizeLocalTaskDetail({
     task_id: 'local-1',
@@ -165,15 +172,18 @@ try {
   assert.strictEqual(evolution.gates.publish_waiter_count, 2)
   const publish = operations.normalizeGlobalPublishStatus({ stateHealth: 'healthy', globalPublish: {
     owner: { kind: 'server', sha: 'abcdef123456', batchId: 'release-abcdef123456', stage: 'server', builderLabel: 'builder-a' },
-    waiters: [{ kind: 'apk', sha: 'fedcba654321', batchId: 'release-fedcba654321', stage: 'android_apk', builderLabel: 'builder-b' }],
+    waiters: [{ kind: 'apk', sha: 'fedcba654321', batchId: 'apk-release-fedcba654321', stage: 'android_apk', builderLabel: 'builder-b' }],
     waiterCount: 1, queuePolicy: 'fifo', coalescingKey: 'kind+sha', immutableReleaseSha: true,
-  }, releaseBatches: [{ batchId: 'release-abcdef123456', sha: 'abcdef123456', status: 'in_progress', updatedAt: 1720000003000, stages: [{ stage: 'server', kind: 'server', status: 'running', builderId: 'builder-a', attempt: 2 }] }] })
+  }, releaseBatches: [{ batchId: 'release-abcdef123456', sha: 'abcdef123456', expectedStages: ['server', 'pc_frontend', 'windows_node'], status: 'in_progress', updatedAt: 1720000003000, stages: [{ stage: 'server', kind: 'server', status: 'running', phase: 'server_deploy', phaseStatus: 'running', builderId: 'builder-a', attempt: 2 }] }] })
   assert.strictEqual(publish.owner.kind, 'server')
   assert.strictEqual(publish.owner.batchId, 'release-abcdef123456')
   assert.strictEqual(publish.waiters[0].kind, 'apk')
   assert.strictEqual(publish.immutableReleaseSha, true)
   assert.strictEqual(publish.stateHealth, 'healthy')
   assert.strictEqual(publish.batches[0].stages[0].attempt, 2)
+  assert.deepStrictEqual(publish.batches[0].expectedStages, ['server', 'pc_frontend', 'windows_node'])
+  assert.strictEqual(publish.batches[0].stages[0].phase, 'server_deploy')
+  assert.strictEqual(publish.batches[0].stages[0].phaseStatus, 'running')
 
   const bannerSource = readSource('src/features/shell/LocalModeBanner.tsx')
   const shellSource = readSource('src/features/shell/Shell.tsx')

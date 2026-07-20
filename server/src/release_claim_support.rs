@@ -27,6 +27,13 @@ pub(super) fn heartbeat_stage<'a>(
             "heartbeat batch does not own token",
         ));
     }
+    if request.sha.trim() != lease.sha {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "immutable-sha-mismatch",
+            "heartbeat sha does not own token",
+        ));
+    }
     let stage = request
         .stage
         .as_deref()
@@ -39,6 +46,15 @@ pub(super) fn heartbeat_stage<'a>(
                 "heartbeat stage is required",
             )
         })?;
+    if stage != lease.stage {
+        return Err(err(
+            StatusCode::CONFLICT,
+            "stage-owner-mismatch",
+            "heartbeat may only update the stage owned by its lease",
+        ));
+    }
+    crate::release_batch::validate_stage_owner(&lease.kind, stage)
+        .map_err(|message| err(StatusCode::CONFLICT, "stage-owner-mismatch", message))?;
     crate::release_batch::validate_stage_transition(
         state,
         &lease.batch_id,
@@ -67,15 +83,13 @@ pub(super) fn validate_finish_owner(
     }
 }
 
-pub(super) async fn persist_or_restore(
+pub(super) async fn commit_candidate(
     manager: &crate::release_manager::ReleaseManager,
     guard: &mut MutexGuard<'_, crate::release_manager::ReleaseStateFile>,
-    original: crate::release_manager::ReleaseStateFile,
+    candidate: crate::release_manager::ReleaseStateFile,
 ) -> Result<(), (StatusCode, Json<Value>)> {
-    if let Err(error) = manager.persist(guard).await {
-        **guard = original;
-        return Err(persist_error(error));
-    }
+    manager.persist(&candidate).await.map_err(persist_error)?;
+    **guard = candidate;
     Ok(())
 }
 
@@ -321,16 +335,50 @@ mod tests {
         std::fs::remove_dir_all(&root).unwrap();
         std::fs::write(&root, b"parent is now a file").unwrap();
         let mut guard = manager.inner.lock().await;
-        let original = guard.clone();
-        guard.server.last_published_version_name = Some("9.9.9".to_string());
-        assert!(persist_or_restore(&manager, &mut guard, original.clone())
+        let before = serde_json::to_vec(&*guard).unwrap();
+        let mut candidate = guard.clone();
+        candidate.server.last_published_version_name = Some("9.9.9".to_string());
+        assert!(commit_candidate(&manager, &mut guard, candidate)
             .await
             .is_err());
-        assert_eq!(
-            guard.server.last_published_version_name,
-            original.server.last_published_version_name
-        );
+        assert_eq!(serde_json::to_vec(&*guard).unwrap(), before);
         drop(guard);
         let _ = std::fs::remove_file(root);
+    }
+
+    #[test]
+    fn heartbeat_cannot_mutate_another_stage_or_sha() {
+        let mut state = crate::release_manager::ReleaseStateFile::default();
+        let lease = PublishLeaseEntry {
+            token: "token".into(),
+            kind: "node_agent".into(),
+            sha: "sha-a".into(),
+            batch_id: "release-sha-a".into(),
+            stage: "windows_node".into(),
+            builder_id: "builder".into(),
+            builder_label: "builder".into(),
+            requested_at: 1,
+            last_heartbeat: 1,
+            lease_expires_at: 100,
+        };
+        crate::release_batch::record_claim(&mut state, &lease, "running", 1);
+        let bytes = serde_json::to_vec(&state).unwrap();
+        let wrong_stage = HeartbeatRequest {
+            kind: "node_agent".into(),
+            token: "token".into(),
+            sha: "sha-a".into(),
+            lease_secs: None,
+            batch_id: Some("release-sha-a".into()),
+            stage: Some("artifact_upload".into()),
+            stage_status: Some("running".into()),
+            phase: None,
+            phase_status: None,
+        };
+        assert!(heartbeat_stage(&state, &lease, &wrong_stage).is_err());
+        let mut wrong_sha = wrong_stage;
+        wrong_sha.stage = Some("windows_node".into());
+        wrong_sha.sha = "sha-b".into();
+        assert!(heartbeat_stage(&state, &lease, &wrong_sha).is_err());
+        assert_eq!(serde_json::to_vec(&state).unwrap(), bytes);
     }
 }

@@ -10,6 +10,10 @@ pub(crate) struct ReleaseBatchStage {
     pub stage: String,
     pub kind: String,
     pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase_status: Option<String>,
     pub builder_id: String,
     pub builder_label: String,
     pub attempt: u32,
@@ -36,15 +40,35 @@ pub(crate) struct ReleaseBatchLedger {
     pub stages: Vec<ReleaseBatchStage>,
 }
 
-fn expected_platform_stages() -> Vec<String> {
+pub(crate) fn expected_platform_stages() -> Vec<String> {
     ["server", "pc_frontend", "windows_node"]
         .into_iter()
         .map(str::to_string)
         .collect()
 }
 
+fn expected_apk_stages() -> Vec<String> {
+    vec!["android_apk".to_string()]
+}
+
+fn expected_stages_for_kind(kind: &str) -> Vec<String> {
+    if kind == "apk" {
+        expected_apk_stages()
+    } else {
+        expected_platform_stages()
+    }
+}
+
 pub(crate) fn default_batch_id(sha: &str) -> String {
     format!("release-{}", sha.trim())
+}
+
+pub(crate) fn default_batch_id_for_kind(kind: &str, sha: &str) -> String {
+    if kind == "apk" {
+        format!("apk-release-{}", sha.trim())
+    } else {
+        default_batch_id(sha)
+    }
 }
 
 pub(crate) fn default_stage(kind: &str) -> &'static str {
@@ -74,6 +98,47 @@ pub(crate) fn validate_batch_identity(
     Ok(())
 }
 
+pub(crate) fn validate_stage_owner(kind: &str, stage: &str) -> Result<(), &'static str> {
+    let allowed = match kind {
+        "server" => matches!(stage, "server" | "pc_frontend"),
+        "node_agent" => stage == "windows_node",
+        "apk" => stage == "android_apk",
+        _ => false,
+    };
+    allowed
+        .then_some(())
+        .ok_or("release kind is not authorized to own the requested top-level stage")
+}
+
+pub(crate) fn validate_batch_stage_identity(
+    state: &ReleaseStateFile,
+    batch_id: &str,
+    kind: &str,
+    stage: &str,
+) -> Result<(), &'static str> {
+    validate_stage_owner(kind, stage)?;
+    let expected = expected_stages_for_kind(kind);
+    if let Some(batch) = state
+        .release_batches
+        .iter()
+        .find(|batch| batch.batch_id == batch_id)
+    {
+        let mut recorded = batch.expected_stages.clone();
+        recorded.sort();
+        recorded.dedup();
+        let mut required = expected.clone();
+        required.sort();
+        if recorded != required {
+            return Err("release batch expected_stages conflicts with requested release family");
+        }
+    }
+    expected
+        .iter()
+        .any(|expected| expected == stage)
+        .then_some(())
+        .ok_or("release stage is not in authoritative expected_stages")
+}
+
 pub(crate) fn record_claim(
     state: &mut ReleaseStateFile,
     lease: &PublishLeaseEntry,
@@ -93,6 +158,20 @@ pub(crate) fn record_claim(
         None,
         now,
     );
+    if let Some(stage) = state
+        .release_batches
+        .iter_mut()
+        .find(|batch| batch.batch_id == lease.batch_id)
+        .and_then(|batch| {
+            batch
+                .stages
+                .iter_mut()
+                .find(|stage| stage.stage == lease.stage)
+        })
+    {
+        stage.phase = None;
+        stage.phase_status = None;
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -109,6 +188,39 @@ pub(crate) fn record_stage(
     error_message: Option<String>,
     now: i64,
 ) {
+    record_stage_phase(
+        state,
+        batch_id,
+        sha,
+        kind,
+        stage,
+        None,
+        None,
+        builder_id,
+        builder_label,
+        status,
+        lease_expires_at,
+        error_message,
+        now,
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn record_stage_phase(
+    state: &mut ReleaseStateFile,
+    batch_id: &str,
+    sha: &str,
+    kind: &str,
+    stage: &str,
+    phase: Option<&str>,
+    phase_status: Option<&str>,
+    builder_id: &str,
+    builder_label: &str,
+    status: &str,
+    lease_expires_at: i64,
+    error_message: Option<String>,
+    now: i64,
+) {
     let batch_index = state
         .release_batches
         .iter()
@@ -117,7 +229,7 @@ pub(crate) fn record_stage(
             state.release_batches.push(ReleaseBatchLedger {
                 batch_id: batch_id.to_string(),
                 sha: sha.to_string(),
-                expected_stages: expected_platform_stages(),
+                expected_stages: expected_stages_for_kind(kind),
                 status: "in_progress".to_string(),
                 created_at: now,
                 updated_at: now,
@@ -132,6 +244,11 @@ pub(crate) fn record_stage(
         }
         current.kind = kind.to_string();
         current.status = normalize_status(status).to_string();
+        if let Some(phase) = phase {
+            current.phase = Some(phase.to_string());
+            current.phase_status =
+                Some(normalize_status(phase_status.unwrap_or(status)).to_string());
+        }
         current.builder_id = builder_id.to_string();
         current.builder_label = builder_label.to_string();
         current.last_heartbeat = now;
@@ -144,6 +261,9 @@ pub(crate) fn record_stage(
             stage: stage.to_string(),
             kind: kind.to_string(),
             status: status.clone(),
+            phase: phase.map(str::to_string),
+            phase_status: phase
+                .map(|_| normalize_status(phase_status.unwrap_or(status.as_str())).to_string()),
             builder_id: builder_id.to_string(),
             builder_label: builder_label.to_string(),
             attempt: 1,
@@ -155,7 +275,16 @@ pub(crate) fn record_stage(
         });
     }
     batch.updated_at = now;
-    batch.status = batch_status(&batch.stages).to_string();
+    let mut unique_expected = Vec::with_capacity(batch.expected_stages.len());
+    batch.expected_stages.retain(|stage| {
+        if unique_expected.iter().any(|seen| seen == stage) {
+            false
+        } else {
+            unique_expected.push(stage.clone());
+            true
+        }
+    });
+    batch.status = batch_status(&batch.expected_stages, &batch.stages).to_string();
     if state.release_batches.len() > 100 {
         let remove = state.release_batches.len() - 100;
         state.release_batches.drain(..remove);
@@ -217,13 +346,16 @@ fn terminal_status(status: &str) -> bool {
     matches!(status, "succeeded" | "failed" | "expired")
 }
 
-fn batch_status(stages: &[ReleaseBatchStage]) -> &'static str {
+fn batch_status(expected_stages: &[String], stages: &[ReleaseBatchStage]) -> &'static str {
+    if expected_stages.is_empty() {
+        return "failed_closed";
+    }
     if stages
         .iter()
         .any(|stage| matches!(stage.status.as_str(), "failed" | "expired" | "unknown"))
     {
         "failed_closed"
-    } else if expected_platform_stages().iter().all(|expected| {
+    } else if expected_stages.iter().all(|expected| {
         stages
             .iter()
             .any(|stage| &stage.stage == expected && stage.status == "succeeded")
@@ -297,5 +429,67 @@ mod tests {
             state.release_batches[0].expected_stages,
             expected_platform_stages()
         );
+    }
+
+    #[test]
+    fn batch_status_uses_authoritative_unique_ledger_expected_stages() {
+        let stage = ReleaseBatchStage {
+            stage: "server".into(),
+            kind: "server".into(),
+            status: "succeeded".into(),
+            phase: Some("deployment_verification".into()),
+            phase_status: Some("succeeded".into()),
+            builder_id: "builder".into(),
+            builder_label: "builder".into(),
+            attempt: 1,
+            requested_at: 1,
+            last_heartbeat: 1,
+            lease_expires_at: 10,
+            completed_at: Some(1),
+            error_message: None,
+        };
+        assert_eq!(batch_status(&["server".into()], &[stage]), "succeeded");
+        assert_eq!(
+            batch_status(&expected_platform_stages(), &[]),
+            "in_progress"
+        );
+        assert_eq!(batch_status(&[], &[]), "failed_closed");
+    }
+
+    #[test]
+    fn stage_owner_model_separates_top_level_stages_from_internal_phases() {
+        assert!(validate_stage_owner("server", "server").is_ok());
+        assert!(validate_stage_owner("server", "pc_frontend").is_ok());
+        assert!(validate_stage_owner("node_agent", "windows_node").is_ok());
+        assert!(validate_stage_owner("node_agent", "artifact_upload").is_err());
+        assert!(validate_stage_owner("apk", "windows_node").is_err());
+    }
+
+    #[test]
+    fn top_level_heartbeat_preserves_visible_internal_phase() {
+        let mut state = ReleaseStateFile::default();
+        record_stage_phase(
+            &mut state,
+            "batch-a",
+            "sha-a",
+            "server",
+            "server",
+            Some("server_build"),
+            Some("running"),
+            "builder",
+            "builder",
+            "running",
+            100,
+            None,
+            1,
+        );
+        record_stage(
+            &mut state, "batch-a", "sha-a", "server", "server", "builder", "builder", "running",
+            110, None, 2,
+        );
+        let stage = &state.release_batches[0].stages[0];
+        assert_eq!(stage.phase.as_deref(), Some("server_build"));
+        assert_eq!(stage.phase_status.as_deref(), Some("running"));
+        assert_eq!(stage.last_heartbeat, 2);
     }
 }

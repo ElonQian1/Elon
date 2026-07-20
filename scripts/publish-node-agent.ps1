@@ -57,6 +57,7 @@ $script:NodeReleaseFinished = $false
 $script:NodeReleaseBatchId = ''
 $script:NodeReleaseActiveStage = 'windows_node'
 $script:NodeReleaseHeartbeat = $null
+$script:NodeReleaseContext = $null
 
 try {
     Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
@@ -491,9 +492,8 @@ $script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeRelease
 if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
     $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
 }
-$script:NodeReleaseHeartbeat = Start-ElonReleaseHeartbeat -ReleaseApiBase "$BaseUrl/api/release" `
-    -Kind 'node_agent' -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId `
-    -Stage 'windows_node'
+$script:NodeReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Sha $GitSha -Stage 'windows_node'
+$script:NodeReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:NodeReleaseContext
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
@@ -503,6 +503,8 @@ if (-not [string]::IsNullOrWhiteSpace($ReleaseChangelog)) {
 
 # ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
 Write-Host "[1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
+$script:NodeReleaseActiveStage = 'linux_build'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
 $PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
 try {
     # musl 交叉编译需要 C 工具链（ring 依赖 gcc）；用 cargo-zigbuild 提供 zig cc，
@@ -532,9 +534,12 @@ try {
 $LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
 if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
 $LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLowerInvariant()
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2. 编译 Windows 版本 ─────────────────────────────────────────────────────
 Write-Host "[2/5] 编译 Windows 版本..." -ForegroundColor Yellow
+$script:NodeReleaseActiveStage = 'windows_build'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
 $PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
 try {
     # 强制通用 CPU，避免全局 target-cpu=native 产出用户机器无法运行的指令。
@@ -557,9 +562,12 @@ $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin -ExpectedIconPath $BrandIcon | Out-Null
 $WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerInvariant()
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
 Write-Host "[2.2/5] 编译一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
+$script:NodeReleaseActiveStage = 'desktop_shell_build'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
 try {
     $unitSeparator = [char]0x1f
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
@@ -570,13 +578,12 @@ try {
 }
 $DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
 if (-not (Test-Path $DesktopShellBin)) { throw "elon-desktop 二进制不存在：$DesktopShellBin" }
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 $script:NodeReleaseActiveStage = 'pc_frontend_bundle'
-Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'running'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
 Invoke-NodeAgentPcFrontendBuild
-Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
@@ -651,8 +658,7 @@ $WindowsClientSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WindowsClie
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
 Write-Host "[3/5] 上传到服务器..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'artifact_upload'
-Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'running'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
 $currentReleaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
 if ($currentReleaseSha -ne $GitSha) {
     throw "上传前当前 worktree HEAD 已改变：claim=$GitSha, current=$currentReleaseSha。不可替换固定发布 SHA。"
@@ -667,8 +673,7 @@ if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
     scp -o ProxyCommand=none $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
     if ($LASTEXITCODE -ne 0) { throw "上传 ripgrep 绿色包失败" }
 }
-Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
@@ -720,8 +725,7 @@ Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 # ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
 Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'target_handshake'
-Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'running'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
 if ($SkipBroadcast) {
     Write-Host "  已按 -SkipBroadcast 跳过在线节点推送；离线/重启客户端仍会通过版本接口自动更新。" -ForegroundColor Yellow
 } elseif (-not [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
@@ -754,8 +758,7 @@ if (-not $SkipBroadcast) {
         -TimeoutSec $HandshakeWaitSec `
         -TargetReleaseIdentity $ReleaseIdentity
 }
-Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-    -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Stage $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 Write-Host ""
 Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green
@@ -763,19 +766,21 @@ Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
-if ($script:NodeReleaseOwned) { Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -Success $true -Sha $GitSha -BatchId $script:NodeReleaseBatchId -Stage 'windows_node' -VersionName $PackageVersion }
+if ($script:NodeReleaseOwned) {
+    Stop-ElonReleaseHeartbeat -HeartbeatJob $script:NodeReleaseHeartbeat
+    $script:NodeReleaseHeartbeat = $null
+    Complete-ElonReleaseContext -Context $script:NodeReleaseContext -Success $true -VersionName $PackageVersion
+}
 $script:NodeReleaseFinished = $true
 } catch {
     try { if ($script:NodeReleaseOwned -and -not $script:NodeReleaseFinished) {
-            Update-ElonReleaseStage -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-                -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId `
-                -Stage $script:NodeReleaseActiveStage -Status 'failed'
-            Complete-ElonReleaseLease -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' `
-                -Token $script:NodeReleaseToken -Success $false -Sha $GitSha `
-                -BatchId $script:NodeReleaseBatchId -Stage 'windows_node' -ErrorMessage ($_ | Out-String)
+            Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'failed'
+            Complete-ElonReleaseContext -Context $script:NodeReleaseContext -Success $false -ErrorMessage ($_ | Out-String)
         } } catch {}
     throw
 } finally {
-    Stop-ElonReleaseHeartbeat -HeartbeatJob $script:NodeReleaseHeartbeat
+    if ($null -ne $script:NodeReleaseHeartbeat) {
+        Stop-ElonReleaseHeartbeat -HeartbeatJob $script:NodeReleaseHeartbeat
+    }
     Exit-NodeAgentPublishLock -Lock $PublishLock
 }

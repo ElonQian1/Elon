@@ -121,34 +121,24 @@ function Get-ReleaseStatus {
 
 $script:ReleaseToken = $null
 $script:ReleaseFinished = $false
+$script:ReleaseHeartbeat = $null
+$script:ReleaseContext = $null
 
 function Complete-Release {
     param(
         [Parameter(Mandatory)] [bool]$Success,
         [string]$VersionName = '',
         [int]$VersionCode = 0,
-        [string]$Sha = '',
         [string]$ErrorMessage = ''
     )
     if (-not $script:ReleaseToken -or $script:ReleaseFinished) { return }
-    try {
-        $payload = @{
-            kind  = 'apk'
-            token = $script:ReleaseToken
-            success = $Success
-            sha = $BuildBaseSha; batchId = [string]$claim.batchId; stage = [string]$claim.stage
-        }
-        if ($Success) {
-            if ($VersionName) { $payload.versionName = $VersionName }
-            if ($VersionCode -gt 0) { $payload.versionCode = $VersionCode }
-        } else {
-            if ($ErrorMessage) { $payload.errorMessage = $ErrorMessage }
-        }
-        Invoke-ReleaseApi -Endpoint 'finish' -Body $payload | Out-Null
-        $script:ReleaseFinished = $true
-    } catch {
-        Write-Host "   ⚠️  release/finish 调用失败（不影响主流程）: $_" -ForegroundColor Yellow
+    if ($null -ne $script:ReleaseHeartbeat) {
+        Stop-ElonReleaseHeartbeat -HeartbeatJob $script:ReleaseHeartbeat
+        $script:ReleaseHeartbeat = $null
     }
+    Complete-ElonReleaseContext -Context $script:ReleaseContext -Success $Success `
+        -VersionName $VersionName -VersionCode $VersionCode -ErrorMessage $ErrorMessage
+    $script:ReleaseFinished = $true
 }
 
 # 全局错误兜底：任何未捕获的 terminating error 也释放槽位
@@ -904,6 +894,8 @@ $claim = Enter-ElonGlobalPublishLease -Claim $claim -Kind 'apk' -ReleaseApiBase 
 if (-not $claim) { exit 0 }
 
 $script:ReleaseToken = [string]$claim.token
+$script:ReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase $ReleaseApiBase -Kind 'apk' -Token $script:ReleaseToken -Sha $BuildBaseSha -BatchId ([string]$claim.batchId) -Stage 'android_apk'
+$script:ReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:ReleaseContext
 $newName = [string]$claim.assignedVersionName
 $newCode = [int]$claim.assignedVersionCode
 if ([string]::IsNullOrWhiteSpace($newName) -or $newCode -le 0) {
@@ -934,8 +926,10 @@ Write-Host "   versionName: $oldName → $newName (临时写入 build.gradle，�
 # ── Step 2: 编译 APK ─────────────────────────────────────────────────────────
 
 if (-not $SkipBuild) {
+    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'gradle_build' -Status 'running'
     Assert-ReleaseSigningConfig
     Invoke-GradleReleaseBuild
+    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'gradle_build' -Status 'succeeded'
 } else {
     Write-Host "⏭️  跳过编译（-SkipBuild）" -ForegroundColor Yellow
 }
@@ -1043,7 +1037,10 @@ if (-not $Force) {
 
 Write-Host "🚀 上传到服务器..." -ForegroundColor Cyan
 
+Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'artifact_upload' -Status 'running'
+
 Publish-ApkStaged -ApkPath $apk.FullName -JsonPath $tmpJson -ReleaseSha $shaFull -ExpectedServerSha $serverShaBeforeUpload
+Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'artifact_upload' -Status 'succeeded'
 Write-Host "   ✅ APK 原子发布完成，.apk-deployed-sha = $sha" -ForegroundColor Green
 
 # 清理临时文件
@@ -1089,7 +1086,7 @@ try {
 
 # ── 汇报 ──────────────────────────────────────────────────────────────────────
 
-Complete-Release -Success:$true -VersionName $versionName -VersionCode $newCode -Sha $shaFull
+Complete-Release -Success:$true -VersionName $versionName -VersionCode $newCode
 
 Write-Host ""
 Write-Host ("=" * 60) -ForegroundColor Cyan
