@@ -9,9 +9,21 @@ function Get-RustCacheDirectorySize {
     if (-not (Test-Path -LiteralPath $Path)) {
         return [int64]0
     }
-    $sum = (Get-ChildItem -LiteralPath $Path -File -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-    if ($null -eq $sum) { return [int64]0 }
-    return [int64]$sum
+    [int64]$sum = 0
+    try {
+        foreach ($file in Get-ChildItem -LiteralPath $Path -File -Recurse -Force -ErrorAction SilentlyContinue) {
+            try {
+                $sum += [int64]$file.Length
+            } catch {
+                continue
+            }
+        }
+    } catch {
+        # Recursive enumeration itself may observe a directory after Cargo
+        # atomically replaces it. The completed prefix remains a safe estimate.
+    }
+    # Size is advisory; post-GC free space is measured authoritatively.
+    return $sum
 }
 
 function Get-RustCacheVolumeState {
@@ -26,6 +38,39 @@ function Get-RustCacheVolumeState {
         free_bytes = [int64]$drive.AvailableFreeSpace
         free_percent = $freePercent
     }
+}
+
+function Remove-RustCachePartition {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        if (-not (Test-Path -LiteralPath $Path)) { return }
+        try {
+            Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction Stop
+            return
+        } catch {
+            $lastError = $_
+            if (-not (Test-Path -LiteralPath $Path)) { return }
+            try {
+                # Windows PowerShell 5.1 Remove-Item can fail while traversing
+                # already-removed incremental children. .NET deletes the
+                # verified managed partition without reusing that enumerator.
+                $fullPath = [System.IO.Path]::GetFullPath($Path)
+                $deletePath = if ($env:OS -eq "Windows_NT" -and -not $fullPath.StartsWith('\\?\')) {
+                    "\\?\$fullPath"
+                } else {
+                    $fullPath
+                }
+                [System.IO.Directory]::Delete($deletePath, $true)
+                return
+            } catch {
+                $lastError = $_
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+    throw $lastError
 }
 
 function Get-RustCachePartitionLastUsed {
@@ -199,15 +244,15 @@ function Invoke-RustCacheGc {
         }
     }
 
-    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.old_epoch) { 0 } elseif ($_.kind -eq "quarantine") { 1 } else { 2 } } }, last_used_utc)
-    foreach ($partition in $selected) {
-        $partition.size_bytes = Get-RustCacheDirectorySize -Path $partition.path
-    }
-
     $activeBuilds = @(Test-RustCacheBuildProcesses)
     if ($Apply -and $activeBuilds.Count -gt 0) {
         $summary = ($activeBuilds | ForEach-Object { "$($_.ProcessName):$($_.Id)" }) -join ", "
         throw "Refusing Rust cache GC while Cargo/rustc processes are active: $summary"
+    }
+
+    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.old_epoch) { 0 } elseif ($_.kind -eq "quarantine") { 1 } else { 2 } } }, last_used_utc)
+    foreach ($partition in $selected) {
+        $partition.size_bytes = Get-RustCacheDirectorySize -Path $partition.path
     }
 
     $estimatedFree = [int64]$volumeBefore.free_bytes
@@ -221,7 +266,7 @@ function Invoke-RustCacheGc {
         $partition.action = if ($Apply) { "delete" } else { "would-delete" }
         if ($Apply) {
             Assert-RustCacheManagedPath -CacheRoot $root -CandidatePath $partition.path
-            Remove-Item -LiteralPath $partition.path -Recurse -Force -ErrorAction Stop
+            Remove-RustCachePartition -Path $partition.path
         }
         $estimatedFree += [int64]$partition.size_bytes
     }
