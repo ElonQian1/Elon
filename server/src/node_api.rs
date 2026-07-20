@@ -38,7 +38,10 @@ use payouts::node_payout_min_fen;
 pub use payouts::{cancel_node_payout, create_node_payout, my_node_payouts};
 pub use public_dev::{admin_public_dev_handshake, update_my_node_sharing};
 use public_dev::{public_dev_handshake_state, public_dev_handshake_value};
-pub use public_dev_smoke::{admin_public_dev_mutual_smoke_get, admin_public_dev_mutual_smoke_post};
+pub use public_dev_smoke::{
+    admin_owner_codex_smoke_post, admin_public_dev_mutual_smoke_get,
+    admin_public_dev_mutual_smoke_post,
+};
 use responses::PublicNodeResponse;
 use runtime_response::{
     capacity_for_response, hardware_for_response, hardware_summary, project_counts_for_user,

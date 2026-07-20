@@ -1,3 +1,4 @@
+mod owner;
 mod support;
 
 use axum::{
@@ -11,6 +12,7 @@ use std::sync::Arc;
 
 use crate::{admin, types::AppState};
 
+pub use owner::admin_owner_codex_smoke_post;
 use support::{
     clean, default_smoke_prompt, resolve_side, run_smoke_direction, PublicDevMutualSmokeResponse,
     SmokeSide,

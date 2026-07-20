@@ -45,6 +45,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
                 .post(node_api::admin_public_dev_mutual_smoke_post),
         )
         .route(
+            "/api/admin/nodes/owner-codex-smoke",
+            post(node_api::admin_owner_codex_smoke_post),
+        )
+        .route(
             "/api/admin/nodes/push-update",
             post(node_api::push_node_update),
         )

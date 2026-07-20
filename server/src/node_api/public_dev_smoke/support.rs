@@ -67,12 +67,12 @@ pub(super) struct SmokeDirection {
 
 #[derive(Debug, Serialize)]
 pub(super) struct SmokePreflight {
-    authorized: bool,
-    ready: bool,
-    cli_allowed_by_share: bool,
-    cli_reported_by_node: bool,
-    route: String,
-    notes: Vec<String>,
+    pub(super) authorized: bool,
+    pub(super) ready: bool,
+    pub(super) cli_allowed_by_share: bool,
+    pub(super) cli_reported_by_node: bool,
+    pub(super) route: String,
+    pub(super) notes: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -138,6 +138,29 @@ pub(super) async fn run_smoke_direction(
     execute: bool,
 ) -> SmokeDirection {
     let preflight = build_preflight(consumer, provider_side, cli_name);
+    run_smoke_direction_with_preflight(
+        state,
+        label,
+        consumer,
+        provider_side,
+        cli_name,
+        prompt,
+        execute,
+        preflight,
+    )
+    .await
+}
+
+pub(super) async fn run_smoke_direction_with_preflight(
+    state: &Arc<AppState>,
+    label: &str,
+    consumer: &SmokeUser,
+    provider_side: &SmokeSide,
+    cli_name: &str,
+    prompt: &str,
+    execute: bool,
+    preflight: SmokePreflight,
+) -> SmokeDirection {
     if !preflight.ready {
         return smoke_direction(
             label,
@@ -438,7 +461,7 @@ fn node_match_score(runtime: &NodeRuntime, needle: &str) -> i32 {
     score
 }
 
-fn cli_list_contains(values: &[String], cli_name: &str) -> bool {
+pub(super) fn cli_list_contains(values: &[String], cli_name: &str) -> bool {
     values
         .iter()
         .any(|value| value.eq_ignore_ascii_case(cli_name))
