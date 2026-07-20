@@ -79,16 +79,13 @@ pub(crate) struct SupervisionContract {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct SupervisionReviewRequest {
     verdict: String,
     #[serde(default)]
     summary: String,
     #[serde(default)]
     improvements: Vec<String>,
-    #[serde(default)]
-    reviewed_by: Option<String>,
-    #[serde(default)]
-    review_source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -135,10 +132,15 @@ impl SupervisionState {
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
-    Router::new().route(
-        "/api/local-tasks/:task_id/supervision/review",
-        post(review_task),
-    )
+    Router::new()
+        .route(
+            "/api/local-tasks/:task_id/supervision/review",
+            post(review_task),
+        )
+        .route(
+            "/api/local-tasks/:task_id/supervision/desktop-review",
+            post(desktop_review_task),
+        )
 }
 
 pub(crate) fn normalize_contract(
@@ -341,6 +343,31 @@ async fn review_task(
     Path(task_id): Path<String>,
     Json(request): Json<SupervisionReviewRequest>,
 ) -> Response {
+    review_task_as(runtime, task_id, request, "pc_operator", "local_pc_api").await
+}
+
+async fn desktop_review_task(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(task_id): Path<String>,
+    Json(request): Json<SupervisionReviewRequest>,
+) -> Response {
+    review_task_as(
+        runtime,
+        task_id,
+        request,
+        DEFAULT_SUPERVISOR,
+        "codex_desktop_helper",
+    )
+    .await
+}
+
+async fn review_task_as(
+    runtime: Arc<NodeRuntime>,
+    task_id: String,
+    request: SupervisionReviewRequest,
+    reviewed_by: &str,
+    review_source: &str,
+) -> Response {
     let Some(creds) = runtime.creds().await else {
         return json_error(
             StatusCode::UNAUTHORIZED,
@@ -360,7 +387,7 @@ async fn review_task(
         Ok(_) => return json_error(StatusCode::BAD_REQUEST, "该任务没有桌面监督契约。"),
         Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
-    let review = match normalize_review(request) {
+    let review = match normalize_review(request, reviewed_by, review_source) {
         Ok(review) => review,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
@@ -627,7 +654,11 @@ fn finish_state(
     }
 }
 
-fn normalize_review(request: SupervisionReviewRequest) -> Result<SupervisionReview, String> {
+fn normalize_review(
+    request: SupervisionReviewRequest,
+    reviewed_by: &str,
+    review_source: &str,
+) -> Result<SupervisionReview, String> {
     let verdict = clean_enum(
         &request.verdict,
         "verdict",
@@ -649,17 +680,8 @@ fn normalize_review(request: SupervisionReviewRequest) -> Result<SupervisionRevi
         MAX_IMPROVEMENT_CHARS,
         "improvements",
     )?;
-    let reviewed_by = clean_id(
-        request.reviewed_by.as_deref().unwrap_or("pc_operator"),
-        "reviewed_by",
-    )?;
-    let review_source = clean_id(
-        request.review_source.as_deref().unwrap_or("local_pc_api"),
-        "review_source",
-    )?;
-    if reviewed_by == DEFAULT_SUPERVISOR && review_source != "codex_desktop_helper" {
-        return Err("PC 操作者不能冒充 codex_desktop 监督者。".to_string());
-    }
+    let reviewed_by = clean_id(reviewed_by, "reviewed_by")?;
+    let review_source = clean_id(review_source, "review_source")?;
     Ok(SupervisionReview {
         protocol: SUPERVISION_PROTOCOL.to_string(),
         verdict,

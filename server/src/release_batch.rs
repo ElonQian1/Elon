@@ -27,11 +27,20 @@ pub(crate) struct ReleaseBatchStage {
 pub(crate) struct ReleaseBatchLedger {
     pub batch_id: String,
     pub sha: String,
+    #[serde(default = "expected_platform_stages")]
+    pub expected_stages: Vec<String>,
     pub status: String,
     pub created_at: i64,
     pub updated_at: i64,
     #[serde(default)]
     pub stages: Vec<ReleaseBatchStage>,
+}
+
+fn expected_platform_stages() -> Vec<String> {
+    ["server", "pc_frontend", "windows_node"]
+        .into_iter()
+        .map(str::to_string)
+        .collect()
 }
 
 pub(crate) fn default_batch_id(sha: &str) -> String {
@@ -108,6 +117,7 @@ pub(crate) fn record_stage(
             state.release_batches.push(ReleaseBatchLedger {
                 batch_id: batch_id.to_string(),
                 sha: sha.to_string(),
+                expected_stages: expected_platform_stages(),
                 status: "in_progress".to_string(),
                 created_at: now,
                 updated_at: now,
@@ -189,7 +199,11 @@ fn batch_status(stages: &[ReleaseBatchStage]) -> &'static str {
         .any(|stage| matches!(stage.status.as_str(), "failed" | "expired" | "unknown"))
     {
         "failed_closed"
-    } else if stages.iter().all(|stage| stage.status == "succeeded") {
+    } else if expected_platform_stages().iter().all(|expected| {
+        stages
+            .iter()
+            .any(|stage| &stage.stage == expected && stage.status == "succeeded")
+    }) {
         "succeeded"
     } else {
         "in_progress"
@@ -234,5 +248,30 @@ mod tests {
         );
         assert_eq!(state.release_batches[0].status, "failed_closed");
         assert_eq!(state.release_batches[0].stages[0].status, "unknown");
+    }
+
+    #[test]
+    fn missing_expected_platform_stage_never_succeeds() {
+        let mut state = ReleaseStateFile::default();
+        for stage in ["server", "pc_frontend"] {
+            record_stage(
+                &mut state,
+                "batch-a",
+                "sha-a",
+                "server",
+                stage,
+                "builder",
+                "builder",
+                "succeeded",
+                10,
+                None,
+                1,
+            );
+        }
+        assert_eq!(state.release_batches[0].status, "in_progress");
+        assert_eq!(
+            state.release_batches[0].expected_stages,
+            expected_platform_stages()
+        );
     }
 }

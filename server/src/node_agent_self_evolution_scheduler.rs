@@ -58,7 +58,7 @@ async fn reconcile(runtime: &Arc<NodeRuntime>) -> Result<()> {
         resource_pressure,
         checked_at_ms: now_ms(),
     })?;
-    for (task_id, reason) in runtime.self_evolution.request_gate_pauses()? {
+    for (owner, logical_id, task_id, reason) in runtime.self_evolution.request_gate_pauses()? {
         let audit = CancelRequestAudit::now(
             "node_agent",
             "self_evolution_scheduler",
@@ -72,6 +72,9 @@ async fn reconcile(runtime: &Arc<NodeRuntime>) -> Result<()> {
         if !runtime.cancel_cli_prompt_with_audit(&task_id, &audit).await {
             anyhow::bail!("self evolution yield audit/cancel failed closed for {task_id}");
         }
+        runtime
+            .self_evolution
+            .commit_action(&owner, &logical_id, "pause")?;
     }
     if let Some(item) = runtime.self_evolution.reserve_next()? {
         if let Err(error) = dispatch_generation(runtime, &item).await {

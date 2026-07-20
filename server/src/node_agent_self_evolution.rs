@@ -282,9 +282,31 @@ impl SelfEvolutionCoordinator {
                     }
                     "resume_required" | "interrupted" => {
                         item.status = "paused".to_string();
-                        item.pause_reason = Some("node_restart".to_string());
-                        item.yield_reason = Some("node_restart".to_string());
-                        item.interruption_source = Some(InterruptionSource::NodeRestart);
+                        let durable_source =
+                            item.pending_action.as_ref().and_then(|intent| {
+                                match (intent.action.as_str(), intent.source.as_str()) {
+                                    ("pause", "updater_apply" | "node_update") => {
+                                        Some(InterruptionSource::UpdaterApply)
+                                    }
+                                    ("pause", "local_pc_ui" | "supervisor") => {
+                                        Some(InterruptionSource::SupervisorIntervention)
+                                    }
+                                    _ => None,
+                                }
+                            });
+                        item.pause_reason = Some(
+                            durable_source
+                                .as_ref()
+                                .map(|source| match source {
+                                    InterruptionSource::UpdaterApply => "node_update",
+                                    InterruptionSource::SupervisorIntervention => "manual_pause",
+                                    InterruptionSource::NodeRestart => "node_restart",
+                                })
+                                .unwrap_or("unknown_interruption")
+                                .to_string(),
+                        );
+                        item.yield_reason = item.pause_reason.clone();
+                        item.interruption_source = durable_source;
                         item.active_task_id = None;
                     }
                     "canceled" | "failed" => {
@@ -320,7 +342,7 @@ impl SelfEvolutionCoordinator {
         })
     }
 
-    fn request_gate_pauses(&self) -> Result<Vec<(String, String)>> {
+    fn request_gate_pauses(&self) -> Result<Vec<(String, String, String, String)>> {
         self.mutate(|state| {
             let Some(reason) = state.gates.blocker().map(str::to_string) else {
                 return Ok(Vec::new());
@@ -329,16 +351,40 @@ impl SelfEvolutionCoordinator {
             for item in &mut state.items {
                 if item.status == "running" {
                     if let Some(task_id) = item.active_task_id.clone() {
-                        item.status = "pause_requested".to_string();
+                        if item
+                            .pending_action
+                            .as_ref()
+                            .is_some_and(|intent| intent.action == "pause")
+                        {
+                            requests.push((
+                                item.owner_user_id.clone(),
+                                item.logical_id.clone(),
+                                task_id,
+                                reason.clone(),
+                            ));
+                            continue;
+                        }
                         item.pause_reason = Some(reason.clone());
                         item.yield_reason = Some(reason.clone());
-                        item.interruption_source = Some(if reason == "node_update" {
-                            InterruptionSource::UpdaterApply
-                        } else {
-                            InterruptionSource::SupervisorIntervention
+                        item.pending_action = Some(PendingSelfEvolutionAction {
+                            action_id: format!("evolution-action-{}", Uuid::new_v4()),
+                            action: "pause".to_string(),
+                            note: Some(format!("yield_for_{reason}")),
+                            actor: "node_agent".to_string(),
+                            source: if reason == "node_update" {
+                                "updater_apply".to_string()
+                            } else {
+                                "supervisor".to_string()
+                            },
+                            requested_at_ms: now_ms(),
                         });
                         item.updated_at_ms = now_ms();
-                        requests.push((task_id, reason.clone()));
+                        requests.push((
+                            item.owner_user_id.clone(),
+                            item.logical_id.clone(),
+                            task_id,
+                            reason.clone(),
+                        ));
                     }
                 }
             }
@@ -434,6 +480,13 @@ impl SelfEvolutionCoordinator {
                 .iter_mut()
                 .find(|item| item.owner_user_id == owner && item.logical_id == logical_id)
                 .context("self evolution item not found")?;
+            if item
+                .pending_action
+                .as_ref()
+                .is_some_and(|pending| pending.action == action)
+            {
+                return Ok((item.clone(), item.active_task_id.clone()));
+            }
             let valid = match action {
                 "pause" => matches!(item.status.as_str(), "running" | "starting"),
                 "resume" => matches!(item.status.as_str(), "paused" | "failed" | "retry_wait"),
@@ -441,13 +494,6 @@ impl SelfEvolutionCoordinator {
                 _ => false,
             };
             if !valid {
-                if item
-                    .pending_action
-                    .as_ref()
-                    .is_some_and(|pending| pending.action == action)
-                {
-                    return Ok((item.clone(), item.active_task_id.clone()));
-                }
                 anyhow::bail!("self evolution action is not valid for current state");
             }
             item.pending_action = Some(PendingSelfEvolutionAction {

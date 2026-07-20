@@ -485,8 +485,6 @@ function New-SupervisionReviewBody {
         verdict = $BodyVerdict
         summary = $BodySummary
         improvements = @($BodyImprovements | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-        reviewed_by = 'codex_desktop'
-        review_source = 'codex_desktop_helper'
     }
 }
 
@@ -632,7 +630,7 @@ switch ($Action) {
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
         $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
-        $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/review" $reviewBody
+        $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/desktop-review" $reviewBody
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Review'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId; verdict = $Verdict; response = $response

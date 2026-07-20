@@ -250,33 +250,36 @@ fn post_task_improvement_requires_explicit_protocol_parent_and_root() {
 
 #[test]
 fn review_identity_prevents_pc_operator_from_impersonating_desktop() {
-    let rejected = normalize_review(SupervisionReviewRequest {
-        verdict: "accepted".to_string(),
-        summary: "operator review".to_string(),
-        improvements: Vec::new(),
-        reviewed_by: Some("codex_desktop".to_string()),
-        review_source: Some("local_pc_ui".to_string()),
-    })
-    .expect_err("PC review must not impersonate the independent desktop supervisor");
-    assert!(rejected.contains("不能冒充"));
+    let rejected = serde_json::from_value::<SupervisionReviewRequest>(serde_json::json!({
+        "verdict": "accepted", "summary": "operator review",
+        "reviewed_by": "codex_desktop", "review_source": "codex_desktop_helper"
+    }));
+    assert!(
+        rejected.is_err(),
+        "public review DTO must reject caller-supplied actor provenance"
+    );
 
-    let desktop = normalize_review(SupervisionReviewRequest {
-        verdict: "accepted".to_string(),
-        summary: "desktop review".to_string(),
-        improvements: Vec::new(),
-        reviewed_by: Some("codex_desktop".to_string()),
-        review_source: Some("codex_desktop_helper".to_string()),
-    })
+    let desktop = normalize_review(
+        SupervisionReviewRequest {
+            verdict: "accepted".to_string(),
+            summary: "desktop review".to_string(),
+            improvements: Vec::new(),
+        },
+        "codex_desktop",
+        "codex_desktop_helper",
+    )
     .expect("trusted desktop helper provenance should be accepted");
     assert_eq!(desktop.review_source, "codex_desktop_helper");
 
-    let operator = normalize_review(SupervisionReviewRequest {
-        verdict: "needs_follow_up".to_string(),
-        summary: "local review".to_string(),
-        improvements: Vec::new(),
-        reviewed_by: None,
-        review_source: None,
-    })
+    let operator = normalize_review(
+        SupervisionReviewRequest {
+            verdict: "needs_follow_up".to_string(),
+            summary: "local review".to_string(),
+            improvements: Vec::new(),
+        },
+        "pc_operator",
+        "local_pc_api",
+    )
     .expect("local operator defaults should remain compatible");
     assert_eq!(operator.reviewed_by, "pc_operator");
     assert_eq!(operator.review_source, "local_pc_api");

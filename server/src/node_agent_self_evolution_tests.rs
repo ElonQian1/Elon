@@ -89,7 +89,14 @@ fn foreground_gate_yields_then_auto_reserves_next_generation() {
         .unwrap();
     let pauses = coordinator.request_gate_pauses().unwrap();
     assert_eq!(pauses.len(), 1);
-    assert_eq!(pauses[0].1, "global_publish");
+    assert_eq!(pauses[0].3, "global_publish");
+    let persisted = coordinator.list_for_owner("owner-a").unwrap().0.remove(0);
+    assert_eq!(persisted.status, "running");
+    assert_eq!(persisted.pending_action.as_ref().unwrap().action, "pause");
+
+    coordinator
+        .commit_action("owner-a", "evo-a", "pause")
+        .unwrap();
 
     {
         let mut state = coordinator.state.lock().unwrap();

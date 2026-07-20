@@ -172,6 +172,7 @@ pub async fn claim_handler(
     let mgr = manager(&state);
     ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
+    let original = guard.clone();
     let now = now_secs();
 
     for lane_kind in [Lane::Server, Lane::Apk, Lane::NodeAgent] {
@@ -413,7 +414,10 @@ pub async fn claim_handler(
         waiter_count: guard.global_publish.waiters.len(),
     };
 
-    mgr.persist(&guard).await.map_err(persist_error)?;
+    if let Err(error) = mgr.persist(&guard).await {
+        *guard = original;
+        return Err(persist_error(error));
+    }
     drop(guard);
     Ok(Json(resp))
 }
@@ -426,6 +430,7 @@ pub async fn heartbeat_handler(
     let mgr = manager(&state);
     ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
+    let original = guard.clone();
     let now = now_secs();
 
     for lane_kind in [Lane::Server, Lane::Apk, Lane::NodeAgent] {
@@ -541,7 +546,10 @@ pub async fn heartbeat_handler(
         ok: true,
         lease_expires_at,
     };
-    mgr.persist(&guard).await.map_err(persist_error)?;
+    if let Err(error) = mgr.persist(&guard).await {
+        *guard = original;
+        return Err(persist_error(error));
+    }
     drop(guard);
     Ok(Json(resp))
 }
@@ -554,6 +562,7 @@ pub async fn finish_handler(
     let mgr = manager(&state);
     ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
+    let original = guard.clone();
     let now = now_secs();
     for lane_kind in [Lane::Server, Lane::Apk, Lane::NodeAgent] {
         sweep_expired(lane_mut(&mut guard, lane_kind), now);
@@ -648,7 +657,10 @@ pub async fn finish_handler(
     };
 
     let resp = FinishResponse { ok: true, recorded };
-    mgr.persist(&guard).await.map_err(persist_error)?;
+    if let Err(error) = mgr.persist(&guard).await {
+        *guard = original;
+        return Err(persist_error(error));
+    }
     drop(guard);
     Ok(Json(resp))
 }
@@ -660,6 +672,7 @@ pub async fn status_handler(
     let mgr = manager(&state);
     ensure_manager_healthy(&mgr)?;
     let mut guard = mgr.inner.lock().await;
+    let original = guard.clone();
     let now = now_secs();
     sweep_expired(&mut guard.server, now);
     sweep_expired(&mut guard.apk, now);
@@ -704,7 +717,10 @@ pub async fn status_handler(
             "now": now,
         }),
     };
-    mgr.persist(&guard).await.map_err(persist_error)?;
+    if let Err(error) = mgr.persist(&guard).await {
+        *guard = original;
+        return Err(persist_error(error));
+    }
     drop(guard);
     Ok(Json(body))
 }

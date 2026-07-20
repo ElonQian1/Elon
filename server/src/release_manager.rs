@@ -172,10 +172,8 @@ impl ReleaseManager {
             anyhow::bail!("release state failed closed: {error}");
         }
         let json = serde_json::to_string_pretty(state).context("serialize release state")?;
-        let tmp = self.path.with_extension("json.tmp");
-        std::fs::write(&tmp, json).with_context(|| format!("write {}", tmp.display()))?;
-        std::fs::rename(&tmp, &self.path)
-            .with_context(|| format!("replace {}", self.path.display()))?;
+        crate::node_agent_atomic_file::write(&self.path, json.as_bytes())
+            .with_context(|| format!("atomically replace {}", self.path.display()))?;
         Ok(())
     }
 }
