@@ -37,6 +37,13 @@ if (-not $SkipCheapGates) {
 
 $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $RepoRoot
 $stateRoot = Join-Path $root "validation-v1"
+$bootstrapLease = $null
+try {
+    $bootstrapLease = Enter-ValidationLock -LockPath (Join-Path $stateRoot '.cargo-lock-bootstrap.lock') -Kind 'cargo-lock-bootstrap' -TimeoutSeconds $WaitTimeoutSeconds
+    Initialize-ValidationCargoLock -RepoRoot $RepoRoot -CargoArgs $CargoArgs
+} finally {
+    Exit-ValidationLock -Lease $bootstrapLease
+}
 $fingerprint = Get-ValidationFingerprint -RepoRoot $RepoRoot -CargoArgs $CargoArgs -Domain $Domain -TargetDir $TargetDir -ExecutionOptions ([ordered]@{ disable_sccache=[bool]$DisableSccache; light_slots=$LightSlots })
 $resultDir = Join-Path $stateRoot ("evidence\" + $fingerprint.fingerprint)
 $summaryPath = Join-Path $resultDir "summary.json"

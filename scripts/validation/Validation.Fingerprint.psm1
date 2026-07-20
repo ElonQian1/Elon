@@ -15,6 +15,31 @@ function ConvertTo-ValidationCommand {
     return ($normalized -join "`n")
 }
 
+function Initialize-ValidationCargoLock {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string[]]$CargoArgs
+    )
+    $manifest = $null
+    for ($i = 0; $i -lt $CargoArgs.Count; $i++) {
+        if ($CargoArgs[$i] -eq '--manifest-path' -and $i + 1 -lt $CargoArgs.Count) {
+            $manifest = $CargoArgs[$i + 1]
+            break
+        }
+        if ($CargoArgs[$i] -like '--manifest-path=*') {
+            $manifest = $CargoArgs[$i].Substring('--manifest-path='.Length)
+            break
+        }
+    }
+    if (-not $manifest) { return }
+    $manifestPath = if ([IO.Path]::IsPathRooted($manifest)) { $manifest } else { Join-Path $RepoRoot $manifest }
+    $lockPath = Join-Path (Split-Path $manifestPath -Parent) 'Cargo.lock'
+    if (Test-Path -LiteralPath $lockPath) { return }
+    if ($CargoArgs -contains '--locked' -or $CargoArgs -contains '--frozen') { return }
+    & cargo generate-lockfile --manifest-path $manifestPath
+    if ($LASTEXITCODE -ne 0) { throw "cargo generate-lockfile failed while stabilizing the validation fingerprint." }
+}
+
 function Get-ValidationGitSnapshot {
     param([Parameter(Mandatory)][string]$RepoRoot)
     $relevantPattern = '^(server/|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|scripts/(cargo-dev|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
@@ -80,4 +105,4 @@ function Get-ValidationFingerprint {
     }
 }
 
-Export-ModuleMember -Function Get-ValidationSha256, ConvertTo-ValidationCommand, Get-ValidationGitSnapshot, Get-ValidationFingerprint
+Export-ModuleMember -Function Get-ValidationSha256, ConvertTo-ValidationCommand, Initialize-ValidationCargoLock, Get-ValidationGitSnapshot, Get-ValidationFingerprint

@@ -11,6 +11,19 @@ function Get-ValidationFailureItems {
     return @($Lines | Where-Object { $_ -match '(^|\s)(FAILED|failures:|error(?:\[[^]]+\])?:)' } | Select-Object -First 100)
 }
 
+function Stop-ValidationCapturedProcess {
+    param([Parameter(Mandatory)]$Process, [string]$TaskkillFilePath = 'taskkill.exe')
+    $treeStopped = $false
+    try {
+        & $TaskkillFilePath /PID $Process.Id /T /F 2>$null | Out-Null
+        $treeStopped = ($LASTEXITCODE -eq 0)
+    } catch { $treeStopped = $false }
+    if (-not $treeStopped -and -not $Process.HasExited) {
+        try { $Process.Kill() } catch {}
+    }
+    return $treeStopped
+}
+
 function Invoke-ValidationCapturedProcess {
     param(
         [Parameter(Mandatory)][string]$FilePath,
@@ -41,7 +54,7 @@ function Invoke-ValidationCapturedProcess {
     $stderrTask = $process.StandardError.ReadToEndAsync()
     $timedOut = -not $process.WaitForExit([Math]::Max(1,$TimeoutSeconds)*1000)
     if ($timedOut) {
-        try { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null } catch { try { $process.Kill() } catch {} }
+        Stop-ValidationCapturedProcess -Process $process | Out-Null
         if (-not $process.WaitForExit(5000)) { throw "Validation process did not terminate after timeout: $FilePath" }
     }
     $stdoutText = $stdoutTask.GetAwaiter().GetResult(); $stderrText = $stderrTask.GetAwaiter().GetResult()
@@ -79,4 +92,4 @@ function Remove-ExpiredValidationEvidence {
     }
 }
 
-Export-ModuleMember -Function Write-ValidationJsonAtomic, Get-ValidationFailureItems, Invoke-ValidationCapturedProcess, Remove-ExpiredValidationEvidence
+Export-ModuleMember -Function Write-ValidationJsonAtomic, Get-ValidationFailureItems, Stop-ValidationCapturedProcess, Invoke-ValidationCapturedProcess, Remove-ExpiredValidationEvidence
