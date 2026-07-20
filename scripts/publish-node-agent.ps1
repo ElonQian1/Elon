@@ -22,7 +22,7 @@ param(
     [string]$Changelog = "",
     [int]$HandshakeWaitSec = 90,
     [switch]$SkipHandshakeWait,
-    [switch]$RequireAllOnlineTargetBuild
+    [switch]$RequireAllOnlineTargetBuild, [string]$ReplayPublishedSha = ""
 )
 
 Set-StrictMode -Version Latest
@@ -478,7 +478,8 @@ $TargetDir = $meta.target_directory
 if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
 if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
-$GitSha = Assert-NodeAgentPublishHeadCurrent -Phase "发布开始"
+$ReplayOnlyRequested = -not [string]::IsNullOrWhiteSpace($ReplayPublishedSha)
+$GitSha = Resolve-NodeAgentPublishSha -RepoRoot $RepoRoot -ReplayPublishedSha $ReplayPublishedSha
 $script:NodeReleaseBatchId = Get-ElonReleaseBatchId -Sha $GitSha
 $ReleaseIdentity = Get-NodeAgentReleaseIdentity -Version $PackageVersion -GitSha $GitSha
 $ReleaseChangelog = Resolve-NodeAgentChangelog -Explicit $Changelog -Sha $GitSha
@@ -488,12 +489,16 @@ if ([string]::IsNullOrWhiteSpace($nodeBuilderId) -or $nodeBuilderId -eq '-') {
 $nodeClaim = Enter-ElonNodeAgentPublishLease -ReleaseApiBase "$BaseUrl/api/release" `
     -Sha $GitSha -VersionName $PackageVersion -BuilderId $nodeBuilderId
 if (-not $nodeClaim) { return }
+$claimIsReplay = $nodeClaim.PSObject.Properties.Name -contains 'replayOnly' -and $nodeClaim.replayOnly
+if ($ReplayOnlyRequested -and -not $claimIsReplay) {
+    throw 'ReplayPublishedSha was not already published/coalesced; refusing to build or upload.'
+}
 $script:NodeReleaseToken = [string]$nodeClaim.token
 $script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeReleaseToken)
 if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
     $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
 }
-if ($nodeClaim.PSObject.Properties.Name -contains 'replayOnly' -and $nodeClaim.replayOnly) {
+if ($claimIsReplay) {
     Invoke-NodeAgentPublishReplay -GitSha $GitSha -PackageVersion $PackageVersion `
         -BatchId $script:NodeReleaseBatchId -ReleaseIdentity $ReleaseIdentity `
         -SkipBroadcast $SkipBroadcast -BroadcastAdminToken $BroadcastAdminToken `

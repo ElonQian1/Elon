@@ -1,5 +1,18 @@
 Set-StrictMode -Version Latest
 
+function Resolve-NodeAgentPublishSha {
+    param([string]$RepoRoot, [string]$ReplayPublishedSha)
+    if ([string]::IsNullOrWhiteSpace($ReplayPublishedSha)) {
+        return Assert-NodeAgentPublishHeadCurrent -Phase 'publish start'
+    }
+    Invoke-GitFetchMain
+    $sha = $ReplayPublishedSha.Trim().ToLowerInvariant()
+    if ($sha -notmatch '^[0-9a-f]{40}$') { throw 'ReplayPublishedSha must be a full 40-character Git SHA.' }
+    git -C $RepoRoot merge-base --is-ancestor $sha origin/main
+    if ($LASTEXITCODE -ne 0) { throw 'ReplayPublishedSha is not an ancestor of immutable origin/main.' }
+    return $sha
+}
+
 function Get-RemoteNodeAgentArtifactIdentity {
     $script = @'
 set -eu

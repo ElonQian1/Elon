@@ -108,6 +108,12 @@ Assert-True (-not $publishScript.Contains('-Stage $script:NodeReleaseActiveStage
     "Node internal phases must never write arbitrary top-level stages"
 Assert-True ($publishScript.Contains('[switch]$RequireAllOnlineTargetBuild')) `
     "The publisher must expose an explicit strict rollout switch"
+Assert-True ($publishScript.Contains('[string]$ReplayPublishedSha')) `
+    "The publisher must expose an explicit immutable same-SHA replay mode"
+Assert-True ($publishScript.Contains('ReplayPublishedSha was not already published/coalesced')) `
+    "Explicit replay must fail closed instead of rebuilding an unknown SHA"
+Assert-True ($replayHelper.Contains('merge-base --is-ancestor $sha origin/main')) `
+    "Explicit replay must only accept a SHA retained by immutable origin/main history"
 Assert-True ($publishScript.Contains('NODE_AGENT_TARGET_BUILD_STATUS=partial')) `
     "The publisher must report partial rollout without claiming ready"
 Assert-True ($publishScript.Contains('if ($RequireAllOnlineTargetBuild)')) `
