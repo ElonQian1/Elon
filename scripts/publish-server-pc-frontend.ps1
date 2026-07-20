@@ -1,4 +1,4 @@
-function Invoke-LoggedCmd {
+﻿function Invoke-LoggedCmd {
     param([string]$Command)
 
     $previousErrorAction = $ErrorActionPreference
