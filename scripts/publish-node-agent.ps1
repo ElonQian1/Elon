@@ -56,6 +56,7 @@ $script:NodeReleaseOwned = $false
 $script:NodeReleaseFinished = $false
 $script:NodeReleaseBatchId = ''
 $script:NodeReleaseActiveStage = 'windows_node'
+$script:NodeReleaseHeartbeat = $null
 
 try {
     Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
