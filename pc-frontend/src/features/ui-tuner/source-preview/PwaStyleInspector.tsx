@@ -137,6 +137,14 @@ export function PwaStyleInspector({ session }: Props) {
               : '写回源码并验证 APK 与 PWA'}
         </button>
         <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
+        {session.syncState.runtimeCapture && <p className={styles.pwaSyncStatus}>
+          PNG 证据：{session.syncState.runtimeCapture.width}×{session.syncState.runtimeCapture.height}
+          {' · '}<code>{session.syncState.runtimeCapture.sha256.slice(0, 16)}</code>
+          {' · '}{session.syncState.runtimeCapture.path}
+        </p>}
+        {session.syncState.runtimeCaptureDiagnostic && <p className={styles.pwaSyncStatus}>
+          {session.syncState.runtimeCaptureDiagnostic.code}：{session.syncState.runtimeCaptureDiagnostic.nextStep}
+        </p>}
         {session.syncState.mismatches.length > 0 && <ul>
           {session.syncState.mismatches.map((mismatch) => <li key={mismatch}>{mismatch}</li>)}
         </ul>}

@@ -593,7 +593,7 @@ try {
   assert.match(bridgeSource, /if \(signature === lastRouteSignature\) return;/, '相同 screen route 必须去重')
   assert.match(sessionSource, /verification\.markSourceSaved\(evidence/, '确定性源码写回后必须先标记 SOURCE_SAVED')
   assert.match(sessionSource, /await verification\.start\(evidence\)/, '确定性绑定才自动运行真实验证')
-  assert.match(sessionSource, /markSourceSaved\(undefined,[\s\S]*AI 只补未绑定属性或结构修改/, 'AI fallback 不得伪造可验证的确定性回执')
+  assert.match(sessionSource, /verification\.markAiWriting\(taskId,[\s\S]*AI 正在补未绑定属性或结构修改/, 'AI fallback 不得伪造可验证的确定性回执')
   assert.doesNotMatch(sessionSource, /phase:\s*'completed'/, '旧 completed 状态不得继续冒充验证')
   assert.match(bridgeSource, /window\.setTimeout\(\(\) => \{[\s\S]*?postRoute\(reason\);[\s\S]*?\}, 80\);/, '画面 Mutation 必须防抖')
   const observerAttributeFilter = bridgeSource.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] ?? ''

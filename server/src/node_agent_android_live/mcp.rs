@@ -116,8 +116,8 @@ pub(crate) async fn handle_request(
         "initialize" => Ok(json!({
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-ui-live", "version": "1.0.0" },
-            "instructions": "模糊路由任务先调用 ui_confirm_route。Codex 桌面端 UI 请求先导入任务、读取项目与 Runtime 并检查能力；requiredCapabilities 只能追加系统推导能力。样式优先 Live Patch/FitRun，结构变化使用最小 CODEX_SOURCE_HANDOFF。平台缺口必须声明 deliveryImpact：原业务任务只创建 Worktree handoff，不得就地升级；DELIVERY_NON_BLOCKING 在 businessDeliveryReady=true 后先收尾业务，再由新的 Codex Desktop Worktree 任务后台升级、发布和复检，前台 UI 任务优先使用真机与节点发布资源；DELIVERY_BLOCKING 则暂停业务并分流。全新页面先建骨架和首次构建，再回到真实 Android Renderer。收尾必须调用 ui_check_workflow_completion；仅 completionReady 或经验证的 businessDeliveryReady 允许对应声明。"
+            "serverInfo": { "name": "yilong-ui-live", "version": "1.1.0" },
+            "instructions": "模糊路由任务先调用 ui_confirm_route。PWA 像素证据优先调用 ui_capture_pwa_runtime，它只使用节点本机无头浏览器并返回路径/哈希，不嵌入 Base64。Codex 桌面端 UI 请求先导入任务、读取项目与 Runtime 并检查能力；requiredCapabilities 只能追加系统推导能力。样式优先 Live Patch/FitRun，结构变化使用最小 CODEX_SOURCE_HANDOFF。平台缺口必须声明 deliveryImpact：原业务任务只创建 Worktree handoff，不得就地升级；DELIVERY_NON_BLOCKING 在 businessDeliveryReady=true 后先收尾业务，再由新的 Codex Desktop Worktree 任务后台升级、发布和复检，前台 UI 任务优先使用真机与节点发布资源；DELIVERY_BLOCKING 则暂停业务并分流。全新页面先建骨架和首次构建，再回到真实 Android Renderer。收尾必须调用 ui_check_workflow_completion；仅 completionReady 或经验证的 businessDeliveryReady 允许对应声明。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),
@@ -449,6 +449,11 @@ async fn call_tool(
                 serde_json::from_value(arguments).context("构建验收参数无效")?;
             let host_port = crate::node_agent_admin_open::admin_port_from_env();
             json!({ "result": build_and_verify(broker, &session_id, request, host_port).await? })
+        }
+        crate::node_agent_pwa_runtime::TOOL_NAME => {
+            let session = broker.session(&session_id).await?;
+            crate::node_agent_pwa_runtime::capture_tool(session.project_root.as_deref(), arguments)
+                .await
         }
         _ => bail!("未知 UI MCP 工具: {name}"),
     };

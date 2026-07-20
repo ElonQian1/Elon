@@ -19,10 +19,38 @@ export interface PwaSourceSavedEvidence {
   projectRoot: string
   draftRevision: number
   route: PwaDesignDraft['route']
+  viewport: PwaDesignDraft['viewport']
   changedFiles: string[]
   sourceRevisions: Record<string, string>
   expectedValues: string[]
   checks: PwaVerificationCheck[]
+}
+
+export interface PwaRuntimeCaptureArtifact {
+  path: string
+  manifestPath: string
+  sha256: string
+  width: number
+  height: number
+  bytes: number
+  mediaType: 'image/png'
+  capturedAt: string
+}
+
+export interface PwaRuntimeCaptureDiagnostic {
+  code: string
+  message: string
+  retryable: boolean
+  nextStep: string
+}
+
+export interface PwaRuntimeCaptureResult {
+  ok: boolean
+  status: 'CAPTURED' | 'CAPTURE_FAILED'
+  artifact?: PwaRuntimeCaptureArtifact
+  revision?: { sourceRevision: string; routeRevision: string }
+  diagnostic?: PwaRuntimeCaptureDiagnostic
+  base64Embedded: false
 }
 
 export interface PwaBuildVerificationResult {
@@ -67,6 +95,9 @@ export interface PwaVerificationState {
   evidence?: PwaSourceSavedEvidence
   build?: PwaBuildVerificationResult
   snapshot?: PwaBridgeVerificationSnapshot
+  runtimeCapture?: PwaRuntimeCaptureArtifact
+  runtimeCaptureDiagnostic?: PwaRuntimeCaptureDiagnostic
+  runtimeCapturePending?: boolean
   mismatches: string[]
   taskId?: string
 }
@@ -98,7 +129,11 @@ export function pwaSourceSavedState(
   message = '源码已保存，尚未执行真实构建验证',
   taskId?: string,
 ): PwaVerificationState {
-  return { ...previous, phase: 'SOURCE_SAVED', message, evidence, taskId, mismatches: [], build: undefined, snapshot: undefined }
+  return {
+    ...previous, phase: 'SOURCE_SAVED', message, evidence, taskId, mismatches: [],
+    build: undefined, snapshot: undefined, runtimeCapture: undefined,
+    runtimeCaptureDiagnostic: undefined, runtimeCapturePending: false,
+  }
 }
 
 export function pwaBuildVerifyingState(state: PwaVerificationState): PwaVerificationState {
@@ -148,6 +183,42 @@ export function completePwaVerification(
     snapshot,
     mismatches: [],
     taskId: undefined,
+  }
+}
+
+export function pwaRuntimeCapturePendingState(state: PwaVerificationState): PwaVerificationState {
+  return {
+    ...state,
+    runtimeCapturePending: true,
+    runtimeCaptureDiagnostic: undefined,
+    message: `${state.message}；正在由 PC 节点无头浏览器保存 PNG 像素证据…`,
+  }
+}
+
+export function completePwaRuntimeCapture(
+  state: PwaVerificationState,
+  capture: PwaRuntimeCaptureResult,
+): PwaVerificationState {
+  if (capture.ok && capture.status === 'CAPTURED' && capture.artifact) {
+    return {
+      ...state,
+      runtimeCapture: capture.artifact,
+      runtimeCaptureDiagnostic: undefined,
+      runtimeCapturePending: false,
+      message: `${state.message.replace(/；正在由 PC 节点无头浏览器保存 PNG 像素证据…$/, '')}；PNG ${capture.artifact.width}×${capture.artifact.height} 已保存并关联 revision`,
+    }
+  }
+  const diagnostic = capture.diagnostic ?? {
+    code: 'CAPTURE_FAILED',
+    message: 'PC 节点未返回 PNG 工件',
+    retryable: true,
+    nextStep: '检查本机 PWA URL、浏览器与 authProfile 后显式重试',
+  }
+  return {
+    ...state,
+    runtimeCapturePending: false,
+    runtimeCaptureDiagnostic: diagnostic,
+    message: `${state.message.replace(/；正在由 PC 节点无头浏览器保存 PNG 像素证据…$/, '')}；源码/iframe 已验证，PNG 待准备：${diagnostic.message}`,
   }
 }
 
@@ -203,6 +274,7 @@ export function sourceSavedEvidenceFromDraft(
     projectRoot: draft.project.workspaceIdentity,
     draftRevision: draft.revision,
     route: draft.route,
+    viewport: draft.viewport,
     changedFiles,
     sourceRevisions: Object.fromEntries(changedFiles.map((file) => [file, revisions[file]])),
     expectedValues: [...expectedValues].sort(),

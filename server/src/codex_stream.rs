@@ -270,6 +270,7 @@ fn ui_tool_progress(tool: &str, completed: bool) -> String {
         "ui_get_project_profile" | "ui_get_design_task" => "正在读取项目 UI 档案和设计任务",
         "ui_get_runtime_status" => "正在检查真实 Android Renderer 是否已连接",
         "ui_get_screen_summary" => "正在读取当前页面的实时组件摘要",
+        "ui_capture_pwa_runtime" => "正在用 PC 节点无头浏览器保存真实 PWA PNG 证据",
         "ui_get_node" | "ui_get_subtree" => "正在精准定位需要修改的组件",
         "ui_get_source_bundle" => "实时能力不足，正在按需读取最小源码片段",
         "ui_create_compose_screen_scaffold" => "正在创建全新页面骨架和 Preview",

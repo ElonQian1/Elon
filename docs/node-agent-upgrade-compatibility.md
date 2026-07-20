@@ -1,6 +1,6 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-07-18
+最后更新：2026-07-21
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
@@ -57,6 +57,7 @@
 - 取消四元组与可信 `interruption_source` 的新旧 sidecar/journal/API fixture，以及 PC UI 的更新恢复、自进化队列/暂停/审查、发布 batch/owner/waiters/stages 和取消来源测试。
 - 低优先自进化在前台任务、发布、更新和构建压力下 pause/yield，门禁解除后自动 resume；必须证明实际派发目录是已持久化的独立 worktree，并覆盖 action intent 重放、审查 provenance 和配额自动重试。
 - 远程监督 v1 的身份、能力、live lease 和断线恢复 fail-closed fixture；本地可信任务优先，远程证据缺失不得降级绕过。
+- PWA Runtime 捕获的 Windows Edge/Chrome 标准路径与 `ELON_PWA_BROWSER_PATH` 探测、浏览器缺失诊断、真实 loopback HTML/PWA fixture 精确 viewport PNG、SHA-256/route/revision 元数据、认证失败不误报、SSRF/秘密门禁，以及成功/超时/启动失败后的浏览器进程树和临时 profile 回收。发布包不得新增 Desktop Browser 或人工可见浏览器依赖。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。
 - 外部项目、托管项目、只读任务、普通写任务和真实构建分别验证路径与环境策略。
 - 超容量建议、项目数建议和无法读取磁盘空间时仍可派单；无自动压力清理。

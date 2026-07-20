@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'react'
-import { verifyPwaSourceBuild } from './sourcePreviewApi'
+import { capturePwaSourceRuntime, verifyPwaSourceBuild } from './sourcePreviewApi'
 import {
   completePwaVerification,
+  completePwaRuntimeCapture,
   livePwaVerificationState,
   pwaAiWritingState,
   pwaBuildVerifyingState,
   pwaSourceSavedState,
+  pwaRuntimeCapturePendingState,
   pwaVerifyFailedState,
   type PwaBridgeVerificationSnapshot,
   type PwaBuildVerificationResult,
@@ -18,6 +20,7 @@ interface UsePwaSourceVerificationOptions {
   reloadSource: () => void
   restoreDraft: () => void
   clearVerifiedDraft: () => void
+  runtimeUrl: string
 }
 
 interface PendingVerification {
@@ -31,6 +34,7 @@ export function usePwaSourceVerification({
   reloadSource,
   restoreDraft,
   clearVerifiedDraft,
+  runtimeUrl,
 }: UsePwaSourceVerificationOptions) {
   const [state, setState] = useState<PwaVerificationState>(() => livePwaVerificationState())
   const stateRef = useRef(state)
@@ -135,11 +139,30 @@ export function usePwaSourceVerification({
     if (next.phase === 'BUILD_VERIFIED') {
       pendingRef.current = null
       clearVerifiedDraft()
+      const capturing = pwaRuntimeCapturePendingState(next)
+      update(capturing)
+      void capturePwaSourceRuntime(pending.evidence, runtimeUrl).then((capture) => {
+        if (stateRef.current.evidence?.requestId !== pending.evidence.requestId) return
+        update(completePwaRuntimeCapture(stateRef.current, capture))
+      }).catch((error) => {
+        if (stateRef.current.evidence?.requestId !== pending.evidence.requestId) return
+        update(completePwaRuntimeCapture(stateRef.current, {
+          ok: false,
+          status: 'CAPTURE_FAILED',
+          base64Embedded: false,
+          diagnostic: {
+            code: 'CAPTURE_REQUEST_FAILED',
+            message: error instanceof Error ? error.message : 'PC 节点 PWA PNG 请求失败',
+            retryable: true,
+            nextStep: '确认本机节点、PWA URL 与浏览器后显式重试',
+          },
+        }))
+      })
     } else {
       restoreDraft()
     }
     return true
-  }, [clearTimeout, clearVerifiedDraft, restoreDraft, update])
+  }, [clearTimeout, clearVerifiedDraft, restoreDraft, runtimeUrl, update])
 
   const retry = useCallback(() => start(), [start])
 

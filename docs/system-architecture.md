@@ -190,6 +190,16 @@ Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP M
 
 持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查链接、孤立文档、owner、复查周期和显式实现引用；问题状态与健康快照同样位于工作区外。服务端把架构、质量、维护、问题工作流和联邦节点合并为目录快照中的 `analysis`，并返回可解释评分组成。大型仓库通过 `.elon/knowledge-federation.json` 的路径与 glob 分层；个人笔记通过 `vaultId` 映射到托管 Git 知识库，每次保存自动提交且可恢复，用户界面不暴露 Git 复杂度。
 
+### 2.6 PWA Runtime 像素证据
+
+Windows 节点复用 `yilong_ui_live` Streamable HTTP MCP，通过 `ui_capture_pwa_runtime` 在本机启动受控的无头 Edge、Chrome 或 Chromium。它使用浏览器 CDP 渲染真实 http(s) 页面并生成 PNG，不依赖 Codex Desktop Browser、可见浏览器、桌面点击或 DOM/CSS 摘要。MCP 会话必须绑定项目 `EDIT_ROOT`；同一内核也由 `/api/source-preview/capture-pwa-runtime` 调用，因此 PC 画面模块、Codex CLI 与 MCP 共用 URL、认证、浏览器、工件和脱敏策略，旧 Android Renderer 工具保持不变。
+
+默认只允许 `localhost` 和 loopback URL，导航及所有 http(s) 子请求都受 origin allowlist 拦截。项目若确需同一受信部署源，可在 `.elon/ui-pwa-runtime.json` 中显式登记最多 16 个 `allowedOrigins`，并可设置 `defaultAuthProfile` 与 `authenticatedReadySelector`；该文件不得保存秘密。认证材料只能放在本机项目 `.elon/ui-tuner/pwa-sessions/<profile>.json`，由 MCP 参数中的安全 profile 名引用；显式准备合同是 `{"version":1,"cookies":[{"name":"session","value":"<local-only>","path":"/","httpOnly":true,"secure":true}],"headers":{}}`，也只允许 `Authorization` 或 `X-*` header，目录已被 Git 忽略。URL userinfo、疑似 token/secret/session/signature 的 query、直接 Cookie/Authorization 参数、链接/重解析点越界、超限 viewport/等待/PNG 都会返回机器可读诊断；登录表单、401/403 或认证就绪 selector 未出现不会被误报为成功画面。
+
+节点依次探测 `ELON_PWA_BROWSER_PATH`、标准 Edge/Chrome 安装路径和 `PATH`。每次捕获使用独立临时 profile、随机 CDP 端口和隐藏窗口；成功、超时、协议错误或启动失败都回收浏览器进程树和临时目录。`BROWSER_NOT_FOUND` 时安装 Microsoft Edge/Google Chrome，或把受信浏览器绝对路径写入 `ELON_PWA_BROWSER_PATH` 后重启节点；`URL_ORIGIN_NOT_ALLOWED`、`AUTHENTICATION_REQUIRED`/`AUTHENTICATION_FAILED` 和 `BROWSER_CLEANUP_FAILED` 的 `nextStep` 是 CLI/PC UI 的权威恢复提示。
+
+成功结果保存到项目 `.elon/ui-tuner/pwa-runtime/captures/`，返回 PNG 与 manifest 的绝对路径、SHA-256、实际像素尺寸、媒体类型、采集时间、脱敏 route、浏览器版本、viewport、网络门禁、进程回收和 source/route revision。PWA 源码闭环仍先完成构建、资源、真实 iframe route/source revision 校验，再安全自动请求 PNG；无法自动捕获时保留源码验收成功并显示明确下一步。Codex context pack 只引用工件路径、哈希和尺寸，`screenshotsEmbeddedAsBase64=false`，默认不嵌入图片 Base64。
+
 ## 3. 代码仓库结构（目标结构）
 
 ```

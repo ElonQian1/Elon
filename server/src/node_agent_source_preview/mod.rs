@@ -2,6 +2,7 @@ mod compose_renderer;
 mod parser;
 mod pwa_json;
 mod pwa_resolver;
+mod pwa_runtime;
 mod pwa_style_syntax;
 mod pwa_verifier;
 mod pwa_writer;

@@ -4,6 +4,7 @@ use super::{
     },
     parser::load_document,
     pwa_resolver::resolve_pwa_style_binding,
+    pwa_runtime::CapturePwaRuntimeRequest,
     pwa_verifier::{verify_pwa_source, VerifyPwaSourceRequest},
     pwa_writer::{commit_pwa_style, PwaCommitErrorKind},
     types::{
@@ -46,6 +47,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/source-preview/verify-pwa-source",
             post(verify_pwa_source_handler),
+        )
+        .route(
+            "/api/source-preview/capture-pwa-runtime",
+            post(capture_pwa_runtime_handler),
         )
 }
 
@@ -134,6 +139,14 @@ async fn verify_pwa_source_handler(
         Ok(value) => Json(value).into_response(),
         Err(error) => error_response(StatusCode::BAD_REQUEST, error),
     }
+}
+
+async fn capture_pwa_runtime_handler(
+    State(_runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<CapturePwaRuntimeRequest>,
+) -> Response {
+    Json(crate::node_agent_pwa_runtime::capture(&req.project_root, req.capture).await)
+        .into_response()
 }
 
 fn error_response(status: StatusCode, error: anyhow::Error) -> Response {

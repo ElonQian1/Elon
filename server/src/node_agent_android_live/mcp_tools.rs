@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 pub(crate) fn tool_definitions() -> Vec<Value> {
-    vec![
+    let mut definitions = vec![
         tool(
             "ui_confirm_route",
             "模糊任务的第一步：确认本轮是 UI_DESIGN 还是 NON_UI。只提交判断和理由，不读取源码、不修改文件。",
@@ -519,7 +519,9 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 }
             }),
         ),
-    ]
+    ];
+    definitions.push(crate::node_agent_pwa_runtime::tool_definition());
+    definitions
 }
 
 fn tool(name: &str, description: &str, input_schema: Value) -> Value {

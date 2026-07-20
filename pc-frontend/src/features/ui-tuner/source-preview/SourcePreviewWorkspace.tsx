@@ -35,6 +35,7 @@ export function SourcePreviewWorkspace({ initialProjectRoot, projectId, active =
     sourceRevision: session.document?.sourceRevision ?? '',
     root: session.document?.root ?? null,
     onSelect: session.setSelectedKey,
+    runtimeUrl: session.renderer.capabilities?.pwaPreview.url ?? '',
   })
   const pwaPreviewActive = Boolean(
     session.document

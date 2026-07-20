@@ -1,5 +1,6 @@
 import type { UiTunerCodexContextPack } from '../contextPack'
 import type { PwaDesignDraft } from './pwaDesignDraft'
+import type { PwaRuntimeCaptureArtifact } from './pwaVerificationModel'
 import type {
   PwaCrossPlatformWritebackResult,
   PwaDesignWritebackPlan,
@@ -13,6 +14,7 @@ export function buildPwaDesignContextPack(input: {
   selection: PwaSelection | null
   plan: PwaDesignWritebackPlan
   deterministicResult: PwaCrossPlatformWritebackResult
+  runtimeCapture?: PwaRuntimeCaptureArtifact
 }): UiTunerCodexContextPack {
   const unresolvedKeys = new Set(input.plan.codexChanges.map((change) => change.elementKey))
   const selected = selectedUnresolvedElement(input.draft, input.selection, unresolvedKeys)
@@ -39,7 +41,7 @@ export function buildPwaDesignContextPack(input: {
       height: input.draft.viewport.height,
       sourceRoot: input.draft.project.workspaceIdentity,
       capturedAt: input.draft.updatedAt,
-      screenshotPath: visual.screenshot,
+      screenshotPath: input.runtimeCapture?.path || visual.screenshot,
     },
     selectionScope: selected?.scope === 'route' ? 'screen' : selected?.scope ?? 'instance',
     selectedElement: selected ? {
@@ -67,8 +69,8 @@ export function buildPwaDesignContextPack(input: {
     liveRuntime: null,
     fitRun: null,
     selectionVisual: {
-      available: Boolean(visual.currentCrop || visual.screenshot),
-      cropPath: visual.currentCrop || visual.screenshot,
+      available: Boolean(input.runtimeCapture?.path || visual.currentCrop || visual.screenshot),
+      cropPath: input.runtimeCapture?.path || visual.currentCrop || visual.screenshot,
       contextPath: visual.visualDiff,
     },
     repeatedComponent: null,
@@ -82,7 +84,7 @@ export function buildPwaDesignContextPack(input: {
       selectedHiddenReasons: [],
     },
     codexContract: {
-      readBeforeEdit: compact([visual.targetCrop, visual.currentCrop, visual.visualDiff, ...unresolvedFiles]),
+      readBeforeEdit: compact([input.runtimeCapture?.path, visual.targetCrop, visual.currentCrop, visual.visualDiff, ...unresolvedFiles]),
       writeTargets: unresolvedFiles,
       forbiddenShortcuts: [
         '不要读取整仓库或整棵 DOM',
@@ -110,6 +112,14 @@ export function buildPwaDesignContextPack(input: {
       },
       deterministicSummary: deterministicSummary(input.deterministicResult),
       visualReferences: { ...input.draft.visualReferences },
+      runtimeCapture: input.runtimeCapture ? {
+        path: input.runtimeCapture.path,
+        sha256: input.runtimeCapture.sha256,
+        manifestPath: input.runtimeCapture.manifestPath,
+        width: input.runtimeCapture.width,
+        height: input.runtimeCapture.height,
+        mediaType: input.runtimeCapture.mediaType,
+      } : undefined,
       writebackPlan: {
         targets: input.plan.targets,
         requiresCodex: input.plan.requiresCodex,

@@ -2,7 +2,7 @@ import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { ComposePreviewEntry, ComposePreviewRender, SourcePreviewDocument, SourceRendererCapabilities } from './types'
 import type { PwaExplicitStyleBinding } from './pwaDesignDraft'
-import type { PwaBuildVerificationResult, PwaSourceSavedEvidence } from './pwaVerificationModel'
+import type { PwaBuildVerificationResult, PwaRuntimeCaptureResult, PwaSourceSavedEvidence } from './pwaVerificationModel'
 import { androidProjectRootCandidates } from './sourcePreviewProjectRoot'
 
 export function sourcePreviewAdminUrl(): string {
@@ -102,4 +102,29 @@ export async function verifyPwaSourceBuild(
       expectedValues: evidence.expectedValues,
     }),
   }, 10 * 60_000)
+}
+
+export async function capturePwaSourceRuntime(
+  evidence: PwaSourceSavedEvidence,
+  runtimeUrl: string,
+): Promise<PwaRuntimeCaptureResult> {
+  if (!runtimeUrl.trim()) throw new Error('PWA_RUNTIME_URL_REQUIRED：当前画面没有可捕获的真实 PWA URL')
+  const target = new URL(runtimeUrl, window.location.origin)
+  if (evidence.route.path?.startsWith('/')) target.pathname = evidence.route.path
+  target.search = evidence.route.search || target.search
+  target.hash = evidence.route.hash || ''
+  const url = target.toString()
+  return nodeApi<PwaRuntimeCaptureResult>(sourcePreviewAdminUrl(), '/api/source-preview/capture-pwa-runtime', {
+    method: 'POST',
+    body: JSON.stringify({
+      projectRoot: evidence.projectRoot,
+      url,
+      viewport: { ...evidence.viewport, deviceScaleFactor: window.devicePixelRatio || 1 },
+      waitFor: { condition: 'networkidle', selector: 'body', timeoutMs: 30_000, settleMs: 500 },
+      evidence: {
+        sourceRevisions: evidence.sourceRevisions,
+        routeRevision: `pwa-draft-r${evidence.draftRevision}`,
+      },
+    }),
+  }, 45_000)
 }

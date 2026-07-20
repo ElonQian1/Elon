@@ -133,6 +133,14 @@ export interface UiTunerCodexContextPack {
     }
     deterministicSummary: Record<string, unknown>
     visualReferences: Record<string, string | undefined>
+    runtimeCapture?: {
+      path: string
+      sha256: string
+      manifestPath: string
+      width: number
+      height: number
+      mediaType: 'image/png'
+    }
     writebackPlan: unknown
     deterministicResult: unknown
     contextPolicy: {

@@ -38,6 +38,8 @@ scripts/_deploy_temp*.sh
 /.elon/ui-design/
 .elon/ui-tuner/live/
 .elon/ui-tuner/fit-runs/
+/.elon/ui-tuner/pwa-runtime/
+/.elon/ui-tuner/pwa-sessions/
 /.elon/ui-standards/*.json.bak
 
 # 本地运行目录（start-local.ps1 自动生成）

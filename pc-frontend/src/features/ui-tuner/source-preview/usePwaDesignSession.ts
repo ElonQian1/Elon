@@ -55,6 +55,7 @@ interface UsePwaDesignSessionOptions {
   sourceRevision: string
   root: SourcePreviewNode | null
   onSelect: (key: string) => void
+  runtimeUrl: string
 }
 
 export interface PwaDesignSession {
@@ -123,6 +124,7 @@ export function usePwaDesignSession({
   sourceRevision,
   root,
   onSelect,
+  runtimeUrl,
 }: UsePwaDesignSessionOptions): PwaDesignSession {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [ready, setReady] = useState(false)
@@ -193,7 +195,7 @@ export function usePwaDesignSession({
     setSaveLabel('真实源码与构建已验证，临时草稿已清除')
   }, [model])
 
-  const verification = usePwaSourceVerification({ post, reloadSource, restoreDraft, clearVerifiedDraft })
+  const verification = usePwaSourceVerification({ post, reloadSource, restoreDraft, clearVerifiedDraft, runtimeUrl })
 
   const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
     setDraft(value)
@@ -457,6 +459,7 @@ export function usePwaDesignSession({
       selection,
       plan,
       deterministicResult,
+      runtimeCapture: verification.state.runtimeCapture,
     })
     try {
       const handoffId = `pwa_${Date.now()}`
