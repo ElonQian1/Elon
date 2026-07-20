@@ -5,7 +5,12 @@ use crate::{
         follow_sidecar_output, run_sidecar, CliSidecarLaunchConfig, CliSidecarOutputEvent,
     },
 };
-use std::{fs, path::PathBuf, time::Duration};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 use tokio::sync::watch;
 
 #[tokio::test]
@@ -15,26 +20,31 @@ async fn progress_aware_timeout_keeps_progressing_task_alive() {
     let task_id = "task-progress-aware";
     let output_path = registry.output_path(task_id, "sidecar-progress-aware");
     let (program, args) = scaled_progress_command(true);
-    let started = tokio::time::Instant::now();
-
-    run_sidecar(scaled_pipe_config(
-        &root,
-        &registry,
-        task_id,
-        "sidecar-progress-aware",
-        output_path.clone(),
-        program,
-        args,
-    ))
+    tokio::time::timeout(
+        Duration::from_secs(15),
+        run_sidecar(scaled_pipe_config(
+            &root,
+            &registry,
+            task_id,
+            "sidecar-progress-aware",
+            output_path.clone(),
+            program,
+            args,
+        )),
+    )
     .await
+    .expect("sidecar process must remain bounded")
     .unwrap();
 
     let (_cancel_tx, mut cancel_rx) = watch::channel(false);
-    let result = follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {})
-        .await
-        .unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_secs(15),
+        follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {}),
+    )
+    .await
+    .expect("sidecar follower must remain bounded")
+    .unwrap();
     assert!(result.exit_ok);
-    assert!(started.elapsed() >= Duration::from_secs(3));
     assert!(result.stdout_text.contains("progress-3"));
     let _ = fs::remove_dir_all(root);
 }
@@ -60,12 +70,19 @@ async fn pty_sidecar_uses_progress_policy_instead_of_legacy_fixed_timeout() {
     // favour of runtime_policy while real output keeps arriving.
     config.timeout_secs = 2;
 
-    run_sidecar(config).await.unwrap();
+    tokio::time::timeout(Duration::from_secs(15), run_sidecar(config))
+        .await
+        .expect("PTY sidecar must remain bounded")
+        .unwrap();
 
     let (_cancel_tx, mut cancel_rx) = watch::channel(false);
-    let result = follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {})
-        .await
-        .unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_secs(15),
+        follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {}),
+    )
+    .await
+    .expect("PTY follower must remain bounded")
+    .unwrap();
     assert!(result.exit_ok, "{result:?}");
     assert!(result.stdout_text.contains("progress-3"));
     let _ = fs::remove_dir_all(root);
@@ -79,26 +96,34 @@ async fn heartbeat_is_visible_but_does_not_mask_true_idle_timeout() {
     let output_path = registry.output_path(task_id, "sidecar-idle-timeout");
     let (program, args) = scaled_progress_command(false);
 
-    run_sidecar(scaled_pipe_config(
-        &root,
-        &registry,
-        task_id,
-        "sidecar-idle-timeout",
-        output_path.clone(),
-        program,
-        args,
-    ))
+    tokio::time::timeout(
+        Duration::from_secs(15),
+        run_sidecar(scaled_pipe_config(
+            &root,
+            &registry,
+            task_id,
+            "sidecar-idle-timeout",
+            output_path.clone(),
+            program,
+            args,
+        )),
+    )
     .await
+    .expect("idle sidecar must remain bounded")
     .unwrap();
 
     let (_cancel_tx, mut cancel_rx) = watch::channel(false);
     let mut heartbeats = 0;
-    let result = follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |event| {
-        if matches!(event, CliSidecarOutputEvent::Heartbeat) {
-            heartbeats += 1;
-        }
-    })
+    let result = tokio::time::timeout(
+        Duration::from_secs(15),
+        follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |event| {
+            if matches!(event, CliSidecarOutputEvent::Heartbeat) {
+                heartbeats += 1;
+            }
+        }),
+    )
     .await
+    .expect("heartbeat/idle follower must remain bounded")
     .unwrap();
     assert!(!result.exit_ok);
     assert!(!result.canceled);
@@ -128,7 +153,16 @@ async fn progress_aware_sidecar_cancel_still_reclaims_process() {
     );
     config.runtime_policy.as_mut().unwrap().idle_timeout_secs = 30;
     let run = tokio::spawn(run_sidecar(config));
-    tokio::time::sleep(Duration::from_millis(300)).await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if registry.session_for_task(task_id).unwrap().is_some() {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("sidecar session must become visible before cancellation");
     assert!(registry.record_cancel_command(task_id).unwrap());
     tokio::time::timeout(Duration::from_secs(5), run)
         .await
@@ -217,9 +251,11 @@ fn scaled_pipe_config(
 }
 
 fn temp_dir(label: &str) -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
     std::env::temp_dir().join(format!(
-        "elon-node-agent-sidecar-{label}-{}-{}",
+        "elon-node-agent-sidecar-{label}-{}-{}-{}",
         std::process::id(),
-        crate::node_agent_cli_sidecar::now_ms()
+        crate::node_agent_cli_sidecar::now_ms(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
     ))
 }

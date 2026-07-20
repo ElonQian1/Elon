@@ -18,6 +18,10 @@ param(
     [switch]$DisableSccache,
     [switch]$SkipCacheGc,
     [switch]$BypassValidationOrchestrator,
+    [switch]$Force,
+    [switch]$SkipCheapGates,
+    [int]$LightSlots = 2,
+    [int]$WaitTimeoutSeconds = 3600,
     [int]$LockTimeoutSeconds = 3600,
     [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
     [string[]]$CargoArgs = @()
@@ -39,6 +43,9 @@ if (-not $BypassValidationOrchestrator) {
     if ($CacheRoot) { $validationArgs += @("-CacheRoot", $CacheRoot) }
     if ($TargetDir) { $validationArgs += @("-TargetDir", $TargetDir) }
     if ($DisableSccache) { $validationArgs += "-DisableSccache" }
+    if ($Force) { $validationArgs += "-Force" }
+    if ($SkipCheapGates) { $validationArgs += "-SkipCheapGates" }
+    $validationArgs += @("-LightSlots", $LightSlots, "-WaitTimeoutSeconds", $WaitTimeoutSeconds)
     $validationArgs += $CargoArgs
     & (Join-Path $RepoRoot "scripts\validate-rust.ps1") @validationArgs
     exit $LASTEXITCODE

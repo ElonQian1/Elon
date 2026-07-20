@@ -1,0 +1,6 @@
+{
+  "schema": "elon.validation.policy.v1",
+  "heavy_verbs": ["test", "build", "bench", "install", "rustc"],
+  "heavy_flags": ["--release", "--all-targets"],
+  "agent_validation_domains": ["validation", "agent-validation"]
+}

@@ -1,6 +1,6 @@
 param(
     [string]$CacheRoot,
-    [string]$Domain = "dev-windows-msvc",
+    [string]$Domain = "agent-validation",
     [string]$TargetDir,
     [int]$WaitTimeoutSeconds = 3600,
     [int]$LightSlots = 2,
@@ -35,7 +35,7 @@ if (-not $SkipCheapGates) {
 
 $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $RepoRoot
 $stateRoot = Join-Path $root "validation-v1"
-$fingerprint = Get-ValidationFingerprint -RepoRoot $RepoRoot -CargoArgs $CargoArgs -Domain $Domain -TargetDir $TargetDir
+$fingerprint = Get-ValidationFingerprint -RepoRoot $RepoRoot -CargoArgs $CargoArgs -Domain $Domain -TargetDir $TargetDir -ExecutionOptions ([ordered]@{ disable_sccache=[bool]$DisableSccache; light_slots=$LightSlots })
 $resultDir = Join-Path $stateRoot ("evidence\" + $fingerprint.fingerprint)
 $summaryPath = Join-Path $resultDir "summary.json"
 $prior = if (Test-Path -LiteralPath $summaryPath) { try { Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json } catch { $null } } else { $null }
@@ -48,7 +48,7 @@ if (-not $Force -and $prior -and $prior.status -eq "success") {
 
 $runLease = $null; $resourceLease = $null
 try {
-    $runLease = Enter-ValidationLock -LockPath (Join-Path $resultDir ".run.lock") -Kind "fingerprint" -TimeoutSeconds $WaitTimeoutSeconds
+    $runLease = Enter-ValidationLock -LockPath (Join-Path $resultDir ".run.lock") -Kind "fingerprint" -TimeoutSeconds $WaitTimeoutSeconds -PersistWaiter
     $prior = if (Test-Path -LiteralPath $summaryPath) { try { Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json } catch { $null } } else { $null }
     if (-not $Force -and $prior -and $prior.status -eq "success") {
         Write-Host "VALIDATION_REUSED=coalesced_wait"
@@ -59,6 +59,7 @@ try {
     $class = Get-ValidationResourceClass -CargoArgs $CargoArgs
     $resourceLease = Enter-ValidationResource -StateRoot $stateRoot -Class $class -LightSlots $LightSlots -TimeoutSeconds $WaitTimeoutSeconds
     Write-Host "VALIDATION_OWNER_PID=$PID"
+    Write-Host "VALIDATION_OWNER_LEASE=$($runLease.owner.lease_id)"
     Write-Host "VALIDATION_RESOURCE=$class"
     Write-Host "VALIDATION_QUEUE_WAIT_MS=$($resourceLease.wait_ms)"
     $cargoDev = Join-Path $RepoRoot "scripts\cargo-dev.ps1"
@@ -69,7 +70,7 @@ try {
     $args += $CargoArgs
     Write-ValidationJsonAtomic -Path $summaryPath -Value ([ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint; status="running"
-        owner_pid=$PID; resource_class=$class; queue_wait_ms=$resourceLease.wait_ms; command=@($CargoArgs)
+        owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id; resource_class=$class; queue_wait_ms=$resourceLease.wait_ms; coalesced_waiters_path=(Join-Path $resultDir '.run.lock.waiters'); command=@($CargoArgs)
         fingerprint_inputs=$fingerprint.payload; started_utc=[DateTime]::UtcNow.ToString("o")
         stdout_path=(Join-Path $resultDir "stdout.log"); stderr_path=(Join-Path $resultDir "stderr.log")
     })
@@ -77,7 +78,7 @@ try {
     $summary = [ordered]@{
         schema="elon.validation.evidence.v1"; fingerprint=$fingerprint.fingerprint
         status=if ($result.exit_code -eq 0) { "success" } else { "failed" }
-        exit_code=$result.exit_code; resource_class=$class; owner_pid=$PID
+        exit_code=$result.exit_code; resource_class=$class; owner_pid=$PID; owner_lease=$runLease.owner.lease_id; owner_process_start_id=$runLease.owner.process_start_id
         queue_wait_ms=$resourceLease.wait_ms; command=@($CargoArgs); fingerprint_inputs=$fingerprint.payload
         started_utc=$result.started_utc; finished_utc=$result.finished_utc; duration_ms=$result.duration_ms
         stdout_path=$result.stdout_path; stderr_path=$result.stderr_path
@@ -91,7 +92,7 @@ try {
     foreach ($line in $result.tail) { Write-Host $line }
     if ($result.exit_code -ne 0) { exit $result.exit_code }
 } finally {
-    Exit-ValidationLock -Lease $resourceLease
+    Exit-ValidationResource -Lease $resourceLease
     Exit-ValidationLock -Lease $runLease
     Remove-ExpiredValidationEvidence -EvidenceRoot (Join-Path $stateRoot "evidence")
 }

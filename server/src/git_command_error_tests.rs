@@ -75,11 +75,12 @@ fn credential_challenge_fails_quickly_with_auditable_stderr() {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::process::Stdio;
-    use std::time::{Duration, Instant};
+    use std::sync::mpsc;
+    use std::time::Duration;
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind credential challenge server");
     let address = listener.local_addr().unwrap();
-    std::thread::spawn(move || {
+    let server = std::thread::spawn(move || {
         if let Ok((mut stream, _)) = listener.accept() {
             let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
             let mut request = [0_u8; 4096];
@@ -96,18 +97,31 @@ fn credential_challenge_fails_quickly_with_auditable_stderr() {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = command.spawn().expect("spawn non-interactive git");
-    let started = Instant::now();
-    loop {
-        if child.try_wait().unwrap().is_some() {
-            break;
+    let child_id = child.id();
+    let (done_tx, done_rx) = mpsc::channel();
+    let reaper = std::thread::spawn(move || {
+        if done_rx.recv_timeout(Duration::from_secs(8)).is_err() {
+            #[cfg(windows)]
+            let _ = Command::new("taskkill")
+                .args(["/PID", &child_id.to_string(), "/T", "/F"])
+                .status();
+            #[cfg(unix)]
+            let _ = Command::new("kill")
+                .args(["-KILL", &child_id.to_string()])
+                .status();
+            true
+        } else {
+            false
         }
-        if started.elapsed() > Duration::from_secs(8) {
-            let _ = child.kill();
-            panic!("credential challenge left background Git waiting for interaction");
-        }
-        std::thread::sleep(Duration::from_millis(25));
-    }
+    });
     let output = child.wait_with_output().unwrap();
+    let _ = done_tx.send(());
+    let timed_out = reaper.join().expect("credential watchdog");
+    server.join().expect("credential challenge server");
+    assert!(
+        !timed_out,
+        "credential challenge left background Git waiting for interaction"
+    );
     assert!(!output.status.success());
     assert!(
         !output.stderr.is_empty(),

@@ -1,5 +1,11 @@
 use super::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord};
-use std::{fs, io::Write, path::PathBuf, process::Command};
+use std::{
+    fs,
+    io::Write,
+    path::PathBuf,
+    process::Command,
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 #[test]
 fn sidecar_session_survives_registry_reload_and_accepts_recovered_approval() {
@@ -269,9 +275,11 @@ fn session(session_id: &str, task_id: &str) -> CliSidecarSessionRecord {
 }
 
 fn unique_test_dir(suffix: &str) -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
     std::env::temp_dir().join(format!(
-        "elon-cli-sidecar-test-{}-{}",
+        "elon-cli-sidecar-test-{}-{}-{}",
         std::process::id(),
-        suffix
+        suffix,
+        NEXT.fetch_add(1, Ordering::Relaxed)
     ))
 }

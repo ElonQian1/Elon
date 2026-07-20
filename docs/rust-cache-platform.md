@@ -171,7 +171,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 purge
 
 代理、Desktop cargo-dev 和 pre-push 使用 `scripts/validate-rust.ps1`。昂贵 Cargo 首次执行的完整 stdout、stderr、退出码、失败项和有界摘要写入 `<cache-root>/validation-v1/evidence/<fingerprint>/`；对话流截断不再成为重跑理由。相同成功指纹直接复用，相同运行中指纹合并等待；锁 owner PID 失效时可恢复。证据默认保留 14 天且最多 100 份，活动锁不会被回收。
 
-指纹覆盖 Git index、unstaged binary diff、untracked 文件内容、Cargo.lock、`rustc -vV`、domain 和规范化 Cargo 参数，所以可跨同项目 worktree 复用，同时 dirty/staged/untracked 或 feature/profile/target 任一变化都会隔离。轻量 check/clippy 最多两个机器槽；test/build/link/release 使用重型单槽，同 target 仍由原 build partition 锁串行。
+指纹覆盖 Git index、unstaged binary diff、untracked 文件内容、Cargo.lock、`.cargo/config*`、`rust-toolchain*`、`rustc -vV`、domain、TargetDir、执行选项和规范化 Cargo 参数。编译相关环境变量只保存值的 SHA-256，不持久化原值；无 origin 项目使用规范化根目录的哈希身份。
+
+调度锁使用随机 lease id、PID 与进程启动身份三元组；PID 被复用时旧锁失效，旧 owner 不能删除后继 lease。最多两个 light 验证并行；heavy 验证持有 heavy gate 并预留全部 light 槽，因此与所有 light/heavy 任务互斥。证据暴露 owner、waiter、queue wait 和 resource class。直接调用 `validate-rust.ps1` 默认使用 `agent-validation` domain；普通 `cargo-dev.ps1` 仍默认使用增量开发 domain，并完整转发验证参数。
 
 sccache 每轮明确输出 `SCCACHE_STATUS`、`SCCACHE_PATH`、命中/未命中统计或 `SCCACHE_DEGRADED_REASON`。缺失时继续必要验证，不联网安装；恢复方式是显式安装 sccache 后运行 `scripts/rust-cache.ps1 install -Apply`。`agent-validation` domain 和 release 设置 `CARGO_INCREMENTAL=0`，普通交互开发不改变 incremental。
 
