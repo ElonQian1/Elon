@@ -220,6 +220,104 @@ fn active_shared_bind_and_each_retry_require_exact_live_authorization() {
 }
 
 #[test]
+fn lease_less_node_shared_dispatch_accepts_exact_cloud_control_identity() {
+    let (store, path) = temp_store();
+    let provider = store
+        .create_user("node-share-provider@example.com", "secret1", None, None)
+        .unwrap();
+    let consumer = store
+        .create_user("node-share-consumer@example.com", "secret1", None, None)
+        .unwrap();
+    store
+        .billing_recharge(&consumer.id, 1_000, "test", "test", None)
+        .unwrap();
+    let compute_call_id = "pc_agent_cli:lease-less-node-share";
+    let node_id = "node-lease-less-share";
+    store
+        .reserve_billing_call(&BillingReservationRequest {
+            user_id: &consumer.id,
+            compute_call_id,
+            feature: "pc_agent_cli_chat",
+            usage_mode: "pc_agent_cli",
+            model: Some("pc-cli/codex"),
+            reserve_fen: 100,
+            bill_missing_balance: true,
+        })
+        .unwrap();
+    let held = store
+        .hold_billing_reservation_for_dispatch(&consumer.id, compute_call_id)
+        .unwrap()
+        .unwrap();
+    let deadline = held.expires_at.as_deref().unwrap();
+    store
+        .start_node_compute_run(NodeComputeRunStart {
+            compute_call_id,
+            consumer_user_id: &consumer.id,
+            provider_user_id: Some(&provider.id),
+            node_id,
+            model_id: Some("pc-cli/codex"),
+            feature: "pc_agent_cli_chat",
+            usage_mode: "pc_agent_cli",
+            route_reason: Some("public_dev_node_share"),
+        })
+        .unwrap();
+    store
+        .bind_node_compute_run_replay_policy(
+            compute_call_id,
+            NodeComputeReplayBinding {
+                billing_source: "shared_codex",
+                resource_owner_user_id: Some(&provider.id),
+                lease_id: None,
+                offline_policy: "require_active_reservation",
+                replay_deadline: Some(deadline),
+                max_cost_rmb_fen: held.reserved_fen,
+                allowance_id: Some(&held.reservation_id),
+            },
+        )
+        .unwrap()
+        .expect("lease-less node sharing should freeze its exact owner and reservation");
+
+    let authorized = store
+        .require_node_compute_run_dispatch_authorization(
+            compute_call_id,
+            node_id,
+            true,
+            Some(deadline),
+            None,
+        )
+        .expect("node-level sharing must dispatch before any vault lease is acquired");
+    assert_eq!(authorized.billing_source, "shared_codex");
+    assert_eq!(
+        authorized.resource_owner_user_id.as_deref(),
+        Some(provider.id.as_str())
+    );
+    assert!(authorized.lease_id.is_none());
+
+    {
+        let conn = store.conn().unwrap();
+        conn.execute(
+            "UPDATE node_compute_runs
+                SET resource_owner_user_id = NULL
+              WHERE compute_call_id = ?1",
+            [compute_call_id],
+        )
+        .unwrap();
+    }
+    assert!(store
+        .require_node_compute_run_dispatch_authorization(
+            compute_call_id,
+            node_id,
+            true,
+            Some(deadline),
+            None,
+        )
+        .is_err());
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
 fn revoke_cancels_unknown_dispatch_but_not_usage_verification_run() {
     let (store, path) = temp_store();
     let fixture = pending_shared_dispatch(&store, "revoke-unknown");

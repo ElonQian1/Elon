@@ -99,12 +99,12 @@ fn require_cloud_controlled_run(
             require_active_shared_lease(conn, run, lease_id, expected_provider_user_id, deadline)
         }
         None => {
-            if run.billing_source != "platform"
-                || run.lease_id.is_some()
-                || normalized(run.resource_owner_user_id.as_deref())
-                    != normalized(expected_provider_user_id)
+            let resource_owner_user_id = normalized(run.resource_owner_user_id.as_deref());
+            if run.lease_id.is_some()
+                || resource_owner_user_id != normalized(expected_provider_user_id)
+                || (run.billing_source == "shared_codex" && resource_owner_user_id.is_none())
             {
-                bail!("平台 PC CLI 派发携带了无效的共享租约身份");
+                bail!("无租约 PC CLI 派发携带了无效的资源 owner 或共享租约身份");
             }
             Ok(())
         }
