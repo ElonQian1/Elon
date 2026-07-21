@@ -241,7 +241,7 @@ fn same_path(left: &Path, right: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs, process::Command};
+    use std::fs;
 
     use homecli_proto::{CliCompletionEnvelope, CliCompletionProducerIdentity, CliProjectContext};
     use serde_json::json;
@@ -477,7 +477,7 @@ mod tests {
     }
 
     fn run(cwd: &Path, args: &[&str]) {
-        let result = Command::new("git")
+        let result = crate::git_command_error::git_command()
             .args(args)
             .current_dir(cwd)
             .output()
@@ -490,7 +490,7 @@ mod tests {
     }
 
     fn output(cwd: &Path, args: &[&str]) -> String {
-        let result = Command::new("git")
+        let result = crate::git_command_error::git_command()
             .args(args)
             .current_dir(cwd)
             .output()
