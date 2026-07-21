@@ -39,12 +39,19 @@ try {
   $commit = Invoke-Credential Commit
   if ($commit.status -ne 'committed') { throw 'commit did not activate the verifier' }
 
+  [byte[]]$reviewBytes = [Text.UTF8Encoding]::new($false).GetBytes('{"verdict":"accepted","summary":"钱一龙"}')
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try { $bodyHash = -join ($sha.ComputeHash($reviewBytes) | ForEach-Object { $_.ToString('x2') }) } finally { $sha.Dispose() }
   $ticket = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ticketScript `
-    -OwnerUserId 'owner-smoke' -TaskId 'task-smoke' -StateRoot $stateRoot -InstallRoot $installRoot
-  if ($LASTEXITCODE -ne 0 -or $ticket -notmatch '^v2\.') { throw 'Desktop signing smoke failed' }
+    -OwnerUserId 'owner-smoke' -TaskId 'task-smoke' -Method POST `
+    -EndpointPath '/api/local-tasks/task-smoke/supervision/desktop-review' -BodySha256 $bodyHash `
+    -StateRoot $stateRoot -InstallRoot $installRoot
+  if ($LASTEXITCODE -ne 0 -or $ticket -notmatch '^v3\.') { throw 'Desktop v3 signing smoke failed' }
   $ErrorActionPreference = 'Continue'
   $wrongRoot = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $ticketScript `
-    -OwnerUserId 'owner-smoke' -TaskId 'task-smoke' -StateRoot $stateRoot -InstallRoot (Join-Path $smokeRoot 'wrong-install') 2>&1 | Out-String
+    -OwnerUserId 'owner-smoke' -TaskId 'task-smoke' -Method POST `
+    -EndpointPath '/api/local-tasks/task-smoke/supervision/desktop-review' -BodySha256 $bodyHash `
+    -StateRoot $stateRoot -InstallRoot (Join-Path $smokeRoot 'wrong-install') 2>&1 | Out-String
   $wrongRootExit = $LASTEXITCODE
   $ErrorActionPreference = 'Stop'
   if ($wrongRootExit -eq 0 -or $wrongRoot -notmatch 'fail_closed') { throw 'explicit root mismatch did not fail closed' }
@@ -58,6 +65,9 @@ try {
   $publicLine = Get-Content -LiteralPath (Join-Path $installRoot '_internal\node-agent.env') |
     Where-Object { $_ -match '^ELON_DESKTOP_REVIEW_PUBLIC_KEYS=' }
   if (($publicLine -split ';').Count -ne 2) { throw 'rotation window did not retain two public keys' }
+  $nodeEnvLines = @(Get-Content -LiteralPath (Join-Path $installRoot '_internal\node-agent.env'))
+  if (-not @($nodeEnvLines | Where-Object { $_ -like 'ELON_DESKTOP_REVIEW_NONCE_LEDGER=*' }) -or
+      -not @($nodeEnvLines | Where-Object { $_ -eq 'ELON_DESKTOP_REVIEW_ALLOW_V2=0' })) { throw 'v3 verifier defaults are missing' }
   $rollback = Invoke-Credential Rollback
   if ($rollback.status -ne 'rolled_back') { throw 'rollback failed' }
   $rolledBackLine = Get-Content -LiteralPath (Join-Path $installRoot '_internal\node-agent.env') |

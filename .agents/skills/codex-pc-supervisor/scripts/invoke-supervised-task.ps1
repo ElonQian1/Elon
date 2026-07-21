@@ -34,6 +34,8 @@ param(
     [string]$ExpectedEvidenceDigest = '',
     [string]$StateRoot = '',
     [string]$InstallRoot = '',
+    [string]$DesktopReviewStateRoot = '',
+    [string]$DesktopReviewInstallRoot = '',
     [switch]$Compact
 )
 
@@ -181,6 +183,7 @@ function Invoke-Utf8JsonRequest {
         [string]$Uri,
         [System.Collections.IDictionary]$Headers,
         [object]$Body = $null,
+        [byte[]]$BodyBytes = $null,
         [int]$TimeoutSec = 15
     )
     $request = [System.Net.HttpWebRequest]::Create($Uri)
@@ -192,8 +195,8 @@ function Invoke-Utf8JsonRequest {
     foreach ($name in $Headers.Keys) {
         $request.Headers[[string]$name] = [string]$Headers[$name]
     }
-    if ($null -ne $Body) {
-        [byte[]]$requestBytes = Convert-ToUtf8JsonBytes $Body
+    if ($null -ne $Body -or $null -ne $BodyBytes) {
+        [byte[]]$requestBytes = if ($null -ne $BodyBytes) { $BodyBytes } else { Convert-ToUtf8JsonBytes $Body }
         $request.ContentType = 'application/json; charset=utf-8'
         $request.ContentLength = $requestBytes.Length
         $requestStream = $request.GetRequestStream()
@@ -318,6 +321,7 @@ function Invoke-NodeApi {
         [string]$Method,
         [string]$Path,
         [object]$Body = $null,
+        [byte[]]$BodyBytes = $null,
         [System.Collections.IDictionary]$ExtraHeaders = $null
     )
     $requestHeaders = @{ Origin = $Connection.BaseUrl }
@@ -328,61 +332,28 @@ function Invoke-NodeApi {
         }
     }
     Invoke-Utf8JsonRequest -Method $Method -Uri "$($Connection.BaseUrl)$Path" `
-        -Headers $requestHeaders -Body $Body -TimeoutSec 15
+        -Headers $requestHeaders -Body $Body -BodyBytes $BodyBytes -TimeoutSec 15
 }
 
 function New-DesktopReviewTicket {
-    param(
-        [string]$OwnerUserId,
-        [string]$RequestedTaskId,
-        [string]$ReviewStateRoot = '',
-        [string]$ReviewInstallRoot = ''
-    )
-    $v2Signer = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $null } else {
-        Join-Path $env:LOCALAPPDATA 'ElonNode\_internal\new-desktop-review-ticket.ps1'
+    param([string]$OwnerUserId, [string]$RequestedTaskId, [string]$Method, [string]$EndpointPath, [byte[]]$BodyBytes)
+    $stateRoot = if (-not [string]::IsNullOrWhiteSpace($DesktopReviewStateRoot)) { $DesktopReviewStateRoot } elseif (-not [string]::IsNullOrWhiteSpace($StateRoot)) { $StateRoot } else { [string]$env:ELON_DESKTOP_REVIEW_STATE_ROOT }
+    $installRoot = if (-not [string]::IsNullOrWhiteSpace($DesktopReviewInstallRoot)) { $DesktopReviewInstallRoot } elseif (-not [string]::IsNullOrWhiteSpace($InstallRoot)) { $InstallRoot } else { [string]$env:ELON_DESKTOP_REVIEW_INSTALL_ROOT }
+    if ([string]::IsNullOrWhiteSpace($stateRoot) -or [string]::IsNullOrWhiteSpace($installRoot)) {
+        throw 'desktop_review_paths_not_configured: set -DesktopReviewStateRoot/-DesktopReviewInstallRoot or ELON_DESKTOP_REVIEW_STATE_ROOT/ELON_DESKTOP_REVIEW_INSTALL_ROOT'
     }
-    if ($null -ne $v2Signer -and (Test-Path -LiteralPath $v2Signer -PathType Leaf)) {
-        # Presence of the v2 signer is an upgrade boundary: access denial must
-        # fail closed and must never downgrade to the legacy shared secret.
-        if ([string]::IsNullOrWhiteSpace($ReviewStateRoot) -or
-            [string]::IsNullOrWhiteSpace($ReviewInstallRoot)) {
-            throw 'Desktop review v2 requires explicit -StateRoot and -InstallRoot; implicit credential-root discovery is disabled.'
-        }
-        $ticket = & $v2Signer -OwnerUserId $OwnerUserId -TaskId $RequestedTaskId `
-            -StateRoot $ReviewStateRoot -InstallRoot $ReviewInstallRoot
+    $signer = Join-Path ([IO.Path]::GetFullPath($installRoot)) '_internal\new-desktop-review-ticket.ps1'
+    if (Test-Path -LiteralPath $signer -PathType Leaf) {
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $bodyHash = -join ($sha.ComputeHash($BodyBytes) | ForEach-Object { $_.ToString('x2') }) } finally { $sha.Dispose() }
+        $ticket = & $signer -OwnerUserId $OwnerUserId -TaskId $RequestedTaskId -Method $Method `
+            -EndpointPath $EndpointPath -BodySha256 $bodyHash -StateRoot $stateRoot -InstallRoot $installRoot
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$ticket)) {
-            throw 'Desktop review v2 signer is unavailable to this process identity.'
+            throw 'desktop_review_signer_unavailable: signer failed or private key/ACL is inaccessible'
         }
         return [string]$ticket
     }
-    return New-LegacyDesktopReviewTicket $OwnerUserId $RequestedTaskId
-}
-
-function New-LegacyDesktopReviewTicket {
-    param([string]$OwnerUserId, [string]$RequestedTaskId)
-    $credential = [string]$env:ELON_DESKTOP_REVIEW_CREDENTIAL
-    if ([string]::IsNullOrWhiteSpace($credential) -or $credential.Trim().Length -lt 32) {
-        throw 'Desktop review credential is unavailable; review fails closed.'
-    }
-    if ([string]::IsNullOrWhiteSpace($OwnerUserId) -or
-        $OwnerUserId.Contains("`n") -or $OwnerUserId.Contains("`r") -or
-        [string]::IsNullOrWhiteSpace($RequestedTaskId) -or
-        $RequestedTaskId.Contains("`n") -or $RequestedTaskId.Contains("`r")) {
-        throw 'Desktop review ticket identity is invalid.'
-    }
-    $expiresAt = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 120
-    $nonce = [guid]::NewGuid().ToString('N')
-    $message = "v1`n$OwnerUserId`n$RequestedTaskId`n$expiresAt`n$nonce"
-    [byte[]]$keyBytes = $script:Utf8NoBomStrict.GetBytes($credential.Trim())
-    [byte[]]$messageBytes = $script:Utf8NoBomStrict.GetBytes($message)
-    $hmac = [System.Security.Cryptography.HMACSHA256]::new($keyBytes)
-    try {
-        [byte[]]$digest = $hmac.ComputeHash($messageBytes)
-    } finally {
-        $hmac.Dispose()
-    }
-    $signature = -join ($digest | ForEach-Object { $_.ToString('x2') })
-    return "v1.$expiresAt.$nonce.$signature"
+    throw 'desktop_review_signer_missing: configured InstallRoot does not contain the signer'
 }
 
 function Get-CloudProjectsPath {
@@ -753,13 +724,15 @@ switch ($Action) {
         Assert-NodeSupervisionAnyCapability $nodeConnection $script:DesktopReviewCapabilities 'Desktop Review'
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
         $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
+        [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
+        $reviewPath = "/api/local-tasks/$encodedTaskId/supervision/desktop-review"
         $detail = Get-TaskDetail $nodeConnection $TaskId 1
         $record = Get-RecordFromDetail $detail
         $ownerUserId = [string](Get-ObjectField $record 'owner_user_id')
-        $ticket = New-DesktopReviewTicket $ownerUserId $TaskId.Trim() $StateRoot $InstallRoot
-        $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/desktop-review" `
-            $reviewBody @{ 'x-elon-desktop-review-ticket' = $ticket }
+        $ticket = New-DesktopReviewTicket $ownerUserId $TaskId.Trim() 'POST' $reviewPath $reviewBytes
+        $response = Invoke-NodeApi -Connection $nodeConnection -Method 'Post' -Path $reviewPath `
+            -BodyBytes $reviewBytes -ExtraHeaders @{ 'x-elon-desktop-review-ticket' = $ticket }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Review'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId; verdict = $Verdict; response = $response

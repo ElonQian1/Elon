@@ -190,24 +190,18 @@ function Invoke-SupervisionSelfTest {
     } catch {
         $invalidDeltaRejected = $true
     }
-    $priorDesktopCredential = [Environment]::GetEnvironmentVariable('ELON_DESKTOP_REVIEW_CREDENTIAL')
+    $priorStateRoot = $env:ELON_DESKTOP_REVIEW_STATE_ROOT
+    $priorInstallRoot = $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT
+    $desktopPathsRejected = $false
     try {
-        $env:ELON_DESKTOP_REVIEW_CREDENTIAL = 'desktop-self-test-credential-at-least-32-bytes'
-        $desktopTicket = New-LegacyDesktopReviewTicket 'owner-self-test' 'local-self-test'
-        $v2MissingRootsRejected = $true
-        $installedV2Signer = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $null } else {
-            Join-Path $env:LOCALAPPDATA 'ElonNode\_internal\new-desktop-review-ticket.ps1'
-        }
-        if ($null -ne $installedV2Signer -and (Test-Path -LiteralPath $installedV2Signer -PathType Leaf)) {
-            try {
-                $null = New-DesktopReviewTicket 'owner-self-test' 'local-self-test'
-                $v2MissingRootsRejected = $false
-            } catch {
-                $v2MissingRootsRejected = $_.Exception.Message -like '*explicit -StateRoot and -InstallRoot*'
-            }
-        }
+        $env:ELON_DESKTOP_REVIEW_STATE_ROOT = ''
+        $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT = ''
+        $null = New-DesktopReviewTicket 'owner-self-test' 'local-self-test' 'POST' '/api/local-tasks/local-self-test/supervision/desktop-review' $reviewBytes
+    } catch {
+        $desktopPathsRejected = $_.Exception.Message -like 'desktop_review_paths_not_configured:*'
     } finally {
-        [Environment]::SetEnvironmentVariable('ELON_DESKTOP_REVIEW_CREDENTIAL', $priorDesktopCredential)
+        $env:ELON_DESKTOP_REVIEW_STATE_ROOT = $priorStateRoot
+        $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT = $priorInstallRoot
     }
     $criteriaFile = Join-Path ([System.IO.Path]::GetTempPath()) "elon-supervision-criteria-$([guid]::NewGuid().ToString('N')).json"
     try {
@@ -251,8 +245,7 @@ function Invoke-SupervisionSelfTest {
         protocol = $script:SupervisionProtocol -eq 'elon.desktop_pc_supervision.v1'
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
         expected_cursor_epoch_path = $testEpochPath -eq '/api/local-tasks/local-test%3Fid?since=42&limit=25&expected_cursor_epoch=journal%3Aa%2Fb%3Fc'
-        desktop_review_ticket = $desktopTicket -match '^v1\.[0-9]+\.[0-9a-f]{32}\.[0-9a-f]{64}$'
-        desktop_review_v2_explicit_roots = $v2MissingRootsRejected
+        desktop_review_paths_fail_closed = $desktopPathsRejected
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
@@ -288,8 +281,7 @@ function Invoke-SupervisionSelfTest {
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
-            'expected_cursor_epoch_handshake', 'desktop_review_short_lived_ticket',
-            'desktop_review_v2_explicit_roots',
+            'expected_cursor_epoch_handshake', 'desktop_review_paths_fail_closed',
             'inspect_wait_active_runtime', 'compact_delta_evidence_digest',
             'compact_delta_no_loss_or_duplicate', 'compact_delta_invalid_epoch_rejected',
             'compact_delta_omits_unchanged_state_and_evidence',

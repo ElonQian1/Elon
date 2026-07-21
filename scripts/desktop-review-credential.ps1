@@ -74,7 +74,7 @@ function Public-Record([Security.Cryptography.X509Certificates.X509Certificate2]
   $fingerprint = [Security.Cryptography.SHA256]::Create().ComputeHash($p.Modulus)
   $keyId = -join ($fingerprint[0..7] | ForEach-Object { $_.ToString('x2') })
   [pscustomobject]@{
-    schema=2; key_id=$keyId; thumbprint=$Cert.Thumbprint
+    schema=3; key_id=$keyId; thumbprint=$Cert.Thumbprint
     public_value=($keyId + ':' + [Convert]::ToBase64String($p.Modulus) + ':' + [Convert]::ToBase64String($p.Exponent))
     key_file=(Get-KeyFile $Cert); desktop_sid=$DesktopIdentitySid; executor_sid=$ExecutorIdentitySid
     state_root=$StateRoot; install_root=$InstallRoot; certificate_store=$CertificateStoreLocation
@@ -91,8 +91,10 @@ function Write-JsonAtomic([string]$Path, [object]$Value) {
 }
 function Set-PublicValues([string[]]$Values) {
   $lines = if (Test-Path -LiteralPath $envPath) { @(Get-Content -LiteralPath $envPath) } else { @() }
-  $lines = @($lines | Where-Object { $_ -notmatch '^\s*ELON_DESKTOP_REVIEW_(CREDENTIAL|PUBLIC_KEYS)=' })
+  $lines = @($lines | Where-Object { $_ -notmatch '^\s*ELON_DESKTOP_REVIEW_(CREDENTIAL|PUBLIC_KEYS|NONCE_LEDGER|ALLOW_V2)=' })
   $lines += 'ELON_DESKTOP_REVIEW_PUBLIC_KEYS=' + ($Values -join ';')
+  $lines += 'ELON_DESKTOP_REVIEW_NONCE_LEDGER=' + (Join-Path $InstallRoot '_internal\desktop-review-nonces.json')
+  $lines += 'ELON_DESKTOP_REVIEW_ALLOW_V2=0'
   $tmp = $envPath + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
   $parent = Split-Path -Parent $envPath
   if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
@@ -100,7 +102,7 @@ function Set-PublicValues([string[]]$Values) {
   Move-Item -LiteralPath $tmp -Destination $envPath -Force
 }
 function Assert-State([object]$State) {
-  if (-not $State -or $State.schema -ne 2) { throw 'credential state schema is unsupported' }
+  if (-not $State -or $State.schema -notin @(2,3)) { throw 'credential state schema is unsupported' }
   if ([IO.Path]::GetFullPath([string]$State.state_root) -ne $StateRoot -or
       [IO.Path]::GetFullPath([string]$State.install_root) -ne $InstallRoot -or
       [string]$State.certificate_store -ne $CertificateStoreLocation) {

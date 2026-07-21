@@ -21,6 +21,7 @@ use std::{
 
 use anyhow::Context;
 use axum::{
+    body::Bytes,
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
@@ -370,14 +371,51 @@ async fn desktop_review_task(
     State(runtime): State<Arc<NodeRuntime>>,
     Path(task_id): Path<String>,
     headers: HeaderMap,
-    Json(request): Json<SupervisionReviewRequest>,
+    body: Bytes,
 ) -> Response {
-    review_task_as(runtime, task_id, request, ReviewChannel::Desktop(headers)).await
+    let endpoint_path = crate::node_agent_desktop_review_auth::endpoint_path(task_id.trim());
+    let Some(creds) = runtime.creds().await else {
+        return json_error(
+            StatusCode::UNAUTHORIZED,
+            "本机节点尚未绑定账号，不能提交监督结论。",
+        );
+    };
+    if let Err(error) = runtime.desktop_review_auth.verify_and_consume(
+        &headers,
+        &creds.owner_user_id,
+        task_id.trim(),
+        "POST",
+        &endpoint_path,
+        &body,
+    ) {
+        let (status, message) = match error {
+            crate::node_agent_desktop_review_auth::DesktopReviewAuthError::NotConfigured => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "desktop_review_not_configured",
+            ),
+            crate::node_agent_desktop_review_auth::DesktopReviewAuthError::LedgerUnavailable => (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "desktop_review_nonce_ledger_unavailable",
+            ),
+            crate::node_agent_desktop_review_auth::DesktopReviewAuthError::Replayed => {
+                (StatusCode::UNAUTHORIZED, "desktop_review_ticket_replayed")
+            }
+            _ => (StatusCode::UNAUTHORIZED, "desktop_review_ticket_invalid"),
+        };
+        return json_error(status, message);
+    }
+    let request = match serde_json::from_slice::<SupervisionReviewRequest>(&body) {
+        Ok(request) => request,
+        Err(_) => return json_error(StatusCode::BAD_REQUEST, "desktop_review_body_invalid"),
+    };
+    review_task_as(runtime, task_id, request, ReviewChannel::VerifiedDesktop).await
 }
 
 enum ReviewChannel {
     PcOperator,
+    #[cfg(test)]
     Desktop(HeaderMap),
+    VerifiedDesktop,
 }
 
 fn resolve_review_identity(
@@ -391,6 +429,14 @@ fn resolve_review_identity(
             format!("pc_operator:{owner_user_id}"),
             "local_pc_api".to_string(),
         )),
+        ReviewChannel::VerifiedDesktop => {
+            let _ = (auth, task_id);
+            Ok((
+                format!("{DEFAULT_SUPERVISOR}:{owner_user_id}"),
+                "codex_desktop_helper".to_string(),
+            ))
+        }
+        #[cfg(test)]
         ReviewChannel::Desktop(headers) => {
             auth.verify_headers(&headers, owner_user_id, task_id)?;
             Ok((
