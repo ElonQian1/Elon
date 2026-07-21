@@ -5,7 +5,7 @@
 //! remain held while a reviewer is unavailable. Dirty worktrees are never
 //! removed here; normal cleanup keeps preserving unknown changes.
 
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{future::Future, path::Path, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use serde_json::json;
@@ -112,25 +112,14 @@ async fn workspace_has_live_or_nonterminal_occupant(
         ) {
             continue;
         }
-        if durable_nonterminal_occupant_blocks_release(
-            candidate_task_id,
-            &occupant.task_id,
-            &occupant.status,
-        ) {
-            return Ok(true);
-        }
-        if runtime
-            .cli_sidecars
-            .session_for_task(&occupant.task_id)?
-            .is_some_and(|session| session.is_live_at(crate::node_agent_cli_sidecar::now_ms()))
-        {
+        if durable_occupant_blocks_release(candidate_task_id, &occupant.task_id, &occupant.status) {
             return Ok(true);
         }
     }
     Ok(false)
 }
 
-fn durable_nonterminal_occupant_blocks_release(
+fn durable_occupant_blocks_release(
     candidate_task_id: &str,
     occupant_task_id: &str,
     occupant_status: &str,
@@ -178,14 +167,9 @@ pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
 }
 
 pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(30));
-        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        // Startup performs an explicit pass after recovery. Avoid duplicating it
-        // on the interval's immediate first tick.
-        interval.tick().await;
-        loop {
-            interval.tick().await;
+    spawn_reconciler_loop(Duration::from_secs(30), move || {
+        let runtime = runtime.clone();
+        async move {
             if let Err(error) = reconcile_all(&runtime).await {
                 warn!(%error, "periodic terminal supervision lease reconciliation failed");
             }
@@ -193,6 +177,21 @@ pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
     });
 }
 
+fn spawn_reconciler_loop<F, Fut>(
+    interval: Duration,
+    mut reconcile: F,
+) -> tokio::task::JoinHandle<()>
+where
+    F: FnMut() -> Fut + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    tokio::spawn(async move {
+        loop {
+            reconcile().await;
+            tokio::time::sleep(interval).await;
+        }
+    })
+}
 fn terminal_release_eligible(
     status: &str,
     cancel_side_effect_committed: bool,
@@ -374,19 +373,19 @@ mod tests {
     }
 
     #[test]
-    fn running_descendant_on_same_workspace_blocks_parent_release() {
+    fn only_nonterminal_descendants_block_parent_release() {
         let fixture = GitFixture::new();
-        assert!(durable_nonterminal_occupant_blocks_release(
+        assert!(durable_occupant_blocks_release(
             "terminal-parent",
             "running-child",
             "running",
         ));
-        assert!(!durable_nonterminal_occupant_blocks_release(
+        assert!(!durable_occupant_blocks_release(
             "terminal-parent",
             "finished-sibling",
             "done",
         ));
-        assert!(!durable_nonterminal_occupant_blocks_release(
+        assert!(!durable_occupant_blocks_release(
             "terminal-parent",
             "terminal-parent",
             "running",
@@ -397,6 +396,49 @@ mod tests {
             &fixture.active.join("server")
         ));
         assert!(!workspace_contains(&fixture.active, &fixture.base));
+    }
+
+    #[tokio::test]
+    async fn slow_initial_reconcile_stays_background_and_retries() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio::sync::Notify;
+
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let handle = spawn_reconciler_loop(Duration::from_millis(10), {
+            let attempts = attempts.clone();
+            let started = started.clone();
+            let release = release.clone();
+            move || {
+                let attempts = attempts.clone();
+                let started = started.clone();
+                let release = release.clone();
+                async move {
+                    if attempts.fetch_add(1, Ordering::SeqCst) == 0 {
+                        started.notify_one();
+                        release.notified().await;
+                    }
+                }
+            }
+        });
+
+        tokio::time::timeout(Duration::from_millis(100), started.notified())
+            .await
+            .expect("startup reconciliation should begin immediately in the background");
+        assert!(
+            !handle.is_finished(),
+            "a slow pass must not block its caller"
+        );
+        release.notify_one();
+        tokio::time::timeout(Duration::from_millis(250), async {
+            while attempts.load(Ordering::SeqCst) < 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the reconciler should retry after the initial slow pass");
+        handle.abort();
     }
 
     struct GitFixture {

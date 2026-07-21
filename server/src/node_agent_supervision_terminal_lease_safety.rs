@@ -166,17 +166,36 @@ async fn lineage_or_workspace_is_active(
     }
     let now = crate::node_agent_cli_sidecar::now_ms();
     for sidecar in runtime.cli_sidecars.all_sessions()? {
-        if sidecar.is_live_at(now)
-            && (sidecar
-                .cwd
-                .as_deref()
-                .is_some_and(|cwd| workspace_contains(active, Path::new(cwd)))
-                || task_contract_has_root(runtime, &sidecar.task_id, root_task_id)?)
-        {
+        let shares_workspace_or_root = sidecar
+            .cwd
+            .as_deref()
+            .is_some_and(|cwd| workspace_contains(active, Path::new(cwd)))
+            || task_contract_has_root(runtime, &sidecar.task_id, root_task_id)?;
+        let sidecar_task = runtime.local_tasks.get(&sidecar.task_id)?;
+        if sidecar_metadata_blocks_release(
+            current_task_id,
+            &sidecar.task_id,
+            sidecar_task.as_ref().map(|task| task.status.as_str()),
+            sidecar.is_live_at(now),
+            shares_workspace_or_root,
+        ) {
             return Ok(true);
         }
     }
     Ok(false)
+}
+
+fn sidecar_metadata_blocks_release(
+    current_task_id: &str,
+    sidecar_task_id: &str,
+    sidecar_task_status: Option<&str>,
+    sidecar_is_live: bool,
+    shares_workspace_or_root: bool,
+) -> bool {
+    sidecar_is_live
+        && shares_workspace_or_root
+        && sidecar_task_id != current_task_id
+        && sidecar_task_status.is_none_or(|status| !is_terminal(status))
 }
 
 fn candidate_blocks_release(
@@ -362,6 +381,38 @@ mod tests {
             active,
         )
         .is_err());
+    }
+
+    #[test]
+    fn terminal_sidecar_metadata_does_not_outlive_execution_ownership() {
+        assert!(!sidecar_metadata_blocks_release(
+            "terminal-parent",
+            "terminal-parent",
+            Some("done"),
+            true,
+            true,
+        ));
+        assert!(!sidecar_metadata_blocks_release(
+            "terminal-parent",
+            "terminal-sibling",
+            Some("failed"),
+            true,
+            true,
+        ));
+        assert!(sidecar_metadata_blocks_release(
+            "terminal-parent",
+            "running-descendant",
+            Some("running"),
+            true,
+            true,
+        ));
+        assert!(sidecar_metadata_blocks_release(
+            "terminal-parent",
+            "unknown-live-task",
+            None,
+            true,
+            true,
+        ));
     }
 
     fn descendant(root: &str) -> SupervisionContract {

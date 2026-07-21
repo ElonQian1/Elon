@@ -570,7 +570,7 @@ async fn run_cli_task(
             return;
         }
     }
-    drop(resume_admission);
+    drop(resume_admission); // Active registry now owns CLI-lifetime exclusion.
     if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
     {
         send_preflight_failure(

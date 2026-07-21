@@ -349,4 +349,37 @@ mod tests {
         drop(first);
         let _ = std::fs::remove_dir_all(root);
     }
+
+    #[test]
+    fn resume_admission_ends_before_cli_lifecycle_finishes() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-resume-admission-lifecycle-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let output = git_command()
+            .arg("init")
+            .current_dir(&root)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+
+        let first = ResumeAdmissionGuard::acquire(&root).unwrap();
+        let (registered_tx, registered_rx) = std::sync::mpsc::channel();
+        let (finish_tx, finish_rx) = std::sync::mpsc::channel();
+        let lifecycle = std::thread::spawn(move || {
+            registered_tx.send(()).unwrap();
+            drop(first);
+            finish_rx.recv().unwrap();
+        });
+
+        registered_rx.recv().unwrap();
+        let concurrent = ResumeAdmissionGuard::acquire(&root)
+            .expect("another process may enter admission while the registered CLI is still alive");
+        assert!(!lifecycle.is_finished());
+        drop(concurrent);
+        finish_tx.send(()).unwrap();
+        lifecycle.join().unwrap();
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

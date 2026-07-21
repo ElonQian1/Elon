@@ -431,6 +431,12 @@ async fn run_agent_runtime() -> Result<()> {
         node_data_root,
         install_id,
     ));
+    // Bind the local management endpoint before any startup reconciliation.
+    // Large stale-task inventories must not make the watchdog mistake a
+    // healthy new runtime for a failed launch.
+    let admin_port = node_agent_admin_open::admin_port_from_env();
+    spawn_admin_server(runtime.clone(), admin_port).await;
+    node_agent_supervision_terminal_lease::spawn_reconciler(runtime.clone());
     if let Err(error) = node_agent_cli_worker::cleanup_terminal_workers(&runtime.cli_sidecars) {
         warn!(%error, "清理已终态版本化 CLI worker 失败，保留旧 worker 继续启动");
     }
@@ -440,9 +446,6 @@ async fn run_agent_runtime() -> Result<()> {
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
-    if let Err(error) = node_agent_supervision_terminal_lease::reconcile_all(&runtime).await {
-        warn!(%error, "启动时回收终态监督 worktree lease 失败，交由周期维护重试");
-    }
     node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
     if let Err(error) = runtime
         .update_recovery
@@ -452,10 +455,7 @@ async fn run_agent_runtime() -> Result<()> {
     }
     runtime.spawn_lifecycle_heartbeat();
     node_agent_cancel_saga::spawn_reconciler(runtime.clone());
-    node_agent_supervision_terminal_lease::spawn_reconciler(runtime.clone());
     node_agent_self_evolution::spawn_scheduler(runtime.clone());
-    let admin_port = node_agent_admin_open::admin_port_from_env();
-    spawn_admin_server(runtime.clone(), admin_port);
     project_document_maintenance::spawn_maintenance_worker();
     node_agent_shared_android_devices::spawn(runtime.clone());
     node_agent_admin_open::maybe_open_admin_page(admin_port);

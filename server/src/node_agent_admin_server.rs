@@ -23,8 +23,15 @@ use super::{
     project_workspace_inspect, windows_doctor, NodeRuntime,
 };
 
-pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
+pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
+    let listener = match tokio::net::TcpListener::bind(addr).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            warn!("admin server 无法监听 {addr}: {e}");
+            return;
+        }
+    };
     tokio::spawn(async move {
         let cors = node_agent_local_admin::cors_layer(&runtime.cfg.cloud_http_url);
         let local_admin_guard = axum::middleware::from_fn_with_state(
@@ -180,14 +187,9 @@ pub(super) fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .with_state(runtime)
             .layer(cors)
             .layer(node_agent_local_admin::private_network_header_layer());
-        match tokio::net::TcpListener::bind(addr).await {
-            Ok(listener) => {
-                info!("🖥️  本地 PC 工作台: http://127.0.0.1:{}/pc", port);
-                if let Err(e) = axum::serve(listener, app).await {
-                    warn!("admin server 退出: {e}");
-                }
-            }
-            Err(e) => warn!("admin server 无法监听 {addr}: {e}"),
+        info!("🖥️  本地 PC 工作台: http://127.0.0.1:{}/pc", port);
+        if let Err(e) = axum::serve(listener, app).await {
+            warn!("admin server 退出: {e}");
         }
     });
 }
