@@ -305,7 +305,7 @@ fn review_routes_enforce_desktop_ticket_and_server_owned_actor() {
     assert_eq!(operator.0, "pc_operator:owner-route-a");
     assert_ne!(operator.0, "codex_desktop:owner-route-a");
     assert_eq!(
-        resolve_review_identity(ReviewChannel::Desktop(HeaderMap::new()), &auth, owner, task),
+        auth.verify_headers(&HeaderMap::new(), owner, task),
         Err(DesktopReviewAuthError::Missing)
     );
 
@@ -317,14 +317,15 @@ fn review_routes_enforce_desktop_ticket_and_server_owned_actor() {
             .unwrap(),
     );
     assert_eq!(
-        resolve_review_identity(ReviewChannel::Desktop(wrong), &auth, owner, task),
+        auth.verify_headers(&wrong, owner, task),
         Err(DesktopReviewAuthError::Invalid)
     );
 
     let mut correct = HeaderMap::new();
     correct.insert(DESKTOP_REVIEW_TICKET_HEADER, ticket.parse().unwrap());
+    auth.verify_headers(&correct, owner, task).unwrap();
     let desktop =
-        resolve_review_identity(ReviewChannel::Desktop(correct), &auth, owner, task).unwrap();
+        resolve_review_identity(ReviewChannel::VerifiedDesktop, &auth, owner, task).unwrap();
     assert_eq!(desktop.0, "codex_desktop:owner-route-a");
     assert_eq!(desktop.1, "codex_desktop_helper");
 }

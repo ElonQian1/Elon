@@ -413,8 +413,6 @@ async fn desktop_review_task(
 
 enum ReviewChannel {
     PcOperator,
-    #[cfg(test)]
-    Desktop(HeaderMap),
     VerifiedDesktop,
 }
 
@@ -431,14 +429,6 @@ fn resolve_review_identity(
         )),
         ReviewChannel::VerifiedDesktop => {
             let _ = (auth, task_id);
-            Ok((
-                format!("{DEFAULT_SUPERVISOR}:{owner_user_id}"),
-                "codex_desktop_helper".to_string(),
-            ))
-        }
-        #[cfg(test)]
-        ReviewChannel::Desktop(headers) => {
-            auth.verify_headers(&headers, owner_user_id, task_id)?;
             Ok((
                 format!("{DEFAULT_SUPERVISOR}:{owner_user_id}"),
                 "codex_desktop_helper".to_string(),
