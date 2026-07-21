@@ -202,6 +202,12 @@ pub(crate) async fn verify(
                 next.push(json!("ui_write_cross_platform_verification"));
             }
         }
+    } else if super::capability_requirements::task_is_launcher_only(Some(&task)) {
+        gates.push(json!({
+            "gate":"CROSS_PLATFORM_VISUAL_PARITY",
+            "status":"NOT_APPLICABLE",
+            "reason":"LAUNCHER_ONLY_NO_WEB_SURFACE",
+        }));
     } else {
         gates.push(json!({
             "gate":"CROSS_PLATFORM_VISUAL_PARITY",
@@ -284,7 +290,7 @@ fn completion_result(
 fn strict_gate_passed(gate: &Value) -> bool {
     matches!(
         gate.get("status").and_then(Value::as_str),
-        Some("PASSED" | "NOT_REQUIRED" | "NOT_REQUIRED_WITHOUT_CLEAN_TARGET")
+        Some("PASSED" | "NOT_APPLICABLE" | "NOT_REQUIRED" | "NOT_REQUIRED_WITHOUT_CLEAN_TARGET")
     )
 }
 
@@ -496,5 +502,12 @@ mod tests {
         assert!(!business_gate_passed(
             &json!({"status":"MISSING_ACCEPTED_RUN"})
         ));
+    }
+
+    #[test]
+    fn not_applicable_gate_is_complete() {
+        let gate = json!({"status":"NOT_APPLICABLE"});
+        assert!(strict_gate_passed(&gate));
+        assert!(business_gate_passed(&gate));
     }
 }

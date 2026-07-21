@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use image::{DynamicImage, GenericImageView, ImageFormat};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::node_agent_android_inspector::adb_capture::capture_screen_png;
@@ -31,6 +31,45 @@ pub(crate) struct LiveFrameArtifact {
     pub(crate) full_frame_height: u32,
     pub(crate) rect: PixelRect,
     pub(crate) captured_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ReusableFrameArtifact {
+    pub(crate) source: String,
+    pub(crate) path: String,
+    pub(crate) sha256: String,
+}
+
+pub(crate) fn validate_launcher_crop_artifact(
+    session: &LiveUiSession,
+    artifact: &ReusableFrameArtifact,
+) -> Result<PathBuf> {
+    if artifact.source != "ANDROID_LAUNCHER" {
+        bail!("currentArtifact.source 必须是 ANDROID_LAUNCHER");
+    }
+    if artifact.sha256.len() != 64 || !artifact.sha256.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        bail!("currentArtifact.sha256 非法");
+    }
+    let root = frame_root(session)?
+        .canonicalize()
+        .context("Live Frame 工件目录不存在")?;
+    let path = PathBuf::from(&artifact.path)
+        .canonicalize()
+        .context("currentArtifact.path 不存在")?;
+    if !path.starts_with(&root) || !path.is_file() {
+        bail!("currentArtifact 必须来自当前 Live UI session");
+    }
+    let expected_name = format!("launcher-{}.png", artifact.sha256.to_ascii_lowercase());
+    if path.file_name().and_then(|value| value.to_str()) != Some(expected_name.as_str()) {
+        bail!("currentArtifact 不是 Launcher crop 工件");
+    }
+    let bytes = read_bounded_image(path.to_string_lossy().as_ref())?;
+    validated_image_dimensions(&bytes)?;
+    if sha256_bytes(&bytes) != artifact.sha256.to_ascii_lowercase() {
+        bail!("currentArtifact SHA-256 不匹配");
+    }
+    Ok(path)
 }
 
 pub(crate) async fn capture_latest_frame_artifact(
@@ -365,6 +404,43 @@ mod tests {
         let error =
             persist_target_crop_artifact(&session, target.to_str().unwrap(), None).unwrap_err();
         assert!(format!("{error:#}").contains("大小必须"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[tokio::test]
+    async fn reuses_only_integrity_checked_launcher_crop_from_same_session() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-launcher-artifact-reuse-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let broker = LiveUiBroker::new();
+        let session = broker
+            .create_session(
+                "device-1".to_string(),
+                "com.example.debug".to_string(),
+                Some(root.display().to_string()),
+                38917,
+            )
+            .await;
+        let artifact = persist_launcher_surface_artifact(
+            &session,
+            &test_png(40, 30),
+            Some(PixelRect {
+                left: 5,
+                top: 6,
+                right: 25,
+                bottom: 18,
+            }),
+        )
+        .unwrap();
+        let reusable: ReusableFrameArtifact =
+            serde_json::from_value(serde_json::to_value(&artifact).unwrap()).unwrap();
+        assert!(validate_launcher_crop_artifact(&session, &reusable).is_ok());
+
+        let mut tampered = reusable.clone();
+        tampered.sha256 = "0".repeat(64);
+        assert!(validate_launcher_crop_artifact(&session, &tampered).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 }

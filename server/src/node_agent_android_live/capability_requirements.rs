@@ -87,7 +87,9 @@ fn derive_capabilities(task: Option<&Value>, profile: Option<&Value>) -> (Vec<St
         .and_then(|value| value.pointer("/task/task/request"))
         .and_then(Value::as_str)
         .unwrap_or_default();
-    if profile_requires_apk_web_parity(profile) || request_requires_cross_platform_parity(request) {
+    if request_requires_cross_platform_parity(request)
+        || (profile_requires_apk_web_parity(profile) && !task_is_launcher_only(task))
+    {
         required.push("CROSS_PLATFORM_STYLE_WRITEBACK");
         reasons.push(json!({
             "reason": if profile_requires_apk_web_parity(profile) {
@@ -113,6 +115,31 @@ fn derive_capabilities(task: Option<&Value>, profile: Option<&Value>) -> (Vec<St
         normalize_capabilities(&required.into_iter().map(str::to_string).collect::<Vec<_>>()),
         reasons,
     )
+}
+
+pub(super) fn task_is_launcher_only(task: Option<&Value>) -> bool {
+    let request = task
+        .and_then(|value| value.pointer("/task/task/request"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_lowercase();
+    if request_requires_cross_platform_parity(&request) {
+        return false;
+    }
+    let launcher_marker = [
+        "launcher",
+        "app icon",
+        "application icon",
+        "adaptive icon",
+        "启动器图标",
+        "桌面图标",
+        "应用图标",
+        "自适应图标",
+    ]
+    .iter()
+    .any(|marker| request.contains(marker));
+    let app_logo = request.contains("logo") && request.contains("app");
+    launcher_marker || app_logo
 }
 
 fn is_android_profile(profile: Option<&Value>) -> bool {
@@ -222,8 +249,8 @@ fn normalize_capabilities(items: &[String]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{derive_capabilities, requested_capabilities};
-    use serde_json::json;
+    use super::{derive_capabilities, requested_capabilities, task_is_launcher_only};
+    use serde_json::{json, Value};
 
     #[test]
     fn caller_declared_capabilities_cannot_remove_derived_platform_requirements() {
@@ -302,5 +329,33 @@ mod tests {
             reason.get("reason").and_then(|value| value.as_str())
                 == Some("TASK_REQUESTS_PWA_SOURCE_WRITEBACK")
         }));
+    }
+
+    #[test]
+    fn launcher_only_task_does_not_inherit_project_web_parity() {
+        let task = json!({"task":{"task":{
+            "mode":"MODIFY_EXISTING",
+            "request":"替换 APP Launcher 图标并验证 adaptive icon mask"
+        }}});
+        let profile = json!({
+            "android":{"applicationId":"com.elon.app"},
+            "capabilities":{"apkWebUiParityRequired":true}
+        });
+        let (derived, reasons) = derive_capabilities(Some(&task), Some(&profile));
+
+        assert!(task_is_launcher_only(Some(&task)));
+        assert!(!derived.contains(&"CROSS_PLATFORM_STYLE_WRITEBACK".to_string()));
+        assert!(!reasons.iter().any(|reason| {
+            reason.get("reason").and_then(Value::as_str)
+                == Some("PROJECT_REQUIRES_APK_WEB_UI_PARITY")
+        }));
+    }
+
+    #[test]
+    fn explicit_web_request_still_requires_cross_platform_parity_for_launcher() {
+        let task = json!({"task":{"task":{
+            "request":"同步 APP Launcher 图标到 APK 与 Web"
+        }}});
+        assert!(!task_is_launcher_only(Some(&task)));
     }
 }

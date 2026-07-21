@@ -127,6 +127,17 @@ async fn mcp_lists_compact_ui_tools() {
             ["properties"]["shape"]["enum"][0],
         "CIRCLE"
     );
+    assert_eq!(
+        visual_diff["inputSchema"]["properties"]["currentArtifact"]["properties"]["source"]
+            ["const"],
+        "ANDROID_LAUNCHER"
+    );
+    assert_eq!(
+        visual_diff["inputSchema"]["properties"]["currentArtifact"]["required"]
+            .as_array()
+            .map(Vec::len),
+        Some(3)
+    );
     let desktop_import = tools
         .iter()
         .find(|tool| tool["name"] == "ui_import_desktop_task")

@@ -619,17 +619,37 @@ async fn visual_diff_from_ir(
         .target_design
         .ok_or_else(|| anyhow!("尚未绑定目标设计图"))?;
     let session = broker.session(session_id).await?;
-    let current = capture_latest_frame_artifact(&session, None).await?;
+    let reusable = arguments
+        .get("currentArtifact")
+        .cloned()
+        .map(serde_json::from_value::<super::frame_artifact::ReusableFrameArtifact>)
+        .transpose()
+        .context("currentArtifact 参数无效")?;
+    let (current_path, current_frame) = if let Some(artifact) = reusable {
+        let path = super::frame_artifact::validate_launcher_crop_artifact(&session, &artifact)?;
+        (
+            path.display().to_string(),
+            json!({
+                "source": artifact.source,
+                "path": path,
+                "sha256": artifact.sha256,
+                "reused": true,
+            }),
+        )
+    } else {
+        let current = capture_latest_frame_artifact(&session, None).await?;
+        (current.path.clone(), json!(current))
+    };
     let request = VisualDiffRequest {
         target_path: target.path,
-        current_path: current.path.clone(),
+        current_path,
         target_rect: parse_rect(arguments.get("targetRect"))?,
         current_rect: parse_rect(arguments.get("currentRect"))?,
         projected_current_rect: parse_rect(arguments.get("projectedCurrentRect"))?,
         mask: serde_json::from_value(arguments.get("mask").cloned().unwrap_or_else(|| json!({})))
             .context("mask 参数无效")?,
     };
-    Ok(json!({ "diff": compare_images(&request)?, "currentFrame": current }))
+    Ok(json!({ "diff": compare_images(&request)?, "currentFrame": current_frame }))
 }
 
 async fn propose_live_patch(

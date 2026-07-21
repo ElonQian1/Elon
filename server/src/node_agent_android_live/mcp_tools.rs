@@ -278,9 +278,16 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_get_visual_diff",
-            "本地计算目标图与真机截图的颜色、边缘、几何损失；支持 Android adaptive icon 系统 mask/crop。",
+            "本地计算目标图与真机截图的颜色、边缘、几何损失；支持复用 Launcher iconCrop 及 Android adaptive icon 系统 mask/crop。",
             json!({
-                "type":"object","properties":{
+                "type":"object","additionalProperties":false,"properties":{
+                    "currentArtifact":{"type":"object",
+                        "required":["source","path","sha256"],"properties":{
+                            "source":{"const":"ANDROID_LAUNCHER"},
+                            "path":{"type":"string","minLength":1,"maxLength":4000},
+                            "sha256":{"type":"string","pattern":"^[A-Fa-f0-9]{64}$"}
+                        }
+                    },
                     "targetRect":rect_value_schema(),
                     "currentRect":rect_value_schema(),
                     "projectedCurrentRect":rect_value_schema()
