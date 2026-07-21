@@ -426,16 +426,6 @@ async fn create_task(
     } else {
         None
     };
-    let record_workspace_path = resume_workspace
-        .as_ref()
-        .map(|workspace| workspace.authorized_workspace_path.as_str())
-        .or_else(|| {
-            fresh_workspace
-                .as_ref()
-                .map(|workspace| workspace.workspace_path.as_str())
-        })
-        .unwrap_or(workspace_path)
-        .to_string();
     let execution_workspace_path = resume_workspace
         .as_ref()
         .map(|workspace| workspace.inherited_workspace.workspace_path.as_str())
@@ -558,19 +548,24 @@ async fn create_task(
             Err(error) => return internal_error(error),
         }
     } else {
-        match runtime.local_tasks.create(LocalTaskStart {
-            task_id: &task_id,
-            owner_user_id: &creds.owner_user_id,
-            agent_id: &creds.agent_id,
-            install_id: &runtime.install_id,
-            project_id,
-            channel_id: channel_id.as_deref(),
-            conversation_id: &conversation_id,
-            workspace_path: &record_workspace_path,
-            prompt: record_prompt,
-            cli: "codex",
-            runtime_permission,
-        }) {
+        match provision::record_local_or_resumed_task(
+            &runtime.local_tasks,
+            LocalTaskStart {
+                task_id: &task_id,
+                owner_user_id: &creds.owner_user_id,
+                agent_id: &creds.agent_id,
+                install_id: &runtime.install_id,
+                project_id,
+                channel_id: channel_id.as_deref(),
+                conversation_id: &conversation_id,
+                workspace_path: &execution_workspace_path,
+                prompt: record_prompt,
+                cli: "codex",
+                runtime_permission,
+            },
+            resume_workspace.as_ref(),
+            supervision.as_ref(),
+        ) {
             Ok(record) => record,
             Err(error) => return internal_error(error),
         }

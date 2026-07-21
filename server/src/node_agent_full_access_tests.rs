@@ -475,6 +475,7 @@ fn managed_workspace_record(
         "platform_provenance": "elon.conversation_worktree.v1",
         "project_id": "project_1",
         "root_task_id": "local-root",
+        "branch": "ai/session/project/root",
         "git_common_dir": git_common_dir,
         "base_revision": base_revision,
         "git_head": active_revision,
@@ -510,6 +511,10 @@ async fn fresh_and_validated_resume_generations_authorize_the_active_worktree() 
     .await
     .expect("fresh dispatch uses its current task record and active cwd");
 
+    std::fs::write(base.join("advanced-base.txt"), "main may advance").unwrap();
+    git(&base, &["add", "advanced-base.txt"]);
+    git(&base, &["commit", "-m", "advance authorized base"]);
+
     let child_context = CliProjectContext {
         project_id: "project_1".into(),
         conversation_id: "local-fe687eb2".into(),
@@ -527,7 +532,28 @@ async fn fresh_and_validated_resume_generations_authorize_the_active_worktree() 
         Some(&root_record),
     )
     .await
-    .expect("first-generation Resume uses the validated root parent");
+    .expect("first-generation Resume preserves immutable provenance when the base advances");
+
+    let mut child_record = root_record.clone();
+    child_record.task_id = "local-resume-child".into();
+    child_record.conversation_id = child_context.conversation_id.clone();
+    child_record.workspace_path = active.to_string_lossy().into_owned();
+    let mut stale_parent = root_record.clone();
+    stale_parent.workspace_status.as_mut().unwrap()["git_head"] =
+        serde_json::json!("0000000000000000000000000000000000000000");
+    require_route_a_full_access_grant_with_inherited_evidence(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&child_context),
+        Some(active.to_string_lossy().as_ref()),
+        false,
+        Some(&child_record),
+        Some(&stale_parent),
+    )
+    .await
+    .expect("the Resume child must authorize from its own inherited identity snapshot");
     let _ = std::fs::remove_dir_all(base.parent().unwrap());
 }
 
@@ -751,46 +777,4 @@ async fn validated_resume_evidence_rejects_identity_lease_git_and_active_path_dr
 
     let _ = std::fs::remove_dir_all(foreign_active);
     let _ = std::fs::remove_dir_all(base.parent().unwrap());
-}
-
-#[test]
-fn runtime_policy_summary_exposes_route_bc_safety_limits() {
-    let summary = runtime_policy_summary();
-
-    assert_eq!(summary["schema"], "elon.pc_node.runtime_policy.v1");
-    assert_eq!(summary["fullAccess"]["routeAInstalledCliOnly"], true);
-    assert_eq!(
-        summary["fullAccess"]["routeBCFullAccessEffect"],
-        "keeps_workspace_path_checks_command_allowlist_and_tool_approvals"
-    );
-    assert_eq!(
-        summary["fullAccess"]["routeBCDangerFullAccessEffect"],
-        "danger_full_access_allows_absolute_paths_arbitrary_shell_and_skips_tool_approvals"
-    );
-    assert_eq!(
-        summary["operatorVisibility"]["policyField"],
-        "runtime_policy"
-    );
-
-    let approval_tools = summary["routeBC"]["approvalRequiredTools"]
-        .as_array()
-        .expect("approvalRequiredTools should be an array");
-    for tool in ["write_file", "apply_patch", "run_command"] {
-        assert!(
-            approval_tools
-                .iter()
-                .any(|item| item.as_str() == Some(tool)),
-            "missing approval tool {tool}"
-        );
-    }
-
-    let denied = summary["routeBC"]["highRiskGitPushDenied"]
-        .as_array()
-        .expect("highRiskGitPushDenied should be an array");
-    for arg in ["--force*", "--delete", "--mirror", "+refspec", ":branch"] {
-        assert!(
-            denied.iter().any(|item| item.as_str() == Some(arg)),
-            "missing high-risk git push marker {arg}"
-        );
-    }
 }

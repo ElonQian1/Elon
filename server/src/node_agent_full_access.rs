@@ -246,6 +246,19 @@ pub(crate) async fn require_route_a_full_access_grant_with_inherited_evidence(
     {
         return Ok(());
     }
+    if let Some(record) = task_record {
+        if task_record_proves_managed_isolated_workspace(grants, identity, context, cwd, record)
+            .await
+        {
+            return Ok(());
+        }
+        if recorded_workspace_paths(record)
+            .iter()
+            .any(|path| same_workspace(path, cwd))
+        {
+            bail!("ISOLATED_WORKTREE_AUTH_MISSING: 隔离 worktree 缺少有效的平台 provenance、Git 身份或 root lease 证据。")
+        }
+    }
     if let Some(record) = inherited_authorization_record {
         let inherited_context = CliProjectContext {
             project_id: context.project_id.clone(),
@@ -264,19 +277,6 @@ pub(crate) async fn require_route_a_full_access_grant_with_inherited_evidence(
             return Ok(());
         }
         bail!("ISOLATED_WORKTREE_AUTH_MISSING: Resume 继承的隔离 worktree 缺少有效的平台 provenance、Git 身份或 root lease 证据。")
-    }
-    if let Some(record) = task_record {
-        if task_record_proves_managed_isolated_workspace(grants, identity, context, cwd, record)
-            .await
-        {
-            return Ok(());
-        }
-        if recorded_workspace_paths(record)
-            .iter()
-            .any(|path| same_workspace(path, cwd))
-        {
-            bail!("ISOLATED_WORKTREE_AUTH_MISSING: 隔离 worktree 缺少有效的平台 provenance、Git 身份或 root lease 证据。")
-        }
     }
     grants
         .require_project(identity, &context.project_id, cwd)
@@ -391,6 +391,18 @@ fn git_identity_matches(base: &str, active: &str, status: &serde_json::Value) ->
     {
         return false;
     }
+    let branch = status
+        .get("branch")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    if branch.is_empty()
+        || branch == "main"
+        || git_value(active, &["branch", "--show-current"]).as_deref() != Some(branch)
+        || !git_value(active, &["rev-parse", "--show-toplevel"])
+            .is_some_and(|top| same_existing_path(&top, active))
+    {
+        return false;
+    }
     let base_revision = status
         .get("base_revision")
         .and_then(serde_json::Value::as_str)
@@ -399,13 +411,16 @@ fn git_identity_matches(base: &str, active: &str, status: &serde_json::Value) ->
         .get("git_head")
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
-    // The authoritative checkout may intentionally lag or diverge from the
-    // immutable origin/main revision used to create the isolated worktree.
-    // Bind both recorded revisions to their actual checkouts instead of
-    // requiring an ancestry relationship between them.
+    // The authorized base checkout is allowed to advance independently after
+    // the platform creates the isolated worktree. Keep the recorded base
+    // revision as immutable provenance and require that exact commit to remain
+    // in the same repository, while binding the active worktree to its exact
+    // current HEAD.
+    let base_revision_ref = format!("{base_revision}^{{commit}}");
     if base_revision.is_empty()
         || active_revision.is_empty()
-        || git_value(base, &["rev-parse", "HEAD"]).as_deref() != Some(base_revision)
+        || !git_value(base, &["rev-parse", "--verify", &base_revision_ref])
+            .is_some_and(|value| value.eq_ignore_ascii_case(base_revision))
         || git_value(active, &["rev-parse", "HEAD"]).as_deref() != Some(active_revision)
     {
         return false;
@@ -700,3 +715,7 @@ fn json_error(
 #[cfg(test)]
 #[path = "node_agent_full_access_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "node_agent_full_access_policy_tests.rs"]
+mod policy_tests;
