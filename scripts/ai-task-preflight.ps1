@@ -8,6 +8,8 @@
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot 'ai-task-finish-contract.ps1')
+
 $directNetworkScript = Join-Path $PSScriptRoot "direct-network.ps1"
 if (Test-Path -LiteralPath $directNetworkScript) {
     . $directNetworkScript
@@ -192,8 +194,14 @@ function Write-AiWorkflowGuard {
     Write-Host "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
     Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
     Write-Host "RULE_PUSH=after commit run git push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
-    Write-Host "RULE_FINISH=after push run scripts\finish-ai-task.ps1 -Kind <Kind>; it verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
-    Write-Host "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed"
+    $contractId = ''
+    if ($State -ne 'blocked_needs_worktree' -and (Test-Path -LiteralPath $EditRoot)) {
+        $contractId = New-AiTaskFinishContract -RepoPath $EditRoot
+        Write-Host "FINISH_CONTRACT_SCHEMA=elon.ai_finish_contract.v1"
+        Write-Host "FINISH_CONTRACT_ID=$contractId"
+    }
+    Write-Host "RULE_FINISH=after push run the exact FINISH_COMMAND_POWERSHELL; it validates the preflight identity, verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
+    Write-Host "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind CodePushed -TaskWorktree `"$EditRoot`" -TaskContract $contractId"
     Write-Host "FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed"
     Write-Host "AI_WORKFLOW_GUARD_END"
 }

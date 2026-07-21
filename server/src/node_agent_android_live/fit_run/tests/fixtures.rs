@@ -165,6 +165,7 @@ pub(super) fn request(auto_start: bool) -> CreateFitRunRequest {
         properties: vec!["width".to_string(), "height".to_string()],
         budget: FitBudget::default(),
         thresholds: FitThresholds::default(),
+        visual_mask: Default::default(),
         auto_start,
     }
 }

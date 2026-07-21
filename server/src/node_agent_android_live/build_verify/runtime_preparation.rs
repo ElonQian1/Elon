@@ -10,6 +10,7 @@ use super::gradle::{
 };
 use super::install::install_debug_apk_with_evidence;
 use super::preparation::PreparationReporter;
+use super::runtime_reconnect::{ensure_live_without_install, RuntimeReuse};
 use super::{
     capture_stable_runtime_frame, compare_source_parity, wait_for_runtime, BuildVerifyResult,
 };
@@ -21,7 +22,7 @@ use crate::node_agent_android_live::verification_gate::{
     evaluate_verification_gates, VerificationGateInput, VerificationGateState,
 };
 
-const RUNTIME_HANDSHAKE_ATTEMPTS: usize = 2;
+pub(super) const RUNTIME_HANDSHAKE_ATTEMPTS: usize = 2;
 const APP_LAUNCH_ATTEMPTS: usize = 2;
 
 pub(super) async fn run(
@@ -32,6 +33,7 @@ pub(super) async fn run(
     reporter: Option<&PreparationReporter>,
 ) -> Result<BuildVerifyResult> {
     let project_root = canonical_project_root(session)?;
+    let project_root_display = project_root.to_string_lossy().to_string();
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let suffix = validate_debug_application_id_suffix(debug_application_id_suffix)?;
@@ -92,6 +94,36 @@ pub(super) async fn run(
     } else {
         build_started.elapsed().as_millis()
     };
+
+    let source_revision = workspace_fingerprint(&project_root_display)?;
+    if reused_apk {
+        match ensure_live_without_install(
+            broker,
+            session,
+            host_port,
+            source_revision.as_deref(),
+            reporter,
+        )
+        .await
+        {
+            RuntimeReuse::Live(runtime_view) => {
+                return finalize_runtime(
+                    session,
+                    &project_root_display,
+                    &apk,
+                    build_duration_ms,
+                    "SKIPPED_RUNTIME_REUSED",
+                    runtime_view,
+                    "当前源码对应的 APK 与 Runtime 已存在；已跳过安装并恢复稳定帧。",
+                    reporter,
+                )
+                .await;
+            }
+            RuntimeReuse::NeedsInstall(reason) => {
+                report_evidence(reporter, "RUNTIME_RECONNECT", "INSTALL_REQUIRED", reason).await;
+            }
+        }
+    }
 
     report_phase(
         reporter,
@@ -222,6 +254,33 @@ pub(super) async fn run(
     }
     let runtime_view = runtime_view.expect("bounded handshake loop either connects or returns");
 
+    finalize_runtime(
+        session,
+        &project_root_display,
+        &apk,
+        build_duration_ms,
+        install.output.trim(),
+        runtime_view,
+        if reused_apk {
+            "已复用当前源码对应的 Debug APK，并恢复会话完成安装、启动和 Runtime 握手。"
+        } else {
+            "Debug Runtime 已增量构建、安装并连接，节点树已经就绪。"
+        },
+        reporter,
+    )
+    .await
+}
+
+async fn finalize_runtime(
+    session: &LiveUiSession,
+    project_root: &str,
+    apk: &std::path::Path,
+    build_duration_ms: u128,
+    install_output: &str,
+    runtime_view: crate::node_agent_android_live::protocol::LiveSessionView,
+    message: &str,
+    reporter: Option<&PreparationReporter>,
+) -> Result<BuildVerifyResult> {
     report_phase(reporter, "CAPTURE", "Runtime 已连接，等待稳定帧与节点树").await;
     tokio::time::sleep(Duration::from_millis(2_200)).await;
     let source_frame = capture_stable_runtime_frame(session).await?;
@@ -235,9 +294,7 @@ pub(super) async fn run(
     let source_parity_verified = verification_gate.source_parity == VerificationGateState::Passed;
     let runtime_build_id = runtime_view.runtime_build_id.clone();
     if source_parity_verified {
-        if let Some(source_revision) =
-            workspace_fingerprint(project_root.to_string_lossy().as_ref())?
-        {
+        if let Some(source_revision) = workspace_fingerprint(project_root)? {
             session
                 .record_source_proof(
                     source_revision,
@@ -247,12 +304,11 @@ pub(super) async fn run(
                 .await;
         }
     }
-
     Ok(BuildVerifyResult {
         status: verification_gate.status,
         apk_path: apk.display().to_string(),
         build_duration_ms,
-        install_output: install.output.trim().to_string(),
+        install_output: install_output.to_string(),
         runtime_connected: runtime_view.connected,
         runtime_build_id,
         node_count: runtime_view.node_count,
@@ -263,12 +319,7 @@ pub(super) async fn run(
         source_parity_scope: "PROCESS_FRAME_BASELINE",
         source_parity_verified,
         verification_gate,
-        message: if reused_apk {
-            "已复用当前源码对应的 Debug APK，并恢复会话完成安装、启动和 Runtime 握手。"
-        } else {
-            "Debug Runtime 已增量构建、安装并连接，节点树已经就绪。"
-        }
-        .to_string(),
+        message: message.to_string(),
     })
 }
 

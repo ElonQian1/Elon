@@ -2,6 +2,8 @@
 
 #[path = "node_agent_cli_pipe_sidecar_runner.rs"]
 mod pipe_sidecar_runner;
+#[path = "node_agent_cli_terminal_hint.rs"]
+mod terminal_hint;
 #[path = "node_agent_cli_sidecar_worker_monitor.rs"]
 mod worker_monitor;
 

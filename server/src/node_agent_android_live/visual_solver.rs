@@ -9,7 +9,9 @@ use crate::node_agent_android_inspector::adb_capture::capture_screen_png;
 use super::broker::LiveUiBroker;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LiveStylePatch, LiveUiNode};
 use super::ui_ir::load_or_build_ui_ir;
-use super::visual_diff::{compare_target_with_png_projected, PixelRect, VisualDiffResult};
+use super::visual_diff::{
+    compare_target_with_png_projected_masked, PixelRect, VisualDiffResult, VisualMask,
+};
 use super::visual_solver_style_hints::target_color_operations;
 use super::visual_solver_values::{
     constrained_value, initial_values, operations_from_values, predicted_rect,
@@ -36,6 +38,8 @@ pub(crate) struct VisualSolverRequest {
     /// 最终仍必须由当前真机帧和硬门禁重新验证。
     #[serde(default)]
     pub(crate) initial_property_deltas: BTreeMap<String, f64>,
+    #[serde(default)]
+    pub(crate) visual_mask: VisualMask,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -95,12 +99,13 @@ pub(crate) async fn solve_visual_style(
         base_rect,
         projected_current_rect,
     );
-    let baseline = compare_target_with_png_projected(
+    let baseline = compare_target_with_png_projected_masked(
         &target.path,
         &baseline_png,
         Some(request.target_rect),
         Some(baseline_current_rect),
         Some(projected_current_rect),
+        &request.visual_mask,
     )?;
     let mut best_values = initial_values(&node, &properties);
     seed_prior_deltas(&mut best_values, &node, &request.initial_property_deltas);
@@ -115,6 +120,7 @@ pub(crate) async fn solve_visual_style(
         projected_current_rect,
         &best_values,
         &fixed_operations,
+        &request.visual_mask,
     )
     .await?;
     let mut evaluations = 1;
@@ -147,6 +153,7 @@ pub(crate) async fn solve_visual_style(
                     projected_current_rect,
                     &candidate,
                     &fixed_operations,
+                    &request.visual_mask,
                 )
                 .await?;
                 evaluations += 1;
@@ -176,12 +183,13 @@ pub(crate) async fn solve_visual_style(
             predicted,
             projected_current_rect,
         );
-        compare_target_with_png_projected(
+        compare_target_with_png_projected_masked(
             &target.path,
             &png,
             Some(request.target_rect),
             Some(current_rect),
             Some(projected_current_rect),
+            &request.visual_mask,
         )?
     } else {
         baseline.clone()
@@ -215,6 +223,7 @@ async fn evaluate(
     projected_current_rect: PixelRect,
     values: &BTreeMap<String, f64>,
     fixed_operations: &[LivePatchOperation],
+    visual_mask: &VisualMask,
 ) -> Result<VisualDiffResult> {
     let patch = patch_for_node(node, combined_operations(values, fixed_operations), true);
     let (_, inverse) = broker.apply_probe_patch(session_id, patch).await?;
@@ -227,12 +236,13 @@ async fn evaluate(
                 predicted,
                 projected_current_rect,
             );
-            compare_target_with_png_projected(
+            compare_target_with_png_projected_masked(
                 target_path,
                 &png,
                 Some(target_rect),
                 Some(current_rect),
                 Some(projected_current_rect),
+                visual_mask,
             )
         }
         Err(error) => Err(error),

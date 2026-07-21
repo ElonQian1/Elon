@@ -1,7 +1,11 @@
 // server/src/node_agent_cli_pipe_sidecar_runner.rs
 
 use anyhow::Result;
-use std::{collections::HashSet, process::Stdio, time::Duration};
+use std::{
+    collections::HashSet,
+    process::Stdio,
+    time::{Duration, Instant},
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, BufReader},
     process::Child,
@@ -12,11 +16,16 @@ use crate::{
     node_agent_cli_sidecar::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord},
     node_agent_cli_sidecar_io::{append_output, read_new_commands, CliSidecarOutputRecord},
     node_agent_cli_sidecar_runner::{
-        hide_tokio_command_window, CliSidecarLaunchConfig, SIDECAR_POLL_MS,
+        hide_tokio_command_window,
+        terminal_hint::{CodexTerminalHint, CodexTerminalOutcome},
+        CliSidecarLaunchConfig, SIDECAR_POLL_MS,
     },
     node_agent_codex_session,
     node_agent_task_journal::TaskJournal,
 };
+
+const CODEX_TERMINAL_DRAIN_GRACE: Duration = Duration::from_millis(750);
+const CODEX_FINAL_MESSAGE_GRACE: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
 enum PipeReadEvent {
@@ -133,6 +142,8 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
     let mut child_exit_observed_at = None;
     let mut canceled = false;
     let mut timed_out = false;
+    let mut protocol_outcome = None;
+    let mut terminal_hint = CodexTerminalHint::default();
     let runtime_policy = config.runtime_policy.clone().unwrap_or_else(|| {
         crate::node_agent_cli_runtime_policy::CliRuntimePolicy::fixed(config.timeout_secs.max(1))
     });
@@ -167,7 +178,7 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
                     }
                 }
             }
-            _ = tokio::time::sleep_until(total_deadline), if !timed_out => {
+            _ = tokio::time::sleep_until(total_deadline), if !timed_out && protocol_outcome.is_none() => {
                 timed_out = true;
                 crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
                 let _ = child.start_kill();
@@ -179,7 +190,7 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
                     )),
                 )?;
             }
-            _ = tokio::time::sleep_until(idle_deadline), if runtime_policy.progress_aware && !timed_out => {
+            _ = tokio::time::sleep_until(idle_deadline), if runtime_policy.progress_aware && !timed_out && protocol_outcome.is_none() => {
                 timed_out = true;
                 crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
                 let _ = child.start_kill();
@@ -194,6 +205,9 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
             event = pipe_rx.recv() => {
                 match event {
                     Some(PipeReadEvent::Chunk(stream, text)) => {
+                        if config.cli_name == "codex" && stream == "stdout" {
+                            terminal_hint.observe(&text, Instant::now());
+                        }
                         let observation = crate::node_agent_cli_output_aggregate::progress_observation(&text);
                         if observation.progress {
                             idle_deadline = tokio::time::Instant::now()
@@ -205,6 +219,18 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
                     Some(PipeReadEvent::Closed("stderr")) => stderr_closed = true,
                     Some(PipeReadEvent::Closed(_)) | None => {}
                 }
+            }
+        }
+
+        if protocol_outcome.is_none() && config.cli_name == "codex" {
+            if let Some(outcome) = terminal_hint.outcome(
+                Instant::now(),
+                CODEX_TERMINAL_DRAIN_GRACE,
+                CODEX_FINAL_MESSAGE_GRACE,
+            ) {
+                protocol_outcome = Some(outcome == CodexTerminalOutcome::Success);
+                crate::node_agent_cli_runtime_policy::terminate_process_tree(child_pid);
+                let _ = child.start_kill();
             }
         }
 
@@ -220,7 +246,7 @@ pub(crate) async fn run_pipe_json_sidecar(config: CliSidecarLaunchConfig) -> Res
             // Cancellation/timeout must still drain both pipes (or the bounded
             // post-exit grace) so an already-emitted usage event is preserved.
             if (stdout_closed && stderr_closed) || drained_after_exit {
-                break status.success();
+                break protocol_outcome.unwrap_or_else(|| status.success());
             }
         }
     };

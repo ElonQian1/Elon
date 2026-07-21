@@ -5,6 +5,7 @@ $finishScript = Join-Path $repoRoot "scripts\finish-ai-task.ps1"
 $checkScript = Join-Path $repoRoot "scripts\check-task-complete.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
+$finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
 $policyFile = Join-Path $repoRoot ".ai\workspace-policy.txt"
 
 $finishSource = Get-Content -Raw -LiteralPath $finishScript
@@ -64,7 +65,9 @@ function Invoke-Finish {
     param(
         [string]$WorktreePath,
         [switch]$ExpectFailure,
-        [switch]$PerformCleanup
+        [switch]$PerformCleanup,
+        [switch]$NoLegacy,
+        [string]$ContractId = ''
     )
 
     $finishArgs = @(
@@ -74,6 +77,11 @@ function Invoke-Finish {
         "-Kind", "CodePushed",
         "-TaskWorktree", $WorktreePath
     )
+    if (-not [string]::IsNullOrWhiteSpace($ContractId)) {
+        $finishArgs += @('-TaskContract', $ContractId)
+    } elseif (-not $NoLegacy) {
+        $finishArgs += "-AllowLegacyNoTaskContract"
+    }
     if (-not $PerformCleanup) {
         $finishArgs += "-SkipWorktreeCleanup"
     }
@@ -121,6 +129,7 @@ try {
     Copy-Item -LiteralPath $checkScript -Destination (Join-Path $mainRepo "scripts\check-task-complete.ps1")
     Copy-Item -LiteralPath $cleanupScript -Destination (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $mainRepo "scripts\direct-network.ps1")
+    Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $mainRepo "scripts\ai-task-finish-contract.ps1")
     Copy-Item -LiteralPath $policyFile -Destination (Join-Path $mainRepo ".ai\workspace-policy.txt")
     Set-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "finish workflow fixture`n" -Encoding UTF8
 
@@ -173,7 +182,12 @@ try {
     $originMain = Invoke-Git $mainRepo @("rev-parse", "origin/main")
     if ($beforeMain -eq $originMain) { throw "Fixture main must start behind origin/main." }
 
-    $successOutput = Invoke-Finish -WorktreePath $taskWorktree
+    . (Join-Path $taskWorktree 'scripts\ai-task-finish-contract.ps1')
+    $taskContractId = New-AiTaskFinishContract -RepoPath $taskWorktree
+    $missingContractOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure -NoLegacy
+    Assert-Contains $missingContractOutput 'requires the immutable TaskContract' 'Managed task finish must fail closed without its preflight contract.'
+    $successOutput = Invoke-Finish -WorktreePath $taskWorktree -ContractId $taskContractId
+    Assert-Contains $successOutput "FINISH_CONTRACT_STATUS=validated:$taskContractId" "Finish must validate the exact preflight contract."
     Assert-Contains $successOutput "LOCAL_MAIN_STATUS=current:" "Finish must report a current main baseline."
     Assert-Contains $successOutput "MAIN_UNTRACKED_STATUS_PATH=legacy-test.rs|candidate_track" "Finish must classify source-looking untracked files without mutating them."
     Assert-Contains $successOutput "FINALIZABLE=true" "Finish must allow final reporting after main is safely synchronized."
@@ -210,7 +224,7 @@ try {
     Invoke-Git $taskWorktree @("commit", "-m", "add collision fixture") | Out-Null
     Invoke-Git $taskWorktree @("push", "origin", "HEAD:main") | Out-Null
 
-    $collisionOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure
+    $collisionOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure -ContractId $taskContractId
     Assert-Contains $collisionOutput "BUSINESS_STATUS=complete" "A local-main collision must not erase the completed remote business state."
     Assert-Contains $collisionOutput "LOCAL_MAIN_STATUS=sync_failed" "A same-path untracked collision must block only local-main synchronization."
     Assert-Contains $collisionOutput "FINALIZABLE=false" "A same-path collision must remain visible to the task owner."
@@ -220,7 +234,7 @@ try {
     }
 
     Remove-Item -LiteralPath $mainCollisionPath -Force
-    $collisionRecoveryOutput = Invoke-Finish -WorktreePath $taskWorktree
+    $collisionRecoveryOutput = Invoke-Finish -WorktreePath $taskWorktree -ContractId $taskContractId
     Assert-Contains $collisionRecoveryOutput "LOCAL_MAIN_STATUS=current:" "Finish must recover after the owner resolves a same-path collision."
     Assert-Contains $collisionRecoveryOutput "FINALIZABLE=true" "Resolved local-main collision must become finalizable."
 
@@ -229,7 +243,7 @@ try {
     $temporaryRoot = Join-Path $taskWorktree ".ai-tmp"
     New-Item -ItemType Directory -Path $temporaryRoot | Out-Null
     Set-Content -LiteralPath (Join-Path $temporaryRoot "transient.log") -Value "temporary" -Encoding UTF8
-    $tempOutput = Invoke-Finish -WorktreePath $taskWorktree
+    $tempOutput = Invoke-Finish -WorktreePath $taskWorktree -ContractId $taskContractId
     Assert-Contains $tempOutput "ARTIFACT_CLEANUP=task:.ai-tmp/" "Declared task temporary root must be cleaned."
     if (Test-Path -LiteralPath $temporaryRoot) { throw "Declared temporary root still exists after finish." }
 
@@ -237,12 +251,12 @@ try {
     # the task worktree and receive a deterministic disposition hint.
     $unresolvedPath = Join-Path $taskWorktree "new_behavior_test.rs"
     Set-Content -LiteralPath $unresolvedPath -Value "#[test]" -Encoding UTF8
-    $failureOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure
+    $failureOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure -ContractId $taskContractId
     Assert-Contains $failureOutput "TASK_UNRESOLVED_PATH=new_behavior_test.rs|candidate_track" "Source/test files must be classified as candidate_track."
     Assert-Contains $failureOutput "FINALIZABLE=false" "Dirty task worktree must block final reporting."
 
     Remove-Item -LiteralPath $unresolvedPath -Force
-    $cleanupOutput = Invoke-Finish -WorktreePath $taskWorktree -PerformCleanup
+    $cleanupOutput = Invoke-Finish -WorktreePath $taskWorktree -PerformCleanup -ContractId $taskContractId
     Assert-Contains $cleanupOutput "TASK_WORKTREE_STATUS=cleaned" "Unified finish must remove its merged Codex task worktree."
     Assert-Contains $cleanupOutput "FINALIZABLE=true" "Cleaned task worktree must be finalizable."
     $registered = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")

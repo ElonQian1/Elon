@@ -251,15 +251,13 @@ async fn create_task(
     if prompt.chars().count() > MAX_LOCAL_PROMPT_CHARS {
         return json_error(StatusCode::PAYLOAD_TOO_LARGE, "本机任务内容过长。");
     }
-    let supervision = match request.supervision {
+    let mut supervision = match request.supervision {
         Some(input) => match crate::node_agent_local_task_supervision::normalize_contract(input) {
             Ok(contract) => Some(contract),
             Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
         },
         None => None,
     };
-    let executor_prompt =
-        crate::node_agent_local_task_supervision::executor_prompt(prompt, supervision.as_ref());
     let runtime_permission = request
         .runtime_permission
         .as_deref()
@@ -324,6 +322,19 @@ async fn create_task(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
+    let resume_context_seed = if let Some(contract) = supervision
+        .as_mut()
+        .filter(|contract| contract.task_role == "resume_original")
+    {
+        match crate::node_agent_local_task_resume_context::resolve_seed(
+            &runtime, &creds, project_id, contract,
+        ) {
+            Ok(seed) => Some(seed),
+            Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
+        }
+    } else {
+        None
+    };
     let mut resume_workspace =
         match crate::node_agent_local_task_resume_routes::resolve_supervised_resume_workspace(
             &runtime,
@@ -415,6 +426,35 @@ async fn create_task(
         "active_workspace_path": workspace.workspace_path.as_str(),
         "branch": workspace.branch.as_deref(),
     })));
+    let compiled_resume_context = match resume_context_seed.as_ref() {
+        Some(seed) => {
+            let Some(workspace) = resume_workspace.as_ref() else {
+                return json_error(
+                    StatusCode::CONFLICT,
+                    "resume context 未取得经过验证的继承工作区。",
+                );
+            };
+            match crate::node_agent_local_task_resume_context::compile(
+                seed,
+                supervision.as_ref().expect("resume contract exists"),
+                workspace,
+            ) {
+                Ok(context) => Some(context),
+                Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
+            }
+        }
+        None => None,
+    };
+    let record_prompt = compiled_resume_context
+        .as_ref()
+        .map(|context| context.record_prompt.as_str())
+        .unwrap_or(prompt);
+    let executor_prompt = compiled_resume_context
+        .as_ref()
+        .map(|context| context.executor_prompt.clone())
+        .unwrap_or_else(|| {
+            crate::node_agent_local_task_supervision::executor_prompt(prompt, supervision.as_ref())
+        });
     let frozen_codex_home =
         match crate::node_agent_codex_child_env::FrozenCodexHome::capture_unmanaged_for_local_task()
         {
@@ -439,6 +479,16 @@ async fn create_task(
                 return internal_error(error);
             }
         }
+        if let Some(context) = compiled_resume_context.as_ref() {
+            if let Err(error) = crate::node_agent_local_task_supervision::record_supervision_event(
+                &runtime.task_journal,
+                &task_id,
+                "resume_context",
+                context.journal_payload.clone(),
+            ) {
+                return internal_error(error);
+            }
+        }
     }
     let record = if let (Some(workspace), Some(contract)) =
         (fresh_workspace.as_ref(), supervision.as_ref())
@@ -452,7 +502,7 @@ async fn create_task(
             channel_id: channel_id.as_deref(),
             conversation_id: &conversation_id,
             base_workspace_path: workspace_path,
-            prompt,
+            prompt: record_prompt,
             runtime_permission,
             root_task_id: contract.root_task_id.as_deref().unwrap_or(&task_id),
             contract,
@@ -476,7 +526,7 @@ async fn create_task(
             channel_id: channel_id.as_deref(),
             conversation_id: &conversation_id,
             workspace_path: &record_workspace_path,
-            prompt,
+            prompt: record_prompt,
             cli: "codex",
             runtime_permission,
         }) {
@@ -510,6 +560,10 @@ async fn create_task(
             "record": record,
             "supervision": supervision,
             "workspace_inheritance": workspace_inheritance,
+            "resume_context": compiled_resume_context.as_ref().map(|context| json!({
+                "schema": crate::node_agent_local_task_resume_context::RESUME_CONTEXT_SCHEMA,
+                "digest": context.digest,
+            })),
         })),
     )
         .into_response()

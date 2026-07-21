@@ -143,6 +143,10 @@ pub(super) async fn admin_status(
     });
     if let Some(object) = payload.as_object_mut() {
         object.insert(
+            "desktop_supervision".to_string(),
+            super::node_agent_supervision_protocol::status_payload(),
+        );
+        object.insert(
             "build_git_sha".to_string(),
             serde_json::json!(super::node_agent_release_identity::git_sha()),
         );

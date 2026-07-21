@@ -28,7 +28,7 @@ use crate::node_agent_android_live::source_commit::{
     build_source_commit_plan_for_patches, commit_source_plan, SourceCommitRequest,
 };
 use crate::node_agent_android_live::ui_ir::load_or_build_ui_ir;
-use crate::node_agent_android_live::visual_diff::compare_target_with_png_projected;
+use crate::node_agent_android_live::visual_diff::compare_target_with_png_projected_masked;
 use crate::node_agent_android_live::visual_solver::{solve_visual_style, VisualSolverRequest};
 
 pub(crate) struct LiveFitRunBackend {
@@ -75,12 +75,14 @@ impl LiveFitRunBackend {
             bail!("目标设计图已变化，FitRun 必须重新校准");
         }
         let png = capture_screen_png(&session.device_id).await?;
-        let diff = compare_target_with_png_projected(
+        let visual_mask = run.visual_mask.visual_mask();
+        let diff = compare_target_with_png_projected_masked(
             &target.path,
             &png,
             Some(pixel_rect(run.pair.target_rect)),
             Some(pixel_rect(run.pair.current_rect)),
             Some(pixel_rect(run.pair.projected_target_rect)),
+            &visual_mask,
         )?;
         let trial_id = new_trial_id("baseline");
         let screenshot_path = persist_frame(&run, &trial_id, &png)?;
@@ -131,6 +133,7 @@ impl LiveFitRunBackend {
                 max_evaluations: Some(remaining),
                 initial_step_dp,
                 initial_property_deltas,
+                visual_mask: run.visual_mask.visual_mask(),
             },
         )
         .await?;

@@ -139,7 +139,18 @@ function Invoke-SupervisionSelfTest {
             last_progress = 1784361600000
             heartbeat = 1784361605000
         }
-        supervision = [ordered]@{ evidence = [ordered]@{ terminal_event_seen = $false } }
+        supervision = [ordered]@{ evidence = [ordered]@{
+            event_count = 99
+            tool_calls = 12
+            tool_results = 11
+            failed_tools = 1
+            file_change_events = 4
+            agent_messages = 2
+            terminal_event_seen = $false
+            changed_files = @('server/src/a.rs','server/src/b.rs')
+            command_exit_codes = @([ordered]@{ command = 'cargo test'; exit_code = 0 })
+            failure_summaries = @('old failure')
+        } }
         events = @([ordered]@{
             seq = 42
             event = [ordered]@{ type = 'recovery_running'; phase = 'verification' }
@@ -149,10 +160,52 @@ function Invoke-SupervisionSelfTest {
     }
     $activeDetail = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $activeDetail) 'application/json'
     $activeCompact = Convert-ToCompactTaskDetail $activeDetail
+    $unchangedCompact = Select-TaskDeltaChanges `
+        (Convert-ToCompactTaskDetail $activeDetail) `
+        $activeCompact.state_digest $activeCompact.evidence_digest
+    $deltaEvents = New-Object System.Collections.Generic.List[object]
+    $deltaSeen = @{}
+    $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
+        cursor_epoch = 'epoch-a'; cursor_reset = $false
+        events = @([pscustomobject]@{ seq = 1; event = [pscustomobject]@{ type = 'one' } })
+    })
+    $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
+        cursor_epoch = 'epoch-a'; cursor_reset = $false
+        events = @(
+            [pscustomobject]@{ seq = 1; event = [pscustomobject]@{ type = 'duplicate' } },
+            [pscustomobject]@{ seq = 2; event = [pscustomobject]@{ type = 'two' } }
+        )
+    })
+    $deltaNoLoss = $deltaEvents.Count -eq 2 -and $deltaEvents[0].seq -eq 1 -and $deltaEvents[1].seq -eq 2
+    $deltaReset = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
+        cursor_epoch = 'epoch-b'; cursor_reset = $true
+        events = @([pscustomobject]@{ seq = 1; event = [pscustomobject]@{ type = 'reset' } })
+    })
+    $invalidDeltaRejected = $false
+    try {
+        $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
+            cursor_epoch = ''; cursor_reset = $false
+            events = @([pscustomobject]@{ seq = 2; event = [pscustomobject]@{ type = 'invalid' } })
+        })
+    } catch {
+        $invalidDeltaRejected = $true
+    }
     $priorDesktopCredential = [Environment]::GetEnvironmentVariable('ELON_DESKTOP_REVIEW_CREDENTIAL')
     try {
         $env:ELON_DESKTOP_REVIEW_CREDENTIAL = 'desktop-self-test-credential-at-least-32-bytes'
-        $desktopTicket = New-DesktopReviewTicket 'owner-self-test' 'local-self-test'
+        $desktopTicket = New-LegacyDesktopReviewTicket 'owner-self-test' 'local-self-test'
+        $v2MissingRootsRejected = $true
+        $installedV2Signer = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $null } else {
+            Join-Path $env:LOCALAPPDATA 'ElonNode\_internal\new-desktop-review-ticket.ps1'
+        }
+        if ($null -ne $installedV2Signer -and (Test-Path -LiteralPath $installedV2Signer -PathType Leaf)) {
+            try {
+                $null = New-DesktopReviewTicket 'owner-self-test' 'local-self-test'
+                $v2MissingRootsRejected = $false
+            } catch {
+                $v2MissingRootsRejected = $_.Exception.Message -like '*explicit -StateRoot and -InstallRoot*'
+            }
+        }
     } finally {
         [Environment]::SetEnvironmentVariable('ELON_DESKTOP_REVIEW_CREDENTIAL', $priorDesktopCredential)
     }
@@ -181,7 +234,9 @@ function Invoke-SupervisionSelfTest {
         improve_parent = $improvementBody.supervision.parent_task_id -eq 'local-parent-task'
         improve_root = $improvementBody.supervision.root_task_id -eq 'local-root-task'
         resume_workspace = $resumeBody.workspace_path -ceq $testWorkspace
-        resume_prompt = $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -ge 0
+        resume_prompt = $resumeBody.prompt -eq 'Resolve elon.resume_context.v1 for parent_task_id=local-parent-task and root_task_id=local-root-task.' -and
+            $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -lt 0 -and
+            $resumeBody.prompt.IndexOf('Resume the original task', [System.StringComparison]::Ordinal) -lt 0
         resume_role = $resumeBody.supervision.task_role -eq 'resume_original'
         resume_protocol = $resumeBody.supervision.protocol -eq $script:SupervisionProtocol
         resume_parent = $resumeBody.supervision.parent_task_id -eq 'local-parent-task'
@@ -197,11 +252,22 @@ function Invoke-SupervisionSelfTest {
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
         expected_cursor_epoch_path = $testEpochPath -eq '/api/local-tasks/local-test%3Fid?since=42&limit=25&expected_cursor_epoch=journal%3Aa%2Fb%3Fc'
         desktop_review_ticket = $desktopTicket -match '^v1\.[0-9]+\.[0-9a-f]{32}\.[0-9a-f]{64}$'
+        desktop_review_v2_explicit_roots = $v2MissingRootsRejected
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
             $activeCompact.last_event_seq -eq 42 -and
             $activeCompact.events[0].type -eq 'recovery_running'
+        compact_delta_omits_repeated_evidence_arrays = $null -eq $activeCompact.terminal_evidence -and
+            $activeCompact.evidence_totals.event_count -eq 99 -and
+            $activeCompact.evidence_digest -match '^[0-9a-f]{64}$' -and
+            $activeCompact.state_digest -match '^[0-9a-f]{64}$'
+        compact_delta_omits_unchanged_state_and_evidence = -not $unchangedCompact.state_changed -and
+            -not $unchangedCompact.evidence_changed -and $null -eq $unchangedCompact.record -and
+            $null -eq $unchangedCompact.runtime -and $null -eq $unchangedCompact.evidence_totals
+        compact_delta_no_loss_or_duplicate = $deltaNoLoss -and $deltaReset -and
+            $deltaEvents.Count -eq 1 -and $deltaEvents[0].event.type -eq 'reset'
+        compact_delta_invalid_epoch_rejected = $invalidDeltaRejected
         criteria_json = $jsonCriteria.Count -eq 2 -and
             $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')
         criteria_file = $fileCriteria.Count -eq 3 -and
@@ -223,7 +289,11 @@ function Invoke-SupervisionSelfTest {
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
             'expected_cursor_epoch_handshake', 'desktop_review_short_lived_ticket',
-            'inspect_wait_active_runtime', 'criteria_json_array', 'criteria_utf8_file'
+            'desktop_review_v2_explicit_roots',
+            'inspect_wait_active_runtime', 'compact_delta_evidence_digest',
+            'compact_delta_no_loss_or_duplicate', 'compact_delta_invalid_epoch_rejected',
+            'compact_delta_omits_unchanged_state_and_evidence',
+            'criteria_json_array', 'criteria_utf8_file'
         )
     })
 }

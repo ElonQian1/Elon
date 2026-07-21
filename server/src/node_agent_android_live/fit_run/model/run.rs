@@ -6,7 +6,7 @@ use super::transitions::legal_transition;
 use super::{
     validate_identifier, FitBudget, FitBudgetUsage, FitCandidate, FitCodexHandoff, FitEnvironment,
     FitRunPhase, FitSessionContext, FitStopReason, FitTargetPair, FitThresholds,
-    FitTrialCheckpoint,
+    FitTrialCheckpoint, FitVisualMask,
 };
 
 const FIT_RUN_SCHEMA_VERSION: u32 = 1;
@@ -27,6 +27,8 @@ pub(crate) struct CreateFitRunRequest {
     #[serde(default)]
     pub(crate) thresholds: FitThresholds,
     #[serde(default)]
+    pub(crate) visual_mask: FitVisualMask,
+    #[serde(default)]
     pub(crate) auto_start: bool,
 }
 
@@ -38,6 +40,7 @@ impl CreateFitRunRequest {
         self.pair.validate()?;
         self.budget.validate()?;
         self.thresholds.validate()?;
+        self.visual_mask.validate(self.pair.target_rect)?;
         if self.properties.len() > 64
             || self
                 .properties
@@ -69,6 +72,8 @@ pub(crate) struct FitRunDocument {
     pub(crate) budget: FitBudget,
     pub(crate) usage: FitBudgetUsage,
     pub(crate) thresholds: FitThresholds,
+    #[serde(default)]
+    pub(crate) visual_mask: FitVisualMask,
     pub(crate) baseline: Option<FitCandidate>,
     pub(crate) current: Option<FitCandidate>,
     pub(crate) best: Option<FitCandidate>,
@@ -108,6 +113,7 @@ impl FitRunDocument {
             budget: request.budget,
             usage: FitBudgetUsage::default(),
             thresholds: request.thresholds,
+            visual_mask: request.visual_mask,
             baseline: None,
             current: None,
             best: None,
@@ -135,6 +141,7 @@ impl FitRunDocument {
         self.pair.validate()?;
         self.budget.validate()?;
         self.thresholds.validate()?;
+        self.visual_mask.validate(self.pair.target_rect)?;
         Ok(())
     }
 

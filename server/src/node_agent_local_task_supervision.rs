@@ -133,6 +133,13 @@ impl SupervisionState {
     pub(crate) fn contract(&self) -> Option<&SupervisionContract> {
         self.contract.as_ref()
     }
+
+    pub(crate) fn resume_summary_payload(&self) -> Value {
+        json!({
+            "review": self.review,
+            "evidence": self.evidence,
+        })
+    }
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -199,7 +206,9 @@ pub(crate) fn normalize_contract(
         MAX_CRITERION_CHARS,
         "acceptance_criteria",
     )?;
-    let acceptance_criteria = if acceptance_criteria.is_empty() {
+    // A resume without explicit criteria is canonicalized from the root task
+    // later. Filling defaults here would create a false criteria drift.
+    let acceptance_criteria = if acceptance_criteria.is_empty() && task_role != "resume_original" {
         vec![
             "完成用户需求，并遵守项目自身的验证、提交、发布和收尾规则。".to_string(),
             "回传修改、测试、提交/发布结果，以及任何尚未解决的阻塞证据。".to_string(),
@@ -269,6 +278,7 @@ pub(crate) fn record_supervision_event(
                 | "supervision_review"
                 | "supervision_action_intent"
                 | "supervision_action_committed"
+                | "resume_context"
         ),
         "unsupported supervision event type"
     );

@@ -32,6 +32,8 @@ pub(crate) struct VisualDiffRequest {
     pub(crate) current_rect: Option<PixelRect>,
     #[serde(default)]
     pub(crate) projected_current_rect: Option<PixelRect>,
+    #[serde(default)]
+    pub(crate) mask: VisualMask,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -59,7 +61,7 @@ pub(crate) fn compare_images(request: &VisualDiffRequest) -> Result<VisualDiffRe
         request.target_rect,
         request.current_rect,
         request.projected_current_rect,
-        &VisualMask::default(),
+        &request.mask,
         VisualScoreProfile::default(),
     )
 }
@@ -80,6 +82,24 @@ pub(crate) fn compare_target_with_png_projected(
     current_rect: Option<PixelRect>,
     projected_current_rect: Option<PixelRect>,
 ) -> Result<VisualDiffResult> {
+    compare_target_with_png_projected_masked(
+        target_path,
+        current_png,
+        target_rect,
+        current_rect,
+        projected_current_rect,
+        &VisualMask::default(),
+    )
+}
+
+pub(crate) fn compare_target_with_png_projected_masked(
+    target_path: &str,
+    current_png: &[u8],
+    target_rect: Option<PixelRect>,
+    current_rect: Option<PixelRect>,
+    projected_current_rect: Option<PixelRect>,
+    mask: &VisualMask,
+) -> Result<VisualDiffResult> {
     let target = open_image(target_path)?;
     let current = decode_png(current_png)?;
     compare_dynamic_images_with_projection(
@@ -88,7 +108,7 @@ pub(crate) fn compare_target_with_png_projected(
         target_rect,
         current_rect,
         projected_current_rect,
-        &VisualMask::default(),
+        mask,
         VisualScoreProfile::default(),
     )
 }

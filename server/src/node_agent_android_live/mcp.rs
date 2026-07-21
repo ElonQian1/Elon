@@ -113,14 +113,9 @@ pub(crate) async fn handle_request(
 ) -> Option<Value> {
     let id = request.id.clone().unwrap_or(Value::Null);
     let result = match request.method.as_str() {
-        "initialize" => Ok(json!({
-            "protocolVersion": MCP_PROTOCOL_VERSION,
-            "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-ui-live", "version": "1.1.0" },
-            "instructions": "模糊路由任务先调用 ui_confirm_route。PWA 像素证据优先调用 ui_capture_pwa_runtime，它只使用节点本机无头浏览器并返回路径/哈希，不嵌入 Base64。Codex 桌面端 UI 请求先导入任务、读取项目与 Runtime 并检查能力；requiredCapabilities 只能追加系统推导能力。样式优先 Live Patch/FitRun，结构变化使用最小 CODEX_SOURCE_HANDOFF。平台缺口必须声明 deliveryImpact：原业务任务只创建 Worktree handoff，不得就地升级；DELIVERY_NON_BLOCKING 在 businessDeliveryReady=true 后先收尾业务，再由新的 Codex Desktop Worktree 任务后台升级、发布和复检，前台 UI 任务优先使用真机与节点发布资源；DELIVERY_BLOCKING 则暂停业务并分流。全新页面先建骨架和首次构建，再回到真实 Android Renderer。收尾必须调用 ui_check_workflow_completion；仅 completionReady 或经验证的 businessDeliveryReady 允许对应声明。"
-        })),
+        "initialize" => initialize_response(),
         "notifications/initialized" => return None,
-        "tools/list" => Ok(json!({ "tools": tool_definitions() })),
+        "tools/list" => tools_list_response(),
         "tools/call" => call_tool(broker, fit_runs, session_id, request.params).await,
         "ping" => Ok(json!({})),
         _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
@@ -133,6 +128,24 @@ pub(crate) async fn handle_request(
             "error": { "code": -32000, "message": format!("{error:#}") }
         }),
     })
+}
+
+fn initialize_response() -> Result<Value> {
+    let tools = tool_definitions();
+    let tool_contract = super::mcp_tool_contract::manifest(&tools)?;
+    Ok(json!({
+        "protocolVersion": MCP_PROTOCOL_VERSION,
+        "capabilities": { "tools": { "listChanged": false } },
+        "serverInfo": { "name": "yilong-ui-live", "version": "1.2.0" },
+        "toolContract": tool_contract,
+        "instructions": "模糊路由任务先调用 ui_confirm_route。PWA 像素证据优先调用 ui_capture_pwa_runtime，它只使用节点本机无头浏览器并返回路径/哈希，不嵌入 Base64。Codex 桌面端 UI 请求先导入任务、读取项目与 Runtime 并检查能力；requiredCapabilities 只能追加系统推导能力。样式优先 Live Patch/FitRun，结构变化使用最小 CODEX_SOURCE_HANDOFF。平台缺口必须声明 deliveryImpact：原业务任务只创建 Worktree handoff，不得就地升级；DELIVERY_NON_BLOCKING 在 businessDeliveryReady=true 后先收尾业务，再由新的 Codex Desktop Worktree 任务后台升级、发布和复检，前台 UI 任务优先使用真机与节点发布资源；DELIVERY_BLOCKING 则暂停业务并分流。全新页面先建骨架和首次构建，再回到真实 Android Renderer。收尾必须调用 ui_check_workflow_completion；仅 completionReady 或经验证的 businessDeliveryReady 允许对应声明。"
+    }))
+}
+
+fn tools_list_response() -> Result<Value> {
+    let tools = tool_definitions();
+    let tool_contract = super::mcp_tool_contract::manifest(&tools)?;
+    Ok(json!({ "tools": tools, "toolContract": tool_contract }))
 }
 
 async fn call_tool(
@@ -372,6 +385,13 @@ async fn call_tool(
                     .unwrap_or_default(),
                 budget: Default::default(),
                 thresholds: Default::default(),
+                visual_mask: serde_json::from_value(
+                    arguments
+                        .get("visualMask")
+                        .cloned()
+                        .unwrap_or_else(|| json!({})),
+                )
+                .context("visualMask 参数无效")?,
                 auto_start: true,
             };
             let context = fit_session_context(broker, &session_id).await?;
@@ -527,15 +547,7 @@ fn find_node<'a>(
     ir: &'a UiIrDocument,
     arguments: &Value,
 ) -> Result<&'a super::protocol::LiveUiNode> {
-    let runtime_id = arguments.get("runtimeNodeId").and_then(Value::as_str);
-    let definition_id = arguments.get("definitionId").and_then(Value::as_str);
-    ir.nodes
-        .iter()
-        .find(|node| {
-            runtime_id == Some(node.runtime_node_id.as_str())
-                || definition_id == Some(node.definition_id.as_str())
-        })
-        .ok_or_else(|| anyhow!("找不到指定 UI 节点"))
+    super::node_selector::resolve(&ir.nodes, arguments)
 }
 
 fn collect_descendants(ir: &UiIrDocument, ids: &mut Vec<String>) {
@@ -620,6 +632,8 @@ async fn visual_diff_from_ir(
         target_rect: parse_rect(arguments.get("targetRect"))?,
         current_rect: parse_rect(arguments.get("currentRect"))?,
         projected_current_rect: parse_rect(arguments.get("projectedCurrentRect"))?,
+        mask: serde_json::from_value(arguments.get("mask").cloned().unwrap_or_else(|| json!({})))
+            .context("mask 参数无效")?,
     };
     Ok(json!({ "diff": compare_images(&request)?, "currentFrame": current }))
 }

@@ -21,7 +21,7 @@ use super::verification_gate::{
     VerificationGateState,
 };
 use super::visual_diff::{
-    compare_pngs, compare_target_with_png_projected, PixelRect, VisualDiffResult,
+    compare_pngs, compare_target_with_png_projected_masked, PixelRect, VisualDiffResult, VisualMask,
 };
 
 mod geometry;
@@ -29,6 +29,7 @@ mod gradle;
 mod install;
 mod preparation;
 mod runtime_preparation;
+mod runtime_reconnect;
 
 pub(crate) use preparation::PreparationRegistry;
 
@@ -49,6 +50,8 @@ pub(crate) struct BuildVerifyRequest {
     pub(crate) projected_current_rect: Option<PixelRect>,
     pub(crate) target_definition_id: Option<String>,
     pub(crate) target_instance_key: Option<String>,
+    #[serde(default)]
+    pub(crate) visual_mask: VisualMask,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -319,12 +322,13 @@ async fn build_and_verify_inner(
     let visual_diff = target_path
         .as_deref()
         .map(|path| {
-            compare_target_with_png_projected(
+            compare_target_with_png_projected_masked(
                 path,
                 &screenshot,
                 request.target_rect,
                 target_comparison_rect,
                 request.projected_current_rect,
+                &request.visual_mask,
             )
         })
         .transpose()?;

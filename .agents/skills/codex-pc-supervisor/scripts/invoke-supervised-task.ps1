@@ -30,12 +30,20 @@ param(
     [ValidateRange(1, 200)]
     [int]$Limit = 200,
     [string]$ExpectedCursorEpoch = '',
+    [string]$ExpectedStateDigest = '',
+    [string]$ExpectedEvidenceDigest = '',
+    [string]$StateRoot = '',
+    [string]$InstallRoot = '',
     [switch]$Compact
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 $script:SupervisionProtocol = 'elon.desktop_pc_supervision.v1'
+$script:DeltaWaitCapability = 'delta_wait_v1'
+$script:TaskDeltaSchema = 'elon.supervision.task_delta.v1'
+$script:ResumeContextCapability = 'resume_context_v1'
+$script:DesktopReviewCapabilities = @('desktop_review_ticket_v2', 'desktop_review_ticket_v1')
 $script:LastNodeAdminUrl = ''
 $script:CachedNodeAdminUrl = ''
 $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
@@ -279,6 +287,7 @@ function Get-NodeConnection {
                 $token = [string](Get-ObjectField $status 'local_admin_token')
                 $header = [string](Get-ObjectField $status 'local_admin_token_header')
                 $version = [string](Get-ObjectField $status 'version')
+                $supervisionStatus = Get-ObjectField $status 'desktop_supervision'
                 if (-not [string]::IsNullOrWhiteSpace($token) -and
                     $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
                     -not [string]::IsNullOrWhiteSpace($version)) {
@@ -289,6 +298,8 @@ function Get-NodeConnection {
                         Header = $header
                         Token = $token
                         Version = $version
+                        SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
+                        SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
                         ProbeMs = $timer.ElapsedMilliseconds
                     }
                 }
@@ -321,19 +332,34 @@ function Invoke-NodeApi {
 }
 
 function New-DesktopReviewTicket {
-    param([string]$OwnerUserId, [string]$RequestedTaskId)
+    param(
+        [string]$OwnerUserId,
+        [string]$RequestedTaskId,
+        [string]$ReviewStateRoot = '',
+        [string]$ReviewInstallRoot = ''
+    )
     $v2Signer = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $null } else {
         Join-Path $env:LOCALAPPDATA 'ElonNode\_internal\new-desktop-review-ticket.ps1'
     }
     if ($null -ne $v2Signer -and (Test-Path -LiteralPath $v2Signer -PathType Leaf)) {
         # Presence of the v2 signer is an upgrade boundary: access denial must
         # fail closed and must never downgrade to the legacy shared secret.
-        $ticket = & $v2Signer -OwnerUserId $OwnerUserId -TaskId $RequestedTaskId
+        if ([string]::IsNullOrWhiteSpace($ReviewStateRoot) -or
+            [string]::IsNullOrWhiteSpace($ReviewInstallRoot)) {
+            throw 'Desktop review v2 requires explicit -StateRoot and -InstallRoot; implicit credential-root discovery is disabled.'
+        }
+        $ticket = & $v2Signer -OwnerUserId $OwnerUserId -TaskId $RequestedTaskId `
+            -StateRoot $ReviewStateRoot -InstallRoot $ReviewInstallRoot
         if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$ticket)) {
             throw 'Desktop review v2 signer is unavailable to this process identity.'
         }
         return [string]$ticket
     }
+    return New-LegacyDesktopReviewTicket $OwnerUserId $RequestedTaskId
+}
+
+function New-LegacyDesktopReviewTicket {
+    param([string]$OwnerUserId, [string]$RequestedTaskId)
     $credential = [string]$env:ELON_DESKTOP_REVIEW_CREDENTIAL
     if ([string]::IsNullOrWhiteSpace($credential) -or $credential.Trim().Length -lt 32) {
         throw 'Desktop review credential is unavailable; review fails closed.'
@@ -435,35 +461,6 @@ function Get-TaskDetail {
     )
     $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit $Since $CursorEpoch
     Invoke-NodeApi $Connection 'Get' $detailPath
-}
-
-function Convert-ToCompactTaskDetail {
-    param([object]$Detail)
-    $record = Get-RecordFromDetail $Detail
-    $supervision = Get-ObjectField $Detail 'supervision'
-    $events = @((Get-ObjectField $Detail 'events') | ForEach-Object {
-        $event = Get-ObjectField $_ 'event'
-        [ordered]@{
-            seq = Get-ObjectField $_ 'seq'
-            type = Get-ObjectField $event 'type'
-            phase = Get-ObjectField $event 'phase'
-            lifecycle = Get-ObjectField $event 'lifecycle'
-        }
-    })
-    return [ordered]@{
-        record = [ordered]@{
-            task_id = Get-ObjectField $record 'task_id'
-            status = Get-ObjectField $record 'status'
-            error = Get-ObjectField $record 'error'
-            finished_at_ms = Get-ObjectField $record 'finished_at_ms'
-        }
-        runtime = Get-ObjectField $Detail 'runtime'
-        approval_state = Get-ObjectField $Detail 'approval_state'
-        evidence = Get-ObjectField $supervision 'evidence'
-        events = $events
-        last_event_seq = Get-ObjectField $Detail 'last_event_seq'
-        has_more = Get-ObjectField $Detail 'has_more'
-    }
 }
 
 function Get-RecordFromDetail {
@@ -579,9 +576,11 @@ function New-ResumeTaskBody {
     $parentRecord = Get-RecordFromDetail $ParentDetail
     $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
     $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
-    $parentPrompt = [string](Get-ObjectField $parentRecord 'prompt')
     $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
-    $resumePrompt = "The capability repair is complete. Resume the original task. Inspect the current workspace and prior failure evidence before repeating work:`n$parentPrompt"
+    # The node is the authority for root requirement, lineage, acceptance
+    # criteria and workspace identity. Never copy the parent prompt here:
+    # doing so recursively nests compiled executor prompts across generations.
+    $resumePrompt = "Resolve elon.resume_context.v1 for parent_task_id=$RequestedParentTaskId and root_task_id=$rootTask."
     return New-SupervisedTaskBody $parentProjectId $parentWorkspace $resumePrompt `
         'resume_original' $RequestedParentTaskId $rootTask $BodyCriteria $BodyImprovementPolicy
 }
@@ -601,6 +600,7 @@ function Submit-Body {
     })
 }
 
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-delta.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-self-test.ps1')
 if ($Action -eq 'SelfTest') { Invoke-SupervisionSelfTest; exit 0 }
 
@@ -618,6 +618,8 @@ switch ($Action) {
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Probe'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; node_version = $nodeConnection.Version
+            supervision_protocol = $nodeConnection.SupervisionProtocol
+            supervision_capabilities = @($nodeConnection.SupervisionCapabilities)
             probe_ms = $nodeConnection.ProbeMs; cache_contains_token = $false
         })
     }
@@ -645,9 +647,19 @@ switch ($Action) {
         Submit-Body $nodeConnection $submitBody 'Submit'
     }
     'Inspect' {
+        if ($Compact) {
+            Assert-NodeSupervisionCapability $nodeConnection $script:DeltaWaitCapability 'Compact Inspect'
+        }
         $detail = Get-TaskDetail $nodeConnection $TaskId $Limit $Since $ExpectedCursorEpoch
         $nextCursor = [int](Get-ObjectField $detail 'last_event_seq')
-        $resultDetail = if ($Compact) { Convert-ToCompactTaskDetail $detail } else { $detail }
+        $record = Get-RecordFromDetail $detail
+        $inspectStatus = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
+        $terminalStatuses = @('done', 'finished', 'success', 'succeeded', 'failed', 'error', 'canceled', 'cancelled', 'interrupted', 'resume_required')
+        $resultDetail = if ($Compact) {
+            Select-TaskDeltaChanges `
+                (Convert-ToCompactTaskDetail $detail $null ($terminalStatuses -contains $inspectStatus)) `
+                $ExpectedStateDigest $ExpectedEvidenceDigest
+        } else { $detail }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Inspect'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId
@@ -661,23 +673,41 @@ switch ($Action) {
             requested_cursor_epoch = Get-ObjectField $detail 'requested_cursor_epoch'
             previous_cursor_epoch = Get-ObjectField $detail 'previous_cursor_epoch'
             sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
+            delta_from = $(if ($Since -ge 0) { $Since } else { 0 })
+            delta_to = $nextCursor
+            delta_event_count = @((Get-ObjectField $detail 'events')).Count
+            state_digest = $(if ($Compact) { Get-ObjectField $resultDetail 'state_digest' } else { $null })
+            delta_schema = $(if ($Compact) { $script:TaskDeltaSchema } else { $null })
         })
     }
     'Wait' {
+        if ($Compact) {
+            Assert-NodeSupervisionCapability $nodeConnection $script:DeltaWaitCapability 'Compact Wait'
+        }
         $terminalStatuses = @('done', 'finished', 'success', 'succeeded', 'failed', 'error', 'canceled', 'cancelled', 'interrupted', 'resume_required')
         $timer = [System.Diagnostics.Stopwatch]::StartNew()
         $detail = $null
         $status = ''
         $cursor = if ($Since -ge 0) { $Since } else { 0 }
+        $initialCursor = $cursor
         $cursorEpoch = $ExpectedCursorEpoch
         $waitLimit = if ($PSBoundParameters.ContainsKey('Limit')) { $Limit } else { 25 }
+        $collectedEvents = New-Object System.Collections.Generic.List[object]
+        $seenEvents = @{}
+        $sawCursorReset = $false
         do {
             try {
                 # Poll only a small event window. The node computes the
                 # supervision evidence summary from the complete journal.
-                $detail = Get-TaskDetail $nodeConnection $TaskId $waitLimit $cursor $cursorEpoch
+                $remainingEventCapacity = $waitLimit - $collectedEvents.Count
+                if ($remainingEventCapacity -le 0) { break }
+                $pageLimit = [Math]::Max(1, [Math]::Min($waitLimit, $remainingEventCapacity))
+                $detail = Get-TaskDetail $nodeConnection $TaskId $pageLimit $cursor $cursorEpoch
                 $record = Get-RecordFromDetail $detail
                 $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
+                if (Merge-TaskDeltaEvents $collectedEvents $seenEvents $detail) {
+                    $sawCursorReset = $true
+                }
                 $returnedCursor = [int](Get-ObjectField $detail 'last_event_seq')
                 if ((Get-ObjectField $detail 'cursor_reset') -eq $true) {
                     $cursor = [int](Get-ObjectField $detail 'resume_cursor')
@@ -685,19 +715,25 @@ switch ($Action) {
                 $returnedEpoch = [string](Get-ObjectField $detail 'cursor_epoch')
                 if (-not [string]::IsNullOrWhiteSpace($returnedEpoch)) { $cursorEpoch = $returnedEpoch }
                 if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
+                if ($collectedEvents.Count -ge $waitLimit) { break }
                 if ((Get-ObjectField $detail 'has_more') -eq $true) { continue }
             } catch {
                 if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) { throw }
             }
             Start-Sleep -Seconds 2
         } while ($timer.Elapsed.TotalSeconds -lt $WaitSeconds)
-        $resultDetail = if ($Compact) { Convert-ToCompactTaskDetail $detail } else { $detail }
+        $isTerminal = $terminalStatuses -contains $status
+        $resultDetail = if ($Compact) {
+            Select-TaskDeltaChanges `
+                (Convert-ToCompactTaskDetail $detail ($collectedEvents.ToArray()) $isTerminal) `
+                $ExpectedStateDigest $ExpectedEvidenceDigest
+        } else { $detail }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Wait'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId; status = $status
             since = $(if ($Since -ge 0) { $Since } else { 0 }); limit = $waitLimit
             next_cursor = $cursor; detail = $resultDetail
-            cursor_reset = [bool](Get-ObjectField $detail 'cursor_reset')
+            cursor_reset = [bool]($sawCursorReset -or (Get-ObjectField $detail 'cursor_reset'))
             requested_cursor = Get-ObjectField $detail 'requested_cursor'
             old_cursor = Get-ObjectField $detail 'old_cursor'
             new_cursor = Get-ObjectField $detail 'new_cursor'
@@ -706,16 +742,22 @@ switch ($Action) {
             requested_cursor_epoch = Get-ObjectField $detail 'requested_cursor_epoch'
             previous_cursor_epoch = Get-ObjectField $detail 'previous_cursor_epoch'
             sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
+            delta_from = $initialCursor
+            delta_to = $cursor
+            delta_event_count = $collectedEvents.Count
+            state_digest = $(if ($Compact) { Get-ObjectField $resultDetail 'state_digest' } else { $null })
+            delta_schema = $(if ($Compact) { $script:TaskDeltaSchema } else { $null })
         })
     }
     'Review' {
+        Assert-NodeSupervisionAnyCapability $nodeConnection $script:DesktopReviewCapabilities 'Desktop Review'
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
         $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
         $detail = Get-TaskDetail $nodeConnection $TaskId 1
         $record = Get-RecordFromDetail $detail
         $ownerUserId = [string](Get-ObjectField $record 'owner_user_id')
-        $ticket = New-DesktopReviewTicket $ownerUserId $TaskId.Trim()
+        $ticket = New-DesktopReviewTicket $ownerUserId $TaskId.Trim() $StateRoot $InstallRoot
         $response = Invoke-NodeApi $nodeConnection 'Post' "/api/local-tasks/$encodedTaskId/supervision/desktop-review" `
             $reviewBody @{ 'x-elon-desktop-review-ticket' = $ticket }
         Convert-ToJsonResult ([ordered]@{
@@ -730,6 +772,7 @@ switch ($Action) {
         Submit-Body $nodeConnection $improvementBody 'Improve'
     }
     'Resume' {
+        Assert-NodeSupervisionCapability $nodeConnection $script:ResumeContextCapability 'Resume'
         $parentDetail = Get-TaskDetail $nodeConnection $TaskId
         $resumeBody = New-ResumeTaskBody $parentDetail $TaskId $resolvedAcceptanceCriteria $ImprovementPolicy
         Submit-Body $nodeConnection $resumeBody 'Resume'

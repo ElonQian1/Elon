@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ai-task-finish-contract.sh"
+
 create_worktree=0
 always_create_worktree=0
 branch_prefix="codex/task"
@@ -89,6 +91,11 @@ git_fetch_with_retry() {
 write_ai_workflow_guard() {
   local edit_root="$1"
   local state="$2"
+  local contract_id=""
+
+  if [[ "$state" != "blocked_needs_worktree" && -e "$edit_root/.git" ]]; then
+    contract_id="$(new_ai_task_finish_contract "$edit_root")"
+  fi
 
   echo "AI_WORKFLOW_GUARD_BEGIN"
   echo "EDIT_ROOT=$edit_root"
@@ -96,9 +103,11 @@ write_ai_workflow_guard() {
   echo "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
   echo "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
   echo "RULE_PUSH=after commit run git push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
-  echo "RULE_FINISH=after push run scripts/finish-ai-task.sh --kind <Kind>; it verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
+  [[ -z "$contract_id" ]] || echo "FINISH_CONTRACT_SCHEMA=elon.ai_finish_contract.v1"
+  [[ -z "$contract_id" ]] || echo "FINISH_CONTRACT_ID=$contract_id"
+  echo "RULE_FINISH=after push run the exact FINISH_COMMAND_SHELL; it validates the preflight identity, verifies origin/main, syncs main, audits artifacts, and cleans the task worktree."
   echo "FINISH_COMMAND_POWERSHELL=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\finish-ai-task.ps1 -Kind CodePushed"
-  echo "FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed"
+  printf 'FINISH_COMMAND_SHELL=bash scripts/finish-ai-task.sh --kind CodePushed --task-worktree %q --task-contract %q\n' "$edit_root" "$contract_id"
   echo "AI_WORKFLOW_GUARD_END"
 }
 

@@ -11,6 +11,7 @@ use super::broker::LiveUiSession;
 use super::capability_requirements::requested_capabilities;
 
 mod handoff;
+mod reconciliation;
 
 #[cfg(test)]
 mod capability_contract_tests;
@@ -251,6 +252,8 @@ pub(crate) async fn report_gap(session: &LiveUiSession, arguments: &Value) -> Re
         upgrade_rounds: 0,
         attempts: Vec::new(),
         failure_signatures: Vec::new(),
+        reconciled_by_gap_id: None,
+        reconciled_at: None,
         created_at: now.clone(),
         updated_at: now,
         last_error: None,
@@ -274,9 +277,13 @@ pub(crate) fn delegated_gap(
     task_id: &str,
 ) -> Result<Option<DelegatedCapabilityGap>> {
     let root = canonical_project_root(session)?;
-    Ok(list_gaps(&root)?
+    let gaps = list_gaps(&root)?;
+    Ok(gaps
         .iter()
-        .find(|gap| handoff::is_delegated_business_gap(gap, task_id))
+        .find(|gap| {
+            handoff::is_delegated_business_gap(gap, task_id)
+                && !reconciliation::has_completed_successor(&gaps, gap)
+        })
         .map(DelegatedCapabilityGap::from_gap))
 }
 
@@ -314,8 +321,15 @@ pub(crate) fn control_gap(session: &LiveUiSession, arguments: &Value) -> Result<
     }
     gap.updated_at = Utc::now().to_rfc3339();
     save_gap(&gap)?;
+    let origin_reconciliation =
+        if action == "RECHECK_PASSED" && gap.delegation.is_evolution_thread() {
+            reconciliation::reconcile_origin(&root, &gap)?
+        } else {
+            None
+        };
     Ok(json!({
         "gap": gap,
+        "originReconciliation": origin_reconciliation,
         "resumeOriginalTask": gap.status == CapabilityGapStatus::Resumed,
         "notifyOriginTask": gap.status == CapabilityGapStatus::Completed,
         "next": next_action(&gap),
@@ -627,6 +641,10 @@ pub(crate) struct CapabilityGapDocument {
     upgrade_rounds: u32,
     attempts: Vec<CapabilityUpgradeAttempt>,
     failure_signatures: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reconciled_by_gap_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    reconciled_at: Option<String>,
     created_at: String,
     updated_at: String,
     last_error: Option<String>,
@@ -764,6 +782,8 @@ mod tests {
                 changed_files: vec![],
             }],
             failure_signatures: vec![],
+            reconciled_by_gap_id: None,
+            reconciled_at: None,
             created_at: "now".into(),
             updated_at: "now".into(),
             last_error: None,

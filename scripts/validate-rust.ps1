@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
-$RepoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel).Trim()
-if ($LASTEXITCODE -ne 0) { throw "Unable to resolve repository root." }
+$RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+& git -C $RepoRoot rev-parse --is-inside-work-tree *> $null
+if ($LASTEXITCODE -ne 0) { throw "Unable to validate repository root." }
 $Modules = Join-Path $RepoRoot "scripts\validation"
 Import-Module (Join-Path $Modules "Validation.Arguments.psm1") -Force -DisableNameChecking
 $parsed = Split-ValidationCargoArguments -Arguments $args -ValueOptions @{

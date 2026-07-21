@@ -41,6 +41,7 @@ $repoRoot = $repoRoot.Trim()
 
 $preflightScript = Join-Path $repoRoot "scripts\ai-task-preflight.ps1"
 $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
+$finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $cleanupSh = Join-Path $repoRoot "scripts\cleanup-task-worktrees.sh"
 $preflightContent = Get-Content -Raw -LiteralPath $preflightScript
@@ -63,7 +64,11 @@ Assert-Contains $preflightShContent "is_pc_conversation_worktree()" "Shell prefl
 Assert-Contains $preflightContent "PC_CONVERSATION_WORKTREE=true" "PowerShell preflight must expose when the current workspace is already a PC conversation worktree."
 Assert-Contains $preflightShContent "PC_CONVERSATION_WORKTREE=true" "Shell preflight must expose when the current workspace is already a PC conversation worktree."
 Assert-Contains $preflightContent "FINISH_COMMAND_POWERSHELL=" "PowerShell preflight must print the deterministic finish entry point."
+Assert-Contains $preflightContent "FINISH_CONTRACT_ID=" "PowerShell preflight must issue an immutable finish contract."
+Assert-Contains $preflightContent "-TaskContract" "PowerShell finish command must bind the preflight contract."
 Assert-Contains $preflightShContent "FINISH_COMMAND_SHELL=" "Shell preflight must print the deterministic finish entry point."
+Assert-Contains $preflightShContent "FINISH_CONTRACT_ID=" "Shell preflight must issue an immutable finish contract."
+Assert-Contains $preflightShContent "--task-contract" "Shell finish command must bind the preflight contract."
 Assert-Contains $preflightContent "--untracked-files=no" "PowerShell preflight must separate tracked main changes from untracked hygiene warnings."
 Assert-Contains $preflightShContent "--untracked-files=no" "Shell preflight must separate tracked main changes from untracked hygiene warnings."
 Assert-Contains $cleanupContent "Test-PlatformSessionWorktree" "PowerShell cleanup must recognize platform conversation worktrees."
@@ -300,9 +305,10 @@ try {
 
     New-Item -ItemType Directory -Path (Join-Path $seedRepo "scripts") | Out-Null
     Copy-Item -LiteralPath $preflightScript -Destination (Join-Path $seedRepo "scripts\ai-task-preflight.ps1")
+    Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $seedRepo "scripts\ai-task-finish-contract.ps1")
     Set-Content -LiteralPath (Join-Path $seedRepo "README.md") -Value "preflight workflow test`n" -Encoding UTF8
 
-    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1") | Out-Null
+    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/ai-task-finish-contract.ps1") | Out-Null
     Invoke-Git $seedRepo @("commit", "-m", "seed preflight workflow test") | Out-Null
     Invoke-Git $seedRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $seedRepo @("push", "-u", "origin", "main") | Out-Null

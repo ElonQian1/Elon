@@ -12,6 +12,7 @@
 | Codex 桌面监督、一龙 PC 执行、用户任务与平台改进双闭环 | `docs/supervised-pc-project-development.md`、`docs/system-architecture.md` 的“PC 节点 AI 运行路线” |
 | PC 节点 AI 三层架构 / Codex JSON、pipe sidecar 与 PTY 分工 | `AI_ARCHITECTURE.md` 的“PC 节点 AI 运行路线”、`docs/符号索引讨论/我们项目的cli能力.md` |
 | Codex 桌面监督 / PC 本机执行 / 验收、能力修复与续跑 | `docs/codex-desktop-pc-supervision.md`、`.agents/skills/codex-pc-supervisor/`、`server/src/node_agent_local_task_supervision.rs` |
+| Codex 桌面低 token 增量 Wait / Resume 上下文 / 终态 / A/B 度量 | `docs/codex-desktop-workflow-efficiency.md`、`server/src/node_agent_supervision_protocol.rs`、`scripts/compare-ai-workflow-efficiency.ps1` |
 | Win 节点轻量工具箱 / Codex CLI 临时 PATH / 工具收录策略 | `docs/win-node-toolbox.md`、`server/src/node_agent_cli_env.rs`、`server/src/node_agent_cli_tool_catalog.rs` |
 | PC 节点项目数据架构体检 / 共享缓存分析 / 渐进治理 | `docs/pc-node-data-root.md`、`server/pc-dev-runtime/src/node_data_paths.rs`、`server/src/node_agent_data_root/`、`server/src/node_agent_cache_advisor.rs` |
 | Windows 节点升级兼容 / 自动迁移 / 灰度 / 事故处置 | `docs/node-agent-upgrade-compatibility.md` |

@@ -162,6 +162,10 @@ impl CapabilityGapHandoffPolicy {
         self.execution_mode == GapExecutionMode::EvolutionThread
     }
 
+    pub(super) fn origin_gap_id(&self) -> Option<&str> {
+        self.origin_gap_id.as_deref()
+    }
+
     pub(super) fn thread_handoff(&self, gap: &CapabilityGapDocument) -> Value {
         if !self.is_business_thread() {
             return Value::Null;

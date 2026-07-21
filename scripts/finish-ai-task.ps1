@@ -15,6 +15,10 @@ param(
 
     [string]$TaskWorktree = "",
 
+    [string]$TaskContract = "",
+
+    [switch]$AllowLegacyNoTaskContract,
+
     [switch]$SkipArtifactCleanup,
 
     [switch]$SkipWorktreeCleanup
@@ -24,6 +28,8 @@ $ErrorActionPreference = "Stop"
 $businessStatus = "not_checked"
 $localMainStatus = "not_checked"
 $taskWorktreeStatus = "not_checked"
+
+. (Join-Path $PSScriptRoot 'ai-task-finish-contract.ps1')
 
 function Invoke-NativeCapture {
     param(
@@ -278,6 +284,18 @@ try {
 
     $taskRoot = (Invoke-GitRequired -RepoPath $startPath -GitArgs @("rev-parse", "--show-toplevel")).Trim()
     $taskRoot = [System.IO.Path]::GetFullPath($taskRoot)
+    $taskBranch = (Invoke-GitRequired -RepoPath $taskRoot -GitArgs @("branch", "--show-current")).Trim()
+    $taskLeaf = Split-Path -Leaf $taskRoot
+    $requiresContract = $taskBranch -like "codex/*" -or $taskLeaf -match '-task-\d{8}-\d{6}'
+    if ($requiresContract -and [string]::IsNullOrWhiteSpace($TaskContract) -and -not $AllowLegacyNoTaskContract) {
+        throw "Managed task worktree requires the immutable TaskContract emitted by preflight."
+    }
+    if (-not [string]::IsNullOrWhiteSpace($TaskContract)) {
+        $null = Assert-AiTaskFinishContract -RepoPath $taskRoot -ContractId $TaskContract
+        Write-Host "FINISH_CONTRACT_STATUS=validated:$TaskContract"
+    } elseif ($AllowLegacyNoTaskContract) {
+        Write-Host "FINISH_CONTRACT_STATUS=legacy_override"
+    }
     $policy = Read-WorkspacePolicy -RepoPath $taskRoot
 
     $directNetworkScript = Join-Path $taskRoot "scripts\direct-network.ps1"
@@ -307,7 +325,6 @@ try {
 
     Invoke-CompletionCheck -RepoPath $taskRoot -CompletionKind $Kind
     $businessStatus = "complete"
-    $taskBranch = (Invoke-GitRequired -RepoPath $taskRoot -GitArgs @("branch", "--show-current")).Trim()
     $isPlatformManagedTask = $taskBranch -like "ai/session/*"
 
     $entries = @(Get-GitWorktreeEntries -RepoPath $taskRoot)
@@ -351,7 +368,6 @@ try {
 
     $taskNormalized = Normalize-PathText $taskRoot
     $mainNormalized = Normalize-PathText $mainPath
-    $taskLeaf = Split-Path -Leaf $taskRoot
     $isManagedTaskWorktree = $taskBranch -like "codex/*" -or $taskLeaf -match '-task-\d{8}-\d{6}'
 
     if ($taskNormalized -eq $mainNormalized) {

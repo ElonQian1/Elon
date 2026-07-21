@@ -42,6 +42,7 @@ pub(super) fn build_verify_request(run: &FitRunDocument) -> BuildVerifyRequest {
         projected_current_rect: Some(pixel_rect(run.pair.projected_target_rect)),
         target_definition_id: Some(run.pair.definition_id.clone()),
         target_instance_key: run.pair.instance_key.clone(),
+        visual_mask: run.visual_mask.visual_mask(),
     }
 }
 

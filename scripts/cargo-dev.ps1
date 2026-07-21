@@ -29,11 +29,11 @@ if ($CargoArgs.Count -eq 0) {
     Write-Error "Usage: powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 [wrapper-options] -- <cargo-args...>"
 }
 
-$gitRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null)
-if ($LASTEXITCODE -ne 0 -or -not $gitRoot) {
+$RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+& git -C $RepoRoot rev-parse --is-inside-work-tree *> $null
+if ($LASTEXITCODE -ne 0) {
     Write-Error "Current script is not inside a Git repository."
 }
-$RepoRoot = $gitRoot.Trim()
 
 if (-not $BypassValidationOrchestrator) {
     $validationArgs = @("-Domain", $Domain)

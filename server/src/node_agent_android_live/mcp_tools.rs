@@ -268,6 +268,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "targetRect":rect_value_schema(),
                     "currentRect":rect_value_schema(),
                     "projectedCurrentRect":rect_value_schema()
+                    ,"mask":{"type":"object","properties":{"excludeRects":{"type":"array","maxItems":24,"items":rect_value_schema()}}}
                 }
             }),
         ),
@@ -297,6 +298,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "properties":{"type":"array","items":{"type":"string"}},
                     "maxEvaluations":{"type":"integer","minimum":1,"maximum":24},
                     "initialStepDp":{"type":"number","minimum":0.25,"maximum":32}
+                    ,"visualMask":{"type":"object","properties":{"excludeRects":{"type":"array","maxItems":24,"items":rect_value_schema()}}}
                 }
             }),
         ),
@@ -305,14 +307,17 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             "创建并立即启动可恢复的自动拟合任务。它会持久化每次试验、预算、最佳结果和学习案例；达到候选后再确认写回源码。",
             json!({
                 "type":"object",
-                "required":["runtimeNodeId","targetRect","projectedTargetRect"],
+                "required":["targetRect","projectedTargetRect"],
+                "anyOf":[{"required":["runtimeNodeId"]},{"required":["selector"]}],
                 "properties":{
                     "taskId":{"type":"string","maxLength":128,"description":"可选；默认绑定当前结构化 UI 任务"},
                     "runtimeNodeId":{"type":"string"},
+                    "selector":stable_selector_value_schema(),
                     "targetRect":rect_value_schema(),
                     "projectedTargetRect":rect_value_schema(),
                     "properties":{"type":"array","items":{"type":"string"},"maxItems":64},
-                    "environment":{"type":"object"}
+                    "environment":{"type":"object"},
+                    "visualMask":fit_visual_mask_schema()
                 }
             }),
         ),
@@ -625,12 +630,50 @@ mod annotation_tests {
 fn node_selector_schema() -> Value {
     json!({
         "type":"object",
-        "properties":{"runtimeNodeId":{"type":"string"},"definitionId":{"type":"string"}}
+        "oneOf":[{"required":["runtimeNodeId"]},{"required":["selector"]},{"required":["definitionId"]}],
+        "properties":{
+            "runtimeNodeId":{"type":"string","description":"精确但仅当前 Runtime 有效"},
+            "selector":stable_selector_value_schema(),
+            "definitionId":{"type":"string","description":"兼容字段；多实例时会拒绝歧义"},
+            "instanceKey":{"type":"string"},
+            "screenId":{"type":"string"}
+        }
+    })
+}
+
+fn stable_selector_value_schema() -> Value {
+    json!({
+        "type":"object","required":["definitionId"],
+        "properties":{
+            "definitionId":{"type":"string","minLength":1},
+            "instanceKey":{"type":"string"},
+            "screenId":{"type":"string"}
+        }
     })
 }
 
 fn rect_schema() -> Value {
     json!({"type":"object","properties":{"rect":rect_value_schema()}})
+}
+
+fn fit_visual_mask_schema() -> Value {
+    json!({
+        "type":"object",
+        "description":"排除区域坐标相对 target crop；只允许动态内容或批注，合计不超过 25%。",
+        "properties":{
+            "regions":{
+                "type":"array","maxItems":24,
+                "items":{
+                    "type":"object","required":["kind","rect","reason"],
+                    "properties":{
+                        "kind":{"enum":["DYNAMIC_CONTENT","ANNOTATION"]},
+                        "rect":rect_value_schema(),
+                        "reason":{"type":"string","minLength":1,"maxLength":240}
+                    }
+                }
+            }
+        }
+    })
 }
 
 fn rect_value_schema() -> Value {

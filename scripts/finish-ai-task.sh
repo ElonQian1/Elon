@@ -3,6 +3,8 @@ set -euo pipefail
 
 kind="CodePushed"
 task_worktree=""
+task_contract=""
+allow_legacy_no_task_contract=0
 skip_artifact_cleanup=0
 skip_worktree_cleanup=0
 
@@ -10,10 +12,12 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --kind) kind="${2:?missing value for --kind}"; shift 2 ;;
     --task-worktree) task_worktree="${2:?missing value for --task-worktree}"; shift 2 ;;
+    --task-contract) task_contract="${2:?missing value for --task-contract}"; shift 2 ;;
+    --allow-legacy-no-task-contract) allow_legacy_no_task_contract=1; shift ;;
     --skip-artifact-cleanup) skip_artifact_cleanup=1; shift ;;
     --skip-worktree-cleanup) skip_worktree_cleanup=1; shift ;;
     -h|--help)
-      echo "Usage: bash scripts/finish-ai-task.sh [--kind CodePushed] [--task-worktree PATH]"
+      echo "Usage: bash scripts/finish-ai-task.sh [--kind CodePushed] [--task-worktree PATH] [--task-contract ID]"
       exit 0
       ;;
     *) echo "Unknown argument: $1" >&2; exit 2 ;;
@@ -23,6 +27,8 @@ done
 business_status="not_checked"
 local_main_status="not_checked"
 task_worktree_status="not_checked"
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ai-task-finish-contract.sh"
 
 finish_error() {
   echo "BUSINESS_STATUS=$business_status"
@@ -36,6 +42,21 @@ finish_error() {
 start_path="${task_worktree:-$PWD}"
 [[ -e "$start_path" ]] || finish_error "Task worktree does not exist: $start_path"
 task_root="$(git -C "$start_path" rev-parse --show-toplevel)"
+task_branch="$(git -C "$task_root" branch --show-current)"
+task_leaf="$(basename "$task_root")"
+requires_contract=0
+if [[ "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
+  requires_contract=1
+fi
+if [[ "$requires_contract" -eq 1 && -z "$task_contract" && "$allow_legacy_no_task_contract" -ne 1 ]]; then
+  finish_error 'Managed task worktree requires the immutable task contract emitted by preflight.'
+fi
+if [[ -n "$task_contract" ]]; then
+  assert_ai_task_finish_contract "$task_root" "$task_contract" || finish_error "Task finish contract validation failed: $task_contract"
+  echo "FINISH_CONTRACT_STATUS=validated:$task_contract"
+elif [[ "$allow_legacy_no_task_contract" -eq 1 ]]; then
+  echo 'FINISH_CONTRACT_STATUS=legacy_override'
+fi
 policy_path="$task_root/.ai/workspace-policy.txt"
 [[ -f "$policy_path" ]] || finish_error "Workspace policy is missing: $policy_path"
 
@@ -139,7 +160,6 @@ case "$kind" in
   *) finish_error "Unsupported completion kind: $kind" ;;
 esac
 business_status="complete"
-task_branch="$(git -C "$task_root" branch --show-current)"
 is_platform_managed_task=0
 [[ "$task_branch" == ai/session/* ]] && is_platform_managed_task=1
 
@@ -176,7 +196,6 @@ if [[ "$skip_main_sync" -eq 0 ]]; then
 fi
 audit_untracked "$main_path" "MAIN_UNTRACKED_STATUS"
 
-task_leaf="$(basename "$task_root")"
 if [[ "$(cd "$task_root" && pwd -P)" == "$(cd "$main_path" && pwd -P)" ]]; then
   task_worktree_status="main_baseline_not_applicable"
 elif [[ "$task_branch" == ai/session/* ]]; then
