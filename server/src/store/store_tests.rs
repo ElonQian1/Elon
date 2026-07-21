@@ -50,11 +50,11 @@ fn register_external_project_persists_and_updates_node_binding() {
         same_path.project.workspace_path.as_deref(),
         Some(r"D:\rust\active-projects\one")
     );
-    assert_eq!(same_path.project.runtime_permission, "danger_full_access");
+    assert_eq!(same_path.project.runtime_permission, "full_access");
     let permission = store
         .get_project_runtime_permission(&first.project.id)
         .expect("runtime permission API record should use the project default");
-    assert_eq!(permission.mode, "danger_full_access");
+    assert_eq!(permission.mode, "full_access");
 
     let second = store
         .register_external_project(
