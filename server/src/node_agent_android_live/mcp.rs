@@ -82,17 +82,11 @@ pub(crate) async fn descriptor_for_project(
     project_root: &str,
     host_port: u16,
 ) -> Result<Option<Value>> {
-    let (session, binding, restored_after_restart) =
-        super::runtime_binding::select_or_restore(broker, project_root, host_port).await?;
+    let (session, runtime_binding) =
+        super::runtime_binding::select_or_control(broker, project_root, host_port).await?;
     let mut value = descriptor(&session, host_port)?;
-    value["runtimeBinding"] = json!({
-        "projectRoot": binding.project_root,
-        "deviceId": binding.device_id,
-        "packageName": binding.package_name,
-        "sourceRevision": binding.source_revision,
-        "rootTaskId": binding.root_task_id,
-        "restoredAfterRestart": restored_after_restart,
-    });
+    value["runtimeBinding"] =
+        super::runtime_binding::descriptor_view(project_root, runtime_binding);
     Ok(Some(value))
 }
 

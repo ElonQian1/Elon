@@ -266,13 +266,15 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_capture_android_launcher_surface",
-            "切换到 Android 系统 HOME/Launcher 后捕获真实表面；可同时按 iconRect 产出图标裁剪工件。",
+            "按 packageName 在 Android HOME/Launcher 桌面页及应用抽屉中有界定位图标，捕获后恢复原页面与 Runtime；仍可显式提供 iconRect。",
             json!({
                 "type":"object","additionalProperties":false,"properties":{
                     "deviceId":{"type":"string","minLength":1,"maxLength":128},
                     "packageName":{"type":"string","minLength":1,"maxLength":180},
+                    "appLabel":{"type":"string","minLength":1,"maxLength":180},
                     "iconRect":rect_value_schema(),
-                    "settleMs":{"type":"integer","minimum":200,"maximum":5000,"default":900}
+                    "settleMs":{"type":"integer","minimum":200,"maximum":5000,"default":900},
+                    "maxPages":{"type":"integer","minimum":1,"maximum":32,"default":24}
                 }
             }),
         ),

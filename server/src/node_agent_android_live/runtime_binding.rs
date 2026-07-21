@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::wait_for_runtime;
@@ -312,6 +313,52 @@ pub(crate) async fn select_or_restore(
             Ok((session, persisted, true))
         }
         Err(error) => Err(error),
+    }
+}
+
+/// Creates a repository control-plane session when no durable Android Runtime
+/// exists. Repository-scoped tools stay callable, while `effective_session_id`
+/// automatically switches to a later real Runtime for the same project.
+pub(crate) async fn select_or_control(
+    broker: &LiveUiBroker,
+    project_root: &str,
+    host_port: u16,
+) -> Result<(
+    std::sync::Arc<LiveUiSession>,
+    Option<(DurableRuntimeBinding, bool)>,
+)> {
+    match select_or_restore(broker, project_root, host_port).await {
+        Ok((session, binding, restored)) => Ok((session, Some((binding, restored)))),
+        Err(error) if error.to_string().contains("RUNTIME_BINDING_MISSING") => Ok((
+            broker
+                .create_session(
+                    "ui-design-bootstrap".to_string(),
+                    "ui.design.bootstrap".to_string(),
+                    Some(project_root.to_string()),
+                    super::adb_session::DEFAULT_DEVICE_PORT,
+                )
+                .await,
+            None,
+        )),
+        Err(error) => Err(error),
+    }
+}
+
+pub(crate) fn descriptor_view(
+    project_root: &str,
+    binding: Option<(DurableRuntimeBinding, bool)>,
+) -> Value {
+    match binding {
+        Some((binding, restored)) => json!({
+            "status": "BOUND", "projectRoot": binding.project_root,
+            "deviceId": binding.device_id, "packageName": binding.package_name,
+            "sourceRevision": binding.source_revision, "rootTaskId": binding.root_task_id,
+            "restoredAfterRestart": restored,
+        }),
+        None => json!({
+            "status": "UNAVAILABLE", "projectRoot": project_root,
+            "diagnostic": "RUNTIME_BINDING_MISSING", "controlPlaneAvailable": true,
+        }),
     }
 }
 
