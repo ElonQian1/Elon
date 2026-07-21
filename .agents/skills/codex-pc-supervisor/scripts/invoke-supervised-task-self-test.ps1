@@ -247,6 +247,7 @@ function Invoke-SupervisionSelfTest {
         legacy_criteria = $testBody.supervision.acceptance_criteria.Count -eq 2
         task_role = $testBody.supervision.task_role -eq 'requirement'
         request_workspace = $requestRoundTrip.workspace_path -ceq $testWorkspace
+        request_permission = $requestRoundTrip.runtime_permission -eq 'full_access'
         request_prompt = $requestRoundTrip.prompt -ceq $testPrompt
         request_criteria = $requestRoundTrip.supervision.acceptance_criteria[0] -ceq $testCriteria[0]
         response_workspace = $decodedParent.record.workspace_path -ceq $testExecutionWorkspace

@@ -107,6 +107,9 @@ pub(super) fn record_provisioned_supervised_task(
         "local task record did not preserve the provisioned execution worktree"
     );
     let status = serde_json::json!({
+        "platform_provenance": "elon.conversation_worktree.v1",
+        "project_id": request.project_id,
+        "root_task_id": request.root_task_id,
         "base_workspace_path": workspace.base_workspace_path,
         "active_workspace_path": workspace.workspace_path,
         "isolated": workspace.isolated,
@@ -114,6 +117,18 @@ pub(super) fn record_provisioned_supervised_task(
         "git_head": crate::node_agent_update_checkpoint::git_output(
             std::path::Path::new(&workspace.workspace_path),
             &["rev-parse", "--verify", "HEAD^{commit}"],
+        ),
+        "base_revision": crate::node_agent_update_checkpoint::git_output(
+            std::path::Path::new(request.base_workspace_path),
+            &["rev-parse", "--verify", "HEAD^{commit}"],
+        ),
+        "git_common_dir": crate::node_agent_update_checkpoint::git_output(
+            std::path::Path::new(&workspace.workspace_path),
+            &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        ),
+        "git_remote": crate::node_agent_update_checkpoint::git_output(
+            std::path::Path::new(request.base_workspace_path),
+            &["config", "--get", "remote.origin.url"],
         ),
         "prepare_status": "provisioned_supervised_worktree",
         "merge_status": "preserved",

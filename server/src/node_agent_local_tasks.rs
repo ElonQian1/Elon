@@ -266,10 +266,10 @@ async fn create_task(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or("full_access");
-    if runtime_permission != "full_access" {
+    if !matches!(runtime_permission, "full_access" | "danger_full_access") {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "离线本机任务首版只允许已显式授权的 full_access 工作目录。",
+            "PROJECT_FULL_ACCESS_DISABLED: 本机监督任务要求项目启用完全访问。",
         );
     }
     let workspace_path = match root_workspace::resolve_request_workspace(

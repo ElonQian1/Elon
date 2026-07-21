@@ -148,7 +148,11 @@ impl FullAccessGrantState {
     ) -> Result<()> {
         let project_id = clean_required("project_id", project_id)?;
         let workspace_path = canonical_workspace_path(workspace_path)?;
-        let granted = self.grants.read().await.iter().any(|grant| {
+        let grants = self.grants.read().await;
+        let project_granted = grants.iter().any(|grant| {
+            identity.matches(grant) && project_ids_equivalent(&grant.project_id, project_id)
+        });
+        let granted = grants.iter().any(|grant| {
             identity.matches(grant)
                 && project_ids_equivalent(&grant.project_id, project_id)
                 && same_workspace(&grant.workspace_path, &workspace_path)
@@ -156,9 +160,10 @@ impl FullAccessGrantState {
         if granted {
             return Ok(());
         }
-        bail!(
-            "Route A 完全访问尚未在本机授权：请在 PC 工作台设置中重新选择该项目目录并确认完全访问。"
-        )
+        if project_granted {
+            bail!("WORKSPACE_IDENTITY_MISMATCH: 请求目录与项目权威完全访问目录不一致。")
+        }
+        bail!("PROJECT_FULL_ACCESS_DISABLED: 项目尚未在本机启用完全访问。")
     }
 
     fn save(&self, grants: Vec<FullAccessGrant>) -> Result<()> {
@@ -211,17 +216,154 @@ pub(crate) async fn require_route_a_full_access_grant(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| anyhow!("Route A 完全访问必须携带项目目录，已拒绝执行。"))?;
-    if platform_managed_workspace_matches(&context.project_id, cwd) {
+    if platform_managed_workspace_matches(&context.project_id, cwd)
+        && !is_legacy_conversation_worktree(cwd, &context.project_id, &context.conversation_id)
+    {
         return Ok(());
     }
-    if task_record.is_some_and(|record| {
-        task_record_proves_legacy_managed_workspace(record, identity, context, cwd)
-    }) {
-        return Ok(());
+    if let Some(record) = task_record {
+        if task_record_proves_managed_isolated_workspace(grants, identity, context, cwd, record)
+            .await
+        {
+            return Ok(());
+        }
+        if recorded_workspace_paths(record)
+            .iter()
+            .any(|path| same_workspace(path, cwd))
+        {
+            bail!("ISOLATED_WORKTREE_AUTH_MISSING: 隔离 worktree 缺少有效的平台 provenance、Git 身份或 root lease 证据。")
+        }
     }
     grants
         .require_project(identity, &context.project_id, cwd)
         .await
+}
+
+async fn task_record_proves_managed_isolated_workspace(
+    grants: &FullAccessGrantState,
+    identity: &FullAccessGrantIdentity,
+    context: &CliProjectContext,
+    cwd: &str,
+    record: &crate::node_agent_local_task_store::LocalTaskRecord,
+) -> bool {
+    if record.owner_user_id != identity.owner_user_id
+        || record.agent_id != identity.agent_id
+        || record.install_id != identity.install_id
+        || !project_ids_equivalent(&record.project_id, &context.project_id)
+        || record.conversation_id != context.conversation_id
+    {
+        return false;
+    }
+    let Some(status) = record.workspace_status.as_ref() else {
+        return false;
+    };
+    if status.get("isolated").and_then(serde_json::Value::as_bool) != Some(true)
+        || status
+            .get("platform_provenance")
+            .and_then(serde_json::Value::as_str)
+            != Some("elon.conversation_worktree.v1")
+        || status
+            .get("project_id")
+            .and_then(serde_json::Value::as_str)
+            .is_none_or(|id| !project_ids_equivalent(id, &context.project_id))
+    {
+        return false;
+    }
+    let Some(root_task_id) = status
+        .get("root_task_id")
+        .and_then(serde_json::Value::as_str)
+        .filter(|v| !v.is_empty())
+    else {
+        return false;
+    };
+    let Some(base) = status
+        .get("base_workspace_path")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return false;
+    };
+    let Some(active) = status
+        .get("active_workspace_path")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return false;
+    };
+    let expected_lease = format!("elon-supervision:{root_task_id}");
+    if !same_existing_path(active, cwd)
+        || grants
+            .require_project(identity, &context.project_id, base)
+            .await
+            .is_err()
+        || crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+            Path::new(base),
+            Path::new(active),
+        )
+        .ok()
+        .flatten()
+        .as_deref()
+            != Some(expected_lease.as_str())
+    {
+        return false;
+    }
+    git_identity_matches(base, active, status)
+}
+
+fn same_existing_path(left: &str, right: &str) -> bool {
+    canonical_existing_path(left)
+        .zip(canonical_existing_path(right))
+        .is_some_and(|(a, b)| a == b)
+}
+
+fn git_value(cwd: &str, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .ok()?;
+    output.status.success().then(|| {
+        String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .replace('\\', "/")
+    })
+}
+
+fn git_identity_matches(base: &str, active: &str, status: &serde_json::Value) -> bool {
+    let base_common = git_value(
+        base,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    );
+    let active_common = git_value(
+        active,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    );
+    if base_common.is_none() || base_common != active_common {
+        return false;
+    }
+    if status
+        .get("git_common_dir")
+        .and_then(serde_json::Value::as_str)
+        .map(|v| v.replace('\\', "/"))
+        != active_common
+    {
+        return false;
+    }
+    let revision = status
+        .get("base_revision")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    if revision.is_empty()
+        || git_value(active, &["merge-base", "--is-ancestor", revision, "HEAD"]).is_none()
+    {
+        return false;
+    }
+    let remote = status
+        .get("git_remote")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    git_value(base, &["config", "--get", "remote.origin.url"])
+        .as_deref()
+        .unwrap_or("")
+        == remote
 }
 
 fn task_record_proves_legacy_managed_workspace(

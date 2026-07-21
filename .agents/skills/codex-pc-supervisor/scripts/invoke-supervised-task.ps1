@@ -587,23 +587,9 @@ function New-ResumeTaskBody {
         'resume_original' $RequestedParentTaskId $rootTask $BodyCriteria $BodyImprovementPolicy
 }
 
-function Submit-Body {
-    param([object]$Connection, [object]$Body, [string]$ResultAction)
-    $response = Invoke-NodeApi $Connection 'Post' '/api/local-tasks' $Body
-    $responseTaskId = [string](Get-ObjectField $response 'task_id')
-    Convert-ToJsonResult ([ordered]@{
-        ok = $true
-        action = $ResultAction
-        protocol = $script:SupervisionProtocol
-        node_url = $Connection.BaseUrl
-        node_version = $Connection.Version
-        task_id = $responseTaskId
-        response = $response
-    })
-}
-
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-delta.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-review.ps1')
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-workspace.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-self-test.ps1')
 if ($Action -eq 'SelfTest') { Invoke-SupervisionSelfTest; exit 0 }
 
@@ -645,9 +631,17 @@ switch ($Action) {
         })
     }
     'Submit' {
-        $submitBody = New-SupervisedTaskBody $ProjectId $WorkspacePath $Prompt $TaskRole `
+        $resolution = Resolve-SubmitProjectWorkspace $nodeConnection $ProjectId $WorkspacePath
+        $submitBody = New-SupervisedTaskBody $ProjectId $resolution.ResolvedPath $Prompt $TaskRole `
             $ParentTaskId $RootTaskId $resolvedAcceptanceCriteria $ImprovementPolicy
-        Submit-Body $nodeConnection $submitBody 'Submit'
+        Submit-Body $nodeConnection $submitBody 'Submit' ([ordered]@{
+            project_id = $resolution.ProjectId
+            requested_workspace_path = $resolution.RequestedPath
+            authorized_workspace_path = $resolution.AuthorizedPath
+            resolved_workspace_path = $resolution.ResolvedPath
+            corrected = $resolution.Corrected
+            runtime_permission = $resolution.RuntimePermission
+        })
     }
     'Inspect' {
         if ($Compact) {

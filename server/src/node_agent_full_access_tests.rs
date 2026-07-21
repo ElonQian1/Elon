@@ -136,7 +136,7 @@ async fn task_record_allows_only_the_exact_legacy_conversation_worktree() {
         Some(&record),
     )
     .await
-    .expect("exact task-recorded legacy worktree should be authorized");
+    .expect_err("legacy path shape without durable provenance must fail closed");
 
     assert!(task_record_proves_legacy_managed_workspace(
         &record,
@@ -256,7 +256,7 @@ async fn route_a_full_access_requires_local_grant() {
     .expect_err("missing grant should reject full access");
 
     assert!(
-        error.to_string().contains("完全访问尚未在本机授权"),
+        error.to_string().contains("PROJECT_FULL_ACCESS_DISABLED"),
         "unexpected error: {error}"
     );
 }
@@ -325,7 +325,7 @@ async fn local_offline_policy_never_uses_personal_chat_bypass() {
     )
     .await
     .expect_err("local offline chat must require an explicit project grant");
-    assert!(error.to_string().contains("完全访问尚未在本机授权"));
+    assert!(error.to_string().contains("PROJECT_FULL_ACCESS_DISABLED"));
 }
 
 #[tokio::test]
@@ -358,7 +358,7 @@ async fn full_access_grants_are_isolated_by_owner_agent_and_install() {
         )
         .await
         .expect_err("foreign runtime identity must not reuse grant");
-        assert!(error.to_string().contains("完全访问尚未在本机授权"));
+        assert!(error.to_string().contains("PROJECT_FULL_ACCESS_DISABLED"));
     }
 
     assert_eq!(state.list(&granted).await.len(), 1);
