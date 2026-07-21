@@ -77,41 +77,9 @@ pub(crate) fn project_identity(project_root: &str) -> Result<(String, String, St
     let canonical_text = canonical.to_string_lossy().to_string();
     let source_revision = workspace_fingerprint(&canonical_text)?
         .ok_or_else(|| anyhow::anyhow!("RUNTIME_BINDING_STALE: 无法计算项目源码 revision"))?;
-    let root_task_id = supervision_root_from_git(&canonical)?.ok_or_else(|| {
-        anyhow::anyhow!("RUNTIME_BINDING_MISSING_ROOT: 项目 worktree 未绑定监督 root task identity")
-    })?;
+    let root_task_id =
+        crate::node_agent_supervision_project_identity::resolve_root_task_id(&canonical)?;
     Ok((canonical_text, source_revision, root_task_id))
-}
-
-fn supervision_root_from_git(root: &Path) -> Result<Option<String>> {
-    let dot_git = root.join(".git");
-    let git_dir = if dot_git.is_dir() {
-        dot_git
-    } else {
-        let text = fs::read_to_string(&dot_git).context("读取 worktree .git 指针失败")?;
-        let target = text
-            .trim()
-            .strip_prefix("gitdir:")
-            .map(str::trim)
-            .ok_or_else(|| anyhow::anyhow!("worktree .git 指针格式无效"))?;
-        let target = PathBuf::from(target);
-        if target.is_absolute() {
-            target
-        } else {
-            root.join(target)
-        }
-    };
-    let locked = git_dir.join("locked");
-    if !locked.exists() {
-        return Ok(None);
-    }
-    let reason = fs::read_to_string(locked)?;
-    Ok(reason
-        .trim()
-        .strip_prefix("elon-supervision:")
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string))
 }
 
 pub(crate) fn persist_verified(session: &LiveUiSession) -> Result<DurableRuntimeBinding> {
@@ -210,13 +178,22 @@ fn candidates_with_legacy_fit_runs(
         Err(error) if error.to_string().contains("RUNTIME_BINDING_MISSING") => {
             let bindings = super::fit_run::durable_runtime_candidates(project_root)?
                 .into_iter()
-                // Historical FitRun manifests predate the root-task field. They are
-                // accepted only as a one-time device/package seed after project-root
-                // and source-revision matching; the new binding is stamped with the
-                // current verified supervision root before its descriptor is exposed.
+                // Historical FitRun manifests predate the root-task field. Their
+                // persisted task id must still resolve through the durable lineage
+                // to this exact root; never stamp an arbitrary current task identity.
                 .filter(|(_, _, revision, _, _)| revision.as_deref() == Some(source_revision))
                 .filter(|(device, package, _, _, _)| {
                     device != "ui-design-bootstrap" && package != "ui.design.bootstrap"
+                })
+                .filter(|(_, _, _, task_id, _)| {
+                    task_id.as_deref().is_some_and(|task_id| {
+                        crate::node_agent_supervision_project_identity::validate_task_root(
+                            Path::new(project_root),
+                            task_id,
+                            root_task_id,
+                        )
+                        .is_ok()
+                    })
                 })
                 .map(
                     |(device_id, package_name, _, _, updated_at)| DurableRuntimeBinding {

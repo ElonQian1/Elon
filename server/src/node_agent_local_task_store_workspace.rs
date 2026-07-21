@@ -3,7 +3,7 @@
 use anyhow::Result;
 use rusqlite::params;
 
-use super::LocalTaskStore;
+use super::{read_record, select_sql, LocalTaskRecord, LocalTaskStore};
 
 impl LocalTaskStore {
     pub(crate) fn record_initial_workspace_status(
@@ -18,5 +18,15 @@ impl LocalTaskStore {
                 AND completion_event_id IS NULL",
             params![task_id, encoded],
         )? > 0)
+    }
+
+    pub(crate) fn list_identity_candidates(&self) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!("{} ORDER BY started_at_ms DESC", select_sql()))?;
+        let records = stmt
+            .query_map([], read_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
     }
 }

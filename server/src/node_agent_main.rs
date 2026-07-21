@@ -114,6 +114,7 @@ mod node_agent_local_task_resume_routes;
 mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
+mod node_agent_supervision_project_identity;
 mod node_agent_supervision_protocol;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;
