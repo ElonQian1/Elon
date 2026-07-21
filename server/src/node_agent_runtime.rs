@@ -430,22 +430,13 @@ impl NodeRuntime {
             info!("已清理 PC 任务 {req_id} 的 {cleared_approvals} 个遗留工具审批");
         }
         self.active_cli_prompts.remove(req_id).await;
-        match crate::node_agent_supervision_terminal_lease::reconcile_task(self, req_id).await {
-            Ok(true) => {}
-            Ok(false) => {
-                crate::node_agent_supervision_terminal_lease::spawn_task_reconciler(
-                    self.clone(),
-                    req_id.to_string(),
-                );
-            }
-            Err(error) => {
-                warn!(%req_id, %error, "终态监督 worktree lease 暂未释放，启动定向重试");
-                crate::node_agent_supervision_terminal_lease::spawn_task_reconciler(
-                    self.clone(),
-                    req_id.to_string(),
-                );
-            }
-        }
+        // Git and lease safety checks are synchronous and may be slow on old
+        // worktrees. Keep them off the admin/runtime Tokio workers so a
+        // terminal task cannot stall new submissions or health probes.
+        crate::node_agent_supervision_terminal_lease::spawn_task_reconciler(
+            self.clone(),
+            req_id.to_string(),
+        );
     }
 
     pub(crate) async fn hardware_profile(&self) -> NodeHardwareProfile {

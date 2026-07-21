@@ -22,10 +22,10 @@ use crate::{
 const PERIODIC_LOCKED_CANDIDATES_PER_PASS: usize = 1;
 const PERIODIC_CANDIDATES_SCANNED_PER_PASS: usize = 4;
 const TASK_RECONCILE_RETRY_DELAYS: [Duration; 4] = [
-    Duration::from_millis(100),
-    Duration::from_millis(500),
-    Duration::from_secs(2),
-    Duration::from_secs(5),
+    Duration::ZERO,
+    Duration::from_millis(250),
+    Duration::from_secs(1),
+    Duration::from_secs(3),
 ];
 
 pub(crate) async fn reconcile_task(runtime: &NodeRuntime, task_id: &str) -> Result<bool> {
@@ -224,43 +224,59 @@ fn optional_path<'a>(value: &'a serde_json::Value, field: &str) -> Option<&'a Pa
 }
 
 pub(crate) fn spawn_task_reconciler(runtime: Arc<NodeRuntime>, task_id: String) {
-    spawn_task_reconciler_loop(TASK_RECONCILE_RETRY_DELAYS, move || {
-        let runtime = runtime.clone();
-        let task_id = task_id.clone();
-        async move { reconcile_task(&runtime, &task_id).await }
-    });
+    spawn_task_reconciler_loop(
+        tokio::runtime::Handle::current(),
+        TASK_RECONCILE_RETRY_DELAYS,
+        move || {
+            let runtime = runtime.clone();
+            let task_id = task_id.clone();
+            async move { reconcile_task(&runtime, &task_id).await }
+        },
+    );
 }
 
-fn spawn_task_reconciler_loop<F, Fut, I>(delays: I, mut reconcile: F) -> tokio::task::JoinHandle<()>
+fn spawn_task_reconciler_loop<F, Fut, I>(
+    runtime_handle: tokio::runtime::Handle,
+    delays: I,
+    mut reconcile: F,
+) -> std::thread::JoinHandle<()>
 where
     I: IntoIterator<Item = Duration> + Send + 'static,
     I::IntoIter: Send,
     F: FnMut() -> Fut + Send + 'static,
     Fut: Future<Output = Result<bool>> + Send + 'static,
 {
-    tokio::spawn(async move {
-        for delay in delays {
-            tokio::time::sleep(delay).await;
-            match reconcile().await {
-                Ok(true) => return,
-                Ok(false) => {}
-                Err(error) => warn!(%error, "定向终态监督 lease 重试暂未释放"),
+    std::thread::Builder::new()
+        .name("elon-terminal-lease-task".to_string())
+        .spawn(move || {
+            for delay in delays {
+                std::thread::sleep(delay);
+                match runtime_handle.block_on(reconcile()) {
+                    Ok(true) => return,
+                    Ok(false) => {}
+                    Err(error) => warn!(%error, "定向终态监督 lease 重试暂未释放"),
+                }
             }
-        }
-    })
+        })
+        .expect("terminal lease task reconciler thread should start")
 }
 
 pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
-    spawn_reconciler_loop(Duration::from_secs(30), move || {
-        let runtime = runtime.clone();
-        async move {
-            if let Err(error) = reconcile_all(&runtime).await {
-                warn!(%error, "periodic terminal supervision lease reconciliation failed");
-            }
-        }
-    });
+    let runtime_handle = tokio::runtime::Handle::current();
+    std::thread::Builder::new()
+        .name("elon-terminal-lease-periodic".to_string())
+        .spawn(move || loop {
+            runtime_handle.block_on(async {
+                if let Err(error) = reconcile_all(&runtime).await {
+                    warn!(%error, "periodic terminal supervision lease reconciliation failed");
+                }
+            });
+            std::thread::sleep(Duration::from_secs(30));
+        })
+        .expect("periodic terminal lease reconciler thread should start");
 }
 
+#[cfg(test)]
 fn spawn_reconciler_loop<F, Fut>(
     interval: Duration,
     mut reconcile: F,
@@ -530,20 +546,23 @@ mod tests {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
         let attempts = Arc::new(AtomicUsize::new(0));
-        let handle = spawn_task_reconciler_loop([Duration::from_millis(1); 4], {
-            let attempts = attempts.clone();
-            move || {
+        let handle = spawn_task_reconciler_loop(
+            tokio::runtime::Handle::current(),
+            [Duration::from_millis(1); 4],
+            {
                 let attempts = attempts.clone();
-                async move {
-                    let attempt = attempts.fetch_add(1, Ordering::SeqCst) + 1;
-                    Ok(attempt == 3)
+                move || {
+                    let attempts = attempts.clone();
+                    async move {
+                        let attempt = attempts.fetch_add(1, Ordering::SeqCst) + 1;
+                        Ok(attempt == 3)
+                    }
                 }
-            }
-        });
+            },
+        );
 
-        tokio::time::timeout(Duration::from_millis(250), handle)
-            .await
-            .expect("task-specific reconcile retries should finish")
+        handle
+            .join()
             .expect("task-specific reconcile task should not panic");
         assert_eq!(attempts.load(Ordering::SeqCst), 3);
     }
