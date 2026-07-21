@@ -328,17 +328,13 @@ async fn run_cli_task(
             return;
         }
     };
-    let authorization_cwd = inherited_workspace
-        .as_ref()
-        .and_then(|workspace| workspace.base_workspace_path.as_deref())
-        .or(cwd.as_deref());
     if let Err(error) = node_agent_full_access::require_route_a_full_access_grant(
         &runtime.full_access_grants,
         &full_access_identity,
         resolved_cli.name(),
         runtime_permission.as_deref(),
         project_context.as_ref(),
-        authorization_cwd,
+        cwd.as_deref(),
         !local_offline,
         runtime.local_tasks.get(&req_id).ok().flatten().as_ref(),
     )
