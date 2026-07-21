@@ -4,6 +4,13 @@
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
+## Desktop review v3 升级边界
+
+- 发布包与安装更新只分发 signer、公钥和 nonce 账本路径等非秘密配置；不得复制 Desktop 私钥或 Desktop `StateRoot`。
+- 凭据 `Commit` 默认写入 v3 公钥集合、`ELON_DESKTOP_REVIEW_NONCE_LEDGER` 与 `ELON_DESKTOP_REVIEW_ALLOW_V2=0`。轮换窗口同时保留新旧公钥；确认 Desktop helper 全部升级后移除旧公钥。
+- v2 兼容必须由运维显式设置 `ELON_DESKTOP_REVIEW_ALLOW_V2=1`，且不会重新启用共享 secret v1。v3 公钥存在时任何 v1 ticket 都拒绝。
+- 更新保留已有 `node-agent.env` 和 nonce 账本，不创建生产凭据、不替换 Desktop 身份，也不自动重启 Desktop。
+
 ## 用户能听懂的一句话
 
 新版的数据根是帮 AI 整理以后新产生的大文件，不是把旧项目判为不合格。升级必须记住原项目和原缓存；自动整理失败时，原项目仍应照常运行。

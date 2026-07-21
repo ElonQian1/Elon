@@ -185,7 +185,9 @@ Codex JSON 的 `item.started/item.completed` 会以有界 `codex_item` 写入 jo
 
 ### Desktop review 凭据引导与恢复
 
-生产环境使用 v2 非对称 review ticket：Desktop 持有不可导出的 RSA-3072 私钥，NodeAgent 只持有公钥。私钥文件 ACL 必须只授予独立的 Desktop 受信身份，并明确拒绝 PC executor 身份；两者 SID 相同或缺失时安装入口 fail-closed。不得用同用户 DPAPI、User/Machine 环境变量或 `node-agent.env` 保存共享秘密。旧版 v1 环境变量仅用于升级兼容窗口，轮换完成后应移除。
+生产环境使用 v3 非对称 review ticket：Desktop 持有不可导出的 RSA-3072 私钥，NodeAgent 只持有公钥。签名以长度前缀字段无歧义绑定 owner、task、HTTP method、规范 endpoint path、实际 UTF-8 body 的 SHA-256、expiry、nonce 和 key id。节点先对原始 body 验签并消费 nonce，之后才反序列化。私钥文件 ACL 必须只授予独立的 Desktop 受信身份，并明确拒绝 PC executor 身份；两者 SID 相同或缺失时安装入口 fail-closed。不得用同用户 DPAPI、User/Machine 环境变量或 `node-agent.env` 保存共享秘密。公钥模式启用后禁止回退 v1；v2 仅在 `ELON_DESKTOP_REVIEW_ALLOW_V2=1` 的明确短期迁移窗口接受，默认关闭。
+
+Desktop helper 的 Review 必须通过 `-DesktopReviewStateRoot/-DesktopReviewInstallRoot`，或明确命名的 `ELON_DESKTOP_REVIEW_STATE_ROOT/ELON_DESKTOP_REVIEW_INSTALL_ROOT` 提供两条路径；不得从调用者 `LOCALAPPDATA` 推测。缺配置稳定返回 `desktop_review_paths_not_configured`，signer 缺失/ACL 或私钥不可访问分别返回 `desktop_review_signer_missing` / `desktop_review_signer_unavailable`。NodeAgent 使用 `ELON_DESKTOP_REVIEW_NONCE_LEDGER` 指定非秘密、持久、有界的 nonce 账本；损坏、不可写或达到上限时返回 `desktop_review_nonce_ledger_unavailable` 并 fail-closed，重放返回 `desktop_review_ticket_replayed`。
 
 运维时必须同时显式传入 `-StateRoot <Desktop 身份专属状态目录>` 与 `-InstallRoot <NodeAgent 安装目录>`，两条路径会冻结进 v2 状态，后续 Validate、Commit、Rollback 和 ticket 签名路径不一致时一律 fail-closed。先以 `desktop-review-credential.ps1 -Action Prepare` 在 Desktop 身份的 `Cert:\CurrentUser\My` 生成暂存密钥并收紧状态目录和 CNG 私钥 ACL，再 `-Action Validate` 真实复核证书、owner、ACL 与身份，经 Desktop 独立审查后执行 `-Action Commit`；随后先重启 NodeAgent 读取 InstallRoot 中的公钥，再重启 Desktop/helper 以相同 StateRoot/InstallRoot 取得私钥签名能力。更新包只需保留 NodeAgent 的 `node-agent.env` 公钥行；Desktop 专属 StateRoot 不属于节点更新包。旧 NodeAgent 不认识 v2 时保持业务任务与 journal，不允许 review，状态应报告不兼容而不是降级。
 
