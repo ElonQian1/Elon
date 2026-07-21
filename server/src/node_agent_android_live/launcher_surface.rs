@@ -476,7 +476,7 @@ async fn swipe(device_id: &str, x1: i32, y1: i32, x2: i32, y2: i32, duration: i3
 }
 
 async fn foreground_line(device_id: &str) -> Result<String> {
-    let output = run_adb_text(
+    let window = run_adb_text(
         &[
             "-s".into(),
             device_id.into(),
@@ -489,9 +489,30 @@ async fn foreground_line(device_id: &str) -> Result<String> {
         512 * 1024,
     )
     .await?;
-    Ok(output
+    if let Some(line) = window
         .lines()
         .find(|line| line.contains("mCurrentFocus") || line.contains("mFocusedApp"))
+    {
+        if !line.trim().is_empty() {
+            return Ok(line.trim().to_string());
+        }
+    }
+    let activities = run_adb_text(
+        &[
+            "-s".into(),
+            device_id.into(),
+            "shell".into(),
+            "dumpsys".into(),
+            "activity".into(),
+            "activities".into(),
+        ],
+        Duration::from_secs(6),
+        1024 * 1024,
+    )
+    .await?;
+    Ok(activities
+        .lines()
+        .find(|line| line.contains("mResumedActivity") || line.contains("topResumedActivity"))
         .unwrap_or_default()
         .trim()
         .to_string())
