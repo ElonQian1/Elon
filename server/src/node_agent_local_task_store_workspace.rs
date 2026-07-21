@@ -36,7 +36,7 @@ impl LocalTaskStore {
         let conn = self.open()?;
         let mut stmt = conn.prepare(&format!(
             "{} WHERE status IN ('done','failed','canceled','finished','cancel_requested')
-             ORDER BY started_at_ms",
+             ORDER BY started_at_ms DESC",
             select_sql()
         ))?;
         let records = stmt

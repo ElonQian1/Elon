@@ -166,6 +166,12 @@ async fn lineage_or_workspace_is_active(
     }
     let now = crate::node_agent_cli_sidecar::now_ms();
     for sidecar in runtime.cli_sidecars.all_sessions()? {
+        // Dead sidecar metadata has no execution ownership. Skip it before
+        // lineage parsing so unrelated legacy contracts cannot block every new
+        // terminal task or make the periodic pass scan the full history.
+        if !sidecar.is_live_at(now) {
+            continue;
+        }
         let shares_workspace_or_root = sidecar
             .cwd
             .as_deref()
@@ -176,7 +182,7 @@ async fn lineage_or_workspace_is_active(
             current_task_id,
             &sidecar.task_id,
             sidecar_task.as_ref().map(|task| task.status.as_str()),
-            sidecar.is_live_at(now),
+            true,
             shares_workspace_or_root,
         ) {
             return Ok(true);

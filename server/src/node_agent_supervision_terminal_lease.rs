@@ -16,6 +16,18 @@ use crate::{
     NodeRuntime,
 };
 
+// Keep the maintenance pass well below the launcher's 15-second health probe.
+// New terminal tasks have their own targeted retries; this loop is only a
+// bounded safety net for interrupted or historical work.
+const PERIODIC_LOCKED_CANDIDATES_PER_PASS: usize = 1;
+const PERIODIC_CANDIDATES_SCANNED_PER_PASS: usize = 4;
+const TASK_RECONCILE_RETRY_DELAYS: [Duration; 4] = [
+    Duration::from_millis(100),
+    Duration::from_millis(500),
+    Duration::from_secs(2),
+    Duration::from_secs(5),
+];
+
 pub(crate) async fn reconcile_task(runtime: &NodeRuntime, task_id: &str) -> Result<bool> {
     let Some(task) = runtime.local_tasks.get(task_id)? else {
         return Ok(false);
@@ -152,7 +164,29 @@ fn required_path<'a>(value: &'a serde_json::Value, field: &str) -> Result<&'a Pa
 
 pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
     let mut released = 0;
-    for task in runtime.local_tasks.list_terminal_lease_candidates()? {
+    let mut locked_candidates = 0;
+    for task in runtime
+        .local_tasks
+        .list_terminal_lease_candidates()?
+        .into_iter()
+        .take(PERIODIC_CANDIDATES_SCANNED_PER_PASS)
+    {
+        if locked_candidates >= PERIODIC_LOCKED_CANDIDATES_PER_PASS {
+            break;
+        }
+        match candidate_has_lock(&task) {
+            Ok(false) => continue,
+            Ok(true) => locked_candidates += 1,
+            Err(error) => {
+                locked_candidates += 1;
+                warn!(
+                    task_id = %task.task_id,
+                    %error,
+                    "terminal supervision lease candidate probe failed closed"
+                );
+                continue;
+            }
+        }
         match reconcile_task(runtime, &task.task_id).await {
             Ok(true) => released += 1,
             Ok(false) => {}
@@ -164,6 +198,56 @@ pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
         }
     }
     Ok(released)
+}
+
+fn candidate_has_lock(task: &crate::node_agent_local_task_store::LocalTaskRecord) -> Result<bool> {
+    let Some(status) = task.workspace_status.as_ref() else {
+        return Ok(false);
+    };
+    let Some(base) = optional_path(status, "base_workspace_path") else {
+        return Ok(false);
+    };
+    let Some(active) = optional_path(status, "active_workspace_path") else {
+        return Ok(false);
+    };
+    crate::node_agent_supervision_worktree_lease::worktree_lock_reason(base, active)
+        .map(|reason| reason.is_some())
+}
+
+fn optional_path<'a>(value: &'a serde_json::Value, field: &str) -> Option<&'a Path> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(Path::new)
+}
+
+pub(crate) fn spawn_task_reconciler(runtime: Arc<NodeRuntime>, task_id: String) {
+    spawn_task_reconciler_loop(TASK_RECONCILE_RETRY_DELAYS, move || {
+        let runtime = runtime.clone();
+        let task_id = task_id.clone();
+        async move { reconcile_task(&runtime, &task_id).await }
+    });
+}
+
+fn spawn_task_reconciler_loop<F, Fut, I>(delays: I, mut reconcile: F) -> tokio::task::JoinHandle<()>
+where
+    I: IntoIterator<Item = Duration> + Send + 'static,
+    I::IntoIter: Send,
+    F: FnMut() -> Fut + Send + 'static,
+    Fut: Future<Output = Result<bool>> + Send + 'static,
+{
+    tokio::spawn(async move {
+        for delay in delays {
+            tokio::time::sleep(delay).await;
+            match reconcile().await {
+                Ok(true) => return,
+                Ok(false) => {}
+                Err(error) => warn!(%error, "定向终态监督 lease 重试暂未释放"),
+            }
+        }
+    })
 }
 
 pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
@@ -439,6 +523,29 @@ mod tests {
         .await
         .expect("the reconciler should retry after the initial slow pass");
         handle.abort();
+    }
+
+    #[tokio::test]
+    async fn task_reconcile_retry_stops_after_release() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let attempts = Arc::new(AtomicUsize::new(0));
+        let handle = spawn_task_reconciler_loop([Duration::from_millis(1); 4], {
+            let attempts = attempts.clone();
+            move || {
+                let attempts = attempts.clone();
+                async move {
+                    let attempt = attempts.fetch_add(1, Ordering::SeqCst) + 1;
+                    Ok(attempt == 3)
+                }
+            }
+        });
+
+        tokio::time::timeout(Duration::from_millis(250), handle)
+            .await
+            .expect("task-specific reconcile retries should finish")
+            .expect("task-specific reconcile task should not panic");
+        assert_eq!(attempts.load(Ordering::SeqCst), 3);
     }
 
     struct GitFixture {
