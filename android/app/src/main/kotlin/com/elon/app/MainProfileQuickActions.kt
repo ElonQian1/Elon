@@ -68,7 +68,13 @@ internal class MainProfileQuickActions(
 
     fun refreshProfileSummary() {
         if (isBindingInitialized()) {
-            UserProfileViews.renderSummary(activity, binding, openProfileDetails)
+            UserProfileViews.renderSummary(
+                activity,
+                binding,
+                http,
+                serverUrl,
+                openProfileDetails
+            )
             tokenUsageCard.attachAndRefresh()
             renderNodeResourcePanel()
             if (nodeResourceExpanded) {
@@ -107,8 +113,7 @@ internal class MainProfileQuickActions(
         binding.profileNodeResourceHint.text =
             if (nodeResourceExpanded) "节点积分、全站节点、我的节点"
             else "积分、全站节点、我的节点"
-        binding.profileNodeResourceArrow.text =
-            if (nodeResourceExpanded) "收起" else "展开"
+        binding.profileNodeResourceArrow.rotation = if (nodeResourceExpanded) 90f else 0f
         binding.profileNodeResourceHeader.contentDescription =
             if (nodeResourceExpanded) "收起 PC 节点资源" else "展开 PC 节点资源"
     }

@@ -5,15 +5,11 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
-import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -27,17 +23,11 @@ internal class ProfileTokenUsageCard(
 ) {
     private var root: LinearLayout? = null
     private var loadSerial = 0
+    private var selectedDays = 30
 
-    private lateinit var statusPill: TextView
-    private lateinit var remainingText: TextView
-    private lateinit var remainingCaption: TextView
-    private lateinit var progressBar: ProgressBar
-    private lateinit var progressLabel: TextView
-    private lateinit var monthValue: TextView
-    private lateinit var weekValue: TextView
-    private lateinit var limitValue: TextView
-    private lateinit var detailButton: TextView
-    private lateinit var rechargeButton: TextView
+    private lateinit var weekButton: TextView
+    private lateinit var monthButton: TextView
+    private lateinit var gauge: ProfileQuotaGaugeView
 
     fun attachAndRefresh() {
         val host = binding.profileUsageContainer
@@ -50,328 +40,142 @@ internal class ProfileTokenUsageCard(
         refresh()
     }
 
-    private fun refresh() {
-        if (!AuthManager.isLoggedIn(activity)) {
-            loadSerial += 1
-            renderLoggedOut()
-            return
-        }
-
-        val serial = ++loadSerial
-        renderLoading()
-        val appContext = activity.applicationContext
-        thread(name = "profile-token-usage") {
-            val result = runCatching { TokenUsageSummaryClient.fetch(appContext) }
-            activity.runOnUiThread {
-                if (serial != loadSerial || activity.isFinishing || activity.isDestroyed) {
-                    return@runOnUiThread
-                }
-                result
-                    .onSuccess { renderSummary(it) }
-                    .onFailure { renderError(it.message ?: "加载失败") }
-            }
-        }
-    }
-
     private fun buildCard(): LinearLayout {
         return LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
+            minimumHeight = activity.dp(284)
             orientation = LinearLayout.VERTICAL
-            setPadding(activity.dp(22), activity.dp(18), activity.dp(22), activity.dp(18))
-            background = roundedRect(Color.parseColor("#222222"), activity.dp(8))
+            setPadding(activity.dp(14), activity.dp(20), activity.dp(14), activity.dp(12))
+            setBackgroundResource(R.drawable.profile_panel_quota)
             isClickable = true
+            isFocusable = true
+            contentDescription = "Token 额度，点按查看用量明细"
             setOnClickListener { openUsageDetails() }
 
-            addView(headerRow())
-            addView(remainingBlock())
-            addView(metricRow())
-            addView(actionRow())
-        }
-    }
-
-    private fun headerRow(): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-
             addView(TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 includeFontPadding = false
                 text = "Token 额度"
-                setTextColor(Color.parseColor("#D6D6D6"))
-                textSize = 16f
-                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.parseColor("#D9D9D9"))
+                textSize = 17f
             })
-
-            statusPill = TextView(activity).apply {
-                includeFontPadding = false
-                gravity = Gravity.CENTER
-                setPadding(activity.dp(10), activity.dp(5), activity.dp(10), activity.dp(5))
-                text = "近30天"
-                textSize = 12f
-                setTextColor(Color.parseColor("#D0D0D0"))
-                background = roundedRect(Color.parseColor("#16251A"), activity.dp(8))
-            }
-            addView(statusPill)
-        }
-    }
-
-    private fun remainingBlock(): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = activity.dp(18)
-            }
-            orientation = LinearLayout.VERTICAL
-
-            remainingText = TextView(activity).apply {
-                includeFontPadding = false
-                text = "读取中..."
-                setTextColor(Color.parseColor("#D6D6D6"))
-                textSize = 32f
-                setTypeface(typeface, Typeface.BOLD)
-            }
-            addView(remainingText)
-
-            remainingCaption = TextView(activity).apply {
-                includeFontPadding = false
-                text = "正在同步服务器用量"
-                setTextColor(Color.parseColor("#A8A8A8"))
-                textSize = 13f
-                setPadding(0, activity.dp(8), 0, 0)
-            }
-            addView(remainingCaption)
-
-            progressBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal).apply {
+            addView(periodActions())
+            gauge = ProfileQuotaGaugeView(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    activity.dp(18)
-                ).apply {
-                    topMargin = activity.dp(16)
-                }
-                max = 1000
-                progress = 0
-                progressTintList = ColorStateList.valueOf(Color.parseColor("#58BE6A"))
-                progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#2E2E2E"))
-            }
-            addView(progressBar)
-
-            progressLabel = TextView(activity).apply {
-                includeFontPadding = false
-                text = "额度读取中"
-                setTextColor(Color.parseColor("#777777"))
-                textSize = 12f
-                setPadding(0, activity.dp(8), 0, 0)
-            }
-            addView(progressLabel)
-        }
-    }
-
-    private fun metricRow(): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = activity.dp(18)
-            }
-            orientation = LinearLayout.HORIZONTAL
-
-            monthValue = addMetric("30天已用")
-            weekValue = addMetric("7天已用")
-            limitValue = addMetric("总额度")
-        }
-    }
-
-    private fun LinearLayout.addMetric(label: String): TextView {
-        val box = LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            orientation = LinearLayout.VERTICAL
-        }
-        box.addView(TextView(activity).apply {
-            includeFontPadding = false
-            text = label
-            setTextColor(Color.parseColor("#777777"))
-            textSize = 11f
-        })
-        val value = TextView(activity).apply {
-            includeFontPadding = false
-            text = "—"
-            setTextColor(Color.parseColor("#D6D6D6"))
-            textSize = 15f
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, activity.dp(7), 0, 0)
-        }
-        box.addView(value)
-        addView(box)
-        return value
-    }
-
-    private fun actionRow(): LinearLayout {
-        return LinearLayout(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = activity.dp(18)
-            }
-            orientation = LinearLayout.HORIZONTAL
-
-            detailButton = actionButton("查看明细", "#2A2A2A", "#D6D6D6", endMarginDp = 8).apply {
+                    activity.dp(190)
+                )
                 setOnClickListener { openUsageDetails() }
             }
-            rechargeButton = actionButton("充值额度", "#58BE6A", "#101010").apply {
-                setOnClickListener { showRechargeDialog() }
-            }
-            addView(detailButton)
-            addView(rechargeButton)
+            addView(gauge)
         }
     }
 
-    private fun actionButton(
-        textValue: String,
-        bgColor: String,
-        textColor: String,
-        endMarginDp: Int = 0
+    private fun periodActions(): LinearLayout {
+        return LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = activity.dp(13)
+            }
+            orientation = LinearLayout.HORIZONTAL
+
+            weekButton = periodButton("7天", endMarginDp = 28) {
+                selectDays(7)
+            }
+            monthButton = periodButton("30天", endMarginDp = 28) {
+                selectDays(30)
+            }
+            val rechargeButton = periodButton("充值") {
+                showRechargeDialog()
+            }
+            addView(weekButton)
+            addView(monthButton)
+            addView(rechargeButton)
+            applyPeriodSelection()
+        }
+    }
+
+    private fun periodButton(
+        label: String,
+        endMarginDp: Int = 0,
+        onClick: () -> Unit
     ): TextView {
         return TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(0, activity.dp(42), 1f).apply {
+            layoutParams = LinearLayout.LayoutParams(0, activity.dp(38), 1f).apply {
                 marginEnd = activity.dp(endMarginDp)
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             isClickable = true
-            text = textValue
-            setTextColor(Color.parseColor(textColor))
-            textSize = 14f
-            setTypeface(typeface, Typeface.BOLD)
-            background = roundedRect(Color.parseColor(bgColor), activity.dp(8))
+            isFocusable = true
+            text = label
+            textSize = 15f
+            setTypeface(typeface, Typeface.NORMAL)
+            setOnClickListener { onClick() }
         }
     }
 
-    private fun renderLoading() {
-        applyStatus("同步中", "#D0D0D0", "#2A2A2A")
-        remainingText.text = "读取中..."
-        remainingCaption.text = "正在同步服务器用量"
-        updateProgress(0, Color.parseColor("#58BE6A"))
-        progressLabel.text = "额度读取中"
-        monthValue.text = "—"
-        weekValue.text = "—"
-        limitValue.text = "—"
-        detailButton.text = "查看明细"
-        detailButton.setOnClickListener { openUsageDetails() }
+    private fun selectDays(days: Int) {
+        if (selectedDays == days) return
+        selectedDays = days
+        applyPeriodSelection()
+        refresh()
     }
 
-    private fun renderLoggedOut() {
-        applyStatus("未登录", "#FFD8A8", "#3A2818")
-        remainingText.text = "登录后查看"
-        remainingCaption.text = "登录账号后显示剩余额度和 token 消耗"
-        updateProgress(0, Color.parseColor("#FFB65C"))
-        progressLabel.text = "未连接账号额度"
-        monthValue.text = "—"
-        weekValue.text = "—"
-        limitValue.text = "—"
-        detailButton.text = "登录账号"
-        detailButton.setOnClickListener {
-            activity.startActivity(Intent(activity, LoginActivity::class.java))
+    private fun applyPeriodSelection() {
+        stylePeriodButton(weekButton, selectedDays == 7)
+        stylePeriodButton(monthButton, selectedDays == 30)
+    }
+
+    private fun stylePeriodButton(button: TextView, selected: Boolean) {
+        button.setBackgroundResource(
+            if (selected) R.drawable.profile_pill_light else R.drawable.profile_pill_dark
+        )
+        button.setTextColor(
+            Color.parseColor(if (selected) "#171717" else "#D9D9D9")
+        )
+        button.isSelected = selected
+    }
+
+    private fun refresh() {
+        if (!AuthManager.isLoggedIn(activity)) {
+            loadSerial += 1
+            gauge.showState("—", "登录后查看")
+            return
+        }
+
+        val serial = ++loadSerial
+        gauge.showState("…", "同步中")
+        val appContext = activity.applicationContext
+        val days = selectedDays
+        thread(name = "profile-token-usage") {
+            val result = runCatching { TokenUsageSummaryClient.fetch(appContext, days) }
+            activity.runOnUiThread {
+                if (serial != loadSerial || activity.isFinishing || activity.isDestroyed) {
+                    return@runOnUiThread
+                }
+                result
+                    .onSuccess(::renderSummary)
+                    .onFailure { gauge.showState("—", "暂不可用") }
+            }
         }
     }
 
     private fun renderSummary(summary: TokenUsageSummary) {
+        val limit = summary.limitTokens?.takeIf { it > 0 }
         val remaining = summary.remainingTokens
-        if (remaining == null) {
-            applyStatus("未配置", "#D0D0D0", "#2A2A2A")
-            remainingText.text = "未配置"
-            remainingCaption.text = "服务器暂未返回剩余额度"
-            updateProgress(0, Color.parseColor("#A8A8A8"))
-            progressLabel.text = "额度上限未配置"
-        } else {
-            val percent = remainingPercent(summary)
-            val percentLabel = percentLabel(percent)
-            val limit = summary.limitTokens?.takeIf { it > 0 }
-            applyStatus(statusLabel(percentLabel), statusTextColor(percentLabel), statusBgColor(percentLabel))
-            remainingText.text = limit?.let { "$percentLabel%" }
-                ?: TokenUsageSummaryClient.formatCount(remaining)
-            remainingCaption.text = limit
-                ?.let { "剩余 ${TokenUsageSummaryClient.formatTokens(remaining)} / ${TokenUsageSummaryClient.formatTokens(it)}" }
-                ?: "剩余 ${TokenUsageSummaryClient.formatTokens(remaining)}"
-            updateProgress(percent, progressColor(percent))
-            progressLabel.text = summary.limitTokens
-                ?.takeIf { it > 0 }
-                ?.let { "已用 ${(100 - percentLabel).coerceIn(0, 100)}% · 近${summary.days}天消耗 ${TokenUsageSummaryClient.formatTokens(summary.totalTokens)}" }
-                ?: "额度总量未配置${summary.resetText?.let { " · $it" }.orEmpty()}"
+        if (limit == null || remaining == null) {
+            gauge.showState("—", "额度未配置")
+            return
         }
-
-        monthValue.text = TokenUsageSummaryClient.formatCount(summary.totalTokens)
-        weekValue.text = TokenUsageSummaryClient.formatCount(summary.weekTokens)
-        limitValue.text = summary.limitTokens?.let { TokenUsageSummaryClient.formatCount(it) } ?: "未配置"
-        detailButton.text = "查看明细"
-        detailButton.setOnClickListener { openUsageDetails() }
-    }
-
-    private fun renderError(message: String) {
-        applyStatus("暂不可用", "#FFC3C3", "#3A1E1E")
-        remainingText.text = "加载失败"
-        remainingCaption.text = message
-        updateProgress(0, Color.parseColor("#E86F6F"))
-        progressLabel.text = "稍后进入“查看明细”可重试"
-        monthValue.text = "—"
-        weekValue.text = "—"
-        limitValue.text = "—"
-    }
-
-    private fun remainingPercent(summary: TokenUsageSummary): Int {
-        val limit = summary.limitTokens?.takeIf { it > 0 } ?: return 1000
-        val remaining = summary.remainingTokens ?: return 0
-        return ((remaining.toDouble() / limit) * 1000).toInt().coerceIn(0, 1000)
-    }
-
-    private fun progressColor(progress: Int): Int = when {
-        progress <= 150 -> Color.parseColor("#FF6B6B")
-        progress <= 350 -> Color.parseColor("#FFB65C")
-        else -> Color.parseColor("#58BE6A")
-    }
-
-    private fun updateProgress(progress: Int, color: Int) {
-        progressBar.progress = progress.coerceIn(0, 1000)
-        progressBar.progressTintList = ColorStateList.valueOf(color)
-        progressBar.progressBackgroundTintList = ColorStateList.valueOf(Color.parseColor("#2E2E2E"))
-    }
-
-    private fun applyStatus(text: String, textColor: String, bgColor: String) {
-        statusPill.text = text
-        statusPill.setTextColor(Color.parseColor(textColor))
-        statusPill.background = roundedRect(Color.parseColor(bgColor), activity.dp(8))
-    }
-
-    private fun percentLabel(progress: Int): Int =
-        ((progress.coerceIn(0, 1000) / 10.0).roundToInt()).coerceIn(0, 100)
-
-    private fun statusLabel(percent: Int): String = when {
-        percent <= 15 -> "告急"
-        percent <= 35 -> "偏低"
-        else -> "充足"
-    }
-
-    private fun statusTextColor(percent: Int): String = when {
-        percent <= 15 -> "#FFC3C3"
-        percent <= 35 -> "#FFD8A8"
-        else -> "#D0D0D0"
-    }
-
-    private fun statusBgColor(percent: Int): String = when {
-        percent <= 15 -> "#3A1E1E"
-        percent <= 35 -> "#3A2818"
-        else -> "#16251A"
+        val percent = ((remaining.toDouble() / limit) * 100)
+            .roundToInt()
+            .coerceIn(0, 100)
+        gauge.showQuota(percent)
     }
 
     private fun openUsageDetails() {
@@ -401,14 +205,7 @@ internal class ProfileTokenUsageCard(
         manager.setPrimaryClip(ClipData.newPlainText("elon_user_id", userId))
         Toast.makeText(activity, "已复制用户 ID", Toast.LENGTH_SHORT).show()
     }
-
-    private fun roundedRect(color: Int, radius: Int): GradientDrawable =
-        GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = radius.toFloat()
-            setColor(color)
-        }
 }
 
 private fun Context.dp(value: Int): Int =
-    (value * resources.displayMetrics.density).toInt()
+    (value * resources.displayMetrics.density + 0.5f).toInt()

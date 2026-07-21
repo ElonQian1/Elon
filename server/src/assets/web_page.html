@@ -2614,6 +2614,268 @@
       padding: 20px 0 32px;
     }
 
+    /* 个人中心 v2：与 Android 新排版共用 20px 边距、14px 分组节奏和 70px 功能行。 */
+    #profilePage {
+      box-sizing: border-box;
+      padding: 14px 20px 104px;
+      background: #000000;
+    }
+    #profilePage > .apk-promo,
+    #profilePage > .profile-legacy-actions { display: none; }
+    #profilePage .profile-user-card {
+      position: static;
+      min-height: 84px;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 12px 18px 12px 20px;
+      gap: 14px;
+      border-radius: 18px;
+      background: #151515;
+    }
+    #profilePage .profile-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      background: #D9D9D9;
+      color: #151515;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    #profilePage .profile-nickname {
+      color: #D9D9D9;
+      font-size: 16px;
+      line-height: 1.15;
+    }
+    #profilePage .profile-account {
+      margin-top: 5px;
+      color: #777777;
+      font-size: 11px;
+      line-height: 1.1;
+    }
+    #profilePage .profile-level-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 5px;
+      color: #D9D9D9;
+      font-size: 11px;
+      line-height: 1;
+    }
+    #profilePage .profile-level-track {
+      display: flex;
+      flex: 1;
+      height: 5px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #2E2E2E;
+    }
+    #profilePage .profile-level-track span { min-width: 0; }
+    #profilePage .profile-level-track .own { background: #58BE6A; }
+    #profilePage .profile-level-track .platform { background: #5DA6FF; }
+    #profilePage .profile-level-track .shared { background: #E58F46; }
+    #profilePage .profile-level-track .provided { background: #F2C94C; }
+    #profilePage .profile-qr-thumb { width: 34px; height: 34px; }
+    #profilePage .usage-section {
+      position: relative;
+      min-height: 284px;
+      box-sizing: border-box;
+      margin: 14px 0 0 !important;
+      padding: 20px 14px 12px;
+      border-radius: 18px;
+      background: #151515;
+      overflow: hidden;
+    }
+    #profilePage .usage-section h3 {
+      display: block;
+      margin: 0;
+      color: #D9D9D9;
+      font-size: 17px;
+      font-weight: 400;
+    }
+    #profilePage .usage-period-actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 28px;
+      margin-top: 13px;
+    }
+    #profilePage .usage-period-button {
+      height: 38px;
+      border: 1px solid #3E3E42;
+      border-radius: 999px;
+      background: #101010;
+      color: #D9D9D9;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    #profilePage .usage-period-button.selected,
+    #profilePage .usage-period-button.recharge {
+      border-color: #D9D9D9;
+      background: #D9D9D9;
+      color: #171717;
+    }
+    #profilePage .usage-gauge {
+      position: relative;
+      height: 190px;
+      margin-top: 0;
+    }
+    #profilePage .usage-gauge svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    #profilePage .usage-gauge path {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 2 8;
+    }
+    #profilePage .usage-gauge-neutral { stroke: #D9D9D9; }
+    #profilePage .usage-gauge-progress {
+      stroke: #5DA6FF;
+      clip-path: inset(0 60% 0 0);
+      transition: clip-path 180ms ease;
+    }
+    #profilePage .usage-remaining {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 37px;
+      margin: 0;
+      color: #D9D9D9;
+      font-size: 48px;
+      font-weight: 400;
+      line-height: 1;
+      text-align: center;
+    }
+    #profilePage .usage-gauge-caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 10px;
+      color: #777777;
+      font-size: 13px;
+      text-align: center;
+    }
+    #profilePage .usage-caption,
+    #profilePage .usage-bar,
+    #profilePage .usage-progress-label,
+    #profilePage .usage-metrics,
+    #profilePage #usageContent,
+    #profilePage #usageStateText { display: none; }
+    #profilePage .profile-action-group {
+      margin-top: 14px;
+      padding: 4px 0;
+      border-radius: 18px;
+      background: #151515;
+      overflow: hidden;
+    }
+    #profilePage .profile-node-resource-panel {
+      margin: 0;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+    #profilePage .profile-node-resource-header,
+    #profilePage .profile-memory-header,
+    #profilePage .profile-row {
+      min-height: 76px;
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0 18px 0 36px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      display: flex;
+      align-items: center;
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+    }
+    #profilePage .profile-node-resource-header:hover,
+    #profilePage .profile-memory-header:hover,
+    #profilePage .profile-row:hover { background: rgba(255,255,255,.025); }
+    #profilePage .profile-action-icon {
+      width: 32px;
+      height: 32px;
+      flex: 0 0 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #D9D9D9;
+    }
+    #profilePage .profile-action-icon svg {
+      width: 32px;
+      height: 32px;
+      display: block;
+    }
+    #profilePage .profile-node-resource-title-block,
+    #profilePage .profile-action-copy {
+      min-width: 0;
+      flex: 1;
+      margin-left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    #profilePage .profile-node-resource-title,
+    #profilePage .profile-action-title {
+      color: #D9D9D9;
+      font-size: 16px;
+      font-weight: 400;
+      line-height: 1.1;
+    }
+    #profilePage .profile-node-resource-hint,
+    #profilePage .profile-action-subtitle {
+      color: #676767;
+      font-size: 12px;
+      line-height: 1.1;
+    }
+    #profilePage .profile-action-chevron,
+    #profilePage .profile-node-resource-toggle {
+      width: 32px;
+      height: 48px;
+      flex: 0 0 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #D9D9D9;
+      font-size: 30px;
+      line-height: 1;
+      transition: transform 150ms ease;
+    }
+    #profilePage .profile-node-resource-header[aria-expanded="true"] .profile-node-resource-toggle,
+    #profilePage .profile-memory-header[aria-expanded="true"] .profile-action-chevron {
+      transform: rotate(90deg);
+    }
+    #profilePage .profile-node-resource-body,
+    #profilePage .profile-memory-body { padding: 0 22px 16px; }
+    #profilePage .profile-memory-panel { margin: 0; padding: 0; background: transparent; }
+    #profilePage .profile-memory-tools {
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #profilePage .profile-memory-add {
+      border: 0;
+      border-radius: 999px;
+      padding: 7px 12px;
+      background: #272727;
+      color: #D9D9D9;
+      cursor: pointer;
+    }
+    #profilePage .profile-version {
+      padding: 0;
+      color: #777777;
+      font-size: 12px;
+      text-align: left;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
     /* ===== Agent 自动化页（网页版同步 APK 入口，不模拟原生权限） ===== */
     .agent-center-page {
       padding: 20px;
@@ -4194,7 +4456,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <div class="profile-user-info">
           <div class="profile-nickname" id="profileNickname">加载中…</div>
           <div class="profile-account" id="profileAccount"></div>
-          <div class="profile-workspace-hint">云端工作区已就绪</div>
+          <div class="profile-level-row">
+            <span id="profileLevel">Lv.--</span>
+            <span class="profile-level-track" id="profileLevelTrack" aria-hidden="true"></span>
+            <span id="profileLevelPercent">同步中</span>
+          </div>
         </div>
         <div class="profile-qr-thumb" title="我的二维码" aria-label="我的二维码">
           <svg viewBox="0 0 28 28" aria-hidden="true">
@@ -4204,30 +4470,30 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       </div>
 
       <div class="usage-section">
-        <h3>Token 额度 <small id="usagePeriodText">近30天</small></h3>
-        <div class="usage-remaining" id="usageRemainingText">—</div>
+        <h3>Token 额度</h3>
+        <div class="usage-period-actions">
+          <button class="usage-period-button" id="usageWeekBtn" type="button">7天</button>
+          <button class="usage-period-button selected" id="usagePeriodText" type="button">30天</button>
+          <button class="usage-period-button recharge" id="rechargeQuotaBtn" type="button">充值</button>
+        </div>
+        <div class="usage-gauge" id="usageRefreshBtn" role="button" tabindex="0" aria-label="刷新 Token 额度">
+          <svg viewBox="0 0 320 190" preserveAspectRatio="none" aria-hidden="true">
+            <path class="usage-gauge-neutral" d="M20 168 A140 140 0 0 1 300 168" pathLength="100" />
+            <path class="usage-gauge-progress" id="usageGaugeProgress" d="M20 168 A140 140 0 0 1 300 168" pathLength="100" />
+          </svg>
+          <div class="usage-remaining" id="usageRemainingText">—</div>
+          <div class="usage-gauge-caption">剩余</div>
+        </div>
+        <span id="usageStateText"></span>
         <div class="usage-caption" id="usageRemainingCaption">正在同步服务器用量</div>
         <div class="usage-bar"><div class="usage-progress" id="usageProgress"></div></div>
         <div class="usage-progress-label" id="usageProgressLabel">额度读取中</div>
         <div class="usage-metrics">
-          <div>
-            <div class="usage-metric-label">30天已用</div>
-            <div class="usage-metric-value" id="usageMonthValue">—</div>
-          </div>
-          <div>
-            <div class="usage-metric-label">7天已用</div>
-            <div class="usage-metric-value" id="usageWeekValue">—</div>
-          </div>
-          <div>
-            <div class="usage-metric-label">总额度</div>
-            <div class="usage-metric-value" id="usageLimitValue">—</div>
-          </div>
+          <span id="usageMonthValue">—</span>
+          <span id="usageWeekValue">—</span>
+          <span id="usageLimitValue">—</span>
         </div>
         <div id="usageContent"></div>
-        <div class="usage-actions">
-          <button class="usage-action secondary" id="usageRefreshBtn" type="button">刷新用量</button>
-          <button class="usage-action primary" id="rechargeQuotaBtn" type="button">充值额度</button>
-        </div>
       </div>
 
       <!-- APK 推广下载块 -->
@@ -4249,13 +4515,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <div class="download-link-box" id="downloadLinkBox">生成中…</div>
       </div>
 
+      <div class="profile-action-group profile-primary-group">
       <div class="profile-node-resource-panel" id="profileNodeResourcePanel">
         <button class="profile-node-resource-header" id="profileNodeResourceToggle" type="button" aria-expanded="false">
+          <span class="profile-action-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="22" height="17" rx="5"/><path d="m11 27 5-6 5 6Z" fill="currentColor" stroke="none"/></svg>
+          </span>
           <span class="profile-node-resource-title-block">
-            <span class="profile-node-resource-title">PC 节点资源</span>
+            <span class="profile-node-resource-title">PC 节点</span>
             <span class="profile-node-resource-hint" id="profileNodeResourceHint">积分、全站节点、我的节点</span>
           </span>
-          <span class="profile-node-resource-toggle" id="profileNodeResourceArrow" aria-hidden="true">展开</span>
+          <span class="profile-node-resource-toggle" id="profileNodeResourceArrow" aria-hidden="true">›</span>
         </button>
 
         <div class="profile-node-resource-body hidden" id="profileNodeResourceBody">
@@ -4340,49 +4610,68 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         </div>
       </div>
 
-      <div class="my-nodes-card" id="memoriesCard">
-        <div class="my-nodes-header">
-          <span class="my-nodes-title">AI 记住的你</span>
-          <span style="display:flex;align-items:center;gap:6px;">
-            <span class="my-nodes-status" id="memoriesStatus">加载中…</span>
-            <button id="addMemoryBtn" title="主动告诉 AI" style="background:none;border:none;color:#8DDC9B;cursor:pointer;font-size:20px;line-height:1;padding:0 4px;">+</button>
+      <div class="profile-memory-panel" id="memoriesCard">
+        <button class="profile-memory-header" id="memoriesToggle" type="button" aria-expanded="false">
+          <span class="profile-action-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10" width="21" height="16" rx="5"/><path d="M21 4c0 4 2 6 6 6-4 0-6 2-6 6 0-4-2-6-6-6 4 0 6-2 6-6Z" fill="currentColor" stroke="none"/></svg>
           </span>
+          <span class="profile-action-copy">
+            <span class="profile-action-title">AI 记忆</span>
+            <span class="profile-action-subtitle">逐渐记住你的偏好</span>
+          </span>
+          <span class="profile-action-chevron" aria-hidden="true">›</span>
+        </button>
+        <div class="profile-memory-body hidden" id="memoriesBody">
+          <div class="profile-memory-tools">
+            <span class="my-nodes-status" id="memoriesStatus">加载中…</span>
+            <button class="profile-memory-add" id="addMemoryBtn" type="button">＋ 主动告诉 AI</button>
+          </div>
+          <div id="memoriesList"></div>
         </div>
-        <p style="font-size:11px;color:#777777;margin:4px 0 8px">AI 在对话中自动记录，让每次回答更贴合你</p>
-        <div id="memoriesList"></div>
       </div>
 
       <button class="profile-row" id="aiSettingsRow">
-        <span>AI 代理设置</span><span class="arrow">›</span>
+        <span class="profile-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="currentColor"><path d="M8 5h8v22l-8 4V5Zm10 12 10-6v16H18V17Z"/></svg>
+        </span>
+        <span class="profile-action-copy"><span class="profile-action-title">AI 代理设置</span><span class="profile-action-subtitle">语音调节</span></span>
+        <span class="profile-action-chevron" aria-hidden="true">›</span>
       </button>
       <button class="profile-row" id="agentAutomationRow">
-        <span>Agent 自动化</span><span class="arrow">›</span>
+        <span class="profile-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="16" cy="16" r="11"/><circle cx="16" cy="16" r="5" fill="currentColor" stroke="none"/></svg>
+        </span>
+        <span class="profile-action-copy"><span class="profile-action-title">Agent 自动化</span><span class="profile-action-subtitle">接管你的配置</span></span>
+        <span class="profile-action-chevron" aria-hidden="true">›</span>
       </button>
-      <button class="profile-row" id="ttsVoiceRow">
-        <span>AI 回复语音</span><span class="arrow">APK 中切换</span>
-      </button>
-      <button class="profile-row" id="chatHandleToggleRow">
-        <span>悬浮按钮</span><span class="chat-handle-switch" id="chatHandleToggleSwitch" aria-hidden="true"></span>
-      </button>
-      <button class="profile-row" id="nodeMarketRow">
-        <span>PC 节点大厅</span><span class="arrow">›</span>
-      </button>
-      <button class="profile-row" id="projectPlazaRow">
-        <span>项目广场</span><span class="arrow">›</span>
-      </button>
-      <button class="profile-row" id="sharePromotionRow">
-        <span>分享推广</span><span class="arrow">复制链接</span>
-      </button>
-      <button class="profile-row" id="importGuestRow">
-        <span>导入游客记录</span><span class="arrow">APK 中处理</span>
-      </button>
-      <button class="profile-row" id="checkUpdateRow">
-        <span>检查更新</span><span class="arrow" id="updateArrow">›</span>
-      </button>
-      <button class="profile-row danger" id="logoutRow">
-        <span>退出登录</span><span class="arrow">›</span>
-      </button>
-      <div class="profile-version" id="versionText">一龙网页版</div>
+      </div>
+
+      <div class="profile-action-group profile-support-group">
+        <button class="profile-row" id="sharePromotionRow">
+          <span class="profile-action-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="9" width="21" height="18" rx="5"/><path d="M23 4v8M19 8h8"/></svg>
+          </span>
+          <span class="profile-action-copy"><span class="profile-action-title">分享推广</span><span class="profile-action-subtitle">全力支持，感谢。</span></span>
+          <span class="profile-action-chevron" aria-hidden="true">›</span>
+        </button>
+        <button class="profile-row" id="checkUpdateRow">
+          <span class="profile-action-icon" aria-hidden="true">
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4v13m0 0-5-5m5 5 5-5"/><path d="M6 19v4a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4v-4"/></svg>
+          </span>
+          <span class="profile-action-copy"><span class="profile-action-title">检测更新</span><span class="profile-version" id="versionText">一龙网页版</span></span>
+          <span class="profile-action-chevron" aria-hidden="true">›</span>
+          <span class="hidden" id="updateArrow"></span>
+        </button>
+      </div>
+
+      <div class="profile-legacy-actions">
+        <button id="ttsVoiceRow" type="button"><span>AI 回复语音</span></button>
+        <button id="chatHandleToggleRow" type="button"><span>悬浮按钮</span><span id="chatHandleToggleSwitch"></span></button>
+        <button id="nodeMarketRow" type="button"><span>PC 节点大厅</span></button>
+        <button id="projectPlazaRow" type="button"><span>项目广场</span></button>
+        <button id="importGuestRow" type="button"><span>导入游客记录</span></button>
+        <button id="logoutRow" type="button"><span>退出登录</span></button>
+      </div>
     </div>
 
   </section>
@@ -4542,7 +4831,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_PROJECT_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
         </span>
       </button>
-      <button class="tab" data-tab="profilePage" data-title="我的" type="button" aria-label="我的">
+      <button class="tab" data-tab="profilePage" data-title="个人中心" type="button" aria-label="我的">
         <img class="tab-selection" src="data:image/png;base64,__BOTTOM_NAV_SELECTED_PNG_B64__" alt="" aria-hidden="true" />
         <span class="ic">
           <img class="inactive-icon" src="data:image/png;base64,__BOTTOM_NAV_PROFILE_PNG_B64__" alt="" aria-hidden="true" />
@@ -5327,6 +5616,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const profileAvatar = $('profileAvatar');
   const profileNickname = $('profileNickname');
   const profileAccount = $('profileAccount');
+  const profileLevel = $('profileLevel');
+  const profileLevelPercent = $('profileLevelPercent');
+  const profileLevelTrack = $('profileLevelTrack');
   const versionText = $('versionText');
   const deleteConfirmMask = $('deleteConfirmMask');
   const deleteConfirmText = $('deleteConfirmText');
@@ -5348,9 +5640,12 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const nodeMarketRow = $('nodeMarketRow');
   const projectPlazaRow = $('projectPlazaRow');
   const usagePeriodText = $('usagePeriodText');
+  const usageWeekBtn = $('usageWeekBtn');
+  const usageStateText = $('usageStateText');
   const usageRemainingText = $('usageRemainingText');
   const usageRemainingCaption = $('usageRemainingCaption');
   const usageProgress = $('usageProgress');
+  const usageGaugeProgress = $('usageGaugeProgress');
   const usageProgressLabel = $('usageProgressLabel');
   const usageMonthValue = $('usageMonthValue');
   const usageWeekValue = $('usageWeekValue');
@@ -5540,6 +5835,8 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let groupSummaryRefreshTimer = null;
   let currentTab = 'chatPage';
   let nodeResourceExpanded = false;
+  let profileMemoriesExpanded = false;
+  let profileUsageDays = 30;
   let socket = null;
   let appSocket = null;
   let busy = false;
@@ -5808,13 +6105,18 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     if (!p) {
       if (webSideMenuLevel) webSideMenuLevel.textContent = currentUser ? 'Lv.--' : 'Lv.0';
       if (webSideMenuLevelPercent) webSideMenuLevelPercent.textContent = currentUser ? '同步中' : '0%';
+      if (profileLevel) profileLevel.textContent = currentUser ? 'Lv.--' : 'Lv.0';
+      if (profileLevelPercent) profileLevelPercent.textContent = currentUser ? '同步中' : '0%';
       renderWebSideMenuSegments([]);
+      renderProfileLevelSegments([]);
       return;
     }
     const level = Math.max(1, Math.round(Number(p.level) || 1));
     const percent = Math.max(0, Math.min(100, Math.round((Number(p.level_progress_ratio) || 0) * 100)));
     if (webSideMenuLevel) webSideMenuLevel.textContent = 'Lv.' + level;
     if (webSideMenuLevelPercent) webSideMenuLevelPercent.textContent = percent + '%';
+    if (profileLevel) profileLevel.textContent = 'Lv.' + level;
+    if (profileLevelPercent) profileLevelPercent.textContent = percent + '%';
     const segments = p.own_codex_progress_ratio == null
       ? [
           ['own', Number(p.consumed_progress_ratio) || 0],
@@ -5829,6 +6131,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
           ['provided', Number(p.provided_progress_ratio) || 0],
         ];
     renderWebSideMenuSegments(segments);
+    renderProfileLevelSegments(segments);
   }
 
   function renderWebSideMenuSegments(segments) {
@@ -5849,6 +6152,23 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     filler.className = 'web-side-level-segment';
     filler.style.flex = String(Math.max(0.001, 1 - total)) + ' 0 0';
     webSideMenuLevelTrack.appendChild(filler);
+  }
+  function renderProfileLevelSegments(segments) {
+    if (!profileLevelTrack) return;
+    profileLevelTrack.innerHTML = '';
+    const cleaned = (segments || [])
+      .map(([name, ratio]) => [name, Math.max(0, Math.min(1, Number(ratio) || 0))])
+      .filter(([, ratio]) => ratio > 0);
+    const total = Math.min(1, cleaned.reduce((sum, [, ratio]) => sum + ratio, 0));
+    cleaned.forEach(([name, ratio]) => {
+      const segment = document.createElement('span');
+      segment.className = name;
+      segment.style.flex = String(Math.min(ratio, 1)) + ' 0 0';
+      profileLevelTrack.appendChild(segment);
+    });
+    const filler = document.createElement('span');
+    filler.style.flex = String(Math.max(0.001, 1 - total)) + ' 0 0';
+    profileLevelTrack.appendChild(filler);
   }
   function playWebChatSideMenuRefreshAnimation() {
     if (!webChatSideMenuRefresh) return;
@@ -6494,6 +6814,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     // 下载页：切入"我的"时刷新版本信息
     if (tabId === 'profilePage') {
       refreshDownloadPage();
+      loadWebSideMenuProgression().catch((e) => console.warn('load progression failed:', e));
       loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
       renderNodeResourcePanel();
       if (nodeResourceExpanded) {
@@ -9212,6 +9533,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function setUsageProgress(value, color) {
     usageProgress.style.width = Math.max(0, Math.min(100, value)) + '%';
     usageProgress.style.background = color;
+    if (usageGaugeProgress) {
+      const remaining = Math.max(0, Math.min(100, Number(value) || 0));
+      usageGaugeProgress.style.clipPath = 'inset(0 ' + remaining + '% 0 0)';
+    }
   }
   function usageProgressColor(percent) {
     if (percent <= 15) return '#ff6b6b';
@@ -9219,9 +9544,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     return '#58be6a';
   }
   function setUsageStatus(label, textColor, bgColor) {
-    usagePeriodText.textContent = label;
-    usagePeriodText.style.color = textColor;
-    usagePeriodText.style.background = bgColor;
+    if (!usageStateText) return;
+    usageStateText.textContent = label;
+    usageStateText.style.color = textColor;
+    usageStateText.style.background = bgColor;
   }
   function usageStatusLabel(percent) {
     if (percent <= 15) return '告急';
@@ -9264,7 +9590,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
     renderUsagePending('同步中', '正在同步服务器用量');
     try {
-      const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/usage/stats?days=30');
+      const res = await api('/api/user/' + encodeURIComponent(currentUser.id) + '/usage/stats?days=' + profileUsageDays);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
       const t = data.total || {};
@@ -9291,7 +9617,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
           usageRemainingText.textContent = percent + '%';
           usageRemainingCaption.textContent = '剩余 ' + formatUsageCount(remaining) + ' / ' + formatUsageCount(limit) + ' tokens';
           setUsageProgress(percent, usageProgressColor(percent));
-          usageProgressLabel.textContent = '已用 ' + Math.max(0, 100 - percent) + '% · 近30天消耗 ' + formatUsageCount(total) + ' tokens';
+          usageProgressLabel.textContent = '已用 ' + Math.max(0, 100 - percent) + '% · 近' + profileUsageDays + '天消耗 ' + formatUsageCount(total) + ' tokens';
         } else {
           setUsageStatus('已同步', '#D0D0D0', '#16251A');
           usageRemainingText.textContent = formatUsageCount(remaining);
@@ -9309,7 +9635,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       usageContent.innerHTML = (byFeature.length ? '<div class="usage-hint" style="margin-top:14px;color:var(--ink-soft)">' +
         byFeature.map((f) => (f.feature || 'other') + ' ' + formatUsageCount(f.total_tokens)).join('、') +
         '</div>' : '') +
-      (total === 0 ? '<div class="usage-hint">近 30 天暂无记录</div>' : '');
+      (total === 0 ? '<div class="usage-hint">近 ' + profileUsageDays + ' 天暂无记录</div>' : '');
     } catch (err) {
       setUsageStatus('暂不可用', '#ffc3c3', '#3a1e1e');
       usageRemainingText.textContent = '加载失败';
@@ -10031,7 +10357,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       toggle.setAttribute('aria-label', nodeResourceExpanded ? '收起 PC 节点资源' : '展开 PC 节点资源');
     }
     if (hint) hint.textContent = nodeResourceExpanded ? '节点积分、全站节点、我的节点' : '积分、全站节点、我的节点';
-    if (arrow) arrow.textContent = nodeResourceExpanded ? '收起' : '展开';
+    if (arrow) arrow.textContent = '›';
   }
 
   async function loadNodeResourcePanel() {
@@ -10255,6 +10581,19 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       setNodeResourceExpanded(!nodeResourceExpanded);
     });
   }
+
+  const memoriesToggle = $('memoriesToggle');
+  if (memoriesToggle) {
+    memoriesToggle.addEventListener('click', () => {
+      profileMemoriesExpanded = !profileMemoriesExpanded;
+      const body = $('memoriesBody');
+      body?.classList.toggle('hidden', !profileMemoriesExpanded);
+      memoriesToggle.setAttribute('aria-expanded', profileMemoriesExpanded ? 'true' : 'false');
+      if (profileMemoriesExpanded) {
+        loadMemories().catch((e) => console.warn('loadMemories failed:', e));
+      }
+    });
+  }
   const myNodesRefreshBtn = $('myNodesRefreshBtn');
   if (myNodesRefreshBtn) {
     myNodesRefreshBtn.addEventListener('click', (event) => {
@@ -10459,8 +10798,22 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }, 2200);
   });
 
+  function selectProfileUsageDays(days) {
+    profileUsageDays = days === 7 ? 7 : 30;
+    usageWeekBtn?.classList.toggle('selected', profileUsageDays === 7);
+    usagePeriodText?.classList.toggle('selected', profileUsageDays === 30);
+    loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
+  }
+  usageWeekBtn?.addEventListener('click', () => selectProfileUsageDays(7));
+  usagePeriodText?.addEventListener('click', () => selectProfileUsageDays(30));
   usageRefreshBtn.addEventListener('click', () => {
     loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
+  });
+  usageRefreshBtn.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      loadUsageStats().catch((e) => console.warn('loadUsageStats failed:', e));
+    }
   });
   rechargeQuotaBtn.addEventListener('click', openRechargeDialog);
   closeRechargeBtn.addEventListener('click', () => rechargeMask.classList.remove('active'));
@@ -10472,14 +10825,17 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   // ====== 检查更新 ======
   checkUpdateRow.addEventListener('click', async () => {
     updateArrow.textContent = '检查中…';
+    versionText.textContent = '正在检查更新…';
     try {
       const res = await fetch('/app/version.json');
       const data = await res.json();
       const v = data.version_name || data.version || '?';
       const b = data.version_code || data.build || '?';
       updateArrow.textContent = '最新 v' + v + ' (' + b + ')';
+      versionText.textContent = '一龙 v' + v + ' (build ' + b + ')';
     } catch {
       updateArrow.textContent = '检查失败';
+      versionText.textContent = '检查失败，请稍后重试';
     }
   });
 

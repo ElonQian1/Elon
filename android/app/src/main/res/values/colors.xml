@@ -21,6 +21,7 @@
     <color name="elon_text_placeholder">#AFAFAF</color>
     <color name="elon_text_nav">#D6D6D6</color>
     <color name="elon_text_tertiary">#777777</color>
+    <color name="profile_text_secondary">#676767</color>
     <color name="elon_text_menu">#2F3136</color>
     <color name="elon_icon_member">#A5AFBD</color>
     <color name="elon_icon_primary">#D9D9D9</color>

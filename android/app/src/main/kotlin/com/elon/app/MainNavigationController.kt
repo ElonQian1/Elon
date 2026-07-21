@@ -259,7 +259,7 @@ internal class MainNavigationController(
         binding.topTitleText.setOnLongClickListener(null)
         hideProjectTopTabs()
         binding.topTitleText.text = when (tab) {
-            binding.tabProfile -> "我的"
+            binding.tabProfile -> "个人中心"
             else -> conversationHomeTitle()
         }
         if (tab == binding.tabChat) {

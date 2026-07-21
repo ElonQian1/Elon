@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -31,9 +32,12 @@ internal class UserMemoriesCard(
 ) {
     private var root: LinearLayout? = null
     private var loadSerial = 0
+    private var memoryExpanded = false
 
     private lateinit var statusPill: TextView
     private lateinit var memoryListContainer: LinearLayout
+    private lateinit var detailBody: LinearLayout
+    private lateinit var arrow: ImageView
 
     // ─── 公开 API ────────────────────────────────────────────────────────────
 
@@ -143,82 +147,121 @@ internal class UserMemoriesCard(
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).also { it.setMargins(0, dp(10), 0, 0) }
+            )
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(22), dp(16), dp(22), dp(16))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#151515"))
-                cornerRadius = dp(8).toFloat()
-            }
-
-            // 标题行
             addView(LinearLayout(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(76)
+                )
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                isClickable = true
+                isFocusable = true
+                contentDescription = "展开 AI 记忆"
+                setPadding(dp(36), 0, dp(18), 0)
+                setOnClickListener {
+                    memoryExpanded = !memoryExpanded
+                    detailBody.visibility = if (memoryExpanded) View.VISIBLE else View.GONE
+                    arrow.rotation = if (memoryExpanded) 90f else 0f
+                    contentDescription = if (memoryExpanded) "收起 AI 记忆" else "展开 AI 记忆"
+                    if (memoryExpanded) refresh()
+                }
+
+                addView(ImageView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(32), dp(32))
+                    setImageResource(R.drawable.profile_icon_ai_memory)
+                    contentDescription = null
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                })
+
+                addView(LinearLayout(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f
+                    ).also { it.marginStart = dp(16) }
+                    orientation = LinearLayout.VERTICAL
+
+                    addView(TextView(activity).apply {
+                        includeFontPadding = false
+                        text = "AI 记忆"
+                        setTextColor(Color.parseColor("#D9D9D9"))
+                        textSize = 16f
+                    })
+
+                    addView(TextView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        ).also { it.topMargin = dp(5) }
+                        includeFontPadding = false
+                        text = "逐渐记住你的偏好"
+                        setTextColor(Color.parseColor("#676767"))
+                        textSize = 12f
+                    })
+                })
+
+                arrow = ImageView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(dp(32), dp(48))
+                    setPadding(dp(8), dp(8), dp(8), dp(8))
+                    setImageResource(R.drawable.profile_icon_chevron)
+                    contentDescription = null
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                }
+                addView(arrow)
+            })
+
+            detailBody = LinearLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-
-                addView(TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    includeFontPadding = false
-                    text = "AI 记住的你"
-                    setTextColor(Color.parseColor("#D6D6D6"))
-                    textSize = 15f
-                    setTypeface(typeface, Typeface.BOLD)
-                })
-
-                statusPill = TextView(activity).apply {
-                    includeFontPadding = false
-                    gravity = Gravity.CENTER
-                    setPadding(dp(10), dp(4), dp(10), dp(4))
-                    text = "加载中…"
-                    textSize = 11f
-                    setTextColor(Color.parseColor("#8DDC9B"))
-                    background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#16251A"))
-                        cornerRadius = dp(8).toFloat()
-                    }
-                }
-                addView(statusPill)
-
-                // + 按钮
-                addView(TextView(activity).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).also { it.marginStart = dp(8) }
-                    includeFontPadding = false
-                    text = "+"
-                    textSize = 20f
-                    setTextColor(Color.parseColor("#8DDC9B"))
-                    setPadding(dp(6), 0, dp(2), 0)
-                    setOnClickListener { showAddDialog() }
-                })
-            })
-
-            // 副标题说明
-            addView(TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).also { it.topMargin = dp(4) }
-                includeFontPadding = false
-                text = "AI 在对话中自动记录，让每次回答更贴合你"
-                textSize = 11f
-                setTextColor(Color.parseColor("#777777"))
-            })
-
-            // 记忆列表
-            memoryListContainer = LinearLayout(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).also { it.topMargin = dp(10) }
                 orientation = LinearLayout.VERTICAL
+                setPadding(dp(22), 0, dp(22), dp(16))
+                visibility = View.GONE
+
+                addView(LinearLayout(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(40)
+                    )
+                    gravity = Gravity.CENTER_VERTICAL
+                    orientation = LinearLayout.HORIZONTAL
+
+                    statusPill = TextView(activity).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                        includeFontPadding = false
+                        text = "加载中…"
+                        textSize = 11f
+                        setTextColor(Color.parseColor("#8DDC9B"))
+                    }
+                    addView(statusPill)
+
+                    addView(TextView(activity).apply {
+                        includeFontPadding = false
+                        text = "＋ 主动告诉 AI"
+                        textSize = 12f
+                        setTextColor(Color.parseColor("#D9D9D9"))
+                        setPadding(dp(10), dp(6), dp(10), dp(6))
+                        background = GradientDrawable().apply {
+                            setColor(Color.parseColor("#272727"))
+                            cornerRadius = dp(16).toFloat()
+                        }
+                        setOnClickListener { showAddDialog() }
+                    })
+                })
+
+                memoryListContainer = LinearLayout(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                    orientation = LinearLayout.VERTICAL
+                }
+                addView(memoryListContainer)
             }
-            addView(memoryListContainer)
+            addView(detailBody)
         }
     }
 
