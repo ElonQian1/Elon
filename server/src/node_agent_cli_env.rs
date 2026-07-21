@@ -32,6 +32,7 @@ pub(crate) fn apply_env(
     // Desktop review authority belongs to the supervising desktop session, not
     // to the PC executor. Never let a spawned CLI or its sidecar inherit it.
     cmd.env_remove(crate::node_agent_desktop_review_auth::DESKTOP_REVIEW_CREDENTIAL_ENV);
+    cmd.env_remove(crate::node_agent_desktop_review_auth::DESKTOP_REVIEW_PUBLIC_KEYS_ENV);
     for (key, value) in cli_child_env_overrides(cli_name, cli_program, cwd) {
         cmd.env(&key, &value);
         sidecar_env.push((key, value));

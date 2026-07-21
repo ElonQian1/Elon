@@ -4,9 +4,17 @@ use std::{
 };
 
 use axum::http::HeaderMap;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use rsa::{
+    pkcs1v15::{Signature as RsaSignature, VerifyingKey},
+    signature::Verifier,
+    traits::PublicKeyParts,
+    BigUint, RsaPublicKey,
+};
 use sha2::{Digest, Sha256};
 
 pub(crate) const DESKTOP_REVIEW_CREDENTIAL_ENV: &str = "ELON_DESKTOP_REVIEW_CREDENTIAL";
+pub(crate) const DESKTOP_REVIEW_PUBLIC_KEYS_ENV: &str = "ELON_DESKTOP_REVIEW_PUBLIC_KEYS";
 pub(crate) const DESKTOP_REVIEW_TICKET_HEADER: &str = "x-elon-desktop-review-ticket";
 const TICKET_VERSION: &str = "v1";
 const MAX_TICKET_LIFETIME_SECS: u64 = 180;
@@ -15,6 +23,7 @@ const CLOCK_SKEW_SECS: u64 = 15;
 #[derive(Clone, Debug)]
 pub(crate) struct DesktopReviewAuth {
     credential: Option<Arc<[u8]>>,
+    public_keys: Arc<Vec<(String, RsaPublicKey)>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,13 +41,21 @@ impl DesktopReviewAuth {
             .map(|value| value.trim().as_bytes().to_vec())
             .filter(|value| value.len() >= 32)
             .map(Arc::<[u8]>::from);
-        Self { credential }
+        let public_keys = std::env::var(DESKTOP_REVIEW_PUBLIC_KEYS_ENV)
+            .ok()
+            .map(|value| parse_public_keys(&value))
+            .unwrap_or_default();
+        Self {
+            credential,
+            public_keys: Arc::new(public_keys),
+        }
     }
 
     #[cfg(test)]
     pub(crate) fn for_test(credential: &str) -> Self {
         Self {
             credential: Some(Arc::from(credential.as_bytes())),
+            public_keys: Arc::new(Vec::new()),
         }
     }
 
@@ -62,10 +79,16 @@ impl DesktopReviewAuth {
         task_id: &str,
         now: u64,
     ) -> Result<(), DesktopReviewAuthError> {
-        let credential = self
-            .credential
-            .as_deref()
-            .ok_or(DesktopReviewAuthError::NotConfigured)?;
+        if ticket.starts_with("v2.") {
+            return self.verify_v2_ticket(ticket, owner_user_id, task_id, now);
+        }
+        let credential = self.credential.as_deref().ok_or_else(|| {
+            if self.public_keys.is_empty() {
+                DesktopReviewAuthError::NotConfigured
+            } else {
+                DesktopReviewAuthError::Invalid
+            }
+        })?;
         let mut parts = ticket.split('.');
         let version = parts.next().ok_or(DesktopReviewAuthError::Invalid)?;
         let expires_at = parts
@@ -96,6 +119,61 @@ impl DesktopReviewAuth {
             return Err(DesktopReviewAuthError::Invalid);
         }
         Ok(())
+    }
+
+    fn verify_v2_ticket(
+        &self,
+        ticket: &str,
+        owner_user_id: &str,
+        task_id: &str,
+        now: u64,
+    ) -> Result<(), DesktopReviewAuthError> {
+        let mut parts = ticket.split('.');
+        let version = parts.next().ok_or(DesktopReviewAuthError::Invalid)?;
+        let key_id = parts.next().ok_or(DesktopReviewAuthError::Invalid)?;
+        let expires_at = parts
+            .next()
+            .and_then(|value| value.parse::<u64>().ok())
+            .ok_or(DesktopReviewAuthError::Invalid)?;
+        let nonce = parts.next().ok_or(DesktopReviewAuthError::Invalid)?;
+        let signature = parts.next().ok_or(DesktopReviewAuthError::Invalid)?;
+        if parts.next().is_some()
+            || version != "v2"
+            || key_id.len() != 16
+            || !key_id.bytes().all(|value| value.is_ascii_hexdigit())
+            || nonce.len() < 16
+            || nonce.len() > 96
+            || !nonce
+                .bytes()
+                .all(|value| value.is_ascii_alphanumeric() || value == b'-')
+        {
+            return Err(DesktopReviewAuthError::Invalid);
+        }
+        if expires_at.saturating_add(CLOCK_SKEW_SECS) < now
+            || expires_at > now.saturating_add(MAX_TICKET_LIFETIME_SECS)
+        {
+            return Err(DesktopReviewAuthError::Expired);
+        }
+        let (_, public_key) = self
+            .public_keys
+            .iter()
+            .find(|(candidate, _)| candidate.eq_ignore_ascii_case(key_id))
+            .ok_or_else(|| {
+                if self.public_keys.is_empty() {
+                    DesktopReviewAuthError::NotConfigured
+                } else {
+                    DesktopReviewAuthError::Invalid
+                }
+            })?;
+        let supplied = BASE64
+            .decode(signature)
+            .ok()
+            .and_then(|bytes| RsaSignature::try_from(bytes.as_slice()).ok())
+            .ok_or(DesktopReviewAuthError::Invalid)?;
+        let message = ticket_message_v2(owner_user_id, task_id, expires_at, nonce);
+        VerifyingKey::<Sha256>::new(public_key.clone())
+            .verify(message.as_bytes(), &supplied)
+            .map_err(|_| DesktopReviewAuthError::Invalid)
     }
 
     #[cfg(test)]
@@ -166,6 +244,12 @@ fn now_secs() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rsa::{
+        pkcs1v15::SigningKey,
+        rand_core::OsRng,
+        signature::{SignatureEncoding, Signer},
+        RsaPrivateKey,
+    };
 
     const SECRET: &str = "desktop-only-test-credential-32-bytes-long";
 
@@ -204,10 +288,83 @@ mod tests {
             auth.verify_ticket(&ticket, "owner", "task", 1_000),
             Err(DesktopReviewAuthError::Invalid)
         );
-        let unavailable = DesktopReviewAuth { credential: None };
+        let unavailable = DesktopReviewAuth {
+            credential: None,
+            public_keys: Arc::new(Vec::new()),
+        };
         assert_eq!(
             unavailable.verify_ticket(&ticket, "owner", "task", 1_000),
             Err(DesktopReviewAuthError::NotConfigured)
         );
     }
+
+    #[test]
+    fn v2_public_key_rotation_and_wrong_signature_fail_closed() {
+        let private = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let other = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let key_id = "0123456789abcdef";
+        let encode = |key: &RsaPrivateKey| {
+            let public = key.to_public_key();
+            format!(
+                "{key_id}:{}:{}",
+                BASE64.encode(public.n().to_bytes_be()),
+                BASE64.encode(public.e().to_bytes_be())
+            )
+        };
+        let auth = DesktopReviewAuth {
+            credential: None,
+            public_keys: Arc::new(parse_public_keys(&encode(&private))),
+        };
+        let message = ticket_message_v2("owner", "task", 1_100, "nonce-1234567890");
+        let signature = SigningKey::<Sha256>::new(private).sign(message.as_bytes());
+        let ticket = format!(
+            "v2.{key_id}.1100.nonce-1234567890.{}",
+            BASE64.encode(signature.to_bytes())
+        );
+        assert_eq!(auth.verify_ticket(&ticket, "owner", "task", 1_000), Ok(()));
+
+        let wrong = SigningKey::<Sha256>::new(other).sign(message.as_bytes());
+        let wrong_ticket = format!(
+            "v2.{key_id}.1100.nonce-1234567890.{}",
+            BASE64.encode(wrong.to_bytes())
+        );
+        assert_eq!(
+            auth.verify_ticket(&wrong_ticket, "owner", "task", 1_000),
+            Err(DesktopReviewAuthError::Invalid)
+        );
+        assert_eq!(
+            auth.verify_ticket(&ticket, "owner", "other-task", 1_000),
+            Err(DesktopReviewAuthError::Invalid)
+        );
+    }
+}
+
+fn ticket_message_v2(owner_user_id: &str, task_id: &str, expires_at: u64, nonce: &str) -> String {
+    format!("v2\n{owner_user_id}\n{task_id}\n{expires_at}\n{nonce}")
+}
+
+fn parse_public_keys(value: &str) -> Vec<(String, RsaPublicKey)> {
+    value
+        .split(';')
+        .filter_map(|entry| {
+            let mut fields = entry.trim().split(':');
+            let key_id = fields.next()?;
+            let modulus = fields.next()?;
+            let exponent = fields.next()?;
+            if fields.next().is_some() {
+                return None;
+            }
+            if key_id.len() != 16 || !key_id.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return None;
+            }
+            let modulus = BASE64.decode(modulus.trim()).ok()?;
+            let exponent = BASE64.decode(exponent.trim()).ok()?;
+            let key = RsaPublicKey::new(
+                BigUint::from_bytes_be(&modulus),
+                BigUint::from_bytes_be(&exponent),
+            )
+            .ok()?;
+            (key.size() >= 256).then(|| (key_id.to_ascii_lowercase(), key))
+        })
+        .collect()
 }
