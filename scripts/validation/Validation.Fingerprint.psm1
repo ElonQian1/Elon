@@ -58,8 +58,22 @@ function Get-ValidationGitSnapshot {
     $untracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files --others --exclude-standard | Where-Object { $_.Replace('\','/') -match $relevantPattern })
     $records = New-Object System.Collections.Generic.List[string]
     $all=@(@($tracked)+@($untracked)|Sort-Object -Unique); $existing=@($all|Where-Object{Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf})
-    $hashes=@($existing | & git -C $RepoRoot hash-object --no-filters --stdin-paths)
-    if ($LASTEXITCODE -ne 0 -or $hashes.Count -ne $existing.Count) { throw "Unable to hash validation workspace inputs." }
+    # Windows PowerShell 5.1 prefixes native-command pipeline input with a BOM.
+    # `git hash-object --stdin-paths` then treats the first tracked path as
+    # "<BOM>.rustfmt-version" and fails before Cargo can run. Pass paths as
+    # ordinary argv values in bounded batches so hashing is encoding-agnostic
+    # without risking the Windows command-line length limit.
+    $hashes = New-Object System.Collections.Generic.List[string]
+    for ($offset = 0; $offset -lt $existing.Count; $offset += 64) {
+        $last = [Math]::Min($offset + 63, $existing.Count - 1)
+        $batch = @($existing[$offset..$last])
+        $batchHashes = @(& git -C $RepoRoot hash-object --no-filters -- @batch)
+        if ($LASTEXITCODE -ne 0 -or $batchHashes.Count -ne $batch.Count) {
+            throw "Unable to hash validation workspace inputs."
+        }
+        foreach ($hash in $batchHashes) { $hashes.Add(([string]$hash).Trim()) }
+    }
+    if ($hashes.Count -ne $existing.Count) { throw "Unable to hash validation workspace inputs." }
     for($i=0;$i -lt $existing.Count;$i++){$records.Add("$($existing[$i].Replace('\','/'))`t$($hashes[$i].Trim())")}
     foreach($relative in @($all|Where-Object{-not (Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf)})){$records.Add("$($relative.Replace('\','/'))`tdeleted")}
     return [pscustomobject]@{

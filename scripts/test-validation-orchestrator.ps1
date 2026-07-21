@@ -47,6 +47,13 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     $baseDetails = Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")
     $baseFingerprint = $baseDetails.fingerprint
     Assert-True ($baseDetails.payload.project -like 'no-origin:*') "project without origin must use safe hashed fallback"
+    $priorOutputEncoding = $OutputEncoding
+    try {
+        $OutputEncoding = New-Object System.Text.UTF8Encoding($true)
+        Assert-Equal $baseFingerprint (Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")).fingerprint "fingerprinting must not pass a BOM-prefixed first path to git"
+    } finally {
+        $OutputEncoding = $priorOutputEncoding
+    }
     $LinkedWorktree=Join-Path $TempRoot 'linked-worktree'; & git -C $SnapshotRepo worktree add --detach $LinkedWorktree HEAD --quiet
     Assert-Equal $baseDetails.payload.project (Get-ValidationFingerprint $LinkedWorktree @('check')).payload.project "no-origin linked worktrees must share common-dir project identity"
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\adjacent.md") -Value "unrelated"
