@@ -148,6 +148,14 @@ async fn lineage_or_workspace_is_active(
         if candidate.task_id == current_task_id || is_terminal(&candidate.status) {
             continue;
         }
+        let same_workspace = candidate_shares_workspace(&candidate, active);
+        if !candidate_requires_contract_lookup(
+            candidate.workspace_status.as_ref(),
+            same_workspace,
+            root_task_id,
+        ) {
+            continue;
+        }
         let contract = load_supervision_contract(&runtime.task_journal, &candidate.task_id)?;
         if candidate_blocks_release(&candidate, contract.as_ref(), root_task_id, active)? {
             return Ok(true);
@@ -210,13 +218,7 @@ fn candidate_blocks_release(
     root_task_id: &str,
     active: &Path,
 ) -> Result<bool> {
-    let same_workspace = same_path(Path::new(&candidate.workspace_path), active)
-        || candidate.workspace_status.as_ref().is_some_and(|status| {
-            status
-                .get("active_workspace_path")
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|path| same_path(Path::new(path), active))
-        });
+    let same_workspace = candidate_shares_workspace(candidate, active);
     let Some(contract) = contract else {
         if same_workspace {
             bail!("active workspace has a nonterminal task without a supervision contract");
@@ -232,6 +234,30 @@ fn candidate_blocks_release(
         bail!("active workspace is occupied by another supervision root");
     }
     Ok(same_workspace || candidate_root == root_task_id)
+}
+
+fn candidate_shares_workspace(candidate: &LocalTaskRecord, active: &Path) -> bool {
+    same_path(Path::new(&candidate.workspace_path), active)
+        || candidate.workspace_status.as_ref().is_some_and(|status| {
+            status
+                .get("active_workspace_path")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|path| same_path(Path::new(path), active))
+        })
+}
+
+fn candidate_requires_contract_lookup(
+    workspace_status: Option<&serde_json::Value>,
+    same_workspace: bool,
+    root_task_id: &str,
+) -> bool {
+    same_workspace
+        || workspace_status
+            .and_then(|status| status.get("root_task_id"))
+            .and_then(serde_json::Value::as_str)
+            .map(str::trim)
+            .filter(|root| !root.is_empty())
+            .is_none_or(|root| root == root_task_id)
 }
 
 fn task_contract_has_root(runtime: &NodeRuntime, task_id: &str, root: &str) -> Result<bool> {
@@ -387,6 +413,22 @@ mod tests {
             active,
         )
         .is_err());
+    }
+
+    #[test]
+    fn unrelated_durable_root_skips_expensive_contract_lookup() {
+        let foreign = serde_json::json!({ "root_task_id": "foreign-root" });
+        assert!(!candidate_requires_contract_lookup(
+            Some(&foreign),
+            false,
+            "root-task",
+        ));
+        assert!(candidate_requires_contract_lookup(
+            Some(&foreign),
+            true,
+            "root-task",
+        ));
+        assert!(candidate_requires_contract_lookup(None, false, "root-task",));
     }
 
     #[test]
