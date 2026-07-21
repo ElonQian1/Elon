@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use image::{imageops, DynamicImage, GenericImageView, Rgba, RgbaImage};
 
 use super::super::PixelRect;
-use super::types::VisualMask;
+use super::types::{AdaptiveIconMaskShape, VisualMask};
 
 const MAX_COMPARE_SIDE: u32 = 640;
 
@@ -86,6 +86,32 @@ fn letterbox(
 
 fn build_eligibility(width: u32, height: u32, mask: &VisualMask, scale: f64) -> Vec<bool> {
     let mut eligible = vec![true; (width * height) as usize];
+    if let Some(adaptive) = mask.adaptive_icon_mask {
+        let inset = adaptive.safe_zone_inset_fraction.clamp(0.0, 0.25);
+        let half_w = width as f64 / 2.0;
+        let half_h = height as f64 / 2.0;
+        let radius_x = half_w * (1.0 - inset * 2.0);
+        let radius_y = half_h * (1.0 - inset * 2.0);
+        for y in 0..height {
+            for x in 0..width {
+                let nx = ((x as f64 + 0.5) - half_w).abs() / radius_x.max(0.5);
+                let ny = ((y as f64 + 0.5) - half_h).abs() / radius_y.max(0.5);
+                let inside = match adaptive.shape {
+                    AdaptiveIconMaskShape::Circle => nx * nx + ny * ny <= 1.0,
+                    AdaptiveIconMaskShape::RoundedSquare => {
+                        let corner = 0.38;
+                        let qx = (nx - (1.0 - corner)).max(0.0);
+                        let qy = (ny - (1.0 - corner)).max(0.0);
+                        nx <= 1.0 && ny <= 1.0 && qx * qx + qy * qy <= corner * corner
+                    }
+                    AdaptiveIconMaskShape::Squircle => nx.powi(4) + ny.powi(4) <= 1.0,
+                };
+                if !inside {
+                    eligible[(y * width + x) as usize] = false;
+                }
+            }
+        }
+    }
     for rect in &mask.exclude_rects {
         let left = (rect.left.max(0) as f64 * scale).round() as u32;
         let top = (rect.top.max(0) as f64 * scale).round() as u32;

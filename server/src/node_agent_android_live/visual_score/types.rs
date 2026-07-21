@@ -30,11 +30,38 @@ impl Default for VisualScoreProfile {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct VisualMask {
     #[serde(default)]
     pub(crate) exclude_rects: Vec<PixelRect>,
+    #[serde(default)]
+    pub(crate) adaptive_icon_mask: Option<AdaptiveIconMask>,
+}
+
+impl Default for VisualMask {
+    fn default() -> Self {
+        Self {
+            exclude_rects: Vec::new(),
+            adaptive_icon_mask: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AdaptiveIconMask {
+    pub(crate) shape: AdaptiveIconMaskShape,
+    #[serde(default)]
+    pub(crate) safe_zone_inset_fraction: f64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub(crate) enum AdaptiveIconMaskShape {
+    Circle,
+    RoundedSquare,
+    Squircle,
 }
 
 #[derive(Debug, Clone, Serialize)]

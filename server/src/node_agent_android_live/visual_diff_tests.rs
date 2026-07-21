@@ -1,8 +1,8 @@
 use image::{DynamicImage, Rgba, RgbaImage};
 
 use super::visual_diff::{
-    compare_dynamic_images, compare_dynamic_images_with_projection, PixelRect, VisualMask,
-    VisualScoreProfile,
+    compare_dynamic_images, compare_dynamic_images_with_projection, AdaptiveIconMask,
+    AdaptiveIconMaskShape, PixelRect, VisualMask, VisualScoreProfile,
 };
 
 fn solid(width: u32, height: u32, color: [u8; 4]) -> DynamicImage {
@@ -102,6 +102,7 @@ fn excluded_region_does_not_pollute_color_score() {
                 right: 20,
                 bottom: 10,
             }],
+            adaptive_icon_mask: None,
         },
         VisualScoreProfile::default(),
     )
@@ -109,6 +110,35 @@ fn excluded_region_does_not_pollute_color_score() {
     assert_eq!(result.score_report.color.mean_absolute_error, 0.0);
     assert_eq!(result.score_report.coverage.compared_pixels, 100);
     assert!(result.score_report.target_gate.passed);
+}
+
+#[test]
+fn adaptive_circle_mask_ignores_launcher_corner_pixels() {
+    let target = solid(40, 40, [0, 0, 0, 255]);
+    let mut current = RgbaImage::from_pixel(40, 40, Rgba([0, 0, 0, 255]));
+    for y in 0..4 {
+        for x in 0..4 {
+            current.put_pixel(x, y, Rgba([255, 255, 255, 255]));
+        }
+    }
+    let result = compare_dynamic_images_with_projection(
+        &target,
+        &DynamicImage::ImageRgba8(current),
+        None,
+        None,
+        None,
+        &VisualMask {
+            exclude_rects: Vec::new(),
+            adaptive_icon_mask: Some(AdaptiveIconMask {
+                shape: AdaptiveIconMaskShape::Circle,
+                safe_zone_inset_fraction: 0.0,
+            }),
+        },
+        VisualScoreProfile::default(),
+    )
+    .unwrap();
+    assert_eq!(result.score_report.color.mean_absolute_error, 0.0);
+    assert!(result.score_report.coverage.compared_pixels < 1_600);
 }
 
 #[test]

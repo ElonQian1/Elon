@@ -72,6 +72,7 @@ impl FitVisualMask {
                     bottom: region.rect.bottom,
                 })
                 .collect(),
+            adaptive_icon_mask: None,
         }
     }
 }

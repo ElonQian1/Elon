@@ -261,14 +261,30 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             rect_schema(),
         ),
         tool(
+            "ui_capture_android_launcher_surface",
+            "切换到 Android 系统 HOME/Launcher 后捕获真实表面；可同时按 iconRect 产出图标裁剪工件。",
+            json!({
+                "type":"object","additionalProperties":false,"properties":{
+                    "iconRect":rect_value_schema(),
+                    "settleMs":{"type":"integer","minimum":200,"maximum":5000,"default":900}
+                }
+            }),
+        ),
+        tool(
             "ui_get_visual_diff",
-            "本地计算目标图与真机截图的颜色、边缘、几何损失。",
+            "本地计算目标图与真机截图的颜色、边缘、几何损失；支持 Android adaptive icon 系统 mask/crop。",
             json!({
                 "type":"object","properties":{
                     "targetRect":rect_value_schema(),
                     "currentRect":rect_value_schema(),
                     "projectedCurrentRect":rect_value_schema()
-                    ,"mask":{"type":"object","properties":{"excludeRects":{"type":"array","maxItems":24,"items":rect_value_schema()}}}
+                    ,"mask":{"type":"object","additionalProperties":false,"properties":{
+                        "excludeRects":{"type":"array","maxItems":24,"items":rect_value_schema()},
+                        "adaptiveIconMask":{"type":"object","additionalProperties":false,"required":["shape"],"properties":{
+                            "shape":{"enum":["CIRCLE","ROUNDED_SQUARE","SQUIRCLE"]},
+                            "safeZoneInsetFraction":{"type":"number","minimum":0,"maximum":0.25,"default":0}
+                        }}
+                    }}
                 }
             }),
         ),
@@ -543,6 +559,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
             | "ui_get_source_bundle"
             | "ui_get_target_crop"
             | "ui_get_current_crop"
+            | "ui_capture_android_launcher_surface"
             | "ui_get_visual_diff"
             | "ui_propose_live_patch"
             | "ui_get_fit_run"

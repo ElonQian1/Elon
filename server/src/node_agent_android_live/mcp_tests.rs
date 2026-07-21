@@ -5,6 +5,50 @@ use super::fit_run::FitRunService;
 use super::mcp::{handle_request, McpRequest};
 
 #[tokio::test]
+async fn launcher_icon_capabilities_are_declared_ready_without_live_runtime() {
+    let broker = std::sync::Arc::new(LiveUiBroker::new());
+    let root = std::env::temp_dir().join(format!(
+        "elon-launcher-capability-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let session = broker
+        .create_session(
+            "device-1".to_string(),
+            "com.example.debug".to_string(),
+            Some(root.display().to_string()),
+            38917,
+        )
+        .await;
+    let request: McpRequest = serde_json::from_value(json!({
+        "jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+            "name":"ui_check_capabilities",
+            "arguments":{"requiredCapabilities":[
+                "ANDROID_LAUNCHER_SURFACE_CAPTURE",
+                "ANDROID_ADAPTIVE_ICON_MASK_VISUAL_DIFF"
+            ]}
+        }
+    }))
+    .unwrap();
+    let fit_runs = FitRunService::live(broker.clone());
+    let response = handle_request(&broker, &fit_runs, &session.id, request)
+        .await
+        .expect("capability response");
+    let result = &response["result"]["structuredContent"];
+    assert!(result["ready"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "ANDROID_LAUNCHER_SURFACE_CAPTURE"));
+    assert!(result["ready"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "ANDROID_ADAPTIVE_ICON_MASK_VISUAL_DIFF"));
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
 async fn mcp_lists_compact_ui_tools() {
     let broker = std::sync::Arc::new(LiveUiBroker::new());
     let session = broker
@@ -56,6 +100,20 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_check_workflow_completion"));
+    let launcher = tools
+        .iter()
+        .find(|tool| tool["name"] == "ui_capture_android_launcher_surface")
+        .expect("launcher surface capture tool must be discoverable");
+    assert_eq!(launcher["annotations"]["readOnlyHint"], true);
+    let visual_diff = tools
+        .iter()
+        .find(|tool| tool["name"] == "ui_get_visual_diff")
+        .expect("visual diff tool");
+    assert_eq!(
+        visual_diff["inputSchema"]["properties"]["mask"]["properties"]["adaptiveIconMask"]
+            ["properties"]["shape"]["enum"][0],
+        "CIRCLE"
+    );
     let desktop_import = tools
         .iter()
         .find(|tool| tool["name"] == "ui_import_desktop_task")

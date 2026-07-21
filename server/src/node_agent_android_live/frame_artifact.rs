@@ -49,6 +49,14 @@ pub(crate) fn persist_frame_artifact(
     persist_image_artifact(session, full_png, rect, "ADB_LIVE", "current")
 }
 
+pub(crate) fn persist_launcher_surface_artifact(
+    session: &LiveUiSession,
+    full_png: &[u8],
+    rect: Option<PixelRect>,
+) -> Result<LiveFrameArtifact> {
+    persist_image_artifact(session, full_png, rect, "ANDROID_LAUNCHER", "launcher")
+}
+
 pub(crate) fn persist_target_crop_artifact(
     session: &LiveUiSession,
     target_path: &str,

@@ -320,6 +320,10 @@ async fn call_tool(
                 capture_latest_frame_artifact(&session, parse_rect(arguments.get("rect"))?).await?;
             json!({ "artifact": artifact, "treeRevision": session.view().await.tree_revision })
         }
+        "ui_capture_android_launcher_surface" => {
+            let session = broker.session(&session_id).await?;
+            super::launcher_surface::capture(&session, &arguments).await?
+        }
         "ui_get_visual_diff" => visual_diff_from_ir(broker, &session_id, &arguments).await?,
         "ui_propose_live_patch" => propose_live_patch(broker, &session_id, &arguments).await?,
         "ui_apply_live_patch" => {

@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 #[path = "visual_score/mod.rs"]
 mod visual_score;
 
-pub(crate) use visual_score::types::{VisualMask, VisualScoreProfile, VisualScoreReport};
+pub(crate) use visual_score::types::{
+    AdaptiveIconMask, AdaptiveIconMaskShape, VisualMask, VisualScoreProfile, VisualScoreReport,
+};
 use visual_score::{score_images, ScoreInput};
 
 const MAX_IMAGE_BYTES: u64 = 32 * 1024 * 1024;

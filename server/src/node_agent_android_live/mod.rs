@@ -19,6 +19,7 @@ mod fit_learning;
 pub(crate) mod fit_run;
 mod frame;
 mod frame_artifact;
+mod launcher_surface;
 mod mcp;
 mod mcp_runtime_preparation;
 mod mcp_tool_contract;
