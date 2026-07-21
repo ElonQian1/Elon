@@ -1,9 +1,3 @@
-//! Durable metadata for tasks created from the localhost PC workbench.
-//!
-//! The existing task journal intentionally excludes prompts and billing payloads. This
-//! small SQLite store keeps the local user's request and the user-facing terminal result;
-//! the completion outbox remains the source of truth for cloud replay/ACK.
-
 use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{bail, Context, Result};
@@ -135,9 +129,7 @@ impl LocalTaskStore {
         self.finish_scoped(Some(owner_user_id), completion)
     }
 
-    /// Repair the local display state from the durable outbox. This path is
-    /// intentionally strict about origin/project/conversation, but does not
-    /// require credentials to be loaded during process startup.
+    /// Repair local display state from the durable outbox during startup.
     pub(crate) fn reconcile_completion(&self, completion: &CliCompletionEnvelope) -> Result<bool> {
         if completion.origin != crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
             bail!("only local_offline completions can reconcile local tasks");
@@ -196,15 +188,20 @@ impl LocalTaskStore {
         conversation_id: Option<&str>,
         completion: &CliCompletionEnvelope,
     ) -> Result<bool> {
-        let conn = self.open()?;
-        let workspace_status = completion
+        let mut conn = self.open()?;
+        let completion_workspace_status = completion
             .workspace_status
             .as_ref()
             .map(serde_json::to_string)
             .transpose()?;
+        let tx = conn.transaction()?;
+        let terminal_workspace_status =
+            workspace::terminal_workspace_status(&tx, &completion.req_id)?;
+        let supervised_workspace_refresh = terminal_workspace_status.is_some();
+        let workspace_status = terminal_workspace_status.or(completion_workspace_status);
         let terminal_status =
             completion_terminal_status(completion.exit_ok, completion.error.as_deref());
-        let changed = conn.execute(
+        let changed = tx.execute(
             "UPDATE local_tasks
                 SET status = CASE
                         WHEN status IN ('done','failed','canceled') THEN status
@@ -222,7 +219,8 @@ impl LocalTaskStore {
                     output_tokens = COALESCE(output_tokens, ?8),
                     reasoning_tokens = COALESCE(reasoning_tokens, ?9),
                     total_tokens = COALESCE(total_tokens, ?10),
-                    workspace_status_json = COALESCE(workspace_status_json, ?11),
+                    workspace_status_json = CASE WHEN ?20 THEN ?11
+                        ELSE COALESCE(workspace_status_json, ?11) END,
                     sync_state = CASE
                         WHEN sync_state IN ('synced','rejected') THEN sync_state
                         ELSE 'pending'
@@ -258,14 +256,14 @@ impl LocalTaskStore {
                 conversation_id,
                 agent_id,
                 install_id,
+                supervised_workspace_refresh,
             ],
         )?;
+        tx.commit()?;
         Ok(changed > 0)
     }
 
-    /// A process restart drops all in-memory child handles. Tasks with no pending
-    /// durable terminal event lose the process handle, so preserve an explicit
-    /// one-click resume state instead of leaving the local UI stuck on `running`.
+    /// Preserve one-click recovery when a restart loses in-memory child handles.
     pub(crate) fn interrupt_lingering_running(
         &self,
         durable_req_ids: &HashSet<String>,

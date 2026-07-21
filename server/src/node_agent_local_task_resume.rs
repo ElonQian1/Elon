@@ -156,6 +156,14 @@ fn resolve_existing_resume_workspace(
     if !parent_is_terminal(parent) {
         bail!("父任务仍在运行或没有可靠终态，不能继承其工作区。");
     }
+    if let Some(reason) = parent
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("resume_blocked_reason"))
+        .and_then(serde_json::Value::as_str)
+    {
+        bail!("父任务终态工作区快照不可信，禁止 Resume：{reason}");
+    }
 
     let project_part = safe_path_part(&parent.project_id, "project", 80);
     let parent_conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
