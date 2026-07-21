@@ -4,7 +4,6 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use anyhow::{Context, Result};
@@ -135,7 +134,7 @@ fn has_managed_lock(project_root: &Path) -> Result<bool> {
 }
 
 fn is_ancestor(project_root: &Path, base: &str) -> Result<bool> {
-    Ok(Command::new("git")
+    Ok(crate::git_command_error::git_command()
         .current_dir(project_root)
         .args(["merge-base", "--is-ancestor", base, "HEAD"])
         .status()
@@ -144,7 +143,7 @@ fn is_ancestor(project_root: &Path, base: &str) -> Result<bool> {
 }
 
 fn git(project_root: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(project_root)
         .args(args)
         .output()
@@ -170,7 +169,7 @@ mod tests {
     use serde_json::json;
 
     fn run(root: &Path, args: &[&str]) {
-        assert!(Command::new("git")
+        assert!(crate::git_command_error::git_command()
             .current_dir(root)
             .args(args)
             .status()
