@@ -88,3 +88,20 @@ fn accepts_compact_launch_tap_node_back_sequence() {
         TraceAction::TapNode { .. }
     ));
 }
+
+#[test]
+fn accepts_deterministic_runtime_node_activation_before_measurement() {
+    let request: TraceRequest = serde_json::from_value(json!({
+        "steps": [
+            {"name":"home", "action":{"type":"LAUNCH"}},
+            {"name":"project", "action":{"type":"ACTIVATE_NODE", "definitionId":"com.elon.app.MainActivity#com.elon.app:id/tabProject"}},
+            {"name":"plaza", "action":{"type":"ACTIVATE_NODE", "definitionId":"com.elon.app.MainActivity#com.elon.app:id/projectPlazaTopTab"}}
+        ],
+        "selectors": [{"label":"plaza", "resourceIdSuffix":":id/marketplacePage"}]
+    })).unwrap();
+    validate_request(&request).unwrap();
+    assert!(matches!(
+        request.steps[1].action,
+        TraceAction::ActivateNode { occurrence: 0, .. }
+    ));
+}

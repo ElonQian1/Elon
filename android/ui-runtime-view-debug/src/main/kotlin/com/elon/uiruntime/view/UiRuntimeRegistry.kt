@@ -68,6 +68,21 @@ internal class UiRuntimeRegistry(
 
     fun nextTreeRevision(): Long = treeRevision.incrementAndGet()
 
+    fun activate(definitionId: String, instanceKey: String?, occurrence: Int): String? {
+        // Refresh mappings immediately so activation does not depend on the last broker snapshot.
+        snapshot()
+        val matches = definitionByRuntimeId.entries.filter { (runtimeId, definition) ->
+            definition == definitionId &&
+                (instanceKey == null || instanceByRuntimeId[runtimeId] == instanceKey)
+        }
+        val (runtimeId, _) = matches.getOrNull(occurrence) ?: return null
+        val view = viewsByRuntimeId[runtimeId]?.get()?.takeIf(View::isAttachedToWindow) ?: return null
+        val clickable = generateSequence(view) { it.parent as? View }
+            .firstOrNull { it.isClickable && it.isEnabled }
+            ?: return null
+        return runtimeId.takeIf { clickable.performClick() }
+    }
+
     fun resolve(target: LivePatchTarget): ResolvedTargets {
         val requestedRuntimeId = target.runtimeNodeId
         if (!requestedRuntimeId.isNullOrBlank()) {

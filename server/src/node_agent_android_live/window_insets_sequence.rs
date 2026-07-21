@@ -37,6 +37,14 @@ struct TraceStep {
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 enum TraceAction {
     Launch,
+    ActivateNode {
+        #[serde(rename = "definitionId")]
+        definition_id: String,
+        #[serde(rename = "instanceKey")]
+        instance_key: Option<String>,
+        #[serde(default)]
+        occurrence: usize,
+    },
     Tap {
         x: i32,
         y: i32,
@@ -243,6 +251,20 @@ async fn perform_action(
         TraceAction::Launch => {
             launch_app(device_id, package_name).await?;
         }
+        TraceAction::ActivateNode {
+            definition_id,
+            instance_key,
+            occurrence,
+        } => {
+            activate_runtime_node(
+                device_id,
+                package_name,
+                definition_id,
+                instance_key.as_deref(),
+                *occurrence,
+            )
+            .await?;
+        }
         TraceAction::Tap { x, y } => {
             if *x < 0 || *y < 0 {
                 bail!("TAP 坐标不能为负数")
@@ -261,6 +283,51 @@ async fn perform_action(
             adb_input(device_id, &["keyevent", "KEYCODE_BACK"]).await?;
         }
         TraceAction::Wait => {}
+    }
+    Ok(())
+}
+
+async fn activate_runtime_node(
+    device_id: &str,
+    package_name: &str,
+    definition_id: &str,
+    instance_key: Option<&str>,
+    occurrence: usize,
+) -> Result<()> {
+    if definition_id.trim().is_empty() || definition_id.chars().count() > 500 {
+        bail!("ACTIVATE_NODE definitionId 必须为 1..500 字")
+    }
+    if occurrence > 50 {
+        bail!("ACTIVATE_NODE occurrence 不能大于 50")
+    }
+    let component = format!("{package_name}/com.elon.uiruntime.view.UiRuntimeControlReceiver");
+    let mut args = vec![
+        "-s".to_string(),
+        device_id.to_string(),
+        "shell".to_string(),
+        "am".to_string(),
+        "broadcast".to_string(),
+        "-n".to_string(),
+        component,
+        "-a".to_string(),
+        "com.elon.uiruntime.ACTIVATE_NODE".to_string(),
+        "--es".to_string(),
+        "definition_id".to_string(),
+        definition_id.to_string(),
+        "--ei".to_string(),
+        "occurrence".to_string(),
+        occurrence.to_string(),
+    ];
+    if let Some(instance_key) = instance_key.filter(|value| !value.is_empty()) {
+        args.extend([
+            "--es".to_string(),
+            "instance_key".to_string(),
+            instance_key.to_string(),
+        ]);
+    }
+    let output = run_adb_text(&args, Duration::from_secs(5), 64 * 1024).await?;
+    if !output.contains("result=-1") {
+        bail!("ACTIVATE_NODE 未成功: {}", output.trim())
     }
     Ok(())
 }

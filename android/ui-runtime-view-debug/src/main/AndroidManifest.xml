@@ -17,6 +17,7 @@
             <intent-filter>
                 <action android:name="com.elon.uiruntime.START" />
                 <action android:name="com.elon.uiruntime.STOP" />
+                <action android:name="com.elon.uiruntime.ACTIVATE_NODE" />
             </intent-filter>
         </receiver>
 

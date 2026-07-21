@@ -3,6 +3,7 @@ package com.elon.uiruntime.view
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.app.Activity
 import android.util.Log
 
 class UiRuntimeControlReceiver : BroadcastReceiver() {
@@ -21,6 +22,14 @@ class UiRuntimeControlReceiver : BroadcastReceiver() {
             ACTION_STOP -> UiRuntimeController.stop(
                 intent.getStringExtra(EXTRA_SESSION_ID)?.takeIf { it.isNotBlank() },
             )
+            ACTION_ACTIVATE_NODE -> {
+                val definitionId = intent.getStringExtra(EXTRA_DEFINITION_ID).orEmpty()
+                val instanceKey = intent.getStringExtra(EXTRA_INSTANCE_KEY)?.takeIf { it.isNotBlank() }
+                val occurrence = intent.getIntExtra(EXTRA_OCCURRENCE, 0)
+                val result = UiRuntimeController.activateNode(definitionId, instanceKey, occurrence)
+                setResultCode(if (result.success) Activity.RESULT_OK else Activity.RESULT_CANCELED)
+                setResultData(result.message)
+            }
         }
     }
 
@@ -28,9 +37,13 @@ class UiRuntimeControlReceiver : BroadcastReceiver() {
         private const val TAG = "YilongUiRuntime"
         private const val ACTION_START = "com.elon.uiruntime.START"
         private const val ACTION_STOP = "com.elon.uiruntime.STOP"
+        private const val ACTION_ACTIVATE_NODE = "com.elon.uiruntime.ACTIVATE_NODE"
         private const val EXTRA_SESSION_ID = "session_id"
         private const val EXTRA_SESSION_TOKEN = "session_token"
         private const val EXTRA_DEVICE_PORT = "device_port"
+        private const val EXTRA_DEFINITION_ID = "definition_id"
+        private const val EXTRA_INSTANCE_KEY = "instance_key"
+        private const val EXTRA_OCCURRENCE = "occurrence"
         private const val DEFAULT_PORT = 38_917
     }
 }

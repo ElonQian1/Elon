@@ -15,6 +15,7 @@ import com.google.gson.JsonObject
 import java.io.ByteArrayOutputStream
 
 internal object UiRuntimeController {
+    data class ActivationResult(val success: Boolean, val message: String)
     private const val TAG = "YilongUiRuntime"
     private val gson = Gson()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -71,6 +72,19 @@ internal object UiRuntimeController {
 
     fun clearExternalNodes() {
         mainHandler.post { registry?.clearExternalNodes() }
+    }
+
+    fun activateNode(definitionId: String, instanceKey: String?, occurrence: Int): ActivationResult {
+        if (definitionId.isBlank()) return ActivationResult(false, "definition_id is required")
+        if (occurrence !in 0..50) return ActivationResult(false, "occurrence must be 0..50")
+        val currentRegistry = registry
+            ?: return ActivationResult(false, "runtime registry is unavailable")
+        val activated = currentRegistry.activate(definitionId.trim(), instanceKey, occurrence)
+        if (activated == null) {
+            return ActivationResult(false, "no unique clickable View matched definitionId=$definitionId occurrence=$occurrence")
+        }
+        scheduleTreeSnapshot()
+        return ActivationResult(true, "activated definitionId=$definitionId runtimeNodeId=$activated")
     }
 
     private fun handleMessage(text: String) {

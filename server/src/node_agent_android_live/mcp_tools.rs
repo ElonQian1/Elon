@@ -146,7 +146,9 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                                 "action":{
                                     "type":"object","required":["type"],
                                     "properties":{
-                                        "type":{"enum":["LAUNCH","TAP","TAP_NODE","BACK","WAIT"]},
+                                        "type":{"enum":["LAUNCH","ACTIVATE_NODE","TAP","TAP_NODE","BACK","WAIT"]},
+                                        "definitionId":{"type":"string","minLength":1,"maxLength":500},
+                                        "instanceKey":{"type":"string","maxLength":500},
                                         "x":{"type":"integer","minimum":0},
                                         "y":{"type":"integer","minimum":0},
                                         "resourceIdSuffix":{"type":"string","maxLength":200},
@@ -193,7 +195,9 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                                 "action":{
                                     "type":"object","required":["type"],
                                     "properties":{
-                                        "type":{"enum":["LAUNCH","TAP","TAP_NODE","BACK","WAIT"]},
+                                        "type":{"enum":["LAUNCH","ACTIVATE_NODE","TAP","TAP_NODE","BACK","WAIT"]},
+                                        "definitionId":{"type":"string","minLength":1,"maxLength":500},
+                                        "instanceKey":{"type":"string","maxLength":500},
                                         "x":{"type":"integer","minimum":0},
                                         "y":{"type":"integer","minimum":0},
                                         "resourceIdSuffix":{"type":"string","maxLength":200},

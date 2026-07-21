@@ -85,9 +85,18 @@ async fn mcp_lists_compact_ui_tools() {
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_create_android_screen_scaffold"));
-    assert!(tools
+    let sequence_trace = tools
         .iter()
-        .any(|tool| tool["name"] == "ui_trace_window_insets_sequence"));
+        .find(|tool| tool["name"] == "ui_trace_window_insets_sequence")
+        .expect("window sequence trace tool must be exposed");
+    assert!(
+        sequence_trace["inputSchema"]["properties"]["steps"]["items"]["properties"]["action"]
+            ["properties"]["type"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "ACTIVATE_NODE")
+    );
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_trace_relational_layout_geometry"));
