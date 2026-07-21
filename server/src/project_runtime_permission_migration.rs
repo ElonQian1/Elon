@@ -6,7 +6,7 @@ pub(crate) fn migration_v103(conn: &Connection) -> Result<()> {
         r#"
         CREATE TABLE IF NOT EXISTS project_runtime_permissions_v103 (
           project_id TEXT PRIMARY KEY,
-          mode       TEXT NOT NULL DEFAULT 'full_access'
+          mode       TEXT NOT NULL DEFAULT 'danger_full_access'
                      CHECK (mode IN ('project_write', 'full_access', 'danger_full_access')),
           updated_by TEXT,
           updated_at TEXT,
@@ -20,7 +20,7 @@ pub(crate) fn migration_v103(conn: &Connection) -> Result<()> {
         SELECT project_id,
                CASE
                  WHEN mode IN ('project_write', 'full_access', 'danger_full_access') THEN mode
-                 ELSE 'full_access'
+                 ELSE 'danger_full_access'
                END,
                updated_by,
                updated_at,
@@ -34,12 +34,18 @@ pub(crate) fn migration_v103(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Change only the schema default. Existing rows are explicit user/project
+/// choices and must never be upgraded from a restricted mode implicitly.
+pub(crate) fn migration_v104(conn: &Connection) -> Result<()> {
+    migration_v103(conn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn migration_preserves_explicit_modes_and_defaults_new_rows_to_full_access() {
+    fn migration_preserves_explicit_modes_and_defaults_new_rows_to_danger_full_access() {
         let conn = Connection::open_in_memory().unwrap();
         conn.execute_batch(
             r#"
@@ -83,6 +89,35 @@ mod tests {
             .unwrap();
 
         assert_eq!(explicit, "project_write");
-        assert_eq!(defaulted, "full_access");
+        assert_eq!(defaulted, "danger_full_access");
+    }
+
+    #[test]
+    fn v104_preserves_an_explicit_restricted_choice() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            r#"
+            CREATE TABLE users (id TEXT PRIMARY KEY);
+            CREATE TABLE projects (id TEXT PRIMARY KEY);
+            INSERT INTO projects (id) VALUES ('restricted');
+            CREATE TABLE project_runtime_permissions (
+              project_id TEXT PRIMARY KEY,
+              mode TEXT NOT NULL DEFAULT 'full_access',
+              updated_by TEXT, updated_at TEXT, expires_at TEXT
+            );
+            INSERT INTO project_runtime_permissions (project_id, mode)
+            VALUES ('restricted', 'project_write');
+            "#,
+        )
+        .unwrap();
+        migration_v104(&conn).unwrap();
+        let mode: String = conn
+            .query_row(
+                "SELECT mode FROM project_runtime_permissions WHERE project_id='restricted'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(mode, "project_write");
     }
 }

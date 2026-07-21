@@ -138,6 +138,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (101, "UI 路由受控近义概念、别名审计与聚类命中", crate::ui_route_learning_migration::migration_v101),
     (102, "项目 Android 测试设备多用户租约", crate::project_android_device_leases_migration::migration_v102),
     (103, "开发期新项目默认完全访问", crate::project_runtime_permission_migration::migration_v103),
+    (104, "新版项目默认 danger_full_access 且保留显式受限选择", crate::project_runtime_permission_migration::migration_v104),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────

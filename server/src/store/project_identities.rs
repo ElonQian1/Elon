@@ -214,7 +214,7 @@ pub(super) fn find_owner_project_by_identity(
                             (SELECT prp.mode
                                FROM project_runtime_permissions prp
                               WHERE prp.project_id = p.id),
-                            'full_access'
+                            'danger_full_access'
                         ) AS runtime_permission,
                         p.display_name
                  FROM project_identities pi
@@ -279,7 +279,7 @@ pub(super) fn find_owner_project_by_git_remote(
                     (SELECT prp.mode
                        FROM project_runtime_permissions prp
                       WHERE prp.project_id = p.id),
-                    'full_access'
+                        'danger_full_access'
                 ) AS runtime_permission,
                 p.display_name
          FROM projects p

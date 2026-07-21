@@ -25,7 +25,7 @@ pub fn normalize_project_runtime_permission(value: &str) -> Option<&'static str>
 }
 
 pub fn default_project_runtime_permission() -> String {
-    PROJECT_RUNTIME_PERMISSION_FULL_ACCESS.to_string()
+    PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS.to_string()
 }
 
 pub fn project_runtime_permission_allows_full_access(value: &str) -> bool {
