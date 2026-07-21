@@ -2,7 +2,8 @@
 //!
 //! Git's native worktree lock survives node restarts and is already honored by
 //! the repository cleanup scripts. The reason embeds only the supervision root
-//! identity, so an accepted review can release exactly the matching lease.
+//! identity, so terminal reconciliation or an accepted review can release
+//! exactly the matching lease without touching foreign locks.
 
 use std::path::Path;
 

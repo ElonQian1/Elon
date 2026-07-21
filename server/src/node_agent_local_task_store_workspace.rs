@@ -31,6 +31,20 @@ impl LocalTaskStore {
             .map_err(anyhow::Error::from)?;
         Ok(records)
     }
+
+    pub(crate) fn list_terminal_lease_candidates(&self) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE status IN ('done','failed','canceled','finished','cancel_requested')
+             ORDER BY started_at_ms",
+            select_sql()
+        ))?;
+        let records = stmt
+            .query_map([], read_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
+    }
 }
 
 /// Refresh a supervised task's durable workspace identity while the caller's

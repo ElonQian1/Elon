@@ -28,6 +28,7 @@ $ErrorActionPreference = "Stop"
 $businessStatus = "not_checked"
 $localMainStatus = "not_checked"
 $taskWorktreeStatus = "not_checked"
+$taskWorktreeLeaseStatus = "not_checked"
 
 . (Join-Path $PSScriptRoot 'ai-task-finish-contract.ps1')
 
@@ -286,7 +287,7 @@ try {
     $taskRoot = [System.IO.Path]::GetFullPath($taskRoot)
     $taskBranch = (Invoke-GitRequired -RepoPath $taskRoot -GitArgs @("branch", "--show-current")).Trim()
     $taskLeaf = Split-Path -Leaf $taskRoot
-    $requiresContract = $taskBranch -like "codex/*" -or $taskLeaf -match '-task-\d{8}-\d{6}'
+    $requiresContract = $taskBranch -like "codex/*" -or $taskBranch -like "ai/session/*" -or $taskLeaf -match '-task-\d{8}-\d{6}'
     if ($requiresContract -and [string]::IsNullOrWhiteSpace($TaskContract) -and -not $AllowLegacyNoTaskContract) {
         throw "Managed task worktree requires the immutable TaskContract emitted by preflight."
     }
@@ -372,16 +373,27 @@ try {
 
     if ($taskNormalized -eq $mainNormalized) {
         $taskWorktreeStatus = "main_baseline_not_applicable"
+        $taskWorktreeLeaseStatus = "not_applicable"
     } elseif ($taskBranch -like "ai/session/*") {
+        $unlock = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "unlock", $taskRoot)
+        if ($unlock.ExitCode -eq 0) {
+            $taskWorktreeLeaseStatus = "released"
+        } elseif ($unlock.Text -match "not locked") {
+            $taskWorktreeLeaseStatus = "already_released"
+        } else {
+            throw "Unable to release completed platform task worktree lease: $($unlock.Text)"
+        }
         $taskWorktreeStatus = "platform_managed"
     } elseif ($SkipWorktreeCleanup) {
         $taskWorktreeStatus = "skipped_by_option"
+        $taskWorktreeLeaseStatus = "preserved_by_option"
     } elseif ($isManagedTaskWorktree) {
         Set-Location -LiteralPath $mainPath
         $unlock = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "unlock", $taskRoot)
         if ($unlock.ExitCode -ne 0 -and $unlock.Text -notmatch "not locked") {
             throw "Unable to unlock completed task worktree: $($unlock.Text)"
         }
+        $taskWorktreeLeaseStatus = if ($unlock.ExitCode -eq 0) { "released" } else { "already_released" }
         $remove = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "remove", $taskRoot)
 
         $remaining = @(Get-GitWorktreeEntries -RepoPath $mainPath | Where-Object {
@@ -416,17 +428,20 @@ try {
         }
     } else {
         $taskWorktreeStatus = "user_managed"
+        $taskWorktreeLeaseStatus = "user_managed"
     }
 
     Write-Host "BUSINESS_STATUS=$businessStatus"
     Write-Host "LOCAL_MAIN_STATUS=$localMainStatus"
     Write-Host "TASK_WORKTREE_STATUS=$taskWorktreeStatus"
+    Write-Host "TASK_WORKTREE_LEASE_STATUS=$taskWorktreeLeaseStatus"
     Write-Host "FINALIZABLE=true"
     exit 0
 } catch {
     Write-Host "BUSINESS_STATUS=$businessStatus"
     Write-Host "LOCAL_MAIN_STATUS=$localMainStatus"
     Write-Host "TASK_WORKTREE_STATUS=$taskWorktreeStatus"
+    Write-Host "TASK_WORKTREE_LEASE_STATUS=$taskWorktreeLeaseStatus"
     Write-Host "FINALIZABLE=false"
     Write-Host "FINISH_ERROR=$($_.Exception.Message)" -ForegroundColor Red
     exit 1

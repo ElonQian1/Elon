@@ -202,11 +202,20 @@ try {
     # and untouched, but they must not turn a clean, pushed platform task back
     # into an unfinished business result.
     Add-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "unknown platform-owned main edit"
-    $platformFinishOutput = Invoke-Finish -WorktreePath $platformSessionWorktree
+    Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:platform-fixture", $platformSessionWorktree) | Out-Null
+    . (Join-Path $platformSessionWorktree 'scripts\ai-task-finish-contract.ps1')
+    $platformContractId = New-AiTaskFinishContract -RepoPath $platformSessionWorktree
+    $platformFinishOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ContractId $platformContractId
     Assert-Contains $platformFinishOutput "BUSINESS_STATUS=complete" "A platform session must retain its completed business state."
     Assert-Contains $platformFinishOutput "LOCAL_MAIN_STATUS=blocked_tracked_changes" "A platform session must report the dirty main baseline."
     Assert-Contains $platformFinishOutput "TASK_WORKTREE_STATUS=platform_managed" "A platform session must remain platform-managed."
+    Assert-Contains $platformFinishOutput "TASK_WORKTREE_LEASE_STATUS=released" "A completed platform session must release its execution lease even when shared main is dirty."
     Assert-Contains $platformFinishOutput "FINALIZABLE=true" "Unknown main edits must not block a clean, pushed platform session."
+    $platformRegistration = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
+    $platformEntry = ($platformRegistration -split "`n`n" | Where-Object { $_.Contains($platformSessionWorktree) }) -join "`n"
+    if ($platformEntry -match '(?m)^locked(?: |$)') {
+        throw "Platform finish left the completed task lease locked.`n$platformEntry"
+    }
     $dirtyMainContent = Get-Content -Raw -LiteralPath (Join-Path $mainRepo "README.md")
     if (-not $dirtyMainContent.Contains("unknown platform-owned main edit")) {
         throw "Platform finish mutated the unknown tracked main edit."

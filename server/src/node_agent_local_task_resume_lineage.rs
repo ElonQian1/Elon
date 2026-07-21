@@ -28,6 +28,12 @@ pub(crate) fn assess_legacy_lease(
     if actual_reason == Some(expected_reason) {
         return Ok(None);
     }
+    // A trustworthy terminal task may already have released its execution
+    // lease. The Resume admission guard will reacquire the exact root lease
+    // before the inherited workspace can be registered as active.
+    if actual_reason.is_none() {
+        return Ok(None);
+    }
     let root_task_id = contract
         .root_task_id
         .as_deref()

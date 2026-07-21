@@ -50,7 +50,8 @@ pub struct ConversationWorkspaceResult {
     pub isolated: bool,
     pub branch: Option<String>,
     /// Present only for a Desktop-supervised task. The matching Git lock is
-    /// retained through completion/merge and released by accepted review.
+    /// retained through merge and released by terminal task reconciliation;
+    /// accepted review remains an idempotent compatibility release path.
     pub supervision_root_task_id: Option<String>,
 }
 
@@ -563,10 +564,10 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     let (before, after) = merge_conversation_branch_into_base(&base_workspace, branch)?;
     if supervised {
         return if before == after {
-            Ok("conversation branch had no new commits; supervision worktree retained until accepted review".into())
+            Ok("conversation branch had no new commits; supervision worktree retained until terminal reconciliation".into())
         } else {
             Ok(format!(
-                "conversation branch merged: {}; supervision worktree retained until accepted review",
+                "conversation branch merged: {}; supervision worktree retained until terminal reconciliation",
                 short_sha(&after)
             ))
         };

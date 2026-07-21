@@ -430,6 +430,11 @@ impl NodeRuntime {
             info!("已清理 PC 任务 {req_id} 的 {cleared_approvals} 个遗留工具审批");
         }
         self.active_cli_prompts.remove(req_id).await;
+        if let Err(error) =
+            crate::node_agent_supervision_terminal_lease::reconcile_task(self, req_id).await
+        {
+            warn!(%req_id, %error, "终态监督 worktree lease 暂未释放，交由启动/周期维护重试");
+        }
     }
 
     pub(crate) async fn hardware_profile(&self) -> NodeHardwareProfile {

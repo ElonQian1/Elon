@@ -310,6 +310,35 @@ fn incomplete_or_drifting_durable_lineage_cannot_authorize_migration() {
     );
 }
 
+#[test]
+fn terminally_released_root_lease_is_reacquired_under_resume_admission() {
+    let fixture = MigrationFixture::new();
+    crate::node_agent_supervision_worktree_lease::release(
+        &fixture.base,
+        &fixture.active,
+        "local-child",
+    )
+    .unwrap();
+    let resolved = fixture.resolve();
+    assert!(resolved.lease_migration.is_none());
+    let admission =
+        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&fixture.base)
+            .unwrap();
+    crate::node_agent_local_task_resume_routes::commit_validated_lease_migration(
+        &resolved, &admission,
+    )
+    .unwrap();
+    assert_eq!(
+        crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+            &fixture.base,
+            &fixture.active,
+        )
+        .unwrap()
+        .as_deref(),
+        Some("elon-supervision:local-root")
+    );
+}
+
 fn create_task(store: &LocalTaskStore, task_id: &str, conversation_id: &str, base: &Path) {
     store
         .create(LocalTaskStart {

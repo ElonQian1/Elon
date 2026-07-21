@@ -380,7 +380,7 @@ fn supervised_prepare_merge_review_release_and_cleanup_use_one_root_lease() {
     run_git(&active, &["add", "README.md"]);
     run_git(&active, &["commit", "-m", "supervised change"]);
     let merge = merge_conversation_workspace(&workspace).unwrap();
-    assert!(merge.contains("retained until accepted review"));
+    assert!(merge.contains("retained until terminal reconciliation"));
     assert!(
         active.exists(),
         "completion/merge must not delete a supervised worktree"
@@ -399,7 +399,7 @@ fn supervised_prepare_merge_review_release_and_cleanup_use_one_root_lease() {
     .is_err());
 
     crate::node_agent_supervision_worktree_lease::release(&base, &active, "root-task-1")
-        .expect("matching accepted review should release exactly the root lease");
+        .expect("matching terminal/review path should release exactly the root lease");
     cleanup_project_workspace_in(&temp, "project-a", base.to_string_lossy().as_ref())
         .expect("cleanup should reclaim the reviewed worktree");
     assert!(!active.exists());

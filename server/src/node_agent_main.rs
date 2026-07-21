@@ -117,6 +117,7 @@ mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
 mod node_agent_supervision_project_identity;
 mod node_agent_supervision_protocol;
+mod node_agent_supervision_terminal_lease;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
@@ -436,6 +437,9 @@ async fn run_agent_runtime() -> Result<()> {
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
+    if let Err(error) = node_agent_supervision_terminal_lease::reconcile_all(&runtime).await {
+        warn!(%error, "启动时回收终态监督 worktree lease 失败，交由周期维护重试");
+    }
     node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
     if let Err(error) = runtime
         .update_recovery
@@ -445,6 +449,7 @@ async fn run_agent_runtime() -> Result<()> {
     }
     runtime.spawn_lifecycle_heartbeat();
     node_agent_cancel_saga::spawn_reconciler(runtime.clone());
+    node_agent_supervision_terminal_lease::spawn_reconciler(runtime.clone());
     node_agent_self_evolution::spawn_scheduler(runtime.clone());
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);

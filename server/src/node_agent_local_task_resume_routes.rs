@@ -397,15 +397,26 @@ pub(crate) fn commit_validated_lease_migration(
     resolved: &ResolvedResumeWorkspace,
     admission: &crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard,
 ) -> anyhow::Result<()> {
-    let Some(migration) = resolved.lease_migration.as_ref() else {
-        return Ok(());
-    };
-    crate::node_agent_supervision_worktree_lease::migrate_legacy_child_lease(
-        admission,
+    if let Some(migration) = resolved.lease_migration.as_ref() {
+        return crate::node_agent_supervision_worktree_lease::migrate_legacy_child_lease(
+            admission,
+            FsPath::new(&resolved.authorized_workspace_path),
+            FsPath::new(&resolved.inherited_workspace.workspace_path),
+            &migration.legacy_task_id,
+            &migration.root_task_id,
+        );
+    }
+    let root_task_id = resolved
+        .inherited_workspace
+        .supervision_root_task_id
+        .as_deref()
+        .ok_or_else(|| {
+            anyhow::anyhow!("Resume inherited workspace is missing root lease identity")
+        })?;
+    crate::node_agent_supervision_worktree_lease::acquire(
         FsPath::new(&resolved.authorized_workspace_path),
         FsPath::new(&resolved.inherited_workspace.workspace_path),
-        &migration.legacy_task_id,
-        &migration.root_task_id,
+        root_task_id,
     )
 }
 

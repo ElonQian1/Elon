@@ -27,6 +27,7 @@ done
 business_status="not_checked"
 local_main_status="not_checked"
 task_worktree_status="not_checked"
+task_worktree_lease_status="not_checked"
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/ai-task-finish-contract.sh"
 
@@ -34,6 +35,7 @@ finish_error() {
   echo "BUSINESS_STATUS=$business_status"
   echo "LOCAL_MAIN_STATUS=$local_main_status"
   echo "TASK_WORKTREE_STATUS=$task_worktree_status"
+  echo "TASK_WORKTREE_LEASE_STATUS=$task_worktree_lease_status"
   echo "FINALIZABLE=false"
   echo "FINISH_ERROR=$1" >&2
   exit 1
@@ -45,7 +47,7 @@ task_root="$(git -C "$start_path" rev-parse --show-toplevel)"
 task_branch="$(git -C "$task_root" branch --show-current)"
 task_leaf="$(basename "$task_root")"
 requires_contract=0
-if [[ "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
+if [[ "$task_branch" == codex/* || "$task_branch" == ai/session/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
   requires_contract=1
 fi
 if [[ "$requires_contract" -eq 1 && -z "$task_contract" && "$allow_legacy_no_task_contract" -ne 1 ]]; then
@@ -198,14 +200,26 @@ audit_untracked "$main_path" "MAIN_UNTRACKED_STATUS"
 
 if [[ "$(cd "$task_root" && pwd -P)" == "$(cd "$main_path" && pwd -P)" ]]; then
   task_worktree_status="main_baseline_not_applicable"
+  task_worktree_lease_status="not_applicable"
 elif [[ "$task_branch" == ai/session/* ]]; then
+  if unlock_output="$(git -C "$main_path" worktree unlock "$task_root" 2>&1)"; then
+    task_worktree_lease_status="released"
+  elif [[ "$unlock_output" == *"not locked"* ]]; then
+    task_worktree_lease_status="already_released"
+  else
+    finish_error "Unable to release completed platform task worktree lease: $unlock_output"
+  fi
   task_worktree_status="platform_managed"
 elif [[ "$skip_worktree_cleanup" -eq 1 ]]; then
   task_worktree_status="skipped_by_option"
+  task_worktree_lease_status="preserved_by_option"
 elif [[ "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
   cd "$main_path"
   if ! unlock_output="$(git -C "$main_path" worktree unlock "$task_root" 2>&1)"; then
     [[ "$unlock_output" == *"not locked"* ]] || finish_error "Unable to unlock completed task worktree: $unlock_output"
+    task_worktree_lease_status="already_released"
+  else
+    task_worktree_lease_status="released"
   fi
   remove_output="$(git -C "$main_path" worktree remove "$task_root" 2>&1)" || true
   if git -C "$main_path" worktree list --porcelain | grep -Fq "worktree $task_root"; then
@@ -230,9 +244,11 @@ elif [[ "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]];
   fi
 else
   task_worktree_status="user_managed"
+  task_worktree_lease_status="user_managed"
 fi
 
 echo "BUSINESS_STATUS=$business_status"
 echo "LOCAL_MAIN_STATUS=$local_main_status"
 echo "TASK_WORKTREE_STATUS=$task_worktree_status"
+echo "TASK_WORKTREE_LEASE_STATUS=$task_worktree_lease_status"
 echo "FINALIZABLE=true"
