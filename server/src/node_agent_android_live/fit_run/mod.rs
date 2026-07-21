@@ -24,5 +24,23 @@ pub(crate) use routes::protected_routes;
 pub(crate) use service::FitRunService;
 pub(crate) use workspace_revision::workspace_fingerprint;
 
+pub(crate) fn durable_runtime_candidates(
+    project_root: &str,
+) -> anyhow::Result<Vec<(String, String, Option<String>, Option<String>, String)>> {
+    Ok(store::FitRunStore::new()
+        .list_for_project(project_root)?
+        .into_iter()
+        .map(|run| {
+            (
+                run.device_id,
+                run.package_name,
+                run.source_revision,
+                run.task_id,
+                run.updated_at,
+            )
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests;

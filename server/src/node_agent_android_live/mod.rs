@@ -29,6 +29,7 @@ mod preview;
 mod protocol;
 mod relational_layout_geometry;
 mod routes;
+mod runtime_binding;
 mod source_commit;
 mod source_json;
 mod source_xml;
