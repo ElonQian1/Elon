@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
+import { ChevronRight, Download, Heart, Image, Loader2, LogIn, Search, Star, Store, UsersRound } from 'lucide-react'
 import { api } from '../../api/client'
 import { useProjectStore } from '../conversation/useProjectStore'
 import styles from './PlazaPage.module.css'
@@ -62,6 +62,18 @@ export default function ProjectPlazaView() {
   const [total, setTotal] = useState<number | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [reactions, setReactions] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('project-plaza-reactions') || '{}') as Record<string, boolean> } catch { return {} }
+  })
+
+  function toggleReaction(projectId: string, kind: 'favorite' | 'liked') {
+    const key = `${projectId}:${kind}`
+    setReactions((current) => {
+      const next = { ...current, [key]: !current[key] }
+      localStorage.setItem('project-plaza-reactions', JSON.stringify(next))
+      return next
+    })
+  }
 
   const load = useCallback(async (options?: { append?: boolean }) => {
     const append = options?.append ?? false
@@ -168,13 +180,7 @@ export default function ProjectPlazaView() {
   return (
     <section className={styles.page} aria-label="项目广场">
       <div className={styles.toolbar}>
-        <div className={styles.toolbarTitle}>
-          <Store size={18} aria-hidden="true" />
-          <div>
-            <strong>项目广场</strong>
-            <span>发现、安装或加入公开项目</span>
-          </div>
-        </div>
+        <h1 className={styles.pageTitle}>项目广场</h1>
         <form onSubmit={handleSearch} className={styles.searchRow}>
           <Search size={16} aria-hidden="true" />
           <input
@@ -185,7 +191,7 @@ export default function ProjectPlazaView() {
           />
           <button className={styles.searchBtn} type="submit">搜索</button>
         </form>
-        <div className={styles.filterRow}>
+        <div className={styles.filterRow} aria-label="项目筛选">
           {FILTERS.map((filter) => (
             <button
               key={filter.key}
@@ -214,19 +220,45 @@ export default function ProjectPlazaView() {
         </div>
       ) : (
         <div className={styles.scrollArea}>
-          <div className={styles.resultMeta}>
-            <span>{total === null ? `已显示 ${projects.length}` : `已显示 ${projects.length} / ${total || projects.length}`}</span>
+          <div className={styles.sectionHeading}>
+            <h2>推荐</h2>
+            <Search size={26} aria-hidden="true" />
           </div>
-          <div className={styles.grid}>
+          <div className={styles.featuredRail}>
+            {projects.slice(0, 5).map((project) => (
+              <article className={styles.featuredCard} key={`featured-${project.id}`} onClick={() => openProject(project)}>
+                <div className={styles.featuredTop}>
+                  <ProjectIcon project={project} />
+                  <span>
+                    <button type="button" aria-label={reactions[`${project.id}:favorite`] ? '取消收藏' : '收藏'} data-active={reactions[`${project.id}:favorite`]} onClick={(event) => { event.stopPropagation(); toggleReaction(project.id, 'favorite') }}><Star /></button>
+                    <button type="button" aria-label={reactions[`${project.id}:liked`] ? '取消点赞' : '点赞'} data-active={reactions[`${project.id}:liked`]} onClick={(event) => { event.stopPropagation(); toggleReaction(project.id, 'liked') }}><Heart /></button>
+                  </span>
+                </div>
+                <strong>{project.display_name || project.name}</strong>
+                <p>{project.description || '这个项目还没有填写简介。'}</p>
+                <div className={styles.mediaRow}><span><Image /></span><span><Image /></span></div>
+                <button type="button" aria-label={`进入${project.display_name || project.name}`}><ChevronRight /></button>
+              </article>
+            ))}
+          </div>
+          <div className={styles.sectionHeading}><h2>全部项目</h2><span>{total ?? projects.length} 个项目</span></div>
+          <div className={styles.projectList}>
             {projects.map((project) => (
+              <div className={styles.projectRow} key={project.id}>
+                <ProjectIcon project={project} />
+                <button className={styles.projectRowMain} type="button" onClick={() => openProject(project)}>
+                  <strong>{project.display_name || project.name}</strong>
+                  <span>{project.description || '这个项目还没有填写简介。'}</span>
+                </button>
               <ProjectCard
-                key={project.id}
                 project={project}
                 joining={joiningId === project.id}
                 joinStatus={joinStatus[project.id]}
                 onJoin={handleJoin}
                 onOpen={openProject}
               />
+                <ChevronRight aria-hidden="true" />
+              </div>
             ))}
           </div>
           {canLoadMore && (

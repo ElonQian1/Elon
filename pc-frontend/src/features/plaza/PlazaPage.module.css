@@ -355,3 +355,56 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Project plaza target: the same restrained black mobile composition is shared by APK and PWA. */
+.page { background: #000; color: #d9d9d9; }
+.toolbar {
+  grid-template-columns: 1fr minmax(260px, 420px);
+  padding: 26px clamp(18px, 4vw, 48px) 18px;
+  border: 0;
+  background: #000;
+}
+.pageTitle { grid-column: 1 / -1; margin: 0; text-align: center; font-size: 27px; font-weight: 500; }
+.searchRow { border: 0; border-radius: 999px; background: #272727; }
+.filterRow { align-self: center; flex-wrap: nowrap; overflow-x: auto; }
+.filterActive { border-color: transparent; background: #1a1a1a; color: #d9d9d9; }
+.scrollArea { padding: 4px clamp(18px, 4vw, 48px) 110px; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 18px; }
+.sectionHeading h2 { margin: 0; font-size: 24px; font-weight: 500; }
+.featuredRail { display: flex; gap: 18px; overflow-x: auto; padding: 0 7vw 10px 0; scroll-snap-type: x mandatory; }
+.featuredCard {
+  position: relative; flex: 0 0 clamp(292px, 47vw, 440px); min-height: 390px; box-sizing: border-box;
+  padding: 28px; border-radius: 34px; background: #181818; scroll-snap-align: start; cursor: pointer;
+}
+.featuredTop { display: flex; align-items: center; justify-content: space-between; }
+.featuredTop .cardIcon, .featuredTop .cardIconImage { width: 58px; height: 58px; border-radius: 50%; background: #d9d9d9; color: #343434; }
+.featuredTop > span { display: flex; gap: 22px; }
+.featuredTop button { padding: 0; border: 0; background: transparent; color: #d9d9d9; cursor: pointer; }
+.featuredTop svg { width: 30px; height: 30px; }
+.featuredTop button[data-active="true"] svg { fill: #d9d9d9; }
+.featuredCard > strong { display: block; margin-top: 20px; font-size: 20px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.featuredCard > p { height: 44px; margin: 10px 0 18px; color: #777; line-height: 1.45; overflow: hidden; }
+.mediaRow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mediaRow span { height: 135px; display: grid; place-items: center; border-radius: 12px; background: #707070; color: #d9d9d9; }
+.featuredCard > button { position: absolute; right: 25px; bottom: 22px; width: 50px; height: 50px; display: grid; place-items: center; border: 0; border-radius: 50%; background: #d9d9d9; color: #444; }
+.projectList { display: flex; flex-direction: column; gap: 12px; }
+.projectRow { min-height: 82px; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto 28px; align-items: center; gap: 16px; }
+.projectRow > .cardIcon, .projectRow > .cardIconImage { width: 64px; height: 64px; border-radius: 16px; background: #d9d9d9; color: #343434; }
+.projectRowMain { min-width: 0; display: flex; flex-direction: column; gap: 7px; padding: 0; border: 0; background: transparent; color: #d9d9d9; text-align: left; cursor: pointer; }
+.projectRowMain strong, .projectRowMain span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.projectRowMain strong { font-size: 17px; font-weight: 500; }
+.projectRowMain span { color: #666; font-size: 14px; }
+.projectRow > .card { min-height: 0; display: block; padding: 0; border: 0; background: transparent; }
+.projectRow > .card > :not(.cardActions) { display: none; }
+.projectRow .cardActions { min-height: 0; }
+.projectRow .cardActions > * { height: 32px; white-space: nowrap; }
+.resultMeta { display: none; }
+
+@media (max-width: 760px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr); padding: 24px 18px 12px; }
+  .pageTitle { grid-column: auto; }
+  .scrollArea { padding: 0 18px 110px; }
+  .featuredCard { flex-basis: 82vw; }
+  .projectRow { grid-template-columns: 58px minmax(0, 1fr) 24px; gap: 13px; }
+  .projectRow > .card { grid-column: 2 / 4; }
+}

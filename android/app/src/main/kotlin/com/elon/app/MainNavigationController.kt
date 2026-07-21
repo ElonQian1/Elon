@@ -137,7 +137,7 @@ internal class MainNavigationController(
         binding.projectTopTabs.visibility = View.VISIBLE
         binding.projectTopTabs.setPadding(0, 0, 0, 0)
         binding.projectTopTabs.gravity = Gravity.CENTER
-        binding.projectHomeTopTabWrap.visibility = View.VISIBLE
+        binding.projectHomeTopTabWrap.visibility = if (plazaSelected) View.GONE else View.VISIBLE
         binding.projectPlazaTopTabWrap.visibility = View.VISIBLE
         updateProjectTopTabVisual(
             tab = binding.projectHomeTopTab,
@@ -149,8 +149,8 @@ internal class MainNavigationController(
             indicator = binding.projectPlazaTabIndicator,
             selected = plazaSelected
         )
+        if (plazaSelected) binding.projectPlazaTopTab.apply { setTypeface(typeface, android.graphics.Typeface.NORMAL); binding.projectPlazaTabIndicator.visibility = View.GONE }
     }
-
     private fun hideProjectTopTabs() {
         designMetrics.setProjectToolbarExpanded(false)
         binding.projectTopTabs.visibility = View.GONE
