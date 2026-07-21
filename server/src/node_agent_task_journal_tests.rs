@@ -30,6 +30,35 @@ fn stale_cursor_resets_with_stable_journal_epoch() {
 }
 
 #[test]
+fn same_epoch_empty_tail_page_preserves_requested_cursor() {
+    let dir = unique_test_dir("empty-tail-cursor");
+    let journal = TaskJournal::new(&dir);
+    journal
+        .record_started(TaskJournalStart {
+            req_id: "req-empty-tail",
+            cli_name: "codex",
+            route: Some("managed_pipe_json_sidecar"),
+            run_handle_id: Some("run-empty-tail"),
+            cwd: Some("D:/isolated"),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+    let first = journal.snapshot("req-empty-tail", 0, 20).unwrap();
+    let tail = first.last_event_seq;
+    let empty = journal
+        .snapshot_with_epoch("req-empty-tail", tail, 20, Some(&first.cursor_epoch))
+        .unwrap();
+
+    assert!(empty.events.is_empty());
+    assert!(!empty.cursor_reset);
+    assert_eq!(empty.requested_cursor, tail);
+    assert_eq!(empty.last_event_seq, tail);
+    assert_eq!(empty.new_cursor, tail);
+    assert_eq!(empty.resume_cursor, tail);
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn records_started_cancel_and_finished_events() {
     let dir = unique_test_dir("lifecycle");
     let journal = TaskJournal::new(&dir);

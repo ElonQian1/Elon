@@ -456,7 +456,16 @@ pub(crate) async fn enqueue(
     let parent_workspace = crate::node_agent_workspace_match::canonical_or_original(
         std::path::Path::new(&parent.workspace_path),
     );
-    if requested_workspace != parent_workspace {
+    let parent_base_workspace = parent
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("base_workspace_path"))
+        .and_then(serde_json::Value::as_str)
+        .map(std::path::Path::new)
+        .map(crate::node_agent_workspace_match::canonical_or_original);
+    if requested_workspace != parent_workspace
+        && parent_base_workspace.as_ref() != Some(&requested_workspace)
+    {
         return Err(admission(
             StatusCode::CONFLICT,
             "self evolution must inherit the exact parent project workspace authorization",
@@ -473,7 +482,7 @@ pub(crate) async fn enqueue(
         project_id: request.project_id,
         channel_id: request.channel_id,
         conversation_id: format!("self-evolution-{}", Uuid::new_v4()),
-        workspace_path: parent.workspace_path,
+        workspace_path: request.workspace_path,
         execution_worktree: None,
         execution_branch: None,
         execution_isolated: false,

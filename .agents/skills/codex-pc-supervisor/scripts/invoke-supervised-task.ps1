@@ -519,6 +519,17 @@ function New-SupervisionReviewBody {
     }
 }
 
+function Resolve-MonotonicTaskCursor {
+    param(
+        [int]$CurrentCursor,
+        [int]$ReturnedCursor,
+        [bool]$CursorReset,
+        [int]$ResumeCursor
+    )
+    if ($CursorReset) { return $ResumeCursor }
+    return [Math]::Max($CurrentCursor, $ReturnedCursor)
+}
+
 function New-ImprovementTaskBody {
     param(
         [object]$ParentDetail,
@@ -533,6 +544,11 @@ function New-ImprovementTaskBody {
     $parentRecord = Get-RecordFromDetail $ParentDetail
     $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
     $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
+    $workspaceStatus = Get-ObjectField $parentRecord 'workspace_status'
+    $recordedBaseWorkspace = [string](Get-ObjectField $workspaceStatus 'base_workspace_path')
+    if (-not [string]::IsNullOrWhiteSpace($recordedBaseWorkspace)) {
+        $parentWorkspace = $recordedBaseWorkspace
+    }
     $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
     $role = if ($IsBlocking) { 'capability_repair' } else { 'post_task_improvement' }
     $prefix = if ($IsBlocking) { 'Repair the Yilong PC capability blocking the original task, then return verification evidence:' } else { 'Improve the Yilong PC executor after the user task is complete:' }
@@ -626,7 +642,10 @@ switch ($Action) {
             Assert-NodeSupervisionCapability $nodeConnection $script:DeltaWaitCapability 'Compact Inspect'
         }
         $detail = Get-TaskDetail $nodeConnection $TaskId $Limit $Since $ExpectedCursorEpoch
-        $nextCursor = [int](Get-ObjectField $detail 'last_event_seq')
+        $nextCursor = Resolve-MonotonicTaskCursor $Since `
+            ([int](Get-ObjectField $detail 'last_event_seq')) `
+            ([bool](Get-ObjectField $detail 'cursor_reset')) `
+            ([int](Get-ObjectField $detail 'resume_cursor'))
         $record = Get-RecordFromDetail $detail
         $inspectStatus = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
         $terminalStatuses = @('done', 'finished', 'success', 'succeeded', 'failed', 'error', 'canceled', 'cancelled', 'interrupted', 'resume_required')
@@ -684,9 +703,9 @@ switch ($Action) {
                     $sawCursorReset = $true
                 }
                 $returnedCursor = [int](Get-ObjectField $detail 'last_event_seq')
-                if ((Get-ObjectField $detail 'cursor_reset') -eq $true) {
-                    $cursor = [int](Get-ObjectField $detail 'resume_cursor')
-                } elseif ($returnedCursor -gt $cursor) { $cursor = $returnedCursor }
+                $cursor = Resolve-MonotonicTaskCursor $cursor $returnedCursor `
+                    ([bool](Get-ObjectField $detail 'cursor_reset')) `
+                    ([int](Get-ObjectField $detail 'resume_cursor'))
                 $returnedEpoch = [string](Get-ObjectField $detail 'cursor_epoch')
                 if (-not [string]::IsNullOrWhiteSpace($returnedEpoch)) { $cursorEpoch = $returnedEpoch }
                 if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }

@@ -42,12 +42,21 @@ impl TaskJournal {
             } else {
                 initial_scan
             };
+            // An empty page at the current journal tail is still a successful
+            // continuation of the caller's cursor. The scanner has no returned
+            // event from which to derive a sequence in that case, so preserve
+            // the requested cursor unless an epoch/stale-cursor reset occurred.
+            let response_cursor = if cursor_reset {
+                event_scan.last_event_seq
+            } else {
+                event_scan.last_event_seq.max(since)
+            };
             Ok(TaskJournalSnapshot {
                 task_id: task_id.to_string(),
                 record,
                 approvals: event_scan.approvals,
                 events: event_scan.events,
-                last_event_seq: event_scan.last_event_seq,
+                last_event_seq: response_cursor,
                 has_more: event_scan.has_more,
                 cursor_epoch: cursor_epoch.clone(),
                 requested_cursor_epoch: expected_cursor_epoch.map(ToOwned::to_owned),
@@ -55,8 +64,8 @@ impl TaskJournal {
                 cursor_reset,
                 requested_cursor: since,
                 old_cursor: since,
-                new_cursor: event_scan.last_event_seq,
-                resume_cursor: event_scan.last_event_seq,
+                new_cursor: response_cursor,
+                resume_cursor: response_cursor,
                 sidecar_update_epoch: cursor_epoch,
             })
         })

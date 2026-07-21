@@ -3,6 +3,7 @@ function Invoke-SupervisionSelfTest {
         return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Value))
     }
     $testWorkspace = ConvertFrom-Utf8Base64 'Qzpc5LiA6b6Z6aG555uuXOS4reaWh+W3peS9nOWMug=='
+    $testExecutionWorkspace = 'C:\conversation-worktrees\temporary-generation'
     $testPrompt = ConvertFrom-Utf8Base64 '5qOA5p+l55uR552j6ZO+6Lev77yM5L+d5oyB5Lit5paH6Lev5b6E5a6M5pW0'
     $testCriteria = @(
         ConvertFrom-Utf8Base64 '5o+Q5Lqk5LiO5qOA5p+l5L+d55WZ5Lit5paH'
@@ -19,7 +20,7 @@ function Invoke-SupervisionSelfTest {
         record = [ordered]@{
             task_id = 'local-parent-task'
             project_id = $testProject
-            workspace_path = $testWorkspace
+            workspace_path = $testExecutionWorkspace
             prompt = $testPrompt
             status = 'failed'
             finished_at_ms = 2
@@ -190,6 +191,8 @@ function Invoke-SupervisionSelfTest {
         cursor_epoch = 'epoch-b'; cursor_reset = $true
         events = @([pscustomobject]@{ seq = 1; event = [pscustomobject]@{ type = 'reset' } })
     })
+    $emptyPageCursor = Resolve-MonotonicTaskCursor 42 0 $false 0
+    $resetPageCursor = Resolve-MonotonicTaskCursor 42 0 $true 7
     $invalidDeltaRejected = $false
     try {
         $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
@@ -238,14 +241,14 @@ function Invoke-SupervisionSelfTest {
         request_workspace = $requestRoundTrip.workspace_path -ceq $testWorkspace
         request_prompt = $requestRoundTrip.prompt -ceq $testPrompt
         request_criteria = $requestRoundTrip.supervision.acceptance_criteria[0] -ceq $testCriteria[0]
-        response_workspace = $decodedParent.record.workspace_path -ceq $testWorkspace
+        response_workspace = $decodedParent.record.workspace_path -ceq $testExecutionWorkspace
         invalid_utf8 = $invalidUtf8Rejected
         review_summary = $reviewRoundTrip.summary -ceq $testSummary
         improve_workspace = $improvementBody.workspace_path -ceq $testWorkspace
         improve_role = $improvementBody.supervision.task_role -eq 'capability_repair'
         improve_parent = $improvementBody.supervision.parent_task_id -eq 'local-parent-task'
         improve_root = $improvementBody.supervision.root_task_id -eq 'local-root-task'
-        resume_workspace = $resumeBody.workspace_path -ceq $testWorkspace
+        resume_workspace = $resumeBody.workspace_path -ceq $testExecutionWorkspace
         resume_prompt = $resumeBody.prompt -eq 'Resolve elon.resume_context.v1 for parent_task_id=local-parent-task and root_task_id=local-root-task.' -and
             $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -lt 0 -and
             $resumeBody.prompt.IndexOf('Resume the original task', [System.StringComparison]::Ordinal) -lt 0
@@ -283,6 +286,8 @@ function Invoke-SupervisionSelfTest {
         compact_delta_dictionary_field_access = $dictionaryFieldAccess
         compact_delta_no_loss_or_duplicate = $deltaNoLoss -and $deltaReset -and
             $deltaEvents.Count -eq 1 -and $deltaEvents[0].event.type -eq 'reset'
+        empty_page_cursor_monotonic = $emptyPageCursor -eq 42
+        epoch_reset_uses_resume_cursor = $resetPageCursor -eq 7
         compact_delta_invalid_epoch_rejected = $invalidDeltaRejected
         criteria_json = $jsonCriteria.Count -eq 2 -and
             $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')

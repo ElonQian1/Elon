@@ -4,6 +4,8 @@
 mod cancel;
 #[path = "node_agent_local_task_provision.rs"]
 mod provision;
+#[path = "node_agent_local_task_root_workspace.rs"]
+mod root_workspace;
 pub(crate) use provision::{
     provision_record_and_dispatch_supervised_task, SupervisedLocalTaskProvision,
 };
@@ -270,6 +272,17 @@ async fn create_task(
             "离线本机任务首版只允许已显式授权的 full_access 工作目录。",
         );
     }
+    let workspace_path = match root_workspace::resolve_request_workspace(
+        &runtime,
+        &creds,
+        project_id,
+        workspace_path,
+        supervision.as_ref(),
+    ) {
+        Ok(path) => path,
+        Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
+    };
+    let workspace_path = workspace_path.as_str();
     if supervision
         .as_ref()
         .is_some_and(|contract| contract.task_role == "post_task_improvement")
@@ -749,32 +762,5 @@ fn internal_error(error: anyhow::Error) -> Response {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{durable_completion_for_local_display, local_identity_is_valid};
-
-    #[test]
-    fn missing_durable_completion_never_synthesizes_local_terminal_event() {
-        let path = std::env::temp_dir().join(format!(
-            "elon-local-missing-outbox-{}.sqlite3",
-            uuid::Uuid::new_v4().simple()
-        ));
-        let outbox = crate::node_agent_completion_outbox::CliCompletionOutbox::new(path.clone());
-
-        assert!(
-            durable_completion_for_local_display(&outbox, "local-missing")
-                .unwrap()
-                .is_none()
-        );
-
-        let _ = std::fs::remove_file(path);
-    }
-
-    #[test]
-    fn local_identity_matches_server_replay_bounds() {
-        assert!(local_identity_is_valid("project-1"));
-        assert!(local_identity_is_valid(&"x".repeat(200)));
-        assert!(!local_identity_is_valid(""));
-        assert!(!local_identity_is_valid(&"x".repeat(201)));
-        assert!(!local_identity_is_valid("project\nother"));
-    }
-}
+#[path = "node_agent_local_tasks_tests.rs"]
+mod tests;
