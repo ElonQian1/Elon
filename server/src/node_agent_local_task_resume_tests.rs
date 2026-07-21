@@ -378,7 +378,10 @@ fn resume_rejects_active_parent_task() {
 
 #[test]
 fn deleted_active_workspace_requires_snapshot_continue_from_recorded_head() {
-    let fixture = ResumeFixture::new();
+    let mut fixture = ResumeFixture::new();
+    // Real isolated records authorize the base via workspace_status while the
+    // top-level workspace_path points at the active conversation worktree.
+    fixture.parent.workspace_path = fixture.active.to_string_lossy().to_string();
     let recorded_head = git_output(&fixture.base, &["rev-parse", "HEAD"]);
     run_git(
         &fixture.base,
@@ -412,6 +415,16 @@ fn deleted_active_workspace_requires_snapshot_continue_from_recorded_head() {
     assert!(resolved.snapshot_continue_required);
     assert_eq!(resolved.git_head, recorded_head);
     assert_eq!(resolved.derivation, "missing_active_snapshot_continue");
+
+    inspect_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&fixture.contract),
+        None,
+        "project-a",
+        fixture.active.to_string_lossy().as_ref(),
+    )
+    .expect("the recorded deleted active path should remain an allowed request identity");
 
     let recreated =
         crate::pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision_at_ref(

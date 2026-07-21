@@ -40,7 +40,13 @@ pub(crate) fn resolve_recycled_resume_workspace(
         requested_project_id == parent.project_id,
         "recycled resume cannot cross projects"
     );
-    let base = canonical_directory(Path::new(&parent.workspace_path), "authorized base repo")?;
+    let authorized_base_path = parent
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("base_workspace_path"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(&parent.workspace_path);
+    let base = canonical_directory(Path::new(authorized_base_path), "authorized base repo")?;
     let (recorded_base, active, status_branch) = recorded_workspace(parent)?;
     let recorded_base = canonical_directory(&recorded_base, "recorded base repo")?;
     anyhow::ensure!(

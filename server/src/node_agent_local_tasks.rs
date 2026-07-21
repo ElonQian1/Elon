@@ -5,7 +5,7 @@ mod cancel;
 #[path = "node_agent_local_task_provision.rs"]
 mod provision;
 #[path = "node_agent_local_task_root_workspace.rs"]
-mod root_workspace;
+pub(crate) mod root_workspace;
 pub(crate) use provision::{
     provision_record_and_dispatch_supervised_task, SupervisedLocalTaskProvision,
 };

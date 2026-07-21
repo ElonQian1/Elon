@@ -160,7 +160,15 @@ fn resolve_existing_resume_workspace(
     let project_part = safe_path_part(&parent.project_id, "project", 80);
     let parent_conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
     let parent_expected_branch = format!("ai/session/{project_part}/{parent_conversation_part}");
-    let authorized_base = canonical_directory(Path::new(&parent.workspace_path), "父任务授权根")?;
+    // Platform-isolated tasks persist the authorization root in workspace_status;
+    // record.workspace_path is normally the active conversation worktree.
+    let authorized_base_path = parent
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("base_workspace_path"))
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(&parent.workspace_path);
+    let authorized_base = canonical_directory(Path::new(authorized_base_path), "父任务授权根")?;
     let (recorded_base, active, status_branch, recorded_head, mut derivation) =
         if let Some(status) = parent.workspace_status.as_ref() {
             if status.get("isolated").and_then(serde_json::Value::as_bool) != Some(true) {
@@ -224,12 +232,17 @@ fn resolve_existing_resume_workspace(
         bail!("父任务活动工作区不是独立 worktree。");
     }
 
-    let requested = canonical_directory(Path::new(requested_workspace_path), "续跑请求工作区")?;
     let active_exists = active.is_dir();
     let active_for_compare = if active_exists {
         canonical_directory(&active, "父任务隔离 worktree")?
     } else {
         active.clone()
+    };
+    let requested_path = Path::new(requested_workspace_path);
+    let requested = if same_path(requested_path, &active_for_compare) {
+        active_for_compare.clone()
+    } else {
+        canonical_directory(requested_path, "续跑请求工作区")?
     };
     if !same_path(&requested, &authorized_base) && !same_path(&requested, &active_for_compare) {
         bail!("续跑请求只能引用父任务原授权根或其已记录的隔离 worktree。");

@@ -70,6 +70,17 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         .update_recovery
         .receipt_for_task(&parent.task_id)
         .map_err(internal_error)?;
+    crate::node_agent_local_tasks::root_workspace::resolve_resume_authorized_workspace(
+        &runtime.local_tasks,
+        &runtime.task_journal,
+        &runtime.update_recovery,
+        creds,
+        &runtime.install_id,
+        project_id,
+        &parent,
+        contract,
+    )
+    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     let mut resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
         contract,
         &parent,
@@ -220,6 +231,26 @@ pub(crate) async fn inspect_resume_workspace_status(
         .receipt_for_task(&parent.task_id)
         .ok()
         .flatten();
+    let creds = crate::Credentials {
+        owner_user_id: parent.owner_user_id.clone(),
+        agent_id: parent.agent_id.clone(),
+        agent_secret: String::new(),
+        user_token: None,
+    };
+    if let Err(error) =
+        crate::node_agent_local_tasks::root_workspace::resolve_resume_authorized_workspace(
+            &runtime.local_tasks,
+            &runtime.task_journal,
+            &runtime.update_recovery,
+            &creds,
+            &runtime.install_id,
+            &parent.project_id,
+            parent,
+            &contract,
+        )
+    {
+        return json!({"eligible": false, "reason": error.to_string()});
+    }
     match crate::node_agent_local_task_resume::resolve_resume_workspace(
         &contract,
         parent,
@@ -297,7 +328,7 @@ fn validate_snapshot_continue_safety(
     let mut duplicate_child = false;
     for child in runtime
         .local_tasks
-        .list_for_owner(&creds.owner_user_id, 100)?
+        .list_all_for_owner_for_safety(&creds.owner_user_id)?
     {
         if child.task_id == parent.task_id {
             continue;

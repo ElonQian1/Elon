@@ -37,6 +37,92 @@ pub(crate) fn resolve_request_workspace(
     )
 }
 
+/// Resolve a resume parent through its persisted supervision ancestry.  Unlike
+/// `record.workspace_path`, which is the active worktree for isolated tasks,
+/// the returned path is anchored at the requirement root's durable base.
+pub(crate) fn resolve_resume_authorized_workspace(
+    tasks: &LocalTaskStore,
+    journal: &TaskJournal,
+    recovery: &crate::node_agent_update_recovery::UpdateRecoveryStore,
+    creds: &crate::Credentials,
+    install_id: &str,
+    project_id: &str,
+    parent: &LocalTaskRecord,
+    contract: &SupervisionContract,
+) -> Result<String> {
+    anyhow::ensure!(
+        contract.protocol == SUPERVISION_PROTOCOL && contract.task_role == "resume_original",
+        "只有当前监督协议的 resume_original 可以解析根工作区。"
+    );
+    let parent_id = required_id(contract.parent_task_id.as_deref(), "parent_task_id")?;
+    anyhow::ensure!(
+        parent_id == parent.task_id,
+        "resume parent identity mismatch"
+    );
+    let root_id = required_id(contract.root_task_id.as_deref(), "root_task_id")?;
+    let mut current = parent.clone();
+    let mut visited = HashSet::new();
+    let mut recorded_bases = Vec::new();
+
+    loop {
+        validate_task_identity(&current, creds, install_id, project_id)?;
+        anyhow::ensure!(
+            visited.insert(current.task_id.clone()),
+            "监督任务谱系包含循环"
+        );
+        recorded_bases.push(recorded_base_workspace(&current)?);
+        let current_contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+            journal,
+            &current.task_id,
+        )?
+        .context("监督任务谱系缺少持久契约。")?;
+        anyhow::ensure!(
+            current_contract.protocol == SUPERVISION_PROTOCOL
+                && current_contract.supervisor == contract.supervisor,
+            "监督任务谱系的协议或 supervisor 身份漂移"
+        );
+        let recorded_root = current_contract
+            .root_task_id
+            .as_deref()
+            .unwrap_or(current.task_id.as_str());
+        anyhow::ensure!(
+            recorded_root == root_id,
+            "resume root_task_id 与持久谱系不一致"
+        );
+        if current.task_id == root_id {
+            anyhow::ensure!(
+                current_contract.task_role == "requirement"
+                    && current_contract.parent_task_id.is_none(),
+                "监督谱系根任务不是可信的 requirement 根"
+            );
+            let root_base = recorded_base_workspace(&current)?;
+            anyhow::ensure!(
+                recorded_bases.iter().all(|base| {
+                    crate::node_agent_update_checkpoint::same_path(
+                        Path::new(base),
+                        Path::new(&root_base),
+                    )
+                }),
+                "监督任务谱系的基础工作区与持久 root 授权根不一致"
+            );
+            return Ok(root_base);
+        }
+        let receipt = recovery.receipt_for_task(&current.task_id)?;
+        let ancestor_id = required_id(
+            durable_parent_id(
+                &current.task_id,
+                root_id,
+                &current_contract,
+                receipt.as_ref(),
+            ),
+            "持久谱系 parent_task_id",
+        )?;
+        current = tasks
+            .get_for_owner(&creds.owner_user_id, ancestor_id)?
+            .context("监督任务谱系的祖先任务不存在。")?;
+    }
+}
+
 pub(crate) fn resolve_chained_authorized_workspace(
     tasks: &LocalTaskStore,
     journal: &TaskJournal,
