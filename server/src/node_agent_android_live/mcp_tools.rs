@@ -488,6 +488,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "changedFiles":{"type":"array","minItems":1,"maxItems":128,"items":{"type":"string","maxLength":2000}},
                     "failureSignature":{"type":"string","maxLength":500},
                     "error":{"type":"string","maxLength":2000}
+                    ,"originProjectRoot":{"type":"string","minLength":1,"maxLength":4000}
                 }
             }),
         ),
@@ -518,6 +519,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "changedFiles":{"type":"array","minItems":1,"maxItems":128,"items":{"type":"string","maxLength":2000}},
                     "failureSignature":{"type":"string","maxLength":500},
                     "error":{"type":"string","maxLength":2000}
+                    ,"originProjectRoot":{"type":"string","minLength":1,"maxLength":4000}
                 }
             }),
         ),

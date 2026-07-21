@@ -306,12 +306,17 @@ pub(crate) fn control_gap(session: &LiveUiSession, arguments: &Value) -> Result<
         "START_UPGRADE" => start_upgrade(&mut gap, arguments)?,
         "PUBLISH_COMPLETED" => publish_completed(&mut gap, arguments)?,
         "RECHECK_PASSED" => {
-            require_status(&gap, CapabilityGapStatus::Published)?;
-            gap.status = if gap.delegation.is_evolution_thread() {
-                CapabilityGapStatus::Completed
-            } else {
-                CapabilityGapStatus::Resumed
-            };
+            if gap.status == CapabilityGapStatus::Published {
+                gap.status = if gap.delegation.is_evolution_thread() {
+                    CapabilityGapStatus::Completed
+                } else {
+                    CapabilityGapStatus::Resumed
+                };
+            } else if !(gap.status == CapabilityGapStatus::Completed
+                && gap.delegation.is_evolution_thread())
+            {
+                require_status(&gap, CapabilityGapStatus::Published)?;
+            }
             gap.last_error = None;
         }
         "RECHECK_FAILED" | "UPGRADE_FAILED" => record_failure(&mut gap, arguments)?,
@@ -325,7 +330,8 @@ pub(crate) fn control_gap(session: &LiveUiSession, arguments: &Value) -> Result<
     save_gap(&gap)?;
     let origin_reconciliation =
         if action == "RECHECK_PASSED" && gap.delegation.is_evolution_thread() {
-            reconciliation::reconcile_origin(&root, &gap)?
+            let origin_root = reconciliation::origin_project_root(arguments)?.unwrap_or(root);
+            reconciliation::reconcile_origin(&origin_root, &gap)?
         } else {
             None
         };
