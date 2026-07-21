@@ -53,6 +53,22 @@ fn v3_ticket(
     )
 }
 
+fn v2_ticket(
+    key: &RsaPrivateKey,
+    key_id: &str,
+    expires: u64,
+    nonce: &str,
+    owner: &str,
+    task: &str,
+) -> String {
+    let message = format!("v2\n{owner}\n{task}\n{expires}\n{nonce}");
+    let signature = SigningKey::<Sha256>::new(key.clone()).sign(message.as_bytes());
+    format!(
+        "v2.{key_id}.{expires}.{nonce}.{}",
+        BASE64.encode(signature.to_bytes())
+    )
+}
+
 fn headers(ticket: &str) -> HeaderMap {
     let mut headers = HeaderMap::new();
     headers.insert(DESKTOP_REVIEW_TICKET_HEADER, ticket.parse().unwrap());
@@ -195,6 +211,43 @@ fn expiry_unknown_key_rotation_and_downgrade_are_fail_closed() {
         .mint_for_test("o", "t", now + 120, "legacy-nonce-1234");
     assert_eq!(
         auth.verify_and_consume(&headers(&legacy), "o", "t", "POST", path, body),
+        Err(DesktopReviewAuthError::Invalid)
+    );
+}
+
+#[test]
+fn v2_migration_requires_explicit_opt_in_and_never_enables_v1_fallback() {
+    let key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+    let now = now_secs();
+    let path = "/api/local-tasks/t/supervision/desktop-review";
+    let body = b"{}";
+    let v2 = v2_ticket(
+        &key,
+        "0000000000000000",
+        now + 120,
+        "migration-nonce-1234",
+        "o",
+        "t",
+    );
+    let default_closed = test_auth(temp_ledger("v2-closed"), &[&key], false);
+    assert_eq!(
+        default_closed.verify_and_consume(&headers(&v2), "o", "t", "POST", path, body),
+        Err(DesktopReviewAuthError::Invalid)
+    );
+
+    let migration = test_auth(temp_ledger("v2-open"), &[&key], true);
+    assert_eq!(
+        migration.verify_and_consume(&headers(&v2), "o", "t", "POST", path, body),
+        Ok(())
+    );
+    let v1 = DesktopReviewAuth::for_test("legacy-shared-secret-at-least-32-bytes").mint_for_test(
+        "o",
+        "t",
+        now + 120,
+        "legacy-nonce-5678",
+    );
+    assert_eq!(
+        migration.verify_and_consume(&headers(&v1), "o", "t", "POST", path, body),
         Err(DesktopReviewAuthError::Invalid)
     );
 }

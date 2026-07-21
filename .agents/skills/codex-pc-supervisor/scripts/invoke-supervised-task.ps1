@@ -45,7 +45,7 @@ $script:SupervisionProtocol = 'elon.desktop_pc_supervision.v1'
 $script:DeltaWaitCapability = 'delta_wait_v1'
 $script:TaskDeltaSchema = 'elon.supervision.task_delta.v1'
 $script:ResumeContextCapability = 'resume_context_v1'
-$script:DesktopReviewCapabilities = @('desktop_review_ticket_v2', 'desktop_review_ticket_v1')
+$script:DesktopReviewCapability = 'desktop_review_ticket_v3'
 $script:LastNodeAdminUrl = ''
 $script:CachedNodeAdminUrl = ''
 $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
@@ -721,7 +721,7 @@ switch ($Action) {
         })
     }
     'Review' {
-        Assert-NodeSupervisionAnyCapability $nodeConnection $script:DesktopReviewCapabilities 'Desktop Review'
+        Assert-NodeSupervisionCapability $nodeConnection $script:DesktopReviewCapability 'Desktop Review'
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
         $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
         [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody

@@ -329,3 +329,185 @@ fn review_routes_enforce_desktop_ticket_and_server_owned_actor() {
     assert_eq!(desktop.0, "codex_desktop:owner-route-a");
     assert_eq!(desktop.1, "codex_desktop_helper");
 }
+
+#[tokio::test]
+async fn desktop_review_v3_is_enforced_by_the_production_post_route() {
+    use axum::{
+        body::{to_bytes, Body},
+        http::Request,
+    };
+    use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+    use rsa::{
+        pkcs1v15::SigningKey,
+        rand_core::OsRng,
+        signature::{SignatureEncoding, Signer},
+        RsaPrivateKey,
+    };
+    use sha2::{Digest, Sha256};
+    use tower::ServiceExt;
+
+    fn ticket(
+        key: &RsaPrivateKey,
+        owner: &str,
+        task: &str,
+        path: &str,
+        body: &[u8],
+        nonce: &str,
+    ) -> String {
+        fn field(value: &str) -> String {
+            format!("{}:{value}", value.as_bytes().len())
+        }
+        let expires = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            + 120;
+        let body_hash = hex::encode(Sha256::digest(body));
+        let message = [
+            "v3".to_string(),
+            field(owner),
+            field(task),
+            field("POST"),
+            field(path),
+            field(&body_hash),
+            expires.to_string(),
+            field(nonce),
+            field("0000000000000000"),
+        ]
+        .join("\n");
+        let signature = SigningKey::<Sha256>::new(key.clone()).sign(message.as_bytes());
+        format!(
+            "v3.0000000000000000.{expires}.{nonce}.{}",
+            BASE64.encode(signature.to_bytes())
+        )
+    }
+
+    async fn post(app: Router, path: &str, body: &[u8], ticket: &str) -> (StatusCode, Value) {
+        let response = app
+            .oneshot(
+                Request::post(path)
+                    .header("content-type", "application/json")
+                    .header(
+                        crate::node_agent_desktop_review_auth::DESKTOP_REVIEW_TICKET_HEADER,
+                        ticket,
+                    )
+                    .body(Body::from(body.to_vec()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap())
+    }
+
+    let root = std::env::temp_dir().join(format!(
+        "elon-desktop-review-route-{}-{}",
+        std::process::id(),
+        uuid::Uuid::new_v4()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let owner = "owner-route-v3";
+    let task = "local-route-v3";
+    let path = "/api/local-tasks/local-route-v3/supervision/desktop-review";
+    let body =
+        "{\"verdict\":\"observing\",\"summary\":\"UTF-8 路由验收\",\"improvements\":[]}".as_bytes();
+    let key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+    let mut runtime = crate::NodeRuntime::new(
+        crate::node_agent_config::NodeConfig {
+            cloud_url: "ws://127.0.0.1".to_string(),
+            cloud_http_url: "http://127.0.0.1".to_string(),
+            ollama_url: "http://127.0.0.1".to_string(),
+            lm_studio_url: None,
+            custom_url: None,
+            price_per_1k: 0.0,
+        },
+        Some(crate::node_agent_config::Credentials {
+            agent_id: "agent-route-v3".to_string(),
+            agent_secret: "unused".to_string(),
+            owner_user_id: owner.to_string(),
+            user_token: None,
+        }),
+        crate::pc_storage_repo::StorageSettings::default(),
+        crate::node_agent_data_root::resolve(None, None, None),
+        "install-route-v3".to_string(),
+    );
+    runtime.task_journal = TaskJournal::new(root.join("journal"));
+    runtime.local_tasks =
+        crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.sqlite3"));
+    runtime.desktop_review_auth =
+        crate::node_agent_desktop_review_auth::DesktopReviewAuth::for_v3_route_test(
+            key.to_public_key(),
+            root.join("nonces.json"),
+        );
+    runtime
+        .local_tasks
+        .create(crate::node_agent_local_task_store::LocalTaskStart {
+            task_id: task,
+            owner_user_id: owner,
+            agent_id: "agent-route-v3",
+            install_id: "install-route-v3",
+            project_id: "elon-self",
+            channel_id: None,
+            conversation_id: "conversation-route-v3",
+            workspace_path: "C:\\isolated",
+            prompt: "route test",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    let contract = normalize_contract(SupervisionContractInput {
+        protocol: Some(SUPERVISION_PROTOCOL.to_string()),
+        supervisor: None,
+        task_role: None,
+        parent_task_id: None,
+        root_task_id: None,
+        acceptance_criteria: vec!["route".to_string()],
+        improvement_policy: None,
+    })
+    .unwrap();
+    record_supervision_event(
+        &runtime.task_journal,
+        task,
+        "supervision_contract",
+        contract_payload(&contract),
+    )
+    .unwrap();
+    let app = routes().with_state(Arc::new(runtime));
+
+    let valid = ticket(&key, owner, task, path, body, "route-success-nonce-1");
+    let (status, response) = post(app.clone(), path, body, &valid).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        response["supervision"]["review"]["reviewed_by"],
+        "codex_desktop:owner-route-v3"
+    );
+    assert_eq!(
+        response["supervision"]["review"]["review_source"],
+        "codex_desktop_helper"
+    );
+
+    let (status, response) = post(app.clone(), path, body, &valid).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(response["error"], "desktop_review_ticket_replayed");
+
+    let body_ticket = ticket(&key, owner, task, path, body, "route-body-nonce-123");
+    let (status, _) = post(app.clone(), path, b"{}", &body_ticket).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    let wrong_task_ticket = ticket(
+        &key,
+        owner,
+        "local-other",
+        path,
+        body,
+        "route-task-nonce-123",
+    );
+    let (status, _) = post(app.clone(), path, body, &wrong_task_ticket).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+
+    let wrong_path_ticket = ticket(&key, owner, task, "/wrong", body, "route-path-nonce-123");
+    let (status, _) = post(app, path, body, &wrong_path_ticket).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    std::fs::remove_dir_all(root).unwrap();
+}

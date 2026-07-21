@@ -4,15 +4,15 @@ use serde_json::{json, Value};
 
 pub(crate) const DELTA_WAIT_V1: &str = "delta_wait_v1";
 pub(crate) const RESUME_CONTEXT_V1: &str = "resume_context_v1";
-pub(crate) const DESKTOP_REVIEW_TICKET_V1: &str = "desktop_review_ticket_v1";
 pub(crate) const DESKTOP_REVIEW_TICKET_V2: &str = "desktop_review_ticket_v2";
+pub(crate) const DESKTOP_REVIEW_TICKET_V3: &str = "desktop_review_ticket_v3";
 pub(crate) const CODEX_TERMINAL_HINT_V1: &str = "codex_terminal_hint_v1";
 
 const CAPABILITIES: &[&str] = &[
     DELTA_WAIT_V1,
     RESUME_CONTEXT_V1,
-    DESKTOP_REVIEW_TICKET_V1,
     DESKTOP_REVIEW_TICKET_V2,
+    DESKTOP_REVIEW_TICKET_V3,
     CODEX_TERMINAL_HINT_V1,
 ];
 
@@ -24,7 +24,7 @@ pub(crate) fn status_payload() -> Value {
         "contracts": {
             "taskDelta": "elon.supervision.task_delta.v1",
             "resumeContext": "elon.resume_context.v1",
-            "desktopReviewTicket": ["elon.desktop_review_ticket.v2", "elon.desktop_review_ticket.v1"]
+            "desktopReviewTicket": ["elon.desktop_review_ticket.v3", "elon.desktop_review_ticket.v2"]
         }
     })
 }
@@ -40,11 +40,21 @@ mod tests {
         for required in [
             DELTA_WAIT_V1,
             RESUME_CONTEXT_V1,
-            DESKTOP_REVIEW_TICKET_V1,
             DESKTOP_REVIEW_TICKET_V2,
+            DESKTOP_REVIEW_TICKET_V3,
             CODEX_TERMINAL_HINT_V1,
         ] {
             assert!(capabilities.iter().any(|value| value == required));
         }
+        assert!(!capabilities
+            .iter()
+            .any(|value| value == "desktop_review_ticket_v1"));
+        assert_eq!(
+            payload["contracts"]["desktopReviewTicket"],
+            json!([
+                "elon.desktop_review_ticket.v3",
+                "elon.desktop_review_ticket.v2"
+            ])
+        );
     }
 }

@@ -193,6 +193,15 @@ function Invoke-SupervisionSelfTest {
     $priorStateRoot = $env:ELON_DESKTOP_REVIEW_STATE_ROOT
     $priorInstallRoot = $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT
     $desktopPathsRejected = $false
+    $legacyDesktopCapabilityRejected = $false
+    try {
+        Assert-NodeSupervisionCapability ([pscustomobject]@{
+            SupervisionProtocol = $script:SupervisionProtocol
+            SupervisionCapabilities = @('desktop_review_ticket_v2', 'desktop_review_ticket_v1')
+        }) $script:DesktopReviewCapability 'Desktop Review'
+    } catch {
+        $legacyDesktopCapabilityRejected = $true
+    }
     try {
         $env:ELON_DESKTOP_REVIEW_STATE_ROOT = ''
         $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT = ''
@@ -246,6 +255,8 @@ function Invoke-SupervisionSelfTest {
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
         expected_cursor_epoch_path = $testEpochPath -eq '/api/local-tasks/local-test%3Fid?since=42&limit=25&expected_cursor_epoch=journal%3Aa%2Fb%3Fc'
         desktop_review_paths_fail_closed = $desktopPathsRejected
+        desktop_review_requires_v3_capability = $legacyDesktopCapabilityRejected -and
+            $script:DesktopReviewCapability -eq 'desktop_review_ticket_v3'
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
@@ -282,6 +293,7 @@ function Invoke-SupervisionSelfTest {
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
             'expected_cursor_epoch_handshake', 'desktop_review_paths_fail_closed',
+            'desktop_review_requires_v3_capability',
             'inspect_wait_active_runtime', 'compact_delta_evidence_digest',
             'compact_delta_no_loss_or_duplicate', 'compact_delta_invalid_epoch_rejected',
             'compact_delta_omits_unchanged_state_and_evidence',

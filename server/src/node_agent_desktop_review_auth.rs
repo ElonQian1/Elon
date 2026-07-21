@@ -97,6 +97,19 @@ impl DesktopReviewAuth {
     }
 
     #[cfg(test)]
+    pub(crate) fn for_v3_route_test(public_key: RsaPublicKey, ledger_path: PathBuf) -> Self {
+        Self {
+            credential: None,
+            public_keys: Arc::new(vec![("0000000000000000".to_string(), public_key)]),
+            allow_v2: false,
+            nonce_ledger: Some(Arc::new(NonceLedger {
+                path: ledger_path,
+                lock: Mutex::new(()),
+            })),
+        }
+    }
+
+    #[cfg(test)]
     pub(crate) fn verify_headers(
         &self,
         headers: &HeaderMap,
