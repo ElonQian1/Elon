@@ -15,8 +15,18 @@ use super::frame_artifact::persist_launcher_surface_artifact;
 use super::visual_diff::PixelRect;
 
 pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
-    validate_device_id(&session.device_id)?;
-    validate_package_name(&session.package_name)?;
+    let device_id = arguments
+        .get("deviceId")
+        .and_then(Value::as_str)
+        .unwrap_or(&session.device_id)
+        .trim();
+    let package_name = arguments
+        .get("packageName")
+        .and_then(Value::as_str)
+        .unwrap_or(&session.package_name)
+        .trim();
+    validate_device_id(device_id)?;
+    validate_package_name(package_name)?;
     let settle_ms = arguments
         .get("settleMs")
         .and_then(Value::as_u64)
@@ -30,11 +40,11 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
         .map(serde_json::from_value::<PixelRect>)
         .transpose()?;
 
-    wake_device_for_user_interaction(&session.device_id).await;
+    wake_device_for_user_interaction(device_id).await;
     let home_output = run_adb_text(
         &[
             "-s".to_string(),
-            session.device_id.clone(),
+            device_id.to_string(),
             "shell".to_string(),
             "am".to_string(),
             "start".to_string(),
@@ -52,7 +62,7 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
     let foreground = run_adb_text(
         &[
             "-s".to_string(),
-            session.device_id.clone(),
+            device_id.to_string(),
             "shell".to_string(),
             "dumpsys".to_string(),
             "window".to_string(),
@@ -67,10 +77,10 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
         .find(|line| line.contains("mCurrentFocus") || line.contains("mFocusedApp"))
         .unwrap_or_default()
         .trim();
-    if foreground_line.contains(&session.package_name) {
+    if foreground_line.contains(package_name) {
         bail!("HOME 启动后前台仍是目标应用，未获得真实 Launcher 表面");
     }
-    let png = capture_screen_png(&session.device_id).await?;
+    let png = capture_screen_png(device_id).await?;
     let surface = persist_launcher_surface_artifact(session, &png, None)?;
     let icon = icon_rect
         .map(|rect| persist_launcher_surface_artifact(session, &png, Some(rect)))
@@ -78,8 +88,8 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
     Ok(json!({
         "surface": surface,
         "iconCrop": icon,
-        "deviceId": session.device_id,
-        "packageName": session.package_name,
+        "deviceId": device_id,
+        "packageName": package_name,
         "launcherForeground": foreground_line,
         "homeCommand": home_output.lines().take(8).collect::<Vec<_>>().join(" | "),
         "captureKind": "ANDROID_LAUNCHER_SURFACE",

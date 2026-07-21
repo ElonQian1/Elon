@@ -105,6 +105,10 @@ async fn mcp_lists_compact_ui_tools() {
         .find(|tool| tool["name"] == "ui_capture_android_launcher_surface")
         .expect("launcher surface capture tool must be discoverable");
     assert_eq!(launcher["annotations"]["readOnlyHint"], true);
+    assert_eq!(
+        launcher["inputSchema"]["properties"]["deviceId"]["maxLength"],
+        128
+    );
     let visual_diff = tools
         .iter()
         .find(|tool| tool["name"] == "ui_get_visual_diff")

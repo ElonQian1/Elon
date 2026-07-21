@@ -265,6 +265,8 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             "切换到 Android 系统 HOME/Launcher 后捕获真实表面；可同时按 iconRect 产出图标裁剪工件。",
             json!({
                 "type":"object","additionalProperties":false,"properties":{
+                    "deviceId":{"type":"string","minLength":1,"maxLength":128},
+                    "packageName":{"type":"string","minLength":1,"maxLength":180},
                     "iconRect":rect_value_schema(),
                     "settleMs":{"type":"integer","minimum":200,"maximum":5000,"default":900}
                 }
