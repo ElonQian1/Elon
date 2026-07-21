@@ -366,7 +366,10 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 "required":["runId","action"],
                 "properties":{
                     "runId":{"type":"string"},
-                    "action":{"enum":["START","PAUSE","RESUME","CANCEL","ACCEPT_BEST","CODEX_STARTED","CODEX_COMPLETED","CODEX_FAILED"]},
+                    "action":{"enum":["START","PAUSE","RESUME","CANCEL","REBIND_SESSION","ACCEPT_BEST","CODEX_STARTED","CODEX_COMPLETED","CODEX_FAILED"]},
+                    "newSessionId":{"type":"string","minLength":1,"maxLength":256},
+                    "newRuntimeNodeId":{"type":"string","minLength":1,"maxLength":256},
+                    "newCurrentRect":rect_value_schema(),
                     "handoffId":{"type":"string"},
                     "taskId":{"type":"string"},
                     "sourceRevisionBefore":{"type":"string"},
@@ -654,6 +657,21 @@ mod annotation_tests {
         assert!(schema["properties"]["businessDelivery"]["required"]
             .as_array()
             .is_some_and(|values| values.iter().any(|value| value == "sourceRevision")));
+    }
+
+    #[test]
+    fn fit_run_control_schema_exposes_explicit_session_rebind() {
+        let tools = tool_definitions();
+        let tool = tools
+            .iter()
+            .find(|tool| tool["name"] == "ui_control_fit_run")
+            .expect("fit run control tool");
+        let schema = &tool["inputSchema"];
+        assert!(schema["properties"]["action"]["enum"]
+            .as_array()
+            .is_some_and(|values| values.iter().any(|value| value == "REBIND_SESSION")));
+        assert_eq!(schema["properties"]["newSessionId"]["minLength"], 1);
+        assert!(schema["properties"]["newCurrentRect"].is_object());
     }
 }
 

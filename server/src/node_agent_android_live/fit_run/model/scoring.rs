@@ -113,7 +113,7 @@ pub(crate) struct FitScore {
 
 impl FitScore {
     pub(crate) fn passes(&self, thresholds: &FitThresholds) -> bool {
-        self.hard_failures.is_empty()
+        self.uncontrolled_hard_failure_count() == 0
             && self.overall_loss <= thresholds.max_overall_loss
             && self.geometry_error <= thresholds.max_geometry_error
             && self.color_error <= thresholds.max_color_error
@@ -121,11 +121,50 @@ impl FitScore {
     }
 
     pub(crate) fn better_than(&self, other: &Self, minimum_delta: f64) -> bool {
-        match self.hard_failures.len().cmp(&other.hard_failures.len()) {
+        match self
+            .uncontrolled_hard_failure_count()
+            .cmp(&other.uncontrolled_hard_failure_count())
+        {
             Ordering::Less => true,
             Ordering::Greater => false,
             Ordering::Equal => self.overall_loss + minimum_delta < other.overall_loss,
         }
+    }
+
+    fn uncontrolled_hard_failure_count(&self) -> usize {
+        self.hard_failures
+            .iter()
+            .filter(|failure| !matches!(failure.as_str(), "geometry" | "color" | "edge"))
+            .count()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{FitScore, FitThresholds};
+
+    fn score(hard_failures: Vec<String>) -> FitScore {
+        FitScore {
+            scorer_version: "test".to_string(),
+            overall_loss: 0.019832,
+            geometry_error: 0.01,
+            color_error: 0.030732,
+            edge_error: 0.02,
+            alpha_error: 0.0,
+            shape_error: None,
+            typography_error: None,
+            hard_failures,
+        }
+    }
+
+    #[test]
+    fn run_thresholds_override_generic_metric_gate_failures() {
+        assert!(score(vec!["color".to_string()]).passes(&FitThresholds::default()));
+    }
+
+    #[test]
+    fn unrelated_hard_failures_still_block_acceptance() {
+        assert!(!score(vec!["perceptual".to_string()]).passes(&FitThresholds::default()));
     }
 }
 

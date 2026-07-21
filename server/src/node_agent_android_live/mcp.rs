@@ -523,6 +523,12 @@ fn fit_command(action: &str, arguments: &Value) -> Result<FitCommand> {
             "type": action.trim().to_ascii_uppercase(),
             "commandId": command_id,
         }),
+        "REBIND_SESSION" => json!({
+            "type":"REBIND_SESSION", "commandId":command_id,
+            "newSessionId":required("newSessionId")?,
+            "newRuntimeNodeId":arguments.get("newRuntimeNodeId").cloned(),
+            "newCurrentRect":arguments.get("newCurrentRect").cloned(),
+        }),
         "CODEX_STARTED" => json!({
             "type":"CODEX_STARTED", "commandId":command_id,
             "handoffId":required("handoffId")?, "taskId":required("taskId")?,
@@ -545,6 +551,7 @@ fn fit_command(action: &str, arguments: &Value) -> Result<FitCommand> {
     };
     serde_json::from_value(value).context("FitRun 控制命令无效")
 }
+
 fn find_node<'a>(
     ir: &'a UiIrDocument,
     arguments: &Value,

@@ -79,13 +79,22 @@ pub(super) fn pixel_metrics(
         if left[3] == 0 || right[3] == 0 {
             continue;
         }
-        let pixel_error = (left[0].abs_diff(right[0]) as f64
-            + left[1].abs_diff(right[1]) as f64
-            + left[2].abs_diff(right[2]) as f64)
-            / (3.0 * 255.0);
+        let normalized_text_aa = cross_renderer_text_aa_pair(left, right);
+        let pixel_error = if normalized_text_aa {
+            (luminance(left) - luminance(right)).abs()
+        } else {
+            (left[0].abs_diff(right[0]) as f64
+                + left[1].abs_diff(right[1]) as f64
+                + left[2].abs_diff(right[2]) as f64)
+                / (3.0 * 255.0)
+        };
         color_errors.push(pixel_error);
         color_sum += pixel_error;
-        let delta_e = delta_e_76(srgb_to_lab(left), srgb_to_lab(right));
+        let delta_e = if normalized_text_aa {
+            (luminance(left) - luminance(right)).abs() * 100.0
+        } else {
+            delta_e_76(srgb_to_lab(left), srgb_to_lab(right))
+        };
         delta_errors.push(delta_e);
         delta_sum += delta_e;
         alpha_sum += left[3].abs_diff(right[3]) as f64 / 255.0;
@@ -177,6 +186,26 @@ fn percentile(values: &[f64], percentile: f64) -> f64 {
 
 fn luminance(pixel: &image::Rgba<u8>) -> f64 {
     (pixel[0] as f64 * 0.2126 + pixel[1] as f64 * 0.7152 + pixel[2] as f64 * 0.0722) / 255.0
+}
+
+fn cross_renderer_text_aa_pair(left: &image::Rgba<u8>, right: &image::Rgba<u8>) -> bool {
+    const GRAYSCALE_SPREAD: u8 = 3;
+    const MAX_SUBPIXEL_SPREAD: u8 = 48;
+    const MAX_LUMINANCE_DELTA: f64 = 0.035;
+    let spread = |pixel: &image::Rgba<u8>| {
+        let min = pixel[0].min(pixel[1]).min(pixel[2]);
+        let max = pixel[0].max(pixel[1]).max(pixel[2]);
+        max - min
+    };
+    let left_spread = spread(left);
+    let right_spread = spread(right);
+    let grayscale_vs_subpixel = (left_spread <= GRAYSCALE_SPREAD
+        && right_spread > GRAYSCALE_SPREAD
+        && right_spread <= MAX_SUBPIXEL_SPREAD)
+        || (right_spread <= GRAYSCALE_SPREAD
+            && left_spread > GRAYSCALE_SPREAD
+            && left_spread <= MAX_SUBPIXEL_SPREAD);
+    grayscale_vs_subpixel && (luminance(left) - luminance(right)).abs() <= MAX_LUMINANCE_DELTA
 }
 
 fn srgb_to_lab(pixel: &image::Rgba<u8>) -> [f64; 3] {

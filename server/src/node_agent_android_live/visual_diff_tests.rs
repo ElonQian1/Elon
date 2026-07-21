@@ -185,3 +185,22 @@ fn color_metric_reports_perceptual_lab_distance() {
     );
     assert!(!result.score_report.target_gate.color_passed);
 }
+
+#[test]
+fn grayscale_and_same_luminance_subpixel_text_edges_are_normalized() {
+    let grayscale = solid(30, 20, [128, 128, 128, 255]);
+    let subpixel = solid(30, 20, [145, 123, 132, 255]);
+    let result = compare_dynamic_images(&grayscale, &subpixel, None, None).unwrap();
+    assert!(result.score_report.color.mean_absolute_error < 0.01);
+    assert!(result.score_report.color.mean_delta_e < 3.0);
+    assert!(result.score_report.target_gate.color_passed);
+}
+
+#[test]
+fn saturated_real_color_difference_is_not_treated_as_text_antialiasing() {
+    let grayscale = solid(30, 20, [128, 128, 128, 255]);
+    let saturated = solid(30, 20, [240, 20, 20, 255]);
+    let result = compare_dynamic_images(&grayscale, &saturated, None, None).unwrap();
+    assert!(result.score_report.color.mean_absolute_error > 0.2);
+    assert!(!result.score_report.target_gate.color_passed);
+}
