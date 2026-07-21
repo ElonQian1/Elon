@@ -138,6 +138,7 @@ function Invoke-SupervisionSelfTest {
             current_command = 'cargo test --bin elon-pc-node'
             last_progress = 1784361600000
             heartbeat = 1784361605000
+            idle_duration = 5
         }
         supervision = [ordered]@{ evidence = [ordered]@{
             event_count = 99
@@ -160,9 +161,17 @@ function Invoke-SupervisionSelfTest {
     }
     $activeDetail = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $activeDetail) 'application/json'
     $activeCompact = Convert-ToCompactTaskDetail $activeDetail
+    $volatileDetail = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $activeDetail) 'application/json'
+    $volatileDetail.runtime.heartbeat = 1784361665000
+    $volatileDetail.runtime.idle_duration = 65
+    $volatileCompact = Convert-ToCompactTaskDetail $volatileDetail
     $unchangedCompact = Select-TaskDeltaChanges `
         (Convert-ToCompactTaskDetail $activeDetail) `
         $activeCompact.state_digest $activeCompact.evidence_digest
+    $terminalCompact = Convert-ToCompactTaskDetail $activeDetail $null $true
+    $unchangedTerminalCompact = Select-TaskDeltaChanges `
+        $terminalCompact $terminalCompact.state_digest $terminalCompact.evidence_digest
+    $dictionaryFieldAccess = (Get-ObjectField ([ordered]@{ state_digest = 'dictionary-digest' }) 'state_digest') -eq 'dictionary-digest'
     $deltaEvents = New-Object System.Collections.Generic.List[object]
     $deltaSeen = @{}
     $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
@@ -269,6 +278,9 @@ function Invoke-SupervisionSelfTest {
         compact_delta_omits_unchanged_state_and_evidence = -not $unchangedCompact.state_changed -and
             -not $unchangedCompact.evidence_changed -and $null -eq $unchangedCompact.record -and
             $null -eq $unchangedCompact.runtime -and $null -eq $unchangedCompact.evidence_totals
+        compact_delta_ignores_volatile_liveness = $volatileCompact.state_digest -eq $activeCompact.state_digest
+        compact_delta_omits_unchanged_terminal_evidence = $null -eq $unchangedTerminalCompact.terminal_evidence
+        compact_delta_dictionary_field_access = $dictionaryFieldAccess
         compact_delta_no_loss_or_duplicate = $deltaNoLoss -and $deltaReset -and
             $deltaEvents.Count -eq 1 -and $deltaEvents[0].event.type -eq 'reset'
         compact_delta_invalid_epoch_rejected = $invalidDeltaRejected
@@ -297,6 +309,8 @@ function Invoke-SupervisionSelfTest {
             'inspect_wait_active_runtime', 'compact_delta_evidence_digest',
             'compact_delta_no_loss_or_duplicate', 'compact_delta_invalid_epoch_rejected',
             'compact_delta_omits_unchanged_state_and_evidence',
+            'compact_delta_ignores_volatile_liveness', 'compact_delta_omits_unchanged_terminal_evidence',
+            'compact_delta_dictionary_field_access',
             'criteria_json_array', 'criteria_utf8_file'
         )
     })

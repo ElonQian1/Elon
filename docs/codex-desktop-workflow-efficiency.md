@@ -40,7 +40,7 @@
 
 Codex CLI sidecar 优先使用明确的 `turn.completed` / `turn.failed` JSON 终态；输出管道支持跨 chunk JSONL 缓冲。旧 CLI 缺少明确终态时，仅在最终 agent message、无在途工具且持续静默达到宽限期后使用保守回退。终态确认后停止空闲/总时限误杀，并回收残留进程。
 
-节点状态公开 `desktop_supervision` 能力与协议版本。桌面端在使用增量 Wait、权威 Resume 或桌面评审票据前先协商能力；评审票据按节点声明选择 v2 公钥签名或 v1 共享凭据。v2 Review 必须显式传入 `-StateRoot` 与 `-InstallRoot`，不得猜测凭据目录。缺失能力时给出明确升级错误，不发送未声明的旧格式请求。
+节点状态公开 `desktop_supervision` 能力与协议版本。桌面端在使用增量 Wait、权威 Resume 或桌面评审票据前先协商能力。Review 必须同时声明 `desktop_review_ticket_v3`，显式传入 `-StateRoot` 与 `-InstallRoot`，并使用正文、方法、路径与持久 nonce 绑定的 v3 公钥票据；helper 不向只声明 v2/v1 的旧节点降级。v2 只保留为节点显式迁移窗口，v1 共享凭据不再声明或接受。缺失能力时给出明确升级错误，不发送未声明的旧格式请求。
 
 ## Runtime、gap 与 UI 稳定性
 

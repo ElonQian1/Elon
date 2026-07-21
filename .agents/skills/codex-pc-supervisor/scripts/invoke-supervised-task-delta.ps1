@@ -61,6 +61,7 @@ function Convert-ToCompactTaskDetail {
     $supervision = Get-ObjectField $Detail 'supervision'
     $evidence = Get-ObjectField $supervision 'evidence'
     $runtime = Get-ObjectField $Detail 'runtime'
+    $approvalState = Get-ObjectField $Detail 'approval_state'
     $sourceEvents = if ($null -eq $EventViews) { @(Get-ObjectField $Detail 'events') } else { @($EventViews) }
     $events = @($sourceEvents | ForEach-Object {
         $event = Get-ObjectField $_ 'event'
@@ -86,17 +87,27 @@ function Convert-ToCompactTaskDetail {
         command_exit_codes = @(Get-ObjectField $evidence 'command_exit_codes')
         failure_summaries = @(Get-ObjectField $evidence 'failure_summaries')
     } } else { $null }
+    $recordSnapshot = [ordered]@{
+        task_id = Get-ObjectField $record 'task_id'; status = Get-ObjectField $record 'status'
+        error = Get-ObjectField $record 'error'; finished_at_ms = Get-ObjectField $record 'finished_at_ms'
+    }
+    $runtimeSnapshot = [ordered]@{
+        phase = Get-ObjectField $runtime 'phase'; current_command = Get-ObjectField $runtime 'current_command'
+        last_progress = Get-ObjectField $runtime 'last_progress'; heartbeat = Get-ObjectField $runtime 'heartbeat'
+        idle_duration = Get-ObjectField $runtime 'idle_duration'; timeout_policy = Get-ObjectField $runtime 'timeout_policy'
+    }
+    # heartbeat and idle_duration are liveness observations derived from time.
+    # Repeating them must not force the complete semantic state body to be sent
+    # on every otherwise-empty Wait. last_progress remains authoritative and lets
+    # the caller calculate current idleness from its own clock.
+    $semanticRuntime = [ordered]@{
+        phase = $runtimeSnapshot.phase; current_command = $runtimeSnapshot.current_command
+        last_progress = $runtimeSnapshot.last_progress; timeout_policy = $runtimeSnapshot.timeout_policy
+    }
     return [ordered]@{
-        record = [ordered]@{
-            task_id = Get-ObjectField $record 'task_id'; status = Get-ObjectField $record 'status'
-            error = Get-ObjectField $record 'error'; finished_at_ms = Get-ObjectField $record 'finished_at_ms'
-        }
-        runtime = [ordered]@{
-            phase = Get-ObjectField $runtime 'phase'; current_command = Get-ObjectField $runtime 'current_command'
-            last_progress = Get-ObjectField $runtime 'last_progress'; heartbeat = Get-ObjectField $runtime 'heartbeat'
-            idle_duration = Get-ObjectField $runtime 'idle_duration'; timeout_policy = Get-ObjectField $runtime 'timeout_policy'
-        }
-        approval_state = Get-ObjectField $Detail 'approval_state'
+        record = $recordSnapshot
+        runtime = $runtimeSnapshot
+        approval_state = $approvalState
         evidence_totals = $evidenceTotals
         evidence_digest = Get-ObjectDigest $evidence
         terminal_evidence = $terminalEvidence
@@ -105,7 +116,7 @@ function Convert-ToCompactTaskDetail {
         has_more = Get-ObjectField $Detail 'has_more'
         state_digest = Get-ObjectDigest ([ordered]@{
             status = Get-ObjectField $record 'status'; error = Get-ObjectField $record 'error'
-            runtime = $runtime; approval_state = Get-ObjectField $Detail 'approval_state'
+            runtime = $semanticRuntime; approval_state = $approvalState
         })
     }
 }
@@ -127,6 +138,7 @@ function Select-TaskDeltaChanges {
     }
     if (-not $evidenceChanged) {
         $Compact.evidence_totals = $null
+        $Compact.terminal_evidence = $null
     }
     $Compact['state_changed'] = $stateChanged
     $Compact['evidence_changed'] = $evidenceChanged
