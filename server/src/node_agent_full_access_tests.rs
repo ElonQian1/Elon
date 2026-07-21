@@ -1,6 +1,49 @@
 use super::*;
 use uuid::Uuid;
 
+fn task_record(
+    project_id: &str,
+    conversation_id: &str,
+    base: &Path,
+    active: &Path,
+) -> crate::node_agent_local_task_store::LocalTaskRecord {
+    crate::node_agent_local_task_store::LocalTaskRecord {
+        task_id: "local-proof".into(),
+        owner_user_id: "owner-1".into(),
+        agent_id: "agent-1".into(),
+        install_id: "install-1".into(),
+        project_id: project_id.into(),
+        channel_id: None,
+        conversation_id: conversation_id.into(),
+        workspace_path: base.to_string_lossy().into_owned(),
+        prompt: "test".into(),
+        cli: "codex".into(),
+        runtime_permission: "full_access".into(),
+        execution_origin: "local_offline".into(),
+        billing_source: "own_codex".into(),
+        status: "running".into(),
+        error: None,
+        final_reply: None,
+        model: None,
+        codex_session_id: None,
+        input_tokens: None,
+        cached_input_tokens: None,
+        output_tokens: None,
+        reasoning_tokens: None,
+        total_tokens: None,
+        workspace_status: Some(serde_json::json!({
+            "base_workspace_path": base.to_string_lossy(),
+            "active_workspace_path": active.to_string_lossy(),
+            "isolated": true
+        })),
+        sync_state: "local_only".into(),
+        completion_event_id: None,
+        started_at_ms: 1,
+        finished_at_ms: None,
+        server_ack_at_ms: None,
+    }
+}
+
 fn temp_workspace(label: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!(
         "elon_full_access_{label}_{}",
@@ -59,6 +102,75 @@ fn platform_managed_workspace_rejects_other_project_paths() {
     let _ = std::fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn task_record_allows_only_the_exact_legacy_conversation_worktree() {
+    let legacy_root = temp_workspace("legacy_task_record").join("workspaces");
+    let base = legacy_root.join("elon-self");
+    let active = legacy_root
+        .join("conversation-worktrees")
+        .join("elon-self")
+        .join("conv-proof");
+    let sibling = legacy_root
+        .join("conversation-worktrees")
+        .join("elon-self")
+        .join("conv-other");
+    std::fs::create_dir_all(&base).unwrap();
+    std::fs::create_dir_all(&active).unwrap();
+    std::fs::create_dir_all(&sibling).unwrap();
+    let record = task_record("elon-project", "conv-proof", &base, &active);
+    let state = FullAccessGrantState::load_from_path(grant_file("legacy-proof"));
+    let identity = identity("owner-1", "agent-1", "install-1");
+
+    require_route_a_full_access_grant(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&CliProjectContext {
+            project_id: "elon-self".into(),
+            conversation_id: "conv-proof".into(),
+            runtime_permission: Some("full_access".into()),
+        }),
+        Some(active.to_string_lossy().as_ref()),
+        false,
+        Some(&record),
+    )
+    .await
+    .expect("exact task-recorded legacy worktree should be authorized");
+
+    assert!(task_record_proves_legacy_managed_workspace(
+        &record,
+        &identity,
+        &CliProjectContext {
+            project_id: "elon-self".into(),
+            conversation_id: "conv-proof".into(),
+            runtime_permission: Some("full_access".into()),
+        },
+        base.to_string_lossy().as_ref(),
+    ));
+
+    assert!(!task_record_proves_legacy_managed_workspace(
+        &record,
+        &identity,
+        &context("elon-self"),
+        sibling.to_string_lossy().as_ref(),
+    ));
+    let mut foreign = task_record("elon-self", "conv-proof", &base, &active);
+    foreign.install_id = "install-other".into();
+    assert!(!task_record_proves_legacy_managed_workspace(
+        &foreign,
+        &identity,
+        &CliProjectContext {
+            project_id: "elon-self".into(),
+            conversation_id: "conv-proof".into(),
+            runtime_permission: Some("full_access".into()),
+        },
+        active.to_string_lossy().as_ref(),
+    ));
+
+    let _ = std::fs::remove_dir_all(legacy_root.parent().unwrap());
+}
+
 fn context(project_id: &str) -> CliProjectContext {
     CliProjectContext {
         project_id: project_id.to_string(),
@@ -89,6 +201,7 @@ async fn grant_and_require_full_access_for_same_project_path() {
         Some(&context("project_1")),
         Some(workspace.to_string_lossy().as_ref()),
         true,
+        None,
     )
     .await
     .expect("grant should authorize matching project path");
@@ -116,6 +229,7 @@ async fn historical_self_project_alias_reuses_only_the_same_builtin_project_gran
         Some(&context("elon-self")),
         Some(workspace.to_string_lossy().as_ref()),
         false,
+        None,
     )
     .await
     .expect("the durable self-project id should reuse the historical alias grant");
@@ -136,6 +250,7 @@ async fn route_a_full_access_requires_local_grant() {
         Some(&context("project_1")),
         Some(workspace.to_string_lossy().as_ref()),
         true,
+        None,
     )
     .await
     .expect_err("missing grant should reject full access");
@@ -160,6 +275,7 @@ async fn project_write_and_builtin_runtime_do_not_need_full_access_grant() {
         Some(&context("project_1")),
         Some(workspace.to_string_lossy().as_ref()),
         true,
+        None,
     )
     .await
     .expect("project_write route A should not require full-access grant");
@@ -172,6 +288,7 @@ async fn project_write_and_builtin_runtime_do_not_need_full_access_grant() {
         Some(&context("project_1")),
         Some(workspace.to_string_lossy().as_ref()),
         true,
+        None,
     )
     .await
     .expect("built-in runtime keeps its own sandbox guard");
@@ -191,6 +308,7 @@ async fn local_offline_policy_never_uses_personal_chat_bypass() {
         Some(&context("chat")),
         Some(workspace.to_string_lossy().as_ref()),
         true,
+        None,
     )
     .await
     .expect("cloud personal chat keeps its historical bypass");
@@ -203,6 +321,7 @@ async fn local_offline_policy_never_uses_personal_chat_bypass() {
         Some(&context("chat")),
         Some(workspace.to_string_lossy().as_ref()),
         false,
+        None,
     )
     .await
     .expect_err("local offline chat must require an explicit project grant");
@@ -235,6 +354,7 @@ async fn full_access_grants_are_isolated_by_owner_agent_and_install() {
             Some(&context("project_1")),
             Some(workspace.to_string_lossy().as_ref()),
             false,
+            None,
         )
         .await
         .expect_err("foreign runtime identity must not reuse grant");

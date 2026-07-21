@@ -196,6 +196,7 @@ pub(crate) async fn require_route_a_full_access_grant(
     project_context: Option<&CliProjectContext>,
     cwd: Option<&str>,
     allow_personal_chat_bypass: bool,
+    task_record: Option<&crate::node_agent_local_task_store::LocalTaskRecord>,
 ) -> Result<()> {
     if !is_route_a_cli(cli_name) || !is_full_access(runtime_permission) {
         return Ok(());
@@ -213,9 +214,93 @@ pub(crate) async fn require_route_a_full_access_grant(
     if platform_managed_workspace_matches(&context.project_id, cwd) {
         return Ok(());
     }
+    if task_record.is_some_and(|record| {
+        task_record_proves_legacy_managed_workspace(record, identity, context, cwd)
+    }) {
+        return Ok(());
+    }
     grants
         .require_project(identity, &context.project_id, cwd)
         .await
+}
+
+fn task_record_proves_legacy_managed_workspace(
+    record: &crate::node_agent_local_task_store::LocalTaskRecord,
+    identity: &FullAccessGrantIdentity,
+    context: &CliProjectContext,
+    cwd: &str,
+) -> bool {
+    if record.owner_user_id != identity.owner_user_id
+        || record.agent_id != identity.agent_id
+        || record.install_id != identity.install_id
+        || !project_ids_equivalent(&record.project_id, &context.project_id)
+        || record.conversation_id != context.conversation_id
+    {
+        return false;
+    }
+    let Some(cwd) = canonical_existing_path(cwd) else {
+        return false;
+    };
+    let paths = recorded_workspace_paths(record);
+    let cwd_is_recorded = paths.iter().any(|candidate| {
+        canonical_existing_path(candidate).is_some_and(|candidate| candidate == cwd)
+    });
+    cwd_is_recorded
+        && paths
+            .into_iter()
+            .filter_map(canonical_existing_path)
+            .any(|candidate| {
+                is_legacy_conversation_worktree(
+                    &candidate,
+                    &context.project_id,
+                    &context.conversation_id,
+                )
+            })
+}
+
+fn recorded_workspace_paths(
+    record: &crate::node_agent_local_task_store::LocalTaskRecord,
+) -> Vec<&str> {
+    let mut paths = vec![record.workspace_path.as_str()];
+    if let Some(status) = record.workspace_status.as_ref() {
+        for key in [
+            "base_workspace_path",
+            "active_workspace_path",
+            "workspace_path",
+        ] {
+            if let Some(path) = status.get(key).and_then(serde_json::Value::as_str) {
+                paths.push(path);
+            }
+        }
+    }
+    paths
+}
+
+fn canonical_existing_path(value: &str) -> Option<String> {
+    std::fs::canonicalize(Path::new(value))
+        .ok()
+        .map(|path| normalize_workspace_path(&path))
+}
+
+fn is_legacy_conversation_worktree(cwd: &str, project_id: &str, conversation_id: &str) -> bool {
+    let parts = cwd
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .map(|part| normalize_workspace_component(part.to_string()))
+        .collect::<Vec<_>>();
+    let project = normalize_workspace_component(safe_path_part(
+        canonical_project_id(project_id),
+        "project",
+        80,
+    ));
+    let conversation =
+        normalize_workspace_component(safe_path_part(conversation_id, "conversation", 100));
+    parts.windows(4).any(|window| {
+        window[0] == "workspaces"
+            && window[1] == "conversation-worktrees"
+            && window[2] == project
+            && window[3] == conversation
+    }) && parts.last() == Some(&conversation)
 }
 
 pub(crate) async fn current_grant_identity(

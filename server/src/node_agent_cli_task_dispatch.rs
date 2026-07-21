@@ -340,6 +340,7 @@ async fn run_cli_task(
         project_context.as_ref(),
         authorization_cwd,
         !local_offline,
+        runtime.local_tasks.get(&req_id).ok().flatten().as_ref(),
     )
     .await
     {

@@ -125,6 +125,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         Some(&authorization_context),
         Some(&resolved.authorized_workspace_path),
         false,
+        Some(&parent),
     )
     .await
     .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;

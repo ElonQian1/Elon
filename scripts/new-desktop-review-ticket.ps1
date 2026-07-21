@@ -1,13 +1,25 @@
 param(
   [Parameter(Mandatory=$true)][string]$OwnerUserId,
   [Parameter(Mandatory=$true)][string]$TaskId,
-  [string]$StatePath = (Join-Path $env:LOCALAPPDATA 'ElonNode\_internal\desktop-review-auth\active.json')
+  [Parameter(Mandatory=$true)][string]$StateRoot,
+  [Parameter(Mandatory=$true)][string]$InstallRoot
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2
-if (-not (Test-Path -LiteralPath $StatePath)) { throw 'desktop review signing capability is not configured' }
-$state = Get-Content -Raw -LiteralPath $StatePath | ConvertFrom-Json
-$cert = Get-Item ('Cert:\CurrentUser\My\' + $state.thumbprint)
+$StateRoot = [IO.Path]::GetFullPath($StateRoot)
+$InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
+$statePath = Join-Path $StateRoot 'active.json'
+if (-not (Test-Path -LiteralPath $statePath)) { throw 'desktop review signing capability is not configured' }
+$state = Get-Content -Raw -LiteralPath $statePath | ConvertFrom-Json
+if ($state.schema -ne 2 -or [IO.Path]::GetFullPath([string]$state.state_root) -ne $StateRoot -or
+    [IO.Path]::GetFullPath([string]$state.install_root) -ne $InstallRoot) {
+  throw 'fail_closed: signing state does not match explicit StateRoot and InstallRoot'
+}
+$currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+if ($currentSid -ne $state.desktop_sid -or $currentSid -eq $state.executor_sid) {
+  throw 'fail_closed: process identity is not the configured Desktop identity'
+}
+$cert = Get-Item ([string]$state.certificate_store + '\' + $state.thumbprint)
 $rsa = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
 if ($null -eq $rsa) { throw 'desktop review signing key is unavailable to this process identity' }
 $expires = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() + 120
