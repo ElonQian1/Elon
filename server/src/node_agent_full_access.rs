@@ -315,7 +315,7 @@ fn same_existing_path(left: &str, right: &str) -> bool {
 }
 
 fn git_value(cwd: &str, args: &[&str]) -> Option<String> {
-    let output = std::process::Command::new("git")
+    let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(cwd)
         .output()
