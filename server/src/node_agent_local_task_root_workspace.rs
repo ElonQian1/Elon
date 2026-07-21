@@ -28,6 +28,7 @@ pub(crate) fn resolve_request_workspace(
     resolve_chained_authorized_workspace(
         &runtime.local_tasks,
         &runtime.task_journal,
+        &runtime.update_recovery,
         creds,
         &runtime.install_id,
         project_id,
@@ -39,6 +40,7 @@ pub(crate) fn resolve_request_workspace(
 pub(crate) fn resolve_chained_authorized_workspace(
     tasks: &LocalTaskStore,
     journal: &TaskJournal,
+    recovery: &crate::node_agent_update_recovery::UpdateRecoveryStore,
     creds: &crate::Credentials,
     install_id: &str,
     project_id: &str,
@@ -84,10 +86,14 @@ pub(crate) fn resolve_chained_authorized_workspace(
         if current.task_id == root_id {
             break;
         }
-        let ancestor_id = required_id(
-            current_contract.parent_task_id.as_deref(),
-            "持久谱系 parent_task_id",
-        )?;
+        let recovery_receipt = recovery.receipt_for_task(&current.task_id)?;
+        let durable_parent = durable_parent_id(
+            &current.task_id,
+            root_id,
+            &current_contract,
+            recovery_receipt.as_ref(),
+        );
+        let ancestor_id = required_id(durable_parent, "持久谱系 parent_task_id")?;
         current = tasks
             .get_for_owner(&creds.owner_user_id, ancestor_id)?
             .context("监督任务谱系的祖先任务不存在。")?;
@@ -96,6 +102,26 @@ pub(crate) fn resolve_chained_authorized_workspace(
     let base = recorded_base_workspace(&current)?;
     validate_requested_workspace(requested_workspace_path, &immediate_parent, &base)?;
     Ok(base)
+}
+
+fn durable_parent_id<'a>(
+    task_id: &str,
+    root_id: &str,
+    contract: &'a SupervisionContract,
+    recovery: Option<&'a crate::node_agent_update_recovery::UpdateRecoveryReceipt>,
+) -> Option<&'a str> {
+    contract.parent_task_id.as_deref().or_else(|| {
+        recovery.and_then(|receipt| {
+            if receipt.root_task_id != root_id {
+                return None;
+            }
+            if receipt.resume_task_id.as_deref() == Some(task_id) {
+                Some(receipt.original_task_id.as_str())
+            } else {
+                receipt.parent_task_id.as_deref()
+            }
+        })
+    })
 }
 
 fn validate_task_identity(
@@ -229,5 +255,32 @@ mod tests {
         validate_requested_workspace(active.to_string_lossy().as_ref(), &root, &resolved).unwrap();
         assert!(validate_requested_workspace("C:/unrelated-root", &root, &resolved).is_err());
         let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn legacy_recovery_child_uses_durable_receipt_lineage() {
+        let contract = SupervisionContract {
+            protocol: SUPERVISION_PROTOCOL.to_string(),
+            supervisor: "codex_desktop".into(),
+            task_role: "resume_original".into(),
+            parent_task_id: None,
+            root_task_id: Some("local-root".into()),
+            acceptance_criteria: Vec::new(),
+            improvement_policy: "after_task_or_unblock".into(),
+        };
+        let mut receipt = crate::node_agent_update_recovery::UpdateRecoveryReceipt::planned(
+            "node-update",
+            "local-root",
+            "local-parent",
+        );
+        receipt.resume_task_id = Some("local-recovery".into());
+        assert_eq!(
+            durable_parent_id("local-recovery", "local-root", &contract, Some(&receipt)),
+            Some("local-parent")
+        );
+        assert_eq!(
+            durable_parent_id("local-recovery", "another-root", &contract, Some(&receipt)),
+            None
+        );
     }
 }

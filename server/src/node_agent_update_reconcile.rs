@@ -63,6 +63,19 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
         .local_tasks
         .get(&active_task_id)?
         .context("更新恢复目标本机任务不存在")?;
+    if let Some(completion) = runtime
+        .completion_outbox
+        .latest_for_req_id(&active_task_id)?
+    {
+        runtime.update_recovery.reconcile_terminal_completion(
+            &active_task_id,
+            &completion.event_id,
+            completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
+            completion.created_at_ms as u128,
+            completion.exit_ok,
+        )?;
+        return Ok(());
+    }
     if let Err(error) = validate_local_recovery(&runtime, &task, &receipt).await {
         let reason = format!("节点更新恢复已熔断：{error}");
         runtime

@@ -193,6 +193,10 @@ function Invoke-SupervisionSelfTest {
     })
     $emptyPageCursor = Resolve-MonotonicTaskCursor 42 0 $false 0
     $resetPageCursor = Resolve-MonotonicTaskCursor 42 0 $true 7
+    $timeoutFailure = Get-WaitFailureCode ([System.Net.WebException]::new(
+        'timeout', [System.Net.WebExceptionStatus]::Timeout))
+    $unreachableFailure = Get-WaitFailureCode ([System.Net.WebException]::new(
+        'connect', [System.Net.WebExceptionStatus]::ConnectFailure))
     $invalidDeltaRejected = $false
     try {
         $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
@@ -288,6 +292,8 @@ function Invoke-SupervisionSelfTest {
             $deltaEvents.Count -eq 1 -and $deltaEvents[0].event.type -eq 'reset'
         empty_page_cursor_monotonic = $emptyPageCursor -eq 42
         epoch_reset_uses_resume_cursor = $resetPageCursor -eq 7
+        compact_wait_timeout_classified = $timeoutFailure -eq 'request_timeout'
+        compact_wait_unreachable_classified = $unreachableFailure -eq 'node_unreachable'
         compact_delta_invalid_epoch_rejected = $invalidDeltaRejected
         criteria_json = $jsonCriteria.Count -eq 2 -and
             $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')
@@ -316,6 +322,7 @@ function Invoke-SupervisionSelfTest {
             'compact_delta_omits_unchanged_state_and_evidence',
             'compact_delta_ignores_volatile_liveness', 'compact_delta_omits_unchanged_terminal_evidence',
             'compact_delta_dictionary_field_access',
+            'compact_wait_timeout_classified', 'compact_wait_unreachable_classified',
             'criteria_json_array', 'criteria_utf8_file'
         )
     })

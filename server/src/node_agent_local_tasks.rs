@@ -322,6 +322,11 @@ async fn create_task(
         };
     }
     let task_id = format!("local-{}", Uuid::new_v4());
+    if let Some(contract) = supervision.as_mut() {
+        if contract.parent_task_id.is_none() && contract.root_task_id.is_none() {
+            contract.root_task_id = Some(task_id.clone());
+        }
+    }
     let conversation_id = request
         .conversation_id
         .as_deref()

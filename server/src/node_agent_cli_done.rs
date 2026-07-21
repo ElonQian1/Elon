@@ -241,6 +241,17 @@ pub(crate) fn persist_and_send_cli_done(
     ) {
         tracing::warn!(%req_id, %error, "failed to update display task journal after durable outbox commit");
     }
+    if context.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
+        if let Err(error) = runtime.update_recovery.reconcile_terminal_completion(
+            req_id,
+            &envelope.event_id,
+            completion_terminal_status(*exit_ok, error.as_deref()),
+            envelope.created_at_ms as u128,
+            *exit_ok,
+        ) {
+            tracing::warn!(%req_id, %error, "failed to reconcile update recovery terminal receipt");
+        }
+    }
     let text = serde_json::to_string(&message).context("serialize durable CliDone")?;
     out_tx
         .send(Message::Text(text))

@@ -326,7 +326,8 @@ function Invoke-NodeApi {
         [string]$Path,
         [object]$Body = $null,
         [byte[]]$BodyBytes = $null,
-        [System.Collections.IDictionary]$ExtraHeaders = $null
+        [System.Collections.IDictionary]$ExtraHeaders = $null,
+        [ValidateRange(1, 15)][int]$TimeoutSec = 15
     )
     $requestHeaders = @{ Origin = $Connection.BaseUrl }
     $requestHeaders[$Connection.Header] = $Connection.Token
@@ -336,7 +337,7 @@ function Invoke-NodeApi {
         }
     }
     Invoke-Utf8JsonRequest -Method $Method -Uri "$($Connection.BaseUrl)$Path" `
-        -Headers $requestHeaders -Body $Body -BodyBytes $BodyBytes -TimeoutSec 15
+        -Headers $requestHeaders -Body $Body -BodyBytes $BodyBytes -TimeoutSec $TimeoutSec
 }
 
 function New-DesktopReviewTicket {
@@ -432,10 +433,11 @@ function Get-TaskDetail {
         [string]$RequestedTaskId,
         [int]$Limit = 200,
         [int]$Since = -1,
-        [string]$CursorEpoch = ''
+        [string]$CursorEpoch = '',
+        [ValidateRange(1, 15)][int]$TimeoutSec = 15
     )
     $detailPath = Get-TaskDetailPath $RequestedTaskId $Limit $Since $CursorEpoch
-    Invoke-NodeApi $Connection 'Get' $detailPath
+    Invoke-NodeApi $Connection 'Get' $detailPath -TimeoutSec $TimeoutSec
 }
 
 function Get-RecordFromDetail {
@@ -528,6 +530,15 @@ function Resolve-MonotonicTaskCursor {
     )
     if ($CursorReset) { return $ResumeCursor }
     return [Math]::Max($CurrentCursor, $ReturnedCursor)
+}
+
+function Get-WaitFailureCode {
+    param([System.Exception]$Exception)
+    if ($Exception -is [System.Net.WebException] -and
+        $Exception.Status -eq [System.Net.WebExceptionStatus]::Timeout) {
+        return 'request_timeout'
+    }
+    return 'node_unreachable'
 }
 
 function New-ImprovementTaskBody {
@@ -689,6 +700,7 @@ switch ($Action) {
         $collectedEvents = New-Object System.Collections.Generic.List[object]
         $seenEvents = @{}
         $sawCursorReset = $false
+        $lastWaitError = $null
         do {
             try {
                 # Poll only a small event window. The node computes the
@@ -696,7 +708,8 @@ switch ($Action) {
                 $remainingEventCapacity = $waitLimit - $collectedEvents.Count
                 if ($remainingEventCapacity -le 0) { break }
                 $pageLimit = [Math]::Max(1, [Math]::Min($waitLimit, $remainingEventCapacity))
-                $detail = Get-TaskDetail $nodeConnection $TaskId $pageLimit $cursor $cursorEpoch
+                $remainingSeconds = [Math]::Max(1, [Math]::Min(15, [Math]::Ceiling($WaitSeconds - $timer.Elapsed.TotalSeconds)))
+                $detail = Get-TaskDetail $nodeConnection $TaskId $pageLimit $cursor $cursorEpoch $remainingSeconds
                 $record = Get-RecordFromDetail $detail
                 $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
                 if (Merge-TaskDeltaEvents $collectedEvents $seenEvents $detail) {
@@ -712,10 +725,19 @@ switch ($Action) {
                 if ($collectedEvents.Count -ge $waitLimit) { break }
                 if ((Get-ObjectField $detail 'has_more') -eq $true) { continue }
             } catch {
-                if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) { throw }
+                $lastWaitError = $_.Exception
+                if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) {
+                    $reason = Get-WaitFailureCode $_.Exception
+                    throw "$reason`: Compact Wait exhausted its WaitSeconds boundary."
+                }
             }
-            Start-Sleep -Seconds 2
+            $remainingSleepMs = [Math]::Floor(($WaitSeconds - $timer.Elapsed.TotalSeconds) * 1000)
+            if ($remainingSleepMs -gt 0) { Start-Sleep -Milliseconds ([Math]::Min(2000, $remainingSleepMs)) }
         } while ($timer.Elapsed.TotalSeconds -lt $WaitSeconds)
+        if ($null -eq $detail -and $null -ne $lastWaitError) {
+            $reason = Get-WaitFailureCode $lastWaitError
+            throw "$reason`: Compact Wait exhausted its WaitSeconds boundary."
+        }
         $isTerminal = $terminalStatuses -contains $status
         $resultDetail = if ($Compact) {
             Select-TaskDeltaChanges `

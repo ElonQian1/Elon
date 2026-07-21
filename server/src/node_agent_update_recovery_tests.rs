@@ -209,6 +209,31 @@ fn terminal_binding_ignores_completed_parent_after_resume_child_exists() {
 }
 
 #[test]
+fn recovered_child_completion_idempotently_promotes_resumed_receipt() {
+    let (root, store) = temp_store();
+    let mut receipt =
+        UpdateRecoveryReceipt::planned("update-terminal", "root-terminal", "parent-terminal");
+    receipt.resume_task_id = Some("resume-terminal".to_string());
+    receipt.state = UpdateRecoveryState::Resumed;
+    store.upsert(receipt).unwrap();
+
+    assert!(store
+        .reconcile_terminal_completion("resume-terminal", "event-terminal", "done", 20, true)
+        .unwrap());
+    assert!(store
+        .reconcile_terminal_completion("resume-terminal", "event-terminal", "done", 20, true)
+        .unwrap());
+    let verified = store.load().unwrap().receipts.remove(0);
+    assert_eq!(verified.state, UpdateRecoveryState::Verified);
+    assert_eq!(
+        verified.completion_event_id.as_deref(),
+        Some("event-terminal")
+    );
+    assert_eq!(verified.terminal_task_status.as_deref(), Some("done"));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn invalid_state_skip_is_rejected() {
     let mut receipt = UpdateRecoveryReceipt::planned("update-5", "root-5", "task-5");
     let error = receipt
