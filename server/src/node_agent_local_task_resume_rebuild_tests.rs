@@ -72,6 +72,7 @@ impl Fixture {
             git_head: Some(head.clone()),
             git_status_sha256: Some("clean-status".to_string()),
             git_status_clean: Some(true),
+            ..WorkspaceGitFingerprint::default()
         };
         Self {
             root,

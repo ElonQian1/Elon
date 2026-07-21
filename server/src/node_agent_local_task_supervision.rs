@@ -82,7 +82,6 @@ pub(crate) struct SupervisionContract {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct SupervisionReviewRequest {
     verdict: String,
     #[serde(default)]

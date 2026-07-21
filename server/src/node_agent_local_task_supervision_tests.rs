@@ -1,6 +1,18 @@
 use super::*;
 
 #[test]
+fn review_request_accepts_legacy_actor_hints_without_trusting_them() {
+    let _: SupervisionReviewRequest = serde_json::from_value(json!({
+        "verdict": "accepted",
+        "summary": "兼容旧 helper",
+        "improvements": [],
+        "reviewed_by": "legacy-caller",
+        "review_source": "legacy-helper"
+    }))
+    .unwrap();
+}
+
+#[test]
 fn supervised_prompt_marks_executor_and_prevents_redispatch() {
     let contract = normalize_contract(SupervisionContractInput {
         protocol: None,
@@ -250,14 +262,14 @@ fn post_task_improvement_requires_explicit_protocol_parent_and_root() {
 
 #[test]
 fn review_identity_prevents_pc_operator_from_impersonating_desktop() {
-    let rejected = serde_json::from_value::<SupervisionReviewRequest>(serde_json::json!({
+    let compatible = serde_json::from_value::<SupervisionReviewRequest>(serde_json::json!({
         "verdict": "accepted", "summary": "operator review",
         "reviewed_by": "codex_desktop", "review_source": "codex_desktop_helper"
-    }));
-    assert!(
-        rejected.is_err(),
-        "public review DTO must reject caller-supplied actor provenance"
-    );
+    }))
+    .expect("legacy helper actor hints should remain wire-compatible");
+    let normalized = normalize_review(compatible, "pc_operator", "local_pc_api").unwrap();
+    assert_eq!(normalized.reviewed_by, "pc_operator");
+    assert_eq!(normalized.review_source, "local_pc_api");
 
     let desktop = normalize_review(
         SupervisionReviewRequest {

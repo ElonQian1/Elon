@@ -16,6 +16,38 @@ fn install_gate_requires_a_checkpoint_for_every_foreground_task() {
 }
 
 #[test]
+fn checkpoint_preserves_platform_isolated_workspace_identity() {
+    let mut fingerprint = WorkspaceGitFingerprint {
+        workspace_path: "C:\\conversation-worktrees\\project\\conversation".to_string(),
+        branch: Some("detected".to_string()),
+        git_head: Some("0123456789abcdef0123456789abcdef01234567".to_string()),
+        git_status_sha256: Some("status".to_string()),
+        git_status_clean: Some(true),
+        ..WorkspaceGitFingerprint::default()
+    };
+    preserve_platform_workspace_identity(
+        &mut fingerprint,
+        Some(&serde_json::json!({
+            "isolated": true,
+            "base_workspace_path": "D:\\project",
+            "active_workspace_path": "C:\\conversation-worktrees\\project\\conversation",
+            "branch": "ai/session/project/conversation",
+            "git_head": "0123456789abcdef0123456789abcdef01234567"
+        })),
+    );
+    assert!(fingerprint.isolated);
+    assert_eq!(
+        fingerprint.base_workspace_path.as_deref(),
+        Some("D:\\project")
+    );
+    assert_eq!(
+        fingerprint.branch.as_deref(),
+        Some("ai/session/project/conversation")
+    );
+    assert!(fingerprint.has_sufficient_identity());
+}
+
+#[test]
 fn incomplete_non_repeatable_action_blocks_until_its_result_is_durable() {
     let call = crate::node_agent_task_journal::TaskJournalEventView {
         seq: 1,

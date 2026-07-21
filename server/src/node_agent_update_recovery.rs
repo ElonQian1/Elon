@@ -179,7 +179,13 @@ impl RecoveryTransport {
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub(crate) struct WorkspaceGitFingerprint {
     #[serde(default)]
+    pub(crate) base_workspace_path: Option<String>,
+    #[serde(default)]
     pub(crate) workspace_path: String,
+    #[serde(default)]
+    pub(crate) isolated: bool,
+    #[serde(default)]
+    pub(crate) branch: Option<String>,
     #[serde(default)]
     pub(crate) git_head: Option<String>,
     #[serde(default)]
@@ -191,6 +197,11 @@ pub(crate) struct WorkspaceGitFingerprint {
 impl WorkspaceGitFingerprint {
     pub(crate) fn has_sufficient_identity(&self) -> bool {
         !self.workspace_path.trim().is_empty()
+            && (!self.isolated
+                || self
+                    .base_workspace_path
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty()))
             && self
                 .git_head
                 .as_deref()

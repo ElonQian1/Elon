@@ -22,7 +22,10 @@ use crate::{
     node_agent_local_task_store::LocalTaskRecord,
     node_agent_local_task_supervision::{load_supervision_contract, SUPERVISION_PROTOCOL},
     node_agent_task_journal_events::completion_terminal_status,
-    node_agent_update_checkpoint::{fingerprint_workspace, incomplete_non_repeatable_action},
+    node_agent_update_checkpoint::{
+        fingerprint_workspace, incomplete_non_repeatable_action,
+        preserve_platform_workspace_identity,
+    },
     node_agent_update_recovery::{ReleaseIdentity, UpdateRecoveryReceipt, UpdateRecoveryState},
     NodeRuntime,
 };
@@ -156,6 +159,30 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         output_path,
         200_000,
     )?;
+    let codex_terminal = codex_terminal_outcome(&stdout);
+    if task.cli.eq_ignore_ascii_case("codex") && codex_terminal.is_none() {
+        let reason = "sidecar 已退出，但缺少 Codex turn.completed/turn.failed 可靠终态；保留隔离工作区并等待 Resume";
+        let _ = runtime
+            .local_tasks
+            .mark_recovery_blocked(&task.task_id, reason)?;
+        if let Some(receipt) = runtime.update_recovery.receipt_for_task(&task.task_id)? {
+            runtime.update_recovery.update(
+                &receipt.update_id,
+                &receipt.original_task_id,
+                |current| {
+                    current.transition(UpdateRecoveryState::Paused, Some(reason))?;
+                    current.resume_strategy =
+                        Some("resume_required_after_non_terminal_replay".to_string());
+                    Ok(())
+                },
+            )?;
+        }
+        return Ok(());
+    }
+    let exit_ok = match codex_terminal {
+        Some(false) => false,
+        _ => exit_ok,
+    };
     let (done, combined_output) = cli_done_message_from_output(
         task.task_id.clone(),
         exit_ok,
@@ -163,7 +190,7 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         &stdout,
         &stderr,
         None,
-        recovered_workspace_status(&task, &session),
+        recovered_workspace_status(&runtime, &task, &session),
         runtime
             .task_journal
             .snapshot(&task.task_id, 0, 1)?
@@ -201,6 +228,20 @@ fn output_contains_terminal_record(path: &Path) -> Result<bool> {
     Ok(read_new_output_records(path, &mut offset)?
         .iter()
         .any(|record| record.record_type == "exit"))
+}
+
+fn codex_terminal_outcome(output: &str) -> Option<bool> {
+    output
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line.trim()).ok())
+        .fold(None, |outcome, value| {
+            match value.get("type").and_then(serde_json::Value::as_str) {
+                Some("turn.completed") => Some(true),
+                Some("turn.failed") => Some(false),
+                Some("turn.started") => None,
+                _ => outcome,
+            }
+        })
 }
 
 fn ensure_recovery_receipt(
@@ -263,6 +304,7 @@ fn ensure_recovery_receipt(
         })
         .unwrap_or(&task.workspace_path);
     receipt.workspace = fingerprint_workspace(Path::new(cwd));
+    preserve_platform_workspace_identity(&mut receipt.workspace, task.workspace_status.as_ref());
     receipt.safety.pending_approval_ids = snapshot.approvals.pending_approval_ids();
     receipt.safety.non_repeatable_action = incomplete_non_repeatable_action(&snapshot.events);
     receipt.safety.journal_event_count = snapshot.last_event_seq;
@@ -408,6 +450,7 @@ fn completion_context(task: &LocalTaskRecord) -> CliCompletionContext {
 }
 
 fn recovered_workspace_status(
+    runtime: &NodeRuntime,
     task: &LocalTaskRecord,
     session: &CliSidecarSessionRecord,
 ) -> Option<CliWorkspaceStatus> {
@@ -415,18 +458,34 @@ fn recovered_workspace_status(
     if active.is_empty() {
         return None;
     }
-    let isolated = !crate::node_agent_update_checkpoint::same_path(
-        Path::new(active),
-        Path::new(&task.workspace_path),
-    );
+    let receipt_workspace = runtime
+        .update_recovery
+        .receipt_for_task(&task.task_id)
+        .ok()
+        .flatten()
+        .map(|receipt| receipt.workspace);
+    let preserved = receipt_workspace
+        .as_ref()
+        .filter(|workspace| workspace.isolated);
+    let isolated = preserved.is_some()
+        || !crate::node_agent_update_checkpoint::same_path(
+            Path::new(active),
+            Path::new(&task.workspace_path),
+        );
     Some(CliWorkspaceStatus {
-        base_workspace_path: isolated.then(|| task.workspace_path.clone()),
+        base_workspace_path: preserved
+            .and_then(|workspace| workspace.base_workspace_path.clone())
+            .or_else(|| isolated.then(|| task.workspace_path.clone())),
         active_workspace_path: active.to_string(),
         isolated,
-        branch: crate::node_agent_update_checkpoint::git_output(
-            Path::new(active),
-            &["branch", "--show-current"],
-        ),
+        branch: preserved
+            .and_then(|workspace| workspace.branch.clone())
+            .or_else(|| {
+                crate::node_agent_update_checkpoint::git_output(
+                    Path::new(active),
+                    &["branch", "--show-current"],
+                )
+            }),
         git_head: crate::node_agent_update_checkpoint::git_output(
             Path::new(active),
             &["rev-parse", "--verify", "HEAD^{commit}"],

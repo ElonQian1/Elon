@@ -67,3 +67,20 @@ fn multi_generation_sidecar_recovery_replaces_stale_target_without_manual_resume
         }
     );
 }
+
+#[test]
+fn codex_process_exit_without_turn_terminal_is_not_completion() {
+    let interrupted = concat!(
+        "{\"type\":\"turn.started\"}\n",
+        "{\"type\":\"item.completed\",\"item\":{\"id\":\"msg\",\"type\":\"agent_message\",\"text\":\"still working\"}}\n"
+    );
+    assert_eq!(codex_terminal_outcome(interrupted), None);
+    assert_eq!(
+        codex_terminal_outcome("{\"type\":\"turn.completed\"}\n"),
+        Some(true)
+    );
+    assert_eq!(
+        codex_terminal_outcome("{\"type\":\"turn.failed\"}\n"),
+        Some(false)
+    );
+}

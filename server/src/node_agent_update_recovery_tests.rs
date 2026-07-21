@@ -27,6 +27,7 @@ fn durable_lifecycle_is_correlated_and_replayable() {
         git_head: Some("abc123".to_string()),
         git_status_sha256: Some("digest".to_string()),
         git_status_clean: Some(true),
+        ..WorkspaceGitFingerprint::default()
     };
     store.upsert(receipt).expect("persist planned receipt");
 

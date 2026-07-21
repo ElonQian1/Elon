@@ -15,6 +15,8 @@ use crate::node_agent_task_journal_events::completion_terminal_status;
 
 #[path = "node_agent_local_task_store_safety.rs"]
 mod safety;
+#[path = "node_agent_local_task_store_workspace.rs"]
+mod workspace;
 
 #[derive(Clone, Debug)]
 pub(crate) struct LocalTaskStore {

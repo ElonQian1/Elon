@@ -133,7 +133,7 @@
 }
 ```
 
-公共 review DTO 不接受 `reviewed_by` 或 `review_source`。本机 UI 路由固定注入
+公共 review DTO 为兼容旧 helper 可接收但会忽略 `reviewed_by` 和 `review_source`；新 helper 不发送这两个字段。服务端始终依据已认证路由覆盖调用方提示。本机 UI 路由固定注入
 `pc_operator:<owner> / local_pc_api`；Desktop helper 使用独立的 `desktop-review`
 路由，由节点注入 `codex_desktop / codex_desktop_helper`，调用方不能通过 body 冒充。
 

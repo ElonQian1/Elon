@@ -168,6 +168,10 @@ fn checkpoint_active_update_transactions(
         }
         receipt.journal_cursor = snapshot.last_event_seq as u64;
         receipt.workspace = fingerprint_workspace(Path::new(&workspace_path));
+        preserve_platform_workspace_identity(
+            &mut receipt.workspace,
+            task.workspace_status.as_ref(),
+        );
         receipt.recovery_policy.deadline_ms =
             Some(crate::node_agent_cli_sidecar::now_ms() + RECOVERY_DEADLINE_MS);
         receipt.safety.pending_approval_ids = snapshot.approvals.pending_approval_ids();
@@ -203,7 +207,10 @@ pub(crate) fn fingerprint_workspace(path: &Path) -> WorkspaceGitFingerprint {
     let git_head = git_output(path, &["rev-parse", "HEAD"]);
     let status = git_output(path, &["status", "--porcelain=v2", "--branch"]);
     WorkspaceGitFingerprint {
+        base_workspace_path: None,
         workspace_path,
+        isolated: false,
+        branch: git_output(path, &["branch", "--show-current"]),
         git_head,
         git_status_sha256: status
             .as_deref()
@@ -214,6 +221,41 @@ pub(crate) fn fingerprint_workspace(path: &Path) -> WorkspaceGitFingerprint {
                 .all(|line| line.trim().is_empty() || line.starts_with('#'))
         }),
     }
+}
+
+pub(crate) fn preserve_platform_workspace_identity(
+    fingerprint: &mut WorkspaceGitFingerprint,
+    status: Option<&serde_json::Value>,
+) {
+    let Some(status) = status
+        .filter(|status| status.get("isolated").and_then(serde_json::Value::as_bool) == Some(true))
+    else {
+        return;
+    };
+    let active = status
+        .get("active_workspace_path")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if !active
+        .is_some_and(|active| same_path(Path::new(active), Path::new(&fingerprint.workspace_path)))
+    {
+        return;
+    }
+    fingerprint.base_workspace_path = status
+        .get("base_workspace_path")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    fingerprint.isolated = fingerprint.base_workspace_path.is_some();
+    fingerprint.branch = status
+        .get("branch")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+        .or_else(|| fingerprint.branch.clone());
 }
 
 pub(crate) fn incomplete_non_repeatable_action(
