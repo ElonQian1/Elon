@@ -347,12 +347,22 @@ fn git_identity_matches(base: &str, active: &str, status: &serde_json::Value) ->
     {
         return false;
     }
-    let revision = status
+    let base_revision = status
         .get("base_revision")
         .and_then(serde_json::Value::as_str)
         .unwrap_or("");
-    if revision.is_empty()
-        || git_value(active, &["merge-base", "--is-ancestor", revision, "HEAD"]).is_none()
+    let active_revision = status
+        .get("git_head")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("");
+    // The authoritative checkout may intentionally lag or diverge from the
+    // immutable origin/main revision used to create the isolated worktree.
+    // Bind both recorded revisions to their actual checkouts instead of
+    // requiring an ancestry relationship between them.
+    if base_revision.is_empty()
+        || active_revision.is_empty()
+        || git_value(base, &["rev-parse", "HEAD"]).as_deref() != Some(base_revision)
+        || git_value(active, &["rev-parse", "HEAD"]).as_deref() != Some(active_revision)
     {
         return false;
     }
