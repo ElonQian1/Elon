@@ -322,6 +322,18 @@ function Invoke-NodeApi {
 
 function New-DesktopReviewTicket {
     param([string]$OwnerUserId, [string]$RequestedTaskId)
+    $v2Signer = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $null } else {
+        Join-Path $env:LOCALAPPDATA 'ElonNode\_internal\new-desktop-review-ticket.ps1'
+    }
+    if ($null -ne $v2Signer -and (Test-Path -LiteralPath $v2Signer -PathType Leaf)) {
+        # Presence of the v2 signer is an upgrade boundary: access denial must
+        # fail closed and must never downgrade to the legacy shared secret.
+        $ticket = & $v2Signer -OwnerUserId $OwnerUserId -TaskId $RequestedTaskId
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$ticket)) {
+            throw 'Desktop review v2 signer is unavailable to this process identity.'
+        }
+        return [string]$ticket
+    }
     $credential = [string]$env:ELON_DESKTOP_REVIEW_CREDENTIAL
     if ([string]::IsNullOrWhiteSpace($credential) -or $credential.Trim().Length -lt 32) {
         throw 'Desktop review credential is unavailable; review fails closed.'
