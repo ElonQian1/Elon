@@ -135,6 +135,47 @@ impl LiveUiBroker {
         matched.into_iter().next()
     }
 
+    /// Selects a real Runtime session for project-scoped verification.  Unlike the
+    /// convenience lookup used by the UI, this deliberately refuses to guess when
+    /// two devices/runtimes claim the same checkout.
+    pub(crate) async fn unique_connected_runtime_for_project(
+        &self,
+        project_root: &str,
+    ) -> Result<Arc<LiveUiSession>> {
+        let expected = canonical_or_raw(project_root);
+        let sessions = self
+            .sessions
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut matched = Vec::new();
+        for session in sessions {
+            let Some(root) = session.project_root.as_deref() else {
+                continue;
+            };
+            let view = session.view().await;
+            if canonical_or_raw(root) == expected
+                && view.connected
+                && view.node_count > 0
+                && session.device_id != "ui-design-bootstrap"
+                && session.package_name != "ui.design.bootstrap"
+            {
+                matched.push(session);
+            }
+        }
+        match matched.len() {
+            1 => Ok(matched.remove(0)),
+            0 => bail!(
+                "项目没有已连接且已上报节点的真实 Android Runtime；请先连接真机/模拟器会话"
+            ),
+            count => bail!(
+                "项目同时存在 {count} 个真实 Android Runtime，会话身份不唯一；请显式结束旧会话后重试"
+            ),
+        }
+    }
+
     pub(crate) async fn session_for_project(
         &self,
         project_root: &str,
@@ -603,12 +644,36 @@ impl LiveUiSession {
     }
 
     pub(crate) async fn request_frame(&self) -> Result<Value> {
-        let tx = self
+        let first_tx = self
             .runtime_tx
             .read()
             .await
             .clone()
             .ok_or_else(|| anyhow!("Android Live Runtime 尚未连接，无法获取进程内真实帧"))?;
+        match self.request_frame_on(first_tx.clone()).await {
+            Ok(frame) => Ok(frame),
+            Err(first_error) => {
+                // A production tree can be large enough that the Runtime socket is
+                // replaced while encoding a frame.  Keep the immutable session
+                // identity and retry once, but only on a genuinely new connection.
+                let replacement = tokio::time::timeout(Duration::from_secs(4), async {
+                    loop {
+                        if let Some(tx) = self.runtime_tx.read().await.clone() {
+                            if !tx.same_channel(&first_tx) {
+                                break tx;
+                            }
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
+                })
+                .await
+                .map_err(|_| first_error)?;
+                self.request_frame_on(replacement).await
+            }
+        }
+    }
+
+    async fn request_frame_on(&self, tx: mpsc::UnboundedSender<Message>) -> Result<Value> {
         let request_id = format!("frame_{}", uuid::Uuid::new_v4().simple());
         let (waiter_tx, waiter_rx) = oneshot::channel();
         self.pending
@@ -710,3 +775,6 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
         .fold(0u8, |diff, (a, b)| diff | (a ^ b))
         == 0
 }
+
+#[cfg(test)]
+mod tests;

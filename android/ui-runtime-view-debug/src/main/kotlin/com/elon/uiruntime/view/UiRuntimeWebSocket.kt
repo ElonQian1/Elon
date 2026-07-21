@@ -53,7 +53,7 @@ internal class UiRuntimeWebSocket(
         // OkHttp may deliver a late close/failure callback from an older socket after a
         // replacement connection has already opened. Only the current socket owns the
         // connection state and is allowed to schedule another attempt.
-        if (!active || socket !== webSocket) return
+        if (!active || !runtimeSocketOwnsCallback(socket, webSocket)) return
         socket = null
         onConnectionChanged(false, error)
         retry = (retry + 1).coerceAtMost(6)
@@ -86,3 +86,6 @@ internal class UiRuntimeWebSocket(
         }
     }
 }
+
+internal fun runtimeSocketOwnsCallback(current: WebSocket?, callback: WebSocket): Boolean =
+    current === callback

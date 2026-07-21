@@ -82,19 +82,9 @@ pub(crate) async fn descriptor_for_project(
     project_root: &str,
     host_port: u16,
 ) -> Result<Option<Value>> {
-    let session = match broker.session_for_project(project_root).await {
-        Some(session) => session,
-        None => {
-            broker
-                .create_session(
-                    "ui-design-bootstrap".to_string(),
-                    "ui.design.bootstrap".to_string(),
-                    Some(project_root.to_string()),
-                    super::adb_session::DEFAULT_DEVICE_PORT,
-                )
-                .await
-        }
-    };
+    let session = broker
+        .unique_connected_runtime_for_project(project_root)
+        .await?;
     descriptor(&session, host_port).map(Some)
 }
 
