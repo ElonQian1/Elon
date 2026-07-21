@@ -26,7 +26,6 @@ pub(crate) async fn reconcile_task(runtime: &NodeRuntime, task_id: &str) -> Resu
     let Some(contract) = load_supervision_contract(&runtime.task_journal, task_id)? else {
         return Ok(false);
     };
-    let execution_active = runtime.active_cli_prompts.contains(task_id).await;
     let cancel_side_effect_committed = if task.status == "cancel_requested" {
         runtime
             .task_journal
@@ -37,18 +36,26 @@ pub(crate) async fn reconcile_task(runtime: &NodeRuntime, task_id: &str) -> Resu
     } else {
         false
     };
-    let live_cancel_sidecar = if task.status == "cancel_requested" {
-        runtime
-            .cli_sidecars
-            .session_for_task(task_id)?
-            .is_some_and(|session| session.is_live_at(crate::node_agent_cli_sidecar::now_ms()))
-    } else {
-        false
-    };
+    let base = required_path(
+        task.workspace_status
+            .as_ref()
+            .context("supervised terminal task is missing durable workspace identity")?,
+        "base_workspace_path",
+    )?;
+    // Serialize terminal release with Resume's lease reacquisition and active
+    // registration so neither side can observe the other's half-transition.
+    let _resume_admission =
+        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(base)?;
+    let workspace_occupied = workspace_has_live_or_nonterminal_occupant(
+        runtime,
+        task_id,
+        Path::new(&task.workspace_path),
+    )
+    .await?;
     if !terminal_release_eligible(
         &task.status,
         cancel_side_effect_committed,
-        execution_active || live_cancel_sidecar,
+        workspace_occupied,
     ) {
         return Ok(false);
     }
@@ -69,6 +76,68 @@ pub(crate) async fn reconcile_task(runtime: &NodeRuntime, task_id: &str) -> Resu
         info!(%task_id, %root_task_id, "released terminal supervision worktree lease");
     }
     Ok(released)
+}
+
+async fn workspace_has_live_or_nonterminal_occupant(
+    runtime: &NodeRuntime,
+    candidate_task_id: &str,
+    active: &Path,
+) -> Result<bool> {
+    if runtime
+        .active_cli_prompts
+        .views_without_approvals()
+        .await
+        .iter()
+        .filter_map(|prompt| prompt.cwd.as_deref())
+        .any(|cwd| workspace_contains(active, Path::new(cwd)))
+    {
+        return Ok(true);
+    }
+
+    for occupant in runtime.local_tasks.list_identity_candidates()? {
+        if !crate::node_agent_update_checkpoint::same_path(
+            active,
+            Path::new(&occupant.workspace_path),
+        ) {
+            continue;
+        }
+        if durable_nonterminal_occupant_blocks_release(
+            candidate_task_id,
+            &occupant.task_id,
+            &occupant.status,
+        ) {
+            return Ok(true);
+        }
+        if runtime
+            .cli_sidecars
+            .session_for_task(&occupant.task_id)?
+            .is_some_and(|session| session.is_live_at(crate::node_agent_cli_sidecar::now_ms()))
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn durable_nonterminal_occupant_blocks_release(
+    candidate_task_id: &str,
+    occupant_task_id: &str,
+    occupant_status: &str,
+) -> bool {
+    occupant_task_id != candidate_task_id && !durable_terminal_status(occupant_status)
+}
+
+fn workspace_contains(workspace: &Path, candidate: &Path) -> bool {
+    let workspace = crate::node_agent_workspace_match::canonical_or_original(workspace);
+    let candidate = crate::node_agent_workspace_match::canonical_or_original(candidate);
+    candidate.starts_with(workspace)
+}
+
+fn durable_terminal_status(status: &str) -> bool {
+    matches!(
+        status.trim().to_ascii_lowercase().as_str(),
+        "done" | "failed" | "canceled" | "cancelled" | "finished"
+    )
 }
 
 pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
@@ -174,10 +243,8 @@ fn terminal_release_eligible(
     if execution_active {
         return false;
     }
-    matches!(
-        status.trim().to_ascii_lowercase().as_str(),
-        "done" | "failed" | "canceled" | "cancelled" | "finished"
-    ) || (status == "cancel_requested" && cancel_side_effect_committed)
+    durable_terminal_status(status)
+        || (status.eq_ignore_ascii_case("cancel_requested") && cancel_side_effect_committed)
 }
 
 fn release_if_eligible(
@@ -346,6 +413,32 @@ mod tests {
             .as_deref(),
             Some("foreign-owner")
         );
+    }
+
+    #[test]
+    fn running_descendant_on_same_workspace_blocks_parent_release() {
+        let fixture = GitFixture::new();
+        assert!(durable_nonterminal_occupant_blocks_release(
+            "terminal-parent",
+            "running-child",
+            "running",
+        ));
+        assert!(!durable_nonterminal_occupant_blocks_release(
+            "terminal-parent",
+            "finished-sibling",
+            "done",
+        ));
+        assert!(!durable_nonterminal_occupant_blocks_release(
+            "terminal-parent",
+            "terminal-parent",
+            "running",
+        ));
+        fs::create_dir_all(fixture.active.join("server")).unwrap();
+        assert!(workspace_contains(
+            &fixture.active,
+            &fixture.active.join("server")
+        ));
+        assert!(!workspace_contains(&fixture.active, &fixture.base));
     }
 
     struct GitFixture {
