@@ -137,6 +137,15 @@ impl FitScore {
             .filter(|failure| !matches!(failure.as_str(), "geometry" | "color" | "edge"))
             .count()
     }
+
+    pub(crate) fn reconcile_threshold_failures(&mut self, thresholds: &FitThresholds) {
+        self.hard_failures.retain(|failure| match failure.as_str() {
+            "geometry" => self.geometry_error > thresholds.max_geometry_error,
+            "color" => self.color_error > thresholds.max_color_error,
+            "edge" => self.edge_error > thresholds.max_edge_error,
+            _ => true,
+        });
+    }
 }
 
 #[cfg(test)]
@@ -165,6 +174,18 @@ mod tests {
     #[test]
     fn unrelated_hard_failures_still_block_acceptance() {
         assert!(!score(vec!["perceptual".to_string()]).passes(&FitThresholds::default()));
+    }
+
+    #[test]
+    fn serialized_metric_failures_follow_run_thresholds() {
+        let mut score = score(vec![
+            "geometry".to_string(),
+            "color".to_string(),
+            "edge".to_string(),
+            "perceptual".to_string(),
+        ]);
+        score.reconcile_threshold_failures(&FitThresholds::default());
+        assert_eq!(score.hard_failures, vec!["perceptual"]);
     }
 }
 

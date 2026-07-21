@@ -11,9 +11,11 @@ pub(super) fn from_diff(
     operations: Vec<Value>,
     screenshot_path: Option<String>,
 ) -> FitCandidate {
+    let mut score = score_from_diff(&diff);
+    score.reconcile_threshold_failures(&run.thresholds);
     FitCandidate {
         trial_id,
-        score: score_from_diff(&diff),
+        score,
         operations,
         screenshot_path,
         diff_artifact_path: None,
@@ -33,19 +35,21 @@ pub(super) fn from_build_value(run: &FitRunDocument, value: &Value) -> Result<Fi
         .get("sourceParityDiff")
         .and_then(|item| item.get("visualLoss"))
         .and_then(Value::as_f64);
+    let mut score = FitScore {
+        scorer_version: "visual-score-v1+projected-geometry-v1".to_string(),
+        overall_loss: number(visual, "visualLoss")?,
+        geometry_error: number(visual, "geometryError")?,
+        color_error: number(visual, "meanAbsoluteColorError")?,
+        edge_error: number(visual, "edgeError")?,
+        alpha_error: number(visual, "alphaError")?,
+        shape_error: None,
+        typography_error: None,
+        hard_failures: failed_metrics(visual),
+    };
+    score.reconcile_threshold_failures(&run.thresholds);
     Ok(FitCandidate {
         trial_id: new_trial_id("build"),
-        score: FitScore {
-            scorer_version: "visual-score-v1+projected-geometry-v1".to_string(),
-            overall_loss: number(visual, "visualLoss")?,
-            geometry_error: number(visual, "geometryError")?,
-            color_error: number(visual, "meanAbsoluteColorError")?,
-            edge_error: number(visual, "edgeError")?,
-            alpha_error: number(visual, "alphaError")?,
-            shape_error: None,
-            typography_error: None,
-            hard_failures: failed_metrics(visual),
-        },
+        score,
         operations: run
             .best
             .as_ref()

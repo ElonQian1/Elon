@@ -145,6 +145,17 @@ impl FitRunDocument {
         Ok(())
     }
 
+    pub(crate) fn reconcile_score_thresholds(&mut self) {
+        for candidate in [&mut self.baseline, &mut self.current, &mut self.best]
+            .into_iter()
+            .flatten()
+        {
+            candidate
+                .score
+                .reconcile_threshold_failures(&self.thresholds);
+        }
+    }
+
     pub(crate) fn transition(&mut self, next: FitRunPhase) -> Result<()> {
         if self.phase == next {
             return Ok(());

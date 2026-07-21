@@ -133,6 +133,37 @@ fn corrupt_run_is_reported_instead_of_silently_disappearing_from_list() {
 }
 
 #[test]
+fn loading_legacy_run_reconciles_generic_failures_with_declared_thresholds() {
+    let (root, mut run) = run(false);
+    let store = FitRunStore::new();
+    let mut accepted = candidate("accepted", 0.02);
+    accepted.score.color_error = 0.031464;
+    accepted.score.hard_failures = vec!["color".to_string()];
+    run.baseline = Some(accepted.clone());
+    run.current = Some(accepted.clone());
+    run.best = Some(accepted);
+    store.save(&run).unwrap();
+
+    let loaded = store.load(root.to_str().unwrap(), &run.run_id).unwrap();
+    assert!(loaded
+        .baseline
+        .as_ref()
+        .unwrap()
+        .score
+        .hard_failures
+        .is_empty());
+    assert!(loaded
+        .current
+        .as_ref()
+        .unwrap()
+        .score
+        .hard_failures
+        .is_empty());
+    assert!(loaded.best.as_ref().unwrap().score.hard_failures.is_empty());
+    cleanup(root);
+}
+
+#[test]
 fn persisted_solver_operation_keeps_baseline_and_promotes_non_zero_delta() {
     let (root, mut run) = run(false);
     run.environment.density = Some(2.0);

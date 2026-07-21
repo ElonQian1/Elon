@@ -42,6 +42,7 @@ impl FitRunStore {
             })?;
         run.validate_loaded()?;
         self.reconcile_trials(&mut run)?;
+        run.reconcile_score_thresholds();
         Ok(run)
     }
 
