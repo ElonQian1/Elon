@@ -79,6 +79,7 @@ mod node_agent_codex_approval;
 mod node_agent_codex_auth_switch;
 mod node_agent_codex_child_env;
 mod node_agent_codex_session;
+mod node_agent_codex_task_contract_identity;
 mod node_agent_codex_vault;
 mod node_agent_codex_vault_active;
 mod node_agent_codex_vault_emergency;

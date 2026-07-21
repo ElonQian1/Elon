@@ -110,10 +110,13 @@ fn resolve_with(
 
     match roots.len() {
         1 => Ok(roots.into_iter().next().expect("one root")),
-        0 => bail!(
-            "RUNTIME_BINDING_MISSING_ROOT: 持久 task/lineage 元数据没有可信 root identity；候选={}",
-            candidates.join(",")
-        ),
+        0 => match crate::node_agent_codex_task_contract_identity::resolve(&canonical)? {
+            Some(root) => Ok(root),
+            None => bail!(
+                "RUNTIME_BINDING_MISSING_ROOT: 持久 task/lineage 元数据没有可信 root identity；候选={}",
+                candidates.join(",")
+            ),
+        },
         count => bail!(
             "RUNTIME_BINDING_AMBIGUOUS_ROOT: 持久监督元数据包含 {count} 个 root identity；候选={}",
             candidates.join(",")
