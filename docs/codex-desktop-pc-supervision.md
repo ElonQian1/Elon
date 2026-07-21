@@ -183,6 +183,14 @@ Codex JSON 的 `item.started/item.completed` 会以有界 `codex_item` 写入 jo
 
 ## 安全与兼容
 
+### Desktop review 凭据引导与恢复
+
+生产环境使用 v2 非对称 review ticket：Desktop 持有不可导出的 RSA-3072 私钥，NodeAgent 只持有公钥。私钥文件 ACL 必须只授予独立的 Desktop 受信身份，并明确拒绝 PC executor 身份；两者 SID 相同或缺失时安装入口 fail-closed。不得用同用户 DPAPI、User/Machine 环境变量或 `node-agent.env` 保存共享秘密。旧版 v1 环境变量仅用于升级兼容窗口，轮换完成后应移除。
+
+运维顺序：先以 `desktop-review-credential.ps1 -Action Prepare` 生成暂存密钥，再 `-Action Validate`，经 Desktop 独立审查后执行 `-Action Commit`；随后先重启 NodeAgent 读取公钥，再重启 Desktop/helper 取得私钥签名能力。更新包保留 `_internal/desktop-review-auth` 与 `node-agent.env`，因此重启会自动恢复；旧 NodeAgent 不认识 v2 时保持业务任务与 journal，不允许 review，状态应报告不兼容而不是降级。
+
+轮换使用 `-Rotate`，commit 时 NodeAgent 同时接受新旧公钥形成双版本窗口；确认所有 Desktop helper 已切换后下一次维护移除旧公钥。`-Action Diagnose` 只报告存在性、兼容与重启状态，不输出密钥、ticket 或签名。失败时旧 active 状态保持不变；`-Action Rollback` 原子恢复上一个公钥集合，之后由运维人员按 NodeAgent → Desktop 顺序受控重启。正式安装前必须确认 Desktop SID 与 executor SID 不同，并单独验证 executor 调用 `new-desktop-review-ticket.ps1` 被密钥 ACL 拒绝。
+
 - 本机管理 API 继续要求动态 admin token 和受信 Origin；Skill 不打印 token。
 - 执行 prompt 带 `<elon-pc-executor>`，执行者看到后禁止重新派发，避免递归。
 - 契约使用 journal 事件持久化，没有为旧任务新增强制数据库列。

@@ -16,6 +16,8 @@
 
 ## 升级不变量
 
+- Desktop review v2 的 NodeAgent 持久化内容只能是公钥；不可导出私钥由独立 Desktop 身份持有。更新必须保留 `_internal/desktop-review-auth` 与 `node-agent.env` 的公钥行，不得复制私钥、放宽 ACL 或把它写入诊断包。旧版本不支持 v2 时 review fail-closed，已有任务、journal 与恢复检查点继续保留。
+
 1. 保留 `install_id`、凭证、登录状态、本地授权、任务 journal、项目绑定、持久化路径和已观察缓存目录。
 2. 新增字段必须带 schema 默认值、幂等迁移和兼容降级；旧配置缺字段不等于配置错误。
 3. 已验证可运行的外部项目继续使用原 cwd、环境和缓存，普通写任务与构建也不因新数据根缺失而阻断。

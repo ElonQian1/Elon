@@ -639,8 +639,8 @@ try {
     Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageClient -ExpectedIconPath $BrandIcon | Out-Null
     Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageUninstall -ExpectedIconPath $BrandIcon | Out-Null
     Copy-Item -LiteralPath $DesktopShellBin -Destination (Join-Path $PackageInternal "elon-desktop.exe") -Force
-    Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
-    Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force
+    foreach ($name in @('node-agent.env.example','README.txt')) { Copy-Item -LiteralPath (Join-Path $LauncherDir $name) -Destination (Join-Path $PackageInternal $name) -Force }
+    foreach ($name in @('desktop-review-credential.ps1','new-desktop-review-ticket.ps1')) { Copy-Item -LiteralPath (Join-Path $RepoRoot "scripts\$name") -Destination (Join-Path $PackageInternal $name) -Force }
     $PackagePcDist = Join-Path $PackageInternal "pc-next-dist"
     New-Item -ItemType Directory -Force -Path $PackagePcDist | Out-Null
     Copy-Item -Path (Join-Path $PcDistDir "*") -Destination $PackagePcDist -Recurse -Force
