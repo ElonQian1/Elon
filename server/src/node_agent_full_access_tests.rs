@@ -510,26 +510,128 @@ async fn fresh_and_validated_resume_generations_authorize_the_active_worktree() 
     .await
     .expect("fresh dispatch uses its current task record and active cwd");
 
-    for conversation_id in ["local-fe687eb2", "resume-of-resume"] {
-        let child_context = CliProjectContext {
-            project_id: "project_1".into(),
-            conversation_id: conversation_id.into(),
-            runtime_permission: Some("full_access".into()),
-        };
-        require_route_a_full_access_grant_with_inherited_evidence(
-            &state,
-            &identity,
-            "codex",
-            Some("full_access"),
-            Some(&child_context),
-            Some(active.to_string_lossy().as_ref()),
-            false,
-            None,
-            Some(&root_record),
-        )
+    let child_context = CliProjectContext {
+        project_id: "project_1".into(),
+        conversation_id: "local-fe687eb2".into(),
+        runtime_permission: Some("full_access".into()),
+    };
+    require_route_a_full_access_grant_with_inherited_evidence(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&child_context),
+        Some(active.to_string_lossy().as_ref()),
+        false,
+        None,
+        Some(&root_record),
+    )
+    .await
+    .expect("first-generation Resume uses the validated root parent");
+    let _ = std::fs::remove_dir_all(base.parent().unwrap());
+}
+
+#[tokio::test]
+async fn resume_of_resume_requires_the_immediate_parent_at_the_current_head() {
+    let (base, active, root_record) = managed_workspace_record("resume-of-resume");
+    let state = FullAccessGrantState::load_from_path(grant_file("resume-of-resume"));
+    let identity = identity("owner-1", "agent-1", "install-1");
+    state
+        .grant_project(&identity, "project_1", base.to_string_lossy().as_ref())
         .await
-        .expect("validated Resume lineage authorizes the inherited active cwd");
+        .unwrap();
+
+    std::fs::write(
+        active.join("generation-two.txt"),
+        "committed by first Resume",
+    )
+    .unwrap();
+    git(&active, &["add", "generation-two.txt"]);
+    git(&active, &["commit", "-m", "advance resume generation"]);
+    let mut parent_record = root_record.clone();
+    parent_record.task_id = "local-resume-parent".into();
+    parent_record.conversation_id = "resume-parent-conversation".into();
+    parent_record.status = "done".into();
+    parent_record.finished_at_ms = Some(2);
+    parent_record.workspace_status.as_mut().unwrap()["git_head"] =
+        serde_json::json!(git(&active, &["rev-parse", "HEAD"]));
+    assert_ne!(
+        root_record.workspace_status.as_ref().unwrap()["git_head"],
+        parent_record.workspace_status.as_ref().unwrap()["git_head"]
+    );
+
+    let context = CliProjectContext {
+        project_id: "project_1".into(),
+        conversation_id: "resume-of-resume-child".into(),
+        runtime_permission: Some("full_access".into()),
+    };
+    let active_path = active.to_string_lossy().into_owned();
+    macro_rules! authorize {
+        ($record:expr) => {
+            require_route_a_full_access_grant_with_inherited_evidence(
+                &state,
+                &identity,
+                "codex",
+                Some("full_access"),
+                Some(&context),
+                Some(&active_path),
+                false,
+                None,
+                Some($record),
+            )
+        };
     }
+
+    authorize!(&parent_record)
+        .await
+        .expect("immediate Resume parent records the current active HEAD");
+    assert!(
+        authorize!(&root_record).await.is_err(),
+        "stale root HEAD must fail"
+    );
+
+    let mut drifted = parent_record.clone();
+    drifted.owner_user_id = "foreign-owner".into();
+    assert!(authorize!(&drifted).await.is_err());
+    drifted = parent_record.clone();
+    drifted.install_id = "foreign-install".into();
+    assert!(authorize!(&drifted).await.is_err());
+    drifted = parent_record.clone();
+    drifted.project_id = "foreign-project".into();
+    assert!(authorize!(&drifted).await.is_err());
+    drifted = parent_record.clone();
+    drifted.workspace_status.as_mut().unwrap()["root_task_id"] = serde_json::json!("foreign-root");
+    assert!(authorize!(&drifted).await.is_err());
+
+    let foreign_active = temp_workspace("resume-of-resume-foreign-active");
+    assert!(require_route_a_full_access_grant_with_inherited_evidence(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&context),
+        Some(foreign_active.to_string_lossy().as_ref()),
+        false,
+        None,
+        Some(&parent_record),
+    )
+    .await
+    .is_err());
+
+    git(
+        &active,
+        &[
+            "config",
+            "remote.origin.url",
+            "https://example.invalid/drift.git",
+        ],
+    );
+    assert!(
+        authorize!(&parent_record).await.is_err(),
+        "remote drift must fail"
+    );
+
+    let _ = std::fs::remove_dir_all(foreign_active);
     let _ = std::fs::remove_dir_all(base.parent().unwrap());
 }
 

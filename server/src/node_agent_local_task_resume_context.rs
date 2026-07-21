@@ -29,7 +29,7 @@ pub(crate) struct ResumeContextSeed {
 
 impl ResumeContextSeed {
     pub(crate) fn inherited_authorization_record(&self) -> LocalTaskRecord {
-        self.root.clone()
+        self.parent.clone()
     }
 }
 
@@ -289,6 +289,11 @@ mod tests {
                 parent: parent.clone(),
                 parent_summary: json!({"generation":generation}),
             };
+            assert_eq!(
+                seed.inherited_authorization_record().task_id,
+                parent.task_id,
+                "each generation must inherit authorization from its immediate parent"
+            );
             let compiled = compile(&seed, &contract, &workspace).unwrap();
             assert_eq!(compiled.executor_prompt.matches(root_prompt).count(), 1);
             assert!(!compiled
