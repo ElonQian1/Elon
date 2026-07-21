@@ -358,6 +358,7 @@ async fn create_task(
             &runtime,
             &creds,
             project_id,
+            &conversation_id,
             workspace_path,
             supervision.as_ref(),
         )

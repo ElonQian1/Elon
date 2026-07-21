@@ -289,6 +289,42 @@ pub fn prepare_conversation_workspace_in_with_supervision(
     conversation_id: &str,
     supervision_root_task_id: Option<&str>,
 ) -> Result<ConversationWorkspaceResult> {
+    prepare_conversation_workspace_in_with_supervision_inner(
+        workspace_root,
+        base_workspace_path,
+        project_id,
+        conversation_id,
+        supervision_root_task_id,
+        None,
+    )
+}
+
+pub(crate) fn prepare_conversation_workspace_in_with_supervision_at_ref(
+    workspace_root: &Path,
+    base_workspace_path: &str,
+    project_id: &str,
+    conversation_id: &str,
+    supervision_root_task_id: Option<&str>,
+    start_ref: &str,
+) -> Result<ConversationWorkspaceResult> {
+    prepare_conversation_workspace_in_with_supervision_inner(
+        workspace_root,
+        base_workspace_path,
+        project_id,
+        conversation_id,
+        supervision_root_task_id,
+        Some(start_ref),
+    )
+}
+
+fn prepare_conversation_workspace_in_with_supervision_inner(
+    workspace_root: &Path,
+    base_workspace_path: &str,
+    project_id: &str,
+    conversation_id: &str,
+    supervision_root_task_id: Option<&str>,
+    requested_start_ref: Option<&str>,
+) -> Result<ConversationWorkspaceResult> {
     let base_workspace = git_path_buf(&PathBuf::from(base_workspace_path));
     if !is_git_work_tree(&base_workspace) {
         return Ok(ConversationWorkspaceResult {
@@ -334,7 +370,9 @@ pub fn prepare_conversation_workspace_in_with_supervision(
         recover_stale_conversation_worktree_path(&base_workspace, &worktree_root, &worktree_path)?;
     }
 
-    let start_ref = conversation_start_ref(&base_workspace);
+    let start_ref = requested_start_ref
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| conversation_start_ref(&base_workspace));
     let worktree_arg = git_path_arg(&worktree_path);
     add_conversation_worktree(
         &base_workspace,

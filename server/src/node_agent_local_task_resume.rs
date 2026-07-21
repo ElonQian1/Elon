@@ -32,6 +32,9 @@ pub(crate) struct ResolvedResumeWorkspace {
     pub derivation: String,
     pub git_head: String,
     pub requires_recreation: bool,
+    /// The recorded active directory was deleted. A resume route may create a
+    /// new platform conversation worktree only after it holds admission.
+    pub snapshot_continue_required: bool,
     pub lease_migration: Option<crate::node_agent_local_task_resume_lineage::LegacyLeaseMigration>,
     pub resume_admission:
         Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
@@ -56,6 +59,17 @@ pub(crate) fn resolve_resume_workspace(
         requested_workspace_path,
         mode == ResumeWorkspaceMode::Acquire,
     ) {
+        Ok(workspace) if workspace.snapshot_continue_required && receipt.is_some() => {
+            crate::node_agent_local_task_resume_rebuild::resolve_recycled_resume_workspace(
+                contract,
+                parent,
+                parent_contract,
+                requested_project_id,
+                requested_workspace_path,
+                receipt.expect("receipt checked above"),
+                mode,
+            )
+        }
         Ok(workspace) => Ok(workspace),
         Err(existing_error) => {
             let Some(receipt) = receipt else {
@@ -162,7 +176,7 @@ fn resolve_existing_resume_workspace(
                 .ok_or_else(|| anyhow!("父任务 workspace_status 缺少隔离分支。"))?;
             (
                 canonical_directory(Path::new(status_base), "父任务记录的基础工作区")?,
-                canonical_directory(Path::new(status_active), "父任务隔离 worktree")?,
+                PathBuf::from(status_active),
                 status_branch.to_string(),
                 status
                     .get("git_head")
@@ -211,7 +225,13 @@ fn resolve_existing_resume_workspace(
     }
 
     let requested = canonical_directory(Path::new(requested_workspace_path), "续跑请求工作区")?;
-    if !same_path(&requested, &authorized_base) && !same_path(&requested, &active) {
+    let active_exists = active.is_dir();
+    let active_for_compare = if active_exists {
+        canonical_directory(&active, "父任务隔离 worktree")?
+    } else {
+        active.clone()
+    };
+    if !same_path(&requested, &authorized_base) && !same_path(&requested, &active_for_compare) {
         bail!("续跑请求只能引用父任务原授权根或其已记录的隔离 worktree。");
     }
 
@@ -219,6 +239,43 @@ fn resolve_existing_resume_workspace(
     if status_branch != expected_branch {
         bail!("父任务隔离分支不符合平台生成规则。");
     }
+    if !active_exists {
+        let parent_contract =
+            parent_contract.ok_or_else(|| anyhow!("父任务缺少可验证的监督契约。"))?;
+        if parent_contract.protocol != SUPERVISION_PROTOCOL
+            || parent_contract.supervisor != contract.supervisor
+        {
+            bail!("父子任务监督协议或 supervisor 身份不一致。");
+        }
+        let parent_root = parent_contract
+            .root_task_id
+            .as_deref()
+            .unwrap_or(parent.task_id.as_str());
+        if parent_root != supervision_root_task_id {
+            bail!("resume_original 的 root_task_id 与父任务监督根不一致。");
+        }
+        let git_head = recorded_head
+            .ok_or_else(|| anyhow!("父任务活动目录已删除，且 workspace_status 缺少 git_head。"))?;
+        validate_snapshot_continue_head(&authorized_base, &git_head)?;
+        return Ok(ResolvedResumeWorkspace {
+            authorized_workspace_path: display_path(&authorized_base),
+            inherited_workspace: ConversationWorkspaceResult {
+                base_workspace_path: Some(display_path(&authorized_base)),
+                workspace_path: display_path(&active),
+                isolated: true,
+                branch: Some(expected_branch),
+                supervision_root_task_id: Some(supervision_root_task_id.to_string()),
+            },
+            derivation: "missing_active_snapshot_continue".to_string(),
+            git_head,
+            requires_recreation: false,
+            snapshot_continue_required: true,
+            lease_migration: None,
+            resume_admission: None,
+        });
+    }
+
+    let active = active_for_compare;
     let git_head = match validate_git_worktree_identity(&authorized_base, &active, &expected_branch)
     {
         Ok(head) => {
@@ -281,9 +338,42 @@ fn resolve_existing_resume_workspace(
         derivation,
         git_head,
         requires_recreation,
+        snapshot_continue_required: false,
         lease_migration,
         resume_admission: None,
     })
+}
+
+fn validate_snapshot_continue_head(base: &Path, recorded_head: &str) -> Result<()> {
+    let commit = git_output(
+        base,
+        &[
+            "rev-parse",
+            "--verify",
+            &format!("{recorded_head}^{{commit}}"),
+        ],
+    )?;
+    if !commit.eq_ignore_ascii_case(recorded_head) {
+        bail!("父任务记录的 git_head 不是授权基础仓库中的完整 commit。")
+    }
+    let origin_head = git_output(
+        base,
+        &["rev-parse", "--verify", "refs/remotes/origin/main^{commit}"],
+    )?;
+    let status = git_command()
+        .args([
+            "merge-base",
+            "--is-ancestor",
+            recorded_head,
+            origin_head.trim(),
+        ])
+        .current_dir(base)
+        .status()
+        .context("验证父任务 git_head 的远端谱系失败")?;
+    if !status.success() {
+        bail!("父任务记录的 git_head 不属于授权基础仓库的 origin/main 谱系。")
+    }
+    Ok(())
 }
 
 fn parent_is_terminal(parent: &LocalTaskRecord) -> bool {

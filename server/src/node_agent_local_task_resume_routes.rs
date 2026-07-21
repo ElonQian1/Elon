@@ -16,6 +16,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     runtime: &Arc<NodeRuntime>,
     creds: &crate::Credentials,
     project_id: &str,
+    conversation_id: &str,
     requested_workspace_path: &str,
     supervision: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
 ) -> Result<Option<ResolvedResumeWorkspace>, Response> {
@@ -105,6 +106,10 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    if resolved.snapshot_continue_required {
+        validate_snapshot_continue_safety(runtime, creds, &parent, &journal_snapshot)
+            .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    }
 
     let identity = crate::node_agent_full_access::FullAccessGrantIdentity::new(
         &creds.owner_user_id,
@@ -130,24 +135,20 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     .await
     .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
 
-    let recorded_workspace_exists =
-        FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
-    if recorded_workspace_exists
-        && !runtime
-            .active_cli_prompt_views_for_workspace(FsPath::new(
-                &resolved.inherited_workspace.workspace_path,
-            ))
-            .await
-            .is_empty()
+    if !runtime
+        .active_cli_prompt_views_for_workspace(FsPath::new(
+            &resolved.inherited_workspace.workspace_path,
+        ))
+        .await
+        .is_empty()
     {
         return Err(json_error(
             StatusCode::CONFLICT,
             "父任务隔离 worktree 已被活跃任务占用，已拒绝续跑。",
         ));
     }
-    if recorded_workspace_exists
-        && live_sidecar_occupies_workspace(runtime, &resolved.inherited_workspace.workspace_path)
-            .map_err(internal_error)?
+    if live_sidecar_occupies_workspace(runtime, &resolved.inherited_workspace.workspace_path)
+        .map_err(internal_error)?
     {
         return Err(json_error(
             StatusCode::CONFLICT,
@@ -166,6 +167,25 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             crate::node_agent_local_task_resume::ResumeWorkspaceMode::Acquire,
         )
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    }
+    if resolved.snapshot_continue_required {
+        let data_paths = runtime.node_data_root.read().await.paths.clone();
+        let workspace_root = data_paths
+            .as_ref()
+            .map(|paths| paths.workspaces())
+            .ok_or_else(|| json_error(StatusCode::CONFLICT, "节点缺少平台 workspace root。"))?;
+        let prepared = crate::pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision_at_ref(
+            &workspace_root,
+            &resolved.authorized_workspace_path,
+            project_id,
+            conversation_id,
+            contract.root_task_id.as_deref(),
+            &resolved.git_head,
+        )
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        resolved.inherited_workspace = prepared;
+        resolved.derivation = "missing_active_snapshot_continue_created".to_string();
+        resolved.snapshot_continue_required = false;
     }
     commit_validated_lease_migration(&resolved, &admission)
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
@@ -267,6 +287,81 @@ fn validate_migration_lineage(
     )
 }
 
+fn validate_snapshot_continue_safety(
+    runtime: &NodeRuntime,
+    creds: &crate::Credentials,
+    parent: &crate::node_agent_local_task_store::LocalTaskRecord,
+    initial_snapshot: &crate::node_agent_task_journal::TaskJournalSnapshot,
+) -> anyhow::Result<()> {
+    let snapshot = runtime.task_journal.snapshot(&parent.task_id, 0, 10_000)?;
+    let mut duplicate_child = false;
+    for child in runtime
+        .local_tasks
+        .list_for_owner(&creds.owner_user_id, 100)?
+    {
+        if child.task_id == parent.task_id {
+            continue;
+        }
+        let Some(contract) = crate::node_agent_local_task_supervision::load_supervision_contract(
+            &runtime.task_journal,
+            &child.task_id,
+        )?
+        else {
+            continue;
+        };
+        if contract.task_role == "resume_original"
+            && contract.parent_task_id.as_deref() == Some(parent.task_id.as_str())
+        {
+            duplicate_child = true;
+            break;
+        }
+    }
+    validate_snapshot_continue_evidence(
+        &snapshot.events,
+        initial_snapshot.approvals.pending_count,
+        snapshot.has_more,
+        duplicate_child,
+    )
+}
+
+fn validate_snapshot_continue_evidence(
+    events: &[crate::node_agent_task_journal::TaskJournalEventView],
+    pending_approvals: usize,
+    journal_has_more: bool,
+    duplicate_child: bool,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        pending_approvals == 0,
+        "父任务仍有待处理审批，禁止 snapshot_continue。"
+    );
+    anyhow::ensure!(!journal_has_more, "父任务 journal 超出安全检查上限。");
+    let terminal_evidence_seen = events.iter().any(|view| {
+        matches!(
+            view.event.get("type").and_then(serde_json::Value::as_str),
+            Some("finished" | "done" | "failed" | "canceled" | "interrupted" | "resume_required")
+        )
+    });
+    anyhow::ensure!(
+        terminal_evidence_seen,
+        "父任务 journal 缺少完整终态证据，禁止 snapshot_continue。"
+    );
+    let unsafe_action = events.iter().any(|view| {
+        view.event
+            .pointer("/payload/safety/non_repeatable_action")
+            .or_else(|| view.event.pointer("/safety/non_repeatable_action"))
+            .is_some_and(|value| !value.is_null() && value.as_str() != Some(""))
+    });
+    anyhow::ensure!(
+        !unsafe_action,
+        "父任务包含不可重复动作，禁止 snapshot_continue。"
+    );
+    anyhow::ensure!(
+        !duplicate_child,
+        "父任务已存在 resume_original 子任务，禁止重复续跑。"
+    );
+    Ok(())
+}
+
 pub(crate) fn commit_validated_lease_migration(
     resolved: &ResolvedResumeWorkspace,
     admission: &crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard,
@@ -287,7 +382,8 @@ fn live_sidecar_occupies_workspace(
     runtime: &NodeRuntime,
     workspace_path: &str,
 ) -> anyhow::Result<bool> {
-    let expected = std::fs::canonicalize(workspace_path)?;
+    let expected = std::fs::canonicalize(workspace_path)
+        .unwrap_or_else(|_| std::path::PathBuf::from(workspace_path));
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -301,8 +397,13 @@ fn live_sidecar_occupies_workspace(
                 && session
                     .cwd
                     .as_deref()
-                    .and_then(|path| std::fs::canonicalize(path).ok())
-                    .is_some_and(|path| path == expected)
+                    .map(|path| {
+                        std::fs::canonicalize(path)
+                            .unwrap_or_else(|_| std::path::PathBuf::from(path))
+                    })
+                    .is_some_and(|path| {
+                        crate::node_agent_update_checkpoint::same_path(&path, &expected)
+                    })
         }))
 }
 
@@ -316,4 +417,48 @@ fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
 
 fn internal_error(error: anyhow::Error) -> Response {
     json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+}
+
+#[cfg(test)]
+mod snapshot_continue_tests {
+    use super::*;
+
+    fn event(
+        seq: usize,
+        value: serde_json::Value,
+    ) -> crate::node_agent_task_journal::TaskJournalEventView {
+        crate::node_agent_task_journal::TaskJournalEventView { seq, event: value }
+    }
+
+    #[test]
+    fn snapshot_continue_evidence_accepts_only_complete_terminal_journal() {
+        let events = vec![event(1, json!({"type":"failed"}))];
+        validate_snapshot_continue_evidence(&events, 0, false, false).unwrap();
+        assert!(
+            validate_snapshot_continue_evidence(&events, 1, false, false)
+                .unwrap_err()
+                .to_string()
+                .contains("审批")
+        );
+        assert!(validate_snapshot_continue_evidence(&events, 0, false, true)
+            .unwrap_err()
+            .to_string()
+            .contains("重复续跑"));
+    }
+
+    #[test]
+    fn snapshot_continue_evidence_rejects_incomplete_or_irreversible_journal() {
+        let incomplete = vec![event(1, json!({"type":"tool_call"}))];
+        assert!(validate_snapshot_continue_evidence(&incomplete, 0, false, false).is_err());
+        let irreversible = vec![event(
+            1,
+            json!({"type":"failed", "payload":{"safety":{"non_repeatable_action":"publish"}}}),
+        )];
+        assert!(
+            validate_snapshot_continue_evidence(&irreversible, 0, false, false)
+                .unwrap_err()
+                .to_string()
+                .contains("不可重复")
+        );
+    }
 }

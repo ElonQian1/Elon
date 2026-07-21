@@ -377,6 +377,131 @@ fn resume_rejects_active_parent_task() {
 }
 
 #[test]
+fn deleted_active_workspace_requires_snapshot_continue_from_recorded_head() {
+    let fixture = ResumeFixture::new();
+    let recorded_head = git_output(&fixture.base, &["rev-parse", "HEAD"]);
+    run_git(
+        &fixture.base,
+        &["update-ref", "refs/remotes/origin/main", &recorded_head],
+    );
+    crate::node_agent_supervision_worktree_lease::release(
+        &fixture.base,
+        &fixture.active,
+        "local-parent",
+    )
+    .unwrap();
+    run_git(
+        &fixture.base,
+        &[
+            "worktree",
+            "remove",
+            "--force",
+            fixture.active.to_string_lossy().as_ref(),
+        ],
+    );
+
+    let resolved = inspect_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&fixture.contract),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect("a deleted active directory should become a snapshot-continue candidate");
+    assert!(resolved.snapshot_continue_required);
+    assert_eq!(resolved.git_head, recorded_head);
+    assert_eq!(resolved.derivation, "missing_active_snapshot_continue");
+
+    let recreated =
+        crate::pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision_at_ref(
+            &fixture.root,
+            fixture.base.to_string_lossy().as_ref(),
+            "project-a",
+            "conversation-resume",
+            Some("local-parent"),
+            &resolved.git_head,
+        )
+        .expect("snapshot continue should create a new platform worktree");
+    assert_ne!(Path::new(&recreated.workspace_path), fixture.active);
+    assert_eq!(
+        git_output(Path::new(&recreated.workspace_path), &["rev-parse", "HEAD"]),
+        recorded_head
+    );
+    assert_eq!(
+        crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+            &fixture.base,
+            Path::new(&recreated.workspace_path)
+        )
+        .unwrap()
+        .as_deref(),
+        Some("elon-supervision:local-parent")
+    );
+}
+
+#[test]
+fn deleted_active_workspace_fails_closed_for_missing_or_drifted_git_head() {
+    let mut fixture = ResumeFixture::new();
+    let recorded_head = git_output(&fixture.base, &["rev-parse", "HEAD"]);
+    run_git(
+        &fixture.base,
+        &["update-ref", "refs/remotes/origin/main", &recorded_head],
+    );
+    crate::node_agent_supervision_worktree_lease::release(
+        &fixture.base,
+        &fixture.active,
+        "local-parent",
+    )
+    .unwrap();
+    run_git(
+        &fixture.base,
+        &[
+            "worktree",
+            "remove",
+            "--force",
+            fixture.active.to_string_lossy().as_ref(),
+        ],
+    );
+    let mut wrong_root = fixture.contract.clone();
+    wrong_root.root_task_id = Some("another-root".to_string());
+    let root_error = inspect_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&wrong_root),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("a deleted worktree must not weaken supervision root identity");
+    assert!(root_error.to_string().contains("root_task_id"));
+
+    fixture.parent.workspace_status.as_mut().unwrap()["git_head"] = serde_json::Value::Null;
+    let missing = inspect_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&fixture.contract),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("missing snapshot identity must fail closed");
+    assert!(missing.to_string().contains("缺少 git_head"));
+
+    fixture.parent.workspace_status.as_mut().unwrap()["git_head"] =
+        json!("0000000000000000000000000000000000000000");
+    let drifted = inspect_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        Some(&fixture.contract),
+        None,
+        "project-a",
+        fixture.base.to_string_lossy().as_ref(),
+    )
+    .expect_err("an unknown commit must fail closed");
+    assert!(drifted.to_string().contains("rev-parse"));
+}
+
+#[test]
 fn dirty_exclusive_resume_preserves_staged_unstaged_and_untracked_changes() {
     let fixture = ResumeFixture::new();
     std::fs::write(fixture.active.join("README.md"), "staged edit\n").unwrap();
