@@ -260,6 +260,16 @@ async fn create_task(
         },
         None => None,
     };
+    if let Some(contract) = supervision
+        .as_ref()
+        .filter(|contract| contract.task_role == "resume_original")
+    {
+        if let Err(error) = crate::node_agent_local_task_resume_context::validate_parent_role_before_resume_side_effects(
+            &runtime, &creds, contract,
+        ) {
+            return json_error(StatusCode::CONFLICT, error.to_string());
+        }
+    }
     let runtime_permission = request
         .runtime_permission
         .as_deref()

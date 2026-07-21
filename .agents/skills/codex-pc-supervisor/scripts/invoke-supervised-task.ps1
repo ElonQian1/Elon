@@ -479,6 +479,10 @@ function Assert-SafeResumeParentDetail {
         [string](Get-ObjectField $contract 'protocol') -ne $script:SupervisionProtocol) {
         throw 'Resume requires a parent task with the current desktop supervision protocol.'
     }
+    $parentRole = [string](Get-ObjectField $contract 'task_role')
+    if (@('requirement', 'resume_original') -notcontains $parentRole) {
+        throw 'Resume parent task_role must be requirement or resume_original.'
+    }
     $resumeStatus = Get-ObjectField $ParentDetail 'resume_workspace_status'
     $derivation = [string](Get-ObjectField $resumeStatus 'derivation')
     $allowedDerivations = @(

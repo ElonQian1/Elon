@@ -36,6 +36,7 @@ function Invoke-SupervisionSelfTest {
             protocol = $script:SupervisionProtocol
             contract = [ordered]@{
                 protocol = $script:SupervisionProtocol
+                task_role = 'requirement'
                 root_task_id = 'local-root-task'
             }
         }
@@ -76,6 +77,28 @@ function Invoke-SupervisionSelfTest {
     $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' $improvementPrompt `
         $testCriteria $true
     $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $resumeParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
+    $resumeParent.supervision.contract.task_role = 'resume_original'
+    $resumeParentBody = New-ResumeTaskBody $resumeParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $rejectedParentRoles = @('missing', 'unknown', 'capability_repair', 'post_task_improvement')
+    $rejectedParentRoleCount = 0
+    foreach ($rejectedRole in $rejectedParentRoles) {
+        $rejectedParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
+        if ($rejectedRole -eq 'missing') {
+            $rejectedParent.supervision.contract.PSObject.Properties.Remove('task_role')
+        } else {
+            $rejectedParent.supervision.contract.task_role = $rejectedRole
+        }
+        try {
+            $null = New-ResumeTaskBody $rejectedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+        } catch {
+            if ($_.Exception.Message -eq 'Resume parent task_role must be requirement or resume_original.') {
+                $rejectedParentRoleCount++
+            } else {
+                throw
+            }
+        }
+    }
     $legacyParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
     $legacyParent.record.workspace_status = $null
     $legacyParent | Add-Member -NotePropertyName resume_workspace_status -NotePropertyValue ([pscustomobject][ordered]@{
@@ -268,6 +291,9 @@ function Invoke-SupervisionSelfTest {
             $resumeBody.prompt.IndexOf($testPrompt, [System.StringComparison]::Ordinal) -lt 0 -and
             $resumeBody.prompt.IndexOf('Resume the original task', [System.StringComparison]::Ordinal) -lt 0
         resume_role = $resumeBody.supervision.task_role -eq 'resume_original'
+        resume_parent_role_requirement = $resumeBody.supervision.task_role -eq 'resume_original'
+        resume_parent_role_resume_original = $resumeParentBody.supervision.task_role -eq 'resume_original'
+        resume_parent_role_reject_matrix = $rejectedParentRoleCount -eq $rejectedParentRoles.Count
         resume_protocol = $resumeBody.supervision.protocol -eq $script:SupervisionProtocol
         resume_parent = $resumeBody.supervision.parent_task_id -eq 'local-parent-task'
         resume_root = $resumeBody.supervision.root_task_id -eq 'local-root-task'
@@ -323,6 +349,8 @@ function Invoke-SupervisionSelfTest {
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
             'non_ascii_prompt', 'acceptance_criteria', 'review_summary', 'review_public_dto',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
+            'resume_parent_role_requirement', 'resume_parent_role_resume_original',
+            'resume_parent_role_reject_matrix',
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',

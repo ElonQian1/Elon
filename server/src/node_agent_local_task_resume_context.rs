@@ -21,6 +21,39 @@ use crate::{
 
 pub(crate) const RESUME_CONTEXT_SCHEMA: &str = "elon.resume_context.v1";
 
+fn ensure_allowed_resume_parent_role(parent_contract: Option<&SupervisionContract>) -> Result<()> {
+    let parent_contract = parent_contract.ok_or_else(|| anyhow!("resume parent 缺少监督契约。"))?;
+    if parent_contract.protocol != SUPERVISION_PROTOCOL
+        || !matches!(
+            parent_contract.task_role.as_str(),
+            "requirement" | "resume_original"
+        )
+    {
+        bail!("resume parent task_role 必须是 requirement 或 resume_original。")
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_parent_role_before_resume_side_effects(
+    runtime: &NodeRuntime,
+    creds: &Credentials,
+    contract: &SupervisionContract,
+) -> Result<()> {
+    if contract.protocol != SUPERVISION_PROTOCOL || contract.task_role != "resume_original" {
+        bail!("resume parent role guard 只接受当前监督协议的 resume_original 请求。")
+    }
+    let parent_task_id = contract
+        .parent_task_id
+        .as_deref()
+        .ok_or_else(|| anyhow!("resume_original 缺少 parent_task_id。"))?;
+    let parent = runtime
+        .local_tasks
+        .get_for_owner(&creds.owner_user_id, parent_task_id)?
+        .ok_or_else(|| anyhow!("resume parent 不存在或不属于当前账号。"))?;
+    let parent_contract = load_supervision_contract(&runtime.task_journal, &parent.task_id)?;
+    ensure_allowed_resume_parent_role(parent_contract.as_ref())
+}
+
 pub(crate) struct ResumeContextSeed {
     root: LocalTaskRecord,
     parent: LocalTaskRecord,
@@ -81,6 +114,7 @@ pub(crate) fn resolve_seed(
     project_id: &str,
     contract: &mut SupervisionContract,
 ) -> Result<ResumeContextSeed> {
+    validate_parent_role_before_resume_side_effects(runtime, creds, contract)?;
     if contract.protocol != SUPERVISION_PROTOCOL || contract.task_role != "resume_original" {
         bail!("resume context 只接受当前监督协议的 resume_original。")
     }
@@ -254,6 +288,23 @@ mod tests {
     }
 
     #[test]
+    fn resume_parent_role_matrix_fails_before_workspace_or_lease_admission() {
+        for role in ["requirement", "resume_original"] {
+            let contract = parent_contract(role);
+            ensure_allowed_resume_parent_role(Some(&contract))
+                .unwrap_or_else(|error| panic!("{role} should be allowed: {error}"));
+        }
+        assert!(ensure_allowed_resume_parent_role(None).is_err());
+        for role in ["unknown", "capability_repair", "post_task_improvement"] {
+            let contract = parent_contract(role);
+            assert!(
+                ensure_allowed_resume_parent_role(Some(&contract)).is_err(),
+                "{role} must be rejected by the pre-side-effect role guard"
+            );
+        }
+    }
+
+    #[test]
     fn five_generation_resume_keeps_one_authoritative_root_prompt() {
         let root_prompt = "ROOT REQUIREMENT UNIQUE";
         let root = record("root", root_prompt);
@@ -337,6 +388,18 @@ mod tests {
             started_at_ms: 1,
             finished_at_ms: Some(2),
             server_ack_at_ms: None,
+        }
+    }
+
+    fn parent_contract(role: &str) -> SupervisionContract {
+        SupervisionContract {
+            protocol: SUPERVISION_PROTOCOL.into(),
+            supervisor: "codex_desktop".into(),
+            task_role: role.into(),
+            parent_task_id: None,
+            root_task_id: Some("root".into()),
+            acceptance_criteria: Vec::new(),
+            improvement_policy: "after_task_or_unblock".into(),
         }
     }
 }
