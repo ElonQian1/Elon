@@ -128,7 +128,16 @@ async fn get_task(
         .get_for_owner(&creds.owner_user_id, task_id.trim())
     {
         Ok(Some(record)) => record,
-        Ok(None) => return json_error(StatusCode::NOT_FOUND, "本机任务不存在。"),
+        Ok(None) => {
+            return crate::node_agent_local_task_detached_view::response_or_not_found(
+                &runtime,
+                task_id.trim(),
+                query.since.unwrap_or(0),
+                query.limit.unwrap_or(200),
+                query.expected_cursor_epoch.as_deref(),
+            )
+            .await
+        }
         Err(error) => return internal_error(error),
     };
     let snapshot = match runtime.task_journal.snapshot_with_epoch(

@@ -12,10 +12,7 @@ use serde_json::json;
 use tracing::{info, warn};
 
 use crate::{
-    node_agent_local_task_store::LocalTaskRecord,
-    node_agent_local_task_supervision::{
-        load_supervision_contract, record_supervision_event, SupervisionContract,
-    },
+    node_agent_local_task_supervision::{load_supervision_contract, record_supervision_event},
     NodeRuntime,
 };
 
@@ -59,10 +56,24 @@ pub(crate) async fn reconcile_task(runtime: &NodeRuntime, task_id: &str) -> Resu
     ) {
         return Ok(false);
     }
-
-    let released = release_record_lease(&task, &contract, task_id, cancel_side_effect_committed)?;
+    let Some(identity) =
+        crate::node_agent_supervision_terminal_lease_safety::verify_release_identity(
+            runtime, &task, &contract, task_id,
+        )
+        .await?
+    else {
+        return Ok(false);
+    };
+    let released = release_if_eligible(
+        &identity.base,
+        &identity.active,
+        &identity.root_task_id,
+        &task.status,
+        cancel_side_effect_committed,
+        false,
+    )?;
     if released {
-        let root_task_id = supervision_root(&contract, task_id);
+        let root_task_id = identity.root_task_id.as_str();
         record_supervision_event(
             &runtime.task_journal,
             task_id,
@@ -140,6 +151,16 @@ fn durable_terminal_status(status: &str) -> bool {
     )
 }
 
+fn required_path<'a>(value: &'a serde_json::Value, field: &str) -> Result<&'a Path> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(Path::new)
+        .with_context(|| format!("supervised workspace identity is missing {field}"))
+}
+
 pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
     let mut released = 0;
     for task in runtime.local_tasks.list_terminal_lease_candidates()? {
@@ -170,69 +191,6 @@ pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
             }
         }
     });
-}
-
-fn release_record_lease(
-    task: &LocalTaskRecord,
-    contract: &SupervisionContract,
-    task_id: &str,
-    cancel_side_effect_committed: bool,
-) -> Result<bool> {
-    let status = task
-        .workspace_status
-        .as_ref()
-        .context("supervised terminal task is missing durable workspace identity")?;
-    anyhow::ensure!(
-        status
-            .get("platform_provenance")
-            .and_then(serde_json::Value::as_str)
-            == Some("elon.conversation_worktree.v1"),
-        "terminal task workspace is not a platform supervision worktree"
-    );
-    let base = required_path(status, "base_workspace_path")?;
-    let active = required_path(status, "active_workspace_path")?;
-    anyhow::ensure!(
-        crate::node_agent_update_checkpoint::same_path(Path::new(&task.workspace_path), active),
-        "terminal task active workspace identity drifted"
-    );
-    let root_task_id = supervision_root(contract, task_id);
-    if let Some(recorded_root) = status
-        .get("root_task_id")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    {
-        anyhow::ensure!(
-            recorded_root == root_task_id,
-            "terminal task supervision root identity drifted"
-        );
-    }
-    release_if_eligible(
-        base,
-        active,
-        root_task_id,
-        &task.status,
-        cancel_side_effect_committed,
-        false,
-    )
-}
-
-fn required_path<'a>(value: &'a serde_json::Value, field: &str) -> Result<&'a Path> {
-    value
-        .get(field)
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(Path::new)
-        .with_context(|| format!("supervised workspace identity is missing {field}"))
-}
-
-fn supervision_root<'a>(contract: &'a SupervisionContract, task_id: &'a str) -> &'a str {
-    contract
-        .root_task_id
-        .as_deref()
-        .or(contract.parent_task_id.as_deref())
-        .unwrap_or(task_id)
 }
 
 fn terminal_release_eligible(

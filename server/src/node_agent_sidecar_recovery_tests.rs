@@ -58,6 +58,7 @@ fn multi_generation_sidecar_recovery_replaces_stale_target_without_manual_resume
     assert!(!receipt_targets_release(&receipt, "0.3.69+new-sha"));
     assert!(receipt_targets_release(&receipt, "0.3.69+old-sha"));
     assert!(recoverable_sidecar_task_status("resume_required"));
+    assert!(recoverable_sidecar_task_status("cancel_requested"));
     assert!(!recoverable_sidecar_task_status("done"));
     assert_eq!(
         release_identity("0.3.69+new-sha"),

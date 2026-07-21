@@ -278,6 +278,8 @@ pub(crate) fn record_supervision_event(
                 | "supervision_review"
                 | "supervision_action_intent"
                 | "supervision_action_committed"
+                | "supervision_local_task_reconciled"
+                | "supervision_worktree_lease_released"
                 | "resume_context"
         ),
         "unsupported supervision event type"

@@ -1,6 +1,7 @@
 // server/src/node_agent_admin_status.rs
 
 use axum::{extract::State, http::HeaderMap, Json};
+use std::collections::HashSet;
 use std::{sync::atomic::Ordering, sync::Arc};
 use tracing::warn;
 
@@ -9,6 +10,10 @@ pub(super) async fn admin_health() -> Json<serde_json::Value> {
         "service": "elon-node-agent",
         "status": "ok"
     }))
+}
+
+fn visible_active_runtime(status: &str, task_id: &str, live_task_ids: &HashSet<String>) -> bool {
+    matches!(status, "running" | "cancel_requested") && live_task_ids.contains(task_id)
 }
 
 #[cfg(test)]
@@ -20,6 +25,15 @@ mod tests {
         assert_eq!(response["service"], "elon-node-agent");
         assert_eq!(response["status"], "ok");
         assert!(response.to_string().len() < 128);
+    }
+
+    #[test]
+    fn stale_running_journal_is_not_reported_after_handles_and_sidecars_end() {
+        let mut live = std::collections::HashSet::new();
+        assert!(!super::visible_active_runtime("running", "task-a", &live));
+        live.insert("task-a".to_string());
+        assert!(super::visible_active_runtime("running", "task-a", &live));
+        assert!(!super::visible_active_runtime("done", "task-a", &live));
     }
 }
 
@@ -53,9 +67,25 @@ pub(super) async fn admin_status(
         warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
         Vec::new()
     });
+    let mut sidecar_sessions = rt.cli_sidecars.all_sessions().unwrap_or_else(|error| {
+        warn!("PC CLI sidecar registry 读取失败，CLI 会话桥接 sidecar 状态降级为空摘要: {error}");
+        Vec::new()
+    });
+    sidecar_sessions.retain(|session| session.is_live_at(super::node_agent_cli_sidecar::now_ms()));
+    sidecar_sessions.sort_by(|left, right| right.last_seen_at_ms.cmp(&left.last_seen_at_ms));
+    sidecar_sessions.truncate(20);
+    let mut live_task_ids = active_cli_prompts
+        .iter()
+        .map(|prompt| prompt.req_id.clone())
+        .collect::<HashSet<_>>();
+    live_task_ids.extend(
+        sidecar_sessions
+            .iter()
+            .map(|session| session.task_id.clone()),
+    );
     let active_task_runtime = recent_task_records
         .iter()
-        .filter(|record| matches!(record.status.as_str(), "running" | "cancel_requested"))
+        .filter(|record| visible_active_runtime(&record.status, &record.req_id, &live_task_ids))
         .map(|record| {
             serde_json::json!({
                 "task_id": record.req_id,
@@ -63,10 +93,6 @@ pub(super) async fn admin_status(
             })
         })
         .collect::<Vec<_>>();
-    let sidecar_sessions = rt.cli_sidecars.latest_sessions(20).unwrap_or_else(|error| {
-        warn!("PC CLI sidecar registry 读取失败，CLI 会话桥接 sidecar 状态降级为空摘要: {error}");
-        Vec::new()
-    });
     let cli_probe = rt.cached_cli_probe().await;
     let cli_refreshing = rt.cli_probe_refreshing.load(Ordering::Acquire);
     let available_clis = cli_probe.available_names();

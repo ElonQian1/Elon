@@ -57,6 +57,7 @@ if [[ -n "$task_contract" ]]; then
   assert_ai_task_finish_contract "$task_root" "$task_contract" || finish_error "Task finish contract validation failed: $task_contract"
   echo "FINISH_CONTRACT_STATUS=validated:$task_contract"
 elif [[ "$allow_legacy_no_task_contract" -eq 1 ]]; then
+  [[ "$task_branch" != ai/session/* ]] || finish_error "Platform session finish does not allow a legacy contract override."
   echo 'FINISH_CONTRACT_STATUS=legacy_override'
 fi
 policy_path="$task_root/.ai/workspace-policy.txt"
@@ -202,12 +203,17 @@ if [[ "$(cd "$task_root" && pwd -P)" == "$(cd "$main_path" && pwd -P)" ]]; then
   task_worktree_status="main_baseline_not_applicable"
   task_worktree_lease_status="not_applicable"
 elif [[ "$task_branch" == ai/session/* ]]; then
-  if unlock_output="$(git -C "$main_path" worktree unlock "$task_root" 2>&1)"; then
+  [[ -n "${AI_FINISH_CONTRACT_ROOT:-}" ]] || finish_error "Platform session finish requires validated immutable provenance/root."
+  expected_lease="elon-supervision:$AI_FINISH_CONTRACT_ROOT"
+  actual_lease="$(ai_finish_worktree_lease_reason "$task_root")"
+  if [[ -z "$actual_lease" ]]; then
+    finish_error "Refusing to finish platform task with a missing or unknown lease."
+  elif [[ "$actual_lease" != "$expected_lease" ]]; then
+    finish_error "Refusing to release foreign or wrong-root platform lease: $actual_lease"
+  elif unlock_output="$(git -C "$main_path" worktree unlock "$task_root" 2>&1)"; then
     task_worktree_lease_status="released"
-  elif [[ "$unlock_output" == *"not locked"* ]]; then
-    task_worktree_lease_status="already_released"
   else
-    finish_error "Unable to release completed platform task worktree lease: $unlock_output"
+    finish_error "Unable to release exact platform task worktree lease: $unlock_output"
   fi
   task_worktree_status="platform_managed"
 elif [[ "$skip_worktree_cleanup" -eq 1 ]]; then

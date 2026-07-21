@@ -278,6 +278,7 @@ function Invoke-CompletionCheck {
 }
 
 try {
+    $validatedContract = $null
     $startPath = if ([string]::IsNullOrWhiteSpace($TaskWorktree)) { (Get-Location).Path } else { $TaskWorktree }
     if (-not (Test-Path -LiteralPath $startPath)) {
         throw "Task worktree does not exist: $startPath"
@@ -292,9 +293,12 @@ try {
         throw "Managed task worktree requires the immutable TaskContract emitted by preflight."
     }
     if (-not [string]::IsNullOrWhiteSpace($TaskContract)) {
-        $null = Assert-AiTaskFinishContract -RepoPath $taskRoot -ContractId $TaskContract
+        $validatedContract = Assert-AiTaskFinishContract -RepoPath $taskRoot -ContractId $TaskContract
         Write-Host "FINISH_CONTRACT_STATUS=validated:$TaskContract"
     } elseif ($AllowLegacyNoTaskContract) {
+        if ($taskBranch -like "ai/session/*") {
+            throw "Platform session finish does not allow a legacy contract override."
+        }
         Write-Host "FINISH_CONTRACT_STATUS=legacy_override"
     }
     $policy = Read-WorkspacePolicy -RepoPath $taskRoot
@@ -375,13 +379,21 @@ try {
         $taskWorktreeStatus = "main_baseline_not_applicable"
         $taskWorktreeLeaseStatus = "not_applicable"
     } elseif ($taskBranch -like "ai/session/*") {
-        $unlock = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "unlock", $taskRoot)
-        if ($unlock.ExitCode -eq 0) {
-            $taskWorktreeLeaseStatus = "released"
-        } elseif ($unlock.Text -match "not locked") {
-            $taskWorktreeLeaseStatus = "already_released"
+        if ($null -eq $validatedContract) {
+            throw "Platform session finish requires validated immutable provenance/root."
+        }
+        $expectedLease = "elon-supervision:$([string]$validatedContract.supervisionRootTaskId)"
+        $actualLease = Get-AiTaskWorktreeLeaseReason -RepoPath $taskRoot
+        if ([string]::IsNullOrWhiteSpace($actualLease)) {
+            throw "Refusing to finish platform task with a missing or unknown lease."
+        } elseif ($actualLease -ne $expectedLease) {
+            throw "Refusing to release foreign or wrong-root platform lease: $actualLease"
         } else {
-            throw "Unable to release completed platform task worktree lease: $($unlock.Text)"
+            $unlock = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "unlock", $taskRoot)
+            if ($unlock.ExitCode -ne 0) {
+                throw "Unable to release exact platform task worktree lease: $($unlock.Text)"
+            }
+            $taskWorktreeLeaseStatus = "released"
         }
         $taskWorktreeStatus = "platform_managed"
     } elseif ($SkipWorktreeCleanup) {

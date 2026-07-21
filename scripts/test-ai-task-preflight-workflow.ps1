@@ -290,7 +290,7 @@ try {
     $existingWorktree = Join-Path $testRoot "existing-worktree"
     $createdWorktreeParent = Join-Path $testRoot "created"
     $conversationPathOnlyWorktree = Join-Path $testRoot "conversation-worktrees\demo-project\path-only"
-    $conversationBranchOnlyWorktree = Join-Path $testRoot "branch-session-worktree"
+    $conversationBranchOnlyWorktree = Join-Path $testRoot "conversation-worktrees\demo-project\branch-only"
     $conversationPathCreatedParent = Join-Path $testRoot "created-conversation-path"
     $conversationBranchCreatedParent = Join-Path $testRoot "created-conversation-branch"
 
@@ -348,6 +348,7 @@ try {
 
     Invoke-Git $seedRepo @("worktree", "add", "-b", "codex/path-only", $conversationPathOnlyWorktree, "origin/main") | Out-Null
     Invoke-Git $seedRepo @("worktree", "add", "-b", "ai/session/demo-project/branch-only", $conversationBranchOnlyWorktree, "origin/main") | Out-Null
+    Invoke-Git $seedRepo @("worktree", "lock", "--reason", "elon-supervision:branch-root", $conversationBranchOnlyWorktree) | Out-Null
 
     Set-Content -LiteralPath (Join-Path $seedRepo "README.md") -Value "preflight workflow test advanced`n" -Encoding UTF8
     Invoke-Git $seedRepo @("add", "README.md") | Out-Null

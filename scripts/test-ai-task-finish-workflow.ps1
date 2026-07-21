@@ -16,6 +16,10 @@ $finishShellSource = Get-Content -Raw -LiteralPath (Join-Path $repoRoot "scripts
 if (-not $finishShellSource.Contains('worktree unlock "$task_root"')) {
     throw "Shell finish must unlock its completed managed worktree before removal."
 }
+if (-not $finishSource.Contains('Get-AiTaskWorktreeLeaseReason') -or
+    -not $finishShellSource.Contains('ai_finish_worktree_lease_reason')) {
+    throw "Platform finish must inspect the exact immutable supervision lease before unlock."
+}
 
 $checkSource = Get-Content -Raw -LiteralPath $checkScript
 $serverGateStart = $checkSource.IndexOf('if ($Kind -eq "Server" -or $Kind -eq "PcFrontend")')
@@ -205,6 +209,20 @@ try {
     Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:platform-fixture", $platformSessionWorktree) | Out-Null
     . (Join-Path $platformSessionWorktree 'scripts\ai-task-finish-contract.ps1')
     $platformContractId = New-AiTaskFinishContract -RepoPath $platformSessionWorktree
+
+    Invoke-Git $mainRepo @("worktree", "unlock", $platformSessionWorktree) | Out-Null
+    Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:wrong-root", $platformSessionWorktree) | Out-Null
+    $wrongRootOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure -ContractId $platformContractId
+    Assert-Contains $wrongRootOutput "lease identity mismatch" "Platform finish must fail closed for a wrong-root supervision lease."
+    Invoke-Git $mainRepo @("worktree", "unlock", $platformSessionWorktree) | Out-Null
+    Invoke-Git $mainRepo @("worktree", "lock", "--reason", "foreign-workflow-lock", $platformSessionWorktree) | Out-Null
+    $foreignLeaseOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure -ContractId $platformContractId
+    Assert-Contains $foreignLeaseOutput "lease identity mismatch" "Platform finish must fail closed for an unknown foreign lease."
+    Invoke-Git $mainRepo @("worktree", "unlock", $platformSessionWorktree) | Out-Null
+    $missingLeaseOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure -ContractId $platformContractId
+    Assert-Contains $missingLeaseOutput "root lease disappeared" "Platform finish must fail closed when no reconciler provenance proves a missing lease."
+    Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:platform-fixture", $platformSessionWorktree) | Out-Null
+
     $platformFinishOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ContractId $platformContractId
     Assert-Contains $platformFinishOutput "BUSINESS_STATUS=complete" "A platform session must retain its completed business state."
     Assert-Contains $platformFinishOutput "LOCAL_MAIN_STATUS=blocked_tracked_changes" "A platform session must report the dirty main baseline."

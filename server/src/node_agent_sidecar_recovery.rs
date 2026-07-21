@@ -46,7 +46,12 @@ pub(crate) async fn reconcile_surviving_sidecars(runtime: Arc<NodeRuntime>) {
 }
 
 async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionRecord) -> Result<()> {
-    let Some(task) = runtime.local_tasks.get(&session.task_id)? else {
+    let Some(task) =
+        crate::node_agent_local_task_durable_reconcile::reconcile_missing_sidecar_task(
+            &runtime, &session,
+        )
+        .await?
+    else {
         return Ok(());
     };
     if task.completion_event_id.is_some() {
@@ -331,7 +336,7 @@ fn ensure_recovery_receipt(
 fn recoverable_sidecar_task_status(status: &str) -> bool {
     matches!(
         status,
-        "running" | "recovering" | "interrupted" | "resume_required"
+        "running" | "recovering" | "interrupted" | "resume_required" | "cancel_requested"
     )
 }
 
