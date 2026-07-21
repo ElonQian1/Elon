@@ -16,7 +16,9 @@ use super::{
 };
 use crate::node_agent_android_live::adb_session::start_runtime_with_evidence;
 use crate::node_agent_android_live::broker::{LiveUiBroker, LiveUiSession};
-use crate::node_agent_android_live::build_verify_apk::select_reusable_debug_apk;
+use crate::node_agent_android_live::build_verify_apk::{
+    select_debug_apk_after_successful_build, select_reusable_debug_apk,
+};
 use crate::node_agent_android_live::fit_run::workspace_fingerprint;
 use crate::node_agent_android_live::verification_gate::{
     evaluate_verification_gates, VerificationGateInput, VerificationGateState,
@@ -74,9 +76,19 @@ pub(super) async fn run(
                     run_debug_build(&gradle_root, &wrapper, Some(suffix), true)
                         .await
                         .context("BUILD 强制刷新阶段失败")?;
-                    select_reusable_debug_apk(&gradle_root, &session.package_name)?.ok_or_else(
-                        || anyhow!("两次有界构建后仍未找到与当前源码一致的 Debug APK"),
-                    )?
+                    let apk = select_debug_apk_after_successful_build(
+                        &gradle_root,
+                        &session.package_name,
+                    )
+                    .context("强制 Gradle 构建后的 APK 选择失败")?;
+                    report_evidence(
+                        reporter,
+                        "BUILD",
+                        "CACHE_OUTPUT_ACCEPTED",
+                        "强制 Gradle 构建成功；接受 applicationId 精确匹配的时间戳保留缓存产物",
+                    )
+                    .await;
+                    apk
                 }
             };
             report_evidence(

@@ -50,6 +50,26 @@ pub(crate) fn select_reusable_debug_apk(
     }
 }
 
+/// Selects the exact Debug APK produced or validated by a Gradle invocation that
+/// has just completed successfully in `gradle_root`.
+///
+/// Gradle may restore an output from its build cache while preserving the cached
+/// file timestamp. In that case the timestamp-only reusable-artifact check above
+/// intentionally rejects the APK before a build, but the successful Gradle build
+/// itself is the source-input proof. The metadata/application-id checks remain
+/// mandatory so an unrelated or split APK can never be selected.
+pub(crate) fn select_debug_apk_after_successful_build(
+    gradle_root: &Path,
+    expected_application_id: &str,
+) -> Result<PathBuf> {
+    select_debug_apk(gradle_root, expected_application_id, None)?.ok_or_else(|| {
+        anyhow!(
+            "Gradle 构建成功，但未找到 applicationId={} 的 Debug APK",
+            expected_application_id
+        )
+    })
+}
+
 fn select_debug_apk(
     gradle_root: &Path,
     expected_application_id: &str,
@@ -303,6 +323,21 @@ mod tests {
         assert!(select_reusable_debug_apk(&root, "com.example.app")
             .unwrap()
             .is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn accepts_timestamp_preserving_cache_output_only_after_successful_build() {
+        let root = test_root();
+        write_output(&root, "app", "com.example.app", "app-debug.apk");
+        std::thread::sleep(Duration::from_millis(30));
+        fs::write(root.join("build.gradle"), "plugins {}").unwrap();
+
+        assert!(select_reusable_debug_apk(&root, "com.example.app")
+            .unwrap()
+            .is_none());
+        let selected = select_debug_apk_after_successful_build(&root, "com.example.app").unwrap();
+        assert_eq!(selected.file_name().unwrap(), "app-debug.apk");
         fs::remove_dir_all(root).unwrap();
     }
 
