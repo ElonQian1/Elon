@@ -603,6 +603,7 @@ function Submit-Body {
 }
 
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-delta.ps1')
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-review.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-self-test.ps1')
 if ($Action -eq 'SelfTest') { Invoke-SupervisionSelfTest; exit 0 }
 
@@ -768,7 +769,8 @@ switch ($Action) {
     'Review' {
         Assert-NodeSupervisionCapability $nodeConnection $script:DesktopReviewCapability 'Desktop Review'
         if ([string]::IsNullOrWhiteSpace($TaskId)) { throw 'Review requires TaskId.' }
-        $reviewBody = New-SupervisionReviewBody $Verdict $Summary $Improvements
+        $reviewBody = Convert-ToPublicSupervisionReviewBody `
+            (New-SupervisionReviewBody $Verdict $Summary $Improvements)
         [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
         $reviewPath = "/api/local-tasks/$encodedTaskId/supervision/desktop-review"

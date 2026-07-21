@@ -63,11 +63,15 @@ function Invoke-SupervisionSelfTest {
             throw
         }
     }
-    $reviewBody = New-SupervisionReviewBody 'accepted' $testSummary @(
+    $reviewCandidate = New-SupervisionReviewBody 'accepted' $testSummary @(
         ConvertFrom-Utf8Base64 '5ZCO57ut57un57ut6KeC5a+f5Lit5paH5pel5b+X'
     )
+    $reviewCandidate.reviewed_by = 'legacy-caller'
+    $reviewCandidate.review_source = 'legacy-helper'
+    $reviewBody = Convert-ToPublicSupervisionReviewBody $reviewCandidate
     [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
     $reviewRoundTrip = Convert-JsonResponseBytes $reviewBytes 'application/json'
+    $reviewPropertyNames = @($reviewRoundTrip.PSObject.Properties.Name)
     $improvementPrompt = ConvertFrom-Utf8Base64 '5L+u5aSN5Lit5paH57un5om/6Lev5b6E'
     $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' $improvementPrompt `
         $testCriteria $true
@@ -248,6 +252,12 @@ function Invoke-SupervisionSelfTest {
         response_workspace = $decodedParent.record.workspace_path -ceq $testExecutionWorkspace
         invalid_utf8 = $invalidUtf8Rejected
         review_summary = $reviewRoundTrip.summary -ceq $testSummary
+        review_public_dto = $reviewPropertyNames.Count -eq 3 -and
+            $reviewPropertyNames -contains 'verdict' -and
+            $reviewPropertyNames -contains 'summary' -and
+            $reviewPropertyNames -contains 'improvements' -and
+            $reviewPropertyNames -notcontains 'reviewed_by' -and
+            $reviewPropertyNames -notcontains 'review_source'
         improve_workspace = $improvementBody.workspace_path -ceq $testWorkspace
         improve_role = $improvementBody.supervision.task_role -eq 'capability_repair'
         improve_parent = $improvementBody.supervision.parent_task_id -eq 'local-parent-task'
@@ -310,7 +320,7 @@ function Invoke-SupervisionSelfTest {
         protocol = $script:SupervisionProtocol
         checks = @(
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
-            'non_ascii_prompt', 'acceptance_criteria', 'review_summary',
+            'non_ascii_prompt', 'acceptance_criteria', 'review_summary', 'review_public_dto',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
