@@ -139,6 +139,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (102, "项目 Android 测试设备多用户租约", crate::project_android_device_leases_migration::migration_v102),
     (103, "开发期新项目默认完全访问", crate::project_runtime_permission_migration::migration_v103),
     (104, "恢复新项目默认 full_access 并保留全部显式选择", crate::project_runtime_permission_migration::migration_v104),
+    (105, "修复已记录 v104 安装的运行权限默认值", crate::project_runtime_permission_migration::migration_v105),
 ];
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────
