@@ -502,6 +502,7 @@ pub(super) async fn run_session(
                                     completion_context,
                                     inherited_workspace: None,
                                     resume_admission: None,
+                                    inherited_authorization_record: None,
                                     allow_codex_auth_switch: true,
                                     frozen_codex_home: None,
                                 },

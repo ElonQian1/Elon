@@ -203,6 +203,31 @@ pub(crate) async fn require_route_a_full_access_grant(
     allow_personal_chat_bypass: bool,
     task_record: Option<&crate::node_agent_local_task_store::LocalTaskRecord>,
 ) -> Result<()> {
+    require_route_a_full_access_grant_with_inherited_evidence(
+        grants,
+        identity,
+        cli_name,
+        runtime_permission,
+        project_context,
+        cwd,
+        allow_personal_chat_bypass,
+        task_record,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn require_route_a_full_access_grant_with_inherited_evidence(
+    grants: &FullAccessGrantState,
+    identity: &FullAccessGrantIdentity,
+    cli_name: &str,
+    runtime_permission: Option<&str>,
+    project_context: Option<&CliProjectContext>,
+    cwd: Option<&str>,
+    allow_personal_chat_bypass: bool,
+    task_record: Option<&crate::node_agent_local_task_store::LocalTaskRecord>,
+    inherited_authorization_record: Option<&crate::node_agent_local_task_store::LocalTaskRecord>,
+) -> Result<()> {
     if !is_route_a_cli(cli_name) || !is_full_access(runtime_permission) {
         return Ok(());
     }
@@ -220,6 +245,25 @@ pub(crate) async fn require_route_a_full_access_grant(
         && !is_legacy_conversation_worktree(cwd, &context.project_id, &context.conversation_id)
     {
         return Ok(());
+    }
+    if let Some(record) = inherited_authorization_record {
+        let inherited_context = CliProjectContext {
+            project_id: context.project_id.clone(),
+            conversation_id: record.conversation_id.clone(),
+            runtime_permission: context.runtime_permission.clone(),
+        };
+        if task_record_proves_managed_isolated_workspace(
+            grants,
+            identity,
+            &inherited_context,
+            cwd,
+            record,
+        )
+        .await
+        {
+            return Ok(());
+        }
+        bail!("ISOLATED_WORKTREE_AUTH_MISSING: Resume 继承的隔离 worktree 缺少有效的平台 provenance、Git 身份或 root lease 证据。")
     }
     if let Some(record) = task_record {
         if task_record_proves_managed_isolated_workspace(grants, identity, context, cwd, record)

@@ -202,6 +202,7 @@ async fn dispatch_generation(runtime: &Arc<NodeRuntime>, item: &SelfEvolutionIte
                     Some(&contract),
                     Some(workspace.clone()),
                     None,
+                    None,
                     frozen.clone(),
                 );
                 Ok(())

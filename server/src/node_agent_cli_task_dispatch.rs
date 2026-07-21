@@ -29,11 +29,11 @@ pub(crate) struct CliTaskDispatchRequest {
     pub prompt: String,
     pub completion_context: CliCompletionContext,
     /// Present only for a node-validated supervised resume. Authorization is
-    /// checked against its base repo while execution/finalization reuse the
-    /// exact inherited worktree.
+    /// checked against its base repo while execution reuses the inherited worktree.
     pub inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
     pub resume_admission:
         Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
+    pub inherited_authorization_record: Option<crate::node_agent_local_task_store::LocalTaskRecord>,
     /// Offline-local work must never auto-switch into a borrowed/shared Codex slot.
     pub allow_codex_auth_switch: bool,
     /// Local work supplies this at creation time. Cloud work captures it once
@@ -86,6 +86,7 @@ async fn run_cli_task(
         completion_context,
         inherited_workspace,
         resume_admission,
+        inherited_authorization_record,
         allow_codex_auth_switch,
         frozen_codex_home,
     } = request;
@@ -328,17 +329,20 @@ async fn run_cli_task(
             return;
         }
     };
-    if let Err(error) = node_agent_full_access::require_route_a_full_access_grant(
-        &runtime.full_access_grants,
-        &full_access_identity,
-        resolved_cli.name(),
-        runtime_permission.as_deref(),
-        project_context.as_ref(),
-        cwd.as_deref(),
-        !local_offline,
-        runtime.local_tasks.get(&req_id).ok().flatten().as_ref(),
-    )
-    .await
+    let current_task_record = runtime.local_tasks.get(&req_id).ok().flatten();
+    if let Err(error) =
+        node_agent_full_access::require_route_a_full_access_grant_with_inherited_evidence(
+            &runtime.full_access_grants,
+            &full_access_identity,
+            resolved_cli.name(),
+            runtime_permission.as_deref(),
+            project_context.as_ref(),
+            cwd.as_deref(),
+            !local_offline,
+            current_task_record.as_ref(),
+            inherited_authorization_record.as_ref(),
+        )
+        .await
     {
         send_preflight_failure(
             &runtime,

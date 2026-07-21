@@ -464,6 +464,9 @@ async fn create_task(
         }
         None => None,
     };
+    let inherited_authorization_record = resume_context_seed
+        .as_ref()
+        .map(|seed| seed.inherited_authorization_record());
     let record_prompt = compiled_resume_context
         .as_ref()
         .map(|context| context.record_prompt.as_str())
@@ -567,6 +570,7 @@ async fn create_task(
         supervision.as_ref(),
         inherited_workspace,
         resume_admission,
+        inherited_authorization_record,
         frozen_codex_home,
     );
     (
@@ -596,6 +600,7 @@ pub(crate) fn dispatch_local_task_record(
     supervision: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
     inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
     resume_admission: Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
+    inherited_authorization_record: Option<crate::node_agent_local_task_store::LocalTaskRecord>,
     frozen_codex_home: crate::node_agent_codex_child_env::FrozenCodexHome,
 ) {
     let (out_tx, out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
@@ -641,6 +646,7 @@ pub(crate) fn dispatch_local_task_record(
             ),
             inherited_workspace,
             resume_admission,
+            inherited_authorization_record,
             allow_codex_auth_switch: false,
             frozen_codex_home: Some(frozen_codex_home),
         },

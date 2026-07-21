@@ -396,6 +396,261 @@ async fn legacy_identityless_grants_fail_closed() {
     let _ = std::fs::remove_dir_all(workspace);
 }
 
+fn git(cwd: &Path, args: &[&str]) -> String {
+    let output = crate::git_command_error::git_command()
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {args:?} failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .replace('\\', "/")
+}
+
+fn managed_workspace_record(
+    label: &str,
+) -> (
+    PathBuf,
+    PathBuf,
+    crate::node_agent_local_task_store::LocalTaskRecord,
+) {
+    let root = temp_workspace(label);
+    let base = root.join("repo");
+    let active = root
+        .join("conversation-worktrees")
+        .join("project_1")
+        .join("root");
+    std::fs::create_dir_all(&base).unwrap();
+    git(&base, &["init"]);
+    git(&base, &["config", "user.email", "tests@example.invalid"]);
+    git(&base, &["config", "user.name", "Tests"]);
+    git(
+        &base,
+        &[
+            "config",
+            "remote.origin.url",
+            "https://example.invalid/repo.git",
+        ],
+    );
+    std::fs::write(base.join("tracked.txt"), "proof").unwrap();
+    git(&base, &["add", "tracked.txt"]);
+    git(&base, &["commit", "-m", "proof"]);
+    git(
+        &base,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "ai/session/project/root",
+            active.to_string_lossy().as_ref(),
+        ],
+    );
+    git(
+        &base,
+        &[
+            "worktree",
+            "lock",
+            "--reason",
+            "elon-supervision:local-root",
+            active.to_string_lossy().as_ref(),
+        ],
+    );
+    let base_revision = git(&base, &["rev-parse", "HEAD"]);
+    let active_revision = git(&active, &["rev-parse", "HEAD"]);
+    let git_common_dir = git(
+        &active,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    );
+    let mut record = task_record("project_1", "root-conversation", &base, &active);
+    record.task_id = "local-root".into();
+    record.workspace_status = Some(serde_json::json!({
+        "base_workspace_path": base.to_string_lossy(),
+        "active_workspace_path": active.to_string_lossy(),
+        "isolated": true,
+        "platform_provenance": "elon.conversation_worktree.v1",
+        "project_id": "project_1",
+        "root_task_id": "local-root",
+        "git_common_dir": git_common_dir,
+        "base_revision": base_revision,
+        "git_head": active_revision,
+        "git_remote": "https://example.invalid/repo.git"
+    }));
+    (base, active, record)
+}
+
+#[tokio::test]
+async fn fresh_and_validated_resume_generations_authorize_the_active_worktree() {
+    let (base, active, root_record) = managed_workspace_record("resume-dispatch");
+    let state = FullAccessGrantState::load_from_path(grant_file("resume-dispatch"));
+    let identity = identity("owner-1", "agent-1", "install-1");
+    state
+        .grant_project(&identity, "project_1", base.to_string_lossy().as_ref())
+        .await
+        .unwrap();
+    let root_context = CliProjectContext {
+        project_id: "project_1".into(),
+        conversation_id: root_record.conversation_id.clone(),
+        runtime_permission: Some("full_access".into()),
+    };
+    require_route_a_full_access_grant(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&root_context),
+        Some(active.to_string_lossy().as_ref()),
+        false,
+        Some(&root_record),
+    )
+    .await
+    .expect("fresh dispatch uses its current task record and active cwd");
+
+    for conversation_id in ["local-fe687eb2", "resume-of-resume"] {
+        let child_context = CliProjectContext {
+            project_id: "project_1".into(),
+            conversation_id: conversation_id.into(),
+            runtime_permission: Some("full_access".into()),
+        };
+        require_route_a_full_access_grant_with_inherited_evidence(
+            &state,
+            &identity,
+            "codex",
+            Some("full_access"),
+            Some(&child_context),
+            Some(active.to_string_lossy().as_ref()),
+            false,
+            None,
+            Some(&root_record),
+        )
+        .await
+        .expect("validated Resume lineage authorizes the inherited active cwd");
+    }
+    let _ = std::fs::remove_dir_all(base.parent().unwrap());
+}
+
+#[tokio::test]
+async fn validated_resume_evidence_rejects_identity_lease_git_and_active_path_drift() {
+    let (base, active, root_record) = managed_workspace_record("resume-drift");
+    let state = FullAccessGrantState::load_from_path(grant_file("resume-drift"));
+    let identity = identity("owner-1", "agent-1", "install-1");
+    state
+        .grant_project(&identity, "project_1", base.to_string_lossy().as_ref())
+        .await
+        .unwrap();
+    let context = CliProjectContext {
+        project_id: "project_1".into(),
+        conversation_id: "resume-child".into(),
+        runtime_permission: Some("full_access".into()),
+    };
+    let foreign_active = temp_workspace("foreign-active");
+
+    for (label, record, cwd) in [
+        {
+            let mut record = root_record.clone();
+            record.owner_user_id = "foreign-owner".into();
+            ("owner", record, active.as_path())
+        },
+        {
+            let mut record = root_record.clone();
+            record.install_id = "foreign-install".into();
+            ("install", record, active.as_path())
+        },
+        {
+            let mut record = root_record.clone();
+            record.project_id = "foreign-project".into();
+            ("project", record, active.as_path())
+        },
+        ("active path", root_record.clone(), foreign_active.as_path()),
+    ] {
+        let error = require_route_a_full_access_grant_with_inherited_evidence(
+            &state,
+            &identity,
+            "codex",
+            Some("full_access"),
+            Some(&context),
+            Some(cwd.to_string_lossy().as_ref()),
+            false,
+            None,
+            Some(&record),
+        )
+        .await
+        .expect_err(label);
+        assert!(error.to_string().contains("ISOLATED_WORKTREE_AUTH_MISSING"));
+    }
+
+    git(
+        &base,
+        &["worktree", "unlock", active.to_string_lossy().as_ref()],
+    );
+    git(
+        &base,
+        &[
+            "worktree",
+            "lock",
+            "--reason",
+            "foreign-lease",
+            active.to_string_lossy().as_ref(),
+        ],
+    );
+    assert!(require_route_a_full_access_grant_with_inherited_evidence(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&context),
+        Some(active.to_string_lossy().as_ref()),
+        false,
+        None,
+        Some(&root_record),
+    )
+    .await
+    .is_err());
+
+    git(
+        &base,
+        &["worktree", "unlock", active.to_string_lossy().as_ref()],
+    );
+    git(
+        &base,
+        &[
+            "worktree",
+            "lock",
+            "--reason",
+            "elon-supervision:local-root",
+            active.to_string_lossy().as_ref(),
+        ],
+    );
+    git(
+        &active,
+        &[
+            "config",
+            "remote.origin.url",
+            "https://example.invalid/drift.git",
+        ],
+    );
+    assert!(require_route_a_full_access_grant_with_inherited_evidence(
+        &state,
+        &identity,
+        "codex",
+        Some("full_access"),
+        Some(&context),
+        Some(active.to_string_lossy().as_ref()),
+        false,
+        None,
+        Some(&root_record),
+    )
+    .await
+    .is_err());
+
+    let _ = std::fs::remove_dir_all(foreign_active);
+    let _ = std::fs::remove_dir_all(base.parent().unwrap());
+}
+
 #[test]
 fn runtime_policy_summary_exposes_route_bc_safety_limits() {
     let summary = runtime_policy_summary();

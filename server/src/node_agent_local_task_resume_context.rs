@@ -27,6 +27,12 @@ pub(crate) struct ResumeContextSeed {
     parent_summary: Value,
 }
 
+impl ResumeContextSeed {
+    pub(crate) fn inherited_authorization_record(&self) -> LocalTaskRecord {
+        self.root.clone()
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RequirementRef<'a> {
