@@ -77,16 +77,30 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
     let mut changed = terminal_drift::sync(runtime, now, TERMINAL_JOURNAL_SYNC_LIMIT).await?;
     let candidates = runtime
         .local_tasks
-        .list_stale_runtime_candidates(cutoff, STALE_CANDIDATE_LIMIT)?;
-    for candidate in candidates.into_iter().filter(|task| {
-        matches!(
-            task.status.as_str(),
-            "running" | "recovering" | "reattaching" | "cancel_requested"
-        ) && task.completion_event_id.is_none()
-    }) {
+        .list_stale_runtime_candidates(cutoff, STALE_CANDIDATE_LIMIT)?
+        .into_iter()
+        .filter(|task| {
+            matches!(
+                task.status.as_str(),
+                "running" | "recovering" | "reattaching" | "cancel_requested"
+            ) && task.completion_event_id.is_none()
+        })
+        .collect::<Vec<_>>();
+    let supervised_ids = candidates
+        .iter()
+        .filter(|task| is_platform_supervised(task))
+        .map(|task| task.task_id.clone())
+        .collect::<HashSet<_>>();
+    let contracts = crate::node_agent_local_task_supervision::load_supervision_contracts(
+        &runtime.task_journal,
+        &supervised_ids,
+    )?;
+    for candidate in candidates {
+        let contract = contracts.get(&candidate.task_id).and_then(Option::as_ref);
         match reconcile_candidate(
             runtime,
             &candidate.task_id,
+            contract,
             now,
             stale_after_ms,
             cutoff,
@@ -108,10 +122,22 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
 async fn repair_historical_terminal_candidates(runtime: &NodeRuntime) -> Result<usize> {
     let candidates = runtime
         .local_tasks
-        .list_terminal_repair_candidates(TERMINAL_REPAIR_LIMIT)?;
+        .list_terminal_repair_candidates(TERMINAL_REPAIR_LIMIT)?
+        .into_iter()
+        .filter(is_platform_supervised)
+        .collect::<Vec<_>>();
+    let task_ids = candidates
+        .iter()
+        .map(|candidate| candidate.task_id.clone())
+        .collect::<HashSet<_>>();
+    let contracts = crate::node_agent_local_task_supervision::load_supervision_contracts(
+        &runtime.task_journal,
+        &task_ids,
+    )?;
     let mut repaired = 0;
-    for candidate in candidates.into_iter().filter(is_platform_supervised) {
-        match repair_historical_terminal_candidate(runtime, &candidate).await {
+    for candidate in candidates {
+        let contract = contracts.get(&candidate.task_id).and_then(Option::as_ref);
+        match repair_historical_terminal_candidate(runtime, &candidate, contract).await {
             Ok(changed) => repaired += usize::from(changed),
             Err(error) => warn!(
                 task_id = %candidate.task_id,
@@ -126,6 +152,7 @@ async fn repair_historical_terminal_candidates(runtime: &NodeRuntime) -> Result<
 async fn repair_historical_terminal_candidate(
     runtime: &NodeRuntime,
     candidate: &crate::node_agent_local_task_store::LocalTaskRecord,
+    contract: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
 ) -> Result<bool> {
     let snapshot_trusted = candidate.workspace_status.as_ref().is_some_and(|status| {
         status
@@ -139,14 +166,11 @@ async fn repair_historical_terminal_candidate(
     if snapshot_trusted && existing.is_some() {
         return Ok(false);
     }
-    let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
-        &runtime.task_journal,
-        &candidate.task_id,
-    )?
-    .context("supervised historical terminal task has no durable contract")?;
+    let contract =
+        contract.context("supervised historical terminal task has no durable contract")?;
     let base = crate::node_agent_supervision_terminal_lease_safety::admission_base(
         candidate,
-        &contract,
+        contract,
         &candidate.task_id,
     )?;
     let Some(admission) =
@@ -176,6 +200,7 @@ async fn repair_historical_terminal_candidate(
         runtime,
         &task,
         active,
+        Some(contract),
         crate::node_agent_cli_sidecar::now_ms(),
         0,
     )
@@ -212,6 +237,7 @@ async fn repair_historical_terminal_candidate(
 async fn reconcile_candidate(
     runtime: &NodeRuntime,
     task_id: &str,
+    contract: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
     now: u128,
     stale_after_ms: u128,
     cutoff: i64,
@@ -221,14 +247,8 @@ async fn reconcile_candidate(
         .local_tasks
         .get(task_id)?
         .context("orphan candidate disappeared before admission")?;
-    let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
-        &runtime.task_journal,
-        task_id,
-    )?;
     let admission_base = if is_platform_supervised(&initial) {
-        let contract = contract
-            .as_ref()
-            .context("supervised orphan candidate has no durable contract")?;
+        let contract = contract.context("supervised orphan candidate has no durable contract")?;
         Some(
             crate::node_agent_supervision_terminal_lease_safety::admission_base(
                 &initial, contract, task_id,
@@ -276,18 +296,24 @@ async fn reconcile_candidate(
         .and_then(serde_json::Value::as_str)
         .map(Path::new)
         .unwrap_or_else(|| Path::new(&task.workspace_path));
-    if candidate_runtime_protects(runtime, &task, active_workspace, now, stale_after_ms).await? {
+    if candidate_runtime_protects(
+        runtime,
+        &task,
+        active_workspace,
+        contract,
+        now,
+        stale_after_ms,
+    )
+    .await?
+    {
         return Ok(false);
     }
     if is_platform_supervised(&task) {
-        let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
-            &runtime.task_journal,
-            task_id,
-        )?
-        .context("supervised orphan contract disappeared under admission")?;
+        let contract =
+            contract.context("supervised orphan contract disappeared under admission")?;
         if !active_workspace.is_dir() {
             if let Some(completion) =
-                crate::node_agent_terminal_finalization::historical_completion(&task, &contract)?
+                crate::node_agent_terminal_finalization::historical_completion(&task, contract)?
             {
                 let admission = admission
                     .as_ref()
@@ -336,6 +362,7 @@ async fn candidate_runtime_protects(
     runtime: &NodeRuntime,
     task: &crate::node_agent_local_task_store::LocalTaskRecord,
     active_workspace: &Path,
+    contract: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
     now: u128,
     stale_after_ms: u128,
 ) -> Result<bool> {
@@ -352,11 +379,8 @@ async fn candidate_runtime_protects(
         return Ok(true);
     }
     if is_platform_supervised(task) {
-        let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
-            &runtime.task_journal,
-            &task.task_id,
-        )?
-        .context("supervised orphan contract disappeared under admission")?;
+        let contract =
+            contract.context("supervised orphan contract disappeared under admission")?;
         let root = contract.root_task_id.as_deref().unwrap_or(&task.task_id);
         if crate::node_agent_supervision_terminal_lease_safety::runtime_lineage_or_workspace_is_active(
             runtime,
@@ -374,7 +398,7 @@ async fn candidate_runtime_protects(
             return Ok(true);
         }
     }
-    if let Some(record) = runtime.task_journal.snapshot(&task.task_id, 0, 1)?.record {
+    if let Some(record) = runtime.task_journal.record(&task.task_id)? {
         if journal_record_protects(&record, now, stale_after_ms)? {
             return Ok(true);
         }

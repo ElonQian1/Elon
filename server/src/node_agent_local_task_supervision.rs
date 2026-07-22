@@ -4,12 +4,16 @@
 //! deterministic evidence summary, and reviewer verdicts on top of the existing
 //! local task journal.
 
+#[path = "node_agent_local_task_supervision_contract_batch.rs"]
+mod contract_batch;
 #[path = "node_agent_local_task_supervision_evidence.rs"]
 mod evidence;
 #[path = "node_agent_local_task_supervision_saga.rs"]
 mod saga;
 #[path = "node_agent_local_task_supervision_validation.rs"]
 mod validation;
+
+pub(crate) use contract_batch::{load_supervision_contract, load_supervision_contracts};
 
 use std::{
     collections::BTreeSet,
@@ -225,13 +229,6 @@ pub(crate) fn normalize_contract(
         acceptance_criteria,
         improvement_policy,
     })
-}
-
-pub(crate) fn load_supervision_contract(
-    journal: &TaskJournal,
-    task_id: &str,
-) -> anyhow::Result<Option<SupervisionContract>> {
-    Ok(load_supervision_state(journal, task_id)?.contract)
 }
 
 pub(crate) fn executor_prompt(user_prompt: &str, contract: Option<&SupervisionContract>) -> String {

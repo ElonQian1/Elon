@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    node_agent_local_task_supervision::load_supervision_contract,
+    node_agent_local_task_supervision::load_supervision_contracts,
     node_agent_update_checkpoint::incomplete_non_repeatable_action,
     node_agent_update_recovery::{
         UpdateGateTaskClassification, UpdateInstallGate, UpdateRecoveryLedger, UpdateRecoveryState,
@@ -36,7 +36,14 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         .collect::<HashSet<_>>();
     let recovery_ledger = runtime.update_recovery.load()?;
     let mut classifications = Vec::new();
-    for task in runtime.local_tasks.list_update_install_candidates()? {
+    let tasks = runtime.local_tasks.list_update_install_candidates()?;
+    let task_ids = tasks
+        .iter()
+        .map(|task| task.task_id.clone())
+        .collect::<HashSet<_>>();
+    let mut snapshots = runtime.task_journal.snapshots(&task_ids, 10_000)?;
+    let contracts = load_supervision_contracts(&runtime.task_journal, &task_ids)?;
+    for task in tasks {
         if task.owner_user_id != credentials.owner_user_id
             || task.agent_id != credentials.agent_id
             || task.install_id != runtime.install_id
@@ -44,7 +51,9 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             classifications.push(blocked_identity(&task));
             continue;
         }
-        let snapshot = runtime.task_journal.snapshot(&task.task_id, 0, 10_000)?;
+        let snapshot = snapshots
+            .remove(&task.task_id)
+            .context("update candidate journal projection is missing")?;
         let sidecar = runtime.cli_sidecars.session_for_task(&task.task_id)?;
         let now = crate::node_agent_cli_sidecar::now_ms();
         let live_sidecar = sidecar
@@ -66,12 +75,12 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
                 .update_recovery
                 .receipt_for_task(&task.task_id)
                 .is_err();
-        let contract = load_supervision_contract(&runtime.task_journal, &task.task_id)?;
+        let contract = contracts.get(&task.task_id).and_then(Option::as_ref);
         let resume = crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
             &runtime,
             &task,
             snapshot.record.as_ref(),
-            contract.as_ref(),
+            contract,
         )
         .await;
         let resume_eligible = resume.get("eligible").and_then(Value::as_bool);

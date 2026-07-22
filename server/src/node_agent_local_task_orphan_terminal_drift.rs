@@ -41,7 +41,7 @@ async fn sync_one(runtime: &NodeRuntime, task_id: &str, now: u128) -> Result<boo
             return Ok(false);
         }
     }
-    let Some(record) = runtime.task_journal.snapshot(task_id, 0, 1)?.record else {
+    let Some(record) = runtime.task_journal.record(task_id)? else {
         return Ok(false);
     };
     if !matches!(

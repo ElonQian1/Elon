@@ -11,8 +11,7 @@ pub(super) fn reconcile_stale_cancel(
 ) -> Result<bool> {
     let durable_cancel_intent = runtime
         .task_journal
-        .snapshot(task_id, 0, 1)?
-        .record
+        .record(task_id)?
         .and_then(|record| record.cancel_intent)
         .is_some();
     let changed = runtime.local_tasks.mark_one_stale_cancel_requested(

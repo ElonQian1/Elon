@@ -1,12 +1,110 @@
-use std::{fs, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::{self, File},
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
 
-use super::{TaskJournal, TaskJournalSnapshot};
+use super::{TaskJournal, TaskJournalEventScan, TaskJournalEventView, TaskJournalSnapshot};
 use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
 
 impl TaskJournal {
+    pub(crate) fn record(&self, task_id: &str) -> Result<Option<super::TaskJournalRecord>> {
+        with_task_journal_io_lock(|| Ok(self.load_registry()?.get(task_id).cloned()))
+    }
+
+    /// Projects several task snapshots from one append-only journal scan.
+    /// Update/recovery audits frequently inspect a small candidate set; scanning
+    /// the entire shared journal once per task grows quadratically with history.
+    pub(crate) fn snapshots(
+        &self,
+        task_ids: &HashSet<String>,
+        limit: usize,
+    ) -> Result<HashMap<String, TaskJournalSnapshot>> {
+        with_task_journal_io_lock(|| {
+            let registry = self.load_registry()?;
+            let cursor_epoch = self.cursor_epoch()?;
+            let event_limit = limit.clamp(1, 200);
+            let mut scans = task_ids
+                .iter()
+                .cloned()
+                .map(|task_id| (task_id, TaskJournalEventScan::default()))
+                .collect::<HashMap<_, _>>();
+            let path = self.events_path();
+            let mut scanned_last_seq = 0;
+            if path.exists() {
+                let file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
+                for (index, line) in BufReader::new(file).lines().enumerate() {
+                    let seq = index + 1;
+                    scanned_last_seq = seq;
+                    let line = line.with_context(|| format!("读取 {:?}", path))?;
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    let event: serde_json::Value = match serde_json::from_str(&line) {
+                        Ok(event) => event,
+                        Err(error) => {
+                            tracing::warn!(
+                                path = %path.display(),
+                                seq,
+                                error = %error,
+                                "skipping corrupt task journal event line"
+                            );
+                            continue;
+                        }
+                    };
+                    let Some(task_id) = event.get("req_id").and_then(serde_json::Value::as_str)
+                    else {
+                        continue;
+                    };
+                    let Some(scan) = scans.get_mut(task_id) else {
+                        continue;
+                    };
+                    scan.approval_tracker.observe_event(seq, &event);
+                    if scan.events.len() >= event_limit {
+                        scan.has_more = true;
+                        continue;
+                    }
+                    scan.last_event_seq = seq;
+                    scan.events.push(TaskJournalEventView { seq, event });
+                }
+            }
+            let mut snapshots = HashMap::with_capacity(task_ids.len());
+            for task_id in task_ids {
+                let mut scan = scans.remove(task_id).unwrap_or_default();
+                scan.scanned_last_seq = scanned_last_seq;
+                if scan.last_event_seq == 0 && scanned_last_seq > 0 {
+                    scan.last_event_seq = scanned_last_seq;
+                }
+                let scan = scan.finish();
+                snapshots.insert(
+                    task_id.clone(),
+                    TaskJournalSnapshot {
+                        task_id: task_id.clone(),
+                        record: registry.get(task_id).cloned(),
+                        approvals: scan.approvals,
+                        events: scan.events,
+                        last_event_seq: scan.last_event_seq,
+                        has_more: scan.has_more,
+                        cursor_epoch: cursor_epoch.clone(),
+                        requested_cursor_epoch: None,
+                        previous_cursor_epoch: None,
+                        cursor_reset: false,
+                        requested_cursor: 0,
+                        old_cursor: 0,
+                        new_cursor: scan.last_event_seq,
+                        resume_cursor: scan.last_event_seq,
+                        sidecar_update_epoch: cursor_epoch.clone(),
+                    },
+                );
+            }
+            Ok(snapshots)
+        })
+    }
+
     pub(crate) fn snapshot(
         &self,
         task_id: &str,
