@@ -1,12 +1,12 @@
-use std::{collections::HashSet, path::PathBuf};
-
+use crate::node_agent_task_journal_events::completion_terminal_status;
 use anyhow::{bail, Context, Result};
 use homecli_proto::CliCompletionEnvelope;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
+use std::{collections::HashSet, path::PathBuf};
 
-use crate::node_agent_task_journal_events::completion_terminal_status;
-
+#[path = "node_agent_local_post_idempotency.rs"]
+pub(crate) mod idempotency;
 #[path = "node_agent_local_task_store_reconcile.rs"]
 pub(crate) mod reconcile;
 #[path = "node_agent_local_task_store_safety.rs"]

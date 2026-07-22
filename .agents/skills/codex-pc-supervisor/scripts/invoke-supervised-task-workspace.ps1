@@ -36,7 +36,9 @@ function Resolve-SubmitProjectWorkspace {
 
 function Submit-Body {
     param([object]$Connection, [object]$Body, [string]$ResultAction, [object]$PathResolution = $null)
-    $response = Invoke-NodeApi $Connection 'Post' '/api/local-tasks' $Body
+    $submission = Invoke-IdempotentNodePost $Connection '/api/local-tasks' $Body
+    $response = $submission.Response
+    $Connection = $submission.Connection
     Convert-ToJsonResult ([ordered]@{
         ok = $true; action = $ResultAction; protocol = $script:SupervisionProtocol
         node_url = $Connection.BaseUrl; node_version = $Connection.Version

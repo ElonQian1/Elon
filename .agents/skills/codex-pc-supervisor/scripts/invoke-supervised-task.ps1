@@ -592,6 +592,7 @@ function New-ResumeTaskBody {
 }
 
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-delta.ps1')
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-idempotency.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-review.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-workspace.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-self-test.ps1')

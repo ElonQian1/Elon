@@ -50,7 +50,7 @@ const MAX_REVIEW_CHARS: usize = 20_000;
 const MAX_IMPROVEMENTS: usize = 20;
 const MAX_IMPROVEMENT_CHARS: usize = 2_000;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct SupervisionContractInput {
     #[serde(default)]
     pub protocol: Option<String>,

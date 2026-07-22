@@ -2,10 +2,17 @@
 
 #[path = "node_agent_local_task_cancel.rs"]
 mod cancel;
+#[path = "node_agent_local_tasks_idempotency.rs"]
+pub(crate) mod idempotency;
+#[path = "node_agent_local_task_output_consumer.rs"]
+mod output_consumer;
 #[path = "node_agent_local_task_provision.rs"]
 mod provision;
 #[path = "node_agent_local_task_root_workspace.rs"]
 pub(crate) mod root_workspace;
+#[cfg(test)]
+use output_consumer::durable_completion_for_local_display;
+pub(crate) use output_consumer::spawn_local_output_consumer;
 pub(crate) use provision::{
     provision_record_and_dispatch_supervised_task, SupervisedLocalTaskProvision,
 };
@@ -14,18 +21,15 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
-use homecli_proto::{
-    AgentToServer, CliCompletionEnvelope, CliCompletionProducerIdentity, CliProjectContext,
-};
-use serde::Deserialize;
+use homecli_proto::{CliCompletionProducerIdentity, CliProjectContext};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio_tungstenite::tungstenite::Message;
-use uuid::Uuid;
 
 use crate::{
     node_agent_cli_task_dispatch::{spawn_cli_task, CliTaskDispatchRequest},
@@ -48,7 +52,8 @@ struct DetailQuery {
     expected_cursor_epoch: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CreateLocalTaskRequest {
     project_id: String,
     #[serde(default)]
@@ -215,6 +220,7 @@ async fn get_task(
 
 async fn create_task(
     State(runtime): State<Arc<NodeRuntime>>,
+    headers: HeaderMap,
     Json(request): Json<CreateLocalTaskRequest>,
 ) -> Response {
     let creds = match bound_credentials(&runtime).await {
@@ -262,7 +268,7 @@ async fn create_task(
     if prompt.chars().count() > MAX_LOCAL_PROMPT_CHARS {
         return json_error(StatusCode::PAYLOAD_TOO_LARGE, "本机任务内容过长。");
     }
-    let mut supervision = match request.supervision {
+    let mut supervision = match request.supervision.clone() {
         Some(input) => match crate::node_agent_local_task_supervision::normalize_contract(input) {
             Ok(contract) => Some(contract),
             Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
@@ -291,6 +297,15 @@ async fn create_task(
             "PROJECT_FULL_ACCESS_DISABLED: 本机监督任务要求项目启用完全访问。",
         );
     }
+    let (task_id, idempotency_binding) =
+        match idempotency::begin(&runtime, &creds.owner_user_id, &headers, &request) {
+            idempotency::Begin::Unbound { task_id } => (task_id, None),
+            idempotency::Begin::Bound(binding) => (binding.task_id.clone(), Some(binding)),
+            idempotency::Begin::Response(response) => return response,
+        };
+    let recovering_idempotent_record = idempotency_binding
+        .as_ref()
+        .is_some_and(|binding| binding.recover_existing);
     let workspace_path = match root_workspace::resolve_request_workspace(
         &runtime,
         &creds,
@@ -326,21 +341,28 @@ async fn create_task(
         )
         .await
         {
-            Ok(item) => (
-                StatusCode::ACCEPTED,
-                Json(json!({
+            Ok(item) => {
+                let body = json!({
                     "ok": true,
                     "task_id": item.logical_id,
                     "status": item.status,
                     "sync_state": "local_only",
                     "self_evolution": item,
-                })),
-            )
-                .into_response(),
+                });
+                if let Err(response) = idempotency::complete(
+                    &runtime,
+                    &creds.owner_user_id,
+                    idempotency_binding.as_ref(),
+                    StatusCode::ACCEPTED,
+                    &body,
+                ) {
+                    return response;
+                }
+                (StatusCode::ACCEPTED, Json(body)).into_response()
+            }
             Err(error) => json_error(error.status, error.message),
         };
     }
-    let task_id = format!("local-{}", Uuid::new_v4());
     if let Some(contract) = supervision.as_mut() {
         if contract.parent_task_id.is_none() && contract.root_task_id.is_none() {
             contract.root_task_id = Some(task_id.clone());
@@ -352,14 +374,16 @@ async fn create_task(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
-        .unwrap_or_else(|| format!("offline-{}", Uuid::new_v4()));
+        .unwrap_or_else(|| format!("offline-{task_id}"));
     let channel_id = request
         .channel_id
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
-    let resume_context_seed = if let Some(contract) = supervision
+    let resume_context_seed = if recovering_idempotent_record {
+        None
+    } else if let Some(contract) = supervision
         .as_mut()
         .filter(|contract| contract.task_role == "resume_original")
     {
@@ -372,7 +396,9 @@ async fn create_task(
     } else {
         None
     };
-    let mut resume_workspace =
+    let mut resume_workspace = if recovering_idempotent_record {
+        None
+    } else {
         match crate::node_agent_local_task_resume_routes::resolve_supervised_resume_workspace(
             &runtime,
             &creds,
@@ -385,48 +411,50 @@ async fn create_task(
         {
             Ok(workspace) => workspace,
             Err(response) => return response,
-        };
-    let fresh_workspace = if resume_workspace.is_none() && supervision.is_some() {
-        let data_paths = runtime.node_data_root.read().await.paths.clone();
-        let supervision_root = supervision
-            .as_ref()
-            .and_then(|contract| contract.root_task_id.as_deref().or(Some(task_id.as_str())));
-        let prepared =
-            match crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
-                data_paths.as_ref(),
-                Some(workspace_path.to_string()),
-                Some(CliProjectContext {
-                    project_id: project_id.to_string(),
-                    conversation_id: conversation_id.clone(),
-                    runtime_permission: Some(runtime_permission.to_string()),
-                }),
-                supervision_root,
-            ) {
-                Ok(prepared) => prepared,
-                Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
-            };
-        let workspace = match prepared.conversation_workspace {
-            Some(workspace)
-                if workspace.isolated
-                    && !crate::node_agent_update_checkpoint::same_path(
-                        std::path::Path::new(workspace_path),
-                        std::path::Path::new(&workspace.workspace_path),
-                    ) =>
-            {
-                workspace
-            }
-            _ => {
-                return json_error(
-                    StatusCode::CONFLICT,
-                    "监督写任务未取得独立 worktree，已在派发前拒绝。",
-                )
-            }
-        };
-        Some(workspace)
-    } else {
-        None
+        }
     };
-    let execution_workspace_path = resume_workspace
+    let fresh_workspace =
+        if !recovering_idempotent_record && resume_workspace.is_none() && supervision.is_some() {
+            let data_paths = runtime.node_data_root.read().await.paths.clone();
+            let supervision_root = supervision
+                .as_ref()
+                .and_then(|contract| contract.root_task_id.as_deref().or(Some(task_id.as_str())));
+            let prepared =
+                match crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
+                    data_paths.as_ref(),
+                    Some(workspace_path.to_string()),
+                    Some(CliProjectContext {
+                        project_id: project_id.to_string(),
+                        conversation_id: conversation_id.clone(),
+                        runtime_permission: Some(runtime_permission.to_string()),
+                    }),
+                    supervision_root,
+                ) {
+                    Ok(prepared) => prepared,
+                    Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
+                };
+            let workspace = match prepared.conversation_workspace {
+                Some(workspace)
+                    if workspace.isolated
+                        && !crate::node_agent_update_checkpoint::same_path(
+                            std::path::Path::new(workspace_path),
+                            std::path::Path::new(&workspace.workspace_path),
+                        ) =>
+                {
+                    workspace
+                }
+                _ => {
+                    return json_error(
+                        StatusCode::CONFLICT,
+                        "监督写任务未取得独立 worktree，已在派发前拒绝。",
+                    )
+                }
+            };
+            Some(workspace)
+        } else {
+            None
+        };
+    let mut execution_workspace_path = resume_workspace
         .as_ref()
         .map(|workspace| workspace.inherited_workspace.workspace_path.as_str())
         .or_else(|| {
@@ -480,7 +508,7 @@ async fn create_task(
         .as_ref()
         .map(|context| context.record_prompt.as_str())
         .unwrap_or(prompt);
-    let executor_prompt = compiled_resume_context
+    let mut executor_prompt = compiled_resume_context
         .as_ref()
         .map(|context| context.executor_prompt.clone())
         .unwrap_or_else(|| {
@@ -521,7 +549,21 @@ async fn create_task(
             }
         }
     }
-    let record = if let (Some(workspace), Some(contract)) =
+    let recovered_idempotent_record = idempotency_binding
+        .as_ref()
+        .filter(|binding| binding.recover_existing)
+        .and_then(|binding| {
+            runtime
+                .local_tasks
+                .get_for_owner(&creds.owner_user_id, &binding.task_id)
+                .ok()
+                .flatten()
+        });
+    let record = if let Some(record) = recovered_idempotent_record {
+        execution_workspace_path = record.workspace_path.clone();
+        executor_prompt = record.prompt.clone();
+        record
+    } else if let (Some(workspace), Some(contract)) =
         (fresh_workspace.as_ref(), supervision.as_ref())
     {
         let request = SupervisedLocalTaskProvision {
@@ -587,23 +629,29 @@ async fn create_task(
         inherited_authorization_record,
         frozen_codex_home,
     );
-    (
-        StatusCode::ACCEPTED,
-        Json(json!({
-            "ok": true,
-            "task_id": task_id,
-            "status": "running",
-            "sync_state": "local_only",
-            "record": record,
-            "supervision": supervision,
-            "workspace_inheritance": workspace_inheritance,
-            "resume_context": compiled_resume_context.as_ref().map(|context| json!({
-                "schema": crate::node_agent_local_task_resume_context::RESUME_CONTEXT_SCHEMA,
-                "digest": context.digest,
-            })),
+    let response_body = json!({
+        "ok": true,
+        "task_id": task_id,
+        "status": "running",
+        "sync_state": "local_only",
+        "record": record,
+        "supervision": supervision,
+        "workspace_inheritance": workspace_inheritance,
+        "resume_context": compiled_resume_context.as_ref().map(|context| json!({
+            "schema": crate::node_agent_local_task_resume_context::RESUME_CONTEXT_SCHEMA,
+            "digest": context.digest,
         })),
-    )
-        .into_response()
+    });
+    if let Err(response) = idempotency::complete(
+        &runtime,
+        &creds.owner_user_id,
+        idempotency_binding.as_ref(),
+        StatusCode::ACCEPTED,
+        &response_body,
+    ) {
+        return response;
+    }
+    (StatusCode::ACCEPTED, Json(response_body)).into_response()
 }
 
 pub(crate) fn dispatch_local_task_record(
@@ -706,57 +754,6 @@ async fn decide_approval(
         "decision": decision,
     }))
     .into_response()
-}
-
-pub(crate) fn spawn_local_output_consumer(
-    runtime: Arc<NodeRuntime>,
-    owner_user_id: String,
-    task_id: String,
-    mut out_rx: tokio::sync::mpsc::UnboundedReceiver<Message>,
-) {
-    tokio::spawn(async move {
-        while let Some(message) = out_rx.recv().await {
-            let Message::Text(text) = message else {
-                continue;
-            };
-            let Ok(message) = serde_json::from_str::<AgentToServer>(&text) else {
-                continue;
-            };
-            match message {
-                AgentToServer::CliDone { req_id, .. } if req_id == task_id => {
-                    let completion = match durable_completion_for_local_display(
-                        &runtime.completion_outbox,
-                        &req_id,
-                    ) {
-                        Ok(Some(completion)) => completion,
-                        Ok(None) => {
-                            tracing::warn!(
-                                %task_id,
-                                "received local CliDone without durable outbox row; leaving terminal state to durable producer/startup repair"
-                            );
-                            break;
-                        }
-                        Err(error) => {
-                            tracing::warn!(%task_id, %error, "failed to read durable local completion");
-                            break;
-                        }
-                    };
-                    if let Err(error) = runtime.local_tasks.finish(&owner_user_id, &completion) {
-                        tracing::warn!(%task_id, %error, "failed to persist local task completion");
-                    }
-                    break;
-                }
-                _ => {}
-            }
-        }
-    });
-}
-
-fn durable_completion_for_local_display(
-    outbox: &crate::node_agent_completion_outbox::CliCompletionOutbox,
-    req_id: &str,
-) -> anyhow::Result<Option<CliCompletionEnvelope>> {
-    outbox.latest_for_req_id(req_id)
 }
 
 async fn bound_credentials(runtime: &Arc<NodeRuntime>) -> Result<crate::Credentials, Response> {

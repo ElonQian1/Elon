@@ -15,6 +15,26 @@ function Invoke-SupervisionSelfTest {
         'requirement' '' '' $testCriteria 'after_task_or_unblock'
     [byte[]]$requestBytes = Convert-ToUtf8JsonBytes $testBody
     $requestRoundTrip = Convert-JsonResponseBytes $requestBytes 'application/json'
+    $ordinaryPostContext = New-OrdinaryPostRequestContext $testBody
+    $ordinaryPostContextAgain = $ordinaryPostContext
+    $ordinaryPostAttempts = New-Object System.Collections.Generic.List[object]
+    $ordinaryPostRetry = Invoke-IdempotentNodePost `
+        ([pscustomobject]@{ BaseUrl = 'http://127.0.0.1:7799' }) '/api/local-tasks' $testBody `
+        $ordinaryPostContext `
+        -RequestInvoker {
+            param($Candidate, $EndpointPath, [byte[]]$Bytes, [string]$Key)
+            $ordinaryPostAttempts.Add([pscustomobject]@{
+                BaseUrl = $Candidate.BaseUrl; Path = $EndpointPath; Key = $Key; Bytes = $Bytes
+            }) | Out-Null
+            if ($ordinaryPostAttempts.Count -eq 1) {
+                throw [System.Net.WebException]::new(
+                    'fake timeout', [System.Net.WebExceptionStatus]::Timeout)
+            }
+            return [pscustomobject]@{ ok = $true; task_id = 'fake-retry-task' }
+        } `
+        -ConnectionResolver {
+            [pscustomobject]@{ BaseUrl = 'http://127.0.0.1:7801' }
+        }
 
     $parentJson = [ordered]@{
         record = [ordered]@{
@@ -273,6 +293,17 @@ function Invoke-SupervisionSelfTest {
         request_permission = $requestRoundTrip.runtime_permission -eq 'full_access'
         request_prompt = $requestRoundTrip.prompt -ceq $testPrompt
         request_criteria = $requestRoundTrip.supervision.acceptance_criteria[0] -ceq $testCriteria[0]
+        ordinary_post_stable_idempotency =
+            $ordinaryPostContext.IdempotencyKey -match '^desktop-[0-9a-f]{32}$' -and
+            $ordinaryPostContextAgain.IdempotencyKey -ceq $ordinaryPostContext.IdempotencyKey -and
+            [object]::ReferenceEquals($ordinaryPostContextAgain, $ordinaryPostContext) -and
+            ([byte[]]$ordinaryPostContext.BodyBytes).Length -eq $requestBytes.Length
+        ordinary_post_timeout_retry_reuses_binding = $ordinaryPostAttempts.Count -eq 2 -and
+            $ordinaryPostAttempts[0].Key -ceq $ordinaryPostAttempts[1].Key -and
+            $ordinaryPostAttempts[0].Key -ceq $ordinaryPostContext.IdempotencyKey -and
+            $ordinaryPostAttempts[0].Path -ceq $ordinaryPostAttempts[1].Path -and
+            $ordinaryPostAttempts[0].Bytes.Length -eq $ordinaryPostAttempts[1].Bytes.Length -and
+            $ordinaryPostRetry.Connection.BaseUrl -eq 'http://127.0.0.1:7801'
         response_workspace = $decodedParent.record.workspace_path -ceq $testExecutionWorkspace
         invalid_utf8 = $invalidUtf8Rejected
         review_summary = $reviewRoundTrip.summary -ceq $testSummary
@@ -347,7 +378,9 @@ function Invoke-SupervisionSelfTest {
         protocol = $script:SupervisionProtocol
         checks = @(
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
-            'non_ascii_prompt', 'acceptance_criteria', 'review_summary', 'review_public_dto',
+            'non_ascii_prompt', 'acceptance_criteria', 'ordinary_post_stable_idempotency',
+            'ordinary_post_timeout_retry_reuses_binding',
+            'review_summary', 'review_public_dto',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
             'resume_parent_role_requirement', 'resume_parent_role_resume_original',
             'resume_parent_role_reject_matrix',

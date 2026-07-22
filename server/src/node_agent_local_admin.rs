@@ -83,6 +83,7 @@ pub(crate) fn cors_layer(cloud_http_url: &str) -> CorsLayer {
         .allow_headers([
             CONTENT_TYPE,
             HeaderName::from_static(LOCAL_ADMIN_TOKEN_HEADER),
+            HeaderName::from_static(crate::node_agent_local_tasks::idempotency::IDEMPOTENCY_HEADER),
         ])
 }
 
