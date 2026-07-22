@@ -105,6 +105,10 @@ try {
     'src/features/ui-tuner/source-preview/sourcePreviewTree.ts',
     'source-preview/sourcePreviewTree.js',
   )
+  compile(
+    'src/features/ui-tuner/source-preview/pwaDesignDraft.ts',
+    'source-preview/pwaDesignDraft.js',
+  )
   const pwaMappingOutput = compile(
     'src/features/ui-tuner/source-preview/pwaNodeMapping.ts',
     'source-preview/pwaNodeMapping.js',
