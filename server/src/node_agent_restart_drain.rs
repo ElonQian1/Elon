@@ -313,6 +313,44 @@ pub(crate) fn status_payload() -> Value {
         })
 }
 
+/// Return stale task ids only when they were classified by the live runtime
+/// for the exact update that the standalone installer is about to apply.
+pub(crate) fn confirmed_stale_registry_tasks_for_update(
+    target_git_sha: &str,
+) -> anyhow::Result<std::collections::HashSet<String>> {
+    let Some(checkpoint) = load_checkpoint()? else {
+        return Ok(std::collections::HashSet::new());
+    };
+    Ok(confirmed_stale_registry_tasks(&checkpoint, target_git_sha))
+}
+
+fn confirmed_stale_registry_tasks(
+    checkpoint: &RestartCheckpoint,
+    target_git_sha: &str,
+) -> std::collections::HashSet<String> {
+    if checkpoint.protocol != CHECKPOINT_PROTOCOL
+        || !matches!(checkpoint.state.as_str(), "applying" | "restart_scheduled")
+    {
+        return std::collections::HashSet::new();
+    }
+    let Some(target) = checkpoint
+        .target_release_identity
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return std::collections::HashSet::new();
+    };
+    let exact_target = target == target_git_sha
+        || target
+            .rsplit_once('+')
+            .is_some_and(|(_, git_sha)| git_sha == target_git_sha);
+    if !exact_target {
+        return std::collections::HashSet::new();
+    }
+    checkpoint.stale_registry_task_ids.iter().cloned().collect()
+}
+
 #[derive(Default)]
 struct DrainClassification {
     blocking: Vec<String>,
@@ -612,6 +650,25 @@ mod tests {
         assert_eq!(checkpoint.state, "restart_scheduled");
         assert!(checkpoint.message.contains("等待目标版本"));
         assert!(!checkpoint.message.contains("runtime_online"));
+    }
+
+    #[test]
+    fn stale_registry_proof_is_bound_to_exact_target_and_applying_state() {
+        let mut checkpoint = RestartCheckpoint::draining(
+            "test",
+            Vec::new(),
+            None,
+            Some("0.3.69+targetsha".to_string()),
+        );
+        checkpoint.stale_registry_task_ids = vec!["stale-evolution".to_string()];
+        assert!(confirmed_stale_registry_tasks(&checkpoint, "targetsha").is_empty());
+
+        checkpoint.transition("restart_scheduled", "ready");
+        assert_eq!(
+            confirmed_stale_registry_tasks(&checkpoint, "targetsha"),
+            std::collections::HashSet::from(["stale-evolution".to_string()])
+        );
+        assert!(confirmed_stale_registry_tasks(&checkpoint, "other-sha").is_empty());
     }
 
     #[test]

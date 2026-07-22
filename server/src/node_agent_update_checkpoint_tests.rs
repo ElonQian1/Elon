@@ -95,6 +95,7 @@ fn legacy_active_task_without_supervision_checkpoint_defers_update() {
         &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
         "old",
         "new",
+        &HashSet::new(),
     )
     .unwrap();
     assert_eq!(decision.active_foreground_task_ids, ["legacy-active"]);
@@ -154,9 +155,26 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
         &sidecars,
         "old",
         "new",
+        &HashSet::new(),
     )
     .expect_err("updater must fail closed before the self-evolution cancel audit is durable");
     assert!(blocked.to_string().contains("durable sidecar audit"));
+
+    assert!(local_tasks
+        .mark_cancel_requested("evolution-active")
+        .unwrap());
+    let confirmed_stale = HashSet::from(["evolution-active".to_string()]);
+    let stale_decision = checkpoint_active_update_transactions(
+        &recovery,
+        &local_tasks,
+        &journal,
+        &sidecars,
+        "old",
+        "new",
+        &confirmed_stale,
+    )
+    .expect("exact-target stale cancel_requested evolution should not block the installer");
+    assert!(stale_decision.install_may_proceed());
 
     sidecars
         .upsert_session(
@@ -180,6 +198,7 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
         &sidecars,
         "old",
         "new",
+        &HashSet::new(),
     )
     .unwrap();
     assert!(decision.active_foreground_task_ids.is_empty());

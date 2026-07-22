@@ -45,6 +45,8 @@ pub(crate) fn checkpoint_downloaded_update(
         .context("更新版本缺少 gitSha，不能建立恢复事务")?;
     let from_git_sha = read_version_git_sha(version_file).unwrap_or_default();
     let store = UpdateRecoveryStore::default();
+    let confirmed_stale =
+        crate::node_agent_restart_drain::confirmed_stale_registry_tasks_for_update(to_git_sha)?;
     let decision = checkpoint_active_update_transactions(
         &store,
         &crate::node_agent_local_task_store::LocalTaskStore::default(),
@@ -52,6 +54,7 @@ pub(crate) fn checkpoint_downloaded_update(
         &crate::node_agent_cli_sidecar::CliSidecarRegistry::default(),
         &from_git_sha,
         to_git_sha,
+        &confirmed_stale,
     )?;
     if !decision.checkpointed_task_ids.is_empty() {
         info!(count = decision.checkpointed_task_ids.len(), %to_git_sha, "已保存节点更新任务恢复检查点");
@@ -82,6 +85,7 @@ fn checkpoint_active_update_transactions(
     sidecars: &crate::node_agent_cli_sidecar::CliSidecarRegistry,
     from_git_sha: &str,
     to_git_sha: &str,
+    confirmed_stale_registry_tasks: &HashSet<String>,
 ) -> Result<UpdateCheckpointDecision> {
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
@@ -100,12 +104,13 @@ fn checkpoint_active_update_transactions(
             let recorded = sidecars
                 .record_cancel_command_with_audit(&task.task_id, &audit)
                 .with_context(|| format!("persist updater cancel audit for {}", task.task_id))?;
-            if !recorded {
-                anyhow::bail!(
-                    "updater refused to interrupt self evolution {} without a durable sidecar audit",
-                    task.task_id
-                );
-            }
+            anyhow::ensure!(
+                recorded
+                    || (task.status == "cancel_requested"
+                        && confirmed_stale_registry_tasks.contains(&task.task_id)),
+                "updater refused to interrupt self evolution {} without a durable sidecar audit or exact-target stale-runtime proof",
+                task.task_id
+            );
             continue;
         }
         decision
