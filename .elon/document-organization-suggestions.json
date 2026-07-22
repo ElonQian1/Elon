@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "ready",
+  "status": "applied",
   "summary": "自项目复查确认现行权威入口、15 个主题分区与目录一致；既有 docs/1.md 到 docs/apk-release-signing-secrets.md 的安全重命名已完成。本轮没有新的无歧义安全移动或重命名，保留稳定权威路径，仅生成可追溯 Git 前后快照。",
   "proposed_profile": "software-platform",
   "proposed_home": null,

@@ -6,23 +6,33 @@
     "summary": "一龙是由服务端、PC Web 工作台、Windows 节点和 Android 客户端组成的 AI 协作平台。先从项目总览理解范围，再按平台架构、客户端、AI 上下文、项目系统和运维主题深入；权威性、生命周期和检索优先级在治理视图中独立判断。",
     "entrypoint": "docs/README.md",
     "start_here": [
-      "docs/README.md",
-      "AI_PROJECT.md",
       "AI_ARCHITECTURE.md",
-      "docs/system-architecture.md",
-      "AI_INDEX.md"
+      "AI_INDEX.md",
+      "AI_PROJECT.md",
+      "docs/README.md",
+      "docs/system-architecture.md"
     ]
   },
   "sections": [
     {
-      "id": "overview",
-      "label": "项目总览",
-      "detail": "定位、范围、阅读地图和核心入口",
-      "color": "#9A74E8",
+      "id": "ai-context",
+      "label": "AI 与上下文",
+      "detail": "跨供应商指令、Agent、Prompt、Skill、RAG 和记忆",
+      "color": "#B582DD",
       "parent_id": "",
-      "order": 10,
-      "icon": "compass",
-      "entrypoint": "docs/README.md"
+      "order": 40,
+      "icon": "bot",
+      "entrypoint": "AGENTS.md"
+    },
+    {
+      "id": "android-client",
+      "label": "Android 客户端",
+      "detail": "APK、Compose UI、真机渲染与发布",
+      "color": "#70B985",
+      "parent_id": "clients",
+      "order": 30,
+      "icon": "smartphone",
+      "entrypoint": "docs/android-setup.md"
     },
     {
       "id": "architecture",
@@ -55,54 +65,24 @@
       "entrypoint": ""
     },
     {
-      "id": "pc-workbench",
-      "label": "PC Web 工作台",
-      "detail": "React/Vite 工作台、项目文档和交互体验",
-      "color": "#69B5D0",
-      "parent_id": "clients",
+      "id": "external-tools",
+      "label": "工具与外部生态",
+      "detail": "CLI、模型、语音与第三方工具集成；权威性由治理维度单独表达",
+      "color": "#D49A5B",
+      "parent_id": "",
+      "order": 90,
+      "icon": "wrench",
+      "entrypoint": ""
+    },
+    {
+      "id": "fb2-project",
+      "label": "fb2 AI 中心",
+      "detail": "fb2 集成契约、SDK、计费和验收资料",
+      "color": "#57A6C7",
+      "parent_id": "subprojects",
       "order": 10,
-      "icon": "monitor",
-      "entrypoint": "docs/pc-frontend-migration.md"
-    },
-    {
-      "id": "windows-node",
-      "label": "Windows 节点",
-      "detail": "本机节点、数据目录、升级与离线韧性",
-      "color": "#65A8C8",
-      "parent_id": "clients",
-      "order": 20,
-      "icon": "hard-drive",
-      "entrypoint": "docs/node-agent-upgrade-compatibility.md"
-    },
-    {
-      "id": "android-client",
-      "label": "Android 客户端",
-      "detail": "APK、Compose UI、真机渲染与发布",
-      "color": "#70B985",
-      "parent_id": "clients",
-      "order": 30,
-      "icon": "smartphone",
-      "entrypoint": "docs/android-setup.md"
-    },
-    {
-      "id": "ai-context",
-      "label": "AI 与上下文",
-      "detail": "跨供应商指令、Agent、Prompt、Skill、RAG 和记忆",
-      "color": "#B582DD",
-      "parent_id": "",
-      "order": 40,
-      "icon": "bot",
-      "entrypoint": "AGENTS.md"
-    },
-    {
-      "id": "project-system",
-      "label": "用户与项目系统",
-      "detail": "项目、频道、Git 工作区、文档知识库和协作流程",
-      "color": "#D18B62",
-      "parent_id": "",
-      "order": 50,
-      "icon": "folder-kanban",
-      "entrypoint": "docs/user-project-system.md"
+      "icon": "package-open",
+      "entrypoint": "docs/fb2-ai-center/README.md"
     },
     {
       "id": "operations",
@@ -113,6 +93,36 @@
       "order": 60,
       "icon": "ship-wheel",
       "entrypoint": "docs/ai-agent-workflow.md"
+    },
+    {
+      "id": "overview",
+      "label": "项目总览",
+      "detail": "定位、范围、阅读地图和核心入口",
+      "color": "#9A74E8",
+      "parent_id": "",
+      "order": 10,
+      "icon": "compass",
+      "entrypoint": "docs/README.md"
+    },
+    {
+      "id": "pc-workbench",
+      "label": "PC Web 工作台",
+      "detail": "React/Vite 工作台、项目文档和交互体验",
+      "color": "#69B5D0",
+      "parent_id": "clients",
+      "order": 10,
+      "icon": "monitor",
+      "entrypoint": "docs/pc-frontend-migration.md"
+    },
+    {
+      "id": "project-system",
+      "label": "用户与项目系统",
+      "detail": "项目、频道、Git 工作区、文档知识库和协作流程",
+      "color": "#D18B62",
+      "parent_id": "",
+      "order": 50,
+      "icon": "folder-kanban",
+      "entrypoint": "docs/user-project-system.md"
     },
     {
       "id": "security",
@@ -135,26 +145,6 @@
       "entrypoint": ""
     },
     {
-      "id": "fb2-project",
-      "label": "fb2 AI 中心",
-      "detail": "fb2 集成契约、SDK、计费和验收资料",
-      "color": "#57A6C7",
-      "parent_id": "subprojects",
-      "order": 10,
-      "icon": "package-open",
-      "entrypoint": "docs/fb2-ai-center/README.md"
-    },
-    {
-      "id": "external-tools",
-      "label": "工具与外部生态",
-      "detail": "CLI、模型、语音与第三方工具集成；权威性由治理维度单独表达",
-      "color": "#D49A5B",
-      "parent_id": "",
-      "order": 90,
-      "icon": "wrench",
-      "entrypoint": ""
-    },
-    {
       "id": "unassigned-topic",
       "label": "未归主题",
       "detail": "尚未确定主要业务主题；不代表文档权威性或生命周期",
@@ -163,60 +153,35 @@
       "order": 100,
       "icon": "circle-help",
       "entrypoint": ""
+    },
+    {
+      "id": "windows-node",
+      "label": "Windows 节点",
+      "detail": "本机节点、数据目录、升级与离线韧性",
+      "color": "#65A8C8",
+      "parent_id": "clients",
+      "order": 20,
+      "icon": "hard-drive",
+      "entrypoint": "docs/node-agent-upgrade-compatibility.md"
     }
   ],
   "assignments": {
-    "docs/README.md": "custom:overview",
-    "AI_PROJECT.md": "custom:overview",
-    "AI_INDEX.md": "custom:overview",
-    "AI_ARCHITECTURE.md": "custom:architecture",
-    "docs/system-architecture.md": "custom:architecture",
-    "docs/intent-routing.md": "custom:backend-api",
-    "docs/route-c-sdk-mvp.md": "custom:backend-api",
-    "docs/pc-frontend-migration.md": "custom:pc-workbench",
-    "docs/project-document-governance-mcp.md": "custom:pc-workbench",
-    "docs/pc-node-data-root.md": "custom:windows-node",
-    "docs/pc-node-offline-resilience.md": "custom:windows-node",
-    "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
-    "docs/win-node-toolbox.md": "custom:windows-node",
-    "docs/android-setup.md": "custom:android-client",
-    "docs/android-real-renderer-ui-workflow.md": "custom:android-client",
-    "docs/shared-android-device-host.md": "custom:android-client",
-    "docs/APP 颜色规范.md": "custom:android-client",
-    "docs/Design.md": "custom:android-client",
     "AGENTS.md": "custom:ai-context",
+    "AI_ARCHITECTURE.md": "custom:architecture",
+    "AI_INDEX.md": "custom:overview",
+    "AI_PROJECT.md": "custom:overview",
     "AI_RULES.md": "custom:ai-context",
     "AI_TASK_TEMPLATE.md": "custom:ai-context",
     "CODEX.md": "custom:ai-context",
-    "docs/ai-to-ai-skill-oracle-roadmap.md": "custom:ai-context",
-    "docs/group-chat-summary-system.md": "custom:ai-context",
-    "docs/记忆系统.md": "custom:ai-context",
-    "docs/user-project-system.md": "custom:project-system",
-    "docs/supervised-pc-project-development.md": "custom:project-system",
-    "docs/project-store-architecture.md": "custom:project-system",
-    "docs/project-landing-manifest.md": "custom:project-system",
+    "docs/APP 颜色规范.md": "custom:android-client",
+    "docs/Design.md": "custom:android-client",
+    "docs/README.md": "custom:overview",
     "docs/ai-agent-workflow.md": "custom:operations",
-    "docs/powershell-version-policy.md": "custom:operations",
-    "docs/query-chat-records.md": "custom:operations",
-    "docs/apk-release-signing-secrets.md": "custom:security",
-    "docs/codex-vault-sharing-runbook.md": "custom:security",
-    "docs/windows-client-defender.md": "custom:security",
-    "docs/fb2-ai-center/README.md": "custom:fb2-project",
-    "docs/fb2-ai-center/billing-policy.md": "custom:fb2-project",
-    "docs/fb2-ai-center/context-projection-layer.md": "custom:fb2-project",
-    "docs/fb2-ai-center/contracts.md": "custom:fb2-project",
-    "docs/fb2-ai-center/data-tools.md": "custom:fb2-project",
-    "docs/fb2-ai-center/final-acceptance-matrix.md": "custom:fb2-project",
-    "docs/fb2-ai-center/handoff.md": "custom:fb2-project",
-    "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
-    "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
-    "docs/fb2-ai-center/roadmap.md": "custom:fb2-project",
-    "docs/fb2-ai-center/test-plan.md": "custom:fb2-project",
-    "docs/fb2-ai-center/tool-manifest-boundary.md": "custom:fb2-project",
-    "docs/fb2-ai-center/voice-sdk.md": "custom:fb2-project",
-    "docs/fb2-business-context-pack.md": "custom:fb2-project",
-    "docs/fb2-chat-voice-kit-integration.md": "custom:fb2-project",
+    "docs/ai-to-ai-skill-oracle-roadmap.md": "custom:ai-context",
+    "docs/android-real-renderer-ui-workflow.md": "custom:android-client",
+    "docs/android-setup.md": "custom:android-client",
     "docs/api测试/hy3 api key.md": "custom:external-tools",
+    "docs/apk-release-signing-secrets.md": "custom:security",
     "docs/asr+tts.md": "custom:external-tools",
     "docs/cli codex剩余用量查询.md": "custom:external-tools",
     "docs/cli会话问题/Codex cli图片识别.md": "custom:external-tools",
@@ -224,40 +189,74 @@
     "docs/cli会话问题/copilot cli图片识别.md": "custom:external-tools",
     "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
-    "docs/小米语音开启.md": "custom:external-tools"
+    "docs/codex-vault-sharing-runbook.md": "custom:security",
+    "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
+    "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
+    "docs/fb2-ai-center/README.md": "custom:fb2-project",
+    "docs/fb2-ai-center/billing-policy.md": "custom:fb2-project",
+    "docs/fb2-ai-center/context-projection-layer.md": "custom:fb2-project",
+    "docs/fb2-ai-center/contracts.md": "custom:fb2-project",
+    "docs/fb2-ai-center/data-tools.md": "custom:fb2-project",
+    "docs/fb2-ai-center/final-acceptance-matrix.md": "custom:fb2-project",
+    "docs/fb2-ai-center/handoff.md": "custom:fb2-project",
+    "docs/fb2-ai-center/roadmap.md": "custom:fb2-project",
+    "docs/fb2-ai-center/test-plan.md": "custom:fb2-project",
+    "docs/fb2-ai-center/tool-manifest-boundary.md": "custom:fb2-project",
+    "docs/fb2-ai-center/voice-sdk.md": "custom:fb2-project",
+    "docs/fb2-business-context-pack.md": "custom:fb2-project",
+    "docs/fb2-chat-voice-kit-integration.md": "custom:fb2-project",
+    "docs/group-chat-summary-system.md": "custom:ai-context",
+    "docs/intent-routing.md": "custom:backend-api",
+    "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
+    "docs/pc-frontend-migration.md": "custom:pc-workbench",
+    "docs/pc-node-data-root.md": "custom:windows-node",
+    "docs/pc-node-offline-resilience.md": "custom:windows-node",
+    "docs/powershell-version-policy.md": "custom:operations",
+    "docs/project-document-governance-mcp.md": "custom:pc-workbench",
+    "docs/project-landing-manifest.md": "custom:project-system",
+    "docs/project-store-architecture.md": "custom:project-system",
+    "docs/query-chat-records.md": "custom:operations",
+    "docs/route-c-sdk-mvp.md": "custom:backend-api",
+    "docs/shared-android-device-host.md": "custom:android-client",
+    "docs/supervised-pc-project-development.md": "custom:project-system",
+    "docs/system-architecture.md": "custom:architecture",
+    "docs/user-project-system.md": "custom:project-system",
+    "docs/win-node-toolbox.md": "custom:windows-node",
+    "docs/windows-client-defender.md": "custom:security",
+    "docs/小米语音开启.md": "custom:external-tools",
+    "docs/记忆系统.md": "custom:ai-context"
   },
   "secondary_assignments": {
-    "AGENTS.md": ["custom:operations"],
-    "AI_ARCHITECTURE.md": ["custom:backend-api", "custom:ai-context"],
-    "docs/system-architecture.md": ["custom:backend-api", "custom:project-system"],
-    "docs/project-document-governance-mcp.md": ["custom:project-system", "custom:ai-context"],
-    "docs/pc-frontend-migration.md": ["custom:project-system"],
-    "docs/node-agent-upgrade-compatibility.md": ["custom:operations"],
-    "docs/ai-agent-workflow.md": ["custom:ai-context"],
-    "docs/codex-vault-sharing-runbook.md": ["custom:operations"],
-    "docs/fb2-ai-center/README.md": ["custom:backend-api"]
-  },
-  "governance_facets": {
-    ".github/copilot-instructions.md": { "retrieval": "required", "lifecycle": "active", "authority": "binding", "document_type": "policy" },
-    "AGENTS.md": { "retrieval": "required", "lifecycle": "active", "authority": "binding", "document_type": "router" },
-    "CODEX.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "provider_adapter" },
-    "AI_PROJECT.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "project_guide" },
-    "AI_ARCHITECTURE.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "architecture" },
-    "AI_INDEX.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "api_reference" },
-    "docs/README.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "overview" },
-    "docs/system-architecture.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "architecture" },
-    "docs/project-document-governance-mcp.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "guide" },
-    "docs/pc-frontend-migration.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "guide" },
-    "docs/node-agent-upgrade-compatibility.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "runbook" },
-    "docs/android-setup.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "guide" },
-    "docs/user-project-system.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "architecture" },
-    "docs/ai-agent-workflow.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "runbook" },
-    "docs/windows-client-defender.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "guidance", "document_type": "security_guide" },
-    "docs/fb2-ai-center/README.md": { "retrieval": "on_demand", "lifecycle": "active", "authority": "authoritative", "document_type": "subproject_overview" },
-    "docs/fb2-ai-center/PLAN.md": { "retrieval": "excluded", "lifecycle": "draft", "authority": "proposal", "document_type": "plan" },
-    "docs/fb2-ai-center/PROGRESS.md": { "retrieval": "excluded", "lifecycle": "active", "authority": "evidence", "document_type": "status" },
-    "docs/api测试/hy3 api key.md": { "retrieval": "excluded", "lifecycle": "unclassified", "authority": "non_authoritative", "document_type": "note" },
-    "docs/符号索引讨论/向量数据库rag相关.md": { "retrieval": "excluded", "lifecycle": "draft", "authority": "proposal", "document_type": "discussion" }
+    "AGENTS.md": [
+      "custom:operations"
+    ],
+    "AI_ARCHITECTURE.md": [
+      "custom:ai-context",
+      "custom:backend-api"
+    ],
+    "docs/ai-agent-workflow.md": [
+      "custom:ai-context"
+    ],
+    "docs/codex-vault-sharing-runbook.md": [
+      "custom:operations"
+    ],
+    "docs/fb2-ai-center/README.md": [
+      "custom:backend-api"
+    ],
+    "docs/node-agent-upgrade-compatibility.md": [
+      "custom:operations"
+    ],
+    "docs/pc-frontend-migration.md": [
+      "custom:project-system"
+    ],
+    "docs/project-document-governance-mcp.md": [
+      "custom:ai-context",
+      "custom:project-system"
+    ],
+    "docs/system-architecture.md": [
+      "custom:backend-api",
+      "custom:project-system"
+    ]
   },
   "governance_overrides": {
     "docs/APP 颜色规范.md": "current",
@@ -302,257 +301,1659 @@
     "docs/群体ai开发/群体ai开发.md": "drafts",
     "docs/记忆系统.md": "drafts"
   },
-  "document_metadata": {
-    "docs/README.md": {
-      "doc_type": "overview",
-      "audience": ["开发者", "AI 代理", "项目管理者"],
-      "owner": "项目维护者",
-      "owners": ["平台文档组"],
-      "reviewed_at": "2026-07-17",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:docs/README.md"],
-      "version": "2026-07",
-      "related": ["AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md"],
-      "supersedes": [],
-      "relations": [
-        { "relation": "see_also", "target": "AI_PROJECT.md" },
-        { "relation": "see_also", "target": "AI_ARCHITECTURE.md" },
-        { "relation": "see_also", "target": "AI_INDEX.md" }
-      ]
+  "governance_facets": {
+    ".github/copilot-instructions.md": {
+      "retrieval": "required",
+      "lifecycle": "active",
+      "authority": "binding",
+      "document_type": "policy"
     },
-    "AI_PROJECT.md": {
-      "doc_type": "overview",
-      "audience": ["开发者", "AI 代理"],
-      "owner": "项目维护者",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:server/src/main.rs", "file:pc-frontend/src/App.tsx"],
-      "related": ["docs/README.md", "AI_ARCHITECTURE.md"],
-      "supersedes": [],
-      "relations": [
-        { "relation": "see_also", "target": "docs/README.md" },
-        { "relation": "depends_on", "target": "AI_ARCHITECTURE.md" }
-      ]
+    "AGENTS.md": {
+      "retrieval": "required",
+      "lifecycle": "active",
+      "authority": "binding",
+      "document_type": "router"
     },
     "AI_ARCHITECTURE.md": {
-      "doc_type": "architecture",
-      "audience": ["开发者", "AI 代理"],
-      "owner": "项目维护者",
-      "reviewed_at": "2026-07-17",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:server/src/main.rs", "file:server/src/node_agent_main.rs"],
-      "version": "",
-      "related": ["docs/system-architecture.md", "AI_INDEX.md"],
-      "supersedes": [],
-      "relations": [
-        { "relation": "supports", "target": "docs/system-architecture.md" },
-        { "relation": "see_also", "target": "AI_INDEX.md" }
-      ]
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture"
     },
     "AI_INDEX.md": {
-      "doc_type": "api-reference",
-      "audience": ["开发者", "AI 代理"],
-      "owner": "项目维护者",
-      "reviewed_at": "2026-07-17",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:server/src/main.rs"],
-      "version": "",
-      "related": ["AI_ARCHITECTURE.md"],
-      "supersedes": [],
-      "relations": [{ "relation": "depends_on", "target": "AI_ARCHITECTURE.md" }]
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "api_reference"
     },
-    "docs/system-architecture.md": {
-      "doc_type": "architecture",
-      "audience": ["开发者", "AI 代理"],
-      "owner": "平台后端",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:server/src/main.rs", "file:server/src/node_agent_main.rs", "file:pc-frontend/src/App.tsx"],
-      "related": ["AI_ARCHITECTURE.md", "AI_INDEX.md"],
-      "supersedes": [],
-      "relations": [{ "relation": "evidence_for", "target": "AI_ARCHITECTURE.md" }]
+    "AI_PROJECT.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "project_guide"
     },
-    "docs/pc-frontend-migration.md": {
-      "doc_type": "client-guides",
-      "audience": ["前端开发者", "AI 代理"],
-      "owner": "PC 客户端",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:pc-frontend/src/App.tsx", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
-      "related": ["docs/project-document-governance-mcp.md"],
-      "supersedes": [],
-      "relations": [{ "relation": "implements", "target": "docs/project-document-governance-mcp.md" }]
+    "CODEX.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "provider_adapter"
     },
-    "docs/node-agent-upgrade-compatibility.md": {
-      "doc_type": "client-guides",
-      "audience": ["节点开发者", "运维人员"],
-      "owner": "平台后端",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 60,
-      "implementation_refs": ["file:server/src/node_agent_main.rs", "file:server/src/node_agent_client_maintenance.rs"],
-      "related": ["docs/pc-node-offline-resilience.md", "docs/ai-agent-workflow.md"],
-      "supersedes": [],
-      "relations": [{ "relation": "depends_on", "target": "docs/ai-agent-workflow.md" }]
-    },
-    "docs/android-setup.md": {
-      "doc_type": "client-guides",
-      "audience": ["Android 开发者", "AI 代理"],
-      "owner": "Android 客户端",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"],
-      "related": ["docs/android-real-renderer-ui-workflow.md", "docs/Design.md"],
-      "supersedes": []
-    },
-    "docs/user-project-system.md": {
-      "doc_type": "architecture",
-      "audience": ["产品开发者", "AI 代理"],
-      "owner": "项目系统",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:server/src/project_space.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
-      "related": ["docs/project-store-architecture.md", "docs/project-document-governance-mcp.md"],
-      "supersedes": [],
-      "relations": [{ "relation": "supports", "target": "docs/project-document-governance-mcp.md" }]
+    "docs/README.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "overview"
     },
     "docs/ai-agent-workflow.md": {
-      "doc_type": "operations",
-      "audience": ["AI 代理", "开发者"],
-      "owner": "项目维护者",
-      "reviewed_at": "2026-07-17",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:scripts/finish-ai-task.ps1"],
-      "version": "",
-      "related": ["AGENTS.md"],
-      "supersedes": [],
-      "relations": [{ "relation": "implements", "target": ".github/copilot-instructions.md" }]
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "runbook"
     },
-    "docs/project-document-governance-mcp.md": {
-      "doc_type": "client-guides",
-      "audience": ["开发者", "AI 供应商"],
-      "owner": "项目维护者",
-      "reviewed_at": "2026-07-17",
-      "review_interval_days": 60,
-      "implementation_refs": ["file:server/src/node_agent_project_docs_mcp.rs", "file:server/src/project_document_governance_facets.rs", "file:server/src/project_document_issue_workflow.rs", "file:server/src/project_document_versioning.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"],
-      "version": "3",
-      "related": ["docs/pc-frontend-migration.md"],
-      "supersedes": [],
-      "relations": [
-        { "relation": "implements", "target": ".github/instructions/document-authority.instructions.md" },
-        { "relation": "see_also", "target": "docs/pc-frontend-migration.md" }
-      ]
+    "docs/android-setup.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "guide"
     },
-    "docs/windows-client-defender.md": {
-      "doc_type": "client-guides",
-      "audience": ["Windows 用户", "运维人员"],
-      "owner": "平台安全",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 90,
-      "implementation_refs": ["file:server/src/node_agent_main.rs"],
-      "related": ["docs/codex-vault-sharing-runbook.md"],
-      "supersedes": []
+    "docs/api测试/hy3 api key.md": {
+      "retrieval": "excluded",
+      "lifecycle": "unclassified",
+      "authority": "non_authoritative",
+      "document_type": "note"
     },
-    "docs/supervised-pc-project-development.md": {
-      "doc_type": "operations",
-      "audience": ["开发者", "AI 代理", "项目管理者"],
-      "owner": "项目维护者",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 60,
-      "implementation_refs": ["file:server/src/ai_cli/pc_agent_dispatch.rs", "file:server/src/node_agent_main.rs"],
-      "version": "1",
-      "related": ["docs/system-architecture.md", "docs/user-project-system.md", "docs/ai-agent-workflow.md"],
-      "supersedes": []
+    "docs/fb2-ai-center/PLAN.md": {
+      "retrieval": "excluded",
+      "lifecycle": "draft",
+      "authority": "proposal",
+      "document_type": "plan"
+    },
+    "docs/fb2-ai-center/PROGRESS.md": {
+      "retrieval": "excluded",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "status"
     },
     "docs/fb2-ai-center/README.md": {
-      "doc_type": "overview",
-      "audience": ["fb2 开发者", "平台开发者"],
-      "owner": "fb2 项目维护者",
-      "reviewed_at": "2026-07-18",
-      "review_interval_days": 60,
-      "implementation_refs": ["file:server/src/external_app_api.rs"],
-      "related": ["docs/fb2-ai-center/contracts.md", "docs/fb2-ai-center/handoff.md"],
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "subproject_overview"
+    },
+    "docs/node-agent-upgrade-compatibility.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "runbook"
+    },
+    "docs/pc-frontend-migration.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "guide"
+    },
+    "docs/project-document-governance-mcp.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "guide"
+    },
+    "docs/system-architecture.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture"
+    },
+    "docs/user-project-system.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture"
+    },
+    "docs/windows-client-defender.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "security_guide"
+    },
+    "docs/符号索引讨论/向量数据库rag相关.md": {
+      "retrieval": "excluded",
+      "lifecycle": "draft",
+      "authority": "proposal",
+      "document_type": "discussion"
+    }
+  },
+  "document_metadata": {
+    ".github/copilot-instructions.md": {
+      "id": "shared-ai-contract",
+      "doc_type": "policy",
+      "audience": [
+        "AI 代理",
+        "开发者"
+      ],
+      "owner": "项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:scripts/ai-task-preflight.ps1",
+        "file:scripts/finish-ai-task.ps1"
+      ],
+      "version": "",
+      "related": [
+        "AGENTS.md"
+      ],
       "supersedes": [],
-      "relations": [{ "relation": "depends_on", "target": "docs/fb2-ai-center/contracts.md" }]
+      "relations": [
+        {
+          "relation": "supports",
+          "target": "AGENTS.md"
+        },
+        {
+          "relation": "related",
+          "target": "AGENTS.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
     },
     "AGENTS.md": {
       "id": "ai-work-entry",
       "doc_type": "router",
-      "audience": ["AI 代理"],
+      "audience": [
+        "AI 代理"
+      ],
       "owner": "项目维护者",
+      "owners": [],
       "reviewed_at": "2026-07-17",
       "review_interval_days": 30,
-      "implementation_refs": ["file:.github/copilot-instructions.md"],
-      "related": [".github/copilot-instructions.md", "CODEX.md"],
+      "implementation_refs": [
+        "file:.github/copilot-instructions.md"
+      ],
+      "version": "",
+      "related": [
+        ".github/copilot-instructions.md",
+        "CODEX.md"
+      ],
       "supersedes": [],
-      "relations": [{ "relation": "depends_on", "target": ".github/copilot-instructions.md" }]
+      "relations": [
+        {
+          "relation": "depends_on",
+          "target": ".github/copilot-instructions.md"
+        },
+        {
+          "relation": "related",
+          "target": ".github/copilot-instructions.md"
+        },
+        {
+          "relation": "related",
+          "target": "CODEX.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
     },
-    ".github/copilot-instructions.md": {
-      "id": "shared-ai-contract",
-      "doc_type": "policy",
-      "audience": ["AI 代理", "开发者"],
+    "AI_ARCHITECTURE.md": {
+      "id": "",
+      "doc_type": "architecture",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
       "owner": "项目维护者",
+      "owners": [],
       "reviewed_at": "2026-07-17",
-      "review_interval_days": 30,
-      "implementation_refs": ["file:scripts/ai-task-preflight.ps1", "file:scripts/finish-ai-task.ps1"],
-      "related": ["AGENTS.md"],
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/main.rs",
+        "file:server/src/node_agent_main.rs"
+      ],
+      "version": "",
+      "related": [
+        "AI_INDEX.md",
+        "docs/system-architecture.md"
+      ],
       "supersedes": [],
-      "relations": [{ "relation": "supports", "target": "AGENTS.md" }]
+      "relations": [
+        {
+          "relation": "supports",
+          "target": "docs/system-architecture.md"
+        },
+        {
+          "relation": "see_also",
+          "target": "AI_INDEX.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_INDEX.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/system-architecture.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "AI_INDEX.md": {
+      "id": "",
+      "doc_type": "api-reference",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/main.rs"
+      ],
+      "version": "",
+      "related": [
+        "AI_ARCHITECTURE.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "depends_on",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_ARCHITECTURE.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "AI_PROJECT.md": {
+      "id": "",
+      "doc_type": "overview",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/main.rs",
+        "file:pc-frontend/src/App.tsx"
+      ],
+      "version": "",
+      "related": [
+        "AI_ARCHITECTURE.md",
+        "docs/README.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "see_also",
+          "target": "docs/README.md"
+        },
+        {
+          "relation": "depends_on",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/README.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/README.md": {
+      "id": "",
+      "doc_type": "overview",
+      "audience": [
+        "开发者",
+        "AI 代理",
+        "项目管理者"
+      ],
+      "owner": "项目维护者",
+      "owners": [
+        "平台文档组"
+      ],
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:docs/README.md"
+      ],
+      "version": "2026-07",
+      "related": [
+        "AI_ARCHITECTURE.md",
+        "AI_INDEX.md",
+        "AI_PROJECT.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "see_also",
+          "target": "AI_PROJECT.md"
+        },
+        {
+          "relation": "see_also",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "see_also",
+          "target": "AI_INDEX.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_INDEX.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_PROJECT.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/ai-agent-workflow.md": {
+      "id": "",
+      "doc_type": "operations",
+      "audience": [
+        "AI 代理",
+        "开发者"
+      ],
+      "owner": "项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:scripts/finish-ai-task.ps1"
+      ],
+      "version": "",
+      "related": [
+        "AGENTS.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "implements",
+          "target": ".github/copilot-instructions.md"
+        },
+        {
+          "relation": "related",
+          "target": "AGENTS.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/android-setup.md": {
+      "id": "",
+      "doc_type": "client-guides",
+      "audience": [
+        "Android 开发者",
+        "AI 代理"
+      ],
+      "owner": "Android 客户端",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"
+      ],
+      "version": "",
+      "related": [
+        "docs/Design.md",
+        "docs/android-real-renderer-ui-workflow.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "related",
+          "target": "docs/Design.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/android-real-renderer-ui-workflow.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/fb2-ai-center/README.md": {
+      "id": "",
+      "doc_type": "overview",
+      "audience": [
+        "fb2 开发者",
+        "平台开发者"
+      ],
+      "owner": "fb2 项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/external_app_api.rs"
+      ],
+      "version": "",
+      "related": [
+        "docs/fb2-ai-center/contracts.md",
+        "docs/fb2-ai-center/handoff.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "depends_on",
+          "target": "docs/fb2-ai-center/contracts.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/fb2-ai-center/contracts.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/fb2-ai-center/handoff.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/node-agent-upgrade-compatibility.md": {
+      "id": "",
+      "doc_type": "client-guides",
+      "audience": [
+        "节点开发者",
+        "运维人员"
+      ],
+      "owner": "平台后端",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/node_agent_main.rs",
+        "file:server/src/node_agent_client_maintenance.rs"
+      ],
+      "version": "",
+      "related": [
+        "docs/ai-agent-workflow.md",
+        "docs/pc-node-offline-resilience.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "depends_on",
+          "target": "docs/ai-agent-workflow.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/ai-agent-workflow.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/pc-node-offline-resilience.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/pc-frontend-migration.md": {
+      "id": "",
+      "doc_type": "client-guides",
+      "audience": [
+        "前端开发者",
+        "AI 代理"
+      ],
+      "owner": "PC 客户端",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:pc-frontend/src/App.tsx",
+        "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"
+      ],
+      "version": "",
+      "related": [
+        "docs/project-document-governance-mcp.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "implements",
+          "target": "docs/project-document-governance-mcp.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/project-document-governance-mcp.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/project-document-governance-mcp.md": {
+      "id": "",
+      "doc_type": "client-guides",
+      "audience": [
+        "开发者",
+        "AI 供应商"
+      ],
+      "owner": "项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-17",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/node_agent_project_docs_mcp.rs",
+        "file:server/src/project_document_governance_facets.rs",
+        "file:server/src/project_document_issue_workflow.rs",
+        "file:server/src/project_document_versioning.rs",
+        "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"
+      ],
+      "version": "3",
+      "related": [
+        "docs/pc-frontend-migration.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "implements",
+          "target": ".github/instructions/document-authority.instructions.md"
+        },
+        {
+          "relation": "see_also",
+          "target": "docs/pc-frontend-migration.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/pc-frontend-migration.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/supervised-pc-project-development.md": {
+      "id": "",
+      "doc_type": "operations",
+      "audience": [
+        "开发者",
+        "AI 代理",
+        "项目管理者"
+      ],
+      "owner": "项目维护者",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/ai_cli/pc_agent_dispatch.rs",
+        "file:server/src/node_agent_main.rs"
+      ],
+      "version": "1",
+      "related": [
+        "docs/ai-agent-workflow.md",
+        "docs/system-architecture.md",
+        "docs/user-project-system.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "related",
+          "target": "docs/ai-agent-workflow.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/system-architecture.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/user-project-system.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/system-architecture.md": {
+      "id": "",
+      "doc_type": "architecture",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "平台后端",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/main.rs",
+        "file:server/src/node_agent_main.rs",
+        "file:pc-frontend/src/App.tsx"
+      ],
+      "version": "",
+      "related": [
+        "AI_ARCHITECTURE.md",
+        "AI_INDEX.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "evidence_for",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_ARCHITECTURE.md"
+        },
+        {
+          "relation": "related",
+          "target": "AI_INDEX.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/user-project-system.md": {
+      "id": "",
+      "doc_type": "architecture",
+      "audience": [
+        "产品开发者",
+        "AI 代理"
+      ],
+      "owner": "项目系统",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/project_space.rs",
+        "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"
+      ],
+      "version": "",
+      "related": [
+        "docs/project-document-governance-mcp.md",
+        "docs/project-store-architecture.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "supports",
+          "target": "docs/project-document-governance-mcp.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/project-document-governance-mcp.md"
+        },
+        {
+          "relation": "related",
+          "target": "docs/project-store-architecture.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
+    },
+    "docs/windows-client-defender.md": {
+      "id": "",
+      "doc_type": "client-guides",
+      "audience": [
+        "Windows 用户",
+        "运维人员"
+      ],
+      "owner": "平台安全",
+      "owners": [],
+      "reviewed_at": "2026-07-18",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/node_agent_main.rs"
+      ],
+      "version": "",
+      "related": [
+        "docs/codex-vault-sharing-runbook.md"
+      ],
+      "supersedes": [],
+      "relations": [
+        {
+          "relation": "related",
+          "target": "docs/codex-vault-sharing-runbook.md"
+        }
+      ],
+      "order": 0,
+      "pinned": false
     }
   },
+  "audit_log": [],
   "knowledge_graph": {
     "nodes": [
-      { "id": "cap-collaboration", "view": "capabilities", "kind": "domain", "label": "项目协作", "detail": "项目、频道、AI 任务、多代理和 Git 交付", "parent_id": "", "order": 10, "color": "#9A74E8", "entrypoint": "docs/user-project-system.md", "document_paths": ["docs/user-project-system.md", "docs/群体ai开发/群体AI开发功能需求与架构设计.md"], "implementation_refs": ["file:server/src/project_space.rs"], "tags": ["project", "channel", "task", "collaboration"] },
-      { "id": "cap-project-space", "view": "capabilities", "kind": "capability", "label": "项目与频道", "detail": "项目空间、成员、频道、消息和权限", "parent_id": "cap-collaboration", "order": 10, "color": "#A884ED", "entrypoint": "docs/user-project-system.md", "document_paths": ["docs/user-project-system.md", "docs/project-store-architecture.md"], "implementation_refs": ["file:server/src/project_space.rs", "file:pc-frontend/src/features/conversation/ConversationPage.tsx"], "tags": ["project", "channel", "member"] },
-      { "id": "cap-ai-tasks", "view": "capabilities", "kind": "capability", "label": "AI 对话与任务", "detail": "从需求讨论到隔离执行、过程展示和验收", "parent_id": "cap-collaboration", "order": 20, "color": "#A884ED", "entrypoint": "AI_PROJECT.md", "document_paths": ["AI_PROJECT.md", "AI_ARCHITECTURE.md"], "implementation_refs": ["file:server/src/project_space/channel_ai.rs", "file:pc-frontend/src/features/dev/TaskProgressSurface.tsx"], "tags": ["conversation", "task", "matter"] },
-      { "id": "cap-multi-agent", "view": "capabilities", "kind": "capability", "label": "多代理协作", "detail": "规划、分工、审查、合并门禁与群体 AI", "parent_id": "cap-collaboration", "order": 30, "color": "#A884ED", "entrypoint": "docs/群体ai开发/群体AI开发功能需求与架构设计.md", "document_paths": ["docs/群体ai开发/群体AI开发功能需求与架构设计.md"], "implementation_refs": ["file:server/src/group_ai/planner.rs", "file:server/src/group_ai/review_gate.rs"], "tags": ["multi-agent", "planner", "reviewer"] },
-      { "id": "cap-git-delivery", "view": "capabilities", "kind": "workflow", "label": "Git 工作区与交付", "detail": "预检、隔离 worktree、验证、提交、推送和统一收尾", "parent_id": "cap-collaboration", "order": 40, "color": "#A884ED", "entrypoint": "docs/ai-agent-workflow.md", "document_paths": ["docs/ai-agent-workflow.md", "AI_TASK_TEMPLATE.md"], "implementation_refs": ["file:scripts/ai-task-preflight.ps1", "file:scripts/finish-ai-task.ps1"], "tags": ["git", "worktree", "delivery"] },
-      { "id": "cap-supervised-pc-development", "view": "capabilities", "kind": "workflow", "label": "桌面监督与 PC 执行", "detail": "Codex 桌面派发和验收、PC 节点执行、证据回传及平台改进续跑", "parent_id": "cap-collaboration", "order": 50, "color": "#A884ED", "entrypoint": "docs/supervised-pc-project-development.md", "document_paths": ["docs/supervised-pc-project-development.md", "docs/system-architecture.md", "docs/user-project-system.md"], "implementation_refs": ["file:server/src/ai_cli/pc_agent_dispatch.rs", "file:server/src/project_space/channel_ai_recovery.rs"], "tags": ["supervision", "pc-node", "route-a", "evidence", "dogfooding", "recovery"] },
-
-      { "id": "cap-knowledge", "view": "capabilities", "kind": "domain", "label": "项目知识库", "detail": "Markdown、权威治理、AI 整理、图谱和版本恢复", "parent_id": "", "order": 20, "color": "#58A8DF", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md", "docs/README.md"], "implementation_refs": ["file:server/src/project_document_governance.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"], "tags": ["document", "knowledge", "governance"] },
-      { "id": "cap-markdown", "view": "capabilities", "kind": "capability", "label": "Markdown 编辑阅读", "detail": "OneNote 式分区、按需读取、编辑和渲染预览", "parent_id": "cap-knowledge", "order": 10, "color": "#69B5D0", "entrypoint": "docs/pc-frontend-migration.md", "document_paths": ["docs/pc-frontend-migration.md"], "implementation_refs": ["file:pc-frontend/src/features/project-docs/ProjectDocumentEditorPane.tsx"], "tags": ["markdown", "editor", "preview"] },
-      { "id": "cap-doc-governance", "view": "capabilities", "kind": "capability", "label": "权威性与生命周期", "detail": "按路径判断权威上限并隔离草稿、证据和历史材料", "parent_id": "cap-knowledge", "order": 20, "color": "#69B5D0", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md", ".github/instructions/document-authority.instructions.md"], "implementation_refs": ["file:server/src/project_document_policy.rs"], "tags": ["authority", "lifecycle", "retrieval"] },
-      { "id": "cap-doc-organizer", "view": "capabilities", "kind": "capability", "label": "AI 自动整理", "detail": "零 token 目录分析、结构化建议、整理前后 Git 提交", "parent_id": "cap-knowledge", "order": 30, "color": "#69B5D0", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md"], "implementation_refs": ["file:server/src/project_document_governance_service.rs", "file:server/src/project_document_git_transaction.rs"], "tags": ["organization", "suggestion", "git"] },
-      { "id": "cap-knowledge-map", "view": "capabilities", "kind": "capability", "label": "项目知识图谱", "detail": "功能、技术架构与文档主题共享同一后端契约", "parent_id": "cap-knowledge", "order": 40, "color": "#69B5D0", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md", "AI_ARCHITECTURE.md"], "implementation_refs": ["file:server/src/project_document_knowledge_graph.rs", "file:pc-frontend/src/features/project-docs/ProjectDocumentCapabilityMap.tsx"], "tags": ["map", "graph", "architecture"] },
-      { "id": "cap-doc-history", "view": "capabilities", "kind": "capability", "label": "历史与恢复", "detail": "项目 Git 或托管知识库版本历史与可逆恢复", "parent_id": "cap-knowledge", "order": 50, "color": "#69B5D0", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md"], "implementation_refs": ["file:server/src/project_document_vault.rs"], "tags": ["history", "restore", "git"] },
-
-      { "id": "cap-ai-runtime", "view": "capabilities", "kind": "domain", "label": "AI 运行平台", "detail": "多供应商路由、上下文检索、工具和运行恢复", "parent_id": "", "order": 30, "color": "#B582DD", "entrypoint": "AI_ARCHITECTURE.md", "document_paths": ["AI_ARCHITECTURE.md", "AI_PROJECT.md"], "implementation_refs": ["file:server/src/ai_cli/mod.rs"], "tags": ["ai", "agent", "runtime"] },
-      { "id": "cap-provider-routing", "view": "capabilities", "kind": "capability", "label": "多供应商与运行路线", "detail": "Codex、Copilot、Claude、Gemini 与 API 路由", "parent_id": "cap-ai-runtime", "order": 10, "color": "#C291E4", "entrypoint": "AI_ARCHITECTURE.md", "document_paths": ["AI_ARCHITECTURE.md", "docs/route-c-sdk-mvp.md"], "implementation_refs": ["file:server/src/node_agent_cli_mcp.rs", "file:server/src/ai_cli/pc_agent_dispatch.rs"], "tags": ["codex", "copilot", "claude", "gemini", "route"] },
-      { "id": "cap-context-rag", "view": "capabilities", "kind": "capability", "label": "上下文与 RAG", "detail": "repo map、符号索引、混合检索和任务上下文包", "parent_id": "cap-ai-runtime", "order": 20, "color": "#C291E4", "entrypoint": "AI_ARCHITECTURE.md", "document_paths": ["AI_ARCHITECTURE.md", "AI_INDEX.md"], "implementation_refs": ["file:server/src/context_compiler/agent_rag_context.rs", "file:server/src/context_compiler/symbol_index_task_pack.rs"], "tags": ["context", "rag", "symbol", "repo-map"] },
-      { "id": "cap-mcp-tools", "view": "capabilities", "kind": "capability", "label": "MCP 与工具调用", "detail": "供应商无关工具协议和受控项目能力", "parent_id": "cap-ai-runtime", "order": 30, "color": "#C291E4", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md"], "implementation_refs": ["file:server/src/node_agent_project_docs_mcp.rs", "file:server/src/agent_llm_tools.rs"], "tags": ["mcp", "tool", "protocol"] },
-      { "id": "cap-task-recovery", "view": "capabilities", "kind": "capability", "label": "任务观测与恢复", "detail": "sidecar、journal、公开过程、重连和继续执行", "parent_id": "cap-ai-runtime", "order": 40, "color": "#C291E4", "entrypoint": "AI_ARCHITECTURE.md", "document_paths": ["AI_ARCHITECTURE.md", "docs/pc-node-offline-resilience.md"], "implementation_refs": ["file:server/src/project_space/channel_ai_recovery.rs", "file:pc-frontend/src/features/dev/agentRunRecoveryModel.ts"], "tags": ["sidecar", "journal", "recovery"] },
-
-      { "id": "cap-clients", "view": "capabilities", "kind": "domain", "label": "多端客户端", "detail": "PC Web、Windows 节点、Android 与共享真机", "parent_id": "", "order": 40, "color": "#5FBC88", "entrypoint": "AI_INDEX.md", "document_paths": ["AI_INDEX.md", "docs/pc-frontend-migration.md", "docs/shared-android-device-host.md"], "implementation_refs": ["file:pc-frontend/src/App.tsx", "file:server/src/node_agent_main.rs", "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"], "tags": ["pc", "windows", "android", "client"] },
-      { "id": "cap-pc-client", "view": "capabilities", "kind": "client", "label": "PC 工作台", "detail": "React/Vite 项目协作、对话、文档和设备控制", "parent_id": "cap-clients", "order": 10, "color": "#70B9D3", "entrypoint": "docs/pc-frontend-migration.md", "document_paths": ["docs/pc-frontend-migration.md"], "implementation_refs": ["file:pc-frontend/src/App.tsx"], "tags": ["pc-frontend", "react", "vite"] },
-      { "id": "cap-windows-node", "view": "capabilities", "kind": "client", "label": "Windows 节点", "detail": "本地 CLI、文件、Git、构建和设备执行", "parent_id": "cap-clients", "order": 20, "color": "#65A8C8", "entrypoint": "docs/node-agent-upgrade-compatibility.md", "document_paths": ["docs/node-agent-upgrade-compatibility.md", "docs/pc-node-data-root.md"], "implementation_refs": ["file:server/src/node_agent_main.rs"], "tags": ["node-agent", "windows", "local"] },
-      { "id": "cap-android-client", "view": "capabilities", "kind": "client", "label": "Android 客户端", "detail": "移动对话、项目入口、任务进度和更新", "parent_id": "cap-clients", "order": 30, "color": "#70B985", "entrypoint": "docs/android-setup.md", "document_paths": ["docs/android-setup.md", "docs/Design.md"], "implementation_refs": ["file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"], "tags": ["android", "apk", "compose"] },
-      { "id": "cap-device-runtime", "view": "capabilities", "kind": "capability", "label": "共享真机与 UI 验证", "detail": "无线 ADB、设备租约、真实渲染与视觉验收", "parent_id": "cap-clients", "order": 40, "color": "#70B985", "entrypoint": "docs/shared-android-device-host.md", "document_paths": ["docs/shared-android-device-host.md", "docs/android-real-renderer-ui-workflow.md"], "implementation_refs": ["file:server/src/node_agent_android_inspector/adb_capture.rs"], "tags": ["adb", "device", "renderer", "ui"] },
-
-      { "id": "cap-operations", "view": "capabilities", "kind": "domain", "label": "发布与运行保障", "detail": "构建发布、升级、安全、观测和故障恢复", "parent_id": "", "order": 50, "color": "#D0A34F", "entrypoint": "docs/ai-agent-workflow.md", "document_paths": ["docs/ai-agent-workflow.md", "docs/node-agent-upgrade-compatibility.md"], "implementation_refs": ["file:scripts/publish-server.ps1"], "tags": ["build", "release", "security", "operations"] },
-      { "id": "cap-release", "view": "capabilities", "kind": "workflow", "label": "构建与发布", "detail": "服务端、PC、节点和 APK 的版本化发布闭环", "parent_id": "cap-operations", "order": 10, "color": "#D7AF59", "entrypoint": "docs/ai-agent-workflow.md", "document_paths": ["docs/ai-agent-workflow.md", "docs/apk-release-signing-secrets.md"], "implementation_refs": ["file:scripts/publish-server.ps1", "file:scripts/publish-apk.ps1"], "tags": ["build", "publish", "deploy"] },
-      { "id": "cap-upgrade", "view": "capabilities", "kind": "capability", "label": "节点升级与兼容", "detail": "自更新、数据迁移、灰度、回滚和离线韧性", "parent_id": "cap-operations", "order": 20, "color": "#D7AF59", "entrypoint": "docs/node-agent-upgrade-compatibility.md", "document_paths": ["docs/node-agent-upgrade-compatibility.md", "docs/pc-node-offline-resilience.md"], "implementation_refs": ["file:server/src/node_agent_client_maintenance.rs"], "tags": ["upgrade", "migration", "rollback"] },
-      { "id": "cap-security", "view": "capabilities", "kind": "capability", "label": "安全、权限与凭据", "detail": "项目权限、工具审批、密钥和 Codex 保险箱", "parent_id": "cap-operations", "order": 30, "color": "#D98675", "entrypoint": "docs/codex-vault-sharing-runbook.md", "document_paths": ["docs/codex-vault-sharing-runbook.md", "docs/windows-client-defender.md"], "implementation_refs": ["file:server/src/node_agent_codex_vault.rs", "file:server/src/project_space/permissions.rs"], "tags": ["security", "permission", "vault"] },
-
-      { "id": "cap-incubation", "view": "capabilities", "kind": "domain", "label": "孵化与子项目", "detail": "具有独立边界、契约和验收资料的子项目", "parent_id": "", "order": 60, "color": "#57A6C7", "entrypoint": "docs/fb2-ai-center/README.md", "document_paths": ["docs/fb2-ai-center/README.md"], "implementation_refs": ["file:server/src/external_app_api.rs"], "tags": ["subproject", "incubation", "fb2"] },
-      { "id": "cap-fb2", "view": "capabilities", "kind": "subproject", "label": "fb2 AI 中心", "detail": "外部应用 AI、语音、上下文、工具和计费集成", "parent_id": "cap-incubation", "order": 10, "color": "#57A6C7", "entrypoint": "docs/fb2-ai-center/README.md", "document_paths": ["docs/fb2-ai-center/README.md", "docs/fb2-ai-center/contracts.md"], "implementation_refs": ["file:server/src/external_app_api.rs"], "tags": ["fb2", "external-app", "voice"] },
-
-      { "id": "arch-clients", "view": "architecture", "kind": "system", "label": "客户端层", "detail": "PC Web 与 Android 用户交互入口", "parent_id": "", "order": 10, "color": "#5FBC88", "entrypoint": "AI_INDEX.md", "document_paths": ["AI_INDEX.md", "docs/pc-frontend-migration.md", "docs/android-setup.md"], "implementation_refs": ["file:pc-frontend/src/App.tsx", "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"], "tags": ["client", "pc", "android"] },
-      { "id": "arch-server", "view": "architecture", "kind": "service", "label": "Rust 云端服务", "detail": "鉴权、项目、会话、调度、公共 API 和实时通道", "parent_id": "", "order": 20, "color": "#4FA9B8", "entrypoint": "docs/system-architecture.md", "document_paths": ["docs/system-architecture.md", "AI_ARCHITECTURE.md"], "implementation_refs": ["file:server/src/main.rs", "file:server/src/router.rs"], "tags": ["server", "api", "websocket"] },
-      { "id": "arch-ai-control", "view": "architecture", "kind": "component", "label": "AI 调度与控制面", "detail": "意图、运行路线、模型、Matter 与代理生命周期", "parent_id": "arch-server", "order": 10, "color": "#B582DD", "entrypoint": "AI_ARCHITECTURE.md", "document_paths": ["AI_ARCHITECTURE.md", "docs/intent-routing.md"], "implementation_refs": ["file:server/src/ai_cli/mod.rs", "file:server/src/group_ai/mod.rs"], "tags": ["ai-cli", "router", "group-ai"] },
-      { "id": "arch-doc-graph", "view": "architecture", "kind": "component", "label": "文档治理与知识图谱", "detail": "目录扫描、治理、图谱、质量索引和供应商无关 MCP", "parent_id": "arch-server", "order": 20, "color": "#58A8DF", "entrypoint": "docs/project-document-governance-mcp.md", "document_paths": ["docs/project-document-governance-mcp.md"], "implementation_refs": ["file:server/src/project_document_knowledge_graph.rs", "file:server/src/node_agent_project_docs_mcp.rs"], "tags": ["document", "graph", "mcp"] },
-      { "id": "arch-node", "view": "architecture", "kind": "service", "label": "Windows 节点", "detail": "本地项目文件、CLI、Git、构建、ADB 和 sidecar 执行", "parent_id": "", "order": 30, "color": "#65A8C8", "entrypoint": "docs/node-agent-upgrade-compatibility.md", "document_paths": ["docs/node-agent-upgrade-compatibility.md", "docs/win-node-toolbox.md"], "implementation_refs": ["file:server/src/node_agent_main.rs", "file:server/src/node_agent_session.rs"], "tags": ["node-agent", "cli", "local"] },
-      { "id": "arch-workspace", "view": "architecture", "kind": "component", "label": "项目工作区与 Git", "detail": "项目文件真源、隔离 worktree、提交和恢复", "parent_id": "arch-node", "order": 10, "color": "#D18B62", "entrypoint": "docs/ai-agent-workflow.md", "document_paths": ["docs/ai-agent-workflow.md", "docs/user-project-system.md"], "implementation_refs": ["file:server/src/pc_workspace_provisioner.rs", "file:server/src/project_document_git_transaction.rs"], "tags": ["workspace", "git", "worktree"] },
-      { "id": "arch-context", "view": "architecture", "kind": "component", "label": "上下文与索引层", "detail": "规则、文档、repo map、符号索引和混合检索", "parent_id": "arch-node", "order": 20, "color": "#B582DD", "entrypoint": "AI_ARCHITECTURE.md", "document_paths": ["AI_ARCHITECTURE.md", "AI_INDEX.md"], "implementation_refs": ["file:server/src/context_compiler/agent_rag_context.rs"], "tags": ["context", "index", "rag"] },
-      { "id": "arch-data", "view": "architecture", "kind": "datastore", "label": "平台数据与状态", "detail": "用户、项目、任务、索引和运行状态持久化", "parent_id": "arch-server", "order": 30, "color": "#D18B62", "entrypoint": "docs/project-store-architecture.md", "document_paths": ["docs/project-store-architecture.md", "docs/pc-node-data-root.md"], "implementation_refs": ["file:server/src/store.rs", "file:server/src/project_document_index.rs"], "tags": ["store", "sqlite", "state"] },
-      { "id": "arch-release", "view": "architecture", "kind": "workflow", "label": "构建发布流水线", "detail": "验证、打包、版本 claim、上传、部署和线上校验", "parent_id": "", "order": 40, "color": "#D0A34F", "entrypoint": "docs/ai-agent-workflow.md", "document_paths": ["docs/ai-agent-workflow.md"], "implementation_refs": ["file:scripts/publish-server.ps1", "file:scripts/publish-apk.ps1"], "tags": ["build", "publish", "deploy"] }
+      {
+        "id": "cap-git-delivery",
+        "view": "capabilities",
+        "kind": "workflow",
+        "label": "Git 工作区与交付",
+        "detail": "预检、隔离 worktree、验证、提交、推送和统一收尾",
+        "parent_id": "cap-collaboration",
+        "order": 40,
+        "color": "#A884ED",
+        "entrypoint": "docs/ai-agent-workflow.md",
+        "document_paths": [
+          "AI_TASK_TEMPLATE.md",
+          "docs/ai-agent-workflow.md"
+        ],
+        "implementation_refs": [
+          "file:scripts/ai-task-preflight.ps1",
+          "file:scripts/finish-ai-task.ps1"
+        ],
+        "tags": [
+          "delivery",
+          "git",
+          "worktree"
+        ]
+      },
+      {
+        "id": "arch-server",
+        "view": "architecture",
+        "kind": "service",
+        "label": "Rust 云端服务",
+        "detail": "鉴权、项目、会话、调度、公共 API 和实时通道",
+        "parent_id": "",
+        "order": 20,
+        "color": "#4FA9B8",
+        "entrypoint": "docs/system-architecture.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "docs/system-architecture.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/main.rs",
+          "file:server/src/router.rs"
+        ],
+        "tags": [
+          "api",
+          "server",
+          "websocket"
+        ]
+      },
+      {
+        "id": "cap-upgrade",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "节点升级与兼容",
+        "detail": "自更新、数据迁移、灰度、回滚和离线韧性",
+        "parent_id": "cap-operations",
+        "order": 20,
+        "color": "#D7AF59",
+        "entrypoint": "docs/node-agent-upgrade-compatibility.md",
+        "document_paths": [
+          "docs/node-agent-upgrade-compatibility.md",
+          "docs/pc-node-offline-resilience.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_agent_client_maintenance.rs"
+        ],
+        "tags": [
+          "migration",
+          "rollback",
+          "upgrade"
+        ]
+      },
+      {
+        "id": "arch-doc-graph",
+        "view": "architecture",
+        "kind": "component",
+        "label": "文档治理与知识图谱",
+        "detail": "目录扫描、治理、图谱、质量索引和供应商无关 MCP",
+        "parent_id": "arch-server",
+        "order": 20,
+        "color": "#58A8DF",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_agent_project_docs_mcp.rs",
+          "file:server/src/project_document_knowledge_graph.rs"
+        ],
+        "tags": [
+          "document",
+          "graph",
+          "mcp"
+        ]
+      },
+      {
+        "id": "arch-workspace",
+        "view": "architecture",
+        "kind": "component",
+        "label": "项目工作区与 Git",
+        "detail": "项目文件真源、隔离 worktree、提交和恢复",
+        "parent_id": "arch-node",
+        "order": 10,
+        "color": "#D18B62",
+        "entrypoint": "docs/ai-agent-workflow.md",
+        "document_paths": [
+          "docs/ai-agent-workflow.md",
+          "docs/user-project-system.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/pc_workspace_provisioner.rs",
+          "file:server/src/project_document_git_transaction.rs"
+        ],
+        "tags": [
+          "git",
+          "workspace",
+          "worktree"
+        ]
+      },
+      {
+        "id": "cap-knowledge-map",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "项目知识图谱",
+        "detail": "功能、技术架构与文档主题共享同一后端契约",
+        "parent_id": "cap-knowledge",
+        "order": 40,
+        "color": "#69B5D0",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/project-docs/ProjectDocumentCapabilityMap.tsx",
+          "file:server/src/project_document_knowledge_graph.rs"
+        ],
+        "tags": [
+          "architecture",
+          "graph",
+          "map"
+        ]
+      },
+      {
+        "id": "arch-ai-control",
+        "view": "architecture",
+        "kind": "component",
+        "label": "AI 调度与控制面",
+        "detail": "意图、运行路线、模型、Matter 与代理生命周期",
+        "parent_id": "arch-server",
+        "order": 10,
+        "color": "#B582DD",
+        "entrypoint": "AI_ARCHITECTURE.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "docs/intent-routing.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/ai_cli/mod.rs",
+          "file:server/src/group_ai/mod.rs"
+        ],
+        "tags": [
+          "ai-cli",
+          "group-ai",
+          "router"
+        ]
+      },
+      {
+        "id": "arch-clients",
+        "view": "architecture",
+        "kind": "system",
+        "label": "客户端层",
+        "detail": "PC Web 与 Android 用户交互入口",
+        "parent_id": "",
+        "order": 10,
+        "color": "#5FBC88",
+        "entrypoint": "AI_INDEX.md",
+        "document_paths": [
+          "AI_INDEX.md",
+          "docs/android-setup.md",
+          "docs/pc-frontend-migration.md"
+        ],
+        "implementation_refs": [
+          "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt",
+          "file:pc-frontend/src/App.tsx"
+        ],
+        "tags": [
+          "android",
+          "client",
+          "pc"
+        ]
+      },
+      {
+        "id": "cap-fb2",
+        "view": "capabilities",
+        "kind": "subproject",
+        "label": "fb2 AI 中心",
+        "detail": "外部应用 AI、语音、上下文、工具和计费集成",
+        "parent_id": "cap-incubation",
+        "order": 10,
+        "color": "#57A6C7",
+        "entrypoint": "docs/fb2-ai-center/README.md",
+        "document_paths": [
+          "docs/fb2-ai-center/README.md",
+          "docs/fb2-ai-center/contracts.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/external_app_api.rs"
+        ],
+        "tags": [
+          "external-app",
+          "fb2",
+          "voice"
+        ]
+      },
+      {
+        "id": "cap-mcp-tools",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "MCP 与工具调用",
+        "detail": "供应商无关工具协议和受控项目能力",
+        "parent_id": "cap-ai-runtime",
+        "order": 30,
+        "color": "#C291E4",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/agent_llm_tools.rs",
+          "file:server/src/node_agent_project_docs_mcp.rs"
+        ],
+        "tags": [
+          "mcp",
+          "protocol",
+          "tool"
+        ]
+      },
+      {
+        "id": "cap-doc-history",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "历史与恢复",
+        "detail": "项目 Git 或托管知识库版本历史与可逆恢复",
+        "parent_id": "cap-knowledge",
+        "order": 50,
+        "color": "#69B5D0",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/project_document_vault.rs"
+        ],
+        "tags": [
+          "git",
+          "history",
+          "restore"
+        ]
+      },
+      {
+        "id": "cap-task-recovery",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "任务观测与恢复",
+        "detail": "sidecar、journal、公开过程、重连和继续执行",
+        "parent_id": "cap-ai-runtime",
+        "order": 40,
+        "color": "#C291E4",
+        "entrypoint": "AI_ARCHITECTURE.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "docs/pc-node-offline-resilience.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/dev/agentRunRecoveryModel.ts",
+          "file:server/src/project_space/channel_ai_recovery.rs"
+        ],
+        "tags": [
+          "journal",
+          "recovery",
+          "sidecar"
+        ]
+      },
+      {
+        "id": "cap-release",
+        "view": "capabilities",
+        "kind": "workflow",
+        "label": "构建与发布",
+        "detail": "服务端、PC、节点和 APK 的版本化发布闭环",
+        "parent_id": "cap-operations",
+        "order": 10,
+        "color": "#D7AF59",
+        "entrypoint": "docs/ai-agent-workflow.md",
+        "document_paths": [
+          "docs/ai-agent-workflow.md",
+          "docs/apk-release-signing-secrets.md"
+        ],
+        "implementation_refs": [
+          "file:scripts/publish-apk.ps1",
+          "file:scripts/publish-server.ps1"
+        ],
+        "tags": [
+          "build",
+          "deploy",
+          "publish"
+        ]
+      },
+      {
+        "id": "cap-security",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "安全、权限与凭据",
+        "detail": "项目权限、工具审批、密钥和 Codex 保险箱",
+        "parent_id": "cap-operations",
+        "order": 30,
+        "color": "#D98675",
+        "entrypoint": "docs/codex-vault-sharing-runbook.md",
+        "document_paths": [
+          "docs/codex-vault-sharing-runbook.md",
+          "docs/windows-client-defender.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_agent_codex_vault.rs",
+          "file:server/src/project_space/permissions.rs"
+        ],
+        "tags": [
+          "permission",
+          "security",
+          "vault"
+        ]
+      },
+      {
+        "id": "arch-data",
+        "view": "architecture",
+        "kind": "datastore",
+        "label": "平台数据与状态",
+        "detail": "用户、项目、任务、索引和运行状态持久化",
+        "parent_id": "arch-server",
+        "order": 30,
+        "color": "#D18B62",
+        "entrypoint": "docs/project-store-architecture.md",
+        "document_paths": [
+          "docs/pc-node-data-root.md",
+          "docs/project-store-architecture.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/project_document_index.rs",
+          "file:server/src/store.rs"
+        ],
+        "tags": [
+          "sqlite",
+          "state",
+          "store"
+        ]
+      },
+      {
+        "id": "cap-ai-runtime",
+        "view": "capabilities",
+        "kind": "domain",
+        "label": "AI 运行平台",
+        "detail": "多供应商路由、上下文检索、工具和运行恢复",
+        "parent_id": "",
+        "order": 30,
+        "color": "#B582DD",
+        "entrypoint": "AI_ARCHITECTURE.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "AI_PROJECT.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/ai_cli/mod.rs"
+        ],
+        "tags": [
+          "agent",
+          "ai",
+          "runtime"
+        ]
+      },
+      {
+        "id": "cap-incubation",
+        "view": "capabilities",
+        "kind": "domain",
+        "label": "孵化与子项目",
+        "detail": "具有独立边界、契约和验收资料的子项目",
+        "parent_id": "",
+        "order": 60,
+        "color": "#57A6C7",
+        "entrypoint": "docs/fb2-ai-center/README.md",
+        "document_paths": [
+          "docs/fb2-ai-center/README.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/external_app_api.rs"
+        ],
+        "tags": [
+          "fb2",
+          "incubation",
+          "subproject"
+        ]
+      },
+      {
+        "id": "arch-node",
+        "view": "architecture",
+        "kind": "service",
+        "label": "Windows 节点",
+        "detail": "本地项目文件、CLI、Git、构建、ADB 和 sidecar 执行",
+        "parent_id": "",
+        "order": 30,
+        "color": "#65A8C8",
+        "entrypoint": "docs/node-agent-upgrade-compatibility.md",
+        "document_paths": [
+          "docs/node-agent-upgrade-compatibility.md",
+          "docs/win-node-toolbox.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_agent_main.rs",
+          "file:server/src/node_agent_session.rs"
+        ],
+        "tags": [
+          "cli",
+          "local",
+          "node-agent"
+        ]
+      },
+      {
+        "id": "cap-ai-tasks",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "AI 对话与任务",
+        "detail": "从需求讨论到隔离执行、过程展示和验收",
+        "parent_id": "cap-collaboration",
+        "order": 20,
+        "color": "#A884ED",
+        "entrypoint": "AI_PROJECT.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "AI_PROJECT.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/dev/TaskProgressSurface.tsx",
+          "file:server/src/project_space/channel_ai.rs"
+        ],
+        "tags": [
+          "conversation",
+          "matter",
+          "task"
+        ]
+      },
+      {
+        "id": "cap-provider-routing",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "多供应商与运行路线",
+        "detail": "Codex、Copilot、Claude、Gemini 与 API 路由",
+        "parent_id": "cap-ai-runtime",
+        "order": 10,
+        "color": "#C291E4",
+        "entrypoint": "AI_ARCHITECTURE.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "docs/route-c-sdk-mvp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/ai_cli/pc_agent_dispatch.rs",
+          "file:server/src/node_agent_cli_mcp.rs"
+        ],
+        "tags": [
+          "claude",
+          "codex",
+          "copilot",
+          "gemini",
+          "route"
+        ]
+      },
+      {
+        "id": "arch-context",
+        "view": "architecture",
+        "kind": "component",
+        "label": "上下文与索引层",
+        "detail": "规则、文档、repo map、符号索引和混合检索",
+        "parent_id": "arch-node",
+        "order": 20,
+        "color": "#B582DD",
+        "entrypoint": "AI_ARCHITECTURE.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "AI_INDEX.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/context_compiler/agent_rag_context.rs"
+        ],
+        "tags": [
+          "context",
+          "index",
+          "rag"
+        ]
+      },
+      {
+        "id": "cap-device-runtime",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "共享真机与 UI 验证",
+        "detail": "无线 ADB、设备租约、真实渲染与视觉验收",
+        "parent_id": "cap-clients",
+        "order": 40,
+        "color": "#70B985",
+        "entrypoint": "docs/shared-android-device-host.md",
+        "document_paths": [
+          "docs/android-real-renderer-ui-workflow.md",
+          "docs/shared-android-device-host.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_agent_android_inspector/adb_capture.rs"
+        ],
+        "tags": [
+          "adb",
+          "device",
+          "renderer",
+          "ui"
+        ]
+      },
+      {
+        "id": "cap-multi-agent",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "多代理协作",
+        "detail": "规划、分工、审查、合并门禁与群体 AI",
+        "parent_id": "cap-collaboration",
+        "order": 30,
+        "color": "#A884ED",
+        "entrypoint": "docs/群体ai开发/群体AI开发功能需求与架构设计.md",
+        "document_paths": [
+          "docs/群体ai开发/群体AI开发功能需求与架构设计.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/group_ai/planner.rs",
+          "file:server/src/group_ai/review_gate.rs"
+        ],
+        "tags": [
+          "multi-agent",
+          "planner",
+          "reviewer"
+        ]
+      },
+      {
+        "id": "cap-collaboration",
+        "view": "capabilities",
+        "kind": "domain",
+        "label": "项目协作",
+        "detail": "项目、频道、AI 任务、多代理和 Git 交付",
+        "parent_id": "",
+        "order": 10,
+        "color": "#9A74E8",
+        "entrypoint": "docs/user-project-system.md",
+        "document_paths": [
+          "docs/user-project-system.md",
+          "docs/群体ai开发/群体AI开发功能需求与架构设计.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/project_space.rs"
+        ],
+        "tags": [
+          "channel",
+          "collaboration",
+          "project",
+          "task"
+        ]
+      },
+      {
+        "id": "cap-markdown",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "Markdown 编辑阅读",
+        "detail": "OneNote 式分区、按需读取、编辑和渲染预览",
+        "parent_id": "cap-knowledge",
+        "order": 10,
+        "color": "#69B5D0",
+        "entrypoint": "docs/pc-frontend-migration.md",
+        "document_paths": [
+          "docs/pc-frontend-migration.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/project-docs/ProjectDocumentEditorPane.tsx"
+        ],
+        "tags": [
+          "editor",
+          "markdown",
+          "preview"
+        ]
+      },
+      {
+        "id": "cap-pc-client",
+        "view": "capabilities",
+        "kind": "client",
+        "label": "PC 工作台",
+        "detail": "React/Vite 项目协作、对话、文档和设备控制",
+        "parent_id": "cap-clients",
+        "order": 10,
+        "color": "#70B9D3",
+        "entrypoint": "docs/pc-frontend-migration.md",
+        "document_paths": [
+          "docs/pc-frontend-migration.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/App.tsx"
+        ],
+        "tags": [
+          "pc-frontend",
+          "react",
+          "vite"
+        ]
+      },
+      {
+        "id": "cap-clients",
+        "view": "capabilities",
+        "kind": "domain",
+        "label": "多端客户端",
+        "detail": "PC Web、Windows 节点、Android 与共享真机",
+        "parent_id": "",
+        "order": 40,
+        "color": "#5FBC88",
+        "entrypoint": "AI_INDEX.md",
+        "document_paths": [
+          "AI_INDEX.md",
+          "docs/pc-frontend-migration.md",
+          "docs/shared-android-device-host.md"
+        ],
+        "implementation_refs": [
+          "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt",
+          "file:pc-frontend/src/App.tsx",
+          "file:server/src/node_agent_main.rs"
+        ],
+        "tags": [
+          "android",
+          "client",
+          "pc",
+          "windows"
+        ]
+      },
+      {
+        "id": "cap-operations",
+        "view": "capabilities",
+        "kind": "domain",
+        "label": "发布与运行保障",
+        "detail": "构建发布、升级、安全、观测和故障恢复",
+        "parent_id": "",
+        "order": 50,
+        "color": "#D0A34F",
+        "entrypoint": "docs/ai-agent-workflow.md",
+        "document_paths": [
+          "docs/ai-agent-workflow.md",
+          "docs/node-agent-upgrade-compatibility.md"
+        ],
+        "implementation_refs": [
+          "file:scripts/publish-server.ps1"
+        ],
+        "tags": [
+          "build",
+          "operations",
+          "release",
+          "security"
+        ]
+      },
+      {
+        "id": "cap-knowledge",
+        "view": "capabilities",
+        "kind": "domain",
+        "label": "项目知识库",
+        "detail": "Markdown、权威治理、AI 整理、图谱和版本恢复",
+        "parent_id": "",
+        "order": 20,
+        "color": "#58A8DF",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          "docs/README.md",
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx",
+          "file:server/src/project_document_governance.rs"
+        ],
+        "tags": [
+          "document",
+          "governance",
+          "knowledge"
+        ]
+      },
+      {
+        "id": "cap-windows-node",
+        "view": "capabilities",
+        "kind": "client",
+        "label": "Windows 节点",
+        "detail": "本地 CLI、文件、Git、构建和设备执行",
+        "parent_id": "cap-clients",
+        "order": 20,
+        "color": "#65A8C8",
+        "entrypoint": "docs/node-agent-upgrade-compatibility.md",
+        "document_paths": [
+          "docs/node-agent-upgrade-compatibility.md",
+          "docs/pc-node-data-root.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_agent_main.rs"
+        ],
+        "tags": [
+          "local",
+          "node-agent",
+          "windows"
+        ]
+      },
+      {
+        "id": "cap-supervised-pc-development",
+        "view": "capabilities",
+        "kind": "workflow",
+        "label": "桌面监督与 PC 执行",
+        "detail": "Codex 桌面派发和验收、PC 节点执行、证据回传及平台改进续跑",
+        "parent_id": "cap-collaboration",
+        "order": 50,
+        "color": "#A884ED",
+        "entrypoint": "docs/supervised-pc-project-development.md",
+        "document_paths": [
+          "docs/supervised-pc-project-development.md",
+          "docs/system-architecture.md",
+          "docs/user-project-system.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/ai_cli/pc_agent_dispatch.rs",
+          "file:server/src/project_space/channel_ai_recovery.rs"
+        ],
+        "tags": [
+          "dogfooding",
+          "evidence",
+          "pc-node",
+          "recovery",
+          "route-a",
+          "supervision"
+        ]
+      },
+      {
+        "id": "cap-context-rag",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "上下文与 RAG",
+        "detail": "repo map、符号索引、混合检索和任务上下文包",
+        "parent_id": "cap-ai-runtime",
+        "order": 20,
+        "color": "#C291E4",
+        "entrypoint": "AI_ARCHITECTURE.md",
+        "document_paths": [
+          "AI_ARCHITECTURE.md",
+          "AI_INDEX.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/context_compiler/agent_rag_context.rs",
+          "file:server/src/context_compiler/symbol_index_task_pack.rs"
+        ],
+        "tags": [
+          "context",
+          "rag",
+          "repo-map",
+          "symbol"
+        ]
+      },
+      {
+        "id": "cap-doc-governance",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "权威性与生命周期",
+        "detail": "按路径判断权威上限并隔离草稿、证据和历史材料",
+        "parent_id": "cap-knowledge",
+        "order": 20,
+        "color": "#69B5D0",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          ".github/instructions/document-authority.instructions.md",
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/project_document_policy.rs"
+        ],
+        "tags": [
+          "authority",
+          "lifecycle",
+          "retrieval"
+        ]
+      },
+      {
+        "id": "cap-android-client",
+        "view": "capabilities",
+        "kind": "client",
+        "label": "Android 客户端",
+        "detail": "移动对话、项目入口、任务进度和更新",
+        "parent_id": "cap-clients",
+        "order": 30,
+        "color": "#70B985",
+        "entrypoint": "docs/android-setup.md",
+        "document_paths": [
+          "docs/Design.md",
+          "docs/android-setup.md"
+        ],
+        "implementation_refs": [
+          "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"
+        ],
+        "tags": [
+          "android",
+          "apk",
+          "compose"
+        ]
+      },
+      {
+        "id": "arch-release",
+        "view": "architecture",
+        "kind": "workflow",
+        "label": "构建发布流水线",
+        "detail": "验证、打包、版本 claim、上传、部署和线上校验",
+        "parent_id": "",
+        "order": 40,
+        "color": "#D0A34F",
+        "entrypoint": "docs/ai-agent-workflow.md",
+        "document_paths": [
+          "docs/ai-agent-workflow.md"
+        ],
+        "implementation_refs": [
+          "file:scripts/publish-apk.ps1",
+          "file:scripts/publish-server.ps1"
+        ],
+        "tags": [
+          "build",
+          "deploy",
+          "publish"
+        ]
+      },
+      {
+        "id": "cap-doc-organizer",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "AI 自动整理",
+        "detail": "零 token 目录分析、结构化建议、整理前后 Git 提交",
+        "parent_id": "cap-knowledge",
+        "order": 30,
+        "color": "#69B5D0",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "document_paths": [
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/project_document_git_transaction.rs",
+          "file:server/src/project_document_governance_service.rs"
+        ],
+        "tags": [
+          "git",
+          "organization",
+          "suggestion"
+        ]
+      },
+      {
+        "id": "cap-project-space",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "项目与频道",
+        "detail": "项目空间、成员、频道、消息和权限",
+        "parent_id": "cap-collaboration",
+        "order": 10,
+        "color": "#A884ED",
+        "entrypoint": "docs/user-project-system.md",
+        "document_paths": [
+          "docs/project-store-architecture.md",
+          "docs/user-project-system.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/conversation/ConversationPage.tsx",
+          "file:server/src/project_space.rs"
+        ],
+        "tags": [
+          "channel",
+          "member",
+          "project"
+        ]
+      }
     ],
     "edges": [
-      { "id": "arch-clients-server", "source": "arch-clients", "target": "arch-server", "relation": "calls", "label": "HTTPS / WebSocket" },
-      { "id": "arch-server-node", "source": "arch-server", "target": "arch-node", "relation": "dispatches", "label": "节点 WebSocket 协议" },
-      { "id": "arch-node-workspace", "source": "arch-node", "target": "arch-workspace", "relation": "operates", "label": "本地文件与 Git" },
-      { "id": "arch-context-workspace", "source": "arch-context", "target": "arch-workspace", "relation": "indexes", "label": "元数据、符号与上下文" },
-      { "id": "arch-doc-context", "source": "arch-doc-graph", "target": "arch-context", "relation": "feeds", "label": "权威文档与图谱" },
-      { "id": "arch-server-data", "source": "arch-server", "target": "arch-data", "relation": "persists", "label": "平台状态" },
-      { "id": "arch-workspace-release", "source": "arch-workspace", "target": "arch-release", "relation": "feeds", "label": "已验证 Git 提交" }
+      {
+        "id": "arch-server-data",
+        "source": "arch-server",
+        "target": "arch-data",
+        "relation": "persists",
+        "label": "平台状态"
+      },
+      {
+        "id": "arch-context-workspace",
+        "source": "arch-context",
+        "target": "arch-workspace",
+        "relation": "indexes",
+        "label": "元数据、符号与上下文"
+      },
+      {
+        "id": "arch-doc-context",
+        "source": "arch-doc-graph",
+        "target": "arch-context",
+        "relation": "feeds",
+        "label": "权威文档与图谱"
+      },
+      {
+        "id": "arch-workspace-release",
+        "source": "arch-workspace",
+        "target": "arch-release",
+        "relation": "feeds",
+        "label": "已验证 Git 提交"
+      },
+      {
+        "id": "arch-node-workspace",
+        "source": "arch-node",
+        "target": "arch-workspace",
+        "relation": "operates",
+        "label": "本地文件与 Git"
+      },
+      {
+        "id": "arch-clients-server",
+        "source": "arch-clients",
+        "target": "arch-server",
+        "relation": "calls",
+        "label": "HTTPS / WebSocket"
+      },
+      {
+        "id": "arch-server-node",
+        "source": "arch-server",
+        "target": "arch-node",
+        "relation": "dispatches",
+        "label": "节点 WebSocket 协议"
+      }
     ]
   }
 }
