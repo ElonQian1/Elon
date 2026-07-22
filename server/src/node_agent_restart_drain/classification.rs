@@ -1,57 +1,88 @@
-use serde_json::json;
+use std::collections::{HashMap, HashSet};
+
+use serde::{Deserialize, Serialize};
 
 use crate::NodeRuntime;
 
 const ACTIVE_HANDLE_STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
+const STALE_CANCEL_PROOF_PROTOCOL: &str = "elon.update_stale_cancel_proof.v1";
 
 #[derive(Default)]
 pub(super) struct DrainClassification {
     pub(super) blocking: Vec<String>,
     pub(super) recoverable: Vec<String>,
     pub(super) stale: Vec<String>,
+    pub(super) stale_cancel_proofs: Vec<StaleCancelProof>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(super) struct StaleCancelProof {
+    protocol: String,
+    task_id: String,
+    target_release_identity: String,
+    target_git_sha: String,
+    task_status: String,
+    runtime_inventory_complete: bool,
+    fresh_exact_handle: bool,
+    live_sidecar: bool,
+    replayable_sidecar: bool,
+    cancel_intent_persisted: bool,
+    supervision_protocol: String,
+    proven_at_ms: u128,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum DrainTaskDisposition {
     Blocking,
-    Recoverable,
-    Stale,
+    SafeStaleCancel,
 }
 
 pub(super) fn drain_task_disposition(
-    durable_running: bool,
-    cancel_requested: bool,
-    handle_fresh: bool,
-    replayable_sidecar: bool,
-    safe_receipt: bool,
+    status: &str,
+    exact_target_bound: bool,
+    runtime_inventory_complete: bool,
+    stale_cancel_proven: bool,
 ) -> DrainTaskDisposition {
-    if !durable_running {
-        DrainTaskDisposition::Stale
-    } else if replayable_sidecar || safe_receipt {
-        DrainTaskDisposition::Recoverable
-    } else if cancel_requested {
-        // Cancellation is its own durable state machine. Never rewrite it to
-        // Resume merely because the executor heartbeat became stale.
-        DrainTaskDisposition::Blocking
-    } else if handle_fresh {
-        DrainTaskDisposition::Blocking
+    if status == "cancel_requested"
+        && exact_target_bound
+        && runtime_inventory_complete
+        && stale_cancel_proven
+    {
+        DrainTaskDisposition::SafeStaleCancel
     } else {
-        DrainTaskDisposition::Stale
+        DrainTaskDisposition::Blocking
     }
 }
 
 pub(super) async fn classify_supervised_tasks(
     runtime: &NodeRuntime,
+    target_release_identity: Option<&str>,
 ) -> anyhow::Result<DrainClassification> {
     let active = runtime.active_cli_prompts.views_without_approvals().await;
     let active = active
         .into_iter()
         .map(|task| (task.req_id.clone(), task))
-        .collect::<std::collections::HashMap<_, _>>();
+        .collect::<HashMap<_, _>>();
     let now = super::now_ms();
+    let fresh_runtime_task_ids = active
+        .values()
+        .filter(|handle| {
+            handle.control_handle_live
+                && now.saturating_sub(handle.last_heartbeat_ms) <= ACTIVE_HANDLE_STALE_AFTER_MS
+        })
+        .map(|handle| handle.req_id.clone())
+        .collect::<HashSet<_>>();
+    let exact_target = exact_target_identity(target_release_identity);
     let mut result = DrainClassification::default();
     let tasks = load_drain_candidates(&runtime.local_tasks)?;
-    let mut seen = std::collections::HashSet::new();
+    let proven_stale_cancels = prove_stale_cancels_for_target(
+        &runtime.local_tasks,
+        &runtime.task_journal,
+        &runtime.cli_sidecars,
+        exact_target.as_ref(),
+        Some(&fresh_runtime_task_ids),
+    )?;
+    let mut seen = HashSet::new();
     for task in tasks {
         seen.insert(task.task_id.clone());
         let supervised = crate::node_agent_local_task_supervision::load_supervision_state(
@@ -62,73 +93,33 @@ pub(super) async fn classify_supervised_tasks(
         if !supervised {
             continue;
         }
-        let durable_running = matches!(
-            task.status.as_str(),
-            "running" | "recovering" | "reattaching" | "cancel_requested"
-        );
-        let handle_fresh = active.get(&task.task_id).is_some_and(|handle| {
-            handle.control_handle_live
-                && now.saturating_sub(handle.last_heartbeat_ms) <= ACTIVE_HANDLE_STALE_AFTER_MS
-        });
-        let sidecar = runtime.cli_sidecars.session_for_task(&task.task_id)?;
-        let replayable_sidecar = sidecar
-            .as_ref()
-            .is_some_and(|sidecar| sidecar.can_replay_after_restart_at(now));
-        let safe_receipt = runtime
-            .update_recovery
-            .receipt_for_task(&task.task_id)?
-            .is_some_and(|receipt| {
-                receipt.safety.evidence_complete
-                    && matches!(
-                        receipt.state,
-                        crate::node_agent_update_recovery::UpdateRecoveryState::Reattaching
-                            | crate::node_agent_update_recovery::UpdateRecoveryState::ResumeCreated
-                            | crate::node_agent_update_recovery::UpdateRecoveryState::Resumed
-                    )
-            });
         match drain_task_disposition(
-            durable_running,
-            task.status == "cancel_requested",
-            handle_fresh,
-            replayable_sidecar,
-            safe_receipt,
+            &task.status,
+            exact_target.is_some(),
+            true,
+            proven_stale_cancels.contains(&task.task_id),
         ) {
-            DrainTaskDisposition::Stale => {
-                let context = json!({
-                    "state": "resume_required",
-                    "reason": "stale_runtime_and_sidecar",
-                    "sidecar_session_id": sidecar.as_ref().map(|value| value.session_id.as_str()),
-                    "sidecar_pid": sidecar.as_ref().and_then(|value| value.sidecar_pid),
-                    "child_pid": sidecar.as_ref().and_then(|value| value.child_pid),
-                    "journal_preserved": true,
-                    "workspace_preserved": true,
-                    "root_lease_preserved": true,
+            DrainTaskDisposition::SafeStaleCancel => {
+                let target = exact_target
+                    .as_ref()
+                    .expect("safe stale cancel requires an exact target");
+                result.stale.push(task.task_id.clone());
+                result.stale_cancel_proofs.push(StaleCancelProof {
+                    protocol: STALE_CANCEL_PROOF_PROTOCOL.to_string(),
+                    task_id: task.task_id,
+                    target_release_identity: target.release_identity.clone(),
+                    target_git_sha: target.git_sha.clone(),
+                    task_status: "cancel_requested".to_string(),
+                    runtime_inventory_complete: true,
+                    fresh_exact_handle: false,
+                    live_sidecar: false,
+                    replayable_sidecar: false,
+                    cancel_intent_persisted: true,
+                    supervision_protocol:
+                        crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.to_string(),
+                    proven_at_ms: now,
                 });
-                let reason = "监督任务没有活动运行句柄，且记录的 sidecar/CLI 进程均不存活；现场已保留并转入 Resume";
-                let transitioned = runtime.local_tasks.mark_stale_sidecar_resume_required(
-                    &task.task_id,
-                    reason,
-                    &context,
-                )?;
-                if transitioned {
-                    runtime
-                        .cli_sidecars
-                        .mark_task_resume_required(&task.task_id)?;
-                    runtime.active_cli_prompts.remove(&task.task_id).await;
-                    crate::node_agent_local_task_supervision::record_supervision_event(
-                        &runtime.task_journal,
-                        &task.task_id,
-                        "supervision_stale_runtime_resume_required",
-                        context,
-                    )?;
-                    result.stale.push(task.task_id.clone());
-                } else {
-                    // A concurrent durable transition is not proof that the
-                    // task is safe to drain. Re-read on the next pass.
-                    result.blocking.push(task.task_id.clone());
-                }
             }
-            DrainTaskDisposition::Recoverable => result.recoverable.push(task.task_id),
             DrainTaskDisposition::Blocking => result.blocking.push(task.task_id),
         }
     }
@@ -147,13 +138,193 @@ pub(super) async fn classify_supervised_tasks(
     result.blocking.sort();
     result.recoverable.sort();
     result.stale.sort();
+    result
+        .stale_cancel_proofs
+        .sort_by(|left, right| left.task_id.cmp(&right.task_id));
     Ok(result)
+}
+
+#[derive(Debug, Clone)]
+struct ExactTargetIdentity {
+    release_identity: String,
+    git_sha: String,
+}
+
+fn exact_target_identity(value: Option<&str>) -> Option<ExactTargetIdentity> {
+    let value = value?.trim();
+    let (version, git_sha) = value.rsplit_once('+')?;
+    let version = version.trim();
+    let git_sha = git_sha.trim();
+    if version.is_empty()
+        || git_sha.len() < 7
+        || !git_sha.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return None;
+    }
+    Some(ExactTargetIdentity {
+        release_identity: format!("{version}+{git_sha}"),
+        git_sha: git_sha.to_string(),
+    })
+}
+
+fn prove_stale_cancels_for_target(
+    local_tasks: &crate::node_agent_local_task_store::LocalTaskStore,
+    journal: &crate::node_agent_task_journal::TaskJournal,
+    sidecars: &crate::node_agent_cli_sidecar::CliSidecarRegistry,
+    exact_target: Option<&ExactTargetIdentity>,
+    fresh_runtime_task_ids: Option<&HashSet<String>>,
+) -> anyhow::Result<HashSet<String>> {
+    if exact_target.is_none() || fresh_runtime_task_ids.is_none() {
+        return Ok(HashSet::new());
+    }
+    crate::node_agent_update_checkpoint::proven_stale_cancelled_tasks(
+        local_tasks,
+        journal,
+        sidecars,
+        fresh_runtime_task_ids,
+    )
 }
 
 pub(super) fn load_drain_candidates(
     store: &crate::node_agent_local_task_store::LocalTaskStore,
 ) -> anyhow::Result<Vec<crate::node_agent_local_task_store::LocalTaskRecord>> {
     store
-        .list_update_candidates()
+        .list_update_install_candidates()
         .map_err(|error| anyhow::anyhow!("durable supervised task query failed: {error:#}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::node_agent_local_task_store::LocalTaskStart;
+
+    #[test]
+    fn exact_target_cancel_proof_reuses_fail_closed_installer_inventory() {
+        let root = std::env::temp_dir().join(format!(
+            "restart-drain-cancel-proof-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+        store
+            .create(LocalTaskStart {
+                task_id: "stale-cancel",
+                owner_user_id: "owner",
+                agent_id: "agent",
+                install_id: "install",
+                project_id: "project",
+                channel_id: None,
+                conversation_id: "conversation",
+                workspace_path: root.to_string_lossy().as_ref(),
+                prompt: "cancel me",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+        let journal = crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
+        journal
+            .record_started(crate::node_agent_task_journal::TaskJournalStart {
+                req_id: "stale-cancel",
+                cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("stale-cancel"),
+                cwd: root.to_str(),
+                runtime_permission: Some("full_access"),
+            })
+            .unwrap();
+        let contract = crate::node_agent_local_task_supervision::SupervisionContract {
+            protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.to_string(),
+            supervisor: "codex_desktop".to_string(),
+            task_role: "capability_repair".to_string(),
+            parent_task_id: Some("parent".to_string()),
+            root_task_id: Some("root".to_string()),
+            acceptance_criteria: Vec::new(),
+            improvement_policy: "after_task_or_unblock".to_string(),
+        };
+        crate::node_agent_local_task_supervision::record_supervision_event(
+            &journal,
+            "stale-cancel",
+            "supervision_contract",
+            crate::node_agent_local_task_supervision::contract_payload(&contract),
+        )
+        .unwrap();
+        assert!(store.mark_cancel_requested("stale-cancel").unwrap());
+        journal.record_cancel_requested("stale-cancel").unwrap();
+        let sidecars =
+            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars"));
+        let target = exact_target_identity(Some("0.3.69+51841351542f7cc3"));
+
+        let safe = prove_stale_cancels_for_target(
+            &store,
+            &journal,
+            &sidecars,
+            target.as_ref(),
+            Some(&HashSet::new()),
+        )
+        .unwrap();
+        assert_eq!(safe, HashSet::from(["stale-cancel".to_string()]));
+        assert_eq!(
+            store.get("stale-cancel").unwrap().unwrap().status,
+            "cancel_requested"
+        );
+        assert!(
+            prove_stale_cancels_for_target(&store, &journal, &sidecars, target.as_ref(), None,)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(prove_stale_cancels_for_target(
+            &store,
+            &journal,
+            &sidecars,
+            exact_target_identity(Some("0.3.69")).as_ref(),
+            Some(&HashSet::new()),
+        )
+        .unwrap()
+        .is_empty());
+        assert!(prove_stale_cancels_for_target(
+            &store,
+            &journal,
+            &sidecars,
+            target.as_ref(),
+            Some(&HashSet::from(["stale-cancel".to_string()])),
+        )
+        .unwrap()
+        .is_empty());
+
+        sidecars
+            .upsert_session(
+                crate::node_agent_cli_sidecar::CliSidecarSessionRecord::managed_conpty(
+                    "live-sidecar",
+                    "stale-cancel",
+                    "codex",
+                    "route_a_external_cli",
+                    Some(root.to_string_lossy().into_owned()),
+                    Some("npipe://elon/live-sidecar".to_string()),
+                    Some(std::process::id()),
+                    None,
+                    crate::node_agent_cli_sidecar::now_ms(),
+                ),
+            )
+            .unwrap();
+        assert!(prove_stale_cancels_for_target(
+            &store,
+            &journal,
+            &sidecars,
+            target.as_ref(),
+            Some(&HashSet::new()),
+        )
+        .unwrap()
+        .is_empty());
+        std::fs::write(root.join("sidecars/sessions.json"), "not-json").unwrap();
+        std::fs::write(root.join("sidecars/sessions.json.bak"), "not-json").unwrap();
+        assert!(prove_stale_cancels_for_target(
+            &store,
+            &journal,
+            &sidecars,
+            target.as_ref(),
+            Some(&HashSet::new()),
+        )
+        .is_err());
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

@@ -2,7 +2,7 @@ use std::{
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc, OnceLock,
+        Arc, Mutex, OnceLock,
     },
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -12,8 +12,13 @@ use serde_json::{json, Value};
 
 use crate::NodeRuntime;
 
+mod admission;
 mod classification;
+use admission::admit_running_update;
+#[cfg(test)]
+use admission::{exact_target_identity as admission_exact_target, update_request_matches};
 use classification::classify_supervised_tasks;
+use classification::StaleCancelProof;
 #[cfg(test)]
 use classification::{drain_task_disposition, load_drain_candidates, DrainTaskDisposition};
 
@@ -36,6 +41,10 @@ struct RestartCheckpoint {
     recoverable_task_ids: Vec<String>,
     #[serde(default)]
     stale_registry_task_ids: Vec<String>,
+    #[serde(default)]
+    stale_cancel_proofs: Vec<StaleCancelProof>,
+    #[serde(default)]
+    superseded_update_id: Option<String>,
     message: String,
 }
 
@@ -59,6 +68,8 @@ impl RestartCheckpoint {
             target_release_identity,
             recoverable_task_ids: Vec::new(),
             stale_registry_task_ids: Vec::new(),
+            stale_cancel_proofs: Vec::new(),
+            superseded_update_id: None,
             message: "检测到活跃桌面监督任务；更新已排空，安全终态后自动继续。".to_string(),
         }
     }
@@ -94,6 +105,8 @@ impl RestartCheckpoint {
             "active_task_ids": self.active_task_ids,
             "recoverable_task_ids": self.recoverable_task_ids,
             "stale_registry_task_ids": self.stale_registry_task_ids,
+            "stale_cancel_proofs": self.stale_cancel_proofs,
+            "superseded_update_id": self.superseded_update_id,
             "target_release_identity": self.target_release_identity,
             "message": self.message,
             "resume_actions": resume_actions,
@@ -107,11 +120,26 @@ pub(crate) async fn schedule_update(
     download_url: Option<String>,
     target_release_identity: Option<String>,
 ) -> Result<Value, String> {
-    let classification = classify_supervised_tasks(runtime.as_ref())
-        .await
-        .map_err(|error| format!("读取监督任务排空状态失败，已拒绝更新：{error:#}"))?;
-    let active = classification.blocking;
+    let classification =
+        classify_supervised_tasks(runtime.as_ref(), target_release_identity.as_deref())
+            .await
+            .map_err(|error| format!("读取监督任务排空状态失败，已拒绝更新：{error:#}"))?;
     let cloud_http_url = runtime.cloud_http_url();
+    let admission = drain_admission_lock()
+        .lock()
+        .map_err(|_| "更新排空准入锁已损坏，已拒绝更新。".to_string())?;
+    if drain_running()
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .is_err()
+    {
+        return admit_running_update(
+            source,
+            download_url.as_deref(),
+            target_release_identity.as_deref(),
+            &classification,
+        );
+    }
+    let active = classification.blocking;
     if active.is_empty() {
         let mut checkpoint = RestartCheckpoint::draining(
             source,
@@ -121,33 +149,29 @@ pub(crate) async fn schedule_update(
         );
         checkpoint.recoverable_task_ids = classification.recoverable;
         checkpoint.stale_registry_task_ids = classification.stale;
+        checkpoint.stale_cancel_proofs = classification.stale_cancel_proofs;
         checkpoint.transition("applying", "没有活跃监督任务，正在安全应用更新。");
-        save_checkpoint(&checkpoint)?;
-        return apply_update(&cloud_http_url, download_url.as_deref(), checkpoint).await;
-    }
-
-    if drain_running()
-        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-        .is_err()
-    {
-        let existing = load_checkpoint()
-            .ok()
-            .flatten()
-            .map(|value| value.payload());
-        return Ok(json!({
-            "ok": true,
-            "deferred": true,
-            "restart_recovery": existing,
-        }));
+        if let Err(error) = save_checkpoint(&checkpoint) {
+            drain_running().store(false, Ordering::Release);
+            return Err(error);
+        }
+        drop(admission);
+        let result = apply_update(&cloud_http_url, download_url.as_deref(), checkpoint).await;
+        if result.is_err() {
+            drain_running().store(false, Ordering::Release);
+        }
+        return result;
     }
     let mut checkpoint =
         RestartCheckpoint::draining(source, active, download_url, target_release_identity);
     checkpoint.recoverable_task_ids = classification.recoverable;
     checkpoint.stale_registry_task_ids = classification.stale;
+    checkpoint.stale_cancel_proofs = classification.stale_cancel_proofs;
     if let Err(error) = save_checkpoint(&checkpoint) {
         drain_running().store(false, Ordering::Release);
         return Err(error);
     }
+    drop(admission);
 
     let response_checkpoint = checkpoint.clone();
     let runtime_for_drain = runtime.clone();
@@ -155,9 +179,34 @@ pub(crate) async fn schedule_update(
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(DRAIN_POLL_SECS)).await;
-            let classification = match classify_supervised_tasks(runtime_for_drain.as_ref()).await {
+            let observed = {
+                let Ok(_admission) = drain_admission_lock().lock() else {
+                    continue;
+                };
+                match load_checkpoint() {
+                    Ok(Some(current)) => current,
+                    _ => continue,
+                }
+            };
+            let observed_update_id = observed.update_id.clone();
+            let classification = match classify_supervised_tasks(
+                runtime_for_drain.as_ref(),
+                observed.target_release_identity.as_deref(),
+            )
+            .await
+            {
                 Ok(classification) => classification,
                 Err(error) => {
+                    let Ok(_admission) = drain_admission_lock().lock() else {
+                        continue;
+                    };
+                    let Ok(Some(current)) = load_checkpoint() else {
+                        continue;
+                    };
+                    if current.update_id != observed_update_id {
+                        continue;
+                    }
+                    let mut checkpoint = current;
                     checkpoint.message =
                         format!("读取监督任务排空状态失败，更新继续保持延期：{error:#}");
                     checkpoint.updated_at_ms = now_ms();
@@ -165,9 +214,20 @@ pub(crate) async fn schedule_update(
                     continue;
                 }
             };
+            let Ok(_admission) = drain_admission_lock().lock() else {
+                continue;
+            };
+            let Ok(Some(current)) = load_checkpoint() else {
+                continue;
+            };
+            if current.update_id != observed_update_id {
+                continue;
+            }
+            let mut checkpoint = current;
             let active = classification.blocking;
             checkpoint.recoverable_task_ids = classification.recoverable;
             checkpoint.stale_registry_task_ids = classification.stale;
+            checkpoint.stale_cancel_proofs = classification.stale_cancel_proofs;
             if !active.is_empty() {
                 checkpoint.active_task_ids = active;
                 checkpoint.updated_at_ms = now_ms();
@@ -177,6 +237,7 @@ pub(crate) async fn schedule_update(
             checkpoint.active_task_ids.clear();
             checkpoint.transition("applying", "监督任务已安全结束，正在应用延期更新。");
             let _ = save_checkpoint(&checkpoint);
+            drop(_admission);
             if let Err(error) = apply_update(
                 &cloud_http_for_drain,
                 checkpoint.download_url.as_deref(),
@@ -186,8 +247,8 @@ pub(crate) async fn schedule_update(
             {
                 checkpoint.transition("failed", error);
                 let _ = save_checkpoint(&checkpoint);
+                drain_running().store(false, Ordering::Release);
             }
-            drain_running().store(false, Ordering::Release);
             break;
         }
     });
@@ -397,6 +458,7 @@ async fn apply_update(
     match crate::node_agent_client_maintenance::push_update_from_server_now(
         cloud_http_url,
         download_url,
+        checkpoint.target_release_identity.as_deref(),
     )
     .await
     {
@@ -440,6 +502,11 @@ fn load_checkpoint() -> anyhow::Result<Option<RestartCheckpoint>> {
 fn drain_running() -> &'static AtomicBool {
     static RUNNING: OnceLock<AtomicBool> = OnceLock::new();
     RUNNING.get_or_init(|| AtomicBool::new(false))
+}
+
+fn drain_admission_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
 }
 
 fn now_ms() -> u128 {
@@ -605,32 +672,64 @@ mod tests {
     }
 
     #[test]
-    fn drain_only_waits_for_genuine_uncheckpointed_execution() {
+    fn drain_only_allows_exact_target_proven_stale_cancel() {
         assert_eq!(
-            drain_task_disposition(true, false, true, false, false),
-            DrainTaskDisposition::Blocking
+            drain_task_disposition("cancel_requested", true, true, true),
+            DrainTaskDisposition::SafeStaleCancel
         );
+        for status in ["running", "recovering", "reattaching", "resume_required"] {
+            assert_eq!(
+                drain_task_disposition(status, true, true, true),
+                DrainTaskDisposition::Blocking,
+                "{status} must remain fail-closed"
+            );
+        }
         assert_eq!(
-            drain_task_disposition(true, false, true, true, false),
-            DrainTaskDisposition::Recoverable
-        );
-        assert_eq!(
-            drain_task_disposition(true, false, true, false, true),
-            DrainTaskDisposition::Recoverable
-        );
-        assert_eq!(
-            drain_task_disposition(true, false, false, false, false),
-            DrainTaskDisposition::Stale
-        );
-        assert_eq!(
-            drain_task_disposition(false, false, true, false, false),
-            DrainTaskDisposition::Stale
-        );
-        assert_eq!(
-            drain_task_disposition(true, true, false, false, false),
+            drain_task_disposition("cancel_requested", false, true, true),
             DrainTaskDisposition::Blocking,
-            "cancel_requested keeps cancellation semantics while unsettled"
+            "a non-exact target must not consume stale cancellation proof"
         );
+        assert_eq!(
+            drain_task_disposition("cancel_requested", true, false, true),
+            DrainTaskDisposition::Blocking,
+            "an incomplete runtime inventory must block"
+        );
+        assert_eq!(
+            drain_task_disposition("cancel_requested", true, true, false),
+            DrainTaskDisposition::Blocking,
+            "fresh handles, live sidecars, or incomplete provenance invalidate proof"
+        );
+    }
+
+    #[test]
+    fn repeated_broadcast_distinguishes_same_and_new_exact_targets() {
+        let checkpoint = RestartCheckpoint::draining(
+            "cloud_broadcast",
+            vec!["local-task".to_string()],
+            Some("https://example.invalid/node.exe".to_string()),
+            Some("0.3.69+51841351542f7cc3".to_string()),
+        );
+        assert!(update_request_matches(
+            &checkpoint,
+            "cloud_broadcast",
+            Some("https://example.invalid/node.exe"),
+            Some("0.3.69+51841351542f7cc3")
+        ));
+        assert!(!update_request_matches(
+            &checkpoint,
+            "cloud_broadcast",
+            Some("https://example.invalid/node.exe"),
+            Some("0.3.70+aaaaaaaaaaaaaaaa")
+        ));
+        assert!(!update_request_matches(
+            &checkpoint,
+            "local_admin",
+            Some("https://example.invalid/node.exe"),
+            Some("0.3.69+51841351542f7cc3")
+        ));
+        assert!(admission_exact_target(Some("0.3.70+aaaaaaaaaaaaaaaa")));
+        assert!(!admission_exact_target(Some("0.3.70")));
+        assert!(!admission_exact_target(Some("latest+not-a-sha")));
     }
 
     #[test]

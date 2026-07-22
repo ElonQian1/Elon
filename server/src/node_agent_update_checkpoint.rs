@@ -98,7 +98,9 @@ pub(crate) fn checkpoint_downloaded_update(
     Ok(decision)
 }
 
-fn proven_stale_cancelled_tasks(
+/// Prove that persisted cancellation has no remaining executor ownership.
+/// Callers must separately bind this proof to their exact update target.
+pub(crate) fn proven_stale_cancelled_tasks(
     local_tasks: &crate::node_agent_local_task_store::LocalTaskStore,
     journal: &crate::node_agent_task_journal::TaskJournal,
     sidecars: &crate::node_agent_cli_sidecar::CliSidecarRegistry,

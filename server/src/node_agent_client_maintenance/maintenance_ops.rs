@@ -22,6 +22,7 @@ pub(crate) struct AutostartInfo {
 pub(crate) async fn push_update_from_server_now(
     cloud_http_url: &str,
     download_url_override: Option<&str>,
+    target_release_identity: Option<&str>,
 ) -> Result<String, String> {
     // 先试已安装的更新程序
     #[cfg(windows)]
@@ -45,11 +46,35 @@ pub(crate) async fn push_update_from_server_now(
     let current_exe = std::env::current_exe().map_err(|e| format!("无法定位当前 exe: {e}"))?;
     let download_path = current_exe.with_extension("new.exe");
     let bat_path = current_exe.with_extension("update.bat");
-    // 异步下载
+    let install_root = current_exe
+        .parent()
+        .ok_or_else(|| "当前 exe 缺少父目录，不能持久化版本身份。".to_string())?;
+    let internal_dir = install_root.join("_internal");
+    let version_file = internal_dir.join("node-agent-version.json");
+    let version_download_path = internal_dir.join("node-agent-version.json.new");
+    tokio::fs::create_dir_all(&internal_dir)
+        .await
+        .map_err(|e| format!("无法创建版本身份目录 {}: {e}", internal_dir.display()))?;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .unwrap_or_default();
+    let version_url = format!(
+        "{}/api/node-agent/version",
+        cloud_http_url.trim_end_matches('/')
+    );
+    let version_text = client
+        .get(&version_url)
+        .send()
+        .await
+        .map_err(|e| format!("下载新版身份失败: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("新版身份接口返回错误: {e}"))?
+        .text()
+        .await
+        .map_err(|e| format!("读取新版身份失败: {e}"))?;
+    let version_text = version_text.trim_start_matches('\u{feff}');
+    let release_identity = fallback_release_identity(version_text, target_release_identity)?;
     let resp = client
         .get(&url)
         .send()
@@ -65,11 +90,16 @@ pub(crate) async fn push_update_from_server_now(
     tokio::fs::write(&download_path, &bytes)
         .await
         .map_err(|e| format!("写入新版 exe 失败: {e}"))?;
-    // 写一个 bat 脚本：等待当前进程退出后替换并重启
-    let cur_str = current_exe.to_string_lossy();
-    let new_str = download_path.to_string_lossy();
-    let bat_content = format!(
-        "@echo off\r\ntimeout /t 2 /nobreak >nul\r\nmove /y \"{new_str}\" \"{cur_str}\"\r\nstart \"\" \"{cur_str}\" --agent-runtime\r\ndel \"%~f0\"\r\n"
+    tokio::fs::write(&version_download_path, version_text.as_bytes())
+        .await
+        .map_err(|e| format!("写入新版身份失败: {e}"))?;
+    // 写一个 bat 脚本：等待当前进程退出，提交 exe 与同目标版本身份，再由
+    // repair-background 恢复安装路径 runtime + watchdog。
+    let bat_content = maintenance_fallback_update_script(
+        &download_path,
+        &current_exe,
+        &version_download_path,
+        &version_file,
     );
     tokio::fs::write(&bat_path, bat_content.as_bytes())
         .await
@@ -89,7 +119,9 @@ pub(crate) async fn push_update_from_server_now(
     record_maintenance_event(
         "push_update",
         true,
-        "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace",
+        &format!(
+            "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace target={release_identity}"
+        ),
     );
     // 异步退出（让当前响应先发出）
     tokio::spawn(async {
@@ -100,6 +132,51 @@ pub(crate) async fn push_update_from_server_now(
         "Win 端正在更新升级，通信临时中断，会自动恢复。下载大小: {} KB",
         bytes.len() / 1024
     ))
+}
+
+pub(crate) fn fallback_release_identity(
+    version_text: &str,
+    expected: Option<&str>,
+) -> Result<String, String> {
+    let value: Value = serde_json::from_str(version_text)
+        .map_err(|error| format!("新版身份不是合法 JSON: {error}"))?;
+    let version = value
+        .get("version")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "新版身份缺少 version。".to_string())?;
+    let git_sha = value
+        .get("gitSha")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "新版身份缺少 gitSha。".to_string())?;
+    let actual = format!("{version}+{git_sha}");
+    if let Some(expected) = expected.map(str::trim).filter(|value| !value.is_empty()) {
+        if actual != expected {
+            return Err(format!(
+                "新版身份 {actual} 与当前排空目标 {expected} 不一致，已拒绝替换。"
+            ));
+        }
+    }
+    Ok(actual)
+}
+
+pub(crate) fn maintenance_fallback_update_script(
+    new_exe: &Path,
+    current_exe: &Path,
+    new_version: &Path,
+    version_file: &Path,
+) -> String {
+    format!(
+        "@echo off\r\ntimeout /t 2 /nobreak >nul\r\nmove /y \"{}\" \"{}\"\r\nif errorlevel 1 exit /b 1\r\nmove /y \"{}\" \"{}\"\r\nif errorlevel 1 exit /b 1\r\nstart \"\" \"{}\" --repair-background\r\ndel \"%~f0\"\r\n",
+        new_exe.display(),
+        current_exe.display(),
+        new_version.display(),
+        version_file.display(),
+        current_exe.display(),
+    )
 }
 pub(crate) fn spawn_client_action(action: ClientAction) -> Result<(), String> {
     #[cfg(windows)]

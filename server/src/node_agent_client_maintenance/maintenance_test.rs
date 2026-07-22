@@ -1,12 +1,16 @@
 #[cfg(test)]
 mod tests {
     use super::super::{
-        autostart_query_script, decode_autostart_info, install_dir_from_local_app_data,
-        maintenance_actions, maintenance_overview, maintenance_target, primary_maintenance_action,
+        autostart_query_script, decode_autostart_info, fallback_release_identity,
+        install_dir_from_local_app_data, maintenance_actions, maintenance_fallback_update_script,
+        maintenance_overview, maintenance_target, primary_maintenance_action,
         recent_maintenance_events, status_payload, truncate_chars,
     };
     use serde_json::json;
-    use std::{fs, path::PathBuf};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
 
     #[test]
     fn install_dir_is_under_local_app_data_elon_node() {
@@ -364,5 +368,38 @@ mod tests {
         assert!(items[2]["detail"].as_str().unwrap().chars().count() <= 180);
 
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn maintenance_fallback_commits_identity_before_background_repair() {
+        let script = maintenance_fallback_update_script(
+            Path::new(r"C:\ElonNode\client.new.exe"),
+            Path::new(r"C:\ElonNode\一龙开发平台.exe"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json.new"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json"),
+        );
+
+        let identity_move = script
+            .find("node-agent-version.json.new")
+            .expect("fallback script should move the target identity");
+        let repair = script
+            .find("--repair-background")
+            .expect("fallback script should restore runtime and watchdog through repair");
+        assert!(identity_move < repair);
+        assert!(!script.contains("--agent-runtime"));
+        assert!(script.matches("if errorlevel 1 exit /b 1").count() >= 2);
+    }
+
+    #[test]
+    fn maintenance_fallback_identity_is_bound_to_exact_broadcast_target() {
+        let version = r#"{"version":"0.3.69","gitSha":"51841351542f7cc3"}"#;
+        assert_eq!(
+            fallback_release_identity(version, Some("0.3.69+51841351542f7cc3")).unwrap(),
+            "0.3.69+51841351542f7cc3"
+        );
+        let error = fallback_release_identity(version, Some("0.3.70+aaaaaaaaaaaaaaaa"))
+            .expect_err("a different broadcast target must fail closed");
+        assert!(error.contains("不一致"));
+        assert!(fallback_release_identity(r#"{"version":"0.3.69"}"#, None).is_err());
     }
 }
