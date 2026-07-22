@@ -19,6 +19,8 @@ mod fit_learning;
 pub(crate) mod fit_run;
 mod frame;
 mod frame_artifact;
+mod launcher_icon;
+mod launcher_mask;
 mod launcher_surface;
 mod launcher_xml;
 mod mcp;

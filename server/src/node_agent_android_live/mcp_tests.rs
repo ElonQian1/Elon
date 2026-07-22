@@ -49,6 +49,52 @@ async fn launcher_icon_capabilities_are_declared_ready_without_live_runtime() {
 }
 
 #[tokio::test]
+async fn capability_gap_can_be_reported_while_runtime_is_disconnected() {
+    let broker = std::sync::Arc::new(LiveUiBroker::new());
+    let root = std::env::temp_dir().join(format!(
+        "elon-disconnected-gap-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let session = broker
+        .create_session(
+            "offline-device".to_string(),
+            "offline.runtime".to_string(),
+            Some(root.display().to_string()),
+            38917,
+        )
+        .await;
+    assert!(!session.view().await.connected);
+    let request: McpRequest = serde_json::from_value(json!({
+        "jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+            "name":"ui_report_capability_gap",
+            "arguments":{
+                "taskId":"offline-gap-regression",
+                "executionMode":"BUSINESS_THREAD",
+                "deliveryImpact":"DELIVERY_BLOCKING",
+                "originThreadId":"offline-origin",
+                "missingCapabilities":["PLATFORM_TOOL_DEFECT"],
+                "evidence":["Android Runtime is intentionally disconnected"],
+                "proposedChanges":["Keep capability-gap reporting on the local MCP control plane"],
+                "resumeTarget":"Resume after the platform upgrade is rechecked"
+            }
+        }
+    }))
+    .unwrap();
+    let fit_runs = FitRunService::live(broker.clone());
+    let response = handle_request(&broker, &fit_runs, &session.id, request)
+        .await
+        .expect("disconnected capability-gap response");
+    let result = &response["result"]["structuredContent"];
+    assert_eq!(result["gap"]["status"], "DEFERRED", "{result:#}");
+    assert_eq!(
+        result["gap"]["delegation"]["executionMode"],
+        "BUSINESS_THREAD"
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
 async fn mcp_lists_compact_ui_tools() {
     let broker = std::sync::Arc::new(LiveUiBroker::new());
     let session = broker
@@ -115,6 +161,10 @@ async fn mcp_lists_compact_ui_tools() {
         .expect("launcher surface capture tool must be discoverable");
     assert_eq!(launcher["annotations"]["readOnlyHint"], true);
     assert_eq!(
+        launcher["inputSchema"]["properties"]["mode"]["default"],
+        "PACKAGE_ICON"
+    );
+    assert_eq!(
         launcher["inputSchema"]["properties"]["deviceId"]["maxLength"],
         128
     );
@@ -134,6 +184,17 @@ async fn mcp_lists_compact_ui_tools() {
     );
     assert_eq!(
         visual_diff["inputSchema"]["properties"]["currentArtifact"]["required"]
+            .as_array()
+            .map(Vec::len),
+        Some(3)
+    );
+    let mask_renderer = tools
+        .iter()
+        .find(|tool| tool["name"] == "ui_render_android_launcher_masks")
+        .expect("launcher mask renderer");
+    assert_eq!(mask_renderer["annotations"]["readOnlyHint"], true);
+    assert_eq!(
+        mask_renderer["inputSchema"]["properties"]["shapes"]["items"]["enum"]
             .as_array()
             .map(Vec::len),
         Some(3)

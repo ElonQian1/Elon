@@ -2,11 +2,17 @@ package com.elon.uiruntime.view
 
 import android.app.Application
 import android.content.Context
+import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.drawable.AdaptiveIconDrawable
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.Process
 import android.util.Log
 import android.util.Base64
 import android.view.PixelCopy
@@ -110,7 +116,126 @@ internal object UiRuntimeController {
                 requestId = root.get("requestId")?.asString.orEmpty(),
                 quality = root.get("quality")?.asInt ?: 72,
             )
+            "icon.request" -> captureLauncherIcon(
+                requestId = root.get("requestId")?.asString.orEmpty(),
+                packageName = root.get("packageName")?.asString.orEmpty(),
+                sizePx = root.get("sizePx")?.asInt ?: 512,
+            )
         }
+    }
+
+    private fun captureLauncherIcon(requestId: String, packageName: String, sizePx: Int) {
+        mainHandler.post {
+            runCatching {
+                require(requestId.isNotBlank()) { "requestId is required" }
+                require(packageName.matches(Regex("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)+"))) {
+                    "packageName is invalid"
+                }
+                require(sizePx in 48..1_024) { "sizePx must be 48..1024" }
+                val app = application ?: error("Runtime application is unavailable")
+                val loaded = loadLauncherDrawable(app, packageName)
+                val bitmap = renderLauncherDrawable(loaded.drawable, sizePx)
+                val bytes = ByteArrayOutputStream().use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        "Launcher icon PNG compression failed"
+                    }
+                    output.toByteArray()
+                }
+                bitmap.recycle()
+                JsonObject().apply {
+                    addProperty("protocolVersion", UI_RUNTIME_PROTOCOL_VERSION)
+                    addProperty("messageType", "icon.snapshot")
+                    addProperty("requestId", requestId)
+                    addProperty("packageName", packageName)
+                    addProperty("appLabel", loaded.appLabel)
+                    addProperty("source", loaded.source)
+                    addProperty("adaptive", loaded.drawable is AdaptiveIconDrawable)
+                    addProperty(
+                        "renderMode",
+                        if (loaded.drawable is AdaptiveIconDrawable) {
+                            "UNMASKED_ADAPTIVE_LAYERS"
+                        } else {
+                            "DRAWABLE"
+                        },
+                    )
+                    addProperty("dataUrl", "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
+                    addProperty("width", sizePx)
+                    addProperty("height", sizePx)
+                    addProperty("bytes", bytes.size)
+                    addProperty("capturedAt", System.currentTimeMillis().toString())
+                }
+            }.fold(
+                onSuccess = { send(gson.toJson(it)) },
+                onFailure = { error ->
+                    send(
+                        gson.toJson(
+                            JsonObject().apply {
+                                addProperty("protocolVersion", UI_RUNTIME_PROTOCOL_VERSION)
+                                addProperty("messageType", "icon.reject")
+                                addProperty("requestId", requestId)
+                                addProperty("packageName", packageName)
+                                addProperty("error", error.message ?: "Launcher icon capture failed")
+                            },
+                        ),
+                    )
+                },
+            )
+        }
+    }
+
+    private data class LoadedLauncherDrawable(
+        val drawable: Drawable,
+        val appLabel: String,
+        val source: String,
+    )
+
+    private fun loadLauncherDrawable(app: Application, packageName: String): LoadedLauncherDrawable {
+        val launcherApps = app.getSystemService(LauncherApps::class.java)
+        val launcherActivity = launcherApps
+            ?.getActivityList(packageName, Process.myUserHandle())
+            ?.firstOrNull()
+        if (launcherActivity != null) {
+            return LoadedLauncherDrawable(
+                drawable = launcherActivity.getIcon(app.resources.displayMetrics.densityDpi),
+                appLabel = launcherActivity.label?.toString().orEmpty(),
+                source = "LAUNCHER_APPS",
+            )
+        }
+        val packageManager = app.packageManager
+        val info = if (Build.VERSION.SDK_INT >= 33) {
+            packageManager.getApplicationInfo(packageName, PackageManager.ApplicationInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.getApplicationInfo(packageName, 0)
+        }
+        return LoadedLauncherDrawable(
+            drawable = info.loadIcon(packageManager),
+            appLabel = info.loadLabel(packageManager).toString(),
+            source = "PACKAGE_MANAGER",
+        )
+    }
+
+    private fun renderLauncherDrawable(drawable: Drawable, sizePx: Int): Bitmap {
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.TRANSPARENT)
+        if (Build.VERSION.SDK_INT >= 26 && drawable is AdaptiveIconDrawable) {
+            drawable.background.setBounds(0, 0, sizePx, sizePx)
+            drawable.background.draw(canvas)
+            drawable.foreground.setBounds(0, 0, sizePx, sizePx)
+            drawable.foreground.draw(canvas)
+        } else {
+            val intrinsicWidth = drawable.intrinsicWidth.coerceAtLeast(1)
+            val intrinsicHeight = drawable.intrinsicHeight.coerceAtLeast(1)
+            val scale = minOf(sizePx.toFloat() / intrinsicWidth, sizePx.toFloat() / intrinsicHeight)
+            val width = (intrinsicWidth * scale).toInt().coerceAtLeast(1)
+            val height = (intrinsicHeight * scale).toInt().coerceAtLeast(1)
+            val left = (sizePx - width) / 2
+            val top = (sizePx - height) / 2
+            drawable.setBounds(left, top, left + width, top + height)
+            drawable.draw(canvas)
+        }
+        return bitmap
     }
 
     private fun captureFrame(requestId: String, quality: Int) {

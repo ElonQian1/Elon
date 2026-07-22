@@ -560,7 +560,8 @@ impl LiveUiSession {
                 state.runtime_stage = Some("TREE_SNAPSHOT_RECEIVED".to_string());
                 state.last_seen_at = Some(Utc::now().to_rfc3339());
             }
-            "patch.ack" | "patch.reject" | "frame.snapshot" | "frame.reject" => {
+            "patch.ack" | "patch.reject" | "frame.snapshot" | "frame.reject" | "icon.snapshot"
+            | "icon.reject" => {
                 let request_id = value
                     .get("requestId")
                     .and_then(Value::as_str)
@@ -778,3 +779,6 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests;
+
+#[path = "broker/runtime_icon.rs"]
+mod runtime_icon;

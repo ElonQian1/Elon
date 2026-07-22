@@ -102,3 +102,45 @@ async fn frame_request_retries_once_on_replacement_connection() {
     session.handle_runtime_text(&json!({"messageType":"frame.snapshot","requestId":request_id,"dataUrl":"data:image/webp;base64,UklGRg==","width":1,"height":1}).to_string()).await.unwrap();
     assert_eq!(request.await.unwrap().unwrap()["requestId"], request_id);
 }
+
+#[tokio::test]
+async fn launcher_icon_request_is_correlated_without_changing_session() {
+    let broker = LiveUiBroker::new();
+    let session = broker
+        .create_session(
+            "device-1".into(),
+            "com.runtime.host".into(),
+            Some(".".into()),
+            1,
+        )
+        .await;
+    let (runtime_tx, mut runtime_rx) = mpsc::unbounded_channel();
+    *session.runtime_tx.write().await = Some(runtime_tx);
+    let request = tokio::spawn({
+        let session = session.clone();
+        async move { session.request_launcher_icon("com.target.app", 512).await }
+    });
+    let Message::Text(text) = runtime_rx.recv().await.unwrap() else {
+        panic!("icon request must be text")
+    };
+    let sent: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(sent["messageType"], "icon.request");
+    assert_eq!(sent["packageName"], "com.target.app");
+    assert_eq!(sent["sizePx"], 512);
+    let request_id = sent["requestId"].as_str().unwrap();
+    session
+        .handle_runtime_text(
+            &json!({
+                "messageType":"icon.snapshot",
+                "requestId":request_id,
+                "packageName":"com.target.app",
+                "dataUrl":"data:image/png;base64,iVBORw0KGgo=",
+                "source":"LAUNCHER_APPS"
+            })
+            .to_string(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(request.await.unwrap().unwrap()["requestId"], request_id);
+    assert_eq!(session.id.len(), "live_".len() + 32);
+}

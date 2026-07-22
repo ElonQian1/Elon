@@ -96,6 +96,20 @@ pub(crate) fn persist_launcher_surface_artifact(
     persist_image_artifact(session, full_png, rect, "ANDROID_LAUNCHER", "launcher")
 }
 
+pub(crate) fn persist_launcher_mask_artifact(
+    session: &LiveUiSession,
+    png: &[u8],
+    shape_slug: &str,
+) -> Result<LiveFrameArtifact> {
+    let prefix = match shape_slug {
+        "circle" => "launcher-mask-circle",
+        "rounded-square" => "launcher-mask-rounded-square",
+        "squircle" => "launcher-mask-squircle",
+        _ => bail!("未知 Launcher mask shape"),
+    };
+    persist_image_artifact(session, png, None, "ANDROID_LAUNCHER_MASK", prefix)
+}
+
 pub(crate) fn persist_target_crop_artifact(
     session: &LiveUiSession,
     target_path: &str,

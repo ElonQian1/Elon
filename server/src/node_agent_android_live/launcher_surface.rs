@@ -28,6 +28,28 @@ struct LocatedIcon {
 }
 
 pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
+    match arguments
+        .get("mode")
+        .and_then(Value::as_str)
+        .unwrap_or("PACKAGE_ICON")
+    {
+        "PACKAGE_ICON" => super::launcher_icon::capture(session, arguments).await,
+        "OEM_FIXED_POSITION" => {
+            if arguments.get("iconRect").is_none() {
+                bail!("OEM_FIXED_POSITION 必须提供固定测试位置 iconRect");
+            }
+            capture_oem_or_legacy(session, arguments, true).await
+        }
+        "LEGACY_BOUNDED_SEARCH" => capture_oem_or_legacy(session, arguments, false).await,
+        mode => bail!("不支持的 Launcher 捕获 mode: {mode}"),
+    }
+}
+
+async fn capture_oem_or_legacy(
+    session: &LiveUiSession,
+    arguments: &Value,
+    fixed_position: bool,
+) -> Result<Value> {
     let device_id = arguments
         .get("deviceId")
         .and_then(Value::as_str)
@@ -77,7 +99,11 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
     let located = if let Some(rect) = explicit_rect {
         LocatedIcon {
             rect,
-            surface: "EXPLICIT_RECT",
+            surface: if fixed_position {
+                "OEM_FIXED_POSITION"
+            } else {
+                "EXPLICIT_RECT"
+            },
             moves_from_origin: 0,
             pages_inspected: 1,
             candidate_launches: 0,
@@ -107,7 +133,7 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
     )
     .await;
     let runtime_restored = if was_connected {
-        launch_package(device_id, package_name).await?;
+        launch_package(device_id, &session.package_name).await?;
         wait_for_same_runtime(session, settle_ms).await
     } else {
         false
@@ -132,6 +158,7 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
         "launcherForeground": foreground_line,
         "homeCommand": home_output.lines().take(8).collect::<Vec<_>>().join(" | "),
         "captureKind": "ANDROID_LAUNCHER_SURFACE",
+        "captureMode": if fixed_position { "OEM_FIXED_POSITION" } else { "LEGACY_BOUNDED_SEARCH" },
         "locator": {
             "surface": located.surface,
             "bounded": true,
@@ -145,6 +172,7 @@ pub(crate) async fn capture(session: &LiveUiSession, arguments: &Value) -> Resul
             "pageRestored": page_restored,
             "runtimeWasConnected": was_connected,
             "sameRuntimeSessionId": session.id,
+            "runtimePackageName": session.package_name,
             "runtimeRestored": runtime_restored,
         },
         "maskAwareDiffTool": "ui_get_visual_diff"

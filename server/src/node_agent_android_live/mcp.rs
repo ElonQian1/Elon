@@ -316,6 +316,10 @@ async fn call_tool(
             let session = broker.session(&session_id).await?;
             super::launcher_surface::capture(&session, &arguments).await?
         }
+        "ui_render_android_launcher_masks" => {
+            let session = broker.session(&session_id).await?;
+            super::launcher_mask::render(&session, &arguments)?
+        }
         "ui_get_visual_diff" => visual_diff_from_ir(broker, &session_id, &arguments).await?,
         "ui_propose_live_patch" => propose_live_patch(broker, &session_id, &arguments).await?,
         "ui_apply_live_patch" => {

@@ -266,15 +266,28 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_capture_android_launcher_surface",
-            "按 packageName 在 Android HOME/Launcher 桌面页及应用抽屉中有界定位图标，捕获后恢复原页面与 Runtime；仍可显式提供 iconRect。",
+            "默认由已连接 Runtime 使用 LauncherApps/PackageManager 直接读取 packageName 图标并产出稳定 iconRect/iconCrop，不切 HOME、不逐页模拟；OEM_FIXED_POSITION 仅用于固定位置的 MIUI 最终呈现复验，LEGACY_BOUNDED_SEARCH 是显式降级。",
             json!({
                 "type":"object","additionalProperties":false,"properties":{
                     "deviceId":{"type":"string","minLength":1,"maxLength":128},
                     "packageName":{"type":"string","minLength":1,"maxLength":180},
+                    "mode":{"enum":["PACKAGE_ICON","OEM_FIXED_POSITION","LEGACY_BOUNDED_SEARCH"],"default":"PACKAGE_ICON"},
                     "appLabel":{"type":"string","minLength":1,"maxLength":180},
                     "iconRect":rect_value_schema(),
+                    "iconSizePx":{"type":"integer","minimum":48,"maximum":1024,"default":512},
                     "settleMs":{"type":"integer","minimum":200,"maximum":5000,"default":900},
                     "maxPages":{"type":"integer","minimum":1,"maximum":32,"default":24}
+                }
+            }),
+        ),
+        tool(
+            "ui_render_android_launcher_masks",
+            "对同一 PackageManager/LauncherApps iconCrop 生成 CIRCLE、ROUNDED_SQUARE、SQUIRCLE 三种真实 PNG mask 产物，并返回各自与原图的 diff/score。",
+            json!({
+                "type":"object","additionalProperties":false,"required":["currentArtifact"],"properties":{
+                    "currentArtifact":launcher_artifact_schema(),
+                    "shapes":{"type":"array","minItems":1,"maxItems":3,"uniqueItems":true,"items":{"enum":["CIRCLE","ROUNDED_SQUARE","SQUIRCLE"]}},
+                    "safeZoneInsetFraction":{"type":"number","minimum":0,"maximum":0.25,"default":0}
                 }
             }),
         ),
@@ -580,6 +593,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
             | "ui_get_target_crop"
             | "ui_get_current_crop"
             | "ui_capture_android_launcher_surface"
+            | "ui_render_android_launcher_masks"
             | "ui_get_visual_diff"
             | "ui_propose_live_patch"
             | "ui_get_fit_run"
@@ -706,6 +720,17 @@ fn stable_selector_value_schema() -> Value {
 
 fn rect_schema() -> Value {
     json!({"type":"object","properties":{"rect":rect_value_schema()}})
+}
+
+fn launcher_artifact_schema() -> Value {
+    json!({
+        "type":"object","additionalProperties":false,
+        "required":["source","path","sha256"],"properties":{
+            "source":{"const":"ANDROID_LAUNCHER"},
+            "path":{"type":"string","minLength":1,"maxLength":4000},
+            "sha256":{"type":"string","pattern":"^[A-Fa-f0-9]{64}$"}
+        }
+    })
 }
 
 fn fit_visual_mask_schema() -> Value {
