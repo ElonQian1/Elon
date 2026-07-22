@@ -10,7 +10,7 @@ use crate::{
     node_agent_local_task_supervision::load_supervision_contract,
     node_agent_update_checkpoint::incomplete_non_repeatable_action,
     node_agent_update_recovery::{
-        UpdateGateTaskClassification, UpdateInstallGate, UpdateRecoveryState,
+        UpdateGateTaskClassification, UpdateInstallGate, UpdateRecoveryLedger, UpdateRecoveryState,
     },
     NodeRuntime,
 };
@@ -25,6 +25,7 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         .filter(|handle| handle.control_handle_live)
         .map(|handle| handle.req_id)
         .collect::<HashSet<_>>();
+    let recovery_ledger = runtime.update_recovery.load()?;
     let mut classifications = Vec::new();
     for task in runtime.local_tasks.list_update_install_candidates()? {
         if task.owner_user_id != credentials.owner_user_id
@@ -49,13 +50,9 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         } else {
             incomplete_non_repeatable_action(&snapshot.events)
         };
-        let receipt = runtime.update_recovery.receipt_for_task(&task.task_id)?;
-        let terminal_recovery_receipt = receipt.as_ref().is_some_and(|receipt| {
-            matches!(
-                receipt.state,
-                UpdateRecoveryState::Failed | UpdateRecoveryState::Verified
-            )
-        });
+        let (recovery_receipt_count, terminal_recovery_receipt) =
+            recovery_receipt_evidence(&recovery_ledger, &task.task_id);
+        let ambiguous_recovery_receipts = recovery_receipt_count > 1;
         let contract = load_supervision_contract(&runtime.task_journal, &task.task_id)?;
         let resume = crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
             &runtime,
@@ -84,12 +81,17 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             terminal_recovery_receipt,
             resume_ineligibility_proof.as_deref(),
         );
-        let excluded = base_terminal && no_execution_owner && no_unsafe_wait && terminal_proof;
+        let excluded = base_terminal
+            && no_execution_owner
+            && no_unsafe_wait
+            && !ambiguous_recovery_receipts
+            && terminal_proof;
         let reason = classification_reason(
             excluded,
             base_terminal,
             no_execution_owner,
             no_unsafe_wait,
+            ambiguous_recovery_receipts,
             terminal_recovery_receipt,
             resume_eligible,
         );
@@ -103,6 +105,8 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             pending_approval_ids,
             non_repeatable_action,
             terminal_recovery_receipt,
+            recovery_receipt_count,
+            ambiguous_recovery_receipts,
             resume_eligible,
             resume_ineligibility_proof,
             excluded_from_install_blockers: excluded,
@@ -169,6 +173,7 @@ fn classification_reason(
     base_terminal: bool,
     no_execution_owner: bool,
     no_unsafe_wait: bool,
+    ambiguous_recovery_receipts: bool,
     terminal_receipt: bool,
     resume_eligible: Option<bool>,
 ) -> String {
@@ -189,6 +194,10 @@ fn classification_reason(
     if !no_unsafe_wait {
         return "pending approval, incomplete audit, or non-repeatable action remains".to_string();
     }
+    if ambiguous_recovery_receipts {
+        return "multiple update recovery receipts target the task; terminal proof is ambiguous"
+            .to_string();
+    }
     if resume_eligible == Some(true) {
         return "task remains eligible for resume".to_string();
     }
@@ -201,6 +210,26 @@ fn terminal_exclusion_proven(
 ) -> bool {
     terminal_recovery_receipt
         || resume_ineligibility_proof.is_some_and(|reason| !reason.trim().is_empty())
+}
+
+fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (usize, bool) {
+    let matches = ledger
+        .receipts
+        .iter()
+        .filter(|receipt| {
+            receipt.original_task_id == task_id
+                || receipt.resume_task_id.as_deref() == Some(task_id)
+        })
+        .collect::<Vec<_>>();
+    let count = matches.len();
+    let terminal = count == 1
+        && matches.first().is_some_and(|receipt| {
+            matches!(
+                receipt.state,
+                UpdateRecoveryState::Failed | UpdateRecoveryState::Verified
+            )
+        });
+    (count, terminal)
 }
 
 fn stable_reconcile_id(
@@ -216,18 +245,40 @@ fn stable_reconcile_id(
 
 #[cfg(test)]
 mod tests {
-    use super::{classification_reason, terminal_exclusion_proven};
+    use super::{classification_reason, recovery_receipt_evidence, terminal_exclusion_proven};
+    use crate::node_agent_update_recovery::{
+        UpdateRecoveryLedger, UpdateRecoveryReceipt, UpdateRecoveryState,
+    };
 
     #[test]
     fn unknown_resume_evidence_stays_fail_closed() {
-        assert!(classification_reason(false, true, true, true, false, None).contains("unknown"));
+        assert!(
+            classification_reason(false, true, true, true, false, false, None).contains("unknown")
+        );
     }
 
     #[test]
     fn active_execution_owner_stays_blocking() {
         assert!(
-            classification_reason(false, true, false, true, true, Some(false)).contains("sidecar")
+            classification_reason(false, true, false, true, false, true, Some(false))
+                .contains("sidecar")
         );
+    }
+
+    #[test]
+    fn duplicate_recovery_receipts_stay_blocking_without_aborting_reconcile() {
+        assert!(
+            classification_reason(false, true, true, true, true, false, Some(false))
+                .contains("ambiguous")
+        );
+
+        let mut ledger = UpdateRecoveryLedger::default();
+        let mut first = UpdateRecoveryReceipt::planned("update-a", "root-a", "task-a");
+        first.state = UpdateRecoveryState::Failed;
+        let mut second = UpdateRecoveryReceipt::planned("update-b", "root-b", "task-a");
+        second.state = UpdateRecoveryState::Verified;
+        ledger.receipts.extend([first, second]);
+        assert_eq!(recovery_receipt_evidence(&ledger, "task-a"), (2, false));
     }
 
     #[test]

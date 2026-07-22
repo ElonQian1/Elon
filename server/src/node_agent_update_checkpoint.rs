@@ -201,6 +201,7 @@ fn checkpoint_active_update_transactions(
                         && classification.status == task.status
                         && classification.finished_at_ms == task.finished_at_ms
                         && classification.excluded_from_install_blockers
+                        && !classification.ambiguous_recovery_receipts
                         && (classification.terminal_recovery_receipt
                             || classification
                                 .resume_ineligibility_proof
