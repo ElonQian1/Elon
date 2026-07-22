@@ -484,6 +484,8 @@ pub(crate) struct UpdateGateTaskClassification {
     #[serde(default)]
     pub(crate) recovery_receipt_count: usize,
     #[serde(default)]
+    pub(crate) terminal_recovery_receipt_count: usize,
+    #[serde(default)]
     pub(crate) ambiguous_recovery_receipts: bool,
     #[serde(default)]
     pub(crate) resume_eligible: Option<bool>,

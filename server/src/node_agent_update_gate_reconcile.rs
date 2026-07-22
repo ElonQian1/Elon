@@ -50,9 +50,10 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         } else {
             incomplete_non_repeatable_action(&snapshot.events)
         };
-        let (recovery_receipt_count, terminal_recovery_receipt) =
+        let (recovery_receipt_count, terminal_recovery_receipt_count, terminal_recovery_receipt) =
             recovery_receipt_evidence(&recovery_ledger, &task.task_id);
-        let ambiguous_recovery_receipts = recovery_receipt_count > 1;
+        let ambiguous_recovery_receipts =
+            recovery_receipt_count > 1 && terminal_recovery_receipt_count != recovery_receipt_count;
         let contract = load_supervision_contract(&runtime.task_journal, &task.task_id)?;
         let resume = crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
             &runtime,
@@ -106,6 +107,7 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             non_repeatable_action,
             terminal_recovery_receipt,
             recovery_receipt_count,
+            terminal_recovery_receipt_count,
             ambiguous_recovery_receipts,
             resume_eligible,
             resume_ineligibility_proof,
@@ -179,7 +181,7 @@ fn classification_reason(
 ) -> String {
     if excluded {
         return if terminal_receipt {
-            "terminal resume_required task with failed/verified recovery receipt and no remaining execution ownership"
+            "terminal resume_required task with only failed/verified recovery receipts and no remaining execution ownership"
         } else {
             "terminal resume_required task is explicitly ineligible for resume and has no remaining execution ownership"
         }.to_string();
@@ -212,7 +214,7 @@ fn terminal_exclusion_proven(
         || resume_ineligibility_proof.is_some_and(|reason| !reason.trim().is_empty())
 }
 
-fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (usize, bool) {
+fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (usize, usize, bool) {
     let matches = ledger
         .receipts
         .iter()
@@ -222,14 +224,16 @@ fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (u
         })
         .collect::<Vec<_>>();
     let count = matches.len();
-    let terminal = count == 1
-        && matches.first().is_some_and(|receipt| {
+    let terminal_count = matches
+        .iter()
+        .filter(|receipt| {
             matches!(
                 receipt.state,
                 UpdateRecoveryState::Failed | UpdateRecoveryState::Verified
             )
-        });
-    (count, terminal)
+        })
+        .count();
+    (count, terminal_count, count > 0 && terminal_count == count)
 }
 
 fn stable_reconcile_id(
@@ -278,7 +282,10 @@ mod tests {
         let mut second = UpdateRecoveryReceipt::planned("update-b", "root-b", "task-a");
         second.state = UpdateRecoveryState::Verified;
         ledger.receipts.extend([first, second]);
-        assert_eq!(recovery_receipt_evidence(&ledger, "task-a"), (2, false));
+        assert_eq!(recovery_receipt_evidence(&ledger, "task-a"), (2, 2, true));
+
+        ledger.receipts[1].state = UpdateRecoveryState::Paused;
+        assert_eq!(recovery_receipt_evidence(&ledger, "task-a"), (2, 1, false));
     }
 
     #[test]
