@@ -212,13 +212,31 @@ pub(crate) fn maintenance_fallback_update_script(
     new_version: &Path,
     version_file: &Path,
 ) -> String {
+    let exe_backup = current_exe.with_extension("before-update.exe");
+    let version_backup = version_file.with_extension("before-update.json");
     format!(
-        "@echo off\r\ntimeout /t 2 /nobreak >nul\r\nmove /y \"{}\" \"{}\"\r\nif errorlevel 1 exit /b 1\r\nmove /y \"{}\" \"{}\"\r\nif errorlevel 1 exit /b 1\r\nstart \"\" \"{}\" --repair-background\r\ndel \"%~f0\"\r\n",
+        "@echo off\r\nsetlocal\r\ntimeout /t 2 /nobreak >nul\r\nset \"HAD_EXE=0\"\r\nset \"HAD_IDENTITY=0\"\r\ndel /q \"{}\" 2>nul\r\ndel /q \"{}\" 2>nul\r\nif exist \"{}\" (\r\n  move /y \"{}\" \"{}\" >nul\r\n  if errorlevel 1 goto rollback\r\n  set \"HAD_EXE=1\"\r\n)\r\nmove /y \"{}\" \"{}\" >nul\r\nif errorlevel 1 goto rollback\r\nif exist \"{}\" (\r\n  move /y \"{}\" \"{}\" >nul\r\n  if errorlevel 1 goto rollback\r\n  set \"HAD_IDENTITY=1\"\r\n)\r\nmove /y \"{}\" \"{}\" >nul\r\nif errorlevel 1 goto rollback\r\nstart \"\" \"{}\" --repair-background\r\nif errorlevel 1 goto rollback\r\ndel /q \"{}\" 2>nul\r\ndel /q \"{}\" 2>nul\r\ndel \"%~f0\"\r\nexit /b 0\r\n:rollback\r\ndel /q \"{}\" 2>nul\r\nif \"%HAD_EXE%\"==\"1\" move /y \"{}\" \"{}\" >nul\r\ndel /q \"{}\" 2>nul\r\nif \"%HAD_IDENTITY%\"==\"1\" move /y \"{}\" \"{}\" >nul\r\nexit /b 1\r\n",
+        exe_backup.display(),
+        version_backup.display(),
+        current_exe.display(),
+        current_exe.display(),
+        exe_backup.display(),
         new_exe.display(),
         current_exe.display(),
+        version_file.display(),
+        version_file.display(),
+        version_backup.display(),
         new_version.display(),
         version_file.display(),
         current_exe.display(),
+        exe_backup.display(),
+        version_backup.display(),
+        current_exe.display(),
+        exe_backup.display(),
+        current_exe.display(),
+        version_file.display(),
+        version_backup.display(),
+        version_file.display(),
     )
 }
 pub(crate) fn spawn_client_action(action: ClientAction) -> Result<(), String> {

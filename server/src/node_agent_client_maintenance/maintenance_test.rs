@@ -389,7 +389,52 @@ mod tests {
             .expect("fallback script should restore runtime and watchdog through repair");
         assert!(identity_move < repair);
         assert!(!script.contains("--agent-runtime"));
-        assert!(script.matches("if errorlevel 1 exit /b 1").count() >= 2);
+        assert!(script.matches("if errorlevel 1 goto rollback").count() >= 5);
+        let rollback = script.find(":rollback").expect("rollback label");
+        assert!(script[rollback..].contains("before-update.exe"));
+        assert!(script[rollback..].contains("before-update.json"));
+        assert!(!script[rollback..].contains("--repair-background"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn maintenance_fallback_second_step_failure_rolls_back_without_repair() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-maintenance-rollback-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(root.join("_internal")).unwrap();
+        let current_exe = root.join("client.exe");
+        let new_exe = root.join("client.new.exe");
+        let version_file = root.join("_internal/node-agent-version.json");
+        let missing_new_version = root.join("_internal/missing-version.json.new");
+        fs::write(&current_exe, b"old-exe").unwrap();
+        fs::write(&new_exe, b"new-exe").unwrap();
+        fs::write(&version_file, b"old-identity").unwrap();
+        let bat = root.join("rollback-test.bat");
+        fs::write(
+            &bat,
+            maintenance_fallback_update_script(
+                &new_exe,
+                &current_exe,
+                &missing_new_version,
+                &version_file,
+            ),
+        )
+        .unwrap();
+
+        let output = std::process::Command::new("cmd")
+            .args(["/D", "/C", bat.to_string_lossy().as_ref()])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "second move must fail nonzero");
+        assert_eq!(fs::read(&current_exe).unwrap(), b"old-exe");
+        assert_eq!(fs::read(&version_file).unwrap(), b"old-identity");
+        assert!(!root.join("client.before-update.exe").exists());
+        assert!(!root
+            .join("_internal/node-agent-version.before-update.json")
+            .exists());
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]
