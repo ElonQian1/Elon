@@ -86,7 +86,9 @@ impl NodeRuntime {
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
-        let live_ui = Arc::new(crate::node_agent_android_live::LiveUiBroker::new());
+        let live_ui = Arc::new(crate::node_agent_android_live::LiveUiBroker::for_node(
+            &install_id,
+        ));
         let ui_fit_runs =
             Arc::new(crate::node_agent_android_live::fit_run::FitRunService::live(live_ui.clone()));
         Self {

@@ -48,11 +48,21 @@ pub(super) async fn prepare_debug_runtime(
             anyhow!("UI Profile 未识别 Android applicationId；请显式提供 basePackageName")
         })?
         .to_string();
-    let debug_application_id_suffix = arguments
+    let requested_debug_application_id_suffix = arguments
         .get("debugApplicationIdSuffix")
         .and_then(Value::as_str)
         .unwrap_or(".uitest")
         .to_string();
+    let node_install_id = broker
+        .debug_deployments
+        .node_install_id()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("PC 节点缺少稳定安装标识，拒绝创建会话级临时调试包"))?;
+    let debug_application_id_suffix = super::scoped_debug_application_id_suffix(
+        &requested_debug_application_id_suffix,
+        node_install_id,
+    )?;
     let restart = arguments
         .get("restart")
         .and_then(Value::as_bool)

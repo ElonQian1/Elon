@@ -12,6 +12,7 @@ mod capability_gap;
 mod capability_requirements;
 mod cross_platform_verification;
 mod debug_package;
+mod deployment_serialization;
 mod design_bootstrap;
 mod design_diff_regions;
 mod desktop_task;

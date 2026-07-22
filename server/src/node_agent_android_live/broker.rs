@@ -21,6 +21,7 @@ const MAX_HISTORY: usize = 100;
 #[derive(Default)]
 pub(crate) struct LiveUiBroker {
     sessions: RwLock<HashMap<String, Arc<LiveUiSession>>>,
+    pub(crate) debug_deployments: super::deployment_serialization::DebugDeploymentRegistry,
     pub(crate) debug_runtime_preparations: super::build_verify::PreparationRegistry,
 }
 
@@ -68,6 +69,15 @@ struct PatchJournalEntry {
 impl LiveUiBroker {
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    pub(crate) fn for_node(install_id: &str) -> Self {
+        Self {
+            debug_deployments: super::deployment_serialization::DebugDeploymentRegistry::for_node(
+                install_id,
+            ),
+            ..Self::default()
+        }
     }
 
     pub(crate) async fn create_session(

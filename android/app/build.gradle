@@ -112,6 +112,8 @@ def releaseKeyAlias = signingValue("ELON_RELEASE_KEY_ALIAS", "elon")
 def releaseKeyPassword = signingValue("ELON_RELEASE_KEY_PASSWORD")
 def releaseKeystoreFile = file(releaseKeystorePath)
 def debugApplicationIdSuffix = signingValue("ELON_DEBUG_APPLICATION_ID_SUFFIX")
+def localNodeName = System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME") ?: "一龙调试"
+def debugAppLabel = signingValue("ELON_DEBUG_APP_LABEL", localNodeName)
 
 gradle.taskGraph.whenReady { graph ->
     def needsReleaseSigning = graph.allTasks.any { it.name.toLowerCase(Locale.ROOT).contains("release") }
@@ -154,6 +156,7 @@ android {
         def fallbackUrl = signingValue("ELON_FALLBACK_SERVER_URL", "")
         buildConfigField "String", "FALLBACK_SERVER_URL", "\"${fallbackUrl}\""
         manifestPlaceholders += [
+            elonAppLabel        : "@string/app_name",
             elonLauncherIcon     : projectIconEnabled ? "@mipmap/elon_project_launcher" : "@mipmap/ic_launcher",
             elonLauncherRoundIcon: projectIconEnabled ? "@mipmap/elon_project_launcher_round" : "@mipmap/ic_launcher_round"
         ]
@@ -161,6 +164,7 @@ android {
 
     buildTypes {
         debug {
+            manifestPlaceholders["elonAppLabel"] = debugAppLabel
             if (debugApplicationIdSuffix) {
                 applicationIdSuffix debugApplicationIdSuffix.startsWith('.')
                     ? debugApplicationIdSuffix

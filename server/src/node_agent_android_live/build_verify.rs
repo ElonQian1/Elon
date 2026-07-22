@@ -131,6 +131,23 @@ async fn prepare_debug_runtime_inner(
         bail!("projectRoot 不能为空；请先在 PC 工作台选择本机项目");
     }
     let package_name = format!("{base_package_name}{suffix}");
+    if let Some(reporter) = reporter {
+        reporter
+            .phase(
+                "DEPLOYMENT_SLOT",
+                format!("等待设备 {device_id} 的固定调试包 {package_name} 部署时隙"),
+            )
+            .await;
+    }
+    let _deployment = broker
+        .debug_deployments
+        .acquire(device_id, &package_name)
+        .await;
+    if let Some(reporter) = reporter {
+        reporter
+            .evidence("DEPLOYMENT_SLOT", "ACQUIRED", "已取得独占部署时隙")
+            .await;
+    }
     let reusable_session = if keep_session {
         broker
             .runtime_session_for(project_root, device_id, &package_name)
@@ -206,6 +223,10 @@ async fn build_and_verify_inner(
     host_port: u16,
 ) -> Result<BuildVerifyResult> {
     let session = broker.session(session_id).await?;
+    let _deployment = broker
+        .debug_deployments
+        .acquire(&session.device_id, &session.package_name)
+        .await;
     let target_path = load_or_build_ui_ir(broker, session_id)
         .await
         .ok()

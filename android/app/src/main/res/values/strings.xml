@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">一龙</string>
+    <string name="app_name">一龙ai</string>
     <!-- Agent 子系统（来自 android-agent 一体化合并） -->
     <string name="agent_accessibility_description">一龙 Agent - 端上自动化操作</string>
     <string name="agent_accessibility_description_v2">一龙 Agent V2 - 多模态视觉 / 智能记忆 / 任务规划 / 错误恢复 / PC 协作</string>
