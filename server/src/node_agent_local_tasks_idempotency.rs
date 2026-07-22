@@ -16,19 +16,19 @@ const METHOD: &str = "POST";
 const PATH: &str = "/api/local-tasks";
 const MAX_KEY_CHARS: usize = 200;
 
-pub(crate) struct Binding {
+pub(super) struct Binding {
     pub(crate) key: String,
     pub(crate) task_id: String,
     pub(crate) recover_existing: bool,
 }
 
-pub(crate) enum Begin {
+pub(super) enum Begin {
     Unbound { task_id: String },
     Bound(Binding),
     Response(Response),
 }
 
-pub(crate) fn begin(
+pub(super) fn begin(
     runtime: &NodeRuntime,
     owner_user_id: &str,
     headers: &HeaderMap,
@@ -144,7 +144,7 @@ pub(crate) fn begin(
     }
 }
 
-pub(crate) fn complete(
+pub(super) fn complete(
     runtime: &NodeRuntime,
     owner_user_id: &str,
     binding: Option<&Binding>,

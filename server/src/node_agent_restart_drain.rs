@@ -237,7 +237,7 @@ fn recover_checkpoint_state(
             .is_some_and(|target| !restart_target_matches(target, current_release_identity))
     {
         checkpoint.message = format!(
-            "from_release 运行时已重新启动，仍等待目标版本 {} 安装；未报告 runtime_online。",
+            "from_release 运行时已重新启动，仍等待目标版本 {} 安装；未将旧进程标记为目标版本在线。",
             checkpoint
                 .target_release_identity
                 .as_deref()
