@@ -121,10 +121,12 @@ mod node_agent_local_task_resume_routes;
 mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
+mod node_agent_local_terminal_reconcile;
 mod node_agent_supervision_project_identity;
 mod node_agent_supervision_protocol;
 mod node_agent_supervision_terminal_lease;
 mod node_agent_supervision_terminal_lease_safety;
+mod node_agent_terminal_finalization;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
@@ -240,6 +242,7 @@ mod tools_patch;
 mod windows_doctor;
 
 mod node_agent_runtime;
+mod node_agent_session_completion_ack;
 pub(crate) use node_agent_runtime::NodeRuntime;
 
 mod node_agent_cli_mcp;

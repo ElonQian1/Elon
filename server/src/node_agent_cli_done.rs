@@ -152,7 +152,7 @@ pub(crate) fn cli_done_message_from_output(
 /// socket or the local workbench consumer. A failed outbox transaction is fatal to
 /// delivery: sending an unjournaled terminal event would recreate the result/token
 /// loss this path is designed to prevent.
-pub(crate) fn persist_and_send_cli_done(
+pub(crate) async fn persist_and_send_cli_done(
     runtime: &NodeRuntime,
     context: &CliCompletionContext,
     cli_name: &str,
@@ -219,45 +219,20 @@ pub(crate) fn persist_and_send_cli_done(
         .enqueue(&envelope)
         .with_context(|| format!("persist CLI completion {}", envelope.event_id))?;
     if context.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
-        match context.local_owner_user_id.as_deref() {
-            Some(owner_user_id) => match runtime.local_tasks.finish(owner_user_id, &envelope) {
-                Ok(true) => {}
-                Ok(false) => tracing::warn!(
-                    %req_id,
-                    event_id = %envelope.event_id,
-                    "durable local completion did not match a local task row"
-                ),
-                Err(error) => tracing::warn!(
-                    %req_id,
-                    event_id = %envelope.event_id,
-                    %error,
-                    "failed to bind durable completion to local task; startup/ACK will retry"
-                ),
-            },
-            None => tracing::error!(
-                %req_id,
-                event_id = %envelope.event_id,
-                "local completion context is missing its owner binding"
-            ),
-        }
-    }
-    if let Err(error) = runtime.task_journal.record_finished_with_outcome(
+        anyhow::ensure!(
+            context.local_owner_user_id.is_some(),
+            "local completion context is missing its owner binding"
+        );
+        crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(runtime)
+            .reconcile(&envelope)
+            .await
+            .with_context(|| format!("reconcile durable local completion {}", envelope.event_id))?;
+    } else if let Err(error) = runtime.task_journal.record_finished_with_outcome(
         req_id,
         completion_terminal_status(*exit_ok, error.as_deref()),
         error.as_deref(),
     ) {
-        tracing::warn!(%req_id, %error, "failed to update display task journal after durable outbox commit");
-    }
-    if context.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
-        if let Err(error) = runtime.update_recovery.reconcile_terminal_completion(
-            req_id,
-            &envelope.event_id,
-            completion_terminal_status(*exit_ok, error.as_deref()),
-            envelope.created_at_ms as u128,
-            *exit_ok,
-        ) {
-            tracing::warn!(%req_id, %error, "failed to reconcile update recovery terminal receipt");
-        }
+        tracing::warn!(%req_id, %error, "failed to update cloud task journal after durable outbox commit");
     }
     let text = serde_json::to_string(&message).context("serialize durable CliDone")?;
     out_tx

@@ -1,7 +1,4 @@
-use super::{
-    apply_cli_completion_ack, completion_replay_backoff_ms, completion_replay_is_due,
-    shutdown_session_task,
-};
+use super::{completion_replay_backoff_ms, completion_replay_is_due, shutdown_session_task};
 use crate::{
     node_agent_completion_outbox::{CliCompletionOutbox, PendingCliCompletion},
     node_agent_local_task_store::{LocalTaskStart, LocalTaskStore},
@@ -16,6 +13,29 @@ fn test_root() -> PathBuf {
         "elon-completion-ack-test-{}",
         uuid::Uuid::new_v4().simple()
     ))
+}
+
+fn test_runtime(root: &PathBuf, local_tasks_path: PathBuf) -> crate::NodeRuntime {
+    let mut runtime = crate::NodeRuntime::new(
+        crate::node_agent_config::NodeConfig {
+            cloud_url: "ws://127.0.0.1".into(),
+            cloud_http_url: "http://127.0.0.1".into(),
+            ollama_url: "http://127.0.0.1".into(),
+            lm_studio_url: None,
+            custom_url: None,
+            price_per_1k: 0.0,
+        },
+        None,
+        crate::pc_storage_repo::StorageSettings::default(),
+        crate::node_agent_data_root::resolve(None, None, None),
+        "install-a".into(),
+    );
+    runtime.completion_outbox = CliCompletionOutbox::new(root.join("outbox.sqlite3"));
+    runtime.local_tasks = LocalTaskStore::new(local_tasks_path);
+    runtime.task_journal = crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
+    runtime.update_recovery =
+        crate::node_agent_update_recovery::UpdateRecoveryStore::new(root.join("recovery.json"));
+    runtime
 }
 
 fn completion(event_id: &str, req_id: &str) -> CliCompletionEnvelope {
@@ -74,18 +94,18 @@ fn seed_local_task(store: &LocalTaskStore, completion: &CliCompletionEnvelope) {
     assert!(store.finish(OWNER, completion).expect("finish local task"));
 }
 
-#[test]
-fn accepted_ack_updates_local_display_before_deleting_outbox_row() {
+#[tokio::test]
+async fn accepted_ack_updates_local_display_before_deleting_outbox_row() {
     let root = test_root();
-    let outbox = CliCompletionOutbox::new(root.join("outbox.sqlite3"));
-    let local_tasks = LocalTaskStore::new(root.join("local-tasks.sqlite3"));
+    let runtime = test_runtime(&root, root.join("local-tasks.sqlite3"));
+    let outbox = &runtime.completion_outbox;
+    let local_tasks = &runtime.local_tasks;
     let completion = completion("event-accepted", "req-accepted");
     outbox.enqueue(&completion).expect("enqueue completion");
     seed_local_task(&local_tasks, &completion);
 
-    apply_cli_completion_ack(
-        &outbox,
-        &local_tasks,
+    crate::node_agent_session_completion_ack::apply(
+        &runtime,
         completion.producer_identity.as_ref().unwrap(),
         &completion.event_id,
         &completion.req_id,
@@ -93,6 +113,7 @@ fn accepted_ack_updates_local_display_before_deleting_outbox_row() {
         false,
         None,
     )
+    .await
     .expect("apply accepted ACK");
 
     assert!(outbox
@@ -108,20 +129,20 @@ fn accepted_ack_updates_local_display_before_deleting_outbox_row() {
     let _ = fs::remove_dir_all(root);
 }
 
-#[test]
-fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
+#[tokio::test]
+async fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
     let root = test_root();
-    let outbox = CliCompletionOutbox::new(root.join("outbox.sqlite3"));
-    let local_tasks = LocalTaskStore::new(root.join("local-tasks.sqlite3"));
+    let runtime = test_runtime(&root, root.join("local-tasks.sqlite3"));
+    let outbox = &runtime.completion_outbox;
+    let local_tasks = &runtime.local_tasks;
     let accepted = completion("event-accepted", "req-accepted");
     let rejected = completion("event-rejected", "req-rejected");
     outbox.enqueue(&accepted).unwrap();
     outbox.enqueue(&rejected).unwrap();
     create_local_task(&local_tasks, &accepted);
 
-    assert!(apply_cli_completion_ack(
-        &outbox,
-        &local_tasks,
+    assert!(crate::node_agent_session_completion_ack::apply(
+        &runtime,
         accepted.producer_identity.as_ref().unwrap(),
         "wrong-event",
         &accepted.req_id,
@@ -129,10 +150,10 @@ fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
         false,
         None,
     )
+    .await
     .is_err());
-    apply_cli_completion_ack(
-        &outbox,
-        &local_tasks,
+    crate::node_agent_session_completion_ack::apply(
+        &runtime,
         accepted.producer_identity.as_ref().unwrap(),
         &accepted.event_id,
         &accepted.req_id,
@@ -140,6 +161,7 @@ fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
         false,
         None,
     )
+    .await
     .expect("ACK should repair a crash before local display persistence");
     let repaired = local_tasks
         .get_for_owner(OWNER, &accepted.req_id)
@@ -150,10 +172,9 @@ fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
     assert_eq!(outbox.pending_count().unwrap(), 1);
 
     // Opening a SQLite database at an existing directory fails deterministically.
-    let broken_local_tasks = LocalTaskStore::new(&root);
-    assert!(apply_cli_completion_ack(
-        &outbox,
-        &broken_local_tasks,
+    let broken_runtime = test_runtime(&root, root.clone());
+    assert!(crate::node_agent_session_completion_ack::apply(
+        &broken_runtime,
         rejected.producer_identity.as_ref().unwrap(),
         &rejected.event_id,
         &rejected.req_id,
@@ -161,6 +182,7 @@ fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
         false,
         Some("permanent rejection"),
     )
+    .await
     .is_err());
 
     assert_eq!(outbox.pending_count().unwrap(), 1);
@@ -175,18 +197,18 @@ fn ack_self_heals_local_display_and_real_storage_failure_keeps_outbox() {
     let _ = fs::remove_dir_all(root);
 }
 
-#[test]
-fn late_local_finish_cannot_downgrade_synced_or_rejected_state() {
+#[tokio::test]
+async fn late_local_finish_cannot_downgrade_synced_or_rejected_state() {
     let root = test_root();
-    let outbox = CliCompletionOutbox::new(root.join("outbox.sqlite3"));
-    let local_tasks = LocalTaskStore::new(root.join("local-tasks.sqlite3"));
+    let runtime = test_runtime(&root, root.join("local-tasks.sqlite3"));
+    let outbox = &runtime.completion_outbox;
+    let local_tasks = &runtime.local_tasks;
 
     let accepted = completion("event-accepted", "req-accepted");
     outbox.enqueue(&accepted).unwrap();
     seed_local_task(&local_tasks, &accepted);
-    apply_cli_completion_ack(
-        &outbox,
-        &local_tasks,
+    crate::node_agent_session_completion_ack::apply(
+        &runtime,
         accepted.producer_identity.as_ref().unwrap(),
         &accepted.event_id,
         &accepted.req_id,
@@ -194,6 +216,7 @@ fn late_local_finish_cannot_downgrade_synced_or_rejected_state() {
         false,
         None,
     )
+    .await
     .unwrap();
     assert!(local_tasks.finish(OWNER, &accepted).unwrap());
     let mut stale_fallback = accepted.clone();
@@ -212,9 +235,8 @@ fn late_local_finish_cannot_downgrade_synced_or_rejected_state() {
     let rejected = completion("event-rejected", "req-rejected");
     outbox.enqueue(&rejected).unwrap();
     seed_local_task(&local_tasks, &rejected);
-    apply_cli_completion_ack(
-        &outbox,
-        &local_tasks,
+    crate::node_agent_session_completion_ack::apply(
+        &runtime,
         rejected.producer_identity.as_ref().unwrap(),
         &rejected.event_id,
         &rejected.req_id,
@@ -222,6 +244,7 @@ fn late_local_finish_cannot_downgrade_synced_or_rejected_state() {
         false,
         Some("permanent rejection"),
     )
+    .await
     .unwrap();
     assert!(local_tasks.finish(OWNER, &rejected).unwrap());
     let rejected_record = local_tasks

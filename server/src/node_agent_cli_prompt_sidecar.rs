@@ -210,7 +210,9 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
                 None,
                 done,
                 &out_tx,
-            ) {
+            )
+            .await
+            {
                 warn!(%error, "failed to persist sidecar follow completion");
             }
             return None;
@@ -241,7 +243,9 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
             Some(&combined_output),
             done,
             &out_tx,
-        ) {
+        )
+        .await
+        {
             warn!(%error, "failed to persist canceled sidecar completion");
         }
         return None;
@@ -449,7 +453,9 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         Some(&combined_output),
         done,
         &out_tx,
-    ) {
+    )
+    .await
+    {
         warn!(%error, "failed to persist sidecar CLI completion");
     }
     None

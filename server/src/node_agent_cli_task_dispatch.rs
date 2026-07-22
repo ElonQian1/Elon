@@ -14,6 +14,10 @@ use crate::{
     resolve_attachment_args, run_cli_prompt, ws_text, CliPromptRun, NodeRuntime,
 };
 
+#[path = "node_agent_cli_task_dispatch_failure.rs"]
+mod failure;
+use failure::send_preflight_failure;
+
 #[derive(Debug)]
 pub(crate) struct CliTaskDispatchRequest {
     pub req_id: String,
@@ -100,12 +104,13 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             error.to_string(),
-        );
+        )
+        .await;
         return;
     }
     if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
     {
-        send_preflight_failure(&runtime, &completion_context, &cli, &out_tx, req_id, error);
+        send_preflight_failure(&runtime, &completion_context, &cli, &out_tx, req_id, error).await;
         return;
     }
     let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -135,7 +140,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 format!("读取 durable completion 状态失败，已拒绝重复执行：{error}"),
-            );
+            )
+            .await;
             return;
         }
     }
@@ -149,7 +155,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 error.to_string(),
-            );
+            )
+            .await;
             return;
         }
     };
@@ -179,7 +186,8 @@ async fn run_cli_task(
                     &out_tx,
                     req_id,
                     "本机离线任务没有在创建时冻结 CODEX_HOME，已拒绝启动。".to_string(),
-                );
+                )
+                .await;
                 return;
             }
             None => match FrozenCodexHome::capture_for_task() {
@@ -192,7 +200,8 @@ async fn run_cli_task(
                         &out_tx,
                         req_id,
                         error.to_string(),
-                    );
+                    )
+                    .await;
                     return;
                 }
             },
@@ -207,7 +216,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 error.to_string(),
-            );
+            )
+            .await;
             return;
         }
         if local_offline {
@@ -219,7 +229,8 @@ async fn run_cli_task(
                     &out_tx,
                     req_id,
                     "本机离线 Codex 任务不能携带云端凭据绑定。".to_string(),
-                );
+                )
+                .await;
                 return;
             }
         } else {
@@ -231,7 +242,8 @@ async fn run_cli_task(
                     &out_tx,
                     req_id,
                     "云端 Codex 任务缺少凭据绑定，已拒绝启动。".to_string(),
-                );
+                )
+                .await;
                 return;
             };
             if let Err(error) = frozen.validate_cloud_binding(binding) {
@@ -242,7 +254,8 @@ async fn run_cli_task(
                     &out_tx,
                     req_id,
                     error.to_string(),
-                );
+                )
+                .await;
                 return;
             }
         }
@@ -256,7 +269,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 "非 Codex 任务不能携带 Codex 凭据绑定。".to_string(),
-            );
+            )
+            .await;
             return;
         }
         if local_offline {
@@ -267,7 +281,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 "本机离线任务只允许使用已冻结本地凭据的 Codex CLI。".to_string(),
-            );
+            )
+            .await;
             return;
         }
         None
@@ -283,7 +298,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             "托管 Codex 凭据必须由云端持续控制，已拒绝启动。".to_string(),
-        );
+        )
+        .await;
         return;
     }
     let effective_requires_cloud_control =
@@ -307,7 +323,8 @@ async fn run_cli_task(
                     &out_tx,
                     req_id,
                     error.to_string(),
-                );
+                )
+                .await;
                 return;
             }
         };
@@ -325,7 +342,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 error.to_string(),
-            );
+            )
+            .await;
             return;
         }
     };
@@ -351,7 +369,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             error.to_string(),
-        );
+        )
+        .await;
         return;
     }
 
@@ -394,7 +413,8 @@ async fn run_cli_task(
                     &out_tx,
                     req_id,
                     format!("failed to resolve supervision root lease identity: {error}"),
-                );
+                )
+                .await;
                 return;
             }
         };
@@ -427,7 +447,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 error.to_string(),
-            );
+            )
+            .await;
             return;
         }
         Err(error) => {
@@ -438,7 +459,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 format!("PC 项目工作区准备任务异常结束: {error}"),
-            );
+            )
+            .await;
             return;
         }
     };
@@ -455,7 +477,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             format!("failed to persist supervision worktree lease: {error}"),
-        );
+        )
+        .await;
         return;
     }
     let build_run_guard = if let Some(project_context) = prepared_cwd
@@ -482,7 +505,8 @@ async fn run_cli_task(
                         &out_tx,
                         req_id,
                         format!("一龙推荐构建环境准备失败: {error:#}"),
-                    );
+                    )
+                    .await;
                     return;
                 }
             }
@@ -566,7 +590,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 "父任务隔离 worktree 已被其他活跃任务占用，已拒绝续跑。".to_string(),
-            );
+            )
+            .await;
             return;
         }
     }
@@ -580,7 +605,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             error,
-        );
+        )
+        .await;
         runtime.finish_cli_prompt(&req_id_for_cleanup).await;
         return;
     }
@@ -592,7 +618,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             error.to_string(),
-        );
+        )
+        .await;
         runtime.finish_cli_prompt(&req_id_for_cleanup).await;
         return;
     }
@@ -612,7 +639,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             error.to_string(),
-        );
+        )
+        .await;
         runtime.finish_cli_prompt(&req_id_for_cleanup).await;
         return;
     }
@@ -625,7 +653,8 @@ async fn run_cli_task(
                 &out_tx,
                 req_id,
                 error.to_string(),
-            );
+            )
+            .await;
             runtime.finish_cli_prompt(&req_id_for_cleanup).await;
             return;
         }
@@ -651,7 +680,8 @@ async fn run_cli_task(
             &out_tx,
             req_id,
             "任务控制通道已断开，已拒绝在确认前启动 CLI。".to_string(),
-        );
+        )
+        .await;
         runtime.finish_cli_prompt(&req_id_for_cleanup).await;
         return;
     }
@@ -729,39 +759,6 @@ async fn validate_completion_producer_identity(
         anyhow::bail!("任务冻结的 owner/节点/安装身份与当前绑定不一致，拒绝启动。")
     }
     Ok(())
-}
-
-fn send_preflight_failure(
-    runtime: &NodeRuntime,
-    completion_context: &CliCompletionContext,
-    cli_name: &str,
-    out_tx: &mpsc::UnboundedSender<Message>,
-    req_id: String,
-    error: String,
-) {
-    let message = AgentToServer::CliDone {
-        req_id,
-        exit_ok: false,
-        error: Some(error),
-        session_id: None,
-        prompt_tokens: None,
-        cached_input_tokens: None,
-        completion_tokens: None,
-        reasoning_tokens: None,
-        total_tokens: None,
-        model: None,
-        workspace_status: None,
-    };
-    if let Err(error) = crate::node_agent_cli_done::persist_and_send_cli_done(
-        runtime,
-        completion_context,
-        cli_name,
-        None,
-        message,
-        out_tx,
-    ) {
-        warn!(%error, "failed to persist preflight CLI completion");
-    }
 }
 
 #[cfg(test)]

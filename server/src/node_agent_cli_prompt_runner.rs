@@ -350,6 +350,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         };
         if let Err(error) =
             persist_and_send_cli_done(&runtime, &completion_context, cli_name, None, done, &out_tx)
+                .await
         {
             warn!(%error, "failed to persist invalid-arguments CLI completion");
         }
@@ -386,6 +387,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         };
         if let Err(error) =
             persist_and_send_cli_done(&runtime, &completion_context, cli_name, None, done, &out_tx)
+                .await
         {
             warn!(%error, "failed to persist api-runtime completion");
         }
@@ -435,6 +437,7 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         };
         if let Err(error) =
             persist_and_send_cli_done(&runtime, &completion_context, cli_name, None, done, &out_tx)
+                .await
         {
             warn!(%error, "failed to persist server-runtime completion");
         }
@@ -592,7 +595,9 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
                 None,
                 done,
                 &out_tx,
-            ) {
+            )
+            .await
+            {
                 warn!(%error, "failed to persist missing CODEX_HOME completion");
             }
             return;
@@ -622,7 +627,9 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
                 None,
                 done,
                 &out_tx,
-            ) {
+            )
+            .await
+            {
                 warn!(%error, "failed to persist CODEX_HOME validation completion");
             }
             return;

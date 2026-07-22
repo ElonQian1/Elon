@@ -147,22 +147,22 @@ impl NodeRuntime {
             if completion.origin != node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
                 continue;
             }
-            match self.local_tasks.reconcile_completion(&completion) {
-                Ok(true) => info!(
+            match crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(
+                self,
+            )
+            .reconcile(&completion)
+            .await
+            {
+                Ok(()) => info!(
                     req_id = %completion.req_id,
                     event_id = %completion.event_id,
-                    "repaired local task terminal state from durable outbox"
-                ),
-                Ok(false) => warn!(
-                    req_id = %completion.req_id,
-                    event_id = %completion.event_id,
-                    "durable local completion has no matching local task row"
+                    "reconciled trusted local terminal state from durable outbox"
                 ),
                 Err(error) => warn!(
                     req_id = %completion.req_id,
                     event_id = %completion.event_id,
                     %error,
-                    "failed to repair local task terminal state from durable outbox"
+                    "durable local terminal reconciliation remains retryable"
                 ),
             }
         }

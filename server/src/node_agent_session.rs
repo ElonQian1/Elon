@@ -235,6 +235,17 @@ pub(super) async fn run_session(
                 {
                     let completion = pending.completion;
                     let event_id = completion.event_id.clone();
+                    if completion.origin
+                        == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN
+                    {
+                        if let Err(error) = crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(&replay_runtime)
+                            .reconcile(&completion)
+                            .await
+                        {
+                            warn!(%event_id, %error, "CLI completion replay blocked by local terminal reconciliation");
+                            continue;
+                        }
+                    }
                     if replay_tx
                         .send(ws_text(&AgentToServer::CliCompletionReplay { completion }))
                         .is_err()
@@ -305,16 +316,15 @@ pub(super) async fn run_session(
                             retryable,
                             error,
                         } => {
-                            if let Err(ack_error) = apply_cli_completion_ack(
-                                &runtime.completion_outbox,
-                                &runtime.local_tasks,
+                            if let Err(ack_error) = crate::node_agent_session_completion_ack::apply(
+                                &runtime,
                                 &session_producer_identity,
                                 &event_id,
                                 &req_id,
                                 accepted,
                                 retryable,
                                 error.as_deref(),
-                            ) {
+                            ).await {
                                 warn!(%event_id, %req_id, error = %ack_error, "应用 CLI completion ACK 失败，保留本机持久记录供重试或诊断");
                             }
                         }
@@ -718,78 +728,6 @@ async fn shutdown_session_task(
             let _ = (&mut *task).await;
         }
     }
-}
-
-fn apply_cli_completion_ack(
-    outbox: &crate::node_agent_completion_outbox::CliCompletionOutbox,
-    local_tasks: &crate::node_agent_local_task_store::LocalTaskStore,
-    authenticated_producer: &CliCompletionProducerIdentity,
-    event_id: &str,
-    req_id: &str,
-    accepted: bool,
-    retryable: bool,
-    error: Option<&str>,
-) -> Result<()> {
-    let completion = outbox
-        .completion_for_binding(event_id, req_id)
-        .context("读取 CLI completion ACK 绑定")?
-        .ok_or_else(|| anyhow!("未知或不匹配的 CLI completion ACK binding"))?;
-    if completion.producer_identity.as_ref() != Some(authenticated_producer) {
-        return Err(anyhow!("CLI completion ACK 不属于当前登录/节点/安装身份"));
-    }
-    let is_local_offline =
-        completion.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN;
-
-    // Local display state moves first. If this fails, the outbox remains pending
-    // and the server's idempotent ACK can drive the same transition after retry.
-    if is_local_offline {
-        let reconciled = local_tasks
-            .reconcile_completion(&completion)
-            .context("从 durable completion 修复本机任务终态")?;
-        if !reconciled {
-            return Err(anyhow!(
-                "durable completion 没有匹配的本机任务，保留 outbox 等待修复"
-            ));
-        }
-        let display_updated = if accepted {
-            local_tasks
-                .mark_synced(event_id)
-                .context("更新本机任务同步状态")?
-        } else {
-            local_tasks
-                .mark_sync_error(event_id, retryable)
-                .context("更新本机任务补传错误状态")?
-        };
-        if !display_updated {
-            return Err(anyhow!(
-                "本机任务尚未绑定 completion event，保留 outbox 等待重试"
-            ));
-        }
-    }
-
-    if accepted {
-        if !outbox
-            .acknowledge(event_id, req_id)
-            .context("持久化 CLI completion ACK")?
-        {
-            return Err(anyhow!("CLI completion ACK binding 在迁移前消失"));
-        }
-        if !outbox
-            .delete_acked(event_id)
-            .context("清理已确认 CLI completion")?
-        {
-            return Err(anyhow!("已确认 CLI completion 未能安全清理"));
-        }
-    } else {
-        let message = error.unwrap_or("服务器拒绝 CLI completion 补传");
-        if !outbox
-            .reject(event_id, req_id, retryable, message)
-            .context("持久化 CLI completion 拒绝状态")?
-        {
-            return Err(anyhow!("CLI completion rejection binding 在迁移前消失"));
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

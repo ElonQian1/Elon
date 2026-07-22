@@ -11,6 +11,8 @@ pub(crate) mod idempotency;
 pub(crate) mod reconcile;
 #[path = "node_agent_local_task_store_safety.rs"]
 mod safety;
+#[path = "node_agent_local_task_store_terminal.rs"]
+mod terminal;
 #[path = "node_agent_local_task_store_update.rs"]
 mod update;
 #[path = "node_agent_local_task_store_workspace.rs"]
@@ -132,29 +134,6 @@ impl LocalTaskStore {
         self.finish_scoped(Some(owner_user_id), completion)
     }
 
-    /// Repair local display state from the durable outbox during startup.
-    pub(crate) fn reconcile_completion(&self, completion: &CliCompletionEnvelope) -> Result<bool> {
-        if completion.origin != crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
-            bail!("only local_offline completions can reconcile local tasks");
-        }
-        let context = completion
-            .project_context
-            .as_ref()
-            .context("local completion is missing project context")?;
-        let producer = completion
-            .producer_identity
-            .as_ref()
-            .context("local completion is missing producer identity")?;
-        self.finish_scoped_with_context(
-            Some(producer.owner_user_id.as_str()),
-            Some(producer.agent_id.as_str()),
-            Some(producer.install_id.as_str()),
-            Some(context.project_id.as_str()),
-            Some(context.conversation_id.as_str()),
-            completion,
-        )
-    }
-
     fn finish_scoped(
         &self,
         owner_user_id: Option<&str>,
@@ -179,6 +158,7 @@ impl LocalTaskStore {
             project_id,
             conversation_id,
             completion,
+            None,
         )
     }
 
@@ -190,6 +170,9 @@ impl LocalTaskStore {
         project_id: Option<&str>,
         conversation_id: Option<&str>,
         completion: &CliCompletionEnvelope,
+        trusted: Option<
+            &crate::node_agent_supervision_terminal_lease_safety::VerifiedTerminalLeaseIdentity,
+        >,
     ) -> Result<bool> {
         let mut conn = self.open()?;
         let completion_workspace_status = completion
@@ -198,8 +181,9 @@ impl LocalTaskStore {
             .map(serde_json::to_string)
             .transpose()?;
         let tx = conn.transaction()?;
+        reconcile::ensure_same_event_is_immutable(&tx, completion)?;
         let terminal_workspace_status =
-            workspace::terminal_workspace_status(&tx, &completion.req_id)?;
+            workspace::terminal_workspace_status(&tx, &completion.req_id, trusted)?;
         let supervised_workspace_refresh = terminal_workspace_status.is_some();
         let workspace_status = terminal_workspace_status.or(completion_workspace_status);
         let terminal_status =
@@ -785,6 +769,13 @@ mod tests {
             Some("event-reconcile")
         );
         assert_eq!(record.total_tokens, Some(6));
+
+        let mut wrong_event = completion.clone();
+        wrong_event.event_id = "event-conflict".to_string();
+        let error = store
+            .reconcile_completion(&wrong_event)
+            .expect_err("a terminal row cannot bind a second completion event");
+        assert!(error.to_string().contains("different completion event"));
 
         let mut wrong_scope = completion;
         wrong_scope.project_context.as_mut().unwrap().project_id = "prj-other".to_string();

@@ -8,6 +8,8 @@ mod cancel_tombstones;
 mod cursor;
 #[path = "node_agent_task_journal_recovery.rs"]
 mod recovery;
+#[path = "node_agent_task_journal_terminal.rs"]
+mod terminal;
 
 use anyhow::{Context, Result};
 use homecli_proto::CancelRequestAudit;

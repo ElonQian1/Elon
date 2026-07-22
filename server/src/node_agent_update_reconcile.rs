@@ -20,7 +20,6 @@ use crate::{
         load_supervision_contract, record_supervision_event, SupervisionContract,
         SUPERVISION_PROTOCOL,
     },
-    node_agent_task_journal_events::completion_terminal_status,
     node_agent_update_checkpoint::{
         file_sha256, fingerprint_workspace, git_output, incomplete_non_repeatable_action,
         same_path, stable_resume_task_id,
@@ -67,13 +66,9 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
         .completion_outbox
         .latest_for_req_id(&active_task_id)?
     {
-        runtime.update_recovery.reconcile_terminal_completion(
-            &active_task_id,
-            &completion.event_id,
-            completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
-            completion.created_at_ms as u128,
-            completion.exit_ok,
-        )?;
+        crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(&runtime)
+            .reconcile(&completion)
+            .await?;
         return Ok(());
     }
     match release_relation(&receipt, &crate::node_agent_release_identity::current()) {
@@ -422,39 +417,18 @@ async fn spawn_sidecar_monitor(
                     Some(&output),
                     done,
                     &out_tx,
-                );
-                if let Ok(completion) = persisted.as_ref() {
-                    let _ = runtime.update_recovery.record_terminal_binding(
-                        &task.task_id,
-                        &completion.event_id,
-                        completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
-                        completion.created_at_ms as u128,
-                    );
+                )
+                .await;
+                if let Err(error) = persisted {
+                    warn!(%error, task_id = %task.task_id, "durable sidecar terminal reconciliation remains retryable");
                 }
-                let state = if persisted.is_ok() && success {
-                    UpdateRecoveryState::Verified
-                } else {
-                    UpdateRecoveryState::Failed
-                };
-                let reason = if state == UpdateRecoveryState::Verified {
-                    "recovered task completed and durable result persisted"
-                } else {
-                    "recovered task failed or durable completion was rejected"
-                };
-                let _ = set_recovery_state(
-                    &runtime.update_recovery,
-                    &update_id,
-                    &original_task_id,
-                    state,
-                    reason,
-                );
             }
             Err(error) => {
                 let _ = set_recovery_state(
                     &runtime.update_recovery,
                     &update_id,
                     &original_task_id,
-                    UpdateRecoveryState::Failed,
+                    UpdateRecoveryState::Paused,
                     &format!("sidecar replay failed: {error}"),
                 );
             }

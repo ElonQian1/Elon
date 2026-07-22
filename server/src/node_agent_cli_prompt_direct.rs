@@ -104,7 +104,9 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                 None,
                 done,
                 &out_tx,
-            ) {
+            )
+            .await
+            {
                 warn!(%error, "failed to persist CLI spawn completion");
             }
             return;
@@ -303,7 +305,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                         Some(&combined_output),
                         done,
                         &out_tx,
-                    ) {
+                    ).await {
                         warn!(%error, "failed to persist canceled CLI completion");
                     }
                     return;
@@ -364,7 +366,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                     Some(&combined_output),
                     done,
                     &out_tx,
-                ) {
+                ).await {
                     warn!(%error, "failed to persist timeout CLI completion");
                 }
                 return;
@@ -565,7 +567,9 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         Some(&combined_output),
         done,
         &out_tx,
-    ) {
+    )
+    .await
+    {
         warn!(%error, "failed to persist direct CLI completion");
     }
 }

@@ -187,29 +187,6 @@ fn lifecycle_lookup_and_final_review_share_the_same_receipt() {
 }
 
 #[test]
-fn terminal_binding_ignores_completed_parent_after_resume_child_exists() {
-    let (root, store) = temp_store();
-    let mut receipt = UpdateRecoveryReceipt::planned("update-7", "root-7", "task-7");
-    receipt.resume_task_id = Some("resume-7".to_string());
-    store.upsert(receipt).unwrap();
-
-    assert!(!store
-        .record_terminal_binding("task-7", "old-canceled", "canceled", 10)
-        .unwrap());
-    let unchanged = store.load().unwrap().receipts.remove(0);
-    assert!(unchanged.completion_event_id.is_none());
-    assert!(unchanged.terminal_task_status.is_none());
-
-    assert!(store
-        .record_terminal_binding("resume-7", "resume-done", "done", 20)
-        .unwrap());
-    let bound = store.load().unwrap().receipts.remove(0);
-    assert_eq!(bound.completion_event_id.as_deref(), Some("resume-done"));
-    assert_eq!(bound.terminal_task_status.as_deref(), Some("done"));
-    let _ = std::fs::remove_dir_all(root);
-}
-
-#[test]
 fn recovered_child_completion_idempotently_promotes_resumed_receipt() {
     let (root, store) = temp_store();
     let mut receipt =
@@ -218,12 +195,34 @@ fn recovered_child_completion_idempotently_promotes_resumed_receipt() {
     receipt.state = UpdateRecoveryState::Resumed;
     store.upsert(receipt).unwrap();
 
-    assert!(store
-        .reconcile_terminal_completion("resume-terminal", "event-terminal", "done", 20, true)
-        .unwrap());
-    assert!(store
-        .reconcile_terminal_completion("resume-terminal", "event-terminal", "done", 20, true)
-        .unwrap());
+    assert_eq!(
+        store
+            .reconcile_terminal_completion(
+                crate::node_agent_update_recovery_terminal::ExpectedRecovery::Required,
+                "resume-terminal",
+                "event-terminal",
+                "done",
+                20,
+                true,
+                None,
+            )
+            .unwrap(),
+        crate::node_agent_update_recovery_terminal::TerminalRecoveryDisposition::Reconciled
+    );
+    assert_eq!(
+        store
+            .reconcile_terminal_completion(
+                crate::node_agent_update_recovery_terminal::ExpectedRecovery::Required,
+                "resume-terminal",
+                "event-terminal",
+                "done",
+                20,
+                true,
+                None,
+            )
+            .unwrap(),
+        crate::node_agent_update_recovery_terminal::TerminalRecoveryDisposition::Reconciled
+    );
     let verified = store.load().unwrap().receipts.remove(0);
     assert_eq!(verified.state, UpdateRecoveryState::Verified);
     assert_eq!(
@@ -231,6 +230,34 @@ fn recovered_child_completion_idempotently_promotes_resumed_receipt() {
         Some("event-terminal")
     );
     assert_eq!(verified.terminal_task_status.as_deref(), Some("done"));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn terminal_preflight_rejects_unpromotable_recovery_without_writing() {
+    let (root, store) = temp_store();
+    store
+        .upsert(UpdateRecoveryReceipt::planned(
+            "update-preflight",
+            "root-preflight",
+            "task-preflight",
+        ))
+        .unwrap();
+    let path = root.join("ledger.json");
+    let before = std::fs::read(&path).unwrap();
+    let error = store
+        .preflight_terminal_completion(
+            crate::node_agent_update_recovery_terminal::ExpectedRecovery::Required,
+            "task-preflight",
+            "event-preflight",
+            "done",
+            20,
+            true,
+            None,
+        )
+        .expect_err("planned recovery cannot skip directly to verified");
+    assert!(error.to_string().contains("cannot accept"));
+    assert_eq!(std::fs::read(&path).unwrap(), before);
     let _ = std::fs::remove_dir_all(root);
 }
 

@@ -37,7 +37,7 @@ impl UpdateRecoveryState {
         matches!(self, Self::Verified | Self::Failed)
     }
 
-    fn can_transition_to(self, next: Self) -> bool {
+    pub(super) fn can_transition_to(self, next: Self) -> bool {
         if self == next {
             return true;
         }
@@ -317,6 +317,10 @@ pub(crate) struct UpdateRecoveryReceipt {
     #[serde(default)]
     pub(crate) terminal_finished_at_ms: Option<u128>,
     #[serde(default)]
+    pub(crate) terminal_success: Option<bool>,
+    #[serde(default)]
+    pub(crate) terminal_outcome: Option<String>,
+    #[serde(default)]
     pub(crate) state: UpdateRecoveryState,
     #[serde(default)]
     pub(crate) state_reason: Option<String>,
@@ -363,6 +367,8 @@ impl UpdateRecoveryReceipt {
             completion_event_id: None,
             terminal_task_status: None,
             terminal_finished_at_ms: None,
+            terminal_success: None,
+            terminal_outcome: None,
             state: UpdateRecoveryState::Planned,
             state_reason: None,
             final_reason: None,
@@ -605,7 +611,7 @@ impl UpdateRecoveryStore {
     }
 
     pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {
-        Ok(self
+        let matches = self
             .load()?
             .receipts
             .into_iter()
@@ -613,7 +619,12 @@ impl UpdateRecoveryStore {
                 receipt.original_task_id == task_id
                     || receipt.resume_task_id.as_deref() == Some(task_id)
             })
-            .max_by_key(|receipt| receipt.updated_at_ms))
+            .collect::<Vec<_>>();
+        match matches.len() {
+            0 => Ok(None),
+            1 => Ok(matches.into_iter().next()),
+            _ => bail!("multiple update recovery receipts target the same task"),
+        }
     }
 
     pub(crate) fn status_payload(&self, limit: usize) -> Result<serde_json::Value> {
@@ -663,37 +674,6 @@ impl UpdateRecoveryStore {
             receipt.updated_at_ms = now_ms();
             Ok(())
         })
-    }
-
-    pub(crate) fn record_terminal_binding(
-        &self,
-        task_id: &str,
-        event_id: &str,
-        status: &str,
-        finished_at_ms: u128,
-    ) -> Result<bool> {
-        let mut ledger = self.load()?;
-        let Some(receipt) = ledger
-            .receipts
-            .iter_mut()
-            .filter(|receipt| receipt.active_task_id() == task_id)
-            .max_by_key(|receipt| receipt.updated_at_ms)
-        else {
-            return Ok(false);
-        };
-        if receipt
-            .completion_event_id
-            .as_deref()
-            .is_some_and(|current| current != event_id)
-        {
-            bail!("recovery receipt already binds a different completion event");
-        }
-        receipt.completion_event_id = Some(event_id.to_string());
-        receipt.terminal_task_status = Some(status.to_string());
-        receipt.terminal_finished_at_ms = Some(finished_at_ms);
-        receipt.updated_at_ms = now_ms();
-        self.save(&ledger)?;
-        Ok(true)
     }
 
     pub(crate) fn record_final_review(

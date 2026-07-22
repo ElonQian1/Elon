@@ -21,7 +21,6 @@ use crate::{
     node_agent_cli_sidecar_runner::CliSidecarReplayCursor,
     node_agent_local_task_store::LocalTaskRecord,
     node_agent_local_task_supervision::{load_supervision_contract, SUPERVISION_PROTOCOL},
-    node_agent_task_journal_events::completion_terminal_status,
     node_agent_update_checkpoint::{
         fingerprint_workspace, incomplete_non_repeatable_action,
         preserve_platform_workspace_identity,
@@ -226,9 +225,10 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         Some(&combined_output),
         done,
         &out_tx,
-    ) {
+    )
+    .await
+    {
         Ok(completion) => {
-            record_recovery_terminal(&runtime, &task.task_id, &completion)?;
             info!(
                 task_id = %task.task_id,
                 event_id = %completion.event_id,
@@ -475,50 +475,10 @@ async fn bind_existing_completion(runtime: &NodeRuntime, task: &LocalTaskRecord)
     let Some(completion) = runtime.completion_outbox.latest_for_req_id(&task.task_id)? else {
         return Ok(false);
     };
-    runtime.local_tasks.reconcile_completion(&completion)?;
-    runtime.task_journal.record_finished_with_outcome(
-        &task.task_id,
-        completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
-        completion.error.as_deref(),
-    )?;
-    record_recovery_terminal(runtime, &task.task_id, &completion)?;
+    crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(runtime)
+        .reconcile(&completion)
+        .await?;
     Ok(true)
-}
-
-fn record_recovery_terminal(
-    runtime: &NodeRuntime,
-    task_id: &str,
-    completion: &homecli_proto::CliCompletionEnvelope,
-) -> Result<()> {
-    if let Some(receipt) = runtime.update_recovery.receipt_for_task(task_id)? {
-        let bound = runtime.update_recovery.record_terminal_binding(
-            task_id,
-            &completion.event_id,
-            completion_terminal_status(completion.exit_ok, completion.error.as_deref()),
-            completion.created_at_ms as u128,
-        )?;
-        if !bound {
-            return Ok(());
-        }
-        runtime.update_recovery.update(
-            &receipt.update_id,
-            &receipt.original_task_id,
-            |current| {
-                if !current.state.is_terminal() {
-                    current.transition(
-                        if completion.exit_ok {
-                            UpdateRecoveryState::Verified
-                        } else {
-                            UpdateRecoveryState::Failed
-                        },
-                        Some("durable sidecar completion bound to local task"),
-                    )?;
-                }
-                Ok(())
-            },
-        )?;
-    }
-    Ok(())
 }
 
 fn completion_context(task: &LocalTaskRecord) -> CliCompletionContext {

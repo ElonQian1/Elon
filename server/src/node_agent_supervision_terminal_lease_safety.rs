@@ -12,10 +12,45 @@ use crate::{
     NodeRuntime,
 };
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum TerminalLeaseExpectation {
+    Exact,
+    Missing,
+}
+
+#[derive(Clone, Debug)]
 pub(crate) struct VerifiedTerminalLeaseIdentity {
     pub(crate) base: PathBuf,
     pub(crate) active: PathBuf,
     pub(crate) root_task_id: String,
+    pub(crate) git_dir: PathBuf,
+    pub(crate) git_common_dir: PathBuf,
+    pub(crate) head: String,
+    task_id: String,
+    project_id: String,
+    workspace_path: String,
+    workspace_status: serde_json::Value,
+}
+
+pub(crate) fn admission_base(
+    task: &LocalTaskRecord,
+    contract: &SupervisionContract,
+    task_id: &str,
+) -> Result<PathBuf> {
+    anyhow::ensure!(
+        contract.protocol == SUPERVISION_PROTOCOL,
+        "terminal task supervision protocol is not trusted"
+    );
+    let root_task_id = supervision_root(contract, task_id)?;
+    let status = task
+        .workspace_status
+        .as_ref()
+        .context("supervised terminal task is missing durable workspace identity")?;
+    anyhow::ensure!(
+        required(status, "root_task_id")? == root_task_id,
+        "terminal task root identity drifted"
+    );
+    canonical_directory(Path::new(required(status, "base_workspace_path")?), "base")
 }
 
 pub(crate) async fn verify_release_identity(
@@ -34,14 +69,190 @@ pub(crate) async fn verify_release_identity(
         .as_ref()
         .context("supervised terminal task is missing durable workspace identity")?;
     let (base, active) = validate_recorded_identity(runtime, task, status, &root_task_id).await?;
-    if lineage_or_workspace_is_active(runtime, task_id, &root_task_id, &active).await? {
+    if lineage_or_workspace_is_active(runtime, task_id, &root_task_id, &active, false).await? {
         return Ok(None);
     }
-    Ok(Some(VerifiedTerminalLeaseIdentity {
+    Ok(Some(build_verified_identity(
+        task,
+        status,
         base,
         active,
         root_task_id,
-    }))
+    )?))
+}
+
+pub(crate) async fn verify_terminal_identity(
+    runtime: &NodeRuntime,
+    task: &LocalTaskRecord,
+    contract: &SupervisionContract,
+    task_id: &str,
+    lease: TerminalLeaseExpectation,
+) -> Result<VerifiedTerminalLeaseIdentity> {
+    anyhow::ensure!(
+        contract.protocol == SUPERVISION_PROTOCOL,
+        "terminal task supervision protocol is not trusted"
+    );
+    let root_task_id = supervision_root(contract, task_id)?.to_string();
+    let status = task
+        .workspace_status
+        .as_ref()
+        .context("supervised terminal task is missing durable workspace identity")?;
+    let (base, active) = validate_recorded_identity(runtime, task, status, &root_task_id).await?;
+    anyhow::ensure!(
+        !lineage_or_workspace_is_active(runtime, task_id, &root_task_id, &active, true).await?,
+        "terminal workspace or supervision lineage still has another active owner"
+    );
+    let identity = build_verified_identity(task, status, base, active, root_task_id)?;
+    identity.revalidate_lease(lease)?;
+    Ok(identity)
+}
+
+fn build_verified_identity(
+    task: &LocalTaskRecord,
+    status: &serde_json::Value,
+    base: PathBuf,
+    active: PathBuf,
+    root_task_id: String,
+) -> Result<VerifiedTerminalLeaseIdentity> {
+    let git_dir = PathBuf::from(git(
+        &active,
+        &["rev-parse", "--path-format=absolute", "--git-dir"],
+    )?);
+    let git_common_dir = PathBuf::from(git(
+        &active,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )?);
+    let head = git(&active, &["rev-parse", "--verify", "HEAD^{commit}"])?;
+    Ok(VerifiedTerminalLeaseIdentity {
+        base,
+        active,
+        root_task_id,
+        git_dir,
+        git_common_dir,
+        head,
+        task_id: task.task_id.clone(),
+        project_id: task.project_id.clone(),
+        workspace_path: task.workspace_path.clone(),
+        workspace_status: status.clone(),
+    })
+}
+
+impl VerifiedTerminalLeaseIdentity {
+    pub(crate) fn revalidate_lease(&self, expected: TerminalLeaseExpectation) -> Result<()> {
+        let actual = crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+            &self.base,
+            &self.active,
+        )?;
+        let exact = crate::node_agent_supervision_worktree_lease::lease_reason(&self.root_task_id)?;
+        match expected {
+            TerminalLeaseExpectation::Exact => anyhow::ensure!(
+                actual.as_deref() == Some(exact.as_str()),
+                "non-finalized terminal completion requires the exact supervision lease"
+            ),
+            TerminalLeaseExpectation::Missing => anyhow::ensure!(
+                actual.is_none(),
+                "completed terminal finalization retained or reacquired a supervision lease"
+            ),
+        }
+        Ok(())
+    }
+
+    pub(crate) fn trusted_workspace_status(
+        &self,
+        task_id: &str,
+        project_id: &str,
+        workspace_path: &str,
+        current: &serde_json::Value,
+    ) -> Result<String> {
+        anyhow::ensure!(
+            task_id == self.task_id
+                && crate::node_agent_full_access::project_ids_equivalent(
+                    project_id,
+                    &self.project_id,
+                )
+                && same_path(Path::new(workspace_path), Path::new(&self.workspace_path))
+                && current == &self.workspace_status,
+            "local terminal workspace row drifted after trusted preflight"
+        );
+        let mut status = current.clone();
+        let object = status
+            .as_object_mut()
+            .context("supervised workspace_status is not an object")?;
+        object.insert(
+            "git_head".into(),
+            serde_json::Value::String(self.head.clone()),
+        );
+        object.insert(
+            "terminal_snapshot_status".into(),
+            serde_json::Value::String("trusted".into()),
+        );
+        object.remove("resume_blocked_reason");
+        serde_json::to_string(&status).map_err(Into::into)
+    }
+
+    pub(crate) fn verify_successful_git_state(
+        &self,
+        final_head: &str,
+        base_commit: &str,
+        branch: &str,
+        origin: &str,
+        common_dir: &Path,
+    ) -> Result<()> {
+        anyhow::ensure!(
+            git(&self.active, &["rev-parse", "--verify", "HEAD^{commit}"])? == self.head
+                && self.head == final_head,
+            "terminal finalHead drifted from current HEAD"
+        );
+        anyhow::ensure!(
+            git(&self.active, &["branch", "--show-current"])? == branch,
+            "terminal finalization branch drifted"
+        );
+        anyhow::ensure!(
+            git(&self.base, &["branch", "--show-current"])? == "main",
+            "terminal base workspace is not main"
+        );
+        anyhow::ensure!(
+            git(&self.active, &["remote", "get-url", "origin"])? == origin
+                && git(&self.base, &["remote", "get-url", "origin"])? == origin,
+            "terminal finalization origin drifted"
+        );
+        anyhow::ensure!(
+            same_path(common_dir, &self.git_common_dir)
+                && same_path(
+                    Path::new(&git(
+                        &self.active,
+                        &["rev-parse", "--path-format=absolute", "--git-common-dir"]
+                    )?),
+                    &self.git_common_dir,
+                )
+                && same_path(
+                    Path::new(&git(
+                        &self.base,
+                        &["rev-parse", "--path-format=absolute", "--git-common-dir"]
+                    )?),
+                    &self.git_common_dir,
+                ),
+            "terminal finalization common-dir drifted"
+        );
+        anyhow::ensure!(
+            git(
+                &self.active,
+                &["status", "--porcelain=v1", "--untracked-files=all"]
+            )?
+            .is_empty(),
+            "terminal worktree is dirty after finalization"
+        );
+        git_success(
+            &self.active,
+            &["merge-base", "--is-ancestor", base_commit, final_head],
+            "TaskContract base is not an ancestor of finalHead",
+        )?;
+        git_success(
+            &self.active,
+            &["merge-base", "--is-ancestor", final_head, "origin/main"],
+            "terminal finalHead is not landed in origin/main",
+        )
+    }
 }
 
 async fn validate_recorded_identity(
@@ -143,6 +354,7 @@ async fn lineage_or_workspace_is_active(
     current_task_id: &str,
     root_task_id: &str,
     active: &Path,
+    allow_current_prompt: bool,
 ) -> Result<bool> {
     for candidate in runtime.local_tasks.list_identity_candidates()? {
         if candidate.task_id == current_task_id || is_terminal(&candidate.status) {
@@ -163,6 +375,9 @@ async fn lineage_or_workspace_is_active(
     }
     for handle in runtime.active_cli_prompts.views_without_approvals().await {
         if handle.req_id == current_task_id {
+            if allow_current_prompt {
+                continue;
+            }
             return Ok(true);
         }
         let shares_workspace = handle
@@ -382,6 +597,15 @@ fn git(cwd: &Path, args: &[&str]) -> Result<String> {
                 args.join(" ")
             )
         })
+}
+
+fn git_success(cwd: &Path, args: &[&str], message: &str) -> Result<()> {
+    let status = crate::git_command_error::git_command()
+        .args(args)
+        .current_dir(cwd)
+        .status()?;
+    anyhow::ensure!(status.success(), "{message}");
+    Ok(())
 }
 
 fn same_path(left: &Path, right: &Path) -> bool {

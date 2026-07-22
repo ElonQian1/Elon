@@ -9,7 +9,7 @@ use crate::NodeRuntime;
 
 pub(crate) fn spawn_local_output_consumer(
     runtime: Arc<NodeRuntime>,
-    owner_user_id: String,
+    _owner_user_id: String,
     task_id: String,
     mut out_rx: tokio::sync::mpsc::UnboundedReceiver<Message>,
 ) {
@@ -40,8 +40,11 @@ pub(crate) fn spawn_local_output_consumer(
                             break;
                         }
                     };
-                    if let Err(error) = runtime.local_tasks.finish(&owner_user_id, &completion) {
-                        tracing::warn!(%task_id, %error, "failed to persist local task completion");
+                    if let Err(error) = crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(&runtime)
+                        .reconcile(&completion)
+                        .await
+                    {
+                        tracing::warn!(%task_id, %error, "failed to reconcile local task completion");
                     }
                     break;
                 }
