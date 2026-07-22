@@ -109,9 +109,9 @@ fn proven_stale_cancelled_tasks(
     };
     let mut proven = HashSet::new();
     for task in local_tasks
-        .list_update_candidates()?
+        .list_update_install_candidates()?
         .into_iter()
-        .filter(|task| task.status == "cancel_requested")
+        .filter(|task| matches!(task.status.as_str(), "cancel_requested" | "resume_required"))
     {
         let contract = load_supervision_contract(journal, &task.task_id)?;
         if !contract
@@ -154,7 +154,7 @@ fn checkpoint_active_update_transactions(
 ) -> Result<UpdateCheckpointDecision> {
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
-    for task in local_tasks.list_update_candidates()? {
+    for task in local_tasks.list_update_install_candidates()? {
         // A confirmed-stale registry entry is historical evidence. Re-read the
         // sidecar registry and bind the install decision to the runtime's
         // current handle inventory before allowing that evidence to suppress a
@@ -167,10 +167,18 @@ fn checkpoint_active_update_transactions(
         if live_execution {
             decision.live_execution_task_ids.push(task.task_id.clone());
         }
-        if task.status == "cancel_requested"
+        let persisted_inactive =
+            matches!(task.status.as_str(), "cancel_requested" | "resume_required");
+        if persisted_inactive
             && confirmed_stale_registry_tasks.contains(&task.task_id)
             && !live_execution
         {
+            continue;
+        }
+        if persisted_inactive {
+            decision
+                .active_foreground_task_ids
+                .push(task.task_id.clone());
             continue;
         }
         let contract = load_supervision_contract(journal, &task.task_id)?;

@@ -321,28 +321,133 @@ fn durable_cancel_without_live_runtime_or_sidecar_is_safe_for_update_only() {
     );
     journal.record_cancel_requested("stale-cancel").unwrap();
 
+    local_tasks
+        .create(LocalTaskStart {
+            task_id: "stale-resume",
+            owner_user_id: "owner",
+            agent_id: "agent",
+            install_id: "install",
+            project_id: "project",
+            channel_id: None,
+            conversation_id: "conversation",
+            workspace_path: root.to_string_lossy().as_ref(),
+            prompt: "resume after cancel",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    journal
+        .record_started(crate::node_agent_task_journal::TaskJournalStart {
+            req_id: "stale-resume",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("stale-resume"),
+            cwd: root.to_str(),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+    crate::node_agent_local_task_supervision::record_supervision_event(
+        &journal,
+        "stale-resume",
+        "supervision_contract",
+        crate::node_agent_local_task_supervision::contract_payload(&contract),
+    )
+    .unwrap();
+    journal.record_cancel_requested("stale-resume").unwrap();
+    assert!(local_tasks
+        .mark_recovery_blocked(
+            "stale-resume",
+            "historical canceled executor requires resume"
+        )
+        .unwrap());
+
     assert!(
         proven_stale_cancelled_tasks(&local_tasks, &journal, &sidecars, None)
             .unwrap()
             .is_empty()
     );
-    assert!(proven_stale_cancelled_tasks(
-        &local_tasks,
-        &journal,
-        &sidecars,
-        Some(&HashSet::from(["stale-cancel".to_string()]))
-    )
-    .unwrap()
-    .is_empty());
     assert_eq!(
         proven_stale_cancelled_tasks(&local_tasks, &journal, &sidecars, Some(&HashSet::new()))
             .unwrap(),
-        HashSet::from(["stale-cancel".to_string()])
+        HashSet::from(["stale-cancel".to_string(), "stale-resume".to_string()])
+    );
+    let confirmed = HashSet::from(["stale-cancel".to_string(), "stale-resume".to_string()]);
+    let safe = checkpoint_active_update_transactions(
+        &UpdateRecoveryStore::new(root.join("recovery-two-stale.json")),
+        &local_tasks,
+        &journal,
+        &sidecars,
+        "old",
+        "new",
+        &confirmed,
+        &HashSet::new(),
+    )
+    .unwrap();
+    assert!(safe.active_foreground_task_ids.is_empty());
+    assert!(safe.install_may_proceed());
+
+    let wrong_window = checkpoint_active_update_transactions(
+        &UpdateRecoveryStore::new(root.join("recovery-wrong-window.json")),
+        &local_tasks,
+        &journal,
+        &sidecars,
+        "old",
+        "new",
+        &HashSet::new(),
+        &HashSet::new(),
+    )
+    .unwrap();
+    assert_eq!(
+        wrong_window.active_foreground_task_ids,
+        ["stale-cancel", "stale-resume"]
+    );
+    assert!(!wrong_window.install_may_proceed());
+    assert_eq!(
+        proven_stale_cancelled_tasks(
+            &local_tasks,
+            &journal,
+            &sidecars,
+            Some(&HashSet::from(["stale-cancel".to_string()]))
+        )
+        .unwrap(),
+        HashSet::from(["stale-resume".to_string()]),
+        "a fresh runtime handle must block only its exact task"
+    );
+    sidecars
+        .upsert_session(
+            crate::node_agent_cli_sidecar::CliSidecarSessionRecord::managed_conpty(
+                "stale-resume-sidecar",
+                "stale-resume",
+                "codex",
+                "route_a_external_cli",
+                Some(root.to_string_lossy().into_owned()),
+                Some("npipe://elon/stale-resume-sidecar".to_string()),
+                Some(std::process::id()),
+                None,
+                crate::node_agent_cli_sidecar::now_ms(),
+            ),
+        )
+        .unwrap();
+    assert_eq!(
+        proven_stale_cancelled_tasks(
+            &local_tasks,
+            &journal,
+            &sidecars,
+            Some(&HashSet::from(["stale-cancel".to_string()]))
+        )
+        .unwrap(),
+        HashSet::new(),
+        "a live sidecar and a fresh runtime handle must both fail closed"
     );
     assert_eq!(
         local_tasks.get("stale-cancel").unwrap().unwrap().status,
         "cancel_requested",
         "update proof must not rewrite cancellation semantics"
+    );
+    assert_eq!(
+        local_tasks.get("stale-resume").unwrap().unwrap().status,
+        "resume_required",
+        "update proof must preserve the historical resume state"
     );
     let _ = std::fs::remove_dir_all(root);
 }

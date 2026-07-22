@@ -329,7 +329,7 @@ pub(crate) fn confirmed_stale_registry_tasks_for_update(
 /// decision from authorizing an unrelated later update.
 pub(crate) fn stale_cancel_proof_window_for_update(target_git_sha: &str) -> anyhow::Result<bool> {
     Ok(load_checkpoint()?.is_some_and(|checkpoint| {
-        checkpoint_targets_update_install_window(&checkpoint, target_git_sha)
+        checkpoint_targets_stale_cancel_recheck_window(&checkpoint, target_git_sha)
     }))
 }
 
@@ -352,6 +352,25 @@ fn checkpoint_targets_update_install_window(
     {
         return false;
     }
+    checkpoint_target_matches(checkpoint, target_git_sha)
+}
+
+fn checkpoint_targets_stale_cancel_recheck_window(
+    checkpoint: &RestartCheckpoint,
+    target_git_sha: &str,
+) -> bool {
+    if checkpoint.protocol != CHECKPOINT_PROTOCOL
+        || !matches!(
+            checkpoint.state.as_str(),
+            "draining" | "applying" | "restart_scheduled"
+        )
+    {
+        return false;
+    }
+    checkpoint_target_matches(checkpoint, target_git_sha)
+}
+
+fn checkpoint_target_matches(checkpoint: &RestartCheckpoint, target_git_sha: &str) -> bool {
     let Some(target) = checkpoint
         .target_release_identity
         .as_deref()
@@ -681,6 +700,28 @@ mod tests {
             &checkpoint,
             "targetsha"
         ));
+        assert!(checkpoint_targets_stale_cancel_recheck_window(
+            &checkpoint,
+            "targetsha"
+        ));
+        assert!(!checkpoint_targets_stale_cancel_recheck_window(
+            &checkpoint,
+            "other-sha"
+        ));
+
+        checkpoint.transition("applying", "installer active");
+        assert!(checkpoint_targets_update_install_window(
+            &checkpoint,
+            "targetsha"
+        ));
+        assert!(checkpoint_targets_stale_cancel_recheck_window(
+            &checkpoint,
+            "targetsha"
+        ));
+        assert_eq!(
+            confirmed_stale_registry_tasks(&checkpoint, "targetsha"),
+            std::collections::HashSet::from(["stale-evolution".to_string()])
+        );
 
         checkpoint.transition("restart_scheduled", "ready");
         assert!(checkpoint_targets_update_install_window(
@@ -695,6 +736,19 @@ mod tests {
         assert!(!checkpoint_targets_update_install_window(
             &checkpoint,
             "other-sha"
+        ));
+
+        checkpoint.transition("resume_required", "wrong phase");
+        assert!(!checkpoint_targets_stale_cancel_recheck_window(
+            &checkpoint,
+            "targetsha"
+        ));
+
+        checkpoint.protocol = "wrong.protocol".to_string();
+        checkpoint.transition("draining", "wrong identity");
+        assert!(!checkpoint_targets_stale_cancel_recheck_window(
+            &checkpoint,
+            "targetsha"
         ));
     }
 

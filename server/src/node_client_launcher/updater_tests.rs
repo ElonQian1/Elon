@@ -156,6 +156,42 @@ fn runtime_handle_status_requires_complete_task_identity() {
     assert!(
         super::runtime_gate::runtime_handle_task_ids_from_status(&serde_json::json!({})).is_err()
     );
+    let wrong_runtime = serde_json::json!({
+        "local_admin_token_header": "x-not-elon-runtime",
+        "active_cli_prompt_count": 0,
+        "active_cli_prompt_task_ids": [],
+        "active_task_runtime": []
+    });
+    assert!(super::runtime_gate::runtime_handle_task_ids_from_status(&wrong_runtime).is_err());
+    let malformed_runtime_handle = serde_json::json!({
+        "local_admin_token_header": "x-elon-local-admin-token",
+        "active_cli_prompt_count": 0,
+        "active_cli_prompt_task_ids": [],
+        "active_task_runtime": [{}]
+    });
+    assert!(
+        super::runtime_gate::runtime_handle_task_ids_from_status(&malformed_runtime_handle)
+            .is_err()
+    );
+}
+
+#[test]
+fn runtime_handle_probe_failure_is_fail_closed() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-runtime-probe-failure-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(root.join("_internal")).unwrap();
+    std::fs::write(
+        root.join("_internal").join("node-agent.env"),
+        "NODE_ADMIN_PORT=1\n",
+    )
+    .unwrap();
+
+    let error = super::runtime_gate::fresh_runtime_handle_task_ids(&root)
+        .expect_err("an unavailable loopback runtime probe must refuse the install window");
+    assert!(error.to_string().contains("拒绝进入安装窗口"));
+    let _ = std::fs::remove_dir_all(root);
 }
 
 #[test]

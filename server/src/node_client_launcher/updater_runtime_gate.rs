@@ -15,16 +15,7 @@ pub(super) fn fresh_runtime_handle_task_ids(
         .context("无法创建本机 runtime handle 探针")?
         .get(format!("http://127.0.0.1:{port}/api/status"))
         .send();
-    let response = match response {
-        Ok(response) => response,
-        Err(_) if !process::agent_runtime_running(install_dir) => {
-            return Ok(std::collections::HashSet::new())
-        }
-        Err(error) => {
-            return Err(error)
-                .context("已安装 runtime 仍在运行，但无法重新验证活动 handle；拒绝进入安装窗口")
-        }
-    };
+    let response = response.context("无法重新验证本机 runtime 活动 handle；拒绝进入安装窗口")?;
     anyhow::ensure!(
         response.status().is_success(),
         "已安装 runtime 状态探针返回 {}，拒绝进入安装窗口",
@@ -43,7 +34,7 @@ pub(super) fn runtime_handle_task_ids_from_status(
         status
             .get("local_admin_token_header")
             .and_then(serde_json::Value::as_str)
-            .is_some_and(|value| !value.trim().is_empty()),
+            == Some(crate::node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER),
         "本机状态响应不属于一龙节点 runtime"
     );
     let reported_count = status
@@ -53,33 +44,43 @@ pub(super) fn runtime_handle_task_ids_from_status(
     let prompt_task_ids = status
         .get("active_cli_prompt_task_ids")
         .and_then(serde_json::Value::as_array)
-        .map(Vec::as_slice)
-        .unwrap_or_default();
-    let mut task_ids = prompt_task_ids
-        .iter()
-        .filter_map(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string)
-        .collect::<std::collections::HashSet<_>>();
-    task_ids.extend(
-        status
-            .get("active_task_runtime")
-            .and_then(serde_json::Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|entry| entry.get("task_id"))
-            .filter_map(serde_json::Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string),
-    );
+        .context("runtime 状态缺少活动 prompt 身份列表")?;
+    let runtime_handles = status
+        .get("active_task_runtime")
+        .and_then(serde_json::Value::as_array)
+        .context("runtime 状态缺少活动执行器身份列表")?;
+    let prompt_ids = validated_task_ids(prompt_task_ids, |entry| entry.as_str())?;
     anyhow::ensure!(
-        prompt_task_ids.len() >= reported_count && task_ids.len() >= reported_count,
+        prompt_ids.len() == reported_count,
+        "runtime 报告 {reported_count} 个活动 prompt，但提供 {} 个唯一可验证任务身份",
+        prompt_ids.len()
+    );
+    let mut task_ids = prompt_ids;
+    task_ids.extend(validated_task_ids(runtime_handles, |entry| {
+        entry.get("task_id").and_then(serde_json::Value::as_str)
+    })?);
+    anyhow::ensure!(
+        task_ids.len() >= reported_count,
         "runtime 报告 {reported_count} 个活动 handle，但只提供 {} 个可验证任务身份",
         task_ids.len()
     );
     Ok(task_ids)
+}
+
+fn validated_task_ids<'a>(
+    entries: &'a [serde_json::Value],
+    task_id: impl Fn(&'a serde_json::Value) -> Option<&'a str>,
+) -> Result<std::collections::HashSet<String>> {
+    entries
+        .iter()
+        .map(|entry| {
+            task_id(entry)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+                .context("runtime 活动 handle 缺少可验证任务身份")
+        })
+        .collect()
 }
 
 pub(super) fn restart_installed_runtime_and_watchdog(install_dir: &Path) -> Result<()> {

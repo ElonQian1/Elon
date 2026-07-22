@@ -26,6 +26,22 @@ impl TerminalLeaseCursor {
 }
 
 impl LocalTaskStore {
+    /// Installer-only view: persisted cancellation and Resume states need a
+    /// fresh executor recheck, but must not widen the live drain candidate set.
+    pub(crate) fn list_update_install_candidates(&self) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE status IN ('running','recovering','reattaching','cancel_requested','resume_required')
+             ORDER BY started_at_ms",
+            select_sql()
+        ))?;
+        let records = stmt
+            .query_map([], read_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
+    }
+
     /// Atomically preserve the workspace/root recovery context while moving a
     /// dead sidecar task out of the misleading running state.
     pub(crate) fn mark_stale_sidecar_resume_required(
