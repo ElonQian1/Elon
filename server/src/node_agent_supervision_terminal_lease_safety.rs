@@ -162,12 +162,24 @@ async fn lineage_or_workspace_is_active(
         }
     }
     for handle in runtime.active_cli_prompts.views_without_approvals().await {
-        if handle.req_id == current_task_id
-            || handle
-                .cwd
-                .as_deref()
-                .is_some_and(|cwd| workspace_contains(active, Path::new(cwd)))
-            || task_contract_has_root(runtime, &handle.req_id, root_task_id)?
+        if handle.req_id == current_task_id {
+            return Ok(true);
+        }
+        let shares_workspace = handle
+            .cwd
+            .as_deref()
+            .is_some_and(|cwd| workspace_contains(active, Path::new(cwd)));
+        if shares_workspace {
+            return Ok(true);
+        }
+        let handle_task = runtime.local_tasks.get(&handle.req_id)?;
+        if candidate_requires_contract_lookup(
+            handle_task
+                .as_ref()
+                .and_then(|task| task.workspace_status.as_ref()),
+            false,
+            root_task_id,
+        ) && task_contract_has_root(runtime, &handle.req_id, root_task_id)?
         {
             return Ok(true);
         }
@@ -177,15 +189,22 @@ async fn lineage_or_workspace_is_active(
         // Dead sidecar metadata has no execution ownership. Skip it before
         // lineage parsing so unrelated legacy contracts cannot block every new
         // terminal task or make the periodic pass scan the full history.
-        if !sidecar.is_live_at(now) {
+        if !sidecar.is_live_at(now) || sidecar.task_id == current_task_id {
             continue;
         }
-        let shares_workspace_or_root = sidecar
+        let shares_workspace = sidecar
             .cwd
             .as_deref()
-            .is_some_and(|cwd| workspace_contains(active, Path::new(cwd)))
-            || task_contract_has_root(runtime, &sidecar.task_id, root_task_id)?;
+            .is_some_and(|cwd| workspace_contains(active, Path::new(cwd)));
         let sidecar_task = runtime.local_tasks.get(&sidecar.task_id)?;
+        let shares_workspace_or_root = shares_workspace
+            || (candidate_requires_contract_lookup(
+                sidecar_task
+                    .as_ref()
+                    .and_then(|task| task.workspace_status.as_ref()),
+                false,
+                root_task_id,
+            ) && task_contract_has_root(runtime, &sidecar.task_id, root_task_id)?);
         if sidecar_metadata_blocks_release(
             current_task_id,
             &sidecar.task_id,
