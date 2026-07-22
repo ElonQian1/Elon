@@ -5,12 +5,15 @@
 
 mod adb_session;
 mod annotation_mapping;
+mod apk_identity;
 mod broker;
 mod build_verify;
 mod build_verify_apk;
 mod capability_gap;
 mod capability_requirements;
 mod cross_platform_verification;
+mod debug_integration;
+mod debug_integration_contract;
 mod debug_package;
 mod deployment_serialization;
 mod design_bootstrap;
@@ -49,6 +52,8 @@ mod visual_solver_values;
 mod window_insets_sequence;
 
 #[cfg(test)]
+mod debug_integration_tests;
+#[cfg(test)]
 mod design_diff_regions_tests;
 #[cfg(test)]
 mod mcp_tests;
@@ -66,6 +71,10 @@ mod visual_diff_tests;
 mod visual_solver_style_hints_tests;
 
 pub(crate) use broker::LiveUiBroker;
-pub(crate) use debug_package::scoped_debug_application_id_suffix;
+pub(crate) use debug_package::{
+    debug_base_package_name, fixed_node_debug_suffix, node_debug_fingerprint,
+    normalize_debug_package_name, resolve_debug_application_id_suffix,
+    scoped_debug_application_id_suffix,
+};
 pub(crate) use mcp::descriptor_for_project as mcp_descriptor_for_project;
 pub(crate) use routes::{protected_routes, runtime_routes};

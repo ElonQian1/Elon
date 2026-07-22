@@ -12,7 +12,7 @@ import type { UiTunerCodexContextPack } from './contextPack'
 import type { UiTunerVerificationReport } from './runtime/verification'
 import { UiTunerLivePanel } from './live/UiTunerLivePanel'
 import type { useLiveUiSession } from './live/useLiveUiSession'
-import type { LivePatchOperation, LiveUiScope } from './live/liveUiApi'
+import type { DebugIntegrationStatus, LivePatchOperation, LiveUiScope } from './live/liveUiApi'
 import type { RuntimeDraftStatus } from './live/runtimeDraftModel'
 import { UiDesignGateway } from './inspector/UiDesignGateway'
 import { UiInspectorTabs, type UiInspectorTab } from './inspector/UiInspectorTabs'
@@ -48,6 +48,7 @@ interface UiTunerInspectorProps {
   liveUiDraftStatus: RuntimeDraftStatus
   livePrepareBusy: boolean
   livePrepareError: string
+  debugIntegration: DebugIntegrationStatus | null
   livePrepareReady: boolean
   liveDebugPackage: string
   liveProjectRoot: string
@@ -85,6 +86,7 @@ export function UiTunerInspector({
   liveUiDraftStatus,
   livePrepareBusy,
   livePrepareError,
+  debugIntegration,
   livePrepareReady,
   liveDebugPackage,
   liveProjectRoot,
@@ -128,6 +130,7 @@ export function UiTunerInspector({
               onApply={onLiveApply} onApplyGesture={onLiveApplyGesture}
               onUndo={onLiveUndo} onRedo={onLiveRedo}
               prepareBusy={livePrepareBusy} prepareError={livePrepareError}
+              debugIntegration={debugIntegration}
               prepareReady={livePrepareReady} debugPackage={liveDebugPackage}
               projectRoot={liveProjectRoot} onProjectRootChange={onLiveProjectRootChange}
               onPrepareRuntime={onPrepareLiveRuntime}
@@ -198,6 +201,7 @@ interface LiveDesignPanelProps {
   onRedo: () => Promise<void>
   prepareBusy: boolean
   prepareError: string
+  debugIntegration: DebugIntegrationStatus | null
   prepareReady: boolean
   debugPackage: string
   projectRoot: string
@@ -219,6 +223,7 @@ function LiveDesignPanel(props: LiveDesignPanelProps) {
       onOpenPreview={liveUi.openPreview} buildVerifyResult={liveUi.buildVerifyResult}
       onBuildVerify={liveUi.buildVerify} prepareBusy={props.prepareBusy}
       prepareError={props.prepareError} prepareReady={props.prepareReady}
+      debugIntegration={props.debugIntegration}
       debugPackage={props.debugPackage} projectRoot={props.projectRoot}
       onProjectRootChange={props.onProjectRootChange} onPrepareRuntime={props.onPrepareRuntime}
     />

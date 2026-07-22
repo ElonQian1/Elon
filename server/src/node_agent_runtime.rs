@@ -96,8 +96,19 @@ impl NodeRuntime {
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
+        let integration_root = node_data_root
+            .paths
+            .as_ref()
+            .map(|paths| paths.workspaces().join("android-debug-integration"))
+            .unwrap_or_else(|| {
+                crate::node_agent_config::state_path()
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .join("android-debug-integration")
+            });
         let live_ui = Arc::new(crate::node_agent_android_live::LiveUiBroker::for_node(
             &install_id,
+            integration_root,
         ));
         let ui_fit_runs =
             Arc::new(crate::node_agent_android_live::fit_run::FitRunService::live(live_ui.clone()));

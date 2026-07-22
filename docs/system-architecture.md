@@ -172,6 +172,14 @@ sidecar `sessions.json` 使用进程间互斥和同目录唯一临时文件原�
 
 节点在创建或复用受监督隔离 worktree 时直接以 `elon-supervision:<root_task_id>` 写入唯一权威 Git lease；prepare、恢复和 merge 不先写通用锁，也不存在临时解锁窗口。为兼容历史节点曾写入的监督后代任务 lease，Resume 路由会先逐代验证持久监督契约直到同一 `requirement` 根，并核对 owner、节点、安装、项目、授权基础工作区、Git 身份和独占状态；只有全部一致时，才持有仓库级跨进程准入锁并用同目录原子替换把 Git `locked` 原因迁移为 root lease，通用锁、陌生 lease 或断裂谱系一律拒绝。该准入锁持续到新任务在活跃工作区注册，避免并发 Resume 穿透。可信终态在执行句柄退出后按 root identity 精确解锁；启动与周期维护幂等回收已有终态陈旧锁，运行态、错误 lease 和未知文件均保留。Review 独立记录验收结论并保留兼容解锁入口，但不再是唯一释放入口；解锁后只有 clean 且已合入的 worktree 才能由通用 cleanup 回收。普通非监督 conversation worktree 仍使用原通用锁，并在成功合并后解锁删除。Windows 超时/取消先同步等待 `taskkill /T /F` 回收完整执行器进程树，再结束直接子进程。启动时 `workspace_status` 先持久化基础路径、活动路径、分支、完整 `git_head` 和 Git 身份锚点；进入可靠终态前，节点在同一持久事务内重新验证路径、branch、common-dir、remote、root lease、节点/安装/owner/project 和占用身份，并原子刷新为当前 HEAD。验证失败时保留启动证据并持久化不可 Resume 原因，为注册丢失后的确定性重建提供 fail-closed 身份。
 
+#### 同节点 Android 多会话合并调试
+
+Codex 会话继续在独立 conversation worktree 开发和自行编译，真机部署则进入节点托管的第二层集成槽。HTTP、MCP 和 PC 工作台提交候选时必须明确 `ready`，提供或由兼容入口确定当前 HEAD，并证明来源 worktree 干净、提交属于固定基础 SHA 的后继、来源 task/session 可审计。协调器在节点数据根的 `workspaces/android-debug-integration` 下创建代次专属 detached worktree，按接收顺序 cherry-pick；不复制脏文件、不直接混写多个 worktree，也不猜测解决冲突。
+
+槽身份是“Git common-dir + 项目 + 物理硬件序列号 + 稳定节点指纹”。状态原子记录基础 SHA、贡献提交顺序、来源、期望代次、已安装代次、冲突、共享预览所有者、APK SHA-256 和最后可用版本。合并、构建、APK 校验和安装由同一物理设备/包互斥锁串行；新候选提高代次，旧构建在暂存和安装前用 fencing token 再校验，因而不能在新构建之后安装。各代构建输出保持隔离，协调器只把通过 `aapt`/`apksigner` 校验的包名、标签、版本、签名和内容哈希原子暂存为 `<sha256>.apk`，不会让多个会话写同一路径。
+
+真机最终包名固定为 `com.elon.app.uituner_<节点指纹>`；`.uituner`、`.uitest`、`.uitest_anim` 及旧带指纹调用都只作为兼容输入。只有 `emulator-*` 且调用者显式设置隔离选项时，才保留模拟器独立测试包。正式 `com.elon.app` / “一龙ai”不变。签名漂移、非法后缀、非 ready/未提交候选、合并冲突、过期代次和设备离线均返回明确状态；系统保留最后可用 APK 与手机当前版本，不创建新真机包，不自动卸载旧包。升级前遗留的杂包只进入诊断报告，由用户明确决定是否处理。
+
 本机低优先自进化是独立调度域：父用户任务先终止，节点再预创建并持久化独立 task/conversation/worktree。pause/review 操作采用“先持久 action intent、再执行外部取消或审查、最后原子提交队列状态”，所以重试不会产生半状态；配额类失败进入有界退避。取消/让路事件持久化四元组和可信 `interruption_source`，审计失败即拒绝取消。发布控制面同样使用持久的 `batch_id + immutable SHA` 阶段 ledger，把 server、PC 前端、Windows 节点的 owner、waiter、heartbeat、attempt 与错误统一成可接管且 fail-closed 的事务视图。
 
 服务器频繁发布重启时，Route A 任务不应把“后端进程重启”直接当成用户任务失败。短期发布排水只做很短的停止接新和状态落盘窗口，不能等待 Codex 长任务自然结束；长期目标是任务可恢复：云端保存 `task_id`、`pc_req_id`、`agent_id`、会话/sidecar 信息和最后公开进度，重启后进入 `recovering` 状态，节点重连后通过本机 journal / Codex session 回放或续接。前端文案应表达“服务器正在更新升级，任务已保留，正在恢复/已恢复/恢复失败可重试”，只有节点确认无法恢复时才转为失败。

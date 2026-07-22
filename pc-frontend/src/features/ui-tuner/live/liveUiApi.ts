@@ -137,6 +137,41 @@ export interface LiveBuildVerifyResult {
 export interface LiveDebugRuntimePrepareResult {
   packageName: string
   build: LiveBuildVerifyResult
+  integration: DebugIntegrationStatus
+}
+
+export interface DebugIntegrationStatus {
+  schema: 'elon.android_debug_integration.v1'
+  slotId: string
+  nodeFingerprint: string
+  projectId: string
+  deviceIdentity: string
+  packageName: string
+  baseSha: string
+  desiredGeneration: number
+  installedGeneration?: number
+  status: string
+  integrationWorktree?: string
+  contributions: Array<{
+    commitSha: string
+    sourceTaskId?: string
+    sourceSessionId?: string
+    acceptedAt: string
+  }>
+  conflicts: string[]
+  legacyPackages?: string[]
+  previewOwner?: string
+  lastError?: string
+  lastUsable?: {
+    apkPath: string
+    sha256: string
+    packageName: string
+    versionCode: string
+    versionName: string
+    appLabel: string
+    signerSha256: string
+    generation: number
+  }
 }
 
 export async function prepareLiveDebugRuntime(input: {
@@ -145,6 +180,11 @@ export async function prepareLiveDebugRuntime(input: {
   projectRoot: string
   debugApplicationIdSuffix: string
   lease: AndroidDeviceLeaseProof
+  candidate: {
+    ready: true
+    sourceSessionId: string
+    previewOwner: string
+  }
 }): Promise<LiveDebugRuntimePrepareResult> {
   const response = await nodeApi<{ result: LiveDebugRuntimePrepareResult }>(
     inspectorAdminUrl(),
@@ -153,6 +193,21 @@ export async function prepareLiveDebugRuntime(input: {
     20 * 60_000,
   )
   return response.result
+}
+
+export async function getDebugIntegrationStatus(
+  projectRoot: string,
+  projectId: string,
+  deviceIdentity: string,
+): Promise<DebugIntegrationStatus | null> {
+  const query = new URLSearchParams({ projectRoot, projectId, deviceIdentity })
+  const response = await nodeApi<{ status: DebugIntegrationStatus | null }>(
+    inspectorAdminUrl(),
+    `/api/android-live/debug-runtime/integration-status?${query.toString()}`,
+    {},
+    5_000,
+  )
+  return response.status
 }
 
 export async function startLiveUiSession(input: {

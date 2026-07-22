@@ -4,7 +4,7 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
@@ -40,6 +40,9 @@ pub struct Credentials {
 #[derive(Default, Serialize, Deserialize)]
 pub(super) struct PersistedState {
     pub(super) install_id: Option<String>,
+    /// Pins the physical-device Debug Launcher identity across client updates.
+    /// A mismatch is identity drift and must never silently create another app.
+    pub(super) debug_package_fingerprint: Option<String>,
     pub(super) agent_id: Option<String>,
     pub(super) agent_secret: Option<String>,
     pub(super) owner_user_id: Option<String>,
@@ -189,6 +192,50 @@ mod persistence_tests {
     }
 
     #[test]
+    fn node_update_keeps_the_pinned_debug_package_identity() {
+        let mut state = PersistedState {
+            install_id: Some("ins_stable_node".into()),
+            ..PersistedState::default()
+        };
+        let first = ensure_debug_package_identity(&mut state, "ins_stable_node").unwrap();
+        let serialized = serde_json::to_vec(&state).unwrap();
+        let mut reloaded: PersistedState = serde_json::from_slice(&serialized).unwrap();
+        let after_restart =
+            ensure_debug_package_identity(&mut reloaded, "ins_stable_node").unwrap();
+
+        assert_eq!(first, after_restart);
+        assert_eq!(
+            reloaded.debug_package_fingerprint.as_deref(),
+            Some(first.as_str())
+        );
+    }
+
+    #[test]
+    fn debug_package_identity_drift_fails_closed() {
+        let mut state = PersistedState::default();
+        ensure_debug_package_identity(&mut state, "ins_original").unwrap();
+
+        let error = ensure_debug_package_identity(&mut state, "ins_changed")
+            .expect_err("identity drift must not create a second package");
+
+        assert!(error.to_string().contains("NODE_DEBUG_IDENTITY_DRIFT"));
+        assert!(error.to_string().contains("第二个节点应用"));
+    }
+
+    #[test]
+    fn legacy_node_state_initializes_debug_identity_without_losing_install_id() {
+        let mut state: PersistedState =
+            serde_json::from_str(r#"{"install_id":"ins_legacy"}"#).unwrap();
+        let fingerprint = ensure_debug_package_identity(&mut state, "ins_legacy").unwrap();
+
+        assert_eq!(state.install_id.as_deref(), Some("ins_legacy"));
+        assert_eq!(
+            state.debug_package_fingerprint.as_deref(),
+            Some(fingerprint.as_str())
+        );
+    }
+
+    #[test]
     fn existing_storage_path_survives_valid_recommended_root() {
         let root =
             std::env::temp_dir().join(format!("elon-node-storage-root-{}", uuid::Uuid::new_v4()));
@@ -294,6 +341,26 @@ pub(super) fn ensure_install_id(persisted: &mut PersistedState) -> String {
     let install_id = format!("ins_{}", uuid::Uuid::new_v4().simple());
     persisted.install_id = Some(install_id.clone());
     install_id
+}
+
+pub(super) fn ensure_debug_package_identity(
+    persisted: &mut PersistedState,
+    install_id: &str,
+) -> Result<String> {
+    let expected = crate::node_agent_android_live::node_debug_fingerprint(install_id)?;
+    if let Some(recorded) = persisted
+        .debug_package_fingerprint
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        if recorded != expected {
+            bail!("NODE_DEBUG_IDENTITY_DRIFT: 节点安装身份与已固定调试包指纹不一致；已拒绝启动调试部署，避免在手机上静默创建第二个节点应用。请恢复原 node.json 或由管理员显式迁移身份");
+        }
+    } else {
+        persisted.debug_package_fingerprint = Some(expected.clone());
+    }
+    Ok(expected)
 }
 
 impl PersistedState {

@@ -1,6 +1,6 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-07-22
+最后更新：2026-07-23
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
@@ -38,6 +38,7 @@
 11. `post_task_improvement` 必须与用户任务解耦：父任务先终止并释放执行资源，改进进入独立低优先 task/conversation/worktree；实际执行 worktree/branch 必须在派发前验证并持久化。前台、发布、更新或构建压力出现时自动 pause/yield，门禁解除后自动 resume；配额类失败自动退避重试，完成后等待带来源的 Desktop 审查。
 12. 取消事件向后兼容地保留 `requested_by`、`source`、`reason`、`requested_at_ms` 四元组；系统中断另带可空的可信枚举 `interruption_source`。sidecar/journal 审计必须先于取消且写失败时拒绝取消；升级读取旧记录不得因缺少新字段而失败。
 13. 三端发布共享同一个 `batch_id + immutable SHA`；server、PC 前端和 Windows 节点阶段必须有持久 heartbeat/attempt/owner/error 记录。损坏 ledger、未知阶段状态、过期 owner 或批次 SHA 漂移都 fail-closed；崩溃后的同批次接管幂等且不能破坏 FIFO 防饿死。
+14. `node.json` 的 `install_id` 同时锚定真机唯一调试包 `com.elon.app.uituner_<节点指纹>`；首次升级可幂等补写 `debug_package_fingerprint`，后续更新和重启必须保持一致。已有指纹与当前安装身份不符时拒绝调试部署并保留原状态，不能换用 `.uitest`、`.uitest_anim` 或新随机身份创建第二套 Launcher 包，也不能自动卸载手机应用。
 
 ## 配置与缓存迁移合同
 
@@ -67,6 +68,7 @@
 - 低优先自进化在前台任务、发布、更新和构建压力下 pause/yield，门禁解除后自动 resume；必须证明实际派发目录是已持久化的独立 worktree，并覆盖 action intent 重放、审查 provenance 和配额自动重试。
 - 远程监督 v1 的身份、能力、live lease 和断线恢复 fail-closed fixture；本地可信任务优先，远程证据缺失不得降级绕过。
 - PWA Runtime 捕获的 Windows Edge/Chrome 标准路径与 `ELON_PWA_BROWSER_PATH` 探测、浏览器缺失诊断、真实 loopback HTML/PWA fixture 精确 viewport PNG、SHA-256/route/revision 元数据、认证失败不误报、SSRF/秘密门禁，以及成功/超时/启动失败后的浏览器进程树和临时 profile 回收。发布包不得新增 Desktop Browser 或人工可见浏览器依赖。
+- Android 调试身份 fixture：旧 `node.json` 首次补写、连续更新/重启包名不变、身份漂移 fail-closed、三个会话按序合并、同文件冲突保留最后可用 APK、新代次淘汰旧构建、USB/无线端点共用物理设备部署锁、所有兼容后缀无法绕过固定真机包、正式包不受影响、历史杂包仅报告不自动卸载。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。
 - 外部项目、托管项目、只读任务、普通写任务和真实构建分别验证路径与环境策略。
 - 超容量建议、项目数建议和无法读取磁盘空间时仍可派单；无自动压力清理。

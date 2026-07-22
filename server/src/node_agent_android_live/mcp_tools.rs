@@ -69,6 +69,8 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "basePackageName":{"type":"string","description":"可选；默认使用项目 UI Profile 预提取的 applicationId"},
                     "deviceId":{"type":"string","description":"可选；不填时优先选择在线模拟器"},
                     "debugApplicationIdSuffix":{"type":"string","default":".uitest"},
+                    "isolatedEmulatorPackage":{"type":"boolean","default":false,"description":"仅模拟器可显式启用；真机一律使用节点固定 .uituner_<指纹> 包"},
+                    "candidate":super::debug_integration_contract::debug_candidate_schema(),
                     "restart":{"type":"boolean","default":false,"description":"仅在上一轮 FAILED 或源码变化后显式启动新一轮；运行中重复调用不创建新会话"}
                 }
             }),
@@ -574,6 +576,9 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
     ];
+    definitions.push(tool("ui_get_debug_integration_status",
+        "读取当前项目指定设备的固定调试槽、贡献提交、冲突、代次、APK SHA256 与最后可用版本。",
+        json!({"type":"object","required":["deviceId"],"properties":{"deviceId":{"type":"string"},"projectId":{"type":"string"}}})));
     definitions.push(crate::node_agent_pwa_runtime::tool_definition());
     definitions
 }
@@ -585,6 +590,7 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
             | "ui_get_project_profile"
             | "ui_get_design_task"
             | "ui_get_runtime_status"
+            | "ui_get_debug_integration_status"
             | "ui_list_render_devices"
             | "ui_get_screen_summary"
             | "ui_get_node"
@@ -640,6 +646,7 @@ mod annotation_tests {
             "ui_get_design_task",
             "ui_get_project_profile",
             "ui_get_runtime_status",
+            "ui_get_debug_integration_status",
             "ui_list_render_devices",
             "ui_check_workflow_completion",
         ] {

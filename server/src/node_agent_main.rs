@@ -87,8 +87,8 @@ mod node_agent_codex_vault_active;
 mod node_agent_codex_vault_emergency;
 mod node_agent_config;
 use node_agent_config::{
-    ensure_install_id, initial_credentials, initial_node_data_root, initial_storage_settings,
-    load_persisted, save_persisted,
+    ensure_debug_package_identity, ensure_install_id, initial_credentials, initial_node_data_root,
+    initial_storage_settings, load_persisted, save_persisted,
 };
 pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
 mod node_agent_cli_redaction;
@@ -378,6 +378,7 @@ async fn run_agent_runtime() -> Result<()> {
     );
     let mut persisted = load_persisted()?;
     let install_id = ensure_install_id(&mut persisted);
+    ensure_debug_package_identity(&mut persisted, &install_id)?;
     // Persist the installation identity before binding a data-root marker. If
     // a later write fails, the next start must reuse the same identity instead
     // of making a valid marker look foreign.

@@ -47,6 +47,7 @@ pub(super) async fn run_debug_build(
     gradle_root: &Path,
     wrapper: &Path,
     debug_application_id_suffix: Option<&str>,
+    debug_app_label: Option<&str>,
     force_rerun: bool,
 ) -> Result<()> {
     let mut command =
@@ -78,6 +79,9 @@ pub(super) async fn run_debug_build(
     }
     if let Some(suffix) = debug_application_id_suffix {
         command.arg(format!("-PELON_DEBUG_APPLICATION_ID_SUFFIX={suffix}"));
+    }
+    if let Some(label) = debug_app_label {
+        command.arg(format!("-PELON_DEBUG_APP_LABEL={label}"));
     }
     crate::node_agent_exec::hide_tokio_command_window(&mut command);
     let output = tokio::time::timeout(BUILD_TIMEOUT, command.output())

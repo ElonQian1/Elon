@@ -23,12 +23,15 @@ pub(crate) struct LiveUiBroker {
     sessions: RwLock<HashMap<String, Arc<LiveUiSession>>>,
     pub(crate) debug_deployments: super::deployment_serialization::DebugDeploymentRegistry,
     pub(crate) debug_runtime_preparations: super::build_verify::PreparationRegistry,
+    pub(crate) debug_integration: super::debug_integration::DebugIntegrationCoordinator,
 }
 
 pub(crate) struct LiveUiSession {
     pub(crate) id: String,
     pub(crate) token: String,
     pub(crate) device_id: String,
+    pub(crate) device_identity: String,
+    pub(crate) debug_project_id: String,
     pub(crate) package_name: String,
     pub(crate) project_root: Option<String>,
     pub(crate) device_port: u16,
@@ -71,39 +74,18 @@ impl LiveUiBroker {
         Self::default()
     }
 
-    pub(crate) fn for_node(install_id: &str) -> Self {
+    pub(crate) fn for_node(install_id: &str, integration_root: std::path::PathBuf) -> Self {
+        let fingerprint = super::node_debug_fingerprint(install_id).unwrap_or_default();
         Self {
             debug_deployments: super::deployment_serialization::DebugDeploymentRegistry::for_node(
                 install_id,
             ),
+            debug_integration: super::debug_integration::DebugIntegrationCoordinator::new(
+                integration_root,
+                fingerprint,
+            ),
             ..Self::default()
         }
-    }
-
-    pub(crate) async fn create_session(
-        &self,
-        device_id: String,
-        package_name: String,
-        project_root: Option<String>,
-        device_port: u16,
-    ) -> Arc<LiveUiSession> {
-        let session = Arc::new(LiveUiSession {
-            id: format!("live_{}", uuid::Uuid::new_v4().simple()),
-            token: uuid::Uuid::new_v4().simple().to_string(),
-            device_id,
-            package_name,
-            project_root,
-            device_port,
-            created_at: Utc::now().to_rfc3339(),
-            state: RwLock::new(LiveSessionState::default()),
-            runtime_tx: RwLock::new(None),
-            pending: Mutex::new(HashMap::new()),
-        });
-        self.sessions
-            .write()
-            .await
-            .insert(session.id.clone(), session.clone());
-        session
     }
 
     pub(crate) async fn remove_session(&self, session_id: &str) -> Option<Arc<LiveUiSession>> {
@@ -216,6 +198,8 @@ impl LiveUiBroker {
         project_root: &str,
         device_id: &str,
         package_name: &str,
+        device_identity: &str,
+        debug_project_id: &str,
     ) -> Option<Arc<LiveUiSession>> {
         let expected_root = canonical_or_raw(project_root);
         let mut matched = self
@@ -225,6 +209,8 @@ impl LiveUiBroker {
             .values()
             .filter(|session| {
                 session.device_id == device_id
+                    && session.device_identity == device_identity
+                    && session.debug_project_id == debug_project_id
                     && session.package_name == package_name
                     && session
                         .project_root
@@ -787,6 +773,7 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
         == 0
 }
 
+mod session_factory;
 #[cfg(test)]
 mod tests;
 

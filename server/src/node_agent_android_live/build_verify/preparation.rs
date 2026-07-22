@@ -19,7 +19,7 @@ const MAX_EVIDENCE_DETAIL_CHARS: usize = 1_200;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct PreparationKey {
-    project_root: String,
+    slot_id: String,
     package_name: String,
     device_id: String,
 }
@@ -41,6 +41,7 @@ pub(crate) struct PrepareDebugRuntimeProgress {
     pub(crate) phase: String,
     pub(crate) retry_after_ms: Option<u64>,
     pub(crate) source_revision: Option<String>,
+    pub(crate) generation: u64,
     pub(crate) evidence: Vec<PreparationEvidence>,
     pub(crate) result: Option<PrepareDebugRuntimeResult>,
     pub(crate) error: Option<String>,
@@ -51,6 +52,7 @@ struct PreparationState {
     status: String,
     phase: String,
     source_revision: Option<String>,
+    generation: u64,
     evidence: Vec<PreparationEvidence>,
     result: Option<PrepareDebugRuntimeResult>,
     error: Option<String>,
@@ -64,6 +66,7 @@ impl PreparationState {
             phase: self.phase.clone(),
             retry_after_ms: (self.status == "IN_PROGRESS").then_some(2_000),
             source_revision: self.source_revision.clone(),
+            generation: self.generation,
             evidence: self.evidence.clone(),
             result: self.result.clone(),
             error: self.error.clone(),
@@ -127,16 +130,28 @@ impl PreparationRegistry {
     pub(crate) async fn poll_or_start(
         &self,
         broker: Arc<LiveUiBroker>,
-        request: PrepareDebugRuntimeRequest,
+        mut request: PrepareDebugRuntimeRequest,
         host_port: u16,
         restart: bool,
     ) -> Result<PrepareDebugRuntimeProgress> {
-        let key = preparation_key(&request)?;
-        let source_revision = workspace_fingerprint(&key.project_root)?;
+        let plan = prepare_integration_plan(&broker, &request)?;
+        request.integration_plan = Some(plan.clone());
+        let key = PreparationKey {
+            slot_id: plan.slot_id.clone(),
+            package_name: plan.package_name.clone(),
+            device_id: request.device_id.trim().to_string(),
+        };
+        let source_revision = Some(format!(
+            "generation:{}:{}",
+            plan.generation,
+            plan.contributions.join(",")
+        ));
         if let Some(existing) = self.operations.lock().await.get(&key).cloned() {
             let progress = existing.read().await.progress();
             let source_unchanged = progress.source_revision == source_revision;
-            if progress.status == "IN_PROGRESS" || (!restart && source_unchanged) {
+            if progress.generation == plan.generation
+                && (progress.status == "IN_PROGRESS" || (!restart && source_unchanged))
+            {
                 return Ok(progress);
             }
         }
@@ -147,6 +162,7 @@ impl PreparationRegistry {
             status: "IN_PROGRESS".to_string(),
             phase: "QUEUED".to_string(),
             source_revision,
+            generation: plan.generation,
             evidence: vec![PreparationEvidence {
                 phase: "QUEUED".to_string(),
                 status: "IN_PROGRESS".to_string(),
@@ -183,19 +199,47 @@ impl PreparationRegistry {
     }
 }
 
-fn preparation_key(request: &PrepareDebugRuntimeRequest) -> Result<PreparationKey> {
+fn prepare_integration_plan(
+    broker: &LiveUiBroker,
+    request: &PrepareDebugRuntimeRequest,
+) -> Result<crate::node_agent_android_live::debug_integration::DebugIntegrationPlan> {
     let project_root = PathBuf::from(request.project_root.trim())
         .canonicalize()
         .with_context(|| format!("项目目录不存在: {}", request.project_root.trim()))?
         .to_string_lossy()
         .to_string();
-    let base_package_name = validate_package_name(request.base_package_name.trim())?;
-    let suffix = validate_debug_application_id_suffix(request.debug_application_id_suffix.trim())?;
-    Ok(PreparationKey {
-        project_root,
-        package_name: format!("{base_package_name}{suffix}"),
-        device_id: request.device_id.trim().to_string(),
-    })
+    let requested_base_package_name = validate_package_name(request.base_package_name.trim())?;
+    let base_package_name =
+        crate::node_agent_android_live::debug_base_package_name(requested_base_package_name);
+    let install_id = broker
+        .node_install_id()
+        .context("PC 节点缺少稳定安装标识，拒绝创建调试集成候选")?;
+    let suffix = crate::node_agent_android_live::resolve_debug_application_id_suffix(
+        request.debug_application_id_suffix.trim(),
+        install_id,
+        request.device_id.trim(),
+        request.isolated_emulator_package,
+    )?;
+    validate_debug_application_id_suffix(&suffix)?;
+    let package_name = format!("{base_package_name}{suffix}");
+    let project_id = request
+        .lease
+        .as_ref()
+        .map(|lease| lease.project_id.as_str())
+        .unwrap_or(project_root.as_str());
+    let device_identity = request
+        .lease
+        .as_ref()
+        .map(|lease| lease.hardware_serial.as_str())
+        .unwrap_or(request.device_id.trim());
+    broker.debug_integration.register_candidate(
+        &project_root,
+        project_id,
+        device_identity,
+        &package_name,
+        request.candidate.as_ref(),
+        "compat-mcp-prepare",
+    )
 }
 
 fn push_evidence(state: &mut PreparationState, phase: &str, status: &str, detail: &str) {
@@ -229,6 +273,7 @@ mod tests {
             status: "IN_PROGRESS".into(),
             phase: "BUILD".into(),
             source_revision: Some("rev-1".into()),
+            generation: 1,
             evidence: Vec::new(),
             result: None,
             error: None,

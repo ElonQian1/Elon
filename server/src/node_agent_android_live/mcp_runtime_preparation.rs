@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde_json::{json, Value};
 
 use super::broker::LiveUiBroker;
@@ -53,16 +53,7 @@ pub(super) async fn prepare_debug_runtime(
         .and_then(Value::as_str)
         .unwrap_or(".uitest")
         .to_string();
-    let node_install_id = broker
-        .debug_deployments
-        .node_install_id()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| anyhow!("PC 节点缺少稳定安装标识，拒绝创建会话级临时调试包"))?;
-    let debug_application_id_suffix = super::scoped_debug_application_id_suffix(
-        &requested_debug_application_id_suffix,
-        node_install_id,
-    )?;
+    let debug_application_id_suffix = requested_debug_application_id_suffix;
     let restart = arguments
         .get("restart")
         .and_then(Value::as_bool)
@@ -76,7 +67,18 @@ pub(super) async fn prepare_debug_runtime(
                 base_package_name,
                 project_root,
                 debug_application_id_suffix,
+                isolated_emulator_package: arguments
+                    .get("isolatedEmulatorPackage")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                candidate: arguments
+                    .get("candidate")
+                    .cloned()
+                    .map(serde_json::from_value)
+                    .transpose()
+                    .context("candidate 格式无效")?,
                 lease: None,
+                integration_plan: None,
             },
             crate::node_agent_admin_open::admin_port_from_env(),
             restart,
@@ -88,4 +90,36 @@ pub(super) async fn prepare_debug_runtime(
         _ => "POLL_PREPARATION",
     };
     Ok(json!({ "result": progress, "nextPhase": next_phase }))
+}
+
+pub(super) async fn debug_integration_status(
+    broker: &Arc<LiveUiBroker>,
+    session_id: &str,
+    arguments: &Value,
+) -> Result<Value> {
+    let session = broker.session(session_id).await?;
+    let project_root = session
+        .project_root
+        .as_deref()
+        .ok_or_else(|| anyhow!("UI 设计会话未绑定项目目录"))?;
+    let device_id = arguments
+        .get("deviceId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("ui_get_debug_integration_status 缺少 deviceId"))?;
+    let project_id = arguments
+        .get("projectId")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(project_root);
+    let device_identity = if device_id == session.device_id {
+        session.device_identity.as_str()
+    } else {
+        device_id
+    };
+    Ok(json!({ "status": broker.debug_integration.status_for(
+        project_root, project_id, device_identity
+    )? }))
 }

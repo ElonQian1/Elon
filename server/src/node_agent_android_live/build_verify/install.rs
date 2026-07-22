@@ -10,9 +10,7 @@ use crate::node_agent_android_inspector::adb_command::run_adb_text;
 // their security scan before rendering the on-device confirmation. Keep the
 // same adb transaction alive long enough for that prompt to be accepted.
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(360);
-const UNINSTALL_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_OUTPUT: usize = 256 * 1024;
-const SIGNATURE_MISMATCH: &str = "INSTALL_FAILED_UPDATE_INCOMPATIBLE";
 const DEVICE_PROBE_ATTEMPTS: usize = 3;
 const INSTALL_ATTEMPTS: usize = 2;
 
@@ -29,10 +27,10 @@ pub(super) async fn install_debug_apk(
     device_id: &str,
     package_name: &str,
     apk: &Path,
-    allow_debug_package_reset: bool,
+    _allow_debug_package_reset: bool,
 ) -> Result<String> {
     Ok(
-        install_debug_apk_with_evidence(device_id, package_name, apk, allow_debug_package_reset)
+        install_debug_apk_with_evidence(device_id, package_name, apk, false)
             .await?
             .output,
     )
@@ -42,13 +40,12 @@ pub(super) async fn install_debug_apk_with_evidence(
     device_id: &str,
     package_name: &str,
     apk: &Path,
-    allow_debug_package_reset: bool,
+    _allow_debug_package_reset: bool,
 ) -> Result<InstallDebugApkEvidence> {
     let device = ensure_device_ready(device_id).await?;
     let mut first_error = None;
     for attempt in 1..=INSTALL_ATTEMPTS {
-        match install_debug_apk_once(device_id, package_name, apk, allow_debug_package_reset).await
-        {
+        match install_debug_apk_once(device_id, package_name, apk).await {
             Ok(output) => {
                 return Ok(InstallDebugApkEvidence {
                     output,
@@ -73,12 +70,48 @@ pub(super) async fn install_debug_apk_with_evidence(
     unreachable!("bounded install loop always returns")
 }
 
-async fn install_debug_apk_once(
+pub(super) async fn list_legacy_debug_packages(
     device_id: &str,
-    package_name: &str,
-    apk: &Path,
-    allow_debug_package_reset: bool,
-) -> Result<String> {
+    expected_package: &str,
+) -> Result<Vec<String>> {
+    let output = run_adb_text(
+        &[
+            "-s".into(),
+            device_id.into(),
+            "shell".into(),
+            "pm".into(),
+            "list".into(),
+            "packages".into(),
+        ],
+        Duration::from_secs(15),
+        MAX_OUTPUT,
+    )
+    .await?;
+    Ok(parse_legacy_debug_packages(&output, expected_package))
+}
+
+fn parse_legacy_debug_packages(output: &str, expected_package: &str) -> Vec<String> {
+    let base = crate::node_agent_android_live::debug_base_package_name(expected_package);
+    let mut packages = output
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("package:"))
+        .filter(|package| *package != expected_package)
+        .filter(|package| {
+            package.strip_prefix(base).is_some_and(|suffix| {
+                suffix == ".uituner"
+                    || suffix.starts_with(".uituner_")
+                    || suffix == ".uitest"
+                    || suffix.starts_with(".uitest_")
+            })
+        })
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+    packages.sort();
+    packages.dedup();
+    packages
+}
+
+async fn install_debug_apk_once(device_id: &str, package_name: &str, apk: &Path) -> Result<String> {
     // Vendor Android builds can require a visible, on-device confirmation for
     // ADB installs. Public test phones often sleep between users, which leaves
     // that prompt hidden behind a black screen and looks like a PC-side hang.
@@ -87,37 +120,6 @@ async fn install_debug_apk_once(
     wake_device_for_user_interaction(device_id).await;
     match run_install(device_id, apk, true).await {
         Ok(output) => require_success(output),
-        Err(error)
-            if allow_debug_package_reset
-                && error
-                    .to_string()
-                    .to_ascii_uppercase()
-                    .contains(SIGNATURE_MISMATCH) =>
-        {
-            // A side-by-side debug package can outlive a keystore rotation or
-            // a node update. It contains no production app data, so reset only
-            // this suffixed debug package and retry instead of leaving the PC
-            // page stuck on an opaque signature mismatch.
-            run_adb_text(
-                &[
-                    "-s".to_string(),
-                    device_id.to_string(),
-                    "uninstall".to_string(),
-                    package_name.to_string(),
-                ],
-                UNINSTALL_TIMEOUT,
-                MAX_OUTPUT,
-            )
-            .await?;
-            let output = require_success(
-                run_install(device_id, apk, false)
-                    .await
-                    .map_err(actionable_install_error)?,
-            )?;
-            Ok(format!(
-                "Reset incompatible side-by-side debug package {package_name}.\n{output}"
-            ))
-        }
         Err(error) => Err(actionable_install_error(error)),
     }
 }
@@ -196,6 +198,14 @@ fn is_transient_adb_error(error: &Error) -> bool {
 
 fn actionable_install_error(error: Error) -> Error {
     let detail = error.to_string();
+    if detail
+        .to_ascii_uppercase()
+        .contains("INSTALL_FAILED_UPDATE_INCOMPATIBLE")
+    {
+        return anyhow!(
+            "DEBUG_APK_SIGNATURE_MISMATCH: 手机上的固定节点调试包与新 APK 签名不一致。系统已 fail-closed：不会创建新包，也不会自动卸载手机已有应用；请恢复节点原调试签名或由用户明确处理旧应用。原始错误：{detail}"
+        );
+    }
     if detail.contains("adb 命令超时") && detail.contains(" install ") {
         return anyhow!(
             "手机安装器等待确认超过 6 分钟。首次安装或更新节点专属 Debug 包时，荣耀、小米等系统可能先执行较长的安全扫描，再要求在手机上勾选风险提示并点“继续安装”；请保持手机解锁、完成确认后在 PC 网页重试。后续同签名 Debug 包更新通常会自动完成。原始错误：{detail}"
@@ -241,7 +251,8 @@ fn require_success(output: String) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        actionable_install_error, is_tcp_device_id, is_transient_adb_error, require_success,
+        actionable_install_error, is_tcp_device_id, is_transient_adb_error,
+        parse_legacy_debug_packages, require_success,
     };
 
     #[test]
@@ -292,5 +303,28 @@ mod tests {
         )));
         assert!(is_tcp_device_id("192.168.31.171:5555"));
         assert!(!is_tcp_device_id("emulator-5554"));
+    }
+
+    #[test]
+    fn signature_mismatch_never_suggests_automatic_uninstall() {
+        let message = actionable_install_error(anyhow::anyhow!(
+            "Failure [INSTALL_FAILED_UPDATE_INCOMPATIBLE]"
+        ))
+        .to_string();
+        assert!(message.contains("不会自动卸载"));
+        assert!(message.contains("不会创建新包"));
+    }
+
+    #[test]
+    fn legacy_debug_packages_are_reported_without_the_formal_or_fixed_package() {
+        let output = "package:com.elon.app\npackage:com.elon.app.uitest\npackage:com.elon.app.uitest_anim\npackage:com.elon.app.uituner_oldnode\npackage:com.elon.app.uituner_fixednode\n";
+        assert_eq!(
+            parse_legacy_debug_packages(output, "com.elon.app.uituner_fixednode"),
+            vec![
+                "com.elon.app.uitest",
+                "com.elon.app.uitest_anim",
+                "com.elon.app.uituner_oldnode"
+            ]
+        );
     }
 }

@@ -219,6 +219,14 @@ async fn call_tool(
             super::mcp_runtime_preparation::prepare_debug_runtime(broker, &session_id, &arguments)
                 .await?
         }
+        "ui_get_debug_integration_status" => {
+            super::mcp_runtime_preparation::debug_integration_status(
+                broker,
+                &session_id,
+                &arguments,
+            )
+            .await?
+        }
         "ui_bind_target_design" => {
             let session = broker.session(&session_id).await?;
             let upload = super::design_bootstrap::target_design_upload(&session, &arguments)?;

@@ -39,6 +39,7 @@
 | 网络/API/WebSocket | `android/app/src/main/kotlin/com/elon/app/net/` |
 | 项目相关 UI | `android/app/src/main/kotlin/com/elon/app/project/` |
 | `elon-self` 共享真机身份、无线 ADB 最近端点和连接约定 | `AI_PROJECT.md` 的“当前共享 Android 真机（项目记忆）”、`docs/shared-android-device-host.md`、`server/src/node_agent_android_inspector/` |
+| 同节点多会话提交级合并、固定真机调试包、代次部署状态 | `AI_ARCHITECTURE.md` 的“PC 节点 AI 运行路线”、`docs/system-architecture.md`、`server/src/node_agent_android_live/debug_integration.rs`、`debug_package.rs` |
 
 ## Web/静态资源入口
 

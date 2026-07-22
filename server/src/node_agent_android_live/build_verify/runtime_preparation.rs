@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context, Result};
@@ -5,10 +6,9 @@ use anyhow::{anyhow, Context, Result};
 use crate::node_agent_android_inspector::adb_capture::launch_app;
 
 use super::gradle::{
-    canonical_project_root, find_gradle_root, gradle_wrapper, run_debug_build,
-    validate_debug_application_id_suffix,
+    find_gradle_root, gradle_wrapper, run_debug_build, validate_debug_application_id_suffix,
 };
-use super::install::install_debug_apk_with_evidence;
+use super::install::{install_debug_apk_with_evidence, list_legacy_debug_packages};
 use super::preparation::PreparationReporter;
 use super::runtime_reconnect::{ensure_live_without_install, RuntimeReuse};
 use super::{
@@ -19,6 +19,7 @@ use crate::node_agent_android_live::broker::{LiveUiBroker, LiveUiSession};
 use crate::node_agent_android_live::build_verify_apk::{
     select_debug_apk_after_successful_build, select_reusable_debug_apk,
 };
+use crate::node_agent_android_live::debug_integration::DebugIntegrationPlan;
 use crate::node_agent_android_live::fit_run::workspace_fingerprint;
 use crate::node_agent_android_live::verification_gate::{
     evaluate_verification_gates, VerificationGateInput, VerificationGateState,
@@ -30,15 +31,18 @@ const APP_LAUNCH_ATTEMPTS: usize = 2;
 pub(super) async fn run(
     broker: &LiveUiBroker,
     session: &LiveUiSession,
+    build_project_root: &Path,
     debug_application_id_suffix: &str,
     host_port: u16,
+    integration_plan: &DebugIntegrationPlan,
     reporter: Option<&PreparationReporter>,
 ) -> Result<BuildVerifyResult> {
-    let project_root = canonical_project_root(session)?;
+    let project_root = build_project_root.canonicalize()?;
     let project_root_display = project_root.to_string_lossy().to_string();
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let suffix = validate_debug_application_id_suffix(debug_application_id_suffix)?;
+    broker.debug_integration.mark_building(integration_plan)?;
 
     report_phase(reporter, "APK_REUSE_CHECK", "检查已成功生成的 Debug APK").await;
     let build_started = Instant::now();
@@ -60,9 +64,15 @@ pub(super) async fn run(
                 "没有可安全复用的 APK；启动增量 assembleDebug",
             )
             .await;
-            run_debug_build(&gradle_root, &wrapper, Some(suffix), false)
-                .await
-                .context("BUILD 阶段失败")?;
+            run_debug_build(
+                &gradle_root,
+                &wrapper,
+                Some(suffix),
+                broker.fixed_debug_label().as_deref(),
+                false,
+            )
+            .await
+            .context("BUILD 阶段失败")?;
             let apk = match select_reusable_debug_apk(&gradle_root, &session.package_name)? {
                 Some(apk) => apk,
                 None => {
@@ -73,9 +83,15 @@ pub(super) async fn run(
                         "增量构建没有刷新 APK；执行一次 --rerun-tasks 以排除陈旧产物",
                     )
                     .await;
-                    run_debug_build(&gradle_root, &wrapper, Some(suffix), true)
-                        .await
-                        .context("BUILD 强制刷新阶段失败")?;
+                    run_debug_build(
+                        &gradle_root,
+                        &wrapper,
+                        Some(suffix),
+                        broker.fixed_debug_label().as_deref(),
+                        true,
+                    )
+                    .await
+                    .context("BUILD 强制刷新阶段失败")?;
                     let apk = select_debug_apk_after_successful_build(
                         &gradle_root,
                         &session.package_name,
@@ -137,6 +153,34 @@ pub(super) async fn run(
         }
     }
 
+    let expected_label = session
+        .package_name
+        .starts_with("com.elon.app.uituner_")
+        .then(|| broker.fixed_debug_label())
+        .flatten();
+    let artifact = crate::node_agent_android_live::apk_identity::verify_and_stage_apk(
+        &apk,
+        &gradle_root,
+        &broker.debug_integration.artifact_root(integration_plan),
+        &session.package_name,
+        expected_label.as_deref(),
+        integration_plan.generation,
+    )
+    .context("APK_IDENTITY 阶段失败")?;
+    broker
+        .debug_integration
+        .record_artifact(integration_plan, artifact.clone())?;
+    broker
+        .debug_integration
+        .authorize_install(integration_plan)?;
+    let staged_apk = std::path::PathBuf::from(&artifact.apk_path);
+    let legacy_packages = list_legacy_debug_packages(&session.device_id, &session.package_name)
+        .await
+        .context("LEGACY_PACKAGE_SCAN 阶段失败")?;
+    broker
+        .debug_integration
+        .record_legacy_packages(integration_plan, legacy_packages)?;
+
     report_phase(
         reporter,
         "INSTALL",
@@ -146,10 +190,14 @@ pub(super) async fn run(
         ),
     )
     .await;
-    let install =
-        install_debug_apk_with_evidence(&session.device_id, &session.package_name, &apk, true)
-            .await
-            .context("INSTALL 阶段失败")?;
+    let install = install_debug_apk_with_evidence(
+        &session.device_id,
+        &session.package_name,
+        &staged_apk,
+        false,
+    )
+    .await
+    .context("INSTALL 阶段失败")?;
     report_evidence(
         reporter,
         "ADB_DEVICE_CHECK",
@@ -162,6 +210,7 @@ pub(super) async fn run(
         ),
     )
     .await;
+    broker.debug_integration.record_deployed(integration_plan)?;
     report_evidence(
         reporter,
         "INSTALL",
@@ -269,7 +318,7 @@ pub(super) async fn run(
     finalize_runtime(
         session,
         &project_root_display,
-        &apk,
+        &staged_apk,
         build_duration_ms,
         install.output.trim(),
         runtime_view,

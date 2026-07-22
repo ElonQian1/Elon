@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
+  DebugIntegrationStatus,
   LivePatchOperation,
   LivePreviewRequest,
   LiveBuildVerifyResult,
@@ -44,6 +45,7 @@ interface UiTunerLivePanelProps {
   onBuildVerify: () => Promise<LiveBuildVerifyResult>
   prepareBusy: boolean
   prepareError: string
+  debugIntegration: DebugIntegrationStatus | null
   prepareReady: boolean
   debugPackage: string
   projectRoot: string
@@ -102,6 +104,7 @@ export function UiTunerLivePanel({
   onBuildVerify,
   prepareBusy,
   prepareError,
+  debugIntegration,
   prepareReady,
   debugPackage,
   projectRoot,
@@ -125,6 +128,33 @@ export function UiTunerLivePanel({
       </div>
 
       {error && <p className={styles.hint}>{error}</p>}
+      {debugIntegration && (
+        <div className={styles.integrationStatus} role="status" aria-live="polite">
+          <div>
+            <strong>共享真机合并调试 · 第 {debugIntegration.desiredGeneration} 代</strong>
+            <span>{debugIntegration.status}</span>
+          </div>
+          <small>固定包：{debugIntegration.packageName}</small>
+          <small>基础提交：{debugIntegration.baseSha.slice(0, 12)} · 贡献 {debugIntegration.contributions.length} 个</small>
+          {debugIntegration.contributions.slice(-5).map((contribution) => (
+            <small key={contribution.commitSha} title={contribution.commitSha}>
+              {contribution.commitSha.slice(0, 12)} · {contribution.sourceSessionId || contribution.sourceTaskId || '兼容调用'}
+            </small>
+          ))}
+          {debugIntegration.conflicts.length > 0 && (
+            <span>冲突：{debugIntegration.conflicts.map((commit) => commit.slice(0, 12)).join('、')}</span>
+          )}
+          {Boolean(debugIntegration.legacyPackages?.length) && (
+            <span>历史调试包（仅报告，不自动卸载）：{debugIntegration.legacyPackages?.join('、')}</span>
+          )}
+          {debugIntegration.lastError && <span>{debugIntegration.lastError}</span>}
+          {debugIntegration.lastUsable && (
+            <small>
+              最后可用：第 {debugIntegration.lastUsable.generation} 代 · APK {debugIntegration.lastUsable.sha256.slice(0, 12)}
+            </small>
+          )}
+        </div>
+      )}
       {session?.id && <UiCapabilityGapPanel sessionId={session.id} />}
       {connected && (
         <div className={styles.connectedProjectField}>
@@ -151,7 +181,7 @@ export function UiTunerLivePanel({
       {!connected && (
         <div className={styles.prepareCard}>
           <strong>启用真正的 LIVE 修改</strong>
-          <p>正式 APK 只支持截图/XML 检查。安装并打开隔离的 Debug Runtime 包后，颜色、尺寸、间距、圆角和文字才能在真机立即变化。</p>
+          <p>正式 APK 只支持截图/XML 检查。安装并打开当前 PC 节点唯一的共享 Debug Runtime 包后，颜色、尺寸、间距、圆角和文字才能在真机立即变化。</p>
           <small>调试包：{debugPackage}</small>
           <label className={styles.projectField}>
             <span>本机 Android 项目目录</span>

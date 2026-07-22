@@ -69,6 +69,38 @@
   color: #fbbf24;
 }
 
+.integrationStatus {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 10px;
+  background: rgba(14, 116, 144, 0.12);
+}
+
+.integrationStatus > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.integrationStatus strong {
+  color: #e0f2fe;
+  font-size: 12px;
+}
+
+.integrationStatus span,
+.integrationStatus small {
+  min-width: 0;
+  color: #bae6fd;
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .nodeInfo {
   align-items: flex-start;
   flex-direction: column;

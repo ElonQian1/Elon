@@ -1,6 +1,7 @@
 export const LIVE_DEBUG_SUFFIX = '.uituner'
 
 const SCOPED_DEBUG_SUFFIX = /^\.uituner_[a-f0-9]{8}$/
+const COMPAT_DEBUG_SUFFIX = /\.(?:uituner|uitest_anim|uitest)(?:_[A-Za-z0-9_]+)?$/
 
 export function liveDebugSuffix(packageName: string | null | undefined) {
   const value = packageName?.trim() ?? ''
@@ -15,6 +16,10 @@ export function isLiveDebugPackage(packageName: string | null | undefined) {
 }
 
 export function liveDebugBasePackage(packageName: string) {
-  const suffix = liveDebugSuffix(packageName)
-  return suffix ? packageName.slice(0, -suffix.length) : packageName
+  return packageName.trim().replace(COMPAT_DEBUG_SUFFIX, '')
+}
+
+export function liveDebugCandidate(projectId: string | null | undefined, deviceIdentity: string) {
+  const owner = `pc-ui:${projectId || 'local'}`
+  return { ready: true as const, sourceSessionId: `${owner}:${deviceIdentity}`, previewOwner: owner }
 }

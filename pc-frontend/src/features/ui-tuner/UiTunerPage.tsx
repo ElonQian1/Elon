@@ -21,21 +21,12 @@ import { useUiTunerDeviceWorkspace } from './device/deviceWorkspace'
 import { useProjectSharedAndroidDevices } from './device/useProjectSharedAndroidDevices'
 import { stringifyCliPatchPackage } from './runtime/cliPatchPackage'
 import { snapshotToTunerDocument } from './runtime/snapshotToTunerDocument'
-import {
-  DEFAULT_UI_TUNER_FILTER,
-  filterUiTunerElements,
-  type UiTunerFilterState,
-} from './filtering'
+import { DEFAULT_UI_TUNER_FILTER, filterUiTunerElements, type UiTunerFilterState } from './filtering'
 import { buildStandardInsight, stringifyStandardPackage } from './standards'
 import type { UiTunerDocument, UiTunerElement, UiTunerElementKind } from './types'
 import { buildDebugFilter, UiTunerInspector } from './UiTunerInspector'
-import { prepareLiveDebugRuntime } from './live/liveUiApi'
-import {
-  isLiveDebugPackage,
-  LIVE_DEBUG_SUFFIX,
-  liveDebugBasePackage,
-  liveDebugSuffix,
-} from './live/debugPackage'
+import { getDebugIntegrationStatus, prepareLiveDebugRuntime, type DebugIntegrationStatus } from './live/liveUiApi'
+import { isLiveDebugPackage, LIVE_DEBUG_SUFFIX, liveDebugBasePackage, liveDebugCandidate, liveDebugSuffix } from './live/debugPackage'
 import { useRuntimeDocumentSync } from './live/useRuntimeDocumentSync'
 import { useRuntimeCanvasGesture } from './live/useRuntimeCanvasGesture'
 import { useRuntimeDraftSession } from './live/useRuntimeDraftSession'
@@ -99,6 +90,7 @@ export default function UiTunerPage() {
   })
   const [livePrepareBusy, setLivePrepareBusy] = useState(false)
   const [livePrepareError, setLivePrepareError] = useState('')
+  const [debugIntegration, setDebugIntegration] = useState<DebugIntegrationStatus | null>(null)
   const comparisonViewport = useComparisonViewport(
     { width: tunerDoc.canvas.width, height: tunerDoc.canvas.height },
     tunerDoc.canvas.targetDesign
@@ -272,7 +264,9 @@ export default function UiTunerPage() {
         projectRoot: effectiveProjectRoot,
         debugApplicationIdSuffix: LIVE_DEBUG_SUFFIX,
         lease,
+        candidate: liveDebugCandidate(activeProjectId, selectedDeviceIdentity || selectedDeviceId),
       })
+      setDebugIntegration(prepared.integration)
       setLiveTargetPackage(prepared.packageName)
       const snapshot = await captureDeviceSnapshot({
         deviceId: selectedDeviceId,
@@ -284,10 +278,11 @@ export default function UiTunerPage() {
       const message = error instanceof Error ? error.message : '实时调试包准备失败'
       setLivePrepareError(message)
       setNotice(message)
+      void getDebugIntegrationStatus(effectiveProjectRoot, activeProjectId || effectiveProjectRoot, selectedHardwareSerial || selectedDeviceId).then(setDebugIntegration).catch(() => undefined)
     } finally {
       setLivePrepareBusy(false)
     }
-  }, [captureDeviceSnapshot, deviceLease.ensureLease, effectiveProjectRoot, selectedDeviceId, selectedHardwareSerial, setDeviceDialogOpen])
+  }, [activeProjectId, captureDeviceSnapshot, deviceLease.ensureLease, effectiveProjectRoot, selectedDeviceId, selectedDeviceIdentity, selectedHardwareSerial, setDeviceDialogOpen])
 
   const liveUi = useRuntimeDocumentSync({
     deviceId: tunerDoc.runtimeSnapshot?.deviceId === selectedDeviceId ? selectedDeviceId : undefined,
@@ -757,9 +752,8 @@ export default function UiTunerPage() {
         onLiveApplyGesture={runtimeDraft.applyGesture}
         onLiveUndo={undoLive} onLiveRedo={redoLive}
         liveUiDraftStatus={runtimeDraft.status}
-        livePrepareBusy={livePrepareBusy}
-        livePrepareError={livePrepareError}
-        livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}
+        livePrepareBusy={livePrepareBusy} livePrepareError={livePrepareError}
+        debugIntegration={debugIntegration} livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}
         liveDebugPackage={liveTargetPackage || `${DEFAULT_ANDROID_PACKAGE}${LIVE_DEBUG_SUFFIX}`}
         liveProjectRoot={liveProjectRoot}
         onLiveProjectRootChange={updateLiveProjectRoot}

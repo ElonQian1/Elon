@@ -173,6 +173,24 @@ try {
     '公网 HTTP 不提供 crypto.randomUUID 时仍须生成稳定格式的租约客户端 ID',
   )
 
+  const debugPackageOutput = compile(
+    'src/features/ui-tuner/live/debugPackage.ts',
+    'live/debugPackage.js',
+  )
+  const { liveDebugBasePackage, liveDebugCandidate, liveDebugSuffix } = require(debugPackageOutput)
+  assert.equal(liveDebugSuffix('com.elon.app.uituner_0123abcd'), '.uituner_0123abcd')
+  assert.equal(liveDebugBasePackage('com.elon.app.uituner_0123abcd'), 'com.elon.app')
+  assert.equal(liveDebugBasePackage('com.elon.app.uitest_anim_legacy'), 'com.elon.app')
+  assert.deepEqual(
+    liveDebugCandidate('project-a', 'hardware-a'),
+    {
+      ready: true,
+      sourceSessionId: 'pc-ui:project-a:hardware-a',
+      previewOwner: 'pc-ui:project-a',
+    },
+    'PC 工作台必须明确创建 ready 候选并记录共享预览所有者',
+  )
+
   const scaleOutput = compile(
     'src/features/ui-tuner/comparison/canvasViewportScale.ts',
     'comparison/canvasViewportScale.js',

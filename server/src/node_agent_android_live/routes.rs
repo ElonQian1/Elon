@@ -40,6 +40,10 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/debug-runtime/prepare",
             post(prepare_debug_runtime_handler),
         )
+        .route(
+            "/api/android-live/debug-runtime/integration-status",
+            get(debug_integration_status_handler),
+        )
         .route("/api/android-live/sessions", post(create_session_handler))
         .route(
             "/api/android-live/sessions/:session_id",
@@ -194,16 +198,31 @@ async fn prepare_debug_runtime_handler(
     {
         return json_error(StatusCode::CONFLICT, format!("{error:#}"));
     }
-    request.debug_application_id_suffix = match super::scoped_debug_application_id_suffix(
-        &request.debug_application_id_suffix,
-        &runtime.install_id,
-    ) {
-        Ok(suffix) => suffix,
-        Err(error) => return json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
-    };
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
     match prepare_debug_runtime(&runtime.live_ui, request, host_port).await {
         Ok(result) => Json(json!({ "ok": true, "result": result })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DebugIntegrationStatusQuery {
+    project_root: String,
+    project_id: String,
+    device_identity: String,
+}
+
+async fn debug_integration_status_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Query(query): Query<DebugIntegrationStatusQuery>,
+) -> Response {
+    match runtime.live_ui.debug_integration.status_for(
+        &query.project_root,
+        &query.project_id,
+        &query.device_identity,
+    ) {
+        Ok(status) => Json(json!({ "ok": true, "status": status })).into_response(),
         Err(error) => json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
     }
 }
@@ -270,17 +289,44 @@ async fn create_session_handler(
         return json_error(StatusCode::CONFLICT, format!("{error:#}"));
     }
     let device_id = req.device_id.trim().to_string();
-    let package_name = req.package_name.trim().to_string();
+    let package_name = match super::normalize_debug_package_name(
+        req.package_name.trim(),
+        &runtime.install_id,
+        &device_id,
+    ) {
+        Ok(package) => package,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
+    };
     let project_root = req
         .project_root
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty());
+    let device_identity = req
+        .lease
+        .as_ref()
+        .map(|lease| lease.hardware_serial.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| device_id.clone());
+    let debug_project_id = req
+        .lease
+        .as_ref()
+        .map(|lease| lease.project_id.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .or_else(|| project_root.clone())
+        .unwrap_or_default();
     if device_id.is_empty() || package_name.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "deviceId 和 packageName 不能为空");
     }
     let session = runtime
         .live_ui
-        .create_session(device_id, package_name, project_root, DEFAULT_DEVICE_PORT)
+        .create_session_with_identity(
+            device_id,
+            device_identity,
+            package_name,
+            project_root,
+            debug_project_id,
+            DEFAULT_DEVICE_PORT,
+        )
         .await;
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
     match start_runtime(&session, host_port).await {

@@ -38,7 +38,7 @@ use gradle::{
     canonical_project_root, find_gradle_root, gradle_wrapper, infer_debug_application_id_suffix,
     run_debug_build, validate_debug_application_id_suffix, validate_package_name,
 };
-use install::install_debug_apk;
+use install::{install_debug_apk, list_legacy_debug_packages};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -81,7 +81,12 @@ pub(crate) struct PrepareDebugRuntimeRequest {
     pub(crate) base_package_name: String,
     pub(crate) project_root: String,
     pub(crate) debug_application_id_suffix: String,
+    #[serde(default)]
+    pub(crate) isolated_emulator_package: bool,
+    pub(crate) candidate: Option<super::debug_integration::DebugMergeCandidateRequest>,
     pub(crate) lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
+    #[serde(skip)]
+    pub(crate) integration_plan: Option<super::debug_integration::DebugIntegrationPlan>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -90,6 +95,7 @@ pub(crate) struct PrepareDebugRuntimeResult {
     pub(crate) package_name: String,
     pub(crate) session_id: Option<String>,
     pub(crate) build: BuildVerifyResult,
+    pub(crate) integration: super::debug_integration::DebugIntegrationStatus,
 }
 
 /// Builds and installs a side-by-side Debug APK before the normal Live session
@@ -121,16 +127,48 @@ async fn prepare_debug_runtime_inner(
     reporter: Option<&preparation::PreparationReporter>,
 ) -> Result<PrepareDebugRuntimeResult> {
     let device_id = request.device_id.trim();
-    let base_package_name = validate_package_name(request.base_package_name.trim())?;
+    let requested_base_package_name = validate_package_name(request.base_package_name.trim())?;
+    let base_package_name = super::debug_base_package_name(requested_base_package_name);
     let project_root = request.project_root.trim();
-    let suffix = validate_debug_application_id_suffix(request.debug_application_id_suffix.trim())?;
+    let install_id = broker
+        .node_install_id()
+        .context("PC 节点缺少稳定安装标识，拒绝创建会话级临时调试包")?;
+    let suffix = super::resolve_debug_application_id_suffix(
+        request.debug_application_id_suffix.trim(),
+        install_id,
+        device_id,
+        request.isolated_emulator_package,
+    )?;
+    validate_debug_application_id_suffix(&suffix)?;
     if device_id.is_empty() {
         bail!("deviceId 不能为空");
     }
+    validate_device_id(device_id)?;
     if project_root.is_empty() {
         bail!("projectRoot 不能为空；请先在 PC 工作台选择本机项目");
     }
     let package_name = format!("{base_package_name}{suffix}");
+    let project_id = request
+        .lease
+        .as_ref()
+        .map(|lease| lease.project_id.as_str())
+        .unwrap_or(project_root);
+    let device_identity = request
+        .lease
+        .as_ref()
+        .map(|lease| lease.hardware_serial.as_str())
+        .unwrap_or(device_id);
+    let integration_plan = match request.integration_plan.clone() {
+        Some(plan) => plan,
+        None => broker.debug_integration.register_candidate(
+            project_root,
+            project_id,
+            device_identity,
+            &package_name,
+            request.candidate.as_ref(),
+            "compat-debug-prepare",
+        )?,
+    };
     if let Some(reporter) = reporter {
         reporter
             .phase(
@@ -141,8 +179,12 @@ async fn prepare_debug_runtime_inner(
     }
     let _deployment = broker
         .debug_deployments
-        .acquire(device_id, &package_name)
+        .acquire(device_identity, &package_name)
         .await;
+    let integration_root = broker
+        .debug_integration
+        .materialize(&integration_plan)
+        .context("MERGE 阶段失败")?;
     if let Some(reporter) = reporter {
         reporter
             .evidence("DEPLOYMENT_SLOT", "ACQUIRED", "已取得独占部署时隙")
@@ -150,7 +192,13 @@ async fn prepare_debug_runtime_inner(
     }
     let reusable_session = if keep_session {
         broker
-            .runtime_session_for(project_root, device_id, &package_name)
+            .runtime_session_for(
+                project_root,
+                device_id,
+                &package_name,
+                device_identity,
+                project_id,
+            )
             .await
     } else {
         None
@@ -160,10 +208,12 @@ async fn prepare_debug_runtime_inner(
         Some(session) => session,
         None => {
             broker
-                .create_session(
+                .create_session_with_identity(
                     device_id.to_string(),
+                    device_identity.to_string(),
                     package_name.clone(),
                     Some(project_root.to_string()),
+                    project_id.to_string(),
                     DEFAULT_DEVICE_PORT,
                 )
                 .await
@@ -182,20 +232,46 @@ async fn prepare_debug_runtime_inner(
             .await;
     }
     let session_id = session.id.clone();
-    let result = runtime_preparation::run(broker, &session, suffix, host_port, reporter).await;
+    let result = runtime_preparation::run(
+        broker,
+        &session,
+        &integration_root,
+        &suffix,
+        host_port,
+        &integration_plan,
+        reporter,
+    )
+    .await;
+    if let Err(error) = result.as_ref() {
+        let _ = broker
+            .debug_integration
+            .record_runtime_failure(&integration_plan, format!("{error:#}"));
+    }
     match result {
-        Ok(build) if keep_session => Ok(PrepareDebugRuntimeResult {
-            package_name,
-            session_id: Some(session_id),
-            build,
-        }),
+        Ok(build) if keep_session => {
+            let integration = broker
+                .debug_integration
+                .status(&integration_plan.slot_id)?
+                .context("合并调试状态丢失")?;
+            Ok(PrepareDebugRuntimeResult {
+                package_name,
+                session_id: Some(session_id),
+                build,
+                integration,
+            })
+        }
         Ok(build) => {
             let _ = stop_runtime(&session).await;
             broker.remove_session(&session_id).await;
+            let integration = broker
+                .debug_integration
+                .status(&integration_plan.slot_id)?
+                .context("合并调试状态丢失")?;
             Ok(PrepareDebugRuntimeResult {
                 package_name,
                 session_id: None,
                 build,
+                integration,
             })
         }
         Err(error) if !keep_session => {
@@ -223,15 +299,33 @@ async fn build_and_verify_inner(
     host_port: u16,
 ) -> Result<BuildVerifyResult> {
     let session = broker.session(session_id).await?;
+    let source_project_root = canonical_project_root(&session)?;
+    let install_id = broker
+        .node_install_id()
+        .context("PC 节点缺少稳定安装标识，拒绝部署调试 APK")?;
+    let normalized_package =
+        super::normalize_debug_package_name(&session.package_name, install_id, &session.device_id)?;
+    if normalized_package != session.package_name {
+        bail!("DEBUG_SESSION_PACKAGE_NOT_CANONICAL: 旧会话包 {} 会产生第二个真机应用；请用固定包 {} 重新连接", session.package_name, normalized_package);
+    }
+    let integration_plan = broker.debug_integration.register_candidate(
+        source_project_root.to_string_lossy().as_ref(),
+        &session.debug_project_id,
+        &session.device_identity,
+        &session.package_name,
+        None,
+        &session.id,
+    )?;
     let _deployment = broker
         .debug_deployments
-        .acquire(&session.device_id, &session.package_name)
+        .acquire(&session.device_identity, &session.package_name)
         .await;
+    let integration_root = broker.debug_integration.materialize(&integration_plan)?;
     let target_path = load_or_build_ui_ir(broker, session_id)
         .await
         .ok()
         .and_then(|ir| ir.target_design.map(|target| target.path));
-    let project_root = canonical_project_root(&session)?;
+    let project_root = integration_root.canonicalize()?;
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let live_snapshot = session.commit_snapshot().await;
@@ -244,6 +338,7 @@ async fn build_and_verify_inner(
     .or_else(|| patched_bounds(&live_snapshot, true));
     let live_preview = (frame.bytes, rect);
 
+    broker.debug_integration.mark_building(&integration_plan)?;
     let build_started = Instant::now();
     let artifact_not_before = SystemTime::now()
         .checked_sub(Duration::from_secs(2))
@@ -251,9 +346,17 @@ async fn build_and_verify_inner(
     let explicit_debug_application_id_suffix = request
         .debug_application_id_suffix
         .as_deref()
-        .map(validate_debug_application_id_suffix)
+        .map(|requested| {
+            super::resolve_debug_application_id_suffix(
+                requested,
+                install_id,
+                &session.device_id,
+                false,
+            )
+        })
         .transpose()?
-        .map(str::to_string);
+        .map(|value| validate_debug_application_id_suffix(&value).map(str::to_string))
+        .transpose()?;
     let debug_application_id_suffix = match explicit_debug_application_id_suffix {
         Some(value) => Some(value),
         None => infer_debug_application_id_suffix(&gradle_root, &session.package_name)?,
@@ -262,23 +365,53 @@ async fn build_and_verify_inner(
         &gradle_root,
         &wrapper,
         debug_application_id_suffix.as_deref(),
+        broker.fixed_debug_label().as_deref(),
         true,
     )
     .await?;
     let build_duration_ms = build_started.elapsed().as_millis();
     let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
-
+    let expected_label = session
+        .package_name
+        .starts_with("com.elon.app.uituner_")
+        .then(|| broker.fixed_debug_label())
+        .flatten();
+    let artifact = super::apk_identity::verify_and_stage_apk(
+        &apk,
+        &gradle_root,
+        &broker.debug_integration.artifact_root(&integration_plan),
+        &session.package_name,
+        expected_label.as_deref(),
+        integration_plan.generation,
+    )?;
+    broker
+        .debug_integration
+        .record_artifact(&integration_plan, artifact.clone())?;
+    broker
+        .debug_integration
+        .authorize_install(&integration_plan)?;
+    let staged_apk = std::path::PathBuf::from(&artifact.apk_path);
     validate_device_id(&session.device_id)?;
+    let legacy_packages = list_legacy_debug_packages(&session.device_id, &session.package_name)
+        .await
+        .context("LEGACY_PACKAGE_SCAN 阶段失败")?;
+    broker
+        .debug_integration
+        .record_legacy_packages(&integration_plan, legacy_packages)?;
+
     let install_output = install_debug_apk(
         &session.device_id,
         &session.package_name,
-        &apk,
+        &staged_apk,
         debug_application_id_suffix.is_some(),
     )
     .await?;
     if !install_output.to_ascii_lowercase().contains("success") {
         bail!("Debug APK 安装未返回 Success: {}", install_output.trim());
     }
+    broker
+        .debug_integration
+        .record_deployed(&integration_plan)?;
 
     session.reset_for_redeploy().await;
     let start_evidence = start_runtime(&session, host_port).await?;
@@ -391,7 +524,7 @@ async fn build_and_verify_inner(
 
     Ok(BuildVerifyResult {
         status,
-        apk_path: apk.display().to_string(),
+        apk_path: staged_apk.display().to_string(),
         build_duration_ms,
         install_output: install_output.trim().to_string(),
         runtime_connected: runtime_view.connected,
