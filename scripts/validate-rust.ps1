@@ -17,8 +17,12 @@ $DisableSccache = [bool]$parsed.wrapper.DisableSccache
 $SkipCheapGates = [bool]$parsed.wrapper.SkipCheapGates
 $CargoArgs = @($parsed.cargo)
 if (-not $CargoArgs.Count) { throw "Usage: validate-rust.ps1 [wrapper-options] -- <cargo-args...>" }
-Import-Module (Join-Path $Modules "Validation.Fingerprint.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $Modules "Validation.Scheduler.psm1") -Force -DisableNameChecking
+Import-Module (Join-Path $Modules "Cargo.Network.psm1") -Force -DisableNameChecking
+Import-Module (Join-Path $Modules "Validation.Receipt.psm1") -Force -DisableNameChecking
+# Re-import public leaves after composite modules so PowerShell 5.1 does not
+# hide their exported commands when a dependency is loaded with -Force.
+Import-Module (Join-Path $Modules "Validation.Fingerprint.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $Modules "Validation.Evidence.psm1") -Force -DisableNameChecking
 Import-Module (Join-Path $RepoRoot "scripts\rust-cache\RustCache.Paths.psm1") -Force -DisableNameChecking
 
@@ -38,6 +42,7 @@ if (-not $SkipCheapGates) {
 
 $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $RepoRoot
 $stateRoot = Join-Path $root "validation-v1"
+$CargoArgs = Add-CargoArgumentOnce $CargoArgs '--locked'
 $bootstrapLease = $null
 try {
     $bootstrapLease = Enter-ValidationLock -LockPath (Join-Path $stateRoot '.cargo-lock-bootstrap.lock') -Kind 'cargo-lock-bootstrap' -TimeoutSeconds $WaitTimeoutSeconds
@@ -50,9 +55,11 @@ $resultDir = Join-Path $stateRoot ("evidence\" + $fingerprint.fingerprint)
 $summaryPath = Join-Path $resultDir "summary.json"
 $prior = if (Test-Path -LiteralPath $summaryPath) { try { Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json } catch { $null } } else { $null }
 if (-not $Force -and $prior -and $prior.status -eq "success") {
+    $receiptPath = Write-ValidationReceipt -StateRoot $stateRoot -FingerprintDetails $fingerprint -EvidenceSummaryPath $summaryPath -NetworkReportPath $prior.network_report
     Write-Host "VALIDATION_REUSED=true"
     Write-Host "VALIDATION_FINGERPRINT=$($fingerprint.fingerprint)"
     Write-Host "VALIDATION_EVIDENCE=$summaryPath"
+    Write-Host "VALIDATION_RECEIPT=$receiptPath"
     exit 0
 }
 
@@ -61,9 +68,11 @@ try {
     $runLease = Enter-ValidationLock -LockPath (Join-Path $resultDir ".run.lock") -Kind "fingerprint" -TimeoutSeconds $WaitTimeoutSeconds -PersistWaiter
     $prior = if (Test-Path -LiteralPath $summaryPath) { try { Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json } catch { $null } } else { $null }
     if (-not $Force -and $prior -and $prior.status -eq "success") {
+        $receiptPath = Write-ValidationReceipt -StateRoot $stateRoot -FingerprintDetails $fingerprint -EvidenceSummaryPath $summaryPath -NetworkReportPath $prior.network_report
         Write-Host "VALIDATION_REUSED=coalesced_wait"
         Write-Host "VALIDATION_FINGERPRINT=$($fingerprint.fingerprint)"
         Write-Host "VALIDATION_EVIDENCE=$summaryPath"
+        Write-Host "VALIDATION_RECEIPT=$receiptPath"
         exit 0
     }
     $class = Get-ValidationResourceClass -CargoArgs $CargoArgs
@@ -72,8 +81,9 @@ try {
     Write-Host "VALIDATION_OWNER_LEASE=$($runLease.owner.lease_id)"
     Write-Host "VALIDATION_RESOURCE=$class"
     Write-Host "VALIDATION_QUEUE_WAIT_MS=$($resourceLease.wait_ms)"
-    $cargoDev = Join-Path $RepoRoot "scripts\cargo-dev.ps1"
-    $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$cargoDev,"-BypassValidationOrchestrator","-SkipCacheGc","-Domain",$Domain)
+    $cargoNetwork = Join-Path $RepoRoot "scripts\cargo-network.ps1"
+    $networkRoot = Join-Path $resultDir 'network'
+    $args = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$cargoNetwork,"-Domain",$Domain,"-ReportRoot",$networkRoot,"-CompileTimeoutSeconds",$WaitTimeoutSeconds)
     if ($DisableSccache) { $args += "-DisableSccache" }
     if ($CacheRoot) { $args += @("-CacheRoot",$CacheRoot) }
     if ($TargetDir) { $args += @("-TargetDir",$TargetDir) }
@@ -111,6 +121,7 @@ try {
         stdout_path=$result.stdout_path; stderr_path=$result.stderr_path
         stdout_lines=$result.stdout_lines; stderr_lines=$result.stderr_lines
         failures=$result.failures; tail=$result.tail; timed_out=[bool]$result.timed_out
+        network_report=(Join-Path $networkRoot 'cargo-network-report.json')
     }
     Write-ValidationJsonAtomic -Path $summaryPath -Value $summary
     Write-Host "VALIDATION_REUSED=false"
@@ -118,6 +129,8 @@ try {
     Write-Host "VALIDATION_EVIDENCE=$summaryPath"
     foreach ($line in $result.tail) { Write-Host $line }
     if ($result.exit_code -ne 0) { exit $result.exit_code }
+    $receiptPath = Write-ValidationReceipt -StateRoot $stateRoot -FingerprintDetails $fingerprint -EvidenceSummaryPath $summaryPath -NetworkReportPath $summary.network_report
+    Write-Host "VALIDATION_RECEIPT=$receiptPath"
 } finally {
     Exit-ValidationResource -Lease $resourceLease
     Exit-ValidationLock -Lease $runLease

@@ -8,7 +8,7 @@
     compiler object cache is shared through sccache.
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 #>
 $ErrorActionPreference = "Stop"
 $argumentModule = Join-Path $PSScriptRoot "validation\Validation.Arguments.psm1"

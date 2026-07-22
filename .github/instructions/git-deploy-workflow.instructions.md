@@ -42,7 +42,7 @@ git push origin HEAD:main
 
 ## push 输出管理
 
-`pre-push` Cargo 输出较大；push 时写入 `.ai-tmp/push.log`，失败只读尾部：
+Rust 用 `scripts/push.ps1` 准备收据；失效时 `pre-push` 补验证。输出写入 `.ai-tmp/push.log`：
 
 ```powershell
 git push origin HEAD:main *> .ai-tmp/push.log
@@ -58,13 +58,13 @@ Bash: `git push origin HEAD:main > .ai-tmp/push.log 2>&1 || tail -n 40 .ai-tmp/p
 Windows：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 ```
 
 Linux/macOS：
 
 ```bash
-bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
+bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --locked
 ```
 
 验证走 `scripts/validate-rust.ps1`；细节见 `docs/rust-cache-platform.md`。

@@ -28,7 +28,8 @@ try {
     '@echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-lock-cargo.ps1" %*
 exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot 'cargo.cmd') -Encoding ASCII
-    '$args | Set-Content -LiteralPath $env:ELON_TEST_LOCK_ARGUMENT_LOG -Encoding UTF8
+    'if($args -ccontains ''-V''){Write-Output ''cargo 1.88.0-test'';exit 0}
+$args | Set-Content -LiteralPath $env:ELON_TEST_LOCK_ARGUMENT_LOG -Encoding UTF8
 $manifest=$args[[Array]::IndexOf($args,''--manifest-path'')+1]
 Set-Content -LiteralPath (Join-Path (Split-Path $manifest -Parent) ''Cargo.lock'') -Value ''# fake deterministic lock''
 exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -Encoding UTF8
@@ -40,10 +41,10 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     Initialize-ValidationCargoLock -RepoRoot $LockRepo -CargoArgs @('check','--manifest-path','Cargo.toml','--locked')
     Assert-True (-not (Test-Path (Join-Path $LockRepo 'Cargo.lock'))) "locked validation must preserve Cargo's missing-lock failure semantics"
     $SnapshotRepo = Join-Path $TempRoot "snapshot-repo"
-    New-Item -ItemType Directory -Force -Path (Join-Path $SnapshotRepo "server"),(Join-Path $SnapshotRepo "docs") | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $SnapshotRepo "server"),(Join-Path $SnapshotRepo "docs"),(Join-Path $SnapshotRepo "pc-frontend\src") | Out-Null
     & git -C $SnapshotRepo init --quiet; & git -C $SnapshotRepo config user.email validation@example.invalid; & git -C $SnapshotRepo config user.name validation-test
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\Cargo.lock") -Value "lock"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "server\lib.rs") -Value "pub fn stable() {}"
-    Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\note.md") -Value "one"; & git -C $SnapshotRepo add .; & git -C $SnapshotRepo commit -m baseline --quiet
+    Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\note.md") -Value "one"; Set-Content -LiteralPath (Join-Path $SnapshotRepo "pc-frontend\src\app.tsx") -Value "export const ui = 1"; & git -C $SnapshotRepo add .; & git -C $SnapshotRepo commit -m baseline --quiet
     $baseDetails = Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")
     $baseFingerprint = $baseDetails.fingerprint
     Assert-True ($baseDetails.payload.project -like 'no-origin:*') "project without origin must use safe hashed fallback"
@@ -54,10 +55,17 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     } finally {
         $OutputEncoding = $priorOutputEncoding
     }
+    & git -C $SnapshotRepo config core.autocrlf true
+    [IO.File]::WriteAllText((Join-Path $SnapshotRepo 'server\lib.rs'),"pub fn stable() {}`r`n",(New-Object Text.UTF8Encoding($false)))
+    Assert-Equal $baseFingerprint (Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")).fingerprint "CRLF-only checkout normalization must not invalidate Rust evidence"
+    & git -C $SnapshotRepo checkout -- server/lib.rs
     $LinkedWorktree=Join-Path $TempRoot 'linked-worktree'; & git -C $SnapshotRepo worktree add --detach $LinkedWorktree HEAD --quiet
     Assert-Equal $baseDetails.payload.project (Get-ValidationFingerprint $LinkedWorktree @('check')).payload.project "no-origin linked worktrees must share common-dir project identity"
     Set-Content -LiteralPath (Join-Path $SnapshotRepo "docs\adjacent.md") -Value "unrelated"
     Assert-Equal $baseFingerprint (Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")).fingerprint "unrelated docs must not invalidate Rust evidence"
+    Set-Content -LiteralPath (Join-Path $SnapshotRepo "pc-frontend\src\app.tsx") -Value "export const ui = 2"
+    Assert-Equal $baseFingerprint (Get-ValidationFingerprint -RepoRoot $SnapshotRepo -CargoArgs @("check")).fingerprint "UI-only changes must reuse Rust evidence"
+    & git -C $SnapshotRepo checkout -- pc-frontend/src/app.tsx
     Set-Content -LiteralPath (Join-Path $SnapshotRepo 'server\lib.rs') 'pub fn staged() {}'
     $unstagedFingerprint=(Get-ValidationFingerprint $SnapshotRepo @('check')).fingerprint; & git -C $SnapshotRepo add server/lib.rs
     Assert-Equal $unstagedFingerprint (Get-ValidationFingerprint $SnapshotRepo @('check')).fingerprint "staging must not change an exact content fingerprint"
@@ -121,7 +129,8 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-lock-cargo.ps1') -E
     '@echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-argument-cargo.ps1" %*
 exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot 'cargo.cmd') -Encoding ASCII
-    'if($env:ELON_TEST_FAKE_TIMEOUT){ Write-Output fake-timeout-started; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30 }
+    'if($args -ccontains ''-V''){Write-Output ''cargo 1.88.0-test'';exit 0}
+if($env:ELON_TEST_FAKE_TIMEOUT){ Write-Output fake-timeout-started; Start-Process powershell.exe -ArgumentList ''-NoProfile'',''-Command'',''Start-Sleep 30''; Start-Sleep 30 }
 $args | Set-Content -LiteralPath $env:ELON_TEST_ARGUMENT_LOG -Encoding UTF8
 exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-argument-cargo.ps1') -Encoding UTF8
     $env:PATH="$BinRoot;$originalPath"
@@ -136,7 +145,8 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot 'fake-argument-cargo.ps1'
     '@echo off
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-cargo.ps1" %*
 exit /b %ERRORLEVEL%' | Set-Content -LiteralPath (Join-Path $BinRoot "cargo.cmd") -Encoding ASCII
-    'if($args -contains ''generate-lockfile''){
+    'if($args -ccontains ''-V''){Write-Output ''cargo 1.88.0-test'';exit 0}
+if($args -contains ''generate-lockfile''){
     $manifest=$args[[Array]::IndexOf($args,''--manifest-path'')+1]
     Set-Content -LiteralPath (Join-Path (Split-Path $manifest -Parent) ''Cargo.lock'') -Value ''# fake deterministic lock''
     exit 0
@@ -167,6 +177,7 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
         throw "validator subprocess failed: one=$($p1.ExitCode) two=$($p2.ExitCode)`none=$((Get-Content -Raw $stderr1))`ntwo=$((Get-Content -Raw $stderr2))"
     }
     Assert-Equal 0 $p1.ExitCode "first exact validation"; Assert-Equal 0 $p2.ExitCode "coalesced exact validation"
+    Assert-True ((Get-Content -Raw $stdout1) -match 'VALIDATION_RECEIPT=') "successful validation must issue a reusable receipt"
     Assert-Equal 1 @(Get-Content $Counter).Count "same in-flight fingerprint must launch once"
     Assert-True ((Get-Content -Raw $stdout2) -match 'VALIDATION_REUSED=coalesced_wait') "waiter must report coalesced_wait, not completed reuse"
     & powershell -NoProfile -ExecutionPolicy Bypass -File $validator -CacheRoot $CacheRoot -SkipCheapGates -DisableSccache check --manifest-path server\Cargo.toml | Out-Null
@@ -179,6 +190,9 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     $validatorText=Get-Content -Raw (Join-Path $PSScriptRoot 'validate-rust.ps1')
     Assert-True ($cargoDevText -match "\$validationArgs \+= '--'") "cargo-dev delegation must use the separator contract"
     Assert-True ($validatorText -match "\$args \+= '--'") "validator delegation must use the separator contract"
+    Assert-True ($validatorText -match 'Add-CargoArgumentOnce \$CargoArgs ''--locked''') "validator must enforce locked Cargo checks"
+    $hookText=Get-Content -Raw (Join-Path $RepoRoot '.githooks\pre-push')
+    Assert-True ($hookText -match 'prepare-push\.ps1') "pre-push must use the formal receipt preparation flow"
     Assert-True ($validatorText -match 'timed_out=\[bool\]\$result\.timed_out') "validator terminal summary must persist the timeout flag"
     Assert-True ($validatorText -match 'Invoke-ValidationCapturedProcess[^\r\n]+-TimeoutSeconds \$WaitTimeoutSeconds') "validator must apply its bound to the captured child"
     $failureOut=Join-Path $TempRoot 'failure.out'; $failureErr=Join-Path $TempRoot 'failure.err'

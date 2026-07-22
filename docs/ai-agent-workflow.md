@@ -199,7 +199,7 @@ AI 代理接收用户消息后，必须先判断需求类型：
 
 ### Rust 代码验证
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 ```
 
 ### Android 代码验证
@@ -286,7 +286,7 @@ bash scripts/publish-server.sh --skip-upload
 
 ```powershell
 # Windows
-powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml pc_lightweight
 ```
 
@@ -295,11 +295,11 @@ powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 test --manifest-p
 ELON_DEV_CARGO_TARGET_DIR=/var/tmp/elon-dev-cargo-target
 
 # Linux/macOS
-bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
+bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --locked
 bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
 ```
 
-Windows `scripts/cargo-dev.ps1` 委托 `scripts/rust-cache.ps1` 的模块：设置 `CARGO_BUILD_BUILD_DIR`、workspace-local `CARGO_TARGET_DIR`、sccache 和分区锁。旧 `ELON_DEV_CARGO_TARGET_DIR` 只作为 legacy 路径登记，不再作为 Windows 日常入口；需要覆盖最终产物位置时显式使用 `-TargetDir`。版本化 pre-push hook 仍走 `cargo-dev`。平台说明和 GC 边界见 `docs/rust-cache-platform.md`。
+Windows `scripts/cargo-dev.ps1` 委托 `scripts/rust-cache.ps1` 的模块：设置 `CARGO_BUILD_BUILD_DIR`、workspace-local `CARGO_TARGET_DIR`、sccache 和分区锁。旧 `ELON_DEV_CARGO_TARGET_DIR` 只作为 legacy 路径登记，不再作为 Windows 日常入口；需要覆盖最终产物位置时显式使用 `-TargetDir`。正式验证由 `validate-rust.ps1` 先做 locked/offline，再经 `cargo-network.ps1` 受控探测和 failover；版本化 pre-push 使用 `prepare-push.ps1` 的精确收据。平台说明和 GC 边界见 `docs/rust-cache-platform.md`。
 
 Linux/macOS 的 `scripts/cargo-dev.sh` 暂时继续使用绝对 `ELON_DEV_CARGO_TARGET_DIR` 和目标目录锁；不得使用相对路径。
 

@@ -29,11 +29,12 @@ git diff --cached --check
 bash scripts/format-rust.sh
 "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-size.ps1
 
-# Cheap gates have passed; Cargo may now reuse an exact successful fingerprint.
+# Cheap gates have passed. A prepared receipt returns immediately; a missing or
+# stale receipt fails closed by running the exact full validation before push.
 if [ -f "server/Cargo.toml" ]; then
-  echo -e "${YELLOW}pre-push: managed Rust validation...${NC}"
-  if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/validate-rust.ps1 -Domain agent-validation -SkipCheapGates check --manifest-path server/Cargo.toml --workspace --quiet 2>&1; then
-    echo -e "${RED}pre-push rejected: managed cargo check failed${NC}" >&2
+  echo -e "${YELLOW}pre-push: checking managed Rust receipt...${NC}"
+  if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/prepare-push.ps1 -SkipCheapGates 2>&1; then
+    echo -e "${RED}pre-push rejected: Rust receipt preparation failed${NC}" >&2
     exit 1
   fi
 fi

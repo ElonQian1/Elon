@@ -29,7 +29,8 @@ function Set-RustCacheParentCargoConfig {
     param(
         [Parameter(Mandatory)][string]$CargoConfigPath,
         [Parameter(Mandatory)][string]$IncludeConfigPath,
-        [switch]$Apply
+        [switch]$Apply,
+        [switch]$ResetSourceReplacement
     )
 
     $fullCargoConfig = [System.IO.Path]::GetFullPath($CargoConfigPath)
@@ -38,6 +39,7 @@ function Set-RustCacheParentCargoConfig {
     $result = New-Object System.Collections.Generic.List[string]
     $section = ""
     $foundOtherInclude = $false
+    $removedSourceReplacements = New-Object System.Collections.Generic.List[string]
     foreach ($line in $existing) {
         if ($line -match '^\s*include\s*=') {
             if ($line -notlike "*$includeTomlPath*") {
@@ -49,6 +51,10 @@ function Set-RustCacheParentCargoConfig {
             $section = $Matches[1].Trim().ToLowerInvariant()
         }
         if ($section -eq "build" -and $line -match '^\s*(target-dir|rustflags)\s*=') {
+            continue
+        }
+        if ($ResetSourceReplacement -and $section -eq 'source.crates-io' -and $line -match '^\s*replace-with\s*=\s*["'']([^"'']+)["'']') {
+            $removedSourceReplacements.Add($Matches[1])
             continue
         }
         $result.Add($line)
@@ -68,17 +74,20 @@ function Set-RustCacheParentCargoConfig {
         $parent = Split-Path $fullCargoConfig -Parent
         New-Item -ItemType Directory -Force -Path $parent | Out-Null
         if (Test-Path -LiteralPath $fullCargoConfig) {
-            $stamp = [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss")
+            $stamp = [DateTime]::UtcNow.ToString("yyyyMMdd-HHmmss-fff")
             $backupPath = "$fullCargoConfig.before-rust-cache-$stamp.bak"
             Copy-Item -LiteralPath $fullCargoConfig -Destination $backupPath -Force
         }
-        Set-Content -LiteralPath $fullCargoConfig -Value $content -Encoding UTF8 -NoNewline
+        $temporary = "$fullCargoConfig.$PID.tmp"
+        Set-Content -LiteralPath $temporary -Value $content -Encoding UTF8 -NoNewline
+        Move-Item -LiteralPath $temporary -Destination $fullCargoConfig -Force
     }
     [pscustomobject]@{
         cargo_config_path = $fullCargoConfig
         include_config_path = $includeTomlPath
         applied = [bool]$Apply
         backup_path = $backupPath
+        removed_source_replacements = @($removedSourceReplacements)
         content = $content
     }
 }
@@ -187,7 +196,8 @@ function Install-RustCachePlatform {
         [string]$RepoRoot,
         [string]$CargoConfigPath,
         [switch]$ActivateCargoConfig,
-        [switch]$ConfigureSccacheServer
+        [switch]$ConfigureSccacheServer,
+        [switch]$ResetCargoSourcePolicy
     )
 
     $sourceRoot = [System.IO.Path]::GetFullPath($SourceScriptsRoot)
@@ -195,6 +205,13 @@ function Install-RustCachePlatform {
     $sourceModules = Join-Path $sourceRoot "rust-cache"
     if (-not (Test-Path -LiteralPath $sourceEntry) -or -not (Test-Path -LiteralPath $sourceModules)) {
         throw "Rust cache source files are incomplete under $sourceRoot"
+    }
+    if ($ActivateCargoConfig) {
+        $writers = @(Get-Process -Name cargo,rustc -ErrorAction SilentlyContinue)
+        if ($writers.Count -gt 0) {
+            $summary = ($writers | ForEach-Object { "$($_.ProcessName):$($_.Id)" }) -join ', '
+            throw "Refusing Cargo config activation while Cargo/rustc writers are active: $summary"
+        }
     }
     $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $RepoRoot
     Initialize-RustCachePolicy -CacheRoot $root | Out-Null
@@ -231,7 +248,7 @@ function Install-RustCachePlatform {
         if ([string]::IsNullOrWhiteSpace($CargoConfigPath)) {
             throw "-CargoConfigPath is required with -ActivateCargoConfig."
         }
-        $activation = Set-RustCacheParentCargoConfig -CargoConfigPath $CargoConfigPath -IncludeConfigPath $includePath -Apply
+        $activation = Set-RustCacheParentCargoConfig -CargoConfigPath $CargoConfigPath -IncludeConfigPath $includePath -Apply -ResetSourceReplacement:$ResetCargoSourcePolicy
     }
     [pscustomobject]@{
         cache_root = $root

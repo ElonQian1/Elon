@@ -85,13 +85,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 statu
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run `
   -ProjectRoot . -Domain dev-windows-msvc `
-  check --manifest-path server\Cargo.toml
+  check --manifest-path server\Cargo.toml --locked
 ```
 
 一龙仓库日常验证继续使用稳定入口，它已委托给平台：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 ```
 
 `--` 是包装器参数与 Cargo 参数的强制边界；边界后的 `-p`、`-F`、`-r`、`-j`、`-q`、`-v` 等短选项和值逐项原样透传。包装器自身选项必须写在边界之前。`validate-rust.ps1` 使用相同契约，并在委托 `cargo-dev.ps1` 时保留该边界。
@@ -108,6 +108,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 insta
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 install -Apply `
   -CargoConfigPath D:\rust\.cargo\config.toml
 ```
+
+若父级配置还永久设置了 `source.crates-io.replace-with`，只在已审查并确认无
+Cargo/rustc 写入者时显式迁移：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 install -Apply `
+  -CargoConfigPath $env:USERPROFILE\.cargo\config.toml -ResetCargoSourcePolicy
+```
+
+安装器先拒绝活动写入者、备份原文件，再原子替换；只移除 crates.io 的
+`replace-with` 键，保留未激活镜像定义和其他用户配置。日常验证不会永久改写
+全局源。
 
 激活操作会：
 
@@ -173,21 +185,67 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 purge
 
 ## 验证
 
+### locked、网络诊断与受信源
+
+应用仓库跟踪 `server/Cargo.lock`，所有正式 check/fetch 都带 `--locked`。验证先用
+当前依赖缓存执行 `--offline`；命中时完全不探网。只有分类为
+`CARGO_OFFLINE_MISSING` 才进入网络阶段，编译错误、缓存锁和磁盘临界不会换源重试。
+
+受信策略位于 `scripts/validation/cargo-sources.json`，初始仅含 crates.io 官方 sparse、
+RsProxy 运营方 sparse 和 USTC 官方帮助确认的 sparse。每个源先检查 HTTPS、受限
+重定向、`config.json` 和由 Cargo.lock 推导的下载端点，再在独立持久 Cargo home 中
+执行限时 `cargo fetch --locked`；Cargo 校验 lockfile checksum 后，以同一源缓存运行
+`cargo check --locked --offline`。短期健康结果会缓存，连续失败会打开熔断器，整个
+failover 有总预算；全局 Cargo 配置和凭据不会被读取、复制或改写到这些受管 home。
+
+稳定诊断码包括 `CARGO_INDEX_FAILURE`、`CARGO_CRATE_DOWNLOAD_FAILURE`、
+`CARGO_DNS_FAILURE`、`CARGO_TLS_FAILURE`、`CARGO_PROXY_FAILURE`、
+`CARGO_GIT_DEPENDENCY_FAILURE`、`CARGO_CACHE_LOCKED`、`CARGO_DISK_CRITICAL`、
+`CARGO_OFFLINE_MISSING` 和 `RUST_COMPILE_ERROR`。报告使用
+`elon.cargo_network_report.v1`。
+
+全部受信源失败时输出 `CARGO_SOURCE_REPAIR_REQUIRED`、报告路径以及
+`elon.ai.cargo_source_repair.v1` 接管协议。AI 只能从官方/运营方页面寻找候选，再用：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-source-repair.ps1 `
+  -Index sparse+https://operator.example/index/ `
+  -Evidence https://operator.example/official-cargo-doc
+```
+
+候选必须通过同运营方 HTTPS 证据、重定向、config/download、Cargo.lock/checksum 和
+隔离 locked fetch/check；该入口只允许临时继续。永久加入必须提交受信策略和故障注入
+测试。随机网页镜像、HTTP 源、跨运营方危险重定向和带凭据 URL 一律拒绝。
+
 ### 受管验证证据与调度
 
 代理、Desktop cargo-dev 和 pre-push 使用 `scripts/validate-rust.ps1`。昂贵 Cargo 首次执行的完整 stdout、stderr、退出码、失败项和有界摘要写入 `<cache-root>/validation-v1/evidence/<fingerprint>/`；对话流截断不再成为重跑理由。相同成功指纹直接复用，相同运行中指纹合并等待；锁 owner PID 失效时可恢复。证据默认保留 14 天且最多 100 份，活动锁不会被回收。
 
-指纹覆盖 Git index、unstaged binary diff、untracked 文件内容、Cargo.lock、`.cargo/config*`、`rust-toolchain*`、`rustc -vV`、domain、TargetDir、执行选项和规范化 Cargo 参数。编译相关环境变量只保存值的 SHA-256，不持久化原值；无 origin 项目使用规范化根目录的哈希身份。
+指纹覆盖 server/build/dependency 输入、Cargo.lock、`.cargo/config*`、`rust-toolchain*`、`rustc -vV`、`cargo -V`、domain、target/features/rustflags、验证/网络脚本版本、执行选项和规范化 Cargo 参数。编译相关环境变量只保存值的 SHA-256，不持久化原值；无 origin 项目使用规范化根目录的哈希身份。
 
 调度锁使用随机 lease id、PID 与进程启动身份三元组；PID 被复用时旧锁失效，旧 owner 不能删除后继 lease。最多两个 light 验证并行；heavy 验证持有 heavy gate 并预留全部 light 槽，因此与所有 light/heavy 任务互斥。证据暴露 owner、waiter、queue wait 和 resource class。直接调用 `validate-rust.ps1` 默认使用 `agent-validation` domain；普通 `cargo-dev.ps1` 仍默认使用增量开发 domain，并完整转发验证参数。
 
 sccache 每轮明确输出 `SCCACHE_STATUS`、`SCCACHE_PATH`、命中/未命中统计或 `SCCACHE_DEGRADED_REASON`。缺失时继续必要验证，不联网安装；恢复方式是显式安装 sccache 后运行 `scripts/rust-cache.ps1 install -Apply`。`agent-validation` domain 和 release 设置 `CARGO_INCREMENTAL=0`，普通交互开发不改变 incremental。
+
+正式推送先在 Git SSH 会话建立前准备精确收据：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-push.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\push.ps1
+```
+
+`prepare-push` 对当前 Rust 输入计算精确键，有效收据立即复用；缺失或失效才执行完整
+验证。`push.ps1` 先准备收据再打开 Git push。版本化 pre-push 仍 fail-closed：有效
+收据只跑廉价门禁，缺失/失效则补完整验证，绝不跳过 Rust 门禁。UI-only 且键未变化的
+push 不会联网或重跑 cargo check。
 
 缓存根优先接受 `ELON_NODE_DATA_ROOT/cache/rust-cache-v2`。系统盘低水位时仅输出 `elon.rust_cache.migration_advice.v1` 建议，不自动移动或删除；迁移必须先设置新根、登记 legacy，再运行 `purge-legacy` dry-run，确认后才可 `-Apply`。
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-rust-cache-platform.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-validation-orchestrator.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-cargo-network.ps1
+bash scripts/test-cargo-source-contract.sh
 ```
 
 测试覆盖注册/隔离路由、release incremental、环境恢复、陈旧锁、GC dry-run、安全路径边界和 Cargo 父配置迁移。

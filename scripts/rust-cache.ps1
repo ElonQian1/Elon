@@ -24,6 +24,7 @@ param(
     [switch]$IncludeSizes,
     [switch]$NoLock,
     [switch]$DisableSccache,
+    [switch]$ResetCargoSourcePolicy,
     [switch]$SkipCacheGc,
     [int]$LockTimeoutSeconds = 3600,
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$RemainingArgs = @()
@@ -92,7 +93,7 @@ switch ($Command) {
         if ([string]::IsNullOrWhiteSpace($CargoConfigPath)) {
             $CargoConfigPath = "D:\rust\.cargo\config.toml"
         }
-        $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -ActivateCargoConfig:$Apply -ConfigureSccacheServer
+        $result = Install-RustCachePlatform -SourceScriptsRoot $scriptsRoot -CacheRoot $CacheRoot -RepoRoot $ProjectRoot -CargoConfigPath $CargoConfigPath -ActivateCargoConfig:$Apply -ConfigureSccacheServer -ResetCargoSourcePolicy:$ResetCargoSourcePolicy
         Write-Host "Installed Rust cache platform: $($result.entry_path)" -ForegroundColor Green
         Write-Host "Cargo include: $($result.cargo_include_path)"
         if (-not $Apply) {

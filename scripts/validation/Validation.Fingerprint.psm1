@@ -52,27 +52,28 @@ function Initialize-ValidationCargoLock {
 
 function Get-ValidationGitSnapshot {
     param([Parameter(Mandatory)][string]$RepoRoot)
-    $relevantPattern = '^(server/|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|scripts/(cargo-dev|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
+    $relevantPattern = '^(server/|\.cargo/(config|config\.toml)$|rust-toolchain(\.toml)?$|rust-cache\.project\.json$|\.rustfmt-version$|\.githooks/pre-push$|scripts/(cargo-dev|cargo-network|cargo-source-repair|prepare-push|push|validate-rust|format-rust|check-source-size)|scripts/(validation|rust-cache)/)'
     $tracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files | Where-Object { $_.Replace('\','/') -match $relevantPattern })
     if ($LASTEXITCODE -ne 0) { throw "Unable to enumerate tracked validation inputs." }
     $untracked = @(& git -c core.quotepath=false -C $RepoRoot ls-files --others --exclude-standard | Where-Object { $_.Replace('\','/') -match $relevantPattern })
     $records = New-Object System.Collections.Generic.List[string]
     $all=@(@($tracked)+@($untracked)|Sort-Object -Unique); $existing=@($all|Where-Object{Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf})
-    # Windows PowerShell 5.1 prefixes native-command pipeline input with a BOM.
-    # `git hash-object --stdin-paths` then treats the first tracked path as
-    # "<BOM>.rustfmt-version" and fails before Cargo can run. Pass paths as
-    # ordinary argv values in bounded batches so hashing is encoding-agnostic
-    # without risking the Windows command-line length limit.
-    $hashes = New-Object System.Collections.Generic.List[string]
-    for ($offset = 0; $offset -lt $existing.Count; $offset += 64) {
-        $last = [Math]::Min($offset + 63, $existing.Count - 1)
-        $batch = @($existing[$offset..$last])
-        $batchHashes = @(& git -C $RepoRoot hash-object --no-filters -- @batch)
-        if ($LASTEXITCODE -ne 0 -or $batchHashes.Count -ne $batch.Count) {
-            throw "Unable to hash validation workspace inputs."
-        }
-        foreach ($hash in $batchHashes) { $hashes.Add(([string]$hash).Trim()) }
-    }
+    # `--stdin-paths` applies Git clean filters, so checkout/rebase CRLF changes
+    # do not invalidate a receipt. Feed UTF-8 without BOM through Process APIs;
+    # Windows PowerShell's native pipeline would prefix the first filename.
+    $info=New-Object Diagnostics.ProcessStartInfo
+    $info.FileName='git';$info.Arguments='hash-object --stdin-paths';$info.WorkingDirectory=$RepoRoot
+    $info.UseShellExecute=$false;$info.CreateNoWindow=$true;$info.RedirectStandardInput=$true;$info.RedirectStandardOutput=$true;$info.RedirectStandardError=$true
+    $process=New-Object Diagnostics.Process;$process.StartInfo=$info
+    if(-not $process.Start()){throw 'Unable to start git hash-object.'}
+    $stdoutTask=$process.StandardOutput.ReadToEndAsync();$stderrTask=$process.StandardError.ReadToEndAsync()
+    $writer=New-Object IO.StreamWriter($process.StandardInput.BaseStream,(New-Object Text.UTF8Encoding($false)))
+    foreach($relative in $existing){$writer.WriteLine(([string]$relative).Replace('\','/'))}
+    $writer.Close();$process.WaitForExit()
+    $stdout=$stdoutTask.GetAwaiter().GetResult();$stderr=$stderrTask.GetAwaiter().GetResult()
+    $hashes=@($stdout -split "`r?`n"|Where-Object{$_})
+    if($process.ExitCode -ne 0 -or $hashes.Count -ne $existing.Count){throw "Unable to hash validation workspace inputs: $stderr"}
+    $process.Dispose()
     if ($hashes.Count -ne $existing.Count) { throw "Unable to hash validation workspace inputs." }
     for($i=0;$i -lt $existing.Count;$i++){$records.Add("$($existing[$i].Replace('\','/'))`t$($hashes[$i].Trim())")}
     foreach($relative in @($all|Where-Object{-not (Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf)})){$records.Add("$($relative.Replace('\','/'))`tdeleted")}
@@ -98,6 +99,8 @@ function Get-ValidationFingerprint {
     $lockHash = if (Test-Path -LiteralPath $lockPath) { (& git hash-object -- $lockPath).Trim() } else { "missing" }
     $rustc = ((& rustc -vV 2>&1) -join "`n").Trim()
     if ($LASTEXITCODE -ne 0) { throw "rustc -vV failed while creating validation fingerprint." }
+    $cargoVersion = ((& cargo -V 2>&1) -join "`n").Trim()
+    if ($LASTEXITCODE -ne 0) { throw "cargo -V failed while creating validation fingerprint." }
     $remote = ((& git -C $RepoRoot config --get remote.origin.url 2>$null) -join "").Trim().ToLowerInvariant()
     if ([string]::IsNullOrWhiteSpace($remote)) {
         $commonDir=(((& git -C $RepoRoot rev-parse --git-common-dir 2>$null) -join '')).Trim()
@@ -115,6 +118,7 @@ function Get-ValidationFingerprint {
         snapshot = $snapshot.digest
         cargo_lock = $lockHash
         rustc = $rustc
+        cargo = $cargoVersion
         domain = $Domain
         target_dir = if ($TargetDir) { [IO.Path]::GetFullPath($TargetDir).ToLowerInvariant() } else { "workspace-default" }
         command = $command

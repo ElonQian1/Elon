@@ -203,6 +203,12 @@ target-dir = "D:/old/shared-target"
 jobs = 12
 rustflags = ["-C", "target-cpu=native"]
 
+[source.crates-io]
+replace-with = "ustc"
+
+[source.ustc]
+registry = "sparse+https://mirrors.ustc.edu.cn/crates.io-index/"
+
 [net]
 retry = 3
 '@ | Set-Content -LiteralPath $CargoConfig -Encoding UTF8
@@ -212,6 +218,11 @@ retry = 3
     Assert-True ($proposal.content -notmatch 'rustflags\s*=') "Cargo activation should remove machine-wide rustflags"
     Assert-True ($proposal.content -match 'jobs = 12') "Cargo activation should preserve unrelated build settings"
     Assert-True ($proposal.content -match '\[net\]') "Cargo activation should preserve other sections"
+    Assert-True ($proposal.content -match 'replace-with\s*=') "ordinary activation preview should not silently reset an explicit source policy"
+    $resetProposal = Set-RustCacheParentCargoConfig -CargoConfigPath $CargoConfig -IncludeConfigPath (Join-Path $CacheRoot "config\cargo-cache.toml") -ResetSourceReplacement
+    Assert-True ($resetProposal.content -notmatch 'replace-with\s*=') "explicit source reset should remove permanent crates.io replacement"
+    Assert-Equal 'ustc' $resetProposal.removed_source_replacements[0] "source reset should report the removed replacement"
+    Assert-True ($resetProposal.content -match '\[source\.ustc\]') "source reset should preserve inactive source definitions and unrelated user data"
 
     $install = Install-RustCachePlatform -SourceScriptsRoot $PSScriptRoot -CacheRoot (Join-Path $TempRoot "installed") -RepoRoot $ProjectRoot
     Assert-True (Test-Path -LiteralPath $install.entry_path) "installer should copy the entry script"
