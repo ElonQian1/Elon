@@ -198,6 +198,103 @@ mod tests {
     use super::*;
     use crate::node_agent_local_task_store::LocalTaskStart;
 
+    #[tokio::test]
+    async fn prelaunch_submit_and_resume_block_update_without_becoming_stale() {
+        let root = std::env::temp_dir().join(format!(
+            "restart-drain-prelaunch-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut runtime = crate::NodeRuntime::new(
+            crate::node_agent_config::NodeConfig {
+                cloud_url: "ws://127.0.0.1".into(),
+                cloud_http_url: "http://127.0.0.1".into(),
+                ollama_url: "http://127.0.0.1".into(),
+                lm_studio_url: None,
+                custom_url: None,
+                price_per_1k: 0.0,
+            },
+            Some(crate::node_agent_config::Credentials {
+                agent_id: "agent-prelaunch".into(),
+                agent_secret: "unused".into(),
+                owner_user_id: "owner-prelaunch".into(),
+                user_token: None,
+            }),
+            crate::pc_storage_repo::StorageSettings::default(),
+            crate::node_agent_data_root::resolve(None, None, None),
+            "install-prelaunch".into(),
+        );
+        runtime.task_journal =
+            crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
+        runtime.local_tasks =
+            crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+        runtime.cli_sidecars =
+            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars"));
+
+        for (task_id, role, parent_task_id) in [
+            ("fresh-submit", "requirement", None),
+            ("fresh-resume", "resume_original", Some("finished-parent")),
+        ] {
+            runtime
+                .local_tasks
+                .create(LocalTaskStart {
+                    task_id,
+                    owner_user_id: "owner-prelaunch",
+                    agent_id: "agent-prelaunch",
+                    install_id: "install-prelaunch",
+                    project_id: "elon-self",
+                    channel_id: None,
+                    conversation_id: task_id,
+                    workspace_path: root.to_string_lossy().as_ref(),
+                    prompt: "must survive the prelaunch registration window",
+                    cli: "codex",
+                    runtime_permission: "full_access",
+                })
+                .unwrap();
+            let contract = crate::node_agent_local_task_supervision::SupervisionContract {
+                protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL
+                    .to_string(),
+                supervisor: "codex_desktop".to_string(),
+                task_role: role.to_string(),
+                parent_task_id: parent_task_id.map(str::to_string),
+                root_task_id: Some("root-prelaunch".to_string()),
+                acceptance_criteria: Vec::new(),
+                improvement_policy: "after_task_or_unblock".to_string(),
+            };
+            crate::node_agent_local_task_supervision::record_supervision_event(
+                &runtime.task_journal,
+                task_id,
+                "supervision_contract",
+                crate::node_agent_local_task_supervision::contract_payload(&contract),
+            )
+            .unwrap();
+        }
+
+        let classification = classify_supervised_tasks(&runtime, Some("0.3.70+aaaaaaaaaaaaaaaa"))
+            .await
+            .unwrap();
+        assert_eq!(
+            classification.blocking,
+            vec!["fresh-resume".to_string(), "fresh-submit".to_string()]
+        );
+        assert!(classification.recoverable.is_empty());
+        assert!(classification.stale.is_empty());
+        assert!(classification.stale_cancel_proofs.is_empty());
+
+        for task_id in ["fresh-submit", "fresh-resume"] {
+            let task = runtime.local_tasks.get(task_id).unwrap().unwrap();
+            assert_eq!(task.status, "running");
+            assert!(task.finished_at_ms.is_none());
+            assert!(task.completion_event_id.is_none());
+            let snapshot = runtime.task_journal.snapshot(task_id, 0, 20).unwrap();
+            assert!(snapshot.events.iter().all(|event| {
+                event.event.get("type").and_then(serde_json::Value::as_str)
+                    != Some("supervision_stale_runtime_resume_required")
+            }));
+        }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
     #[test]
     fn exact_target_cancel_proof_reuses_fail_closed_installer_inventory() {
         let root = std::env::temp_dir().join(format!(
