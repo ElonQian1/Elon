@@ -127,8 +127,9 @@ pub(crate) fn cli_done_message_from_output(
     workspace_status: Option<CliWorkspaceStatus>,
     session_id: Option<String>,
 ) -> (AgentToServer, String) {
-    let combined_output = format!("{stdout_text}\n{stderr_text}");
-    let usage = cli_usage::parse_cli_usage(&combined_output);
+    let raw_output = format!("{stdout_text}\n{stderr_text}");
+    let usage = cli_usage::parse_cli_usage(&raw_output);
+    let combined_output = crate::node_agent_cli_redaction::redact_text(&raw_output);
     let model = usage
         .as_ref()
         .and_then(|usage| usage.model.clone())
@@ -137,7 +138,7 @@ pub(crate) fn cli_done_message_from_output(
         cli_done_message(
             req_id,
             exit_ok,
-            error,
+            error.map(|value| crate::node_agent_cli_redaction::redact_text(&value)),
             usage,
             model,
             workspace_status,
@@ -159,6 +160,12 @@ pub(crate) fn persist_and_send_cli_done(
     message: AgentToServer,
     out_tx: &mpsc::UnboundedSender<Message>,
 ) -> Result<CliCompletionEnvelope> {
+    let mut message = message;
+    if let AgentToServer::CliDone { error, .. } = &mut message {
+        *error = error
+            .take()
+            .map(|value| crate::node_agent_cli_redaction::redact_text(&value));
+    }
     let AgentToServer::CliDone {
         req_id,
         exit_ok,
@@ -176,7 +183,7 @@ pub(crate) fn persist_and_send_cli_done(
         bail!("durable CLI completion helper requires CliDone");
     };
     let final_output = final_output
-        .map(str::to_string)
+        .map(crate::node_agent_cli_redaction::redact_text)
         .or_else(|| {
             runtime
                 .task_journal

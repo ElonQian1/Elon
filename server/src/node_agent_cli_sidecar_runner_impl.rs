@@ -61,6 +61,7 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
 
     let mut codex_approval_tracker = CodexApprovalTracker::default();
     let mut codex_session_capture = CodexSessionCapture::default();
+    let mut output_redactor = crate::node_agent_cli_redaction::CliOutputRedactor::default();
     let mut mailbox_offset = 0_u64;
     let mut processed_commands = HashSet::new();
     let mut reader_closed = false;
@@ -138,8 +139,12 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
             event = pty_output_rx.recv() => {
                 match event {
                     Some(CliPtyEvent::Output(text)) => {
+                        if text.contains("\x1b[6n") {
+                            pty.write_input("\x1b[1;1R")?;
+                        }
+                        let visible_text = text.replace("\x1b[6n", "");
                         let observation = crate::node_agent_cli_output_aggregate::progress_observation(
-                            &text.replace("\x1b[6n", ""),
+                            &visible_text,
                         );
                         if observation.progress {
                             idle_deadline = tokio::time::Instant::now()
@@ -150,15 +155,18 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
                                 observation.current_command.as_deref(),
                             )?;
                         }
-                        write_pty_chunk(
-                            &config,
-                            &task_journal,
-                            &registry,
-                            &mut codex_approval_tracker,
-                            &mut codex_session_capture,
-                            &mut pty,
-                            &text,
-                        )?;
+                        let safe_text = output_redactor.push(&visible_text);
+                        if !safe_text.is_empty() {
+                            write_pty_chunk(
+                                &config,
+                                &task_journal,
+                                &registry,
+                                &mut codex_approval_tracker,
+                                &mut codex_session_capture,
+                                &mut pty,
+                                &safe_text,
+                            )?;
+                        }
                     }
                     Some(CliPtyEvent::ReaderError(error)) => {
                         append_output(
@@ -189,6 +197,18 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
         }
     };
 
+    let safe_tail = output_redactor.finish();
+    if !safe_tail.is_empty() {
+        write_pty_chunk(
+            &config,
+            &task_journal,
+            &registry,
+            &mut codex_approval_tracker,
+            &mut codex_session_capture,
+            &mut pty,
+            &safe_tail,
+        )?;
+    }
     let state = if timed_out {
         "failed"
     } else if canceled {

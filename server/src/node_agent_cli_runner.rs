@@ -17,10 +17,11 @@ pub fn send_cli_chunk(
     stream: &str,
     text: &str,
 ) {
-    let _ = task_journal.record_cli_chunk(req_id, stream, text);
+    let text = super::node_agent_cli_redaction::redact_text(text);
+    let _ = task_journal.record_cli_chunk(req_id, stream, &text);
     let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
         req_id: req_id.to_string(),
-        text: text.to_string(),
+        text,
     }));
 }
 
@@ -29,9 +30,10 @@ pub fn send_cli_chunk_message(
     req_id: &str,
     text: &str,
 ) {
+    let text = super::node_agent_cli_redaction::redact_text(text);
     let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
         req_id: req_id.to_string(),
-        text: text.to_string(),
+        text,
     }));
 }
 

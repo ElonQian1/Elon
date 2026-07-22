@@ -530,6 +530,7 @@ pub(crate) fn send_chunk(
     req_id: &str,
     text: String,
 ) {
+    let text = crate::node_agent_cli_redaction::redact_text(&text);
     if let Some(journal) = task_journal {
         let _ = journal.record_cli_chunk(req_id, "runtime", &text);
     }

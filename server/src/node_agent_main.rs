@@ -89,6 +89,7 @@ use node_agent_config::{
     load_persisted, save_persisted,
 };
 pub use node_agent_config::{machine_label, state_path, Credentials, NodeConfig};
+mod node_agent_cli_redaction;
 mod node_agent_cli_runner;
 mod node_agent_data_root;
 mod node_agent_download_router;

@@ -38,7 +38,7 @@ impl CliSidecarOutputRecord {
         Self {
             record_type: "chunk".to_string(),
             stream: Some(stream.to_string()),
-            text: Some(text.to_string()),
+            text: Some(crate::node_agent_cli_redaction::redact_text(text)),
             child_pid: None,
             exit_code: None,
             success: None,
@@ -88,7 +88,7 @@ impl CliSidecarOutputRecord {
             exit_code: None,
             success: Some(false),
             canceled: Some(false),
-            error: Some(error),
+            error: Some(crate::node_agent_cli_redaction::redact_text(&error)),
             runtime: None,
             at_ms: now_ms(),
         }

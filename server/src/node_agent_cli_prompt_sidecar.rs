@@ -156,7 +156,10 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
             node_agent_cli_sidecar_runner::CliSidecarOutputEvent::Stderr(text) => {
                 if cli_name == "codex" {
                     if !text.trim().is_empty() {
-                        info!("[codex stderr] {}", text.trim_end());
+                        info!(
+                            "[codex stderr] {}",
+                            crate::node_agent_cli_redaction::redact_text(text.trim_end())
+                        );
                         let observation =
                             journal_aggregate.observe(&task_journal, &req_id, "stderr", &text);
                         if observation.progress {

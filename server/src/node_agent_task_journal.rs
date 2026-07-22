@@ -399,7 +399,8 @@ impl TaskJournal {
     }
 
     pub(crate) fn record_cli_chunk(&self, req_id: &str, stream: &str, text: &str) -> Result<()> {
-        with_task_journal_io_lock(|| match cli_chunk_event(req_id, stream, text, now_ms()) {
+        let text = crate::node_agent_cli_redaction::redact_text(text);
+        with_task_journal_io_lock(|| match cli_chunk_event(req_id, stream, &text, now_ms()) {
             Some(event) => self.append_event(event),
             None => Ok(()),
         })

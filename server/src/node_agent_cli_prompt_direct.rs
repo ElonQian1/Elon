@@ -245,6 +245,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
                             continue;
                         }
                         if !l.trim().is_empty() {
+                            let l = crate::node_agent_cli_redaction::redact_text(&l);
                             info!("[codex stderr] {}", l);
                             let text = l + "\n";
                             let observation = journal_aggregate.observe(
