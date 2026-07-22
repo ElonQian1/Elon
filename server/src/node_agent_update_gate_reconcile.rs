@@ -15,8 +15,11 @@ use crate::{
     NodeRuntime,
 };
 
+const UPDATE_RECEIPT_INSTALL_GATE_ENV: &str = "ELON_ENABLE_UPDATE_RECEIPT_INSTALL_GATE";
+
 pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
     let credentials = runtime.creds().await.context("节点当前没有已绑定身份")?;
+    let receipt_install_gate_enabled = receipt_install_gate_enabled();
     let (orphan_rows_reconciled, orphan_reconcile_error) =
         match crate::node_agent_local_task_orphan_reconcile::reconcile_once(runtime.as_ref()).await
         {
@@ -107,13 +110,16 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         let persisted_inactive = resumable_checkpoint || durable_cancelled;
         let no_execution_owner =
             !fresh_runtime_handle && !live_sidecar && !replayable_sidecar && !live_journal_process;
-        let no_unsafe_wait = pending_approval_ids.is_empty() && non_repeatable_action.is_none();
+        let no_unsafe_wait = pending_approval_ids.is_empty()
+            && (non_repeatable_action.is_none()
+                || non_repeatable_action.as_deref() == Some("journal_exceeds_audit_limit"));
         let excluded = can_exclude_from_install(
             persisted_inactive,
             durable_cancelled,
             no_execution_owner,
             no_unsafe_wait,
             ambiguous_recovery_receipts,
+            receipt_install_gate_enabled,
         );
         let reason = classification_reason(
             excluded,
@@ -123,6 +129,7 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             no_execution_owner,
             no_unsafe_wait,
             ambiguous_recovery_receipts,
+            receipt_install_gate_enabled,
             terminal_recovery_receipt,
             resume_eligible,
         );
@@ -186,6 +193,7 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         "idempotency": "stable_reconcile_id",
         "reconcile_id": reconcile_id,
         "install_may_proceed": blockers.is_empty(),
+        "receipt_install_gate_enabled": receipt_install_gate_enabled,
         "orphan_rows_reconciled": orphan_rows_reconciled,
         "orphan_reconcile_error": orphan_reconcile_error,
         "excluded_terminal_history_count": excluded_count,
@@ -214,10 +222,14 @@ fn classification_reason(
     no_execution_owner: bool,
     no_unsafe_wait: bool,
     ambiguous_recovery_receipts: bool,
+    receipt_install_gate_enabled: bool,
     terminal_receipt: bool,
     resume_eligible: Option<bool>,
 ) -> String {
     if excluded {
+        if ambiguous_recovery_receipts && !receipt_install_gate_enabled {
+            return "duplicate historical recovery receipts remain audit-only because the receipt install gate is disabled; no execution owner remains".to_string();
+        }
         return if durable_cancelled {
             if cancel_side_effect_committed {
                 "durable cancel side effect is committed and no execution owner or unsafe wait remains"
@@ -244,7 +256,7 @@ fn classification_reason(
     if !no_unsafe_wait {
         return "pending approval, incomplete audit, or non-repeatable action remains".to_string();
     }
-    if ambiguous_recovery_receipts {
+    if ambiguous_recovery_receipts && receipt_install_gate_enabled {
         return "multiple update recovery receipts target the task; terminal proof is ambiguous"
             .to_string();
     }
@@ -257,11 +269,29 @@ fn can_exclude_from_install(
     no_execution_owner: bool,
     no_unsafe_wait: bool,
     ambiguous_recovery_receipts: bool,
+    receipt_install_gate_enabled: bool,
 ) -> bool {
     persisted_inactive
         && no_execution_owner
         && (no_unsafe_wait || durable_cancelled)
-        && !ambiguous_recovery_receipts
+        && (!receipt_install_gate_enabled || !ambiguous_recovery_receipts)
+}
+
+fn receipt_install_gate_enabled() -> bool {
+    receipt_install_gate_enabled_from(
+        std::env::var(UPDATE_RECEIPT_INSTALL_GATE_ENV)
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn receipt_install_gate_enabled_from(value: Option<&str>) -> bool {
+    value.is_some_and(|value| {
+        matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "enabled"
+        )
+    })
 }
 
 fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (usize, usize, bool) {
@@ -300,8 +330,8 @@ fn stable_reconcile_id(
 #[cfg(test)]
 mod tests {
     use super::{
-        can_exclude_from_install, classification_reason, recovery_receipt_evidence,
-        stable_reconcile_id,
+        can_exclude_from_install, classification_reason, receipt_install_gate_enabled_from,
+        recovery_receipt_evidence, stable_reconcile_id,
     };
     use crate::node_agent_update_recovery::{
         UpdateGateTaskClassification, UpdateRecoveryLedger, UpdateRecoveryReceipt,
@@ -310,10 +340,10 @@ mod tests {
 
     #[test]
     fn unknown_resume_evidence_stays_fail_closed() {
-        assert!(
-            classification_reason(false, false, false, false, true, true, false, false, None)
-                .contains("does not prove")
-        );
+        assert!(classification_reason(
+            false, false, false, false, true, true, false, false, false, None
+        )
+        .contains("does not prove"));
     }
 
     #[test]
@@ -326,6 +356,7 @@ mod tests {
             false,
             true,
             false,
+            false,
             true,
             Some(false)
         )
@@ -333,7 +364,20 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_recovery_receipts_stay_blocking_without_aborting_reconcile() {
+    fn duplicate_recovery_receipts_are_audit_only_unless_gate_is_enabled() {
+        assert!(classification_reason(
+            true,
+            true,
+            false,
+            false,
+            true,
+            true,
+            true,
+            false,
+            false,
+            Some(false)
+        )
+        .contains("audit-only"));
         assert!(classification_reason(
             false,
             true,
@@ -342,10 +386,20 @@ mod tests {
             true,
             true,
             true,
+            true,
             false,
             Some(false)
         )
         .contains("ambiguous"));
+        assert!(can_exclude_from_install(
+            true, false, true, true, true, false
+        ));
+        assert!(!can_exclude_from_install(
+            true, false, true, true, true, true
+        ));
+        assert!(!receipt_install_gate_enabled_from(None));
+        assert!(!receipt_install_gate_enabled_from(Some("disabled")));
+        assert!(receipt_install_gate_enabled_from(Some("1")));
 
         let mut ledger = UpdateRecoveryLedger::default();
         let mut first = UpdateRecoveryReceipt::planned("update-a", "root-a", "task-a");
@@ -361,22 +415,30 @@ mod tests {
 
     #[test]
     fn durable_cancel_intent_is_excluded_after_execution_ownership_is_gone() {
-        assert!(
-            classification_reason(true, true, true, true, true, true, false, false, None)
-                .contains("cancel side effect")
-        );
-        assert!(
-            classification_reason(true, true, true, false, true, true, false, false, None)
-                .contains("cancel intent")
-        );
-        assert!(
-            classification_reason(false, false, false, false, true, true, false, false, None)
-                .contains("does not prove")
-        );
-        assert!(can_exclude_from_install(true, true, true, false, false));
-        assert!(!can_exclude_from_install(true, true, false, false, false));
-        assert!(!can_exclude_from_install(true, true, true, false, true));
-        assert!(!can_exclude_from_install(true, false, true, false, false));
+        assert!(classification_reason(
+            true, true, true, true, true, true, false, false, false, None
+        )
+        .contains("cancel side effect"));
+        assert!(classification_reason(
+            true, true, true, false, true, true, false, false, false, None
+        )
+        .contains("cancel intent"));
+        assert!(classification_reason(
+            false, false, false, false, true, true, false, false, false, None
+        )
+        .contains("does not prove"));
+        assert!(can_exclude_from_install(
+            true, true, true, false, false, false
+        ));
+        assert!(!can_exclude_from_install(
+            true, true, false, false, false, false
+        ));
+        assert!(!can_exclude_from_install(
+            true, true, true, false, true, true
+        ));
+        assert!(!can_exclude_from_install(
+            true, false, true, false, false, false
+        ));
     }
 
     #[test]

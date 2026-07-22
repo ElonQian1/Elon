@@ -66,6 +66,26 @@ impl LocalTaskStore {
         Ok(records)
     }
 
+    pub(crate) fn list_terminal_journal_drift_candidates(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE status = 'resume_required'
+                   AND finished_at_ms IS NOT NULL
+                   AND completion_event_id IS NULL
+             ORDER BY finished_at_ms, task_id
+             LIMIT ?1",
+            select_sql()
+        ))?;
+        let records = stmt
+            .query_map(params![limit.clamp(1, 1_000) as i64], read_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
+    }
+
     /// Installer-only view: persisted cancellation and Resume states need a
     /// fresh executor recheck, but must not widen the live drain candidate set.
     pub(crate) fn list_update_install_candidates(&self) -> Result<Vec<LocalTaskRecord>> {

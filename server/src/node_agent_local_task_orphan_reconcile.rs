@@ -16,6 +16,8 @@ use crate::NodeRuntime;
 mod cancel;
 #[path = "node_agent_local_task_orphan_runtime_evidence.rs"]
 mod runtime_evidence;
+#[path = "node_agent_local_task_orphan_terminal_drift.rs"]
+mod terminal_drift;
 
 pub(crate) use runtime_evidence::recorded_process_is_live;
 use runtime_evidence::{journal_record_protects, sidecar_record_protects};
@@ -25,6 +27,7 @@ const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_SCAN_LIMIT: usize = 1_000;
 const TERMINAL_REPAIR_LIMIT: usize = 128;
 const STALE_CANDIDATE_LIMIT: usize = 256;
+const TERMINAL_JOURNAL_SYNC_LIMIT: usize = 1_000;
 
 pub(crate) async fn reconcile_once(runtime: &NodeRuntime) -> Result<usize> {
     reconcile_with_stale_after(runtime, STALE_AFTER_MS).await
@@ -68,10 +71,10 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
     let now = crate::node_agent_cli_sidecar::now_ms();
     let cutoff = (now.min(i64::MAX as u128) as i64)
         .saturating_sub(stale_after_ms.min(i64::MAX as u128) as i64);
+    let mut changed = terminal_drift::sync(runtime, now, TERMINAL_JOURNAL_SYNC_LIMIT).await?;
     let candidates = runtime
         .local_tasks
         .list_stale_runtime_candidates(cutoff, STALE_CANDIDATE_LIMIT)?;
-    let mut changed = 0;
     for candidate in candidates.into_iter().filter(|task| {
         matches!(
             task.status.as_str(),
