@@ -1120,4 +1120,4 @@ if (Test-Path $distClient) {
 
 # ── 自动清理已合并、工作树干净的孤儿 task worktree ─────────────
 . (Join-Path $PSScriptRoot 'apk-publish-postflight.ps1')
-Invoke-ElonApkWorktreeCleanup -RepoRoot $RepoRoot
+Invoke-ElonApkPublishPostflight -RepoRoot $RepoRoot -ApkPath $apk.FullName -ExpectedVersionCode $newCode

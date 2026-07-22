@@ -16,3 +16,15 @@ function Invoke-ElonApkWorktreeCleanup {
         Write-Host "   Worktree auto-cleanup failed: $_" -ForegroundColor Yellow
     }
 }
+
+function Invoke-ElonApkPublishPostflight {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [Parameter(Mandatory)][string]$ApkPath,
+        [Parameter(Mandatory)][int]$ExpectedVersionCode
+    )
+
+    Invoke-ElonApkWorktreeCleanup -RepoRoot $RepoRoot
+    . (Join-Path $PSScriptRoot 'apk-adb-autodeploy.ps1')
+    Invoke-ElonApkAdbAutodeploy -ApkPath $ApkPath -ExpectedVersionCode $ExpectedVersionCode | Out-Null
+}
