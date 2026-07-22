@@ -1482,11 +1482,11 @@
 
                     <ImageView
                         android:id="@+id/bottomActionPlusIcon"
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
-                        android:src="@drawable/ic_top_add_plus_custom" />
+                        android:src="@drawable/ic_bottom_action_plus" />
                 </FrameLayout>
             </LinearLayout>
         </FrameLayout>

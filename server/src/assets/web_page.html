@@ -3608,12 +3608,23 @@
       cursor: pointer;
     }
     .bottom-compose-button img {
-      width: 28px;
-      height: 28px;
-      object-fit: contain;
-      display: block;
-      margin: auto;
+      display: none;
     }
+    .bottom-compose-button::before,
+    .bottom-compose-button::after {
+      content: "";
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 16px; height: 2px;
+      border-radius: 999px;
+      background: #D6D6D6;
+      transform-origin: center;
+      transition: transform 160ms ease;
+    }
+    .bottom-compose-button::before { transform: translate(-50%, -50%); }
+    .bottom-compose-button::after { transform: translate(-50%, -50%) rotate(90deg); }
+    .bottom-compose-button[aria-expanded="true"]::before { transform: translate(-50%, -50%) rotate(45deg); }
+    .bottom-compose-button[aria-expanded="true"]::after { transform: translate(-50%, -50%) rotate(135deg); }
     .home-action-menu {
       position: fixed;
       right: max(20px, calc((100vw - 720px) / 2 + 20px));

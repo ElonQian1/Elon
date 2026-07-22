@@ -42,13 +42,23 @@ class HomeActionMenuContractTest {
         val popup = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainActionPopups.kt"
         )
+        val plusIcon = readRepositoryFile(
+            "android/app/src/main/res/drawable/ic_bottom_action_plus.xml"
+        )
 
         assertTrue(layout.contains("android:id=\"@+id/bottomActionPlusIcon\""))
-        assertTrue(layout.contains("android:src=\"@drawable/ic_top_add_plus_custom\""))
+        assertTrue(layout.contains("android:src=\"@drawable/ic_bottom_action_plus\""))
+        assertTrue(layout.contains("android:layout_width=\"24dp\""))
+        assertTrue(layout.contains("android:layout_height=\"24dp\""))
+        assertTrue(plusIcon.contains("android:pathData=\"M12,4 L12,20 M4,12 L20,12\""))
+        assertTrue(plusIcon.contains("android:strokeWidth=\"2\""))
         assertTrue(layout.contains("android:src=\"@drawable/ic_home_ai_avatar\""))
         assertTrue(navigation.contains("binding.addButton.visibility = View.GONE"))
         assertTrue(bottomNavigation.contains("showHomeActions(binding.bottomComposeButton, tab)"))
         assertTrue(popup.contains("renderer().showBottomActionPopup"))
+        assertTrue(popup.contains("anchor === binding.bottomComposeButton"))
+        assertTrue(popup.contains("binding.bottomActionPlusIcon"))
+        assertTrue(popup.contains(".rotation(if (expanded) 45f else 0f)"))
         assertTrue(popup.contains("R.drawable.ic_home_action_group"))
         assertTrue(popup.contains("R.drawable.ic_home_action_add_friend"))
         assertTrue(popup.contains("R.drawable.ic_home_action_new_project"))
@@ -60,6 +70,8 @@ class HomeActionMenuContractTest {
         val server = readRepositoryFile("server/src/web.rs")
 
         assertTrue(web.contains("id=\"homeActionMenu\""))
+        assertTrue(web.contains(".bottom-compose-button[aria-expanded=\"true\"]::before"))
+        assertTrue(web.contains("width: 16px; height: 2px;"))
         assertTrue(web.contains("<span>发起群聊</span>"))
         assertTrue(web.contains("<span>添加好友</span>"))
         assertTrue(web.contains("<span>新建项目</span>"))

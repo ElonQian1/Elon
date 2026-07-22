@@ -59,10 +59,10 @@ internal class MainActionPopups(
         } else {
             showTopActionPopup(anchor, actions)
         }
-        if (anchor === binding.addButton) {
-            setTopAddButtonExpanded(true)
+        if (anchor === binding.addButton || anchor === binding.bottomComposeButton) {
+            setHomeAddButtonExpanded(anchor, true)
             popup.setOnDismissListener {
-                setTopAddButtonExpanded(false)
+                setHomeAddButtonExpanded(anchor, false)
                 if (getActionPopup() === popup) setActionPopup(null)
             }
         } else {
@@ -134,9 +134,14 @@ internal class MainActionPopups(
         return popup
     }
 
-    private fun setTopAddButtonExpanded(expanded: Boolean) {
-        binding.addButtonPlus.animate().cancel()
-        binding.addButtonPlus.animate()
+    private fun setHomeAddButtonExpanded(anchor: View, expanded: Boolean) {
+        val icon = if (anchor === binding.bottomComposeButton) {
+            binding.bottomActionPlusIcon
+        } else {
+            binding.addButtonPlus
+        }
+        icon.animate().cancel()
+        icon.animate()
             .rotation(if (expanded) 45f else 0f)
             .setDuration(160L)
             .setInterpolator(DecelerateInterpolator())
