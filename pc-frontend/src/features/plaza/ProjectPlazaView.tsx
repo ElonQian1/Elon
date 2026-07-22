@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, Image, Loader2, Search } from 'lucide-react'
+import { Image, Loader2, Search } from 'lucide-react'
 import { api } from '../../api/client'
 import avatarAsset from '../../assets/project-plaza/avatar.png'
 import cardAsset from '../../assets/project-plaza/card.png'
 import heartAsset from '../../assets/project-plaza/heart.png'
 import starAsset from '../../assets/project-plaza/star.png'
 import thumbnailAsset from '../../assets/project-plaza/thumbnail.png'
+import plazaChevronAsset from '../../../../server/src/assets/project_view_chevron.png'
 import { useProjectStore } from '../conversation/useProjectStore'
 import styles from './PlazaPage.module.css'
 
@@ -220,7 +221,9 @@ export default function ProjectPlazaView() {
                       aria-label={primaryActionLabel(project, joinStatus[project.id])}
                       onClick={() => void runPrimaryAction(project)}
                     >
-                      {joiningId === project.id ? <Loader2 className={styles.spinner} /> : <ChevronRight />}
+                      {joiningId === project.id
+                        ? <Loader2 className={styles.spinner} />
+                        : <img src={plazaChevronAsset} alt="" aria-hidden="true" />}
                     </button>
                   </div>
                 </article>
@@ -244,7 +247,9 @@ export default function ProjectPlazaView() {
                   aria-label={primaryActionLabel(project, joinStatus[project.id])}
                   onClick={() => void runPrimaryAction(project)}
                 >
-                  {joiningId === project.id ? <Loader2 className={styles.spinner} /> : <ChevronRight />}
+                  {joiningId === project.id
+                    ? <Loader2 className={styles.spinner} />
+                    : <img src={plazaChevronAsset} alt="" aria-hidden="true" />}
                 </button>
               </article>
             ))}

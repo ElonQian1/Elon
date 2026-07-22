@@ -6,6 +6,7 @@ import java.nio.ByteOrder
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.security.MessageDigest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -50,6 +51,29 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
+    fun plazaEntryArrowsUseTheVerifiedOriginalBitmapOnAndroidAndWeb() {
+        val expectedSha256 = "3147797d74d7ee606612a79224216210865d6b783273fc3166eb332f3ed37275"
+        val androidAsset = repositoryRoot().resolve(
+            "android/app/src/main/res/drawable-nodpi/project_view_chevron.png"
+        )
+        val webAsset = repositoryRoot().resolve("server/src/assets/project_view_chevron.png")
+        assertEquals(expectedSha256, sha256(androidAsset))
+        assertEquals(expectedSha256, sha256(webAsset))
+        assertEquals(43 to 43, readPngDimensions(androidAsset))
+
+        val androidSource = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        assertEquals(2, Regex(Regex.escape("R.drawable.project_view_chevron")).findAll(androidSource).count())
+        assertFalse(androidSource.contains("text = \"›\""))
+
+        val webSource = readRepositoryFile("pc-frontend/src/features/plaza/ProjectPlazaView.tsx")
+        assertTrue(webSource.contains("server/src/assets/project_view_chevron.png'"))
+        assertEquals(2, Regex(Regex.escape("src={plazaChevronAsset}")).findAll(webSource).count())
+        assertFalse(webSource.contains("ChevronRight"))
+    }
+
+    @Test
     fun projectEntryHasNoMineTabOrProjectOnlyAddButton() {
         val navigation = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainNavigationController.kt"
@@ -57,7 +81,10 @@ class ProjectPlazaLayoutContractTest {
         val marketplaceChrome = navigation.substringAfter("private fun applyMarketplaceChrome()")
             .substringBefore("private fun applyProjectSpaceChrome")
         assertTrue(navigation.contains("binding.tabProject -> binding.marketplacePage"))
-        assertTrue(navigation.contains("if (tab == binding.tabProject) {\n            loadMarketplace()"))
+        assertTrue(
+            Regex("if \\(tab == binding\\.tabProject\\) \\{\\s+loadMarketplace\\(\\)")
+                .containsMatchIn(navigation)
+        )
         assertTrue(marketplaceChrome.contains("hideProjectTopTabs()"))
         assertTrue(marketplaceChrome.contains("binding.addButton.visibility = View.GONE"))
         assertFalse(marketplaceChrome.contains("showProjectTopTabs"))
@@ -87,6 +114,10 @@ class ProjectPlazaLayoutContractTest {
         val header = ByteBuffer.wrap(bytes, 16, 8).order(ByteOrder.BIG_ENDIAN)
         return header.int to header.int
     }
+
+    private fun sha256(path: Path): String = MessageDigest.getInstance("SHA-256")
+        .digest(Files.readAllBytes(path))
+        .joinToString("") { "%02x".format(it) }
 
     private fun repositoryRoot(): Path {
         val cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()

@@ -405,12 +405,12 @@ internal class MainMarketplaceActions(
                 }
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(85)).apply { topMargin = dp(6) })
         }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        addView(TextView(activity).apply {
-            text = "›"
-            gravity = Gravity.CENTER
+        addView(ImageView(activity).apply {
+            setImageResource(R.drawable.project_view_chevron)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setColorFilter(Color.parseColor("#454545"))
             background = rect("#D9D9D9", 18)
-            setTextColor(Color.parseColor("#454545"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 27f)
+            setPadding(dp(5), dp(5), dp(5), dp(5))
             contentDescription = "进入${project.displayTitle()}"
         }, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.END or Gravity.BOTTOM).apply {
             marginEnd = dp(19)
@@ -477,10 +477,11 @@ internal class MainMarketplaceActions(
                 setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
-        addView(TextView(activity).apply {
-            text = "›"; gravity = Gravity.END or Gravity.CENTER_VERTICAL; contentDescription = "进入${project.displayTitle()}"
-            setPadding(0, 0, dp(3), 0)
-            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
+        addView(ImageView(activity).apply {
+            setImageResource(R.drawable.project_view_chevron)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(dp(8), dp(8), dp(3), dp(8))
+            contentDescription = "进入${project.displayTitle()}"
         }, LinearLayout.LayoutParams(dp(42), dp(48)))
     }
 
